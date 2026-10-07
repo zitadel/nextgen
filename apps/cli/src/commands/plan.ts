@@ -1,7 +1,7 @@
 import { consola } from "consola";
 
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
-import { connectTarget } from "../lib/target";
+import { connectEnvironment } from "../lib/environment";
 import {
   buildSyncPlan,
   collectPlanWarnings,
@@ -30,7 +30,7 @@ export default class Plan extends BaseCommand {
     const { cwd, env, isTTY, serverFlag, envName, envFile } = this.meta;
 
     // Verbatim: the plan diffs what it reads against the project's files.
-    const { client, projectId, server } = await connectTarget(
+    const { client, projectId, server } = await connectEnvironment(
       { cwd, env, serverFlag, envName, envFile },
       { verbatim: true },
     );

@@ -10,8 +10,8 @@ import (
 	ht "github.com/ogen-go/ogen/http"
 )
 
-func encodeAddAllowedOriginRequest(
-	req *AllowedOrigin,
+func encodeAddOriginRequest(
+	req *Origin,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -68,20 +68,6 @@ func encodeCreateAuthAttemptRequest(
 
 func encodeCreateBrandingRequest(
 	req *Branding,
-	r *http.Request,
-) error {
-	const contentType = "application/json"
-	e := new(jx.Encoder)
-	{
-		req.Encode(e)
-	}
-	encoded := e.Bytes()
-	ht.SetBody(r, bytes.NewReader(encoded), contentType)
-	return nil
-}
-
-func encodeCreateConfigurationReleaseRequest(
-	req *ConfigurationBundle,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -416,8 +402,8 @@ func encodeQueryUsersRequest(
 	return nil
 }
 
-func encodeRemoveAllowedOriginRequest(
-	req *RemoveAllowedOriginReq,
+func encodeRemoveOriginRequest(
+	req *RemoveOriginReq,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -430,8 +416,8 @@ func encodeRemoveAllowedOriginRequest(
 	return nil
 }
 
-func encodeRemoveOriginRequest(
-	req *RemoveOriginReq,
+func encodeRemovePreviewRequest(
+	req *RemovePreviewReq,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -458,8 +444,8 @@ func encodeRollbackDeploymentRequest(
 	return nil
 }
 
-func encodeSetProjectClassRequest(
-	req *SetProjectClassReq,
+func encodeSetProjectModeRequest(
+	req *SetProjectModeReq,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

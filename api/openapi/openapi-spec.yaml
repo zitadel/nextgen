@@ -54,10 +54,10 @@ tags:
 
       Assembling a release does not deploy it: the same release can later be
       run on any number of targets unchanged.
-  - name: Origins
+  - name: Previews
     description: |
-      The live preview URLs of a project. A row per URL admits requests from
-      it until it expires; patterns on the project only bound what a preview
+      The live preview URLs of a project. A preview admits requests from its
+      URL until it expires; patterns on the project only bound what a preview
       deploy may register.
   - name: Grants
     description: |
@@ -135,12 +135,12 @@ paths:
     $ref: endpoints/projects/query/methods.yaml
   /projects/{project_id}:
     $ref: endpoints/projects/by_id/methods.yaml
-  /projects/{project_id}/allowed_origins:
-    $ref: endpoints/projects/by_id/allowed_origins/methods.yaml
-  /projects/{project_id}/allowed_origins/remove:
-    $ref: endpoints/projects/by_id/allowed_origins/remove/methods.yaml
-  /projects/{project_id}/class:
-    $ref: endpoints/projects/by_id/class/methods.yaml
+  /projects/{project_id}/origins:
+    $ref: endpoints/projects/by_id/origins/methods.yaml
+  /projects/{project_id}/origins/remove:
+    $ref: endpoints/projects/by_id/origins/remove/methods.yaml
+  /projects/{project_id}/mode:
+    $ref: endpoints/projects/by_id/mode/methods.yaml
   /projects/{project_id}/claim/init:
     $ref: endpoints/projects/by_id/claim/init/methods.yaml
   /projects/{project_id}/claim/status:
@@ -173,10 +173,10 @@ paths:
     $ref: endpoints/teams/query/methods.yaml
   /teams/{team_id}:
     $ref: endpoints/teams/by_id/methods.yaml
-  /origins:
-    $ref: endpoints/origins/methods.yaml
-  /origins/remove:
-    $ref: endpoints/origins/remove/methods.yaml
+  /previews:
+    $ref: endpoints/previews/methods.yaml
+  /previews/remove:
+    $ref: endpoints/previews/remove/methods.yaml
   /branding:
     $ref: endpoints/branding/methods.yaml
   /branding/{id}:
@@ -197,8 +197,6 @@ paths:
     $ref: endpoints/releases/by_id/methods.yaml
   /releases/{release_id}/revoke:
     $ref: endpoints/releases/by_id/revoke/methods.yaml
-  /configuration-releases:
-    $ref: endpoints/configuration_releases/methods.yaml
   /grants:
     $ref: endpoints/grants/methods.yaml
   /grants/query:

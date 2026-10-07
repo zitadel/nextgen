@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -19,21 +20,33 @@ const (
 	// second waits for the first and then reads its rows as newest.
 	lockProjectStmt      = `SELECT id FROM zitadel_nextgen.projects WHERE id = $1 FOR UPDATE`
 	createDeploymentStmt = `INSERT INTO zitadel_nextgen.deployments` +
-		` (project_id, id, deploy_id, origin, release_id, metadata, deployed_at)` +
-		` VALUES ($1, $2, $3, $4, $5, $6, $7)`
-	deploymentQuery = `SELECT project_id, id, deploy_id, origin, release_id, metadata, deployed_at` +
-		` FROM zitadel_nextgen.deployments`
-	// The newest row per origin: no row of the same target is newer.
-	newestPerOrigin = `NOT EXISTS (SELECT 1 FROM zitadel_nextgen.deployments newer` +
-		` WHERE newer.project_id = zitadel_nextgen.deployments.project_id` +
-		` AND newer.origin = zitadel_nextgen.deployments.origin` +
-		` AND (newer.deployed_at > zitadel_nextgen.deployments.deployed_at` +
-		` OR (newer.deployed_at = zitadel_nextgen.deployments.deployed_at AND newer.id > zitadel_nextgen.deployments.id)))`
+		` (project_id, id, release_id, metadata, deployed_at) VALUES ($1, $2, $3, $4, $5)`
+	createDeploymentTargetStmt = `INSERT INTO zitadel_nextgen.deployment_targets` +
+		` (project_id, deployment_id, origin, release_id, deployed_at) VALUES ($1, $2, $3, $4, $5)`
+	deploymentQuery = `SELECT deployments.project_id, deployments.id, deployments.release_id,` +
+		` deployments.metadata, deployments.deployed_at FROM zitadel_nextgen.deployments`
+	// The operation one target serves: its newest target row, joined back to
+	// the operation. An optional release filter is appended before the order.
+	newestForOriginQuery = deploymentQuery +
+		` JOIN zitadel_nextgen.deployment_targets t ON t.project_id = deployments.project_id AND t.deployment_id = deployments.id` +
+		` WHERE t.project_id = $1 AND t.origin = $2`
+	newestForOriginOrder   = ` ORDER BY t.deployed_at DESC, t.deployment_id DESC LIMIT 1`
+	deploymentTargetsQuery = `SELECT deployment_id, origin FROM zitadel_nextgen.deployment_targets` +
+		` WHERE project_id = $1 AND deployment_id = ANY($2) ORDER BY deployment_id, origin`
+	// The newest target row per origin: no row of the same origin is newer.
+	liveTargetsQuery = `SELECT deployment_id, origin FROM zitadel_nextgen.deployment_targets t WHERE t.project_id = $1` +
+		` AND NOT EXISTS (SELECT 1 FROM zitadel_nextgen.deployment_targets newer` +
+		` WHERE newer.project_id = t.project_id AND newer.origin = t.origin` +
+		` AND (newer.deployed_at > t.deployed_at` +
+		` OR (newer.deployed_at = t.deployed_at AND newer.deployment_id > t.deployment_id)))` +
+		` ORDER BY origin`
 	createDeploymentVariableStmt = `INSERT INTO zitadel_nextgen.deployment_variables` +
 		` (project_id, deployment_id, name, value, is_secret) VALUES ($1, $2, $3, $4, $5)`
 	deploymentVariablesQuery = `SELECT project_id, deployment_id, name, value, is_secret` +
 		` FROM zitadel_nextgen.deployment_variables WHERE project_id = $1 AND deployment_id = $2 ORDER BY name`
 )
+
+var deploymentSchema = deployment.NewSchema("zitadel_nextgen.deployment_targets")
 
 type deploymentStatements struct{ statement }
 
@@ -47,74 +60,76 @@ func (ds deploymentStatements) LockProject(ctx context.Context, projectID string
 	return wrapError(ds.client.QueryRow(ctx, lockProjectStmt, projectID).Scan(&locked))
 }
 
-// CreateDeployments implements [service.DeploymentStatements].
+// CreateDeployment implements [service.DeploymentStatements].
 //
 // One deployed_at for the whole set, read from clock_timestamp() so a deploy
 // that waited on the project lock stamps after the one it waited for.
-func (ds deploymentStatements) CreateDeployments(ctx context.Context, rows []*domain.Deployment) error {
-	if len(rows) == 0 {
-		return nil
-	}
+func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment) error {
 	return withTransaction(ctx, ds.client, func(ctx context.Context, tx queryExecutor) error {
 		var stamp time.Time
 		if err := tx.QueryRow(ctx, `SELECT clock_timestamp()`).Scan(&stamp); err != nil {
 			return wrapError(err)
 		}
-		rsi := newResourceScopeStatements(tx)
-		for _, entity := range rows {
-			if err := ensureManagedID(&entity.ID, domain.PrefixDeployment); err != nil {
-				return err
-			}
-			metadata, err := deployment.MarshalMetadata(entity.Metadata)
-			if err != nil {
-				return err
-			}
-			if _, err := tx.Exec(ctx, createDeploymentStmt,
-				entity.ProjectID, entity.ID, entity.DeployID, entity.Origin, entity.ReleaseID, metadata, stamp,
+		if err := ensureManagedID(&entity.ID, domain.PrefixDeployment); err != nil {
+			return err
+		}
+		metadata, err := deployment.MarshalMetadata(entity.Metadata)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, createDeploymentStmt,
+			entity.ProjectID, entity.ID, entity.ReleaseID, metadata, stamp,
+		); err != nil {
+			return wrapError(err)
+		}
+		for _, target := range entity.Targets {
+			if _, err := tx.Exec(ctx, createDeploymentTargetStmt,
+				entity.ProjectID, entity.ID, target.Origin, entity.ReleaseID, stamp,
 			); err != nil {
 				return wrapError(err)
 			}
-			entity.DeployedAt = stamp.UTC()
-			if err := rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindDeployment, entity.ProjectID, entity.ID)); err != nil {
-				return err
-			}
 		}
-		return nil
+		entity.DeployedAt = stamp.UTC()
+		return newResourceScopeStatements(tx).UpsertResourceScope(ctx,
+			domain.NewResourceScope(domain.ResourceKindDeployment, entity.ProjectID, entity.ID))
 	})
 }
 
 // GetDeploymentByID implements [service.DeploymentStatements].
 func (ds deploymentStatements) GetDeploymentByID(ctx context.Context, projectID, id string) (*domain.Deployment, error) {
-	return ds.getOne(ctx, &database.ListOptions[domain.DeploymentField]{
+	var compiler statementCompiler
+	if err := compileRead(&compiler, deploymentQuery, &database.ListOptions[domain.DeploymentField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.DeploymentFieldProjectID), projectID),
 			database.Equal(database.Col(domain.DeploymentFieldID), id),
 		),
-	})
+	}, deploymentSchema); err != nil {
+		return nil, err
+	}
+	return ds.getOne(ctx, compiler.String(), compiler.args...)
 }
 
 // NewestDeployment implements [service.DeploymentStatements].
 func (ds deploymentStatements) NewestDeployment(ctx context.Context, projectID, origin string) (*domain.Deployment, error) {
-	return ds.getOne(ctx, deployment.NewestOf(projectID, origin, nil))
+	return ds.getOne(ctx, newestForOriginQuery+newestForOriginOrder, projectID, origin)
 }
 
 // NewestDeploymentOfRelease implements [service.DeploymentStatements].
 func (ds deploymentStatements) NewestDeploymentOfRelease(ctx context.Context, projectID, origin, releaseID string) (*domain.Deployment, error) {
-	return ds.getOne(ctx, deployment.NewestOf(projectID, origin, &releaseID))
+	return ds.getOne(ctx, newestForOriginQuery+` AND t.release_id = $3`+newestForOriginOrder, projectID, origin, releaseID)
 }
 
-func (ds deploymentStatements) getOne(ctx context.Context, opts *database.ListOptions[domain.DeploymentField]) (*domain.Deployment, error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, deploymentQuery, opts, deployment.Schema); err != nil {
-		return nil, err
-	}
-	rows, err := ds.client.Query(ctx, compiler.String(), compiler.args...)
+func (ds deploymentStatements) getOne(ctx context.Context, query string, args ...any) (*domain.Deployment, error) {
+	rows, err := ds.client.Query(ctx, query, args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}
 	entity, err := pgx.CollectExactlyOneRow(rows, scanDeployment)
 	if err != nil {
 		return nil, wrapError(err)
+	}
+	if err := ds.loadTargets(ctx, entity.ProjectID, []*domain.Deployment{entity}); err != nil {
+		return nil, err
 	}
 	return entity, nil
 }
@@ -127,36 +142,72 @@ func (ds deploymentStatements) GetDeploymentsByIDs(ctx context.Context, projectI
 	var compiler statementCompiler
 	if err := compileRead(&compiler, deploymentQuery, &database.ListOptions[domain.DeploymentField]{
 		Filter: deployment.ByIDs(projectID, ids),
-	}, deployment.Schema); err != nil {
+	}, deploymentSchema); err != nil {
 		return nil, err
 	}
-
-	rows, err := ds.client.Query(ctx, compiler.String(), compiler.args...)
+	items, err := ds.collect(ctx, compiler.String(), compiler.args...)
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, err
 	}
-	items, err := pgx.CollectRows(rows, scanDeployment)
-	if err != nil {
-		return nil, wrapError(err)
+	if err := ds.loadTargets(ctx, projectID, items); err != nil {
+		return nil, err
 	}
 	return items, nil
 }
 
 // ListLiveDeployments implements [service.DeploymentStatements].
 func (ds deploymentStatements) ListLiveDeployments(ctx context.Context, projectID string) ([]*domain.Deployment, error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, deploymentQuery, &database.ListOptions[domain.DeploymentField]{
-		Filter: database.Equal(database.Col(domain.DeploymentFieldProjectID), projectID),
-		Pagination: database.Page[domain.DeploymentField]{
-			OrderBy: database.OrderBy[domain.DeploymentField]{
-				Columns:   []database.Column[domain.DeploymentField]{database.Col(domain.DeploymentFieldOrigin)},
-				Direction: database.OrderAsc,
-			},
-		},
-	}, deployment.Schema, newestPerOrigin); err != nil {
+	pairs, err := ds.collectTargets(ctx, liveTargetsQuery, projectID)
+	if err != nil {
 		return nil, err
 	}
-	rows, err := ds.client.Query(ctx, compiler.String(), compiler.args...)
+	ids := make([]string, 0, len(pairs))
+	for _, pair := range pairs {
+		if !slices.Contains(ids, pair.DeploymentID) {
+			ids = append(ids, pair.DeploymentID)
+		}
+	}
+	var compiler statementCompiler
+	if err := compileRead(&compiler, deploymentQuery, &database.ListOptions[domain.DeploymentField]{
+		Filter:     deployment.ByIDs(projectID, ids),
+		Pagination: database.Page[domain.DeploymentField]{OrderBy: deployment.NewestFirst()},
+	}, deploymentSchema); err != nil {
+		return nil, err
+	}
+	items, err := ds.collect(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, err
+	}
+	deployment.AttachTargets(items, pairs)
+	return items, nil
+}
+
+// ListDeployments implements [service.DeploymentStatements].
+func (ds deploymentStatements) ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
+	var compiler statementCompiler
+	if err := compileList(ctx, &compiler, deploymentQuery, filter, deploymentSchema, "zitadel_nextgen.deployments", "id"); err != nil {
+		return nil, err
+	}
+	items, err := ds.collect(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) > 0 {
+		if err := ds.loadTargets(ctx, items[0].ProjectID, items); err != nil {
+			return nil, err
+		}
+	}
+	nextCursor := pagination.MarshalNext(
+		filter.Pagination.OrderBy,
+		items,
+		deploymentSchema,
+		filter.Pagination.Limit,
+	)
+	return &database.ListResult[*domain.Deployment]{Items: items, NextCursor: nextCursor}, nil
+}
+
+func (ds deploymentStatements) collect(ctx context.Context, query string, args ...any) ([]*domain.Deployment, error) {
+	rows, err := ds.client.Query(ctx, query, args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}
@@ -167,31 +218,37 @@ func (ds deploymentStatements) ListLiveDeployments(ctx context.Context, projectI
 	return items, nil
 }
 
-// ListDeployments implements [service.DeploymentStatements].
-func (ds deploymentStatements) ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
-	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, deploymentQuery, filter, deployment.Schema, "zitadel_nextgen.deployments", "id"); err != nil {
-		return nil, err
+// loadTargets attaches every target row of the listed operations.
+func (ds deploymentStatements) loadTargets(ctx context.Context, projectID string, items []*domain.Deployment) error {
+	if len(items) == 0 {
+		return nil
 	}
+	ids := make([]string, len(items))
+	for i, item := range items {
+		ids[i] = item.ID
+	}
+	pairs, err := ds.collectTargets(ctx, deploymentTargetsQuery, projectID, ids)
+	if err != nil {
+		return err
+	}
+	deployment.AttachTargets(items, pairs)
+	return nil
+}
 
-	rows, err := ds.client.Query(ctx, compiler.String(), compiler.args...)
+func (ds deploymentStatements) collectTargets(ctx context.Context, query string, args ...any) ([]deployment.TargetRow, error) {
+	rows, err := ds.client.Query(ctx, query, args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}
-
-	items, err := pgx.CollectRows(rows, scanDeployment)
+	pairs, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (deployment.TargetRow, error) {
+		var pair deployment.TargetRow
+		err := row.Scan(&pair.DeploymentID, &pair.Origin)
+		return pair, err
+	})
 	if err != nil {
 		return nil, wrapError(err)
 	}
-
-	nextCursor := pagination.MarshalNext(
-		filter.Pagination.OrderBy,
-		items,
-		deployment.Schema,
-		filter.Pagination.Limit,
-	)
-
-	return &database.ListResult[*domain.Deployment]{Items: items, NextCursor: nextCursor}, nil
+	return pairs, nil
 }
 
 // CreateDeploymentVariables implements [service.DeploymentStatements].
@@ -240,8 +297,6 @@ func scanDeployment(row pgx.CollectableRow) (*domain.Deployment, error) {
 	if err := row.Scan(
 		&scanned.ProjectID,
 		&scanned.ID,
-		&scanned.DeployID,
-		&scanned.Origin,
 		&scanned.ReleaseID,
 		&scanned.Metadata,
 		&scanned.DeployedAt,

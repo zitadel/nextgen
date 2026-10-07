@@ -10,7 +10,7 @@ type statements struct {
 	cryptoKeyStatements
 	jsonSchemaStatements
 	releaseStatements
-	originStatements
+	previewStatements
 	idpConnectionStatements
 	idpIdentityLinkStatements
 	deploymentStatements
@@ -49,7 +49,7 @@ func newStatements(db queryExecutor) statements {
 		cryptoKeyStatements:           newCryptoKeyStatements(db),
 		jsonSchemaStatements:          newJSONSchemaStatements(db),
 		releaseStatements:             newReleaseStatements(db),
-		originStatements:              newOriginStatements(db),
+		previewStatements:             newPreviewStatements(db),
 		idpConnectionStatements:       newIDPConnectionStatements(db),
 		idpIdentityLinkStatements:     newIDPIdentityLinkStatements(db),
 		deploymentStatements:          newDeploymentStatements(db),

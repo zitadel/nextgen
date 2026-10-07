@@ -472,7 +472,7 @@ export default class Setup extends BaseCommand {
     // where the engine resolves the connection's `${{ NAME }}` from, against
     // Zitadel Cloud as much as against a local server. A refusal is reported
     // rather than failing setup: everything else is already provisioned, and
-    // `vars set` publishes it later.
+    // `variable set` publishes it later.
     // One outcome per provider, keyed by slug: the summary reports each
     // separately, because one provider's publish can land while another's does
     // not, and telling the developer "the secret did not reach the project"
@@ -803,11 +803,11 @@ function dryRunProject(issuer: string): CreateProject201 {
   return {
     id: "dry-run-0000",
     name: "dry-run",
-    class: "sandbox",
+    mode: "sandbox",
     project_secret: "sk_proj_dry_run_full",
     preview_secret: "sk_proj_dry_run_preview",
     preview_token: "sk_proj_dry_run_preview_token",
-    allowed_origins: [{ pattern: issuer, kind: "primary" }],
+    origins: [{ pattern: issuer, kind: "primary" }],
     created_at: "2026-04-21T14:03:11.000Z",
   };
 }
@@ -820,7 +820,7 @@ function dryRunProject(issuer: string): CreateProject201 {
  * a run that named a provider on the command line is scripted, and stopping
  * to ask would hang it.
  *
- * The secret is never a flag, following `vars set`: it cannot reach
+ * The secret is never a flag, following `variable set`: it cannot reach
  * shell history, a process listing or a CI log. Only a scripted run reads it
  * from stdin — an interactive one is asked, and consuming stdin there would
  * leave the wizard's own prompts reading a stream already at EOF. A terminal
@@ -1085,7 +1085,7 @@ async function createProjectWithLocalHint(
     // requests the dev proxy forwards from it.
     return await client.createProject({
       name: projectName,
-      allowed_origins: [{ pattern: issuer, kind: "primary" }],
+      origins: [{ pattern: issuer, kind: "primary" }],
       seed_defaults: false,
     });
   } catch (error) {

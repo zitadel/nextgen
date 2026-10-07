@@ -211,7 +211,7 @@ func (s *variableService) ResolveForDeploy(ctx context.Context, projectID string
 	if preview {
 		for _, v := range resolved {
 			if v.IsSecret && v.AppliesTo != domain.VariableAppliesToPreview {
-				warnings = append(warnings, v.Name+" has no preview value; serving the production one. Set one: zitadel vars set "+v.Name+" --secret --preview")
+				warnings = append(warnings, v.Name+" has no preview value; serving the production one. Set one: zitadel variable set "+v.Name+" --secret --preview")
 			}
 		}
 	}

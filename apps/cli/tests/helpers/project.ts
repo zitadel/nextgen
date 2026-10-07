@@ -312,7 +312,7 @@ export class ScaffoldedApp {
   setVariable(name: string, value: string, { secret = false } = {}): Promise<CliResult> {
     return this.pipingStdin(value, () =>
       this.cli([
-        "vars",
+        "variable",
         "set",
         name,
         "--json",
@@ -322,11 +322,11 @@ export class ScaffoldedApp {
   }
 
   getVariable(name: string): Promise<CliResult> {
-    return this.cli(["vars", "get", name, "--json"]);
+    return this.cli(["variable", "get", name, "--json"]);
   }
 
   deleteVariable(name: string): Promise<CliResult> {
-    return this.cli(["vars", "rm", name, "--force", "--json"]);
+    return this.cli(["variable", "rm", name, "--force", "--json"]);
   }
 
   /** The providers the platform has registered. */
@@ -358,8 +358,8 @@ export class ScaffoldedApp {
    * anything an environment holds.
    */
   async projectVariables(): Promise<ProjectVariable[]> {
-    const result = await this.cli(["vars", "list", "--json"]);
-    expect(result, "vars list should have succeeded").toSucceed();
+    const result = await this.cli(["variable", "list", "--json"]);
+    expect(result, "variable list should have succeeded").toSucceed();
     return this.envelopeOf<{ variables: ProjectVariable[] }>(result).data.variables;
   }
 

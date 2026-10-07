@@ -17,7 +17,7 @@ import (
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 )
 
-func TestProjectCreate_EventPayloadIncludesAllowedOrigins(t *testing.T) {
+func TestProjectCreate_EventPayloadIncludesOrigins(t *testing.T) {
 	t.Parallel()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
@@ -64,7 +64,7 @@ func TestProjectCreate_EventPayloadIncludesAllowedOrigins(t *testing.T) {
 	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t))
 
 	ctx := middleware.WithRequestIDContext(t.Context(), "req_create")
-	got, err := svc.Create(ctx, "Acme", []domain.AllowedOrigin{{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview}}, true)
+	got, err := svc.Create(ctx, "Acme", []domain.Origin{{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview}}, true)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 
@@ -85,8 +85,8 @@ func TestProjectCreate_EventPayloadIncludesAllowedOrigins(t *testing.T) {
 	var payload domain.ProjectPayload
 	require.NoError(t, json.Unmarshal(created.Payload, &payload))
 	assert.Equal(t, "Acme", payload.Name)
-	assert.Equal(t, []string{"preview https://*-acme.vercel.app"}, payload.AllowedOrigins)
-	assert.Equal(t, "sandbox", payload.Class)
+	assert.Equal(t, []string{"preview https://*-acme.vercel.app"}, payload.Origins)
+	assert.Equal(t, "sandbox", payload.Mode)
 }
 
 func TestProjectUpdate_EventPayloadNameDelta(t *testing.T) {
@@ -128,7 +128,7 @@ func TestProjectUpdate_EventPayloadNameDelta(t *testing.T) {
 	var payload domain.ProjectPayload
 	require.NoError(t, json.Unmarshal(gotEvent.Payload, &payload))
 	assert.Equal(t, "renamed", payload.Name)
-	assert.Nil(t, payload.AllowedOrigins)
+	assert.Nil(t, payload.Origins)
 	assert.Nil(t, payload.PasswordHashAlgorithm, "a rename says nothing about hashing")
 }
 

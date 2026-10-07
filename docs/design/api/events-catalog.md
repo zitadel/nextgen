@@ -129,7 +129,7 @@ tracked below.
 | ReleaseService revoke | `release.revoked` | `admin` | `release` | `revoked_at` |
 | IDPConnectionService create (new slug) | `idp.created` | `admin` | `idp_connection` | `slug`, `protocol`, `template`, `display_name`, `revision_id` |
 | IDPConnectionService revise (existing slug) | `idp.updated` | `admin` | `idp_connection` | `revision_id`; delta: `display_name`, `template` (when changed) |
-| DeploymentService create and rollback (one event per target row) | `deployment.created` | `admin` | `deployment` | `origin`, `deploy_id`, `release_id`, `reason`, `message`, `rollback_of` |
+| DeploymentService create and rollback (one event per deployment) | `deployment.created` | `admin` | `deployment` | `origins`, `release_id`, `reason`, `message`, `rollback_of` |
 | Project create seed `CreateAuthzAssignment` (sk_proj) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService create (`CreateAuthzAssignment` for user/team on project.viewer, editor, or admin) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService revoke (`RevokeAuthzAssignment`) | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |

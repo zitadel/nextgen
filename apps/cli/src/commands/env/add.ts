@@ -24,7 +24,7 @@ type AllowedEntry = {
  * `zitadel env add` — bind a second environment to a project: create one on
  * the server, or bind an id a teammate sent over, write the
  * `.env.<name>.local` file the environment is, and allow the origins it will
- * serve. The allowlist is project state; collecting it here is the one moment
+ * serve. Origins are project state; collecting them here is the one moment
  * a person holds the project secret and is setting the project up anyway.
  */
 export default class EnvAdd extends BaseCommand {
@@ -43,7 +43,7 @@ export default class EnvAdd extends BaseCommand {
     name: Flags.string({ description: "The name for a project this command creates." }),
     origin: Flags.string({
       multiple: true,
-      description: "A production origin to allow (primary). Repeatable.",
+      description: "A primary origin: a hostname the environment serves. Repeatable.",
     }),
     preview: Flags.string({
       multiple: true,
@@ -95,7 +95,7 @@ export default class EnvAdd extends BaseCommand {
       return this.emit({
         status: "skipped",
         reason: "dry-run",
-        data: { environment: envName, server, project_id: projectId, file, allowed_origins: wanted },
+        data: { environment: envName, server, project_id: projectId, file, origins: wanted },
       });
     }
 
@@ -109,10 +109,10 @@ export default class EnvAdd extends BaseCommand {
     } else {
       const created = await createZitadelClient({ baseUrl: server }).createProject({
         name: projectName ?? envName,
-        allowed_origins: [],
+        origins: [],
         seed_defaults: false,
       });
-      consola.success(`created ${created.id}   class=${created.class}`);
+      consola.success(`created ${created.id}   mode=${created.mode}`);
       projectId = created.id;
       secret = created.project_secret;
       values = {
@@ -159,12 +159,12 @@ export default class EnvAdd extends BaseCommand {
         ? []
         : [
             publicCliCommand(
-              `allowlist add https://app.example.com --kind primary --env ${envName}`,
+              `origin add https://app.example.com --kind primary --env ${envName}`,
               cliVersion,
             ),
           ]),
       ...deferred.map((entry) =>
-        publicCliCommand(`allowlist add '${entry.pattern}' --kind ${entry.kind} --env ${envName}`, cliVersion),
+        publicCliCommand(`origin add '${entry.pattern}' --kind ${entry.kind} --env ${envName}`, cliVersion),
       ),
       publicCliCommand(`deploy --env ${envName}`, cliVersion),
       publicCliCommand(`claim --env ${envName}`, cliVersion),
@@ -198,7 +198,7 @@ export default class EnvAdd extends BaseCommand {
         project_id: projectId,
         file,
         keys: Object.keys(values),
-        allowed_origins: allowed,
+        origins: allowed,
         next_commands: next,
       },
       pretty,
@@ -211,7 +211,7 @@ async function allowOrigin(
   projectId: string,
   entry: { pattern: string; kind: OriginKind },
 ): Promise<AllowedEntry> {
-  const added = await client.addAllowedOrigin(projectId, entry);
+  const added = await client.addOrigin(projectId, entry);
   return { pattern: added.pattern, kind: added.kind, check: added.check };
 }
 
@@ -225,7 +225,7 @@ function checkLine(entry: AllowedEntry): string {
  * The origins an interactive run collects: the production URL, which nothing
  * on disk knows, and the preview pattern, proposed from the deploy platform
  * the repository is wired to and confirmed rather than assumed. Either may be
- * skipped; `allowlist add` is the same operation later.
+ * skipped; `origin add` is the same operation later.
  */
 async function askOrigins(cwd: string): Promise<Array<{ pattern: string; kind: OriginKind }>> {
   const entries: Array<{ pattern: string; kind: OriginKind }> = [];

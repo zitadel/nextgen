@@ -1109,7 +1109,7 @@ describe("other resources", () => {
 
 describe("configuration resources are read-only", () => {
   it("exposes only list and get for every configuration topic", () => {
-    for (const topic of ["schemas", "releases", "flow-definitions", "branding"]) {
+    for (const topic of ["schemas", "release", "flow-definitions", "branding"]) {
       const resource = RESOURCES[topic as keyof typeof RESOURCES];
       expect(resource, topic).toBeDefined();
       expect(Object.keys(resource!), topic).toEqual(

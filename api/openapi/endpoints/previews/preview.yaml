@@ -1,0 +1,17 @@
+title: Preview
+type: object
+description: A live preview URL and when it stops being served.
+required:
+  - origin
+  - expires_at
+  - created_at
+properties:
+  origin:
+    type: string
+    example: https://acme-git-sso-acmeinc.vercel.app
+  expires_at:
+    type: string
+    format: date-time
+  created_at:
+    type: string
+    format: date-time

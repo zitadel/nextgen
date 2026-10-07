@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	createProjectStmt               = `INSERT INTO zitadel_nextgen.projects (id, name, allowed_origins, class, password_hash_policy) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at, updated_at`
-	updateProjectAllowedOriginsStmt = `UPDATE zitadel_nextgen.projects SET allowed_origins = $2, updated_at = now() WHERE id = $1 RETURNING updated_at`
-	updateProjectClassStmt          = `UPDATE zitadel_nextgen.projects SET class = $2, updated_at = now() WHERE id = $1 RETURNING updated_at`
+	createProjectStmt        = `INSERT INTO zitadel_nextgen.projects (id, name, origins, mode, password_hash_policy) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at, updated_at`
+	updateProjectOriginsStmt = `UPDATE zitadel_nextgen.projects SET origins = $2, updated_at = now() WHERE id = $1 RETURNING updated_at`
+	updateProjectModeStmt    = `UPDATE zitadel_nextgen.projects SET mode = $2, updated_at = now() WHERE id = $1 RETURNING updated_at`
 )
 
 type projectStatements struct{ statement }
@@ -34,7 +34,7 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 	if err := ensureManagedID(&project.ID, domain.PrefixProject); err != nil {
 		return err
 	}
-	origins, err := storageproject.MarshalAllowedOrigins(project.AllowedOrigins)
+	origins, err := storageproject.MarshalOrigins(project.Origins)
 	if err != nil {
 		return err
 	}
@@ -43,7 +43,7 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 		return err
 	}
 	return withTransaction(ctx, ps.client, func(ctx context.Context, tx queryExecutor) error {
-		if err := wrapError(tx.QueryRow(ctx, createProjectStmt, project.ID, project.Name, origins, project.Class.String(), policy).
+		if err := wrapError(tx.QueryRow(ctx, createProjectStmt, project.ID, project.Name, origins, project.Mode.String(), policy).
 			Scan(&project.ID, &project.CreatedAt, &project.UpdatedAt)); err != nil {
 			return err
 		}
@@ -64,7 +64,7 @@ func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) (b
 	return tag.RowsAffected() > 0, nil
 }
 
-const projectQuery = "SELECT id, name, allowed_origins, class, password_hash_policy, created_at, updated_at FROM zitadel_nextgen.projects"
+const projectQuery = "SELECT id, name, origins, mode, password_hash_policy, created_at, updated_at FROM zitadel_nextgen.projects"
 
 // GetProjectByID implements [service.ProjectStatements].
 func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*domain.Project, error) {
@@ -86,12 +86,12 @@ func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*dom
 	return project, nil
 }
 
-const updateProjectStmt = `UPDATE zitadel_nextgen.projects SET name = $2, updated_at = now() WHERE id = $1 RETURNING id, name, allowed_origins, class, password_hash_policy, created_at, updated_at`
+const updateProjectStmt = `UPDATE zitadel_nextgen.projects SET name = $2, updated_at = now() WHERE id = $1 RETURNING id, name, origins, mode, password_hash_policy, created_at, updated_at`
 
 const setProjectPasswordHashPolicyStmt = `UPDATE zitadel_nextgen.projects SET password_hash_policy = $2, updated_at = now() WHERE id = $1 RETURNING updated_at`
 
 // UpdateProject implements [service.ProjectStatements].
-// Only the name is updated; the allowlist and class have writes of their own.
+// Only the name is updated; the origins and mode have writes of their own.
 // The whole row is read back onto the project.
 func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.Project) error {
 	rows, err := ps.client.Query(ctx, updateProjectStmt, project.ID, project.Name)
@@ -106,20 +106,20 @@ func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.P
 	return nil
 }
 
-// UpdateProjectAllowedOrigins implements [service.ProjectStatements].
-func (ps projectStatements) UpdateProjectAllowedOrigins(ctx context.Context, projectID string, origins []domain.AllowedOrigin) error {
-	encoded, err := storageproject.MarshalAllowedOrigins(origins)
+// UpdateProjectOrigins implements [service.ProjectStatements].
+func (ps projectStatements) UpdateProjectOrigins(ctx context.Context, projectID string, origins []domain.Origin) error {
+	encoded, err := storageproject.MarshalOrigins(origins)
 	if err != nil {
 		return err
 	}
 	var updatedAt time.Time
-	return wrapError(ps.client.QueryRow(ctx, updateProjectAllowedOriginsStmt, projectID, encoded).Scan(&updatedAt))
+	return wrapError(ps.client.QueryRow(ctx, updateProjectOriginsStmt, projectID, encoded).Scan(&updatedAt))
 }
 
-// UpdateProjectClass implements [service.ProjectStatements].
-func (ps projectStatements) UpdateProjectClass(ctx context.Context, projectID string, class domain.ProjectClass) error {
+// UpdateProjectMode implements [service.ProjectStatements].
+func (ps projectStatements) UpdateProjectMode(ctx context.Context, projectID string, mode domain.ProjectMode) error {
 	var updatedAt time.Time
-	return wrapError(ps.client.QueryRow(ctx, updateProjectClassStmt, projectID, class.String()).Scan(&updatedAt))
+	return wrapError(ps.client.QueryRow(ctx, updateProjectModeStmt, projectID, mode.String()).Scan(&updatedAt))
 }
 
 // SetProjectPasswordHashPolicy implements [service.ProjectStatements].
@@ -168,17 +168,17 @@ func (ps projectStatements) scanProject(row pgx.CollectableRow) (*domain.Project
 	project := new(domain.Project)
 	var (
 		origins []byte
-		class   string
+		mode    string
 		policy  []byte
 	)
-	if err := row.Scan(&project.ID, &project.Name, &origins, &class, &policy, &project.CreatedAt, &project.UpdatedAt); err != nil {
+	if err := row.Scan(&project.ID, &project.Name, &origins, &mode, &policy, &project.CreatedAt, &project.UpdatedAt); err != nil {
 		return nil, err
 	}
-	allowed, err := storageproject.UnmarshalAllowedOrigins(origins)
+	allowed, err := storageproject.UnmarshalOrigins(origins)
 	if err != nil {
 		return nil, err
 	}
-	parsedClass, err := domain.ProjectClassString(class)
+	parsedMode, err := domain.ProjectModeString(mode)
 	if err != nil {
 		return nil, err
 	}
@@ -186,8 +186,8 @@ func (ps projectStatements) scanProject(row pgx.CollectableRow) (*domain.Project
 	if err != nil {
 		return nil, err
 	}
-	project.AllowedOrigins = allowed
-	project.Class = parsedClass
+	project.Origins = allowed
+	project.Mode = parsedMode
 	project.PasswordHashPolicy = decoded
 	return project, nil
 }
@@ -215,9 +215,9 @@ var projectSchema = database.NewSchema(map[domain.ProjectField]database.FieldBin
 		Accessor: func(p *domain.Project) any { return p.UpdatedAt },
 		Coerce:   database.CoerceTime,
 	},
-	domain.ProjectFieldClass: {
-		SQLName:  "class",
-		Accessor: func(p *domain.Project) any { return p.Class.String() },
+	domain.ProjectFieldMode: {
+		SQLName:  "mode",
+		Accessor: func(p *domain.Project) any { return p.Mode.String() },
 		Coerce:   database.CoerceString,
 	},
 })

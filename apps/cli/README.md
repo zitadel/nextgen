@@ -112,17 +112,19 @@ and agent UIs may display stderr package-manager progress together with stdout.
 - `zitadel deploy`: build a release from `.zitadel/` and deploy it to the
   project default and every primary origin
 - `zitadel preview`: in a platform build, deploy the release to this build's
-  preview URLs for a limited time (`preview rm <url>` retires one)
-- `zitadel deployments`: the deployment log, or `--live` for what every
+  preview URLs for a limited time (`preview list` shows them, `preview rm
+  <url>` retires one)
+- `zitadel deployment list`: the deployments, or `--live` for what every
   target serves
-- `zitadel rollback`: undo the newest deploy on every target it moved
-- `zitadel allowlist`: list, `add --kind primary|preview`, and `rm` the
-  project's allowed origin patterns
+- `zitadel deployment rollback`: undo the newest deployment on every target
+  it moved
+- `zitadel origin list|add|rm`: the project's origin patterns
+  (`add --kind primary|preview`)
 - `zitadel env`: show which server and project this directory resolves to;
   `env add <name>` binds another project through `.env.<name>.local`
 - `zitadel branding eject`: scaffold an editable login template from a design
 - `zitadel schemas list`: list the project's user schemas
-- `zitadel vars list|get|set|rm|resolve`: manage the project's variables and
+- `zitadel variable list|get|set|rm|resolve`: manage the project's variables and
   secrets; `--preview` addresses the value previews get
 - `zitadel eject`: remove what setup wrote (alias: `zitadel uninstall`)
 - `zitadel start|stop|logs|reset`: manage the local runtime
@@ -137,9 +139,6 @@ which ships in this package.
 <summary>Full command reference</summary>
 
 <!-- commands -->
-* [`zitadel allowlist`](#zitadel-allowlist)
-* [`zitadel allowlist add PATTERN`](#zitadel-allowlist-add-pattern)
-* [`zitadel allowlist rm PATTERN`](#zitadel-allowlist-rm-pattern)
 * [`zitadel apply`](#zitadel-apply)
 * [`zitadel autocomplete [SHELL]`](#zitadel-autocomplete-shell)
 * [`zitadel branding eject`](#zitadel-branding-eject)
@@ -149,7 +148,8 @@ which ships in this package.
 * [`zitadel commands`](#zitadel-commands)
 * [`zitadel console`](#zitadel-console)
 * [`zitadel deploy`](#zitadel-deploy)
-* [`zitadel deployments`](#zitadel-deployments)
+* [`zitadel deployment list`](#zitadel-deployment-list)
+* [`zitadel deployment rollback [DEPLOYMENT_ID]`](#zitadel-deployment-rollback-deployment_id)
 * [`zitadel doctor`](#zitadel-doctor)
 * [`zitadel eject`](#zitadel-eject)
 * [`zitadel env`](#zitadel-env)
@@ -168,20 +168,23 @@ which ships in this package.
 * [`zitadel idps get ID`](#zitadel-idps-get-id)
 * [`zitadel idps list`](#zitadel-idps-list)
 * [`zitadel logs`](#zitadel-logs)
+* [`zitadel origin add PATTERN`](#zitadel-origin-add-pattern)
+* [`zitadel origin list`](#zitadel-origin-list)
+* [`zitadel origin rm PATTERN`](#zitadel-origin-rm-pattern)
 * [`zitadel plan`](#zitadel-plan)
 * [`zitadel preview`](#zitadel-preview)
+* [`zitadel preview list`](#zitadel-preview-list)
 * [`zitadel preview rm URL`](#zitadel-preview-rm-url)
 * [`zitadel projects demote`](#zitadel-projects-demote)
 * [`zitadel projects get ID`](#zitadel-projects-get-id)
 * [`zitadel projects list`](#zitadel-projects-list)
 * [`zitadel projects promote`](#zitadel-projects-promote)
 * [`zitadel projects update ID`](#zitadel-projects-update-id)
-* [`zitadel releases get ID`](#zitadel-releases-get-id)
-* [`zitadel releases list`](#zitadel-releases-list)
-* [`zitadel releases revoke ID`](#zitadel-releases-revoke-id)
+* [`zitadel release get ID`](#zitadel-release-get-id)
+* [`zitadel release list`](#zitadel-release-list)
+* [`zitadel release revoke ID`](#zitadel-release-revoke-id)
 * [`zitadel reset`](#zitadel-reset)
 * [`zitadel resources`](#zitadel-resources)
-* [`zitadel rollback`](#zitadel-rollback)
 * [`zitadel schemas get SCHEMA`](#zitadel-schemas-get-schema)
 * [`zitadel schemas list`](#zitadel-schemas-list)
 * [`zitadel search`](#zitadel-search)
@@ -204,116 +207,13 @@ which ships in this package.
 * [`zitadel users get ID`](#zitadel-users-get-id)
 * [`zitadel users list`](#zitadel-users-list)
 * [`zitadel users update ID`](#zitadel-users-update-id)
-* [`zitadel vars get NAME`](#zitadel-vars-get-name)
-* [`zitadel vars list`](#zitadel-vars-list)
-* [`zitadel vars resolve`](#zitadel-vars-resolve)
-* [`zitadel vars rm NAME`](#zitadel-vars-rm-name)
-* [`zitadel vars set NAME`](#zitadel-vars-set-name)
+* [`zitadel variable get NAME`](#zitadel-variable-get-name)
+* [`zitadel variable list`](#zitadel-variable-list)
+* [`zitadel variable resolve`](#zitadel-variable-resolve)
+* [`zitadel variable rm NAME`](#zitadel-variable-rm-name)
+* [`zitadel variable set NAME`](#zitadel-variable-set-name)
 * [`zitadel version`](#zitadel-version)
 * [`zitadel which`](#zitadel-which)
-
-## `zitadel allowlist`
-
-List the project's allowed origin patterns.
-
-```
-USAGE
-  $ zitadel allowlist [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n] [--dry-run]
-    [--verbose] [--debug] [--telemetry] [--plain]
-
-FLAGS
-  -c, --cwd=<value>       Project directory to operate on.
-  -e, --env=<value>       Environment whose .env.<name>.local file binds the server and project.
-  -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>    Override the resolved server URL.
-      --debug             Debug logging.
-      --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read the server and project from this file instead of the .env convention.
-      --plain             Tab-separated rows with no header, for piping.
-      --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
-      --verbose           Verbose logging.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  List the project's allowed origin patterns.
-
-EXAMPLES
-  $ zitadel allowlist
-
-  $ zitadel allowlist --json
-```
-
-## `zitadel allowlist add PATTERN`
-
-Add an allowed origin pattern to the project.
-
-```
-USAGE
-  $ zitadel allowlist add PATTERN --kind primary|preview [--json] [-c <value>] [-s <value>] [-e <value>]
-    [--env-file <value>] [-n] [--dry-run] [--verbose] [--debug] [--telemetry]
-
-ARGUMENTS
-  PATTERN  An origin, or a pattern with one `*` label.
-
-FLAGS
-  -c, --cwd=<value>       Project directory to operate on.
-  -e, --env=<value>       Environment whose .env.<name>.local file binds the server and project.
-  -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>    Override the resolved server URL.
-      --debug             Debug logging.
-      --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read the server and project from this file instead of the .env convention.
-      --kind=<option>     (required) primary admits requests; preview only bounds what a preview deploy may register.
-                          <options: primary|preview>
-      --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
-      --verbose           Verbose logging.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Add an allowed origin pattern to the project.
-
-EXAMPLES
-  $ zitadel allowlist add https://app.acme.com --kind primary
-
-  $ zitadel allowlist add 'https://*-acmeinc.vercel.app' --kind preview
-```
-
-## `zitadel allowlist rm PATTERN`
-
-Remove an allowed origin pattern from the project.
-
-```
-USAGE
-  $ zitadel allowlist rm PATTERN [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n]
-    [--dry-run] [--verbose] [--debug] [--telemetry]
-
-ARGUMENTS
-  PATTERN  The pattern to remove, exactly as listed.
-
-FLAGS
-  -c, --cwd=<value>       Project directory to operate on.
-  -e, --env=<value>       Environment whose .env.<name>.local file binds the server and project.
-  -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>    Override the resolved server URL.
-      --debug             Debug logging.
-      --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read the server and project from this file instead of the .env convention.
-      --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
-      --verbose           Verbose logging.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Remove an allowed origin pattern from the project.
-
-EXAMPLES
-  $ zitadel allowlist rm https://old.acme.com
-```
 
 ## `zitadel apply`
 
@@ -606,14 +506,14 @@ EXAMPLES
   $ zitadel deploy --origin https://staging.acme.com
 ```
 
-## `zitadel deployments`
+## `zitadel deployment list`
 
-List the deployment log, or what every target serves with --live.
+List the deployments, or what every target serves with --live.
 
 ```
 USAGE
-  $ zitadel deployments [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n] [--dry-run]
-    [--verbose] [--debug] [--telemetry] [--live] [--origin <value>] [--deploy <value>] [--plain]
+  $ zitadel deployment list [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n] [--dry-run]
+    [--verbose] [--debug] [--telemetry] [--live] [--origin <value>] [--plain]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -621,11 +521,10 @@ FLAGS
   -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
   -s, --server=<value>    Override the resolved server URL.
       --debug             Debug logging.
-      --deploy=<value>    The rows one deploy wrote.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read the server and project from this file instead of the .env convention.
-      --live              The newest row per target: what each one serves.
-      --origin=<value>    One target's history. Use 'default' for the project default.
+      --live              What each target serves right now, one line per target.
+      --origin=<value>    The deployments that touched one target. Use 'default' for the project default.
       --plain             Tab-separated rows with no header, for piping.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
       --verbose           Verbose logging.
@@ -634,16 +533,54 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  List the deployment log, or what every target serves with --live.
+  List the deployments, or what every target serves with --live.
 
 EXAMPLES
-  $ zitadel deployments
+  $ zitadel deployment list
 
-  $ zitadel deployments --live
+  $ zitadel deployment list --live
 
-  $ zitadel deployments --origin https://app.acme.com
+  $ zitadel deployment list --origin https://app.acme.com
+```
 
-  $ zitadel deployments --deploy dpl_01KB3F8N2P9S5WQY
+## `zitadel deployment rollback [DEPLOYMENT_ID]`
+
+Undo the newest deployment, or go back to an earlier one by id.
+
+```
+USAGE
+  $ zitadel deployment rollback [DEPLOYMENT_ID] [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry] [--origin <value>] [-m <value>] [-f]
+
+ARGUMENTS
+  [DEPLOYMENT_ID]  Re-apply what this deployment set on every target it touched.
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment whose .env.<name>.local file binds the server and project.
+  -f, --force             Skip the confirmation. Required when non-interactive.
+  -m, --message=<value>   Summary recorded on the rollback.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>    Override the resolved server URL.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read the server and project from this file instead of the .env convention.
+      --origin=<value>    Narrow the rollback to one target ('default' for the project default).
+      --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
+      --verbose           Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Undo the newest deployment, or go back to an earlier one by id.
+
+EXAMPLES
+  $ zitadel deployment rollback
+
+  $ zitadel deployment rollback dep_01KB3F8N2P9S5WQV
+
+  $ zitadel deployment rollback --origin https://app.acme.com
 ```
 
 ## `zitadel doctor`
@@ -766,7 +703,7 @@ FLAGS
       --env-file=<value>    Read the server and project from this file instead of the .env convention.
       --force               Overwrite an existing .env.<name>.local.
       --name=<value>        The name for a project this command creates.
-      --origin=<value>...   A production origin to allow (primary). Repeatable.
+      --origin=<value>...   A primary origin: a hostname the environment serves. Repeatable.
       --preview=<value>...  A pattern the preview credential may register URLs under. Repeatable.
       --project=<value>     Bind this existing project instead of creating one.
       --[no-]telemetry      Send anonymous usage analytics. Disable with --no-telemetry.
@@ -1343,6 +1280,109 @@ DESCRIPTION
   Show local Zitadel server logs.
 ```
 
+## `zitadel origin add PATTERN`
+
+Add an origin pattern to the project.
+
+```
+USAGE
+  $ zitadel origin add PATTERN --kind primary|preview [--json] [-c <value>] [-s <value>] [-e <value>]
+    [--env-file <value>] [-n] [--dry-run] [--verbose] [--debug] [--telemetry]
+
+ARGUMENTS
+  PATTERN  An origin, or a pattern with one `*` label.
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment whose .env.<name>.local file binds the server and project.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>    Override the resolved server URL.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read the server and project from this file instead of the .env convention.
+      --kind=<option>     (required) primary admits requests; preview only bounds what a preview deploy may register.
+                          <options: primary|preview>
+      --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
+      --verbose           Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Add an origin pattern to the project.
+
+EXAMPLES
+  $ zitadel origin add https://app.acme.com --kind primary
+
+  $ zitadel origin add 'https://*-acmeinc.vercel.app' --kind preview
+```
+
+## `zitadel origin list`
+
+List the project's origin patterns.
+
+```
+USAGE
+  $ zitadel origin list [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n] [--dry-run]
+    [--verbose] [--debug] [--telemetry] [--plain]
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment whose .env.<name>.local file binds the server and project.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>    Override the resolved server URL.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read the server and project from this file instead of the .env convention.
+      --plain             Tab-separated rows with no header, for piping.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
+      --verbose           Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List the project's origin patterns.
+
+EXAMPLES
+  $ zitadel origin list
+
+  $ zitadel origin list --json
+```
+
+## `zitadel origin rm PATTERN`
+
+Remove an origin pattern from the project.
+
+```
+USAGE
+  $ zitadel origin rm PATTERN [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n]
+    [--dry-run] [--verbose] [--debug] [--telemetry]
+
+ARGUMENTS
+  PATTERN  The pattern to remove, exactly as listed.
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment whose .env.<name>.local file binds the server and project.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>    Override the resolved server URL.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read the server and project from this file instead of the .env convention.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
+      --verbose           Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Remove an origin pattern from the project.
+
+EXAMPLES
+  $ zitadel origin rm https://old.acme.com
+```
+
 ## `zitadel plan`
 
 Validate config without mutation and preview the sync diff.
@@ -1408,9 +1448,42 @@ EXAMPLES
   $ zitadel preview --strict
 ```
 
+## `zitadel preview list`
+
+List the live preview URLs and when each expires.
+
+```
+USAGE
+  $ zitadel preview list [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n] [--dry-run]
+    [--verbose] [--debug] [--telemetry] [--plain]
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment whose .env.<name>.local file binds the server and project.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>    Override the resolved server URL.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read the server and project from this file instead of the .env convention.
+      --plain             Tab-separated rows with no header, for piping.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
+      --verbose           Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List the live preview URLs and when each expires.
+
+EXAMPLES
+  $ zitadel preview list
+
+  $ zitadel preview list --json
+```
+
 ## `zitadel preview rm URL`
 
-Retire a preview URL; its deployment records are kept.
+Retire a preview URL; its deployments are kept.
 
 ```
 USAGE
@@ -1435,7 +1508,7 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Retire a preview URL; its deployment records are kept.
+  Retire a preview URL; its deployments are kept.
 
 EXAMPLES
   $ zitadel preview rm https://acme-git-sso-acmeinc.vercel.app
@@ -1443,7 +1516,7 @@ EXAMPLES
 
 ## `zitadel projects demote`
 
-Demote the project to class sandbox.
+Demote the project to sandbox mode.
 
 ```
 USAGE
@@ -1466,7 +1539,7 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Demote the project to class sandbox.
+  Demote the project to sandbox mode.
 
 EXAMPLES
   $ zitadel projects demote --env production --confirm
@@ -1556,7 +1629,7 @@ EXAMPLES
 
 ## `zitadel projects promote`
 
-Promote the project to class production.
+Promote the project to production mode.
 
 ```
 USAGE
@@ -1578,7 +1651,7 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Promote the project to class production.
+  Promote the project to production mode.
 
 EXAMPLES
   $ zitadel projects promote --env production
@@ -1627,13 +1700,13 @@ EXAMPLES
   $ zitadel projects update <id> --file ./project.json
 ```
 
-## `zitadel releases get ID`
+## `zitadel release get ID`
 
 Get one release by id.
 
 ```
 USAGE
-  $ zitadel releases get ID [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n] [--dry-run]
+  $ zitadel release get ID [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n] [--dry-run]
     [--verbose] [--debug] [--telemetry] [--fields <value>]
 
 ARGUMENTS
@@ -1659,18 +1732,18 @@ DESCRIPTION
   Get one release by id.
 
 EXAMPLES
-  $ zitadel releases get <id>
+  $ zitadel release get <id>
 
-  $ zitadel releases get <id> --json
+  $ zitadel release get <id> --json
 ```
 
-## `zitadel releases list`
+## `zitadel release list`
 
-List releases.
+List release.
 
 ```
 USAGE
-  $ zitadel releases list [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n] [--dry-run]
+  $ zitadel release list [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n] [--dry-run]
     [--verbose] [--debug] [--telemetry] [--limit <value>] [-a | --page-token <value>] [--fields <value>] [--plain]
 
 FLAGS
@@ -1694,21 +1767,21 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  List releases.
+  List release.
 
 EXAMPLES
-  $ zitadel releases list --json
+  $ zitadel release list --json
 
-  $ zitadel releases list --all --json
+  $ zitadel release list --all --json
 ```
 
-## `zitadel releases revoke ID`
+## `zitadel release revoke ID`
 
 Revoke a release so nothing serves it, pinned or not.
 
 ```
 USAGE
-  $ zitadel releases revoke ID [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n] [--dry-run]
+  $ zitadel release revoke ID [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n] [--dry-run]
     [--verbose] [--debug] [--telemetry]
 
 ARGUMENTS
@@ -1732,7 +1805,7 @@ DESCRIPTION
   Revoke a release so nothing serves it, pinned or not.
 
 EXAMPLES
-  $ zitadel releases revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+  $ zitadel release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1
 ```
 
 ## `zitadel reset`
@@ -1795,44 +1868,6 @@ EXAMPLES
   $ zitadel resources --json
 
   $ zitadel resources --json | jq -r '.data.resources[] | "\(.topic): \(.verbs | join(", "))"'
-```
-
-## `zitadel rollback`
-
-Undo the newest deploy, or go back to an earlier one with --to.
-
-```
-USAGE
-  $ zitadel rollback [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n] [--dry-run]
-    [--verbose] [--debug] [--telemetry] [--to <value>] [--origin <value>] [-m <value>] [-f]
-
-FLAGS
-  -c, --cwd=<value>       Project directory to operate on.
-  -e, --env=<value>       Environment whose .env.<name>.local file binds the server and project.
-  -f, --force             Skip the confirmation. Required when non-interactive.
-  -m, --message=<value>   Summary recorded on the rollback.
-  -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>    Override the resolved server URL.
-      --debug             Debug logging.
-      --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read the server and project from this file instead of the .env convention.
-      --origin=<value>    Narrow the rollback to one target ('default' for the project default).
-      --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
-      --to=<value>        Re-apply what this deploy set on every target it touched.
-      --verbose           Verbose logging.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Undo the newest deploy, or go back to an earlier one with --to.
-
-EXAMPLES
-  $ zitadel rollback
-
-  $ zitadel rollback --to dpl_01KB3F8N2P9S5WQV
-
-  $ zitadel rollback --origin https://app.acme.com
 ```
 
 ## `zitadel schemas get SCHEMA`
@@ -2728,13 +2763,13 @@ EXAMPLES
   $ zitadel users update <id> --file ./user.json
 ```
 
-## `zitadel vars get NAME`
+## `zitadel variable get NAME`
 
 Get one variable from the project.
 
 ```
 USAGE
-  $ zitadel vars get NAME [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n]
+  $ zitadel variable get NAME [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--preview]
 
 ARGUMENTS
@@ -2759,18 +2794,18 @@ DESCRIPTION
   Get one variable from the project.
 
 EXAMPLES
-  $ zitadel vars get GOOGLE_CLIENT_ID
+  $ zitadel variable get GOOGLE_CLIENT_ID
 
-  $ zitadel vars get GOOGLE_CLIENT_ID --preview --json
+  $ zitadel variable get GOOGLE_CLIENT_ID --preview --json
 ```
 
-## `zitadel vars list`
+## `zitadel variable list`
 
 List the project's variables and secrets.
 
 ```
 USAGE
-  $ zitadel vars list [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n] [--dry-run]
+  $ zitadel variable list [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n] [--dry-run]
     [--verbose] [--debug] [--telemetry] [--preview] [--plain]
 
 FLAGS
@@ -2793,18 +2828,18 @@ DESCRIPTION
   List the project's variables and secrets.
 
 EXAMPLES
-  $ zitadel vars list
+  $ zitadel variable list
 
-  $ zitadel vars list --json
+  $ zitadel variable list --json
 ```
 
-## `zitadel vars resolve`
+## `zitadel variable resolve`
 
 Show the variables a target is serving, frozen on its deployment.
 
 ```
 USAGE
-  $ zitadel vars resolve [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n] [--dry-run]
+  $ zitadel variable resolve [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n] [--dry-run]
     [--verbose] [--debug] [--telemetry] [--preview] [--origin <value>] [--plain]
 
 FLAGS
@@ -2828,18 +2863,18 @@ DESCRIPTION
   Show the variables a target is serving, frozen on its deployment.
 
 EXAMPLES
-  $ zitadel vars resolve
+  $ zitadel variable resolve
 
-  $ zitadel vars resolve --origin https://acme-git-sso-acmeinc.vercel.app
+  $ zitadel variable resolve --origin https://acme-git-sso-acmeinc.vercel.app
 ```
 
-## `zitadel vars rm NAME`
+## `zitadel variable rm NAME`
 
 Remove one variable from the project.
 
 ```
 USAGE
-  $ zitadel vars rm NAME [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n]
+  $ zitadel variable rm NAME [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--preview] [-f]
 
 ARGUMENTS
@@ -2865,18 +2900,18 @@ DESCRIPTION
   Remove one variable from the project.
 
 EXAMPLES
-  $ zitadel vars rm GOOGLE_CLIENT_ID
+  $ zitadel variable rm GOOGLE_CLIENT_ID
 
-  $ zitadel vars rm GOOGLE_CLIENT_SECRET --preview --force
+  $ zitadel variable rm GOOGLE_CLIENT_SECRET --preview --force
 ```
 
-## `zitadel vars set NAME`
+## `zitadel variable set NAME`
 
 Set one variable on the project.
 
 ```
 USAGE
-  $ zitadel vars set NAME [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n]
+  $ zitadel variable set NAME [--json] [-c <value>] [-s <value>] [-e <value>] [--env-file <value>] [-n]
     [--dry-run] [--verbose] [--debug] [--telemetry] [--preview] [--secret] [--as string|number|boolean]
 
 ARGUMENTS
@@ -2905,13 +2940,13 @@ DESCRIPTION
   Set one variable on the project.
 
 EXAMPLES
-  $ zitadel vars set GOOGLE_CLIENT_ID
+  $ zitadel variable set GOOGLE_CLIENT_ID
 
-  $ zitadel vars set GOOGLE_CLIENT_SECRET --secret < secret.txt
+  $ zitadel variable set GOOGLE_CLIENT_SECRET --secret < secret.txt
 
-  $ zitadel vars set GOOGLE_CLIENT_SECRET --secret --preview
+  $ zitadel variable set GOOGLE_CLIENT_SECRET --secret --preview
 
-  $ zitadel vars set SESSION_TTL --as number
+  $ zitadel variable set SESSION_TTL --as number
 ```
 
 ## `zitadel version`

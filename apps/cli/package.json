@@ -74,6 +74,24 @@
       },
       "sso": {
         "description": "Manage the identity providers users can sign in with."
+      },
+      "env": {
+        "description": "Bind and inspect the environments this directory resolves to."
+      },
+      "deployment": {
+        "description": "List deployments and roll one back."
+      },
+      "preview": {
+        "description": "Deploy to, list and retire preview URLs."
+      },
+      "origin": {
+        "description": "Manage the project's origin patterns."
+      },
+      "variable": {
+        "description": "Manage the project's variables and secrets."
+      },
+      "release": {
+        "description": "Inspect and revoke releases."
       }
     }
   },

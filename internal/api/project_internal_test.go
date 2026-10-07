@@ -22,10 +22,10 @@ type stubProjectService struct {
 	created *domain.Project
 }
 
-func (s stubProjectService) Create(context.Context, string, []domain.AllowedOrigin, bool) (*domain.Project, error) {
+func (s stubProjectService) Create(context.Context, string, []domain.Origin, bool) (*domain.Project, error) {
 	return s.created, nil
 }
-func (s stubProjectService) CreateWithID(context.Context, string, string, []domain.AllowedOrigin, bool) (*domain.Project, error) {
+func (s stubProjectService) CreateWithID(context.Context, string, string, []domain.Origin, bool) (*domain.Project, error) {
 	return s.created, nil
 }
 func (stubProjectService) Get(context.Context, string) (*domain.Project, error) {
@@ -44,13 +44,13 @@ func (stubProjectService) ListAuthorized(context.Context, service.ListAuthorized
 	return nil, domain.ErrSessionTokenInvalid()
 }
 func (stubProjectService) Delete(context.Context, string) error { return nil }
-func (stubProjectService) AddAllowedOrigin(context.Context, string, domain.AllowedOrigin) (*domain.OriginLintWarning, error) {
+func (stubProjectService) AddOrigin(context.Context, string, domain.Origin) (*domain.OriginLintWarning, error) {
 	return nil, domain.ErrProjectNotFound()
 }
-func (stubProjectService) RemoveAllowedOrigin(context.Context, string, string) error {
+func (stubProjectService) RemoveOrigin(context.Context, string, string) error {
 	return domain.ErrProjectNotFound()
 }
-func (stubProjectService) SetClass(context.Context, string, domain.ProjectClass, bool) (*domain.Project, error) {
+func (stubProjectService) SetMode(context.Context, string, domain.ProjectMode, bool) (*domain.Project, error) {
 	return nil, domain.ErrProjectNotFound()
 }
 
@@ -74,7 +74,7 @@ func TestProjectErrorResponse(t *testing.T) {
 		{"claim_window_expired", domain.ErrProjectClaimWindowExpired(), http.StatusGone},
 		{"origin_not_allowed", domain.ErrProjectOriginNotAllowed(nil), http.StatusForbidden},
 		{"preview_not_live", domain.ErrProjectPreviewNotLive(nil), http.StatusForbidden},
-		{"class_change_refused", domain.ErrProjectClassChangeRefused(nil), http.StatusBadRequest},
+		{"mode_change_refused", domain.ErrProjectModeChangeRefused(nil), http.StatusBadRequest},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

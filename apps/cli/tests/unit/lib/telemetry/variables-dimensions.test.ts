@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
  * is *called*, which is the part that reaches Mixpanel and cannot be renamed
  * later without breaking saved reports.
  */
-const commandsDir = join(import.meta.dirname, "../../../../src/commands/vars");
+const commandsDir = join(import.meta.dirname, "../../../../src/commands/variable");
 const agentsDoc = join(import.meta.dirname, "../../../../AGENTS.md");
 
 /** The dimension names each command passes to `recordTelemetry`. */
@@ -37,7 +37,7 @@ describe("variables telemetry dimensions", () => {
   it("records only dimensions the tracking plan documents", async () => {
     const documented = (await readFile(agentsDoc, "utf8"))
       .split("\n")
-      .find((line) => line.startsWith("- **vars**"));
+      .find((line) => line.startsWith("- **variable**"));
     expect(documented, "AGENTS.md has no variables entry in the tracking plan").toBeDefined();
 
     for (const [file, keys] of await recordedDimensions()) {

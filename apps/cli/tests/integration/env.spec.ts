@@ -117,16 +117,16 @@ describe("env", () => {
 
       expect(result).toSucceed();
       type Allowed = { pattern: string; kind: string; check: { status: string } };
-      const { data } = app.envelopeOf<{ allowed_origins: Allowed[]; next_commands: string[] }>(result);
-      expect(data.allowed_origins.map((entry) => [entry.pattern, entry.kind, entry.check.status])).toEqual([
+      const { data } = app.envelopeOf<{ origins: Allowed[]; next_commands: string[] }>(result);
+      expect(data.origins.map((entry) => [entry.pattern, entry.kind, entry.check.status])).toEqual([
         ["https://app.acme.com", "primary", "ok"],
         ["https://*-acmeinc.vercel.app", "preview", "ok"],
       ]);
-      expect(data.next_commands.some((cmd) => cmd.includes("allowlist add"))).toBe(false);
-      const listed = app.envelopeOf<{ allowed_origins: Array<{ pattern: string; kind: string }> }>(
-        await app.run(["allowlist", "--json", "--env", "production"]),
+      expect(data.next_commands.some((cmd) => cmd.includes("origin add"))).toBe(false);
+      const listed = app.envelopeOf<{ origins: Array<{ pattern: string; kind: string }> }>(
+        await app.run(["origin", "list", "--json", "--env", "production"]),
       );
-      expect(listed.data.allowed_origins).toEqual([
+      expect(listed.data.origins).toEqual([
         { pattern: "https://app.acme.com", kind: "primary" },
         { pattern: "https://*-acmeinc.vercel.app", kind: "preview" },
       ]);
@@ -168,9 +168,9 @@ describe("env", () => {
       ]);
 
       expect(result).toSucceed();
-      const { data } = app.envelopeOf<{ allowed_origins: unknown[]; next_commands: string[] }>(result);
-      expect(data.allowed_origins).toEqual([]);
-      expect(data.next_commands[0]).toContain("allowlist add 'https://staging.acme.com' --kind primary");
+      const { data } = app.envelopeOf<{ origins: unknown[]; next_commands: string[] }>(result);
+      expect(data.origins).toEqual([]);
+      expect(data.next_commands[0]).toContain("origin add 'https://staging.acme.com' --kind primary");
     });
 
     it("refuses to overwrite a bound environment without --force", async () => {

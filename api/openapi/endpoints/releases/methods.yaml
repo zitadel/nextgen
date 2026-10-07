@@ -2,21 +2,31 @@ post:
   operationId: createRelease
   summary: Create a release
   description: |
-    Bundles a release from revisions that already exist, supplied as
-    `(kind, revision_id)` pairs. No new revisions are allocated — use the
-    per-kind create endpoints for that, then pin the ids here.
+    Assembles a release in one of two forms.
 
-    Every referenced `revision_id` must exist in the project. Each one's handle
-    is read from the revision itself and recorded on the release, so a resource
+    `pointers` pins revisions that already exist, supplied as
+    `(kind, revision_id)` pairs. No new revisions are allocated — use the
+    per-kind create endpoints for that, then pin the ids here. Every
+    referenced `revision_id` must exist in the project; each one's handle is
+    read from the revision itself and recorded on the release, so a resource
     is always pinned under the identity it declares.
 
-    Creating a release does not deploy it. A release is environment-agnostic
-    and the same release can later be deployed to any number of environments
+    `bundle` takes the contents of `.zitadel/` as authored on disk. For every
+    resource in it the server compares the content against the project's
+    newest revision of the same handle: unchanged content reuses that
+    revision, changed content allocates a new one. Handle references between
+    resources (a flow definition's `user_schema` naming a schema by
+    `objectType`) resolve to the revisions the same bundle produced. The
+    caller keeps no state: the same `.zitadel/` builds the same release on
+    any project.
+
+    Creating a release does not deploy it. A release is not tied to a target
+    and the same release can later be deployed to any number of targets
     unchanged.
 
     Idempotent on the pinned set: metadata is excluded from the comparison, so
-    re-submitting the same revisions with a different `message` returns the
-    release that already pins them rather than creating a second one.
+    re-submitting the same content with a different `message` returns the
+    release that already pins it rather than creating a second one.
   tags:
     - Releases
   parameters:
@@ -61,6 +71,29 @@ post:
               pointers:
                 - kind: schema
                   revision_id: sch_01KWHF18816ZQE7F0N9WD3P2E4
+          bundle:
+            summary: Built from the files on disk
+            description: |
+              The CLI's form: one schema and one flow definition as
+              authored, the flow naming its schema by `objectType`.
+            value:
+              bundle:
+                schemas:
+                  - objectType: human-user
+                    type: object
+                    properties:
+                      email:
+                        type: string
+                        format: email
+                flow_definitions:
+                  - name: default-login
+                    user_schema: human-user
+                    purposes:
+                      - login
+                    steps: []
+              message: add phone_number to human-user
+              git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+              git_dirty: false
   responses:
     '200':
       description: |
@@ -69,7 +102,7 @@ post:
       content:
         application/json:
           schema:
-            $ref: release.yaml
+            $ref: create-release-response.yaml
           examples:
             reused:
               summary: The same set was submitted again under a new message
@@ -78,38 +111,39 @@ post:
                 returned — note the message it was originally created with,
                 not the one just submitted.
               value:
-                id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
-                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
-                content_hash: 9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
-                metadata:
-                  message: add phone_number to human-user
-                  git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
-                  git_dirty: false
-                  created_at: '2026-07-14T09:11:00Z'
-                  created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
-                  created_by_type: human
-                pointers:
+                release:
+                  id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                  project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                  content_hash: 9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
+                  metadata:
+                    message: add phone_number to human-user
+                    git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+                    git_dirty: false
+                    created_at: '2026-07-14T09:11:00Z'
+                    created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                    created_by_type: human
+                  pointers:
+                    - kind: schema
+                      handle: human-user
+                      revision_id: sch_01KWHF18816ZQE7F0N9WD3P2E4
+                    - kind: flow_definition
+                      handle: default-login
+                      revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
+                revisions:
                   - kind: schema
                     handle: human-user
-                    revision_id: https://example.com/schemas/default-human-user.json
-                  - kind: schema
-                    handle: machine-user
-                    revision_id: sch_01KWHF2XY6RN7F0N9WD3P2E4YM
+                    revision_id: sch_01KWHF18816ZQE7F0N9WD3P2E4
+                    created: false
                   - kind: flow_definition
                     handle: default-login
                     revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
-                  - kind: flow_definition
-                    handle: b2b-login
-                    revision_id: flowdef_01KWHG3B72K7M7F0N9WD3P2E4
-                  - kind: branding
-                    handle: default
-                    revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    created: false
     '201':
       description: The release was created successfully.
       content:
         application/json:
           schema:
-            $ref: release.yaml
+            $ref: create-release-response.yaml
           examples:
             created:
               summary: A newly assembled release
@@ -118,61 +152,88 @@ post:
                 revision it pins — `objectType` for a schema, `name` for a flow
                 definition, and `default` for branding.
               value:
-                id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
-                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
-                content_hash: 9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
-                metadata:
-                  message: add phone_number to human-user
-                  git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
-                  git_dirty: false
-                  created_at: '2026-07-14T09:11:00Z'
-                  created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
-                  created_by_type: human
-                pointers:
+                release:
+                  id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                  project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                  content_hash: 9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
+                  metadata:
+                    message: add phone_number to human-user
+                    git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+                    git_dirty: false
+                    created_at: '2026-07-14T09:11:00Z'
+                    created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                    created_by_type: human
+                  pointers:
+                    - kind: schema
+                      handle: human-user
+                      revision_id: https://example.com/schemas/default-human-user.json
+                    - kind: schema
+                      handle: machine-user
+                      revision_id: sch_01KWHF2XY6RN7F0N9WD3P2E4YM
+                    - kind: flow_definition
+                      handle: default-login
+                      revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
+                    - kind: flow_definition
+                      handle: b2b-login
+                      revision_id: flowdef_01KWHG3B72K7M7F0N9WD3P2E4
+                    - kind: branding
+                      handle: default
+                      revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
+                revisions:
                   - kind: schema
                     handle: human-user
                     revision_id: https://example.com/schemas/default-human-user.json
+                    created: false
                   - kind: schema
                     handle: machine-user
                     revision_id: sch_01KWHF2XY6RN7F0N9WD3P2E4YM
+                    created: false
                   - kind: flow_definition
                     handle: default-login
                     revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
+                    created: false
                   - kind: flow_definition
                     handle: b2b-login
                     revision_id: flowdef_01KWHG3B72K7M7F0N9WD3P2E4
+                    created: false
                   - kind: branding
                     handle: default
                     revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
-            createdByCI:
-              summary: Assembled from a pipeline, with a dirty tree
+                    created: false
+            builtFromBundle:
+              summary: Built from a bundle, one revision allocated
               description: |
-                A project secret names no user, so `created_by` is null while
-                `created_by_type` still reports `service` — the release was
-                assembled by a machine. `git_dirty` records that the working
-                tree had uncommitted changes, so the content does not
-                correspond exactly to `git_sha`.
+                The schema matched the project's newest revision and was
+                reused; the flow definition changed, so a new revision was
+                allocated and pinned.
               value:
-                id: rel_550e8400-e29b-41d4-a716-446655440000
-                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
-                content_hash: 9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
-                metadata:
-                  message: deploy from CI
-                  git_sha: 8d4e1a0f2b3c4d5e6f708192a3b4c5d6e7f80912
-                  git_dirty: true
-                  created_at: '2026-07-15T11:02:00Z'
-                  created_by: null
-                  created_by_type: service
-                pointers:
+                release:
+                  id: rel_550e8400-e29b-41d4-a716-446655440000
+                  project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                  content_hash: 9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
+                  metadata:
+                    message: deploy from CI
+                    git_sha: 8d4e1a0f2b3c4d5e6f708192a3b4c5d6e7f80912
+                    git_dirty: true
+                    created_at: '2026-07-15T11:02:00Z'
+                    created_by: null
+                    created_by_type: service
+                  pointers:
+                    - kind: schema
+                      handle: human-user
+                      revision_id: sch_01KWHF18816ZQE7F0N9WD3P2E4
+                    - kind: flow_definition
+                      handle: default-login
+                      revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
+                revisions:
                   - kind: schema
                     handle: human-user
                     revision_id: sch_01KWHF18816ZQE7F0N9WD3P2E4
+                    created: false
                   - kind: flow_definition
                     handle: default-login
                     revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
-                  - kind: branding
-                    handle: default
-                    revision_id: brnd_01KWH8Q5NZT7F0N9WD3P2E4YM6
+                    created: true
     default:
       $ref: createRelease-error-response.yaml
 

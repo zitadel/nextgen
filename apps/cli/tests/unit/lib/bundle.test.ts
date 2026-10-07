@@ -28,9 +28,9 @@ describe("buildConfigurationBundle", () => {
 
     const { body, resources } = await buildConfigurationBundle(cwd);
 
-    expect(body.schemas).toEqual([{ objectType: "user", type: "object" }]);
-    expect(body.flow_definitions).toEqual([{ name: "default", user_schema: "user" }]);
-    expect(body.brandings).toEqual([]);
+    expect(body.bundle.schemas).toEqual([{ objectType: "user", type: "object" }]);
+    expect(body.bundle.flow_definitions).toEqual([{ name: "default", user_schema: "user" }]);
+    expect(body.bundle.brandings).toEqual([]);
     expect(resources.map((r) => [r.kind, r.handle])).toEqual([
       ["schema", "user"],
       ["flow_definition", "default"],
@@ -50,7 +50,7 @@ describe("buildConfigurationBundle", () => {
 
     const { body } = await buildConfigurationBundle(cwd);
 
-    expect((body.flow_definitions as Array<{ user_schema: string }>)[0].user_schema).toBe("staff");
+    expect((body.bundle.flow_definitions as Array<{ user_schema: string }>)[0].user_schema).toBe("staff");
   });
 
   it("is empty for a directory without resources", async () => {

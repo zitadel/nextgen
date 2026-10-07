@@ -1,9 +1,0 @@
-type: string
-description: |
-  What the project is for. `sandbox` allows loopback origins, an empty
-  allowlist meaning allow-all, and any release named in a header. `production`
-  requires at least one pattern, refuses loopback and wildcard primaries, and
-  only serves a pinned release already deployed to the matched target.
-enum:
-  - sandbox
-  - production

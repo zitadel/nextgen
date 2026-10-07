@@ -417,14 +417,14 @@ docker --image <ref>` remains the explicit image override for debugging.
   `ZITADEL_PUBLISHABLE_KEY`. `env` prints what resolved and from where;
   `env list` the environments bound here; `env add <name>` writes
   `.env.<name>.local` for a new or existing (`--project <id>`) project and
-  allows the origins it will serve (`--origin <url>` for a production
+  allows the origins it will serve (`--origin <url>` for a primary
   hostname, `--preview <pattern>` for what a preview deploy may register;
   interactively it asks, proposing the preview pattern from the deploy
   platform's files). An environment is a client-side label: nothing on the
   server is keyed on it.
 - `deploy` — build a release from `.zitadel/` (the sync loop runs first, so
   unchanged content reuses its revisions) and deploy it to the project default
-  and every `primary` origin in one operation (`data.deploy_id`, `dpl_…`).
+  and every `primary` origin in one deployment (`data.deployment_id`, `dep_…`).
   `--origin <url>` narrows it to one primary origin and refuses a preview URL.
   The last line printed is `NEXT_PUBLIC_ZITADEL_RELEASE=sha256:<digest>` for a
   build that pins the release. Authenticates with the project secret.
@@ -432,24 +432,26 @@ docker --image <ref>` remains the explicit image override for debugging.
   URLs the platform reports (`VERCEL_BRANCH_URL`/`VERCEL_URL`,
   `DEPLOY_PRIME_URL`/`DEPLOY_URL`, `CF_PAGES_URL`) or `--origin <url>`, each
   for `--ttl` (default `7d`), renewed on every run. Each URL must match a
-  `preview` pattern of the allowlist. Outside a `preview`/`development`
-  environment it is a `skipped` no-op, so `zitadel preview && next build` is
-  the build command on every branch. With no `ZITADEL_PREVIEW_TOKEN` it warns
-  and exits 0 (`--strict` fails). `preview rm <url>` retires one URL early.
-- `deployments` — the log newest first (`--origin`, `--deploy <dpl_…>`), or
-  `--live` for the newest row per target with `expires_at` on previews.
-  `(default)` is the empty origin, what a caller with no `Origin` is served.
-- `rollback` — undo the newest deploy on every target it moved, or `--to
-  <dpl_…>`; `--origin` narrows to one target. Needs `--force` when
-  non-interactive. Targets the undone deploy created are left as they are and
-  named in `data.warnings`.
-- `allowlist` — the project's origin patterns with their kind; `allowlist add
+  `preview` pattern of the project's origins. Without `--origin`, outside a
+  `preview`/`development` environment it is a `skipped` no-op, so
+  `zitadel preview && next build` is the build command on every branch. With
+  no `ZITADEL_PREVIEW_TOKEN` it warns and exits 0 (`--strict` fails).
+  `preview list` shows the live previews; `preview rm <url>` retires one early.
+- `deployment list` — the log newest first, one line per deployment
+  (`--origin` narrows to the ones that moved it), or `--live` for one line
+  per target with `expires_at` on previews. `(default)` is the empty origin,
+  what a caller with no `Origin` is served.
+- `deployment rollback [dep_…]` — undo the newest deployment on every target
+  it moved, or the one named; `--origin` narrows to one target. Needs
+  `--force` when non-interactive. Targets the undone deployment created are
+  left as they are and named in `data.warnings`.
+- `origin list` — the project's origin patterns with their kind; `origin add
   <pattern> --kind primary|preview` reports the check the pattern passed
-  (`data.check`), `allowlist rm <pattern>` removes one. A `primary` pattern
+  (`data.check`), `origin rm <pattern>` removes one. A `primary` pattern
   admits requests; a `preview` pattern only bounds what `preview` may
-  register, and a request from such a URL is admitted by the live row alone.
-- `projects promote` / `projects demote --confirm` — set the project class
-  (`sandbox` or `production`). `releases revoke <id>` — refuse a release on
+  register, and a request from such a URL is admitted by the live preview alone.
+- `projects promote` / `projects demote --confirm` — set the project mode
+  (`sandbox` or `production`). `release revoke <id>` — refuse a release on
   every path, pinned or not.
 - `schemas list` — inspect the revision history of a user-schema, filtered by
   `--object-type` (e.g. `human-user`). Non-interactive/`--json` prints one row

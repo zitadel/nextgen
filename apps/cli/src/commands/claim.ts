@@ -12,7 +12,7 @@ import { ZitadelError } from "../lib/errors";
 import { isObject } from "../lib/json";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret, type ZitadelSecret } from "../lib/project";
-import { connectTarget } from "../lib/target";
+import { connectEnvironment } from "../lib/environment";
 
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
@@ -99,7 +99,7 @@ export default class Claim extends BaseCommand {
     await this.toMeta(flags);
     const { cwd, dryRun, nonInteractive, env, serverFlag, envName, envFile } = this.meta;
 
-    const { client, projectId, server } = await connectTarget({
+    const { client, projectId, server } = await connectEnvironment({
       cwd,
       env,
       serverFlag,

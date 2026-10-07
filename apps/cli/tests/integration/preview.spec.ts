@@ -11,11 +11,11 @@ const DEPLOY_URL = "https://acme-k3x9v2-acmeinc.vercel.app";
 
 async function anAppAllowingPreviews(): Promise<ScaffoldedApp> {
   const app = await aSetUpApp();
-  expect(await app.run(["allowlist", "add", PATTERN, "--kind", "preview", "--json"])).toSucceed();
+  expect(await app.run(["origin", "add", PATTERN, "--kind", "preview", "--json"])).toSucceed();
   return app;
 }
 
-type Preview = { origins: string[]; deploy_id: string; ttl_seconds: number };
+type Preview = { origins: string[]; deployment_id: string; ttl_seconds: number };
 
 describe("preview", () => {
   it("deploys to the URLs the platform reports", async () => {
@@ -30,7 +30,7 @@ describe("preview", () => {
     expect(result).toSucceed();
     const { data } = app.envelopeOf<Preview>(result);
     expect(data.origins).toEqual([BRANCH_URL, DEPLOY_URL]);
-    expect(data.deploy_id).toMatch(/^dpl_/);
+    expect(data.deployment_id).toMatch(/^dep_/);
     expect(data.ttl_seconds).toBe(604_800);
   });
 
@@ -40,10 +40,10 @@ describe("preview", () => {
       await app.run(["preview", "--non-interactive", "--json", "--origin", BRANCH_URL, "--ttl", "24h"]),
     ).toSucceed();
 
-    const live = await app.run(["deployments", "--live", "--json"]);
+    const live = await app.run(["deployment", "list", "--live", "--json"]);
 
-    const rows = app.envelopeOf<{ deployments: Array<{ origin: string; expires_at?: string | null }> }>(live)
-      .data.deployments;
+    const rows = app.envelopeOf<{ targets: Array<{ origin: string; expires_at?: string | null }> }>(live)
+      .data.targets;
     expect(rows.find((row) => row.origin === BRANCH_URL)?.expires_at).toBeTruthy();
   });
 
@@ -87,8 +87,8 @@ describe("preview", () => {
 
     expect(result).toSucceed();
     expect(app.envelopeOf<Preview>(result).data.origins).toEqual([BRANCH_URL]);
-    const live = await app.run(["deployments", "--live", "--json", "--env", "production"]);
-    const rows = app.envelopeOf<{ deployments: Array<{ origin: string }> }>(live).data.deployments;
+    const live = await app.run(["deployment", "list", "--live", "--json", "--env", "production"]);
+    const rows = app.envelopeOf<{ targets: Array<{ origin: string }> }>(live).data.targets;
     expect(rows.map((row) => row.origin)).toContain(BRANCH_URL);
   });
 

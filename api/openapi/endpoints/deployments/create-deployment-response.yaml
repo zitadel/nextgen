@@ -1,0 +1,20 @@
+title: CreateDeploymentResponse
+type: object
+description: |
+  The deployment a deploy or rollback wrote, or the one the targets already
+  served. `targets` on it lists the expansion the server applied (`primary`
+  becomes each primary origin).
+required:
+  - deployment
+  - warnings
+properties:
+  deployment:
+    $ref: deployment.yaml
+  warnings:
+    type: array
+    description: |
+      Non-fatal notes, such as a secret with no preview value on a preview
+      deploy, or a target a rollback left as it was. Each is a short sentence
+      the CLI prints verbatim.
+    items:
+      type: string

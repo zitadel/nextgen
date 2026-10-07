@@ -32,7 +32,7 @@ type RuntimeResolution struct {
 
 func (res *RuntimeResolution) logAttrs() []any {
 	attrs := []any{
-		slog.String("class", res.Project.Class.String()),
+		slog.String("mode", res.Project.Mode.String()),
 		slog.String("matched_origin", res.Origin),
 		slog.String("target", res.Target),
 		slog.String("source", res.Source),
@@ -40,7 +40,6 @@ func (res *RuntimeResolution) logAttrs() []any {
 	if res.Deployment != nil {
 		attrs = append(attrs,
 			slog.String("deployment_id", res.Deployment.ID),
-			slog.String("deploy_id", res.Deployment.DeployID),
 			slog.Time("deployed_at", res.Deployment.DeployedAt),
 		)
 	}
@@ -64,9 +63,9 @@ func NewRuntimeResolver(v2Pool *DB, releases ReleaseService) *RuntimeResolver {
 	return &RuntimeResolver{v2Pool: v2Pool, releases: releases, now: time.Now}
 }
 
-// Resolve walks the three layers: the gate refuses an origin the allowlist
-// does not admit, the route serves the newest deployment to that exact
-// origin, and the fallback serves the project default. A pin may then select
+// Resolve walks the three layers: the gate refuses an origin no pattern
+// admits, the route serves the newest deployment to that exact origin, and
+// the fallback serves the project default. A pin may then select
 // among what was deployed to the matched target; it never activates.
 func (r *RuntimeResolver) Resolve(ctx context.Context, projectID, origin, pin string) (*RuntimeResolution, error) {
 	logger := getLoggingContext(ctx, "runtime").With(
@@ -126,7 +125,7 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin, pin st
 			resolution.Deployment = dep
 		case !isNoRow(err):
 			return nil, domain.ErrInternal(err).WithMessage("failed to read the project default deployment")
-		case project.Class == domain.ProjectClassProduction && pin == "":
+		case project.Mode == domain.ProjectModeProduction && pin == "":
 			return nil, domain.ErrReleaseNoDefault()
 		}
 	}
@@ -145,7 +144,7 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin, pin st
 			resolution.Deployment = dep
 		case !isNoRow(err):
 			return nil, domain.ErrInternal(err).WithMessage("failed to look up the pinned release's deployments")
-		case project.Class == domain.ProjectClassProduction:
+		case project.Mode == domain.ProjectModeProduction:
 			return nil, domain.ErrReleaseNotDeployed(map[string]string{"release": pin, "target": resolution.Target})
 		default:
 			resolution.Deployment = nil
@@ -178,10 +177,10 @@ type matchedOrigin struct {
 }
 
 // Gate decides whether a request from origin may be served at all. An absent
-// origin is not a browser and passes with no match. A sandbox project with an
-// empty allowlist admits everything, and admits loopback regardless; a
-// production project requires a pattern. A preview pattern admits nothing by
-// itself: the live row for the exact URL does.
+// origin is not a browser and passes with no match. A sandbox project with no
+// origins admits everything, and admits loopback regardless; a production
+// project requires a pattern. A preview pattern admits nothing by itself: the
+// preview row for the exact URL does.
 func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, origin string) (*matchedOrigin, error) {
 	origin = strings.TrimSpace(origin)
 	if origin == "" {
@@ -191,9 +190,9 @@ func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, ori
 	if err != nil {
 		return nil, domain.ErrProjectOriginNotAllowed(map[string]string{"origin": origin})
 	}
-	entry, ok := domain.MatchAllowedOrigin(project.AllowedOrigins, normalized)
+	entry, ok := domain.MatchOrigin(project.Origins, normalized)
 	if !ok {
-		if project.Class == domain.ProjectClassSandbox && (len(project.AllowedOrigins) == 0 || domain.IsLoopbackOrigin(normalized)) {
+		if project.Mode == domain.ProjectModeSandbox && (len(project.Origins) == 0 || domain.IsLoopbackOrigin(normalized)) {
 			return &matchedOrigin{origin: normalized}, nil
 		}
 		return nil, domain.ErrProjectOriginNotAllowed(map[string]string{"origin": normalized})
@@ -201,12 +200,12 @@ func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, ori
 	if entry.Kind == domain.OriginKindPrimary {
 		return &matchedOrigin{origin: normalized}, nil
 	}
-	row, err := r.v2Pool.Statements().GetOrigin(ctx, project.ID, normalized)
+	row, err := r.v2Pool.Statements().GetPreview(ctx, project.ID, normalized)
 	if err != nil {
 		if isNoRow(err) {
 			return nil, domain.ErrProjectPreviewNotLive(map[string]string{"origin": normalized})
 		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to read the preview origin")
+		return nil, domain.ErrInternal(err).WithMessage("failed to read the preview")
 	}
 	if row.Expired(r.now()) {
 		return nil, domain.ErrProjectPreviewNotLive(map[string]string{"origin": normalized})

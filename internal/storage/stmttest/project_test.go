@@ -38,7 +38,7 @@ func TestProjectStatements_Create(t *testing.T) {
 		})
 
 		t.Run("empty id is assigned by dialect", func(t *testing.T) {
-			project := &domain.Project{Name: "project-" + uniqueSuffix(t), AllowedOrigins: []domain.AllowedOrigin{}}
+			project := &domain.Project{Name: "project-" + uniqueSuffix(t), Origins: []domain.Origin{}}
 			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
 			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
 
@@ -65,7 +65,7 @@ func TestProjectStatements_Update(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("updates name and refreshes updated_at", func(t *testing.T) {
 			project := newTestProject(uniqueProjectID(t))
-			project.AllowedOrigins = []domain.AllowedOrigin{
+			project.Origins = []domain.Origin{
 				{Pattern: "https://*.example.com", Kind: domain.OriginKindPreview},
 				{Pattern: "http://localhost:3000", Kind: domain.OriginKindPrimary},
 			}
@@ -79,11 +79,11 @@ func TestProjectStatements_Update(t *testing.T) {
 			require.NoError(t, d.stmts.UpdateProject(t.Context(), project))
 			assert.True(t, project.UpdatedAt.After(createdUpdatedAt))
 			assert.Equal(t, createdAt.UTC(), project.CreatedAt.UTC())
-			assert.Equal(t, []domain.AllowedOrigin{
+			assert.Equal(t, []domain.Origin{
 				{Pattern: "https://*.example.com", Kind: domain.OriginKindPreview},
 				{Pattern: "http://localhost:3000", Kind: domain.OriginKindPrimary},
-			}, project.AllowedOrigins)
-			assert.Equal(t, domain.ProjectClassSandbox, project.Class)
+			}, project.Origins)
+			assert.Equal(t, domain.ProjectModeSandbox, project.Mode)
 
 			stored, err := d.stmts.GetProjectByID(t.Context(), project.ID)
 			require.NoError(t, err)
@@ -99,7 +99,7 @@ func TestProjectStatements_Update(t *testing.T) {
 	})
 }
 
-func TestProjectStatements_AllowedOriginsAndClass(t *testing.T) {
+func TestProjectStatements_OriginsAndMode(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		project := newTestProject(uniqueProjectID(t))
 		t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
@@ -107,27 +107,27 @@ func TestProjectStatements_AllowedOriginsAndClass(t *testing.T) {
 
 		stored, err := d.stmts.GetProjectByID(t.Context(), project.ID)
 		require.NoError(t, err)
-		assert.Empty(t, stored.AllowedOrigins)
-		assert.NotNil(t, stored.AllowedOrigins, "an empty allowlist reads as an empty list, never nil")
-		assert.Equal(t, domain.ProjectClassSandbox, stored.Class)
+		assert.Empty(t, stored.Origins)
+		assert.NotNil(t, stored.Origins, "no origins read as an empty list, never nil")
+		assert.Equal(t, domain.ProjectModeSandbox, stored.Mode)
 
-		origins := []domain.AllowedOrigin{
+		origins := []domain.Origin{
 			{Pattern: "https://app.acme.com", Kind: domain.OriginKindPrimary},
 			{Pattern: "https://*-acmeinc.vercel.app", Kind: domain.OriginKindPreview},
 		}
-		require.NoError(t, d.stmts.UpdateProjectAllowedOrigins(t.Context(), project.ID, origins))
-		require.NoError(t, d.stmts.UpdateProjectClass(t.Context(), project.ID, domain.ProjectClassProduction))
+		require.NoError(t, d.stmts.UpdateProjectOrigins(t.Context(), project.ID, origins))
+		require.NoError(t, d.stmts.UpdateProjectMode(t.Context(), project.ID, domain.ProjectModeProduction))
 
 		stored, err = d.stmts.GetProjectByID(t.Context(), project.ID)
 		require.NoError(t, err)
-		assert.Equal(t, origins, stored.AllowedOrigins)
-		assert.Equal(t, domain.ProjectClassProduction, stored.Class)
+		assert.Equal(t, origins, stored.Origins)
+		assert.Equal(t, domain.ProjectModeProduction, stored.Mode)
 		assert.True(t, stored.UpdatedAt.After(project.CreatedAt) || stored.UpdatedAt.Equal(project.CreatedAt))
 
 		// A project that is not there is reported, not silently skipped.
-		err = d.stmts.UpdateProjectAllowedOrigins(t.Context(), project.ID+"-missing", origins)
+		err = d.stmts.UpdateProjectOrigins(t.Context(), project.ID+"-missing", origins)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
-		err = d.stmts.UpdateProjectClass(t.Context(), project.ID+"-missing", domain.ProjectClassSandbox)
+		err = d.stmts.UpdateProjectMode(t.Context(), project.ID+"-missing", domain.ProjectModeSandbox)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }

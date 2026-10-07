@@ -1,19 +1,24 @@
 type: object
 description: |
-  The set of revisions to bundle into a release, plus the metadata to record
-  alongside it.
+  What goes into the release, in one of two forms, plus the metadata to
+  record alongside it. Exactly one of `pointers` and `bundle` is given.
+
+  `pointers` names revisions that already exist, as `(kind, revision_id)`
+  pairs; no new revisions are allocated. `bundle` carries the configuration
+  as authored on disk; the server compares each resource against the
+  project's newest revision of the same handle, reuses it when the content
+  matches and allocates a new one otherwise. Either way the result is a
+  release pinning one revision per resource.
 
   `created_at` and `created_by` are derived server-side from the caller's
   authentication context and are not accepted here.
-required:
-  - pointers
 properties:
   pointers:
     type: array
     minItems: 1
     maxItems: 50
     description: |
-      The revisions to pin. Must not be empty.
+      The revisions to pin. Must not be empty when given.
 
       A kind usually appears more than once: a project has several user schemas
       and several flow definitions, and each is pinned on its own. What it
@@ -30,6 +35,8 @@ properties:
       widening a bound breaks no client that was already inside it.
     items:
       $ref: create-release-pointer.yaml
+  bundle:
+    $ref: configuration-bundle.yaml
   message:
     type: string
     maxLength: 1024

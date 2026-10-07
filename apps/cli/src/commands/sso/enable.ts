@@ -49,7 +49,7 @@ import {
 } from "../../lib/oclif";
 import { readDevelopmentIssuer } from "../../lib/project";
 import { readState } from "../../lib/sync/state";
-import { connectTarget, type Connected } from "../../lib/target";
+import { connectEnvironment, type Connected } from "../../lib/environment";
 import { readStdin } from "../../lib/variables";
 
 /**
@@ -60,7 +60,7 @@ import { readStdin } from "../../lib/variables";
  * written. It works on the local Project `zitadel setup` created and does not
  * require claiming, because this is the local development path.
  *
- * The client secret never comes from a flag, following `vars set`: it is
+ * The client secret never comes from a flag, following `variable set`: it is
  * prompted for, or read from stdin when scripting, so it cannot land in shell
  * history, a process listing, or CI logs.
  */
@@ -110,7 +110,7 @@ export default class SsoEnable extends BaseCommand {
     const connected =
       this.meta.source === "mock"
         ? undefined
-        : await connectTarget({ cwd, env, serverFlag, envName, envFile });
+        : await connectEnvironment({ cwd, env, serverFlag, envName, envFile });
     const projectId = connected?.projectId ?? "mock";
     const schema = selectSchema(await readSchemaFiles(cwd), flags.schema);
     const connections = await readConnectionFiles(cwd);
@@ -297,7 +297,7 @@ export default class SsoEnable extends BaseCommand {
           changed: edits.written,
           skipped: edits.skipped,
         }),
-        // `vars set` only when the secret did not reach the project:
+        // `variable set` only when the secret did not reach the project:
         // the connection references it as `${{ NAME }}` and the engine
         // resolves that from the project's variables, so a button whose
         // credential never arrived fails at token exchange. An ok result

@@ -3,14 +3,14 @@ description: |
   The release to make live and the targets to make it live on.
 
   A target is `default` (what a caller with no `Origin` is served),
-  `primary` (every `primary` pattern in the project's allowed origins,
-  expanded server-side), or one exact origin. All targets move in one
-  transaction under one `deploy_id`; on any failure nothing is written.
+  `primary` (every `primary` pattern among the project's origins, expanded
+  server-side), or one exact origin. All targets move in one deployment; on
+  any failure nothing is written.
 
   Exact preview origins must match a `preview` pattern of the project and
-  carry a `ttl_seconds`; the server writes or renews a live preview row per
-  origin. `default` and `primary` require `deployment.write`; a preview
-  target is enough for `deployment.preview`.
+  carry a `ttl_seconds`; the server writes or renews a preview per origin.
+  `default` and `primary` require `deployment.write`; a preview target is
+  enough for `deployment.preview`.
 
   `deployed_at` and `deployed_by` are derived server-side from the caller's
   authentication context and are not accepted here.
@@ -45,21 +45,22 @@ properties:
     maxLength: 1024
     description: |
       A short free-form summary of why this deployment happened, analogous to
-      a git commit message. Recorded on every row of the deploy.
+      a git commit message.
     example: add phone_number to human-user
   ttl_seconds:
     type: integer
     minimum: 60
     maximum: 2592000
     description: |
-      How long the preview rows written by this deploy stay live, renewed on
+      How long the previews written by this deployment stay live, renewed on
       each run. Required when a target is a preview origin, rejected otherwise.
     example: 604800
   expected_deployment_id:
     description: |
       An optimistic-concurrency guard: the deployment the caller believes the
-      first target currently serves. When present and the newest row for that
-      target is another one, the request answers `409` and nothing changes.
+      first target currently serves. When present and that target's newest
+      deployment is another one, the request answers `409` and nothing
+      changes.
     oneOf:
       - $ref: ../../components/schemas/deployment-id.yaml
       - type: 'null'

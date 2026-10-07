@@ -386,11 +386,11 @@ describe("setup command", () => {
           {
             id: "proj-test",
             name: "demo",
-            class: "sandbox",
+            mode: "sandbox",
             project_secret: "sk_proj_test_full",
             preview_secret: "sk_proj_test_preview",
             preview_token: "sk_proj_preview_token",
-            allowed_origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
+            origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
             created_at: "2026-04-21T14:03:11.000Z",
           },
           { status: 201 },
@@ -398,13 +398,19 @@ describe("setup command", () => {
       }),
       http.post("*/releases", () =>
         HttpResponse.json(
-          { id: "rel_test", content_hash: "a".repeat(64), project_id: "proj-test", metadata: {}, pointers: [] },
+          {
+            release: { id: "rel_test", content_hash: "a".repeat(64), project_id: "proj-test", metadata: {}, pointers: [] },
+            revisions: [],
+          },
           { status: 201 },
         ),
       ),
       http.post("*/deployments", () =>
         HttpResponse.json(
-          { deploy_id: "dpl_test", release_id: "rel_test", targets: [""], deployments: [] },
+          {
+            deployment: { id: "dep_test", release_id: "rel_test", targets: [{ origin: "" }], metadata: {}, deployed_at: "2026-04-21T14:03:11.000Z" },
+            warnings: [],
+          },
           { status: 201 },
         ),
       ),
@@ -415,7 +421,7 @@ describe("setup command", () => {
     expect(res.exitCode).toBe(0);
     expect(createProjectBody).toMatchObject({
       name: expect.any(String),
-      allowed_origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
+      origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
       seed_defaults: false,
     });
     const projectName = (createProjectBody as { name?: unknown }).name;

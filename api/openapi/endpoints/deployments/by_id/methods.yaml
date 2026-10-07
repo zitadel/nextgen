@@ -25,17 +25,18 @@ get:
             $ref: ../deployment.yaml
           examples:
             rolledBack:
-              summary: A rollback row on a primary origin
+              summary: A rollback of the default and a primary origin
               value:
                 id: dep_01KX5N7C9D2E7F0N9WD3P2E4YM6
                 project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
-                deploy_id: dpl_01KX5N7C9D2E7F0N9WD3P2E4YM7
-                origin: https://app.acme.com
                 release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                targets:
+                  - origin: ''
+                  - origin: https://app.acme.com
                 deployed_at: '2026-07-14T10:02:00Z'
                 metadata:
                   reason: rollback
-                  rollback_of: dpl_01KX5N7C9D2E7F0N9WD3P2E4YM5
+                  rollback_of: dep_01KX5N7C9D2E7F0N9WD3P2E4YM5
                   deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
                   deployed_by_type: human
     default:

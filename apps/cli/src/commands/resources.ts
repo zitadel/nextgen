@@ -42,7 +42,7 @@ import { consola } from "consola";
 import { type ZitadelClient } from "../lib/api-client";
 import { CommandGroups } from "../lib/oclif/groups";
 import { ZitadelError } from "../lib/errors";
-import { connectTarget } from "../lib/target";
+import { connectEnvironment } from "../lib/environment";
 import {
   buildResourceCommands,
   type CreateSpec,
@@ -333,9 +333,9 @@ export const RESOURCES = {
     group: CommandGroups.resources,
     singular: "project",
     idField: "id",
-    columns: ["id", "name", "class", "created_at"],
+    columns: ["id", "name", "mode", "created_at"],
     heading: "name",
-    detail: ["id", "class", "allowed_origins", "created_at", "updated_at"],
+    detail: ["id", "mode", "origins", "created_at", "updated_at"],
     list: list({
       items: "projects",
       body: QueryProjectsBody,
@@ -420,7 +420,7 @@ export const RESOURCES = {
     },
   },
 
-  releases: {
+  release: {
     group: CommandGroups.configuration,
     singular: "release",
     idField: "id",
@@ -519,14 +519,14 @@ export const RESOURCES = {
 
 /**
  * The `<resource> <verb>` commands, ready for the explicit command table.
- * Connecting resolves the target like `deploy` does, so `--env production`
+ * Connecting resolves the environment like `deploy` does, so `--env production`
  * lists production's users and a missing credential fails naming the file
  * that should hold it.
  */
 export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
   operations: FILTER_OPERATIONS,
   connect: async ({ cwd, env, serverFlag, envName, envFile }) => {
-    const { client, projectId, server } = await connectTarget({
+    const { client, projectId, server } = await connectEnvironment({
       cwd,
       env,
       serverFlag,

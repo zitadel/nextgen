@@ -16,12 +16,12 @@ import (
 	"github.com/ogen-go/ogen/validate"
 )
 
-// AddAllowedOriginParams is parameters of addAllowedOrigin operation.
-type AddAllowedOriginParams struct {
+// AddOriginParams is parameters of addOrigin operation.
+type AddOriginParams struct {
 	ProjectID ProjectID
 }
 
-func unpackAddAllowedOriginParams(packed middleware.Parameters) (params AddAllowedOriginParams) {
+func unpackAddOriginParams(packed middleware.Parameters) (params AddOriginParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "project_id",
@@ -32,7 +32,7 @@ func unpackAddAllowedOriginParams(packed middleware.Parameters) (params AddAllow
 	return params
 }
 
-func decodeAddAllowedOriginParams(args [1]string, argsEscaped bool, r *http.Request) (params AddAllowedOriginParams, _ error) {
+func decodeAddOriginParams(args [1]string, argsEscaped bool, r *http.Request) (params AddOriginParams, _ error) {
 	// Decode path: project_id.
 	if err := func() error {
 		param := args[0]
@@ -274,79 +274,6 @@ func unpackCreateBrandingParams(packed middleware.Parameters) (params CreateBran
 }
 
 func decodeCreateBrandingParams(args [0]string, argsEscaped bool, r *http.Request) (params CreateBrandingParams, _ error) {
-	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode query: project_id.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotProjectIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotProjectIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.ProjectID = ProjectID(paramsDotProjectIDVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.ProjectID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "project_id",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// CreateConfigurationReleaseParams is parameters of createConfigurationRelease operation.
-type CreateConfigurationReleaseParams struct {
-	// The unique identifier of the project.
-	ProjectID ProjectID
-}
-
-func unpackCreateConfigurationReleaseParams(packed middleware.Parameters) (params CreateConfigurationReleaseParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "project_id",
-			In:   "query",
-		}
-		params.ProjectID = packed[key].(ProjectID)
-	}
-	return params
-}
-
-func decodeCreateConfigurationReleaseParams(args [0]string, argsEscaped bool, r *http.Request) (params CreateConfigurationReleaseParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode query: project_id.
 	if err := func() error {
@@ -4891,11 +4818,9 @@ func decodeListBrandingParams(args [0]string, argsEscaped bool, r *http.Request)
 type ListDeploymentsParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// One target's history. The empty string is the project default.
+	// The deployments that touched one target. The empty string is the project default.
 	Origin OptString `json:",omitempty,omitzero"`
-	// The rows one deploy wrote.
-	DeployID OptString `json:",omitempty,omitzero"`
-	// The newest row per target only.
+	// What every target serves right now, instead of the log.
 	Live OptBool `json:",omitempty,omitzero"`
 	// Related objects to embed on each returned deployment.
 	Expand []DeploymentExpand `json:",omitempty"`
@@ -4923,15 +4848,6 @@ func unpackListDeploymentsParams(packed middleware.Parameters) (params ListDeplo
 		}
 		if v, ok := packed[key]; ok {
 			params.Origin = v.(OptString)
-		}
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "deploy_id",
-			In:   "query",
-		}
-		if v, ok := packed[key]; ok {
-			params.DeployID = v.(OptString)
 		}
 	}
 	{
@@ -5063,47 +4979,6 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "origin",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	// Decode query: deploy_id.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "deploy_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotDeployIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotDeployIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.DeployID.SetTo(paramsDotDeployIDVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "deploy_id",
 			In:   "query",
 			Err:  err,
 		}
@@ -7267,13 +7142,13 @@ func decodeListMyProjectsParams(args [0]string, argsEscaped bool, r *http.Reques
 	return params, nil
 }
 
-// ListOriginsParams is parameters of listOrigins operation.
-type ListOriginsParams struct {
+// ListPreviewsParams is parameters of listPreviews operation.
+type ListPreviewsParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
 }
 
-func unpackListOriginsParams(packed middleware.Parameters) (params ListOriginsParams) {
+func unpackListPreviewsParams(packed middleware.Parameters) (params ListPreviewsParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "project_id",
@@ -7284,7 +7159,7 @@ func unpackListOriginsParams(packed middleware.Parameters) (params ListOriginsPa
 	return params
 }
 
-func decodeListOriginsParams(args [0]string, argsEscaped bool, r *http.Request) (params ListOriginsParams, _ error) {
+func decodeListPreviewsParams(args [0]string, argsEscaped bool, r *http.Request) (params ListPreviewsParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode query: project_id.
 	if err := func() error {
@@ -8984,12 +8859,12 @@ func decodeQueryUsersParams(args [0]string, argsEscaped bool, r *http.Request) (
 	return params, nil
 }
 
-// RemoveAllowedOriginParams is parameters of removeAllowedOrigin operation.
-type RemoveAllowedOriginParams struct {
+// RemoveOriginParams is parameters of removeOrigin operation.
+type RemoveOriginParams struct {
 	ProjectID ProjectID
 }
 
-func unpackRemoveAllowedOriginParams(packed middleware.Parameters) (params RemoveAllowedOriginParams) {
+func unpackRemoveOriginParams(packed middleware.Parameters) (params RemoveOriginParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "project_id",
@@ -9000,7 +8875,7 @@ func unpackRemoveAllowedOriginParams(packed middleware.Parameters) (params Remov
 	return params
 }
 
-func decodeRemoveAllowedOriginParams(args [1]string, argsEscaped bool, r *http.Request) (params RemoveAllowedOriginParams, _ error) {
+func decodeRemoveOriginParams(args [1]string, argsEscaped bool, r *http.Request) (params RemoveOriginParams, _ error) {
 	// Decode path: project_id.
 	if err := func() error {
 		param := args[0]
@@ -9064,13 +8939,13 @@ func decodeRemoveAllowedOriginParams(args [1]string, argsEscaped bool, r *http.R
 	return params, nil
 }
 
-// RemoveOriginParams is parameters of removeOrigin operation.
-type RemoveOriginParams struct {
+// RemovePreviewParams is parameters of removePreview operation.
+type RemovePreviewParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
 }
 
-func unpackRemoveOriginParams(packed middleware.Parameters) (params RemoveOriginParams) {
+func unpackRemovePreviewParams(packed middleware.Parameters) (params RemovePreviewParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "project_id",
@@ -9081,7 +8956,7 @@ func unpackRemoveOriginParams(packed middleware.Parameters) (params RemoveOrigin
 	return params
 }
 
-func decodeRemoveOriginParams(args [0]string, argsEscaped bool, r *http.Request) (params RemoveOriginParams, _ error) {
+func decodeRemovePreviewParams(args [0]string, argsEscaped bool, r *http.Request) (params RemovePreviewParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode query: project_id.
 	if err := func() error {
@@ -9433,12 +9308,12 @@ func decodeRollbackDeploymentParams(args [0]string, argsEscaped bool, r *http.Re
 	return params, nil
 }
 
-// SetProjectClassParams is parameters of setProjectClass operation.
-type SetProjectClassParams struct {
+// SetProjectModeParams is parameters of setProjectMode operation.
+type SetProjectModeParams struct {
 	ProjectID ProjectID
 }
 
-func unpackSetProjectClassParams(packed middleware.Parameters) (params SetProjectClassParams) {
+func unpackSetProjectModeParams(packed middleware.Parameters) (params SetProjectModeParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "project_id",
@@ -9449,7 +9324,7 @@ func unpackSetProjectClassParams(packed middleware.Parameters) (params SetProjec
 	return params
 }
 
-func decodeSetProjectClassParams(args [1]string, argsEscaped bool, r *http.Request) (params SetProjectClassParams, _ error) {
+func decodeSetProjectModeParams(args [1]string, argsEscaped bool, r *http.Request) (params SetProjectModeParams, _ error) {
 	// Decode path: project_id.
 	if err := func() error {
 		param := args[0]

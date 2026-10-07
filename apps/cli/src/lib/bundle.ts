@@ -3,7 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import type { CreateConfigurationReleaseBody } from "@zitadel/api/generated/model";
+import type { CreateReleaseBody } from "@zitadel/api/generated/model";
 import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
 
 import { BRANDING_DIR, toBrandingWireBody } from "./branding";
@@ -27,13 +27,13 @@ export type BundledResource = {
 };
 
 export type ConfigurationBundle = {
-  body: CreateConfigurationReleaseBody;
+  body: CreateReleaseBody;
   resources: BundledResource[];
 };
 
 /**
- * Reads `.zitadel/{schemas,flows,branding}` into the request body of
- * `POST /configuration-releases`. Nothing local is consulted for ids: the
+ * Reads `.zitadel/{schemas,flows,branding}` into the `bundle` form of
+ * `POST /releases`. Nothing local is consulted for ids: the
  * server compares content against the project's newest revisions, so the
  * same directory builds the same release on any project.
  *
@@ -86,13 +86,10 @@ export async function buildConfigurationBundle(cwd: string): Promise<Configurati
 
   const git = await gitMetadata(cwd);
   const body = {
-    schemas,
-    flow_definitions: flows,
-    flow_schema_uri: DEFAULT_FLOW_SCHEMA_URI,
-    brandings,
+    bundle: { schemas, flow_definitions: flows, flow_schema_uri: DEFAULT_FLOW_SCHEMA_URI, brandings },
     ...(git.sha ? { git_sha: git.sha } : {}),
     git_dirty: git.dirty,
-  } as unknown as CreateConfigurationReleaseBody;
+  } as unknown as CreateReleaseBody;
   return { body, resources };
 }
 

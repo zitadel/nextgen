@@ -29,9 +29,9 @@ func ensureProject(ctx context.Context, stmts service.AllStatements, projectID s
 	// The bootstrap header carries no project name, so derive a placeholder
 	// name from the project ID to satisfy the NOT NULL name column.
 	err := stmts.CreateProject(ctx, &domain.Project{
-		ID:             projectID,
-		Name:           "project-" + projectID,
-		AllowedOrigins: []domain.AllowedOrigin{},
+		ID:      projectID,
+		Name:    "project-" + projectID,
+		Origins: []domain.Origin{},
 	})
 	if err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {

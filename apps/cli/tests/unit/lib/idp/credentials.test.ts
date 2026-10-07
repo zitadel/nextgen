@@ -6,18 +6,18 @@ const VERSION = "1.0.0-alpha.23";
 
 describe("the recovery command for a credential", () => {
   it("names the owner, without which every variables command refuses", () => {
-    // `vars set NAME` alone fails with "Name the owner:"
+    // `variable set NAME` alone fails with "Name the owner:"
     // before making a request, so the recovery step would repair nothing.
   });
 
   it("is runnable rather than a bare subcommand", () => {
     // A JSON result is read by agents, which execute these as shell commands.
-    expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION)).toMatch(/^npx .+ vars set /);
+    expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION)).toMatch(/^npx .+ variable set /);
   });
 
   it("marks a secret as one, so the value is not stored in the clear", () => {
     expect(republishCommand("GOOGLE_CLIENT_SECRET", true, VERSION)).toContain(
-      "vars set GOOGLE_CLIENT_SECRET --secret",
+      "variable set GOOGLE_CLIENT_SECRET --secret",
     );
     expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION)).not.toContain("--secret");
   });
@@ -46,7 +46,7 @@ describe("the recovery commands a result carries", () => {
     );
 
     expect(commands).toHaveLength(1);
-    expect(commands[0]).toContain("vars set GOOGLE_CLIENT_SECRET --secret");
+    expect(commands[0]).toContain("variable set GOOGLE_CLIENT_SECRET --secret");
   });
 
   it("covers a deferred publish, not just a failed one", () => {

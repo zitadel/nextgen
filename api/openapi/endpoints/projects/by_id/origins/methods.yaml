@@ -1,0 +1,35 @@
+post:
+  operationId: addOrigin
+  summary: Add an origin pattern
+  description: |
+    Adds one `{pattern, kind}` to the project's origins. The pattern is
+    checked against the project's mode: a `production` project refuses
+    loopback hosts, a `*` in a `primary` pattern, and a `preview` wildcard on
+    a shared host that carries no tenant-unique label. A host the server does
+    not know is accepted with a warning naming what it could not check.
+  tags:
+    - Projects
+  parameters:
+    - name: project_id
+      in: path
+      required: true
+      schema:
+        $ref: ../../../../components/schemas/project-id.yaml
+  security:
+    - oauth2:
+        - origin.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../../origin.yaml
+  responses:
+    '201':
+      description: The pattern was added.
+      content:
+        application/json:
+          schema:
+            $ref: add-origin-response.yaml
+    default:
+      $ref: addOrigin-error-response.yaml

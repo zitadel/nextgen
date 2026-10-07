@@ -1,6 +1,6 @@
-// Package deployment holds shared helpers for the deployments table used by
-// v2 dialect statements: list options and the encoding of the metadata JSON
-// column.
+// Package deployment holds shared helpers for the deployments and
+// deployment_targets tables used by v2 dialect statements: the schema, list
+// options and the encoding of the metadata JSON column.
 package deployment
 
 import (
@@ -27,12 +27,11 @@ type metadata struct {
 	DeployedByType *string `json:"deployed_by_type,omitempty"`
 }
 
-// Row carries the scanned columns of one deployments row.
+// Row carries the scanned columns of one deployments row: the operation
+// without its targets, which the dialect attaches afterwards.
 type Row struct {
 	ProjectID  string
 	ID         string
-	DeployID   string
-	Origin     string
 	ReleaseID  string
 	Metadata   []byte
 	DeployedAt time.Time
@@ -82,8 +81,6 @@ func ToDomain(row Row) (*domain.Deployment, error) {
 	return &domain.Deployment{
 		ProjectID: row.ProjectID,
 		ID:        row.ID,
-		DeployID:  row.DeployID,
-		Origin:    row.Origin,
 		ReleaseID: row.ReleaseID,
 		Metadata: domain.DeploymentMetadata{
 			Reason:         reason,
@@ -95,4 +92,26 @@ func ToDomain(row Row) (*domain.Deployment, error) {
 		// Spanner returns UTC while pgx defaults to local; normalize.
 		DeployedAt: row.DeployedAt.UTC(),
 	}, nil
+}
+
+// AttachTargets sets each deployment's targets from the (deployment id,
+// origin) pairs a dialect scanned, keeping the pairs' order per deployment.
+// A deployment no pair names keeps an empty, non-nil list.
+func AttachTargets(items []*domain.Deployment, pairs []TargetRow) {
+	byID := make(map[string][]domain.DeploymentTarget, len(items))
+	for _, pair := range pairs {
+		byID[pair.DeploymentID] = append(byID[pair.DeploymentID], domain.DeploymentTarget{Origin: pair.Origin})
+	}
+	for _, item := range items {
+		item.Targets = byID[item.ID]
+		if item.Targets == nil {
+			item.Targets = []domain.DeploymentTarget{}
+		}
+	}
+}
+
+// TargetRow is one scanned deployment_targets row.
+type TargetRow struct {
+	DeploymentID string
+	Origin       string
 }

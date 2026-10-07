@@ -196,7 +196,7 @@ import {
 const z = await startLocalZitadel({
   port,          // default: free port
   dir,           // default: temp dir, removed on stop (caller dirs are kept)
-  appOrigins,    // registered as the project's primary allowed_origins
+  appOrigins,    // registered as the project's primary origins
   useCase,       // "minimal" (default) | "consumer" | "business"
   preset,        // "password-first" (default)
   serverBinary,  // ZITADEL_SERVER_BINARY override (path to a built server binary)

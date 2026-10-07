@@ -1,0 +1,25 @@
+get:
+  operationId: listPreviews
+  summary: List live previews
+  description: |
+    One entry per live preview URL of the project, with its expiry. The
+    preview is what admits a request from that URL: a URL matching a
+    `preview` pattern but holding no live preview is refused. Previews are
+    written by deploying to a preview target and go away when they expire or
+    are removed.
+  tags:
+    - Previews
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+  security:
+    - oauth2:
+        - preview.read
+  responses:
+    '200':
+      description: The live previews.
+      content:
+        application/json:
+          schema:
+            $ref: list-previews-response.yaml
+    default:
+      $ref: listPreviews-error-response.yaml

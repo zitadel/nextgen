@@ -1,0 +1,31 @@
+post:
+  operationId: removePreview
+  summary: Retire a preview
+  description: |
+    Deletes the live preview behind one URL, so requests from it are refused
+    from now on. The URL's deployments are kept. A URL with no live preview
+    answers not found.
+  tags:
+    - Previews
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+  security:
+    - oauth2:
+        - preview.delete
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+            - origin
+          properties:
+            origin:
+              type: string
+              example: https://acme-git-sso-acmeinc.vercel.app
+  responses:
+    '204':
+      description: The preview was retired.
+    default:
+      $ref: removePreview-error-response.yaml

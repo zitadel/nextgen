@@ -1,0 +1,20 @@
+title: Origin
+type: object
+description: |
+  One of a project's origins: a pattern and what it is for. A `primary`
+  pattern admits requests from URLs it matches; a `preview` pattern only
+  bounds which URLs a preview deploy may register, and a request from such a
+  URL is admitted by its live preview alone. `*` matches one or more
+  characters, none of them a dot; a literal beats a wildcard.
+required:
+  - pattern
+  - kind
+properties:
+  pattern:
+    type: string
+    example: https://*-acmeinc.vercel.app
+  kind:
+    type: string
+    enum:
+      - primary
+      - preview

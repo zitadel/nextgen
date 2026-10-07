@@ -159,11 +159,11 @@ type fakeProjectService struct {
 
 var _ service.ProjectService = (*fakeProjectService)(nil)
 
-func (f *fakeProjectService) Create(context.Context, string, []domain.AllowedOrigin, bool) (*domain.Project, error) {
+func (f *fakeProjectService) Create(context.Context, string, []domain.Origin, bool) (*domain.Project, error) {
 	panic("unused")
 }
 
-func (f *fakeProjectService) CreateWithID(context.Context, string, string, []domain.AllowedOrigin, bool) (*domain.Project, error) {
+func (f *fakeProjectService) CreateWithID(context.Context, string, string, []domain.Origin, bool) (*domain.Project, error) {
 	panic("unused")
 }
 
@@ -191,15 +191,15 @@ func (f *fakeProjectService) DefaultProject(context.Context, string) (*domain.Pr
 	return f.project, f.err
 }
 
-func (f *fakeProjectService) AddAllowedOrigin(context.Context, string, domain.AllowedOrigin) (*domain.OriginLintWarning, error) {
+func (f *fakeProjectService) AddOrigin(context.Context, string, domain.Origin) (*domain.OriginLintWarning, error) {
 	panic("unused")
 }
 
-func (f *fakeProjectService) RemoveAllowedOrigin(context.Context, string, string) error {
+func (f *fakeProjectService) RemoveOrigin(context.Context, string, string) error {
 	panic("unused")
 }
 
-func (f *fakeProjectService) SetClass(context.Context, string, domain.ProjectClass, bool) (*domain.Project, error) {
+func (f *fakeProjectService) SetMode(context.Context, string, domain.ProjectMode, bool) (*domain.Project, error) {
 	panic("unused")
 }
 

@@ -1,18 +1,19 @@
 title: Deployment
 description: |
-  An immutable record of a release being made live on one target.
+  An immutable record of one release being made live on a set of targets at
+  one instant.
 
-  Deploying and rolling back both append rows. A target is an origin string:
-  the empty string is the project default, anything else is a production
-  hostname or a live preview URL. What a target serves is its newest row;
-  nothing points at a deployment and nothing updates one.
+  Deploying and rolling back both append deployments. A target is an origin
+  string: the empty string is the project default, anything else is a
+  primary origin or a live preview URL. What a target serves is the newest
+  deployment that names it; nothing points at a deployment and nothing
+  updates one.
 type: object
 required:
   - id
   - project_id
-  - deploy_id
-  - origin
   - release_id
+  - targets
   - deployed_at
   - metadata
 properties:
@@ -24,38 +25,26 @@ properties:
     readOnly: true
     description: The project this deployment belongs to.
     $ref: ../../components/schemas/project-id.yaml
-  deploy_id:
-    readOnly: true
-    type: string
-    description: |
-      Correlates the rows one deploy wrote. Rolling a deploy back addresses
-      this id and writes a new set under a new one.
-    example: dpl_01KX3RG8A7F0N9WD3P2E4YM5C1
-  origin:
-    readOnly: true
-    type: string
-    description: |
-      The target: `""` for the project default, otherwise an exact origin.
-    example: https://app.acme.com
   release_id:
     readOnly: true
     description: The release this deployment made live.
     $ref: ../../components/schemas/release-id.yaml
+  targets:
+    readOnly: true
+    type: array
+    minItems: 1
+    description: |
+      The targets this deployment made the release live on, origin ASC. In
+      the live view (`live=true`) only the targets this deployment currently
+      serves are listed.
+    items:
+      $ref: deployment-target.yaml
   deployed_at:
     readOnly: true
     type: string
     format: date-time
     description: When the deployment was created.
     example: '2026-07-14T09:11:00Z'
-  expires_at:
-    readOnly: true
-    description: |
-      When the preview row behind this origin stops admitting requests. Only
-      set in the live view (`live=true`) and only for a preview origin.
-    oneOf:
-      - type: string
-        format: date-time
-      - type: 'null'
   metadata:
     readOnly: true
     $ref: deployment-metadata.yaml

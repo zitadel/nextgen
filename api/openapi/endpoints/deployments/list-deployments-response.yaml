@@ -2,10 +2,10 @@ type: object
 description: |
   Deployments, newest first.
 
-  Filtered to one environment, the first row is that environment's current
-  deployment and the rest is its history. Unfiltered, the list interleaves
-  every environment of the project, so the first row is only the most recent
-  deployment anywhere, not any particular environment's current one.
+  Filtered to one origin, the first entry is what that target serves and the
+  rest is its history. Unfiltered, the list interleaves every target of the
+  project, so the first entry is only the most recent deployment anywhere,
+  not any particular target's current one.
 required:
   - deployments
 properties:

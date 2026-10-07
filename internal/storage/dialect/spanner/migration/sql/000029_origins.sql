@@ -24,41 +24,38 @@ DROP TABLE IF EXISTS environments
 ALTER TABLE projects DROP COLUMN preview_origins
 -- +goose StatementEnd
 -- +goose StatementBegin
-ALTER TABLE projects ADD COLUMN allowed_origins JSON NOT NULL DEFAULT (JSON '[]')
+ALTER TABLE projects ADD COLUMN origins JSON NOT NULL DEFAULT (JSON '[]')
 -- +goose StatementEnd
 -- +goose StatementBegin
-ALTER TABLE projects ADD COLUMN class STRING(MAX) NOT NULL DEFAULT ('sandbox')
+ALTER TABLE projects ADD COLUMN mode STRING(MAX) NOT NULL DEFAULT ('sandbox')
 -- +goose StatementEnd
 -- +goose StatementBegin
 ALTER TABLE releases ADD COLUMN revoked_at TIMESTAMP
 -- +goose StatementEnd
 -- +goose StatementBegin
-CREATE TABLE origins (
+CREATE TABLE previews (
     project_id  STRING(MAX) NOT NULL,
     origin      STRING(MAX) NOT NULL,
     expires_at  TIMESTAMP   NOT NULL,
     created_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
-    CONSTRAINT chk_origins_origin CHECK (origin <> ''),
-    CONSTRAINT fk_origins_project
+    CONSTRAINT chk_previews_origin CHECK (origin <> ''),
+    CONSTRAINT fk_previews_project
         FOREIGN KEY (project_id)
         REFERENCES projects (id)
         ON DELETE CASCADE,
 ) PRIMARY KEY (project_id, origin)
 -- +goose StatementEnd
 -- +goose StatementBegin
-CREATE INDEX idx_origins_expires_at ON origins (expires_at)
+CREATE INDEX idx_previews_expires_at ON previews (expires_at)
 -- +goose StatementEnd
 -- +goose StatementBegin
 CREATE TABLE deployments (
     project_id   STRING(MAX) NOT NULL,
     id           STRING(MAX) NOT NULL,
-    deploy_id    STRING(MAX) NOT NULL,
-    origin       STRING(MAX) NOT NULL DEFAULT (''),
     release_id   STRING(MAX) NOT NULL,
     metadata     JSON        NOT NULL,
     deployed_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     CONSTRAINT chk_deployments_id CHECK (id <> ''),
-    CONSTRAINT chk_deployments_deploy_id CHECK (deploy_id <> ''),
     CONSTRAINT fk_deployments_project
         FOREIGN KEY (project_id)
         REFERENCES projects (id)
@@ -69,16 +66,25 @@ CREATE TABLE deployments (
 ) PRIMARY KEY (project_id, id)
 -- +goose StatementEnd
 -- +goose StatementBegin
-CREATE INDEX idx_deployments_project_origin_deployed_at
-    ON deployments (project_id, origin, deployed_at DESC, id DESC)
--- +goose StatementEnd
--- +goose StatementBegin
-CREATE INDEX idx_deployments_project_deploy_id
-    ON deployments (project_id, deploy_id)
--- +goose StatementEnd
--- +goose StatementBegin
 CREATE INDEX idx_deployments_project_deployed_at
     ON deployments (project_id, deployed_at DESC, id DESC)
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE TABLE deployment_targets (
+    project_id     STRING(MAX) NOT NULL,
+    deployment_id  STRING(MAX) NOT NULL,
+    origin         STRING(MAX) NOT NULL DEFAULT (''),
+    release_id     STRING(MAX) NOT NULL,
+    deployed_at    TIMESTAMP   NOT NULL,
+    CONSTRAINT fk_deployment_targets_deployment
+        FOREIGN KEY (project_id, deployment_id)
+        REFERENCES deployments (project_id, id)
+        ON DELETE CASCADE,
+) PRIMARY KEY (project_id, deployment_id, origin)
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE INDEX idx_deployment_targets_project_origin_deployed_at
+    ON deployment_targets (project_id, origin, deployed_at DESC, deployment_id DESC)
 -- +goose StatementEnd
 -- +goose StatementBegin
 CREATE TABLE variables (
@@ -122,31 +128,31 @@ DROP TABLE IF EXISTS deployment_variables
 DROP TABLE IF EXISTS variables
 -- +goose StatementEnd
 -- +goose StatementBegin
+DROP INDEX IF EXISTS idx_deployment_targets_project_origin_deployed_at
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP TABLE IF EXISTS deployment_targets
+-- +goose StatementEnd
+-- +goose StatementBegin
 DROP INDEX IF EXISTS idx_deployments_project_deployed_at
--- +goose StatementEnd
--- +goose StatementBegin
-DROP INDEX IF EXISTS idx_deployments_project_deploy_id
--- +goose StatementEnd
--- +goose StatementBegin
-DROP INDEX IF EXISTS idx_deployments_project_origin_deployed_at
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS deployments
 -- +goose StatementEnd
 -- +goose StatementBegin
-DROP INDEX IF EXISTS idx_origins_expires_at
+DROP INDEX IF EXISTS idx_previews_expires_at
 -- +goose StatementEnd
 -- +goose StatementBegin
-DROP TABLE IF EXISTS origins
+DROP TABLE IF EXISTS previews
 -- +goose StatementEnd
 -- +goose StatementBegin
 ALTER TABLE releases DROP COLUMN revoked_at
 -- +goose StatementEnd
 -- +goose StatementBegin
-ALTER TABLE projects DROP COLUMN class
+ALTER TABLE projects DROP COLUMN mode
 -- +goose StatementEnd
 -- +goose StatementBegin
-ALTER TABLE projects DROP COLUMN allowed_origins
+ALTER TABLE projects DROP COLUMN origins
 -- +goose StatementEnd
 -- +goose StatementBegin
 ALTER TABLE projects ADD COLUMN preview_origins STRING(MAX) NOT NULL DEFAULT ('[]')

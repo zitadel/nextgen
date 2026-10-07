@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
@@ -23,7 +22,7 @@ const (
 	// caller with no Origin is served. Stored as the empty origin.
 	TargetDefault = "default"
 	// TargetPrimary expands server-side to every primary pattern of the
-	// project's allowlist.
+	// project's origins.
 	TargetPrimary = "primary"
 )
 
@@ -48,35 +47,39 @@ type CreateDeploymentInput struct {
 	PreviewOnly bool
 }
 
-// DeploymentOutput is the rows one deploy wrote, or, when Created is false,
-// the rows every target already served with the same release and values.
+// RollbackNothingToUndo is the message of the dep.invalid a rollback answers
+// when no requested target has an earlier release to return to; the details
+// carry one note per target.
+const RollbackNothingToUndo = "no target of the deployment has an earlier release to return to"
+
+// DeploymentOutput is the deployment one call wrote, or, when Created is
+// false, the one every target already served with the same release and
+// values.
 type DeploymentOutput struct {
-	DeployID string
-	Release  *domain.Release
-	Targets  []string
-	Rows     []*domain.Deployment
-	Warnings []string
-	Created  bool
+	Deployment *domain.Deployment
+	Release    *domain.Release
+	Warnings   []string
+	Created    bool
 }
 
-// RollbackInput addresses a deploy to undo or re-apply. A nil DeployID undoes
-// the newest deploy; a non-nil Origin narrows the rows to one target.
+// RollbackInput addresses a deployment to undo or re-apply. A nil
+// DeploymentID undoes the newest deployment; a non-nil Origin narrows the
+// targets to one.
 type RollbackInput struct {
-	ProjectID string
-	DeployID  *string
-	Origin    *string
-	Message   *string
+	ProjectID    string
+	DeploymentID *string
+	Origin       *string
+	Message      *string
 }
 
 type ListDeploymentsInput struct {
 	ProjectID string
-	// Origin narrows the list to one target's history, the empty string
-	// being the project default.
+	// Origin narrows the list to the deployments that touched one target,
+	// the empty string being the project default.
 	Origin *string
-	// DeployID narrows the list to the rows one deploy wrote.
-	DeployID *string
-	// Live lists the newest row per target instead of the log, with the
-	// preview expiry joined in. Not paged.
+	// Live lists what every target serves instead of the log: the
+	// deployments current for at least one target, each with only those
+	// targets, the preview expiry joined in. Not paged.
 	Live bool
 	// IncludeReleases embeds the release each deployment made live (ADR 059).
 	IncludeReleases bool
@@ -86,9 +89,6 @@ type ListDeploymentsInput struct {
 
 type ListDeploymentsOutput struct {
 	Items []*domain.Deployment
-	// ExpiresAt holds, per preview origin in Items, when its live row ends.
-	// Only filled by the live view.
-	ExpiresAt map[string]time.Time
 	// ReleasesByID holds the releases the listed deployments point at, keyed
 	// by id, when IncludeReleases asked for them. Nil otherwise.
 	ReleasesByID  map[string]*domain.Release
@@ -112,13 +112,13 @@ type deployTarget struct {
 	preview bool
 }
 
-// Create makes a release live on every target the request names, one row
-// per target in one transaction under one deploy id. The variables each row
-// runs are frozen from the store at this moment.
+// Create makes a release live on every target the request names, as one
+// deployment in one transaction. The variables the deployment runs are
+// frozen from the store at this moment.
 //
-// Idempotent on release and values: when every target's newest row already
-// names this release with the same frozen values, nothing is written and the
-// existing rows are returned with Created false.
+// Idempotent on release and values: when every target already serves this
+// release from one deployment with the same frozen values, nothing is
+// written and that deployment is returned with Created false.
 func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentInput) (*DeploymentOutput, error) {
 	if !input.Reason.IsADeploymentReason() {
 		return nil, domain.ErrDeploymentInvalid("unknown reason", nil)
@@ -159,112 +159,105 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 	if existing, err := s.alreadyServing(ctx, input.ProjectID, release.ID, targets, resolved); err != nil {
 		return nil, err
 	} else if existing != nil {
-		return &DeploymentOutput{
-			DeployID: existing[0].DeployID,
-			Release:  release,
-			Targets:  originsOf(targets),
-			Rows:     existing,
-			Warnings: warnings,
-		}, nil
+		return &DeploymentOutput{Deployment: existing, Release: release, Warnings: warnings}, nil
 	}
 
 	actor, _ := audit.ActorFromContext(ctx)
-	rows := make([]*domain.Deployment, 0, len(targets))
-	for _, target := range targets {
-		row, err := domain.NewDeployment(input.ProjectID, target.origin, release.ID, domain.DeploymentMetadata{
-			Reason:         input.Reason,
-			Message:        input.Message,
-			DeployedBy:     actor.ActorID,
-			DeployedByType: actor.ActorType,
-		})
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, row)
+	entity, err := domain.NewDeployment(input.ProjectID, originsOf(targets), release.ID, domain.DeploymentMetadata{
+		Reason:         input.Reason,
+		Message:        input.Message,
+		DeployedBy:     actor.ActorID,
+		DeployedByType: actor.ActorType,
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	frozen := func(row *domain.Deployment) []*domain.DeploymentVariable {
-		return domain.FreezeVariables(row.ID, resolved)
-	}
 	var expires *time.Time
 	if input.TTL != nil {
 		at := s.now().Add(*input.TTL)
 		expires = &at
 	}
-	deployID, err := s.write(ctx, input.ProjectID, rows, frozen, input.ExpectedDeploymentID, expires)
-	if err != nil {
+	frozen := func(id string) []*domain.DeploymentVariable { return domain.FreezeVariables(id, resolved) }
+	if err := s.write(ctx, entity, frozen, input.ExpectedDeploymentID, expires); err != nil {
 		return nil, err
 	}
-	return &DeploymentOutput{
-		DeployID: deployID,
-		Release:  release,
-		Targets:  originsOf(targets),
-		Rows:     rows,
-		Warnings: warnings,
-		Created:  true,
-	}, nil
+	return &DeploymentOutput{Deployment: entity, Release: release, Warnings: warnings, Created: true}, nil
 }
 
-// Rollback undoes one deploy, or re-applies an earlier one: for every target
-// it moved, a row naming the release that target should serve is appended
-// under a new deploy id with reason rollback, carrying the frozen values of
-// the deployment it restores.
+// Rollback undoes one deployment, or re-applies an earlier one: every target
+// it moved goes back to the release it served before, in one new deployment
+// with reason rollback that carries the frozen values of the deployment it
+// restores.
+//
+// The restored targets may have served different releases before the undone
+// deployment moved them. A rollback is one deployment of one release, so
+// each distinct earlier release is written as a deployment of its own.
 func (s *DeploymentService) Rollback(ctx context.Context, input RollbackInput) (*DeploymentOutput, error) {
 	stmts := s.v2Pool.Statements()
-	undone, err := s.deployRows(ctx, input.ProjectID, input.DeployID)
+	undone, err := s.deploymentToUndo(ctx, input.ProjectID, input.DeploymentID)
 	if err != nil {
 		return nil, err
 	}
+	origins := undone.Origins()
 	if input.Origin != nil {
-		undone = slices.DeleteFunc(undone, func(row *domain.Deployment) bool { return row.Origin != *input.Origin })
-		if len(undone) == 0 {
-			return nil, domain.ErrDeploymentInvalid("the deploy did not move that target", nil)
+		if !containsOrigin(origins, *input.Origin) {
+			return nil, domain.ErrDeploymentInvalid("the deployment did not move that target", nil)
 		}
+		origins = []string{*input.Origin}
 	}
-	reapply := input.DeployID != nil
+	reapply := input.DeploymentID != nil
 
-	actor, _ := audit.ActorFromContext(ctx)
 	var (
-		rows     []*domain.Deployment
-		restored = make(map[string]*domain.Deployment)
 		warnings []string
-		targets  []string
-		release  *domain.Release
+		// The deployment each origin goes back to, grouped by release so
+		// one rollback deployment is written per release.
+		restoredByOrigin = make(map[string]*domain.Deployment)
+		originsByRelease = make(map[string][]string)
+		releaseOrder     []string
 	)
-	for _, row := range undone {
-		targets = append(targets, row.Origin)
-		var restore *domain.Deployment
-		if reapply {
-			restore = row
-		} else {
-			restore, err = s.previousRelease(ctx, input.ProjectID, row)
+	for _, origin := range origins {
+		restore := undone
+		if !reapply {
+			restore, err = s.previousRelease(ctx, input.ProjectID, undone, origin)
 			if err != nil {
 				return nil, err
 			}
 			if restore == nil {
-				warnings = append(warnings, fmt.Sprintf("%s: no earlier release, left as is", targetLabel(row.Origin)))
+				warnings = append(warnings, fmt.Sprintf("%s: no earlier release, left as is", targetLabel(origin)))
 				continue
 			}
 		}
-		newest, err := stmts.NewestDeployment(ctx, input.ProjectID, row.Origin)
+		newest, err := stmts.NewestDeployment(ctx, input.ProjectID, origin)
 		if err != nil && !isNoRow(err) {
 			return nil, domain.ErrInternal(err).WithMessage("failed to read the target's newest deployment")
 		}
-		if newest != nil && newest.ReleaseID == restore.ReleaseID && newest.ID == restore.ID {
-			warnings = append(warnings, fmt.Sprintf("%s: already serving that deployment", targetLabel(row.Origin)))
+		if newest != nil && newest.ID == restore.ID {
+			warnings = append(warnings, fmt.Sprintf("%s: already serving that deployment", targetLabel(origin)))
 			continue
 		}
-		if release == nil || release.ID != restore.ReleaseID {
-			release, err = s.releases.Get(ctx, input.ProjectID, restore.ReleaseID)
-			if err != nil {
-				return nil, err
-			}
+		restoredByOrigin[origin] = restore
+		if _, seen := originsByRelease[restore.ReleaseID]; !seen {
+			releaseOrder = append(releaseOrder, restore.ReleaseID)
+		}
+		originsByRelease[restore.ReleaseID] = append(originsByRelease[restore.ReleaseID], origin)
+	}
+	if len(releaseOrder) == 0 {
+		return nil, domain.ErrDeploymentInvalid(map[string]any{"warnings": warnings}, nil).WithMessage(RollbackNothingToUndo)
+	}
+
+	actor, _ := audit.ActorFromContext(ctx)
+	output := &DeploymentOutput{Warnings: warnings, Created: true}
+	for _, releaseID := range releaseOrder {
+		release, err := s.releases.Get(ctx, input.ProjectID, releaseID)
+		if err != nil {
+			return nil, err
 		}
 		if release.Revoked() {
 			return nil, domain.ErrReleaseRevoked()
 		}
-		undoneID := row.DeployID
-		next, err := domain.NewDeployment(input.ProjectID, row.Origin, restore.ReleaseID, domain.DeploymentMetadata{
+		undoneID := undone.ID
+		next, err := domain.NewDeployment(input.ProjectID, originsByRelease[releaseID], releaseID, domain.DeploymentMetadata{
 			Reason:         domain.DeploymentReasonRollback,
 			Message:        input.Message,
 			RollbackOf:     &undoneID,
@@ -274,67 +267,57 @@ func (s *DeploymentService) Rollback(ctx context.Context, input RollbackInput) (
 		if err != nil {
 			return nil, err
 		}
-		rows = append(rows, next)
-		restored[row.Origin] = restore
-	}
-	if len(rows) == 0 {
-		return &DeploymentOutput{Targets: targets, Warnings: warnings, Release: release}, nil
-	}
-
-	frozenByOrigin := make(map[string][]*domain.DeploymentVariable, len(rows))
-	for origin, restore := range restored {
-		values, err := stmts.GetDeploymentVariables(ctx, input.ProjectID, restore.ID)
+		// Every origin of this rollback restores a deployment of the same
+		// release; the first one's frozen values travel with it.
+		restored := restoredByOrigin[originsByRelease[releaseID][0]]
+		values, err := stmts.GetDeploymentVariables(ctx, input.ProjectID, restored.ID)
 		if err != nil {
 			return nil, domain.ErrInternal(err).WithMessage("failed to read the restored deployment's variables")
 		}
-		frozenByOrigin[origin] = values
-	}
-	frozen := func(row *domain.Deployment) []*domain.DeploymentVariable {
-		copied := make([]*domain.DeploymentVariable, 0, len(frozenByOrigin[row.Origin]))
-		for _, v := range frozenByOrigin[row.Origin] {
-			copied = append(copied, &domain.DeploymentVariable{
-				ProjectID:    v.ProjectID,
-				DeploymentID: row.ID,
-				Name:         v.Name,
-				Value:        v.Value,
-				IsSecret:     v.IsSecret,
-			})
+		frozen := func(id string) []*domain.DeploymentVariable {
+			copied := make([]*domain.DeploymentVariable, 0, len(values))
+			for _, v := range values {
+				copied = append(copied, &domain.DeploymentVariable{
+					ProjectID:    v.ProjectID,
+					DeploymentID: id,
+					Name:         v.Name,
+					Value:        v.Value,
+					IsSecret:     v.IsSecret,
+				})
+			}
+			return copied
 		}
-		return copied
+		if err := s.write(ctx, next, frozen, nil, nil); err != nil {
+			return nil, err
+		}
+		// The answer carries the first deployment written; a rollback that
+		// had to split over releases names the others in warnings.
+		if output.Deployment == nil {
+			output.Deployment = next
+			output.Release = release
+		} else {
+			output.Warnings = append(output.Warnings, fmt.Sprintf("%s served %s before and rolled back as %s", strings.Join(originsByRelease[releaseID], ", "), releaseID, next.ID))
+		}
 	}
-	deployID, err := s.write(ctx, input.ProjectID, rows, frozen, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	return &DeploymentOutput{
-		DeployID: deployID,
-		Release:  release,
-		Targets:  targets,
-		Rows:     rows,
-		Warnings: warnings,
-		Created:  true,
-	}, nil
+	return output, nil
 }
 
-// write appends rows under one minted deploy id, freezes each row's values
-// and renews the preview rows, all in one transaction behind the project
-// lock.
+// write appends the deployment and its targets, freezes its values and
+// renews the preview rows, all in one transaction behind the project lock.
 func (s *DeploymentService) write(
 	ctx context.Context,
-	projectID string,
-	rows []*domain.Deployment,
-	frozen func(*domain.Deployment) []*domain.DeploymentVariable,
+	entity *domain.Deployment,
+	frozen func(deploymentID string) []*domain.DeploymentVariable,
 	expectedDeploymentID *string,
 	previewExpiry *time.Time,
-) (string, error) {
-	var deployID string
+) error {
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
-		if err := stmts.LockProject(ctx, projectID); err != nil {
+		if err := stmts.LockProject(ctx, entity.ProjectID); err != nil {
 			return err
 		}
 		if expectedDeploymentID != nil {
-			newest, err := stmts.NewestDeployment(ctx, projectID, rows[0].Origin)
+			newest, err := stmts.NewestDeployment(ctx, entity.ProjectID, entity.Targets[0].Origin)
 			if err != nil && !isNoRow(err) {
 				return err
 			}
@@ -347,56 +330,45 @@ func (s *DeploymentService) write(
 				return domain.ErrDeploymentConflict(details)
 			}
 		}
-		id, err := stmts.NewManagedID(string(domain.PrefixDeploy))
-		if err != nil {
+		if err := stmts.CreateDeployment(ctx, entity); err != nil {
 			return err
 		}
-		deployID = id
-		for _, row := range rows {
-			row.DeployID = deployID
-		}
-		if err := stmts.CreateDeployments(ctx, rows); err != nil {
-			return err
-		}
-		for _, row := range rows {
-			if values := frozen(row); len(values) > 0 {
-				if err := stmts.CreateDeploymentVariables(ctx, values); err != nil {
-					return err
-				}
+		if values := frozen(entity.ID); len(values) > 0 {
+			if err := stmts.CreateDeploymentVariables(ctx, values); err != nil {
+				return err
 			}
-			if previewExpiry != nil {
-				if err := stmts.UpsertOrigin(ctx, &domain.Origin{
-					ProjectID: projectID,
-					Origin:    row.Origin,
+		}
+		if previewExpiry != nil {
+			for _, target := range entity.Targets {
+				if err := stmts.UpsertPreview(ctx, &domain.Preview{
+					ProjectID: entity.ProjectID,
+					Origin:    target.Origin,
 					ExpiresAt: *previewExpiry,
 				}); err != nil {
 					return err
 				}
 			}
-			if err := emitDeploymentCreated(ctx, stmts, row); err != nil {
-				return err
-			}
 		}
-		return nil
+		return emitDeploymentCreated(ctx, stmts, entity)
 	})
 	if err != nil {
 		if isNoRow(err) {
-			return "", domain.ErrProjectNotFound()
+			return domain.ErrProjectNotFound()
 		}
 		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
-			return "", domain.ErrDeploymentInvalid("release not found in this project", err)
+			return domain.ErrDeploymentInvalid("release not found in this project", err)
 		}
 		if de, ok := errors.AsType[domain.Error](err); ok {
-			return "", de
+			return de
 		}
-		return "", domain.ErrInternal(err).WithMessage("failed to create deployment")
+		return domain.ErrInternal(err).WithMessage("failed to create deployment")
 	}
-	return deployID, nil
+	return nil
 }
 
 // expandTargets turns the wire selectors into exact targets, checked against
-// the allowlist. Mixing preview origins with the default or a primary is
-// refused: a preview run never moves production.
+// the project's origins. Mixing preview origins with the default or a
+// primary is refused: a preview run never moves production.
 func expandTargets(project *domain.Project, selectors []string) ([]deployTarget, []string, error) {
 	if len(selectors) == 0 {
 		return nil, nil, domain.ErrDeploymentInvalid("at least one target is required", nil)
@@ -417,7 +389,7 @@ func expandTargets(project *domain.Project, selectors []string) ([]deployTarget,
 		case TargetDefault:
 			add(deployTarget{origin: ""})
 		case TargetPrimary:
-			for _, entry := range project.AllowedOrigins {
+			for _, entry := range project.Origins {
 				if entry.Kind != domain.OriginKindPrimary {
 					continue
 				}
@@ -432,7 +404,7 @@ func expandTargets(project *domain.Project, selectors []string) ([]deployTarget,
 			if err != nil {
 				return nil, nil, domain.ErrDeploymentInvalid(map[string]string{"target": selector, "reason": "not a target: use default, primary, or an exact origin"}, err)
 			}
-			matched, ok := domain.MatchAllowedOrigin(project.AllowedOrigins, origin)
+			matched, ok := domain.MatchOrigin(project.Origins, origin)
 			if !ok {
 				return nil, nil, domain.ErrProjectOriginNotAllowed(map[string]string{"origin": origin})
 			}
@@ -459,6 +431,15 @@ func originsOf(targets []deployTarget) []string {
 	return origins
 }
 
+func containsOrigin(origins []string, origin string) bool {
+	for _, candidate := range origins {
+		if candidate == origin {
+			return true
+		}
+	}
+	return false
+}
+
 func targetLabel(origin string) string {
 	if origin == "" {
 		return "(default)"
@@ -466,11 +447,11 @@ func targetLabel(origin string) string {
 	return origin
 }
 
-// alreadyServing returns the newest rows of every target when all of them
-// already name releaseID with the same frozen values, else nil.
-func (s *DeploymentService) alreadyServing(ctx context.Context, projectID, releaseID string, targets []deployTarget, resolved []*domain.Variable) ([]*domain.Deployment, error) {
+// alreadyServing returns the deployment every target serves when it is one
+// and the same, names releaseID and froze the same values, else nil.
+func (s *DeploymentService) alreadyServing(ctx context.Context, projectID, releaseID string, targets []deployTarget, resolved []*domain.Variable) (*domain.Deployment, error) {
 	stmts := s.v2Pool.Statements()
-	rows := make([]*domain.Deployment, 0, len(targets))
+	var current *domain.Deployment
 	for _, target := range targets {
 		newest, err := stmts.NewestDeployment(ctx, projectID, target.origin)
 		if err != nil {
@@ -479,19 +460,19 @@ func (s *DeploymentService) alreadyServing(ctx context.Context, projectID, relea
 			}
 			return nil, domain.ErrInternal(err).WithMessage("failed to read the target's newest deployment")
 		}
-		if newest.ReleaseID != releaseID {
+		if newest.ReleaseID != releaseID || (current != nil && newest.ID != current.ID) {
 			return nil, nil
 		}
-		frozen, err := stmts.GetDeploymentVariables(ctx, projectID, newest.ID)
-		if err != nil {
-			return nil, domain.ErrInternal(err).WithMessage("failed to read the deployment's variables")
-		}
-		if !sameFrozenValues(frozen, resolved) {
-			return nil, nil
-		}
-		rows = append(rows, newest)
+		current = newest
 	}
-	return rows, nil
+	frozen, err := stmts.GetDeploymentVariables(ctx, projectID, current.ID)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to read the deployment's variables")
+	}
+	if !sameFrozenValues(frozen, resolved) {
+		return nil, nil
+	}
+	return current, nil
 }
 
 // sameFrozenValues reports whether a deployment's frozen set equals the
@@ -519,44 +500,33 @@ func sameFrozenValues(frozen []*domain.DeploymentVariable, resolved []*domain.Va
 	return true
 }
 
-// deployRows reads the rows one deploy wrote, or the newest deploy's rows
-// when deployID is nil.
-func (s *DeploymentService) deployRows(ctx context.Context, projectID string, deployID *string) ([]*domain.Deployment, error) {
-	// Nested reads on behalf of a caller the handler already authorised.
-	ctx = WithAuthzListUnrestricted(ctx)
-	stmts := s.v2Pool.Statements()
-	id := deployID
-	if id == nil {
-		page, err := stmts.ListDeployments(ctx, deployment.ListOptions(projectID, nil, nil, 1))
-		if err != nil {
-			return nil, mapListError(err, "failed to list deployments")
-		}
-		if len(page.Items) == 0 {
-			return nil, domain.ErrDeploymentNotFound().WithMessage("the project has no deployment to roll back")
-		}
-		id = &page.Items[0].DeployID
+// deploymentToUndo reads the named deployment, or the project's newest one
+// when deploymentID is nil.
+func (s *DeploymentService) deploymentToUndo(ctx context.Context, projectID string, deploymentID *string) (*domain.Deployment, error) {
+	if deploymentID != nil {
+		return s.Get(ctx, projectID, *deploymentID)
 	}
-	page, err := stmts.ListDeployments(ctx, deployment.ListOptions(projectID, nil, id, 100))
+	// A nested read on behalf of a caller the handler already authorised.
+	page, err := s.v2Pool.Statements().ListDeployments(WithAuthzListUnrestricted(ctx), deployment.ListOptions(projectID, nil, 1))
 	if err != nil {
 		return nil, mapListError(err, "failed to list deployments")
 	}
 	if len(page.Items) == 0 {
-		return nil, domain.ErrDeploymentNotFound()
+		return nil, domain.ErrDeploymentNotFound().WithMessage("the project has no deployment to roll back")
 	}
-	return page.Items, nil
+	return page.Items[0], nil
 }
 
-// previousRelease finds the newest row on row's target that names a release
-// other than row's and does not belong to row's deploy, or nil when the
-// target has served nothing else.
-func (s *DeploymentService) previousRelease(ctx context.Context, projectID string, row *domain.Deployment) (*domain.Deployment, error) {
-	origin := row.Origin
-	page, err := s.v2Pool.Statements().ListDeployments(WithAuthzListUnrestricted(ctx), deployment.ListOptions(projectID, &origin, nil, 100))
+// previousRelease finds the newest deployment of origin that names a release
+// other than undone's and is not undone itself, or nil when the target has
+// served nothing else.
+func (s *DeploymentService) previousRelease(ctx context.Context, projectID string, undone *domain.Deployment, origin string) (*domain.Deployment, error) {
+	page, err := s.v2Pool.Statements().ListDeployments(WithAuthzListUnrestricted(ctx), deployment.ListOptions(projectID, &origin, 100))
 	if err != nil {
 		return nil, mapListError(err, "failed to list deployments")
 	}
 	for _, candidate := range page.Items {
-		if candidate.DeployID == row.DeployID || candidate.ReleaseID == row.ReleaseID {
+		if candidate.ID == undone.ID || candidate.ReleaseID == undone.ReleaseID {
 			continue
 		}
 		return candidate, nil
@@ -622,17 +592,24 @@ func (s *DeploymentService) List(ctx context.Context, input ListDeploymentsInput
 		if err != nil {
 			return nil, mapListError(err, "failed to list live deployments")
 		}
-		origins, err := stmts.ListOrigins(ctx, input.ProjectID)
+		previews, err := stmts.ListPreviews(ctx, input.ProjectID)
 		if err != nil {
-			return nil, domain.ErrInternal(err).WithMessage("failed to list origins")
+			return nil, domain.ErrInternal(err).WithMessage("failed to list previews")
+		}
+		expires := make(map[string]time.Time, len(previews))
+		for _, preview := range previews {
+			expires[preview.Origin] = preview.ExpiresAt
+		}
+		for _, item := range items {
+			for i := range item.Targets {
+				if at, ok := expires[item.Targets[i].Origin]; ok {
+					item.Targets[i].ExpiresAt = &at
+				}
+			}
 		}
 		output.Items = items
-		output.ExpiresAt = make(map[string]time.Time, len(origins))
-		for _, origin := range origins {
-			output.ExpiresAt[origin.Origin] = origin.ExpiresAt
-		}
 	} else {
-		opts := deployment.ListOptions(input.ProjectID, input.Origin, input.DeployID, uint32(normalizeLimit(input.Limit)))
+		opts := deployment.ListOptions(input.ProjectID, input.Origin, uint32(normalizeLimit(input.Limit)))
 		opts.Pagination.Cursor = []byte(input.PageToken)
 		result, err := stmts.ListDeployments(ctx, opts)
 		if err != nil {
@@ -674,13 +651,13 @@ func (s *DeploymentService) releasesFor(ctx context.Context, projectID string, i
 	return byID, nil
 }
 
-// ---- Origins ---------------------------------------------------------------
+// ---- Previews --------------------------------------------------------------
 
-// ListOrigins returns the project's live preview rows, expired ones left out.
-func (s *DeploymentService) ListOrigins(ctx context.Context, projectID string) ([]*domain.Origin, error) {
-	rows, err := s.v2Pool.Statements().ListOrigins(ctx, projectID)
+// ListPreviews returns the project's live previews, expired ones left out.
+func (s *DeploymentService) ListPreviews(ctx context.Context, projectID string) ([]*domain.Preview, error) {
+	rows, err := s.v2Pool.Statements().ListPreviews(ctx, projectID)
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to list origins")
+		return nil, domain.ErrInternal(err).WithMessage("failed to list previews")
 	}
 	now := s.now()
 	live := rows[:0]
@@ -692,17 +669,17 @@ func (s *DeploymentService) ListOrigins(ctx context.Context, projectID string) (
 	return live, nil
 }
 
-// RemoveOrigin retires one preview URL: its row goes, its deployment rows stay.
-func (s *DeploymentService) RemoveOrigin(ctx context.Context, projectID, origin string) error {
+// RemovePreview retires one preview URL: its row goes, its deployments stay.
+func (s *DeploymentService) RemovePreview(ctx context.Context, projectID, origin string) error {
 	normalized, err := domain.NormalizeOrigin(origin)
 	if err != nil {
 		return err
 	}
-	if err := s.v2Pool.Statements().DeleteOrigin(ctx, projectID, normalized); err != nil {
+	if err := s.v2Pool.Statements().DeletePreview(ctx, projectID, normalized); err != nil {
 		if isNoRow(err) {
-			return domain.ErrOriginNotFound()
+			return domain.ErrPreviewNotFound()
 		}
-		return domain.ErrInternal(err).WithMessage("failed to delete origin")
+		return domain.ErrInternal(err).WithMessage("failed to delete preview")
 	}
 	return nil
 }

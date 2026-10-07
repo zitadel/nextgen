@@ -4,10 +4,10 @@ description: |
   Allowlisted fields for `deployment.created`. The deployment id is already
   the event's `entity_id`; the fields here say what went live where.
 properties:
-  origin:
-    type: string
-  deploy_id:
-    type: string
+  origins:
+    type: array
+    items:
+      type: string
   release_id:
     type: string
   reason:

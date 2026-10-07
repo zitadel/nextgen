@@ -8,16 +8,16 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
-	// AddAllowedOrigin implements addAllowedOrigin operation.
+	// AddOrigin implements addOrigin operation.
 	//
-	// Adds one `{pattern, kind}` to the project's allowlist. The pattern is
-	// checked against the project's class: a `production` project refuses
+	// Adds one `{pattern, kind}` to the project's origins. The pattern is
+	// checked against the project's mode: a `production` project refuses
 	// loopback hosts, a `*` in a `primary` pattern, and a `preview` wildcard on
 	// a shared host that carries no tenant-unique label. A host the server does
 	// not know is accepted with a warning naming what it could not check.
 	//
-	// POST /projects/{project_id}/allowed_origins
-	AddAllowedOrigin(ctx context.Context, req *AllowedOrigin, params AddAllowedOriginParams) (AddAllowedOriginRes, error)
+	// POST /projects/{project_id}/origins
+	AddOrigin(ctx context.Context, req *Origin, params AddOriginParams) (AddOriginRes, error)
 	// BeginUserPasskeyRegistration implements beginUserPasskeyRegistration operation.
 	//
 	// Starts a WebAuthn registration ceremony for the user and returns the
@@ -59,36 +59,19 @@ type Handler interface {
 	//
 	// POST /branding
 	CreateBranding(ctx context.Context, req *Branding, params CreateBrandingParams) (CreateBrandingRes, error)
-	// CreateConfigurationRelease implements createConfigurationRelease operation.
-	//
-	// The CLI's entry point for shipping configuration: takes the contents of
-	// `.zitadel/` as authored on disk and turns it into a release in one call.
-	// For every resource in the bundle the server compares the content against
-	// the project's newest revision of that resource. Unchanged content reuses
-	// the existing revision; changed content allocates a new one. Handle
-	// references between resources (a flow definition's `user_schema` naming a
-	// schema by `objectType`) are resolved to the revision ids the same bundle
-	// produced. The resulting set of revisions is assembled into a release, so
-	// submitting an unchanged bundle twice answers `200` with the release that
-	// already pins it. The caller keeps no state: the same `.zitadel/` builds
-	// the same release on any project.
-	// Building a release does not deploy it. Follow up with `POST /deployments`
-	// to make it live on a target.
-	//
-	// POST /configuration-releases
-	CreateConfigurationRelease(ctx context.Context, req *ConfigurationBundle, params CreateConfigurationReleaseParams) (CreateConfigurationReleaseRes, error)
 	// CreateDeployment implements createDeployment operation.
 	//
-	// Makes a release live on one or more targets by appending a deployment row
-	// per target, all in one transaction under one `deploy_id`. What a target
-	// serves is its newest row, so nothing else moves.
-	// The variables each row runs are frozen at this moment: the project's
-	// variable store is resolved (`preview` values overriding `all` values when
-	// every target is a preview origin) and copied onto the deployment, so a
-	// later edit of the store reaches no deployment until the next deploy.
-	// Idempotent on release and values: when every target's newest row already
-	// names this release with the same frozen values, nothing is written and the
-	// answer is `200` with those rows.
+	// Makes a release live on one or more targets as one deployment, written in
+	// one transaction. What a target serves is the newest deployment naming it,
+	// so nothing else moves.
+	// The variables the deployment runs are frozen at this moment: the
+	// project's variable store is resolved (`preview` values overriding `all`
+	// values when every target is a preview origin) and copied onto the
+	// deployment, so a later edit of the store reaches no deployment until the
+	// next deploy.
+	// Idempotent on release and values: when every target already serves this
+	// release from one deployment with the same frozen values, nothing is
+	// written and the answer is `200` with that deployment.
 	//
 	// POST /deployments
 	CreateDeployment(ctx context.Context, req *CreateDeploymentRequest, params CreateDeploymentParams) (CreateDeploymentRes, error)
@@ -187,18 +170,27 @@ type Handler interface {
 	CreateProject(ctx context.Context, req *CreateProjectRequest) (CreateProjectRes, error)
 	// CreateRelease implements createRelease operation.
 	//
-	// Bundles a release from revisions that already exist, supplied as
+	// Assembles a release in one of two forms.
+	// `pointers` pins revisions that already exist, supplied as
 	// `(kind, revision_id)` pairs. No new revisions are allocated — use the
-	// per-kind create endpoints for that, then pin the ids here.
-	// Every referenced `revision_id` must exist in the project. Each one's handle
-	// is read from the revision itself and recorded on the release, so a resource
+	// per-kind create endpoints for that, then pin the ids here. Every
+	// referenced `revision_id` must exist in the project; each one's handle is
+	// read from the revision itself and recorded on the release, so a resource
 	// is always pinned under the identity it declares.
-	// Creating a release does not deploy it. A release is environment-agnostic
-	// and the same release can later be deployed to any number of environments
+	// `bundle` takes the contents of `.zitadel/` as authored on disk. For every
+	// resource in it the server compares the content against the project's
+	// newest revision of the same handle: unchanged content reuses that
+	// revision, changed content allocates a new one. Handle references between
+	// resources (a flow definition's `user_schema` naming a schema by
+	// `objectType`) resolve to the revisions the same bundle produced. The
+	// caller keeps no state: the same `.zitadel/` builds the same release on
+	// any project.
+	// Creating a release does not deploy it. A release is not tied to a target
+	// and the same release can later be deployed to any number of targets
 	// unchanged.
 	// Idempotent on the pinned set: metadata is excluded from the comparison, so
-	// re-submitting the same revisions with a different `message` returns the
-	// release that already pins them rather than creating a second one.
+	// re-submitting the same content with a different `message` returns the
+	// release that already pins it rather than creating a second one.
 	//
 	// POST /releases
 	CreateRelease(ctx context.Context, req *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error)
@@ -576,11 +568,12 @@ type Handler interface {
 	// ListDeployments implements listDeployments operation.
 	//
 	// Lists deployments newest first. Bare, it is the project-wide log. `origin`
-	// narrows it to one target's history (`""` for the default), `deploy_id` to
-	// the rows one deploy wrote, and `live=true` to the newest row per target —
-	// what each one serves right now, with `expires_at` filled for previews.
-	// `expand: ["release"]` embeds the release each row made live; it requires
-	// `release.read`.
+	// narrows it to the deployments that touched one target (`""` for the
+	// default). `live=true` answers what every target serves right now: the
+	// deployments current for at least one target, each listing only the
+	// targets it serves, with `expires_at` filled for previews.
+	// `expand: ["release"]` embeds the release each deployment made live; it
+	// requires `release.read`.
 	//
 	// GET /deployments
 	ListDeployments(ctx context.Context, params ListDeploymentsParams) (ListDeploymentsRes, error)
@@ -625,15 +618,16 @@ type Handler interface {
 	//
 	// GET /users/me/projects
 	ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error)
-	// ListOrigins implements listOrigins operation.
+	// ListPreviews implements listPreviews operation.
 	//
-	// One row per live preview URL of the project, with its expiry. The row is
-	// what admits a request from that URL: a URL matching a `preview` pattern
-	// but holding no row is refused. Rows are written by deploying to a preview
-	// target and go away when they expire or are removed.
+	// One entry per live preview URL of the project, with its expiry. The
+	// preview is what admits a request from that URL: a URL matching a
+	// `preview` pattern but holding no live preview is refused. Previews are
+	// written by deploying to a preview target and go away when they expire or
+	// are removed.
 	//
-	// GET /origins
-	ListOrigins(ctx context.Context, params ListOriginsParams) (ListOriginsRes, error)
+	// GET /previews
+	ListPreviews(ctx context.Context, params ListPreviewsParams) (ListPreviewsRes, error)
 	// ListReleases implements listReleases operation.
 	//
 	// Lists the project's releases, newest first.
@@ -747,22 +741,22 @@ type Handler interface {
 	//
 	// POST /users/query
 	QueryUsers(ctx context.Context, req *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
-	// RemoveAllowedOrigin implements removeAllowedOrigin operation.
-	//
-	// Removes one pattern from the project's allowlist. Requests from URLs only
-	// that pattern admitted are refused from now on; live preview rows and
-	// deployment history are untouched.
-	//
-	// POST /projects/{project_id}/allowed_origins/remove
-	RemoveAllowedOrigin(ctx context.Context, req *RemoveAllowedOriginReq, params RemoveAllowedOriginParams) (RemoveAllowedOriginRes, error)
 	// RemoveOrigin implements removeOrigin operation.
 	//
-	// Deletes the live row behind one preview URL, so requests from it are
-	// refused from now on. The URL's deployment rows are kept. A URL with no
-	// row answers not found.
+	// Removes one pattern from the project's origins. Requests from URLs only
+	// that pattern admitted are refused from now on; live previews and
+	// deployment history are untouched.
 	//
-	// POST /origins/remove
+	// POST /projects/{project_id}/origins/remove
 	RemoveOrigin(ctx context.Context, req *RemoveOriginReq, params RemoveOriginParams) (RemoveOriginRes, error)
+	// RemovePreview implements removePreview operation.
+	//
+	// Deletes the live preview behind one URL, so requests from it are refused
+	// from now on. The URL's deployments are kept. A URL with no live preview
+	// answers not found.
+	//
+	// POST /previews/remove
+	RemovePreview(ctx context.Context, req *RemovePreviewReq, params RemovePreviewParams) (RemovePreviewRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Logs out by permanently deleting the session.
@@ -796,26 +790,30 @@ type Handler interface {
 	RevokeSession(ctx context.Context, params RevokeSessionParams) (RevokeSessionRes, error)
 	// RollbackDeployment implements rollbackDeployment operation.
 	//
-	// Undoes one deploy: for every target that deploy moved, appends a row
-	// naming the release that target served before it, under a new `deploy_id`
-	// with `reason: rollback` and `rollback_of` set. Bare, it undoes the newest
-	// deploy of the project; `deploy_id` names an earlier one to re-apply, and
-	// `origin` narrows the undo to one target.
-	// A target the undone deploy created has no earlier release and is left as
-	// it is; it is named in `warnings`. The frozen values of the restored
-	// deployment travel with it.
+	// Undoes one deployment: every target it moved goes back to the release it
+	// served before, in a new deployment with `reason: rollback` and
+	// `rollback_of` set. Bare, it undoes the newest deployment of the project;
+	// `deployment_id` names an earlier one to re-apply on every target it
+	// touched, and `origin` narrows the undo to one target.
+	// A target the undone deployment created has no earlier release and is
+	// left as it is; it is named in `warnings`. When no requested target has
+	// one, nothing is written and the answer is `409` `dep.invalid` with those
+	// notes in `details.warnings`. The frozen values of the restored deployment
+	// travel with it. When the targets served different releases before, one
+	// rollback deployment is written per release and the others are named in
+	// `warnings`.
 	//
 	// POST /deployments/rollback
 	RollbackDeployment(ctx context.Context, req *RollbackRequest, params RollbackDeploymentParams) (RollbackDeploymentRes, error)
-	// SetProjectClass implements setProjectClass operation.
+	// SetProjectMode implements setProjectMode operation.
 	//
-	// Sets the project's class. `sandbox` → `production` re-checks every
-	// allowlist pattern against the production rules and fails naming each
-	// offender; it requires a claimed project. `production` → `sandbox` lets
-	// loopback origins back in and needs `confirm: true`.
+	// Sets the project's mode. `sandbox` → `production` re-checks every origin
+	// pattern against the production rules and fails naming each offender; it
+	// requires a claimed project. `production` → `sandbox` lets loopback
+	// origins back in and needs `confirm: true`.
 	//
-	// POST /projects/{project_id}/class
-	SetProjectClass(ctx context.Context, req *SetProjectClassReq, params SetProjectClassParams) (SetProjectClassRes, error)
+	// POST /projects/{project_id}/mode
+	SetProjectMode(ctx context.Context, req *SetProjectModeReq, params SetProjectModeParams) (SetProjectModeRes, error)
 	// SetUserPassword implements setUserPassword operation.
 	//
 	// Set user password.

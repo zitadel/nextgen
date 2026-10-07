@@ -6,10 +6,10 @@ import (
 	"time"
 )
 
-// OriginKind says what an allowlist pattern is for. A primary pattern admits
+// OriginKind says what an origin pattern is for. A primary pattern admits
 // requests from the URLs it matches; a preview pattern only bounds which URLs
 // a preview deploy may register, and a request from such a URL is admitted by
-// the live [Origin] row alone.
+// its [Preview] row alone.
 //
 //go:generate go tool enumer -type OriginKind -transform snake -trimprefix OriginKind -sql
 type OriginKind uint8
@@ -19,41 +19,40 @@ const (
 	OriginKindPreview
 )
 
-// ProjectClass is what a project is for. A sandbox allows loopback origins,
-// an empty allowlist meaning allow-all, and any release named in a header; a
+// ProjectMode is what a project is for. A sandbox allows loopback origins,
+// no origins meaning allow-all, and any release named in a header; a
 // production project requires at least one pattern, refuses loopback and
 // wildcard primaries, and only serves a pinned release already deployed to
 // the matched target.
 //
-//go:generate go tool enumer -type ProjectClass -transform snake -trimprefix ProjectClass -sql
-type ProjectClass uint8
+//go:generate go tool enumer -type ProjectMode -transform snake -trimprefix ProjectMode -sql
+type ProjectMode uint8
 
 const (
-	ProjectClassSandbox ProjectClass = iota
-	ProjectClassProduction
+	ProjectModeSandbox ProjectMode = iota
+	ProjectModeProduction
 )
 
-// AllowedOrigin is one entry of a project's origin allowlist: a pattern and
-// what it is for. Pattern is normalised (lowercase scheme://host[:port]) and
-// may hold one or more `*`, each matching one or more characters none of
-// which is a dot.
-type AllowedOrigin struct {
+// Origin is one entry of a project's origins: a pattern and what it is for.
+// Pattern is normalised (lowercase scheme://host[:port]) and may hold one or
+// more `*`, each matching one or more characters none of which is a dot.
+type Origin struct {
 	Pattern string
 	Kind    OriginKind
 }
 
-// Origin is a live preview URL. The row is what admits requests from the URL
-// until ExpiresAt; a URL matching a preview pattern but holding no row is
-// refused. Renewed by deploying to it again, retired by deleting it.
-type Origin struct {
+// Preview is a live preview URL. The row is what admits requests from the
+// URL until ExpiresAt; a URL matching a preview pattern but holding no row
+// is refused. Renewed by deploying to it again, retired by deleting it.
+type Preview struct {
 	ProjectID string
 	Origin    string
 	ExpiresAt time.Time
 	CreatedAt time.Time
 }
 
-func (o *Origin) Expired(now time.Time) bool {
-	return !o.ExpiresAt.After(now)
+func (p *Preview) Expired(now time.Time) bool {
+	return !p.ExpiresAt.After(now)
 }
 
 // OriginLintWarning is a non-fatal finding on a pattern: accepted, with a
@@ -68,11 +67,15 @@ func ErrOriginInvalid(details any) Error {
 }
 
 func ErrOriginNotFound() Error {
-	return newError("origin.not_found", "origin: no live preview row for this URL", nil, nil)
+	return newError("origin.not_found", "origin: no such pattern on this project", nil, nil)
 }
 
-func ErrOriginNotPermittedForClass(details any) Error {
-	return newError("origin.not_permitted_for_class", "origin: the pattern is not permitted on a project of this class", details, nil)
+func ErrPreviewNotFound() Error {
+	return newError("preview.not_found", "preview: no live preview for this URL", nil, nil)
+}
+
+func ErrOriginNotPermittedForMode(details any) Error {
+	return newError("origin.not_permitted_for_mode", "origin: the pattern is not permitted on a project in this mode", details, nil)
 }
 
 func ErrOriginUnbounded(details any) Error {
@@ -95,8 +98,8 @@ func ErrProjectMismatch() Error {
 	return newError(PrefixProject.ErrorCodePrefix("mismatch"), "the project named in the request is not the one the credential belongs to", nil, nil)
 }
 
-func ErrProjectClassChangeRefused(details any) Error {
-	return newError(PrefixProject.ErrorCodePrefix("class_change_refused"), "the project cannot change class until every allowed origin passes the rules of the new class", details, nil)
+func ErrProjectModeChangeRefused(details any) Error {
+	return newError(PrefixProject.ErrorCodePrefix("mode_change_refused"), "the project cannot change mode until every origin passes the rules of the new mode", details, nil)
 }
 
 // NormalizeOrigin lowercases and validates an origin or an origin pattern:
@@ -146,16 +149,16 @@ func splitHostPort(host string) (hostname, port string) {
 	return host, ""
 }
 
-// MatchAllowedOrigin returns the allowlist entry that admits origin. A
-// literal match beats a wildcard match, and among wildcards the first in the
-// list wins. Scheme and port compare literally; there is no loopback
-// aliasing, because the WebAuthn relying-party id derives from the host.
-func MatchAllowedOrigin(patterns []AllowedOrigin, origin string) (AllowedOrigin, bool) {
+// MatchOrigin returns the entry that admits origin. A literal match beats a
+// wildcard match, and among wildcards the first in the list wins. Scheme and
+// port compare literally; there is no loopback aliasing, because the
+// WebAuthn relying-party id derives from the host.
+func MatchOrigin(patterns []Origin, origin string) (Origin, bool) {
 	origin = strings.ToLower(strings.TrimSpace(origin))
 	if origin == "" {
-		return AllowedOrigin{}, false
+		return Origin{}, false
 	}
-	var wildcard *AllowedOrigin
+	var wildcard *Origin
 	for i := range patterns {
 		entry := patterns[i]
 		if !strings.Contains(entry.Pattern, "*") {
@@ -171,7 +174,7 @@ func MatchAllowedOrigin(patterns []AllowedOrigin, origin string) (AllowedOrigin,
 	if wildcard != nil {
 		return *wildcard, true
 	}
-	return AllowedOrigin{}, false
+	return Origin{}, false
 }
 
 // matchOriginPattern reports whether a wildcard pattern covers origin. Each
@@ -250,25 +253,25 @@ func dottedLabel(left string) bool {
 	return ok && rest != "" && !strings.Contains(rest, "*")
 }
 
-// LintOriginPattern checks one allowlist entry against a project class. It
-// returns an error for a pattern the class refuses and a warning for one it
-// accepts without being able to check. The same rules run when a project
-// changes class, against every pattern it holds.
-func LintOriginPattern(class ProjectClass, entry AllowedOrigin) (*OriginLintWarning, error) {
+// LintOriginPattern checks one entry against a project mode. It returns an
+// error for a pattern the mode refuses and a warning for one it accepts
+// without being able to check. The same rules run when a project changes
+// mode, against every pattern it holds.
+func LintOriginPattern(mode ProjectMode, entry Origin) (*OriginLintWarning, error) {
 	if _, err := NormalizeOrigin(entry.Pattern); err != nil {
 		return nil, err
 	}
 	hasStar := strings.Contains(entry.Pattern, "*")
 	details := map[string]string{"pattern": entry.Pattern, "kind": entry.Kind.String()}
 
-	if class == ProjectClassProduction {
+	if mode == ProjectModeProduction {
 		if IsLoopbackOrigin(entry.Pattern) {
 			details["reason"] = "loopback origins are only allowed on a sandbox project"
-			return nil, ErrOriginNotPermittedForClass(details)
+			return nil, ErrOriginNotPermittedForMode(details)
 		}
 		if entry.Kind == OriginKindPrimary && hasStar {
 			details["reason"] = "a primary pattern on a production project must be an exact origin"
-			return nil, ErrOriginNotPermittedForClass(details)
+			return nil, ErrOriginNotPermittedForMode(details)
 		}
 	}
 	if !hasStar {
@@ -285,7 +288,7 @@ func LintOriginPattern(class ProjectClass, entry AllowedOrigin) (*OriginLintWarn
 		if shared.labelBounded(left) {
 			return nil, nil
 		}
-		if class == ProjectClassProduction {
+		if mode == ProjectModeProduction {
 			details["host"] = strings.TrimPrefix(shared.suffix, ".")
 			return nil, ErrOriginUnbounded(details)
 		}

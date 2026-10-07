@@ -553,6 +553,44 @@ func (c *MockAllStatementsCreateChallengeCall) DoAndReturn(f func(context.Contex
 	return c
 }
 
+// CreateDeployment mocks base method.
+func (m *MockAllStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateDeployment", ctx, entity)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateDeployment indicates an expected call of CreateDeployment.
+func (mr *MockAllStatementsMockRecorder) CreateDeployment(ctx, entity any) *MockAllStatementsCreateDeploymentCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateDeployment", reflect.TypeOf((*MockAllStatements)(nil).CreateDeployment), ctx, entity)
+	return &MockAllStatementsCreateDeploymentCall{Call: call}
+}
+
+// MockAllStatementsCreateDeploymentCall wrap *gomock.Call
+type MockAllStatementsCreateDeploymentCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsCreateDeploymentCall) Return(arg0 error) *MockAllStatementsCreateDeploymentCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsCreateDeploymentCall) Do(f func(context.Context, *domain.Deployment) error) *MockAllStatementsCreateDeploymentCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsCreateDeploymentCall) DoAndReturn(f func(context.Context, *domain.Deployment) error) *MockAllStatementsCreateDeploymentCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // CreateDeploymentVariables mocks base method.
 func (m *MockAllStatements) CreateDeploymentVariables(ctx context.Context, rows []*domain.DeploymentVariable) error {
 	m.ctrl.T.Helper()
@@ -587,44 +625,6 @@ func (c *MockAllStatementsCreateDeploymentVariablesCall) Do(f func(context.Conte
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsCreateDeploymentVariablesCall) DoAndReturn(f func(context.Context, []*domain.DeploymentVariable) error) *MockAllStatementsCreateDeploymentVariablesCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// CreateDeployments mocks base method.
-func (m *MockAllStatements) CreateDeployments(ctx context.Context, rows []*domain.Deployment) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateDeployments", ctx, rows)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// CreateDeployments indicates an expected call of CreateDeployments.
-func (mr *MockAllStatementsMockRecorder) CreateDeployments(ctx, rows any) *MockAllStatementsCreateDeploymentsCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateDeployments", reflect.TypeOf((*MockAllStatements)(nil).CreateDeployments), ctx, rows)
-	return &MockAllStatementsCreateDeploymentsCall{Call: call}
-}
-
-// MockAllStatementsCreateDeploymentsCall wrap *gomock.Call
-type MockAllStatementsCreateDeploymentsCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsCreateDeploymentsCall) Return(arg0 error) *MockAllStatementsCreateDeploymentsCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsCreateDeploymentsCall) Do(f func(context.Context, []*domain.Deployment) error) *MockAllStatementsCreateDeploymentsCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsCreateDeploymentsCall) DoAndReturn(f func(context.Context, []*domain.Deployment) error) *MockAllStatementsCreateDeploymentsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1467,41 +1467,41 @@ func (c *MockAllStatementsDeleteEventsOlderThanCall) DoAndReturn(f func(context.
 	return c
 }
 
-// DeleteExpiredOrigins mocks base method.
-func (m *MockAllStatements) DeleteExpiredOrigins(ctx context.Context, now time.Time) (int64, error) {
+// DeleteExpiredPreviews mocks base method.
+func (m *MockAllStatements) DeleteExpiredPreviews(ctx context.Context, now time.Time) (int64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteExpiredOrigins", ctx, now)
+	ret := m.ctrl.Call(m, "DeleteExpiredPreviews", ctx, now)
 	ret0, _ := ret[0].(int64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// DeleteExpiredOrigins indicates an expected call of DeleteExpiredOrigins.
-func (mr *MockAllStatementsMockRecorder) DeleteExpiredOrigins(ctx, now any) *MockAllStatementsDeleteExpiredOriginsCall {
+// DeleteExpiredPreviews indicates an expected call of DeleteExpiredPreviews.
+func (mr *MockAllStatementsMockRecorder) DeleteExpiredPreviews(ctx, now any) *MockAllStatementsDeleteExpiredPreviewsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteExpiredOrigins", reflect.TypeOf((*MockAllStatements)(nil).DeleteExpiredOrigins), ctx, now)
-	return &MockAllStatementsDeleteExpiredOriginsCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteExpiredPreviews", reflect.TypeOf((*MockAllStatements)(nil).DeleteExpiredPreviews), ctx, now)
+	return &MockAllStatementsDeleteExpiredPreviewsCall{Call: call}
 }
 
-// MockAllStatementsDeleteExpiredOriginsCall wrap *gomock.Call
-type MockAllStatementsDeleteExpiredOriginsCall struct {
+// MockAllStatementsDeleteExpiredPreviewsCall wrap *gomock.Call
+type MockAllStatementsDeleteExpiredPreviewsCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsDeleteExpiredOriginsCall) Return(arg0 int64, arg1 error) *MockAllStatementsDeleteExpiredOriginsCall {
+func (c *MockAllStatementsDeleteExpiredPreviewsCall) Return(arg0 int64, arg1 error) *MockAllStatementsDeleteExpiredPreviewsCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsDeleteExpiredOriginsCall) Do(f func(context.Context, time.Time) (int64, error)) *MockAllStatementsDeleteExpiredOriginsCall {
+func (c *MockAllStatementsDeleteExpiredPreviewsCall) Do(f func(context.Context, time.Time) (int64, error)) *MockAllStatementsDeleteExpiredPreviewsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsDeleteExpiredOriginsCall) DoAndReturn(f func(context.Context, time.Time) (int64, error)) *MockAllStatementsDeleteExpiredOriginsCall {
+func (c *MockAllStatementsDeleteExpiredPreviewsCall) DoAndReturn(f func(context.Context, time.Time) (int64, error)) *MockAllStatementsDeleteExpiredPreviewsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1582,40 +1582,40 @@ func (c *MockAllStatementsDeleteJSONSchemaByIDCall) DoAndReturn(f func(context.C
 	return c
 }
 
-// DeleteOrigin mocks base method.
-func (m *MockAllStatements) DeleteOrigin(ctx context.Context, projectID, origin string) error {
+// DeletePreview mocks base method.
+func (m *MockAllStatements) DeletePreview(ctx context.Context, projectID, origin string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteOrigin", ctx, projectID, origin)
+	ret := m.ctrl.Call(m, "DeletePreview", ctx, projectID, origin)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// DeleteOrigin indicates an expected call of DeleteOrigin.
-func (mr *MockAllStatementsMockRecorder) DeleteOrigin(ctx, projectID, origin any) *MockAllStatementsDeleteOriginCall {
+// DeletePreview indicates an expected call of DeletePreview.
+func (mr *MockAllStatementsMockRecorder) DeletePreview(ctx, projectID, origin any) *MockAllStatementsDeletePreviewCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteOrigin", reflect.TypeOf((*MockAllStatements)(nil).DeleteOrigin), ctx, projectID, origin)
-	return &MockAllStatementsDeleteOriginCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePreview", reflect.TypeOf((*MockAllStatements)(nil).DeletePreview), ctx, projectID, origin)
+	return &MockAllStatementsDeletePreviewCall{Call: call}
 }
 
-// MockAllStatementsDeleteOriginCall wrap *gomock.Call
-type MockAllStatementsDeleteOriginCall struct {
+// MockAllStatementsDeletePreviewCall wrap *gomock.Call
+type MockAllStatementsDeletePreviewCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsDeleteOriginCall) Return(arg0 error) *MockAllStatementsDeleteOriginCall {
+func (c *MockAllStatementsDeletePreviewCall) Return(arg0 error) *MockAllStatementsDeletePreviewCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsDeleteOriginCall) Do(f func(context.Context, string, string) error) *MockAllStatementsDeleteOriginCall {
+func (c *MockAllStatementsDeletePreviewCall) Do(f func(context.Context, string, string) error) *MockAllStatementsDeletePreviewCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsDeleteOriginCall) DoAndReturn(f func(context.Context, string, string) error) *MockAllStatementsDeleteOriginCall {
+func (c *MockAllStatementsDeletePreviewCall) DoAndReturn(f func(context.Context, string, string) error) *MockAllStatementsDeletePreviewCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -2935,45 +2935,6 @@ func (c *MockAllStatementsGetJSONSchemaByIDCall) DoAndReturn(f func(context.Cont
 	return c
 }
 
-// GetOrigin mocks base method.
-func (m *MockAllStatements) GetOrigin(ctx context.Context, projectID, origin string) (*domain.Origin, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetOrigin", ctx, projectID, origin)
-	ret0, _ := ret[0].(*domain.Origin)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetOrigin indicates an expected call of GetOrigin.
-func (mr *MockAllStatementsMockRecorder) GetOrigin(ctx, projectID, origin any) *MockAllStatementsGetOriginCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOrigin", reflect.TypeOf((*MockAllStatements)(nil).GetOrigin), ctx, projectID, origin)
-	return &MockAllStatementsGetOriginCall{Call: call}
-}
-
-// MockAllStatementsGetOriginCall wrap *gomock.Call
-type MockAllStatementsGetOriginCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsGetOriginCall) Return(arg0 *domain.Origin, arg1 error) *MockAllStatementsGetOriginCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsGetOriginCall) Do(f func(context.Context, string, string) (*domain.Origin, error)) *MockAllStatementsGetOriginCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsGetOriginCall) DoAndReturn(f func(context.Context, string, string) (*domain.Origin, error)) *MockAllStatementsGetOriginCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // GetPersonalTeamForUser mocks base method.
 func (m *MockAllStatements) GetPersonalTeamForUser(ctx context.Context, projectID, userID string) (*domain.Team, error) {
 	m.ctrl.T.Helper()
@@ -3009,6 +2970,45 @@ func (c *MockAllStatementsGetPersonalTeamForUserCall) Do(f func(context.Context,
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsGetPersonalTeamForUserCall) DoAndReturn(f func(context.Context, string, string) (*domain.Team, error)) *MockAllStatementsGetPersonalTeamForUserCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetPreview mocks base method.
+func (m *MockAllStatements) GetPreview(ctx context.Context, projectID, origin string) (*domain.Preview, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPreview", ctx, projectID, origin)
+	ret0, _ := ret[0].(*domain.Preview)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPreview indicates an expected call of GetPreview.
+func (mr *MockAllStatementsMockRecorder) GetPreview(ctx, projectID, origin any) *MockAllStatementsGetPreviewCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPreview", reflect.TypeOf((*MockAllStatements)(nil).GetPreview), ctx, projectID, origin)
+	return &MockAllStatementsGetPreviewCall{Call: call}
+}
+
+// MockAllStatementsGetPreviewCall wrap *gomock.Call
+type MockAllStatementsGetPreviewCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsGetPreviewCall) Return(arg0 *domain.Preview, arg1 error) *MockAllStatementsGetPreviewCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsGetPreviewCall) Do(f func(context.Context, string, string) (*domain.Preview, error)) *MockAllStatementsGetPreviewCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsGetPreviewCall) DoAndReturn(f func(context.Context, string, string) (*domain.Preview, error)) *MockAllStatementsGetPreviewCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -4650,41 +4650,41 @@ func (c *MockAllStatementsListManagedGrantsCall) DoAndReturn(f func(context.Cont
 	return c
 }
 
-// ListOrigins mocks base method.
-func (m *MockAllStatements) ListOrigins(ctx context.Context, projectID string) ([]*domain.Origin, error) {
+// ListPreviews mocks base method.
+func (m *MockAllStatements) ListPreviews(ctx context.Context, projectID string) ([]*domain.Preview, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListOrigins", ctx, projectID)
-	ret0, _ := ret[0].([]*domain.Origin)
+	ret := m.ctrl.Call(m, "ListPreviews", ctx, projectID)
+	ret0, _ := ret[0].([]*domain.Preview)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListOrigins indicates an expected call of ListOrigins.
-func (mr *MockAllStatementsMockRecorder) ListOrigins(ctx, projectID any) *MockAllStatementsListOriginsCall {
+// ListPreviews indicates an expected call of ListPreviews.
+func (mr *MockAllStatementsMockRecorder) ListPreviews(ctx, projectID any) *MockAllStatementsListPreviewsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListOrigins", reflect.TypeOf((*MockAllStatements)(nil).ListOrigins), ctx, projectID)
-	return &MockAllStatementsListOriginsCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPreviews", reflect.TypeOf((*MockAllStatements)(nil).ListPreviews), ctx, projectID)
+	return &MockAllStatementsListPreviewsCall{Call: call}
 }
 
-// MockAllStatementsListOriginsCall wrap *gomock.Call
-type MockAllStatementsListOriginsCall struct {
+// MockAllStatementsListPreviewsCall wrap *gomock.Call
+type MockAllStatementsListPreviewsCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsListOriginsCall) Return(arg0 []*domain.Origin, arg1 error) *MockAllStatementsListOriginsCall {
+func (c *MockAllStatementsListPreviewsCall) Return(arg0 []*domain.Preview, arg1 error) *MockAllStatementsListPreviewsCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsListOriginsCall) Do(f func(context.Context, string) ([]*domain.Origin, error)) *MockAllStatementsListOriginsCall {
+func (c *MockAllStatementsListPreviewsCall) Do(f func(context.Context, string) ([]*domain.Preview, error)) *MockAllStatementsListPreviewsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsListOriginsCall) DoAndReturn(f func(context.Context, string) ([]*domain.Origin, error)) *MockAllStatementsListOriginsCall {
+func (c *MockAllStatementsListPreviewsCall) DoAndReturn(f func(context.Context, string) ([]*domain.Preview, error)) *MockAllStatementsListPreviewsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -5961,78 +5961,78 @@ func (c *MockAllStatementsUpdateProjectCall) DoAndReturn(f func(context.Context,
 	return c
 }
 
-// UpdateProjectAllowedOrigins mocks base method.
-func (m *MockAllStatements) UpdateProjectAllowedOrigins(ctx context.Context, projectID string, origins []domain.AllowedOrigin) error {
+// UpdateProjectMode mocks base method.
+func (m *MockAllStatements) UpdateProjectMode(ctx context.Context, projectID string, class domain.ProjectMode) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateProjectAllowedOrigins", ctx, projectID, origins)
+	ret := m.ctrl.Call(m, "UpdateProjectMode", ctx, projectID, class)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// UpdateProjectAllowedOrigins indicates an expected call of UpdateProjectAllowedOrigins.
-func (mr *MockAllStatementsMockRecorder) UpdateProjectAllowedOrigins(ctx, projectID, origins any) *MockAllStatementsUpdateProjectAllowedOriginsCall {
+// UpdateProjectMode indicates an expected call of UpdateProjectMode.
+func (mr *MockAllStatementsMockRecorder) UpdateProjectMode(ctx, projectID, class any) *MockAllStatementsUpdateProjectModeCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProjectAllowedOrigins", reflect.TypeOf((*MockAllStatements)(nil).UpdateProjectAllowedOrigins), ctx, projectID, origins)
-	return &MockAllStatementsUpdateProjectAllowedOriginsCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProjectMode", reflect.TypeOf((*MockAllStatements)(nil).UpdateProjectMode), ctx, projectID, class)
+	return &MockAllStatementsUpdateProjectModeCall{Call: call}
 }
 
-// MockAllStatementsUpdateProjectAllowedOriginsCall wrap *gomock.Call
-type MockAllStatementsUpdateProjectAllowedOriginsCall struct {
+// MockAllStatementsUpdateProjectModeCall wrap *gomock.Call
+type MockAllStatementsUpdateProjectModeCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsUpdateProjectAllowedOriginsCall) Return(arg0 error) *MockAllStatementsUpdateProjectAllowedOriginsCall {
+func (c *MockAllStatementsUpdateProjectModeCall) Return(arg0 error) *MockAllStatementsUpdateProjectModeCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsUpdateProjectAllowedOriginsCall) Do(f func(context.Context, string, []domain.AllowedOrigin) error) *MockAllStatementsUpdateProjectAllowedOriginsCall {
+func (c *MockAllStatementsUpdateProjectModeCall) Do(f func(context.Context, string, domain.ProjectMode) error) *MockAllStatementsUpdateProjectModeCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsUpdateProjectAllowedOriginsCall) DoAndReturn(f func(context.Context, string, []domain.AllowedOrigin) error) *MockAllStatementsUpdateProjectAllowedOriginsCall {
+func (c *MockAllStatementsUpdateProjectModeCall) DoAndReturn(f func(context.Context, string, domain.ProjectMode) error) *MockAllStatementsUpdateProjectModeCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
-// UpdateProjectClass mocks base method.
-func (m *MockAllStatements) UpdateProjectClass(ctx context.Context, projectID string, class domain.ProjectClass) error {
+// UpdateProjectOrigins mocks base method.
+func (m *MockAllStatements) UpdateProjectOrigins(ctx context.Context, projectID string, origins []domain.Origin) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateProjectClass", ctx, projectID, class)
+	ret := m.ctrl.Call(m, "UpdateProjectOrigins", ctx, projectID, origins)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// UpdateProjectClass indicates an expected call of UpdateProjectClass.
-func (mr *MockAllStatementsMockRecorder) UpdateProjectClass(ctx, projectID, class any) *MockAllStatementsUpdateProjectClassCall {
+// UpdateProjectOrigins indicates an expected call of UpdateProjectOrigins.
+func (mr *MockAllStatementsMockRecorder) UpdateProjectOrigins(ctx, projectID, origins any) *MockAllStatementsUpdateProjectOriginsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProjectClass", reflect.TypeOf((*MockAllStatements)(nil).UpdateProjectClass), ctx, projectID, class)
-	return &MockAllStatementsUpdateProjectClassCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProjectOrigins", reflect.TypeOf((*MockAllStatements)(nil).UpdateProjectOrigins), ctx, projectID, origins)
+	return &MockAllStatementsUpdateProjectOriginsCall{Call: call}
 }
 
-// MockAllStatementsUpdateProjectClassCall wrap *gomock.Call
-type MockAllStatementsUpdateProjectClassCall struct {
+// MockAllStatementsUpdateProjectOriginsCall wrap *gomock.Call
+type MockAllStatementsUpdateProjectOriginsCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsUpdateProjectClassCall) Return(arg0 error) *MockAllStatementsUpdateProjectClassCall {
+func (c *MockAllStatementsUpdateProjectOriginsCall) Return(arg0 error) *MockAllStatementsUpdateProjectOriginsCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsUpdateProjectClassCall) Do(f func(context.Context, string, domain.ProjectClass) error) *MockAllStatementsUpdateProjectClassCall {
+func (c *MockAllStatementsUpdateProjectOriginsCall) Do(f func(context.Context, string, []domain.Origin) error) *MockAllStatementsUpdateProjectOriginsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsUpdateProjectClassCall) DoAndReturn(f func(context.Context, string, domain.ProjectClass) error) *MockAllStatementsUpdateProjectClassCall {
+func (c *MockAllStatementsUpdateProjectOriginsCall) DoAndReturn(f func(context.Context, string, []domain.Origin) error) *MockAllStatementsUpdateProjectOriginsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -6361,40 +6361,40 @@ func (c *MockAllStatementsUpsertEventSinkCursorCall) DoAndReturn(f func(context.
 	return c
 }
 
-// UpsertOrigin mocks base method.
-func (m *MockAllStatements) UpsertOrigin(ctx context.Context, entity *domain.Origin) error {
+// UpsertPreview mocks base method.
+func (m *MockAllStatements) UpsertPreview(ctx context.Context, entity *domain.Preview) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpsertOrigin", ctx, entity)
+	ret := m.ctrl.Call(m, "UpsertPreview", ctx, entity)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// UpsertOrigin indicates an expected call of UpsertOrigin.
-func (mr *MockAllStatementsMockRecorder) UpsertOrigin(ctx, entity any) *MockAllStatementsUpsertOriginCall {
+// UpsertPreview indicates an expected call of UpsertPreview.
+func (mr *MockAllStatementsMockRecorder) UpsertPreview(ctx, entity any) *MockAllStatementsUpsertPreviewCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertOrigin", reflect.TypeOf((*MockAllStatements)(nil).UpsertOrigin), ctx, entity)
-	return &MockAllStatementsUpsertOriginCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertPreview", reflect.TypeOf((*MockAllStatements)(nil).UpsertPreview), ctx, entity)
+	return &MockAllStatementsUpsertPreviewCall{Call: call}
 }
 
-// MockAllStatementsUpsertOriginCall wrap *gomock.Call
-type MockAllStatementsUpsertOriginCall struct {
+// MockAllStatementsUpsertPreviewCall wrap *gomock.Call
+type MockAllStatementsUpsertPreviewCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsUpsertOriginCall) Return(arg0 error) *MockAllStatementsUpsertOriginCall {
+func (c *MockAllStatementsUpsertPreviewCall) Return(arg0 error) *MockAllStatementsUpsertPreviewCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsUpsertOriginCall) Do(f func(context.Context, *domain.Origin) error) *MockAllStatementsUpsertOriginCall {
+func (c *MockAllStatementsUpsertPreviewCall) Do(f func(context.Context, *domain.Preview) error) *MockAllStatementsUpsertPreviewCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsUpsertOriginCall) DoAndReturn(f func(context.Context, *domain.Origin) error) *MockAllStatementsUpsertOriginCall {
+func (c *MockAllStatementsUpsertPreviewCall) DoAndReturn(f func(context.Context, *domain.Preview) error) *MockAllStatementsUpsertPreviewCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -6767,78 +6767,78 @@ func (c *MockProjectStatementsUpdateProjectCall) DoAndReturn(f func(context.Cont
 	return c
 }
 
-// UpdateProjectAllowedOrigins mocks base method.
-func (m *MockProjectStatements) UpdateProjectAllowedOrigins(ctx context.Context, projectID string, origins []domain.AllowedOrigin) error {
+// UpdateProjectMode mocks base method.
+func (m *MockProjectStatements) UpdateProjectMode(ctx context.Context, projectID string, class domain.ProjectMode) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateProjectAllowedOrigins", ctx, projectID, origins)
+	ret := m.ctrl.Call(m, "UpdateProjectMode", ctx, projectID, class)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// UpdateProjectAllowedOrigins indicates an expected call of UpdateProjectAllowedOrigins.
-func (mr *MockProjectStatementsMockRecorder) UpdateProjectAllowedOrigins(ctx, projectID, origins any) *MockProjectStatementsUpdateProjectAllowedOriginsCall {
+// UpdateProjectMode indicates an expected call of UpdateProjectMode.
+func (mr *MockProjectStatementsMockRecorder) UpdateProjectMode(ctx, projectID, class any) *MockProjectStatementsUpdateProjectModeCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProjectAllowedOrigins", reflect.TypeOf((*MockProjectStatements)(nil).UpdateProjectAllowedOrigins), ctx, projectID, origins)
-	return &MockProjectStatementsUpdateProjectAllowedOriginsCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProjectMode", reflect.TypeOf((*MockProjectStatements)(nil).UpdateProjectMode), ctx, projectID, class)
+	return &MockProjectStatementsUpdateProjectModeCall{Call: call}
 }
 
-// MockProjectStatementsUpdateProjectAllowedOriginsCall wrap *gomock.Call
-type MockProjectStatementsUpdateProjectAllowedOriginsCall struct {
+// MockProjectStatementsUpdateProjectModeCall wrap *gomock.Call
+type MockProjectStatementsUpdateProjectModeCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockProjectStatementsUpdateProjectAllowedOriginsCall) Return(arg0 error) *MockProjectStatementsUpdateProjectAllowedOriginsCall {
+func (c *MockProjectStatementsUpdateProjectModeCall) Return(arg0 error) *MockProjectStatementsUpdateProjectModeCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockProjectStatementsUpdateProjectAllowedOriginsCall) Do(f func(context.Context, string, []domain.AllowedOrigin) error) *MockProjectStatementsUpdateProjectAllowedOriginsCall {
+func (c *MockProjectStatementsUpdateProjectModeCall) Do(f func(context.Context, string, domain.ProjectMode) error) *MockProjectStatementsUpdateProjectModeCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockProjectStatementsUpdateProjectAllowedOriginsCall) DoAndReturn(f func(context.Context, string, []domain.AllowedOrigin) error) *MockProjectStatementsUpdateProjectAllowedOriginsCall {
+func (c *MockProjectStatementsUpdateProjectModeCall) DoAndReturn(f func(context.Context, string, domain.ProjectMode) error) *MockProjectStatementsUpdateProjectModeCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
-// UpdateProjectClass mocks base method.
-func (m *MockProjectStatements) UpdateProjectClass(ctx context.Context, projectID string, class domain.ProjectClass) error {
+// UpdateProjectOrigins mocks base method.
+func (m *MockProjectStatements) UpdateProjectOrigins(ctx context.Context, projectID string, origins []domain.Origin) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateProjectClass", ctx, projectID, class)
+	ret := m.ctrl.Call(m, "UpdateProjectOrigins", ctx, projectID, origins)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// UpdateProjectClass indicates an expected call of UpdateProjectClass.
-func (mr *MockProjectStatementsMockRecorder) UpdateProjectClass(ctx, projectID, class any) *MockProjectStatementsUpdateProjectClassCall {
+// UpdateProjectOrigins indicates an expected call of UpdateProjectOrigins.
+func (mr *MockProjectStatementsMockRecorder) UpdateProjectOrigins(ctx, projectID, origins any) *MockProjectStatementsUpdateProjectOriginsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProjectClass", reflect.TypeOf((*MockProjectStatements)(nil).UpdateProjectClass), ctx, projectID, class)
-	return &MockProjectStatementsUpdateProjectClassCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProjectOrigins", reflect.TypeOf((*MockProjectStatements)(nil).UpdateProjectOrigins), ctx, projectID, origins)
+	return &MockProjectStatementsUpdateProjectOriginsCall{Call: call}
 }
 
-// MockProjectStatementsUpdateProjectClassCall wrap *gomock.Call
-type MockProjectStatementsUpdateProjectClassCall struct {
+// MockProjectStatementsUpdateProjectOriginsCall wrap *gomock.Call
+type MockProjectStatementsUpdateProjectOriginsCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockProjectStatementsUpdateProjectClassCall) Return(arg0 error) *MockProjectStatementsUpdateProjectClassCall {
+func (c *MockProjectStatementsUpdateProjectOriginsCall) Return(arg0 error) *MockProjectStatementsUpdateProjectOriginsCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockProjectStatementsUpdateProjectClassCall) Do(f func(context.Context, string, domain.ProjectClass) error) *MockProjectStatementsUpdateProjectClassCall {
+func (c *MockProjectStatementsUpdateProjectOriginsCall) Do(f func(context.Context, string, []domain.Origin) error) *MockProjectStatementsUpdateProjectOriginsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockProjectStatementsUpdateProjectClassCall) DoAndReturn(f func(context.Context, string, domain.ProjectClass) error) *MockProjectStatementsUpdateProjectClassCall {
+func (c *MockProjectStatementsUpdateProjectOriginsCall) DoAndReturn(f func(context.Context, string, []domain.Origin) error) *MockProjectStatementsUpdateProjectOriginsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -14088,58 +14088,58 @@ func (m *MockProjectService) EXPECT() *MockProjectServiceMockRecorder {
 	return m.recorder
 }
 
-// AddAllowedOrigin mocks base method.
-func (m *MockProjectService) AddAllowedOrigin(ctx context.Context, projectID string, entry domain.AllowedOrigin) (*domain.OriginLintWarning, error) {
+// AddOrigin mocks base method.
+func (m *MockProjectService) AddOrigin(ctx context.Context, projectID string, entry domain.Origin) (*domain.OriginLintWarning, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddAllowedOrigin", ctx, projectID, entry)
+	ret := m.ctrl.Call(m, "AddOrigin", ctx, projectID, entry)
 	ret0, _ := ret[0].(*domain.OriginLintWarning)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// AddAllowedOrigin indicates an expected call of AddAllowedOrigin.
-func (mr *MockProjectServiceMockRecorder) AddAllowedOrigin(ctx, projectID, entry any) *MockProjectServiceAddAllowedOriginCall {
+// AddOrigin indicates an expected call of AddOrigin.
+func (mr *MockProjectServiceMockRecorder) AddOrigin(ctx, projectID, entry any) *MockProjectServiceAddOriginCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddAllowedOrigin", reflect.TypeOf((*MockProjectService)(nil).AddAllowedOrigin), ctx, projectID, entry)
-	return &MockProjectServiceAddAllowedOriginCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddOrigin", reflect.TypeOf((*MockProjectService)(nil).AddOrigin), ctx, projectID, entry)
+	return &MockProjectServiceAddOriginCall{Call: call}
 }
 
-// MockProjectServiceAddAllowedOriginCall wrap *gomock.Call
-type MockProjectServiceAddAllowedOriginCall struct {
+// MockProjectServiceAddOriginCall wrap *gomock.Call
+type MockProjectServiceAddOriginCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockProjectServiceAddAllowedOriginCall) Return(arg0 *domain.OriginLintWarning, arg1 error) *MockProjectServiceAddAllowedOriginCall {
+func (c *MockProjectServiceAddOriginCall) Return(arg0 *domain.OriginLintWarning, arg1 error) *MockProjectServiceAddOriginCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockProjectServiceAddAllowedOriginCall) Do(f func(context.Context, string, domain.AllowedOrigin) (*domain.OriginLintWarning, error)) *MockProjectServiceAddAllowedOriginCall {
+func (c *MockProjectServiceAddOriginCall) Do(f func(context.Context, string, domain.Origin) (*domain.OriginLintWarning, error)) *MockProjectServiceAddOriginCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockProjectServiceAddAllowedOriginCall) DoAndReturn(f func(context.Context, string, domain.AllowedOrigin) (*domain.OriginLintWarning, error)) *MockProjectServiceAddAllowedOriginCall {
+func (c *MockProjectServiceAddOriginCall) DoAndReturn(f func(context.Context, string, domain.Origin) (*domain.OriginLintWarning, error)) *MockProjectServiceAddOriginCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // Create mocks base method.
-func (m *MockProjectService) Create(ctx context.Context, name string, allowedOrigins []domain.AllowedOrigin, seedDefaults bool) (*domain.Project, error) {
+func (m *MockProjectService) Create(ctx context.Context, name string, origins []domain.Origin, seedDefaults bool) (*domain.Project, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", ctx, name, allowedOrigins, seedDefaults)
+	ret := m.ctrl.Call(m, "Create", ctx, name, origins, seedDefaults)
 	ret0, _ := ret[0].(*domain.Project)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Create indicates an expected call of Create.
-func (mr *MockProjectServiceMockRecorder) Create(ctx, name, allowedOrigins, seedDefaults any) *MockProjectServiceCreateCall {
+func (mr *MockProjectServiceMockRecorder) Create(ctx, name, origins, seedDefaults any) *MockProjectServiceCreateCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockProjectService)(nil).Create), ctx, name, allowedOrigins, seedDefaults)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockProjectService)(nil).Create), ctx, name, origins, seedDefaults)
 	return &MockProjectServiceCreateCall{Call: call}
 }
 
@@ -14155,30 +14155,30 @@ func (c *MockProjectServiceCreateCall) Return(arg0 *domain.Project, arg1 error) 
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockProjectServiceCreateCall) Do(f func(context.Context, string, []domain.AllowedOrigin, bool) (*domain.Project, error)) *MockProjectServiceCreateCall {
+func (c *MockProjectServiceCreateCall) Do(f func(context.Context, string, []domain.Origin, bool) (*domain.Project, error)) *MockProjectServiceCreateCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockProjectServiceCreateCall) DoAndReturn(f func(context.Context, string, []domain.AllowedOrigin, bool) (*domain.Project, error)) *MockProjectServiceCreateCall {
+func (c *MockProjectServiceCreateCall) DoAndReturn(f func(context.Context, string, []domain.Origin, bool) (*domain.Project, error)) *MockProjectServiceCreateCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // CreateWithID mocks base method.
-func (m *MockProjectService) CreateWithID(ctx context.Context, id, name string, allowedOrigins []domain.AllowedOrigin, seedDefaults bool) (*domain.Project, error) {
+func (m *MockProjectService) CreateWithID(ctx context.Context, id, name string, origins []domain.Origin, seedDefaults bool) (*domain.Project, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateWithID", ctx, id, name, allowedOrigins, seedDefaults)
+	ret := m.ctrl.Call(m, "CreateWithID", ctx, id, name, origins, seedDefaults)
 	ret0, _ := ret[0].(*domain.Project)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateWithID indicates an expected call of CreateWithID.
-func (mr *MockProjectServiceMockRecorder) CreateWithID(ctx, id, name, allowedOrigins, seedDefaults any) *MockProjectServiceCreateWithIDCall {
+func (mr *MockProjectServiceMockRecorder) CreateWithID(ctx, id, name, origins, seedDefaults any) *MockProjectServiceCreateWithIDCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateWithID", reflect.TypeOf((*MockProjectService)(nil).CreateWithID), ctx, id, name, allowedOrigins, seedDefaults)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateWithID", reflect.TypeOf((*MockProjectService)(nil).CreateWithID), ctx, id, name, origins, seedDefaults)
 	return &MockProjectServiceCreateWithIDCall{Call: call}
 }
 
@@ -14194,13 +14194,13 @@ func (c *MockProjectServiceCreateWithIDCall) Return(arg0 *domain.Project, arg1 e
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockProjectServiceCreateWithIDCall) Do(f func(context.Context, string, string, []domain.AllowedOrigin, bool) (*domain.Project, error)) *MockProjectServiceCreateWithIDCall {
+func (c *MockProjectServiceCreateWithIDCall) Do(f func(context.Context, string, string, []domain.Origin, bool) (*domain.Project, error)) *MockProjectServiceCreateWithIDCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockProjectServiceCreateWithIDCall) DoAndReturn(f func(context.Context, string, string, []domain.AllowedOrigin, bool) (*domain.Project, error)) *MockProjectServiceCreateWithIDCall {
+func (c *MockProjectServiceCreateWithIDCall) DoAndReturn(f func(context.Context, string, string, []domain.Origin, bool) (*domain.Project, error)) *MockProjectServiceCreateWithIDCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -14399,79 +14399,79 @@ func (c *MockProjectServiceListAuthorizedCall) DoAndReturn(f func(context.Contex
 	return c
 }
 
-// RemoveAllowedOrigin mocks base method.
-func (m *MockProjectService) RemoveAllowedOrigin(ctx context.Context, projectID, pattern string) error {
+// RemoveOrigin mocks base method.
+func (m *MockProjectService) RemoveOrigin(ctx context.Context, projectID, pattern string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RemoveAllowedOrigin", ctx, projectID, pattern)
+	ret := m.ctrl.Call(m, "RemoveOrigin", ctx, projectID, pattern)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// RemoveAllowedOrigin indicates an expected call of RemoveAllowedOrigin.
-func (mr *MockProjectServiceMockRecorder) RemoveAllowedOrigin(ctx, projectID, pattern any) *MockProjectServiceRemoveAllowedOriginCall {
+// RemoveOrigin indicates an expected call of RemoveOrigin.
+func (mr *MockProjectServiceMockRecorder) RemoveOrigin(ctx, projectID, pattern any) *MockProjectServiceRemoveOriginCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveAllowedOrigin", reflect.TypeOf((*MockProjectService)(nil).RemoveAllowedOrigin), ctx, projectID, pattern)
-	return &MockProjectServiceRemoveAllowedOriginCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveOrigin", reflect.TypeOf((*MockProjectService)(nil).RemoveOrigin), ctx, projectID, pattern)
+	return &MockProjectServiceRemoveOriginCall{Call: call}
 }
 
-// MockProjectServiceRemoveAllowedOriginCall wrap *gomock.Call
-type MockProjectServiceRemoveAllowedOriginCall struct {
+// MockProjectServiceRemoveOriginCall wrap *gomock.Call
+type MockProjectServiceRemoveOriginCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockProjectServiceRemoveAllowedOriginCall) Return(arg0 error) *MockProjectServiceRemoveAllowedOriginCall {
+func (c *MockProjectServiceRemoveOriginCall) Return(arg0 error) *MockProjectServiceRemoveOriginCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockProjectServiceRemoveAllowedOriginCall) Do(f func(context.Context, string, string) error) *MockProjectServiceRemoveAllowedOriginCall {
+func (c *MockProjectServiceRemoveOriginCall) Do(f func(context.Context, string, string) error) *MockProjectServiceRemoveOriginCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockProjectServiceRemoveAllowedOriginCall) DoAndReturn(f func(context.Context, string, string) error) *MockProjectServiceRemoveAllowedOriginCall {
+func (c *MockProjectServiceRemoveOriginCall) DoAndReturn(f func(context.Context, string, string) error) *MockProjectServiceRemoveOriginCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
-// SetClass mocks base method.
-func (m *MockProjectService) SetClass(ctx context.Context, projectID string, class domain.ProjectClass, confirm bool) (*domain.Project, error) {
+// SetMode mocks base method.
+func (m *MockProjectService) SetMode(ctx context.Context, projectID string, mode domain.ProjectMode, confirm bool) (*domain.Project, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetClass", ctx, projectID, class, confirm)
+	ret := m.ctrl.Call(m, "SetMode", ctx, projectID, mode, confirm)
 	ret0, _ := ret[0].(*domain.Project)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// SetClass indicates an expected call of SetClass.
-func (mr *MockProjectServiceMockRecorder) SetClass(ctx, projectID, class, confirm any) *MockProjectServiceSetClassCall {
+// SetMode indicates an expected call of SetMode.
+func (mr *MockProjectServiceMockRecorder) SetMode(ctx, projectID, mode, confirm any) *MockProjectServiceSetModeCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetClass", reflect.TypeOf((*MockProjectService)(nil).SetClass), ctx, projectID, class, confirm)
-	return &MockProjectServiceSetClassCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetMode", reflect.TypeOf((*MockProjectService)(nil).SetMode), ctx, projectID, mode, confirm)
+	return &MockProjectServiceSetModeCall{Call: call}
 }
 
-// MockProjectServiceSetClassCall wrap *gomock.Call
-type MockProjectServiceSetClassCall struct {
+// MockProjectServiceSetModeCall wrap *gomock.Call
+type MockProjectServiceSetModeCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockProjectServiceSetClassCall) Return(arg0 *domain.Project, arg1 error) *MockProjectServiceSetClassCall {
+func (c *MockProjectServiceSetModeCall) Return(arg0 *domain.Project, arg1 error) *MockProjectServiceSetModeCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockProjectServiceSetClassCall) Do(f func(context.Context, string, domain.ProjectClass, bool) (*domain.Project, error)) *MockProjectServiceSetClassCall {
+func (c *MockProjectServiceSetModeCall) Do(f func(context.Context, string, domain.ProjectMode, bool) (*domain.Project, error)) *MockProjectServiceSetModeCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockProjectServiceSetClassCall) DoAndReturn(f func(context.Context, string, domain.ProjectClass, bool) (*domain.Project, error)) *MockProjectServiceSetClassCall {
+func (c *MockProjectServiceSetModeCall) DoAndReturn(f func(context.Context, string, domain.ProjectMode, bool) (*domain.Project, error)) *MockProjectServiceSetModeCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

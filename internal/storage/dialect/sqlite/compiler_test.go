@@ -15,7 +15,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/flowdefinition"
 )
 
-const testProjectQuery = "SELECT id, name, allowed_origins, class, created_at, updated_at FROM projects"
+const testProjectQuery = "SELECT id, name, origins, class, created_at, updated_at FROM projects"
 
 func compileProjectRead(t *testing.T, opts *database.ListOptions[domain.ProjectField]) (string, []any) {
 	t.Helper()

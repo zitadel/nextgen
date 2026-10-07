@@ -20,7 +20,7 @@ type statements struct {
 	cryptoKeyStatements
 	jsonSchemaStatements
 	releaseStatements
-	originStatements
+	previewStatements
 	idpConnectionStatements
 	idpIdentityLinkStatements
 	deploymentStatements
@@ -59,7 +59,7 @@ func newStatements(client queryExecutor) statements {
 		cryptoKeyStatements:           newCryptoKeyStatements(client),
 		jsonSchemaStatements:          newJSONSchemaStatements(client),
 		releaseStatements:             newReleaseStatements(client),
-		originStatements:              newOriginStatements(client),
+		previewStatements:             newPreviewStatements(client),
 		idpConnectionStatements:       newIDPConnectionStatements(client),
 		idpIdentityLinkStatements:     newIDPIdentityLinkStatements(client),
 		deploymentStatements:          newDeploymentStatements(client),

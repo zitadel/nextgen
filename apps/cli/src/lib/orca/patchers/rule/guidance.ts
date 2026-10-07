@@ -94,7 +94,7 @@ This app's login is managed by Zitadel. Local config is the source of truth; nev
 
 The golden path:
 
-1. Start the dev server and open ${ctx.issuer}/login — **exactly this origin, not 127.0.0.1**. Passkeys and the origin allowlist are bound to it. (Freshly scaffolded apps also redirect / there; pre-existing apps keep their homepage.)
+1. Start the dev server and open ${ctx.issuer}/login — **exactly this origin, not 127.0.0.1**. Passkeys and the project's origins are bound to it. (Freshly scaffolded apps also redirect / there; pre-existing apps keep their homepage.)
 2. Prove the loop in a real browser: register a user → sign out → sign in → /profile shows signed in.${passkeyVerifyNote}
 3. Customize by editing local config:
    - \`.zitadel/schemas/*.json\` — what a user is (fields, required, auth methods). See \`.zitadel/schemas/README.md\`.

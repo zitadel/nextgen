@@ -1,0 +1,39 @@
+title: CreateReleaseResponse
+type: object
+description: |
+  The release, plus what happened to each resource it pins: whether the
+  revision already existed (reused) or this call allocated it (created). The
+  pointer form never allocates, so every entry reads `created: false`.
+required:
+  - release
+  - revisions
+properties:
+  release:
+    $ref: release.yaml
+  revisions:
+    type: array
+    description: One entry per pinned resource, in pointer order.
+    items:
+      type: object
+      required:
+        - kind
+        - handle
+        - revision_id
+        - created
+      properties:
+        kind:
+          $ref: ../../components/schemas/release-pointer-kind.yaml
+        handle:
+          type: string
+          description: The resource's handle (`objectType`, `name` or `default`).
+          example: human-user
+        revision_id:
+          type: string
+          description: The revision the release pins for this resource.
+          example: sch_01KWHF2XY6RN7F0N9WD3P2E4YM
+        created:
+          type: boolean
+          description: |
+            `true` when this call allocated the revision because the bundled
+            content differed from the project's newest one; `false` when an
+            existing revision was pinned.

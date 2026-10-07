@@ -1,0 +1,42 @@
+post:
+  operationId: setProjectMode
+  summary: Promote or demote a project
+  description: |
+    Sets the project's mode. `sandbox` → `production` re-checks every origin
+    pattern against the production rules and fails naming each offender; it
+    requires a claimed project. `production` → `sandbox` lets loopback
+    origins back in and needs `confirm: true`.
+  tags:
+    - Projects
+  parameters:
+    - name: project_id
+      in: path
+      required: true
+      schema:
+        $ref: ../../../../components/schemas/project-id.yaml
+  security:
+    - oauth2:
+        - project.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+            - mode
+          properties:
+            mode:
+              $ref: ../../project-mode.yaml
+            confirm:
+              type: boolean
+              default: false
+  responses:
+    '200':
+      description: The mode was changed.
+      content:
+        application/json:
+          schema:
+            $ref: ../../project-response.yaml
+    default:
+      $ref: setProjectMode-error-response.yaml

@@ -370,7 +370,7 @@ func battleDeployments(t *testing.T, d dialect) {
 	created := make([]*domain.Deployment, 0, 5)
 	for i := range 5 {
 		rel := createRelease(t, d.stmts, projectID, string(rune('a'+i)), domain.ReleaseMetadata{})
-		created = append(created, createDeploy(t, d.stmts, projectID, rel.ID, origin)...)
+		created = append(created, createDeploy(t, d.stmts, projectID, rel.ID, origin))
 	}
 	// drainIncarnation compares the paged ids against this slice in order, so
 	// it has to be the order the query produces rather than the order the
@@ -388,7 +388,7 @@ func battleDeployments(t *testing.T, d dialect) {
 	}
 	filter := database.And(
 		database.Equal(database.Col(domain.DeploymentFieldProjectID), projectID),
-		database.Equal(database.Col(domain.DeploymentFieldOrigin), origin),
+		database.CorrelatedEqual(database.Col(domain.DeploymentFieldOrigin), origin),
 	)
 	orderAsc := deployment.NewestFirst()
 	orderAsc.Direction = database.OrderAsc
@@ -400,7 +400,7 @@ func battleDeployments(t *testing.T, d dialect) {
 
 	t.Run("newest_first_helper", func(t *testing.T) {
 		got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.Deployment], error) {
-			opts := deployment.ListOptions(projectID, nil, nil, 2)
+			opts := deployment.ListOptions(projectID, nil, 2)
 			opts.Pagination.Cursor = cursor
 			return d.stmts.ListDeployments(unfilteredListCtx(t), opts)
 		}, func(dep *domain.Deployment) string { return dep.ID })

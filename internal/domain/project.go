@@ -65,44 +65,44 @@ type Project struct {
 	Name      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	// AllowedOrigins is the origin allowlist: patterns with a kind. Nothing
+	// Origins are the project's origin patterns, each with a kind. Nothing
 	// here routes; a primary pattern admits requests and a preview pattern
 	// bounds what a preview deploy may register.
-	AllowedOrigins []AllowedOrigin
-	// Class decides which patterns the allowlist accepts and whether a pinned
+	Origins []Origin
+	// Mode decides which patterns the project accepts and whether a pinned
 	// release must already be deployed to the matched target.
-	Class ProjectClass
+	Mode ProjectMode
 	// PasswordHashPolicy is the hashing method this project's passwords are
 	// written with. Nil means the deployment default, which is what a project
 	// runs on until an admin chooses otherwise. See [PasswordHashPolicy].
 	PasswordHashPolicy *PasswordHashPolicy
 }
 
-// NewProject validates the name and normalises every allowlist pattern
-// against the sandbox rules, which is the class a project starts in.
-func NewProject(name string, allowedOrigins []AllowedOrigin) (*Project, error) {
+// NewProject validates the name and normalises every origin pattern against
+// the sandbox rules, which is the mode a project starts in.
+func NewProject(name string, entries []Origin) (*Project, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, ErrProjectNameInvalid()
 	}
 
-	origins, err := NormalizeAllowedOrigins(ProjectClassSandbox, allowedOrigins)
+	origins, err := NormalizeOrigins(ProjectModeSandbox, entries)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Project{
-		Name:           name,
-		AllowedOrigins: origins,
-		Class:          ProjectClassSandbox,
+		Name:    name,
+		Origins: origins,
+		Mode:    ProjectModeSandbox,
 	}, nil
 }
 
-// NormalizeAllowedOrigins normalises and lints every entry for class, in
-// order, and rejects a pattern listed twice. Never nil, so an empty allowlist
-// is stored as an empty list.
-func NormalizeAllowedOrigins(class ProjectClass, entries []AllowedOrigin) ([]AllowedOrigin, error) {
-	origins := make([]AllowedOrigin, 0, len(entries))
+// NormalizeOrigins normalises and lints every entry for mode, in order, and
+// rejects a pattern listed twice. Never nil, so a project with no patterns
+// is stored with an empty list.
+func NormalizeOrigins(mode ProjectMode, entries []Origin) ([]Origin, error) {
+	origins := make([]Origin, 0, len(entries))
 	seen := make(map[string]bool, len(entries))
 	for _, entry := range entries {
 		pattern, err := NormalizeOrigin(entry.Pattern)
@@ -113,7 +113,7 @@ func NormalizeAllowedOrigins(class ProjectClass, entries []AllowedOrigin) ([]All
 			return nil, ErrOriginInvalid(map[string]string{"pattern": entry.Pattern, "reason": "unknown kind"})
 		}
 		entry.Pattern = pattern
-		if _, err := LintOriginPattern(class, entry); err != nil {
+		if _, err := LintOriginPattern(mode, entry); err != nil {
 			return nil, err
 		}
 		if seen[pattern] {
@@ -149,7 +149,7 @@ func (p *Project) PreviewDeployToken() *Token {
 	return &Token{
 		ProjectID: p.ID,
 		Type:      TokenTypeProjectPreviewDeploy,
-		Scope:     []string{"release.write", "release.read", "deployment.preview", "deployment.read", "allowed_origin.read", "project.read"},
+		Scope:     []string{"release.write", "release.read", "deployment.preview", "deployment.read", "origin.read", "project.read"},
 	}
 }
 
@@ -210,8 +210,8 @@ const (
 	ProjectFieldName
 	ProjectFieldCreatedAt
 	ProjectFieldUpdatedAt
-	ProjectFieldAllowedOrigins
-	ProjectFieldClass
+	ProjectFieldOrigins
+	ProjectFieldMode
 )
 
 type ProjectKeySet struct {

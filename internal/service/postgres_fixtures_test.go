@@ -17,9 +17,9 @@ func ensureProject(t *testing.T, projectID string) {
 	t.Helper()
 	pool := integrationPoolOrFail(t)
 	err := pool.Statements().CreateProject(t.Context(), &domain.Project{
-		ID:             projectID,
-		Name:           "project-" + projectID,
-		AllowedOrigins: []domain.AllowedOrigin{},
+		ID:      projectID,
+		Name:    "project-" + projectID,
+		Origins: []domain.Origin{},
 	})
 	if err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {

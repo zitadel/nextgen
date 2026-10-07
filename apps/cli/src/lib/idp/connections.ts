@@ -194,7 +194,7 @@ export function refuseResolvedSecret(definition: object, id: string): void {
  * with Google however its slug reads.
  *
  * The derivation stays legible on purpose — these names get typed into
- * `vars set` by hand — so the ambiguity is refused rather than encoded
+ * `variable set` by hand — so the ambiguity is refused rather than encoded
  * around.
  *
  * @param ours - The variables this run will publish to.

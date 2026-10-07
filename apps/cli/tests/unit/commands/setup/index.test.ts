@@ -408,7 +408,7 @@ describe("setup command pre-flight", () => {
     expect(capture.body).toBeTruthy();
     expect(capture.body).toMatchObject({
       name: expect.any(String),
-      allowed_origins: expect.arrayContaining([expect.any(Object)]),
+      origins: expect.arrayContaining([expect.any(Object)]),
       seed_defaults: false,
     });
     const projectName = capture.body?.name;
@@ -680,7 +680,7 @@ async function startCreateProjectCaptureServer(): Promise<{
       );
       return;
     }
-    if (req.method === "POST" && path === "/configuration-releases") {
+    if (req.method === "POST" && path === "/releases") {
       res.writeHead(201, { "content-type": "application/json" }).end(
         JSON.stringify({
           release: {
@@ -697,7 +697,10 @@ async function startCreateProjectCaptureServer(): Promise<{
     }
     if (req.method === "POST" && path === "/deployments") {
       res.writeHead(201, { "content-type": "application/json" }).end(
-        JSON.stringify({ deploy_id: "dpl_test", release_id: "rel_test", targets: [""], deployments: [] }),
+        JSON.stringify({
+          deployment: { id: "dep_test", release_id: "rel_test", targets: [{ origin: "" }], metadata: {}, deployed_at: "2026-06-01T00:00:00.000Z" },
+          warnings: [],
+        }),
       );
       return;
     }

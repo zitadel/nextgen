@@ -1,8 +1,8 @@
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
-import { resolveTarget, TARGET_KEYS, type Target } from "../../lib/target";
+import { ENVIRONMENT_KEYS, resolveEnvironment, type Environment } from "../../lib/environment";
 
 /** The labels `zitadel env` prints a resolved value under. */
-const LABELS: Record<(typeof TARGET_KEYS)[number], string> = {
+const LABELS: Record<(typeof ENVIRONMENT_KEYS)[number], string> = {
   ZITADEL_URL: "server",
   ZITADEL_PROJECT_ID: "project",
   ZITADEL_PROJECT_SECRET: "secret",
@@ -25,30 +25,30 @@ export default class Env extends BaseCommand {
     const { flags } = await this.parse(Env);
     await this.toMeta(flags);
     const { cwd, env, serverFlag, envName, envFile } = this.meta;
-    const target = await resolveTarget({ cwd, env, serverFlag, envName, envFile });
-    return this.emit({ status: "ok", data: targetData(target), pretty: renderTarget(target) });
+    const resolved = await resolveEnvironment({ cwd, env, serverFlag, envName, envFile });
+    return this.emit({ status: "ok", data: environmentData(resolved), pretty: renderEnvironment(resolved) });
   }
 }
 
-export function targetData(target: Target): Record<string, unknown> {
+export function environmentData(resolved: Environment): Record<string, unknown> {
   return {
-    environment: target.environment,
-    server: target.values.ZITADEL_URL,
-    project_id: target.values.ZITADEL_PROJECT_ID,
+    environment: resolved.name,
+    server: resolved.values.ZITADEL_URL,
+    project_id: resolved.values.ZITADEL_PROJECT_ID,
     credentials: {
-      project_secret: target.values.ZITADEL_PROJECT_SECRET?.source,
-      preview_token: target.values.ZITADEL_PREVIEW_TOKEN?.source,
-      publishable_key: target.values.ZITADEL_PUBLISHABLE_KEY?.source,
+      project_secret: resolved.values.ZITADEL_PROJECT_SECRET?.source,
+      preview_token: resolved.values.ZITADEL_PREVIEW_TOKEN?.source,
+      publishable_key: resolved.values.ZITADEL_PUBLISHABLE_KEY?.source,
     },
-    consulted: target.consulted,
+    consulted: resolved.consulted,
   };
 }
 
 /** Secrets are shown by their source only; a value never reaches the screen. */
-export function renderTarget(target: Target): string {
-  const lines = [`environment  ${target.environment.value.padEnd(20)} ${target.environment.source}`];
-  for (const key of TARGET_KEYS) {
-    const resolved = target.values[key];
+export function renderEnvironment(environment: Environment): string {
+  const lines = [`environment  ${environment.name.value.padEnd(20)} ${environment.name.source}`];
+  for (const key of ENVIRONMENT_KEYS) {
+    const resolved = environment.values[key];
     if (!resolved) {
       continue;
     }
@@ -57,7 +57,7 @@ export function renderTarget(target: Target): string {
     lines.push(`${LABELS[key].padEnd(12)} ${shown.padEnd(20)} ${resolved.source}`);
   }
   lines.push("", "consulted, in order:");
-  for (const entry of target.consulted) {
+  for (const entry of environment.consulted) {
     const supplied =
       typeof entry.supplied === "string"
         ? `(${entry.supplied})`

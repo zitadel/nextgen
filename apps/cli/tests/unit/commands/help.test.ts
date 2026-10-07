@@ -41,27 +41,28 @@ Configuration commands
   deploy:                Build a release from .zitadel/ and deploy it to the project default and primary origins
   branding eject:        Take ownership of the login template
   preview:               Build a release and deploy it to this build's preview URLs, for a limited time
-  deployments:           List the deployment log, or what every target serves with --live
-  rollback:              Undo the newest deploy, or go back to an earlier one with --to
-  allowlist:             List the project's allowed origin patterns
-  vars list:             List the project's variables and secrets
-  allowlist add:         Add an allowed origin pattern to the project
-  allowlist rm:          Remove an allowed origin pattern from the project
+  deployment list:       List the deployments, or what every target serves with --live
+  deployment rollback:   Undo the newest deployment, or go back to an earlier one by id
+  origin list:           List the project's origin patterns
+  variable list:         List the project's variables and secrets
   branding get:          Get one branding revision by id
   branding list:         List branding
   flow-definitions get:  Get one flow definition by id
   flow-definitions list: List flow-definitions
-  preview rm:            Retire a preview URL; its deployment records are kept
-  releases get:          Get one release by id
-  releases list:         List releases
-  releases revoke:       Revoke a release so nothing serves it, pinned or not
+  origin add:            Add an origin pattern to the project
+  origin rm:             Remove an origin pattern from the project
+  preview list:          List the live preview URLs and when each expires
+  preview rm:            Retire a preview URL; its deployments are kept
+  release get:           Get one release by id
+  release list:          List release
+  release revoke:        Revoke a release so nothing serves it, pinned or not
   schemas get:           Get one schema by id
   schemas list:          List schemas
   sso enable:            Enable an identity provider for a user schema
-  vars get:              Get one variable from the project
-  vars resolve:          Show the variables a target is serving, frozen on its deployment
-  vars rm:               Remove one variable from the project
-  vars set:              Set one variable on the project
+  variable get:          Get one variable from the project
+  variable resolve:      Show the variables a target is serving, frozen on its deployment
+  variable rm:           Remove one variable from the project
+  variable set:          Set one variable on the project
 
 Resource commands
   resources:             List the resources this CLI manages and what can be done to each
@@ -74,10 +75,10 @@ Resource commands
   idps create:           Create an identity provider connection
   idps get:              Get one identity provider connection by id
   idps list:             List idps
-  projects demote:       Demote the project to class sandbox
+  projects demote:       Demote the project to sandbox mode
   projects get:          Get one project by id
   projects list:         List projects
-  projects promote:      Promote the project to class production
+  projects promote:      Promote the project to production mode
   projects update:       Update a project by id
   sessions get:          Get one session by id
   sessions list:         List sessions

@@ -78,10 +78,10 @@ func uniqueProjectID(t *testing.T) string {
 	return "proj-" + uniqueSuffix(t)
 }
 
-// newTestProject builds a persistable project. AllowedOrigins is a non-nil empty
+// newTestProject builds a persistable project. Origins is a non-nil empty
 // slice because the projects table declares preview_origins NOT NULL.
 func newTestProject(id string) *domain.Project {
-	return &domain.Project{ID: id, Name: "project-" + rand.Text(), AllowedOrigins: []domain.AllowedOrigin{}}
+	return &domain.Project{ID: id, Name: "project-" + rand.Text(), Origins: []domain.Origin{}}
 }
 
 // newTestTeam builds a persistable team.

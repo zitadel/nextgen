@@ -1,6 +1,6 @@
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { renderTable } from "../../lib/oclif/crud/table";
-import { detectEnvironment, listLocalEnvironments } from "../../lib/target";
+import { detectEnvironment, listLocalEnvironments } from "../../lib/environment";
 
 const COLUMNS = ["environment", "server", "project"] as const;
 

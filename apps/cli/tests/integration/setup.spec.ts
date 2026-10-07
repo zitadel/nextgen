@@ -84,8 +84,8 @@ describe("setup", () => {
 
         expect(await app.setup()).toSucceed();
 
-        const live = await app.run(["deployments", "--live", "--json"]);
-        const rows = app.envelopeOf<{ deployments: Array<{ origin: string }> }>(live).data.deployments;
+        const live = await app.run(["deployment", "list", "--live", "--json"]);
+        const rows = app.envelopeOf<{ targets: Array<{ origin: string }> }>(live).data.targets;
         expect(rows.map((row) => row.origin).sort()).toEqual(["", "http://localhost:3000"]);
       });
 

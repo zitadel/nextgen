@@ -1,16 +1,20 @@
 post:
   operationId: rollbackDeployment
-  summary: Roll a deploy back
+  summary: Roll a deployment back
   description: |
-    Undoes one deploy: for every target that deploy moved, appends a row
-    naming the release that target served before it, under a new `deploy_id`
-    with `reason: rollback` and `rollback_of` set. Bare, it undoes the newest
-    deploy of the project; `deploy_id` names an earlier one to re-apply, and
-    `origin` narrows the undo to one target.
+    Undoes one deployment: every target it moved goes back to the release it
+    served before, in a new deployment with `reason: rollback` and
+    `rollback_of` set. Bare, it undoes the newest deployment of the project;
+    `deployment_id` names an earlier one to re-apply on every target it
+    touched, and `origin` narrows the undo to one target.
 
-    A target the undone deploy created has no earlier release and is left as
-    it is; it is named in `warnings`. The frozen values of the restored
-    deployment travel with it.
+    A target the undone deployment created has no earlier release and is
+    left as it is; it is named in `warnings`. When no requested target has
+    one, nothing is written and the answer is `409` `dep.invalid` with those
+    notes in `details.warnings`. The frozen values of the restored deployment
+    travel with it. When the targets served different releases before, one
+    rollback deployment is written per release and the others are named in
+    `warnings`.
   tags:
     - Deployments
   parameters:
@@ -26,10 +30,10 @@ post:
           $ref: rollback-request.yaml
   responses:
     '201':
-      description: The rollback rows were written.
+      description: The rollback was written.
       content:
         application/json:
           schema:
-            $ref: ../deploy-response.yaml
+            $ref: ../create-deployment-response.yaml
     default:
       $ref: rollbackDeployment-error-response.yaml

@@ -1,0 +1,21 @@
+title: DeploymentTarget
+type: object
+description: One target a deployment made its release live on.
+required:
+  - origin
+properties:
+  origin:
+    readOnly: true
+    type: string
+    description: |
+      `""` for the project default, otherwise an exact origin.
+    example: https://app.acme.com
+  expires_at:
+    readOnly: true
+    description: |
+      When the preview behind this origin stops admitting requests. Only set
+      in the live view (`live=true`) and only for a preview origin.
+    oneOf:
+      - type: string
+        format: date-time
+      - type: 'null'

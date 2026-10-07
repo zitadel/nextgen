@@ -45,8 +45,6 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   healthz: "liveness probe, not a resource",
   livez: "liveness probe, not a resource",
   readyz: "readiness probe, not a resource",
-  "configuration-releases":
-    "the bundle constructor behind `zitadel deploy`, `preview` and `setup`; not a collection to list or get",
   flow: "the runtime login flow protocol, driven by the login UI and the SDKs",
   auth_attempts: "the runtime authentication protocol, driven by the login UI and the SDKs",
   // Deployments are acts, not files: creating one is `zitadel deploy`'s
@@ -54,7 +52,7 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // history is that command's to read. Registry CRUD would offer a `create`
   // that skips the release construction the command exists to do.
   deployments: "created and read through `zitadel deploy` orchestration, not registry CRUD (#529)",
-  origins: "live preview rows are written by `zitadel preview` and retired by `zitadel preview rm`",
+  previews: "written by `zitadel preview`, listed by `preview list` and retired by `preview rm`",
 };
 
 /**
@@ -79,12 +77,9 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   createBranding:
     "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
   createRelease:
-    "the CLI builds releases from `.zitadel/` through createConfigurationRelease; posting pointers is for API clients that already hold revision ids",
-  createConfigurationRelease:
-    "called from lib/release.ts for `zitadel deploy`, `zitadel preview` and `zitadel setup`",
-  getDeploymentById: "the log is read whole by `zitadel deployments`; no command addresses one row",
-  listDeployments: "called from lib/deployments.ts by `zitadel deployments`, `deploy` and `rollback`",
-  listOrigins: "live preview rows show in `zitadel deployments --live`; no separate listing",
+    "called from lib/release.ts, which sends the `bundle` form for `zitadel deploy`, `zitadel preview` and `zitadel setup`",
+  getDeploymentById: "the deployments are read whole by `zitadel deployment list`; no command addresses one",
+  listDeployments: "called from lib/deployments.ts by `zitadel deployment list`, `deploy` and `deployment rollback`",
   createFlowDefinition:
     "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
 
@@ -166,13 +161,13 @@ const REFS = ["ID", "sch_1", "flowdef_1", "https://example.com/schema.json"] as 
  * than create and update, as `gh variable set` does (ADR 062, ADR 064).
  */
 const STANDALONE: Readonly<Record<string, readonly string[]>> = {
-  variables: ["vars/list", "vars/get", "vars/set", "vars/rm", "vars/resolve"],
-  deployments: ["deploy", "preview/index", "deployments", "rollback"],
-  origins: ["preview/rm"],
-  // Project state the registry's CRUD grammar does not reach: the allowlist,
-  // the class, and revoking a release.
-  projects: ["allowlist/index", "allowlist/add", "allowlist/rm", "projects/promote", "projects/demote"],
-  releases: ["releases/revoke"],
+  variables: ["variable/list", "variable/get", "variable/set", "variable/rm", "variable/resolve"],
+  deployments: ["deploy", "preview/index", "deployment/list", "deployment/rollback"],
+  previews: ["preview/list", "preview/rm"],
+  // Project state the registry's CRUD grammar does not reach: the origins,
+  // the mode, and revoking a release.
+  projects: ["origin/list", "origin/add", "origin/rm", "projects/promote", "projects/demote"],
+  releases: ["release/revoke"],
 };
 
 /**

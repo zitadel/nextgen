@@ -4,15 +4,25 @@ import { ZitadelError } from "./errors";
 /** The label the CLI prints for the empty origin, which is the project default. */
 export const DEFAULT_TARGET = "(default)";
 
-/** One deployment row as every listing shows it. */
-export type DeploymentRow = Readonly<{
+/** One target a deployment put a release on; `expires_at` only in the live view, previews only. */
+export type DeploymentTarget = Readonly<{ origin: string; expires_at?: string | null }>;
+
+/** One deployment: a release put on a set of targets in one operation. */
+export type Deployment = Readonly<{
   id: string;
-  deploy_id: string;
+  release_id: string;
+  deployed_at: string;
+  targets: readonly DeploymentTarget[];
+  metadata: { reason?: string; message?: string | null; rollback_of?: string | null };
+}>;
+
+/** What one target serves right now, flattened from the deployment that put it there. */
+export type ServingRow = Readonly<{
   origin: string;
+  deployment_id: string;
   release_id: string;
   deployed_at: string;
   expires_at?: string | null;
-  metadata: { reason?: string; message?: string | null; rollback_of?: string | null };
 }>;
 
 export const targetLabel = (origin: string): string => (origin === "" ? DEFAULT_TARGET : origin);
@@ -43,17 +53,26 @@ export function relativeExpiry(iso: string | null | undefined, now = Date.now())
   return hours >= 48 ? `in ${Math.round(hours / 24)}d` : `in ${hours}h`;
 }
 
-/** The newest row per target: what each one serves right now. */
-export async function liveDeployments(
-  client: ZitadelClient,
-  projectId: string,
-): Promise<DeploymentRow[]> {
+/**
+ * What every target serves right now, one row per target. The live view
+ * answers with the deployments still serving something, each carrying only
+ * the targets it still serves.
+ */
+export async function liveTargets(client: ZitadelClient, projectId: string): Promise<ServingRow[]> {
   const { deployments } = await client.listDeployments({ project_id: projectId, live: true });
-  return deployments as DeploymentRow[];
+  return (deployments as Deployment[]).flatMap((deployment) =>
+    deployment.targets.map((target) => ({
+      origin: target.origin,
+      deployment_id: deployment.id,
+      release_id: deployment.release_id,
+      deployed_at: deployment.deployed_at,
+      expires_at: target.expires_at,
+    })),
+  );
 }
 
 /** The release each origin served before a deploy, keyed by origin. */
-export function servingByOrigin(rows: readonly DeploymentRow[]): Map<string, string> {
+export function servingByOrigin(rows: readonly ServingRow[]): Map<string, string> {
   return new Map(rows.map((row) => [row.origin, row.release_id]));
 }
 
@@ -141,7 +160,7 @@ export function normalizeOrigin(raw: string): string {
 export const normalizeOrigins = (raws: readonly string[]): string[] =>
   dedupe(raws.map(normalizeOrigin));
 
-/** Whether an origin is covered by an allowlist pattern (`*` is one or more non-dot characters). */
+/** Whether an origin is covered by an origin pattern (`*` is one or more non-dot characters). */
 export function matchesPattern(pattern: string, origin: string): boolean {
   const escaped = pattern
     .toLowerCase()

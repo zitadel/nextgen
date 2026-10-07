@@ -38,7 +38,7 @@ func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
 	cols = append(cols, schematest.Columns("branding", branding.Schema)...)
 	cols = append(cols, schematest.Columns("releases", release.Schema)...)
 	cols = append(cols, schematest.Columns("variables", variable.Schema)...)
-	cols = append(cols, schematest.Columns("deployments", deployment.Schema)...)
+	cols = append(cols, schematest.Columns("deployments", deployment.NewSchema("deployment_targets"))...)
 	cols = append(cols, schematest.Columns("flow_definitions", flowdefinition.Schema)...)
 	cols = append(cols, schematest.Columns("authz_membership_edges", authz.MembershipEdgeSchema)...)
 	cols = append(cols, schematest.Columns("authz_assignments", authz.AuthzAssignmentSchema)...)

@@ -5,13 +5,13 @@ properties:
   name:
     type: string
     description: The name of the project.
-  allowed_origins:
+  origins:
     type: array
     items:
-      $ref: allowed-origin.yaml
+      $ref: origin.yaml
     description: |
-      The origin allowlist the project starts with. Empty means every origin
-      is served, which only a `sandbox` project may keep.
+      The origins the project starts with. Empty means every origin is
+      served, which only a `sandbox` project may keep.
   seed_defaults:
     type: boolean
     default: true

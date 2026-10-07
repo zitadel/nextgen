@@ -20,9 +20,9 @@
  * Platform routes (mounted via setupPlatformHandlers):
  *   POST   /projects                  — create project
  *   GET    /projects/:id              — fetch project
- *   POST   /projects/:id/allowed_origins        — add an allowlist pattern
- *   POST   /projects/:id/allowed_origins/remove — remove one
- *   POST   /projects/:id/class        — promote or demote the project
+ *   POST   /projects/:id/origins      — add an origin pattern
+ *   POST   /projects/:id/origins/remove — remove one
+ *   POST   /projects/:id/mode         — promote or demote the project
  *   POST   /projects/:id/claim/init   — mint a claim challenge
  *   GET    /projects/:id/claim/status — poll a claim challenge
  *   POST   /schemas                   — create user schema
@@ -32,13 +32,13 @@
  *   POST   /flow_definitions          — create flow definition
  *   GET    /flow_definitions          — list flow definitions
  *   GET    /flow_definitions/:id      — get flow definition
- *   POST   /releases, GET /releases, GET /releases/:id, POST /releases/:id/revoke
- *   POST   /configuration-releases    — a .zitadel/ bundle turned into a release
+ *   POST   /releases                  — from pointers, or from a .zitadel/ bundle
+ *   GET    /releases, GET /releases/:id, POST /releases/:id/revoke
  *   POST   /deployments               — deploy a release to targets
- *   GET    /deployments               — the log (origin, deploy_id, live filters)
+ *   GET    /deployments               — the log (origin, live filters)
  *   GET    /deployments/:id, GET /deployments/:id/variables
- *   POST   /deployments/rollback      — undo a deploy
- *   GET    /origins, POST /origins/remove — live preview URLs
+ *   POST   /deployments/rollback      — undo a deployment
+ *   GET    /previews, POST /previews/remove — live preview URLs
  *   GET/PATCH /variables, GET/DELETE /variables/:name — by applies_to
  *
  * `POST /flow` runs the platform store's origin gate and release pin check

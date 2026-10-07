@@ -1,4 +1,4 @@
-import type { CreateConfigurationRelease201 } from "@zitadel/api/generated/model";
+import type { CreateRelease201 } from "@zitadel/api/generated/model";
 import { consola } from "consola";
 
 import type { ZitadelClient } from "./api-client";
@@ -11,7 +11,7 @@ export type BuiltRelease = Readonly<{
   /** False when the server already held a release of this content. */
   created: boolean;
   /** One entry per bundled resource: the revision pinned, and whether this call allocated it. */
-  revisions: CreateConfigurationRelease201["revisions"];
+  revisions: CreateRelease201["revisions"];
   /** How many revisions this call allocated. */
   changed: number;
 }>;
@@ -32,10 +32,10 @@ export async function buildRelease(opts: {
   if (resources.length === 0) {
     throw new Error("nothing to release: .zitadel/ holds no schema, flow or branding");
   }
-  const result = (await opts.client.createConfigurationRelease(
+  const result = (await opts.client.createRelease(
     { ...body, ...(opts.message ? { message: opts.message } : {}) },
     { project_id: opts.projectId },
-  )) as CreateConfigurationRelease201;
+  )) as CreateRelease201;
   // The client cannot see the status code; a release the server already held
   // allocated no revision, which is the only thing a caller uses `created` for.
   const changed = result.revisions.filter((revision) => revision.created).length;

@@ -1,7 +1,7 @@
 /**
- * The deployment log, origin allowlist and variables of the platform mock:
- * fan-out over targets, idempotency on release and frozen values, rollback,
- * the origin gate on `POST /flow`, and the `applies_to` buckets.
+ * The deployment log, origins and variables of the platform mock: fan-out
+ * over targets, idempotency on release and frozen values, rollback, the
+ * origin gate on `POST /flow`, and the `applies_to` buckets.
  */
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
@@ -27,9 +27,14 @@ type Json = Record<string, unknown>;
 function first(body: Json): Json {
   const [row] = body.deployments as Json[];
   if (!row) {
-    throw new Error("expected at least one deployment row");
+    throw new Error("expected at least one deployment");
   }
   return row;
+}
+
+/** The origins a deployment response names, in order. */
+function targetsOf(deployment: Json): string[] {
+  return (deployment.targets as Json[]).map((target) => target.origin as string);
 }
 
 async function call(method: string, path: string, body?: unknown, headers: Record<string, string> = {}) {
@@ -45,7 +50,7 @@ async function call(method: string, path: string, body?: unknown, headers: Recor
 async function newProject(allowed: { pattern: string; kind: "primary" | "preview" }[] = []) {
   const { body } = await call("POST", "/projects", {
     name: "deployments",
-    allowed_origins: allowed,
+    origins: allowed,
     seed_defaults: true,
   });
   return body.id as string;
@@ -56,7 +61,7 @@ async function newRelease(projectId: string, revisionId = `sch_${Math.random().t
     pointers: [{ kind: "schema", revision_id: revisionId }],
   });
   expect([200, 201]).toContain(status);
-  return body.id as string;
+  return (body.release as Json).id as string;
 }
 
 const ACME = [
@@ -66,7 +71,7 @@ const ACME = [
 ];
 
 describe("deployments", () => {
-  test("a deploy to default and primary writes one row per target under one deploy id", async () => {
+  test("a deploy to default and primary is one deployment over every target", async () => {
     const projectId = await newProject(ACME);
     const releaseId = await newRelease(projectId);
 
@@ -77,10 +82,11 @@ describe("deployments", () => {
     });
 
     expect(status).toBe(201);
-    expect(body.targets).toEqual(["", "https://app.acme.com", "https://www.acme.com"]);
-    const rows = body.deployments as Json[];
-    expect(new Set(rows.map((row) => row.deploy_id)).size).toBe(1);
-    expect(rows.every((row) => row.release_id === releaseId)).toBe(true);
+    const deployment = body.deployment as Json;
+    expect(deployment.id).toMatch(/^dep_/);
+    expect(targetsOf(deployment)).toEqual(["", "https://app.acme.com", "https://www.acme.com"]);
+    expect(deployment.release_id).toBe(releaseId);
+    expect(body.warnings).toEqual([]);
   });
 
   test("deploying what every target already serves answers 200 and writes nothing", async () => {
@@ -97,7 +103,7 @@ describe("deployments", () => {
     });
 
     expect(again.status).toBe(200);
-    expect(first(again.body).id).toBe(first(initial.body).id);
+    expect((again.body.deployment as Json).id).toBe((initial.body.deployment as Json).id);
     const log = await call("GET", `/deployments?project_id=${projectId}`);
     expect((log.body.deployments as Json[]).length).toBe(1);
   });
@@ -118,15 +124,15 @@ describe("deployments", () => {
     });
 
     expect(second.status).toBe(201);
-    const firstId = first(initial.body).id as string;
-    const secondId = first(second.body).id as string;
+    const firstId = (initial.body.deployment as Json).id as string;
+    const secondId = (second.body.deployment as Json).id as string;
     const frozenFirst = await call("GET", `/deployments/${firstId}/variables?project_id=${projectId}`);
     const frozenSecond = await call("GET", `/deployments/${secondId}/variables?project_id=${projectId}`);
     expect(frozenFirst.body).toEqual({ SUPPORT_EMAIL: "help@acme.com" });
     expect(frozenSecond.body).toEqual({ SUPPORT_EMAIL: "care@acme.com" });
   });
 
-  test("a preview deploy needs a ttl, writes a live origin row, and prefers preview values", async () => {
+  test("a preview deploy needs a ttl, registers a preview, and prefers preview values", async () => {
     const projectId = await newProject(ACME);
     const releaseId = await newRelease(projectId);
     await call("PATCH", `/variables?project_id=${projectId}`, {
@@ -152,12 +158,13 @@ describe("deployments", () => {
     expect(status).toBe(201);
     expect(body.warnings).toEqual(["GOOGLE_CLIENT_SECRET has no preview value — serving the production one"]);
 
-    const origins = await call("GET", `/origins?project_id=${projectId}`);
-    expect((origins.body.origins as Json[]).map((row) => row.origin)).toEqual([url]);
+    const previews = await call("GET", `/previews?project_id=${projectId}`);
+    expect((previews.body.previews as Json[]).map((row) => row.origin)).toEqual([url]);
     const live = await call("GET", `/deployments?project_id=${projectId}&live=true`);
     const row = first(live.body);
-    expect(row.origin).toBe(url);
-    expect(typeof row.expires_at).toBe("string");
+    const [target] = row.targets as Json[];
+    expect(target?.origin).toBe(url);
+    expect(typeof target?.expires_at).toBe("string");
     const frozen = await call("GET", `/deployments/${row.id as string}/variables?project_id=${projectId}`);
     expect(frozen.body).toEqual({ GOOGLE_CLIENT_ID: "preview-id", GOOGLE_CLIENT_SECRET: { secret: true } });
   });
@@ -182,7 +189,7 @@ describe("deployments", () => {
     expect(stranger.body.code).toBe("proj.origin_not_allowed");
   });
 
-  test("rollback undoes the newest deploy on every target it moved", async () => {
+  test("rollback undoes the newest deployment on every target it moved", async () => {
     const projectId = await newProject(ACME);
     const good = await newRelease(projectId, "sch_good");
     const bad = await newRelease(projectId, "sch_bad");
@@ -195,23 +202,51 @@ describe("deployments", () => {
     const { status, body } = await call("POST", `/deployments/rollback?project_id=${projectId}`, {});
 
     expect(status).toBe(201);
-    const rows = body.deployments as Json[];
-    expect(rows.map((row) => row.origin)).toEqual(["", "https://app.acme.com", "https://www.acme.com"]);
-    expect(rows.every((row) => row.release_id === good)).toBe(true);
-    expect(rows.every((row) => (row.metadata as Json).rollback_of === broken.body.deploy_id)).toBe(true);
+    const rollback = body.deployment as Json;
+    expect(targetsOf(rollback)).toEqual(["", "https://app.acme.com", "https://www.acme.com"]);
+    expect(rollback.release_id).toBe(good);
+    expect((rollback.metadata as Json).rollback_of).toBe((broken.body.deployment as Json).id);
     const live = await call("GET", `/deployments?project_id=${projectId}&live=true`);
-    expect((live.body.deployments as Json[]).every((row) => row.release_id === good)).toBe(true);
+    expect((live.body.deployments as Json[]).map((row) => row.id)).toEqual([rollback.id]);
   });
 
-  test("rollback leaves a target with no earlier release alone and says so", async () => {
+  test("rollback of a deployment whose targets had nothing earlier is refused", async () => {
     const projectId = await newProject(ACME);
     const releaseId = await newRelease(projectId);
     await call("POST", `/deployments?project_id=${projectId}`, { release: releaseId, targets: ["default"] });
 
-    const { body } = await call("POST", `/deployments/rollback?project_id=${projectId}`, {});
+    const { status, body } = await call("POST", `/deployments/rollback?project_id=${projectId}`, {});
 
-    expect(body.deployments).toEqual([]);
-    expect(body.warnings).toEqual(["(default) has no earlier release and was left as it is"]);
+    expect(status).toBe(409);
+    expect(body.code).toBe("dep.invalid");
+    expect((body.details as Json).warnings).toEqual(["(default) has no earlier release and was left as it is"]);
+  });
+
+  test("rollback of one origin leaves the deployment's other targets where they are", async () => {
+    const projectId = await newProject(ACME);
+    const good = await newRelease(projectId, "sch_good");
+    const bad = await newRelease(projectId, "sch_bad");
+    await call("POST", `/deployments?project_id=${projectId}`, { release: good, targets: ["default", "primary"] });
+    const broken = await call("POST", `/deployments?project_id=${projectId}`, {
+      release: bad,
+      targets: ["default", "primary"],
+    });
+
+    const { body } = await call("POST", `/deployments/rollback?project_id=${projectId}`, {
+      deployment_id: (broken.body.deployment as Json).id,
+      origin: "https://app.acme.com",
+    });
+
+    expect(targetsOf(body.deployment as Json)).toEqual(["https://app.acme.com"]);
+    const live = await call("GET", `/deployments?project_id=${projectId}&live=true`);
+    const served = (live.body.deployments as Json[]).flatMap((row) =>
+      targetsOf(row).map((origin) => [origin, row.release_id]),
+    );
+    expect(served).toEqual([
+      ["https://app.acme.com", good],
+      ["", bad],
+      ["https://www.acme.com", bad],
+    ]);
   });
 
   test("a release resolves by digest prefix, and a revoked one cannot be deployed", async () => {
@@ -225,16 +260,18 @@ describe("deployments", () => {
     });
     expect(same.status).toBe(201);
     expect(again.status).toBe(200);
-    expect(again.body.id).toBe(same.body.id);
-    expect(same.body.content_hash).toMatch(/^[0-9a-f]{64}$/);
+    const sameRelease = same.body.release as Json;
+    expect((again.body.release as Json).id).toBe(sameRelease.id);
+    expect(sameRelease.content_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect((same.body.revisions as Json[]).map((r) => r.created)).toEqual([false]);
     const listed = await call("GET", `/releases?project_id=${projectId}`);
-    expect((listed.body.releases as Json[]).map((r) => r.content_hash)).toContain(same.body.content_hash);
+    expect((listed.body.releases as Json[]).map((r) => r.content_hash)).toContain(sameRelease.content_hash);
     const byDigest = await call("POST", `/deployments?project_id=${projectId}`, {
-      release: `sha256:${(same.body.content_hash as string).slice(0, 16)}`,
+      release: `sha256:${(sameRelease.content_hash as string).slice(0, 16)}`,
       targets: ["default"],
     });
     expect(byDigest.status).toBe(201);
-    expect(byDigest.body.release_id).toBe(same.body.id);
+    expect((byDigest.body.deployment as Json).release_id).toBe(sameRelease.id);
 
     const revoked = await call("POST", `/releases/${releaseId}/revoke?project_id=${projectId}`);
     expect(typeof revoked.body.revoked_at).toBe("string");
@@ -246,7 +283,7 @@ describe("deployments", () => {
     expect(refused.body.code).toBe("rel.revoked");
   });
 
-  test("the log filters by origin and deploy id, and the default is a row of its own", async () => {
+  test("the log filters by origin, narrows a deployment to it, and expands the release", async () => {
     const projectId = await newProject(ACME);
     const releaseId = await newRelease(projectId);
     const deploy = await call("POST", `/deployments?project_id=${projectId}`, {
@@ -255,35 +292,38 @@ describe("deployments", () => {
     });
 
     const byOrigin = await call("GET", `/deployments?project_id=${projectId}&origin=`);
-    expect((byOrigin.body.deployments as Json[]).map((row) => row.origin)).toEqual([""]);
-    const byDeploy = await call(
+    const rows = byOrigin.body.deployments as Json[];
+    expect(rows.map((row) => row.id)).toEqual([(deploy.body.deployment as Json).id]);
+    expect(targetsOf(first(byOrigin.body))).toEqual([""]);
+    const expanded = await call("GET", `/deployments?project_id=${projectId}&expand=release`);
+    expect(targetsOf(first(expanded.body)).length).toBe(3);
+    expect((first(expanded.body).release as Json).id).toBe(releaseId);
+    const byId = await call(
       "GET",
-      `/deployments?project_id=${projectId}&deploy_id=${deploy.body.deploy_id as string}&expand=release`,
+      `/deployments/${(deploy.body.deployment as Json).id as string}?project_id=${projectId}`,
     );
-    const rows = byDeploy.body.deployments as Json[];
-    expect(rows.length).toBe(3);
-    expect((first(byDeploy.body).release as Json).id).toBe(releaseId);
+    expect(targetsOf(byId.body)).toEqual(["", "https://app.acme.com", "https://www.acme.com"]);
   });
 });
 
-describe("allowlist and class", () => {
+describe("origins and mode", () => {
   test("adds a pattern with its lint result and refuses a duplicate", async () => {
     const projectId = await newProject();
 
-    const added = await call("POST", `/projects/${projectId}/allowed_origins`, {
+    const added = await call("POST", `/projects/${projectId}/origins`, {
       pattern: "https://*-acmeinc.vercel.app",
       kind: "preview",
     });
     expect(added.status).toBe(201);
     expect((added.body.check as Json).status).toBe("ok");
 
-    const unknown = await call("POST", `/projects/${projectId}/allowed_origins`, {
+    const unknown = await call("POST", `/projects/${projectId}/origins`, {
       pattern: "https://*.acme.newhost.dev",
       kind: "preview",
     });
     expect((unknown.body.check as Json).code).toBe("origin_host_unknown");
 
-    const dup = await call("POST", `/projects/${projectId}/allowed_origins`, {
+    const dup = await call("POST", `/projects/${projectId}/origins`, {
       pattern: "https://*-acmeinc.vercel.app",
       kind: "preview",
     });
@@ -293,31 +333,32 @@ describe("allowlist and class", () => {
   test("promotion re-checks every pattern and a production project refuses loopback", async () => {
     const projectId = await newProject([{ pattern: "http://localhost:3000", kind: "primary" }]);
 
-    const refused = await call("POST", `/projects/${projectId}/class`, { class: "production" });
+    const refused = await call("POST", `/projects/${projectId}/mode`, { mode: "production" });
     expect(refused.status).toBe(400);
-    expect(refused.body.code).toBe("proj.origin_not_permitted_for_class");
+    expect(refused.body.code).toBe("proj.mode_change_refused");
 
-    await call("POST", `/projects/${projectId}/allowed_origins/remove`, { pattern: "http://localhost:3000" });
-    await call("POST", `/projects/${projectId}/allowed_origins`, { pattern: "https://app.acme.com", kind: "primary" });
-    const promoted = await call("POST", `/projects/${projectId}/class`, { class: "production" });
+    await call("POST", `/projects/${projectId}/origins/remove`, { pattern: "http://localhost:3000" });
+    await call("POST", `/projects/${projectId}/origins`, { pattern: "https://app.acme.com", kind: "primary" });
+    const promoted = await call("POST", `/projects/${projectId}/mode`, { mode: "production" });
     expect(promoted.status).toBe(200);
-    expect(promoted.body.class).toBe("production");
+    expect(promoted.body.mode).toBe("production");
 
-    const wildcardPrimary = await call("POST", `/projects/${projectId}/allowed_origins`, {
+    const wildcardPrimary = await call("POST", `/projects/${projectId}/origins`, {
       pattern: "https://*.acme.com",
       kind: "primary",
     });
-    expect(wildcardPrimary.body.code).toBe("proj.origin_not_permitted_for_class");
-    const unbounded = await call("POST", `/projects/${projectId}/allowed_origins`, {
+    expect(wildcardPrimary.body.code).toBe("origin.not_permitted_for_mode");
+    const unbounded = await call("POST", `/projects/${projectId}/origins`, {
       pattern: "https://*.vercel.app",
       kind: "preview",
     });
     expect(unbounded.body.code).toBe("proj.origin_unbounded");
 
-    const demote = await call("POST", `/projects/${projectId}/class`, { class: "sandbox" });
+    const demote = await call("POST", `/projects/${projectId}/mode`, { mode: "sandbox" });
     expect(demote.status).toBe(400);
-    const confirmed = await call("POST", `/projects/${projectId}/class`, { class: "sandbox", confirm: true });
-    expect(confirmed.body.class).toBe("sandbox");
+    expect(demote.body.code).toBe("proj.mode_change_refused");
+    const confirmed = await call("POST", `/projects/${projectId}/mode`, { mode: "sandbox", confirm: true });
+    expect(confirmed.body.mode).toBe("sandbox");
   });
 });
 
@@ -325,7 +366,7 @@ describe("the origin gate on POST /flow", () => {
   const start = (projectId: string, headers: Record<string, string>) =>
     call("POST", "/flow", { project_id: projectId, purpose: "login" }, headers);
 
-  test("admits a primary, refuses an unlisted origin, and refuses a preview without a live row", async () => {
+  test("admits a primary, refuses an unlisted origin, and refuses a preview that is not live", async () => {
     const projectId = await newProject(ACME);
 
     expect((await start(projectId, { Origin: "https://app.acme.com" })).status).toBe(201);
@@ -337,7 +378,7 @@ describe("the origin gate on POST /flow", () => {
     expect(squatter.body.code).toBe("proj.preview_not_live");
   });
 
-  test("a live preview row admits its URL until it is retired", async () => {
+  test("a live preview admits its URL until it is retired", async () => {
     const projectId = await newProject(ACME);
     const releaseId = await newRelease(projectId);
     const url = "https://acme-git-sso-acmeinc.vercel.app";
@@ -348,8 +389,11 @@ describe("the origin gate on POST /flow", () => {
     });
 
     expect((await start(projectId, { Origin: url })).status).toBe(201);
-    await call("POST", `/origins/remove?project_id=${projectId}`, { origin: url });
+    await call("POST", `/previews/remove?project_id=${projectId}`, { origin: url });
     expect((await start(projectId, { Origin: url })).body.code).toBe("proj.preview_not_live");
+    const gone = await call("POST", `/previews/remove?project_id=${projectId}`, { origin: url });
+    expect(gone.status).toBe(404);
+    expect(gone.body.code).toBe("preview.not_found");
   });
 
   test("a pin selects among releases deployed to the target on a production project", async () => {
@@ -361,7 +405,7 @@ describe("the origin gate on POST /flow", () => {
     // sandbox: any release
     expect((await start(projectId, { "X-Zitadel-Release": draft })).status).toBe(201);
 
-    await call("POST", `/projects/${projectId}/class`, { class: "production" });
+    await call("POST", `/projects/${projectId}/mode`, { mode: "production" });
     expect((await start(projectId, { "X-Zitadel-Release": deployed })).status).toBe(201);
     expect(
       (await start(projectId, { Origin: "https://app.acme.com", "X-Zitadel-Release": deployed })).status,
@@ -392,7 +436,7 @@ describe("variables by applies_to", () => {
   });
 });
 
-describe("configuration releases", () => {
+describe("releases from a bundle", () => {
   type Revision = { kind: string; handle: string; revision_id: string; created: boolean };
 
   /** The seeded schema and flow of a fresh project, as a `.zitadel/` bundle would carry them. */
@@ -415,8 +459,8 @@ describe("configuration releases", () => {
     const projectId = await newProject(ACME);
     const bundle = await seededBundle(projectId);
 
-    const first = await call("POST", `/configuration-releases?project_id=${projectId}`, bundle);
-    const second = await call("POST", `/configuration-releases?project_id=${projectId}`, bundle);
+    const first = await call("POST", `/releases?project_id=${projectId}`, { bundle });
+    const second = await call("POST", `/releases?project_id=${projectId}`, { bundle });
 
     expect(first.status).toBe(201);
     expect((first.body.revisions as Revision[]).map((r) => [r.kind, r.created])).toEqual([
@@ -431,12 +475,11 @@ describe("configuration releases", () => {
   test("a changed flow mints one flow revision and reuses the schema", async () => {
     const projectId = await newProject(ACME);
     const bundle = await seededBundle(projectId);
-    const base = await call("POST", `/configuration-releases?project_id=${projectId}`, bundle);
+    const base = await call("POST", `/releases?project_id=${projectId}`, { bundle });
     const renamed = { ...bundle.flow_definitions[0]!, name: "b2b-login" };
 
-    const { status, body } = await call("POST", `/configuration-releases?project_id=${projectId}`, {
-      ...bundle,
-      flow_definitions: [renamed],
+    const { status, body } = await call("POST", `/releases?project_id=${projectId}`, {
+      bundle: { ...bundle, flow_definitions: [renamed] },
     });
 
     expect(status).toBe(201);
@@ -456,9 +499,8 @@ describe("configuration releases", () => {
       properties: { ...(bundle.schemas[0]!.properties as Json), nickname: { type: "string" } },
     };
 
-    const { status, body } = await call("POST", `/configuration-releases?project_id=${projectId}`, {
-      ...bundle,
-      schemas: [changedSchema],
+    const { status, body } = await call("POST", `/releases?project_id=${projectId}`, {
+      bundle: { ...bundle, schemas: [changedSchema] },
     });
 
     expect(status).toBe(201);
@@ -469,12 +511,15 @@ describe("configuration releases", () => {
     expect((stored.body.flow_definition as Json).user_schema).toBe(schema!.revision_id);
   });
 
-  test("an empty bundle is refused", async () => {
+  test("an empty bundle is refused, as is a body naming neither pointers nor a bundle", async () => {
     const projectId = await newProject(ACME);
 
-    const { status, body } = await call("POST", `/configuration-releases?project_id=${projectId}`, {});
+    const empty = await call("POST", `/releases?project_id=${projectId}`, { bundle: {} });
+    expect(empty.status).toBe(400);
+    expect(empty.body.code).toBe("rel.invalid");
 
-    expect(status).toBe(400);
-    expect(body.code).toBe("rel.invalid");
+    const neither = await call("POST", `/releases?project_id=${projectId}`, { message: "nothing" });
+    expect(neither.status).toBe(400);
+    expect(neither.body.code).toBe("rel.invalid");
   });
 });

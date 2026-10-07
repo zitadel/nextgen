@@ -2,18 +2,19 @@ post:
   operationId: createDeployment
   summary: Create a deployment
   description: |
-    Makes a release live on one or more targets by appending a deployment row
-    per target, all in one transaction under one `deploy_id`. What a target
-    serves is its newest row, so nothing else moves.
+    Makes a release live on one or more targets as one deployment, written in
+    one transaction. What a target serves is the newest deployment naming it,
+    so nothing else moves.
 
-    The variables each row runs are frozen at this moment: the project's
-    variable store is resolved (`preview` values overriding `all` values when
-    every target is a preview origin) and copied onto the deployment, so a
-    later edit of the store reaches no deployment until the next deploy.
+    The variables the deployment runs are frozen at this moment: the
+    project's variable store is resolved (`preview` values overriding `all`
+    values when every target is a preview origin) and copied onto the
+    deployment, so a later edit of the store reaches no deployment until the
+    next deploy.
 
-    Idempotent on release and values: when every target's newest row already
-    names this release with the same frozen values, nothing is written and the
-    answer is `200` with those rows.
+    Idempotent on release and values: when every target already serves this
+    release from one deployment with the same frozen values, nothing is
+    written and the answer is `200` with that deployment.
   tags:
     - Deployments
   parameters:
@@ -50,13 +51,13 @@ post:
       content:
         application/json:
           schema:
-            $ref: deploy-response.yaml
+            $ref: create-deployment-response.yaml
     '201':
-      description: The rows were written and the targets now serve the release.
+      description: The deployment was written and the targets now serve the release.
       content:
         application/json:
           schema:
-            $ref: deploy-response.yaml
+            $ref: create-deployment-response.yaml
     default:
       $ref: createDeployment-error-response.yaml
 get:
@@ -64,12 +65,13 @@ get:
   summary: List deployments
   description: |
     Lists deployments newest first. Bare, it is the project-wide log. `origin`
-    narrows it to one target's history (`""` for the default), `deploy_id` to
-    the rows one deploy wrote, and `live=true` to the newest row per target —
-    what each one serves right now, with `expires_at` filled for previews.
+    narrows it to the deployments that touched one target (`""` for the
+    default). `live=true` answers what every target serves right now: the
+    deployments current for at least one target, each listing only the
+    targets it serves, with `expires_at` filled for previews.
 
-    `expand: ["release"]` embeds the release each row made live; it requires
-    `release.read`.
+    `expand: ["release"]` embeds the release each deployment made live; it
+    requires `release.read`.
   tags:
     - Deployments
   parameters:
@@ -77,20 +79,14 @@ get:
     - name: origin
       in: query
       required: false
-      description: One target's history. The empty string is the project default.
+      description: The deployments that touched one target. The empty string is the project default.
       schema:
         type: string
       allowEmptyValue: true
-    - name: deploy_id
-      in: query
-      required: false
-      description: The rows one deploy wrote.
-      schema:
-        type: string
     - name: live
       in: query
       required: false
-      description: The newest row per target only.
+      description: What every target serves right now, instead of the log.
       schema:
         type: boolean
     - name: expand

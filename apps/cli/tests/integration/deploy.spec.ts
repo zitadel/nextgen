@@ -5,7 +5,7 @@ import { aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
-type Deploy = { deploy_id: string; targets: string[]; release: { id: string; content_hash: string } };
+type Deploy = { deployment_id: string; targets: string[]; release: { id: string; content_hash: string } };
 
 describe("deploy", () => {
   describe("against an invalid server", () => {
@@ -32,7 +32,7 @@ describe("deploy", () => {
 
       expect(result).toSucceed();
       const { data } = app.envelopeOf<Deploy>(result);
-      expect(data.deploy_id).toMatch(/^dpl_/);
+      expect(data.deployment_id).toMatch(/^dep_/);
       expect(data.targets).toContain("");
       expect(data.targets).toContain("http://localhost:3000");
       expect(data.release.content_hash).toMatch(/^[0-9a-f]{64}$/);
@@ -78,7 +78,7 @@ describe("deploy", () => {
     it("refuses a preview URL as an origin", async () => {
       const app = await aSetUpApp();
       expect(
-        await app.run(["allowlist", "add", "https://*-acme.vercel.app", "--kind", "preview", "--json"]),
+        await app.run(["origin", "add", "https://*-acme.vercel.app", "--kind", "preview", "--json"]),
       ).toSucceed();
 
       const result = await app.run([
@@ -94,11 +94,11 @@ describe("deploy", () => {
 
     it("deploys nothing on a dry run", async () => {
       const app = await aSetUpApp();
-      const before = await app.run(["deployments", "--json"]);
+      const before = await app.run(["deployment", "list", "--json"]);
 
       expect(await app.run(["deploy", "--non-interactive", "--json", "--dry-run"])).toSucceed();
 
-      const after = await app.run(["deployments", "--json"]);
+      const after = await app.run(["deployment", "list", "--json"]);
       expect(app.envelopeOf<{ count: number }>(after).data.count).toBe(
         app.envelopeOf<{ count: number }>(before).data.count,
       );

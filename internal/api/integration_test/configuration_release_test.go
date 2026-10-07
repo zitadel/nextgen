@@ -37,11 +37,11 @@ func bundleSchema(t *testing.T, objectType, title string) api.UserSchema {
 	return schema
 }
 
-// TestConfigurationRelease covers the bundle constructor: a `.zitadel/`
-// directory becomes a release with no client-side state, unchanged content
-// resolves to the same revisions and the same release, and a change
-// allocates only the revision that changed.
-func TestConfigurationRelease(t *testing.T) {
+// TestReleaseFromBundle covers the bundle form of POST /releases: a
+// `.zitadel/` directory becomes a release with no client-side state,
+// unchanged content resolves to the same revisions and the same release, and
+// a change allocates only the revision that changed.
+func TestReleaseFromBundle(t *testing.T) {
 	t.Parallel()
 
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, false)
@@ -49,31 +49,33 @@ func TestConfigurationRelease(t *testing.T) {
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
-	params := api.CreateConfigurationReleaseParams{ProjectID: api.ProjectID(project.ID)}
+	params := api.CreateReleaseParams{ProjectID: api.ProjectID(project.ID)}
 
 	const handle = "bundle-user"
 	// What `.zitadel/flows/password-login.json` holds right now; the changed
 	// subtest advances it, so later subtests post the content on disk.
 	current := passwordLoginFlowDefinition(handle)
-	bundle := func(flow api.FlowDefinition) *api.ConfigurationBundle {
-		return &api.ConfigurationBundle{
-			Schemas:         []api.UserSchema{bundleSchema(t, handle, "bundle user")},
-			FlowDefinitions: []api.FlowDefinition{flow},
-			Message:         api.NewOptString("initial release"),
+	bundle := func(flow api.FlowDefinition) *api.CreateReleaseRequest {
+		return &api.CreateReleaseRequest{
+			Bundle: api.NewOptConfigurationBundle(api.ConfigurationBundle{
+				Schemas:         []api.UserSchema{bundleSchema(t, handle, "bundle user")},
+				FlowDefinitions: []api.FlowDefinition{flow},
+			}),
+			Message: api.NewOptString("initial release"),
 		}
 	}
-	byHandle := func(revisions []api.ConfigurationReleaseResponseRevisionsItem) map[string]api.ConfigurationReleaseResponseRevisionsItem {
-		out := make(map[string]api.ConfigurationReleaseResponseRevisionsItem, len(revisions))
+	byHandle := func(revisions []api.CreateReleaseResponseRevisionsItem) map[string]api.CreateReleaseResponseRevisionsItem {
+		out := make(map[string]api.CreateReleaseResponseRevisionsItem, len(revisions))
 		for _, revision := range revisions {
 			out[string(revision.Kind)+"/"+revision.Handle] = revision
 		}
 		return out
 	}
 
-	first, err := client.CreateConfigurationRelease(t.Context(), bundle(current), params)
+	first, err := client.CreateRelease(t.Context(), bundle(current), params)
 	require.NoError(t, err)
-	require.IsType(t, &api.CreateConfigurationReleaseCreated{}, first, helpers.MustMarshal(t, first))
-	created := api.ConfigurationReleaseResponse(*first.(*api.CreateConfigurationReleaseCreated))
+	require.IsType(t, &api.CreateReleaseCreated{}, first, helpers.MustMarshal(t, first))
+	created := api.CreateReleaseResponse(*first.(*api.CreateReleaseCreated))
 	require.Len(t, created.Revisions, 2)
 	firstRevisions := byHandle(created.Revisions)
 	assert.True(t, firstRevisions["schema/"+handle].Created, "the schema was new to the project")
@@ -90,10 +92,10 @@ func TestConfigurationRelease(t *testing.T) {
 	})
 
 	t.Run("the identical bundle reuses every revision and the release", func(t *testing.T) {
-		again, err := client.CreateConfigurationRelease(t.Context(), bundle(current), params)
+		again, err := client.CreateRelease(t.Context(), bundle(current), params)
 		require.NoError(t, err)
-		require.IsType(t, &api.CreateConfigurationReleaseOK{}, again, helpers.MustMarshal(t, again))
-		reused := api.ConfigurationReleaseResponse(*again.(*api.CreateConfigurationReleaseOK))
+		require.IsType(t, &api.CreateReleaseOK{}, again, helpers.MustMarshal(t, again))
+		reused := api.CreateReleaseResponse(*again.(*api.CreateReleaseOK))
 		assert.Equal(t, created.Release.ID, reused.Release.ID)
 		for _, revision := range reused.Revisions {
 			assert.False(t, revision.Created, "%s/%s should have been reused", revision.Kind, revision.Handle)
@@ -106,10 +108,10 @@ func TestConfigurationRelease(t *testing.T) {
 		changed.Steps[0].Name = "username"
 		changed.Purposes = api.FlowDefinitionPurposes{"login": "username"}
 		current = changed
-		resp, err := client.CreateConfigurationRelease(t.Context(), bundle(current), params)
+		resp, err := client.CreateRelease(t.Context(), bundle(current), params)
 		require.NoError(t, err)
-		require.IsType(t, &api.CreateConfigurationReleaseCreated{}, resp, helpers.MustMarshal(t, resp))
-		next := api.ConfigurationReleaseResponse(*resp.(*api.CreateConfigurationReleaseCreated))
+		require.IsType(t, &api.CreateReleaseCreated{}, resp, helpers.MustMarshal(t, resp))
+		next := api.CreateReleaseResponse(*resp.(*api.CreateReleaseCreated))
 		assert.NotEqual(t, created.Release.ID, next.Release.ID)
 		revisions := byHandle(next.Revisions)
 		assert.False(t, revisions["schema/"+handle].Created)
@@ -119,18 +121,29 @@ func TestConfigurationRelease(t *testing.T) {
 	})
 
 	t.Run("an empty bundle is refused", func(t *testing.T) {
-		resp, err := client.CreateConfigurationRelease(t.Context(), &api.ConfigurationBundle{}, params)
+		resp, err := client.CreateRelease(t.Context(), &api.CreateReleaseRequest{
+			Bundle: api.NewOptConfigurationBundle(api.ConfigurationBundle{}),
+		}, params)
 		require.NoError(t, err)
-		require.IsType(t, &api.CreateConfigurationReleaseErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
-		assert.Equal(t, 400, resp.(*api.CreateConfigurationReleaseErrorResponseStatusCode).StatusCode)
+		require.IsType(t, &api.CreateReleaseErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, 400, resp.(*api.CreateReleaseErrorResponseStatusCode).StatusCode)
+	})
+
+	t.Run("pointers and a bundle together are refused", func(t *testing.T) {
+		req := bundle(current)
+		req.Pointers = []api.CreateReleasePointer{{Kind: api.ReleasePointerKindSchema, RevisionID: firstRevisions["schema/"+handle].RevisionID}}
+		resp, err := client.CreateRelease(t.Context(), req, params)
+		require.NoError(t, err)
+		require.IsType(t, &api.CreateReleaseErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, 400, resp.(*api.CreateReleaseErrorResponseStatusCode).StatusCode)
 	})
 
 	t.Run("the preview-deploy credential may build a release", func(t *testing.T) {
 		preview, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
 		harness.SetPreviewDeployTokenOnApiClient(t, preview, project)
-		resp, err := preview.CreateConfigurationRelease(t.Context(), bundle(current), params)
+		resp, err := preview.CreateRelease(t.Context(), bundle(current), params)
 		require.NoError(t, err)
-		require.IsType(t, &api.CreateConfigurationReleaseOK{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.CreateReleaseOK{}, resp, helpers.MustMarshal(t, resp))
 	})
 }

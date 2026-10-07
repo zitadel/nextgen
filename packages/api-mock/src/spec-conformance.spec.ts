@@ -259,7 +259,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         name: "conformance-app",
-        allowed_origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
+        origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
         seed_defaults: false,
       }),
     });
@@ -268,8 +268,8 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(() => CreateProjectResponse.parse(body)).not.toThrow();
     const parsed = CreateProjectResponse.parse(body);
     expect(parsed.name).toBe("conformance-app");
-    expect(parsed.class).toBe("sandbox");
-    expect(parsed.allowed_origins).toEqual([{ pattern: "http://localhost:3000", kind: "primary" }]);
+    expect(parsed.mode).toBe("sandbox");
+    expect(parsed.origins).toEqual([{ pattern: "http://localhost:3000", kind: "primary" }]);
     expect(typeof parsed.preview_token).toBe("string");
   });
 
@@ -1350,7 +1350,7 @@ describe("api-mock idp and variable contract details", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pointers: [{ kind: "schema", revision_id: "sch_conformance" }] }),
     });
-    const { id: releaseId } = (await release.json()) as { id: string };
+    const { release: { id: releaseId } } = (await release.json()) as { release: { id: string } };
     const deployed = await fetch(`${BASE}/deployments?project_id=${projectId}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -1364,7 +1364,9 @@ describe("api-mock idp and variable contract details", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => ListDeploymentsResponse.parse(body)).not.toThrow();
-    expect(ListDeploymentsResponse.parse(body).deployments.map((row) => row.origin)).toEqual([""]);
+    expect(
+      ListDeploymentsResponse.parse(body).deployments.flatMap((row) => row.targets.map((target) => target.origin)),
+    ).toEqual([""]);
   });
 
   test("reads back what the write did not touch", async () => {

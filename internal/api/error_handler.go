@@ -120,6 +120,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return brandingErrorResponse(e)
 	case strings.HasPrefix(e.Code, "origin."):
 		return originErrorResponse(e)
+	case strings.HasPrefix(e.Code, "preview."):
+		return previewErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixRelease.ErrorCodePrefix("")):
 		return releaseErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixIDPConnection.ErrorCodePrefix("")):

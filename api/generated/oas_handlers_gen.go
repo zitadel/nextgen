@@ -33,28 +33,28 @@ func (c *codeRecorder) Unwrap() http.ResponseWriter {
 	return c.ResponseWriter
 }
 
-// handleAddAllowedOriginRequest handles addAllowedOrigin operation.
+// handleAddOriginRequest handles addOrigin operation.
 //
-// Adds one `{pattern, kind}` to the project's allowlist. The pattern is
-// checked against the project's class: a `production` project refuses
+// Adds one `{pattern, kind}` to the project's origins. The pattern is
+// checked against the project's mode: a `production` project refuses
 // loopback hosts, a `*` in a `primary` pattern, and a `preview` wildcard on
 // a shared host that carries no tenant-unique label. A host the server does
 // not know is accepted with a warning naming what it could not check.
 //
-// POST /projects/{project_id}/allowed_origins
-func (s *Server) handleAddAllowedOriginRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// POST /projects/{project_id}/origins
+func (s *Server) handleAddOriginRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("addAllowedOrigin"),
+		otelogen.OperationID("addOrigin"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/projects/{project_id}/allowed_origins"),
+		semconv.HTTPRouteKey.String("/projects/{project_id}/origins"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), AddAllowedOriginOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), AddOriginOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -109,15 +109,15 @@ func (s *Server) handleAddAllowedOriginRequest(args [1]string, argsEscaped bool,
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: AddAllowedOriginOperation,
-			ID:   "addAllowedOrigin",
+			Name: AddOriginOperation,
+			ID:   "addOrigin",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, AddAllowedOriginOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, AddOriginOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -157,7 +157,7 @@ func (s *Server) handleAddAllowedOriginRequest(args [1]string, argsEscaped bool,
 			return
 		}
 	}
-	params, err := decodeAddAllowedOriginParams(args, argsEscaped, r)
+	params, err := decodeAddOriginParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -169,7 +169,7 @@ func (s *Server) handleAddAllowedOriginRequest(args [1]string, argsEscaped bool,
 	}
 
 	var rawBody []byte
-	request, rawBody, close, err := s.decodeAddAllowedOriginRequest(r)
+	request, rawBody, close, err := s.decodeAddOriginRequest(r)
 	if err != nil {
 		err = &ogenerrors.DecodeRequestError{
 			OperationContext: opErrContext,
@@ -185,13 +185,13 @@ func (s *Server) handleAddAllowedOriginRequest(args [1]string, argsEscaped bool,
 		}
 	}()
 
-	var response AddAllowedOriginRes
+	var response AddOriginRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    AddAllowedOriginOperation,
-			OperationSummary: "Add an allowed origin pattern",
-			OperationID:      "addAllowedOrigin",
+			OperationName:    AddOriginOperation,
+			OperationSummary: "Add an origin pattern",
+			OperationID:      "addOrigin",
 			Body:             request,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -204,9 +204,9 @@ func (s *Server) handleAddAllowedOriginRequest(args [1]string, argsEscaped bool,
 		}
 
 		type (
-			Request  = *AllowedOrigin
-			Params   = AddAllowedOriginParams
-			Response = AddAllowedOriginRes
+			Request  = *Origin
+			Params   = AddOriginParams
+			Response = AddOriginRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -215,14 +215,14 @@ func (s *Server) handleAddAllowedOriginRequest(args [1]string, argsEscaped bool,
 		](
 			m,
 			mreq,
-			unpackAddAllowedOriginParams,
+			unpackAddOriginParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.AddAllowedOrigin(ctx, request, params)
+				response, err = s.h.AddOrigin(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.AddAllowedOrigin(ctx, request, params)
+		response, err = s.h.AddOrigin(ctx, request, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -230,7 +230,7 @@ func (s *Server) handleAddAllowedOriginRequest(args [1]string, argsEscaped bool,
 		return
 	}
 
-	if err := encodeAddAllowedOriginResponse(response, w, span); err != nil {
+	if err := encodeAddOriginResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -1049,232 +1049,19 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 	}
 }
 
-// handleCreateConfigurationReleaseRequest handles createConfigurationRelease operation.
-//
-// The CLI's entry point for shipping configuration: takes the contents of
-// `.zitadel/` as authored on disk and turns it into a release in one call.
-// For every resource in the bundle the server compares the content against
-// the project's newest revision of that resource. Unchanged content reuses
-// the existing revision; changed content allocates a new one. Handle
-// references between resources (a flow definition's `user_schema` naming a
-// schema by `objectType`) are resolved to the revision ids the same bundle
-// produced. The resulting set of revisions is assembled into a release, so
-// submitting an unchanged bundle twice answers `200` with the release that
-// already pins it. The caller keeps no state: the same `.zitadel/` builds
-// the same release on any project.
-// Building a release does not deploy it. Follow up with `POST /deployments`
-// to make it live on a target.
-//
-// POST /configuration-releases
-func (s *Server) handleCreateConfigurationReleaseRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("createConfigurationRelease"),
-		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/configuration-releases"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), CreateConfigurationReleaseOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(codeAttr)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: CreateConfigurationReleaseOperation,
-			ID:   "createConfigurationRelease",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, CreateConfigurationReleaseOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-	params, err := decodeCreateConfigurationReleaseParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-	request, rawBody, close, err := s.decodeCreateConfigurationReleaseRequest(r)
-	if err != nil {
-		err = &ogenerrors.DecodeRequestError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeRequest", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-	defer func() {
-		if err := close(); err != nil {
-			recordError("CloseRequest", err)
-		}
-	}()
-
-	var response CreateConfigurationReleaseRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    CreateConfigurationReleaseOperation,
-			OperationSummary: "Build a release from a configuration bundle",
-			OperationID:      "createConfigurationRelease",
-			Body:             request,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = *ConfigurationBundle
-			Params   = CreateConfigurationReleaseParams
-			Response = CreateConfigurationReleaseRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackCreateConfigurationReleaseParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.CreateConfigurationRelease(ctx, request, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.CreateConfigurationRelease(ctx, request, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeCreateConfigurationReleaseResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
 // handleCreateDeploymentRequest handles createDeployment operation.
 //
-// Makes a release live on one or more targets by appending a deployment row
-// per target, all in one transaction under one `deploy_id`. What a target
-// serves is its newest row, so nothing else moves.
-// The variables each row runs are frozen at this moment: the project's
-// variable store is resolved (`preview` values overriding `all` values when
-// every target is a preview origin) and copied onto the deployment, so a
-// later edit of the store reaches no deployment until the next deploy.
-// Idempotent on release and values: when every target's newest row already
-// names this release with the same frozen values, nothing is written and the
-// answer is `200` with those rows.
+// Makes a release live on one or more targets as one deployment, written in
+// one transaction. What a target serves is the newest deployment naming it,
+// so nothing else moves.
+// The variables the deployment runs are frozen at this moment: the
+// project's variable store is resolved (`preview` values overriding `all`
+// values when every target is a preview origin) and copied onto the
+// deployment, so a later edit of the store reaches no deployment until the
+// next deploy.
+// Idempotent on release and values: when every target already serves this
+// release from one deployment with the same frozen values, nothing is
+// written and the answer is `200` with that deployment.
 //
 // POST /deployments
 func (s *Server) handleCreateDeploymentRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -2635,18 +2422,27 @@ func (s *Server) handleCreateProjectRequest(args [0]string, argsEscaped bool, w 
 
 // handleCreateReleaseRequest handles createRelease operation.
 //
-// Bundles a release from revisions that already exist, supplied as
+// Assembles a release in one of two forms.
+// `pointers` pins revisions that already exist, supplied as
 // `(kind, revision_id)` pairs. No new revisions are allocated — use the
-// per-kind create endpoints for that, then pin the ids here.
-// Every referenced `revision_id` must exist in the project. Each one's handle
-// is read from the revision itself and recorded on the release, so a resource
+// per-kind create endpoints for that, then pin the ids here. Every
+// referenced `revision_id` must exist in the project; each one's handle is
+// read from the revision itself and recorded on the release, so a resource
 // is always pinned under the identity it declares.
-// Creating a release does not deploy it. A release is environment-agnostic
-// and the same release can later be deployed to any number of environments
+// `bundle` takes the contents of `.zitadel/` as authored on disk. For every
+// resource in it the server compares the content against the project's
+// newest revision of the same handle: unchanged content reuses that
+// revision, changed content allocates a new one. Handle references between
+// resources (a flow definition's `user_schema` naming a schema by
+// `objectType`) resolve to the revisions the same bundle produced. The
+// caller keeps no state: the same `.zitadel/` builds the same release on
+// any project.
+// Creating a release does not deploy it. A release is not tied to a target
+// and the same release can later be deployed to any number of targets
 // unchanged.
 // Idempotent on the pinned set: metadata is excluded from the comparison, so
-// re-submitting the same revisions with a different `message` returns the
-// release that already pins them rather than creating a second one.
+// re-submitting the same content with a different `message` returns the
+// release that already pins it rather than creating a second one.
 //
 // POST /releases
 func (s *Server) handleCreateReleaseRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -10193,11 +9989,12 @@ func (s *Server) handleListBrandingRequest(args [0]string, argsEscaped bool, w h
 // handleListDeploymentsRequest handles listDeployments operation.
 //
 // Lists deployments newest first. Bare, it is the project-wide log. `origin`
-// narrows it to one target's history (`""` for the default), `deploy_id` to
-// the rows one deploy wrote, and `live=true` to the newest row per target —
-// what each one serves right now, with `expires_at` filled for previews.
-// `expand: ["release"]` embeds the release each row made live; it requires
-// `release.read`.
+// narrows it to the deployments that touched one target (`""` for the
+// default). `live=true` answers what every target serves right now: the
+// deployments current for at least one target, each listing only the
+// targets it serves, with `expires_at` filled for previews.
+// `expand: ["release"]` embeds the release each deployment made live; it
+// requires `release.read`.
 //
 // GET /deployments
 func (s *Server) handleListDeploymentsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -10346,10 +10143,6 @@ func (s *Server) handleListDeploymentsRequest(args [0]string, argsEscaped bool, 
 					Name: "origin",
 					In:   "query",
 				}: params.Origin,
-				{
-					Name: "deploy_id",
-					In:   "query",
-				}: params.DeployID,
 				{
 					Name: "live",
 					In:   "query",
@@ -11293,27 +11086,28 @@ func (s *Server) handleListMyProjectsRequest(args [0]string, argsEscaped bool, w
 	}
 }
 
-// handleListOriginsRequest handles listOrigins operation.
+// handleListPreviewsRequest handles listPreviews operation.
 //
-// One row per live preview URL of the project, with its expiry. The row is
-// what admits a request from that URL: a URL matching a `preview` pattern
-// but holding no row is refused. Rows are written by deploying to a preview
-// target and go away when they expire or are removed.
+// One entry per live preview URL of the project, with its expiry. The
+// preview is what admits a request from that URL: a URL matching a
+// `preview` pattern but holding no live preview is refused. Previews are
+// written by deploying to a preview target and go away when they expire or
+// are removed.
 //
-// GET /origins
-func (s *Server) handleListOriginsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// GET /previews
+func (s *Server) handleListPreviewsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("listOrigins"),
+		otelogen.OperationID("listPreviews"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/origins"),
+		semconv.HTTPRouteKey.String("/previews"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), ListOriginsOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), ListPreviewsOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -11368,15 +11162,15 @@ func (s *Server) handleListOriginsRequest(args [0]string, argsEscaped bool, w ht
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: ListOriginsOperation,
-			ID:   "listOrigins",
+			Name: ListPreviewsOperation,
+			ID:   "listPreviews",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, ListOriginsOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, ListPreviewsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -11416,7 +11210,7 @@ func (s *Server) handleListOriginsRequest(args [0]string, argsEscaped bool, w ht
 			return
 		}
 	}
-	params, err := decodeListOriginsParams(args, argsEscaped, r)
+	params, err := decodeListPreviewsParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -11429,13 +11223,13 @@ func (s *Server) handleListOriginsRequest(args [0]string, argsEscaped bool, w ht
 
 	var rawBody []byte
 
-	var response ListOriginsRes
+	var response ListPreviewsRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    ListOriginsOperation,
-			OperationSummary: "List live preview origins",
-			OperationID:      "listOrigins",
+			OperationName:    ListPreviewsOperation,
+			OperationSummary: "List live previews",
+			OperationID:      "listPreviews",
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -11449,8 +11243,8 @@ func (s *Server) handleListOriginsRequest(args [0]string, argsEscaped bool, w ht
 
 		type (
 			Request  = struct{}
-			Params   = ListOriginsParams
-			Response = ListOriginsRes
+			Params   = ListPreviewsParams
+			Response = ListPreviewsRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -11459,14 +11253,14 @@ func (s *Server) handleListOriginsRequest(args [0]string, argsEscaped bool, w ht
 		](
 			m,
 			mreq,
-			unpackListOriginsParams,
+			unpackListPreviewsParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.ListOrigins(ctx, params)
+				response, err = s.h.ListPreviews(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.ListOrigins(ctx, params)
+		response, err = s.h.ListPreviews(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -11474,7 +11268,7 @@ func (s *Server) handleListOriginsRequest(args [0]string, argsEscaped bool, w ht
 		return
 	}
 
-	if err := encodeListOriginsResponse(response, w, span); err != nil {
+	if err := encodeListPreviewsResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -14206,224 +14000,20 @@ func (s *Server) handleQueryUsersRequest(args [0]string, argsEscaped bool, w htt
 	}
 }
 
-// handleRemoveAllowedOriginRequest handles removeAllowedOrigin operation.
-//
-// Removes one pattern from the project's allowlist. Requests from URLs only
-// that pattern admitted are refused from now on; live preview rows and
-// deployment history are untouched.
-//
-// POST /projects/{project_id}/allowed_origins/remove
-func (s *Server) handleRemoveAllowedOriginRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("removeAllowedOrigin"),
-		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/projects/{project_id}/allowed_origins/remove"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), RemoveAllowedOriginOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(codeAttr)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: RemoveAllowedOriginOperation,
-			ID:   "removeAllowedOrigin",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, RemoveAllowedOriginOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-	params, err := decodeRemoveAllowedOriginParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-	request, rawBody, close, err := s.decodeRemoveAllowedOriginRequest(r)
-	if err != nil {
-		err = &ogenerrors.DecodeRequestError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeRequest", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-	defer func() {
-		if err := close(); err != nil {
-			recordError("CloseRequest", err)
-		}
-	}()
-
-	var response RemoveAllowedOriginRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    RemoveAllowedOriginOperation,
-			OperationSummary: "Remove an allowed origin pattern",
-			OperationID:      "removeAllowedOrigin",
-			Body:             request,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "project_id",
-					In:   "path",
-				}: params.ProjectID,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = *RemoveAllowedOriginReq
-			Params   = RemoveAllowedOriginParams
-			Response = RemoveAllowedOriginRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackRemoveAllowedOriginParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.RemoveAllowedOrigin(ctx, request, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.RemoveAllowedOrigin(ctx, request, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeRemoveAllowedOriginResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
 // handleRemoveOriginRequest handles removeOrigin operation.
 //
-// Deletes the live row behind one preview URL, so requests from it are
-// refused from now on. The URL's deployment rows are kept. A URL with no
-// row answers not found.
+// Removes one pattern from the project's origins. Requests from URLs only
+// that pattern admitted are refused from now on; live previews and
+// deployment history are untouched.
 //
-// POST /origins/remove
-func (s *Server) handleRemoveOriginRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// POST /projects/{project_id}/origins/remove
+func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("removeOrigin"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/origins/remove"),
+		semconv.HTTPRouteKey.String("/projects/{project_id}/origins/remove"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
@@ -14565,14 +14155,14 @@ func (s *Server) handleRemoveOriginRequest(args [0]string, argsEscaped bool, w h
 		mreq := middleware.Request{
 			Context:          ctx,
 			OperationName:    RemoveOriginOperation,
-			OperationSummary: "Retire a preview origin",
+			OperationSummary: "Remove an origin pattern",
 			OperationID:      "removeOrigin",
 			Body:             request,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
 					Name: "project_id",
-					In:   "query",
+					In:   "path",
 				}: params.ProjectID,
 			},
 			Raw: r,
@@ -14606,6 +14196,210 @@ func (s *Server) handleRemoveOriginRequest(args [0]string, argsEscaped bool, w h
 	}
 
 	if err := encodeRemoveOriginResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
+// handleRemovePreviewRequest handles removePreview operation.
+//
+// Deletes the live preview behind one URL, so requests from it are refused
+// from now on. The URL's deployments are kept. A URL with no live preview
+// answers not found.
+//
+// POST /previews/remove
+func (s *Server) handleRemovePreviewRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("removePreview"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.HTTPRouteKey.String("/previews/remove"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), RemovePreviewOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(codeAttr)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: RemovePreviewOperation,
+			ID:   "removePreview",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, RemovePreviewOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeRemovePreviewParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+	request, rawBody, close, err := s.decodeRemovePreviewRequest(r)
+	if err != nil {
+		err = &ogenerrors.DecodeRequestError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeRequest", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+	defer func() {
+		if err := close(); err != nil {
+			recordError("CloseRequest", err)
+		}
+	}()
+
+	var response RemovePreviewRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    RemovePreviewOperation,
+			OperationSummary: "Retire a preview",
+			OperationID:      "removePreview",
+			Body:             request,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = *RemovePreviewReq
+			Params   = RemovePreviewParams
+			Response = RemovePreviewRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackRemovePreviewParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.RemovePreview(ctx, request, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.RemovePreview(ctx, request, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeRemovePreviewResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -15179,14 +14973,18 @@ func (s *Server) handleRevokeSessionRequest(args [1]string, argsEscaped bool, w 
 
 // handleRollbackDeploymentRequest handles rollbackDeployment operation.
 //
-// Undoes one deploy: for every target that deploy moved, appends a row
-// naming the release that target served before it, under a new `deploy_id`
-// with `reason: rollback` and `rollback_of` set. Bare, it undoes the newest
-// deploy of the project; `deploy_id` names an earlier one to re-apply, and
-// `origin` narrows the undo to one target.
-// A target the undone deploy created has no earlier release and is left as
-// it is; it is named in `warnings`. The frozen values of the restored
-// deployment travel with it.
+// Undoes one deployment: every target it moved goes back to the release it
+// served before, in a new deployment with `reason: rollback` and
+// `rollback_of` set. Bare, it undoes the newest deployment of the project;
+// `deployment_id` names an earlier one to re-apply on every target it
+// touched, and `origin` narrows the undo to one target.
+// A target the undone deployment created has no earlier release and is
+// left as it is; it is named in `warnings`. When no requested target has
+// one, nothing is written and the answer is `409` `dep.invalid` with those
+// notes in `details.warnings`. The frozen values of the restored deployment
+// travel with it. When the targets served different releases before, one
+// rollback deployment is written per release and the others are named in
+// `warnings`.
 //
 // POST /deployments/rollback
 func (s *Server) handleRollbackDeploymentRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -15337,7 +15135,7 @@ func (s *Server) handleRollbackDeploymentRequest(args [0]string, argsEscaped boo
 		mreq := middleware.Request{
 			Context:          ctx,
 			OperationName:    RollbackDeploymentOperation,
-			OperationSummary: "Roll a deploy back",
+			OperationSummary: "Roll a deployment back",
 			OperationID:      "rollbackDeployment",
 			Body:             request,
 			RawBody:          rawBody,
@@ -15386,27 +15184,27 @@ func (s *Server) handleRollbackDeploymentRequest(args [0]string, argsEscaped boo
 	}
 }
 
-// handleSetProjectClassRequest handles setProjectClass operation.
+// handleSetProjectModeRequest handles setProjectMode operation.
 //
-// Sets the project's class. `sandbox` → `production` re-checks every
-// allowlist pattern against the production rules and fails naming each
-// offender; it requires a claimed project. `production` → `sandbox` lets
-// loopback origins back in and needs `confirm: true`.
+// Sets the project's mode. `sandbox` → `production` re-checks every origin
+// pattern against the production rules and fails naming each offender; it
+// requires a claimed project. `production` → `sandbox` lets loopback
+// origins back in and needs `confirm: true`.
 //
-// POST /projects/{project_id}/class
-func (s *Server) handleSetProjectClassRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// POST /projects/{project_id}/mode
+func (s *Server) handleSetProjectModeRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("setProjectClass"),
+		otelogen.OperationID("setProjectMode"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/projects/{project_id}/class"),
+		semconv.HTTPRouteKey.String("/projects/{project_id}/mode"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), SetProjectClassOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), SetProjectModeOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -15461,15 +15259,15 @@ func (s *Server) handleSetProjectClassRequest(args [1]string, argsEscaped bool, 
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: SetProjectClassOperation,
-			ID:   "setProjectClass",
+			Name: SetProjectModeOperation,
+			ID:   "setProjectMode",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, SetProjectClassOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, SetProjectModeOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -15509,7 +15307,7 @@ func (s *Server) handleSetProjectClassRequest(args [1]string, argsEscaped bool, 
 			return
 		}
 	}
-	params, err := decodeSetProjectClassParams(args, argsEscaped, r)
+	params, err := decodeSetProjectModeParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -15521,7 +15319,7 @@ func (s *Server) handleSetProjectClassRequest(args [1]string, argsEscaped bool, 
 	}
 
 	var rawBody []byte
-	request, rawBody, close, err := s.decodeSetProjectClassRequest(r)
+	request, rawBody, close, err := s.decodeSetProjectModeRequest(r)
 	if err != nil {
 		err = &ogenerrors.DecodeRequestError{
 			OperationContext: opErrContext,
@@ -15537,13 +15335,13 @@ func (s *Server) handleSetProjectClassRequest(args [1]string, argsEscaped bool, 
 		}
 	}()
 
-	var response SetProjectClassRes
+	var response SetProjectModeRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    SetProjectClassOperation,
+			OperationName:    SetProjectModeOperation,
 			OperationSummary: "Promote or demote a project",
-			OperationID:      "setProjectClass",
+			OperationID:      "setProjectMode",
 			Body:             request,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -15556,9 +15354,9 @@ func (s *Server) handleSetProjectClassRequest(args [1]string, argsEscaped bool, 
 		}
 
 		type (
-			Request  = *SetProjectClassReq
-			Params   = SetProjectClassParams
-			Response = SetProjectClassRes
+			Request  = *SetProjectModeReq
+			Params   = SetProjectModeParams
+			Response = SetProjectModeRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -15567,14 +15365,14 @@ func (s *Server) handleSetProjectClassRequest(args [1]string, argsEscaped bool, 
 		](
 			m,
 			mreq,
-			unpackSetProjectClassParams,
+			unpackSetProjectModeParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.SetProjectClass(ctx, request, params)
+				response, err = s.h.SetProjectMode(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.SetProjectClass(ctx, request, params)
+		response, err = s.h.SetProjectMode(ctx, request, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -15582,7 +15380,7 @@ func (s *Server) handleSetProjectClassRequest(args [1]string, argsEscaped bool, 
 		return
 	}
 
-	if err := encodeSetProjectClassResponse(response, w, span); err != nil {
+	if err := encodeSetProjectModeResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)

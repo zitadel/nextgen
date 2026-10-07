@@ -94,17 +94,17 @@ func (s *stubAuthAttemptService) FinishPasskeyEnrollment(context.Context, servic
 
 var _ service.AuthAttemptService = (*stubAuthAttemptService)(nil)
 
-// testAllowedOrigins is an allowlist a sandbox project accepts: a wildcard
+// testOrigins is an allowlist a sandbox project accepts: a wildcard
 // on a host the lint does not know (a warning, not a refusal) and a loopback
 // primary.
-var testAllowedOrigins = []domain.AllowedOrigin{
+var testOrigins = []domain.Origin{
 	{Pattern: "https://*.example.com", Kind: domain.OriginKindPreview},
 	{Pattern: "http://localhost:3000", Kind: domain.OriginKindPrimary},
 }
 
-var testAllowedOriginsAPI = []api.AllowedOrigin{
-	{Pattern: "https://*.example.com", Kind: api.AllowedOriginKindPreview},
-	{Pattern: "http://localhost:3000", Kind: api.AllowedOriginKindPrimary},
+var testOriginsAPI = []api.Origin{
+	{Pattern: "https://*.example.com", Kind: api.OriginKindPreview},
+	{Pattern: "http://localhost:3000", Kind: api.OriginKindPrimary},
 }
 
 func TestCreateProject(t *testing.T) {
@@ -117,17 +117,17 @@ func TestCreateProject(t *testing.T) {
 		{
 			name: "no optional fields",
 			req: &api.CreateProjectRequest{
-				Name:           helpers.ProjectName(),
-				AllowedOrigins: []api.AllowedOrigin{},
+				Name:    helpers.ProjectName(),
+				Origins: []api.Origin{},
 			},
 		},
 		{
 			name: "with optional fields",
 			req: &api.CreateProjectRequest{
 				Name: helpers.ProjectName(),
-				AllowedOrigins: []api.AllowedOrigin{
-					{Pattern: "https://*-acme.vercel.app", Kind: api.AllowedOriginKindPreview},
-					{Pattern: "https://app.acme.com", Kind: api.AllowedOriginKindPrimary},
+				Origins: []api.Origin{
+					{Pattern: "https://*-acme.vercel.app", Kind: api.OriginKindPreview},
+					{Pattern: "https://app.acme.com", Kind: api.OriginKindPrimary},
 				},
 			},
 		},
@@ -151,8 +151,8 @@ func TestCreateProject(t *testing.T) {
 			assert.NotEmpty(t, got.ProjectSecret)
 			assert.NotEmpty(t, got.PreviewSecret)
 			assert.NotEmpty(t, got.PreviewToken)
-			assert.Equal(t, api.ProjectClassSandbox, got.Class)
-			assert.Equal(t, tc.req.AllowedOrigins, got.AllowedOrigins)
+			assert.Equal(t, api.ProjectModeSandbox, got.Mode)
+			assert.Equal(t, tc.req.Origins, got.Origins)
 		})
 	}
 }
@@ -261,7 +261,7 @@ func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
 func TestGetProject(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), testAllowedOrigins, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), testOrigins, true)
 	require.NoError(t, err)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -278,7 +278,7 @@ func TestGetProject(t *testing.T) {
 	}{
 		{
 			name: "ok",
-			want: &api.ProjectResponse{Name: project.Name, AllowedOrigins: testAllowedOriginsAPI},
+			want: &api.ProjectResponse{Name: project.Name, Origins: testOriginsAPI},
 		},
 		{
 			name:      "not found",
@@ -327,7 +327,7 @@ func TestProjectSessionCaller(t *testing.T) {
 	t.Run("granted person opens the project", func(t *testing.T) {
 		resp, err := grantee.GetProject(t.Context(), params)
 		require.NoError(t, err)
-		assertProjectResponse(t, &api.ProjectResponse{Name: project.Name, AllowedOrigins: []api.AllowedOrigin{}}, resp)
+		assertProjectResponse(t, &api.ProjectResponse{Name: project.Name, Origins: []api.Origin{}}, resp)
 	})
 
 	t.Run("granted person renames the project", func(t *testing.T) {
@@ -384,29 +384,29 @@ func TestPatchProject(t *testing.T) {
 	var (
 		renamed       = helpers.ProjectName()
 		renamedKeep   = helpers.ProjectName()
-		keptOrigins   = testAllowedOrigins
+		keptOrigins   = testOrigins
 		nameInvalid   = domain.ErrProjectNameInvalid()
 		notFound      = domain.ErrProjectNotFound()
 		validRenameTo = &api.PatchProjectRequest{Name: api.NewOptNilString(helpers.ProjectName())}
 	)
 
 	tcs := []struct {
-		name           string
-		allowedOrigins []domain.AllowedOrigin
-		projectID      api.ProjectID
-		req            *api.PatchProjectRequest
-		want           api.PatchProjectRes
+		name      string
+		origins   []domain.Origin
+		projectID api.ProjectID
+		req       *api.PatchProjectRequest
+		want      api.PatchProjectRes
 	}{
 		{
 			name: "rename",
 			req:  &api.PatchProjectRequest{Name: api.NewOptNilString(renamed)},
-			want: &api.ProjectResponse{Name: renamed, AllowedOrigins: []api.AllowedOrigin{}},
+			want: &api.ProjectResponse{Name: renamed, Origins: []api.Origin{}},
 		},
 		{
-			name:           "allowed origins are left untouched",
-			allowedOrigins: keptOrigins,
-			req:            &api.PatchProjectRequest{Name: api.NewOptNilString(renamedKeep)},
-			want:           &api.ProjectResponse{Name: renamedKeep, AllowedOrigins: testAllowedOriginsAPI},
+			name:    "allowed origins are left untouched",
+			origins: keptOrigins,
+			req:     &api.PatchProjectRequest{Name: api.NewOptNilString(renamedKeep)},
+			want:    &api.ProjectResponse{Name: renamedKeep, Origins: testOriginsAPI},
 		},
 		{
 			name: "absent name",
@@ -441,7 +441,7 @@ func TestPatchProject(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), tc.allowedOrigins, true)
+			project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), tc.origins, true)
 			require.NoError(t, err)
 
 			client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -639,7 +639,7 @@ func TestProjectPasswordHashPolicyGovernsHashing(t *testing.T) {
 func TestQueryProjects(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), testAllowedOrigins, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), testOrigins, true)
 	require.NoError(t, err)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -647,7 +647,7 @@ func TestQueryProjects(t *testing.T) {
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	var (
-		own            = api.ProjectResponse{Name: project.Name, AllowedOrigins: testAllowedOriginsAPI}
+		own            = api.ProjectResponse{Name: project.Name, Origins: testOriginsAPI}
 		requestInvalid = domain.ErrRequestInvalid()
 		// A minute of slack absorbs the whole-second truncation RFC3339 applies.
 		before = project.CreatedAt.Add(-time.Minute).Format(time.RFC3339)
@@ -838,7 +838,7 @@ func assertProjectResponse(t *testing.T, want, got any) {
 
 		assert.NotEmpty(t, actual.ID)
 		assert.Equal(t, expected.Name, actual.Name)
-		assert.Equal(t, expected.AllowedOrigins, actual.AllowedOrigins)
+		assert.Equal(t, expected.Origins, actual.Origins)
 		assert.NotEmpty(t, actual.CreatedAt)
 		assert.False(t, actual.UpdatedAt.Before(actual.CreatedAt))
 	case *api.QueryProjectsResponse:

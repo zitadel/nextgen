@@ -38,7 +38,7 @@ func newReleaseFixture(t *testing.T) releaseFixture {
 
 // newReleaseFixtureWithOrigins is newReleaseFixture on a project created
 // with the given allowlist.
-func newReleaseFixtureWithOrigins(t *testing.T, origins []domain.AllowedOrigin) releaseFixture {
+func newReleaseFixtureWithOrigins(t *testing.T, origins []domain.Origin) releaseFixture {
 	t.Helper()
 
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), origins, true)
@@ -108,7 +108,7 @@ func TestCreateRelease(t *testing.T) {
 		GitSha:   api.NewOptString("4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7"),
 	})
 	require.IsType(t, &api.CreateReleaseCreated{}, resp, "create release: %s", helpers.MustMarshal(t, resp))
-	created := api.Release(*resp.(*api.CreateReleaseCreated))
+	created := resp.(*api.CreateReleaseCreated).Release
 
 	t.Run("the release records the handle each revision declares", func(t *testing.T) {
 		assert.True(t, domain.PrefixRelease.Matches(string(created.ID)), "id %q is not rel_-prefixed", created.ID)
@@ -145,7 +145,7 @@ func TestCreateRelease(t *testing.T) {
 			Message:  api.NewOptString("a different message entirely"),
 		})
 		require.IsType(t, &api.CreateReleaseOK{}, resp, "recreate release: %s", helpers.MustMarshal(t, resp))
-		reused := api.Release(*resp.(*api.CreateReleaseOK))
+		reused := resp.(*api.CreateReleaseOK).Release
 
 		assert.Equal(t, created.ID, reused.ID)
 		assert.Equal(t, "initial import", reused.Metadata.Message.Value,
@@ -172,7 +172,7 @@ func TestCreateRelease(t *testing.T) {
 			},
 		})
 		require.IsType(t, &api.CreateReleaseCreated{}, resp, "create release: %s", helpers.MustMarshal(t, resp))
-		assert.NotEqual(t, created.ID, api.Release(*resp.(*api.CreateReleaseCreated)).ID)
+		assert.NotEqual(t, created.ID, resp.(*api.CreateReleaseCreated).Release.ID)
 	})
 
 	// The endpoint pins revisions, it does not create them, so a revision the

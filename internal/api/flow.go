@@ -374,10 +374,6 @@ func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 	return out
 }
 
-// validateOriginAgainstProject returns an error if the origin is not in the
-// project's PreviewOrigins allowlist. An empty allowlist means allow all
-// (development/test mode).
-//
 // resolveRuntime decides which release serves the attempt from the browser
 // origin the request carries and the release it may pin, and puts the answer
 // on the context. A request without an origin is not a browser and is served

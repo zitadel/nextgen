@@ -16,11 +16,11 @@ DROP TABLE IF EXISTS environments;
 ALTER TABLE projects DROP COLUMN preview_origins;
 -- +goose StatementEnd
 -- +goose StatementBegin
-ALTER TABLE projects ADD COLUMN allowed_origins TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE projects ADD COLUMN origins TEXT NOT NULL DEFAULT '[]';
 -- +goose StatementEnd
 -- +goose StatementBegin
-ALTER TABLE projects ADD COLUMN class TEXT NOT NULL DEFAULT 'sandbox'
-    CHECK (class IN ('sandbox', 'production'));
+ALTER TABLE projects ADD COLUMN mode TEXT NOT NULL DEFAULT 'sandbox'
+    CHECK (mode IN ('sandbox', 'production'));
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -28,33 +28,30 @@ ALTER TABLE releases ADD COLUMN revoked_at INTEGER;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
-CREATE TABLE origins (
+CREATE TABLE previews (
     project_id  TEXT    NOT NULL,
     origin      TEXT    NOT NULL,
     expires_at  INTEGER NOT NULL,
     created_at  INTEGER NOT NULL,
     PRIMARY KEY (project_id, origin),
-    CONSTRAINT chk_origins_origin CHECK (origin <> ''),
-    CONSTRAINT fk_origins_project
+    CONSTRAINT chk_previews_origin CHECK (origin <> ''),
+    CONSTRAINT fk_previews_project
         FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
 );
 -- +goose StatementEnd
 -- +goose StatementBegin
-CREATE INDEX idx_origins_expires_at ON origins (expires_at);
+CREATE INDEX idx_previews_expires_at ON previews (expires_at);
 -- +goose StatementEnd
 
 -- +goose StatementBegin
 CREATE TABLE deployments (
     project_id   TEXT    NOT NULL,
     id           TEXT    NOT NULL,
-    deploy_id    TEXT    NOT NULL,
-    origin       TEXT    NOT NULL DEFAULT '',
     release_id   TEXT    NOT NULL,
     metadata     TEXT    NOT NULL,
     deployed_at  INTEGER NOT NULL,
     PRIMARY KEY (project_id, id),
     CONSTRAINT chk_deployments_id CHECK (id <> ''),
-    CONSTRAINT chk_deployments_deploy_id CHECK (deploy_id <> ''),
     CONSTRAINT chk_deployments_metadata CHECK (json_type(metadata) = 'object'),
     CONSTRAINT fk_deployments_project
         FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
@@ -68,16 +65,25 @@ CREATE TABLE deployments (
 );
 -- +goose StatementEnd
 -- +goose StatementBegin
-CREATE INDEX idx_deployments_project_origin_deployed_at
-    ON deployments (project_id, origin, deployed_at DESC, id DESC);
--- +goose StatementEnd
--- +goose StatementBegin
-CREATE INDEX idx_deployments_project_deploy_id
-    ON deployments (project_id, deploy_id);
--- +goose StatementEnd
--- +goose StatementBegin
 CREATE INDEX idx_deployments_project_deployed_at
     ON deployments (project_id, deployed_at DESC, id DESC);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE TABLE deployment_targets (
+    project_id     TEXT    NOT NULL,
+    deployment_id  TEXT    NOT NULL,
+    origin         TEXT    NOT NULL DEFAULT '',
+    release_id     TEXT    NOT NULL,
+    deployed_at    INTEGER NOT NULL,
+    PRIMARY KEY (project_id, deployment_id, origin),
+    FOREIGN KEY (project_id, deployment_id)
+        REFERENCES deployments (project_id, id) ON DELETE CASCADE
+);
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE INDEX idx_deployment_targets_project_origin_deployed_at
+    ON deployment_targets (project_id, origin, deployed_at DESC, deployment_id DESC);
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -115,19 +121,22 @@ DROP TABLE IF EXISTS deployment_variables;
 DROP TABLE IF EXISTS variables;
 -- +goose StatementEnd
 -- +goose StatementBegin
+DROP TABLE IF EXISTS deployment_targets;
+-- +goose StatementEnd
+-- +goose StatementBegin
 DROP TABLE IF EXISTS deployments;
 -- +goose StatementEnd
 -- +goose StatementBegin
-DROP TABLE IF EXISTS origins;
+DROP TABLE IF EXISTS previews;
 -- +goose StatementEnd
 -- +goose StatementBegin
 ALTER TABLE releases DROP COLUMN revoked_at;
 -- +goose StatementEnd
 -- +goose StatementBegin
-ALTER TABLE projects DROP COLUMN class;
+ALTER TABLE projects DROP COLUMN mode;
 -- +goose StatementEnd
 -- +goose StatementBegin
-ALTER TABLE projects DROP COLUMN allowed_origins;
+ALTER TABLE projects DROP COLUMN origins;
 -- +goose StatementEnd
 -- +goose StatementBegin
 ALTER TABLE projects ADD COLUMN preview_origins TEXT NOT NULL DEFAULT '[]';

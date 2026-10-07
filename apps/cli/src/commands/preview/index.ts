@@ -11,8 +11,8 @@ import {
 import { ZitadelError } from "../../lib/errors";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { publicCliCommand } from "../../lib/public-cli";
+import { connectEnvironment, resolveEnvironment } from "../../lib/environment";
 import { buildRelease } from "../../lib/release";
-import { connectTarget, resolveTarget } from "../../lib/target";
 
 /** The environments a platform build previews in; any other build is a no-op. */
 const PREVIEW_ENVIRONMENTS = new Set(["preview", "development"]);
@@ -47,15 +47,15 @@ export default class Preview extends BaseCommand {
     await this.toMeta(flags);
     const { cwd, env, dryRun, cliVersion, serverFlag, envName, envFile } = this.meta;
 
-    const target = await resolveTarget({ cwd, env, serverFlag, envName, envFile });
-    const environment = target.environment.value;
+    const resolved = await resolveEnvironment({ cwd, env, serverFlag, envName, envFile });
+    const environment = resolved.name.value;
     const explicit = normalizeOrigins(flags.origin ?? []);
     if (explicit.length === 0 && !PREVIEW_ENVIRONMENTS.has(environment)) {
       return this.emit({
         status: "skipped",
         reason: "not-a-preview",
-        data: { environment, source: target.environment.source },
-        pretty: `environment  ${environment}   ${target.environment.source}\nnothing to preview — production is deployed by \`zitadel deploy\`, after merge`,
+        data: { environment, source: resolved.name.source },
+        pretty: `environment  ${environment}   ${resolved.name.source}\nnothing to preview — production is deployed by \`zitadel deploy\`, after merge`,
       });
     }
 
@@ -72,7 +72,7 @@ export default class Preview extends BaseCommand {
     }
 
     const ttlSeconds = parseTtl(flags.ttl);
-    if (!target.values.ZITADEL_PREVIEW_TOKEN && !target.values.ZITADEL_PROJECT_SECRET) {
+    if (!resolved.values.ZITADEL_PREVIEW_TOKEN && !resolved.values.ZITADEL_PROJECT_SECRET) {
       if (flags.strict) {
         throw new ZitadelError("E_VALIDATION", "no preview credential in the environment", {
           hint: "Set ZITADEL_PREVIEW_TOKEN in the platform's preview scope.",
@@ -89,7 +89,7 @@ export default class Preview extends BaseCommand {
       });
     }
 
-    const { client, projectId, server, credentialSource } = await connectTarget(
+    const { client, projectId, server, credentialSource } = await connectEnvironment(
       { cwd, env, serverFlag, envName, envFile },
       { credential: "preview" },
     );
@@ -99,7 +99,7 @@ export default class Preview extends BaseCommand {
     const project = await client.getProject(projectId);
     const checks = origins.map((origin) => ({
       origin,
-      pattern: project.allowed_origins.find(
+      pattern: project.origins.find(
         (entry) => entry.kind === "preview" && matchesPattern(entry.pattern, origin),
       )?.pattern,
     }));
@@ -109,8 +109,8 @@ export default class Preview extends BaseCommand {
         "E_VALIDATION",
         `${unmatched.map((check) => check.origin).join(", ")} matches no preview pattern of the project`,
         {
-          hint: "Someone holding project.write adds a pattern once: zitadel allowlist add 'https://*-<team>.vercel.app' --kind preview",
-          nextCommands: [publicCliCommand("allowlist", cliVersion)],
+          hint: "Someone holding project.write adds a pattern once: zitadel origin add 'https://*-<team>.vercel.app' --kind preview",
+          nextCommands: [publicCliCommand("origin list", cliVersion)],
         },
       );
     }
@@ -125,7 +125,7 @@ export default class Preview extends BaseCommand {
 
     consola.start("Building the release");
     const release = await buildRelease({ cwd, client, projectId, message: flags.message });
-    const deploy = await client.createDeployment(
+    const result = await client.createDeployment(
       {
         release: release.id,
         targets: origins,
@@ -134,8 +134,10 @@ export default class Preview extends BaseCommand {
       },
       { project_id: projectId },
     );
+    const { deployment } = result;
+    const warnings = result.warnings ?? [];
 
-    const expires = deploy.deployments[0]?.expires_at;
+    const expires = deployment.targets[0]?.expires_at;
     const pretty = [
       ...(platform ? [`platform    ${platform.platform}`] : []),
       ...checks.map(
@@ -143,9 +145,9 @@ export default class Preview extends BaseCommand {
       ),
       "",
       `release     ${release.id}  sha256:${release.content_hash.slice(0, 12)}  ${release.created ? "(new)" : "(exists, reusing)"}`,
-      `origins     ${origins.length} row${origins.length === 1 ? "" : "s"} written${expires ? `, expire ${expires}` : ""}`,
-      ...(deploy.warnings ?? []).map((warning) => `warning  ${warning}`),
-      `deployed    ${deploy.deploy_id}   ${deploy.deployments.length} deployment records written`,
+      `previews    ${origins.length} live${expires ? `, expire ${expires}` : ""}`,
+      ...warnings.map((warning) => `warning  ${warning}`),
+      `deployed    ${deployment.id}   ${deployment.targets.length} target${deployment.targets.length === 1 ? "" : "s"}`,
       "",
       `NEXT_PUBLIC_ZITADEL_RELEASE=sha256:${release.content_hash}`,
     ].join("\n");
@@ -160,11 +162,11 @@ export default class Preview extends BaseCommand {
         origins,
         ttl_seconds: ttlSeconds,
         release,
-        deploy_id: deploy.deploy_id,
-        deployments: deploy.deployments,
-        warnings: deploy.warnings ?? [],
+        deployment_id: deployment.id,
+        deployment,
+        warnings,
       },
-      warnings: deploy.warnings ?? [],
+      warnings,
       pretty,
     });
   }

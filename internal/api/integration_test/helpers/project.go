@@ -55,8 +55,8 @@ type cleanupProjectService struct {
 // registered here, before anything the test itself registers, so under
 // t.Cleanup's last in, first out order it runs last: every cleanup the test
 // adds afterwards still sees the project.
-func (s cleanupProjectService) Create(ctx context.Context, name string, allowedOrigins []domain.AllowedOrigin, seedDefaults bool) (*domain.Project, error) {
-	project, err := s.ProjectService.Create(ctx, name, allowedOrigins, seedDefaults)
+func (s cleanupProjectService) Create(ctx context.Context, name string, origins []domain.Origin, seedDefaults bool) (*domain.Project, error) {
+	project, err := s.ProjectService.Create(ctx, name, origins, seedDefaults)
 	if err != nil {
 		return project, err
 	}

@@ -124,7 +124,7 @@ async function createProject(projectName: string): Promise<string> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       name: projectName,
-      allowed_origins: [{ pattern: consoleOrigin, kind: "primary" }],
+      origins: [{ pattern: consoleOrigin, kind: "primary" }],
       // The project only has to exist and be grantable; a schema and login flow
       // are what a project needs to sign users in, which this one never does.
       seed_defaults: false,

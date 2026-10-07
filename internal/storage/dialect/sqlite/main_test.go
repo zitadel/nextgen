@@ -46,9 +46,9 @@ func TestProjectCRUD(t *testing.T) {
 	ctx := t.Context()
 	id := "proj-" + t.Name()
 	project := &domain.Project{
-		ID:             id,
-		Name:           "Test Project",
-		AllowedOrigins: []domain.AllowedOrigin{{Pattern: "https://preview.example", Kind: domain.OriginKindPreview}},
+		ID:      id,
+		Name:    "Test Project",
+		Origins: []domain.Origin{{Pattern: "https://preview.example", Kind: domain.OriginKindPreview}},
 	}
 	require.NoError(t, testPool.CreateProject(ctx, project))
 	require.False(t, project.CreatedAt.IsZero())
@@ -57,7 +57,7 @@ func TestProjectCRUD(t *testing.T) {
 	got, err := testPool.GetProjectByID(ctx, id)
 	require.NoError(t, err)
 	require.Equal(t, project.Name, got.Name)
-	require.Equal(t, project.AllowedOrigins, got.AllowedOrigins)
+	require.Equal(t, project.Origins, got.Origins)
 
 	project.Name = "Renamed"
 	require.NoError(t, testPool.UpdateProject(ctx, project))

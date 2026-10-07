@@ -16,9 +16,9 @@ import (
 func TestProjectStatements_StringFilters(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		specialName := `acme_100%_a\b`
-		special := &domain.Project{ID: uniqueProjectID(t), Name: specialName, AllowedOrigins: []domain.AllowedOrigin{}}
-		cased := &domain.Project{ID: uniqueProjectID(t), Name: "AcmeCorp", AllowedOrigins: []domain.AllowedOrigin{}}
-		neighbor := &domain.Project{ID: uniqueProjectID(t), Name: "acmeX100ZaWb", AllowedOrigins: []domain.AllowedOrigin{}}
+		special := &domain.Project{ID: uniqueProjectID(t), Name: specialName, Origins: []domain.Origin{}}
+		cased := &domain.Project{ID: uniqueProjectID(t), Name: "AcmeCorp", Origins: []domain.Origin{}}
+		neighbor := &domain.Project{ID: uniqueProjectID(t), Name: "acmeX100ZaWb", Origins: []domain.Origin{}}
 
 		for _, p := range []*domain.Project{special, cased, neighbor} {
 			require.NoError(t, d.stmts.CreateProject(t.Context(), p))
@@ -79,7 +79,7 @@ func TestProjectStatements_StringFilters(t *testing.T) {
 
 		t.Run("non-ascii same-case contains fold matches", func(t *testing.T) {
 			// SQLite LOWER is ASCII-only; ignore-case LIKE must fold in SQL too.
-			uebung := &domain.Project{ID: uniqueProjectID(t), Name: "Übung", AllowedOrigins: []domain.AllowedOrigin{}}
+			uebung := &domain.Project{ID: uniqueProjectID(t), Name: "Übung", Origins: []domain.Origin{}}
 			require.NoError(t, d.stmts.CreateProject(t.Context(), uebung))
 			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), uebung.ID) })
 
@@ -103,7 +103,7 @@ func TestProjectStatements_StringFilters(t *testing.T) {
 			// Go's ToLower folds İ to a plain i, but SQLite's LOWER keeps it and
 			// a full-Unicode LOWER yields i plus a combining dot. Only folding
 			// the needle in the database matches the stored row on every dialect.
-			ist := &domain.Project{ID: uniqueProjectID(t), Name: "İstanbul", AllowedOrigins: []domain.AllowedOrigin{}}
+			ist := &domain.Project{ID: uniqueProjectID(t), Name: "İstanbul", Origins: []domain.Origin{}}
 			require.NoError(t, d.stmts.CreateProject(t.Context(), ist))
 			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), ist.ID) })
 

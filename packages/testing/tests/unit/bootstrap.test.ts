@@ -29,7 +29,7 @@ const server = setupServer(
         name: "zitadel-testing",
         project_secret: "secret_1",
         preview_secret: "preview_1",
-        allowed_origins: [],
+        origins: [],
         created_at: "2026-01-01T00:00:00Z",
       },
       { status: 201 },
@@ -73,7 +73,7 @@ describe("bootstrapProject", () => {
 
     expect(captured.projectBody).toMatchObject({
       name: "zitadel-testing",
-      allowed_origins: [{ pattern: "http://localhost:3002", kind: "primary" }],
+      origins: [{ pattern: "http://localhost:3002", kind: "primary" }],
       seed_defaults: false,
     });
 

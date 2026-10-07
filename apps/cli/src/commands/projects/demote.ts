@@ -3,14 +3,14 @@ import { cancel, confirm, isCancel } from "@clack/prompts";
 
 import { ZitadelError } from "../../lib/errors";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
-import { connectTarget } from "../../lib/target";
+import { connectEnvironment } from "../../lib/environment";
 
 /**
- * `zitadel projects demote` — make the project `sandbox` again, which lets
+ * `zitadel projects demote` — put the project back in sandbox mode, which lets
  * loopback origins back into a project that may hold real users.
  */
 export default class ProjectsDemote extends BaseCommand {
-  static override description = "Demote the project to class sandbox.";
+  static override description = "Demote the project to sandbox mode.";
   static override group = CommandGroups.resources;
   static override examples = ["<%= config.bin %> projects demote --env production --confirm"];
   static override flags = {
@@ -21,9 +21,9 @@ export default class ProjectsDemote extends BaseCommand {
     const { flags } = await this.parse(ProjectsDemote);
     await this.toMeta(flags);
     const { cwd, env, dryRun, nonInteractive, serverFlag, envName, envFile } = this.meta;
-    const { client, projectId } = await connectTarget({ cwd, env, serverFlag, envName, envFile });
+    const { client, projectId } = await connectEnvironment({ cwd, env, serverFlag, envName, envFile });
     if (dryRun) {
-      return this.emit({ status: "skipped", reason: "dry-run", data: { class: "sandbox" } });
+      return this.emit({ status: "skipped", reason: "dry-run", data: { mode: "sandbox" } });
     }
     if (!flags.confirm) {
       if (nonInteractive) {
@@ -35,11 +35,11 @@ export default class ProjectsDemote extends BaseCommand {
         throw new ZitadelError("E_VALIDATION", "Demote cancelled by user");
       }
     }
-    const project = await client.setProjectClass(projectId, { class: "sandbox", confirm: true });
+    const project = await client.setProjectMode(projectId, { mode: "sandbox", confirm: true });
     return this.emit({
       status: "ok",
-      data: { id: project.id, class: project.class },
-      pretty: `class      production -> ${project.class}`,
+      data: { id: project.id, mode: project.mode },
+      pretty: `mode       production -> ${project.mode}`,
     });
   }
 }

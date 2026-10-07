@@ -12,425 +12,423 @@ import (
 	"github.com/zitadel/nextgen/internal/api/ogenx"
 )
 
-// AddAllowedOriginErrorResponse represents sum type.
-type AddAllowedOriginErrorResponse struct {
-	Type                       AddAllowedOriginErrorResponseType // switch on this field
-	AuthUnauthorized           AuthUnauthorized
-	EvtInvalid                 EvtInvalid
-	Internal                   Internal
-	OriginInvalid              OriginInvalid
-	OriginNotPermittedForClass OriginNotPermittedForClass
-	OriginPermissionDenied     OriginPermissionDenied
-	OriginUnbounded            OriginUnbounded
-	ProjNotFound               ProjNotFound
-	ProjPermissionDenied       ProjPermissionDenied
-	ReqInvalid                 ReqInvalid
+// AddOriginErrorResponse represents sum type.
+type AddOriginErrorResponse struct {
+	Type                      AddOriginErrorResponseType // switch on this field
+	AuthUnauthorized          AuthUnauthorized
+	EvtInvalid                EvtInvalid
+	Internal                  Internal
+	OriginInvalid             OriginInvalid
+	OriginNotPermittedForMode OriginNotPermittedForMode
+	OriginPermissionDenied    OriginPermissionDenied
+	OriginUnbounded           OriginUnbounded
+	ProjNotFound              ProjNotFound
+	ProjPermissionDenied      ProjPermissionDenied
+	ReqInvalid                ReqInvalid
 }
 
-// AddAllowedOriginErrorResponseType is oneOf type of AddAllowedOriginErrorResponse.
-type AddAllowedOriginErrorResponseType string
+// AddOriginErrorResponseType is oneOf type of AddOriginErrorResponse.
+type AddOriginErrorResponseType string
 
-// Possible values for AddAllowedOriginErrorResponseType.
+// Possible values for AddOriginErrorResponseType.
 const (
-	AuthUnauthorizedAddAllowedOriginErrorResponse           AddAllowedOriginErrorResponseType = "auth.unauthorized"
-	EvtInvalidAddAllowedOriginErrorResponse                 AddAllowedOriginErrorResponseType = "evt.invalid"
-	InternalAddAllowedOriginErrorResponse                   AddAllowedOriginErrorResponseType = "internal"
-	OriginInvalidAddAllowedOriginErrorResponse              AddAllowedOriginErrorResponseType = "origin.invalid"
-	OriginNotPermittedForClassAddAllowedOriginErrorResponse AddAllowedOriginErrorResponseType = "origin.not_permitted_for_class"
-	OriginPermissionDeniedAddAllowedOriginErrorResponse     AddAllowedOriginErrorResponseType = "origin.permission_denied"
-	OriginUnboundedAddAllowedOriginErrorResponse            AddAllowedOriginErrorResponseType = "origin.unbounded"
-	ProjNotFoundAddAllowedOriginErrorResponse               AddAllowedOriginErrorResponseType = "proj.not_found"
-	ProjPermissionDeniedAddAllowedOriginErrorResponse       AddAllowedOriginErrorResponseType = "proj.permission_denied"
-	ReqInvalidAddAllowedOriginErrorResponse                 AddAllowedOriginErrorResponseType = "req.invalid"
+	AuthUnauthorizedAddOriginErrorResponse          AddOriginErrorResponseType = "auth.unauthorized"
+	EvtInvalidAddOriginErrorResponse                AddOriginErrorResponseType = "evt.invalid"
+	InternalAddOriginErrorResponse                  AddOriginErrorResponseType = "internal"
+	OriginInvalidAddOriginErrorResponse             AddOriginErrorResponseType = "origin.invalid"
+	OriginNotPermittedForModeAddOriginErrorResponse AddOriginErrorResponseType = "origin.not_permitted_for_mode"
+	OriginPermissionDeniedAddOriginErrorResponse    AddOriginErrorResponseType = "origin.permission_denied"
+	OriginUnboundedAddOriginErrorResponse           AddOriginErrorResponseType = "origin.unbounded"
+	ProjNotFoundAddOriginErrorResponse              AddOriginErrorResponseType = "proj.not_found"
+	ProjPermissionDeniedAddOriginErrorResponse      AddOriginErrorResponseType = "proj.permission_denied"
+	ReqInvalidAddOriginErrorResponse                AddOriginErrorResponseType = "req.invalid"
 )
 
-// IsAuthUnauthorized reports whether AddAllowedOriginErrorResponse is AuthUnauthorized.
-func (s AddAllowedOriginErrorResponse) IsAuthUnauthorized() bool {
-	return s.Type == AuthUnauthorizedAddAllowedOriginErrorResponse
+// IsAuthUnauthorized reports whether AddOriginErrorResponse is AuthUnauthorized.
+func (s AddOriginErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedAddOriginErrorResponse
 }
 
-// IsEvtInvalid reports whether AddAllowedOriginErrorResponse is EvtInvalid.
-func (s AddAllowedOriginErrorResponse) IsEvtInvalid() bool {
-	return s.Type == EvtInvalidAddAllowedOriginErrorResponse
+// IsEvtInvalid reports whether AddOriginErrorResponse is EvtInvalid.
+func (s AddOriginErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidAddOriginErrorResponse
 }
 
-// IsInternal reports whether AddAllowedOriginErrorResponse is Internal.
-func (s AddAllowedOriginErrorResponse) IsInternal() bool {
-	return s.Type == InternalAddAllowedOriginErrorResponse
+// IsInternal reports whether AddOriginErrorResponse is Internal.
+func (s AddOriginErrorResponse) IsInternal() bool { return s.Type == InternalAddOriginErrorResponse }
+
+// IsOriginInvalid reports whether AddOriginErrorResponse is OriginInvalid.
+func (s AddOriginErrorResponse) IsOriginInvalid() bool {
+	return s.Type == OriginInvalidAddOriginErrorResponse
 }
 
-// IsOriginInvalid reports whether AddAllowedOriginErrorResponse is OriginInvalid.
-func (s AddAllowedOriginErrorResponse) IsOriginInvalid() bool {
-	return s.Type == OriginInvalidAddAllowedOriginErrorResponse
+// IsOriginNotPermittedForMode reports whether AddOriginErrorResponse is OriginNotPermittedForMode.
+func (s AddOriginErrorResponse) IsOriginNotPermittedForMode() bool {
+	return s.Type == OriginNotPermittedForModeAddOriginErrorResponse
 }
 
-// IsOriginNotPermittedForClass reports whether AddAllowedOriginErrorResponse is OriginNotPermittedForClass.
-func (s AddAllowedOriginErrorResponse) IsOriginNotPermittedForClass() bool {
-	return s.Type == OriginNotPermittedForClassAddAllowedOriginErrorResponse
+// IsOriginPermissionDenied reports whether AddOriginErrorResponse is OriginPermissionDenied.
+func (s AddOriginErrorResponse) IsOriginPermissionDenied() bool {
+	return s.Type == OriginPermissionDeniedAddOriginErrorResponse
 }
 
-// IsOriginPermissionDenied reports whether AddAllowedOriginErrorResponse is OriginPermissionDenied.
-func (s AddAllowedOriginErrorResponse) IsOriginPermissionDenied() bool {
-	return s.Type == OriginPermissionDeniedAddAllowedOriginErrorResponse
+// IsOriginUnbounded reports whether AddOriginErrorResponse is OriginUnbounded.
+func (s AddOriginErrorResponse) IsOriginUnbounded() bool {
+	return s.Type == OriginUnboundedAddOriginErrorResponse
 }
 
-// IsOriginUnbounded reports whether AddAllowedOriginErrorResponse is OriginUnbounded.
-func (s AddAllowedOriginErrorResponse) IsOriginUnbounded() bool {
-	return s.Type == OriginUnboundedAddAllowedOriginErrorResponse
+// IsProjNotFound reports whether AddOriginErrorResponse is ProjNotFound.
+func (s AddOriginErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundAddOriginErrorResponse
 }
 
-// IsProjNotFound reports whether AddAllowedOriginErrorResponse is ProjNotFound.
-func (s AddAllowedOriginErrorResponse) IsProjNotFound() bool {
-	return s.Type == ProjNotFoundAddAllowedOriginErrorResponse
+// IsProjPermissionDenied reports whether AddOriginErrorResponse is ProjPermissionDenied.
+func (s AddOriginErrorResponse) IsProjPermissionDenied() bool {
+	return s.Type == ProjPermissionDeniedAddOriginErrorResponse
 }
 
-// IsProjPermissionDenied reports whether AddAllowedOriginErrorResponse is ProjPermissionDenied.
-func (s AddAllowedOriginErrorResponse) IsProjPermissionDenied() bool {
-	return s.Type == ProjPermissionDeniedAddAllowedOriginErrorResponse
+// IsReqInvalid reports whether AddOriginErrorResponse is ReqInvalid.
+func (s AddOriginErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidAddOriginErrorResponse
 }
 
-// IsReqInvalid reports whether AddAllowedOriginErrorResponse is ReqInvalid.
-func (s AddAllowedOriginErrorResponse) IsReqInvalid() bool {
-	return s.Type == ReqInvalidAddAllowedOriginErrorResponse
-}
-
-// SetAuthUnauthorized sets AddAllowedOriginErrorResponse to AuthUnauthorized.
-func (s *AddAllowedOriginErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
-	s.Type = AuthUnauthorizedAddAllowedOriginErrorResponse
+// SetAuthUnauthorized sets AddOriginErrorResponse to AuthUnauthorized.
+func (s *AddOriginErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedAddOriginErrorResponse
 	s.AuthUnauthorized = v
 }
 
-// GetAuthUnauthorized returns AuthUnauthorized and true boolean if AddAllowedOriginErrorResponse is AuthUnauthorized.
-func (s AddAllowedOriginErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if AddOriginErrorResponse is AuthUnauthorized.
+func (s AddOriginErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
 	if !s.IsAuthUnauthorized() {
 		return v, false
 	}
 	return s.AuthUnauthorized, true
 }
 
-// NewAuthUnauthorizedAddAllowedOriginErrorResponse returns new AddAllowedOriginErrorResponse from AuthUnauthorized.
-func NewAuthUnauthorizedAddAllowedOriginErrorResponse(v AuthUnauthorized) AddAllowedOriginErrorResponse {
-	var s AddAllowedOriginErrorResponse
+// NewAuthUnauthorizedAddOriginErrorResponse returns new AddOriginErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedAddOriginErrorResponse(v AuthUnauthorized) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
 	s.SetAuthUnauthorized(v)
 	return s
 }
 
-// SetEvtInvalid sets AddAllowedOriginErrorResponse to EvtInvalid.
-func (s *AddAllowedOriginErrorResponse) SetEvtInvalid(v EvtInvalid) {
-	s.Type = EvtInvalidAddAllowedOriginErrorResponse
+// SetEvtInvalid sets AddOriginErrorResponse to EvtInvalid.
+func (s *AddOriginErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidAddOriginErrorResponse
 	s.EvtInvalid = v
 }
 
-// GetEvtInvalid returns EvtInvalid and true boolean if AddAllowedOriginErrorResponse is EvtInvalid.
-func (s AddAllowedOriginErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+// GetEvtInvalid returns EvtInvalid and true boolean if AddOriginErrorResponse is EvtInvalid.
+func (s AddOriginErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
 	if !s.IsEvtInvalid() {
 		return v, false
 	}
 	return s.EvtInvalid, true
 }
 
-// NewEvtInvalidAddAllowedOriginErrorResponse returns new AddAllowedOriginErrorResponse from EvtInvalid.
-func NewEvtInvalidAddAllowedOriginErrorResponse(v EvtInvalid) AddAllowedOriginErrorResponse {
-	var s AddAllowedOriginErrorResponse
+// NewEvtInvalidAddOriginErrorResponse returns new AddOriginErrorResponse from EvtInvalid.
+func NewEvtInvalidAddOriginErrorResponse(v EvtInvalid) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
 	s.SetEvtInvalid(v)
 	return s
 }
 
-// SetInternal sets AddAllowedOriginErrorResponse to Internal.
-func (s *AddAllowedOriginErrorResponse) SetInternal(v Internal) {
-	s.Type = InternalAddAllowedOriginErrorResponse
+// SetInternal sets AddOriginErrorResponse to Internal.
+func (s *AddOriginErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalAddOriginErrorResponse
 	s.Internal = v
 }
 
-// GetInternal returns Internal and true boolean if AddAllowedOriginErrorResponse is Internal.
-func (s AddAllowedOriginErrorResponse) GetInternal() (v Internal, ok bool) {
+// GetInternal returns Internal and true boolean if AddOriginErrorResponse is Internal.
+func (s AddOriginErrorResponse) GetInternal() (v Internal, ok bool) {
 	if !s.IsInternal() {
 		return v, false
 	}
 	return s.Internal, true
 }
 
-// NewInternalAddAllowedOriginErrorResponse returns new AddAllowedOriginErrorResponse from Internal.
-func NewInternalAddAllowedOriginErrorResponse(v Internal) AddAllowedOriginErrorResponse {
-	var s AddAllowedOriginErrorResponse
+// NewInternalAddOriginErrorResponse returns new AddOriginErrorResponse from Internal.
+func NewInternalAddOriginErrorResponse(v Internal) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
 	s.SetInternal(v)
 	return s
 }
 
-// SetOriginInvalid sets AddAllowedOriginErrorResponse to OriginInvalid.
-func (s *AddAllowedOriginErrorResponse) SetOriginInvalid(v OriginInvalid) {
-	s.Type = OriginInvalidAddAllowedOriginErrorResponse
+// SetOriginInvalid sets AddOriginErrorResponse to OriginInvalid.
+func (s *AddOriginErrorResponse) SetOriginInvalid(v OriginInvalid) {
+	s.Type = OriginInvalidAddOriginErrorResponse
 	s.OriginInvalid = v
 }
 
-// GetOriginInvalid returns OriginInvalid and true boolean if AddAllowedOriginErrorResponse is OriginInvalid.
-func (s AddAllowedOriginErrorResponse) GetOriginInvalid() (v OriginInvalid, ok bool) {
+// GetOriginInvalid returns OriginInvalid and true boolean if AddOriginErrorResponse is OriginInvalid.
+func (s AddOriginErrorResponse) GetOriginInvalid() (v OriginInvalid, ok bool) {
 	if !s.IsOriginInvalid() {
 		return v, false
 	}
 	return s.OriginInvalid, true
 }
 
-// NewOriginInvalidAddAllowedOriginErrorResponse returns new AddAllowedOriginErrorResponse from OriginInvalid.
-func NewOriginInvalidAddAllowedOriginErrorResponse(v OriginInvalid) AddAllowedOriginErrorResponse {
-	var s AddAllowedOriginErrorResponse
+// NewOriginInvalidAddOriginErrorResponse returns new AddOriginErrorResponse from OriginInvalid.
+func NewOriginInvalidAddOriginErrorResponse(v OriginInvalid) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
 	s.SetOriginInvalid(v)
 	return s
 }
 
-// SetOriginNotPermittedForClass sets AddAllowedOriginErrorResponse to OriginNotPermittedForClass.
-func (s *AddAllowedOriginErrorResponse) SetOriginNotPermittedForClass(v OriginNotPermittedForClass) {
-	s.Type = OriginNotPermittedForClassAddAllowedOriginErrorResponse
-	s.OriginNotPermittedForClass = v
+// SetOriginNotPermittedForMode sets AddOriginErrorResponse to OriginNotPermittedForMode.
+func (s *AddOriginErrorResponse) SetOriginNotPermittedForMode(v OriginNotPermittedForMode) {
+	s.Type = OriginNotPermittedForModeAddOriginErrorResponse
+	s.OriginNotPermittedForMode = v
 }
 
-// GetOriginNotPermittedForClass returns OriginNotPermittedForClass and true boolean if AddAllowedOriginErrorResponse is OriginNotPermittedForClass.
-func (s AddAllowedOriginErrorResponse) GetOriginNotPermittedForClass() (v OriginNotPermittedForClass, ok bool) {
-	if !s.IsOriginNotPermittedForClass() {
+// GetOriginNotPermittedForMode returns OriginNotPermittedForMode and true boolean if AddOriginErrorResponse is OriginNotPermittedForMode.
+func (s AddOriginErrorResponse) GetOriginNotPermittedForMode() (v OriginNotPermittedForMode, ok bool) {
+	if !s.IsOriginNotPermittedForMode() {
 		return v, false
 	}
-	return s.OriginNotPermittedForClass, true
+	return s.OriginNotPermittedForMode, true
 }
 
-// NewOriginNotPermittedForClassAddAllowedOriginErrorResponse returns new AddAllowedOriginErrorResponse from OriginNotPermittedForClass.
-func NewOriginNotPermittedForClassAddAllowedOriginErrorResponse(v OriginNotPermittedForClass) AddAllowedOriginErrorResponse {
-	var s AddAllowedOriginErrorResponse
-	s.SetOriginNotPermittedForClass(v)
+// NewOriginNotPermittedForModeAddOriginErrorResponse returns new AddOriginErrorResponse from OriginNotPermittedForMode.
+func NewOriginNotPermittedForModeAddOriginErrorResponse(v OriginNotPermittedForMode) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
+	s.SetOriginNotPermittedForMode(v)
 	return s
 }
 
-// SetOriginPermissionDenied sets AddAllowedOriginErrorResponse to OriginPermissionDenied.
-func (s *AddAllowedOriginErrorResponse) SetOriginPermissionDenied(v OriginPermissionDenied) {
-	s.Type = OriginPermissionDeniedAddAllowedOriginErrorResponse
+// SetOriginPermissionDenied sets AddOriginErrorResponse to OriginPermissionDenied.
+func (s *AddOriginErrorResponse) SetOriginPermissionDenied(v OriginPermissionDenied) {
+	s.Type = OriginPermissionDeniedAddOriginErrorResponse
 	s.OriginPermissionDenied = v
 }
 
-// GetOriginPermissionDenied returns OriginPermissionDenied and true boolean if AddAllowedOriginErrorResponse is OriginPermissionDenied.
-func (s AddAllowedOriginErrorResponse) GetOriginPermissionDenied() (v OriginPermissionDenied, ok bool) {
+// GetOriginPermissionDenied returns OriginPermissionDenied and true boolean if AddOriginErrorResponse is OriginPermissionDenied.
+func (s AddOriginErrorResponse) GetOriginPermissionDenied() (v OriginPermissionDenied, ok bool) {
 	if !s.IsOriginPermissionDenied() {
 		return v, false
 	}
 	return s.OriginPermissionDenied, true
 }
 
-// NewOriginPermissionDeniedAddAllowedOriginErrorResponse returns new AddAllowedOriginErrorResponse from OriginPermissionDenied.
-func NewOriginPermissionDeniedAddAllowedOriginErrorResponse(v OriginPermissionDenied) AddAllowedOriginErrorResponse {
-	var s AddAllowedOriginErrorResponse
+// NewOriginPermissionDeniedAddOriginErrorResponse returns new AddOriginErrorResponse from OriginPermissionDenied.
+func NewOriginPermissionDeniedAddOriginErrorResponse(v OriginPermissionDenied) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
 	s.SetOriginPermissionDenied(v)
 	return s
 }
 
-// SetOriginUnbounded sets AddAllowedOriginErrorResponse to OriginUnbounded.
-func (s *AddAllowedOriginErrorResponse) SetOriginUnbounded(v OriginUnbounded) {
-	s.Type = OriginUnboundedAddAllowedOriginErrorResponse
+// SetOriginUnbounded sets AddOriginErrorResponse to OriginUnbounded.
+func (s *AddOriginErrorResponse) SetOriginUnbounded(v OriginUnbounded) {
+	s.Type = OriginUnboundedAddOriginErrorResponse
 	s.OriginUnbounded = v
 }
 
-// GetOriginUnbounded returns OriginUnbounded and true boolean if AddAllowedOriginErrorResponse is OriginUnbounded.
-func (s AddAllowedOriginErrorResponse) GetOriginUnbounded() (v OriginUnbounded, ok bool) {
+// GetOriginUnbounded returns OriginUnbounded and true boolean if AddOriginErrorResponse is OriginUnbounded.
+func (s AddOriginErrorResponse) GetOriginUnbounded() (v OriginUnbounded, ok bool) {
 	if !s.IsOriginUnbounded() {
 		return v, false
 	}
 	return s.OriginUnbounded, true
 }
 
-// NewOriginUnboundedAddAllowedOriginErrorResponse returns new AddAllowedOriginErrorResponse from OriginUnbounded.
-func NewOriginUnboundedAddAllowedOriginErrorResponse(v OriginUnbounded) AddAllowedOriginErrorResponse {
-	var s AddAllowedOriginErrorResponse
+// NewOriginUnboundedAddOriginErrorResponse returns new AddOriginErrorResponse from OriginUnbounded.
+func NewOriginUnboundedAddOriginErrorResponse(v OriginUnbounded) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
 	s.SetOriginUnbounded(v)
 	return s
 }
 
-// SetProjNotFound sets AddAllowedOriginErrorResponse to ProjNotFound.
-func (s *AddAllowedOriginErrorResponse) SetProjNotFound(v ProjNotFound) {
-	s.Type = ProjNotFoundAddAllowedOriginErrorResponse
+// SetProjNotFound sets AddOriginErrorResponse to ProjNotFound.
+func (s *AddOriginErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundAddOriginErrorResponse
 	s.ProjNotFound = v
 }
 
-// GetProjNotFound returns ProjNotFound and true boolean if AddAllowedOriginErrorResponse is ProjNotFound.
-func (s AddAllowedOriginErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+// GetProjNotFound returns ProjNotFound and true boolean if AddOriginErrorResponse is ProjNotFound.
+func (s AddOriginErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
 	if !s.IsProjNotFound() {
 		return v, false
 	}
 	return s.ProjNotFound, true
 }
 
-// NewProjNotFoundAddAllowedOriginErrorResponse returns new AddAllowedOriginErrorResponse from ProjNotFound.
-func NewProjNotFoundAddAllowedOriginErrorResponse(v ProjNotFound) AddAllowedOriginErrorResponse {
-	var s AddAllowedOriginErrorResponse
+// NewProjNotFoundAddOriginErrorResponse returns new AddOriginErrorResponse from ProjNotFound.
+func NewProjNotFoundAddOriginErrorResponse(v ProjNotFound) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
 	s.SetProjNotFound(v)
 	return s
 }
 
-// SetProjPermissionDenied sets AddAllowedOriginErrorResponse to ProjPermissionDenied.
-func (s *AddAllowedOriginErrorResponse) SetProjPermissionDenied(v ProjPermissionDenied) {
-	s.Type = ProjPermissionDeniedAddAllowedOriginErrorResponse
+// SetProjPermissionDenied sets AddOriginErrorResponse to ProjPermissionDenied.
+func (s *AddOriginErrorResponse) SetProjPermissionDenied(v ProjPermissionDenied) {
+	s.Type = ProjPermissionDeniedAddOriginErrorResponse
 	s.ProjPermissionDenied = v
 }
 
-// GetProjPermissionDenied returns ProjPermissionDenied and true boolean if AddAllowedOriginErrorResponse is ProjPermissionDenied.
-func (s AddAllowedOriginErrorResponse) GetProjPermissionDenied() (v ProjPermissionDenied, ok bool) {
+// GetProjPermissionDenied returns ProjPermissionDenied and true boolean if AddOriginErrorResponse is ProjPermissionDenied.
+func (s AddOriginErrorResponse) GetProjPermissionDenied() (v ProjPermissionDenied, ok bool) {
 	if !s.IsProjPermissionDenied() {
 		return v, false
 	}
 	return s.ProjPermissionDenied, true
 }
 
-// NewProjPermissionDeniedAddAllowedOriginErrorResponse returns new AddAllowedOriginErrorResponse from ProjPermissionDenied.
-func NewProjPermissionDeniedAddAllowedOriginErrorResponse(v ProjPermissionDenied) AddAllowedOriginErrorResponse {
-	var s AddAllowedOriginErrorResponse
+// NewProjPermissionDeniedAddOriginErrorResponse returns new AddOriginErrorResponse from ProjPermissionDenied.
+func NewProjPermissionDeniedAddOriginErrorResponse(v ProjPermissionDenied) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
 	s.SetProjPermissionDenied(v)
 	return s
 }
 
-// SetReqInvalid sets AddAllowedOriginErrorResponse to ReqInvalid.
-func (s *AddAllowedOriginErrorResponse) SetReqInvalid(v ReqInvalid) {
-	s.Type = ReqInvalidAddAllowedOriginErrorResponse
+// SetReqInvalid sets AddOriginErrorResponse to ReqInvalid.
+func (s *AddOriginErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidAddOriginErrorResponse
 	s.ReqInvalid = v
 }
 
-// GetReqInvalid returns ReqInvalid and true boolean if AddAllowedOriginErrorResponse is ReqInvalid.
-func (s AddAllowedOriginErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+// GetReqInvalid returns ReqInvalid and true boolean if AddOriginErrorResponse is ReqInvalid.
+func (s AddOriginErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 	if !s.IsReqInvalid() {
 		return v, false
 	}
 	return s.ReqInvalid, true
 }
 
-// NewReqInvalidAddAllowedOriginErrorResponse returns new AddAllowedOriginErrorResponse from ReqInvalid.
-func NewReqInvalidAddAllowedOriginErrorResponse(v ReqInvalid) AddAllowedOriginErrorResponse {
-	var s AddAllowedOriginErrorResponse
+// NewReqInvalidAddOriginErrorResponse returns new AddOriginErrorResponse from ReqInvalid.
+func NewReqInvalidAddOriginErrorResponse(v ReqInvalid) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
 	s.SetReqInvalid(v)
 	return s
 }
 
-// AddAllowedOriginErrorResponseStatusCode wraps AddAllowedOriginErrorResponse with StatusCode.
-type AddAllowedOriginErrorResponseStatusCode struct {
+// AddOriginErrorResponseStatusCode wraps AddOriginErrorResponse with StatusCode.
+type AddOriginErrorResponseStatusCode struct {
 	StatusCode int
-	Response   AddAllowedOriginErrorResponse
+	Response   AddOriginErrorResponse
 }
 
 // GetStatusCode returns the value of StatusCode.
-func (s *AddAllowedOriginErrorResponseStatusCode) GetStatusCode() int {
+func (s *AddOriginErrorResponseStatusCode) GetStatusCode() int {
 	return s.StatusCode
 }
 
 // GetResponse returns the value of Response.
-func (s *AddAllowedOriginErrorResponseStatusCode) GetResponse() AddAllowedOriginErrorResponse {
+func (s *AddOriginErrorResponseStatusCode) GetResponse() AddOriginErrorResponse {
 	return s.Response
 }
 
 // SetStatusCode sets the value of StatusCode.
-func (s *AddAllowedOriginErrorResponseStatusCode) SetStatusCode(val int) {
+func (s *AddOriginErrorResponseStatusCode) SetStatusCode(val int) {
 	s.StatusCode = val
 }
 
 // SetResponse sets the value of Response.
-func (s *AddAllowedOriginErrorResponseStatusCode) SetResponse(val AddAllowedOriginErrorResponse) {
+func (s *AddOriginErrorResponseStatusCode) SetResponse(val AddOriginErrorResponse) {
 	s.Response = val
 }
 
-func (*AddAllowedOriginErrorResponseStatusCode) addAllowedOriginRes() {}
+func (*AddOriginErrorResponseStatusCode) addOriginRes() {}
 
 // Ref: #
-type AddAllowedOriginResponse struct {
-	Pattern string                       `json:"pattern"`
-	Kind    AddAllowedOriginResponseKind `json:"kind"`
+type AddOriginResponse struct {
+	Pattern string                `json:"pattern"`
+	Kind    AddOriginResponseKind `json:"kind"`
 	// What the lint found. `ok` passed; `warning` passed with a note.
-	Check AddAllowedOriginResponseCheck `json:"check"`
+	Check AddOriginResponseCheck `json:"check"`
 }
 
 // GetPattern returns the value of Pattern.
-func (s *AddAllowedOriginResponse) GetPattern() string {
+func (s *AddOriginResponse) GetPattern() string {
 	return s.Pattern
 }
 
 // GetKind returns the value of Kind.
-func (s *AddAllowedOriginResponse) GetKind() AddAllowedOriginResponseKind {
+func (s *AddOriginResponse) GetKind() AddOriginResponseKind {
 	return s.Kind
 }
 
 // GetCheck returns the value of Check.
-func (s *AddAllowedOriginResponse) GetCheck() AddAllowedOriginResponseCheck {
+func (s *AddOriginResponse) GetCheck() AddOriginResponseCheck {
 	return s.Check
 }
 
 // SetPattern sets the value of Pattern.
-func (s *AddAllowedOriginResponse) SetPattern(val string) {
+func (s *AddOriginResponse) SetPattern(val string) {
 	s.Pattern = val
 }
 
 // SetKind sets the value of Kind.
-func (s *AddAllowedOriginResponse) SetKind(val AddAllowedOriginResponseKind) {
+func (s *AddOriginResponse) SetKind(val AddOriginResponseKind) {
 	s.Kind = val
 }
 
 // SetCheck sets the value of Check.
-func (s *AddAllowedOriginResponse) SetCheck(val AddAllowedOriginResponseCheck) {
+func (s *AddOriginResponse) SetCheck(val AddOriginResponseCheck) {
 	s.Check = val
 }
 
-func (*AddAllowedOriginResponse) addAllowedOriginRes() {}
+func (*AddOriginResponse) addOriginRes() {}
 
 // What the lint found. `ok` passed; `warning` passed with a note.
-type AddAllowedOriginResponseCheck struct {
-	Status AddAllowedOriginResponseCheckStatus `json:"status"`
+type AddOriginResponseCheck struct {
+	Status AddOriginResponseCheckStatus `json:"status"`
 	// Set with `warning`, for example `origin_host_unknown`.
 	Code    OptString `json:"code"`
 	Message string    `json:"message"`
 }
 
 // GetStatus returns the value of Status.
-func (s *AddAllowedOriginResponseCheck) GetStatus() AddAllowedOriginResponseCheckStatus {
+func (s *AddOriginResponseCheck) GetStatus() AddOriginResponseCheckStatus {
 	return s.Status
 }
 
 // GetCode returns the value of Code.
-func (s *AddAllowedOriginResponseCheck) GetCode() OptString {
+func (s *AddOriginResponseCheck) GetCode() OptString {
 	return s.Code
 }
 
 // GetMessage returns the value of Message.
-func (s *AddAllowedOriginResponseCheck) GetMessage() string {
+func (s *AddOriginResponseCheck) GetMessage() string {
 	return s.Message
 }
 
 // SetStatus sets the value of Status.
-func (s *AddAllowedOriginResponseCheck) SetStatus(val AddAllowedOriginResponseCheckStatus) {
+func (s *AddOriginResponseCheck) SetStatus(val AddOriginResponseCheckStatus) {
 	s.Status = val
 }
 
 // SetCode sets the value of Code.
-func (s *AddAllowedOriginResponseCheck) SetCode(val OptString) {
+func (s *AddOriginResponseCheck) SetCode(val OptString) {
 	s.Code = val
 }
 
 // SetMessage sets the value of Message.
-func (s *AddAllowedOriginResponseCheck) SetMessage(val string) {
+func (s *AddOriginResponseCheck) SetMessage(val string) {
 	s.Message = val
 }
 
-type AddAllowedOriginResponseCheckStatus string
+type AddOriginResponseCheckStatus string
 
 const (
-	AddAllowedOriginResponseCheckStatusOk      AddAllowedOriginResponseCheckStatus = "ok"
-	AddAllowedOriginResponseCheckStatusWarning AddAllowedOriginResponseCheckStatus = "warning"
+	AddOriginResponseCheckStatusOk      AddOriginResponseCheckStatus = "ok"
+	AddOriginResponseCheckStatusWarning AddOriginResponseCheckStatus = "warning"
 )
 
-// AllValues returns all AddAllowedOriginResponseCheckStatus values.
-func (AddAllowedOriginResponseCheckStatus) AllValues() []AddAllowedOriginResponseCheckStatus {
-	return []AddAllowedOriginResponseCheckStatus{
-		AddAllowedOriginResponseCheckStatusOk,
-		AddAllowedOriginResponseCheckStatusWarning,
+// AllValues returns all AddOriginResponseCheckStatus values.
+func (AddOriginResponseCheckStatus) AllValues() []AddOriginResponseCheckStatus {
+	return []AddOriginResponseCheckStatus{
+		AddOriginResponseCheckStatusOk,
+		AddOriginResponseCheckStatusWarning,
 	}
 }
 
 // MarshalText implements encoding.TextMarshaler.
-func (s AddAllowedOriginResponseCheckStatus) MarshalText() ([]byte, error) {
+func (s AddOriginResponseCheckStatus) MarshalText() ([]byte, error) {
 	switch s {
-	case AddAllowedOriginResponseCheckStatusOk:
+	case AddOriginResponseCheckStatusOk:
 		return []byte(s), nil
-	case AddAllowedOriginResponseCheckStatusWarning:
+	case AddOriginResponseCheckStatusWarning:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -438,40 +436,40 @@ func (s AddAllowedOriginResponseCheckStatus) MarshalText() ([]byte, error) {
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
-func (s *AddAllowedOriginResponseCheckStatus) UnmarshalText(data []byte) error {
-	switch AddAllowedOriginResponseCheckStatus(data) {
-	case AddAllowedOriginResponseCheckStatusOk:
-		*s = AddAllowedOriginResponseCheckStatusOk
+func (s *AddOriginResponseCheckStatus) UnmarshalText(data []byte) error {
+	switch AddOriginResponseCheckStatus(data) {
+	case AddOriginResponseCheckStatusOk:
+		*s = AddOriginResponseCheckStatusOk
 		return nil
-	case AddAllowedOriginResponseCheckStatusWarning:
-		*s = AddAllowedOriginResponseCheckStatusWarning
+	case AddOriginResponseCheckStatusWarning:
+		*s = AddOriginResponseCheckStatusWarning
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
 
-type AddAllowedOriginResponseKind string
+type AddOriginResponseKind string
 
 const (
-	AddAllowedOriginResponseKindPrimary AddAllowedOriginResponseKind = "primary"
-	AddAllowedOriginResponseKindPreview AddAllowedOriginResponseKind = "preview"
+	AddOriginResponseKindPrimary AddOriginResponseKind = "primary"
+	AddOriginResponseKindPreview AddOriginResponseKind = "preview"
 )
 
-// AllValues returns all AddAllowedOriginResponseKind values.
-func (AddAllowedOriginResponseKind) AllValues() []AddAllowedOriginResponseKind {
-	return []AddAllowedOriginResponseKind{
-		AddAllowedOriginResponseKindPrimary,
-		AddAllowedOriginResponseKindPreview,
+// AllValues returns all AddOriginResponseKind values.
+func (AddOriginResponseKind) AllValues() []AddOriginResponseKind {
+	return []AddOriginResponseKind{
+		AddOriginResponseKindPrimary,
+		AddOriginResponseKindPreview,
 	}
 }
 
 // MarshalText implements encoding.TextMarshaler.
-func (s AddAllowedOriginResponseKind) MarshalText() ([]byte, error) {
+func (s AddOriginResponseKind) MarshalText() ([]byte, error) {
 	switch s {
-	case AddAllowedOriginResponseKindPrimary:
+	case AddOriginResponseKindPrimary:
 		return []byte(s), nil
-	case AddAllowedOriginResponseKindPreview:
+	case AddOriginResponseKindPreview:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -479,85 +477,13 @@ func (s AddAllowedOriginResponseKind) MarshalText() ([]byte, error) {
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
-func (s *AddAllowedOriginResponseKind) UnmarshalText(data []byte) error {
-	switch AddAllowedOriginResponseKind(data) {
-	case AddAllowedOriginResponseKindPrimary:
-		*s = AddAllowedOriginResponseKindPrimary
+func (s *AddOriginResponseKind) UnmarshalText(data []byte) error {
+	switch AddOriginResponseKind(data) {
+	case AddOriginResponseKindPrimary:
+		*s = AddOriginResponseKindPrimary
 		return nil
-	case AddAllowedOriginResponseKindPreview:
-		*s = AddAllowedOriginResponseKindPreview
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-// One entry of a project's origin allowlist. A `primary` pattern admits
-// requests from URLs it matches; a `preview` pattern only bounds which URLs a
-// preview deploy may register, and a request from such a URL is admitted by
-// the live preview row alone. `*` matches one or more characters, none of
-// them a dot; a literal beats a wildcard.
-// Ref: #
-type AllowedOrigin struct {
-	Pattern string            `json:"pattern"`
-	Kind    AllowedOriginKind `json:"kind"`
-}
-
-// GetPattern returns the value of Pattern.
-func (s *AllowedOrigin) GetPattern() string {
-	return s.Pattern
-}
-
-// GetKind returns the value of Kind.
-func (s *AllowedOrigin) GetKind() AllowedOriginKind {
-	return s.Kind
-}
-
-// SetPattern sets the value of Pattern.
-func (s *AllowedOrigin) SetPattern(val string) {
-	s.Pattern = val
-}
-
-// SetKind sets the value of Kind.
-func (s *AllowedOrigin) SetKind(val AllowedOriginKind) {
-	s.Kind = val
-}
-
-type AllowedOriginKind string
-
-const (
-	AllowedOriginKindPrimary AllowedOriginKind = "primary"
-	AllowedOriginKindPreview AllowedOriginKind = "preview"
-)
-
-// AllValues returns all AllowedOriginKind values.
-func (AllowedOriginKind) AllValues() []AllowedOriginKind {
-	return []AllowedOriginKind{
-		AllowedOriginKindPrimary,
-		AllowedOriginKindPreview,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s AllowedOriginKind) MarshalText() ([]byte, error) {
-	switch s {
-	case AllowedOriginKindPrimary:
-		return []byte(s), nil
-	case AllowedOriginKindPreview:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *AllowedOriginKind) UnmarshalText(data []byte) error {
-	switch AllowedOriginKind(data) {
-	case AllowedOriginKindPrimary:
-		*s = AllowedOriginKindPrimary
-		return nil
-	case AllowedOriginKindPreview:
-		*s = AllowedOriginKindPreview
+	case AddOriginResponseKindPreview:
+		*s = AddOriginResponseKindPreview
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -8830,8 +8756,7 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 	return s
 }
 
-// The contents of a project's `.zitadel/` directory as authored on disk, plus
-// the metadata to record on the resulting release.
+// The contents of a project's `.zitadel/` directory as authored on disk.
 // Cross-resource references use handles, not revision ids: a flow definition's
 // `user_schema` names a schema by its `objectType`. The server resolves each
 // handle against the schemas in this bundle (or, failing that, the project's
@@ -8847,12 +8772,6 @@ type ConfigurationBundle struct {
 	// The branding descriptor from `.zitadel/branding/branding.json`, with its
 	// template inlined. A project has one branding, so at most one entry.
 	Brandings []Branding `json:"brandings"`
-	// A short summary of what the release changes.
-	Message OptString `json:"message"`
-	// The source commit the caller was operating from.
-	GitSha OptString `json:"git_sha"`
-	// Set when the working tree had uncommitted changes.
-	GitDirty OptBool `json:"git_dirty"`
 }
 
 // GetSchemas returns the value of Schemas.
@@ -8875,21 +8794,6 @@ func (s *ConfigurationBundle) GetBrandings() []Branding {
 	return s.Brandings
 }
 
-// GetMessage returns the value of Message.
-func (s *ConfigurationBundle) GetMessage() OptString {
-	return s.Message
-}
-
-// GetGitSha returns the value of GitSha.
-func (s *ConfigurationBundle) GetGitSha() OptString {
-	return s.GitSha
-}
-
-// GetGitDirty returns the value of GitDirty.
-func (s *ConfigurationBundle) GetGitDirty() OptBool {
-	return s.GitDirty
-}
-
 // SetSchemas sets the value of Schemas.
 func (s *ConfigurationBundle) SetSchemas(val []UserSchema) {
 	s.Schemas = val
@@ -8908,103 +8812,6 @@ func (s *ConfigurationBundle) SetFlowSchemaURI(val OptSchemaURI) {
 // SetBrandings sets the value of Brandings.
 func (s *ConfigurationBundle) SetBrandings(val []Branding) {
 	s.Brandings = val
-}
-
-// SetMessage sets the value of Message.
-func (s *ConfigurationBundle) SetMessage(val OptString) {
-	s.Message = val
-}
-
-// SetGitSha sets the value of GitSha.
-func (s *ConfigurationBundle) SetGitSha(val OptString) {
-	s.GitSha = val
-}
-
-// SetGitDirty sets the value of GitDirty.
-func (s *ConfigurationBundle) SetGitDirty(val OptBool) {
-	s.GitDirty = val
-}
-
-// The release assembled from a configuration bundle, plus what happened to
-// each resource in it: whether its content matched the project's newest
-// revision (reused) or a new revision was allocated (created).
-// Ref: #
-type ConfigurationReleaseResponse struct {
-	Release Release `json:"release"`
-	// One entry per resource in the bundle, in pointer order.
-	Revisions []ConfigurationReleaseResponseRevisionsItem `json:"revisions"`
-}
-
-// GetRelease returns the value of Release.
-func (s *ConfigurationReleaseResponse) GetRelease() Release {
-	return s.Release
-}
-
-// GetRevisions returns the value of Revisions.
-func (s *ConfigurationReleaseResponse) GetRevisions() []ConfigurationReleaseResponseRevisionsItem {
-	return s.Revisions
-}
-
-// SetRelease sets the value of Release.
-func (s *ConfigurationReleaseResponse) SetRelease(val Release) {
-	s.Release = val
-}
-
-// SetRevisions sets the value of Revisions.
-func (s *ConfigurationReleaseResponse) SetRevisions(val []ConfigurationReleaseResponseRevisionsItem) {
-	s.Revisions = val
-}
-
-type ConfigurationReleaseResponseRevisionsItem struct {
-	Kind ReleasePointerKind `json:"kind"`
-	// The resource's handle (`objectType`, `name` or `default`).
-	Handle string `json:"handle"`
-	// The revision the release pins for this resource.
-	RevisionID string `json:"revision_id"`
-	// `true` when this call allocated the revision because the bundled
-	// content differed from the project's newest one; `false` when the
-	// newest revision already matched and was reused.
-	Created bool `json:"created"`
-}
-
-// GetKind returns the value of Kind.
-func (s *ConfigurationReleaseResponseRevisionsItem) GetKind() ReleasePointerKind {
-	return s.Kind
-}
-
-// GetHandle returns the value of Handle.
-func (s *ConfigurationReleaseResponseRevisionsItem) GetHandle() string {
-	return s.Handle
-}
-
-// GetRevisionID returns the value of RevisionID.
-func (s *ConfigurationReleaseResponseRevisionsItem) GetRevisionID() string {
-	return s.RevisionID
-}
-
-// GetCreated returns the value of Created.
-func (s *ConfigurationReleaseResponseRevisionsItem) GetCreated() bool {
-	return s.Created
-}
-
-// SetKind sets the value of Kind.
-func (s *ConfigurationReleaseResponseRevisionsItem) SetKind(val ReleasePointerKind) {
-	s.Kind = val
-}
-
-// SetHandle sets the value of Handle.
-func (s *ConfigurationReleaseResponseRevisionsItem) SetHandle(val string) {
-	s.Handle = val
-}
-
-// SetRevisionID sets the value of RevisionID.
-func (s *ConfigurationReleaseResponseRevisionsItem) SetRevisionID(val string) {
-	s.RevisionID = val
-}
-
-// SetCreated sets the value of Created.
-func (s *ConfigurationReleaseResponseRevisionsItem) SetCreated(val bool) {
-	s.Created = val
 }
 
 // CreateAuthAttemptErrorResponse represents sum type.
@@ -9227,755 +9034,7 @@ func (s *CreateAuthAttemptRequest) SetSessionID(val OptNilSessionID) {
 	s.SessionID = val
 }
 
-type CreateConfigurationReleaseCreated ConfigurationReleaseResponse
-
-func (*CreateConfigurationReleaseCreated) createConfigurationReleaseRes() {}
-
-// CreateConfigurationReleaseErrorResponse represents sum type.
-type CreateConfigurationReleaseErrorResponse struct {
-	Type                     CreateConfigurationReleaseErrorResponseType // switch on this field
-	AuthUnauthorized         AuthUnauthorized
-	BrndInvalid              BrndInvalid
-	BrndMissingProjectID     BrndMissingProjectID
-	EvtInvalid               EvtInvalid
-	FlowdefInvalid           FlowdefInvalid
-	FlowdefRevisionConflict  FlowdefRevisionConflict
-	Internal                 Internal
-	SchAlreadyExists         SchAlreadyExists
-	SchFetchDenied           SchFetchDenied
-	SchFetchDowngrade        SchFetchDowngrade
-	SchFetchTimeout          SchFetchTimeout
-	SchFetchTooLarge         SchFetchTooLarge
-	SchFetchTooManyRedirects SchFetchTooManyRedirects
-	SchInvalidRequest        SchInvalidRequest
-	SchNotFound              SchNotFound
-	SchRevisionConflict      SchRevisionConflict
-	FlowdefMissingProjectID  FlowdefMissingProjectID
-	RelInvalid               RelInvalid
-	RelNotFound              RelNotFound
-	RelPermissionDenied      RelPermissionDenied
-	RelProjectNotFound       RelProjectNotFound
-	RelRevisionNotFound      RelRevisionNotFound
-	RelRevisionUnpinnable    RelRevisionUnpinnable
-	ReqInvalid               ReqInvalid
-	FlowdefSchemaFetchFailed FlowdefSchemaFetchFailed
-}
-
-// CreateConfigurationReleaseErrorResponseType is oneOf type of CreateConfigurationReleaseErrorResponse.
-type CreateConfigurationReleaseErrorResponseType string
-
-// Possible values for CreateConfigurationReleaseErrorResponseType.
-const (
-	AuthUnauthorizedCreateConfigurationReleaseErrorResponse         CreateConfigurationReleaseErrorResponseType = "auth.unauthorized"
-	BrndInvalidCreateConfigurationReleaseErrorResponse              CreateConfigurationReleaseErrorResponseType = "brnd.invalid"
-	BrndMissingProjectIDCreateConfigurationReleaseErrorResponse     CreateConfigurationReleaseErrorResponseType = "brnd.missing_project_id"
-	EvtInvalidCreateConfigurationReleaseErrorResponse               CreateConfigurationReleaseErrorResponseType = "evt.invalid"
-	FlowdefInvalidCreateConfigurationReleaseErrorResponse           CreateConfigurationReleaseErrorResponseType = "flowdef.invalid"
-	FlowdefRevisionConflictCreateConfigurationReleaseErrorResponse  CreateConfigurationReleaseErrorResponseType = "flowdef.revision_conflict"
-	InternalCreateConfigurationReleaseErrorResponse                 CreateConfigurationReleaseErrorResponseType = "internal"
-	SchAlreadyExistsCreateConfigurationReleaseErrorResponse         CreateConfigurationReleaseErrorResponseType = "sch.already_exists"
-	SchFetchDeniedCreateConfigurationReleaseErrorResponse           CreateConfigurationReleaseErrorResponseType = "sch.fetch_denied"
-	SchFetchDowngradeCreateConfigurationReleaseErrorResponse        CreateConfigurationReleaseErrorResponseType = "sch.fetch_downgrade"
-	SchFetchTimeoutCreateConfigurationReleaseErrorResponse          CreateConfigurationReleaseErrorResponseType = "sch.fetch_timeout"
-	SchFetchTooLargeCreateConfigurationReleaseErrorResponse         CreateConfigurationReleaseErrorResponseType = "sch.fetch_too_large"
-	SchFetchTooManyRedirectsCreateConfigurationReleaseErrorResponse CreateConfigurationReleaseErrorResponseType = "sch.fetch_too_many_redirects"
-	SchInvalidRequestCreateConfigurationReleaseErrorResponse        CreateConfigurationReleaseErrorResponseType = "sch.invalid_request"
-	SchNotFoundCreateConfigurationReleaseErrorResponse              CreateConfigurationReleaseErrorResponseType = "sch.not_found"
-	SchRevisionConflictCreateConfigurationReleaseErrorResponse      CreateConfigurationReleaseErrorResponseType = "sch.revision_conflict"
-	FlowdefMissingProjectIDCreateConfigurationReleaseErrorResponse  CreateConfigurationReleaseErrorResponseType = "flowdef.missing_project_id"
-	RelInvalidCreateConfigurationReleaseErrorResponse               CreateConfigurationReleaseErrorResponseType = "rel.invalid"
-	RelNotFoundCreateConfigurationReleaseErrorResponse              CreateConfigurationReleaseErrorResponseType = "rel.not_found"
-	RelPermissionDeniedCreateConfigurationReleaseErrorResponse      CreateConfigurationReleaseErrorResponseType = "rel.permission_denied"
-	RelProjectNotFoundCreateConfigurationReleaseErrorResponse       CreateConfigurationReleaseErrorResponseType = "rel.project_not_found"
-	RelRevisionNotFoundCreateConfigurationReleaseErrorResponse      CreateConfigurationReleaseErrorResponseType = "rel.revision_not_found"
-	RelRevisionUnpinnableCreateConfigurationReleaseErrorResponse    CreateConfigurationReleaseErrorResponseType = "rel.revision_unpinnable"
-	ReqInvalidCreateConfigurationReleaseErrorResponse               CreateConfigurationReleaseErrorResponseType = "req.invalid"
-	FlowdefSchemaFetchFailedCreateConfigurationReleaseErrorResponse CreateConfigurationReleaseErrorResponseType = "flowdef.schema_fetch_failed"
-)
-
-// IsAuthUnauthorized reports whether CreateConfigurationReleaseErrorResponse is AuthUnauthorized.
-func (s CreateConfigurationReleaseErrorResponse) IsAuthUnauthorized() bool {
-	return s.Type == AuthUnauthorizedCreateConfigurationReleaseErrorResponse
-}
-
-// IsBrndInvalid reports whether CreateConfigurationReleaseErrorResponse is BrndInvalid.
-func (s CreateConfigurationReleaseErrorResponse) IsBrndInvalid() bool {
-	return s.Type == BrndInvalidCreateConfigurationReleaseErrorResponse
-}
-
-// IsBrndMissingProjectID reports whether CreateConfigurationReleaseErrorResponse is BrndMissingProjectID.
-func (s CreateConfigurationReleaseErrorResponse) IsBrndMissingProjectID() bool {
-	return s.Type == BrndMissingProjectIDCreateConfigurationReleaseErrorResponse
-}
-
-// IsEvtInvalid reports whether CreateConfigurationReleaseErrorResponse is EvtInvalid.
-func (s CreateConfigurationReleaseErrorResponse) IsEvtInvalid() bool {
-	return s.Type == EvtInvalidCreateConfigurationReleaseErrorResponse
-}
-
-// IsFlowdefInvalid reports whether CreateConfigurationReleaseErrorResponse is FlowdefInvalid.
-func (s CreateConfigurationReleaseErrorResponse) IsFlowdefInvalid() bool {
-	return s.Type == FlowdefInvalidCreateConfigurationReleaseErrorResponse
-}
-
-// IsFlowdefRevisionConflict reports whether CreateConfigurationReleaseErrorResponse is FlowdefRevisionConflict.
-func (s CreateConfigurationReleaseErrorResponse) IsFlowdefRevisionConflict() bool {
-	return s.Type == FlowdefRevisionConflictCreateConfigurationReleaseErrorResponse
-}
-
-// IsInternal reports whether CreateConfigurationReleaseErrorResponse is Internal.
-func (s CreateConfigurationReleaseErrorResponse) IsInternal() bool {
-	return s.Type == InternalCreateConfigurationReleaseErrorResponse
-}
-
-// IsSchAlreadyExists reports whether CreateConfigurationReleaseErrorResponse is SchAlreadyExists.
-func (s CreateConfigurationReleaseErrorResponse) IsSchAlreadyExists() bool {
-	return s.Type == SchAlreadyExistsCreateConfigurationReleaseErrorResponse
-}
-
-// IsSchFetchDenied reports whether CreateConfigurationReleaseErrorResponse is SchFetchDenied.
-func (s CreateConfigurationReleaseErrorResponse) IsSchFetchDenied() bool {
-	return s.Type == SchFetchDeniedCreateConfigurationReleaseErrorResponse
-}
-
-// IsSchFetchDowngrade reports whether CreateConfigurationReleaseErrorResponse is SchFetchDowngrade.
-func (s CreateConfigurationReleaseErrorResponse) IsSchFetchDowngrade() bool {
-	return s.Type == SchFetchDowngradeCreateConfigurationReleaseErrorResponse
-}
-
-// IsSchFetchTimeout reports whether CreateConfigurationReleaseErrorResponse is SchFetchTimeout.
-func (s CreateConfigurationReleaseErrorResponse) IsSchFetchTimeout() bool {
-	return s.Type == SchFetchTimeoutCreateConfigurationReleaseErrorResponse
-}
-
-// IsSchFetchTooLarge reports whether CreateConfigurationReleaseErrorResponse is SchFetchTooLarge.
-func (s CreateConfigurationReleaseErrorResponse) IsSchFetchTooLarge() bool {
-	return s.Type == SchFetchTooLargeCreateConfigurationReleaseErrorResponse
-}
-
-// IsSchFetchTooManyRedirects reports whether CreateConfigurationReleaseErrorResponse is SchFetchTooManyRedirects.
-func (s CreateConfigurationReleaseErrorResponse) IsSchFetchTooManyRedirects() bool {
-	return s.Type == SchFetchTooManyRedirectsCreateConfigurationReleaseErrorResponse
-}
-
-// IsSchInvalidRequest reports whether CreateConfigurationReleaseErrorResponse is SchInvalidRequest.
-func (s CreateConfigurationReleaseErrorResponse) IsSchInvalidRequest() bool {
-	return s.Type == SchInvalidRequestCreateConfigurationReleaseErrorResponse
-}
-
-// IsSchNotFound reports whether CreateConfigurationReleaseErrorResponse is SchNotFound.
-func (s CreateConfigurationReleaseErrorResponse) IsSchNotFound() bool {
-	return s.Type == SchNotFoundCreateConfigurationReleaseErrorResponse
-}
-
-// IsSchRevisionConflict reports whether CreateConfigurationReleaseErrorResponse is SchRevisionConflict.
-func (s CreateConfigurationReleaseErrorResponse) IsSchRevisionConflict() bool {
-	return s.Type == SchRevisionConflictCreateConfigurationReleaseErrorResponse
-}
-
-// IsFlowdefMissingProjectID reports whether CreateConfigurationReleaseErrorResponse is FlowdefMissingProjectID.
-func (s CreateConfigurationReleaseErrorResponse) IsFlowdefMissingProjectID() bool {
-	return s.Type == FlowdefMissingProjectIDCreateConfigurationReleaseErrorResponse
-}
-
-// IsRelInvalid reports whether CreateConfigurationReleaseErrorResponse is RelInvalid.
-func (s CreateConfigurationReleaseErrorResponse) IsRelInvalid() bool {
-	return s.Type == RelInvalidCreateConfigurationReleaseErrorResponse
-}
-
-// IsRelNotFound reports whether CreateConfigurationReleaseErrorResponse is RelNotFound.
-func (s CreateConfigurationReleaseErrorResponse) IsRelNotFound() bool {
-	return s.Type == RelNotFoundCreateConfigurationReleaseErrorResponse
-}
-
-// IsRelPermissionDenied reports whether CreateConfigurationReleaseErrorResponse is RelPermissionDenied.
-func (s CreateConfigurationReleaseErrorResponse) IsRelPermissionDenied() bool {
-	return s.Type == RelPermissionDeniedCreateConfigurationReleaseErrorResponse
-}
-
-// IsRelProjectNotFound reports whether CreateConfigurationReleaseErrorResponse is RelProjectNotFound.
-func (s CreateConfigurationReleaseErrorResponse) IsRelProjectNotFound() bool {
-	return s.Type == RelProjectNotFoundCreateConfigurationReleaseErrorResponse
-}
-
-// IsRelRevisionNotFound reports whether CreateConfigurationReleaseErrorResponse is RelRevisionNotFound.
-func (s CreateConfigurationReleaseErrorResponse) IsRelRevisionNotFound() bool {
-	return s.Type == RelRevisionNotFoundCreateConfigurationReleaseErrorResponse
-}
-
-// IsRelRevisionUnpinnable reports whether CreateConfigurationReleaseErrorResponse is RelRevisionUnpinnable.
-func (s CreateConfigurationReleaseErrorResponse) IsRelRevisionUnpinnable() bool {
-	return s.Type == RelRevisionUnpinnableCreateConfigurationReleaseErrorResponse
-}
-
-// IsReqInvalid reports whether CreateConfigurationReleaseErrorResponse is ReqInvalid.
-func (s CreateConfigurationReleaseErrorResponse) IsReqInvalid() bool {
-	return s.Type == ReqInvalidCreateConfigurationReleaseErrorResponse
-}
-
-// IsFlowdefSchemaFetchFailed reports whether CreateConfigurationReleaseErrorResponse is FlowdefSchemaFetchFailed.
-func (s CreateConfigurationReleaseErrorResponse) IsFlowdefSchemaFetchFailed() bool {
-	return s.Type == FlowdefSchemaFetchFailedCreateConfigurationReleaseErrorResponse
-}
-
-// SetAuthUnauthorized sets CreateConfigurationReleaseErrorResponse to AuthUnauthorized.
-func (s *CreateConfigurationReleaseErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
-	s.Type = AuthUnauthorizedCreateConfigurationReleaseErrorResponse
-	s.AuthUnauthorized = v
-}
-
-// GetAuthUnauthorized returns AuthUnauthorized and true boolean if CreateConfigurationReleaseErrorResponse is AuthUnauthorized.
-func (s CreateConfigurationReleaseErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
-	if !s.IsAuthUnauthorized() {
-		return v, false
-	}
-	return s.AuthUnauthorized, true
-}
-
-// NewAuthUnauthorizedCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from AuthUnauthorized.
-func NewAuthUnauthorizedCreateConfigurationReleaseErrorResponse(v AuthUnauthorized) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetAuthUnauthorized(v)
-	return s
-}
-
-// SetBrndInvalid sets CreateConfigurationReleaseErrorResponse to BrndInvalid.
-func (s *CreateConfigurationReleaseErrorResponse) SetBrndInvalid(v BrndInvalid) {
-	s.Type = BrndInvalidCreateConfigurationReleaseErrorResponse
-	s.BrndInvalid = v
-}
-
-// GetBrndInvalid returns BrndInvalid and true boolean if CreateConfigurationReleaseErrorResponse is BrndInvalid.
-func (s CreateConfigurationReleaseErrorResponse) GetBrndInvalid() (v BrndInvalid, ok bool) {
-	if !s.IsBrndInvalid() {
-		return v, false
-	}
-	return s.BrndInvalid, true
-}
-
-// NewBrndInvalidCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from BrndInvalid.
-func NewBrndInvalidCreateConfigurationReleaseErrorResponse(v BrndInvalid) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetBrndInvalid(v)
-	return s
-}
-
-// SetBrndMissingProjectID sets CreateConfigurationReleaseErrorResponse to BrndMissingProjectID.
-func (s *CreateConfigurationReleaseErrorResponse) SetBrndMissingProjectID(v BrndMissingProjectID) {
-	s.Type = BrndMissingProjectIDCreateConfigurationReleaseErrorResponse
-	s.BrndMissingProjectID = v
-}
-
-// GetBrndMissingProjectID returns BrndMissingProjectID and true boolean if CreateConfigurationReleaseErrorResponse is BrndMissingProjectID.
-func (s CreateConfigurationReleaseErrorResponse) GetBrndMissingProjectID() (v BrndMissingProjectID, ok bool) {
-	if !s.IsBrndMissingProjectID() {
-		return v, false
-	}
-	return s.BrndMissingProjectID, true
-}
-
-// NewBrndMissingProjectIDCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from BrndMissingProjectID.
-func NewBrndMissingProjectIDCreateConfigurationReleaseErrorResponse(v BrndMissingProjectID) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetBrndMissingProjectID(v)
-	return s
-}
-
-// SetEvtInvalid sets CreateConfigurationReleaseErrorResponse to EvtInvalid.
-func (s *CreateConfigurationReleaseErrorResponse) SetEvtInvalid(v EvtInvalid) {
-	s.Type = EvtInvalidCreateConfigurationReleaseErrorResponse
-	s.EvtInvalid = v
-}
-
-// GetEvtInvalid returns EvtInvalid and true boolean if CreateConfigurationReleaseErrorResponse is EvtInvalid.
-func (s CreateConfigurationReleaseErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
-	if !s.IsEvtInvalid() {
-		return v, false
-	}
-	return s.EvtInvalid, true
-}
-
-// NewEvtInvalidCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from EvtInvalid.
-func NewEvtInvalidCreateConfigurationReleaseErrorResponse(v EvtInvalid) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetEvtInvalid(v)
-	return s
-}
-
-// SetFlowdefInvalid sets CreateConfigurationReleaseErrorResponse to FlowdefInvalid.
-func (s *CreateConfigurationReleaseErrorResponse) SetFlowdefInvalid(v FlowdefInvalid) {
-	s.Type = FlowdefInvalidCreateConfigurationReleaseErrorResponse
-	s.FlowdefInvalid = v
-}
-
-// GetFlowdefInvalid returns FlowdefInvalid and true boolean if CreateConfigurationReleaseErrorResponse is FlowdefInvalid.
-func (s CreateConfigurationReleaseErrorResponse) GetFlowdefInvalid() (v FlowdefInvalid, ok bool) {
-	if !s.IsFlowdefInvalid() {
-		return v, false
-	}
-	return s.FlowdefInvalid, true
-}
-
-// NewFlowdefInvalidCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from FlowdefInvalid.
-func NewFlowdefInvalidCreateConfigurationReleaseErrorResponse(v FlowdefInvalid) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetFlowdefInvalid(v)
-	return s
-}
-
-// SetFlowdefRevisionConflict sets CreateConfigurationReleaseErrorResponse to FlowdefRevisionConflict.
-func (s *CreateConfigurationReleaseErrorResponse) SetFlowdefRevisionConflict(v FlowdefRevisionConflict) {
-	s.Type = FlowdefRevisionConflictCreateConfigurationReleaseErrorResponse
-	s.FlowdefRevisionConflict = v
-}
-
-// GetFlowdefRevisionConflict returns FlowdefRevisionConflict and true boolean if CreateConfigurationReleaseErrorResponse is FlowdefRevisionConflict.
-func (s CreateConfigurationReleaseErrorResponse) GetFlowdefRevisionConflict() (v FlowdefRevisionConflict, ok bool) {
-	if !s.IsFlowdefRevisionConflict() {
-		return v, false
-	}
-	return s.FlowdefRevisionConflict, true
-}
-
-// NewFlowdefRevisionConflictCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from FlowdefRevisionConflict.
-func NewFlowdefRevisionConflictCreateConfigurationReleaseErrorResponse(v FlowdefRevisionConflict) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetFlowdefRevisionConflict(v)
-	return s
-}
-
-// SetInternal sets CreateConfigurationReleaseErrorResponse to Internal.
-func (s *CreateConfigurationReleaseErrorResponse) SetInternal(v Internal) {
-	s.Type = InternalCreateConfigurationReleaseErrorResponse
-	s.Internal = v
-}
-
-// GetInternal returns Internal and true boolean if CreateConfigurationReleaseErrorResponse is Internal.
-func (s CreateConfigurationReleaseErrorResponse) GetInternal() (v Internal, ok bool) {
-	if !s.IsInternal() {
-		return v, false
-	}
-	return s.Internal, true
-}
-
-// NewInternalCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from Internal.
-func NewInternalCreateConfigurationReleaseErrorResponse(v Internal) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetInternal(v)
-	return s
-}
-
-// SetSchAlreadyExists sets CreateConfigurationReleaseErrorResponse to SchAlreadyExists.
-func (s *CreateConfigurationReleaseErrorResponse) SetSchAlreadyExists(v SchAlreadyExists) {
-	s.Type = SchAlreadyExistsCreateConfigurationReleaseErrorResponse
-	s.SchAlreadyExists = v
-}
-
-// GetSchAlreadyExists returns SchAlreadyExists and true boolean if CreateConfigurationReleaseErrorResponse is SchAlreadyExists.
-func (s CreateConfigurationReleaseErrorResponse) GetSchAlreadyExists() (v SchAlreadyExists, ok bool) {
-	if !s.IsSchAlreadyExists() {
-		return v, false
-	}
-	return s.SchAlreadyExists, true
-}
-
-// NewSchAlreadyExistsCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from SchAlreadyExists.
-func NewSchAlreadyExistsCreateConfigurationReleaseErrorResponse(v SchAlreadyExists) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetSchAlreadyExists(v)
-	return s
-}
-
-// SetSchFetchDenied sets CreateConfigurationReleaseErrorResponse to SchFetchDenied.
-func (s *CreateConfigurationReleaseErrorResponse) SetSchFetchDenied(v SchFetchDenied) {
-	s.Type = SchFetchDeniedCreateConfigurationReleaseErrorResponse
-	s.SchFetchDenied = v
-}
-
-// GetSchFetchDenied returns SchFetchDenied and true boolean if CreateConfigurationReleaseErrorResponse is SchFetchDenied.
-func (s CreateConfigurationReleaseErrorResponse) GetSchFetchDenied() (v SchFetchDenied, ok bool) {
-	if !s.IsSchFetchDenied() {
-		return v, false
-	}
-	return s.SchFetchDenied, true
-}
-
-// NewSchFetchDeniedCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from SchFetchDenied.
-func NewSchFetchDeniedCreateConfigurationReleaseErrorResponse(v SchFetchDenied) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetSchFetchDenied(v)
-	return s
-}
-
-// SetSchFetchDowngrade sets CreateConfigurationReleaseErrorResponse to SchFetchDowngrade.
-func (s *CreateConfigurationReleaseErrorResponse) SetSchFetchDowngrade(v SchFetchDowngrade) {
-	s.Type = SchFetchDowngradeCreateConfigurationReleaseErrorResponse
-	s.SchFetchDowngrade = v
-}
-
-// GetSchFetchDowngrade returns SchFetchDowngrade and true boolean if CreateConfigurationReleaseErrorResponse is SchFetchDowngrade.
-func (s CreateConfigurationReleaseErrorResponse) GetSchFetchDowngrade() (v SchFetchDowngrade, ok bool) {
-	if !s.IsSchFetchDowngrade() {
-		return v, false
-	}
-	return s.SchFetchDowngrade, true
-}
-
-// NewSchFetchDowngradeCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from SchFetchDowngrade.
-func NewSchFetchDowngradeCreateConfigurationReleaseErrorResponse(v SchFetchDowngrade) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetSchFetchDowngrade(v)
-	return s
-}
-
-// SetSchFetchTimeout sets CreateConfigurationReleaseErrorResponse to SchFetchTimeout.
-func (s *CreateConfigurationReleaseErrorResponse) SetSchFetchTimeout(v SchFetchTimeout) {
-	s.Type = SchFetchTimeoutCreateConfigurationReleaseErrorResponse
-	s.SchFetchTimeout = v
-}
-
-// GetSchFetchTimeout returns SchFetchTimeout and true boolean if CreateConfigurationReleaseErrorResponse is SchFetchTimeout.
-func (s CreateConfigurationReleaseErrorResponse) GetSchFetchTimeout() (v SchFetchTimeout, ok bool) {
-	if !s.IsSchFetchTimeout() {
-		return v, false
-	}
-	return s.SchFetchTimeout, true
-}
-
-// NewSchFetchTimeoutCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from SchFetchTimeout.
-func NewSchFetchTimeoutCreateConfigurationReleaseErrorResponse(v SchFetchTimeout) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetSchFetchTimeout(v)
-	return s
-}
-
-// SetSchFetchTooLarge sets CreateConfigurationReleaseErrorResponse to SchFetchTooLarge.
-func (s *CreateConfigurationReleaseErrorResponse) SetSchFetchTooLarge(v SchFetchTooLarge) {
-	s.Type = SchFetchTooLargeCreateConfigurationReleaseErrorResponse
-	s.SchFetchTooLarge = v
-}
-
-// GetSchFetchTooLarge returns SchFetchTooLarge and true boolean if CreateConfigurationReleaseErrorResponse is SchFetchTooLarge.
-func (s CreateConfigurationReleaseErrorResponse) GetSchFetchTooLarge() (v SchFetchTooLarge, ok bool) {
-	if !s.IsSchFetchTooLarge() {
-		return v, false
-	}
-	return s.SchFetchTooLarge, true
-}
-
-// NewSchFetchTooLargeCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from SchFetchTooLarge.
-func NewSchFetchTooLargeCreateConfigurationReleaseErrorResponse(v SchFetchTooLarge) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetSchFetchTooLarge(v)
-	return s
-}
-
-// SetSchFetchTooManyRedirects sets CreateConfigurationReleaseErrorResponse to SchFetchTooManyRedirects.
-func (s *CreateConfigurationReleaseErrorResponse) SetSchFetchTooManyRedirects(v SchFetchTooManyRedirects) {
-	s.Type = SchFetchTooManyRedirectsCreateConfigurationReleaseErrorResponse
-	s.SchFetchTooManyRedirects = v
-}
-
-// GetSchFetchTooManyRedirects returns SchFetchTooManyRedirects and true boolean if CreateConfigurationReleaseErrorResponse is SchFetchTooManyRedirects.
-func (s CreateConfigurationReleaseErrorResponse) GetSchFetchTooManyRedirects() (v SchFetchTooManyRedirects, ok bool) {
-	if !s.IsSchFetchTooManyRedirects() {
-		return v, false
-	}
-	return s.SchFetchTooManyRedirects, true
-}
-
-// NewSchFetchTooManyRedirectsCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from SchFetchTooManyRedirects.
-func NewSchFetchTooManyRedirectsCreateConfigurationReleaseErrorResponse(v SchFetchTooManyRedirects) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetSchFetchTooManyRedirects(v)
-	return s
-}
-
-// SetSchInvalidRequest sets CreateConfigurationReleaseErrorResponse to SchInvalidRequest.
-func (s *CreateConfigurationReleaseErrorResponse) SetSchInvalidRequest(v SchInvalidRequest) {
-	s.Type = SchInvalidRequestCreateConfigurationReleaseErrorResponse
-	s.SchInvalidRequest = v
-}
-
-// GetSchInvalidRequest returns SchInvalidRequest and true boolean if CreateConfigurationReleaseErrorResponse is SchInvalidRequest.
-func (s CreateConfigurationReleaseErrorResponse) GetSchInvalidRequest() (v SchInvalidRequest, ok bool) {
-	if !s.IsSchInvalidRequest() {
-		return v, false
-	}
-	return s.SchInvalidRequest, true
-}
-
-// NewSchInvalidRequestCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from SchInvalidRequest.
-func NewSchInvalidRequestCreateConfigurationReleaseErrorResponse(v SchInvalidRequest) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetSchInvalidRequest(v)
-	return s
-}
-
-// SetSchNotFound sets CreateConfigurationReleaseErrorResponse to SchNotFound.
-func (s *CreateConfigurationReleaseErrorResponse) SetSchNotFound(v SchNotFound) {
-	s.Type = SchNotFoundCreateConfigurationReleaseErrorResponse
-	s.SchNotFound = v
-}
-
-// GetSchNotFound returns SchNotFound and true boolean if CreateConfigurationReleaseErrorResponse is SchNotFound.
-func (s CreateConfigurationReleaseErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
-	if !s.IsSchNotFound() {
-		return v, false
-	}
-	return s.SchNotFound, true
-}
-
-// NewSchNotFoundCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from SchNotFound.
-func NewSchNotFoundCreateConfigurationReleaseErrorResponse(v SchNotFound) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetSchNotFound(v)
-	return s
-}
-
-// SetSchRevisionConflict sets CreateConfigurationReleaseErrorResponse to SchRevisionConflict.
-func (s *CreateConfigurationReleaseErrorResponse) SetSchRevisionConflict(v SchRevisionConflict) {
-	s.Type = SchRevisionConflictCreateConfigurationReleaseErrorResponse
-	s.SchRevisionConflict = v
-}
-
-// GetSchRevisionConflict returns SchRevisionConflict and true boolean if CreateConfigurationReleaseErrorResponse is SchRevisionConflict.
-func (s CreateConfigurationReleaseErrorResponse) GetSchRevisionConflict() (v SchRevisionConflict, ok bool) {
-	if !s.IsSchRevisionConflict() {
-		return v, false
-	}
-	return s.SchRevisionConflict, true
-}
-
-// NewSchRevisionConflictCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from SchRevisionConflict.
-func NewSchRevisionConflictCreateConfigurationReleaseErrorResponse(v SchRevisionConflict) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetSchRevisionConflict(v)
-	return s
-}
-
-// SetFlowdefMissingProjectID sets CreateConfigurationReleaseErrorResponse to FlowdefMissingProjectID.
-func (s *CreateConfigurationReleaseErrorResponse) SetFlowdefMissingProjectID(v FlowdefMissingProjectID) {
-	s.Type = FlowdefMissingProjectIDCreateConfigurationReleaseErrorResponse
-	s.FlowdefMissingProjectID = v
-}
-
-// GetFlowdefMissingProjectID returns FlowdefMissingProjectID and true boolean if CreateConfigurationReleaseErrorResponse is FlowdefMissingProjectID.
-func (s CreateConfigurationReleaseErrorResponse) GetFlowdefMissingProjectID() (v FlowdefMissingProjectID, ok bool) {
-	if !s.IsFlowdefMissingProjectID() {
-		return v, false
-	}
-	return s.FlowdefMissingProjectID, true
-}
-
-// NewFlowdefMissingProjectIDCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from FlowdefMissingProjectID.
-func NewFlowdefMissingProjectIDCreateConfigurationReleaseErrorResponse(v FlowdefMissingProjectID) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetFlowdefMissingProjectID(v)
-	return s
-}
-
-// SetRelInvalid sets CreateConfigurationReleaseErrorResponse to RelInvalid.
-func (s *CreateConfigurationReleaseErrorResponse) SetRelInvalid(v RelInvalid) {
-	s.Type = RelInvalidCreateConfigurationReleaseErrorResponse
-	s.RelInvalid = v
-}
-
-// GetRelInvalid returns RelInvalid and true boolean if CreateConfigurationReleaseErrorResponse is RelInvalid.
-func (s CreateConfigurationReleaseErrorResponse) GetRelInvalid() (v RelInvalid, ok bool) {
-	if !s.IsRelInvalid() {
-		return v, false
-	}
-	return s.RelInvalid, true
-}
-
-// NewRelInvalidCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from RelInvalid.
-func NewRelInvalidCreateConfigurationReleaseErrorResponse(v RelInvalid) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetRelInvalid(v)
-	return s
-}
-
-// SetRelNotFound sets CreateConfigurationReleaseErrorResponse to RelNotFound.
-func (s *CreateConfigurationReleaseErrorResponse) SetRelNotFound(v RelNotFound) {
-	s.Type = RelNotFoundCreateConfigurationReleaseErrorResponse
-	s.RelNotFound = v
-}
-
-// GetRelNotFound returns RelNotFound and true boolean if CreateConfigurationReleaseErrorResponse is RelNotFound.
-func (s CreateConfigurationReleaseErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
-	if !s.IsRelNotFound() {
-		return v, false
-	}
-	return s.RelNotFound, true
-}
-
-// NewRelNotFoundCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from RelNotFound.
-func NewRelNotFoundCreateConfigurationReleaseErrorResponse(v RelNotFound) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetRelNotFound(v)
-	return s
-}
-
-// SetRelPermissionDenied sets CreateConfigurationReleaseErrorResponse to RelPermissionDenied.
-func (s *CreateConfigurationReleaseErrorResponse) SetRelPermissionDenied(v RelPermissionDenied) {
-	s.Type = RelPermissionDeniedCreateConfigurationReleaseErrorResponse
-	s.RelPermissionDenied = v
-}
-
-// GetRelPermissionDenied returns RelPermissionDenied and true boolean if CreateConfigurationReleaseErrorResponse is RelPermissionDenied.
-func (s CreateConfigurationReleaseErrorResponse) GetRelPermissionDenied() (v RelPermissionDenied, ok bool) {
-	if !s.IsRelPermissionDenied() {
-		return v, false
-	}
-	return s.RelPermissionDenied, true
-}
-
-// NewRelPermissionDeniedCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from RelPermissionDenied.
-func NewRelPermissionDeniedCreateConfigurationReleaseErrorResponse(v RelPermissionDenied) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetRelPermissionDenied(v)
-	return s
-}
-
-// SetRelProjectNotFound sets CreateConfigurationReleaseErrorResponse to RelProjectNotFound.
-func (s *CreateConfigurationReleaseErrorResponse) SetRelProjectNotFound(v RelProjectNotFound) {
-	s.Type = RelProjectNotFoundCreateConfigurationReleaseErrorResponse
-	s.RelProjectNotFound = v
-}
-
-// GetRelProjectNotFound returns RelProjectNotFound and true boolean if CreateConfigurationReleaseErrorResponse is RelProjectNotFound.
-func (s CreateConfigurationReleaseErrorResponse) GetRelProjectNotFound() (v RelProjectNotFound, ok bool) {
-	if !s.IsRelProjectNotFound() {
-		return v, false
-	}
-	return s.RelProjectNotFound, true
-}
-
-// NewRelProjectNotFoundCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from RelProjectNotFound.
-func NewRelProjectNotFoundCreateConfigurationReleaseErrorResponse(v RelProjectNotFound) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetRelProjectNotFound(v)
-	return s
-}
-
-// SetRelRevisionNotFound sets CreateConfigurationReleaseErrorResponse to RelRevisionNotFound.
-func (s *CreateConfigurationReleaseErrorResponse) SetRelRevisionNotFound(v RelRevisionNotFound) {
-	s.Type = RelRevisionNotFoundCreateConfigurationReleaseErrorResponse
-	s.RelRevisionNotFound = v
-}
-
-// GetRelRevisionNotFound returns RelRevisionNotFound and true boolean if CreateConfigurationReleaseErrorResponse is RelRevisionNotFound.
-func (s CreateConfigurationReleaseErrorResponse) GetRelRevisionNotFound() (v RelRevisionNotFound, ok bool) {
-	if !s.IsRelRevisionNotFound() {
-		return v, false
-	}
-	return s.RelRevisionNotFound, true
-}
-
-// NewRelRevisionNotFoundCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from RelRevisionNotFound.
-func NewRelRevisionNotFoundCreateConfigurationReleaseErrorResponse(v RelRevisionNotFound) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetRelRevisionNotFound(v)
-	return s
-}
-
-// SetRelRevisionUnpinnable sets CreateConfigurationReleaseErrorResponse to RelRevisionUnpinnable.
-func (s *CreateConfigurationReleaseErrorResponse) SetRelRevisionUnpinnable(v RelRevisionUnpinnable) {
-	s.Type = RelRevisionUnpinnableCreateConfigurationReleaseErrorResponse
-	s.RelRevisionUnpinnable = v
-}
-
-// GetRelRevisionUnpinnable returns RelRevisionUnpinnable and true boolean if CreateConfigurationReleaseErrorResponse is RelRevisionUnpinnable.
-func (s CreateConfigurationReleaseErrorResponse) GetRelRevisionUnpinnable() (v RelRevisionUnpinnable, ok bool) {
-	if !s.IsRelRevisionUnpinnable() {
-		return v, false
-	}
-	return s.RelRevisionUnpinnable, true
-}
-
-// NewRelRevisionUnpinnableCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from RelRevisionUnpinnable.
-func NewRelRevisionUnpinnableCreateConfigurationReleaseErrorResponse(v RelRevisionUnpinnable) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetRelRevisionUnpinnable(v)
-	return s
-}
-
-// SetReqInvalid sets CreateConfigurationReleaseErrorResponse to ReqInvalid.
-func (s *CreateConfigurationReleaseErrorResponse) SetReqInvalid(v ReqInvalid) {
-	s.Type = ReqInvalidCreateConfigurationReleaseErrorResponse
-	s.ReqInvalid = v
-}
-
-// GetReqInvalid returns ReqInvalid and true boolean if CreateConfigurationReleaseErrorResponse is ReqInvalid.
-func (s CreateConfigurationReleaseErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
-	if !s.IsReqInvalid() {
-		return v, false
-	}
-	return s.ReqInvalid, true
-}
-
-// NewReqInvalidCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from ReqInvalid.
-func NewReqInvalidCreateConfigurationReleaseErrorResponse(v ReqInvalid) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetReqInvalid(v)
-	return s
-}
-
-// SetFlowdefSchemaFetchFailed sets CreateConfigurationReleaseErrorResponse to FlowdefSchemaFetchFailed.
-func (s *CreateConfigurationReleaseErrorResponse) SetFlowdefSchemaFetchFailed(v FlowdefSchemaFetchFailed) {
-	s.Type = FlowdefSchemaFetchFailedCreateConfigurationReleaseErrorResponse
-	s.FlowdefSchemaFetchFailed = v
-}
-
-// GetFlowdefSchemaFetchFailed returns FlowdefSchemaFetchFailed and true boolean if CreateConfigurationReleaseErrorResponse is FlowdefSchemaFetchFailed.
-func (s CreateConfigurationReleaseErrorResponse) GetFlowdefSchemaFetchFailed() (v FlowdefSchemaFetchFailed, ok bool) {
-	if !s.IsFlowdefSchemaFetchFailed() {
-		return v, false
-	}
-	return s.FlowdefSchemaFetchFailed, true
-}
-
-// NewFlowdefSchemaFetchFailedCreateConfigurationReleaseErrorResponse returns new CreateConfigurationReleaseErrorResponse from FlowdefSchemaFetchFailed.
-func NewFlowdefSchemaFetchFailedCreateConfigurationReleaseErrorResponse(v FlowdefSchemaFetchFailed) CreateConfigurationReleaseErrorResponse {
-	var s CreateConfigurationReleaseErrorResponse
-	s.SetFlowdefSchemaFetchFailed(v)
-	return s
-}
-
-// CreateConfigurationReleaseErrorResponseStatusCode wraps CreateConfigurationReleaseErrorResponse with StatusCode.
-type CreateConfigurationReleaseErrorResponseStatusCode struct {
-	StatusCode int
-	Response   CreateConfigurationReleaseErrorResponse
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *CreateConfigurationReleaseErrorResponseStatusCode) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// GetResponse returns the value of Response.
-func (s *CreateConfigurationReleaseErrorResponseStatusCode) GetResponse() CreateConfigurationReleaseErrorResponse {
-	return s.Response
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *CreateConfigurationReleaseErrorResponseStatusCode) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-// SetResponse sets the value of Response.
-func (s *CreateConfigurationReleaseErrorResponseStatusCode) SetResponse(val CreateConfigurationReleaseErrorResponse) {
-	s.Response = val
-}
-
-func (*CreateConfigurationReleaseErrorResponseStatusCode) createConfigurationReleaseRes() {}
-
-type CreateConfigurationReleaseOK ConfigurationReleaseResponse
-
-func (*CreateConfigurationReleaseOK) createConfigurationReleaseRes() {}
-
-type CreateDeploymentCreated DeployResponse
+type CreateDeploymentCreated CreateDeploymentResponse
 
 func (*CreateDeploymentCreated) createDeploymentRes() {}
 
@@ -10411,19 +9470,19 @@ func (s *CreateDeploymentErrorResponseStatusCode) SetResponse(val CreateDeployme
 
 func (*CreateDeploymentErrorResponseStatusCode) createDeploymentRes() {}
 
-type CreateDeploymentOK DeployResponse
+type CreateDeploymentOK CreateDeploymentResponse
 
 func (*CreateDeploymentOK) createDeploymentRes() {}
 
 // The release to make live and the targets to make it live on.
 // A target is `default` (what a caller with no `Origin` is served),
-// `primary` (every `primary` pattern in the project's allowed origins,
-// expanded server-side), or one exact origin. All targets move in one
-// transaction under one `deploy_id`; on any failure nothing is written.
+// `primary` (every `primary` pattern among the project's origins, expanded
+// server-side), or one exact origin. All targets move in one deployment; on
+// any failure nothing is written.
 // Exact preview origins must match a `preview` pattern of the project and
-// carry a `ttl_seconds`; the server writes or renews a live preview row per
-// origin. `default` and `primary` require `deployment.write`; a preview
-// target is enough for `deployment.preview`.
+// carry a `ttl_seconds`; the server writes or renews a preview per origin.
+// `default` and `primary` require `deployment.write`; a preview target is
+// enough for `deployment.preview`.
 // `deployed_at` and `deployed_by` are derived server-side from the caller's
 // authentication context and are not accepted here.
 // Ref: #
@@ -10438,14 +9497,15 @@ type CreateDeploymentRequest struct {
 	// Why this deployment happens. Omitted, the server records `deploy`.
 	Reason OptDeploymentReason `json:"reason"`
 	// A short free-form summary of why this deployment happened, analogous to
-	// a git commit message. Recorded on every row of the deploy.
+	// a git commit message.
 	Message OptString `json:"message"`
-	// How long the preview rows written by this deploy stay live, renewed on
+	// How long the previews written by this deployment stay live, renewed on
 	// each run. Required when a target is a preview origin, rejected otherwise.
 	TTLSeconds OptInt `json:"ttl_seconds"`
 	// An optimistic-concurrency guard: the deployment the caller believes the
-	// first target currently serves. When present and the newest row for that
-	// target is another one, the request answers `409` and nothing changes.
+	// first target currently serves. When present and that target's newest
+	// deployment is another one, the request answers `409` and nothing
+	// changes.
 	ExpectedDeploymentID OptNilDeploymentID `json:"expected_deployment_id"`
 }
 
@@ -10508,6 +9568,40 @@ func (s *CreateDeploymentRequest) SetTTLSeconds(val OptInt) {
 func (s *CreateDeploymentRequest) SetExpectedDeploymentID(val OptNilDeploymentID) {
 	s.ExpectedDeploymentID = val
 }
+
+// The deployment a deploy or rollback wrote, or the one the targets already
+// served. `targets` on it lists the expansion the server applied (`primary`
+// becomes each primary origin).
+// Ref: #
+type CreateDeploymentResponse struct {
+	Deployment Deployment `json:"deployment"`
+	// Non-fatal notes, such as a secret with no preview value on a preview
+	// deploy, or a target a rollback left as it was. Each is a short sentence
+	// the CLI prints verbatim.
+	Warnings []string `json:"warnings"`
+}
+
+// GetDeployment returns the value of Deployment.
+func (s *CreateDeploymentResponse) GetDeployment() Deployment {
+	return s.Deployment
+}
+
+// GetWarnings returns the value of Warnings.
+func (s *CreateDeploymentResponse) GetWarnings() []string {
+	return s.Warnings
+}
+
+// SetDeployment sets the value of Deployment.
+func (s *CreateDeploymentResponse) SetDeployment(val Deployment) {
+	s.Deployment = val
+}
+
+// SetWarnings sets the value of Warnings.
+func (s *CreateDeploymentResponse) SetWarnings(val []string) {
+	s.Warnings = val
+}
+
+func (*CreateDeploymentResponse) rollbackDeploymentRes() {}
 
 // CreateFlowDefinitionErrorResponse represents sum type.
 type CreateFlowDefinitionErrorResponse struct {
@@ -13156,9 +12250,9 @@ func (*CreateProjectErrorResponseStatusCode) createProjectRes() {}
 type CreateProjectRequest struct {
 	// The name of the project.
 	Name string `json:"name"`
-	// The origin allowlist the project starts with. Empty means every origin
-	// is served, which only a `sandbox` project may keep.
-	AllowedOrigins []AllowedOrigin `json:"allowed_origins"`
+	// The origins the project starts with. Empty means every origin is
+	// served, which only a `sandbox` project may keep.
+	Origins []Origin `json:"origins"`
 	// Whether the server should provision fallback default user schema and flow
 	// resources for the project. CLI-managed projects set this to false and
 	// upload their local .zitadel config files through the schema and flow APIs.
@@ -13170,9 +12264,9 @@ func (s *CreateProjectRequest) GetName() string {
 	return s.Name
 }
 
-// GetAllowedOrigins returns the value of AllowedOrigins.
-func (s *CreateProjectRequest) GetAllowedOrigins() []AllowedOrigin {
-	return s.AllowedOrigins
+// GetOrigins returns the value of Origins.
+func (s *CreateProjectRequest) GetOrigins() []Origin {
+	return s.Origins
 }
 
 // GetSeedDefaults returns the value of SeedDefaults.
@@ -13185,9 +12279,9 @@ func (s *CreateProjectRequest) SetName(val string) {
 	s.Name = val
 }
 
-// SetAllowedOrigins sets the value of AllowedOrigins.
-func (s *CreateProjectRequest) SetAllowedOrigins(val []AllowedOrigin) {
-	s.AllowedOrigins = val
+// SetOrigins sets the value of Origins.
+func (s *CreateProjectRequest) SetOrigins(val []Origin) {
+	s.Origins = val
 }
 
 // SetSeedDefaults sets the value of SeedDefaults.
@@ -13200,8 +12294,8 @@ type CreateProjectResponse struct {
 	// The unique identifier of the project.
 	ID string `json:"id"`
 	// The name of the project.
-	Name  string       `json:"name"`
-	Class ProjectClass `json:"class"`
+	Name string      `json:"name"`
+	Mode ProjectMode `json:"mode"`
 	// Secret which can be used for authentication when modifying the project.
 	ProjectSecret string `json:"project_secret"`
 	// The public-plane credential a browser bundle ships with (the
@@ -13209,10 +12303,10 @@ type CreateProjectResponse struct {
 	PreviewSecret string `json:"preview_secret"`
 	// The credential a pull-request build holds. It may create releases and
 	// deploy to preview origins matching a `preview` pattern, and nothing
-	// else: no allowlist, class or variable writes, and no deploy to the
+	// else: no origin, mode or variable writes, and no deploy to the
 	// default or a primary origin.
-	PreviewToken   string          `json:"preview_token"`
-	AllowedOrigins []AllowedOrigin `json:"allowed_origins"`
+	PreviewToken string   `json:"preview_token"`
+	Origins      []Origin `json:"origins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -13227,9 +12321,9 @@ func (s *CreateProjectResponse) GetName() string {
 	return s.Name
 }
 
-// GetClass returns the value of Class.
-func (s *CreateProjectResponse) GetClass() ProjectClass {
-	return s.Class
+// GetMode returns the value of Mode.
+func (s *CreateProjectResponse) GetMode() ProjectMode {
+	return s.Mode
 }
 
 // GetProjectSecret returns the value of ProjectSecret.
@@ -13247,9 +12341,9 @@ func (s *CreateProjectResponse) GetPreviewToken() string {
 	return s.PreviewToken
 }
 
-// GetAllowedOrigins returns the value of AllowedOrigins.
-func (s *CreateProjectResponse) GetAllowedOrigins() []AllowedOrigin {
-	return s.AllowedOrigins
+// GetOrigins returns the value of Origins.
+func (s *CreateProjectResponse) GetOrigins() []Origin {
+	return s.Origins
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -13267,9 +12361,9 @@ func (s *CreateProjectResponse) SetName(val string) {
 	s.Name = val
 }
 
-// SetClass sets the value of Class.
-func (s *CreateProjectResponse) SetClass(val ProjectClass) {
-	s.Class = val
+// SetMode sets the value of Mode.
+func (s *CreateProjectResponse) SetMode(val ProjectMode) {
+	s.Mode = val
 }
 
 // SetProjectSecret sets the value of ProjectSecret.
@@ -13287,9 +12381,9 @@ func (s *CreateProjectResponse) SetPreviewToken(val string) {
 	s.PreviewToken = val
 }
 
-// SetAllowedOrigins sets the value of AllowedOrigins.
-func (s *CreateProjectResponse) SetAllowedOrigins(val []AllowedOrigin) {
-	s.AllowedOrigins = val
+// SetOrigins sets the value of Origins.
+func (s *CreateProjectResponse) SetOrigins(val []Origin) {
+	s.Origins = val
 }
 
 // SetCreatedAt sets the value of CreatedAt.
@@ -13299,23 +12393,38 @@ func (s *CreateProjectResponse) SetCreatedAt(val time.Time) {
 
 func (*CreateProjectResponse) createProjectRes() {}
 
-type CreateReleaseCreated Release
+type CreateReleaseCreated CreateReleaseResponse
 
 func (*CreateReleaseCreated) createReleaseRes() {}
 
 // CreateReleaseErrorResponse represents sum type.
 type CreateReleaseErrorResponse struct {
-	Type                  CreateReleaseErrorResponseType // switch on this field
-	AuthUnauthorized      AuthUnauthorized
-	EvtInvalid            EvtInvalid
-	Internal              Internal
-	RelInvalid            RelInvalid
-	RelNotFound           RelNotFound
-	RelPermissionDenied   RelPermissionDenied
-	RelProjectNotFound    RelProjectNotFound
-	RelRevisionNotFound   RelRevisionNotFound
-	RelRevisionUnpinnable RelRevisionUnpinnable
-	ReqInvalid            ReqInvalid
+	Type                     CreateReleaseErrorResponseType // switch on this field
+	AuthUnauthorized         AuthUnauthorized
+	BrndInvalid              BrndInvalid
+	BrndMissingProjectID     BrndMissingProjectID
+	EvtInvalid               EvtInvalid
+	FlowdefInvalid           FlowdefInvalid
+	FlowdefRevisionConflict  FlowdefRevisionConflict
+	Internal                 Internal
+	SchAlreadyExists         SchAlreadyExists
+	SchFetchDenied           SchFetchDenied
+	SchFetchDowngrade        SchFetchDowngrade
+	SchFetchTimeout          SchFetchTimeout
+	SchFetchTooLarge         SchFetchTooLarge
+	SchFetchTooManyRedirects SchFetchTooManyRedirects
+	SchInvalidRequest        SchInvalidRequest
+	SchNotFound              SchNotFound
+	SchRevisionConflict      SchRevisionConflict
+	FlowdefMissingProjectID  FlowdefMissingProjectID
+	RelInvalid               RelInvalid
+	RelNotFound              RelNotFound
+	RelPermissionDenied      RelPermissionDenied
+	RelProjectNotFound       RelProjectNotFound
+	RelRevisionNotFound      RelRevisionNotFound
+	RelRevisionUnpinnable    RelRevisionUnpinnable
+	ReqInvalid               ReqInvalid
+	FlowdefSchemaFetchFailed FlowdefSchemaFetchFailed
 }
 
 // CreateReleaseErrorResponseType is oneOf type of CreateReleaseErrorResponse.
@@ -13323,16 +12432,31 @@ type CreateReleaseErrorResponseType string
 
 // Possible values for CreateReleaseErrorResponseType.
 const (
-	AuthUnauthorizedCreateReleaseErrorResponse      CreateReleaseErrorResponseType = "auth.unauthorized"
-	EvtInvalidCreateReleaseErrorResponse            CreateReleaseErrorResponseType = "evt.invalid"
-	InternalCreateReleaseErrorResponse              CreateReleaseErrorResponseType = "internal"
-	RelInvalidCreateReleaseErrorResponse            CreateReleaseErrorResponseType = "rel.invalid"
-	RelNotFoundCreateReleaseErrorResponse           CreateReleaseErrorResponseType = "rel.not_found"
-	RelPermissionDeniedCreateReleaseErrorResponse   CreateReleaseErrorResponseType = "rel.permission_denied"
-	RelProjectNotFoundCreateReleaseErrorResponse    CreateReleaseErrorResponseType = "rel.project_not_found"
-	RelRevisionNotFoundCreateReleaseErrorResponse   CreateReleaseErrorResponseType = "rel.revision_not_found"
-	RelRevisionUnpinnableCreateReleaseErrorResponse CreateReleaseErrorResponseType = "rel.revision_unpinnable"
-	ReqInvalidCreateReleaseErrorResponse            CreateReleaseErrorResponseType = "req.invalid"
+	AuthUnauthorizedCreateReleaseErrorResponse         CreateReleaseErrorResponseType = "auth.unauthorized"
+	BrndInvalidCreateReleaseErrorResponse              CreateReleaseErrorResponseType = "brnd.invalid"
+	BrndMissingProjectIDCreateReleaseErrorResponse     CreateReleaseErrorResponseType = "brnd.missing_project_id"
+	EvtInvalidCreateReleaseErrorResponse               CreateReleaseErrorResponseType = "evt.invalid"
+	FlowdefInvalidCreateReleaseErrorResponse           CreateReleaseErrorResponseType = "flowdef.invalid"
+	FlowdefRevisionConflictCreateReleaseErrorResponse  CreateReleaseErrorResponseType = "flowdef.revision_conflict"
+	InternalCreateReleaseErrorResponse                 CreateReleaseErrorResponseType = "internal"
+	SchAlreadyExistsCreateReleaseErrorResponse         CreateReleaseErrorResponseType = "sch.already_exists"
+	SchFetchDeniedCreateReleaseErrorResponse           CreateReleaseErrorResponseType = "sch.fetch_denied"
+	SchFetchDowngradeCreateReleaseErrorResponse        CreateReleaseErrorResponseType = "sch.fetch_downgrade"
+	SchFetchTimeoutCreateReleaseErrorResponse          CreateReleaseErrorResponseType = "sch.fetch_timeout"
+	SchFetchTooLargeCreateReleaseErrorResponse         CreateReleaseErrorResponseType = "sch.fetch_too_large"
+	SchFetchTooManyRedirectsCreateReleaseErrorResponse CreateReleaseErrorResponseType = "sch.fetch_too_many_redirects"
+	SchInvalidRequestCreateReleaseErrorResponse        CreateReleaseErrorResponseType = "sch.invalid_request"
+	SchNotFoundCreateReleaseErrorResponse              CreateReleaseErrorResponseType = "sch.not_found"
+	SchRevisionConflictCreateReleaseErrorResponse      CreateReleaseErrorResponseType = "sch.revision_conflict"
+	FlowdefMissingProjectIDCreateReleaseErrorResponse  CreateReleaseErrorResponseType = "flowdef.missing_project_id"
+	RelInvalidCreateReleaseErrorResponse               CreateReleaseErrorResponseType = "rel.invalid"
+	RelNotFoundCreateReleaseErrorResponse              CreateReleaseErrorResponseType = "rel.not_found"
+	RelPermissionDeniedCreateReleaseErrorResponse      CreateReleaseErrorResponseType = "rel.permission_denied"
+	RelProjectNotFoundCreateReleaseErrorResponse       CreateReleaseErrorResponseType = "rel.project_not_found"
+	RelRevisionNotFoundCreateReleaseErrorResponse      CreateReleaseErrorResponseType = "rel.revision_not_found"
+	RelRevisionUnpinnableCreateReleaseErrorResponse    CreateReleaseErrorResponseType = "rel.revision_unpinnable"
+	ReqInvalidCreateReleaseErrorResponse               CreateReleaseErrorResponseType = "req.invalid"
+	FlowdefSchemaFetchFailedCreateReleaseErrorResponse CreateReleaseErrorResponseType = "flowdef.schema_fetch_failed"
 )
 
 // IsAuthUnauthorized reports whether CreateReleaseErrorResponse is AuthUnauthorized.
@@ -13340,14 +12464,84 @@ func (s CreateReleaseErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedCreateReleaseErrorResponse
 }
 
+// IsBrndInvalid reports whether CreateReleaseErrorResponse is BrndInvalid.
+func (s CreateReleaseErrorResponse) IsBrndInvalid() bool {
+	return s.Type == BrndInvalidCreateReleaseErrorResponse
+}
+
+// IsBrndMissingProjectID reports whether CreateReleaseErrorResponse is BrndMissingProjectID.
+func (s CreateReleaseErrorResponse) IsBrndMissingProjectID() bool {
+	return s.Type == BrndMissingProjectIDCreateReleaseErrorResponse
+}
+
 // IsEvtInvalid reports whether CreateReleaseErrorResponse is EvtInvalid.
 func (s CreateReleaseErrorResponse) IsEvtInvalid() bool {
 	return s.Type == EvtInvalidCreateReleaseErrorResponse
 }
 
+// IsFlowdefInvalid reports whether CreateReleaseErrorResponse is FlowdefInvalid.
+func (s CreateReleaseErrorResponse) IsFlowdefInvalid() bool {
+	return s.Type == FlowdefInvalidCreateReleaseErrorResponse
+}
+
+// IsFlowdefRevisionConflict reports whether CreateReleaseErrorResponse is FlowdefRevisionConflict.
+func (s CreateReleaseErrorResponse) IsFlowdefRevisionConflict() bool {
+	return s.Type == FlowdefRevisionConflictCreateReleaseErrorResponse
+}
+
 // IsInternal reports whether CreateReleaseErrorResponse is Internal.
 func (s CreateReleaseErrorResponse) IsInternal() bool {
 	return s.Type == InternalCreateReleaseErrorResponse
+}
+
+// IsSchAlreadyExists reports whether CreateReleaseErrorResponse is SchAlreadyExists.
+func (s CreateReleaseErrorResponse) IsSchAlreadyExists() bool {
+	return s.Type == SchAlreadyExistsCreateReleaseErrorResponse
+}
+
+// IsSchFetchDenied reports whether CreateReleaseErrorResponse is SchFetchDenied.
+func (s CreateReleaseErrorResponse) IsSchFetchDenied() bool {
+	return s.Type == SchFetchDeniedCreateReleaseErrorResponse
+}
+
+// IsSchFetchDowngrade reports whether CreateReleaseErrorResponse is SchFetchDowngrade.
+func (s CreateReleaseErrorResponse) IsSchFetchDowngrade() bool {
+	return s.Type == SchFetchDowngradeCreateReleaseErrorResponse
+}
+
+// IsSchFetchTimeout reports whether CreateReleaseErrorResponse is SchFetchTimeout.
+func (s CreateReleaseErrorResponse) IsSchFetchTimeout() bool {
+	return s.Type == SchFetchTimeoutCreateReleaseErrorResponse
+}
+
+// IsSchFetchTooLarge reports whether CreateReleaseErrorResponse is SchFetchTooLarge.
+func (s CreateReleaseErrorResponse) IsSchFetchTooLarge() bool {
+	return s.Type == SchFetchTooLargeCreateReleaseErrorResponse
+}
+
+// IsSchFetchTooManyRedirects reports whether CreateReleaseErrorResponse is SchFetchTooManyRedirects.
+func (s CreateReleaseErrorResponse) IsSchFetchTooManyRedirects() bool {
+	return s.Type == SchFetchTooManyRedirectsCreateReleaseErrorResponse
+}
+
+// IsSchInvalidRequest reports whether CreateReleaseErrorResponse is SchInvalidRequest.
+func (s CreateReleaseErrorResponse) IsSchInvalidRequest() bool {
+	return s.Type == SchInvalidRequestCreateReleaseErrorResponse
+}
+
+// IsSchNotFound reports whether CreateReleaseErrorResponse is SchNotFound.
+func (s CreateReleaseErrorResponse) IsSchNotFound() bool {
+	return s.Type == SchNotFoundCreateReleaseErrorResponse
+}
+
+// IsSchRevisionConflict reports whether CreateReleaseErrorResponse is SchRevisionConflict.
+func (s CreateReleaseErrorResponse) IsSchRevisionConflict() bool {
+	return s.Type == SchRevisionConflictCreateReleaseErrorResponse
+}
+
+// IsFlowdefMissingProjectID reports whether CreateReleaseErrorResponse is FlowdefMissingProjectID.
+func (s CreateReleaseErrorResponse) IsFlowdefMissingProjectID() bool {
+	return s.Type == FlowdefMissingProjectIDCreateReleaseErrorResponse
 }
 
 // IsRelInvalid reports whether CreateReleaseErrorResponse is RelInvalid.
@@ -13385,6 +12579,11 @@ func (s CreateReleaseErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidCreateReleaseErrorResponse
 }
 
+// IsFlowdefSchemaFetchFailed reports whether CreateReleaseErrorResponse is FlowdefSchemaFetchFailed.
+func (s CreateReleaseErrorResponse) IsFlowdefSchemaFetchFailed() bool {
+	return s.Type == FlowdefSchemaFetchFailedCreateReleaseErrorResponse
+}
+
 // SetAuthUnauthorized sets CreateReleaseErrorResponse to AuthUnauthorized.
 func (s *CreateReleaseErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
 	s.Type = AuthUnauthorizedCreateReleaseErrorResponse
@@ -13403,6 +12602,48 @@ func (s CreateReleaseErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, o
 func NewAuthUnauthorizedCreateReleaseErrorResponse(v AuthUnauthorized) CreateReleaseErrorResponse {
 	var s CreateReleaseErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetBrndInvalid sets CreateReleaseErrorResponse to BrndInvalid.
+func (s *CreateReleaseErrorResponse) SetBrndInvalid(v BrndInvalid) {
+	s.Type = BrndInvalidCreateReleaseErrorResponse
+	s.BrndInvalid = v
+}
+
+// GetBrndInvalid returns BrndInvalid and true boolean if CreateReleaseErrorResponse is BrndInvalid.
+func (s CreateReleaseErrorResponse) GetBrndInvalid() (v BrndInvalid, ok bool) {
+	if !s.IsBrndInvalid() {
+		return v, false
+	}
+	return s.BrndInvalid, true
+}
+
+// NewBrndInvalidCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from BrndInvalid.
+func NewBrndInvalidCreateReleaseErrorResponse(v BrndInvalid) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetBrndInvalid(v)
+	return s
+}
+
+// SetBrndMissingProjectID sets CreateReleaseErrorResponse to BrndMissingProjectID.
+func (s *CreateReleaseErrorResponse) SetBrndMissingProjectID(v BrndMissingProjectID) {
+	s.Type = BrndMissingProjectIDCreateReleaseErrorResponse
+	s.BrndMissingProjectID = v
+}
+
+// GetBrndMissingProjectID returns BrndMissingProjectID and true boolean if CreateReleaseErrorResponse is BrndMissingProjectID.
+func (s CreateReleaseErrorResponse) GetBrndMissingProjectID() (v BrndMissingProjectID, ok bool) {
+	if !s.IsBrndMissingProjectID() {
+		return v, false
+	}
+	return s.BrndMissingProjectID, true
+}
+
+// NewBrndMissingProjectIDCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from BrndMissingProjectID.
+func NewBrndMissingProjectIDCreateReleaseErrorResponse(v BrndMissingProjectID) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetBrndMissingProjectID(v)
 	return s
 }
 
@@ -13427,6 +12668,48 @@ func NewEvtInvalidCreateReleaseErrorResponse(v EvtInvalid) CreateReleaseErrorRes
 	return s
 }
 
+// SetFlowdefInvalid sets CreateReleaseErrorResponse to FlowdefInvalid.
+func (s *CreateReleaseErrorResponse) SetFlowdefInvalid(v FlowdefInvalid) {
+	s.Type = FlowdefInvalidCreateReleaseErrorResponse
+	s.FlowdefInvalid = v
+}
+
+// GetFlowdefInvalid returns FlowdefInvalid and true boolean if CreateReleaseErrorResponse is FlowdefInvalid.
+func (s CreateReleaseErrorResponse) GetFlowdefInvalid() (v FlowdefInvalid, ok bool) {
+	if !s.IsFlowdefInvalid() {
+		return v, false
+	}
+	return s.FlowdefInvalid, true
+}
+
+// NewFlowdefInvalidCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from FlowdefInvalid.
+func NewFlowdefInvalidCreateReleaseErrorResponse(v FlowdefInvalid) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetFlowdefInvalid(v)
+	return s
+}
+
+// SetFlowdefRevisionConflict sets CreateReleaseErrorResponse to FlowdefRevisionConflict.
+func (s *CreateReleaseErrorResponse) SetFlowdefRevisionConflict(v FlowdefRevisionConflict) {
+	s.Type = FlowdefRevisionConflictCreateReleaseErrorResponse
+	s.FlowdefRevisionConflict = v
+}
+
+// GetFlowdefRevisionConflict returns FlowdefRevisionConflict and true boolean if CreateReleaseErrorResponse is FlowdefRevisionConflict.
+func (s CreateReleaseErrorResponse) GetFlowdefRevisionConflict() (v FlowdefRevisionConflict, ok bool) {
+	if !s.IsFlowdefRevisionConflict() {
+		return v, false
+	}
+	return s.FlowdefRevisionConflict, true
+}
+
+// NewFlowdefRevisionConflictCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from FlowdefRevisionConflict.
+func NewFlowdefRevisionConflictCreateReleaseErrorResponse(v FlowdefRevisionConflict) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetFlowdefRevisionConflict(v)
+	return s
+}
+
 // SetInternal sets CreateReleaseErrorResponse to Internal.
 func (s *CreateReleaseErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalCreateReleaseErrorResponse
@@ -13445,6 +12728,216 @@ func (s CreateReleaseErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalCreateReleaseErrorResponse(v Internal) CreateReleaseErrorResponse {
 	var s CreateReleaseErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetSchAlreadyExists sets CreateReleaseErrorResponse to SchAlreadyExists.
+func (s *CreateReleaseErrorResponse) SetSchAlreadyExists(v SchAlreadyExists) {
+	s.Type = SchAlreadyExistsCreateReleaseErrorResponse
+	s.SchAlreadyExists = v
+}
+
+// GetSchAlreadyExists returns SchAlreadyExists and true boolean if CreateReleaseErrorResponse is SchAlreadyExists.
+func (s CreateReleaseErrorResponse) GetSchAlreadyExists() (v SchAlreadyExists, ok bool) {
+	if !s.IsSchAlreadyExists() {
+		return v, false
+	}
+	return s.SchAlreadyExists, true
+}
+
+// NewSchAlreadyExistsCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from SchAlreadyExists.
+func NewSchAlreadyExistsCreateReleaseErrorResponse(v SchAlreadyExists) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetSchAlreadyExists(v)
+	return s
+}
+
+// SetSchFetchDenied sets CreateReleaseErrorResponse to SchFetchDenied.
+func (s *CreateReleaseErrorResponse) SetSchFetchDenied(v SchFetchDenied) {
+	s.Type = SchFetchDeniedCreateReleaseErrorResponse
+	s.SchFetchDenied = v
+}
+
+// GetSchFetchDenied returns SchFetchDenied and true boolean if CreateReleaseErrorResponse is SchFetchDenied.
+func (s CreateReleaseErrorResponse) GetSchFetchDenied() (v SchFetchDenied, ok bool) {
+	if !s.IsSchFetchDenied() {
+		return v, false
+	}
+	return s.SchFetchDenied, true
+}
+
+// NewSchFetchDeniedCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from SchFetchDenied.
+func NewSchFetchDeniedCreateReleaseErrorResponse(v SchFetchDenied) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetSchFetchDenied(v)
+	return s
+}
+
+// SetSchFetchDowngrade sets CreateReleaseErrorResponse to SchFetchDowngrade.
+func (s *CreateReleaseErrorResponse) SetSchFetchDowngrade(v SchFetchDowngrade) {
+	s.Type = SchFetchDowngradeCreateReleaseErrorResponse
+	s.SchFetchDowngrade = v
+}
+
+// GetSchFetchDowngrade returns SchFetchDowngrade and true boolean if CreateReleaseErrorResponse is SchFetchDowngrade.
+func (s CreateReleaseErrorResponse) GetSchFetchDowngrade() (v SchFetchDowngrade, ok bool) {
+	if !s.IsSchFetchDowngrade() {
+		return v, false
+	}
+	return s.SchFetchDowngrade, true
+}
+
+// NewSchFetchDowngradeCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from SchFetchDowngrade.
+func NewSchFetchDowngradeCreateReleaseErrorResponse(v SchFetchDowngrade) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetSchFetchDowngrade(v)
+	return s
+}
+
+// SetSchFetchTimeout sets CreateReleaseErrorResponse to SchFetchTimeout.
+func (s *CreateReleaseErrorResponse) SetSchFetchTimeout(v SchFetchTimeout) {
+	s.Type = SchFetchTimeoutCreateReleaseErrorResponse
+	s.SchFetchTimeout = v
+}
+
+// GetSchFetchTimeout returns SchFetchTimeout and true boolean if CreateReleaseErrorResponse is SchFetchTimeout.
+func (s CreateReleaseErrorResponse) GetSchFetchTimeout() (v SchFetchTimeout, ok bool) {
+	if !s.IsSchFetchTimeout() {
+		return v, false
+	}
+	return s.SchFetchTimeout, true
+}
+
+// NewSchFetchTimeoutCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from SchFetchTimeout.
+func NewSchFetchTimeoutCreateReleaseErrorResponse(v SchFetchTimeout) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetSchFetchTimeout(v)
+	return s
+}
+
+// SetSchFetchTooLarge sets CreateReleaseErrorResponse to SchFetchTooLarge.
+func (s *CreateReleaseErrorResponse) SetSchFetchTooLarge(v SchFetchTooLarge) {
+	s.Type = SchFetchTooLargeCreateReleaseErrorResponse
+	s.SchFetchTooLarge = v
+}
+
+// GetSchFetchTooLarge returns SchFetchTooLarge and true boolean if CreateReleaseErrorResponse is SchFetchTooLarge.
+func (s CreateReleaseErrorResponse) GetSchFetchTooLarge() (v SchFetchTooLarge, ok bool) {
+	if !s.IsSchFetchTooLarge() {
+		return v, false
+	}
+	return s.SchFetchTooLarge, true
+}
+
+// NewSchFetchTooLargeCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from SchFetchTooLarge.
+func NewSchFetchTooLargeCreateReleaseErrorResponse(v SchFetchTooLarge) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetSchFetchTooLarge(v)
+	return s
+}
+
+// SetSchFetchTooManyRedirects sets CreateReleaseErrorResponse to SchFetchTooManyRedirects.
+func (s *CreateReleaseErrorResponse) SetSchFetchTooManyRedirects(v SchFetchTooManyRedirects) {
+	s.Type = SchFetchTooManyRedirectsCreateReleaseErrorResponse
+	s.SchFetchTooManyRedirects = v
+}
+
+// GetSchFetchTooManyRedirects returns SchFetchTooManyRedirects and true boolean if CreateReleaseErrorResponse is SchFetchTooManyRedirects.
+func (s CreateReleaseErrorResponse) GetSchFetchTooManyRedirects() (v SchFetchTooManyRedirects, ok bool) {
+	if !s.IsSchFetchTooManyRedirects() {
+		return v, false
+	}
+	return s.SchFetchTooManyRedirects, true
+}
+
+// NewSchFetchTooManyRedirectsCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from SchFetchTooManyRedirects.
+func NewSchFetchTooManyRedirectsCreateReleaseErrorResponse(v SchFetchTooManyRedirects) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetSchFetchTooManyRedirects(v)
+	return s
+}
+
+// SetSchInvalidRequest sets CreateReleaseErrorResponse to SchInvalidRequest.
+func (s *CreateReleaseErrorResponse) SetSchInvalidRequest(v SchInvalidRequest) {
+	s.Type = SchInvalidRequestCreateReleaseErrorResponse
+	s.SchInvalidRequest = v
+}
+
+// GetSchInvalidRequest returns SchInvalidRequest and true boolean if CreateReleaseErrorResponse is SchInvalidRequest.
+func (s CreateReleaseErrorResponse) GetSchInvalidRequest() (v SchInvalidRequest, ok bool) {
+	if !s.IsSchInvalidRequest() {
+		return v, false
+	}
+	return s.SchInvalidRequest, true
+}
+
+// NewSchInvalidRequestCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from SchInvalidRequest.
+func NewSchInvalidRequestCreateReleaseErrorResponse(v SchInvalidRequest) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetSchInvalidRequest(v)
+	return s
+}
+
+// SetSchNotFound sets CreateReleaseErrorResponse to SchNotFound.
+func (s *CreateReleaseErrorResponse) SetSchNotFound(v SchNotFound) {
+	s.Type = SchNotFoundCreateReleaseErrorResponse
+	s.SchNotFound = v
+}
+
+// GetSchNotFound returns SchNotFound and true boolean if CreateReleaseErrorResponse is SchNotFound.
+func (s CreateReleaseErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
+	if !s.IsSchNotFound() {
+		return v, false
+	}
+	return s.SchNotFound, true
+}
+
+// NewSchNotFoundCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from SchNotFound.
+func NewSchNotFoundCreateReleaseErrorResponse(v SchNotFound) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetSchNotFound(v)
+	return s
+}
+
+// SetSchRevisionConflict sets CreateReleaseErrorResponse to SchRevisionConflict.
+func (s *CreateReleaseErrorResponse) SetSchRevisionConflict(v SchRevisionConflict) {
+	s.Type = SchRevisionConflictCreateReleaseErrorResponse
+	s.SchRevisionConflict = v
+}
+
+// GetSchRevisionConflict returns SchRevisionConflict and true boolean if CreateReleaseErrorResponse is SchRevisionConflict.
+func (s CreateReleaseErrorResponse) GetSchRevisionConflict() (v SchRevisionConflict, ok bool) {
+	if !s.IsSchRevisionConflict() {
+		return v, false
+	}
+	return s.SchRevisionConflict, true
+}
+
+// NewSchRevisionConflictCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from SchRevisionConflict.
+func NewSchRevisionConflictCreateReleaseErrorResponse(v SchRevisionConflict) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetSchRevisionConflict(v)
+	return s
+}
+
+// SetFlowdefMissingProjectID sets CreateReleaseErrorResponse to FlowdefMissingProjectID.
+func (s *CreateReleaseErrorResponse) SetFlowdefMissingProjectID(v FlowdefMissingProjectID) {
+	s.Type = FlowdefMissingProjectIDCreateReleaseErrorResponse
+	s.FlowdefMissingProjectID = v
+}
+
+// GetFlowdefMissingProjectID returns FlowdefMissingProjectID and true boolean if CreateReleaseErrorResponse is FlowdefMissingProjectID.
+func (s CreateReleaseErrorResponse) GetFlowdefMissingProjectID() (v FlowdefMissingProjectID, ok bool) {
+	if !s.IsFlowdefMissingProjectID() {
+		return v, false
+	}
+	return s.FlowdefMissingProjectID, true
+}
+
+// NewFlowdefMissingProjectIDCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from FlowdefMissingProjectID.
+func NewFlowdefMissingProjectIDCreateReleaseErrorResponse(v FlowdefMissingProjectID) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetFlowdefMissingProjectID(v)
 	return s
 }
 
@@ -13595,6 +13088,27 @@ func NewReqInvalidCreateReleaseErrorResponse(v ReqInvalid) CreateReleaseErrorRes
 	return s
 }
 
+// SetFlowdefSchemaFetchFailed sets CreateReleaseErrorResponse to FlowdefSchemaFetchFailed.
+func (s *CreateReleaseErrorResponse) SetFlowdefSchemaFetchFailed(v FlowdefSchemaFetchFailed) {
+	s.Type = FlowdefSchemaFetchFailedCreateReleaseErrorResponse
+	s.FlowdefSchemaFetchFailed = v
+}
+
+// GetFlowdefSchemaFetchFailed returns FlowdefSchemaFetchFailed and true boolean if CreateReleaseErrorResponse is FlowdefSchemaFetchFailed.
+func (s CreateReleaseErrorResponse) GetFlowdefSchemaFetchFailed() (v FlowdefSchemaFetchFailed, ok bool) {
+	if !s.IsFlowdefSchemaFetchFailed() {
+		return v, false
+	}
+	return s.FlowdefSchemaFetchFailed, true
+}
+
+// NewFlowdefSchemaFetchFailedCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from FlowdefSchemaFetchFailed.
+func NewFlowdefSchemaFetchFailedCreateReleaseErrorResponse(v FlowdefSchemaFetchFailed) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetFlowdefSchemaFetchFailed(v)
+	return s
+}
+
 // CreateReleaseErrorResponseStatusCode wraps CreateReleaseErrorResponse with StatusCode.
 type CreateReleaseErrorResponseStatusCode struct {
 	StatusCode int
@@ -13623,7 +13137,7 @@ func (s *CreateReleaseErrorResponseStatusCode) SetResponse(val CreateReleaseErro
 
 func (*CreateReleaseErrorResponseStatusCode) createReleaseRes() {}
 
-type CreateReleaseOK Release
+type CreateReleaseOK CreateReleaseResponse
 
 func (*CreateReleaseOK) createReleaseRes() {}
 
@@ -13661,13 +13175,19 @@ func (s *CreateReleasePointer) SetRevisionID(val string) {
 	s.RevisionID = val
 }
 
-// The set of revisions to bundle into a release, plus the metadata to record
-// alongside it.
+// What goes into the release, in one of two forms, plus the metadata to
+// record alongside it. Exactly one of `pointers` and `bundle` is given.
+// `pointers` names revisions that already exist, as `(kind, revision_id)`
+// pairs; no new revisions are allocated. `bundle` carries the configuration
+// as authored on disk; the server compares each resource against the
+// project's newest revision of the same handle, reuses it when the content
+// matches and allocates a new one otherwise. Either way the result is a
+// release pinning one revision per resource.
 // `created_at` and `created_by` are derived server-side from the caller's
 // authentication context and are not accepted here.
 // Ref: #
 type CreateReleaseRequest struct {
-	// The revisions to pin. Must not be empty.
+	// The revisions to pin. Must not be empty when given.
 	// A kind usually appears more than once: a project has several user schemas
 	// and several flow definitions, and each is pinned on its own. What it
 	// cannot do is
@@ -13681,6 +13201,7 @@ type CreateReleaseRequest struct {
 	// request, and is set conservatively: raising it is a spec change, and
 	// widening a bound breaks no client that was already inside it.
 	Pointers []CreateReleasePointer `json:"pointers"`
+	Bundle   OptConfigurationBundle `json:"bundle"`
 	// A short summary of what the release changes, analogous to a git commit
 	// message. Recorded on the release and shown when listing releases.
 	Message OptString `json:"message"`
@@ -13694,6 +13215,11 @@ type CreateReleaseRequest struct {
 // GetPointers returns the value of Pointers.
 func (s *CreateReleaseRequest) GetPointers() []CreateReleasePointer {
 	return s.Pointers
+}
+
+// GetBundle returns the value of Bundle.
+func (s *CreateReleaseRequest) GetBundle() OptConfigurationBundle {
+	return s.Bundle
 }
 
 // GetMessage returns the value of Message.
@@ -13716,6 +13242,11 @@ func (s *CreateReleaseRequest) SetPointers(val []CreateReleasePointer) {
 	s.Pointers = val
 }
 
+// SetBundle sets the value of Bundle.
+func (s *CreateReleaseRequest) SetBundle(val OptConfigurationBundle) {
+	s.Bundle = val
+}
+
 // SetMessage sets the value of Message.
 func (s *CreateReleaseRequest) SetMessage(val OptString) {
 	s.Message = val
@@ -13729,6 +13260,88 @@ func (s *CreateReleaseRequest) SetGitSha(val OptString) {
 // SetGitDirty sets the value of GitDirty.
 func (s *CreateReleaseRequest) SetGitDirty(val OptBool) {
 	s.GitDirty = val
+}
+
+// The release, plus what happened to each resource it pins: whether the
+// revision already existed (reused) or this call allocated it (created). The
+// pointer form never allocates, so every entry reads `created: false`.
+// Ref: #
+type CreateReleaseResponse struct {
+	Release Release `json:"release"`
+	// One entry per pinned resource, in pointer order.
+	Revisions []CreateReleaseResponseRevisionsItem `json:"revisions"`
+}
+
+// GetRelease returns the value of Release.
+func (s *CreateReleaseResponse) GetRelease() Release {
+	return s.Release
+}
+
+// GetRevisions returns the value of Revisions.
+func (s *CreateReleaseResponse) GetRevisions() []CreateReleaseResponseRevisionsItem {
+	return s.Revisions
+}
+
+// SetRelease sets the value of Release.
+func (s *CreateReleaseResponse) SetRelease(val Release) {
+	s.Release = val
+}
+
+// SetRevisions sets the value of Revisions.
+func (s *CreateReleaseResponse) SetRevisions(val []CreateReleaseResponseRevisionsItem) {
+	s.Revisions = val
+}
+
+type CreateReleaseResponseRevisionsItem struct {
+	Kind ReleasePointerKind `json:"kind"`
+	// The resource's handle (`objectType`, `name` or `default`).
+	Handle string `json:"handle"`
+	// The revision the release pins for this resource.
+	RevisionID string `json:"revision_id"`
+	// `true` when this call allocated the revision because the bundled
+	// content differed from the project's newest one; `false` when an
+	// existing revision was pinned.
+	Created bool `json:"created"`
+}
+
+// GetKind returns the value of Kind.
+func (s *CreateReleaseResponseRevisionsItem) GetKind() ReleasePointerKind {
+	return s.Kind
+}
+
+// GetHandle returns the value of Handle.
+func (s *CreateReleaseResponseRevisionsItem) GetHandle() string {
+	return s.Handle
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *CreateReleaseResponseRevisionsItem) GetRevisionID() string {
+	return s.RevisionID
+}
+
+// GetCreated returns the value of Created.
+func (s *CreateReleaseResponseRevisionsItem) GetCreated() bool {
+	return s.Created
+}
+
+// SetKind sets the value of Kind.
+func (s *CreateReleaseResponseRevisionsItem) SetKind(val ReleasePointerKind) {
+	s.Kind = val
+}
+
+// SetHandle sets the value of Handle.
+func (s *CreateReleaseResponseRevisionsItem) SetHandle(val string) {
+	s.Handle = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *CreateReleaseResponseRevisionsItem) SetRevisionID(val string) {
+	s.RevisionID = val
+}
+
+// SetCreated sets the value of Created.
+func (s *CreateReleaseResponseRevisionsItem) SetCreated(val bool) {
+	s.Created = val
 }
 
 // CreateSchemaErrorResponse represents sum type.
@@ -15885,96 +15498,28 @@ func (s *DepPermissionDeniedDetails) init() DepPermissionDeniedDetails {
 	return m
 }
 
-// The rows one deploy wrote, correlated by `deploy_id`. `targets` lists the
-// expansion the server applied (`primary` becomes each primary origin).
-// Ref: #
-type DeployResponse struct {
-	DeployID  string    `json:"deploy_id"`
-	ReleaseID ReleaseID `json:"release_id"`
-	// The origins this deploy addressed, `""` being the default.
-	Targets     []string     `json:"targets"`
-	Deployments []Deployment `json:"deployments"`
-	// Non-fatal notes, such as a secret with no preview value on a preview
-	// deploy. Each is a short sentence the CLI prints verbatim.
-	Warnings []string `json:"warnings"`
-}
-
-// GetDeployID returns the value of DeployID.
-func (s *DeployResponse) GetDeployID() string {
-	return s.DeployID
-}
-
-// GetReleaseID returns the value of ReleaseID.
-func (s *DeployResponse) GetReleaseID() ReleaseID {
-	return s.ReleaseID
-}
-
-// GetTargets returns the value of Targets.
-func (s *DeployResponse) GetTargets() []string {
-	return s.Targets
-}
-
-// GetDeployments returns the value of Deployments.
-func (s *DeployResponse) GetDeployments() []Deployment {
-	return s.Deployments
-}
-
-// GetWarnings returns the value of Warnings.
-func (s *DeployResponse) GetWarnings() []string {
-	return s.Warnings
-}
-
-// SetDeployID sets the value of DeployID.
-func (s *DeployResponse) SetDeployID(val string) {
-	s.DeployID = val
-}
-
-// SetReleaseID sets the value of ReleaseID.
-func (s *DeployResponse) SetReleaseID(val ReleaseID) {
-	s.ReleaseID = val
-}
-
-// SetTargets sets the value of Targets.
-func (s *DeployResponse) SetTargets(val []string) {
-	s.Targets = val
-}
-
-// SetDeployments sets the value of Deployments.
-func (s *DeployResponse) SetDeployments(val []Deployment) {
-	s.Deployments = val
-}
-
-// SetWarnings sets the value of Warnings.
-func (s *DeployResponse) SetWarnings(val []string) {
-	s.Warnings = val
-}
-
-func (*DeployResponse) rollbackDeploymentRes() {}
-
-// An immutable record of a release being made live on one target.
-// Deploying and rolling back both append rows. A target is an origin string:
-// the empty string is the project default, anything else is a production
-// hostname or a live preview URL. What a target serves is its newest row;
-// nothing points at a deployment and nothing updates one.
+// An immutable record of one release being made live on a set of targets at
+// one instant.
+// Deploying and rolling back both append deployments. A target is an origin
+// string: the empty string is the project default, anything else is a
+// primary origin or a live preview URL. What a target serves is the newest
+// deployment that names it; nothing points at a deployment and nothing
+// updates one.
 // Ref: #
 type Deployment struct {
 	// The opaque, immutable resource id, assigned at creation.
 	ID DeploymentID `json:"id"`
 	// The project this deployment belongs to.
 	ProjectID ProjectID `json:"project_id"`
-	// Correlates the rows one deploy wrote. Rolling a deploy back addresses
-	// this id and writes a new set under a new one.
-	DeployID string `json:"deploy_id"`
-	// The target: `""` for the project default, otherwise an exact origin.
-	Origin string `json:"origin"`
 	// The release this deployment made live.
 	ReleaseID ReleaseID `json:"release_id"`
+	// The targets this deployment made the release live on, origin ASC. In
+	// the live view (`live=true`) only the targets this deployment currently
+	// serves are listed.
+	Targets []DeploymentTarget `json:"targets"`
 	// When the deployment was created.
-	DeployedAt time.Time `json:"deployed_at"`
-	// When the preview row behind this origin stops admitting requests. Only
-	// set in the live view (`live=true`) and only for a preview origin.
-	ExpiresAt OptNilDateTime     `json:"expires_at"`
-	Metadata  DeploymentMetadata `json:"metadata"`
+	DeployedAt time.Time          `json:"deployed_at"`
+	Metadata   DeploymentMetadata `json:"metadata"`
 	// The release named by `release_id`, present only when the request asked
 	// for it with `expand: ["release"]`.
 	Release OptRelease `json:"release"`
@@ -15990,29 +15535,19 @@ func (s *Deployment) GetProjectID() ProjectID {
 	return s.ProjectID
 }
 
-// GetDeployID returns the value of DeployID.
-func (s *Deployment) GetDeployID() string {
-	return s.DeployID
-}
-
-// GetOrigin returns the value of Origin.
-func (s *Deployment) GetOrigin() string {
-	return s.Origin
-}
-
 // GetReleaseID returns the value of ReleaseID.
 func (s *Deployment) GetReleaseID() ReleaseID {
 	return s.ReleaseID
 }
 
+// GetTargets returns the value of Targets.
+func (s *Deployment) GetTargets() []DeploymentTarget {
+	return s.Targets
+}
+
 // GetDeployedAt returns the value of DeployedAt.
 func (s *Deployment) GetDeployedAt() time.Time {
 	return s.DeployedAt
-}
-
-// GetExpiresAt returns the value of ExpiresAt.
-func (s *Deployment) GetExpiresAt() OptNilDateTime {
-	return s.ExpiresAt
 }
 
 // GetMetadata returns the value of Metadata.
@@ -16035,29 +15570,19 @@ func (s *Deployment) SetProjectID(val ProjectID) {
 	s.ProjectID = val
 }
 
-// SetDeployID sets the value of DeployID.
-func (s *Deployment) SetDeployID(val string) {
-	s.DeployID = val
-}
-
-// SetOrigin sets the value of Origin.
-func (s *Deployment) SetOrigin(val string) {
-	s.Origin = val
-}
-
 // SetReleaseID sets the value of ReleaseID.
 func (s *Deployment) SetReleaseID(val ReleaseID) {
 	s.ReleaseID = val
 }
 
+// SetTargets sets the value of Targets.
+func (s *Deployment) SetTargets(val []DeploymentTarget) {
+	s.Targets = val
+}
+
 // SetDeployedAt sets the value of DeployedAt.
 func (s *Deployment) SetDeployedAt(val time.Time) {
 	s.DeployedAt = val
-}
-
-// SetExpiresAt sets the value of ExpiresAt.
-func (s *Deployment) SetExpiresAt(val OptNilDateTime) {
-	s.ExpiresAt = val
 }
 
 // SetMetadata sets the value of Metadata.
@@ -16521,22 +16046,16 @@ func (s *DeploymentCreatedEventDelegationType) UnmarshalText(data []byte) error 
 // the event's `entity_id`; the fields here say what went live where.
 // Ref: #
 type DeploymentCreatedPayload struct {
-	Origin     OptString `json:"origin"`
-	DeployID   OptString `json:"deploy_id"`
+	Origins    []string  `json:"origins"`
 	ReleaseID  OptString `json:"release_id"`
 	Reason     OptString `json:"reason"`
 	Message    OptString `json:"message"`
 	RollbackOf OptString `json:"rollback_of"`
 }
 
-// GetOrigin returns the value of Origin.
-func (s *DeploymentCreatedPayload) GetOrigin() OptString {
-	return s.Origin
-}
-
-// GetDeployID returns the value of DeployID.
-func (s *DeploymentCreatedPayload) GetDeployID() OptString {
-	return s.DeployID
+// GetOrigins returns the value of Origins.
+func (s *DeploymentCreatedPayload) GetOrigins() []string {
+	return s.Origins
 }
 
 // GetReleaseID returns the value of ReleaseID.
@@ -16559,14 +16078,9 @@ func (s *DeploymentCreatedPayload) GetRollbackOf() OptString {
 	return s.RollbackOf
 }
 
-// SetOrigin sets the value of Origin.
-func (s *DeploymentCreatedPayload) SetOrigin(val OptString) {
-	s.Origin = val
-}
-
-// SetDeployID sets the value of DeployID.
-func (s *DeploymentCreatedPayload) SetDeployID(val OptString) {
-	s.DeployID = val
+// SetOrigins sets the value of Origins.
+func (s *DeploymentCreatedPayload) SetOrigins(val []string) {
+	s.Origins = val
 }
 
 // SetReleaseID sets the value of ReleaseID.
@@ -16640,9 +16154,9 @@ type DeploymentMetadata struct {
 	Reason OptDeploymentReason `json:"reason"`
 	// The caller-supplied summary of why this deployment happened.
 	Message OptNilString `json:"message"`
-	// On a rollback, the `deploy_id` this row reversed, so the trail reads
+	// On a rollback, the deployment this one reversed, so the trail reads
 	// forwards and backwards.
-	RollbackOf OptNilString `json:"rollback_of"`
+	RollbackOf OptNilDeploymentID `json:"rollback_of"`
 	// The identity that created the deployment. Absent when the caller is a
 	// machine principal carrying no user identity.
 	DeployedBy OptNilString `json:"deployed_by"`
@@ -16661,7 +16175,7 @@ func (s *DeploymentMetadata) GetMessage() OptNilString {
 }
 
 // GetRollbackOf returns the value of RollbackOf.
-func (s *DeploymentMetadata) GetRollbackOf() OptNilString {
+func (s *DeploymentMetadata) GetRollbackOf() OptNilDeploymentID {
 	return s.RollbackOf
 }
 
@@ -16686,7 +16200,7 @@ func (s *DeploymentMetadata) SetMessage(val OptNilString) {
 }
 
 // SetRollbackOf sets the value of RollbackOf.
-func (s *DeploymentMetadata) SetRollbackOf(val OptNilString) {
+func (s *DeploymentMetadata) SetRollbackOf(val OptNilDeploymentID) {
 	s.RollbackOf = val
 }
 
@@ -16755,13 +16269,13 @@ func (s *DeploymentMetadataDeployedByType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Why the deployment was created. All three are the same operation — a new
-// deployment pointing the environment at a release — and the reason records
-// the caller's intent:
-// - `deploy` — a release goes live on the environment.
-// - `promote` — a release that already runs on another environment goes live
-// here; `source_environment_id` records where it came from.
-// - `rollback` — a release the environment ran earlier goes live again.
+// Why the deployment was created. All three are the same operation — a
+// release made live on a set of targets — and the reason records the
+// caller's intent:
+// - `deploy` — a release goes live on the targets.
+// - `promote` — a release that already runs on another target goes live
+// here.
+// - `rollback` — a release the targets ran earlier goes live again.
 // Ref: #
 type DeploymentReason string
 
@@ -16809,6 +16323,36 @@ func (s *DeploymentReason) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// One target a deployment made its release live on.
+// Ref: #
+type DeploymentTarget struct {
+	// `""` for the project default, otherwise an exact origin.
+	Origin string `json:"origin"`
+	// When the preview behind this origin stops admitting requests. Only set
+	// in the live view (`live=true`) and only for a preview origin.
+	ExpiresAt OptNilDateTime `json:"expires_at"`
+}
+
+// GetOrigin returns the value of Origin.
+func (s *DeploymentTarget) GetOrigin() string {
+	return s.Origin
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *DeploymentTarget) GetExpiresAt() OptNilDateTime {
+	return s.ExpiresAt
+}
+
+// SetOrigin sets the value of Origin.
+func (s *DeploymentTarget) SetOrigin(val string) {
+	s.Origin = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *DeploymentTarget) SetExpiresAt(val OptNilDateTime) {
+	s.ExpiresAt = val
 }
 
 // Empty payload for event types with no typed fields
@@ -31137,10 +30681,10 @@ func (s *ListDeploymentsErrorResponseStatusCode) SetResponse(val ListDeployments
 func (*ListDeploymentsErrorResponseStatusCode) listDeploymentsRes() {}
 
 // Deployments, newest first.
-// Filtered to one environment, the first row is that environment's current
-// deployment and the rest is its history. Unfiltered, the list interleaves
-// every environment of the project, so the first row is only the most recent
-// deployment anywhere, not any particular environment's current one.
+// Filtered to one origin, the first entry is what that target serves and the
+// rest is its history. Unfiltered, the list interleaves every target of the
+// project, so the first entry is only the most recent deployment anywhere,
+// not any particular target's current one.
 // Ref: #
 type ListDeploymentsResponse struct {
 	Deployments []Deployment `json:"deployments"`
@@ -32140,9 +31684,9 @@ func (s *ListMyProjectsResponseHeaders) SetResponse(val ListMyProjectsResponse) 
 
 func (*ListMyProjectsResponseHeaders) listMyProjectsRes() {}
 
-// ListOriginsErrorResponse represents sum type.
-type ListOriginsErrorResponse struct {
-	Type                ListOriginsErrorResponseType // switch on this field
+// ListPreviewsErrorResponse represents sum type.
+type ListPreviewsErrorResponse struct {
+	Type                ListPreviewsErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
 	DepNotFound         DepNotFound
 	DepPermissionDenied DepPermissionDenied
@@ -32150,192 +31694,192 @@ type ListOriginsErrorResponse struct {
 	ReqInvalid          ReqInvalid
 }
 
-// ListOriginsErrorResponseType is oneOf type of ListOriginsErrorResponse.
-type ListOriginsErrorResponseType string
+// ListPreviewsErrorResponseType is oneOf type of ListPreviewsErrorResponse.
+type ListPreviewsErrorResponseType string
 
-// Possible values for ListOriginsErrorResponseType.
+// Possible values for ListPreviewsErrorResponseType.
 const (
-	AuthUnauthorizedListOriginsErrorResponse    ListOriginsErrorResponseType = "auth.unauthorized"
-	DepNotFoundListOriginsErrorResponse         ListOriginsErrorResponseType = "dep.not_found"
-	DepPermissionDeniedListOriginsErrorResponse ListOriginsErrorResponseType = "dep.permission_denied"
-	InternalListOriginsErrorResponse            ListOriginsErrorResponseType = "internal"
-	ReqInvalidListOriginsErrorResponse          ListOriginsErrorResponseType = "req.invalid"
+	AuthUnauthorizedListPreviewsErrorResponse    ListPreviewsErrorResponseType = "auth.unauthorized"
+	DepNotFoundListPreviewsErrorResponse         ListPreviewsErrorResponseType = "dep.not_found"
+	DepPermissionDeniedListPreviewsErrorResponse ListPreviewsErrorResponseType = "dep.permission_denied"
+	InternalListPreviewsErrorResponse            ListPreviewsErrorResponseType = "internal"
+	ReqInvalidListPreviewsErrorResponse          ListPreviewsErrorResponseType = "req.invalid"
 )
 
-// IsAuthUnauthorized reports whether ListOriginsErrorResponse is AuthUnauthorized.
-func (s ListOriginsErrorResponse) IsAuthUnauthorized() bool {
-	return s.Type == AuthUnauthorizedListOriginsErrorResponse
+// IsAuthUnauthorized reports whether ListPreviewsErrorResponse is AuthUnauthorized.
+func (s ListPreviewsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListPreviewsErrorResponse
 }
 
-// IsDepNotFound reports whether ListOriginsErrorResponse is DepNotFound.
-func (s ListOriginsErrorResponse) IsDepNotFound() bool {
-	return s.Type == DepNotFoundListOriginsErrorResponse
+// IsDepNotFound reports whether ListPreviewsErrorResponse is DepNotFound.
+func (s ListPreviewsErrorResponse) IsDepNotFound() bool {
+	return s.Type == DepNotFoundListPreviewsErrorResponse
 }
 
-// IsDepPermissionDenied reports whether ListOriginsErrorResponse is DepPermissionDenied.
-func (s ListOriginsErrorResponse) IsDepPermissionDenied() bool {
-	return s.Type == DepPermissionDeniedListOriginsErrorResponse
+// IsDepPermissionDenied reports whether ListPreviewsErrorResponse is DepPermissionDenied.
+func (s ListPreviewsErrorResponse) IsDepPermissionDenied() bool {
+	return s.Type == DepPermissionDeniedListPreviewsErrorResponse
 }
 
-// IsInternal reports whether ListOriginsErrorResponse is Internal.
-func (s ListOriginsErrorResponse) IsInternal() bool {
-	return s.Type == InternalListOriginsErrorResponse
+// IsInternal reports whether ListPreviewsErrorResponse is Internal.
+func (s ListPreviewsErrorResponse) IsInternal() bool {
+	return s.Type == InternalListPreviewsErrorResponse
 }
 
-// IsReqInvalid reports whether ListOriginsErrorResponse is ReqInvalid.
-func (s ListOriginsErrorResponse) IsReqInvalid() bool {
-	return s.Type == ReqInvalidListOriginsErrorResponse
+// IsReqInvalid reports whether ListPreviewsErrorResponse is ReqInvalid.
+func (s ListPreviewsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListPreviewsErrorResponse
 }
 
-// SetAuthUnauthorized sets ListOriginsErrorResponse to AuthUnauthorized.
-func (s *ListOriginsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
-	s.Type = AuthUnauthorizedListOriginsErrorResponse
+// SetAuthUnauthorized sets ListPreviewsErrorResponse to AuthUnauthorized.
+func (s *ListPreviewsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListPreviewsErrorResponse
 	s.AuthUnauthorized = v
 }
 
-// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListOriginsErrorResponse is AuthUnauthorized.
-func (s ListOriginsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListPreviewsErrorResponse is AuthUnauthorized.
+func (s ListPreviewsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
 	if !s.IsAuthUnauthorized() {
 		return v, false
 	}
 	return s.AuthUnauthorized, true
 }
 
-// NewAuthUnauthorizedListOriginsErrorResponse returns new ListOriginsErrorResponse from AuthUnauthorized.
-func NewAuthUnauthorizedListOriginsErrorResponse(v AuthUnauthorized) ListOriginsErrorResponse {
-	var s ListOriginsErrorResponse
+// NewAuthUnauthorizedListPreviewsErrorResponse returns new ListPreviewsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListPreviewsErrorResponse(v AuthUnauthorized) ListPreviewsErrorResponse {
+	var s ListPreviewsErrorResponse
 	s.SetAuthUnauthorized(v)
 	return s
 }
 
-// SetDepNotFound sets ListOriginsErrorResponse to DepNotFound.
-func (s *ListOriginsErrorResponse) SetDepNotFound(v DepNotFound) {
-	s.Type = DepNotFoundListOriginsErrorResponse
+// SetDepNotFound sets ListPreviewsErrorResponse to DepNotFound.
+func (s *ListPreviewsErrorResponse) SetDepNotFound(v DepNotFound) {
+	s.Type = DepNotFoundListPreviewsErrorResponse
 	s.DepNotFound = v
 }
 
-// GetDepNotFound returns DepNotFound and true boolean if ListOriginsErrorResponse is DepNotFound.
-func (s ListOriginsErrorResponse) GetDepNotFound() (v DepNotFound, ok bool) {
+// GetDepNotFound returns DepNotFound and true boolean if ListPreviewsErrorResponse is DepNotFound.
+func (s ListPreviewsErrorResponse) GetDepNotFound() (v DepNotFound, ok bool) {
 	if !s.IsDepNotFound() {
 		return v, false
 	}
 	return s.DepNotFound, true
 }
 
-// NewDepNotFoundListOriginsErrorResponse returns new ListOriginsErrorResponse from DepNotFound.
-func NewDepNotFoundListOriginsErrorResponse(v DepNotFound) ListOriginsErrorResponse {
-	var s ListOriginsErrorResponse
+// NewDepNotFoundListPreviewsErrorResponse returns new ListPreviewsErrorResponse from DepNotFound.
+func NewDepNotFoundListPreviewsErrorResponse(v DepNotFound) ListPreviewsErrorResponse {
+	var s ListPreviewsErrorResponse
 	s.SetDepNotFound(v)
 	return s
 }
 
-// SetDepPermissionDenied sets ListOriginsErrorResponse to DepPermissionDenied.
-func (s *ListOriginsErrorResponse) SetDepPermissionDenied(v DepPermissionDenied) {
-	s.Type = DepPermissionDeniedListOriginsErrorResponse
+// SetDepPermissionDenied sets ListPreviewsErrorResponse to DepPermissionDenied.
+func (s *ListPreviewsErrorResponse) SetDepPermissionDenied(v DepPermissionDenied) {
+	s.Type = DepPermissionDeniedListPreviewsErrorResponse
 	s.DepPermissionDenied = v
 }
 
-// GetDepPermissionDenied returns DepPermissionDenied and true boolean if ListOriginsErrorResponse is DepPermissionDenied.
-func (s ListOriginsErrorResponse) GetDepPermissionDenied() (v DepPermissionDenied, ok bool) {
+// GetDepPermissionDenied returns DepPermissionDenied and true boolean if ListPreviewsErrorResponse is DepPermissionDenied.
+func (s ListPreviewsErrorResponse) GetDepPermissionDenied() (v DepPermissionDenied, ok bool) {
 	if !s.IsDepPermissionDenied() {
 		return v, false
 	}
 	return s.DepPermissionDenied, true
 }
 
-// NewDepPermissionDeniedListOriginsErrorResponse returns new ListOriginsErrorResponse from DepPermissionDenied.
-func NewDepPermissionDeniedListOriginsErrorResponse(v DepPermissionDenied) ListOriginsErrorResponse {
-	var s ListOriginsErrorResponse
+// NewDepPermissionDeniedListPreviewsErrorResponse returns new ListPreviewsErrorResponse from DepPermissionDenied.
+func NewDepPermissionDeniedListPreviewsErrorResponse(v DepPermissionDenied) ListPreviewsErrorResponse {
+	var s ListPreviewsErrorResponse
 	s.SetDepPermissionDenied(v)
 	return s
 }
 
-// SetInternal sets ListOriginsErrorResponse to Internal.
-func (s *ListOriginsErrorResponse) SetInternal(v Internal) {
-	s.Type = InternalListOriginsErrorResponse
+// SetInternal sets ListPreviewsErrorResponse to Internal.
+func (s *ListPreviewsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListPreviewsErrorResponse
 	s.Internal = v
 }
 
-// GetInternal returns Internal and true boolean if ListOriginsErrorResponse is Internal.
-func (s ListOriginsErrorResponse) GetInternal() (v Internal, ok bool) {
+// GetInternal returns Internal and true boolean if ListPreviewsErrorResponse is Internal.
+func (s ListPreviewsErrorResponse) GetInternal() (v Internal, ok bool) {
 	if !s.IsInternal() {
 		return v, false
 	}
 	return s.Internal, true
 }
 
-// NewInternalListOriginsErrorResponse returns new ListOriginsErrorResponse from Internal.
-func NewInternalListOriginsErrorResponse(v Internal) ListOriginsErrorResponse {
-	var s ListOriginsErrorResponse
+// NewInternalListPreviewsErrorResponse returns new ListPreviewsErrorResponse from Internal.
+func NewInternalListPreviewsErrorResponse(v Internal) ListPreviewsErrorResponse {
+	var s ListPreviewsErrorResponse
 	s.SetInternal(v)
 	return s
 }
 
-// SetReqInvalid sets ListOriginsErrorResponse to ReqInvalid.
-func (s *ListOriginsErrorResponse) SetReqInvalid(v ReqInvalid) {
-	s.Type = ReqInvalidListOriginsErrorResponse
+// SetReqInvalid sets ListPreviewsErrorResponse to ReqInvalid.
+func (s *ListPreviewsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListPreviewsErrorResponse
 	s.ReqInvalid = v
 }
 
-// GetReqInvalid returns ReqInvalid and true boolean if ListOriginsErrorResponse is ReqInvalid.
-func (s ListOriginsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+// GetReqInvalid returns ReqInvalid and true boolean if ListPreviewsErrorResponse is ReqInvalid.
+func (s ListPreviewsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 	if !s.IsReqInvalid() {
 		return v, false
 	}
 	return s.ReqInvalid, true
 }
 
-// NewReqInvalidListOriginsErrorResponse returns new ListOriginsErrorResponse from ReqInvalid.
-func NewReqInvalidListOriginsErrorResponse(v ReqInvalid) ListOriginsErrorResponse {
-	var s ListOriginsErrorResponse
+// NewReqInvalidListPreviewsErrorResponse returns new ListPreviewsErrorResponse from ReqInvalid.
+func NewReqInvalidListPreviewsErrorResponse(v ReqInvalid) ListPreviewsErrorResponse {
+	var s ListPreviewsErrorResponse
 	s.SetReqInvalid(v)
 	return s
 }
 
-// ListOriginsErrorResponseStatusCode wraps ListOriginsErrorResponse with StatusCode.
-type ListOriginsErrorResponseStatusCode struct {
+// ListPreviewsErrorResponseStatusCode wraps ListPreviewsErrorResponse with StatusCode.
+type ListPreviewsErrorResponseStatusCode struct {
 	StatusCode int
-	Response   ListOriginsErrorResponse
+	Response   ListPreviewsErrorResponse
 }
 
 // GetStatusCode returns the value of StatusCode.
-func (s *ListOriginsErrorResponseStatusCode) GetStatusCode() int {
+func (s *ListPreviewsErrorResponseStatusCode) GetStatusCode() int {
 	return s.StatusCode
 }
 
 // GetResponse returns the value of Response.
-func (s *ListOriginsErrorResponseStatusCode) GetResponse() ListOriginsErrorResponse {
+func (s *ListPreviewsErrorResponseStatusCode) GetResponse() ListPreviewsErrorResponse {
 	return s.Response
 }
 
 // SetStatusCode sets the value of StatusCode.
-func (s *ListOriginsErrorResponseStatusCode) SetStatusCode(val int) {
+func (s *ListPreviewsErrorResponseStatusCode) SetStatusCode(val int) {
 	s.StatusCode = val
 }
 
 // SetResponse sets the value of Response.
-func (s *ListOriginsErrorResponseStatusCode) SetResponse(val ListOriginsErrorResponse) {
+func (s *ListPreviewsErrorResponseStatusCode) SetResponse(val ListPreviewsErrorResponse) {
 	s.Response = val
 }
 
-func (*ListOriginsErrorResponseStatusCode) listOriginsRes() {}
+func (*ListPreviewsErrorResponseStatusCode) listPreviewsRes() {}
 
 // Ref: #
-type ListOriginsResponse struct {
-	Origins []Origin `json:"origins"`
+type ListPreviewsResponse struct {
+	Previews []Preview `json:"previews"`
 }
 
-// GetOrigins returns the value of Origins.
-func (s *ListOriginsResponse) GetOrigins() []Origin {
-	return s.Origins
+// GetPreviews returns the value of Previews.
+func (s *ListPreviewsResponse) GetPreviews() []Preview {
+	return s.Previews
 }
 
-// SetOrigins sets the value of Origins.
-func (s *ListOriginsResponse) SetOrigins(val []Origin) {
-	s.Origins = val
+// SetPreviews sets the value of Previews.
+func (s *ListPreviewsResponse) SetPreviews(val []Preview) {
+	s.Previews = val
 }
 
-func (*ListOriginsResponse) listOriginsRes() {}
+func (*ListPreviewsResponse) listPreviewsRes() {}
 
 // ListReleasesErrorResponse represents sum type.
 type ListReleasesErrorResponse struct {
@@ -35272,6 +34816,52 @@ func (o OptCompletedFactorPayload) Get() (v CompletedFactorPayload, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptCompletedFactorPayload) Or(d CompletedFactorPayload) CompletedFactorPayload {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptConfigurationBundle returns new OptConfigurationBundle with value set to v.
+func NewOptConfigurationBundle(v ConfigurationBundle) OptConfigurationBundle {
+	return OptConfigurationBundle{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptConfigurationBundle is optional ConfigurationBundle.
+type OptConfigurationBundle struct {
+	Value ConfigurationBundle
+	Set   bool
+}
+
+// IsSet returns true if OptConfigurationBundle was set.
+func (o OptConfigurationBundle) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptConfigurationBundle) Reset() {
+	var v ConfigurationBundle
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptConfigurationBundle) SetTo(v ConfigurationBundle) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptConfigurationBundle) Get() (v ConfigurationBundle, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptConfigurationBundle) Or(d ConfigurationBundle) ConfigurationBundle {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -42735,38 +42325,38 @@ func (o OptOriginNotFoundDetails) Or(d OriginNotFoundDetails) OriginNotFoundDeta
 	return d
 }
 
-// NewOptOriginNotPermittedForClassDetails returns new OptOriginNotPermittedForClassDetails with value set to v.
-func NewOptOriginNotPermittedForClassDetails(v OriginNotPermittedForClassDetails) OptOriginNotPermittedForClassDetails {
-	return OptOriginNotPermittedForClassDetails{
+// NewOptOriginNotPermittedForModeDetails returns new OptOriginNotPermittedForModeDetails with value set to v.
+func NewOptOriginNotPermittedForModeDetails(v OriginNotPermittedForModeDetails) OptOriginNotPermittedForModeDetails {
+	return OptOriginNotPermittedForModeDetails{
 		Value: v,
 		Set:   true,
 	}
 }
 
-// OptOriginNotPermittedForClassDetails is optional OriginNotPermittedForClassDetails.
-type OptOriginNotPermittedForClassDetails struct {
-	Value OriginNotPermittedForClassDetails
+// OptOriginNotPermittedForModeDetails is optional OriginNotPermittedForModeDetails.
+type OptOriginNotPermittedForModeDetails struct {
+	Value OriginNotPermittedForModeDetails
 	Set   bool
 }
 
-// IsSet returns true if OptOriginNotPermittedForClassDetails was set.
-func (o OptOriginNotPermittedForClassDetails) IsSet() bool { return o.Set }
+// IsSet returns true if OptOriginNotPermittedForModeDetails was set.
+func (o OptOriginNotPermittedForModeDetails) IsSet() bool { return o.Set }
 
 // Reset unsets value.
-func (o *OptOriginNotPermittedForClassDetails) Reset() {
-	var v OriginNotPermittedForClassDetails
+func (o *OptOriginNotPermittedForModeDetails) Reset() {
+	var v OriginNotPermittedForModeDetails
 	o.Value = v
 	o.Set = false
 }
 
 // SetTo sets value to v.
-func (o *OptOriginNotPermittedForClassDetails) SetTo(v OriginNotPermittedForClassDetails) {
+func (o *OptOriginNotPermittedForModeDetails) SetTo(v OriginNotPermittedForModeDetails) {
 	o.Set = true
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-func (o OptOriginNotPermittedForClassDetails) Get() (v OriginNotPermittedForClassDetails, ok bool) {
+func (o OptOriginNotPermittedForModeDetails) Get() (v OriginNotPermittedForModeDetails, ok bool) {
 	if !o.Set {
 		return v, false
 	}
@@ -42774,7 +42364,7 @@ func (o OptOriginNotPermittedForClassDetails) Get() (v OriginNotPermittedForClas
 }
 
 // Or returns value if set, or given parameter if does not.
-func (o OptOriginNotPermittedForClassDetails) Or(d OriginNotPermittedForClassDetails) OriginNotPermittedForClassDetails {
+func (o OptOriginNotPermittedForModeDetails) Or(d OriginNotPermittedForModeDetails) OriginNotPermittedForModeDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -43103,6 +42693,52 @@ func (o OptPatchUserRequestAttributes) Or(d PatchUserRequestAttributes) PatchUse
 	return d
 }
 
+// NewOptPreviewNotFoundDetails returns new OptPreviewNotFoundDetails with value set to v.
+func NewOptPreviewNotFoundDetails(v PreviewNotFoundDetails) OptPreviewNotFoundDetails {
+	return OptPreviewNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPreviewNotFoundDetails is optional PreviewNotFoundDetails.
+type OptPreviewNotFoundDetails struct {
+	Value PreviewNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptPreviewNotFoundDetails was set.
+func (o OptPreviewNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPreviewNotFoundDetails) Reset() {
+	var v PreviewNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPreviewNotFoundDetails) SetTo(v PreviewNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPreviewNotFoundDetails) Get() (v PreviewNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPreviewNotFoundDetails) Or(d PreviewNotFoundDetails) PreviewNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptProjClaimExpiredDetails returns new OptProjClaimExpiredDetails with value set to v.
 func NewOptProjClaimExpiredDetails(v ProjClaimExpiredDetails) OptProjClaimExpiredDetails {
 	return OptProjClaimExpiredDetails{
@@ -43195,52 +42831,6 @@ func (o OptProjClaimWindowExpiredDetails) Or(d ProjClaimWindowExpiredDetails) Pr
 	return d
 }
 
-// NewOptProjClassChangeRefusedDetails returns new OptProjClassChangeRefusedDetails with value set to v.
-func NewOptProjClassChangeRefusedDetails(v ProjClassChangeRefusedDetails) OptProjClassChangeRefusedDetails {
-	return OptProjClassChangeRefusedDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptProjClassChangeRefusedDetails is optional ProjClassChangeRefusedDetails.
-type OptProjClassChangeRefusedDetails struct {
-	Value ProjClassChangeRefusedDetails
-	Set   bool
-}
-
-// IsSet returns true if OptProjClassChangeRefusedDetails was set.
-func (o OptProjClassChangeRefusedDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptProjClassChangeRefusedDetails) Reset() {
-	var v ProjClassChangeRefusedDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptProjClassChangeRefusedDetails) SetTo(v ProjClassChangeRefusedDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptProjClassChangeRefusedDetails) Get() (v ProjClassChangeRefusedDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptProjClassChangeRefusedDetails) Or(d ProjClassChangeRefusedDetails) ProjClassChangeRefusedDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptProjMissingIDDetails returns new OptProjMissingIDDetails with value set to v.
 func NewOptProjMissingIDDetails(v ProjMissingIDDetails) OptProjMissingIDDetails {
 	return OptProjMissingIDDetails{
@@ -43281,6 +42871,52 @@ func (o OptProjMissingIDDetails) Get() (v ProjMissingIDDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptProjMissingIDDetails) Or(d ProjMissingIDDetails) ProjMissingIDDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptProjModeChangeRefusedDetails returns new OptProjModeChangeRefusedDetails with value set to v.
+func NewOptProjModeChangeRefusedDetails(v ProjModeChangeRefusedDetails) OptProjModeChangeRefusedDetails {
+	return OptProjModeChangeRefusedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjModeChangeRefusedDetails is optional ProjModeChangeRefusedDetails.
+type OptProjModeChangeRefusedDetails struct {
+	Value ProjModeChangeRefusedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjModeChangeRefusedDetails was set.
+func (o OptProjModeChangeRefusedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjModeChangeRefusedDetails) Reset() {
+	var v ProjModeChangeRefusedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjModeChangeRefusedDetails) SetTo(v ProjModeChangeRefusedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjModeChangeRefusedDetails) Get() (v ProjModeChangeRefusedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjModeChangeRefusedDetails) Or(d ProjModeChangeRefusedDetails) ProjModeChangeRefusedDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -47427,42 +47063,35 @@ func (o OptVariableAppliesTo) Or(d VariableAppliesTo) VariableAppliesTo {
 	return d
 }
 
-// A live preview URL and when it stops being served.
+// One of a project's origins: a pattern and what it is for. A `primary`
+// pattern admits requests from URLs it matches; a `preview` pattern only
+// bounds which URLs a preview deploy may register, and a request from such a
+// URL is admitted by its live preview alone. `*` matches one or more
+// characters, none of them a dot; a literal beats a wildcard.
 // Ref: #
 type Origin struct {
-	Origin    string    `json:"origin"`
-	ExpiresAt time.Time `json:"expires_at"`
-	CreatedAt time.Time `json:"created_at"`
+	Pattern string     `json:"pattern"`
+	Kind    OriginKind `json:"kind"`
 }
 
-// GetOrigin returns the value of Origin.
-func (s *Origin) GetOrigin() string {
-	return s.Origin
+// GetPattern returns the value of Pattern.
+func (s *Origin) GetPattern() string {
+	return s.Pattern
 }
 
-// GetExpiresAt returns the value of ExpiresAt.
-func (s *Origin) GetExpiresAt() time.Time {
-	return s.ExpiresAt
+// GetKind returns the value of Kind.
+func (s *Origin) GetKind() OriginKind {
+	return s.Kind
 }
 
-// GetCreatedAt returns the value of CreatedAt.
-func (s *Origin) GetCreatedAt() time.Time {
-	return s.CreatedAt
+// SetPattern sets the value of Pattern.
+func (s *Origin) SetPattern(val string) {
+	s.Pattern = val
 }
 
-// SetOrigin sets the value of Origin.
-func (s *Origin) SetOrigin(val string) {
-	s.Origin = val
-}
-
-// SetExpiresAt sets the value of ExpiresAt.
-func (s *Origin) SetExpiresAt(val time.Time) {
-	s.ExpiresAt = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *Origin) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
+// SetKind sets the value of Kind.
+func (s *Origin) SetKind(val OriginKind) {
+	s.Kind = val
 }
 
 // Merged schema.
@@ -47516,6 +47145,47 @@ func (s *OriginInvalidDetails) init() OriginInvalidDetails {
 		*s = m
 	}
 	return m
+}
+
+type OriginKind string
+
+const (
+	OriginKindPrimary OriginKind = "primary"
+	OriginKindPreview OriginKind = "preview"
+)
+
+// AllValues returns all OriginKind values.
+func (OriginKind) AllValues() []OriginKind {
+	return []OriginKind{
+		OriginKindPrimary,
+		OriginKindPreview,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s OriginKind) MarshalText() ([]byte, error) {
+	switch s {
+	case OriginKindPrimary:
+		return []byte(s), nil
+	case OriginKindPreview:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *OriginKind) UnmarshalText(data []byte) error {
+	switch OriginKind(data) {
+	case OriginKindPrimary:
+		*s = OriginKindPrimary
+		return nil
+	case OriginKindPreview:
+		*s = OriginKindPreview
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Merged schema.
@@ -47573,49 +47243,49 @@ func (s *OriginNotFoundDetails) init() OriginNotFoundDetails {
 
 // Merged schema.
 // Ref: #
-type OriginNotPermittedForClass struct {
+type OriginNotPermittedForMode struct {
 	// Merged property.
 	Code string `json:"code"`
 	// Human-readable explanation of the error.
 	Message string `json:"message"`
 	// Additional error-specific context.
-	Details OptOriginNotPermittedForClassDetails `json:"details"`
+	Details OptOriginNotPermittedForModeDetails `json:"details"`
 }
 
 // GetCode returns the value of Code.
-func (s *OriginNotPermittedForClass) GetCode() string {
+func (s *OriginNotPermittedForMode) GetCode() string {
 	return s.Code
 }
 
 // GetMessage returns the value of Message.
-func (s *OriginNotPermittedForClass) GetMessage() string {
+func (s *OriginNotPermittedForMode) GetMessage() string {
 	return s.Message
 }
 
 // GetDetails returns the value of Details.
-func (s *OriginNotPermittedForClass) GetDetails() OptOriginNotPermittedForClassDetails {
+func (s *OriginNotPermittedForMode) GetDetails() OptOriginNotPermittedForModeDetails {
 	return s.Details
 }
 
 // SetCode sets the value of Code.
-func (s *OriginNotPermittedForClass) SetCode(val string) {
+func (s *OriginNotPermittedForMode) SetCode(val string) {
 	s.Code = val
 }
 
 // SetMessage sets the value of Message.
-func (s *OriginNotPermittedForClass) SetMessage(val string) {
+func (s *OriginNotPermittedForMode) SetMessage(val string) {
 	s.Message = val
 }
 
 // SetDetails sets the value of Details.
-func (s *OriginNotPermittedForClass) SetDetails(val OptOriginNotPermittedForClassDetails) {
+func (s *OriginNotPermittedForMode) SetDetails(val OptOriginNotPermittedForModeDetails) {
 	s.Details = val
 }
 
 // Additional error-specific context.
-type OriginNotPermittedForClassDetails map[string]jx.Raw
+type OriginNotPermittedForModeDetails map[string]jx.Raw
 
-func (s *OriginNotPermittedForClassDetails) init() OriginNotPermittedForClassDetails {
+func (s *OriginNotPermittedForModeDetails) init() OriginNotPermittedForModeDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -49507,6 +49177,97 @@ func (s *PatchUserRequestAttributes) init() PatchUserRequestAttributes {
 	return m
 }
 
+// A live preview URL and when it stops being served.
+// Ref: #
+type Preview struct {
+	Origin    string    `json:"origin"`
+	ExpiresAt time.Time `json:"expires_at"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetOrigin returns the value of Origin.
+func (s *Preview) GetOrigin() string {
+	return s.Origin
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *Preview) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *Preview) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetOrigin sets the value of Origin.
+func (s *Preview) SetOrigin(val string) {
+	s.Origin = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *Preview) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *Preview) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// Merged schema.
+// Ref: #
+type PreviewNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptPreviewNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *PreviewNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *PreviewNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *PreviewNotFound) GetDetails() OptPreviewNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *PreviewNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *PreviewNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *PreviewNotFound) SetDetails(val OptPreviewNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type PreviewNotFoundDetails map[string]jx.Raw
+
+func (s *PreviewNotFoundDetails) init() PreviewNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // Merged schema.
 // Ref: #
 type ProjClaimExpired struct {
@@ -49617,59 +49378,6 @@ func (s *ProjClaimWindowExpiredDetails) init() ProjClaimWindowExpiredDetails {
 
 // Merged schema.
 // Ref: #
-type ProjClassChangeRefused struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptProjClassChangeRefusedDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *ProjClassChangeRefused) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *ProjClassChangeRefused) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *ProjClassChangeRefused) GetDetails() OptProjClassChangeRefusedDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *ProjClassChangeRefused) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *ProjClassChangeRefused) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *ProjClassChangeRefused) SetDetails(val OptProjClassChangeRefusedDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type ProjClassChangeRefusedDetails map[string]jx.Raw
-
-func (s *ProjClassChangeRefusedDetails) init() ProjClassChangeRefusedDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-// Merged schema.
-// Ref: #
 type ProjMissingID struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -49713,6 +49421,59 @@ func (s *ProjMissingID) SetDetails(val OptProjMissingIDDetails) {
 type ProjMissingIDDetails map[string]jx.Raw
 
 func (s *ProjMissingIDDetails) init() ProjMissingIDDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ProjModeChangeRefused struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjModeChangeRefusedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjModeChangeRefused) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjModeChangeRefused) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjModeChangeRefused) GetDetails() OptProjModeChangeRefusedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjModeChangeRefused) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjModeChangeRefused) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjModeChangeRefused) SetDetails(val OptProjModeChangeRefusedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ProjModeChangeRefusedDetails map[string]jx.Raw
+
+func (s *ProjModeChangeRefusedDetails) init() ProjModeChangeRefusedDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -50041,52 +49802,6 @@ func (s *ProjPreviewNotLiveDetails) init() ProjPreviewNotLiveDetails {
 		*s = m
 	}
 	return m
-}
-
-// What the project is for. `sandbox` allows loopback origins, an empty
-// allowlist meaning allow-all, and any release named in a header. `production`
-// requires at least one pattern, refuses loopback and wildcard primaries, and
-// only serves a pinned release already deployed to the matched target.
-// Ref: #
-type ProjectClass string
-
-const (
-	ProjectClassSandbox    ProjectClass = "sandbox"
-	ProjectClassProduction ProjectClass = "production"
-)
-
-// AllValues returns all ProjectClass values.
-func (ProjectClass) AllValues() []ProjectClass {
-	return []ProjectClass{
-		ProjectClassSandbox,
-		ProjectClassProduction,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s ProjectClass) MarshalText() ([]byte, error) {
-	switch s {
-	case ProjectClassSandbox:
-		return []byte(s), nil
-	case ProjectClassProduction:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *ProjectClass) UnmarshalText(data []byte) error {
-	switch ProjectClass(data) {
-	case ProjectClassSandbox:
-		*s = ProjectClassSandbox
-		return nil
-	case ProjectClassProduction:
-		*s = ProjectClassProduction
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
 }
 
 // Merged schema.
@@ -50981,12 +50696,59 @@ func (s *ProjectDeletedEventDelegationType) UnmarshalText(data []byte) error {
 
 type ProjectID string
 
+// What the project is for. `sandbox` allows loopback origins, no origins
+// meaning allow-all, and any release named in a header. `production`
+// requires at least one pattern, refuses loopback and wildcard primaries, and
+// only serves a pinned release already deployed to the matched target.
+// Ref: #
+type ProjectMode string
+
+const (
+	ProjectModeSandbox    ProjectMode = "sandbox"
+	ProjectModeProduction ProjectMode = "production"
+)
+
+// AllValues returns all ProjectMode values.
+func (ProjectMode) AllValues() []ProjectMode {
+	return []ProjectMode{
+		ProjectModeSandbox,
+		ProjectModeProduction,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ProjectMode) MarshalText() ([]byte, error) {
+	switch s {
+	case ProjectModeSandbox:
+		return []byte(s), nil
+	case ProjectModeProduction:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ProjectMode) UnmarshalText(data []byte) error {
+	switch ProjectMode(data) {
+	case ProjectModeSandbox:
+		*s = ProjectModeSandbox
+		return nil
+	case ProjectModeProduction:
+		*s = ProjectModeProduction
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Shared allowlisted fields for `project.created` (full snapshot) and
 // `project.updated` (delta: only changed fields present).
 // Ref: #
 type ProjectPayload struct {
-	Name           OptString `json:"name"`
-	PreviewOrigins []string  `json:"preview_origins"`
+	Name    OptString `json:"name"`
+	Origins []string  `json:"origins"`
+	Mode    OptString `json:"mode"`
 	// The password hashing algorithm the project switched to. The empty string
 	// means it was handed back to the server default. Absent when the update
 	// did not touch hashing.
@@ -50998,9 +50760,14 @@ func (s *ProjectPayload) GetName() OptString {
 	return s.Name
 }
 
-// GetPreviewOrigins returns the value of PreviewOrigins.
-func (s *ProjectPayload) GetPreviewOrigins() []string {
-	return s.PreviewOrigins
+// GetOrigins returns the value of Origins.
+func (s *ProjectPayload) GetOrigins() []string {
+	return s.Origins
+}
+
+// GetMode returns the value of Mode.
+func (s *ProjectPayload) GetMode() OptString {
+	return s.Mode
 }
 
 // GetPasswordHashAlgorithm returns the value of PasswordHashAlgorithm.
@@ -51013,9 +50780,14 @@ func (s *ProjectPayload) SetName(val OptString) {
 	s.Name = val
 }
 
-// SetPreviewOrigins sets the value of PreviewOrigins.
-func (s *ProjectPayload) SetPreviewOrigins(val []string) {
-	s.PreviewOrigins = val
+// SetOrigins sets the value of Origins.
+func (s *ProjectPayload) SetOrigins(val []string) {
+	s.Origins = val
+}
+
+// SetMode sets the value of Mode.
+func (s *ProjectPayload) SetMode(val OptString) {
+	s.Mode = val
 }
 
 // SetPasswordHashAlgorithm sets the value of PasswordHashAlgorithm.
@@ -51029,10 +50801,10 @@ type ProjectResponse struct {
 	// The unique identifier of the project.
 	ID string `json:"id"`
 	// The name of the project.
-	Name  string       `json:"name"`
-	Class ProjectClass `json:"class"`
-	// The origin allowlist. Patterns with a kind; nothing here routes.
-	AllowedOrigins []AllowedOrigin `json:"allowed_origins"`
+	Name string      `json:"name"`
+	Mode ProjectMode `json:"mode"`
+	// The project's origins. Patterns with a kind; nothing here routes.
+	Origins []Origin `json:"origins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"created_at"`
 	// The time when the project was last updated.
@@ -51052,14 +50824,14 @@ func (s *ProjectResponse) GetName() string {
 	return s.Name
 }
 
-// GetClass returns the value of Class.
-func (s *ProjectResponse) GetClass() ProjectClass {
-	return s.Class
+// GetMode returns the value of Mode.
+func (s *ProjectResponse) GetMode() ProjectMode {
+	return s.Mode
 }
 
-// GetAllowedOrigins returns the value of AllowedOrigins.
-func (s *ProjectResponse) GetAllowedOrigins() []AllowedOrigin {
-	return s.AllowedOrigins
+// GetOrigins returns the value of Origins.
+func (s *ProjectResponse) GetOrigins() []Origin {
+	return s.Origins
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -51087,14 +50859,14 @@ func (s *ProjectResponse) SetName(val string) {
 	s.Name = val
 }
 
-// SetClass sets the value of Class.
-func (s *ProjectResponse) SetClass(val ProjectClass) {
-	s.Class = val
+// SetMode sets the value of Mode.
+func (s *ProjectResponse) SetMode(val ProjectMode) {
+	s.Mode = val
 }
 
-// SetAllowedOrigins sets the value of AllowedOrigins.
-func (s *ProjectResponse) SetAllowedOrigins(val []AllowedOrigin) {
-	s.AllowedOrigins = val
+// SetOrigins sets the value of Origins.
+func (s *ProjectResponse) SetOrigins(val []Origin) {
+	s.Origins = val
 }
 
 // SetCreatedAt sets the value of CreatedAt.
@@ -51112,9 +50884,9 @@ func (s *ProjectResponse) SetPasswordHash(val OptNilPasswordHashPolicy) {
 	s.PasswordHash = val
 }
 
-func (*ProjectResponse) getProjectRes()      {}
-func (*ProjectResponse) patchProjectRes()    {}
-func (*ProjectResponse) setProjectClassRes() {}
+func (*ProjectResponse) getProjectRes()     {}
+func (*ProjectResponse) patchProjectRes()   {}
+func (*ProjectResponse) setProjectModeRes() {}
 
 // Merged schema.
 // Ref: #
@@ -55679,9 +55451,9 @@ func (s *ReleaseSummary) SetMetadata(val ReleaseMetadata) {
 	s.Metadata = val
 }
 
-// RemoveAllowedOriginErrorResponse represents sum type.
-type RemoveAllowedOriginErrorResponse struct {
-	Type                   RemoveAllowedOriginErrorResponseType // switch on this field
+// RemoveOriginErrorResponse represents sum type.
+type RemoveOriginErrorResponse struct {
+	Type                   RemoveOriginErrorResponseType // switch on this field
 	AuthUnauthorized       AuthUnauthorized
 	EvtInvalid             EvtInvalid
 	Internal               Internal
@@ -55693,329 +55465,20 @@ type RemoveAllowedOriginErrorResponse struct {
 	ReqInvalid             ReqInvalid
 }
 
-// RemoveAllowedOriginErrorResponseType is oneOf type of RemoveAllowedOriginErrorResponse.
-type RemoveAllowedOriginErrorResponseType string
-
-// Possible values for RemoveAllowedOriginErrorResponseType.
-const (
-	AuthUnauthorizedRemoveAllowedOriginErrorResponse       RemoveAllowedOriginErrorResponseType = "auth.unauthorized"
-	EvtInvalidRemoveAllowedOriginErrorResponse             RemoveAllowedOriginErrorResponseType = "evt.invalid"
-	InternalRemoveAllowedOriginErrorResponse               RemoveAllowedOriginErrorResponseType = "internal"
-	OriginInvalidRemoveAllowedOriginErrorResponse          RemoveAllowedOriginErrorResponseType = "origin.invalid"
-	OriginNotFoundRemoveAllowedOriginErrorResponse         RemoveAllowedOriginErrorResponseType = "origin.not_found"
-	OriginPermissionDeniedRemoveAllowedOriginErrorResponse RemoveAllowedOriginErrorResponseType = "origin.permission_denied"
-	ProjNotFoundRemoveAllowedOriginErrorResponse           RemoveAllowedOriginErrorResponseType = "proj.not_found"
-	ProjPermissionDeniedRemoveAllowedOriginErrorResponse   RemoveAllowedOriginErrorResponseType = "proj.permission_denied"
-	ReqInvalidRemoveAllowedOriginErrorResponse             RemoveAllowedOriginErrorResponseType = "req.invalid"
-)
-
-// IsAuthUnauthorized reports whether RemoveAllowedOriginErrorResponse is AuthUnauthorized.
-func (s RemoveAllowedOriginErrorResponse) IsAuthUnauthorized() bool {
-	return s.Type == AuthUnauthorizedRemoveAllowedOriginErrorResponse
-}
-
-// IsEvtInvalid reports whether RemoveAllowedOriginErrorResponse is EvtInvalid.
-func (s RemoveAllowedOriginErrorResponse) IsEvtInvalid() bool {
-	return s.Type == EvtInvalidRemoveAllowedOriginErrorResponse
-}
-
-// IsInternal reports whether RemoveAllowedOriginErrorResponse is Internal.
-func (s RemoveAllowedOriginErrorResponse) IsInternal() bool {
-	return s.Type == InternalRemoveAllowedOriginErrorResponse
-}
-
-// IsOriginInvalid reports whether RemoveAllowedOriginErrorResponse is OriginInvalid.
-func (s RemoveAllowedOriginErrorResponse) IsOriginInvalid() bool {
-	return s.Type == OriginInvalidRemoveAllowedOriginErrorResponse
-}
-
-// IsOriginNotFound reports whether RemoveAllowedOriginErrorResponse is OriginNotFound.
-func (s RemoveAllowedOriginErrorResponse) IsOriginNotFound() bool {
-	return s.Type == OriginNotFoundRemoveAllowedOriginErrorResponse
-}
-
-// IsOriginPermissionDenied reports whether RemoveAllowedOriginErrorResponse is OriginPermissionDenied.
-func (s RemoveAllowedOriginErrorResponse) IsOriginPermissionDenied() bool {
-	return s.Type == OriginPermissionDeniedRemoveAllowedOriginErrorResponse
-}
-
-// IsProjNotFound reports whether RemoveAllowedOriginErrorResponse is ProjNotFound.
-func (s RemoveAllowedOriginErrorResponse) IsProjNotFound() bool {
-	return s.Type == ProjNotFoundRemoveAllowedOriginErrorResponse
-}
-
-// IsProjPermissionDenied reports whether RemoveAllowedOriginErrorResponse is ProjPermissionDenied.
-func (s RemoveAllowedOriginErrorResponse) IsProjPermissionDenied() bool {
-	return s.Type == ProjPermissionDeniedRemoveAllowedOriginErrorResponse
-}
-
-// IsReqInvalid reports whether RemoveAllowedOriginErrorResponse is ReqInvalid.
-func (s RemoveAllowedOriginErrorResponse) IsReqInvalid() bool {
-	return s.Type == ReqInvalidRemoveAllowedOriginErrorResponse
-}
-
-// SetAuthUnauthorized sets RemoveAllowedOriginErrorResponse to AuthUnauthorized.
-func (s *RemoveAllowedOriginErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
-	s.Type = AuthUnauthorizedRemoveAllowedOriginErrorResponse
-	s.AuthUnauthorized = v
-}
-
-// GetAuthUnauthorized returns AuthUnauthorized and true boolean if RemoveAllowedOriginErrorResponse is AuthUnauthorized.
-func (s RemoveAllowedOriginErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
-	if !s.IsAuthUnauthorized() {
-		return v, false
-	}
-	return s.AuthUnauthorized, true
-}
-
-// NewAuthUnauthorizedRemoveAllowedOriginErrorResponse returns new RemoveAllowedOriginErrorResponse from AuthUnauthorized.
-func NewAuthUnauthorizedRemoveAllowedOriginErrorResponse(v AuthUnauthorized) RemoveAllowedOriginErrorResponse {
-	var s RemoveAllowedOriginErrorResponse
-	s.SetAuthUnauthorized(v)
-	return s
-}
-
-// SetEvtInvalid sets RemoveAllowedOriginErrorResponse to EvtInvalid.
-func (s *RemoveAllowedOriginErrorResponse) SetEvtInvalid(v EvtInvalid) {
-	s.Type = EvtInvalidRemoveAllowedOriginErrorResponse
-	s.EvtInvalid = v
-}
-
-// GetEvtInvalid returns EvtInvalid and true boolean if RemoveAllowedOriginErrorResponse is EvtInvalid.
-func (s RemoveAllowedOriginErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
-	if !s.IsEvtInvalid() {
-		return v, false
-	}
-	return s.EvtInvalid, true
-}
-
-// NewEvtInvalidRemoveAllowedOriginErrorResponse returns new RemoveAllowedOriginErrorResponse from EvtInvalid.
-func NewEvtInvalidRemoveAllowedOriginErrorResponse(v EvtInvalid) RemoveAllowedOriginErrorResponse {
-	var s RemoveAllowedOriginErrorResponse
-	s.SetEvtInvalid(v)
-	return s
-}
-
-// SetInternal sets RemoveAllowedOriginErrorResponse to Internal.
-func (s *RemoveAllowedOriginErrorResponse) SetInternal(v Internal) {
-	s.Type = InternalRemoveAllowedOriginErrorResponse
-	s.Internal = v
-}
-
-// GetInternal returns Internal and true boolean if RemoveAllowedOriginErrorResponse is Internal.
-func (s RemoveAllowedOriginErrorResponse) GetInternal() (v Internal, ok bool) {
-	if !s.IsInternal() {
-		return v, false
-	}
-	return s.Internal, true
-}
-
-// NewInternalRemoveAllowedOriginErrorResponse returns new RemoveAllowedOriginErrorResponse from Internal.
-func NewInternalRemoveAllowedOriginErrorResponse(v Internal) RemoveAllowedOriginErrorResponse {
-	var s RemoveAllowedOriginErrorResponse
-	s.SetInternal(v)
-	return s
-}
-
-// SetOriginInvalid sets RemoveAllowedOriginErrorResponse to OriginInvalid.
-func (s *RemoveAllowedOriginErrorResponse) SetOriginInvalid(v OriginInvalid) {
-	s.Type = OriginInvalidRemoveAllowedOriginErrorResponse
-	s.OriginInvalid = v
-}
-
-// GetOriginInvalid returns OriginInvalid and true boolean if RemoveAllowedOriginErrorResponse is OriginInvalid.
-func (s RemoveAllowedOriginErrorResponse) GetOriginInvalid() (v OriginInvalid, ok bool) {
-	if !s.IsOriginInvalid() {
-		return v, false
-	}
-	return s.OriginInvalid, true
-}
-
-// NewOriginInvalidRemoveAllowedOriginErrorResponse returns new RemoveAllowedOriginErrorResponse from OriginInvalid.
-func NewOriginInvalidRemoveAllowedOriginErrorResponse(v OriginInvalid) RemoveAllowedOriginErrorResponse {
-	var s RemoveAllowedOriginErrorResponse
-	s.SetOriginInvalid(v)
-	return s
-}
-
-// SetOriginNotFound sets RemoveAllowedOriginErrorResponse to OriginNotFound.
-func (s *RemoveAllowedOriginErrorResponse) SetOriginNotFound(v OriginNotFound) {
-	s.Type = OriginNotFoundRemoveAllowedOriginErrorResponse
-	s.OriginNotFound = v
-}
-
-// GetOriginNotFound returns OriginNotFound and true boolean if RemoveAllowedOriginErrorResponse is OriginNotFound.
-func (s RemoveAllowedOriginErrorResponse) GetOriginNotFound() (v OriginNotFound, ok bool) {
-	if !s.IsOriginNotFound() {
-		return v, false
-	}
-	return s.OriginNotFound, true
-}
-
-// NewOriginNotFoundRemoveAllowedOriginErrorResponse returns new RemoveAllowedOriginErrorResponse from OriginNotFound.
-func NewOriginNotFoundRemoveAllowedOriginErrorResponse(v OriginNotFound) RemoveAllowedOriginErrorResponse {
-	var s RemoveAllowedOriginErrorResponse
-	s.SetOriginNotFound(v)
-	return s
-}
-
-// SetOriginPermissionDenied sets RemoveAllowedOriginErrorResponse to OriginPermissionDenied.
-func (s *RemoveAllowedOriginErrorResponse) SetOriginPermissionDenied(v OriginPermissionDenied) {
-	s.Type = OriginPermissionDeniedRemoveAllowedOriginErrorResponse
-	s.OriginPermissionDenied = v
-}
-
-// GetOriginPermissionDenied returns OriginPermissionDenied and true boolean if RemoveAllowedOriginErrorResponse is OriginPermissionDenied.
-func (s RemoveAllowedOriginErrorResponse) GetOriginPermissionDenied() (v OriginPermissionDenied, ok bool) {
-	if !s.IsOriginPermissionDenied() {
-		return v, false
-	}
-	return s.OriginPermissionDenied, true
-}
-
-// NewOriginPermissionDeniedRemoveAllowedOriginErrorResponse returns new RemoveAllowedOriginErrorResponse from OriginPermissionDenied.
-func NewOriginPermissionDeniedRemoveAllowedOriginErrorResponse(v OriginPermissionDenied) RemoveAllowedOriginErrorResponse {
-	var s RemoveAllowedOriginErrorResponse
-	s.SetOriginPermissionDenied(v)
-	return s
-}
-
-// SetProjNotFound sets RemoveAllowedOriginErrorResponse to ProjNotFound.
-func (s *RemoveAllowedOriginErrorResponse) SetProjNotFound(v ProjNotFound) {
-	s.Type = ProjNotFoundRemoveAllowedOriginErrorResponse
-	s.ProjNotFound = v
-}
-
-// GetProjNotFound returns ProjNotFound and true boolean if RemoveAllowedOriginErrorResponse is ProjNotFound.
-func (s RemoveAllowedOriginErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
-	if !s.IsProjNotFound() {
-		return v, false
-	}
-	return s.ProjNotFound, true
-}
-
-// NewProjNotFoundRemoveAllowedOriginErrorResponse returns new RemoveAllowedOriginErrorResponse from ProjNotFound.
-func NewProjNotFoundRemoveAllowedOriginErrorResponse(v ProjNotFound) RemoveAllowedOriginErrorResponse {
-	var s RemoveAllowedOriginErrorResponse
-	s.SetProjNotFound(v)
-	return s
-}
-
-// SetProjPermissionDenied sets RemoveAllowedOriginErrorResponse to ProjPermissionDenied.
-func (s *RemoveAllowedOriginErrorResponse) SetProjPermissionDenied(v ProjPermissionDenied) {
-	s.Type = ProjPermissionDeniedRemoveAllowedOriginErrorResponse
-	s.ProjPermissionDenied = v
-}
-
-// GetProjPermissionDenied returns ProjPermissionDenied and true boolean if RemoveAllowedOriginErrorResponse is ProjPermissionDenied.
-func (s RemoveAllowedOriginErrorResponse) GetProjPermissionDenied() (v ProjPermissionDenied, ok bool) {
-	if !s.IsProjPermissionDenied() {
-		return v, false
-	}
-	return s.ProjPermissionDenied, true
-}
-
-// NewProjPermissionDeniedRemoveAllowedOriginErrorResponse returns new RemoveAllowedOriginErrorResponse from ProjPermissionDenied.
-func NewProjPermissionDeniedRemoveAllowedOriginErrorResponse(v ProjPermissionDenied) RemoveAllowedOriginErrorResponse {
-	var s RemoveAllowedOriginErrorResponse
-	s.SetProjPermissionDenied(v)
-	return s
-}
-
-// SetReqInvalid sets RemoveAllowedOriginErrorResponse to ReqInvalid.
-func (s *RemoveAllowedOriginErrorResponse) SetReqInvalid(v ReqInvalid) {
-	s.Type = ReqInvalidRemoveAllowedOriginErrorResponse
-	s.ReqInvalid = v
-}
-
-// GetReqInvalid returns ReqInvalid and true boolean if RemoveAllowedOriginErrorResponse is ReqInvalid.
-func (s RemoveAllowedOriginErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
-	if !s.IsReqInvalid() {
-		return v, false
-	}
-	return s.ReqInvalid, true
-}
-
-// NewReqInvalidRemoveAllowedOriginErrorResponse returns new RemoveAllowedOriginErrorResponse from ReqInvalid.
-func NewReqInvalidRemoveAllowedOriginErrorResponse(v ReqInvalid) RemoveAllowedOriginErrorResponse {
-	var s RemoveAllowedOriginErrorResponse
-	s.SetReqInvalid(v)
-	return s
-}
-
-// RemoveAllowedOriginErrorResponseStatusCode wraps RemoveAllowedOriginErrorResponse with StatusCode.
-type RemoveAllowedOriginErrorResponseStatusCode struct {
-	StatusCode int
-	Response   RemoveAllowedOriginErrorResponse
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *RemoveAllowedOriginErrorResponseStatusCode) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// GetResponse returns the value of Response.
-func (s *RemoveAllowedOriginErrorResponseStatusCode) GetResponse() RemoveAllowedOriginErrorResponse {
-	return s.Response
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *RemoveAllowedOriginErrorResponseStatusCode) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-// SetResponse sets the value of Response.
-func (s *RemoveAllowedOriginErrorResponseStatusCode) SetResponse(val RemoveAllowedOriginErrorResponse) {
-	s.Response = val
-}
-
-func (*RemoveAllowedOriginErrorResponseStatusCode) removeAllowedOriginRes() {}
-
-// RemoveAllowedOriginNoContent is response for RemoveAllowedOrigin operation.
-type RemoveAllowedOriginNoContent struct{}
-
-func (*RemoveAllowedOriginNoContent) removeAllowedOriginRes() {}
-
-type RemoveAllowedOriginReq struct {
-	Pattern string `json:"pattern"`
-}
-
-// GetPattern returns the value of Pattern.
-func (s *RemoveAllowedOriginReq) GetPattern() string {
-	return s.Pattern
-}
-
-// SetPattern sets the value of Pattern.
-func (s *RemoveAllowedOriginReq) SetPattern(val string) {
-	s.Pattern = val
-}
-
-// RemoveOriginErrorResponse represents sum type.
-type RemoveOriginErrorResponse struct {
-	Type                RemoveOriginErrorResponseType // switch on this field
-	AuthUnauthorized    AuthUnauthorized
-	DepInvalid          DepInvalid
-	DepNotFound         DepNotFound
-	DepPermissionDenied DepPermissionDenied
-	Internal            Internal
-	OriginInvalid       OriginInvalid
-	OriginNotFound      OriginNotFound
-	ReqInvalid          ReqInvalid
-}
-
 // RemoveOriginErrorResponseType is oneOf type of RemoveOriginErrorResponse.
 type RemoveOriginErrorResponseType string
 
 // Possible values for RemoveOriginErrorResponseType.
 const (
-	AuthUnauthorizedRemoveOriginErrorResponse    RemoveOriginErrorResponseType = "auth.unauthorized"
-	DepInvalidRemoveOriginErrorResponse          RemoveOriginErrorResponseType = "dep.invalid"
-	DepNotFoundRemoveOriginErrorResponse         RemoveOriginErrorResponseType = "dep.not_found"
-	DepPermissionDeniedRemoveOriginErrorResponse RemoveOriginErrorResponseType = "dep.permission_denied"
-	InternalRemoveOriginErrorResponse            RemoveOriginErrorResponseType = "internal"
-	OriginInvalidRemoveOriginErrorResponse       RemoveOriginErrorResponseType = "origin.invalid"
-	OriginNotFoundRemoveOriginErrorResponse      RemoveOriginErrorResponseType = "origin.not_found"
-	ReqInvalidRemoveOriginErrorResponse          RemoveOriginErrorResponseType = "req.invalid"
+	AuthUnauthorizedRemoveOriginErrorResponse       RemoveOriginErrorResponseType = "auth.unauthorized"
+	EvtInvalidRemoveOriginErrorResponse             RemoveOriginErrorResponseType = "evt.invalid"
+	InternalRemoveOriginErrorResponse               RemoveOriginErrorResponseType = "internal"
+	OriginInvalidRemoveOriginErrorResponse          RemoveOriginErrorResponseType = "origin.invalid"
+	OriginNotFoundRemoveOriginErrorResponse         RemoveOriginErrorResponseType = "origin.not_found"
+	OriginPermissionDeniedRemoveOriginErrorResponse RemoveOriginErrorResponseType = "origin.permission_denied"
+	ProjNotFoundRemoveOriginErrorResponse           RemoveOriginErrorResponseType = "proj.not_found"
+	ProjPermissionDeniedRemoveOriginErrorResponse   RemoveOriginErrorResponseType = "proj.permission_denied"
+	ReqInvalidRemoveOriginErrorResponse             RemoveOriginErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether RemoveOriginErrorResponse is AuthUnauthorized.
@@ -56023,19 +55486,9 @@ func (s RemoveOriginErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedRemoveOriginErrorResponse
 }
 
-// IsDepInvalid reports whether RemoveOriginErrorResponse is DepInvalid.
-func (s RemoveOriginErrorResponse) IsDepInvalid() bool {
-	return s.Type == DepInvalidRemoveOriginErrorResponse
-}
-
-// IsDepNotFound reports whether RemoveOriginErrorResponse is DepNotFound.
-func (s RemoveOriginErrorResponse) IsDepNotFound() bool {
-	return s.Type == DepNotFoundRemoveOriginErrorResponse
-}
-
-// IsDepPermissionDenied reports whether RemoveOriginErrorResponse is DepPermissionDenied.
-func (s RemoveOriginErrorResponse) IsDepPermissionDenied() bool {
-	return s.Type == DepPermissionDeniedRemoveOriginErrorResponse
+// IsEvtInvalid reports whether RemoveOriginErrorResponse is EvtInvalid.
+func (s RemoveOriginErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidRemoveOriginErrorResponse
 }
 
 // IsInternal reports whether RemoveOriginErrorResponse is Internal.
@@ -56051,6 +55504,21 @@ func (s RemoveOriginErrorResponse) IsOriginInvalid() bool {
 // IsOriginNotFound reports whether RemoveOriginErrorResponse is OriginNotFound.
 func (s RemoveOriginErrorResponse) IsOriginNotFound() bool {
 	return s.Type == OriginNotFoundRemoveOriginErrorResponse
+}
+
+// IsOriginPermissionDenied reports whether RemoveOriginErrorResponse is OriginPermissionDenied.
+func (s RemoveOriginErrorResponse) IsOriginPermissionDenied() bool {
+	return s.Type == OriginPermissionDeniedRemoveOriginErrorResponse
+}
+
+// IsProjNotFound reports whether RemoveOriginErrorResponse is ProjNotFound.
+func (s RemoveOriginErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundRemoveOriginErrorResponse
+}
+
+// IsProjPermissionDenied reports whether RemoveOriginErrorResponse is ProjPermissionDenied.
+func (s RemoveOriginErrorResponse) IsProjPermissionDenied() bool {
+	return s.Type == ProjPermissionDeniedRemoveOriginErrorResponse
 }
 
 // IsReqInvalid reports whether RemoveOriginErrorResponse is ReqInvalid.
@@ -56079,66 +55547,24 @@ func NewAuthUnauthorizedRemoveOriginErrorResponse(v AuthUnauthorized) RemoveOrig
 	return s
 }
 
-// SetDepInvalid sets RemoveOriginErrorResponse to DepInvalid.
-func (s *RemoveOriginErrorResponse) SetDepInvalid(v DepInvalid) {
-	s.Type = DepInvalidRemoveOriginErrorResponse
-	s.DepInvalid = v
+// SetEvtInvalid sets RemoveOriginErrorResponse to EvtInvalid.
+func (s *RemoveOriginErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidRemoveOriginErrorResponse
+	s.EvtInvalid = v
 }
 
-// GetDepInvalid returns DepInvalid and true boolean if RemoveOriginErrorResponse is DepInvalid.
-func (s RemoveOriginErrorResponse) GetDepInvalid() (v DepInvalid, ok bool) {
-	if !s.IsDepInvalid() {
+// GetEvtInvalid returns EvtInvalid and true boolean if RemoveOriginErrorResponse is EvtInvalid.
+func (s RemoveOriginErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
 		return v, false
 	}
-	return s.DepInvalid, true
+	return s.EvtInvalid, true
 }
 
-// NewDepInvalidRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from DepInvalid.
-func NewDepInvalidRemoveOriginErrorResponse(v DepInvalid) RemoveOriginErrorResponse {
+// NewEvtInvalidRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from EvtInvalid.
+func NewEvtInvalidRemoveOriginErrorResponse(v EvtInvalid) RemoveOriginErrorResponse {
 	var s RemoveOriginErrorResponse
-	s.SetDepInvalid(v)
-	return s
-}
-
-// SetDepNotFound sets RemoveOriginErrorResponse to DepNotFound.
-func (s *RemoveOriginErrorResponse) SetDepNotFound(v DepNotFound) {
-	s.Type = DepNotFoundRemoveOriginErrorResponse
-	s.DepNotFound = v
-}
-
-// GetDepNotFound returns DepNotFound and true boolean if RemoveOriginErrorResponse is DepNotFound.
-func (s RemoveOriginErrorResponse) GetDepNotFound() (v DepNotFound, ok bool) {
-	if !s.IsDepNotFound() {
-		return v, false
-	}
-	return s.DepNotFound, true
-}
-
-// NewDepNotFoundRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from DepNotFound.
-func NewDepNotFoundRemoveOriginErrorResponse(v DepNotFound) RemoveOriginErrorResponse {
-	var s RemoveOriginErrorResponse
-	s.SetDepNotFound(v)
-	return s
-}
-
-// SetDepPermissionDenied sets RemoveOriginErrorResponse to DepPermissionDenied.
-func (s *RemoveOriginErrorResponse) SetDepPermissionDenied(v DepPermissionDenied) {
-	s.Type = DepPermissionDeniedRemoveOriginErrorResponse
-	s.DepPermissionDenied = v
-}
-
-// GetDepPermissionDenied returns DepPermissionDenied and true boolean if RemoveOriginErrorResponse is DepPermissionDenied.
-func (s RemoveOriginErrorResponse) GetDepPermissionDenied() (v DepPermissionDenied, ok bool) {
-	if !s.IsDepPermissionDenied() {
-		return v, false
-	}
-	return s.DepPermissionDenied, true
-}
-
-// NewDepPermissionDeniedRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from DepPermissionDenied.
-func NewDepPermissionDeniedRemoveOriginErrorResponse(v DepPermissionDenied) RemoveOriginErrorResponse {
-	var s RemoveOriginErrorResponse
-	s.SetDepPermissionDenied(v)
+	s.SetEvtInvalid(v)
 	return s
 }
 
@@ -56205,6 +55631,69 @@ func NewOriginNotFoundRemoveOriginErrorResponse(v OriginNotFound) RemoveOriginEr
 	return s
 }
 
+// SetOriginPermissionDenied sets RemoveOriginErrorResponse to OriginPermissionDenied.
+func (s *RemoveOriginErrorResponse) SetOriginPermissionDenied(v OriginPermissionDenied) {
+	s.Type = OriginPermissionDeniedRemoveOriginErrorResponse
+	s.OriginPermissionDenied = v
+}
+
+// GetOriginPermissionDenied returns OriginPermissionDenied and true boolean if RemoveOriginErrorResponse is OriginPermissionDenied.
+func (s RemoveOriginErrorResponse) GetOriginPermissionDenied() (v OriginPermissionDenied, ok bool) {
+	if !s.IsOriginPermissionDenied() {
+		return v, false
+	}
+	return s.OriginPermissionDenied, true
+}
+
+// NewOriginPermissionDeniedRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from OriginPermissionDenied.
+func NewOriginPermissionDeniedRemoveOriginErrorResponse(v OriginPermissionDenied) RemoveOriginErrorResponse {
+	var s RemoveOriginErrorResponse
+	s.SetOriginPermissionDenied(v)
+	return s
+}
+
+// SetProjNotFound sets RemoveOriginErrorResponse to ProjNotFound.
+func (s *RemoveOriginErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundRemoveOriginErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if RemoveOriginErrorResponse is ProjNotFound.
+func (s RemoveOriginErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from ProjNotFound.
+func NewProjNotFoundRemoveOriginErrorResponse(v ProjNotFound) RemoveOriginErrorResponse {
+	var s RemoveOriginErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetProjPermissionDenied sets RemoveOriginErrorResponse to ProjPermissionDenied.
+func (s *RemoveOriginErrorResponse) SetProjPermissionDenied(v ProjPermissionDenied) {
+	s.Type = ProjPermissionDeniedRemoveOriginErrorResponse
+	s.ProjPermissionDenied = v
+}
+
+// GetProjPermissionDenied returns ProjPermissionDenied and true boolean if RemoveOriginErrorResponse is ProjPermissionDenied.
+func (s RemoveOriginErrorResponse) GetProjPermissionDenied() (v ProjPermissionDenied, ok bool) {
+	if !s.IsProjPermissionDenied() {
+		return v, false
+	}
+	return s.ProjPermissionDenied, true
+}
+
+// NewProjPermissionDeniedRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from ProjPermissionDenied.
+func NewProjPermissionDeniedRemoveOriginErrorResponse(v ProjPermissionDenied) RemoveOriginErrorResponse {
+	var s RemoveOriginErrorResponse
+	s.SetProjPermissionDenied(v)
+	return s
+}
+
 // SetReqInvalid sets RemoveOriginErrorResponse to ReqInvalid.
 func (s *RemoveOriginErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidRemoveOriginErrorResponse
@@ -56260,16 +55749,299 @@ type RemoveOriginNoContent struct{}
 func (*RemoveOriginNoContent) removeOriginRes() {}
 
 type RemoveOriginReq struct {
+	Pattern string `json:"pattern"`
+}
+
+// GetPattern returns the value of Pattern.
+func (s *RemoveOriginReq) GetPattern() string {
+	return s.Pattern
+}
+
+// SetPattern sets the value of Pattern.
+func (s *RemoveOriginReq) SetPattern(val string) {
+	s.Pattern = val
+}
+
+// RemovePreviewErrorResponse represents sum type.
+type RemovePreviewErrorResponse struct {
+	Type                RemovePreviewErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	DepInvalid          DepInvalid
+	DepNotFound         DepNotFound
+	DepPermissionDenied DepPermissionDenied
+	Internal            Internal
+	OriginInvalid       OriginInvalid
+	PreviewNotFound     PreviewNotFound
+	ReqInvalid          ReqInvalid
+}
+
+// RemovePreviewErrorResponseType is oneOf type of RemovePreviewErrorResponse.
+type RemovePreviewErrorResponseType string
+
+// Possible values for RemovePreviewErrorResponseType.
+const (
+	AuthUnauthorizedRemovePreviewErrorResponse    RemovePreviewErrorResponseType = "auth.unauthorized"
+	DepInvalidRemovePreviewErrorResponse          RemovePreviewErrorResponseType = "dep.invalid"
+	DepNotFoundRemovePreviewErrorResponse         RemovePreviewErrorResponseType = "dep.not_found"
+	DepPermissionDeniedRemovePreviewErrorResponse RemovePreviewErrorResponseType = "dep.permission_denied"
+	InternalRemovePreviewErrorResponse            RemovePreviewErrorResponseType = "internal"
+	OriginInvalidRemovePreviewErrorResponse       RemovePreviewErrorResponseType = "origin.invalid"
+	PreviewNotFoundRemovePreviewErrorResponse     RemovePreviewErrorResponseType = "preview.not_found"
+	ReqInvalidRemovePreviewErrorResponse          RemovePreviewErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether RemovePreviewErrorResponse is AuthUnauthorized.
+func (s RemovePreviewErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedRemovePreviewErrorResponse
+}
+
+// IsDepInvalid reports whether RemovePreviewErrorResponse is DepInvalid.
+func (s RemovePreviewErrorResponse) IsDepInvalid() bool {
+	return s.Type == DepInvalidRemovePreviewErrorResponse
+}
+
+// IsDepNotFound reports whether RemovePreviewErrorResponse is DepNotFound.
+func (s RemovePreviewErrorResponse) IsDepNotFound() bool {
+	return s.Type == DepNotFoundRemovePreviewErrorResponse
+}
+
+// IsDepPermissionDenied reports whether RemovePreviewErrorResponse is DepPermissionDenied.
+func (s RemovePreviewErrorResponse) IsDepPermissionDenied() bool {
+	return s.Type == DepPermissionDeniedRemovePreviewErrorResponse
+}
+
+// IsInternal reports whether RemovePreviewErrorResponse is Internal.
+func (s RemovePreviewErrorResponse) IsInternal() bool {
+	return s.Type == InternalRemovePreviewErrorResponse
+}
+
+// IsOriginInvalid reports whether RemovePreviewErrorResponse is OriginInvalid.
+func (s RemovePreviewErrorResponse) IsOriginInvalid() bool {
+	return s.Type == OriginInvalidRemovePreviewErrorResponse
+}
+
+// IsPreviewNotFound reports whether RemovePreviewErrorResponse is PreviewNotFound.
+func (s RemovePreviewErrorResponse) IsPreviewNotFound() bool {
+	return s.Type == PreviewNotFoundRemovePreviewErrorResponse
+}
+
+// IsReqInvalid reports whether RemovePreviewErrorResponse is ReqInvalid.
+func (s RemovePreviewErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidRemovePreviewErrorResponse
+}
+
+// SetAuthUnauthorized sets RemovePreviewErrorResponse to AuthUnauthorized.
+func (s *RemovePreviewErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedRemovePreviewErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if RemovePreviewErrorResponse is AuthUnauthorized.
+func (s RemovePreviewErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedRemovePreviewErrorResponse(v AuthUnauthorized) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetDepInvalid sets RemovePreviewErrorResponse to DepInvalid.
+func (s *RemovePreviewErrorResponse) SetDepInvalid(v DepInvalid) {
+	s.Type = DepInvalidRemovePreviewErrorResponse
+	s.DepInvalid = v
+}
+
+// GetDepInvalid returns DepInvalid and true boolean if RemovePreviewErrorResponse is DepInvalid.
+func (s RemovePreviewErrorResponse) GetDepInvalid() (v DepInvalid, ok bool) {
+	if !s.IsDepInvalid() {
+		return v, false
+	}
+	return s.DepInvalid, true
+}
+
+// NewDepInvalidRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from DepInvalid.
+func NewDepInvalidRemovePreviewErrorResponse(v DepInvalid) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetDepInvalid(v)
+	return s
+}
+
+// SetDepNotFound sets RemovePreviewErrorResponse to DepNotFound.
+func (s *RemovePreviewErrorResponse) SetDepNotFound(v DepNotFound) {
+	s.Type = DepNotFoundRemovePreviewErrorResponse
+	s.DepNotFound = v
+}
+
+// GetDepNotFound returns DepNotFound and true boolean if RemovePreviewErrorResponse is DepNotFound.
+func (s RemovePreviewErrorResponse) GetDepNotFound() (v DepNotFound, ok bool) {
+	if !s.IsDepNotFound() {
+		return v, false
+	}
+	return s.DepNotFound, true
+}
+
+// NewDepNotFoundRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from DepNotFound.
+func NewDepNotFoundRemovePreviewErrorResponse(v DepNotFound) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetDepNotFound(v)
+	return s
+}
+
+// SetDepPermissionDenied sets RemovePreviewErrorResponse to DepPermissionDenied.
+func (s *RemovePreviewErrorResponse) SetDepPermissionDenied(v DepPermissionDenied) {
+	s.Type = DepPermissionDeniedRemovePreviewErrorResponse
+	s.DepPermissionDenied = v
+}
+
+// GetDepPermissionDenied returns DepPermissionDenied and true boolean if RemovePreviewErrorResponse is DepPermissionDenied.
+func (s RemovePreviewErrorResponse) GetDepPermissionDenied() (v DepPermissionDenied, ok bool) {
+	if !s.IsDepPermissionDenied() {
+		return v, false
+	}
+	return s.DepPermissionDenied, true
+}
+
+// NewDepPermissionDeniedRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from DepPermissionDenied.
+func NewDepPermissionDeniedRemovePreviewErrorResponse(v DepPermissionDenied) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetDepPermissionDenied(v)
+	return s
+}
+
+// SetInternal sets RemovePreviewErrorResponse to Internal.
+func (s *RemovePreviewErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalRemovePreviewErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if RemovePreviewErrorResponse is Internal.
+func (s RemovePreviewErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from Internal.
+func NewInternalRemovePreviewErrorResponse(v Internal) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetOriginInvalid sets RemovePreviewErrorResponse to OriginInvalid.
+func (s *RemovePreviewErrorResponse) SetOriginInvalid(v OriginInvalid) {
+	s.Type = OriginInvalidRemovePreviewErrorResponse
+	s.OriginInvalid = v
+}
+
+// GetOriginInvalid returns OriginInvalid and true boolean if RemovePreviewErrorResponse is OriginInvalid.
+func (s RemovePreviewErrorResponse) GetOriginInvalid() (v OriginInvalid, ok bool) {
+	if !s.IsOriginInvalid() {
+		return v, false
+	}
+	return s.OriginInvalid, true
+}
+
+// NewOriginInvalidRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from OriginInvalid.
+func NewOriginInvalidRemovePreviewErrorResponse(v OriginInvalid) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetOriginInvalid(v)
+	return s
+}
+
+// SetPreviewNotFound sets RemovePreviewErrorResponse to PreviewNotFound.
+func (s *RemovePreviewErrorResponse) SetPreviewNotFound(v PreviewNotFound) {
+	s.Type = PreviewNotFoundRemovePreviewErrorResponse
+	s.PreviewNotFound = v
+}
+
+// GetPreviewNotFound returns PreviewNotFound and true boolean if RemovePreviewErrorResponse is PreviewNotFound.
+func (s RemovePreviewErrorResponse) GetPreviewNotFound() (v PreviewNotFound, ok bool) {
+	if !s.IsPreviewNotFound() {
+		return v, false
+	}
+	return s.PreviewNotFound, true
+}
+
+// NewPreviewNotFoundRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from PreviewNotFound.
+func NewPreviewNotFoundRemovePreviewErrorResponse(v PreviewNotFound) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetPreviewNotFound(v)
+	return s
+}
+
+// SetReqInvalid sets RemovePreviewErrorResponse to ReqInvalid.
+func (s *RemovePreviewErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidRemovePreviewErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if RemovePreviewErrorResponse is ReqInvalid.
+func (s RemovePreviewErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from ReqInvalid.
+func NewReqInvalidRemovePreviewErrorResponse(v ReqInvalid) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// RemovePreviewErrorResponseStatusCode wraps RemovePreviewErrorResponse with StatusCode.
+type RemovePreviewErrorResponseStatusCode struct {
+	StatusCode int
+	Response   RemovePreviewErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *RemovePreviewErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *RemovePreviewErrorResponseStatusCode) GetResponse() RemovePreviewErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *RemovePreviewErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *RemovePreviewErrorResponseStatusCode) SetResponse(val RemovePreviewErrorResponse) {
+	s.Response = val
+}
+
+func (*RemovePreviewErrorResponseStatusCode) removePreviewRes() {}
+
+// RemovePreviewNoContent is response for RemovePreview operation.
+type RemovePreviewNoContent struct{}
+
+func (*RemovePreviewNoContent) removePreviewRes() {}
+
+type RemovePreviewReq struct {
 	Origin string `json:"origin"`
 }
 
 // GetOrigin returns the value of Origin.
-func (s *RemoveOriginReq) GetOrigin() string {
+func (s *RemovePreviewReq) GetOrigin() string {
 	return s.Origin
 }
 
 // SetOrigin sets the value of Origin.
-func (s *RemoveOriginReq) SetOrigin(val string) {
+func (s *RemovePreviewReq) SetOrigin(val string) {
 	s.Origin = val
 }
 
@@ -57913,17 +57685,18 @@ func (*RollbackDeploymentErrorResponseStatusCode) rollbackDeploymentRes() {}
 
 // Ref: #
 type RollbackRequest struct {
-	// The deploy to go back to. Omitted, the newest deploy is undone; given,
-	// what that deploy set is re-applied on every target it touched.
-	DeployID OptNilString `json:"deploy_id"`
+	// The deployment to go back to. Omitted, the newest deployment is undone;
+	// given, what that deployment set is re-applied on every target it
+	// touched.
+	DeploymentID OptNilDeploymentID `json:"deployment_id"`
 	// Narrow the rollback to one target. `""` is the project default.
 	Origin  OptNilString `json:"origin"`
 	Message OptString    `json:"message"`
 }
 
-// GetDeployID returns the value of DeployID.
-func (s *RollbackRequest) GetDeployID() OptNilString {
-	return s.DeployID
+// GetDeploymentID returns the value of DeploymentID.
+func (s *RollbackRequest) GetDeploymentID() OptNilDeploymentID {
+	return s.DeploymentID
 }
 
 // GetOrigin returns the value of Origin.
@@ -57936,9 +57709,9 @@ func (s *RollbackRequest) GetMessage() OptString {
 	return s.Message
 }
 
-// SetDeployID sets the value of DeployID.
-func (s *RollbackRequest) SetDeployID(val OptNilString) {
-	s.DeployID = val
+// SetDeploymentID sets the value of DeploymentID.
+func (s *RollbackRequest) SetDeploymentID(val OptNilDeploymentID) {
+	s.DeploymentID = val
 }
 
 // SetOrigin sets the value of Origin.
@@ -61025,264 +60798,264 @@ func (s *SessionWithTokenResponseHeaders) SetResponse(val SessionWithTokenRespon
 func (*SessionWithTokenResponseHeaders) createSessionRes()   {}
 func (*SessionWithTokenResponseHeaders) exchangeHandoffRes() {}
 
-// SetProjectClassErrorResponse represents sum type.
-type SetProjectClassErrorResponse struct {
-	Type                   SetProjectClassErrorResponseType // switch on this field
-	AuthUnauthorized       AuthUnauthorized
-	EvtInvalid             EvtInvalid
-	Internal               Internal
-	ProjClassChangeRefused ProjClassChangeRefused
-	ProjNotFound           ProjNotFound
-	ProjPermissionDenied   ProjPermissionDenied
-	ReqInvalid             ReqInvalid
+// SetProjectModeErrorResponse represents sum type.
+type SetProjectModeErrorResponse struct {
+	Type                  SetProjectModeErrorResponseType // switch on this field
+	AuthUnauthorized      AuthUnauthorized
+	EvtInvalid            EvtInvalid
+	Internal              Internal
+	ProjModeChangeRefused ProjModeChangeRefused
+	ProjNotFound          ProjNotFound
+	ProjPermissionDenied  ProjPermissionDenied
+	ReqInvalid            ReqInvalid
 }
 
-// SetProjectClassErrorResponseType is oneOf type of SetProjectClassErrorResponse.
-type SetProjectClassErrorResponseType string
+// SetProjectModeErrorResponseType is oneOf type of SetProjectModeErrorResponse.
+type SetProjectModeErrorResponseType string
 
-// Possible values for SetProjectClassErrorResponseType.
+// Possible values for SetProjectModeErrorResponseType.
 const (
-	AuthUnauthorizedSetProjectClassErrorResponse       SetProjectClassErrorResponseType = "auth.unauthorized"
-	EvtInvalidSetProjectClassErrorResponse             SetProjectClassErrorResponseType = "evt.invalid"
-	InternalSetProjectClassErrorResponse               SetProjectClassErrorResponseType = "internal"
-	ProjClassChangeRefusedSetProjectClassErrorResponse SetProjectClassErrorResponseType = "proj.class_change_refused"
-	ProjNotFoundSetProjectClassErrorResponse           SetProjectClassErrorResponseType = "proj.not_found"
-	ProjPermissionDeniedSetProjectClassErrorResponse   SetProjectClassErrorResponseType = "proj.permission_denied"
-	ReqInvalidSetProjectClassErrorResponse             SetProjectClassErrorResponseType = "req.invalid"
+	AuthUnauthorizedSetProjectModeErrorResponse      SetProjectModeErrorResponseType = "auth.unauthorized"
+	EvtInvalidSetProjectModeErrorResponse            SetProjectModeErrorResponseType = "evt.invalid"
+	InternalSetProjectModeErrorResponse              SetProjectModeErrorResponseType = "internal"
+	ProjModeChangeRefusedSetProjectModeErrorResponse SetProjectModeErrorResponseType = "proj.mode_change_refused"
+	ProjNotFoundSetProjectModeErrorResponse          SetProjectModeErrorResponseType = "proj.not_found"
+	ProjPermissionDeniedSetProjectModeErrorResponse  SetProjectModeErrorResponseType = "proj.permission_denied"
+	ReqInvalidSetProjectModeErrorResponse            SetProjectModeErrorResponseType = "req.invalid"
 )
 
-// IsAuthUnauthorized reports whether SetProjectClassErrorResponse is AuthUnauthorized.
-func (s SetProjectClassErrorResponse) IsAuthUnauthorized() bool {
-	return s.Type == AuthUnauthorizedSetProjectClassErrorResponse
+// IsAuthUnauthorized reports whether SetProjectModeErrorResponse is AuthUnauthorized.
+func (s SetProjectModeErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedSetProjectModeErrorResponse
 }
 
-// IsEvtInvalid reports whether SetProjectClassErrorResponse is EvtInvalid.
-func (s SetProjectClassErrorResponse) IsEvtInvalid() bool {
-	return s.Type == EvtInvalidSetProjectClassErrorResponse
+// IsEvtInvalid reports whether SetProjectModeErrorResponse is EvtInvalid.
+func (s SetProjectModeErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidSetProjectModeErrorResponse
 }
 
-// IsInternal reports whether SetProjectClassErrorResponse is Internal.
-func (s SetProjectClassErrorResponse) IsInternal() bool {
-	return s.Type == InternalSetProjectClassErrorResponse
+// IsInternal reports whether SetProjectModeErrorResponse is Internal.
+func (s SetProjectModeErrorResponse) IsInternal() bool {
+	return s.Type == InternalSetProjectModeErrorResponse
 }
 
-// IsProjClassChangeRefused reports whether SetProjectClassErrorResponse is ProjClassChangeRefused.
-func (s SetProjectClassErrorResponse) IsProjClassChangeRefused() bool {
-	return s.Type == ProjClassChangeRefusedSetProjectClassErrorResponse
+// IsProjModeChangeRefused reports whether SetProjectModeErrorResponse is ProjModeChangeRefused.
+func (s SetProjectModeErrorResponse) IsProjModeChangeRefused() bool {
+	return s.Type == ProjModeChangeRefusedSetProjectModeErrorResponse
 }
 
-// IsProjNotFound reports whether SetProjectClassErrorResponse is ProjNotFound.
-func (s SetProjectClassErrorResponse) IsProjNotFound() bool {
-	return s.Type == ProjNotFoundSetProjectClassErrorResponse
+// IsProjNotFound reports whether SetProjectModeErrorResponse is ProjNotFound.
+func (s SetProjectModeErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundSetProjectModeErrorResponse
 }
 
-// IsProjPermissionDenied reports whether SetProjectClassErrorResponse is ProjPermissionDenied.
-func (s SetProjectClassErrorResponse) IsProjPermissionDenied() bool {
-	return s.Type == ProjPermissionDeniedSetProjectClassErrorResponse
+// IsProjPermissionDenied reports whether SetProjectModeErrorResponse is ProjPermissionDenied.
+func (s SetProjectModeErrorResponse) IsProjPermissionDenied() bool {
+	return s.Type == ProjPermissionDeniedSetProjectModeErrorResponse
 }
 
-// IsReqInvalid reports whether SetProjectClassErrorResponse is ReqInvalid.
-func (s SetProjectClassErrorResponse) IsReqInvalid() bool {
-	return s.Type == ReqInvalidSetProjectClassErrorResponse
+// IsReqInvalid reports whether SetProjectModeErrorResponse is ReqInvalid.
+func (s SetProjectModeErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidSetProjectModeErrorResponse
 }
 
-// SetAuthUnauthorized sets SetProjectClassErrorResponse to AuthUnauthorized.
-func (s *SetProjectClassErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
-	s.Type = AuthUnauthorizedSetProjectClassErrorResponse
+// SetAuthUnauthorized sets SetProjectModeErrorResponse to AuthUnauthorized.
+func (s *SetProjectModeErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedSetProjectModeErrorResponse
 	s.AuthUnauthorized = v
 }
 
-// GetAuthUnauthorized returns AuthUnauthorized and true boolean if SetProjectClassErrorResponse is AuthUnauthorized.
-func (s SetProjectClassErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if SetProjectModeErrorResponse is AuthUnauthorized.
+func (s SetProjectModeErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
 	if !s.IsAuthUnauthorized() {
 		return v, false
 	}
 	return s.AuthUnauthorized, true
 }
 
-// NewAuthUnauthorizedSetProjectClassErrorResponse returns new SetProjectClassErrorResponse from AuthUnauthorized.
-func NewAuthUnauthorizedSetProjectClassErrorResponse(v AuthUnauthorized) SetProjectClassErrorResponse {
-	var s SetProjectClassErrorResponse
+// NewAuthUnauthorizedSetProjectModeErrorResponse returns new SetProjectModeErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedSetProjectModeErrorResponse(v AuthUnauthorized) SetProjectModeErrorResponse {
+	var s SetProjectModeErrorResponse
 	s.SetAuthUnauthorized(v)
 	return s
 }
 
-// SetEvtInvalid sets SetProjectClassErrorResponse to EvtInvalid.
-func (s *SetProjectClassErrorResponse) SetEvtInvalid(v EvtInvalid) {
-	s.Type = EvtInvalidSetProjectClassErrorResponse
+// SetEvtInvalid sets SetProjectModeErrorResponse to EvtInvalid.
+func (s *SetProjectModeErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidSetProjectModeErrorResponse
 	s.EvtInvalid = v
 }
 
-// GetEvtInvalid returns EvtInvalid and true boolean if SetProjectClassErrorResponse is EvtInvalid.
-func (s SetProjectClassErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+// GetEvtInvalid returns EvtInvalid and true boolean if SetProjectModeErrorResponse is EvtInvalid.
+func (s SetProjectModeErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
 	if !s.IsEvtInvalid() {
 		return v, false
 	}
 	return s.EvtInvalid, true
 }
 
-// NewEvtInvalidSetProjectClassErrorResponse returns new SetProjectClassErrorResponse from EvtInvalid.
-func NewEvtInvalidSetProjectClassErrorResponse(v EvtInvalid) SetProjectClassErrorResponse {
-	var s SetProjectClassErrorResponse
+// NewEvtInvalidSetProjectModeErrorResponse returns new SetProjectModeErrorResponse from EvtInvalid.
+func NewEvtInvalidSetProjectModeErrorResponse(v EvtInvalid) SetProjectModeErrorResponse {
+	var s SetProjectModeErrorResponse
 	s.SetEvtInvalid(v)
 	return s
 }
 
-// SetInternal sets SetProjectClassErrorResponse to Internal.
-func (s *SetProjectClassErrorResponse) SetInternal(v Internal) {
-	s.Type = InternalSetProjectClassErrorResponse
+// SetInternal sets SetProjectModeErrorResponse to Internal.
+func (s *SetProjectModeErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalSetProjectModeErrorResponse
 	s.Internal = v
 }
 
-// GetInternal returns Internal and true boolean if SetProjectClassErrorResponse is Internal.
-func (s SetProjectClassErrorResponse) GetInternal() (v Internal, ok bool) {
+// GetInternal returns Internal and true boolean if SetProjectModeErrorResponse is Internal.
+func (s SetProjectModeErrorResponse) GetInternal() (v Internal, ok bool) {
 	if !s.IsInternal() {
 		return v, false
 	}
 	return s.Internal, true
 }
 
-// NewInternalSetProjectClassErrorResponse returns new SetProjectClassErrorResponse from Internal.
-func NewInternalSetProjectClassErrorResponse(v Internal) SetProjectClassErrorResponse {
-	var s SetProjectClassErrorResponse
+// NewInternalSetProjectModeErrorResponse returns new SetProjectModeErrorResponse from Internal.
+func NewInternalSetProjectModeErrorResponse(v Internal) SetProjectModeErrorResponse {
+	var s SetProjectModeErrorResponse
 	s.SetInternal(v)
 	return s
 }
 
-// SetProjClassChangeRefused sets SetProjectClassErrorResponse to ProjClassChangeRefused.
-func (s *SetProjectClassErrorResponse) SetProjClassChangeRefused(v ProjClassChangeRefused) {
-	s.Type = ProjClassChangeRefusedSetProjectClassErrorResponse
-	s.ProjClassChangeRefused = v
+// SetProjModeChangeRefused sets SetProjectModeErrorResponse to ProjModeChangeRefused.
+func (s *SetProjectModeErrorResponse) SetProjModeChangeRefused(v ProjModeChangeRefused) {
+	s.Type = ProjModeChangeRefusedSetProjectModeErrorResponse
+	s.ProjModeChangeRefused = v
 }
 
-// GetProjClassChangeRefused returns ProjClassChangeRefused and true boolean if SetProjectClassErrorResponse is ProjClassChangeRefused.
-func (s SetProjectClassErrorResponse) GetProjClassChangeRefused() (v ProjClassChangeRefused, ok bool) {
-	if !s.IsProjClassChangeRefused() {
+// GetProjModeChangeRefused returns ProjModeChangeRefused and true boolean if SetProjectModeErrorResponse is ProjModeChangeRefused.
+func (s SetProjectModeErrorResponse) GetProjModeChangeRefused() (v ProjModeChangeRefused, ok bool) {
+	if !s.IsProjModeChangeRefused() {
 		return v, false
 	}
-	return s.ProjClassChangeRefused, true
+	return s.ProjModeChangeRefused, true
 }
 
-// NewProjClassChangeRefusedSetProjectClassErrorResponse returns new SetProjectClassErrorResponse from ProjClassChangeRefused.
-func NewProjClassChangeRefusedSetProjectClassErrorResponse(v ProjClassChangeRefused) SetProjectClassErrorResponse {
-	var s SetProjectClassErrorResponse
-	s.SetProjClassChangeRefused(v)
+// NewProjModeChangeRefusedSetProjectModeErrorResponse returns new SetProjectModeErrorResponse from ProjModeChangeRefused.
+func NewProjModeChangeRefusedSetProjectModeErrorResponse(v ProjModeChangeRefused) SetProjectModeErrorResponse {
+	var s SetProjectModeErrorResponse
+	s.SetProjModeChangeRefused(v)
 	return s
 }
 
-// SetProjNotFound sets SetProjectClassErrorResponse to ProjNotFound.
-func (s *SetProjectClassErrorResponse) SetProjNotFound(v ProjNotFound) {
-	s.Type = ProjNotFoundSetProjectClassErrorResponse
+// SetProjNotFound sets SetProjectModeErrorResponse to ProjNotFound.
+func (s *SetProjectModeErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundSetProjectModeErrorResponse
 	s.ProjNotFound = v
 }
 
-// GetProjNotFound returns ProjNotFound and true boolean if SetProjectClassErrorResponse is ProjNotFound.
-func (s SetProjectClassErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+// GetProjNotFound returns ProjNotFound and true boolean if SetProjectModeErrorResponse is ProjNotFound.
+func (s SetProjectModeErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
 	if !s.IsProjNotFound() {
 		return v, false
 	}
 	return s.ProjNotFound, true
 }
 
-// NewProjNotFoundSetProjectClassErrorResponse returns new SetProjectClassErrorResponse from ProjNotFound.
-func NewProjNotFoundSetProjectClassErrorResponse(v ProjNotFound) SetProjectClassErrorResponse {
-	var s SetProjectClassErrorResponse
+// NewProjNotFoundSetProjectModeErrorResponse returns new SetProjectModeErrorResponse from ProjNotFound.
+func NewProjNotFoundSetProjectModeErrorResponse(v ProjNotFound) SetProjectModeErrorResponse {
+	var s SetProjectModeErrorResponse
 	s.SetProjNotFound(v)
 	return s
 }
 
-// SetProjPermissionDenied sets SetProjectClassErrorResponse to ProjPermissionDenied.
-func (s *SetProjectClassErrorResponse) SetProjPermissionDenied(v ProjPermissionDenied) {
-	s.Type = ProjPermissionDeniedSetProjectClassErrorResponse
+// SetProjPermissionDenied sets SetProjectModeErrorResponse to ProjPermissionDenied.
+func (s *SetProjectModeErrorResponse) SetProjPermissionDenied(v ProjPermissionDenied) {
+	s.Type = ProjPermissionDeniedSetProjectModeErrorResponse
 	s.ProjPermissionDenied = v
 }
 
-// GetProjPermissionDenied returns ProjPermissionDenied and true boolean if SetProjectClassErrorResponse is ProjPermissionDenied.
-func (s SetProjectClassErrorResponse) GetProjPermissionDenied() (v ProjPermissionDenied, ok bool) {
+// GetProjPermissionDenied returns ProjPermissionDenied and true boolean if SetProjectModeErrorResponse is ProjPermissionDenied.
+func (s SetProjectModeErrorResponse) GetProjPermissionDenied() (v ProjPermissionDenied, ok bool) {
 	if !s.IsProjPermissionDenied() {
 		return v, false
 	}
 	return s.ProjPermissionDenied, true
 }
 
-// NewProjPermissionDeniedSetProjectClassErrorResponse returns new SetProjectClassErrorResponse from ProjPermissionDenied.
-func NewProjPermissionDeniedSetProjectClassErrorResponse(v ProjPermissionDenied) SetProjectClassErrorResponse {
-	var s SetProjectClassErrorResponse
+// NewProjPermissionDeniedSetProjectModeErrorResponse returns new SetProjectModeErrorResponse from ProjPermissionDenied.
+func NewProjPermissionDeniedSetProjectModeErrorResponse(v ProjPermissionDenied) SetProjectModeErrorResponse {
+	var s SetProjectModeErrorResponse
 	s.SetProjPermissionDenied(v)
 	return s
 }
 
-// SetReqInvalid sets SetProjectClassErrorResponse to ReqInvalid.
-func (s *SetProjectClassErrorResponse) SetReqInvalid(v ReqInvalid) {
-	s.Type = ReqInvalidSetProjectClassErrorResponse
+// SetReqInvalid sets SetProjectModeErrorResponse to ReqInvalid.
+func (s *SetProjectModeErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidSetProjectModeErrorResponse
 	s.ReqInvalid = v
 }
 
-// GetReqInvalid returns ReqInvalid and true boolean if SetProjectClassErrorResponse is ReqInvalid.
-func (s SetProjectClassErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+// GetReqInvalid returns ReqInvalid and true boolean if SetProjectModeErrorResponse is ReqInvalid.
+func (s SetProjectModeErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 	if !s.IsReqInvalid() {
 		return v, false
 	}
 	return s.ReqInvalid, true
 }
 
-// NewReqInvalidSetProjectClassErrorResponse returns new SetProjectClassErrorResponse from ReqInvalid.
-func NewReqInvalidSetProjectClassErrorResponse(v ReqInvalid) SetProjectClassErrorResponse {
-	var s SetProjectClassErrorResponse
+// NewReqInvalidSetProjectModeErrorResponse returns new SetProjectModeErrorResponse from ReqInvalid.
+func NewReqInvalidSetProjectModeErrorResponse(v ReqInvalid) SetProjectModeErrorResponse {
+	var s SetProjectModeErrorResponse
 	s.SetReqInvalid(v)
 	return s
 }
 
-// SetProjectClassErrorResponseStatusCode wraps SetProjectClassErrorResponse with StatusCode.
-type SetProjectClassErrorResponseStatusCode struct {
+// SetProjectModeErrorResponseStatusCode wraps SetProjectModeErrorResponse with StatusCode.
+type SetProjectModeErrorResponseStatusCode struct {
 	StatusCode int
-	Response   SetProjectClassErrorResponse
+	Response   SetProjectModeErrorResponse
 }
 
 // GetStatusCode returns the value of StatusCode.
-func (s *SetProjectClassErrorResponseStatusCode) GetStatusCode() int {
+func (s *SetProjectModeErrorResponseStatusCode) GetStatusCode() int {
 	return s.StatusCode
 }
 
 // GetResponse returns the value of Response.
-func (s *SetProjectClassErrorResponseStatusCode) GetResponse() SetProjectClassErrorResponse {
+func (s *SetProjectModeErrorResponseStatusCode) GetResponse() SetProjectModeErrorResponse {
 	return s.Response
 }
 
 // SetStatusCode sets the value of StatusCode.
-func (s *SetProjectClassErrorResponseStatusCode) SetStatusCode(val int) {
+func (s *SetProjectModeErrorResponseStatusCode) SetStatusCode(val int) {
 	s.StatusCode = val
 }
 
 // SetResponse sets the value of Response.
-func (s *SetProjectClassErrorResponseStatusCode) SetResponse(val SetProjectClassErrorResponse) {
+func (s *SetProjectModeErrorResponseStatusCode) SetResponse(val SetProjectModeErrorResponse) {
 	s.Response = val
 }
 
-func (*SetProjectClassErrorResponseStatusCode) setProjectClassRes() {}
+func (*SetProjectModeErrorResponseStatusCode) setProjectModeRes() {}
 
-type SetProjectClassReq struct {
-	Class   ProjectClass `json:"class"`
-	Confirm OptBool      `json:"confirm"`
+type SetProjectModeReq struct {
+	Mode    ProjectMode `json:"mode"`
+	Confirm OptBool     `json:"confirm"`
 }
 
-// GetClass returns the value of Class.
-func (s *SetProjectClassReq) GetClass() ProjectClass {
-	return s.Class
+// GetMode returns the value of Mode.
+func (s *SetProjectModeReq) GetMode() ProjectMode {
+	return s.Mode
 }
 
 // GetConfirm returns the value of Confirm.
-func (s *SetProjectClassReq) GetConfirm() OptBool {
+func (s *SetProjectModeReq) GetConfirm() OptBool {
 	return s.Confirm
 }
 
-// SetClass sets the value of Class.
-func (s *SetProjectClassReq) SetClass(val ProjectClass) {
-	s.Class = val
+// SetMode sets the value of Mode.
+func (s *SetProjectModeReq) SetMode(val ProjectMode) {
+	s.Mode = val
 }
 
 // SetConfirm sets the value of Confirm.
-func (s *SetProjectClassReq) SetConfirm(val OptBool) {
+func (s *SetProjectModeReq) SetConfirm(val OptBool) {
 	s.Confirm = val
 }
 

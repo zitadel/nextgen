@@ -1,28 +1,29 @@
 import type { Command } from "@oclif/core";
 
-import Allowlist from "./commands/allowlist/index";
-import AllowlistAdd from "./commands/allowlist/add";
-import AllowlistRm from "./commands/allowlist/rm";
 import Apply from "./commands/apply";
 import BrandingEject from "./commands/branding/eject";
 import Claim from "./commands/claim";
 import Console from "./commands/console";
 import Deploy from "./commands/deploy";
-import Deployments from "./commands/deployments";
+import DeploymentList from "./commands/deployment/list";
+import DeploymentRollback from "./commands/deployment/rollback";
 import Doctor from "./commands/doctor/index";
 import Eject from "./commands/eject";
 import Env from "./commands/env/index";
 import EnvAdd from "./commands/env/add";
 import EnvList from "./commands/env/list";
 import Logs from "./commands/logs";
+import OriginAdd from "./commands/origin/add";
+import OriginList from "./commands/origin/list";
+import OriginRm from "./commands/origin/rm";
 import Plan from "./commands/plan";
 import Preview from "./commands/preview/index";
+import PreviewList from "./commands/preview/list";
 import PreviewRm from "./commands/preview/rm";
 import ProjectsDemote from "./commands/projects/demote";
 import ProjectsPromote from "./commands/projects/promote";
-import ReleasesRevoke from "./commands/releases/revoke";
+import ReleaseRevoke from "./commands/release/revoke";
 import Reset from "./commands/reset";
-import Rollback from "./commands/rollback";
 import { RESOURCE_COMMANDS } from "./commands/resources";
 import ResourcesList from "./commands/resources-list";
 import Setup from "./commands/setup/index";
@@ -30,11 +31,11 @@ import SsoEnable from "./commands/sso/enable";
 import Start from "./commands/start";
 import Status from "./commands/status";
 import Stop from "./commands/stop";
-import VarsGet from "./commands/vars/get";
-import VarsList from "./commands/vars/list";
-import VarsResolve from "./commands/vars/resolve";
-import VarsRm from "./commands/vars/rm";
-import VarsSet from "./commands/vars/set";
+import VariableGet from "./commands/variable/get";
+import VariableList from "./commands/variable/list";
+import VariableResolve from "./commands/variable/resolve";
+import VariableRm from "./commands/variable/rm";
+import VariableSet from "./commands/variable/set";
 
 /**
  * The explicit oclif command table (`oclif.commands.strategy: "explicit"` in
@@ -46,12 +47,10 @@ import VarsSet from "./commands/vars/set";
  * `commands/resources.ts`, so a new backend resource is one registry entry.
  */
 export const COMMANDS: Record<string, typeof Command> = {
-  allowlist: Allowlist,
   apply: Apply,
   claim: Claim,
   console: Console,
   deploy: Deploy,
-  deployments: Deployments,
   doctor: Doctor,
   eject: Eject,
   env: Env,
@@ -59,26 +58,29 @@ export const COMMANDS: Record<string, typeof Command> = {
   plan: Plan,
   preview: Preview,
   reset: Reset,
-  rollback: Rollback,
   resources: ResourcesList,
   setup: Setup,
   start: Start,
   status: Status,
   stop: Stop,
-  "allowlist:add": AllowlistAdd,
-  "allowlist:rm": AllowlistRm,
   "branding:eject": BrandingEject,
+  "deployment:list": DeploymentList,
+  "deployment:rollback": DeploymentRollback,
   "env:add": EnvAdd,
   "env:list": EnvList,
+  "origin:list": OriginList,
+  "origin:add": OriginAdd,
+  "origin:rm": OriginRm,
+  "preview:list": PreviewList,
   "preview:rm": PreviewRm,
   "projects:promote": ProjectsPromote,
   "projects:demote": ProjectsDemote,
-  "releases:revoke": ReleasesRevoke,
+  "release:revoke": ReleaseRevoke,
   "sso:enable": SsoEnable,
-  "vars:list": VarsList,
-  "vars:get": VarsGet,
-  "vars:set": VarsSet,
-  "vars:rm": VarsRm,
-  "vars:resolve": VarsResolve,
+  "variable:list": VariableList,
+  "variable:get": VariableGet,
+  "variable:set": VariableSet,
+  "variable:rm": VariableRm,
+  "variable:resolve": VariableResolve,
   ...RESOURCE_COMMANDS,
 };

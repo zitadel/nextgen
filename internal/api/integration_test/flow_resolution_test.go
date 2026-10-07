@@ -96,7 +96,7 @@ func TestFlowResolution(t *testing.T) {
 		}
 		resp := fixture.create(t, &api.CreateReleaseRequest{Pointers: pointers})
 		require.IsType(t, &api.CreateReleaseCreated{}, resp, helpers.MustMarshal(t, resp))
-		return string(resp.(*api.CreateReleaseCreated).ID)
+		return string(resp.(*api.CreateReleaseCreated).Release.ID)
 	}
 	production := releaseWith(t, "production-identifier")
 	branch := releaseWith(t, "branch-identifier")
@@ -150,8 +150,8 @@ func TestFlowResolution(t *testing.T) {
 	})
 
 	t.Run("production only serves a pin deployed to the matched target", func(t *testing.T) {
-		promoted, err := fixture.client.SetProjectClass(t.Context(), &api.SetProjectClassReq{Class: api.ProjectClassProduction},
-			api.SetProjectClassParams{ProjectID: api.ProjectID(projectID)})
+		promoted, err := fixture.client.SetProjectMode(t.Context(), &api.SetProjectModeReq{Mode: api.ProjectModeProduction},
+			api.SetProjectModeParams{ProjectID: api.ProjectID(projectID)})
 		require.NoError(t, err)
 		require.IsType(t, &api.ProjectResponse{}, promoted, helpers.MustMarshal(t, promoted))
 

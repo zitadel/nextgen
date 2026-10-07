@@ -1,0 +1,8 @@
+type: object
+required:
+  - previews
+properties:
+  previews:
+    type: array
+    items:
+      $ref: preview.yaml

@@ -2,11 +2,11 @@ type: object
 required:
   - id
   - name
-  - class
+  - mode
   - project_secret
   - preview_secret
   - preview_token
-  - allowed_origins
+  - origins
   - created_at
 properties:
   id:
@@ -15,8 +15,8 @@ properties:
   name:
     type: string
     description: The name of the project.
-  class:
-    $ref: project-class.yaml
+  mode:
+    $ref: project-mode.yaml
   project_secret:
     type: string
     description: |
@@ -31,12 +31,12 @@ properties:
     description: |
       The credential a pull-request build holds. It may create releases and
       deploy to preview origins matching a `preview` pattern, and nothing
-      else: no allowlist, class or variable writes, and no deploy to the
+      else: no origin, mode or variable writes, and no deploy to the
       default or a primary origin.
-  allowed_origins:
+  origins:
     type: array
     items:
-      $ref: allowed-origin.yaml
+      $ref: origin.yaml
   created_at:
     type: string
     format: date-time

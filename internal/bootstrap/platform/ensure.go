@@ -19,7 +19,7 @@ import (
 
 // ProjectCreator is the slice of [service.ProjectService] the bootstrap needs.
 type ProjectCreator interface {
-	CreateWithID(ctx context.Context, id, name string, allowedOrigins []domain.AllowedOrigin, seedDefaults bool) (*domain.Project, error)
+	CreateWithID(ctx context.Context, id, name string, origins []domain.Origin, seedDefaults bool) (*domain.Project, error)
 }
 
 // Ensure idempotently creates the platform project when enabled, with the

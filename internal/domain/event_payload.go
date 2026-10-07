@@ -19,9 +19,9 @@ type RequestAPIPayload struct {
 // ProjectPayload is shared by project.created (full snapshot) and
 // project.updated (delta: only changed fields set).
 type ProjectPayload struct {
-	Name           string   `json:"name,omitempty"`
-	AllowedOrigins []string `json:"allowed_origins,omitempty"`
-	Class          string   `json:"class,omitempty"`
+	Name    string   `json:"name,omitempty"`
+	Origins []string `json:"origins,omitempty"`
+	Mode    string   `json:"mode,omitempty"`
 	// PasswordHashAlgorithm records a change to the method the project's
 	// passwords are hashed with (ADR 029 §Hashing). It is a pointer so the
 	// delta can tell "not touched" (absent) from "handed back to the deployment
@@ -249,12 +249,11 @@ func ReleasePayloadSnapshot(rel *Release) ReleasePayload {
 // table, this event has no foreign key, so the audit trail of a retired
 // preview origin lives on here (ADR 061).
 type DeploymentPayload struct {
-	Origin     string `json:"origin,omitempty"`
-	DeployID   string `json:"deploy_id,omitempty"`
-	ReleaseID  string `json:"release_id,omitempty"`
-	Reason     string `json:"reason,omitempty"`
-	Message    string `json:"message,omitempty"`
-	RollbackOf string `json:"rollback_of,omitempty"`
+	Origins    []string `json:"origins,omitempty"`
+	ReleaseID  string   `json:"release_id,omitempty"`
+	Reason     string   `json:"reason,omitempty"`
+	Message    string   `json:"message,omitempty"`
+	RollbackOf string   `json:"rollback_of,omitempty"`
 }
 
 type DeploymentCreatedPayload = DeploymentPayload
@@ -271,8 +270,7 @@ func DeploymentPayloadSnapshot(dep *Deployment) DeploymentPayload {
 		return DeploymentPayload{}
 	}
 	payload := DeploymentPayload{
-		Origin:    dep.Origin,
-		DeployID:  dep.DeployID,
+		Origins:   dep.Origins(),
 		ReleaseID: dep.ReleaseID,
 		Reason:    dep.Metadata.Reason.String(),
 	}

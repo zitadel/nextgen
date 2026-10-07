@@ -15,12 +15,12 @@ properties:
     example: hotfix for the login outage
   rollback_of:
     description: |
-      On a rollback, the `deploy_id` this row reversed, so the trail reads
+      On a rollback, the deployment this one reversed, so the trail reads
       forwards and backwards.
     oneOf:
-      - type: string
+      - $ref: ../../components/schemas/deployment-id.yaml
       - type: 'null'
-    example: dpl_01KX3RG8A7F0N9WD3P2E4YM5C1
+    example: dep_01KX3RG8A7F0N9WD3P2E4YM5C1
   deployed_by:
     description: |
       The identity that created the deployment. Absent when the caller is a

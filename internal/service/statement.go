@@ -30,7 +30,7 @@ type AllStatements interface {
 	CryptoKeyStatements
 	JSONSchemaStatements
 	ReleaseStatements
-	OriginStatements
+	PreviewStatements
 	IDPConnectionStatements
 	IDPIdentityLinkStatements
 	DeploymentStatements
@@ -72,11 +72,11 @@ type ProjectStatements interface {
 	// the project to the deployment default. Returns a [database.NoRowFoundError]
 	// when no project carries the id.
 	SetProjectPasswordHashPolicy(ctx context.Context, projectID string, policy *domain.PasswordHashPolicy) error
-	// UpdateProjectAllowedOrigins replaces the allowlist whole; the caller
-	// has normalised and linted it. Returns a [database.NoRowFoundError]
+	// UpdateProjectOrigins replaces the origins whole; the caller has
+	// normalised and linted them. Returns a [database.NoRowFoundError]
 	// when no project carries the id.
-	UpdateProjectAllowedOrigins(ctx context.Context, projectID string, origins []domain.AllowedOrigin) error
-	UpdateProjectClass(ctx context.Context, projectID string, class domain.ProjectClass) error
+	UpdateProjectOrigins(ctx context.Context, projectID string, origins []domain.Origin) error
+	UpdateProjectMode(ctx context.Context, projectID string, class domain.ProjectMode) error
 	ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 	// DeleteProjectByID removes the project. changed is false when no row matched.
 	DeleteProjectByID(ctx context.Context, id string) (changed bool, err error)
@@ -164,23 +164,23 @@ type ReleaseStatements interface {
 	ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error)
 }
 
-// OriginStatements keeps one row per live preview URL. The row is what admits
+// PreviewStatements keeps one row per live preview URL. The row is what admits
 // a request from the URL; a URL with no row, or an expired one, is refused.
-type OriginStatements interface {
+type PreviewStatements interface {
 	Statements
-	// UpsertOrigin inserts the row or renews its expiry, and sets CreatedAt on
+	// UpsertPreview inserts the row or renews its expiry, and sets CreatedAt on
 	// entity to the row's original creation time.
-	UpsertOrigin(ctx context.Context, entity *domain.Origin) error
-	// GetOrigin reads one row, expired or not. Absent is a
+	UpsertPreview(ctx context.Context, entity *domain.Preview) error
+	// GetPreview reads one row, expired or not. Absent is a
 	// [database.NoRowFoundError].
-	GetOrigin(ctx context.Context, projectID, origin string) (*domain.Origin, error)
-	// ListOrigins reads every row of the project, origin ASC, expired or not.
-	ListOrigins(ctx context.Context, projectID string) ([]*domain.Origin, error)
-	// DeleteOrigin retires one URL. Absent is a [database.NoRowFoundError].
-	DeleteOrigin(ctx context.Context, projectID, origin string) error
-	// DeleteExpiredOrigins sweeps every row whose expiry is at or before now
+	GetPreview(ctx context.Context, projectID, origin string) (*domain.Preview, error)
+	// ListPreviews reads every row of the project, origin ASC, expired or not.
+	ListPreviews(ctx context.Context, projectID string) ([]*domain.Preview, error)
+	// DeletePreview retires one URL. Absent is a [database.NoRowFoundError].
+	DeletePreview(ctx context.Context, projectID, origin string) error
+	// DeleteExpiredPreviews sweeps every row whose expiry is at or before now
 	// and reports how many went.
-	DeleteExpiredOrigins(ctx context.Context, now time.Time) (int64, error)
+	DeleteExpiredPreviews(ctx context.Context, now time.Time) (int64, error)
 }
 
 // IDPConnectionStatements persists identity provider connections and their
@@ -246,28 +246,32 @@ type IDPIdentityLinkStatements interface {
 
 type DeploymentStatements interface {
 	Statements
-	// CreateDeployments appends one row per entity. Every row's ID is minted
-	// here; DeployID is the caller's and shared across the set; one
-	// deployed_at is stamped for the whole set and written back onto each
-	// entity. The caller runs this inside a transaction together with the
-	// lock and the frozen variables, so a deploy that moved two targets and
-	// not the third cannot happen. An unknown release is a
-	// [database.ForeignKeyError].
-	CreateDeployments(ctx context.Context, rows []*domain.Deployment) error
+	// CreateDeployment appends the operation and one target row per entry
+	// of entity.Targets. The ID is minted here and one deployed_at is
+	// stamped for the whole set and written back onto the entity. The
+	// caller runs this inside a transaction together with the lock and the
+	// frozen variables, so a deploy that moved two targets and not the
+	// third cannot happen. An unknown release is a [database.ForeignKeyError].
+	CreateDeployment(ctx context.Context, entity *domain.Deployment) error
+	// GetDeploymentByID reads one operation with its targets, origin ASC.
 	GetDeploymentByID(ctx context.Context, projectID, id string) (*domain.Deployment, error)
 	// GetDeploymentsByIDs reads the named deployments in one round trip.
 	// Unknown ids are simply absent from the result, not an error.
 	GetDeploymentsByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Deployment, error)
+	// ListDeployments pages the operations, each with its targets. A filter
+	// on DeploymentFieldOrigin narrows to the operations that touched one
+	// target; see [deployment.ListOptions].
 	ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
-	// ListLiveDeployments reads the newest row per origin of the project,
-	// origin ASC: what every target serves right now.
+	// ListLiveDeployments reads what every target serves right now: the
+	// operations whose row is the newest for at least one origin, newest
+	// first, each carrying only the targets it currently serves, origin ASC.
 	ListLiveDeployments(ctx context.Context, projectID string) ([]*domain.Deployment, error)
-	// NewestDeployment reads what one target serves. Nothing deployed there is
-	// a [database.NoRowFoundError].
+	// NewestDeployment reads the operation one target serves. Nothing
+	// deployed there is a [database.NoRowFoundError].
 	NewestDeployment(ctx context.Context, projectID, origin string) (*domain.Deployment, error)
-	// NewestDeploymentOfRelease reads the newest row of one target naming
-	// releaseID, for honouring a pin. Never deployed there is a
-	// [database.NoRowFoundError].
+	// NewestDeploymentOfRelease reads the newest operation that made
+	// releaseID live on one target, for honouring a pin. Never deployed
+	// there is a [database.NoRowFoundError].
 	NewestDeploymentOfRelease(ctx context.Context, projectID, origin, releaseID string) (*domain.Deployment, error)
 	// LockProject takes the project row's write lock for the rest of the
 	// transaction, so concurrent deploys to the default and primary origins

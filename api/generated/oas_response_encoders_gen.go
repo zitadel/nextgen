@@ -15,9 +15,9 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-func encodeAddAllowedOriginResponse(response AddAllowedOriginRes, w http.ResponseWriter, span trace.Span) error {
+func encodeAddOriginResponse(response AddOriginRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *AddAllowedOriginResponse:
+	case *AddOriginResponse:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err
@@ -38,7 +38,7 @@ func encodeAddAllowedOriginResponse(response AddAllowedOriginRes, w http.Respons
 
 		return nil
 
-	case *AddAllowedOriginErrorResponseStatusCode:
+	case *AddOriginErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -420,80 +420,6 @@ func encodeCreateBrandingResponse(response CreateBrandingRes, w http.ResponseWri
 		return nil
 
 	case *ErrorDetailsStatusCode:
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		code := response.StatusCode
-		if code == 0 {
-			// Set default status code.
-			code = http.StatusOK
-		}
-		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
-		}
-
-		e := new(jx.Encoder)
-		response.Response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		if code >= http.StatusInternalServerError {
-			return errors.Wrapf(ht.ErrInternalServerErrorResponse, "code: %d, message: %s", code, http.StatusText(code))
-		}
-		return nil
-
-	default:
-		return errors.Errorf("unexpected response type: %T", response)
-	}
-}
-
-func encodeCreateConfigurationReleaseResponse(response CreateConfigurationReleaseRes, w http.ResponseWriter, span trace.Span) error {
-	switch response := response.(type) {
-	case *CreateConfigurationReleaseOK:
-		if err := func() error {
-			if err := response.Validate(); err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrap(err, "validate")
-		}
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	case *CreateConfigurationReleaseCreated:
-		if err := func() error {
-			if err := response.Validate(); err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrap(err, "validate")
-		}
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	case *CreateConfigurationReleaseErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4506,9 +4432,9 @@ func encodeListMyProjectsResponse(response ListMyProjectsRes, w http.ResponseWri
 	}
 }
 
-func encodeListOriginsResponse(response ListOriginsRes, w http.ResponseWriter, span trace.Span) error {
+func encodeListPreviewsResponse(response ListPreviewsRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *ListOriginsResponse:
+	case *ListPreviewsResponse:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err
@@ -4529,7 +4455,7 @@ func encodeListOriginsResponse(response ListOriginsRes, w http.ResponseWriter, s
 
 		return nil
 
-	case *ListOriginsErrorResponseStatusCode:
+	case *ListPreviewsErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -5820,15 +5746,15 @@ func encodeQueryUsersResponse(response QueryUsersRes, w http.ResponseWriter, spa
 	}
 }
 
-func encodeRemoveAllowedOriginResponse(response RemoveAllowedOriginRes, w http.ResponseWriter, span trace.Span) error {
+func encodeRemoveOriginResponse(response RemoveOriginRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *RemoveAllowedOriginNoContent:
+	case *RemoveOriginNoContent:
 		w.WriteHeader(204)
 		span.SetStatus(codes.Ok, http.StatusText(204))
 
 		return nil
 
-	case *RemoveAllowedOriginErrorResponseStatusCode:
+	case *RemoveOriginErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -5858,15 +5784,15 @@ func encodeRemoveAllowedOriginResponse(response RemoveAllowedOriginRes, w http.R
 	}
 }
 
-func encodeRemoveOriginResponse(response RemoveOriginRes, w http.ResponseWriter, span trace.Span) error {
+func encodeRemovePreviewResponse(response RemovePreviewRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *RemoveOriginNoContent:
+	case *RemovePreviewNoContent:
 		w.WriteHeader(204)
 		span.SetStatus(codes.Ok, http.StatusText(204))
 
 		return nil
 
-	case *RemoveOriginErrorResponseStatusCode:
+	case *RemovePreviewErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -6083,7 +6009,7 @@ func encodeRevokeSessionResponse(response RevokeSessionRes, w http.ResponseWrite
 
 func encodeRollbackDeploymentResponse(response RollbackDeploymentRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *DeployResponse:
+	case *CreateDeploymentResponse:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err
@@ -6134,7 +6060,7 @@ func encodeRollbackDeploymentResponse(response RollbackDeploymentRes, w http.Res
 	}
 }
 
-func encodeSetProjectClassResponse(response SetProjectClassRes, w http.ResponseWriter, span trace.Span) error {
+func encodeSetProjectModeResponse(response SetProjectModeRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
 	case *ProjectResponse:
 		if err := func() error {
@@ -6157,7 +6083,7 @@ func encodeSetProjectClassResponse(response SetProjectClassRes, w http.ResponseW
 
 		return nil
 
-	case *SetProjectClassErrorResponseStatusCode:
+	case *SetProjectModeErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {

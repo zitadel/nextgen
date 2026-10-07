@@ -6,10 +6,12 @@ description: |
 properties:
   name:
     type: string
-  preview_origins:
+  origins:
     type: array
     items:
       type: string
+  mode:
+    type: string
   password_hash_algorithm:
     type: string
     description: |

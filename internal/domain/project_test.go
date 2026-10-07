@@ -19,8 +19,8 @@ import (
 func TestNewProject(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		name           string
-		allowedOrigins []domain.AllowedOrigin
+		name    string
+		origins []domain.Origin
 	}
 	tests := []struct {
 		name    string
@@ -51,19 +51,19 @@ func TestNewProject(t *testing.T) {
 		{
 			name: "allowed origins are normalised",
 			args: args{
-				name:           "my-project",
-				allowedOrigins: []domain.AllowedOrigin{{Pattern: "HTTPS://App.Acme.com", Kind: domain.OriginKindPrimary}},
+				name:    "my-project",
+				origins: []domain.Origin{{Pattern: "HTTPS://App.Acme.com", Kind: domain.OriginKindPrimary}},
 			},
 			check: func(t *testing.T, got *domain.Project) {
-				assert.Equal(t, []domain.AllowedOrigin{{Pattern: "https://app.acme.com", Kind: domain.OriginKindPrimary}}, got.AllowedOrigins)
-				assert.Equal(t, domain.ProjectClassSandbox, got.Class)
+				assert.Equal(t, []domain.Origin{{Pattern: "https://app.acme.com", Kind: domain.OriginKindPrimary}}, got.Origins)
+				assert.Equal(t, domain.ProjectModeSandbox, got.Mode)
 			},
 		},
 		{
 			name: "a pattern listed twice is refused",
 			args: args{
 				name: "my-project",
-				allowedOrigins: []domain.AllowedOrigin{
+				origins: []domain.Origin{
 					{Pattern: "https://app.acme.com", Kind: domain.OriginKindPrimary},
 					{Pattern: "https://app.acme.com", Kind: domain.OriginKindPreview},
 				},
@@ -89,7 +89,7 @@ func TestNewProject(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := domain.NewProject(tt.args.name, tt.args.allowedOrigins)
+			got, err := domain.NewProject(tt.args.name, tt.args.origins)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 				assert.Nil(t, got)

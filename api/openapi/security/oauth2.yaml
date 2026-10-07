@@ -30,8 +30,8 @@ flows:
       deployment.read: Permission to read deployments
       deployment.write: Permission to deploy to the project default and primary origins, and to roll back
       deployment.preview: Permission to deploy to preview origins matching a preview pattern
-      origin.read: Permission to list live preview origins
-      origin.delete: Permission to retire a live preview origin
+      preview.read: Permission to list live previews
+      preview.delete: Permission to retire a live preview
       events.read: Permission to list and get project audit events
       variable.read: Permission to read project variables (a secret's value is never returned)
       variable.write: Permission to create and manage project variables and secrets
@@ -40,9 +40,9 @@ flows:
       domain.delete: Permission to delete project domains (reserved; endpoints not yet available)
       feature.read: Permission to read project feature configuration (reserved; endpoints not yet available)
       feature.write: Permission to change project feature configuration (reserved; endpoints not yet available)
-      allowed_origin.read: Permission to read allowed origin patterns
-      allowed_origin.write: Permission to add allowed origin patterns
-      allowed_origin.delete: Permission to remove allowed origin patterns
+      origin.read: Permission to read origin patterns
+      origin.write: Permission to add origin patterns
+      origin.delete: Permission to remove origin patterns
       signing_key.create: Permission to create signing keys (reserved; endpoints not yet available)
       signing_key.read: Permission to read signing keys (reserved; endpoints not yet available)
       signing_key.delete: Permission to delete signing keys (reserved; endpoints not yet available)
@@ -81,8 +81,8 @@ flows:
       deployment.read: Permission to read deployments
       deployment.write: Permission to deploy to the project default and primary origins, and to roll back
       deployment.preview: Permission to deploy to preview origins matching a preview pattern
-      origin.read: Permission to list live preview origins
-      origin.delete: Permission to retire a live preview origin
+      preview.read: Permission to list live previews
+      preview.delete: Permission to retire a live preview
       events.read: Permission to list and get project audit events
       variable.read: Permission to read project variables (a secret's value is never returned)
       variable.write: Permission to create and manage project variables and secrets
@@ -91,9 +91,9 @@ flows:
       domain.delete: Permission to delete project domains (reserved; endpoints not yet available)
       feature.read: Permission to read project feature configuration (reserved; endpoints not yet available)
       feature.write: Permission to change project feature configuration (reserved; endpoints not yet available)
-      allowed_origin.read: Permission to read allowed origin patterns
-      allowed_origin.write: Permission to add allowed origin patterns
-      allowed_origin.delete: Permission to remove allowed origin patterns
+      origin.read: Permission to read origin patterns
+      origin.write: Permission to add origin patterns
+      origin.delete: Permission to remove origin patterns
       signing_key.create: Permission to create signing keys (reserved; endpoints not yet available)
       signing_key.read: Permission to read signing keys (reserved; endpoints not yet available)
       signing_key.delete: Permission to delete signing keys (reserved; endpoints not yet available)
