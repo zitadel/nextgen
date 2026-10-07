@@ -2,7 +2,6 @@ import type { StoryObj } from "@storybook/web-components-vite";
 import { PASSWORD_FIELD } from "@zitadel/api-mock";
 import { html } from "lit";
 
-
 import {
   fill,
   mock,
@@ -121,9 +120,7 @@ export const RecoverStep: Story = {
     // stable `data-action`; match on that, not its localized label (the
     // orchestrator translates action text from `navigator.language`, so a
     // text match would time out in a non-English browser).
-    const link = await waitFor(() =>
-      login?.shadowRoot?.querySelector('[data-action="recover"]'),
-    );
+    const link = await waitFor(() => login?.shadowRoot?.querySelector('[data-action="recover"]'));
     (link as HTMLElement).click();
     await waitFor(
       () =>
@@ -152,7 +149,9 @@ export const SignedIn: Story = {
     await submit(canvasElement);
     await waitFor(() => {
       const sr = canvasElement.querySelector("zitadel-login")?.shadowRoot;
-      return sr != null && sr.querySelector("zl-field") == null && sr.querySelector("zl-button") != null;
+      return (
+        sr != null && sr.querySelector("zl-field") == null && sr.querySelector("zl-button") != null
+      );
     });
   },
 };

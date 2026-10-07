@@ -115,7 +115,10 @@ export const orchestratorBase = {
     // `<zitadel-login>` element, and the values the flow engine (here, the
     // mock backend) returns in its responses.
     purpose: {
-      control: { type: "inline-radio", labels: { login: "login (sign in)", register: "register (sign up)" } },
+      control: {
+        type: "inline-radio",
+        labels: { login: "login (sign in)", register: "register (sign up)" },
+      },
       options: ["login", "register"],
       description:
         "Host prop `purpose`: which flow to run — `login` (sign in) or `register` (sign up). Decides the first step, and the fields, the mock returns.",
