@@ -10,10 +10,10 @@ tasks:
       cache: false
       runInCI: false
 
-  # cli, server, server-debug and check start moon themselves, so moon runs
-  # them with node directly: launched through `pnpm run`, the moon they start
-  # would inherit pnpm's environment and every task under it would warn about
-  # the platform-specific server packages.
+  # cli, server, server-debug, journey and check start moon themselves, so
+  # moon runs them with node directly: launched through `pnpm run`, the moon
+  # they start would inherit pnpm's environment and every task under it would
+  # warn about the platform-specific server packages.
   cli:
     command: "node scripts/run-cli.mjs"
     options:
@@ -36,7 +36,7 @@ tasks:
       runInCI: false
 
   journey:
-    command: "corepack pnpm run journey"
+    command: "node scripts/run-journey.mjs"
     options:
       cache: false
       runInCI: false

@@ -54,6 +54,8 @@ tasks:
   # Mock server restarting on source changes, for development.
   dev:
     command: "corepack pnpm run dev"
+    deps:
+      - "build"
     options:
       cache: false
       persistent: true

@@ -48,6 +48,8 @@ tasks:
   # Local mock server for development.
   dev:
     command: "corepack pnpm run dev"
+    deps:
+      - "api-mock:build"
     options:
       cache: false
       persistent: true

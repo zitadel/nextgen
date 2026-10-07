@@ -45,7 +45,10 @@ const EXEMPT_TASKS = new Set([
   ".:cli",
   ".:server",
   ".:server-debug",
+  ".:journey",
   ".:check",
+  "apps/cli-journey-e2e:e2e-local",
+  "apps/cli-journey-e2e:e2e-testkit",
   // The CI gate runs both Vitest projects through `test:all`.
   "packages/api-mock:test",
   "packages/components:test",
@@ -60,7 +63,10 @@ const EXEMPT_SCRIPTS = new Set([
   // The entry points behind the orchestrator tasks above.
   ".:cli",
   ".:server",
+  ".:journey",
   ".:check",
+  "apps/cli-journey-e2e:e2e-local",
+  "apps/cli-journey-e2e:e2e-testkit",
   // The Vitest lanes behind the test:all exceptions above.
   "packages/api-mock:test",
   "packages/api-mock:test:browser",
@@ -71,8 +77,25 @@ const EXEMPT_SCRIPTS = new Set([
 ]);
 
 const NPM_LIFECYCLE = new Set(["prepack", "postpack", "postinstall", "prepare", "preinstall"]);
-const STARTS_RUNNER =
-  /\b(?:pnpm|npm|yarn)\s+(?:run|exec|--filter|-F|-r|--recursive|--dir|-C)\b|\bnode\s+--run\b/;
+const PACKAGE_MANAGERS = new Set(["pnpm", "npm", "npx", "yarn", "corepack"]);
+
+/**
+ * Whether a script starts a package manager (or chains to another script with
+ * `node --run`): checks the command at the start of every `&&`/`||`/`;`/`|`
+ * segment, after env assignments, so subcommands and options do not matter
+ * and package-manager names inside quoted text do not count.
+ */
+export function startsPackageManager(body) {
+  const unquoted = body.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, "''");
+  for (const segment of unquoted.split(/&&|\|\||[;|()]/)) {
+    const words = segment.trim().split(/\s+/).filter((word) => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(word));
+    const [command = "", next = ""] = words;
+    if (PACKAGE_MANAGERS.has(command) || (command === "node" && next === "--run")) {
+      return true;
+    }
+  }
+  return false;
+}
 
 function isHook(name, scripts) {
   if (NPM_LIFECYCLE.has(name)) return false;
@@ -89,7 +112,7 @@ function exempt(set, dir, name) {
 export function checkProject(dir, scripts, tasks) {
   const problems = [];
   for (const [name, body] of Object.entries(scripts)) {
-    if (STARTS_RUNNER.test(body)) {
+    if (startsPackageManager(body)) {
       problems.push(`${dir}: script "${name}" starts a package manager: ${body}`);
     }
     if (isHook(name, scripts)) {
@@ -108,6 +131,8 @@ export function checkProject(dir, scripts, tasks) {
     const command = task?.command ?? task?.script;
     if (command !== `corepack pnpm run ${id}`) {
       problems.push(`${dir}: task "${id}" must run \`corepack pnpm run ${id}\`, not: ${command}`);
+    } else if (!(id in scripts)) {
+      problems.push(`${dir}: task "${id}" runs a script "${id}" that does not exist`);
     }
   }
   return problems;

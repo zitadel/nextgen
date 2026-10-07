@@ -184,11 +184,12 @@ Moon owns the task graph; `package.json` scripts are its leaves.
   `pnpm exec`, and not the `node_modules/.bin` shim, which is a `.cmd` on
   Windows that `spawn` cannot start without a shell.
 
-`scripts/check-package-scripts.mjs` enforces this in `workspace:test`; its
-exemption lists (the Go server, `build-release`, npm pack hooks, the root
-`cli`/`server`/`server-debug`/`check` orchestrators that start Moon
-themselves, and the `components`/`api-mock` `test:all` lanes) say why each
-exception exists.
+`scripts/check-package-scripts.mjs` enforces this in `workspace:test`. Its
+exemption lists say why each exception exists: the Go server, `build-release`,
+npm pack hooks, the `components`/`api-mock` `test:all` lanes, and the
+orchestrators that start Moon themselves (root `cli`, `server`,
+`server-debug`, `journey` and `check`; `cli-journey-e2e` `e2e-local` and
+`e2e-testkit`), which Moon runs with node directly.
 
 Moon manages TypeScript workspace targets, Go checks, and release build tasks.
 Long-running customer-style local orchestration still runs through repository

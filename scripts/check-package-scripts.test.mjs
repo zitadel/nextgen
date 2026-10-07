@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { checkProject, checkWorkspace } from "./check-package-scripts.mjs";
+import { checkProject, checkWorkspace, startsPackageManager } from "./check-package-scripts.mjs";
 
 describe("package-script contract", () => {
   it("holds for every workspace package", () => {
@@ -54,5 +54,37 @@ describe("package-script contract", () => {
     expect(
       checkProject("apps/x", { preview: "vite preview" }, { preview: { command: "corepack pnpm run preview" } }),
     ).toEqual([]);
+  });
+
+  it.each([
+    "pnpm test",
+    "pnpm --silent run test",
+    "pnpm install",
+    "pnpm dlx tool",
+    "corepack pnpm run build",
+    "npm run build",
+    "npx vitest",
+    "tsdown && pnpm run test",
+    "CI=1 pnpm test",
+    "node --run build",
+  ])("detects a package manager in %s", (body) => {
+    expect(startsPackageManager(body)).toBe(true);
+  });
+
+  it.each([
+    "vitest run",
+    "tsc --noEmit && tsc --noEmit -p tsconfig.spec.json",
+    "node scripts/doctor.mjs",
+    'node -e "console.log(\'use pnpm\')"',
+    "echo 'run npm install yourself'",
+    "NEXTGEN_NUXT_BUILD_DIR=.nuxt nuxt prepare && vue-tsc --noEmit",
+  ])("does not flag %s", (body) => {
+    expect(startsPackageManager(body)).toBe(false);
+  });
+
+  it("rejects a task whose same-named script is missing", () => {
+    expect(checkProject("apps/x", {}, { build: { command: "corepack pnpm run build" } })).toEqual([
+      'apps/x: task "build" runs a script "build" that does not exist',
+    ]);
   });
 });
