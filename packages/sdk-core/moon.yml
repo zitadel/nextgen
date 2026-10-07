@@ -6,9 +6,6 @@ dependsOn:
   - "api"
 
 tasks:
-  lint:
-    command: "corepack pnpm run lint"
-
   typecheck:
     command: "corepack pnpm run typecheck"
     deps:

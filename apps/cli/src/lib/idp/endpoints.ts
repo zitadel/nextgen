@@ -56,8 +56,7 @@ async function askUrl(message: string, initialValue: string, command: string): P
   const answer = await text({
     message,
     initialValue,
-    validate: (value) =>
-      isSupportedIssuer(String(value ?? "")) ? undefined : ISSUER_REQUIREMENT,
+    validate: (value) => (isSupportedIssuer(String(value ?? "")) ? undefined : ISSUER_REQUIREMENT),
   });
   bailOnCancel(answer, command);
   return String(answer).trim();

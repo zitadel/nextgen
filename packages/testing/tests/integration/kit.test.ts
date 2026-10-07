@@ -15,14 +15,12 @@ describe.skipIf(!serverBinary)("startLocalZitadel (real instance)", () => {
       appOrigins: ["http://localhost:3002"],
     });
     const bootMs = Math.round(performance.now() - bootStarted);
-    // eslint-disable-next-line no-console
     console.info(`[testing] instance ready in ${bootMs}ms at ${zitadel.handle.baseUrl}`);
 
     try {
       const seedStarted = performance.now();
       const [alice, bob] = await Promise.all([zitadel.seedUser(), zitadel.seedUser()]);
       const seedMs = Math.round(performance.now() - seedStarted);
-      // eslint-disable-next-line no-console
       console.info(`[testing] seeded 2 users concurrently in ${seedMs}ms`);
 
       expect(alice.id).not.toBe(bob.id);

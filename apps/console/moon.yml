@@ -8,13 +8,6 @@ dependsOn:
   - "sdk-react"
 
 tasks:
-  lint:
-    command: "corepack pnpm run lint"
-    deps:
-      - "api:generate"
-      - "design-tokens:build"
-      - "sdk-react:build"
-
   typecheck:
     command: "corepack pnpm run typecheck"
     deps:

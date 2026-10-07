@@ -50,6 +50,11 @@ export default defineConfig({
         test: {
           name: "browser",
           globals: true,
+          // Serialize browser files so parallel Chromium contexts do not
+          // overwhelm the Vitest Vite server under CI load, which flakes the
+          // setup-module fetch (vitest-dev/vitest#9509). The jsdom `unit`
+          // project above still runs in parallel.
+          fileParallelism: false,
           include: ["src/**/*.browser.spec.ts"],
           browser: {
             enabled: true,

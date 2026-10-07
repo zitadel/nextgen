@@ -32,7 +32,6 @@
     "generate": "tsx scripts/build.ts",
     "build": "tsdown",
     "test": "vitest run",
-    "lint": "oxlint .",
     "typecheck": "tsc --build tsconfig.json"
   },
   "devDependencies": {

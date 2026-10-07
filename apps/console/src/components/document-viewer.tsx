@@ -39,9 +39,7 @@ export function DocumentViewer({ document, noun }: { document: unknown; noun: st
 
   const source = useMemo(
     () =>
-      format === "yaml"
-        ? stringifyYaml(document, YAML_OPTIONS)
-        : JSON.stringify(document, null, 2),
+      format === "yaml" ? stringifyYaml(document, YAML_OPTIONS) : JSON.stringify(document, null, 2),
     [document, format],
   );
   const lines = useHighlighted(source, format);
@@ -83,9 +81,11 @@ export function DocumentViewer({ document, noun }: { document: unknown; noun: st
         <code>
           {lines
             ? lines.map((line, index) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: static syntax-highlighted lines, never reordered
                 <Fragment key={index}>
                   {index > 0 && "\n"}
                   {line.map((token, position) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: static highlight tokens within a line, never reordered
                     <span key={position} style={{ color: token.color }}>
                       {token.content}
                     </span>

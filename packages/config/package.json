@@ -89,8 +89,7 @@
     "sync-schemas": "node scripts/sync-meta-schemas.mjs",
     "build": "tsdown",
     "typecheck": "tsc --build tsconfig.json",
-    "test": "vitest run",
-    "lint": "oxlint ."
+    "test": "vitest run"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",

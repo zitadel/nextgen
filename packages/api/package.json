@@ -72,7 +72,6 @@
     "generate": "orval --config orval.config.ts --clean",
     "build": "tsdown",
     "test": "vitest run",
-    "lint": "oxlint .",
     "typecheck": "tsc --build tsconfig.json"
   },
   "devDependencies": {

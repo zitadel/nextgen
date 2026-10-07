@@ -9,13 +9,6 @@ dependsOn:
   - "sdk-next"
 
 tasks:
-  lint:
-    command: "corepack pnpm run lint"
-    deps:
-      - "api:build"
-      - "config:build"
-      - "sdk-next:build"
-
   typecheck:
     command: "corepack pnpm run typecheck"
     deps:

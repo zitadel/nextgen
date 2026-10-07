@@ -23,7 +23,9 @@ export function platformPackageName(platform = process.platform, arch = process.
     const supported = supportedPlatforms
       .map((candidate) => `${candidate.platform}/${candidate.arch}`)
       .join(", ");
-    throw new Error(`Unsupported platform for @zitadel/server: ${platform}/${arch}. Supported: ${supported}.`);
+    throw new Error(
+      `Unsupported platform for @zitadel/server: ${platform}/${arch}. Supported: ${supported}.`,
+    );
   }
   return match.packageName;
 }
@@ -56,9 +58,12 @@ export function ensureExecutable(binaryPath, platform = process.platform) {
   try {
     chmodSync(binaryPath, 0o755);
   } catch (error) {
-    throw new Error(`Zitadel server binary at ${binaryPath} is not executable and could not be fixed.`, {
-      cause: error,
-    });
+    throw new Error(
+      `Zitadel server binary at ${binaryPath} is not executable and could not be fixed.`,
+      {
+        cause: error,
+      },
+    );
   }
 }
 

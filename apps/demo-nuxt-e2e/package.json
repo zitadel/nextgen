@@ -4,14 +4,12 @@
   "private": true,
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "oxlint .",
     "e2e": "playwright test"
   },
   "devDependencies": {
     "@zitadel/sdk-nuxt": "workspace:*",
     "@playwright/test": "catalog:",
     "@zitadel/api-mock": "workspace:*",
-    "eslint-plugin-playwright": "catalog:",
     "typescript": "catalog:"
   }
 }

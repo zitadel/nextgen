@@ -7,9 +7,6 @@ dependsOn:
   - "testing"
 
 tasks:
-  lint:
-    command: "corepack pnpm run lint"
-
   # The e2e tasks themselves are opt-in (`runInCI: false`), which would leave
   # the specs entirely outside CI's type surface — API contract drift in a
   # spec would only surface when someone next ran the suite. Typechecking is

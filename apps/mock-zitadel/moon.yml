@@ -16,11 +16,6 @@ tasks:
     outputs:
       - "dist/**"
 
-  lint:
-    command: "corepack pnpm run lint"
-    deps:
-      - "api-mock:build"
-
   # @zitadel/api's source is gitignored and produced by orval, so it is
   # generated first.
   typecheck:

@@ -9,7 +9,15 @@ import { parseJson, runCliForTest } from "../../../helpers/run-cli";
  */
 describe("a flag that must not be blank", () => {
   it("refuses an empty value, where oclif's own check passes it", async () => {
-    const result = await runCliForTest(["sso", "enable", "--provider", "google", "--client-id", "", "--json"]);
+    const result = await runCliForTest([
+      "sso",
+      "enable",
+      "--provider",
+      "google",
+      "--client-id",
+      "",
+      "--json",
+    ]);
 
     expect(result.exitCode).not.toBe(0);
     const json = parseJson(result.stdout) as { code: string; hint?: string };
@@ -18,7 +26,15 @@ describe("a flag that must not be blank", () => {
   });
 
   it("refuses a value that is only whitespace", async () => {
-    const result = await runCliForTest(["sso", "enable", "--provider", "google", "--client-id", "   ", "--json"]);
+    const result = await runCliForTest([
+      "sso",
+      "enable",
+      "--provider",
+      "google",
+      "--client-id",
+      "   ",
+      "--json",
+    ]);
 
     expect((parseJson(result.stdout) as { code: string }).code).toBe("E_VALIDATION");
   });
@@ -26,7 +42,14 @@ describe("a flag that must not be blank", () => {
   it("still refuses a missing value the way oclif always did", async () => {
     // Unquoted `--client-id $UNSET` drops the word entirely; that path was
     // never broken and must keep its own wording.
-    const result = await runCliForTest(["sso", "enable", "--provider", "google", "--client-id", "--json"]);
+    const result = await runCliForTest([
+      "sso",
+      "enable",
+      "--provider",
+      "google",
+      "--client-id",
+      "--json",
+    ]);
 
     expect(result.exitCode).not.toBe(0);
     expect((parseJson(result.stdout) as { message: string }).message).toContain("expects a value");

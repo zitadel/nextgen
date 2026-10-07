@@ -11,7 +11,10 @@
  * Follows `branding.ts`: an overlay rather than a fixture edit, so the
  * default mock keeps mirroring the shipped flow byte for byte.
  */
-import type { CreateFlow201, CreateFlow201StepSsoProvidersItem } from "@zitadel/api/generated/model";
+import type {
+  CreateFlow201,
+  CreateFlow201StepSsoProvidersItem,
+} from "@zitadel/api/generated/model";
 
 export type MockSsoProvider = CreateFlow201StepSsoProvidersItem;
 

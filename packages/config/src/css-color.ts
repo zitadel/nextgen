@@ -151,15 +151,22 @@ function resolveMix(body: string, context: ResolveContext, depth: number): Rgba 
 
   // CSS mixes in premultiplied alpha: mixing red with transparent has to keep
   // red's hue and lose opacity, not slide towards transparent black.
-  const mixed = interpolateWithPremultipliedAlpha([toCulori(c1), toCulori(c2)], mode as never, {
-    h: { fixup },
-  } as never)(weight);
+  const mixed = interpolateWithPremultipliedAlpha(
+    [toCulori(c1), toCulori(c2)],
+    mode as never,
+    {
+      h: { fixup },
+    } as never,
+  )(weight);
   const rgba = fromCulori(mixed);
   if (!rgba) return undefined;
   return { ...rgba, a: clamp(rgba.a * alphaScale, 0, 1) };
 }
 
-function normalisePercentages(first: number | undefined, second: number | undefined): [number, number] {
+function normalisePercentages(
+  first: number | undefined,
+  second: number | undefined,
+): [number, number] {
   if (first === undefined && second === undefined) return [50, 50];
   if (first === undefined) return [100 - (second as number), second as number];
   if (second === undefined) return [first, 100 - first];
@@ -230,7 +237,12 @@ function fromCulori(color: Color): Rgba | undefined {
   const rgb = toRgb(color);
   if (!rgb) return undefined;
   const channel = (value: number | undefined): number => clamp((value ?? 0) * 255, 0, 255);
-  return { r: channel(rgb.r), g: channel(rgb.g), b: channel(rgb.b), a: clamp(rgb.alpha ?? 1, 0, 1) };
+  return {
+    r: channel(rgb.r),
+    g: channel(rgb.g),
+    b: channel(rgb.b),
+    a: clamp(rgb.alpha ?? 1, 0, 1),
+  };
 }
 
 function toCulori({ r, g, b, a }: Rgba): Color {

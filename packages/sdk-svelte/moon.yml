@@ -9,13 +9,6 @@ dependsOn:
   - "sdk-core"
 
 tasks:
-  lint:
-    command: "corepack pnpm run lint"
-    deps:
-      - "api:build"
-      - "components:build"
-      - "sdk-core:build"
-
   typecheck:
     command: "corepack pnpm run typecheck"
     deps:

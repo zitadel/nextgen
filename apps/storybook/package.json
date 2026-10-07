@@ -9,7 +9,6 @@
     "build": "storybook build --output-dir dist",
     "typecheck": "tsc --build tsconfig.json",
     "test": "vitest run --project=storybook",
-    "lint": "oxlint .",
     "install-browsers": "playwright install chromium"
   },
   "dependencies": {

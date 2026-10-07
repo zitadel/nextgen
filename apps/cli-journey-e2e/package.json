@@ -7,13 +7,11 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "e2e-local": "node scripts/run-local.mjs",
     "e2e": "playwright test",
-    "lint": "oxlint .",
     "e2e-testkit": "node scripts/run-local.mjs --suite testkit"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
     "@zitadel/testing": "workspace:*",
-    "eslint-plugin-playwright": "catalog:",
     "typescript": "catalog:"
   }
 }

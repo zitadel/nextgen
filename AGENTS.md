@@ -195,7 +195,9 @@ exemption lists say why each exception exists: the Go server, `build-release`,
 npm pack hooks, the `components`/`api-mock` `test:all` lanes, and the
 orchestrators that start Moon themselves (root `cli`, `server`,
 `server-debug`, `journey` and `check`; `cli-journey-e2e` `e2e-local` and
-`e2e-testkit`), which Moon runs with node directly.
+`e2e-testkit`), which Moon runs with node directly. Tasks inherited from
+`.moon/tasks/*.yml` (the workspace-wide Biome `lint`) are not per-package
+scripts and run their tool directly.
 
 Moon manages TypeScript workspace targets, Go checks, and release build tasks.
 Long-running customer-style local orchestration still runs through repository
@@ -441,7 +443,7 @@ verify with `corepack pnpm exec changeset status --since origin/main`.
   `moon ci`, `moon run <project>:<task>`, and release tasks under
   `moon run release:*`.
 - Keep direct underlying tools for implementation details: `vite`, `vitest`,
-  `tsc`, `playwright`, `oxlint`, `go`, `docker buildx`, and `changeset`.
+  `tsc`, `playwright`, `biome`, `go`, `docker buildx`, and `changeset`.
 - Do not reintroduce Nx or GoReleaser without updating the ADRs first.
 - When unsure about Moon flags, check `moon --help` or the task definition in
   the nearest `moon.yml` before guessing.

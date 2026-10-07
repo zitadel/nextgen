@@ -9,12 +9,6 @@ dependsOn:
   - "design-tokens"
 
 tasks:
-  lint:
-    command: "corepack pnpm run lint"
-    deps:
-      - "api:build"
-      - "design-tokens:build"
-
   typecheck:
     command: "corepack pnpm run typecheck"
     deps:

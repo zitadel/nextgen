@@ -17,11 +17,6 @@ tasks:
       # and its checks rewrite or prune; see the mutex note on server:generate.
       mutex: "generated-sources"
 
-  lint:
-    command: "corepack pnpm run lint"
-    deps:
-      - "generate"
-
   typecheck:
     command: "corepack pnpm run typecheck"
     deps:

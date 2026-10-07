@@ -9,9 +9,7 @@ import type {
 import defaultHumanUserSchemaTemplate from "../defaults/default-human-user.json" with {
   type: "json",
 };
-import defaultLoginFlowTemplate from "../defaults/default-login.json" with {
-  type: "json",
-};
+import defaultLoginFlowTemplate from "../defaults/default-login.json" with { type: "json" };
 import passkeyFirstHumanUserSchemaTemplate from "../defaults/presets/passkey-first/human-user.json" with {
   type: "json",
 };
@@ -263,9 +261,7 @@ export type DefaultConfigRenderOptions = {
   useCase?: string;
 };
 
-export function defaultHumanUserSchemaUrl(
-  builtinSchemaBase = DEFAULT_BUILTIN_SCHEMA_BASE,
-): string {
+export function defaultHumanUserSchemaUrl(builtinSchemaBase = DEFAULT_BUILTIN_SCHEMA_BASE): string {
   return `${trimTrailingSlash(builtinSchemaBase)}/default-human-user.json`;
 }
 

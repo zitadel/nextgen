@@ -43,7 +43,6 @@
     "test": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
     "test:all": "vitest run",
-    "lint": "oxlint .",
     "typecheck": "tsc --build tsconfig.json",
     "build": "node -e \"process.exit(0)\"",
     "install-browsers": "playwright install chromium"
