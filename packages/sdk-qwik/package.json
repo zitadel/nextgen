@@ -32,8 +32,7 @@
     "build": "vite build --mode lib",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:all": "pnpm run test",
-    "lint": "eslint ."
+    "test:all": "pnpm run test"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
@@ -44,26 +43,14 @@
     "@qwik.dev/core": "^2.0.0-beta.45"
   },
   "devDependencies": {
-    "@eslint/js": "catalog:",
-    "@eslint/json": "catalog:",
-    "@eslint/markdown": "catalog:",
     "@qwik.dev/core": "^2.0.0-beta.45",
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",
-    "eslint": "catalog:",
-    "eslint-config-prettier": "catalog:",
-    "eslint-import-resolver-typescript": "catalog:",
-    "eslint-plugin-import": "catalog:",
-    "eslint-plugin-perfectionist": "catalog:",
-    "eslint-plugin-prettier": "catalog:",
-    "eslint-plugin-qwik": "^2.0.0-beta.45",
     "msw": "catalog:",
     "playwright": "catalog:",
-    "prettier": "catalog:",
     "typescript": "catalog:",
-    "typescript-eslint": "catalog:",
     "vite": "catalog:",
     "vite-plugin-dts": "catalog:",
     "vitest": "catalog:"

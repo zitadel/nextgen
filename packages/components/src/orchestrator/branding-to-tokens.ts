@@ -170,7 +170,10 @@ function collectDeclarations(branding: Branding | undefined): Record<string, str
 function mapPalette(palette: BrandingPalette | undefined): Record<string, string> {
   if (!palette) return {};
   const out: Record<string, string> = {};
-  for (const [key, varNames] of Object.entries(PALETTE_MAP) as [keyof BrandingPalette, string[]][]) {
+  for (const [key, varNames] of Object.entries(PALETTE_MAP) as [
+    keyof BrandingPalette,
+    string[],
+  ][]) {
     const value = palette[key];
     if (typeof value === "string" && value.length > 0) {
       for (const varName of varNames) {

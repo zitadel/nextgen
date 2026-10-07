@@ -107,7 +107,9 @@ describe("local server Docker helpers", () => {
 
     expect(args).toContain("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true");
     const mount = args[args.indexOf("--volume", args.indexOf("--env")) + 1];
-    expect(mount).toBe("/tmp/app/.zitadel/local/admin-user.json:/var/lib/zitadel/bootstrap/admin-user.json:ro");
+    expect(mount).toBe(
+      "/tmp/app/.zitadel/local/admin-user.json:/var/lib/zitadel/bootstrap/admin-user.json:ro",
+    );
     // The image's own CMD is replaced, so the migrate default is passed again.
     expect(args.slice(-3)).toEqual([
       "--migrate",

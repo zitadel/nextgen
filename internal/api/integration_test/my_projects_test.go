@@ -185,15 +185,9 @@ func TestListMyProjects(t *testing.T) {
 		})
 		assert.Equal(t, want[1:], myProjectIDs(page2))
 
-		// The last page was full, so it still carries a token. Following it is
-		// what ends the listing, exactly as the response schema says.
-		require.True(t, page2.NextPageToken.Set, helpers.MustMarshal(t, page2))
-		page3 := listMyProjects(t, client, api.ListMyProjectsParams{
-			Limit:     api.NewOptLimit(1),
-			PageToken: api.NewOptPageToken(page2.NextPageToken.Value),
-		})
-		assert.Empty(t, page3.Projects)
-		assert.False(t, page3.NextPageToken.Set)
+		// The second page is the last: look-ahead sees no further row, so it
+		// carries no token and there is no trailing empty page (#849).
+		assert.False(t, page2.NextPageToken.Set, helpers.MustMarshal(t, page2))
 	})
 
 	// Deactivating a user does not revoke the sessions already minted for it

@@ -38,14 +38,9 @@ import {
   type SecretPublisher,
 } from "../../lib/idp";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
-import {
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "../../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { serverKind } from "../../lib/oclif/server-kind";
-import { readLocalAdmin } from "../../lib/local-server/admin-credential";
+import { findLocalAdminFor } from "../../lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
 import { readPlatformRuntime } from "../../lib/local-server/runtime";
 import { readZitadelSecret, writeZitadelSecret } from "../../lib/project";
@@ -72,12 +67,7 @@ import {
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
 import { installDependenciesForSetup } from "./install";
-import {
-  PickFrameworkPrompt,
-  SETUP_PROMPTS,
-  type SetupAnswers,
-  type SsoAnswer,
-} from "./prompts";
+import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers, type SsoAnswer } from "./prompts";
 import {
   detectProjectFacts,
   fileNameOf,
@@ -90,6 +80,7 @@ import {
   type Row,
   type Section,
 } from "./summary";
+import { reportWarning } from "../../lib/warnings";
 
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the
@@ -109,9 +100,7 @@ const FRAMEWORK_OPTIONS = createOrca()
  * guaranteed to fail and an explicit pass is rejected at parse time — before
  * any remote project is created.
  */
-const UNAVAILABLE_RENDERER_IDS = RENDERER_IDS.filter(
-  (id) => !AVAILABLE_RENDERER_IDS.includes(id),
-);
+const UNAVAILABLE_RENDERER_IDS = RENDERER_IDS.filter((id) => !AVAILABLE_RENDERER_IDS.includes(id));
 const RENDERER_FLAG_DESCRIPTION =
   UNAVAILABLE_RENDERER_IDS.length === 0
     ? "Renderer (default: react)."
@@ -218,10 +207,7 @@ export default class Setup extends BaseCommand {
         `Detected ${framework.id}${framework.devPort ? ` (dev port ${framework.devPort})` : ""}`,
       );
     } catch (error) {
-      if (
-        error instanceof ZitadelError &&
-        error.code === "E_FRAMEWORK_NOT_DETECTED"
-      ) {
+      if (error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED") {
         const target = await inspectScaffoldTarget(cwd);
         if (!target.scaffoldable && !force) {
           throw frameworkDetectionWithScaffoldTarget(error, cwd, target);
@@ -474,7 +460,7 @@ export default class Setup extends BaseCommand {
           // Said out loud: a connection pointing somewhere other than the
           // vendor is not what the developer will want in the end, and nothing
           // else in the summary would show it.
-          consola.warn(
+          reportWarning(
             `${idpProvider(answer.provider).displayName} points at ` +
               `${answer.endpoints.issuer}, not the provider`,
           );
@@ -553,7 +539,10 @@ export default class Setup extends BaseCommand {
     // `zitadel claim` has nothing left to do. Claiming an anonymous project
     // stays a cloud journey.
     let ownedByLocalAdmin: { email: string; team_id: string } | undefined;
-    if (!dryRun && serverKind.value(answers.server) === "local") {
+    const isLocal = serverKind.value(answers.server) === "local";
+    const hostsPlatform =
+      !dryRun && isLocal ? await localServerHostsPlatform(answers.server) : false;
+    if (hostsPlatform) {
       // The runtime document naming the platform project does not prove a
       // claim can complete (a deployment can pin that project without the
       // platform bootstrap, which leaves the admin without a personal team),
@@ -563,8 +552,16 @@ export default class Setup extends BaseCommand {
       // belongs inside the guard for the same reason — a malformed
       // `admin.json` must not fail a setup that already wrote the app.
       try {
-        const admin = await readLocalAdmin(cwd);
-        if (admin && (await localServerHostsPlatform(answers.server))) {
+        const admin = await findLocalAdminFor(cwd, answers.server);
+        if (!admin) {
+          // The console lists only projects the signed-in person can manage,
+          // so an unattached project is one the local admin never sees. A
+          // server started by hand has no local admin anywhere, hence the "if".
+          reportWarning(
+            `No local admin for ${answers.server} in ${cwd} or its parents, so the project is not attached to a team and the local console will not list it. If \`zitadel start\` started this server, run setup from the directory it ran in, or one inside it.`,
+          );
+        }
+        if (admin) {
           const owner = await claimProjectAsAdmin({
             serverUrl: answers.server,
             projectId: project.id,
@@ -584,7 +581,7 @@ export default class Setup extends BaseCommand {
           consola.success(`Project owned by ${admin.email} (team ${owner.team_id})`);
         }
       } catch (error) {
-        consola.warn(
+        reportWarning(
           `Could not attach the project to the local admin: ${toZitadelError(error).message}`,
         );
       }
@@ -594,13 +591,29 @@ export default class Setup extends BaseCommand {
     const nudgeClaim =
       !ownedByLocalAdmin &&
       (claimState({ secret: {}, server: answers.server }).kind === "detached" ||
-        (serverKind.value(answers.server) === "local" &&
-          (dryRun || (await localServerHostsPlatform(answers.server)))));
+        (isLocal && (dryRun || hostsPlatform)));
     const claimNudge = nudgeClaim
       ? {
           actions: [claimAction(this.meta.cliVersion, deadline)],
           boxActions: [claimBoxAction(this.meta.cliVersion, deadline)],
           commands: [claimCommand(this.meta.cliVersion)],
+        }
+      : { actions: [], boxActions: [], commands: [] };
+    // Only when the project is the local admin's: the console lists nothing
+    // else for them, so the command would open an empty console otherwise.
+    const consoleCommand = publicCliCommand("console", this.meta.cliVersion);
+    const consoleStep = ownedByLocalAdmin
+      ? {
+          actions: [
+            `Manage the project in the local console as ${ownedByLocalAdmin.email}: ${consoleCommand}`,
+          ],
+          boxActions: [
+            {
+              text: `Manage the project in the local console, signed in as ${ownedByLocalAdmin.email}:`,
+              command: consoleCommand,
+            },
+          ],
+          commands: [consoleCommand],
         }
       : { actions: [], boxActions: [], commands: [] };
     // The structured report is human-only. Under `--json` we let the
@@ -631,7 +644,11 @@ export default class Setup extends BaseCommand {
           [
             renderSummary(sections),
             "",
-            renderBoxActions([...installOutcome.boxActions, ...claimNudge.boxActions]),
+            renderBoxActions([
+              ...installOutcome.boxActions,
+              ...consoleStep.boxActions,
+              ...claimNudge.boxActions,
+            ]),
           ].join("\n"),
         ),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
@@ -690,6 +707,7 @@ export default class Setup extends BaseCommand {
         next_actions: [
           ...installOutcome.nextActions,
           brandingGuidanceAction(this.meta.cliVersion),
+          ...consoleStep.actions,
           ...claimNudge.actions,
         ],
         // A JSON run prints no warnings, so a credential the project never
@@ -715,6 +733,7 @@ export default class Setup extends BaseCommand {
             this.meta.cliVersion,
           ),
           ...installOutcome.nextCommands,
+          ...consoleStep.commands,
           ...claimNudge.commands,
         ],
       },
@@ -771,10 +790,7 @@ async function resolveScaffoldFramework(
  * that accepts and stalls cannot hang setup after the real work is done.
  * Exported so the fail-closed behavior is testable without a live server.
  */
-export async function localServerHostsPlatform(
-  server: string,
-  timeoutMs = 1500,
-): Promise<boolean> {
+export async function localServerHostsPlatform(server: string, timeoutMs = 1500): Promise<boolean> {
   return Boolean(await readPlatformRuntime(server, timeoutMs));
 }
 
@@ -1042,10 +1058,7 @@ function ssoRecovery(
     // somewhere nobody asked for. Both callers of this are local-server
     // failures, so `local` is the server meant in every case.
     commands: remaining.map((provider) =>
-      publicCliCommand(
-        `sso enable --provider ${provider.provider} --server local`,
-        cliVersion,
-      ),
+      publicCliCommand(`sso enable --provider ${provider.provider} --server local`, cliVersion),
     ),
   };
 }
@@ -1210,16 +1223,8 @@ function buildSummary(opts: {
   scaffoldedFramework: boolean;
   sso: readonly SsoAnswer[];
 }): Section[] {
-  const {
-    projectFacts,
-    writtenRel,
-    depsAdded,
-    project,
-    server,
-    issuer,
-    scaffoldedFramework,
-    sso,
-  } = opts;
+  const { projectFacts, writtenRel, depsAdded, project, server, issuer, scaffoldedFramework, sso } =
+    opts;
   const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
 
   const detected: Row[] = [{ label: "Framework", value: formatFrameworkLine(projectFacts) }];

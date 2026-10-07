@@ -3,19 +3,23 @@ import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   LOCAL_ADMIN_EMAIL,
   LOCAL_ADMIN_FILE,
   LOCAL_ADMIN_USER_FILE,
   ensureLocalAdmin,
+  findLocalAdminDir,
+  findLocalAdminFor,
   readLocalAdmin,
 } from "../../../../src/lib/local-server/admin-credential";
+import { writeRuntimeMetadata } from "../../../../src/lib/local-server/runtime";
 
 const tempDirs: string[] = [];
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
     if (dir) await rm(dir, { recursive: true, force: true });
@@ -28,6 +32,22 @@ async function tempCwd(): Promise<string> {
   return cwd;
 }
 
+/** What `zitadel start` records beside the local admin: which server it started. */
+async function recordStartedServer(dir: string, serverUrl: string): Promise<void> {
+  await writeRuntimeMetadata(dir, {
+    schema_version: 1,
+    backend: "docker",
+    container_name: "zitadel-server-test",
+    container_id: "container-1",
+    image: "ghcr.io/zitadel/nextgen:test",
+    port: Number(new URL(serverUrl).port),
+    server_url: serverUrl,
+    data_dir: join(dir, ".zitadel/local/nextgen-data"),
+    created_at: "2026-06-09T00:00:00.000Z",
+    cli_version: "0.0.0-test",
+  });
+}
+
 /** Decodes passlib's adapted base64 (`.` for `+`, no padding). */
 function ab64Decode(value: string): Buffer {
   return Buffer.from(value.replaceAll(".", "+"), "base64");
@@ -36,6 +56,59 @@ function ab64Decode(value: string): Buffer {
 describe("local admin", () => {
   it("has no admin before start creates one", async () => {
     expect(await readLocalAdmin(await tempCwd())).toBeUndefined();
+  });
+
+  it("finds the admin in the directory start ran in, from there or from inside it", async () => {
+    const cwd = await tempCwd();
+    await ensureLocalAdmin(cwd);
+    const nested = join(cwd, "apps", "web");
+    await mkdir(nested, { recursive: true });
+
+    expect(await findLocalAdminDir(cwd)).toBe(cwd);
+    expect(await findLocalAdminDir(nested)).toBe(cwd);
+  });
+
+  it("finds no admin directory when none of the parents has one", async () => {
+    const cwd = await tempCwd();
+    // The search ends at the home directory; pinning it keeps the developer's
+    // own `~/.zitadel/local` out of the test.
+    vi.stubEnv("HOME", cwd);
+    vi.stubEnv("USERPROFILE", cwd);
+
+    expect(await findLocalAdminDir(cwd)).toBeUndefined();
+  });
+
+  it("gives a server the admin its own start created, under either loopback name", async () => {
+    const cwd = await tempCwd();
+    const { admin } = await ensureLocalAdmin(cwd);
+    await recordStartedServer(cwd, "http://localhost:8081");
+    const app = join(cwd, "my-app");
+    await mkdir(app);
+
+    expect(await findLocalAdminFor(app, "http://localhost:8081")).toEqual(admin);
+    expect(await findLocalAdminFor(app, "http://127.0.0.1:8081")).toEqual(admin);
+  });
+
+  it("gives a server no admin that another server's start created", async () => {
+    const cwd = await tempCwd();
+    vi.stubEnv("HOME", cwd);
+    vi.stubEnv("USERPROFILE", cwd);
+    await ensureLocalAdmin(cwd);
+    await recordStartedServer(cwd, "http://localhost:8081");
+
+    expect(await findLocalAdminFor(cwd, "http://localhost:9000")).toBeUndefined();
+  });
+
+  it("looks past another server's admin to the right one further up", async () => {
+    const outer = await tempCwd();
+    const { admin } = await ensureLocalAdmin(outer);
+    await recordStartedServer(outer, "http://localhost:8081");
+    const inner = join(outer, "sandbox");
+    await mkdir(inner);
+    await ensureLocalAdmin(inner);
+    await recordStartedServer(inner, "http://localhost:9000");
+
+    expect(await findLocalAdminFor(inner, "http://localhost:8081")).toEqual(admin);
   });
 
   it("creates the credential and a bootstrap user document the server can verify", async () => {
@@ -73,7 +146,13 @@ describe("local admin", () => {
 
     const [, id, rounds, salt, hash] = doc.authenticators.password.encoded_hash.split("$");
     expect(id).toBe("pbkdf2-sha256");
-    const recomputed = pbkdf2Sync(admin.password, ab64Decode(salt ?? ""), Number(rounds), 32, "sha256");
+    const recomputed = pbkdf2Sync(
+      admin.password,
+      ab64Decode(salt ?? ""),
+      Number(rounds),
+      32,
+      "sha256",
+    );
     expect(recomputed.equals(ab64Decode(hash ?? ""))).toBe(true);
     expect(doc.authenticators.password.change_required).toBe(false);
   });
@@ -96,18 +175,21 @@ describe("local admin", () => {
 
   // A credential that exists but cannot be read is still the one the server
   // imported; minting a replacement would split the password in two.
-  it.skipIf(process.getuid?.() === 0)("refuses an unreadable credential instead of replacing it", async () => {
-    const cwd = await tempCwd();
-    const { admin } = await ensureLocalAdmin(cwd);
-    await chmod(join(cwd, LOCAL_ADMIN_FILE), 0o000);
+  it.skipIf(process.getuid?.() === 0)(
+    "refuses an unreadable credential instead of replacing it",
+    async () => {
+      const cwd = await tempCwd();
+      const { admin } = await ensureLocalAdmin(cwd);
+      await chmod(join(cwd, LOCAL_ADMIN_FILE), 0o000);
 
-    try {
-      await expect(ensureLocalAdmin(cwd)).rejects.toThrow(/cannot be read/);
-    } finally {
-      await chmod(join(cwd, LOCAL_ADMIN_FILE), 0o600);
-    }
-    expect(await readLocalAdmin(cwd)).toEqual(admin);
-  });
+      try {
+        await expect(ensureLocalAdmin(cwd)).rejects.toThrow(/cannot be read/);
+      } finally {
+        await chmod(join(cwd, LOCAL_ADMIN_FILE), 0o600);
+      }
+      expect(await readLocalAdmin(cwd)).toEqual(admin);
+    },
+  );
 
   it("names the schema under the server's configured schema base", async () => {
     const cwd = await tempCwd();
@@ -115,7 +197,9 @@ describe("local admin", () => {
     const { userFile } = await ensureLocalAdmin(cwd, "https://schemas.example.test/api/schemas/");
 
     const doc = JSON.parse(await readFile(userFile, "utf8")) as { header: { schema_url: string } };
-    expect(doc.header.schema_url).toBe("https://schemas.example.test/api/schemas/default-human-user.json");
+    expect(doc.header.schema_url).toBe(
+      "https://schemas.example.test/api/schemas/default-human-user.json",
+    );
   });
 
   it("replaces the bootstrap document without leaving a staging file behind", async () => {

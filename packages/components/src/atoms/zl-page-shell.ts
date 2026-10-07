@@ -31,10 +31,7 @@ import { baseHostStyles, surfaceStyles } from "../styles/index.js";
  */
 @customElement("zl-page-shell")
 export class ZlPageShell extends LitElement {
-  static override styles = [
-    baseHostStyles,
-    ...surfaceStyles(pageShellStyles),
-  ];
+  static override styles = [baseHostStyles, ...surfaceStyles(pageShellStyles)];
 
   override render() {
     const hasHeader = this.lightDomSlotFilled("header");

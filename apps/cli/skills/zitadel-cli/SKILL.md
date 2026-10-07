@@ -128,6 +128,10 @@ Each invocation prints one JSON object:
 - On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_NOT_FOUND`,
   `E_CONFLICT`) and `message`.
 - `next_commands`: the suggested follow-ups. Prefer these over free-text hints.
+- `warnings`: things that went wrong without stopping the command, such as a
+  value that was not published. Always present on success (often empty), and
+  present on a no-op or failure when there are any. Read them before you report
+  success: a warning usually means a follow-up step is needed.
 - A `list` verb emits `data: { items, count, next_page_token }`; when a page
   remains, `data.next_commands` carries the exact command for the next page.
 - `plan` and `apply` emit `data.changes`: one row per touched resource
@@ -227,6 +231,16 @@ where it detects a framework. It stops on any other non-empty directory and
 asks for `--force` — which the golden path passes because `start` has already
 written `.zitadel/local` into the directory. If you run `setup` before `start`,
 in a truly empty directory, `--force` is not needed.
+
+The app may also live in a subdirectory of the one `start` ran in: `setup`,
+`console` and `--server local` read `.zitadel/local/` from the working
+directory or the nearest parent that has it (up to the home directory), so
+`mkdir my-app && cd my-app` after `start` works without `--force`. On a local
+server that hosts the platform project, `setup` attaches the project to the
+local admin's team and ends `data.next_commands` with `console`; when it finds
+no local admin for that server on the way up, it says so in the envelope's
+`warnings` and the project stays unattached, so the local console does not
+list it.
 
 After `setup`, follow `data.next_commands` to start the app. Prove the generated
 auth flow in a visible browser by registering a unique user, logging out, logging

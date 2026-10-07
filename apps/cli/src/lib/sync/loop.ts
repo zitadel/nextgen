@@ -13,6 +13,7 @@ import type { PlanResourceChange } from "./plan-renderer.js";
 import { readState, removeFromState, updateState } from "./state.js";
 import { FatalFetchError } from "./types.js";
 import type { FlowRepin, ResourceEntry, ResourceSyncer, SyncAction } from "./types.js";
+import { reportWarning } from "../warnings";
 
 /**
  * Compute the sync plan for `cwd` against the state file and (when
@@ -269,7 +270,7 @@ export async function runSyncLoop(
   for (const action of actions) {
     if (action.kind === "create" || action.kind === "update" || action.kind === "revise") {
       for (const warning of action.warnings ?? []) {
-        consola.warn(`${action.path}: ${warning.message}`);
+        reportWarning(`${action.path}: ${warning.message}`);
       }
     }
   }
@@ -393,7 +394,12 @@ export async function runSyncLoop(
           hash: await writeBack(action, canonical, fallbackHash),
         });
         consola.info(`Updated the ${action.syncer.kind} on Zitadel from ${action.path}`);
-        applied.push({ kind: action.syncer.kind, action: "update", file: action.path, id: trackedId });
+        applied.push({
+          kind: action.syncer.kind,
+          action: "update",
+          file: action.path,
+          id: trackedId,
+        });
         break;
       }
       case "delete": {
@@ -402,7 +408,12 @@ export async function runSyncLoop(
         consola.info(
           `Deleted the ${action.syncer.kind} on Zitadel because ${action.path} was removed locally`,
         );
-        applied.push({ kind: action.syncer.kind, action: "delete", file: action.path, id: action.id });
+        applied.push({
+          kind: action.syncer.kind,
+          action: "delete",
+          file: action.path,
+          id: action.id,
+        });
         break;
       }
       case "skip": {
@@ -613,10 +624,7 @@ export function hashResourceContent(data: object): string {
  * reordering keys or spelling out a meta-schema default does not read as an
  * edit.
  */
-export function hashForState(
-  syncer: Pick<ResourceSyncer, "normalize">,
-  data: object,
-): string {
+export function hashForState(syncer: Pick<ResourceSyncer, "normalize">, data: object): string {
   const normalized = syncer.normalize?.(data) ?? data;
   return createHash("sha256").update(stableStringify(normalized)).digest("hex");
 }

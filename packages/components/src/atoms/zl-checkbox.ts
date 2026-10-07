@@ -43,10 +43,7 @@ export class ZlCheckbox extends LitElement {
     delegatesFocus: true,
   };
 
-  static override styles = [
-    baseHostStyles,
-    ...surfaceStyles(checkboxStyles),
-  ];
+  static override styles = [baseHostStyles, ...surfaceStyles(checkboxStyles)];
 
   /**
    * Field name — used as the key in form submission and in `zl-change` detail.
@@ -168,9 +165,11 @@ export class ZlCheckbox extends LitElement {
               <zl-icon class="zr-checkbox__check" part="check" name="check" size="16" decorative></zl-icon>
             </span>
           </span>
-          ${labelText
-            ? html`<span class="zr-checkbox__label" part="label">${labelText}</span>`
-            : html`<slot></slot>`}
+          ${
+            labelText
+              ? html`<span class="zr-checkbox__label" part="label">${labelText}</span>`
+              : html`<slot></slot>`
+          }
         </label>
         <div
           class="zr-checkbox__error"

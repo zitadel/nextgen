@@ -42,14 +42,10 @@ import {
   type RuntimeBackend,
   type RuntimeMetadata,
 } from "../lib/local-server/runtime";
-import {
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../lib/oclif";
 import { listenersForPort, type TcpListener } from "../lib/prober/ports";
 import { publicCliCommand } from "../lib/public-cli";
+import { reportWarning } from "../lib/warnings";
 
 const START_TIMEOUT_MS = 90_000;
 
@@ -182,7 +178,12 @@ export default class Start extends BaseCommand {
       await writeRuntimeMetadata(this.meta.cwd, metadata);
       return this.emit({
         status: "ok",
-        data: readyData(metadata, false, this.meta.cliVersion, await consoleLoginFor(serverUrl, local?.admin)),
+        data: readyData(
+          metadata,
+          false,
+          this.meta.cliVersion,
+          await consoleLoginFor(serverUrl, local?.admin),
+        ),
       });
     }
 
@@ -211,7 +212,12 @@ export default class Start extends BaseCommand {
       await writeRuntimeMetadata(this.meta.cwd, metadata);
       return this.emit({
         status: "ok",
-        data: readyData(metadata, true, this.meta.cliVersion, await consoleLoginFor(serverUrl, local?.admin)),
+        data: readyData(
+          metadata,
+          true,
+          this.meta.cliVersion,
+          await consoleLoginFor(serverUrl, local?.admin),
+        ),
       });
     }
 
@@ -248,7 +254,12 @@ export default class Start extends BaseCommand {
     await writeRuntimeMetadata(this.meta.cwd, metadata);
     return this.emit({
       status: "ok",
-      data: readyData(metadata, false, this.meta.cliVersion, await consoleLoginFor(serverUrl, local?.admin)),
+      data: readyData(
+        metadata,
+        false,
+        this.meta.cliVersion,
+        await consoleLoginFor(serverUrl, local?.admin),
+      ),
     });
   }
 }
@@ -289,7 +300,7 @@ async function consoleLoginFor(
     return { signed_in_as: admin.email, sign_in_url: url };
   } catch (error) {
     const reason = toZitadelError(error);
-    consola.warn(`Could not create a console sign-in link: ${reason.message}`);
+    reportWarning(`Could not create a console sign-in link: ${reason.message}`);
     return { signed_in_as: admin.email, error: reason.message, hint: reason.hint };
   }
 }
@@ -389,7 +400,7 @@ function readyData(
       ...(console?.sign_in_url
         ? [`Console: you are ${console.signed_in_as}. Open ${console.sign_in_url} (works once).`]
         : []),
-      "From your app directory, run setup; the CLI will detect the framework or ask when needed.",
+      "Run setup in this directory or one inside it, so it finds this server's local admin; the CLI will detect the framework or ask when needed.",
       "Setup installs dependencies when needed; then start your app dev server.",
     ],
     next_commands: [
@@ -464,14 +475,18 @@ async function serverExitedError(
   logPath: string | undefined,
 ): Promise<ZitadelError> {
   const logTail = logPath ? await binaryLogs(logPath, 40) : undefined;
-  return new ZitadelError("E_NETWORK", "Local Zitadel server process exited before becoming healthy", {
-    hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
-    nextCommands: [
-      publicCliCommand("logs", cliVersion),
-      publicCliCommand("reset --force", cliVersion),
-    ],
-    details: { ...details, server_url: serverUrl, ...(logTail ? { log_tail: logTail } : {}) },
-  });
+  return new ZitadelError(
+    "E_NETWORK",
+    "Local Zitadel server process exited before becoming healthy",
+    {
+      hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
+      nextCommands: [
+        publicCliCommand("logs", cliVersion),
+        publicCliCommand("reset --force", cliVersion),
+      ],
+      details: { ...details, server_url: serverUrl, ...(logTail ? { log_tail: logTail } : {}) },
+    },
+  );
 }
 
 function validatePort(port: number): void {

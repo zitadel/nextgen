@@ -34,8 +34,8 @@ function makeJwt(
 
 function makeRequest(url: string, cookie?: string, authorization?: string): NextRequest {
   const headers: Record<string, string> = {};
-  if (cookie) headers["cookie"] = cookie;
-  if (authorization) headers["authorization"] = authorization;
+  if (cookie) headers.cookie = cookie;
+  if (authorization) headers.authorization = authorization;
   return new NextRequest(url, { headers });
 }
 
@@ -270,7 +270,7 @@ describe("nextgenMiddleware", () => {
 
   it("strips x-nextgen-auth-token from proxied requests", async () => {
     let capturedHeaders: Headers | undefined;
-    const upstreamFetch = vi.fn().mockImplementation((url: string, init: RequestInit) => {
+    const upstreamFetch = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
       capturedHeaders = init.headers as Headers;
       return Promise.resolve(new Response("{}", { status: 200 }));
     });

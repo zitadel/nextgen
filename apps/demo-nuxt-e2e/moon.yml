@@ -7,9 +7,6 @@ dependsOn:
   - "demo-nuxt"
 
 tasks:
-  lint:
-    command: "corepack pnpm exec oxlint ."
-
   # No workspace build deps: the specs only import @playwright/test — the
   # api-mock and demo-nuxt dependencies are dev-server commands, not types.
   typecheck:

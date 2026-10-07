@@ -47,8 +47,14 @@ const meta: Meta<IconArgs> = {
     size: { control: "inline-radio", options: ["16", "24"] },
     tone: { control: "inline-radio", options: ["default", "error", "success", "disabled"] },
     spin: { control: "boolean" },
-    decorative: { control: "boolean", description: "Force aria-hidden (use next to a visible label)." },
-    label: { control: "text", description: "Accessible name override; falls back to the glyph default." },
+    decorative: {
+      control: "boolean",
+      description: "Force aria-hidden (use next to a visible label).",
+    },
+    label: {
+      control: "text",
+      description: "Accessible name override; falls back to the glyph default.",
+    },
   },
 };
 

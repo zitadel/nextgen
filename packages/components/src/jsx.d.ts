@@ -24,47 +24,47 @@ declare module "react" {
       // neither) and preserves the concrete element type on the ref.
       "zitadel-login": React.HTMLAttributes<HTMLElement> &
         React.RefAttributes<ZitadelLogin> & {
-        project?: ZitadelLogin["project"];
-        variant?: ZitadelLogin["variant"];
-        theme?: ZitadelLogin["theme"];
-        suppressHeader?: ZitadelLogin["suppressHeader"];
-        "suppress-header"?: boolean;
-        purpose?: ZitadelLogin["purpose"];
-        "flow-name"?: string;
-        "project-id"?: string;
-        "proxy-path"?: string;
-        url?: string;
-        "post-sign-in-url"?: string;
-        "resume-flow-id"?: string;
-        "preview-state"?: ZitadelLogin["previewState"];
-        "preview-success-step"?: string;
-        "manual-ceremony"?: boolean;
-        lang?: string;
-        locales?: ZitadelLogin["locales"];
-      };
+          project?: ZitadelLogin["project"];
+          variant?: ZitadelLogin["variant"];
+          theme?: ZitadelLogin["theme"];
+          suppressHeader?: ZitadelLogin["suppressHeader"];
+          "suppress-header"?: boolean;
+          purpose?: ZitadelLogin["purpose"];
+          "flow-name"?: string;
+          "project-id"?: string;
+          "proxy-path"?: string;
+          url?: string;
+          "post-sign-in-url"?: string;
+          "resume-flow-id"?: string;
+          "preview-state"?: ZitadelLogin["previewState"];
+          "preview-success-step"?: string;
+          "manual-ceremony"?: boolean;
+          lang?: string;
+          locales?: ZitadelLogin["locales"];
+        };
       "zitadel-session": React.HTMLAttributes<HTMLElement> &
         React.RefAttributes<ZitadelSession> & {
-        project?: ZitadelSession["project"];
-        variant?: ZitadelSession["variant"];
-        theme?: ZitadelSession["theme"];
-        suppressHeader?: ZitadelSession["suppressHeader"];
-        "suppress-header"?: boolean;
-        "project-id"?: string;
-        "proxy-path"?: string;
-        url?: string;
-        "post-sign-out-url"?: string;
-        heading?: string;
-        "logout-label"?: string;
-      };
+          project?: ZitadelSession["project"];
+          variant?: ZitadelSession["variant"];
+          theme?: ZitadelSession["theme"];
+          suppressHeader?: ZitadelSession["suppressHeader"];
+          "suppress-header"?: boolean;
+          "project-id"?: string;
+          "proxy-path"?: string;
+          url?: string;
+          "post-sign-out-url"?: string;
+          heading?: string;
+          "logout-label"?: string;
+        };
       "zitadel-logout": React.HTMLAttributes<HTMLElement> &
         React.RefAttributes<ZitadelLogout> & {
-        project?: ZitadelLogout["project"];
-        theme?: ZitadelLogout["theme"];
-        "project-id"?: string;
-        "proxy-path"?: string;
-        url?: string;
-        "post-sign-out-url"?: string;
-      };
+          project?: ZitadelLogout["project"];
+          theme?: ZitadelLogout["theme"];
+          "project-id"?: string;
+          "proxy-path"?: string;
+          url?: string;
+          "post-sign-out-url"?: string;
+        };
     }
   }
 }

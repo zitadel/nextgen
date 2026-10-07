@@ -86,10 +86,22 @@ const config: StorybookConfig = {
     // logic hot, without changing how the rest of the workspace resolves it.
     const componentsSrc = resolve(packagesDir, "components/src");
     const componentsAlias = [
-      { find: /^@zitadel\/components\/atoms$/, replacement: resolve(componentsSrc, "atoms/index.ts") },
-      { find: /^@zitadel\/components\/manifests$/, replacement: resolve(componentsSrc, "manifests.ts") },
-      { find: /^@zitadel\/components\/tokens$/, replacement: resolve(componentsSrc, "tokens/index.ts") },
-      { find: /^@zitadel\/components\/orchestrator$/, replacement: resolve(componentsSrc, "orchestrator/index.ts") },
+      {
+        find: /^@zitadel\/components\/atoms$/,
+        replacement: resolve(componentsSrc, "atoms/index.ts"),
+      },
+      {
+        find: /^@zitadel\/components\/manifests$/,
+        replacement: resolve(componentsSrc, "manifests.ts"),
+      },
+      {
+        find: /^@zitadel\/components\/tokens$/,
+        replacement: resolve(componentsSrc, "tokens/index.ts"),
+      },
+      {
+        find: /^@zitadel\/components\/orchestrator$/,
+        replacement: resolve(componentsSrc, "orchestrator/index.ts"),
+      },
       { find: /^@zitadel\/components$/, replacement: resolve(componentsSrc, "index.ts") },
     ];
     const existingAlias = viteConfig.resolve.alias;

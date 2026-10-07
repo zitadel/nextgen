@@ -1618,9 +1618,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       // (ADR 022). The kind-based exclusion also keeps it out of the generic
       // secondary-button loop.
       expect(element.shadowRoot?.querySelector('[data-action="back"]')).toBeNull();
-      expect(
-        element.shadowRoot?.querySelector('[data-testid="zitadel-action-back"]'),
-      ).toBeNull();
+      expect(element.shadowRoot?.querySelector('[data-testid="zitadel-action-back"]')).toBeNull();
     });
 
     it("pushes a single sentinel entry without touching the URL", async () => {
@@ -1711,9 +1709,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       // ON the sentinel. That is not a request to go back in the flow.
       window.dispatchEvent(new PopStateEvent("popstate", { state: { zl: true } }));
 
-      const submitsAfter = mock
-        .getCaptured()
-        .filter((req) => req.kind === "submitFlowStep").length;
+      const submitsAfter = mock.getCaptured().filter((req) => req.kind === "submitFlowStep").length;
       expect(submitsAfter).toBe(submitsBefore);
 
       // The widget stays armed: a real back press still maps to the back
@@ -2274,7 +2270,12 @@ describe("<zitadel-login preview-state>", () => {
                       },
                     ],
                     actions: [
-                      { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
+                      {
+                        name: "submit",
+                        kind: "submit",
+                        text_key: "submit.continue",
+                        primary: true,
+                      },
                     ],
                     gates: {},
                   },
@@ -2455,7 +2456,9 @@ describe("<zitadel-login preview-state>", () => {
 
     expect(
       loginPreviewStatesFor(
-        step([{ name: "email", type: "email", text_key: "identifier.field.email", required: true }]),
+        step([
+          { name: "email", type: "email", text_key: "identifier.field.email", required: true },
+        ]),
       ),
     ).toContain("validation_error");
     // An optional field, a must-accept checkbox, or no fields at all: an empty
@@ -2496,9 +2499,7 @@ describe("<zitadel-login preview-state>", () => {
     await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="email"][invalid]'));
 
     element.previewState = "default";
-    await waitFor(() =>
-      element.shadowRoot?.querySelector('zl-field[name="email"]:not([invalid])'),
-    );
+    await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="email"]:not([invalid])'));
     expect(element.shadowRoot?.querySelector("zl-alert")).toBeNull();
     expect(requests()).toEqual(["createFlow"]);
   });

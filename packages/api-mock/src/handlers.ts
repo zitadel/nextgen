@@ -201,11 +201,11 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
 
   async function renderCurrentStep(): Promise<CreateFlow201> {
     const snapshot = actor.getSnapshot();
-    const userHandle = snapshot.context.capturedFields["email"] ?? "";
+    const userHandle = snapshot.context.capturedFields.email ?? "";
     const input = {
       flowId: FLOW_ID,
       sessionToken: snapshot.context.sessionToken,
-      capturedEmail: snapshot.context.capturedFields["email"],
+      capturedEmail: snapshot.context.capturedFields.email,
       registeredCredentials: authn.getByUser(userHandle),
       iss,
     };
@@ -393,7 +393,10 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       ),
     ),
     http.delete("*/sessions/me", () =>
-      HttpResponse.json({ code: "auth.unauthorized", message: "no session cookie" }, { status: 401 }),
+      HttpResponse.json(
+        { code: "auth.unauthorized", message: "no session cookie" },
+        { status: 401 },
+      ),
     ),
   ];
 

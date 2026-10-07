@@ -10,7 +10,6 @@ import type { Json, ResourceRegistry } from "./types";
  */
 export const describeRegistry = <Ctx>(registry: ResourceRegistry<Ctx>): readonly Json[] =>
   Object.entries(registry).map(([topic, resource]) => {
-
     return {
       topic,
       singular: resource.singular,

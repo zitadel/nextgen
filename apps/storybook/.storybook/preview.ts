@@ -13,9 +13,9 @@ import { mswLoader } from "msw-storybook-addon/csf3";
 // empty registry, so the first `define` wins and picks up the edited source.
 // Confined to Storybook so the component library keeps Lit's strict behaviour.
 const nativeDefine = customElements.define.bind(customElements);
-customElements.define = (name, constructor, options) => {
+customElements.define = (name, ctor, options) => {
   if (customElements.get(name)) return;
-  nativeDefine(name, constructor, options);
+  nativeDefine(name, ctor, options);
 };
 
 // Design-system variables on :root so the atoms resolve `var(--zl-*)`.

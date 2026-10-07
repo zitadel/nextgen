@@ -17,7 +17,12 @@ export async function pageToLLMText(page: unknown): Promise<string | undefined> 
   const normalized = normalizePage(page);
   const title = normalized.title ?? normalized.url;
   const description = normalized.description ?? "";
-  const markdown = findString(normalized.data, ["processedMarkdown", "markdown", "content", "body"]);
+  const markdown = findString(normalized.data, [
+    "processedMarkdown",
+    "markdown",
+    "content",
+    "body",
+  ]);
   const structuredData = await resolveStructuredData(normalized.data.structuredData);
   const structured = structuredData?.contents
     ?.map((entry) => [entry.heading, entry.content].filter(Boolean).join("\n"))

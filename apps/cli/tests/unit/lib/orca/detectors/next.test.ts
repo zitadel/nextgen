@@ -56,7 +56,10 @@ describe("NextDetector", () => {
   });
 
   it("recognizes next as a devDependency", async () => {
-    await writeFile(join(dir, "package.json"), JSON.stringify({ devDependencies: { next: "15.0.0" } }));
+    await writeFile(
+      join(dir, "package.json"),
+      JSON.stringify({ devDependencies: { next: "15.0.0" } }),
+    );
     await mkdir(join(dir, "app"));
     expect(await detector.detect(dir)).toMatchObject({ id: "next" });
   });
@@ -81,7 +84,10 @@ describe("NextDetector", () => {
   });
 
   it("returns null when next is not a dependency", async () => {
-    await writeFile(join(dir, "package.json"), JSON.stringify({ dependencies: { react: "18.0.0" } }));
+    await writeFile(
+      join(dir, "package.json"),
+      JSON.stringify({ dependencies: { react: "18.0.0" } }),
+    );
     await mkdir(join(dir, "app"));
     expect(await detector.detect(dir)).toBeNull();
   });

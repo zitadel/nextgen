@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ianlancetaylor/jsonschema"
+
 	"github.com/zitadel/nextgen/internal/maputil"
 )
 
@@ -131,9 +133,9 @@ type FlowSSOReturn struct {
 // [Process]. Pop is reserved for the deferred pivot stack. HandoffToken
 // + HandoffTokenExpiresAt are populated only on the terminal step;
 // SSOBindingNonce only on the [FlowStepNameSSORedirect] step, where the
-// handler sets it as the browser-binding cookie. SSOResolved is set only by
-// [Render], when it resolved a parked SSO identity: the handler re-seals
-// only such a render.
+// handler sets it as the browser-binding cookie. Reseal is set only by
+// [Render], when resolving a parked SSO identity changed the state: the
+// handler re-seals only such a render.
 type FlowStepResult struct {
 	State                 *FlowState
 	Step                  *FlowStep
@@ -141,7 +143,7 @@ type FlowStepResult struct {
 	HandoffToken          string
 	HandoffTokenExpiresAt time.Time
 	SSOBindingNonce       string
-	SSOResolved           bool
+	Reseal                bool
 }
 
 // FlowStep is the capability payload the API surfaces to the client.
@@ -360,8 +362,8 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinitio
 	if def == nil || state == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: render without definition or state", ErrFlowIntegrity())
 	}
-	if result, resolved, err := r.resolveSSOIdentity(ctx, def, state); err != nil || resolved {
-		result.SSOResolved = resolved
+	if result, reseal, err := r.resolveSSOIdentity(ctx, def, state); err != nil || result.Step != nil {
+		result.Reseal = reseal
 		return result, err
 	}
 	step, err := r.renderStep(ctx, def, state)
@@ -374,8 +376,10 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinitio
 }
 
 // resolveSSOIdentity turns an external identity an SSO callback parked on the
-// attempt into an outcome on the current step. resolved reports that it
-// produced the result; otherwise Render goes on to render the step as usual.
+// attempt into an outcome on the current step. A branch that produces the
+// result always returns a step, and Render relies on that: a result without
+// one goes on to render the step as usual. The bool reports that the state
+// changed and the handler must re-seal it.
 //
 // It runs on every render, so every GET /flow/{id} pays one attempt read even
 // without SSO. The read is not only for SSO: LoadParked also restarts any flow
@@ -415,14 +419,51 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		if err != nil {
 			return FlowStepResult{}, false, err
 		}
-		return r.retrySSOHandoff(pc, resolvedFields, parked.BoundUserID)
+		// Checked here as well, so the error render leaves the cookie alone:
+		// the state does not change, and a reload shows the error again.
+		if !ssoAuthenticatedRoutes(currentStep) {
+			msg := FlowStepErrorSSOUnavailable
+			result, err := r.renderStepError(pc, resolvedFields, &msg)
+			return result, false, err
+		}
+		return r.retrySSOHandoff(pc, resolvedFields, parked.BoundUserID, false)
+	}
+	// A collision bound a user, but the cookie that recorded it lost the race
+	// to one that recorded this row as collected: catch the state up.
+	if parked != nil && parked.CollisionUserID != "" {
+		// The marker counts only while the attempt still carries that user: a
+		// stale submission may have overwritten the user factor since.
+		if parked.AttemptUserID != parked.CollisionUserID {
+			return FlowStepResult{}, false, ErrFlowRestartRequired()
+		}
+		switch state.CollectedData.UserID {
+		case parked.CollisionUserID:
+			// The user alone is no proof that this cookie recorded the
+			// collision: the flow may have identified that user before SSO.
+			if state.SSOResolvedCheckID == parked.CheckID {
+				return FlowStepResult{}, false, nil
+			}
+		case "":
+		default:
+			return FlowStepResult{}, false, ErrFlowRestartRequired()
+		}
+		pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep}
+		resolvedFields, err := r.resolveInputs(pc)
+		if err != nil {
+			return FlowStepResult{}, false, err
+		}
+		// The bind may have run on another step, or under an older definition.
+		if !userAlreadyExistsRoutes(currentStep) {
+			msg := FlowStepErrorSSOUnavailable
+			result, err := r.renderStepError(pc, resolvedFields, &msg)
+			return result, false, err
+		}
+		state.SSOResolvedCheckID = parked.CheckID
+		recordResolvedUser(state, parked.CollisionUserID)
+		result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeUserAlreadyExists, false)
+		return result, true, err
 	}
 	if parked == nil {
-		return FlowStepResult{}, false, nil
-	}
-	// Creation under `auto` (create or collide) is not resolved yet: the row
-	// stays parked, and no guard is recorded, so a later render can resolve it.
-	if parked.Link == nil && !parked.CreationDisabled {
 		return FlowStepResult{}, false, nil
 	}
 
@@ -432,17 +473,39 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		return FlowStepResult{}, false, err
 	}
 	// Recorded before the branch work, so a failed branch is not retried on
-	// every reload.
+	// every reload, and a row left parked for collection is not resolved twice.
 	state.SSOResolvedCheckID = parked.CheckID
 
-	if parked.Link == nil {
-		// provisioning.creation is disabled: the identity has no account and
-		// will not get one. The row stays parked, so a failed render or seal
-		// re-runs this branch and shows the error again; the replay guard in
-		// the sealed cookie keeps later reloads from repeating it. The row
-		// expires with the attempt or is replaced by the next ceremony.
+	if parked.Link == nil && parked.CreationDisabled {
+		// The identity has no account and will not get one. The row stays
+		// parked, so a failed render or seal re-runs this branch and shows the
+		// error again; the replay guard in the sealed cookie keeps later
+		// reloads from repeating it. The row expires with the attempt or is
+		// replaced by the next ceremony.
 		msg := FlowStepErrorSSOCreationDisabled
 		result, err := r.renderStepError(pc, resolvedFields, &msg)
+		return result, true, err
+	}
+	if parked.Link == nil {
+		outcome, err := r.provisionSSOIdentity(ctx, state, currentStep, parked)
+		if errors.Is(err, ErrSSOStateInvalid()) {
+			return r.resolveStaleSSOBind(pc, resolvedFields, loadInput)
+		}
+		if errors.Is(err, errSSOUnroutable) {
+			msg := FlowStepErrorSSOUnavailable
+			result, err := r.renderStepError(pc, resolvedFields, &msg)
+			return result, true, err
+		}
+		if err != nil {
+			return FlowStepResult{}, false, err
+		}
+		// Creation bound the attempt, so a concurrent render can win the
+		// handoff first, as after the linked bind. As after create_user, the
+		// step that created the user offers no back.
+		if outcome == FlowImplicitOutcomeSSOAuthenticated {
+			return r.retrySSOHandoff(pc, resolvedFields, state.CollectedData.UserID, true)
+		}
+		result, err := r.routeOutcome(pc, resolvedFields, outcome, false)
 		return result, true, err
 	}
 
@@ -463,31 +526,250 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		LinkID:       parked.Link.LinkID,
 	})
 	if errors.Is(err, ErrSSOStateInvalid()) {
-		// A concurrent request settled the row, or a new ceremony replaced it.
-		// One more read tells which.
-		reread, err := r.ssoIdentities.LoadParked(ctx, loadInput)
-		if err != nil {
-			// Handed off or expired: restart, so this response cannot reseal a
-			// cookie over the winner's. Any other read failure is returned as is.
-			return FlowStepResult{}, false, fmt.Errorf("flow state machine: reload parked sso identity: %w", err)
-		}
-		if reread == nil || reread.BoundUserID == "" {
-			// Replaced: the new ceremony keeps the flow, so render the step.
-			return FlowStepResult{}, false, nil
-		}
-		return r.retrySSOHandoff(pc, resolvedFields, reread.BoundUserID)
+		return r.resolveStaleSSOBind(pc, resolvedFields, loadInput)
 	}
 	if err != nil {
 		return FlowStepResult{}, false, fmt.Errorf("flow state machine: bind sso identity: %w", err)
 	}
-	return r.retrySSOHandoff(pc, resolvedFields, parked.Link.UserID)
+	return r.retrySSOHandoff(pc, resolvedFields, parked.Link.UserID, false)
+}
+
+// provisionSSOIdentity settles an unlinked identity under `creation: auto`
+// and returns the outcome to raise. A user owning one of the unique claims is
+// bound (user_already_exists, as for a typed registration collision);
+// otherwise complete, trusted claims create a linked user
+// (sso_authenticated); anything else is collected (sso_user_not_found), with
+// the row left parked for the prefill.
+func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, state *FlowState, step *FlowDefinitionStep, parked *FlowSSOParkedIdentity) (string, error) {
+	schema, err := r.schemas.Resolve(ctx, r.schemaStore, state.ProjectID, state.UserSchemaURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("flow state machine: load user schema for sso identity: %w", err)
+	}
+	// A connection can map a superset of properties for several schemas; this
+	// schema consumes only the top-level properties it defines.
+	claims := ssoSchemaClaims(schema, parked.Claims)
+	probeClaims, uniqueClaims := ssoUniqueClaims(schema, claims)
+	if bound, err := r.bindSSOCollision(ctx, state, step, parked, probeClaims); err != nil || bound {
+		return FlowImplicitOutcomeUserAlreadyExists, err
+	}
+	// Neither linked to nor colliding with the user the flow or its attempt
+	// carries (a signed-in session included): no new user can register on
+	// that attempt, and it is not collected either. The bind helper stays the
+	// backstop.
+	if ssoBoundUser(state, parked) != "" {
+		return "", ErrFlowRestartRequired()
+	}
+	if !ssoClaimsComplete(schema, parked, claims, uniqueClaims) {
+		return FlowImplicitOutcomeSSOUserNotFound, nil
+	}
+	// The user and the link cannot be undone, so creation waits until
+	// sso_authenticated can route, as the linked bind does.
+	if !ssoAuthenticatedRoutes(step) {
+		return "", errSSOUnroutable
+	}
+
+	attributes := map[string]any{}
+	for name, value := range claims {
+		if err := maputil.SetNested(attributes, AttributeKey(name).Nodes(), value); err != nil {
+			return "", fmt.Errorf("flow state machine: sso claim %q: %w", name, err)
+		}
+	}
+	userID, err := r.ssoIdentities.CreateLinked(ctx, FlowSSOCreateInput{
+		ProjectID:     state.ProjectID,
+		AttemptID:     state.AuthAttemptID,
+		CheckID:       parked.CheckID,
+		UserSchemaURL: state.UserSchemaURL,
+		ConnectionID:  parked.ConnectionID,
+		Subject:       parked.Subject,
+		Attributes:    attributes,
+	})
+	if errors.Is(err, ErrUserAlreadyExists()) {
+		// Another flow took a unique value since the probe (a request on this
+		// attempt loses on the parked row instead): whoever took a probed
+		// attribute is bound, and anything else falls back to collection.
+		if bound, err := r.bindSSOCollision(ctx, state, step, parked, probeClaims); err != nil || bound {
+			return FlowImplicitOutcomeUserAlreadyExists, err
+		}
+		return FlowImplicitOutcomeSSOUserNotFound, nil
+	}
+	if errors.Is(err, ErrUserInvalid()) {
+		// A claim fails the schema (too long, bad format): collect it so the
+		// user can fix it.
+		return FlowImplicitOutcomeSSOUserNotFound, nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("flow state machine: create sso user: %w", err)
+	}
+	recordResolvedUser(state, userID)
+	return FlowImplicitOutcomeSSOAuthenticated, nil
+}
+
+// ssoBoundUser is the user the flow already carries: the one its state
+// recorded, or else the one its attempt carries, which a flow started on a
+// signed-in session gets from that session without the state recording it.
+func ssoBoundUser(state *FlowState, parked *FlowSSOParkedIdentity) string {
+	if state.CollectedData.UserID != "" {
+		return state.CollectedData.UserID
+	}
+	return parked.AttemptUserID
+}
+
+// ssoSchemaClaims keeps the claims whose name is a top-level property of the
+// schema and drops the rest.
+func ssoSchemaClaims(schema *jsonschema.Schema, claims map[string]any) map[string]any {
+	root := newSchemaReader(schema)
+	out := make(map[string]any, len(claims))
+	for name, value := range claims {
+		if _, ok := root.Property(name); ok {
+			out[name] = value
+		}
+	}
+	return out
+}
+
+// ssoUniqueClaims returns the claim names whose top-level schema property
+// carries an x-unique scope (unique), and the project-scoped subset the
+// collision check probes (probe), both sorted so the probe order is stable.
+// Team scope is not probed, because the probe only asks the project-scoped
+// registry; a team-scoped collision is still refused at creation and falls
+// back to collection. An object or array property is unique like any other
+// (the registry stores it), so it is in unique, but it is not probed: the
+// lookup takes a single value. The annotation is read directly, so a claim
+// whose property no flow step could render (a type union) is no error; a
+// claim the schema does not know is skipped.
+func ssoUniqueClaims(schema *jsonschema.Schema, claims map[string]any) (probe, unique []string) {
+	root := newSchemaReader(schema)
+	for name := range claims {
+		prop, ok := root.Property(name)
+		if !ok {
+			continue
+		}
+		scope := deriveUnique(prop)
+		if scope == AttributeUniquenessUnspecified {
+			continue
+		}
+		unique = append(unique, name)
+		if t, _ := prop.JSONType(); scope == AttributeUniquenessProject && t != "object" && t != "array" {
+			probe = append(probe, name)
+		}
+	}
+	slices.Sort(probe)
+	slices.Sort(unique)
+	return probe, unique
+}
+
+// errSSOUnroutable reports a collision or a creation on a step that cannot
+// route its outcome. Nothing is written: the engine shows the provider as
+// unavailable, as for a linked identity.
+var errSSOUnroutable = errors.New("flow state machine: sso outcome cannot route on this step")
+
+// bindSSOCollision looks up each project-unique claim, verified or not, until
+// one names an existing user, then binds that user by id. Like a typed
+// identifier it only binds the user: no link, no sso factor. The bind checks
+// the exact parked row first and replaces it by a marker of that user, so a
+// row another request replaced binds nothing (ErrSSOStateInvalid) and a
+// retry after a lost cookie catches up from the marker. It returns
+// errSSOUnroutable, before binding, when step cannot route
+// user_already_exists.
+func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, step *FlowDefinitionStep, parked *FlowSSOParkedIdentity, probeClaims []string) (bool, error) {
+	for _, name := range probeClaims {
+		value, _ := parked.Claims[name].(string)
+		if value == "" {
+			continue
+		}
+		// A read-only lookup: an identifier submission that misses records a
+		// failed check on the attempt, and a miss here is no sign-in attempt.
+		owner, err := r.ssoIdentities.FindUniqueOwner(ctx, state.ProjectID, state.UserSchemaURL, name, value)
+		if err != nil {
+			return false, fmt.Errorf("flow state machine: look up sso claim %q: %w", name, err)
+		}
+		if owner == "" {
+			continue
+		}
+		// The bind refuses another bound user too; this makes the invariant
+		// explicit in the engine.
+		if bound := ssoBoundUser(state, parked); bound != "" && bound != owner {
+			return false, ErrFlowRestartRequired()
+		}
+		// The bind cannot be undone, and the validator does not require
+		// user_already_exists on a step with sso_providers, so the bind waits
+		// until the outcome can route. A declared purpose can: it starts that
+		// purpose fresh, as it does for a typed collision.
+		if !userAlreadyExistsRoutes(step) {
+			return false, errSSOUnroutable
+		}
+		if err := r.ssoIdentities.BindCollision(ctx, FlowSSOBindInput{
+			ProjectID: state.ProjectID,
+			AttemptID: state.AuthAttemptID,
+			CheckID:   parked.CheckID,
+			UserID:    owner,
+		}); err != nil {
+			return false, fmt.Errorf("flow state machine: bind sso collision: %w", err)
+		}
+		recordResolvedUser(state, owner)
+		return true, nil
+	}
+	return false, nil
+}
+
+// ssoClaimsComplete reports whether the claims can create a user unattended:
+// every required property has a claim, and every required unique one arrived
+// verified, so an unverified address cannot claim an account. Claims are
+// top-level, so a required nested object never completes.
+func ssoClaimsComplete(schema *jsonschema.Schema, parked *FlowSSOParkedIdentity, claims map[string]any, uniqueClaims []string) bool {
+	// RequiredPaths reads `required` and `properties` only. Requiredness a
+	// composition or a reference adds, at any depth, is not evaluated, so such
+	// a schema never creates a user unattended: the verified-unique rule must
+	// not be bypassable.
+	if newSchemaReader(schema).ComposesRequiredness() {
+		return false
+	}
+	for name := range claims {
+		// Attribute keys use the dot as a path separator, so a top-level property
+		// whose name has one would be stored as a nested object.
+		if strings.Contains(name, ".") {
+			return false
+		}
+	}
+	materialized := make(map[string]struct{}, len(claims))
+	for name := range claims {
+		materialized[name] = struct{}{}
+	}
+	for path := range newSchemaReader(schema).RequiredPaths(materialized) {
+		if claims[path] == nil {
+			return false
+		}
+		if slices.Contains(uniqueClaims, path) && !parked.Verified[path] {
+			return false
+		}
+	}
+	return true
+}
+
+// resolveStaleSSOBind handles a bind that found its parked row gone: a
+// concurrent request settled it, or a new ceremony replaced it. One more read
+// tells which.
+func (r *FlowStateMachineRuntime) resolveStaleSSOBind(pc *processCtx, resolvedFields FlowResolvedFields, loadInput FlowSSOLoadInput) (FlowStepResult, bool, error) {
+	reread, err := r.ssoIdentities.LoadParked(pc.ctx, loadInput)
+	if err != nil {
+		// Handed off or expired: restart, so this response cannot reseal a
+		// cookie over the winner's. Any other read failure is returned as is.
+		return FlowStepResult{}, false, fmt.Errorf("flow state machine: reload parked sso identity: %w", err)
+	}
+	if reread == nil || reread.BoundUserID == "" {
+		// Replaced, or settled by a collision whose marker the next render
+		// reconciles: render the step.
+		return FlowStepResult{}, false, nil
+	}
+	return r.retrySSOHandoff(pc, resolvedFields, reread.BoundUserID, false)
 }
 
 // retrySSOHandoff raises sso_authenticated for a user bound on the attempt,
 // which mints the handoff. The bind is this request's or an earlier one whose
 // request did not deliver the handoff; either way a concurrent render can win
-// the handoff first.
-func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields FlowResolvedFields, userID string) (FlowStepResult, bool, error) {
+// the handoff first. irreversible clears the back stack. A retry cannot tell
+// a created user from a linked one, so it passes false.
+func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields FlowResolvedFields, userID string, irreversible bool) (FlowStepResult, bool, error) {
 	// An earlier bind may have run on another step, or under an older
 	// definition. Checked before the user is recorded: a purpose would drop
 	// that user and move the flow to a fresh attempt.
@@ -497,7 +779,7 @@ func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields
 		return result, true, err
 	}
 	recordResolvedUser(pc.state, userID)
-	result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, false)
+	result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeSSOAuthenticated, irreversible)
 	if errors.Is(err, ErrAuthAttemptAlreadyHandedOff()) {
 		// A concurrent retry won the handoff. A handed-off attempt restarts
 		// the flow on every later render too, so this one does the same.
@@ -511,6 +793,13 @@ func (r *FlowStateMachineRuntime) retrySSOHandoff(pc *processCtx, resolvedFields
 func ssoAuthenticatedRoutes(step *FlowDefinitionStep) bool {
 	t, ok := step.Transitions[FlowImplicitOutcomeSSOAuthenticated]
 	return ok && t.Action == nil && t.Purpose == nil
+}
+
+// userAlreadyExistsRoutes reports whether step routes user_already_exists
+// within this flow. A purpose counts: it starts that purpose fresh.
+func userAlreadyExistsRoutes(step *FlowDefinitionStep) bool {
+	t, ok := step.Transitions[FlowImplicitOutcomeUserAlreadyExists]
+	return ok && t.Action == nil
 }
 
 // processCtx carries the per-submission context threaded through the
@@ -997,11 +1286,11 @@ func applyOutcomeFlip(state *FlowState, outcome string) {
 }
 
 // dispatchChallenges submits field-shaped challenges in
-// [challengeDispatchOrder]. CurrentPurpose + visited on_success decide
-// verify-vs-skip. What reaches it is what the action submitted, so a leg
-// that consumes a subset (see [identifierFieldsOnly]) dispatches a subset.
+// [challengeDispatchOrder]. CurrentPurpose decides verify-vs-skip. What
+// reaches it is what the action submitted, so a leg that consumes a subset
+// (see [identifierFieldsOnly]) dispatches a subset.
 func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved FlowResolvedFields) (flowDispatchResult, error) {
-	ctx, def, state, step, fields := pc.ctx, pc.def, pc.state, pc.currentStep, pc.in.Fields
+	ctx, state, fields := pc.ctx, pc.state, pc.in.Fields
 	for _, challenge := range challengeDispatchOrder {
 		name, value, ok := fieldValueByChallenge(resolved, fields, challenge)
 		if !ok {
@@ -1040,12 +1329,6 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 			if state.CurrentPurpose != FlowDefinitionPurposeLogin {
 				continue
 			}
-			// Skip if any visited step runs an on_success — today the only
-			// one (create_user) establishes the password kind, and the
-			// validator enforces password-collected-upstream for it.
-			if anyVisitedStepOnSuccess(def, state, step) {
-				continue
-			}
 			err := r.authAttempts.SubmitPassword(ctx, FlowSubmitPasswordInput{
 				ProjectID: state.ProjectID,
 				AttemptID: state.AuthAttemptID,
@@ -1061,20 +1344,6 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 		}
 	}
 	return flowDispatchResult{}, nil
-}
-
-// anyVisitedStepOnSuccess reports whether any step in (history ∪ current)
-// runs an on_success mutation.
-func anyVisitedStepOnSuccess(def *FlowDefinition, state *FlowState, current *FlowDefinitionStep) bool {
-	if current.OnSuccess != nil {
-		return true
-	}
-	for _, name := range state.History {
-		if s, ok := def.FindStep(name); ok && s.OnSuccess != nil {
-			return true
-		}
-	}
-	return false
 }
 
 // uniqueFieldValues returns every uniquely-keyed field with a collected

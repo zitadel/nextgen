@@ -106,7 +106,6 @@ const GO_TEST_TARGETS = [
   "server:check-generate",
   "server:test",
   "server:test-postgres",
-  "server:test-spanner",
   "server:test-sqlite",
 ];
 const TESTING_DEMO_TARGETS = ["testing:test-integration", "demo-next-e2e:e2e-real"];
@@ -232,20 +231,20 @@ export function queryAffectedTargets(base, spawn = spawnSync) {
       Object.keys(projectTasks).map((task) => `${project}:${task}`),
     );
   } catch {
-    console.error(
-      `# moon query returned non-JSON stdout: ${String(result.stdout).slice(0, 200)}`,
-    );
+    console.error(`# moon query returned non-JSON stdout: ${String(result.stdout).slice(0, 200)}`);
     return null;
   }
 }
 
 function isVersionOutputFile(file) {
-  return file === "pnpm-lock.yaml" ||
+  return (
+    file === "pnpm-lock.yaml" ||
     file === ".changeset/pre.json" ||
     file === ".changeset/config.json" ||
     file.startsWith(".changeset/") ||
     file.endsWith("/package.json") ||
-    file.endsWith("/CHANGELOG.md");
+    file.endsWith("/CHANGELOG.md")
+  );
 }
 
 function main() {
@@ -276,7 +275,7 @@ function main() {
     console.log(`# gating: full run (${reason})`);
   }
   if (process.env.GITHUB_OUTPUT) {
-    appendFileSync(process.env.GITHUB_OUTPUT, lines.join("\n") + "\n");
+    appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`);
   }
   const skipped = ALL_GATES.filter((g) => !gates[g]);
   if (process.env.GITHUB_STEP_SUMMARY && mode === "full") {
@@ -285,7 +284,7 @@ function main() {
       : skipped.length === 0
         ? `CI gating: all lanes affected (journey matrix: ${matrix}).`
         : `CI gating: skipped by affected-selection: ${skipped.join(", ")} (journey matrix: ${matrix}).`;
-    appendFileSync(process.env.GITHUB_STEP_SUMMARY, note + "\n");
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${note}\n`);
   }
 }
 
