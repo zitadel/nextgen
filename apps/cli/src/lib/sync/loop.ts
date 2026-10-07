@@ -13,6 +13,7 @@ import type { PlanResourceChange } from "./plan-renderer.js";
 import { readState, removeFromState, updateState } from "./state.js";
 import { FatalFetchError } from "./types.js";
 import type { FlowRepin, ResourceEntry, ResourceSyncer, SyncAction } from "./types.js";
+import { reportWarning } from "../warnings";
 
 /**
  * Compute the sync plan for `cwd` against the state file and (when
@@ -269,7 +270,7 @@ export async function runSyncLoop(
   for (const action of actions) {
     if (action.kind === "create" || action.kind === "update" || action.kind === "revise") {
       for (const warning of action.warnings ?? []) {
-        consola.warn(`${action.path}: ${warning.message}`);
+        reportWarning(`${action.path}: ${warning.message}`);
       }
     }
   }
@@ -532,6 +533,11 @@ async function fetchOldIfAsked(
     // A syncer that refused on purpose is not a fetch that merely failed.
     if (err instanceof FatalFetchError) {
       throw err.reason;
+    }
+    // Nor is one the developer cancelled with Ctrl-C: previewing offline
+    // instead would carry on after being told to stop.
+    if (err instanceof ZitadelError && err.code === "E_CANCELLED") {
+      throw err;
     }
     consola.debug(`fetch ${syncer.kind} ${id} failed:`, err);
     return null;

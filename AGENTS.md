@@ -51,7 +51,7 @@ Go server:
 
 Product surfaces (`apps/`):
 
-- `apps/cli/` — the `zitadel` npm CLI. `apps/cli/SKILLS.md` is the canonical
+- `apps/cli/` — the `zitadel` npm CLI. `apps/cli/skills/zitadel-cli/SKILL.md` is the canonical
   consumer-agent contract.
 - `apps/server/` + `apps/server-*/` — the `@zitadel/server` npm binary
   wrapper and its per-platform binary packages (one per OS/arch).
@@ -92,6 +92,10 @@ Repo tooling:
 
 - `tools/release/` — the Moon `release` project (snapshot, artifacts, draft
   GitHub Release shell).
+- `tools/bench/` — the k6 benchmark harness, a nested Go module (ADR 067):
+  `moon run bench:sweep` measures a server that is already running (locally
+  `moon run workspace:server`). AGPL-only and excluded from commercial
+  licensing because it links k6.
 - `scripts/` — the Node `.mjs` orchestration behind the `workspace:*` tasks
   (doctor, check, journey, server, cli, release helpers).
 - `docs/` — design notes, runbooks, and ADRs that explain product intent.
@@ -115,7 +119,7 @@ Repo tooling:
 
 The consumer command table lives in
 [README.md](README.md#i-am-adding-zitadel-to-my-app); the canonical
-consumer-agent contract is [apps/cli/SKILLS.md](apps/cli/SKILLS.md).
+consumer-agent contract is [apps/cli/skills/zitadel-cli/SKILL.md](apps/cli/skills/zitadel-cli/SKILL.md).
 
 ### Contributor commands vs product commands
 
@@ -351,13 +355,13 @@ minting contract (`Ensure` / `NewManagedID`, the `idgen` boundary) lives in
 - Do not hand-edit generated package output under `dist/`.
 - Do not hand-edit `apps/console/src/routeTree.gen.ts`; update route files and
   let the TanStack Router plugin regenerate it.
-- Keep `apps/cli/SKILLS.md` aligned with the current CLI command surface and
+- Keep `apps/cli/skills/zitadel-cli/SKILL.md` aligned with the current CLI command surface and
   agent contract when CLI behavior changes.
 
 ## CLI Contract
 
 The CLI is an agent-facing product surface;
-[apps/cli/SKILLS.md](apps/cli/SKILLS.md) is the canonical agent-facing
+[apps/cli/skills/zitadel-cli/SKILL.md](apps/cli/skills/zitadel-cli/SKILL.md) is the canonical agent-facing
 reference for consuming it. Preserve the JSON envelope contract:
 `--json` output must be parseable JSON on stdout, include top-level
 `cli_version`, `command`, `source`, and `status`, and avoid stray stdout text.

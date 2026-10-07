@@ -80,6 +80,8 @@ const (
 	EventTypeIDPCreated EventType = "idp.created"
 	EventTypeIDPUpdated EventType = "idp.updated"
 
+	EventTypeIDPIdentityLinkCreated EventType = "idp.identity_link.created"
+
 	EventTypeDeploymentCreated EventType = "deployment.created"
 
 	EventTypeAuthzGranted EventType = "authz.granted"

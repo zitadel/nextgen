@@ -1,5 +1,6 @@
 import { qwikVite } from "@qwik.dev/core/optimizer";
 import { playwright } from "@vitest/browser-playwright";
+import { apiMockPublicDir } from "@zitadel/api-mock/public-dir";
 import { defineConfig } from "vitest/config";
 
 import { baseTest } from "../../vitest.shared.mjs";
@@ -12,6 +13,9 @@ import { baseTest } from "../../vitest.shared.mjs";
 // upgrade, and native custom events all behave as they do in production.
 export default defineConfig({
   cacheDir: ".vitest",
+  // Serves api-mock's `mockServiceWorker.js` from the test origin, where the
+  // MSW worker started in `src/test-setup.ts` registers it.
+  publicDir: apiMockPublicDir,
   plugins: [qwikVite()],
   resolve: {
     // Use the browser build so Qwik's client `render()` resolves correctly.

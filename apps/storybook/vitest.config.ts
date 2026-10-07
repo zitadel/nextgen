@@ -42,6 +42,15 @@ export default defineConfig({
         optimizeDeps: {
           exclude: optimizeDepsExclude,
           include: optimizeDepsInclude,
+          // Forbid on-the-fly discovery: optimize ONLY the `include` list up
+          // front and never re-optimize mid-run. The browser suite's recurring
+          // cold-CI failure ("Failed to fetch dynamically imported module …
+          // setup-file-with-project-annotations.js") is Vite re-optimizing when
+          // it discovers a dep after the browser has started, which invalidates
+          // the in-flight module URLs. With discovery off that race cannot
+          // happen: a missing dep fails deterministically (and reproducibly on
+          // a cold local cache) instead of flaking under CI timing.
+          noDiscovery: true,
         },
         test: {
           name: "storybook",
