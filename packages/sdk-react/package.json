@@ -43,6 +43,7 @@
   },
   "devDependencies": {
     "@testing-library/react": "catalog:",
+    "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",

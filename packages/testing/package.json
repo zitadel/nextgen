@@ -58,9 +58,11 @@
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
     "msw": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   }
 }

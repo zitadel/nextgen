@@ -77,10 +77,13 @@
   },
   "devDependencies": {
     "@faker-js/faker": "catalog:",
+    "@types/node": "catalog:",
     "msw": "catalog:",
     "orval": "catalog:",
     "tsdown": "catalog:",
-    "tslib": "catalog:"
+    "tslib": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@tanstack/react-query": "catalog:",

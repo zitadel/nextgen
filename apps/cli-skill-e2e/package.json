@@ -10,6 +10,7 @@
     "report": "node scripts/report.mjs"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "marked": "catalog:",
     "sanitize-html": "catalog:",
     "vitest": "catalog:"

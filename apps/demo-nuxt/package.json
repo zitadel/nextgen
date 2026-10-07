@@ -20,12 +20,15 @@
     "typecheck": "NEXTGEN_NUXT_BUILD_DIR=.nuxt-typecheck nuxt prepare && vue-tsc --noEmit -p .nuxt-typecheck/tsconfig.json"
   },
   "dependencies": {
+    "@zitadel/api": "workspace:*",
     "@zitadel/sdk-nuxt": "workspace:*",
     "@zitadel/components": "workspace:*",
     "@zitadel/design-tokens": "workspace:*",
-    "nuxt": "catalog:"
+    "nuxt": "catalog:",
+    "vue": "catalog:"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "typescript": "^5.7.3",
     "vue-tsc": "catalog:"
   }

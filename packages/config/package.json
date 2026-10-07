@@ -103,9 +103,11 @@
   },
   "devDependencies": {
     "@types/culori": "catalog:",
+    "@types/node": "catalog:",
     "ajv": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   }
 }

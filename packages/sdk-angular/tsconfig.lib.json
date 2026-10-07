@@ -1,14 +1,25 @@
 {
-  "extends": "./tsconfig.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "./src",
-    "outDir": "./dist/types",
+    "rootDir": "src",
+    "outDir": "dist/types",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    // Angular decorators are the legacy (experimental) kind, and Angular's
+    // property initialisation semantics require [[Set]] class fields.
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
     "declaration": true,
     "declarationMap": true,
+    // `ngc -p tsconfig.lib.json` emits only the partial-Ivy `.d.ts`; the JS
+    // comes from the vite build (tsconfig.lib.prod.json).
     "emitDeclarationOnly": true
   },
   "angularCompilerOptions": {
+    "enableI18nLegacyMessageIdFormat": false,
+    "strictTemplates": true,
     "compilationMode": "partial",
     "_experimentalAllowEmitDeclarationOnly": true
-  }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts", "src/**/*.test.ts", "src/**/__tests__/**", "src/test-setup.ts"]
 }

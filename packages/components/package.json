@@ -84,6 +84,9 @@
     "playwright": "catalog:",
     "ts-lit-plugin": "catalog:",
     "tsdown": "catalog:",
-    "tslib": "catalog:"
+    "tslib": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
   }
 }

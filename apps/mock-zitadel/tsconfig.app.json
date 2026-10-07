@@ -2,19 +2,12 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": ".",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "types": [
-      "node"
-    ]
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "declaration": true,
+    "declarationMap": true
   },
-  "include": [
-    "api/**/*.ts",
-    "src/**/*.ts"
-  ],
+  "include": ["api/**/*.ts", "src/**/*.ts"],
   "exclude": [
     "src/**/*.spec.ts",
     "src/**/*.spec.tsx",

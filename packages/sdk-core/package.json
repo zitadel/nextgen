@@ -51,6 +51,7 @@
     "@zitadel/api": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

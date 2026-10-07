@@ -66,6 +66,7 @@
     "msw": "catalog:",
     "playwright": "catalog:",
     "tsx": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:",
     "zod": "catalog:"
   },

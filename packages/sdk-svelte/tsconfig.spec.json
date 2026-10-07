@@ -2,16 +2,13 @@
   "extends": "./tsconfig.lib.json",
   "compilerOptions": {
     "rootDir": ".",
-    // No `noEmit` (typecheck passes `--noEmit`): the analog vitest plugin
-    // compiles the specs through this program and does not override it, so
-    // `noEmit` would leave every component "not in the TypeScript program".
-    // It does not override `emitDeclarationOnly` either, hence the reset.
-    "emitDeclarationOnly": false,
+    "noEmit": true,
     "types": ["node", "vitest", "vitest/globals", "vitest/importMeta"]
   },
   "include": [
     "*.config.mts",
     "*.config.ts",
+    "vite-plugin-svelte-types.ts",
     "src/**/*.d.ts",
     "src/**/*.spec.ts",
     "src/**/*.test.ts",
