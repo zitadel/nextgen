@@ -214,6 +214,10 @@ export type NextgenMiddlewareOptions = {
 
   /**
    * URL path prefix that is reverse-proxied to the auth backend.
+   *
+   * Sign-in with an external provider currently requires the default: the
+   * provider returns to `/__nextgen/idp/callback`, which is proxied only under
+   * the default prefix.
    * @default "/__nextgen"
    */
   proxyPath?: string;
