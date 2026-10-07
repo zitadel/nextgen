@@ -13,7 +13,12 @@ export {
   type IconTone,
 } from "./zl-icon.js";
 export { ZlPageShell, zlPageShellManifest } from "./zl-page-shell.js";
-export { ZlPasskey, zlPasskeyManifest, type ZlPasskeyResultDetail, type ZlPasskeyErrorDetail } from "./zl-passkey.js";
+export {
+  ZlPasskey,
+  zlPasskeyManifest,
+  type ZlPasskeyResultDetail,
+  type ZlPasskeyErrorDetail,
+} from "./zl-passkey.js";
 export { ZlPill, zlPillManifest } from "./zl-pill.js";
 export {
   ZlSsoProviders,

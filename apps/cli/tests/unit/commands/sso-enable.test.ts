@@ -36,7 +36,10 @@ async function makeProject(schemas: Record<string, unknown> = {}): Promise<strin
     // Every schema gets the login flow that runs against it: the provider is
     // offered by a flow, so a project without one is not a project this
     // command can configure.
-    await writeFile(join(cwd, `.zitadel/flows/${name}-login.json`), `${JSON.stringify(loginFlow(name))}\n`);
+    await writeFile(
+      join(cwd, `.zitadel/flows/${name}-login.json`),
+      `${JSON.stringify(loginFlow(name))}\n`,
+    );
   }
   // The README that ships beside the schemas must not be read as one.
   await writeFile(join(cwd, ".zitadel/schemas/README.md"), "# schemas\n");
@@ -130,7 +133,7 @@ describe("sso enable", () => {
     const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
     expect(result.exitCode).toBe(0);
 
-    const payload = parseJson(result.stdout) as { data: Record<string, any> };
+    const payload = parseJson(result.stdout) as { data: Record<string, unknown> };
     expect(payload.data.connection).toMatchObject({
       action: "create",
       slug: "google",
@@ -155,7 +158,7 @@ describe("sso enable", () => {
     const before = await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8");
 
     const result = await enable(cwd);
-    const payload = parseJson(result.stdout) as { data: Record<string, any> };
+    const payload = parseJson(result.stdout) as { data: { connection: { action: string } } };
     expect(payload.data.connection.action).toBe("reuse");
     expect(await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).toBe(before);
   });
@@ -191,14 +194,25 @@ describe("sso enable", () => {
 
   it("changes the named schema when several exist", async () => {
     const cwd = await makeProject({ customers: defaultSchema, employees: defaultSchema });
-    const result = await enable(cwd, "--schema", "employees", "--client-id", "1234-abc.apps.googleusercontent.com");
-    const payload = parseJson(result.stdout) as { data: Record<string, any> };
+    const result = await enable(
+      cwd,
+      "--schema",
+      "employees",
+      "--client-id",
+      "1234-abc.apps.googleusercontent.com",
+    );
+    const payload = parseJson(result.stdout) as { data: Record<string, unknown> };
     expect(payload.data.schema).toBe("employees");
   });
 
   it("changes nothing on a dry run", async () => {
     const cwd = await makeProject();
-    const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com", "--dry-run");
+    const result = await enable(
+      cwd,
+      "--client-id",
+      "1234-abc.apps.googleusercontent.com",
+      "--dry-run",
+    );
     const payload = parseJson(result.stdout) as { status: string };
     expect(payload.status).toBe("skipped");
     await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
@@ -211,12 +225,12 @@ describe("sso enable", () => {
   it("names the project it changed in both output modes", async () => {
     const cwd = await makeProject();
     const done = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
-    expect((parseJson(done.stdout) as { data: Record<string, any> }).data.project_id).toBe(
+    expect((parseJson(done.stdout) as { data: Record<string, unknown> }).data.project_id).toBe(
       "proj_01TEST",
     );
 
     const preview = await enable(cwd, "--client-id", "abc", "--dry-run");
-    expect((parseJson(preview.stdout) as { data: Record<string, any> }).data.project_id).toBe(
+    expect((parseJson(preview.stdout) as { data: Record<string, unknown> }).data.project_id).toBe(
       "proj_01TEST",
     );
   });
@@ -260,9 +274,9 @@ describe("sso enable", () => {
     const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
 
     expect(result.exitCode).toBe(0);
-    const written = JSON.parse(
-      await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8"),
-    ) as { oidc: Record<string, unknown> };
+    const written = JSON.parse(await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")) as {
+      oidc: Record<string, unknown>;
+    };
     expect(written.oidc.issuer).toBe("https://accounts.google.com");
     // No endpoints: the vendor's are resolved from its discovery document.
     expect(written.oidc.authorization_endpoint).toBeUndefined();
@@ -295,7 +309,11 @@ describe("sso enable", () => {
         slug: "google",
         template: "google",
         protocol: "oidc",
-        oidc: { issuer: "https://accounts.google.com", client_id: "literal-one", client_secret: "${{ GOOGLE_CLIENT_SECRET }}" },
+        oidc: {
+          issuer: "https://accounts.google.com",
+          client_id: "literal-one",
+          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+        },
       })}\n`,
     );
 
@@ -305,7 +323,6 @@ describe("sso enable", () => {
     const json = parseJson(result.stdout) as { code: string };
     expect(json.code).toBe("E_VALIDATION");
   });
-
 
   it("publishes to the variables the reused connection actually names", async () => {
     // A connection is an editable file and may point at its own variables.
@@ -398,7 +415,9 @@ describe("sso enable secret handling", () => {
     });
     // Rendered as a command an agent can run, like every other result's.
     expect(json.data.next_commands).toEqual(
-      expect.arrayContaining([expect.stringContaining("variables set GOOGLE_CLIENT_SECRET --project-level --secret")]),
+      expect.arrayContaining([
+        expect.stringContaining("variables set GOOGLE_CLIENT_SECRET --project-level --secret"),
+      ]),
     );
     expect(json.data.next_commands.every((command) => command.startsWith("npx "))).toBe(true);
   });
@@ -431,7 +450,6 @@ describe("sso enable secret handling", () => {
     expect(json.hint).toContain("stdin");
     await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
   });
-
 });
 
 describe("sso enable with a connection already on disk", () => {

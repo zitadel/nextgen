@@ -137,7 +137,7 @@ A spec body contains a fixture call, a command, and matchers — nothing else:
   never interleave, and a command with no human-rendered output has no second
   one.
 
-Formatting is prettier's, per the repo's `.prettierrc.json`, so nothing is
+Formatting is Biome's, per the repo's `biome.json`, so nothing is
 hand-wrapped.
 
 One exception, in `cli.spec.ts`: it scans `src/**` for the commands the CLI

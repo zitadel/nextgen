@@ -24,9 +24,7 @@ const identifierStep: CreateFlow201 = {
   step: {
     name: "identifier",
     texts: { title_key: "identifier.title" },
-    fields: [
-      { name: "email", type: "email", text_key: "identifier.field.email", required: true },
-    ],
+    fields: [{ name: "email", type: "email", text_key: "identifier.field.email", required: true }],
     actions: [{ name: "submit", kind: "submit", text_key: "submit.continue", primary: true }],
     gates: {},
   },
@@ -80,7 +78,11 @@ function installFlowFetchStub(responses: readonly CreateFlow201[]): { restore: (
   });
   const original = globalThis.fetch;
   globalThis.fetch = fetchStub as unknown as typeof fetch;
-  return { restore: () => void (globalThis.fetch = original) };
+  return {
+    restore: () => {
+      globalThis.fetch = original;
+    },
+  };
 }
 
 async function waitFor<T>(probe: () => T | null | undefined, timeout = 3000): Promise<T> {

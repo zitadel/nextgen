@@ -45,7 +45,10 @@ const meta: Meta<TextFieldArgs> = {
     invalid: { control: "boolean" },
     error: { control: "text", description: "Inline error message (forces the invalid treatment)." },
     success: { control: "text", description: "Inline success message." },
-    forgotPasswordHref: { control: "text", description: "When set, renders the forgot-password link row." },
+    forgotPasswordHref: {
+      control: "text",
+      description: "When set, renders the forgot-password link row.",
+    },
   },
 };
 
@@ -53,7 +56,17 @@ export default meta;
 type Story = StoryObj<TextFieldArgs>;
 
 export const Default: Story = {
-  render: ({ label, type, placeholder, required, disabled, invalid, error, success, forgotPasswordHref }) => html`
+  render: ({
+    label,
+    type,
+    placeholder,
+    required,
+    disabled,
+    invalid,
+    error,
+    success,
+    forgotPasswordHref,
+  }) => html`
     <zl-field
       label=${label}
       type=${type}

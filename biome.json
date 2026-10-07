@@ -1,0 +1,105 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignoreUnknown": true,
+    "includes": [
+      "**",
+      "!**/*.gen.ts",
+      "!**/next-env.d.ts",
+      "!**/*.css",
+      "!**/*.svg",
+      "!**/*.html",
+      "!**/*.json",
+      "!**/*.jsonc",
+      "!**/*.svelte",
+      "!**/*.vue",
+      "!**/mockServiceWorker.js",
+      "!**/generated",
+      "!**/dist",
+      "!**/out-tsc",
+      "!**/.nuxt-typecheck"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "lineEnding": "lf"
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "all",
+      "bracketSpacing": true,
+      "arrowParentheses": "always"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "a11y": {
+        "noSvgWithoutTitle": "error",
+        "useAriaPropsSupportedByRole": "error",
+        "useButtonType": "error",
+        "useKeyWithClickEvents": "error",
+        "useSemanticElements": "error"
+      },
+      "complexity": {
+        "useLiteralKeys": "error",
+        "useOptionalChain": "off"
+      },
+      "correctness": {
+        "noEmptyPattern": "error",
+        "noInnerDeclarations": "error",
+        "noUnknownProperty": "error",
+        "noUnusedFunctionParameters": "error",
+        "noUnusedVariables": "error",
+        "noQwikUseVisibleTask": "off",
+        "useQwikValidLexicalScope": "off"
+      },
+      "performance": {
+        "noAccumulatingSpread": "error"
+      },
+      "style": {
+        "noDescendingSpecificity": "off",
+        "noNonNullAssertion": "error",
+        "useTemplate": "error"
+      },
+      "suspicious": {
+        "noArrayIndexKey": "error",
+        "noAssignInExpressions": "error",
+        "noDoubleEquals": "error",
+        "noDocumentCookie": "error",
+        "noExplicitAny": "error",
+        "noImplicitAnyLet": "error",
+        "noShadowRestrictedNames": "error",
+        "noTemplateCurlyInString": "off",
+        "noThenProperty": "error",
+        "useIterableCallbackReturn": "error"
+      }
+    }
+  },
+  "assist": {
+    "enabled": false
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.{test,spec}.{ts,tsx,mts,cts}", "**/__tests__/**", "**/tests/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    }
+  ]
+}

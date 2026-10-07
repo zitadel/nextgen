@@ -41,9 +41,7 @@ export const listMyProjectsCached = sessionCached(() => api.listMyProjects(), 15
 /** `validateSearch` for the `_authed` layout: an id, or nothing. */
 export function validateProjectScopeSearch(search: Record<string, unknown>): ProjectScopeSearch {
   const project = search[PROJECT_SCOPE_PARAM];
-  return typeof project === "string" && project.trim() !== ""
-    ? { project: project.trim() }
-    : {};
+  return typeof project === "string" && project.trim() !== "" ? { project: project.trim() } : {};
 }
 
 /**

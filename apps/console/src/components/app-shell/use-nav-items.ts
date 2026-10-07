@@ -59,9 +59,7 @@ export function useNavItems(view: NavView = "portal"): NavItem[] {
 
   // Design-only entries are portal rows; the Settings view has none.
   const designOnly: NavItem[] =
-    view === "portal"
-      ? DESIGN_ONLY_NAV.map((nav) => ({ to: undefined, nav, children: [] }))
-      : [];
+    view === "portal" ? DESIGN_ONLY_NAV.map((nav) => ({ to: undefined, nav, children: [] })) : [];
 
   const all: NavItem[] = [...routed, ...designOnly];
   const byPath = new Map<string, NavItem>();

@@ -478,9 +478,9 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     };
     expect(fixedJson.status).toBe("ok");
     expect(fixedJson.data.ok).toBe(true);
-    expect(
-      fixedJson.data.checks.find((check) => check.name === "managed-files")?.status,
-    ).toBe("pass");
+    expect(fixedJson.data.checks.find((check) => check.name === "managed-files")?.status).toBe(
+      "pass",
+    );
     expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(MANAGED_MARKER);
   });
 
@@ -495,16 +495,16 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
       data: { ok: boolean; checks: Check[] };
     };
     expect(warnedJson.data.ok).toBe(true);
-    expect(
-      warnedJson.data.checks.find((check) => check.name === "managed-files")?.status,
-    ).toBe("warn");
+    expect(warnedJson.data.checks.find((check) => check.name === "managed-files")?.status).toBe(
+      "warn",
+    );
 
     const fixed = await doctor(cwd, ["--fix"]);
     expect(fixed.exitCode).toBe(0);
     const fixedJson = parseJson(fixed.stdout) as { data: { checks: Check[] } };
-    expect(
-      fixedJson.data.checks.find((check) => check.name === "managed-files")?.status,
-    ).toBe("pass");
+    expect(fixedJson.data.checks.find((check) => check.name === "managed-files")?.status).toBe(
+      "pass",
+    );
     expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toContain(MANAGED_MARKER);
   });
 

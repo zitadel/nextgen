@@ -27,11 +27,7 @@ const FIELD_ATOM_TAGS = "zl-field, zl-select, zl-checkbox";
 
 export const mandatoryGatesMarkerComment = `<!--${MANDATORY_GATES_MARKER}-->`;
 
-export function patchMandatoryGates(
-  html: string,
-  step: CreateFlow201Step,
-  locale: Locale,
-): string {
+export function patchMandatoryGates(html: string, step: CreateFlow201Step, locale: Locale): string {
   const template = document.createElement("template");
   template.innerHTML = html;
   const fragment = template.content;

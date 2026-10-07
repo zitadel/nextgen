@@ -1,9 +1,4 @@
-import {
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankArg,
-  OwnerCommand,
-} from "../../lib/oclif";
+import { CommandGroups, type JsonEnvelope, nonBlankArg, OwnerCommand } from "../../lib/oclif";
 import { renderDetail } from "../../lib/oclif/crud/table";
 import { assertVariableName, toVariableRow, variableCells } from "../../lib/variables";
 

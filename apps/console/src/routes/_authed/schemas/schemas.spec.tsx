@@ -99,7 +99,9 @@ async function renderAt(path: string, project?: string) {
     import("@tanstack/react-router"),
     import("../../../router"),
   ]);
-  const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [scopedPath(path, project)] }) });
+  const router = createAppRouter({
+    history: createMemoryHistory({ initialEntries: [scopedPath(path, project)] }),
+  });
   render(<RouterProvider router={router} />);
   return router;
 }
@@ -225,10 +227,7 @@ describe("user schemas list", () => {
         }
         if (failNextPage) {
           failNextPage = false;
-          return HttpResponse.json(
-            { code: "internal", message: "boom" },
-            { status: 500 },
-          );
+          return HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 });
         }
         return HttpResponse.json({ schemas: [envelope("sch_deep", DEEP)] });
       }),
