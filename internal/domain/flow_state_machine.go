@@ -941,8 +941,35 @@ func (r *FlowStateMachineRuntime) resolveInputs(pc *processCtx) (FlowResolvedFie
 	if err != nil {
 		return FlowResolvedFields{}, err
 	}
-	prefillFromCollected(&resolved, pc.state.CollectedData.UserData)
+	if err := r.prefillStep(pc.ctx, pc.state, pc.currentStep, &resolved); err != nil {
+		return FlowResolvedFields{}, err
+	}
 	return resolved, nil
+}
+
+// prefillStep fills the step's empty fields with values the user already
+// supplied. A step that creates the user from an SSO identity takes the
+// provider's claims first, so the collected data fills only what the provider
+// left out. Without a parked identity that step renders empty: its submit
+// cannot succeed.
+func (r *FlowStateMachineRuntime) prefillStep(ctx context.Context, state *FlowState, step *FlowDefinitionStep, resolved *FlowResolvedFields) error {
+	if step.OnSuccess != nil && *step.OnSuccess == FlowOnSuccessCreateUserWithSso {
+		collected, err := r.ssoIdentities.LoadCollected(ctx, FlowSSOLoadInput{
+			ProjectID:       state.ProjectID,
+			AttemptID:       state.AuthAttemptID,
+			UserSchemaURL:   state.UserSchemaURL,
+			ResolvedCheckID: state.SSOResolvedCheckID,
+		})
+		if err != nil {
+			return fmt.Errorf("flow state machine: load collected sso identity: %w", err)
+		}
+		if collected == nil {
+			return nil
+		}
+		prefillFromCollected(resolved, collected.Claims)
+	}
+	prefillFromCollected(resolved, state.CollectedData.UserData)
+	return nil
 }
 
 // validateAndMerge checks the submitted values and, on success, folds
@@ -1782,7 +1809,9 @@ func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, e
 
 	// Prefill and build after the drop, so the step reflects the state the
 	// user is actually returning to.
-	prefillFromCollected(&resolved, pc.state.CollectedData.UserData)
+	if err := r.prefillStep(pc.ctx, pc.state, prevStep, &resolved); err != nil {
+		return FlowStepResult{}, err
+	}
 	step, err := r.buildStep(pc.ctx, pc.state, prevStep, resolved, nil, nil, nil)
 	if err != nil {
 		return FlowStepResult{}, err
@@ -1847,7 +1876,9 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *FlowDefin
 	if err != nil {
 		return nil, err
 	}
-	prefillFromCollected(&resolved, state.CollectedData.UserData)
+	if err := r.prefillStep(ctx, state, step, &resolved); err != nil {
+		return nil, err
+	}
 	// A terminal step renders as complete, so a re-render of a finished flow
 	// says so (GET /flow/{id} answers 410 on it).
 	return r.buildStep(ctx, state, step, resolved, nil, step.Complete, nil)

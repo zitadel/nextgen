@@ -624,6 +624,11 @@ func TestFlowStateMachine_Process_CreateUserWithSsoNotWired(t *testing.T) {
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
 	// The create_user handler must not run for a different mutation.
 	w.createUser.EXPECT().Handle(gomock.Any(), gomock.Any()).Times(0)
+	// The start render and the submit look for a parked identity to prefill.
+	w.ssoIdentities.EXPECT().
+		LoadCollected(gomock.Any(), domain.FlowSSOLoadInput{ProjectID: testProjectID, AttemptID: "attempt-1", UserSchemaURL: defaultSchemaURL}).
+		Return(nil, nil).
+		Times(2)
 
 	withSso := domain.FlowOnSuccessCreateUserWithSso
 	def := signupDefinition()
@@ -5909,4 +5914,113 @@ func TestFlowStateMachine_Render_SSOCollisionMarkerWithDifferentAttemptUserResta
 	_, err := w.sm.Render(t.Context(), def, state)
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 	assert.Empty(t, state.CollectedData.UserID)
+}
+
+// withSSOCollectionStep turns sso-register of [withSSOOutcomeSteps] into the
+// step that creates the user from the parked identity.
+func withSSOCollectionStep(def *domain.FlowDefinition) *domain.FlowDefinition {
+	def = withSSOOutcomeSteps(def)
+	withSSO := domain.FlowOnSuccessCreateUserWithSso
+	step := &def.Steps[len(def.Steps)-1]
+	step.Fields = []domain.Field{"email", "username", "given_name", "family_name"}
+	step.OnSuccess = &withSSO
+	return def
+}
+
+// collectionStepWorld sits on the collection step after the engine resolved
+// the parked row ch-1 into it.
+func collectionStepWorld(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *domain.FlowState) {
+	t.Helper()
+	w, def, state := ssoRenderWorld(t)
+	state.CurrentStep = "sso-register"
+	state.SSOResolvedCheckID = "ch-1"
+	w.ssoIdentities.EXPECT().
+		LoadParked(gomock.Any(), domain.FlowSSOLoadInput{
+			ProjectID:       testProjectID,
+			AttemptID:       "att-1",
+			UserSchemaURL:   defaultSchemaURL,
+			ResolvedCheckID: "ch-1",
+		}).
+		Return(nil, nil)
+	return w, withSSOCollectionStep(def), state
+}
+
+// expectCollected makes LoadCollected hand back collected for the row ch-1.
+func (w *flowTestWorld) expectCollected(collected *domain.FlowSSOParkedIdentity, err error) {
+	w.ssoIdentities.EXPECT().
+		LoadCollected(gomock.Any(), domain.FlowSSOLoadInput{
+			ProjectID:       testProjectID,
+			AttemptID:       "att-1",
+			UserSchemaURL:   defaultSchemaURL,
+			ResolvedCheckID: "ch-1",
+		}).
+		Return(collected, err)
+}
+
+// renderedValues maps each prefilled field to its value.
+func renderedValues(fields []domain.FlowField) map[string]string {
+	values := map[string]string{}
+	for _, f := range fields {
+		if f.Value != nil {
+			values[f.Name] = *f.Value
+		}
+	}
+	return values
+}
+
+// An identity the provider left incomplete is collected on a step that
+// renders with the provider's claims filled in.
+func TestFlowStateMachine_Render_SSOUserNotFoundPrefillsCollectionStep(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	def = withSSOCollectionStep(def)
+	parked := unlinkedParked(map[string]any{"email": "alice@example.com", "given_name": "Alice"}, map[string]bool{"email": true})
+	w.expectParked(parked, nil)
+	w.expectOwner("email", "alice@example.com", "")
+	w.expectCollected(parked, nil)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	require.Equal(t, "sso-register", result.Step.Name)
+	assert.Equal(t, map[string]string{"email": "alice@example.com", "given_name": "Alice"}, renderedValues(result.Step.Fields))
+}
+
+// The provider's claims fill the fields first, and what earlier steps
+// collected fills the rest. A claim that is not a string prefills nothing.
+func TestFlowStateMachine_Render_SSOCollectionStepPrefillsClaimsBeforeCollected(t *testing.T) {
+	t.Parallel()
+	w, def, state := collectionStepWorld(t)
+	state.CollectedData.UserData = map[string]any{"email": "typed@example.com", "username": "typed", "given_name": "Typed"}
+	w.expectCollected(unlinkedParked(map[string]any{"email": "alice@example.com", "given_name": 42}, nil), nil)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{
+		"email":      "alice@example.com",
+		"username":   "typed",
+		"given_name": "Typed",
+	}, renderedValues(result.Step.Fields))
+}
+
+// With no parked row the step renders empty and with no error. Values earlier
+// steps collected are not filled in either: the submit cannot succeed.
+func TestFlowStateMachine_Render_SSOCollectionStepWithoutParkedRowRendersEmpty(t *testing.T) {
+	t.Parallel()
+	w, def, state := collectionStepWorld(t)
+	state.CollectedData.UserData = map[string]any{"email": "typed@example.com", "username": "typed"}
+	w.expectCollected(nil, nil)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Nil(t, result.Step.Error)
+	assert.Empty(t, renderedValues(result.Step.Fields))
+}
+
+func TestFlowStateMachine_Render_SSOCollectionStepLoadErrorPropagates(t *testing.T) {
+	t.Parallel()
+	w, def, state := collectionStepWorld(t)
+	w.expectCollected(nil, domain.ErrFlowRestartRequired())
+
+	_, err := w.sm.Render(t.Context(), def, state)
+	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 }
