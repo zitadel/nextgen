@@ -109,6 +109,14 @@ describe("auth-factor enable", () => {
         expect(result).toPrint("Enabled passkey for default-human-user");
       });
 
+      it("warns when no login flow offers the factor yet", async () => {
+        const app = await anAppWithoutPasskey();
+
+        const result = await app.toggleFactorsRendered("enable", ["passkey"]);
+
+        expect(result.stderr).toContain("No login flow for default-human-user offers passkey yet");
+      });
+
       it("renders text rather than a json envelope", async () => {
         const app = await anAppWithoutPasskey();
 

@@ -307,6 +307,16 @@ describe("auth-factor", () => {
   });
 
   describe("--dry-run", () => {
+    it("still reports the warnings", async () => {
+      const cwd = await makeProject();
+
+      const { envelope } = await run(cwd, "enable", "--mode", "passkey", "--dry-run");
+
+      expect(envelope.warnings).toEqual([
+        "No login flow for default-human-user offers passkey yet. Add it to a flow to show it.",
+      ]);
+    });
+
     it("previews the change without writing it", async () => {
       const cwd = await makeProject();
 

@@ -20,6 +20,7 @@ import { stableStringify } from "../../lib/json";
 import { BaseCommand, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { publicCliCommand } from "../../lib/public-cli";
 import { flowsForSchema } from "../../lib/schema-flows";
+import { reportWarning } from "../../lib/warnings";
 
 /** The flags `auth-factor enable` and `auth-factor disable` share. */
 export const AUTH_FACTOR_FLAGS = {
@@ -91,8 +92,14 @@ export abstract class AuthFactorCommand extends BaseCommand {
     ) {
       // Only reachable with --force: said even so, because nobody can sign in.
       warnings.push(
-        `${schema.name} has no way to sign in left. Its users can only be managed through the API.`,
+        `${schema.name} ${dryRun ? "would have" : "has"} no way to sign in left. ` +
+          "Its users can only be managed through the API.",
       );
+    }
+    // Reported rather than returned, so a terminal shows them and a dry run's
+    // envelope carries them too (see apps/cli/AGENTS.md).
+    for (const warning of warnings) {
+      reportWarning(warning);
     }
     const data = {
       schema: schema.name,
@@ -133,7 +140,6 @@ export abstract class AuthFactorCommand extends BaseCommand {
             ? []
             : [publicCliCommand("plan", cliVersion), publicCliCommand("apply", cliVersion)],
       },
-      warnings,
       pretty:
         change.changed.length === 0
           ? `Nothing to ${verb} for ${schema.name}`
