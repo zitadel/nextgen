@@ -39,6 +39,17 @@ const (
 	// start a sign-in with, or whose sign-in the current step cannot route.
 	// The user stays on the step.
 	FlowStepErrorSSOUnavailable = "error.sso_unavailable"
+	// FlowStepErrorSSOCancelled reports a provider callback carrying
+	// access_denied (RFC 6749 §4.1.2.1): the person declined at the provider,
+	// or it refused the request. The one provider error with its own key,
+	// because telling someone the sign-in failed when they cancelled it sends
+	// them hunting for a mistake they never made.
+	FlowStepErrorSSOCancelled = "error.sso_cancelled"
+	// FlowStepErrorSSOFailed reports every other failure after the provider
+	// redirected back: another provider error code, a failed code exchange or
+	// id_token validation, or a configuration failure. The cause goes to the
+	// server log only; the step error stays generic.
+	FlowStepErrorSSOFailed = "error.sso_failed"
 )
 
 // FlowStepErrorAllowed reports whether a step error value honors the
@@ -476,6 +487,12 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 	// every reload, and a row left parked for collection is not resolved twice.
 	state.SSOResolvedCheckID = parked.CheckID
 
+	// The ceremony failed at the provider or in the callback; the key is the
+	// step error. The row stays parked, as under creation disabled.
+	if parked.ErrorKey != "" {
+		result, err := r.renderStepError(pc, resolvedFields, &parked.ErrorKey)
+		return result, true, err
+	}
 	if parked.Link == nil && parked.CreationDisabled {
 		// The identity has no account and will not get one. The row stays
 		// parked, so a failed render or seal re-runs this branch and shows the
@@ -1313,11 +1330,11 @@ func applyOutcomeFlip(state *FlowState, outcome string) {
 }
 
 // dispatchChallenges submits field-shaped challenges in
-// [challengeDispatchOrder]. CurrentPurpose + visited on_success decide
-// verify-vs-skip. What reaches it is what the action submitted, so a leg
-// that consumes a subset (see [identifierFieldsOnly]) dispatches a subset.
+// [challengeDispatchOrder]. CurrentPurpose decides verify-vs-skip. What
+// reaches it is what the action submitted, so a leg that consumes a subset
+// (see [identifierFieldsOnly]) dispatches a subset.
 func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved FlowResolvedFields) (flowDispatchResult, error) {
-	ctx, def, state, step, fields := pc.ctx, pc.def, pc.state, pc.currentStep, pc.in.Fields
+	ctx, state, fields := pc.ctx, pc.state, pc.in.Fields
 	for _, challenge := range challengeDispatchOrder {
 		name, value, ok := fieldValueByChallenge(resolved, fields, challenge)
 		if !ok {
@@ -1356,12 +1373,6 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 			if state.CurrentPurpose != FlowDefinitionPurposeLogin {
 				continue
 			}
-			// Skip if any visited step runs an on_success — today the only
-			// one (create_user) establishes the password kind, and the
-			// validator enforces password-collected-upstream for it.
-			if anyVisitedStepOnSuccess(def, state, step) {
-				continue
-			}
 			err := r.authAttempts.SubmitPassword(ctx, FlowSubmitPasswordInput{
 				ProjectID: state.ProjectID,
 				AttemptID: state.AuthAttemptID,
@@ -1377,20 +1388,6 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 		}
 	}
 	return flowDispatchResult{}, nil
-}
-
-// anyVisitedStepOnSuccess reports whether any step in (history ∪ current)
-// runs an on_success mutation.
-func anyVisitedStepOnSuccess(def *FlowDefinition, state *FlowState, current *FlowDefinitionStep) bool {
-	if current.OnSuccess != nil {
-		return true
-	}
-	for _, name := range state.History {
-		if s, ok := def.FindStep(name); ok && s.OnSuccess != nil {
-			return true
-		}
-	}
-	return false
 }
 
 // uniqueFieldValues returns every uniquely-keyed field with a collected

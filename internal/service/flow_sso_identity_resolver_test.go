@@ -235,10 +235,11 @@ func TestFlowSSOIdentityResolver_LoadParked_NothingToResolveIsNil(t *testing.T) 
 			&domain.AuthFactorUser{UserID: "user-1"},
 			&domain.AuthFactorSSO{ConnectionID: "idp-1", LinkID: "idplink-1", AttemptID: "att-earlier"},
 		}}},
-		// A row the engine already resolved (sso_user_not_found or creation
-		// disabled leaves it parked) is skipped before the revision and link
-		// reads.
-		"already resolved row": {attempt: parkedAttempt(parkedResult()), resolvedID: "ch-1"},
+		// A row the engine already resolved (sso_user_not_found, creation
+		// disabled or a parked error leaves it parked) is skipped before the
+		// revision and link reads.
+		"already resolved row":       {attempt: parkedAttempt(parkedResult()), resolvedID: "ch-1"},
+		"already resolved error row": {attempt: parkedAttempt(&domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed}), resolvedID: "ch-1"},
 		// An earlier bind lost its handoff, then a second ceremony parked a row
 		// the engine already resolved: the row still wins, so the earlier user
 		// is not signed in.
@@ -315,6 +316,19 @@ func TestFlowSSOIdentityResolver_LoadParked_DeadAttemptRestarts(t *testing.T) {
 			require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
 		})
 	}
+}
+
+// An error result carries no identity: the key is reported as it is, and the
+// pinned revision is never read.
+func TestFlowSSOIdentityResolver_LoadParked_ErrorResultReportsKey(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.expectAttempt(parkedAttempt(&domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled}))
+	f.expectNoRevisionOrLinkRead()
+
+	got, err := f.resolver.LoadParked(t.Context(), loadInput())
+	require.NoError(t, err)
+	assert.Equal(t, &domain.FlowSSOParkedIdentity{CheckID: "ch-1", ErrorKey: domain.FlowStepErrorSSOCancelled}, got)
 }
 
 func TestFlowSSOIdentityResolver_LoadParked_LinkFound(t *testing.T) {

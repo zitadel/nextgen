@@ -1,14 +1,14 @@
-import { Check, Copy } from "lucide-react"
-import { useEffect, useState } from "react"
+import { Check, Copy } from "lucide-react";
+import { useEffect, useState } from "react";
 
-import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 /** Icon size per button size — the design draws 14px in a toolbar, 12px inline. */
-const ICON_SIZE = { sm: "size-3.5", "icon-xs": "size-3" } as const
+const ICON_SIZE = { sm: "size-3.5", "icon-xs": "size-3" } as const;
 
 /** How long the tick stays before the button returns to its resting state. */
-const CONFIRM_MS = 2000
+const CONFIRM_MS = 2000;
 
 /**
  * Copy-to-clipboard control.
@@ -30,20 +30,20 @@ export function CopyButton({
   size = "icon-xs",
   className,
 }: {
-  value: string
+  value: string;
   /** The button's full accessible name, e.g. `Copy User ID`. */
-  label: string
-  size?: keyof typeof ICON_SIZE
+  label: string;
+  size?: keyof typeof ICON_SIZE;
   /** Escape hatch for call sites where the button must not drive row height. */
-  className?: string
+  className?: string;
 }) {
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (!copied) return
-    const timer = setTimeout(() => setCopied(false), CONFIRM_MS)
-    return () => clearTimeout(timer)
-  }, [copied])
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), CONFIRM_MS);
+    return () => clearTimeout(timer);
+  }, [copied]);
 
   return (
     <>
@@ -58,12 +58,12 @@ export function CopyButton({
           // explicitly rather than by optional-chaining the call: both are
           // safe, but the chain form reads as though `.then()` runs on
           // `undefined`.
-          const { clipboard } = navigator
-          if (!clipboard) return
+          const { clipboard } = navigator;
+          if (!clipboard) return;
           void clipboard.writeText(value).then(
             () => setCopied(true),
             () => setCopied(false),
-          )
+          );
         }}
       >
         {copied ? (
@@ -76,5 +76,5 @@ export function CopyButton({
         {copied ? "Copied to clipboard" : ""}
       </span>
     </>
-  )
+  );
 }

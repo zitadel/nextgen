@@ -472,6 +472,7 @@ function ThemeToggle() {
         return (
           <Tooltip key={value}>
             <TooltipTrigger asChild>
+              {/* biome-ignore lint/a11y/useSemanticElements: ARIA radiogroup pattern with roving tabindex and arrow-key handling; native radio inputs cannot carry the icon styling or the ref array this control needs */}
               <button
                 ref={(node) => {
                   optionRefs.current[index] = node;

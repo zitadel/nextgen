@@ -441,6 +441,71 @@ func TestFlowStateMachine_Process_LoginInvalidPassword(t *testing.T) {
 	assert.Equal(t, domain.FlowStepErrorInvalidCredentials, *result.Step.Error)
 }
 
+// A collision on a step that declares create_user never runs the mutation,
+// so the password step after it must verify the existing user's password.
+func TestFlowStateMachine_Process_RegisterCollisionVerifiesPassword(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := signupDefinition()
+	def.Steps[0].Transitions[domain.FlowImplicitOutcomeUserAlreadyExists] = domain.FlowStepTransition{Target: "password"}
+	def.Steps = append(def.Steps, domain.FlowDefinitionStep{
+		Name:   "password",
+		Fields: []domain.Field{"x-auth-methods#password"},
+		Actions: []domain.FlowStepAction{
+			{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+		},
+		Transitions: map[string]domain.FlowStepTransition{
+			domain.FlowActionSubmit: {Target: "done"},
+		},
+	})
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), identifiedBy("attempt-1", "email", "alice@example.com")).
+		Return("user_alice", nil)
+	w.authAttemptService.EXPECT().
+		SubmitPassword(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasswordInput) bool {
+			return in.AttemptID == "attempt-1" && in.Plain == "wrong-password"
+		})).
+		Return(domain.ErrAuthAttemptProofRejected(nil))
+	w.createUser.EXPECT().Handle(gomock.Any(), gomock.Any()).Times(0)
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	collided, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{
+			"email":                   "alice@example.com",
+			"x-auth-methods#password": "attacker-chosen",
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "password", collided.State.CurrentStep)
+	require.Equal(t, domain.FlowDefinitionPurposeLogin, collided.State.CurrentPurpose)
+
+	result, err := w.sm.Process(t.Context(), def, collided.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"x-auth-methods#password": "wrong-password"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.Step)
+	require.Equal(t, "password", result.Step.Name)
+	require.NotNil(t, result.Step.Error)
+	assert.Equal(t, domain.FlowStepErrorInvalidCredentials, *result.Step.Error)
+	assert.Empty(t, result.HandoffToken)
+}
+
 func TestFlowStateMachine_Process_FieldValidationErrorKeepsStep(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
@@ -3535,6 +3600,8 @@ func TestFlowStepErrorContract(t *testing.T) {
 		domain.FlowStepErrorPasskeyRegistrationInvalid,
 		domain.FlowStepErrorSSOCreationDisabled,
 		domain.FlowStepErrorSSOUnavailable,
+		domain.FlowStepErrorSSOCancelled,
+		domain.FlowStepErrorSSOFailed,
 	}
 	for _, key := range stepErrorConsts {
 		assert.True(t, domain.FlowStepErrorAllowed(key), "step-error const %q must honor the contract", key)
@@ -4780,6 +4847,24 @@ func TestFlowStateMachine_Render_SSOCreationDisabledRendersStepError(t *testing.
 	assert.Equal(t, "credentials", result.Step.Name)
 	require.NotNil(t, result.Step.Error)
 	assert.Equal(t, domain.FlowStepErrorSSOCreationDisabled, *result.Step.Error)
+	assert.True(t, containsFieldName(result.Step.Fields, "email"), "the step keeps its inputs")
+	assert.Empty(t, result.HandoffToken)
+	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+	assert.True(t, result.Reseal)
+}
+
+func TestFlowStateMachine_Render_SSOParkedErrorRendersStepError(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	w.expectParked(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", ErrorKey: domain.FlowStepErrorSSOCancelled}, nil)
+	w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Times(0)
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.Step.Name)
+	require.NotNil(t, result.Step.Error)
+	assert.Equal(t, domain.FlowStepErrorSSOCancelled, *result.Step.Error)
 	assert.True(t, containsFieldName(result.Step.Fields, "email"), "the step keeps its inputs")
 	assert.Empty(t, result.HandoffToken)
 	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)

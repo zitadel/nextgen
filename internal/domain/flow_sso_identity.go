@@ -58,6 +58,10 @@ type FlowSSOParkedIdentity struct {
 	// CheckID is the parked row's id, the replay key for
 	// [FlowState.SSOResolvedCheckID].
 	CheckID string
+	// ErrorKey is set when the ceremony failed ([SSOCallbackResult.ErrorKey]):
+	// the step renders it as its error. Only CheckID and AttemptUserID are set
+	// besides it; the row carries no identity to resolve.
+	ErrorKey string
 	// ConnectionID is the connection's stable id, never the revision id.
 	ConnectionID string
 	Subject      string

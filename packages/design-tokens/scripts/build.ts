@@ -31,11 +31,6 @@ import { overrides } from "../src/overrides.ts";
 
 type Hex = string;
 type Px = number;
-type PrimitiveRef = { primitive: string };
-type SemanticValue = Hex | PrimitiveRef;
-/** A semantic colour that resolves differently per theme mode. */
-type ModeValue = { dark: SemanticValue; light?: SemanticValue };
-type ColorToken = SemanticValue | ModeValue;
 
 /**
  * The new themed surface produced by `scripts/sync-from-export.ts` from the
@@ -151,9 +146,31 @@ function build(): BuildResult {
   // grouped surface so the two never collide (e.g. legacy `color.border.*`
   // group vs the new flat `theme.border`).
   /** Mirror structure for the typed TS `tokens` export (resolved dark values). */
-  const tsTree: Record<string, unknown> = { color: {}, theme: {}, spacing: {}, radius: {}, font: {}, motion: {}, focus: {}, breakpoint: {}, container: {}, layout: {} };
+  const tsTree: Record<string, unknown> = {
+    color: {},
+    theme: {},
+    spacing: {},
+    radius: {},
+    font: {},
+    motion: {},
+    focus: {},
+    breakpoint: {},
+    container: {},
+    layout: {},
+  };
   /** Mirror structure for the `cssVars` export — `var(--zl-…)` strings consumers compose into styles. */
-  const refTree: Record<string, unknown> = { color: {}, theme: {}, spacing: {}, radius: {}, font: {}, motion: {}, focus: {}, breakpoint: {}, container: {}, layout: {} };
+  const refTree: Record<string, unknown> = {
+    color: {},
+    theme: {},
+    spacing: {},
+    radius: {},
+    font: {},
+    motion: {},
+    focus: {},
+    breakpoint: {},
+    container: {},
+    layout: {},
+  };
 
   const push = (cssVar: string, value: string, valuePath: string[], light?: string): void => {
     cssVars.push([cssVar, value]);
@@ -236,7 +253,11 @@ function build(): BuildResult {
   for (const [name, metrics] of Object.entries(shadcn.text)) {
     const { fontSize, lineHeight } = metrics as { fontSize: Px; lineHeight: Px };
     push(cssVarName("text", name, "size"), pxToRem(fontSize), ["text", toCamel(name), "size"]);
-    push(cssVarName("text", name, "leading"), pxToRem(lineHeight), ["text", toCamel(name), "leading"]);
+    push(cssVarName("text", name, "leading"), pxToRem(lineHeight), [
+      "text",
+      toCamel(name),
+      "leading",
+    ]);
   }
 
   // ---- font weights ----
@@ -367,11 +388,12 @@ function assertOffScaleContainerRole(role: string, value: string): void {
 function containerStep(name: string): Px {
   const px = shadcn.container?.[name];
   if (typeof px !== "number") {
-    throw new Error(`figma.tokens.json is missing container.${name} — cannot emit the container max-width surface`);
+    throw new Error(
+      `figma.tokens.json is missing container.${name} — cannot emit the container max-width surface`,
+    );
   }
   return px;
 }
-
 
 /**
  * The theme selectors are `:root`-qualified on purpose.
@@ -399,7 +421,11 @@ function emitCss(vars: Array<[string, string]>, lightVars: Array<[string, string
   return `${BANNER}${root}${light}`;
 }
 
-function emitTs(values: Record<string, unknown>, refs: Record<string, unknown>, css: string): string {
+function emitTs(
+  values: Record<string, unknown>,
+  refs: Record<string, unknown>,
+  css: string,
+): string {
   // We embed the full CSS as a string export so consumers that can't pull
   // the raw .css file (a Lit shadow root, a Node test harness, an inline
   // <style> in an SSR'd page) still get the canonical base token layer.
@@ -484,7 +510,9 @@ function emitShadcn(shadcnColorVars: string[]): string {
   });
   // Alias rather than restate the pixel values: `tokens.css` now emits the same
   // Figma radius scale as `--zl-radius-*`, and two copies of a scale drift.
-  const radii = Object.keys(shadcn.radius).map((name) => `  --radius-${name}: var(--zl-radius-${name});`);
+  const radii = Object.keys(shadcn.radius).map(
+    (name) => `  --radius-${name}: var(--zl-radius-${name});`,
+  );
   const shadows = Object.keys(shadcn.shadow ?? {}).map(
     (name) => `  --shadow-${name}: var(--zl-shadow-${name});`,
   );
@@ -523,12 +551,10 @@ async function main(): Promise<void> {
     writeFile(resolve(OUT_DIR, "tailwind.css"), result.tailwind),
     writeFile(resolve(OUT_DIR, "shadcn.css"), result.shadcn),
   ]);
-  // eslint-disable-next-line no-console
   console.log(`design-tokens: wrote tokens.css, tokens.ts, tailwind.css, shadcn.css to ${OUT_DIR}`);
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err);
   process.exit(1);
 });

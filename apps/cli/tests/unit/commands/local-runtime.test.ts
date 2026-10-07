@@ -606,7 +606,9 @@ describe("local runtime commands", () => {
     };
     expect(envelope.status).toBe("ok");
     expect(envelope.data.urls.api).toBe(serverUrl);
-    expect(envelope.data.next_actions.join("\n")).toContain("Run setup in this directory or one inside it");
+    expect(envelope.data.next_actions.join("\n")).toContain(
+      "Run setup in this directory or one inside it",
+    );
     expect(envelope.data.next_actions.join("\n")).toContain("Setup installs dependencies");
     // As in the binary case: no platform project on the fake server, so no
     // link and no `console` suggestion.
@@ -1157,10 +1159,6 @@ function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
     created_at: "2026-06-09T00:00:00.000Z",
     cli_version: "0.0.0-test",
   };
-}
-
-function runtimePidOf(stdout: string): number {
-  return (parseJson(stdout) as { data: { runtime: { pid: number } } }).data.runtime.pid;
 }
 
 async function expectedDefaultImage(): Promise<string> {

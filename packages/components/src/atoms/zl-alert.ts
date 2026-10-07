@@ -48,12 +48,10 @@ import type { IconName } from "./zl-icon.js";
  */
 @customElement("zl-alert")
 export class ZlAlert extends LitElement {
-  static override styles = [
-    baseHostStyles,
-    ...surfaceStyles(alertStyles),
-  ];
+  static override styles = [baseHostStyles, ...surfaceStyles(alertStyles)];
 
-  @property({ reflect: true }) accessor severity: "error" | "success" | "warning" | "info" = "error";
+  @property({ reflect: true }) accessor severity: "error" | "success" | "warning" | "info" =
+    "error";
 
   @property() accessor heading: string | undefined = undefined;
 
@@ -77,8 +75,9 @@ export class ZlAlert extends LitElement {
           <slot name="detail" class="zr-alert__detail" part="detail"></slot>
           <slot name="link" class="zr-alert__link" part="link"></slot>
         </div>
-        ${this.dismissible
-          ? html`<button
+        ${
+          this.dismissible
+            ? html`<button
               type="button"
               class="zr-alert__close"
               part="close"
@@ -87,7 +86,8 @@ export class ZlAlert extends LitElement {
             >
               <zl-icon name="cross" size="16" label="Dismiss" decorative></zl-icon>
             </button>`
-          : null}
+            : null
+        }
       </div>
     `;
   }

@@ -10,12 +10,8 @@ const locale: Record<string, string> = {
 
 const step: CreateFlow201Step = {
   name: "identifier",
-  fields: [
-    { name: "email", type: "email", text_key: "identifier.field.email", required: true },
-  ],
-  actions: [
-    { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
-  ],
+  fields: [{ name: "email", type: "email", text_key: "identifier.field.email", required: true }],
+  actions: [{ name: "submit", kind: "submit", text_key: "submit.continue", primary: true }],
   gates: {},
 };
 
@@ -64,7 +60,9 @@ describe("patchMandatoryGates", () => {
     // field (with a raw text_key label) at the bottom of the form.
     const selectStep: CreateFlow201Step = {
       ...step,
-      fields: [{ name: "country", type: "select", text_key: "register.field.country", required: true }],
+      fields: [
+        { name: "country", type: "select", text_key: "register.field.country", required: true },
+      ],
     };
     const html =
       `<zl-select name="country"></zl-select>` +
@@ -78,7 +76,9 @@ describe("patchMandatoryGates", () => {
   it("does not duplicate a required checkbox already rendered as <zl-checkbox>", () => {
     const checkboxStep: CreateFlow201Step = {
       ...step,
-      fields: [{ name: "terms", type: "checkbox", text_key: "register.field.terms", required: true }],
+      fields: [
+        { name: "terms", type: "checkbox", text_key: "register.field.terms", required: true },
+      ],
     };
     const html =
       `<zl-checkbox name="terms"></zl-checkbox>` +

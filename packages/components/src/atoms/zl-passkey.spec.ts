@@ -94,7 +94,9 @@ describe("<zl-passkey>", () => {
 
   function nextEvent<T>(el: ZlPasskey, name: string): Promise<T> {
     return new Promise<T>((resolve) => {
-      el.addEventListener(name, (event) => resolve((event as CustomEvent).detail as T), { once: true });
+      el.addEventListener(name, (event) => resolve((event as CustomEvent).detail as T), {
+        once: true,
+      });
     });
   }
 

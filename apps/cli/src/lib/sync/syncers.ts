@@ -227,9 +227,13 @@ class IdpConnectionSyncer implements ResourceSyncer {
   }
 
   async delete(_id: string): Promise<void> {
-    throw new ZitadelError("E_NOT_IMPLEMENTED", "Deleting an identity provider connection is not supported yet", {
-      hint: "Restore the file, or remove the connection on the platform once deletion is designed (#1013).",
-    });
+    throw new ZitadelError(
+      "E_NOT_IMPLEMENTED",
+      "Deleting an identity provider connection is not supported yet",
+      {
+        hint: "Restore the file, or remove the connection on the platform once deletion is designed (#1013).",
+      },
+    );
   }
 }
 
@@ -292,7 +296,10 @@ class SchemaSyncer implements ResourceSyncer {
    * loudly if a caller reaches it.
    */
   async update(_id: string, _data: object): Promise<{ canonical?: object }> {
-    throw new ZitadelError("E_NOT_IMPLEMENTED", "schemas are revisioned — edit publishes a new revision, not an update");
+    throw new ZitadelError(
+      "E_NOT_IMPLEMENTED",
+      "schemas are revisioned — edit publishes a new revision, not an update",
+    );
   }
 
   async delete(id: string): Promise<void> {

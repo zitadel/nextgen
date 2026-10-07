@@ -140,7 +140,9 @@ async function commandPublish(options) {
       platforms: CONTAINER_PLATFORMS,
     });
     await upsertProductGithubRelease({ repoRoot, outDir, dryRun: true, log: console.log });
-    console.log("dry run: would publish npm packages, push container images, and update the draft GitHub Release");
+    console.log(
+      "dry run: would publish npm packages, push container images, and update the draft GitHub Release",
+    );
     return;
   }
 
@@ -149,7 +151,13 @@ async function commandPublish(options) {
     cwd: repoRoot,
     env: releasePublishEnv(),
   });
-  await buildContainerImage({ repoRoot, outDir, release, push: true, platforms: CONTAINER_PLATFORMS });
+  await buildContainerImage({
+    repoRoot,
+    outDir,
+    release,
+    push: true,
+    platforms: CONTAINER_PLATFORMS,
+  });
   await commandVerify();
   await upsertProductGithubRelease({ repoRoot, outDir, log: console.log });
 }
@@ -214,14 +222,18 @@ export function releasePublishEnv(overrides = {}) {
 }
 
 export function shouldFailManualPublishSkip(options = {}, env = process.env) {
-  return env.GITHUB_EVENT_NAME === "workflow_dispatch" && !options.dryRun && !options.recoverVersion;
+  return (
+    env.GITHUB_EVENT_NAME === "workflow_dispatch" && !options.dryRun && !options.recoverVersion
+  );
 }
 
 async function assertMainBranch(options, { allowDryRunBypass = true } = {}) {
   if ((allowDryRunBypass && options.dryRun) || process.env.GITHUB_REF === "refs/heads/main") {
     return;
   }
-  const branch = (await runCapture("git", ["branch", "--show-current"], { cwd: repoRoot })).stdout.trim();
+  const branch = (
+    await runCapture("git", ["branch", "--show-current"], { cwd: repoRoot })
+  ).stdout.trim();
   if (branch !== "main") {
     throw new Error(`release publish must run from main, got ${branch || "detached HEAD"}`);
   }

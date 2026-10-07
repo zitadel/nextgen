@@ -159,8 +159,7 @@ export const RESOURCES = {
         { field: "status", operations: FILTER_OPERATIONS },
       ],
       sorts: ["created_at", "name", "status"],
-      call: ({ client, projectId }, body) =>
-        client.queryTeams(body, { project_id: projectId }),
+      call: ({ client, projectId }, body) => client.queryTeams(body, { project_id: projectId }),
     }),
     get: { call: ({ client }, id) => client.getTeam(id), response: GetTeamResponse },
     create: create(CreateTeamBody, ({ client, projectId }, body) =>
@@ -190,8 +189,7 @@ export const RESOURCES = {
         { field: "lifecycle_owner_team_id", operations: FILTER_OPERATIONS },
       ],
       sorts: ["created_at", "user_id"],
-      call: ({ client, projectId }, body) =>
-        client.querySessions(body, { project_id: projectId }),
+      call: ({ client, projectId }, body) => client.querySessions(body, { project_id: projectId }),
     }),
     get: { call: ({ client }, id) => client.getSession(id), response: GetSessionResponse },
     // The endpoint terminates the session rather than removing a record, so
@@ -262,14 +260,7 @@ export const RESOURCES = {
     idField: "id",
     columns: ["id", "user.user_id", "team.team_id", "relation", "created_at", "expires_at"],
     heading: "id",
-    detail: [
-      "user.user_id",
-      "team.team_id",
-      "relation",
-      "object_type",
-      "created_at",
-      "expires_at",
-    ],
+    detail: ["user.user_id", "team.team_id", "relation", "object_type", "created_at", "expires_at"],
     list: list({
       items: "grants",
       body: QueryGrantsBody,
@@ -282,8 +273,7 @@ export const RESOURCES = {
         { field: "expires_at", operations: FILTER_OPERATIONS },
       ],
       sorts: ["created_at", "expires_at", "id"],
-      call: ({ client, projectId }, body) =>
-        client.queryGrants(body, { project_id: projectId }),
+      call: ({ client, projectId }, body) => client.queryGrants(body, { project_id: projectId }),
     }),
     get: {
       call: ({ client, projectId }, id) => client.getGrant(id, { project_id: projectId }),
@@ -317,8 +307,7 @@ export const RESOURCES = {
         { field: "created_at", operations: FILTER_OPERATIONS },
       ],
       sorts: ["slug", "created_at"],
-      call: ({ client, projectId }, body) =>
-        client.queryIdps(body, { project_id: projectId }),
+      call: ({ client, projectId }, body) => client.queryIdps(body, { project_id: projectId }),
     }),
     get: {
       call: ({ client, projectId }, id) => client.getIdpById(id, { project_id: projectId }),
@@ -342,9 +331,7 @@ export const RESOURCES = {
       items: "projects",
       body: QueryProjectsBody,
       response: QueryProjectsResponse,
-      filters: [
-        { field: "created_at", operations: FILTER_OPERATIONS },
-      ],
+      filters: [{ field: "created_at", operations: FILTER_OPERATIONS }],
       sorts: ["created_at"],
       call: ({ client }, body) => client.queryProjects(body),
     }),

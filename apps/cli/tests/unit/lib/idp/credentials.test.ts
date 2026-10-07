@@ -54,16 +54,24 @@ describe("the recovery commands a result carries", () => {
     // Deferred means the value never reached the project either; the button
     // fails at token exchange just the same.
     expect(
-      republishCommands([{ name: "GOOGLE_CLIENT_ID", secret: false, published: "deferred" }], VERSION),
+      republishCommands(
+        [{ name: "GOOGLE_CLIENT_ID", secret: false, published: "deferred" }],
+        VERSION,
+      ),
     ).toHaveLength(1);
   });
 
   it("skips a credential this run never had", () => {
     // No provider was enabled, or no secret was supplied: there is nothing to
     // republish and a command naming an empty variable would be noise.
-    expect(republishCommands([{ name: undefined, secret: false, published: "failed" }], VERSION)).toEqual([]);
     expect(
-      republishCommands([{ name: "GOOGLE_CLIENT_ID", secret: false, published: undefined }], VERSION),
+      republishCommands([{ name: undefined, secret: false, published: "failed" }], VERSION),
+    ).toEqual([]);
+    expect(
+      republishCommands(
+        [{ name: "GOOGLE_CLIENT_ID", secret: false, published: undefined }],
+        VERSION,
+      ),
     ).toEqual([]);
   });
 });

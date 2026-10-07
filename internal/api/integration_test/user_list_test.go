@@ -106,17 +106,9 @@ func TestQueryUsers(t *testing.T) {
 	require.Len(t, secondPage.Users, 1)
 	assert.Equal(t, "user_list-user-01", userID(t, secondPage.Users[0]))
 
-	// The second page is full too, so it carries a cursor of its own; only the
-	// page past the end reports that there is nothing more.
-	pageToken, ok = secondPage.NextPageToken.Get()
-	require.True(t, ok, "a full page carries a cursor even when it is the last one")
-
-	thirdPage := queryUsers(t, &api.QueryUsersRequest{
-		Limit:     api.NewOptLimit(1),
-		PageToken: api.NewOptNilPageToken(pageToken),
-	})
-	assert.Empty(t, thirdPage.Users)
-	assert.False(t, thirdPage.NextPageToken.IsSet())
+	// The second page is the last: look-ahead sees no further row, so it
+	// carries no cursor and there is no trailing empty page (#849).
+	assert.False(t, secondPage.NextPageToken.IsSet(), "the final page carries no cursor")
 
 	// Another project's bearer sees nothing: scope comes from the token, so
 	// the same call answers with that project's (empty) user list.

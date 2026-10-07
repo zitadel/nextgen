@@ -286,6 +286,28 @@ describe("claim page", () => {
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 
+  // A CSRF refusal is not a team problem: it must not take the "no team yet"
+  // branch, and a plain retry would be refused the same way.
+  it("does not mistake a CSRF refusal for a missing team", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    stubComplete(() =>
+      HttpResponse.json(
+        {
+          code: "auth.csrf_invalid",
+          message: "The request failed cross-site request forgery validation.",
+        },
+        { status: 403 },
+      ),
+    );
+    await renderAt(CLAIM_PATH);
+
+    expect(
+      await screen.findByRole("heading", { name: "The claim was not accepted from this page" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Your account has no team yet" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
+  });
+
   it("dead-ends claim.personal_team_not_active and names the remedy", async () => {
     // The mirror case: the membership exists but is not active, which
     // provisioning will not fix. `membership_status` decides the copy —
@@ -434,7 +456,11 @@ describe("claim window countdown", () => {
     fetchSession.mockResolvedValue(makeTestSession());
     stubWindow(9);
     stubComplete(() =>
-      HttpResponse.json({ project_id: PROJECT_ID, team_id: "team_1", claimed_at: "2026-08-24T10:00:00Z" }),
+      HttpResponse.json({
+        project_id: PROJECT_ID,
+        team_id: "team_1",
+        claimed_at: "2026-08-24T10:00:00Z",
+      }),
     );
 
     await renderAt(CLAIM_PATH);
@@ -447,7 +473,10 @@ describe("claim window countdown", () => {
     fetchSession.mockResolvedValue(makeTestSession());
     stubWindow(9);
     stubComplete(() =>
-      HttpResponse.json({ code: "proj.claim_expired", message: "the claim link expired" }, { status: 410 }),
+      HttpResponse.json(
+        { code: "proj.claim_expired", message: "the claim link expired" },
+        { status: 410 },
+      ),
     );
 
     await renderAt(CLAIM_PATH);

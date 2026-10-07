@@ -2,7 +2,6 @@ package user
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,24 +33,4 @@ func TestGroupByProject_ClearsAttributesAndIndexes(t *testing.T) {
 	assert.Nil(t, groups[0].ByID["u1"].Attributes)
 	assert.Equal(t, "p2", groups[1].ProjectID)
 	assert.Equal(t, []string{"u3"}, groups[1].IDs)
-}
-
-func TestNextCursor_OnlyWhenPageFull(t *testing.T) {
-	now := time.Now().UTC()
-	users := []*domain.User{
-		{ID: "u1", Metadata: domain.UserMetadata{CreatedAt: now}},
-		{ID: "u2", Metadata: domain.UserMetadata{CreatedAt: now.Add(time.Second)}},
-	}
-	page := database.Page[domain.UserField]{
-		Limit: 2,
-		OrderBy: database.OrderBy[domain.UserField]{
-			Columns: []database.Column[domain.UserField]{
-				database.Col(domain.UserFieldCreatedAt),
-				database.Col(domain.UserFieldID),
-			},
-			Direction: database.OrderAsc,
-		},
-	}
-	assert.NotEmpty(t, NextCursor(users, page))
-	assert.Empty(t, NextCursor(users[:1], page))
 }

@@ -23,14 +23,23 @@ function facts(id: string, appDir: string): FrameworkFacts {
  * (warn-only, `ok: true` with a broken auth path) is a test failure, not a
  * production surprise.
  */
-const PATCHERS: Array<{ patcher: Patcher; view: { framework: FrameworkFacts; rendererId: string } }> = [
+const PATCHERS: Array<{
+  patcher: Patcher;
+  view: { framework: FrameworkFacts; rendererId: string };
+}> = [
   { patcher: new NextPatcher(), view: { framework: facts("next", "app"), rendererId: "react" } },
   { patcher: new NuxtPatcher(), view: { framework: facts("nuxt", "app"), rendererId: "react" } },
-  { patcher: new AngularPatcher(), view: { framework: facts("angular", "src"), rendererId: "react" } },
+  {
+    patcher: new AngularPatcher(),
+    view: { framework: facts("angular", "src"), rendererId: "react" },
+  },
   { patcher: new ReactPatcher(), view: { framework: facts("react", "src"), rendererId: "react" } },
   { patcher: new VuePatcher(), view: { framework: facts("vue", "src"), rendererId: "react" } },
   { patcher: new SolidPatcher(), view: { framework: facts("solid", "src"), rendererId: "react" } },
-  { patcher: new SveltePatcher(), view: { framework: facts("svelte", "src"), rendererId: "react" } },
+  {
+    patcher: new SveltePatcher(),
+    view: { framework: facts("svelte", "src"), rendererId: "react" },
+  },
   { patcher: new QwikPatcher(), view: { framework: facts("qwik", "src"), rendererId: "react" } },
 ];
 
@@ -72,9 +81,7 @@ describe("patcher file classification", () => {
       rendererId: "react",
     });
     expect(actions.fileClasses!["app/plugins/auth.server.ts"]).toBe("infrastructure");
-    expect(actions.fileClasses!["app/plugins/zitadel-components.client.ts"]).toBe(
-      "infrastructure",
-    );
+    expect(actions.fileClasses!["app/plugins/zitadel-components.client.ts"]).toBe("infrastructure");
     expect(actions.fileClasses!["app/pages/login.vue"]).toBe("presentation");
   });
 
