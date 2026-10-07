@@ -84,21 +84,30 @@ Every refusal happens before anything is written, including under `--dry-run`.
   for a flow with a structural error, such as a purpose that points at a
   missing step. The command cannot tell whether such a flow still uses the
   method, so it refuses until the flow is fixed.
-- **No factor would be left.** Disabling the last usable way to sign in is
-  refused unless `--force` is passed. Only password, passkey and SSO with at
-  least one provider count. `otp` and `magic_link` are allowed by the
-  meta-schema but not supported by the login engine yet, so they do not count.
-  This refusal is CLI policy, not a server rule. The server accepts a schema
-  with every method disabled, because a schema whose users are only created
-  and managed through the API never needs a sign-in method. Most of the time,
-  though, disabling the last factor is a mistake that locks every user out,
-  so it is guarded the way [ADR 064 §10](064-cli-resource-commands.md) guards
-  destructive verbs. In a terminal the command asks for confirmation, and
-  declining ends as `skipped`. Non-interactively, and under `--dry-run`, it
-  refuses unless `--force` is passed, and the refusal carries the exact
-  command to re-run with `--force`. `--force` overrides this refusal only. The
-  other refusals protect against a `plan` or `apply` that would fail, so no
-  flag overrides them, and they are checked before the prompt.
+- **No factor would be left.** Disabling the schema's last enabled way to
+  sign in is guarded. Only password, passkey and SSO with at least one
+  provider count. `otp` and `magic_link` are allowed by the meta-schema but
+  not supported by the login engine yet, so they do not count. This guard is
+  CLI policy, not a server rule. The server accepts a schema with every method
+  disabled, because a schema whose users are only created and managed through
+  the API never needs a sign-in method. Most of the time, though, it is a
+  mistake, so it is guarded the way
+  [ADR 064 §10](064-cli-resource-commands.md) guards destructive verbs. In a
+  terminal the command asks for confirmation, and declining ends as
+  `skipped`. Non-interactively, and under `--dry-run`, it refuses unless
+  `--force` is passed, and the refusal carries the exact command to re-run
+  with `--force`. `--force` overrides this guard only. The other refusals
+  protect against a `plan` or `apply` that would fail, so no flag overrides
+  them, and they are checked before the prompt.
+
+  The guard reads the schema alone. Whether anyone can actually sign in also
+  depends on the active flows: a factor is only reachable when the schema
+  enables it and an active flow offers it. The command cannot remove a factor
+  that an active flow offers, because the flow refusal above stops it first.
+  So the only way to lose every reachable factor is to edit a flow, which this
+  command never does. To make that visible, every run warns when, after the
+  change, no active flow offers any factor the schema enables.
+
 - **Password needs an identifier.** Enabling password on a schema without
   `x-identifier` is refused, because the server rejects that combination and
   `plan` does not catch it.
