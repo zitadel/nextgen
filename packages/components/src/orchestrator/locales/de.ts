@@ -196,6 +196,13 @@ export const de: Locale = {
     "Der neue Passkey konnte nicht bestätigt werden. Bitte registriere ihn erneut.",
   "error.sso_unavailable":
     "Dieser Anmeldeanbieter ist gerade nicht verfügbar. Bitte wähle eine andere Anmeldemethode.",
+  "error.sso_verified_unique_value_changed":
+    "Dein Anmeldeanbieter hat diesen Wert bestätigt, daher kann er hier nicht geändert werden.",
+  "error.sso_user_invalid":
+    "Einige Angaben passen nicht zusammen. Bitte prüfe sie und versuche es erneut.",
+  "error.sso_user_cannot_be_created":
+    "Mit dieser Anmeldemethode können wir dein Konto nicht erstellen. Bitte wende dich an den Support.",
+  "error.user_already_exists": "Ein Konto mit diesen Angaben existiert bereits.",
 
   // --- Feld- / Formularfehler ---
   "error.email_required": "Bitte gib eine E-Mail-Adresse ein",

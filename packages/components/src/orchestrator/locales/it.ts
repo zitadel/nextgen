@@ -189,6 +189,12 @@ export const it: Locale = {
     "Non è stato possibile verificare la nuova passkey. Riprova a registrarla.",
   "error.sso_unavailable":
     "Questo provider di accesso non è disponibile al momento. Prova un altro metodo di accesso.",
+  "error.sso_verified_unique_value_changed":
+    "Il tuo provider di accesso ha confermato questo valore, quindi non può essere modificato qui.",
+  "error.sso_user_invalid": "Alcuni dati non sono coerenti tra loro. Controllali e riprova.",
+  "error.sso_user_cannot_be_created":
+    "Non possiamo creare il tuo account con questo metodo di accesso. Contatta l'assistenza.",
+  "error.user_already_exists": "Esiste già un account con questi dati.",
 
   // --- Errori campo / modulo ---
   "error.email_required": "Inserisci un indirizzo e-mail",
