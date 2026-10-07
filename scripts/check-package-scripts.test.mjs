@@ -114,6 +114,8 @@ describe("package-script contract", () => {
     "npm.cmd run build",
     "node.exe --run build",
     '"C:\\tools\\PNPM.EXE" install',
+    "pnpm>out.log test",
+    "vitest run && pnpm>>out.log install",
   ])("detects a package manager in %s", (body) => {
     expect(startsPackageManager(body)).toBe(true);
   });
@@ -173,6 +175,9 @@ describe("package-script contract", () => {
     ["timeout 5 vitest run", "the command wrapper `timeout`"],
     ["xargs -n1 pnpm add < deps.txt", "the command wrapper `xargs`"],
     ["nice -n 10 npm run build", "the command wrapper `nice`"],
+    ["cmd /c pnpm run test", "the Windows shell `cmd`"],
+    ['powershell -Command "pnpm run test"', "the Windows shell `powershell`"],
+    ["pwsh -c 'pnpm run test'", "the Windows shell `pwsh`"],
   ])("rejects unsupported syntax in %s", (body, reason) => {
     expect(unsupportedSyntax(body)).toBe(reason);
   });
@@ -191,6 +196,8 @@ describe("package-script contract", () => {
     "time -p vitest run",
     "command -p tsc --noEmit",
     "node.exe scripts/doctor.mjs",
+    "vitest run>out.log",
+    "echo 'a>b' && vitest run",
   ])("allows plain commands like %s", (body) => {
     expect(unsupportedSyntax(body)).toBeNull();
   });
