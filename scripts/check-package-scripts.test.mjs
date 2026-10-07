@@ -104,6 +104,9 @@ describe("package-script contract", () => {
     "2>&1 pnpm run test",
     "2>&1 corepack pnpm run test",
     "&> out.log pnpm install",
+    "exec -- pnpm run build",
+    "command -- pnpm run build",
+    "nohup -- npm start",
   ])("detects a package manager in %s", (body) => {
     expect(startsPackageManager(body)).toBe(true);
   });
@@ -158,6 +161,7 @@ describe("package-script contract", () => {
     ["bash -lc 'pnpm test'", "an inline `bash -c` script"],
     ['PM=pnpm; "$PM" run test', "a variable in the command position"],
     ["$TOOL run build", "a variable in the command position"],
+    ["trap 'pnpm run test' EXIT", "`trap`"],
   ])("rejects unsupported syntax in %s", (body, reason) => {
     expect(unsupportedSyntax(body)).toBe(reason);
   });
@@ -171,6 +175,8 @@ describe("package-script contract", () => {
     "vitest run --reporter=$REPORTER",
     "echo 'costs $5' && vitest run",
     "2>&1 vitest run",
+    "exec -- vitest run",
+    "command -- tsc --noEmit",
   ])("allows plain commands like %s", (body) => {
     expect(unsupportedSyntax(body)).toBeNull();
   });

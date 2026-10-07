@@ -159,7 +159,7 @@ function substitutions(text) {
   return bodies;
 }
 
-const EVALUATORS = new Set(["eval", "source", "."]);
+const EVALUATORS = new Set(["eval", "source", ".", "trap"]);
 
 /**
  * Shell constructs a single-step script has no use for, and that would let a
@@ -257,7 +257,10 @@ function commandWords(input) {
     }
   }
   let i = 0;
-  while (i < words.length && (KEYWORDS.has(words[i]) || ASSIGNMENT.test(words[i]))) i += 1;
+  while (i < words.length && (KEYWORDS.has(words[i]) || ASSIGNMENT.test(words[i]))) {
+    // `exec -- cmd`, `command -- cmd`: the terminator belongs to the wrapper.
+    i += KEYWORDS.has(words[i]) && words[i + 1] === "--" ? 2 : 1;
+  }
   if (words[i]?.split("/").pop() !== "env") return words.slice(i);
   i += 1;
   while (i < words.length) {
