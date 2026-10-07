@@ -86,7 +86,13 @@ const PACKAGE_MANAGERS = new Set(["pnpm", "npm", "npx", "yarn", "corepack"]);
  * and package-manager names inside quoted text do not count.
  */
 export function startsPackageManager(body) {
-  const unquoted = body.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, "''");
+  // Single-quoted text and escaped `\$` are literal; command substitutions
+  // (`$(…)`, backticks) still run inside double quotes, so check their bodies.
+  const live = body.replace(/'[^']*'/g, "''").replace(/\\\$/g, "");
+  for (const [, dollar, backtick] of live.matchAll(/\$\(([^()]*)\)|`([^`]*)`/g)) {
+    if (startsPackageManager(dollar ?? backtick)) return true;
+  }
+  const unquoted = live.replace(/"(?:[^"\\]|\\.)*"/g, "''");
   for (const segment of unquoted.split(/&&|\|\||[;|()]/)) {
     const [command = "", next = ""] = commandWords(segment.trim().split(/\s+/));
     if (PACKAGE_MANAGERS.has(command) || (command === "node" && next === "--run")) {

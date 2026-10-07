@@ -70,6 +70,10 @@ describe("package-script contract", () => {
     "env -u CI pnpm run test",
     "env -u CI -u VERCEL -- pnpm install",
     "node --run build",
+    'echo "$(pnpm run test)"',
+    "echo $(pnpm test)",
+    "echo `pnpm test`",
+    'echo "`npm run build`"',
   ])("detects a package manager in %s", (body) => {
     expect(startsPackageManager(body)).toBe(true);
   });
@@ -83,6 +87,9 @@ describe("package-script contract", () => {
     "NEXTGEN_NUXT_BUILD_DIR=.nuxt nuxt prepare && vue-tsc --noEmit",
     "env CI=1 vitest run",
     "env -u CI node scripts/run-local.mjs",
+    "echo '$(pnpm run test)'",
+    'echo "\\$(pnpm run test)"',
+    "echo \"$(node scripts/version.mjs)\"",
   ])("does not flag %s", (body) => {
     expect(startsPackageManager(body)).toBe(false);
   });
