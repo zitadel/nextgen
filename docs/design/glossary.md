@@ -17,7 +17,7 @@ Three layers. Long-form in [`api/hierarchy.md`](api/hierarchy.md).
 
 | Term | Meaning |
 |---|---|
-| **Project** | A tenant. Owns branding, IdPs, custom domain, feature flags, teams, users, apps, flows, sessions. One project is reserved as the **platform project** — Zitadel's own project, where the accounts that pay Zitadel live. **LOCKED rename** from today's "instance". |
+| **Project** | A tenant. Owns branding, IdPs, origins (§4), a custom domain for hosted login (§6), feature flags, teams, users, apps, flows, sessions. One project is reserved as the **platform project** — Zitadel's own project, where the accounts that pay Zitadel live. **LOCKED rename** from today's "instance". |
 | **Team** | A tenant-grouping inside any project. Two canonical shapes: (a) a team inside the **platform project** represents a paying customer / developer account; (b) a team inside a **customer project** represents a B2B end-customer tenant. Same resource, different project context. |
 | **User** | An identity inside any project. A user inside the platform project is what used to be called a "platform_user" (a developer/admin). A user inside a customer project is an end-user. Team participation attaches users to teams; lifecycle ownership is explicit policy. |
 
@@ -81,7 +81,7 @@ Core nouns used across the API. Full endpoint map in [`api/resource-map.md`](api
 | **release** | An immutable bundle of configuration revisions ([ADR 035](../adrs/035-configuration-environments.md)): `rel_…` in storage, its content digest (`sha256:…`) on the wire. Building one is not deploying it. |
 | **deployment** | The operation that makes one release live on one or more targets: `dep_…`, immutable, append-only, one row per origin under it. What a target serves is its newest deployment, and a rollback is another deployment. Replaces the environment's current-deployment pointer and the spike's separate `dpl_` deploy id. |
 | **target** | What a deployment points at: the project default (what a caller with no `Origin` is served) or one exact origin. The word has no other meaning; the CLI's server-and-project lookup is *environment resolution* (§6). |
-| **origin** | One entry of a project's origin allowlist, `{pattern, kind}` with kind `primary` or `preview`. A `primary` pattern admits requests from the URLs it matches; a `preview` pattern only bounds which URLs a preview deploy may register. Project state, not `zitadel.json` content: `POST /projects/{id}/origins`, `zitadel origin add`. Not "domain": an origin carries scheme and port and is matched against the `Origin` header. **RECOMMENDED rename** from `preview_origins` / "allowlist". |
+| **origin** | One entry of a project's origin allowlist, `{pattern, kind}` with kind `primary` or `preview`. A `primary` pattern admits requests from the URLs it matches; a `preview` pattern only bounds which URLs a preview deploy may register. Project state, not `zitadel.json` content: `POST /projects/{id}/origins`, `zitadel origin add`. Not "domain": an origin carries scheme and port and is matched against the `Origin` header, and a **custom domain** (§6) is where Zitadel serves hosted login, not where the app runs. **RECOMMENDED rename** from `preview_origins` / "allowlist". |
 | **preview** | A live preview URL with an expiry, registered by `zitadel preview`, admitting requests from that exact URL while it lives. `GET /previews`, `zitadel preview list`, `zitadel preview rm`. |
 | **mode** | `sandbox` or `production`, on the project. `sandbox` allows loopback origins and an empty allowlist; `production` requires at least one origin and refuses loopback and wildcard primaries. **RECOMMENDED rename** from `class`. |
 
@@ -127,6 +127,7 @@ From the configuration surface, flow engine, and branding. Long-form in [`platfo
 | **page template** | Proposed later Liquid document (`page.liquid`) with a `login_widget` hole for Zitadel-served page chrome. Not a settled requirement; not used by embeds. |
 | **embedded login** | `<zitadel-login>` rendered by the customer's application. The customer owns the document. Orthogonal to whether the Zitadel *server* is cloud or customer-operated. |
 | **Zitadel-served login** | Zitadel presents the login page (today `/ui/login/`). Same widget; branding/content reuse where applicable. Independent of Cloud vs customer-operated server. Alias: **hosted login**. |
+| **custom domain** | The customer-chosen hostname (CNAME + ACME certificate) on which Zitadel serves the hosted login and OIDC endpoints: integration level 3 in [`platform/overview.md`](platform/overview.md), deferred past the MVP. Not an **origin** (§4): an origin is where the customer's app runs and is allowlisted; a custom domain is where Zitadel itself answers. |
 | **fully custom frontend** | Customer-owned authentication UI on Zitadel's supported APIs. A presentation model, not an embed escape hatch. |
 
 ---
