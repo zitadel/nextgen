@@ -113,28 +113,28 @@ func (rs releaseStatements) GetReleasesByIDs(ctx context.Context, projectID stri
 
 // ListReleases implements [service.ReleaseStatements].
 func (rs releaseStatements) ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error) {
-	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, releaseQuery, filter, release.Schema, "zitadel_nextgen.releases", "id"); err != nil {
+	items, nextCursor, err := pagination.Page(filter.Pagination, release.Schema, func(limit uint32) ([]*domain.Release, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileList(ctx, &compiler, releaseQuery, filter, release.Schema, "zitadel_nextgen.releases", "id"); err != nil {
+			return nil, err
+		}
+
+		rows, err := rs.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		items, err := pgx.CollectRows(rows, scanRelease)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		return items, nil
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	rows, err := rs.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	items, err := pgx.CollectRows(rows, scanRelease)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	nextCursor := pagination.MarshalNext(
-		filter.Pagination.OrderBy,
-		items,
-		release.Schema,
-		filter.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.Release]{Items: items, NextCursor: nextCursor}, nil
 }
 
