@@ -603,8 +603,9 @@ describe("materializeSetupResources with several providers", () => {
       }),
     }));
 
-    const { materializeSetupResources: materialize } =
-      await import("../../../src/lib/setup-resources");
+    const { materializeSetupResources: materialize } = await import(
+      "../../../src/lib/setup-resources"
+    );
     const client = {
       createIdp: vi.fn().mockImplementation(async (body: { idp: { slug?: string } }) => ({
         // A distinct id per connection, so a first-only bug cannot hide behind
