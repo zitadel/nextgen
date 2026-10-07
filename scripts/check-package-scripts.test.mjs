@@ -116,6 +116,9 @@ describe("package-script contract", () => {
     '"C:\\tools\\PNPM.EXE" install',
     "pnpm>out.log test",
     "vitest run && pnpm>>out.log install",
+    "busybox sh -c 'pnpm run test'",
+    "some-wrapper --flag pnpm run test",
+    "some-wrapper --flag 'pnpm run test'",
   ])("detects a package manager in %s", (body) => {
     expect(startsPackageManager(body)).toBe(true);
   });
@@ -181,6 +184,7 @@ describe("package-script contract", () => {
     ["fish -c 'pnpm run test'", "an inline `fish -c` script"],
     ["ksh -c 'npm run build'", "an inline `ksh -c` script"],
     ["tcsh -c 'pnpm test'", "an inline `tcsh -c` script"],
+    ["busybox sh -c 'pnpm run test'", "the command wrapper `busybox`"],
   ])("rejects unsupported syntax in %s", (body, reason) => {
     expect(unsupportedSyntax(body)).toBe(reason);
   });
