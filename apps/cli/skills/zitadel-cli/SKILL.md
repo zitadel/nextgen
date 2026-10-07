@@ -128,6 +128,10 @@ Each invocation prints one JSON object:
 - On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_NOT_FOUND`,
   `E_CONFLICT`) and `message`.
 - `next_commands`: the suggested follow-ups. Prefer these over free-text hints.
+- `warnings`: things that went wrong without stopping the command, such as a
+  value that was not published. Always present on success (often empty), and
+  present on a no-op or failure when there are any. Read them before you report
+  success: a warning usually means a follow-up step is needed.
 - A `list` verb emits `data: { items, count, next_page_token }`; when a page
   remains, `data.next_commands` carries the exact command for the next page.
 - `plan` and `apply` emit `data.changes`: one row per touched resource
