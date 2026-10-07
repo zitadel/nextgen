@@ -1,4 +1,4 @@
-import type { Properties } from "./index";
+import type { Properties } from "mixpanel";
 
 /**
  * Return a new bag with empty values stripped, per Mixpanel's "omit, never send

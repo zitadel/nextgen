@@ -1,21 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 
-import mixpanelLib, { type Mixpanel as MixpanelClient, type Modifiers } from "mixpanel";
+import mixpanelLib, {
+  type Mixpanel as MixpanelClient,
+  type Modifiers,
+  type Properties,
+} from "mixpanel";
 
 import { resolveTelemetryHost } from "./config";
 import { resolveConsent } from "./consent";
 import { type Identity, loadOrCreateIdentity } from "./identity";
 import { compact } from "./util";
 
-export type { Modifiers } from "mixpanel";
+export type { Properties, Modifiers } from "mixpanel";
 export type { TelemetryRegion } from "./config";
-
-// Mixpanel's property-bag type lives inside a `declare namespace … export =`
-// block that TS will not surface as a named import, so derive it from the
-// `track` signature — resolved identically under every tsconfig's module
-// resolution, unlike a bare `import { Properties }`.
-export type Properties = Parameters<MixpanelClient["track"]>[1];
 
 /** Property bag accepted by {@link Telemetry.track} / {@link Telemetry.profile}. */
 export type TelemetryProperties = Properties;
@@ -150,7 +148,9 @@ export class Telemetry {
    * a synchronous throw or an error callback must not surface to the caller or
    * leak as an unhandled rejection.
    */
-  private enqueue(send: (client: MixpanelClient, done: () => void) => void): void {
+  private enqueue(
+    send: (client: MixpanelClient, done: () => void) => void,
+  ): void {
     const client = this.client;
     if (!client) {
       return;
