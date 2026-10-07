@@ -171,7 +171,7 @@ function substitutions(text) {
   return bodies;
 }
 
-const EVALUATORS = new Set(["eval", "source", ".", "trap"]);
+const EVALUATORS = new Set(["eval", "source", ".", "trap", "coproc"]);
 
 /** Windows shells, whose command strings this guard does not parse. */
 const WINDOWS_SHELLS = new Set(["cmd", "powershell", "pwsh"]);
