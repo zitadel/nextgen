@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -12,6 +13,12 @@ import (
 	"github.com/zitadel/nextgen/internal/service/mocks"
 	"go.uber.org/mock/gomock"
 )
+
+// safeRequestContext is the request state WithCSRFRequest records for a safe
+// (GET) request, which checkSessionCSRF requires before it lets one through.
+func safeRequestContext(t *testing.T) context.Context {
+	return context.WithValue(t.Context(), csrfRequestKey{}, csrfRequest{})
+}
 
 func TestHandleOAuth2(t *testing.T) {
 	t.Parallel()
@@ -144,7 +151,7 @@ func TestHandleNextgenSession(t *testing.T) {
 		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(token, nil)
 
 		handler := NewSecurityHandler(tokenService)
-		ctx, err := handler.HandleNextgenSession(t.Context(), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
+		ctx, err := handler.HandleNextgenSession(safeRequestContext(t), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
 		require.NoError(t, err)
 
 		got, ok := sessionTokenFromContext(ctx)
@@ -181,7 +188,7 @@ func TestHandleNextgenSession(t *testing.T) {
 				tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(token, nil)
 
 				handler := NewSecurityHandler(tokenService)
-				ctx, err := handler.HandleNextgenSession(t.Context(), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
+				ctx, err := handler.HandleNextgenSession(safeRequestContext(t), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
 				require.NoError(t, err)
 
 				scope, ok := GetScopeContext(ctx)
@@ -222,7 +229,7 @@ func TestHandleNextgenSession(t *testing.T) {
 		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(token, nil)
 
 		handler := NewSecurityHandler(tokenService)
-		ctx, err := handler.HandleNextgenSession(t.Context(), api.QueryUsersOperation, api.NextgenSession{APIKey: "raw-cookie"})
+		ctx, err := handler.HandleNextgenSession(safeRequestContext(t), api.QueryUsersOperation, api.NextgenSession{APIKey: "raw-cookie"})
 		require.NoError(t, err)
 
 		scope, ok := GetScopeContext(ctx)
@@ -259,7 +266,7 @@ func TestHandleNextgenSession(t *testing.T) {
 				tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(token, nil)
 
 				handler := NewSecurityHandler(tokenService)
-				ctx, err := handler.HandleNextgenSession(t.Context(), op, api.NextgenSession{APIKey: "raw-cookie"})
+				ctx, err := handler.HandleNextgenSession(safeRequestContext(t), op, api.NextgenSession{APIKey: "raw-cookie"})
 				require.ErrorIs(t, err, ogenerrors.ErrSkipServerSecurity)
 				_, ok := GetScopeContext(ctx)
 				require.False(t, ok)
@@ -275,7 +282,7 @@ func TestHandleNextgenSession(t *testing.T) {
 		tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
 
 		handler := NewSecurityHandler(tokenService)
-		_, err := handler.HandleNextgenSession(t.Context(), api.GetMySessionOperation, api.NextgenSession{APIKey: "garbage"})
+		_, err := handler.HandleNextgenSession(safeRequestContext(t), api.GetMySessionOperation, api.NextgenSession{APIKey: "garbage"})
 		require.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
 	})
 
@@ -386,7 +393,7 @@ func TestHandleNextgenSession(t *testing.T) {
 		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(token, nil)
 
 		handler := NewSecurityHandler(tokenService)
-		_, err := handler.HandleNextgenSession(t.Context(), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
+		_, err := handler.HandleNextgenSession(safeRequestContext(t), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
 		require.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
 	})
 }
