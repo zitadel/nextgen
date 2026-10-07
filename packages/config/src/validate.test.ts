@@ -117,9 +117,7 @@ describe("validateFlowDefinition — valid flows", () => {
       (a) => a.name !== "register",
     );
     // register/register-password become unreachable; drop them.
-    def.steps = def.steps.filter((s) =>
-      ["identifier", "password", "done"].includes(s.name),
-    );
+    def.steps = def.steps.filter((s) => ["identifier", "password", "done"].includes(s.name));
     // The default schema requires email, still collected on identifier.
     expect(validateFlowDefinition(def, schema)).toEqual([]);
   });
@@ -246,16 +244,16 @@ describe("steps", () => {
     const def = flow();
     def.steps.push({ name: "idle", transitions: { user_not_found: { target: "done" } } });
     expect(messages(validateFlowDefinition(def))).toContain(
-      'step "idle" is non-terminal but has no fields, actions, sso_providers, gates, or transitions.callback',
+      'step "idle" is non-terminal but has no fields, actions, sso_providers, gates, or transitions.sso_authenticated',
     );
   });
 
-  it("rejects sso_providers without transitions.callback", () => {
+  it("rejects sso_providers without transitions.sso_authenticated", () => {
     const def = flow();
     const s = step(def, "identifier");
     s.sso_providers = ["idp"];
     expect(messages(validateFlowDefinition(def))).toContain(
-      'step "identifier": has sso_providers but is missing transitions.callback',
+      'step "identifier": has sso_providers but is missing transitions.sso_authenticated',
     );
   });
 
@@ -271,8 +269,32 @@ describe("steps", () => {
     const def = flow();
     step(def, "identifier").transitions.jump = { target: "done" };
     expect(messages(validateFlowDefinition(def))).toContain(
-      'step "identifier": transition key "jump" is not an action name or reserved outcome (user_not_found, user_already_exists, identity_unknown, callback)',
+      'step "identifier": transition key "jump" is not an action name or reserved outcome (user_not_found, user_already_exists, sso_user_not_found, sso_authenticated)',
     );
+  });
+
+  for (const outcome of ["sso_authenticated", "sso_user_not_found"]) {
+    it(`rejects purpose or action on ${outcome}`, () => {
+      for (const transition of [
+        { target: "register", purpose: "register" },
+        { target: "other-flow", action: "switch" },
+      ]) {
+        const def = flow();
+        step(def, "identifier").transitions[outcome] = transition;
+        expect(messages(validateFlowDefinition(def))).toContain(
+          `step "identifier": transition "${outcome}" is an sso outcome and cannot declare purpose or action`,
+        );
+      }
+    });
+  }
+
+  it("accepts purpose on the shared user_already_exists", () => {
+    const def = flow();
+    step(def, "register").transitions.user_already_exists = {
+      target: "identifier",
+      purpose: "login",
+    };
+    expect(errors(validateFlowDefinition(def))).toEqual([]);
   });
 
   it("collects issues across independent steps", () => {
@@ -579,12 +601,8 @@ describe("schema-dependent rules", () => {
     const def = flow();
     step(def, "register").fields.push("mixed", "nullable");
     const msgs = messages(validateFlowDefinition(def, withUnions));
-    expect(msgs).toContain(
-      'step "register": flow field: unsupported JSON type: [string number]',
-    );
-    expect(msgs).not.toContain(
-      'step "register": flow field: unsupported JSON type: [null string]',
-    );
+    expect(msgs).toContain('step "register": flow field: unsupported JSON type: [string number]');
+    expect(msgs).not.toContain('step "register": flow field: unsupported JSON type: [null string]');
   });
 
   // The nullable idiom reduces before the composite test, so a nullable
@@ -831,9 +849,7 @@ describe("drift audit (Go validator)", () => {
     const source = readFileSync(goSource, "utf8");
     for (const [rule, { goRef }] of Object.entries(FLOW_VALIDATION_RULES)) {
       if (goRef === null) continue;
-      expect(source, `rule ${rule} → Go func ${goRef}`).toMatch(
-        new RegExp(`func ${goRef}\\(`),
-      );
+      expect(source, `rule ${rule} → Go func ${goRef}`).toMatch(new RegExp(`func ${goRef}\\(`));
     }
   });
 
@@ -893,7 +909,8 @@ describe("drift audit (Go validator)", () => {
   it.skipIf(!existsSync(purposesSource))("purpose enum matches the Go source exactly", () => {
     const source = readFileSync(purposesSource, "utf8");
     const block =
-      source.match(/FlowDefinitionPurposeLogin FlowDefinitionPurpose = iota[\s\S]*?\n\)/)?.[0] ?? "";
+      source.match(/FlowDefinitionPurposeLogin FlowDefinitionPurpose = iota[\s\S]*?\n\)/)?.[0] ??
+      "";
     const goPurposes = [...block.matchAll(/FlowDefinitionPurpose(\w+)/g)].map(([, name]) =>
       snake(name ?? ""),
     );
@@ -904,8 +921,7 @@ describe("drift audit (Go validator)", () => {
 
   it.skipIf(!existsSync(purposesSource))("action kinds match the Go enum exactly", () => {
     const source = readFileSync(purposesSource, "utf8");
-    const block =
-      source.match(/FlowActionKindUnset FlowActionKind = iota[\s\S]*?\n\)/)?.[0] ?? "";
+    const block = source.match(/FlowActionKindUnset FlowActionKind = iota[\s\S]*?\n\)/)?.[0] ?? "";
     const goKinds = [
       ...block.matchAll(/^\s*FlowActionKind(\w+)(?: FlowActionKind = iota)?$/gm),
     ].map(([, name]) => snake(name ?? ""));
@@ -920,16 +936,19 @@ describe("drift audit (Go validator)", () => {
     "internal/domain/flow_on_success.go",
   );
 
-  it.skipIf(!existsSync(onSuccessSource))("on_success manifests match the Go source exactly", () => {
-    const source = readFileSync(onSuccessSource, "utf8");
-    const body = source.match(/func ManifestForOnSuccess[\s\S]*?\n}/)?.[0] ?? "";
-    const cases = [...body.matchAll(/case FlowOnSuccess(\w+):/g)].map(([, name]) =>
-      snake(name ?? ""),
-    );
-    // Mirrors ON_SUCCESS_MANIFESTS in validate.ts (keys and kinds): an
-    // on_success gaining a manifest in Go without a port here skips its
-    // collected-upstream check at plan time.
-    expect(cases).toEqual(["create_user"]);
-    expect(body).toContain("FlowFieldChallengeIdentifier, FlowFieldChallengePassword");
-  });
+  it.skipIf(!existsSync(onSuccessSource))(
+    "on_success manifests match the Go source exactly",
+    () => {
+      const source = readFileSync(onSuccessSource, "utf8");
+      const body = source.match(/func ManifestForOnSuccess[\s\S]*?\n}/)?.[0] ?? "";
+      const cases = [...body.matchAll(/case FlowOnSuccess(\w+):/g)].map(([, name]) =>
+        snake(name ?? ""),
+      );
+      // Mirrors ON_SUCCESS_MANIFESTS in validate.ts (keys and kinds): an
+      // on_success gaining a manifest in Go without a port here skips its
+      // collected-upstream check at plan time.
+      expect(cases).toEqual(["create_user"]);
+      expect(body).toContain("FlowFieldChallengeIdentifier, FlowFieldChallengePassword");
+    },
+  );
 });

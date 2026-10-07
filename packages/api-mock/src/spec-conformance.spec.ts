@@ -206,9 +206,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: { cookie: sessionCookie },
     });
     expect(revoke.status).toBe(204);
-    expect(
-      revoke.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c)),
-    ).toBe(true);
+    expect(revoke.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c))).toBe(true);
 
     // Session is gone after revocation.
     const after = await fetch(`${BASE}/sessions/me`, { headers: { cookie: sessionCookie } });
@@ -555,7 +553,9 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
 
     const list = async (params: string) => {
-      const res = await fetch(`${BASE}/flow_definitions?project_id=proj_conformance_latest${params}`);
+      const res = await fetch(
+        `${BASE}/flow_definitions?project_id=proj_conformance_latest${params}`,
+      );
       expect(res.status).toBe(200);
       const body = (await res.json()) as { flow_definitions: { id: string }[] };
       return body.flow_definitions.map((entry) => entry.id);
@@ -1168,7 +1168,9 @@ describe("api-mock idp connections and variables", () => {
     const patch = await fetch(`${BASE}/variables?project_id=${projectId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ GOOGLE_CLIENT_ID: { value: "824.apps.googleusercontent.com", secret: false } }),
+      body: JSON.stringify({
+        GOOGLE_CLIENT_ID: { value: "824.apps.googleusercontent.com", secret: false },
+      }),
     });
     // 200 with the addressed owner read back, not 204.
     expect(patch.status).toBe(200);
@@ -1235,10 +1237,9 @@ describe("api-mock idp connections and variables", () => {
       body: JSON.stringify({ GOOGLE_CLIENT_SECRET: { value: "GOCSPX-real", secret: true } }),
     });
 
-    const body = (await (await fetch(`${BASE}/variables?project_id=${projectId}`)).json()) as Record<
-      string,
-      unknown
-    >;
+    const body = (await (
+      await fetch(`${BASE}/variables?project_id=${projectId}`)
+    ).json()) as Record<string, unknown>;
 
     expect(body.GOOGLE_CLIENT_SECRET).toEqual({ secret: true });
     expect(JSON.stringify(body)).not.toContain("GOCSPX-real");

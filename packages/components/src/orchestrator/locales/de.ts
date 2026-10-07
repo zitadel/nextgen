@@ -179,8 +179,7 @@ export const de: Locale = {
 
   // --- Passkey-Fehler ---
   "error.passkey_cancelled": "Die Passkey-Abfrage wurde vorzeitig geschlossen.",
-  "error.passkey_timeout":
-    "Die Passkey-Anfrage hat zu lange gedauert. Bitte versuche es erneut.",
+  "error.passkey_timeout": "Die Passkey-Anfrage hat zu lange gedauert. Bitte versuche es erneut.",
   "error.passkey_not_registered":
     "Dieser Passkey ist nicht registriert. Bitte melde dich mit E-Mail und Passwort an.",
   "error.passkey_setup_failed":
@@ -189,6 +188,10 @@ export const de: Locale = {
   "error.passkey_failed": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
   "error.passkey_invalid":
     "Dieser Passkey konnte nicht bestätigt werden. Bitte versuche es erneut.",
+  "error.sso_creation_disabled":
+    "Für diese Anmeldung gibt es kein Konto, und mit diesem Anbieter können keine neuen Konten erstellt werden.",
+  "error.flow_restart_required":
+    "Ihre Anmeldung konnte nicht fortgesetzt werden. Bitte beginnen Sie erneut.",
   "error.passkey_registration_invalid":
     "Der neue Passkey konnte nicht bestätigt werden. Bitte registriere ihn erneut.",
   "error.sso_unavailable":
@@ -214,8 +217,10 @@ export const de: Locale = {
   "error.sign_in_server.title": "Anmeldung konnte nicht abgeschlossen werden.",
   "error.sign_in_server.body": "Bitte versuche es in einigen Minuten erneut",
   "error.sso_cancelled.title": "Anmeldung abgebrochen",
-  "error.sso_cancelled.body": "Du hast die Anmeldung beim Anbieter abgebrochen, oder er hat die Anfrage abgelehnt. Versuche es erneut oder nutze eine andere Methode.",
+  "error.sso_cancelled.body":
+    "Du hast die Anmeldung beim Anbieter abgebrochen, oder er hat die Anfrage abgelehnt. Versuche es erneut oder nutze eine andere Methode.",
   "error.sso_failed.title": "Anmeldung fehlgeschlagen",
-  "error.sso_failed.body": "Der Anbieter konnte die Anmeldung nicht abschließen. Bitte versuche es erneut.",
+  "error.sso_failed.body":
+    "Der Anbieter konnte die Anmeldung nicht abschließen. Bitte versuche es erneut.",
   "error.more_info": "Weitere Informationen",
 };

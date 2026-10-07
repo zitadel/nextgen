@@ -64,8 +64,8 @@ export type FlowValidationRuleId = keyof typeof FLOW_VALIDATION_RULES;
 export const RESERVED_OUTCOMES = [
   "user_not_found",
   "user_already_exists",
-  "identity_unknown",
-  "callback",
+  "sso_user_not_found",
+  "sso_authenticated",
 ] as const;
 
 /** Mirrors the `FlowDefinitionPurpose` enum (snake transform) in flow_definition.go. */
@@ -80,7 +80,7 @@ export const FLOW_PURPOSES = [
 
 /**
  * Mirrors `purposeFlipTargets` in flow_definition_validator.go: the
- * identifier outcomes only. `identity_unknown` comes only from SSO
+ * identifier outcomes only. `sso_user_not_found` comes only from SSO
  * resolution and is left out here; requiring it on every combined entry
  * step would reject the shipped default flow. A rule on steps carrying
  * sso_providers is future work (#1044).
@@ -156,7 +156,10 @@ export function validateFlowDefinition(flow: object, schema?: object): FlowValid
     }
     if (!stepNames.has(entryStep)) {
       issues.push(
-        error("definition", `purpose ${q(purpose)} targets unknown entry-point step ${q(entryStep)}`),
+        error(
+          "definition",
+          `purpose ${q(purpose)} targets unknown entry-point step ${q(entryStep)}`,
+        ),
       );
     }
   }
@@ -322,7 +325,10 @@ function validateStep(step: FlowStep): FlowValidationIssue[] {
       issues.push(error("steps", `step ${q(name)}: duplicate action ${q(action.name)}`, name));
       continue;
     }
-    if (action.kind === "" || (action.kind !== "back" && !DECLARABLE_ACTION_KINDS.has(action.kind))) {
+    if (
+      action.kind === "" ||
+      (action.kind !== "back" && !DECLARABLE_ACTION_KINDS.has(action.kind))
+    ) {
       issues.push(error("steps", `step ${q(name)}: action ${q(action.name)} has no kind`, name));
     } else if (action.kind === "back") {
       issues.push(
@@ -346,26 +352,30 @@ function validateStep(step: FlowStep): FlowValidationIssue[] {
     actionNames.add(action.name);
   }
 
-  const hasCallback = step.transitions.has("callback");
+  const hasSsoAuthenticated = step.transitions.has("sso_authenticated");
   if (
     step.fields.length === 0 &&
     step.actions.length === 0 &&
     step.ssoProviderCount === 0 &&
     step.gateCount === 0 &&
-    !hasCallback
+    !hasSsoAuthenticated
   ) {
     issues.push(
       error(
         "steps",
-        `step ${q(name)} is non-terminal but has no fields, actions, sso_providers, gates, or transitions.callback`,
+        `step ${q(name)} is non-terminal but has no fields, actions, sso_providers, gates, or transitions.sso_authenticated`,
         name,
       ),
     );
   }
 
-  if (step.ssoProviderCount > 0 && !hasCallback) {
+  if (step.ssoProviderCount > 0 && !hasSsoAuthenticated) {
     issues.push(
-      error("steps", `step ${q(name)}: has sso_providers but is missing transitions.callback`, name),
+      error(
+        "steps",
+        `step ${q(name)}: has sso_providers but is missing transitions.sso_authenticated`,
+        name,
+      ),
     );
   }
 
@@ -377,12 +387,28 @@ function validateStep(step: FlowStep): FlowValidationIssue[] {
     }
   }
 
-  for (const transitionKey of step.transitions.keys()) {
-    if (!actionNames.has(transitionKey) && !(RESERVED_OUTCOMES as readonly string[]).includes(transitionKey)) {
+  for (const [transitionKey, t] of step.transitions) {
+    if (
+      !actionNames.has(transitionKey) &&
+      !(RESERVED_OUTCOMES as readonly string[]).includes(transitionKey)
+    ) {
       issues.push(
         error(
           "steps",
-          `step ${q(name)}: transition key ${q(transitionKey)} is not an action name or reserved outcome (user_not_found, user_already_exists, identity_unknown, callback)`,
+          `step ${q(name)}: transition key ${q(transitionKey)} is not an action name or reserved outcome (user_not_found, user_already_exists, sso_user_not_found, sso_authenticated)`,
+          name,
+        ),
+      );
+    }
+    // The sso outcomes carry a bound user or parked claims, which a
+    // re-purpose would drop and another flow cannot receive.
+    const isSsoOutcome =
+      transitionKey === "sso_authenticated" || transitionKey === "sso_user_not_found";
+    if (isSsoOutcome && (t.purpose !== null || t.action !== null)) {
+      issues.push(
+        error(
+          "steps",
+          `step ${q(name)}: transition ${q(transitionKey)} is an sso outcome and cannot declare purpose or action`,
           name,
         ),
       );
@@ -513,7 +539,11 @@ function validateGraph(def: FlowDef, stepNames: Set<string>): FlowValidationIssu
   for (const step of def.steps) {
     if (!step.terminal && step.transitions.size === 0) {
       issues.push(
-        error("graph", `step ${q(step.name)} is non-terminal but has no outgoing transitions`, step.name),
+        error(
+          "graph",
+          `step ${q(step.name)} is non-terminal but has no outgoing transitions`,
+          step.name,
+        ),
       );
     }
   }
@@ -525,7 +555,9 @@ function validateGraph(def: FlowDef, stepNames: Set<string>): FlowValidationIssu
   }
   for (const step of def.steps) {
     if (!reachable.has(step.name)) {
-      issues.push(error("graph", `step ${q(step.name)} is unreachable from any entry point`, step.name));
+      issues.push(
+        error("graph", `step ${q(step.name)} is unreachable from any entry point`, step.name),
+      );
     }
   }
 
@@ -540,8 +572,7 @@ function validateCycles(def: FlowDef): FlowValidationIssue[] {
   const safe = new Set<string>();
   const queue: string[] = [];
   for (const step of def.steps) {
-    const escapes =
-      step.terminal || [...step.transitions.values()].some((t) => !isCurrentFlow(t));
+    const escapes = step.terminal || [...step.transitions.values()].some((t) => !isCurrentFlow(t));
     if (escapes) {
       safe.add(step.name);
       queue.push(step.name);
@@ -683,7 +714,7 @@ function resolveFieldChallenge(
   // Mirrors walkUserProperty: a nested property is addressed by its
   // dotted path, descending one `properties` level per segment.
   const segments = field.split(".");
-  let property: unknown = undefined;
+  let property: unknown;
   let level: Record<string, unknown> | undefined = properties;
   for (const [i, segment] of segments.entries()) {
     // Own properties only: Go indexes a map, where an inherited name like

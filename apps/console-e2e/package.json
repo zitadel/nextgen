@@ -8,7 +8,6 @@
   "devDependencies": {
     "@playwright/test": "catalog:",
     "@zitadel/testing": "workspace:*",
-    "eslint-plugin-playwright": "catalog:",
     "typescript": "catalog:"
   }
 }

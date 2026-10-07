@@ -1,6 +1,7 @@
 import { consola } from "consola";
 
 import { publicCliCommand } from "../public-cli";
+import { reportWarning } from "../warnings";
 
 /**
  * Publishes one variable to the project.
@@ -168,14 +169,14 @@ function reportPublished(
       consola.success(`Published ${name} to the project`);
       break;
     case "deferred":
-      consola.warn(
+      reportWarning(
         noValue
           ? `${name} has no value yet. Publish it with: ${republish}`
           : `${name} was not published to the project. Publish it with: ${republish}`,
       );
       break;
     case "failed":
-      consola.warn(`${name} could not be published. Sign-in fails until it is: ${republish}`);
+      reportWarning(`${name} could not be published. Sign-in fails until it is: ${republish}`);
       break;
   }
 }
@@ -200,10 +201,6 @@ export function reportSecretOutcome(
  * A missing one is never "no value yet": the command refuses without a client
  * id, so the only way here is a project it could not reach.
  */
-export function reportClientIdOutcome(
-  name: string,
-  state: PublishState,
-  cliVersion: string,
-): void {
+export function reportClientIdOutcome(name: string, state: PublishState, cliVersion: string): void {
   reportPublished(name, state, republishCommand(name, false, cliVersion), false);
 }

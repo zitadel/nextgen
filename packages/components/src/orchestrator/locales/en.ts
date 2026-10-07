@@ -199,6 +199,9 @@ export const en: Record<string, string> = {
   "error.passkey_unsupported": "This device does not support passkeys",
   "error.passkey_failed": "Something went wrong. Please try again.",
   "error.passkey_invalid": "This passkey could not be verified. Please try again.",
+  "error.sso_creation_disabled":
+    "There is no account for this sign-in, and new accounts cannot be created with this provider.",
+  "error.flow_restart_required": "Your sign-in could not be continued. Please start again.",
   "error.passkey_registration_invalid":
     "The new passkey could not be verified. Please try registering it again.",
   "error.sso_unavailable":
@@ -227,7 +230,8 @@ export const en: Record<string, string> = {
   "error.sign_in_server.title": "We couldn't complete your sign in.",
   "error.sign_in_server.body": "Please try again in a few minutes",
   "error.sso_cancelled.title": "Sign-in cancelled",
-  "error.sso_cancelled.body": "You cancelled signing in with the provider, or it declined the request. You can try again or use another method.",
+  "error.sso_cancelled.body":
+    "You cancelled signing in with the provider, or it declined the request. You can try again or use another method.",
   "error.sso_failed.title": "Sign-in failed",
   "error.sso_failed.body": "The provider could not complete the sign-in. Please try again.",
   "error.more_info": "More information",

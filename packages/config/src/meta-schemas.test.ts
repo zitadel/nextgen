@@ -159,23 +159,23 @@ describe("meta-schemas", () => {
     const cases: Array<[string, Record<string, unknown>, boolean]> = [
       ["sso_providers without transitions", { sso_providers: [provider] }, false],
       [
-        "sso_providers without a callback",
+        "sso_providers without an sso_authenticated transition",
         { sso_providers: [provider], transitions: { submit: { target: "extra" } } },
         false,
       ],
       [
-        "sso_providers with a callback",
-        { sso_providers: [provider], transitions: { callback: { target: "extra" } } },
+        "sso_providers with an sso_authenticated transition",
+        { sso_providers: [provider], transitions: { sso_authenticated: { target: "extra" } } },
         true,
       ],
       [
         "twenty sso_providers",
-        { sso_providers: providers(20), transitions: { callback: { target: "extra" } } },
+        { sso_providers: providers(20), transitions: { sso_authenticated: { target: "extra" } } },
         true,
       ],
       [
         "twenty-one sso_providers",
-        { sso_providers: providers(21), transitions: { callback: { target: "extra" } } },
+        { sso_providers: providers(21), transitions: { sso_authenticated: { target: "extra" } } },
         false,
       ],
       [
@@ -192,8 +192,8 @@ describe("meta-schemas", () => {
       ["non-terminal step with nothing", {}, false],
       ["non-terminal step with only empty lists", { fields: [], actions: [] }, false],
       [
-        "non-terminal step with only a callback",
-        { transitions: { callback: { target: "extra" } } },
+        "non-terminal step with only an sso_authenticated transition",
+        { transitions: { sso_authenticated: { target: "extra" } } },
         true,
       ],
       ["non-terminal step with fields", { fields: ["email"] }, true],
@@ -210,6 +210,41 @@ describe("meta-schemas", () => {
         {
           fields: ["email"],
           transitions: { submit: { target: "extra", purpose: "login", action: null } },
+        },
+        true,
+      ],
+      [
+        "sso_authenticated with a purpose",
+        {
+          fields: ["email"],
+          transitions: { sso_authenticated: { target: "extra", purpose: "register" } },
+        },
+        false,
+      ],
+      [
+        "sso_user_not_found with an action",
+        {
+          fields: ["email"],
+          transitions: { sso_user_not_found: { target: "extra", action: "switch" } },
+        },
+        false,
+      ],
+      [
+        "sso outcomes with a null purpose and action",
+        {
+          fields: ["email"],
+          transitions: {
+            sso_authenticated: { target: "extra", purpose: null, action: null },
+            sso_user_not_found: { target: "extra", purpose: null, action: null },
+          },
+        },
+        true,
+      ],
+      [
+        "user_already_exists with a purpose",
+        {
+          fields: ["email"],
+          transitions: { user_already_exists: { target: "extra", purpose: "login" } },
         },
         true,
       ],
@@ -283,11 +318,13 @@ describe("meta-schemas", () => {
     expect(check({ hero_url: "https://cdn.example.com/hero.png" })).toBe(true);
     expect(check({ hero_url: "HTTPS://cdn.example.com/hero.png" })).toBe(true);
     expect(check({ logo_url: "https://cdn.example.com:8443/logo.svg" })).toBe(true);
-    expect(check({ theme: { light: { logo_url: "https://cdn.example.com:8443/on-light.svg" } } })).toBe(
-      true,
-    );
     expect(
-      check({ typography: { font_family: "Inter", font_url: "https://fonts.example.com:8443/css" } }),
+      check({ theme: { light: { logo_url: "https://cdn.example.com:8443/on-light.svg" } } }),
+    ).toBe(true);
+    expect(
+      check({
+        typography: { font_family: "Inter", font_url: "https://fonts.example.com:8443/css" },
+      }),
     ).toBe(true);
     // Loopback HTTP is the dev-posture carve-out, mirrored across the zod
     // and Go gates: editors must not flag what plan/apply accept.

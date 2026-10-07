@@ -61,8 +61,8 @@ Product surfaces (`apps/`):
 
 Development and test surfaces (`apps/`):
 
-- `apps/storybook/` — the single component workbench for the shared UI
-  packages.
+- `apps/storybook/` — the component workbench for the login surface
+  (`@zitadel/components`).
 - `apps/demo-next/` and `apps/demo-nuxt/` — reference integrations of the
   embedded sign-in component on each framework.
 - `apps/*-e2e/` — Playwright projects: one per demo (real framework
@@ -92,6 +92,10 @@ Repo tooling:
 
 - `tools/release/` — the Moon `release` project (snapshot, artifacts, draft
   GitHub Release shell).
+- `tools/bench/` — the k6 benchmark harness, a nested Go module (ADR 067):
+  `moon run bench:sweep` measures a server that is already running (locally
+  `moon run workspace:server`). AGPL-only and excluded from commercial
+  licensing because it links k6.
 - `scripts/` — the Node `.mjs` orchestration behind the `workspace:*` tasks
   (doctor, check, journey, server, cli, release helpers).
 - `docs/` — design notes, runbooks, and ADRs that explain product intent.
@@ -241,7 +245,8 @@ upward**. When deciding where a new test belongs:
    and full-page navigation. Owned by the `apps/*-e2e/` projects: the demo
    projects (`demo-next-e2e`, `demo-nuxt-e2e` — each with a mock lane and,
    for next, an `e2e-real` lane on `@zitadel/testing`), `console-e2e`
-   (shell smoke, dev-proxy real-instance, and binary-served embedded lanes),
+   (shell smoke, dev-proxy real-instance, binary-served embedded, and
+   platform-project lanes),
    and `cli-journey-e2e` (the framework matrix across all 8 SDKs).
    Middleware-owning SDKs get their own e2e project because
    the proxy and route-protection layers are framework-specific.
@@ -285,15 +290,14 @@ building any UI under `apps/console/**` or
 
 Both surfaces are theme-portable: tokens are authored as `{ dark, light }` pairs
 and flip via `[data-theme="light"]` (amended ADR 014 §5). When adding atom CSS,
-never reach for the raw `--zl-color-gray-*` ramp — it is mode-independent by
-design; use the semantic tokens.
+never hardcode a colour; use the semantic `--zl-*` roles.
 
 Where the component lives decides the iteration tool: console UI iterates on the
 console dev server, verified at light/dark and each breakpoint; login atoms
 iterate in Storybook. A missing visual value is a **new token** in
 `@zitadel/design-tokens`, never a magic value — except licensed brand assets
-(e.g. display fonts), which stay in the consuming app because
-`@zitadel/design-tokens` ships as a public npm package.
+(e.g. display fonts), which stay in the consuming app because the tokens are
+inlined into the public `@zitadel/components` bundle.
 
 ## Resource identifiers
 
@@ -407,7 +411,7 @@ verify with `corepack pnpm exec changeset status --since origin/main`.
   `moon ci`, `moon run <project>:<task>`, and release tasks under
   `moon run release:*`.
 - Keep direct underlying tools for implementation details: `vite`, `vitest`,
-  `tsc`, `playwright`, `oxlint`, `go`, `docker buildx`, and `changeset`.
+  `tsc`, `playwright`, `biome`, `go`, `docker buildx`, and `changeset`.
 - Do not reintroduce Nx or GoReleaser without updating the ADRs first.
 - When unsure about Moon flags, check `moon --help` or the task definition in
   the nearest `moon.yml` before guessing.

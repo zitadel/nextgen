@@ -480,10 +480,79 @@ func TestSetUserPassword(t *testing.T) {
 				project.ID, userEmail, originalPassword)
 			assert.ErrorAs(t, err, new(domain.ErrAuthAttemptProofRejected(nil)))
 		})
+
+		t.Run("64 characters", func(t *testing.T) {
+			t.Parallel()
+
+			params, userEmail := createUser(t, "testsetuserpassword.max@example.com")
+
+			password := strings.Repeat("a", domain.MaxPasswordLength)
+			resp, err := client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: password}, params)
+			assert.NoError(t, err)
+			assert.IsType(t, &api.SetUserPasswordNoContent{}, resp, helpers.MustMarshal(t, resp))
+
+			_, err = helpers.CreateSessionUsingPassword(t,
+				harness.EnsureAuthAttemptService(t),
+				harness.EnsureSessionService(t),
+				project.ID, userEmail, password)
+			assert.NoError(t, err)
+		})
+
+		t.Run("either composition of the same characters signs in", func(t *testing.T) {
+			t.Parallel()
+
+			params, userEmail := createUser(t, "testsetuserpassword.nfc@example.com")
+
+			const (
+				decomposed = "cafe\u0301-au-lait" // e + combining acute accent
+				composed   = "caf\u00e9-au-lait"  // é as one code point
+			)
+			resp, err := client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: decomposed}, params)
+			assert.NoError(t, err)
+			assert.IsType(t, &api.SetUserPasswordNoContent{}, resp, helpers.MustMarshal(t, resp))
+
+			for _, typed := range []string{composed, decomposed} {
+				_, err = helpers.CreateSessionUsingPassword(t,
+					harness.EnsureAuthAttemptService(t),
+					harness.EnsureSessionService(t),
+					project.ID, userEmail, typed)
+				assert.NoError(t, err, "%+q", typed)
+			}
+		})
 	})
 
 	t.Run("error", func(t *testing.T) {
 		t.Parallel()
+
+		badRequest := func(t *testing.T, password string, code string) {
+			t.Helper()
+			params, _ := createUser(t, "testsetuserpassword."+code+"@example.com")
+			resp, err := client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: password}, params)
+			assert.NoError(t, err)
+			require.IsType(t, &api.SetUserPasswordBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, code, string(resp.(*api.SetUserPasswordBadRequest).Code))
+		}
+
+		t.Run("longer than 64 characters", func(t *testing.T) {
+			t.Parallel()
+			badRequest(t, strings.Repeat("a", domain.MaxPasswordLength+1), domain.ErrUserPasswordTooLong().Code)
+		})
+
+		t.Run("empty", func(t *testing.T) {
+			t.Parallel()
+			badRequest(t, "", domain.ErrUserPasswordEmpty().Code)
+		})
+
+		t.Run("more bytes than bcrypt takes", func(t *testing.T) {
+			t.Parallel()
+			// The harness hashes with bcrypt, which stops at 72 bytes: 64
+			// code points pass the length rule but are 128 bytes here.
+			params, _ := createUser(t, "testsetuserpassword.bcrypt@example.com")
+			resp, err := client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: strings.Repeat("ü", domain.MaxPasswordLength)}, params)
+			assert.NoError(t, err)
+			require.IsType(t, &api.SetUserPasswordBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, domain.ErrUserPasswordTooLong().Code, string(resp.(*api.SetUserPasswordBadRequest).Code))
+		})
 
 		t.Run("user not found", func(t *testing.T) {
 			t.Parallel()

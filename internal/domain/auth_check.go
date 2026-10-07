@@ -14,6 +14,7 @@ const (
 	AuthCheckTypePasskey
 	AuthCheckTypePasskeyRegistration
 	AuthCheckTypeSSOCallback
+	AuthCheckTypeSSO
 )
 
 // Class returns the factor class a check type competes in. Passkey

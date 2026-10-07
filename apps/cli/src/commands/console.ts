@@ -3,7 +3,7 @@ import consola from "consola";
 
 import { openInBrowser } from "../lib/browser";
 import { ZitadelError } from "../lib/errors";
-import { readLocalAdmin } from "../lib/local-server/admin-credential";
+import { findLocalAdminDir, readLocalAdmin } from "../lib/local-server/admin-credential";
 import { consoleSignInUrl } from "../lib/local-server/sign-in";
 import {
   DEFAULT_LOCAL_SERVER_URL,
@@ -21,7 +21,7 @@ import { publicCliCommand } from "../lib/public-cli";
  */
 export default class Console extends BaseCommand {
   static override description =
-    "Open the local console, signed in as the local admin created by `zitadel start`.";
+    "Open the local console, signed in as the local admin created by `zitadel start`.\n\nRun it in the directory `zitadel start` ran in, or one inside it: the local admin is read from the nearest `.zitadel/local/` on the way up.";
   static override group = CommandGroups.localServer;
   static override groupOrder = 6;
 
@@ -31,22 +31,27 @@ export default class Console extends BaseCommand {
   ];
 
   static override flags = {
-    "no-open": Flags.boolean({ description: "Print the sign-in link instead of opening a browser." }),
+    "no-open": Flags.boolean({
+      description: "Print the sign-in link instead of opening a browser.",
+    }),
   };
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Console);
     const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
-    const runtime = await readRuntimeMetadata(cwd);
+    // `start` may have run in a parent of the app directory; its runtime
+    // metadata sits beside the admin it created.
+    const localDir = (await findLocalAdminDir(cwd)) ?? cwd;
+    const runtime = await readRuntimeMetadata(localDir);
     await this.toMeta(flags, {
       resolveServer: false,
       source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
     });
 
-    const admin = await readLocalAdmin(cwd);
+    const admin = await readLocalAdmin(localDir);
     if (!admin) {
-      throw new ZitadelError("E_VALIDATION", "No local admin in this directory", {
-        hint: "Run `zitadel start` first; it creates the local admin the console signs in as.",
+      throw new ZitadelError("E_VALIDATION", "No local admin in this directory or its parents", {
+        hint: "Run this from the directory `zitadel start` ran in, or one inside it. If the server was never started, run `zitadel start` first; it creates the local admin the console signs in as.",
         nextCommands: [publicCliCommand("start", this.meta.cliVersion)],
       });
     }
@@ -66,7 +71,7 @@ export default class Console extends BaseCommand {
       });
     }
 
-    const serverUrl = await resolveLocalServer(cwd);
+    const serverUrl = await resolveLocalServer(localDir);
     const signInUrl = await consoleSignInUrl(serverUrl, admin);
 
     consola.log(`Signed in to the local console as ${admin.email}:`);
@@ -84,9 +89,7 @@ export default class Console extends BaseCommand {
         signed_in_as: admin.email,
         sign_in_url: signInUrl,
         browser_opened: opened,
-        next_actions: [
-          "The link signs you in once. Run `zitadel console` again for a fresh one.",
-        ],
+        next_actions: ["The link signs you in once. Run `zitadel console` again for a fresh one."],
       },
     });
   }

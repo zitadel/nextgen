@@ -13,7 +13,7 @@ properties:
   challenge_id:
     $ref: ../../../../components/schemas/challenge-id.yaml
   method:
-    $ref: ../../../../components/schemas/factor-method.yaml
+    $ref: ../../../../components/schemas/challenge-method.yaml
     description: |
       The authentication method this challenge represents.
       Determines which proof is expected in verify.

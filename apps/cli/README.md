@@ -462,6 +462,9 @@ DESCRIPTION
   Open the local console, signed in as the local admin created by `zitadel
   start`.
 
+  Run it in the directory `zitadel start` ran in, or one inside it: the local
+  admin is read from the nearest `.zitadel/local/` on the way up.
+
 EXAMPLES
   $ zitadel console
 
@@ -1869,7 +1872,8 @@ FLAGS
       Project directory to operate on.
 
   -f, --force
-      Overwrite managed files that already exist, and scaffold into a non-empty directory.
+      Overwrite managed files that already exist, and scaffold into a non-empty
+      directory.
 
   -n, --non-interactive
       Disable prompts. Required when scripting or running as an agent.

@@ -29,9 +29,7 @@ async function skipPasskeyUpsellIfVisible(page: Page): Promise<void> {
   const skip = page.getByRole("button", { name: /skip for now/i });
   const outcome = await Promise.race([
     skip.waitFor({ state: "visible", timeout: 30_000 }).then(() => "upsell" as const),
-    page
-      .waitForURL(/\/admin(?:[/?#]|$)/, { timeout: 30_000 })
-      .then(() => "done" as const),
+    page.waitForURL(/\/admin(?:[/?#]|$)/, { timeout: 30_000 }).then(() => "done" as const),
   ]);
   if (outcome === "upsell") {
     await skip.click();

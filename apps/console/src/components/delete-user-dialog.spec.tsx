@@ -68,7 +68,9 @@ describe("delete user dialog", () => {
     ]);
     render(
       <RouterProvider
-        router={createAppRouter({ history: createMemoryHistory({ initialEntries: [scopedPath("/users")] }) })}
+        router={createAppRouter({
+          history: createMemoryHistory({ initialEntries: [scopedPath("/users")] }),
+        })}
       />,
     );
     await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
@@ -148,9 +150,7 @@ describe("delete user dialog", () => {
     await userEvent.type(screen.getByLabelText("Type DELETE to confirm"), "DELETE");
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
-    await waitFor(() =>
-      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(deleteCalls).toBe(0);
     // Reachable again after dismissal. This also pins the second bug the e2e
     // found: opening the dialog from inside the row menu left the menu open
@@ -178,8 +178,6 @@ describe("delete user dialog", () => {
     // Recoverable: the operator can retry without re-typing. (The list itself is
     // outside the modal's a11y tree while it is open, so it is not asserted on
     // here — the success case covers the row going away.)
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Delete user" })).toBeEnabled(),
-    );
+    await waitFor(() => expect(screen.getByRole("button", { name: "Delete user" })).toBeEnabled());
   });
 });

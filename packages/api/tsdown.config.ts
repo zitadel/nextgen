@@ -26,13 +26,12 @@ export default defineConfig({
     "runtime/config": "src/runtime/config.ts",
     "generated/model/index": "src/generated/model/index.ts",
     "generated/endpoints/zitadelNextGen": "src/generated/endpoints/zitadelNextGen.ts",
-    "generated/endpoints/zitadelNextGen.msw":
-      "src/generated/endpoints/zitadelNextGen.msw.ts",
-    "generated/endpoints/zitadelNextGen.zod":
-      "src/generated/endpoints/zitadelNextGen.zod.ts",
+    "generated/endpoints/zitadelNextGen.msw": "src/generated/endpoints/zitadelNextGen.msw.ts",
+    "generated/endpoints/zitadelNextGen.zod": "src/generated/endpoints/zitadelNextGen.zod.ts",
   },
   outDir: "dist",
   format: ["esm"],
+  failOnWarn: true,
   tsconfig: "tsconfig.lib.json",
   dts: true,
   sourcemap: true,

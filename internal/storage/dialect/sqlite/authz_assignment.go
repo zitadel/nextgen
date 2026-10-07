@@ -158,25 +158,26 @@ func (s authzAssignmentStatements) ListManagedGrants(ctx context.Context, projec
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, listManagedGrantsQuery, filter, authz.AuthzAssignmentSchema, "", "", authz.ManagedGrantListConjunct); err != nil {
+	assignments, nextCursor, err := pagination.Page(filter.Pagination, authz.AuthzAssignmentSchema, func(limit uint32) ([]*domain.AuthzAssignment, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileList(ctx, &compiler, listManagedGrantsQuery, filter, authz.AuthzAssignmentSchema, "", "", authz.ManagedGrantListConjunct); err != nil {
+			return nil, err
+		}
+		rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		defer rows.Close()
+		assignments, err := collectRows(rows, scanAuthzAssignment)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return assignments, nil
+	})
+	if err != nil {
 		return nil, err
 	}
-	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	defer rows.Close()
-	assignments, err := collectRows(rows, scanAuthzAssignment)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	nextCursor := pagination.MarshalNext(
-		filter.Pagination.OrderBy,
-		assignments,
-		authz.AuthzAssignmentSchema,
-		filter.Pagination.Limit,
-	)
 	return &database.ListResult[*domain.AuthzAssignment]{
 		Items:      assignments,
 		NextCursor: nextCursor,
@@ -245,34 +246,42 @@ func (s authzAssignmentStatements) ListClaimedProjectIDs(ctx context.Context, af
 
 // ListAuthorizedProjects implements [service.AuthzAssignmentStatements].
 func (s authzAssignmentStatements) ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
-	var compiler statementCompiler
-	compiler.WriteString(projectQuery)
-	compiler.WriteString(" WHERE id IN (")
-	authz.WriteAuthorizedProjectIDs(&compiler, sqliteAuthzEnv(), homeProjectID, userID)
-	compiler.WriteString(")")
-	keyset, err := cursorFilter(page, projectSchema)
+	projects, nextCursor, err := pagination.Page(page, projectSchema, func(limit uint32) ([]*domain.Project, error) {
+		page := page
+		page.Limit = limit
+		var compiler statementCompiler
+		compiler.WriteString(projectQuery)
+		compiler.WriteString(" WHERE id IN (")
+		authz.WriteAuthorizedProjectIDs(&compiler, sqliteAuthzEnv(), homeProjectID, userID)
+		compiler.WriteString(")")
+		keyset, err := cursorFilter(page, projectSchema)
+		if err != nil {
+			return nil, err
+		}
+		if keyset != nil {
+			compiler.WriteString(" AND ")
+			compileFilter(&compiler, keyset, projectSchema)
+		}
+		compileOrderBy(&compiler, page.OrderBy, projectSchema)
+		compileLimit(&compiler, page.Limit)
+
+		rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		defer rows.Close()
+		projects, err := collectRows(rows, scanProject)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return projects, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	if keyset != nil {
-		compiler.WriteString(" AND ")
-		compileFilter(&compiler, keyset, projectSchema)
-	}
-	compileOrderBy(&compiler, page.OrderBy, projectSchema)
-	compileLimit(&compiler, page.Limit)
-
-	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	defer rows.Close()
-	projects, err := collectRows(rows, scanProject)
-	if err != nil {
-		return nil, wrapError(err)
-	}
 	return &database.ListResult[*domain.Project]{
 		Items:      projects,
-		NextCursor: pagination.MarshalNext(page.OrderBy, projects, projectSchema, page.Limit),
+		NextCursor: nextCursor,
 	}, nil
 }
 

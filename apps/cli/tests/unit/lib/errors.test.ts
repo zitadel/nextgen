@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ApiError } from "@zitadel/api/runtime/fetch";
+import { ApiError, NetworkError } from "@zitadel/api/runtime/fetch";
 
 import { EXIT_CODES, ZitadelError, toZitadelError } from "../../../src/lib/errors";
 
@@ -18,6 +18,7 @@ describe("EXIT_CODES", () => {
       E_PORT_IN_USE: 5,
       E_VALIDATION: 3,
       E_NOT_IMPLEMENTED: 2,
+      E_CANCELLED: 130,
     });
   });
 });
@@ -80,9 +81,7 @@ describe("toZitadelError", () => {
     const result = toZitadelError(errno);
     expect(result.code).toBe("E_CONFLICT");
     expect(result.message).toBe("file exists");
-    expect(result.hint).toBe(
-      "A file already exists. Use --force to overwrite or remove it first.",
-    );
+    expect(result.hint).toBe("A file already exists. Use --force to overwrite or remove it first.");
   });
 
   it("maps ENOENT errno errors to E_VALIDATION", () => {
@@ -93,26 +92,34 @@ describe("toZitadelError", () => {
     expect(result.hint).toBe("A required file or directory is missing.");
   });
 
-  it("wraps a fetch-style TypeError as E_NETWORK", () => {
-    const err = new TypeError("fetch failed");
+  it("maps a request that got no response to E_NETWORK", () => {
+    const err = new NetworkError(
+      "http://localhost:8080/idps",
+      "unreachable",
+      "GET http://localhost:8080/idps got no response (ECONNREFUSED)",
+    );
     const result = toZitadelError(err);
     expect(result.code).toBe("E_NETWORK");
-    expect(result.message).toBe("fetch failed");
+    expect(result.exitCode).toBe(4);
+    expect(result.message).toBe("GET http://localhost:8080/idps got no response (ECONNREFUSED)");
     expect(result.hint).toBe(
       "Check your connection, ZITADEL_API_BASE, or the configured server URL.",
     );
-    expect(result.details).toEqual({
-      original: { name: "TypeError", message: "fetch failed", code: undefined },
-    });
+    expect(result.details).toEqual({ url: "http://localhost:8080/idps", reason: "unreachable" });
   });
 
-  it("wraps an error with a networky cause code as E_NETWORK", () => {
-    const err = Object.assign(new Error("connection problem"), {
-      cause: { code: "ECONNREFUSED" },
-    });
+  it("maps a request that timed out to E_NETWORK with a hint about the server", () => {
+    const err = new NetworkError("http://localhost:8080/idps", "timeout", "GET … timed out");
     const result = toZitadelError(err);
     expect(result.code).toBe("E_NETWORK");
-    expect(result.message).toBe("connection problem");
+    expect(result.hint).toBe(
+      "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.",
+    );
+  });
+
+  it("does not guess a network failure from a TypeError's message", () => {
+    const result = toZitadelError(new TypeError("fetch failed"));
+    expect(result.code).toBe("E_VALIDATION");
   });
 
   it("wraps a zod-like Error (issues array) as E_VALIDATION", () => {
@@ -166,7 +173,10 @@ describe("toZitadelError", () => {
       {
         code: "flowdef.invalid",
         message: "flow definition: invalid",
-        details: { details: "required fields [company] in user schema are missing in the flow definition steps" },
+        details: {
+          details:
+            "required fields [company] in user schema are missing in the flow definition steps",
+        },
       },
       "PUT http://mock/flow_definitions/flow_1?project_id=proj_1 returned 400",
     );

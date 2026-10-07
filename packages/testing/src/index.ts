@@ -7,8 +7,7 @@ import { identity, seedUser, seedUsers } from "./seed";
 import { mintSession } from "./session";
 import type { ConnectedZitadel, InstanceHandle, LocalZitadel } from "./types";
 
-export type StartLocalZitadelOptions = BootServerOptions &
-  Omit<BootstrapProjectOptions, "baseUrl">;
+export type StartLocalZitadelOptions = BootServerOptions & Omit<BootstrapProjectOptions, "baseUrl">;
 
 /**
  * Attach to an already-bootstrapped instance/project. Lifecycle-free on
@@ -48,7 +47,7 @@ export async function startLocalZitadel(
   options: StartLocalZitadelOptions = {},
 ): Promise<LocalZitadel> {
   const server = await bootLocalServer(options);
-  let bootstrapped;
+  let bootstrapped: Awaited<ReturnType<typeof bootstrapProject>>;
   try {
     bootstrapped = await bootstrapProject({
       baseUrl: server.baseUrl,
@@ -63,7 +62,6 @@ export async function startLocalZitadel(
     } catch (stopError) {
       // Both errors are preserved in AggregateError.errors, which the rule
       // below cannot model.
-      // oxlint-disable-next-line preserve-caught-error
       throw new AggregateError(
         [error, stopError],
         "bootstrap failed, and stopping the booted instance also failed",

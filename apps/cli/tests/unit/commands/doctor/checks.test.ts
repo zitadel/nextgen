@@ -74,16 +74,31 @@ async function makeProject(): Promise<string> {
   );
   await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
   await chmod(join(cwd, ".zitadel/secret"), 0o600);
-  await writeFile(join(cwd, ".gitignore"), [".zitadel/secret", ".env*", "!.env.example"].join("\n"));
+  await writeFile(
+    join(cwd, ".gitignore"),
+    [".zitadel/secret", ".env*", "!.env.example"].join("\n"),
+  );
   await writeFile(
     join(cwd, ".env.example"),
     ["ZITADEL_PROJECT_ID=", "ZITADEL_ENVIRONMENT=", "ZITADEL_ISSUER="].join("\n"),
   );
   await writeFile(join(cwd, ".zitadel/schemas/user.json"), JSON.stringify(VALID_USER_SCHEMA));
-  await writeFile(join(cwd, "app/login/page.tsx"), `${MANAGED_MARKER}\nexport default function L() {}\n`);
-  await writeFile(join(cwd, "app/register/page.tsx"), `${MANAGED_MARKER}\nexport default function R() {}\n`);
-  await writeFile(join(cwd, "app/profile/page.tsx"), `${MANAGED_MARKER}\nexport default function P() {}\n`);
-  await writeFile(join(cwd, "middleware.ts"), `${MANAGED_MARKER}\nexport function middleware() {}\n`);
+  await writeFile(
+    join(cwd, "app/login/page.tsx"),
+    `${MANAGED_MARKER}\nexport default function L() {}\n`,
+  );
+  await writeFile(
+    join(cwd, "app/register/page.tsx"),
+    `${MANAGED_MARKER}\nexport default function R() {}\n`,
+  );
+  await writeFile(
+    join(cwd, "app/profile/page.tsx"),
+    `${MANAGED_MARKER}\nexport default function P() {}\n`,
+  );
+  await writeFile(
+    join(cwd, "middleware.ts"),
+    `${MANAGED_MARKER}\nexport function middleware() {}\n`,
+  );
   await writeFile(join(cwd, "custom-elements.d.ts"), `${MANAGED_MARKER}\nexport {};\n`);
   return cwd;
 }
@@ -365,13 +380,19 @@ describe("DependencyCheck", () => {
 
   it("fails when no @zitadel package is present", async () => {
     const cwd = await makeProject();
-    await writeFile(join(cwd, "package.json"), JSON.stringify({ name: "demo", dependencies: { next: "^15" } }));
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
+    );
     expect((await new DependencyCheck().run(ctxFor(cwd))).status).toBe("fail");
   });
 
   it("fix re-adds the SDK dependency via the patcher", async () => {
     const cwd = await makeProject();
-    await writeFile(join(cwd, "package.json"), JSON.stringify({ name: "demo", dependencies: { next: "^15" } }));
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
+    );
     const check = new DependencyCheck();
     expect((await check.run(ctxFor(cwd))).status).toBe("fail");
 
@@ -382,7 +403,10 @@ describe("DependencyCheck", () => {
 
   it("fix reclaims proxy.ts for Next 16 projects", async () => {
     const cwd = await makeProject();
-    await writeFile(join(cwd, "package.json"), JSON.stringify({ name: "demo", dependencies: { next: "^16" } }));
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
+    );
     await rm(join(cwd, "middleware.ts"));
 
     await new DependencyCheck().fix(ctxFor(cwd));
@@ -734,10 +758,7 @@ describe("ManagedFilesCheck", () => {
     const cwd = await makeAngularProject();
     // Two projects, no defaultProject: the transform throws rather than
     // guessing — the wiring state is unknown, which must surface, not vanish.
-    await writeFile(
-      join(cwd, "angular.json"),
-      JSON.stringify({ projects: { a: {}, b: {} } }),
-    );
+    await writeFile(join(cwd, "angular.json"), JSON.stringify({ projects: { a: {}, b: {} } }));
 
     const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
 
@@ -782,7 +803,10 @@ function setBearer(proxyReq) {
     const middleware = `${MANAGED_MARKER}\nexport function middleware() {}\n`;
     await writeFile(
       join(cwd, "package.json"),
-      JSON.stringify({ name: "demo", dependencies: { next: "^16", "@zitadel/sdk-next": "latest" } }),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^16", "@zitadel/sdk-next": "latest" },
+      }),
     );
     await writeScaffoldState(cwd, {
       files: {
@@ -814,7 +838,10 @@ function setBearer(proxyReq) {
     // unrelated page is missing so --fix has repair work to do.
     await writeFile(
       join(cwd, "package.json"),
-      JSON.stringify({ name: "demo", dependencies: { next: "^16", "@zitadel/sdk-next": "latest" } }),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^16", "@zitadel/sdk-next": "latest" },
+      }),
     );
     const editedMiddleware = `${MANAGED_MARKER}\nexport function middleware() { /* custom */ }\n`;
     await writeFile(join(cwd, "middleware.ts"), editedMiddleware);
@@ -861,7 +888,10 @@ function setBearer(proxyReq) {
     // --fix must not finalize a manifest that records no boundary at all.
     await writeFile(
       join(cwd, "package.json"),
-      JSON.stringify({ name: "demo", dependencies: { next: "^16", "@zitadel/sdk-next": "latest" } }),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^16", "@zitadel/sdk-next": "latest" },
+      }),
     );
     await writeFile(
       join(cwd, "middleware.ts"),
@@ -956,7 +986,10 @@ function setBearer(proxyReq) {
     // then upgraded to Next 16 — the current templates write proxy.ts.
     await writeFile(
       join(cwd, "package.json"),
-      JSON.stringify({ name: "demo", dependencies: { next: "^16", "@zitadel/sdk-next": "latest" } }),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^16", "@zitadel/sdk-next": "latest" },
+      }),
     );
     await writeScaffoldState(cwd, {
       files: { "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" } },
@@ -1004,7 +1037,10 @@ describe("ProjectMatchCheck", () => {
 
   it("fails when secret project_id disagrees with config project", async () => {
     const cwd = await makeProject();
-    await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ ...SECRET, project_id: "other" }));
+    await writeFile(
+      join(cwd, ".zitadel/secret"),
+      JSON.stringify({ ...SECRET, project_id: "other" }),
+    );
     await chmod(join(cwd, ".zitadel/secret"), 0o600);
     expect((await new ProjectMatchCheck().run(ctxFor(cwd))).status).toBe("fail");
   });

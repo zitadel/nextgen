@@ -36,7 +36,6 @@ export default {
 };
 type Story = StoryObj<OrchestratorArgs>;
 
-
 /**
  * Sign-in, first step: the identifier collects the email only. Submitting
  * advances to the password step — the split shape the real default flow

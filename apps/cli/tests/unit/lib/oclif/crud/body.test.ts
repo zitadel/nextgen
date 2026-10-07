@@ -46,7 +46,10 @@ describe("readRawBody", () => {
 describe("credentials on the command line", () => {
   it("refuses a secret nested anywhere in an inline --data body", async () => {
     await expect(
-      readRawBody({ data: '{"attributes":{"email":"a@b.c","password":"hunter2"}}' }, "users create"),
+      readRawBody(
+        { data: '{"attributes":{"email":"a@b.c","password":"hunter2"}}' },
+        "users create",
+      ),
     ).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: expect.stringContaining('Refusing to read "password" from --data'),

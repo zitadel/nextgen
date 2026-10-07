@@ -177,9 +177,7 @@ function AddUserForm({
 
   const selected = schemas?.find((option) => option.id === schemaId);
   const fields = selected ? schemaFields(selected.schema) : [];
-  const missingRequired = fields.some(
-    (entry) => entry.required && !values[entry.key]?.trim(),
-  );
+  const missingRequired = fields.some((entry) => entry.required && !values[entry.key]?.trim());
 
   const selectSchema = useCallback((next: string) => {
     setSchemaId(next);
@@ -215,10 +213,7 @@ function AddUserForm({
           attributes[entry.key] = value;
         }
       }
-      await api.createUser(
-        { schema: selected.id, attributes },
-        { project_id: projectId },
-      );
+      await api.createUser({ schema: selected.id, attributes }, { project_id: projectId });
       await onCreated();
       onClose();
     } catch (cause) {
@@ -247,12 +242,7 @@ function AddUserForm({
             <div className={LABEL_ROW}>
               <FieldLabel className={LABEL}>User Schema</FieldLabel>
             </div>
-            <SchemaPicker
-              id="user-schema"
-              schemas={schemas}
-              selected={selected}
-              onSelect={selectSchema}
-            />
+            <SchemaPicker schemas={schemas} selected={selected} onSelect={selectSchema} />
           </Field>
           <Separator />
           {fields.map((entry) => (
@@ -260,9 +250,7 @@ function AddUserForm({
               key={entry.key}
               field={entry}
               value={values[entry.key] ?? ""}
-              onChange={(value) =>
-                setValues((current) => ({ ...current, [entry.key]: value }))
-              }
+              onChange={(value) => setValues((current) => ({ ...current, [entry.key]: value }))}
             />
           ))}
         </div>
@@ -294,12 +282,7 @@ function AddUserForm({
 
       <Separator />
       <SheetFooter className={FOOTER}>
-        <Button
-          type="button"
-          variant="secondary"
-          className="gap-1.5 px-2.5"
-          onClick={onClose}
-        >
+        <Button type="button" variant="secondary" className="gap-1.5 px-2.5" onClick={onClose}>
           Cancel
         </Button>
         <Button
@@ -318,12 +301,10 @@ function AddUserForm({
 
 /** Searchable schema picker, composed from the shared Combobox. */
 function SchemaPicker({
-  id,
   schemas,
   selected,
   onSelect,
 }: {
-  id: string;
   schemas: SchemaOption[] | undefined;
   selected: SchemaOption | undefined;
   onSelect: (id: string) => void;

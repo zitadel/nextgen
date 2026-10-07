@@ -124,9 +124,9 @@ describe("<zitadel-login> with identity providers", () => {
     await atom.updateComplete;
 
     await withStubbedNavigation(async () => {
-      atom.shadowRoot?.querySelectorAll("zl-button")[0]?.dispatchEvent(
-        new MouseEvent("click", { bubbles: true, composed: true }),
-      );
+      atom.shadowRoot
+        ?.querySelectorAll("zl-button")[0]
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
       await waitFor(() =>
         mock.getCaptured().some((entry) => entry.kind === "submitFlowStep") ? true : null,
       );
@@ -134,8 +134,9 @@ describe("<zitadel-login> with identity providers", () => {
 
     const submits = mock
       .getCaptured()
-      .filter((entry): entry is Extract<typeof entry, { kind: "submitFlowStep" }> =>
-        entry.kind === "submitFlowStep",
+      .filter(
+        (entry): entry is Extract<typeof entry, { kind: "submitFlowStep" }> =>
+          entry.kind === "submitFlowStep",
       );
     expect(submits).toHaveLength(1);
     expect(submits[0]?.body.action).toBe("sso");
@@ -151,9 +152,9 @@ describe("<zitadel-login> with identity providers", () => {
       await atom.updateComplete;
 
       await withStubbedNavigation(async () => {
-        atom.shadowRoot?.querySelectorAll("zl-button")[0]?.dispatchEvent(
-          new MouseEvent("click", { bubbles: true, composed: true }),
-        );
+        atom.shadowRoot
+          ?.querySelectorAll("zl-button")[0]
+          ?.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
         await waitFor(() =>
           mock.getCaptured().some((entry) => entry.kind === "submitFlowStep") ? true : null,
         );
@@ -161,8 +162,9 @@ describe("<zitadel-login> with identity providers", () => {
 
       const submit = mock
         .getCaptured()
-        .find((entry): entry is Extract<typeof entry, { kind: "submitFlowStep" }> =>
-          entry.kind === "submitFlowStep",
+        .find(
+          (entry): entry is Extract<typeof entry, { kind: "submitFlowStep" }> =>
+            entry.kind === "submitFlowStep",
         );
       const target = new URL(submit?.body.return_target ?? "");
       expect(target.searchParams.get("flow")).toBe(submit?.flowId);
@@ -180,9 +182,9 @@ describe("<zitadel-login> with identity providers", () => {
     await atom.updateComplete;
 
     const navigations = await withStubbedNavigation(async () => {
-      atom.shadowRoot?.querySelectorAll("zl-button")[0]?.dispatchEvent(
-        new MouseEvent("click", { bubbles: true, composed: true }),
-      );
+      atom.shadowRoot
+        ?.querySelectorAll("zl-button")[0]
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
       await new Promise((resolve) => setTimeout(resolve, 200));
     });
 
@@ -201,9 +203,9 @@ describe("<zitadel-login> with identity providers", () => {
     element.addEventListener("zitadel-flow-complete", (e) => completes.push(e as CustomEvent));
 
     await withStubbedNavigation(async () => {
-      atom.shadowRoot?.querySelectorAll("zl-button")[0]?.dispatchEvent(
-        new MouseEvent("click", { bubbles: true, composed: true }),
-      );
+      atom.shadowRoot
+        ?.querySelectorAll("zl-button")[0]
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
       await waitFor(() => (redirects.length > 0 ? redirects : null));
     });
 
@@ -217,9 +219,9 @@ describe("<zitadel-login> with identity providers", () => {
     await atom.updateComplete;
 
     await withStubbedNavigation(async () => {
-      atom.shadowRoot?.querySelectorAll("zl-button")[0]?.dispatchEvent(
-        new MouseEvent("click", { bubbles: true, composed: true }),
-      );
+      atom.shadowRoot
+        ?.querySelectorAll("zl-button")[0]
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
       await new Promise((resolve) => setTimeout(resolve, 200));
     });
 
@@ -268,7 +270,6 @@ describe("<zitadel-login> with identity providers", () => {
     expect(redirects).toHaveLength(0);
   });
 
-
   it("resumes the flow a provider callback left in the URL", async () => {
     // The callback finishes by navigating the browser back with `?flow=<id>`.
     // It is a fresh page load, so nothing of the previous document survives:
@@ -297,6 +298,113 @@ describe("<zitadel-login> with identity providers", () => {
     expect(seen).not.toContain("POST /flow");
   });
 
+  describe("when the server answers flow.restart_required", () => {
+    const restartRequired = () =>
+      HttpResponse.json(
+        { code: "flow.restart_required", message: "the flow must be restarted" },
+        { status: 409 },
+      );
+
+    async function resumeStale(): Promise<{ element: ZitadelLogin; seen: string[]; url: string }> {
+      const seen: string[] = [];
+      const record = ({ request }: { request: Request }) => {
+        seen.push(`${request.method} ${new URL(request.url).pathname}`);
+      };
+      server.events.on("request:start", record);
+      const original = window.location.href;
+      window.history.replaceState({}, "", "/login?keep=1&flow=flow_stale#top");
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      let url = "";
+      try {
+        element.purpose = "login";
+        element.project = testProject;
+        host.appendChild(element);
+        await waitFor(() => element.shadowRoot?.querySelector("zl-field, zl-alert"));
+        await element.updateComplete;
+        url = window.location.search + window.location.hash;
+      } finally {
+        window.history.replaceState({}, "", original);
+        server.events.removeListener("request:start", record);
+      }
+      return { element, seen, url };
+    }
+
+    it("starts a fresh flow and tells the user why", async () => {
+      server.use(http.get("*/flow/:id", restartRequired, { once: true }));
+
+      const { element, seen, url } = await resumeStale();
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+      expect(seen.filter((r) => r === "POST /flow")).toHaveLength(1);
+      // A reload must not resume the refused flow again.
+      expect(url).toBe("?keep=1#top");
+      expect(element.shadowRoot?.textContent).toContain(
+        "Your sign-in could not be continued. Please start again.",
+      );
+    });
+
+    it("restarts only once when the fresh flow is refused too", async () => {
+      server.use(http.get("*/flow/:id", restartRequired), http.post("*/flow", restartRequired));
+
+      const { element, seen } = await resumeStale();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(seen.filter((r) => r === "POST /flow")).toHaveLength(1);
+      expect(element.shadowRoot?.querySelector("zl-alert")).not.toBeNull();
+    });
+
+    it("does not carry typed values into the replacement flow", async () => {
+      const element = await mountLogin();
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+      const submitted: Array<Record<string, unknown>> = [];
+      const record = async ({ request }: { request: Request }) => {
+        if (request.method === "POST" && new URL(request.url).pathname.endsWith("/submit")) {
+          const body = (await request.clone().json()) as { fields?: Record<string, unknown> };
+          submitted.push(body.fields ?? {});
+        }
+      };
+      server.events.on("request:start", record);
+      try {
+        // The typed value is refused together with its flow.
+        server.use(http.post("*/flow/:id/submit", restartRequired, { once: true }));
+        element.shadowRoot?.dispatchEvent(
+          new CustomEvent("zl-input", {
+            bubbles: true,
+            composed: true,
+            detail: { name: "email", value: "typed@example.test" },
+          }),
+        );
+        element.shadowRoot?.dispatchEvent(
+          new CustomEvent("zl-submit", {
+            bubbles: true,
+            composed: true,
+            detail: { action: "submit" },
+          }),
+        );
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes("Your sign-in could not be continued")
+            ? true
+            : null,
+        );
+        await element.updateComplete;
+
+        element.shadowRoot?.dispatchEvent(
+          new CustomEvent("zl-submit", {
+            bubbles: true,
+            composed: true,
+            detail: { action: "submit" },
+          }),
+        );
+        await waitFor(() => (submitted.length >= 2 ? true : null));
+      } finally {
+        server.events.removeListener("request:start", record);
+      }
+
+      expect(submitted[0]?.email).toBe("typed@example.test");
+      expect(submitted[1]?.email).not.toBe("typed@example.test");
+    });
+  });
+
   const notFound = { code: "flow.not_found", message: "flow not found" };
   // What the server answers when the required cookie is absent: the
   // parameter decoder refuses the request before the handler runs.
@@ -319,38 +427,41 @@ describe("<zitadel-login> with identity providers", () => {
         return el;
       },
     },
-  ])("starts over when the flow from $source answers $status", async ({ source, status, body, mount }) => {
-    // The cookie window can close during the external sign-in, and a flow
-    // can finish in another tab. The handle then names nothing, and a page
-    // stuck on a startup error has no way forward.
-    const seen: string[] = [];
-    const record = ({ request }: { request: Request }) => {
-      seen.push(`${request.method} ${new URL(request.url).pathname}`);
-    };
-    server.events.on("request:start", record);
-    server.use(http.get("*/flow/:id", () => HttpResponse.json(body, { status })));
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    const original = window.location.href;
-    if (source === "the URL") window.history.replaceState({}, "", "/login?flow=flow_stale");
+  ])(
+    "starts over when the flow from $source answers $status",
+    async ({ source, status, body, mount }) => {
+      // The cookie window can close during the external sign-in, and a flow
+      // can finish in another tab. The handle then names nothing, and a page
+      // stuck on a startup error has no way forward.
+      const seen: string[] = [];
+      const record = ({ request }: { request: Request }) => {
+        seen.push(`${request.method} ${new URL(request.url).pathname}`);
+      };
+      server.events.on("request:start", record);
+      server.use(http.get("*/flow/:id", () => HttpResponse.json(body, { status })));
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const original = window.location.href;
+      if (source === "the URL") window.history.replaceState({}, "", "/login?flow=flow_stale");
 
-    let warned: string[];
-    try {
-      const element = mount(document.createElement("zitadel-login") as ZitadelLogin);
-      element.purpose = "login";
-      element.project = testProject;
-      host.appendChild(element);
-      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
-    } finally {
-      window.history.replaceState({}, "", original);
-      server.events.removeListener("request:start", record);
-      warned = warn.mock.calls.map((call) => String(call[0]));
-      warn.mockRestore();
-    }
+      let warned: string[];
+      try {
+        const element = mount(document.createElement("zitadel-login") as ZitadelLogin);
+        element.purpose = "login";
+        element.project = testProject;
+        host.appendChild(element);
+        await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+      } finally {
+        window.history.replaceState({}, "", original);
+        server.events.removeListener("request:start", record);
+        warned = warn.mock.calls.map((call) => String(call[0]));
+        warn.mockRestore();
+      }
 
-    expect(seen).toContain("GET /flow/flow_stale");
-    expect(seen).toContain("POST /flow");
-    expect(warned).toEqual([expect.stringContaining("flow_stale")]);
-  });
+      expect(seen).toContain("GET /flow/flow_stale");
+      expect(seen).toContain("POST /flow");
+      expect(warned).toEqual([expect.stringContaining("flow_stale")]);
+    },
+  );
 
   it("offers no providers when the project has enabled none", async () => {
     clearSsoProviders();

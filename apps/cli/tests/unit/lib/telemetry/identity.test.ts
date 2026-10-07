@@ -4,10 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import {
-  loadOrCreateIdentity,
-  telemetryConfigDir,
-} from "../../../../src/lib/telemetry/identity";
+import { loadOrCreateIdentity, telemetryConfigDir } from "../../../../src/lib/telemetry/identity";
 
 const dirs: string[] = [];
 

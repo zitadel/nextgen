@@ -57,7 +57,13 @@ const FRAMEWORK = {
 };
 
 function baseAnswers(over: Partial<SetupAnswers> = {}): SetupAnswers {
-  return { server: "https://api.zitadel.cloud", devPort: 3000, useCase: "minimal", sso: [], ...over };
+  return {
+    server: "https://api.zitadel.cloud",
+    devPort: 3000,
+    useCase: "minimal",
+    sso: [],
+    ...over,
+  };
 }
 
 const ctx: PromptContext = { framework: FRAMEWORK, cwd: "/tmp/app" };
@@ -152,11 +158,7 @@ describe("ServerPrompt", () => {
       initialValue: "http://localhost:8080",
     });
     const values = selectOptionsFromFirstCall().map((option) => option.value);
-    expect(values).toEqual([
-      "https://api.zitadel.cloud",
-      "http://localhost:8080",
-      "__custom__",
-    ]);
+    expect(values).toEqual(["https://api.zitadel.cloud", "http://localhost:8080", "__custom__"]);
   });
 
   it("offers only Cloud and Custom when no local server is detected", async () => {
@@ -353,7 +355,6 @@ describe("SocialSignInPrompt", () => {
     );
   });
 
-
   it("asks where the provider lives on a development build", async () => {
     // Someone working on the CLI runs it against a local stand-in constantly.
     // Before this the connection had to be hand-edited afterwards.
@@ -372,8 +373,6 @@ describe("SocialSignInPrompt", () => {
     // rejected as `idp.endpoints_partial`, so discovery supplies them.
     expect(answers.sso[0]?.endpoints).toEqual({ issuer: "http://localhost:9100" });
   });
-
-
 
   it("never asks on a released build", async () => {
     // The gate is the build stamp, not a flag: someone who installed the CLI
@@ -414,7 +413,9 @@ describe("SocialSignInPrompt", () => {
 
   it("does not ask which provider when --sso named one", async () => {
     vi.mocked(password).mockResolvedValueOnce("" as never);
-    const seeded = baseAnswers({ sso: [{ provider: "google", clientId: "from-the-flag", secret: "" }] });
+    const seeded = baseAnswers({
+      sso: [{ provider: "google", clientId: "from-the-flag", secret: "" }],
+    });
 
     const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
 
@@ -428,7 +429,9 @@ describe("SocialSignInPrompt", () => {
     // The secret is never a flag, and only a scripted run pipes it in — so an
     // interactive run with --sso arrives here without one.
     vi.mocked(password).mockResolvedValueOnce("typed-after-the-flag" as never);
-    const seeded = baseAnswers({ sso: [{ provider: "google", clientId: "from-the-flag", secret: "" }] });
+    const seeded = baseAnswers({
+      sso: [{ provider: "google", clientId: "from-the-flag", secret: "" }],
+    });
 
     const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
 

@@ -4,7 +4,7 @@ additionalProperties: false
 # A step is rejected when it matches any of these shapes.
 not:
   anyOf:
-    # sso_providers offered without a callback transition to return to
+    # sso_providers offered without an sso_authenticated transition to route to
     - required: [sso_providers]
       properties:
         sso_providers: { minItems: 1 }
@@ -12,7 +12,7 @@ not:
         - not: { required: [transitions] }
         - properties:
             transitions:
-              not: { required: [callback] }
+              not: { required: [sso_authenticated] }
     # a terminal step that also collects, acts, gates or transitions
     - required: [complete]
       anyOf:
@@ -34,7 +34,26 @@ not:
         sso_providers: { maxItems: 0 }
         gates: { maxProperties: 0 }
         transitions:
-          not: { required: [callback] }
+          not: { required: [sso_authenticated] }
+    # an sso outcome that declares purpose or action: it carries a bound user
+    # or parked claims, which a re-purpose would drop and another flow cannot
+    # receive. Only a string counts, so an explicit null stays legal.
+    - required: [transitions]
+      properties:
+        transitions:
+          anyOf:
+            - required: [sso_authenticated]
+              properties:
+                sso_authenticated:
+                  anyOf:
+                    - { required: [purpose], properties: { purpose: { type: string } } }
+                    - { required: [action], properties: { action: { type: string } } }
+            - required: [sso_user_not_found]
+              properties:
+                sso_user_not_found:
+                  anyOf:
+                    - { required: [purpose], properties: { purpose: { type: string } } }
+                    - { required: [action], properties: { action: { type: string } } }
 description: |
   A step in a flow definition. This is the admin-authored configuration,
   not the runtime payload sent to the frontend.
@@ -149,7 +168,7 @@ properties:
       Keys match action names from the `actions` array. Additional keys
       come from implicit outcomes based on schema annotations
       (e.g. `user_not_found` from `x-unique` fields) and engine
-      events (e.g. `sso`, `callback`).
+      events (e.g. `sso_authenticated`, `sso_user_not_found`).
     additionalProperties:
       type: object
       required: [target]

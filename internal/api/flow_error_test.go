@@ -11,6 +11,8 @@ import (
 	"github.com/go-faster/jx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -126,6 +128,13 @@ func TestMapFlowErrorStatus_usesFlowSentinels(t *testing.T) {
 			wantCode:   "flow.unsupported",
 			wantMsg:    "flow feature is not supported",
 		},
+		{
+			name:       "wrapped restart required drops the resolved values",
+			err:        fmt.Errorf("%w: schema https://a.example.test/user.json", domain.ErrFlowRestartRequired()),
+			wantStatus: http.StatusConflict,
+			wantCode:   "flow.restart_required",
+			wantMsg:    "the flow must be restarted",
+		},
 	}
 
 	for _, tt := range tests {
@@ -141,4 +150,15 @@ func TestMapFlowErrorStatus_usesFlowSentinels(t *testing.T) {
 			assert.NotContains(t, got.Response.Message, "on step")
 		})
 	}
+}
+
+func TestMapFlowGetError_restartRequiredIs409(t *testing.T) {
+	t.Parallel()
+
+	res, err := mapFlowGetError(fmt.Errorf("%w: other schema", domain.ErrFlowRestartRequired()))
+	require.NoError(t, err)
+	conflict, ok := res.(*api.GetFlowStepConflict)
+	require.True(t, ok, "got %T", res)
+	assert.Equal(t, "flow.restart_required", string(conflict.Code))
+	assert.Equal(t, "the flow must be restarted", conflict.Message)
 }
