@@ -22,7 +22,7 @@ login flow that still asks for a method the schema no longer enables.
 
 ```
 zitadel auth-factor enable  --mode password [--mode passkey] [--schema <name>]
-zitadel auth-factor disable --mode passkey  [--schema <name>]
+zitadel auth-factor disable --mode passkey  [--schema <name>] [--force]
 ```
 
 - **The topic is `auth-factor`, not `auth`.** In other developer CLIs, `auth`
@@ -84,9 +84,17 @@ Every refusal happens before anything is written, including under `--dry-run`.
   missing step. The command cannot tell whether such a flow still uses the
   method, so it refuses until the flow is fixed.
 - **No factor would be left.** Disabling the last usable way to sign in is
-  refused. Only password, passkey and SSO with at least one provider count.
-  `otp` and `magic_link` are allowed by the meta-schema but not supported by
-  the login engine yet, so they do not count.
+  refused unless `--force` is passed. Only password, passkey and SSO with at
+  least one provider count. `otp` and `magic_link` are allowed by the
+  meta-schema but not supported by the login engine yet, so they do not count.
+  This refusal is CLI policy, not a server rule. The server accepts a schema
+  with every method disabled, because a schema whose users are only created
+  and managed through the API never needs a sign-in method. Most of the time,
+  though, disabling the last factor is a mistake that locks every user out,
+  so the CLI asks for `--force` to confirm it, the same guard ADR 064 puts on
+  destructive verbs. `--force` overrides this refusal only. The other
+  refusals protect against a `plan` or `apply` that would fail, so no flag
+  overrides them.
 - **Password needs an identifier.** Enabling password on a schema without
   `x-identifier` is refused, because the server rejects that combination and
   `plan` does not catch it.
