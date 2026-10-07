@@ -445,7 +445,9 @@ func apiUserTeam(team domain.UserTeam) api.UserTeam {
 
 func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
-	case domain.ErrUserInvalid().Code:
+	case domain.ErrUserInvalid().Code,
+		domain.ErrUserPasswordEmpty().Code,
+		domain.ErrUserPasswordTooLong().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrUserNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
