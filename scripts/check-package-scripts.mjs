@@ -294,7 +294,10 @@ function commandWords(input) {
     // `exec -- cmd`, `time -p cmd`, `command -p cmd`: options belong to the
     // wrapper; `exec -a NAME` also takes the following word.
     while (wrapper && i < words.length && words[i].startsWith("-")) {
-      i += wrapper === "exec" && words[i] === "-a" ? 2 : 1;
+      const takesValue =
+        (wrapper === "exec" && words[i] === "-a") ||
+        (wrapper === "time" && ["-f", "--format", "-o", "--output"].includes(words[i]));
+      i += takesValue ? 2 : 1;
     }
   }
   if (executableName(words[i] ?? "") !== "env") return words.slice(i);
@@ -326,7 +329,7 @@ function isHook(name, scripts) {
   if (NPM_LIFECYCLE.has(name)) return false;
   const match = /^(pre|post)(.+)$/.exec(name);
   // `preview` is only a hook when a `view` script exists.
-  return match !== null && match[2] in scripts;
+  return match !== null && Object.hasOwn(scripts, match[2]);
 }
 
 function exempt(set, dir, name) {
@@ -351,7 +354,7 @@ export function checkProject(dir, scripts, tasks) {
     if (name.includes(":")) {
       problems.push(`${dir}: script "${name}" must be kebab-case (moon task ids cannot contain ":")`);
     }
-    if (!(name in tasks)) {
+    if (!Object.hasOwn(tasks, name)) {
       problems.push(`${dir}: script "${name}" has no moon task of the same name`);
     }
   }
@@ -360,7 +363,7 @@ export function checkProject(dir, scripts, tasks) {
     const command = task?.command ?? task?.script;
     if (command !== `corepack pnpm run ${id}`) {
       problems.push(`${dir}: task "${id}" must run \`corepack pnpm run ${id}\`, not: ${command}`);
-    } else if (!(id in scripts)) {
+    } else if (!Object.hasOwn(scripts, id)) {
       problems.push(`${dir}: task "${id}" runs a script "${id}" that does not exist`);
     }
   }

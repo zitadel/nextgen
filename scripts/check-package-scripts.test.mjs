@@ -118,6 +118,9 @@ describe("package-script contract", () => {
     "vitest run && pnpm>>out.log install",
     "pnpm&>out.log run test",
     "pnpm&>>out.log run test",
+    "command time -f %E pnpm run test",
+    "time -o timing.txt pnpm install",
+    "time --format=%E pnpm test",
   ])("detects a package manager in %s", (body) => {
     expect(startsPackageManager(body)).toBe(true);
   });
@@ -206,6 +209,7 @@ describe("package-script contract", () => {
     "vitest run>out.log",
     "vitest run&>out.log",
     "tsc --noEmit &>> tsc.log",
+    "command time -f %E vitest run",
     "echo 'a>b' && vitest run",
     "vitest run --testNamePattern 'npm run build'",
     "playwright test --grep 'pnpm install'",
@@ -217,5 +221,21 @@ describe("package-script contract", () => {
     expect(
       checkProject("apps/x", { test: "eval 'vitest run'" }, { test: { command: "corepack pnpm run test" } }),
     ).toEqual(['apps/x: script "test" uses `eval`; keep scripts to plain commands']);
+  });
+
+  it("only counts a project's own scripts and tasks", () => {
+    expect(checkProject("apps/x", { constructor: "vitest run" }, {})).toEqual([
+      'apps/x: script "constructor" has no moon task of the same name',
+    ]);
+    expect(checkProject("apps/x", {}, { constructor: { command: "corepack pnpm run constructor" } })).toEqual([
+      'apps/x: task "constructor" runs a script "constructor" that does not exist',
+    ]);
+    expect(
+      checkProject(
+        "apps/x",
+        { preconstructor: "vitest run" },
+        { preconstructor: { command: "corepack pnpm run preconstructor" } },
+      ),
+    ).toEqual([]);
   });
 });
