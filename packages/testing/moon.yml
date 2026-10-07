@@ -11,12 +11,6 @@ dependsOn:
   - "cli"
 
 tasks:
-  lint:
-    command: "corepack pnpm run lint"
-    deps:
-      - "api:build"
-      - "config:build"
-
   typecheck:
     command: "corepack pnpm run typecheck"
     deps:

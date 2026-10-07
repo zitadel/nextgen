@@ -66,9 +66,13 @@ describe("renderDetail", () => {
     expect(
       renderDetail("ada@example.com", ["id", "metadata.status", "metadata.created_at"], user),
     ).toBe(
-      ["ada@example.com", "", "id          user_1", "status      active", "created_at  2026-01-01T00:00:00Z"].join(
-        "\n",
-      ),
+      [
+        "ada@example.com",
+        "",
+        "id          user_1",
+        "status      active",
+        "created_at  2026-01-01T00:00:00Z",
+      ].join("\n"),
     );
   });
 

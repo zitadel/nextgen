@@ -8,7 +8,8 @@ import { forwardedArgs, isDirectRun } from "./dev-process.mjs";
 const ADR_FILENAME_PATTERN = /^(\d{3})-[a-z0-9-]+\.md$/;
 const ADR_HEADING_PATTERN = /^#\s*ADR\s+(\d{3}):\s*(.+)\s*$/;
 const ADR_STATUS_PATTERN = /^>\s*\*\*Status:\*\*\s*(.+?)\s*$/;
-const README_ROW_PATTERN = /^\|\s*\[(\d{3})\]\(([^)]+)\)\s*\|\s*([^|]+)\|\s*([^|]+)\|\s*([^|]+)\|\s*$/;
+const README_ROW_PATTERN =
+  /^\|\s*\[(\d{3})\]\(([^)]+)\)\s*\|\s*([^|]+)\|\s*([^|]+)\|\s*([^|]+)\|\s*$/;
 
 // The canonical status vocabulary. A status line may carry a suffix or
 // parenthetical after the leading token ("Accepted — 2026-05-19",
@@ -315,8 +316,7 @@ export async function checkAdrsIndex(options = {}) {
   const { files, errors: scanErrors } = scanAdrDirectory(entries);
 
   const readmePath = join(adrsDir, readmeFilename);
-  const readmeMarkdown =
-    options.readmeMarkdown ?? (await readFile(readmePath, "utf8"));
+  const readmeMarkdown = options.readmeMarkdown ?? (await readFile(readmePath, "utf8"));
   const readmeRows = parseReadmeIndex(readmeMarkdown);
 
   const headings = options.headings ?? new Map();

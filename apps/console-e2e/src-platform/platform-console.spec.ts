@@ -85,9 +85,7 @@ test("a platform operator reaches every management screen without an error", asy
   expect((await flowStart).postDataJSON()).toMatchObject({
     project_id: zitadel.handle.projectId,
   });
-  await expect(
-    page.locator("zitadel-login").getByRole("textbox", { name: "Email" }),
-  ).toBeVisible();
+  await expect(page.locator("zitadel-login").getByRole("textbox", { name: "Email" })).toBeVisible();
 
   // The granted customer project: listed on the overview, where a row opens
   // the project (selects it, lands on Teams); its own page is Project settings.
@@ -100,9 +98,7 @@ test("a platform operator reaches every management screen without an error", asy
     .getByRole("navigation", { name: "Primary" })
     .getByRole("link", { name: "Project settings" })
     .click();
-  await expect(page).toHaveURL(
-    new RegExp(`/project\\?project=${zitadel.handle.projectId}$`),
-  );
+  await expect(page).toHaveURL(new RegExp(`/project\\?project=${zitadel.handle.projectId}$`));
   await expectNoErrorState(page);
 
   const field = page.getByLabel("Project name");

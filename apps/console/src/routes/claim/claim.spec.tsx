@@ -456,7 +456,11 @@ describe("claim window countdown", () => {
     fetchSession.mockResolvedValue(makeTestSession());
     stubWindow(9);
     stubComplete(() =>
-      HttpResponse.json({ project_id: PROJECT_ID, team_id: "team_1", claimed_at: "2026-08-24T10:00:00Z" }),
+      HttpResponse.json({
+        project_id: PROJECT_ID,
+        team_id: "team_1",
+        claimed_at: "2026-08-24T10:00:00Z",
+      }),
     );
 
     await renderAt(CLAIM_PATH);
@@ -469,7 +473,10 @@ describe("claim window countdown", () => {
     fetchSession.mockResolvedValue(makeTestSession());
     stubWindow(9);
     stubComplete(() =>
-      HttpResponse.json({ code: "proj.claim_expired", message: "the claim link expired" }, { status: 410 }),
+      HttpResponse.json(
+        { code: "proj.claim_expired", message: "the claim link expired" },
+        { status: 410 },
+      ),
     );
 
     await renderAt(CLAIM_PATH);

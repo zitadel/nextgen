@@ -38,7 +38,6 @@ function formatDeadline(deadline: Date): string {
   });
 }
 
-
 /**
  * Whether this project is attached to a team, as the CLI can tell locally.
  *

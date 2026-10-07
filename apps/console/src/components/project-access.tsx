@@ -77,7 +77,7 @@ export function ProjectAccess({
     onChange(rows.map((row, i) => (i === index ? { ...row, ...next } : row)));
 
   return (
-    <div className={SECTION} role="group" aria-labelledby={labelId}>
+    <fieldset className={`${SECTION} min-w-0`} aria-labelledby={labelId}>
       <div className={LABEL_ROW}>
         <p id={labelId} className={LABEL}>
           Projects
@@ -88,6 +88,7 @@ export function ProjectAccess({
       {rows.length > 0 && (
         <div className={ROWS}>
           {rows.map((row, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: rows have no stable id and empty rows share a blank projectId
             <div key={index} className={ROW}>
               <ProjectPicker
                 value={row.projectId}
@@ -133,7 +134,7 @@ export function ProjectAccess({
           + Add project
         </Button>
       )}
-    </div>
+    </fieldset>
   );
 }
 
