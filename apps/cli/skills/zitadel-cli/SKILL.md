@@ -257,7 +257,10 @@ Disabling the schema's last way to sign in needs `--force` when non-interactive;
 only pass it for a schema whose users are managed through the API, and ask the
 user first. A factor that is enabled but not offered by any active flow is
 reported in `warnings` and `data.not_offered`. Follow `data.next_commands`
-(`plan`, `apply`) to publish the change.
+(`plan`, `apply`) to publish the change. When a path or schema name would need
+shell quoting, `next_commands` is empty and `data.next_args` (or
+`details.retry_args` on a refusal) holds the same commands as argument lists.
+A schema that points at an external url is refused: edit that schema instead.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `plan` and `apply`. See the reference below for driving the login UI

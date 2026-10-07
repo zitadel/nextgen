@@ -116,12 +116,23 @@ describe("normalizePublicCliJson", () => {
 });
 
 describe("isPortableShellWord", () => {
-  it("accepts a plain value", () => {
+  it("accepts a plain value and a POSIX-style path", () => {
     expect(isPortableShellWord("default-human-user")).toBe(true);
+    expect(isPortableShellWord("/home/dev/my-app")).toBe(true);
   });
 
   it("rejects anything a POSIX shell, PowerShell or cmd.exe could read differently", () => {
-    for (const value of ["my users", "x;y", "$(id)", "a&b", "%PATH%", "it's", "a|b", "a`b"]) {
+    for (const value of [
+      "my users",
+      "x;y",
+      "$(id)",
+      "a&b",
+      "%PATH%",
+      "it's",
+      "a|b",
+      "a`b",
+      "C:\\dev",
+    ]) {
       expect(isPortableShellWord(value), value).toBe(false);
     }
   });

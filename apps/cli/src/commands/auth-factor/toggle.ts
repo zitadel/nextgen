@@ -21,7 +21,7 @@ import { ZitadelError } from "../../lib/errors";
 import { type FlowFile, readSchemaFiles, type SchemaFile, selectSchema } from "../../lib/idp";
 import { stableStringify } from "../../lib/json";
 import { BaseCommand, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
-import { isPortableShellWord, publicCliCommand } from "../../lib/public-cli";
+import { portableCommands } from "../../lib/public-cli";
 import { flowsForSchema } from "../../lib/schema-flows";
 import { reportWarning } from "../../lib/warnings";
 
@@ -50,11 +50,15 @@ export const AUTH_FACTOR_FLAGS = {
  */
 export abstract class AuthFactorCommand extends BaseCommand {
   protected async toggle(
-    flags: { mode?: string[]; schema?: string },
+    flags: { mode?: string[]; schema?: string; cwd?: string },
     enabled: boolean,
   ): Promise<JsonEnvelope> {
-    await this.toMeta(flags);
+    // Nothing here talks to a server, so none is resolved: a stopped local
+    // runtime must not block staging a change for a later apply.
+    await this.toMeta(flags, { resolveServer: false });
     const { cwd, dryRun, force, nonInteractive, cliVersion } = this.meta;
+    // A follow-up run from where the user stands must reach the same Project.
+    const cwdArgs = flags.cwd === undefined ? [] : ["--cwd", cwd];
     const verb = enabled ? "enable" : "disable";
 
     const factors = [...new Set(flags.mode ?? [])] as AuthFactor[];
@@ -65,6 +69,14 @@ export abstract class AuthFactorCommand extends BaseCommand {
     }
 
     const schema = selectSchema(await readSchemaFiles(cwd), flags.schema);
+    if (schema.body.kind === "schema-url") {
+      throw new ZitadelError("E_VALIDATION", `${schema.path} points at an external schema`, {
+        hint:
+          "Its sign-in methods live in the schema at its url, which the server fetches. " +
+          "Edit x-auth-methods there instead.",
+        details: { file: schema.path, url: schema.body.url },
+      });
+    }
     const malformed = malformedAuthMethods(schema.body, factors);
     if (malformed !== undefined) {
       throw new ZitadelError("E_VALIDATION", `${schema.path}: ${malformed}`, {
@@ -91,7 +103,7 @@ export abstract class AuthFactorCommand extends BaseCommand {
     if (lastFactor && !force) {
       // ADR 064 §10: a terminal asks; a script or a dry run needs --force.
       if (nonInteractive || dryRun) {
-        refuseLastFactor(schema, factors, cliVersion);
+        refuseLastFactor(schema, factors, cwdArgs, cliVersion);
       }
       const answer = await confirm({
         message: `Disable ${change.changed.join(", ")} anyway? Nobody will be able to sign in to ${schema.name}.`,
@@ -178,15 +190,22 @@ export abstract class AuthFactorCommand extends BaseCommand {
       consola.info(`${factor} is already ${verb}d for ${schema.name}`);
     }
 
+    const followUps =
+      change.changed.length === 0
+        ? []
+        : [
+            ["plan", ...cwdArgs],
+            ["apply", ...cwdArgs],
+          ];
     return this.emit({
       status: "ok",
       data: {
         ...data,
         // The edit is local until it is applied, like any configuration file.
-        next_commands:
-          change.changed.length === 0
-            ? []
-            : [publicCliCommand("plan", cliVersion), publicCliCommand("apply", cliVersion)],
+        // `next_args` always holds the argument lists; `next_commands` has the
+        // strings only when every argument is safe to run as written.
+        next_commands: portableCommands(followUps, cliVersion),
+        next_args: followUps,
       },
       pretty:
         change.changed.length === 0
@@ -217,6 +236,7 @@ function refuseMissingIdentifier(schema: SchemaFile, changed: readonly AuthFacto
 function refuseLastFactor(
   schema: SchemaFile,
   disabling: readonly AuthFactor[],
+  cwdArgs: readonly string[],
   cliVersion: string,
 ): never {
   // Always given as an argument list, which no shell interprets.
@@ -226,26 +246,31 @@ function refuseLastFactor(
     ...disabling.flatMap((factor) => ["--mode", factor]),
     "--schema",
     schema.name,
+    ...cwdArgs,
     "--force",
   ];
   const alternatives = AUTH_FACTORS.filter(
     (factor) =>
       !disabling.includes(factor) && (factor !== "password" || hasIdentifier(schema.body)),
   );
-  // The schema name comes from a file name. One that would need quoting is
-  // left out of runnable commands: quoting differs between POSIX shells,
-  // PowerShell and cmd.exe, so no one quoting is safe on all of them.
-  const nextCommands = isPortableShellWord(schema.name)
-    ? [
-        publicCliCommand(retryArgs.join(" "), cliVersion),
-        ...alternatives.map((factor) =>
-          publicCliCommand(
-            `auth-factor enable --mode ${factor} --schema ${schema.name}`,
-            cliVersion,
-          ),
-        ),
-      ]
-    : [];
+  // The schema name comes from a file name and the --cwd path from the user.
+  // One that would need quoting leaves the strings out: quoting differs
+  // between POSIX shells, PowerShell and cmd.exe, so none is safe on all.
+  const nextCommands = portableCommands(
+    [
+      retryArgs,
+      ...alternatives.map((factor) => [
+        "auth-factor",
+        "enable",
+        "--mode",
+        factor,
+        "--schema",
+        schema.name,
+        ...cwdArgs,
+      ]),
+    ],
+    cliVersion,
+  );
   throw new ZitadelError("E_VALIDATION", `${schema.path} would have no way to sign in left`, {
     hint:
       "Enable another factor or an identity provider (`sso enable --provider <name>`) first. " +

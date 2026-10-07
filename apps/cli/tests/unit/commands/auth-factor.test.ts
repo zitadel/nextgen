@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -81,6 +81,11 @@ async function run(cwd: string, verb: "enable" | "disable", ...args: string[]) {
   return { exitCode: result.exitCode, envelope: parseJson(result.stdout) as Envelope };
 }
 
+/** A suggested command with the CLI prefix and the temp --cwd path left out. */
+function suggested(command: string): string {
+  return command.replace(/^.*? auth-factor /, "").replace(/--cwd \S+/, "--cwd <cwd>");
+}
+
 async function readSchema(cwd: string, name = "default-human-user") {
   return JSON.parse(await readFile(join(cwd, `.zitadel/schemas/${name}.json`), "utf8")) as {
     "x-auth-methods": Record<string, { enabled: boolean }>;
@@ -118,7 +123,52 @@ describe("auth-factor", () => {
       const { envelope } = await run(cwd, "disable", "--mode", "passkey");
 
       const next = envelope.data?.next_commands as string[];
-      expect(next.map((command) => command.split(" ").at(-1))).toEqual(["plan", "apply"]);
+      expect(
+        next.map((command) => command.replace(/^.*?@\S+ /, "").replace(/--cwd \S+/, "--cwd <cwd>")),
+      ).toEqual(["plan --cwd <cwd>", "apply --cwd <cwd>"]);
+    });
+
+    it("hands over the follow-ups as argument lists when the path needs quoting", async () => {
+      const parent = await mkdtemp(join(tmpdir(), "zitadel auth factor "));
+      tempDirs.push(parent);
+      const cwd = await makeProject();
+      const spaced = join(parent, "my project");
+      await rename(cwd, spaced);
+
+      const { envelope } = await run(spaced, "disable", "--mode", "passkey");
+
+      expect(envelope.data?.next_commands).toEqual([]);
+      expect(envelope.data?.next_args).toEqual([
+        ["plan", "--cwd", expect.stringContaining("my project")],
+        ["apply", "--cwd", expect.stringContaining("my project")],
+      ]);
+    });
+
+    it("refuses a schema that points at an external url", async () => {
+      const cwd = await makeProject(
+        {
+          "default-human-user": {
+            kind: "schema-url",
+            url: "https://schemas.test.invalid/customers.json",
+          },
+        },
+        {},
+      );
+
+      const { envelope } = await run(cwd, "disable", "--mode", "passkey");
+
+      expect(envelope).toMatchObject({
+        code: "E_VALIDATION",
+        details: { url: "https://schemas.test.invalid/customers.json" },
+      });
+    });
+
+    it("works with a local server that is not running", async () => {
+      const cwd = await makeProject();
+
+      const { exitCode } = await run(cwd, "disable", "--mode", "passkey", "--server", "local");
+
+      expect(exitCode).toBe(0);
     });
 
     it("lists no next commands when nothing changed", async () => {
@@ -262,9 +312,9 @@ describe("auth-factor", () => {
 
       expect(envelope.code).toBe("E_VALIDATION");
       expect(envelope.details?.usable).toEqual(["passkey"]);
-      expect(envelope.next_commands?.map((c) => c.replace(/^.*? auth-factor /, ""))).toEqual([
-        "disable --mode passkey --schema default-human-user --force",
-        "enable --mode password --schema default-human-user",
+      expect(envelope.next_commands?.map(suggested)).toEqual([
+        "disable --mode passkey --schema default-human-user --cwd <cwd> --force",
+        "enable --mode password --schema default-human-user --cwd <cwd>",
       ]);
     });
 
@@ -282,8 +332,8 @@ describe("auth-factor", () => {
 
       const { envelope } = await run(cwd, "disable", "--mode", "passkey");
 
-      expect(envelope.next_commands?.map((c) => c.replace(/^.*? auth-factor /, ""))).toEqual([
-        "disable --mode passkey --schema default-human-user --force",
+      expect(envelope.next_commands?.map(suggested)).toEqual([
+        "disable --mode passkey --schema default-human-user --cwd <cwd> --force",
       ]);
     });
 
@@ -309,6 +359,8 @@ describe("auth-factor", () => {
           "passkey",
           "--schema",
           "my users&calc",
+          "--cwd",
+          expect.any(String),
           "--force",
         ],
       });

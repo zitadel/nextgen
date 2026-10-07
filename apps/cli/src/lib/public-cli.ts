@@ -21,7 +21,20 @@ export function npmSelectorForCliVersion(cliVersion: string): string {
  * command at all; callers hand it over as an argument list instead.
  */
 export function isPortableShellWord(value: string): boolean {
-  return /^[A-Za-z0-9_.-]+$/.test(value);
+  // `/` is included so a POSIX-style --cwd path can be suggested as written.
+  return /^[A-Za-z0-9_./-]+$/.test(value);
+}
+
+/**
+ * Suggested commands as strings, built from argument lists. Every argument
+ * must be a portable shell word, or none of the commands is returned: a
+ * caller then hands over the argument lists alone, which no shell interprets.
+ */
+export function portableCommands(argLists: readonly string[][], cliVersion: string): string[] {
+  if (!argLists.every((args) => args.every(isPortableShellWord))) {
+    return [];
+  }
+  return argLists.map((args) => publicCliCommand(args.join(" "), cliVersion));
 }
 
 export function publicCliCommand(args: string, cliVersion: string): string {
