@@ -89,15 +89,55 @@ const PACKAGE_MANAGERS = new Set(["pnpm", "npm", "npx", "yarn", "corepack"]);
  * single-quoted text and escaped `\$` stay literal.
  */
 export function startsPackageManager(body) {
-  const live = body.replace(/'[^']*'/g, "''").replace(/\\\$/g, "");
-  for (const [, dollar, backtick] of live.matchAll(/\$\(([^()]*)\)|`([^`]*)`/g)) {
-    if (startsPackageManager(dollar ?? backtick)) return true;
-  }
+  if (substitutions(body).some(startsPackageManager)) return true;
   return simpleCommands(body).some((words) => {
-    const [command = "", next = ""] = commandWords(words);
+    const [command = "", ...args] = commandWords(words);
     const executable = command.split("/").pop();
-    return PACKAGE_MANAGERS.has(executable) || (executable === "node" && next === "--run");
+    if (SHELLS.has(executable)) {
+      const flag = args.indexOf("-c");
+      return flag !== -1 && startsPackageManager(args[flag + 1] ?? "");
+    }
+    return PACKAGE_MANAGERS.has(executable) || (executable === "node" && args[0] === "--run");
   });
+}
+
+const SHELLS = new Set(["sh", "bash", "zsh", "dash"]);
+
+/**
+ * The bodies of the command substitutions (`$(…)`, backticks) a shell would
+ * run: outside quotes and inside double quotes, but not inside single quotes
+ * (which are only literal outside double quotes) or after a backslash.
+ */
+function substitutions(text) {
+  const bodies = [];
+  let inDouble = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (char === "\\") {
+      i += 1;
+    } else if (char === "'" && !inDouble) {
+      const close = text.indexOf("'", i + 1);
+      i = close === -1 ? text.length : close;
+    } else if (char === '"') {
+      inDouble = !inDouble;
+    } else if (char === "$" && text[i + 1] === "(") {
+      let depth = 1;
+      let j = i + 2;
+      while (j < text.length && depth > 0) {
+        if (text[j] === "(") depth += 1;
+        else if (text[j] === ")") depth -= 1;
+        j += 1;
+      }
+      bodies.push(text.slice(i + 2, j - 1));
+      i = j - 1;
+    } else if (char === "`") {
+      const close = text.indexOf("`", i + 1);
+      const stop = close === -1 ? text.length : close;
+      bodies.push(text.slice(i + 1, stop));
+      i = stop;
+    }
+  }
+  return bodies;
 }
 
 /** Split a shell command line into simple commands, each a list of words. */

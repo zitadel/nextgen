@@ -81,6 +81,10 @@ describe("package-script contract", () => {
     "vitest run\npnpm run test",
     "/usr/local/bin/pnpm run test",
     "{ pnpm run test; }",
+    `echo "version='$(pnpm test)'"`,
+    "echo \"$(echo $(pnpm test))\"",
+    "sh -c 'pnpm run test'",
+    'bash -c "npm run build"',
   ])("detects a package manager in %s", (body) => {
     expect(startsPackageManager(body)).toBe(true);
   });
@@ -101,6 +105,9 @@ describe("package-script contract", () => {
     "if true; then vitest run; fi",
     "env -S 'vitest run'",
     "vitest run\ntsc --noEmit",
+    "echo '\"$(pnpm test)\"'",
+    "sh -c 'vitest run'",
+    "bash scripts/run.sh",
   ])("does not flag %s", (body) => {
     expect(startsPackageManager(body)).toBe(false);
   });
