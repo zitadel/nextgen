@@ -306,6 +306,24 @@ describe("reachableSignInMethods", () => {
     expect(reachableSignInMethods(schema({ password: { enabled: true } }), [flow])).toEqual([]);
   });
 
+  it("stops at an outcome that switches to registration on its own", () => {
+    // The shipped shape: user_not_found routes to register with no purpose.
+    const flow = {
+      purposes: { login: "identifier", register: "register" },
+      steps: [
+        {
+          name: "identifier",
+          actions: [{ name: "passkey", kind: "passkey" }],
+          transitions: { user_not_found: { target: "register" } },
+        },
+        { name: "register", fields: ["x-auth-methods#password"] },
+      ],
+    };
+    const both = schema({ password: { enabled: true }, passkey: { enabled: true } });
+
+    expect(reachableSignInMethods(both, [flow])).toEqual(["passkey"]);
+  });
+
   it("does not count a flow that only registers passkeys", () => {
     const passkeyOnly = schema({ password: { enabled: false }, passkey: { enabled: true } });
     const registerOnly = {

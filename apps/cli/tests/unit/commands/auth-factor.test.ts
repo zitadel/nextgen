@@ -183,6 +183,44 @@ describe("auth-factor", () => {
       });
     });
 
+    it("does not count a register step that only enrols a passkey", async () => {
+      const flow = passwordFlow();
+      const enrolling = {
+        ...flow,
+        purposes: { login: "identifier", register: "register" },
+        steps: [
+          // A combined flow must route each purpose to the other.
+          {
+            ...flow.steps[0],
+            transitions: { ...flow.steps[0]?.transitions, user_not_found: { target: "register" } },
+          },
+          ...flow.steps.slice(1),
+          {
+            name: "register",
+            fields: ["email"],
+            actions: [{ name: "passkey_register", kind: "passkey_register", primary: true }],
+            transitions: {
+              passkey_register: { target: "done" },
+              user_already_exists: { target: "identifier" },
+            },
+          },
+        ],
+      };
+      const cwd = await makeProject(
+        {
+          "default-human-user": {
+            ...passwordSchema(),
+            "x-auth-methods": { password: { enabled: true }, passkey: { enabled: false } },
+          },
+        },
+        { "default-human-user-login": enrolling },
+      );
+
+      const { envelope } = await run(cwd, "enable", "--mode", "passkey");
+
+      expect(envelope.data?.not_offered).toEqual(["passkey"]);
+    });
+
     it("does not count a draft flow as offering the factor", async () => {
       const draft = {
         ...passwordFlow(),

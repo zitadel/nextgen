@@ -1,5 +1,9 @@
 import { flowConfigSchema } from "@zitadel/config/schemas";
-import { validateFlowDefinition, type FlowValidationIssue } from "@zitadel/config/validate";
+import {
+  PURPOSE_FLIP_TARGETS,
+  validateFlowDefinition,
+  type FlowValidationIssue,
+} from "@zitadel/config/validate";
 
 import { isObject } from "./json";
 
@@ -207,6 +211,17 @@ export function reachableSignInMethods(
 }
 
 /**
+ * Outcomes the engine answers by switching from login to register without a
+ * `purpose` on the transition: the validator's flip table, plus
+ * `sso_user_not_found`, which it leaves out of that table on purpose but
+ * which routes to registration the same way.
+ */
+const LOGIN_LEAVING_OUTCOMES = new Set([
+  ...Object.keys(PURPOSE_FLIP_TARGETS.login ?? {}),
+  "sso_user_not_found",
+]);
+
+/**
  * The flow cut down to the steps reachable from its `login` entry, following
  * transitions that stay in the login purpose. No `login` purpose means no
  * steps: such a flow signs nobody in.
@@ -224,8 +239,14 @@ function loginJourney(flow: Record<string, unknown>): Record<string, unknown> {
       continue;
     }
     reached.add(name);
-    const transitions = isObject(step.transitions) ? Object.values(step.transitions) : [];
-    for (const transition of transitions) {
+    const transitions = isObject(step.transitions) ? Object.entries(step.transitions) : [];
+    for (const [outcome, transition] of transitions) {
+      // Some outcomes switch the journey to registration on their own, with
+      // no `purpose` on the transition: the steps after them register a new
+      // user rather than sign one in.
+      if (LOGIN_LEAVING_OUTCOMES.has(outcome)) {
+        continue;
+      }
       // Mirrors the validator's local adjacency: a transition with an
       // `action` goes to another flow, whose step names are not this flow's,
       // and one into another purpose (register, say) leaves the login

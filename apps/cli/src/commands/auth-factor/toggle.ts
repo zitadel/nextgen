@@ -10,7 +10,6 @@ import {
   AUTH_FACTORS,
   type AuthFactor,
   checkFlow,
-  flowOffers,
   hasIdentifier,
   malformedAuthMethods,
   reachableSignInMethods,
@@ -125,9 +124,13 @@ export abstract class AuthFactorCommand extends BaseCommand {
     // Only an active flow is served, so a draft offering the factor does not
     // put it on the sign-in screen.
     const activeFlows = flows.filter((flow) => flow.body.status === "active");
-    const notOffered = enabled
-      ? factors.filter((factor) => !activeFlows.some((flow) => flowOffers(flow.body, factor)))
-      : [];
+    // Judged on the login journey, as the reachability warning is: a passkey
+    // that a register step only enrols is not offered to anyone signing in.
+    const reachableAfter = reachableSignInMethods(
+      change.document,
+      activeFlows.map((flow) => flow.body),
+    );
+    const notOffered = enabled ? factors.filter((factor) => !reachableAfter.includes(factor)) : [];
     // Enabling first and editing the flow second is a normal order of work, so
     // this is a warning rather than a refusal.
     const warnings = notOffered.map(

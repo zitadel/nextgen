@@ -110,6 +110,10 @@ describe("flowsForSchema", () => {
       "an id that is not a string",
       JSON.stringify({ resources: { ".zitadel/schemas/customers.json": { id: 7 } } }),
     ],
+    [
+      "an empty id",
+      JSON.stringify({ resources: { ".zitadel/schemas/customers.json": { id: "" } } }),
+    ],
   ])("refuses a state file with %s rather than treat it as never synced", async (_, state) => {
     const cwd = await projectWithFlows({ login: "sch_PUBLISHED" }, state);
 

@@ -80,10 +80,13 @@ async function publishedIdsOf(cwd: string, path: string): Promise<string[]> {
       throw new Error(`resources["${path}"] is not an object`);
     }
     const ids = [entry.id, entry.previousId].filter((id) => id !== undefined);
-    if (!ids.every((id) => typeof id === "string")) {
-      throw new Error(`resources["${path}"] has an id that is not a string`);
+    // An empty id is as corrupt as a missing one would be wrong to assume:
+    // dropping it would fall back to URL matching and could skip the flow
+    // pinned to the real published id.
+    if (!ids.every((id) => typeof id === "string" && id !== "")) {
+      throw new Error(`resources["${path}"] has an id that is not a non-empty string`);
     }
-    return (ids as string[]).filter((id) => id !== "");
+    return ids as string[];
   } catch (error) {
     if (isErrno(error, "ENOENT")) {
       return [];
