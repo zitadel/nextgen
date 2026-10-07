@@ -178,28 +178,28 @@ func (ds deploymentStatements) GetDeploymentsByIDs(ctx context.Context, projectI
 
 // ListDeployments implements [service.DeploymentStatements].
 func (ds deploymentStatements) ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
-	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, deploymentQuery, filter, deployment.Schema, "zitadel_nextgen.deployments", "id"); err != nil {
+	items, nextCursor, err := pagination.Page(filter.Pagination, deployment.Schema, func(limit uint32) ([]*domain.Deployment, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileList(ctx, &compiler, deploymentQuery, filter, deployment.Schema, "zitadel_nextgen.deployments", "id"); err != nil {
+			return nil, err
+		}
+
+		rows, err := ds.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		items, err := pgx.CollectRows(rows, scanDeployment)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		return items, nil
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	rows, err := ds.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	items, err := pgx.CollectRows(rows, scanDeployment)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	nextCursor := pagination.MarshalNext(
-		filter.Pagination.OrderBy,
-		items,
-		deployment.Schema,
-		filter.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.Deployment]{Items: items, NextCursor: nextCursor}, nil
 }
 
