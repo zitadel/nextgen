@@ -31,6 +31,9 @@ type ssoResolutionFixture struct {
 	idpFixture
 	team       *domain.Team
 	connection api.IdpResponse
+	// definitionName selects the definition flows start on; empty resolves
+	// by audience.
+	definitionName string
 }
 
 func newSSOResolutionFixture(t *testing.T, connection api.IdpConnection) *ssoResolutionFixture {
@@ -64,6 +67,9 @@ func (f *ssoResolutionFixture) startFlow(t *testing.T, sessionID string) ssoFlow
 	req := &api.CreateFlowRequest{ProjectID: f.projectID(), Purpose: api.CreateFlowRequestPurposeLogin}
 	if sessionID != "" {
 		req.SessionID = api.NewOptString(sessionID)
+	}
+	if f.definitionName != "" {
+		req.FlowDefinitionName = api.NewOptString(f.definitionName)
 	}
 	resp, err := f.client.CreateFlow(t.Context(), req)
 	require.NoError(t, err)
