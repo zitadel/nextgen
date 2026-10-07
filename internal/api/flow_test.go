@@ -625,7 +625,7 @@ func TestGetFlowStep_SSOResolvedRenderResealsCookie(t *testing.T) {
 	ts := newTestServer(t)
 	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", IssuedAt: time.Now()}
 	cookieVal := ts.sealCookie(t, state)
-	ts.fake.getResult = domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "identify"}, SSOResolved: true}
+	ts.fake.getResult = domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "identify"}, Reseal: true}
 
 	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
 	if resp.StatusCode != http.StatusOK {

@@ -313,6 +313,15 @@ type IDPConnectionPayload struct {
 	RevisionID  string  `json:"revision_id"`
 }
 
+// IDPIdentityLinkCreatedPayload is the create snapshot for
+// idp.identity_link.created. The link id is the event's entity_id; the
+// connection and user ids are secondary ids. The provider's subject is never
+// included: it identifies the person at the provider.
+type IDPIdentityLinkCreatedPayload struct {
+	ConnectionID string `json:"connection_id"`
+	UserID       string `json:"user_id"`
+}
+
 // IDPConnectionPayloadSnapshot is the allowlisted create snapshot for idp.created.
 func IDPConnectionPayloadSnapshot(connection *IDPConnection) (IDPConnectionPayload, error) {
 	doc, err := ParseIDPConnectionDocument(connection.Document)

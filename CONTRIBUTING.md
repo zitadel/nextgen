@@ -267,8 +267,7 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
   their `:test` task (via `test:all`), each pulling in Chromium through a moon
   `install-browsers` dep.
 - `moon ci :lint :typecheck :build :test :check-adrs`.
-- `moon run server:test`, then `moon run server:test-postgres`,
-  `moon run server:test-spanner` (Spanner emulator testcontainer), and
+- `moon run server:test`, then `moon run server:test-postgres` and
   `moon run server:test-sqlite`.
 - `moon run release:snapshot -- --skip-container` — a non-publishing release
   snapshot.
@@ -297,6 +296,11 @@ empty diff, or a failed query all force the
 complete run — and when the query returns an empty affected set, the run is
 only skipped if every changed file is on a narrow explicitly-inert allowlist
 (`docs/`, root agent notes), because unclaimed files are not assumed inert.
+
+The Spanner emulator suite (`moon run server:test-spanner`) is not part of
+`full-pr`. It runs in the separate `spanner` workflow, nightly on `main` and on
+demand, and is not a required check. To run it against a branch, use
+`gh workflow run spanner.yml --ref <branch>`, or run the Moon task locally.
 
 **Version-only mode** (Changesets version PRs) runs `release:version`,
 `release:pack`, and tarball verification instead.

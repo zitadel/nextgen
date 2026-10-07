@@ -91,6 +91,7 @@ describe("setup dependency installation", () => {
       .map((action) => [action.text, action.command].filter(Boolean).join(" "))
       .join("\n");
     expect(boxText).toContain("register a user");
+    expect(boxText).toContain("Open a second terminal in this directory");
     expect(boxText).not.toContain(".zitadel/schemas/");
     expect(boxText).not.toContain(planCommand);
     // The box carries the same journey as the envelope, structured for
