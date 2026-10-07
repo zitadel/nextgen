@@ -69,6 +69,8 @@ func TestWithCSRFRequestUsesEffectiveHost(t *testing.T) {
 		{"origin matches neither", "https://evil.example", "console.example.com", true},
 		{"no forwarded host: compared with Host", "https://console.example.com", "", true},
 		{"no forwarded host, origin matches Host", "http://backend:8080", "", false},
+		// Proxies append: the first entry is the host the client asked for.
+		{"forwarded host list", "https://console.example.com", "console.example.com, lb.internal", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
