@@ -237,6 +237,37 @@ Server enforcement must not land before the first-party callers can supply the
 token. The CLI's secret-authenticated `claim/init` and `claim/status` legs are
 unchanged; only the cookie-authenticated browser leg it opens is affected.
 
+> **Implementation note (2026-09-25, #1300):** shipped with three deliberate
+> refinements.
+>
+> - **Origin.** The check is Go's `http.CrossOriginProtection`: the
+>   browser-set `Sec-Fetch-Site` header, falling back to `Origin` against
+>   the effective host (`X-Forwarded-Host` before `Host`, as the rest of the
+>   server resolves it, so a proxy that rewrites `Host` does not refuse a
+>   client's real `Origin`). Requests carrying neither (non-browser clients)
+>   pass the origin check and still need the token where one is required. An exact match
+>   against the configured public base would have failed in every
+>   development and test setup that does not configure it, and behind the
+>   Console's Vite dev proxy.
+> - **Token.** The CSRF token is derived from the session cookie value
+>   (an HMAC keyed by it; `CSRFToken` in `internal/api/csrf.go`), with no
+>   server-side state or keys. Only a holder of the HttpOnly cookie can learn
+>   it, from its own cookie-authenticated resource, `GET /sessions/me/csrf`.
+> - **Scope.** The origin check covers every unsafe request the cookie
+>   authenticates. The token is required on all of them by default, so an
+>   operation that starts accepting the cookie is covered without being
+>   listed; only an explicit exemption list skips it. Sign-out
+>   (`revokeMySession`) is exempt, because customer apps call it through the
+>   SDK proxies, which cannot supply the token yet, and so are the
+>   `POST …/query` reads. A refusal is `403 auth.csrf_invalid`, listed in each
+>   affected operation's default error responses.
+>
+> Session liveness (the "active user session" condition above) needs no
+> check of its own: revoking or rotating a session deletes its token records,
+> a token record expires with its session, and every request introspects the
+> cookie against that record, so a signed-out session is refused at once.
+> `TestConsoleSessionRevokedStopsAuthorizing` pins it.
+
 ### 6. Project discovery is an authorization query
 
 The Console and CLI need a query that means "projects on which this principal
@@ -275,6 +306,17 @@ The ADR 033 denial contract applies unchanged:
 For a foreign human principal, an unknown target and a real but unauthorized
 target must be indistinguishable. The existing operator delete-idempotency
 exception for project secrets does not extend to foreign human sessions.
+
+> **Implementation note (2026-10-05, #1300):** creates keep ADR 033's
+> existing answer for a project without a foothold instead of `404`. Creating
+> a user, a schema, a flow definition or a branding revision in such a project
+> answers `400` with the resource's `*.invalid` code and the detail "project
+> does not exist" (`writeMiss` in `internal/api/authz.go`); teams and grants
+> already answer `404`. The answer is identical for a project that does not
+> exist, so the boundary above holds, and project-secret callers keep the
+> shape they already rely on. `TestConsoleSessionForeignTargetIsIndistinguishable`
+> pins both: every operation the Console calls answers a real foreign target
+> exactly as it answers a missing one.
 
 ### 8. Audit events are written in the protected project
 

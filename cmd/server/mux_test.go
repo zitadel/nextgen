@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/internal/api"
 
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/staticui/login"
@@ -128,4 +129,25 @@ func TestBuildHTTPMuxOmitsRuntimeDocumentWhenNoUISurfaceIsEnabled(t *testing.T) 
 	rec := get(t, mux, consoleRuntimePath)
 	assert.Equal(t, "api", rec.Header().Get("X-Test-Handler"))
 	assert.Equal(t, consoleRuntimePath, rec.Header().Get("X-Test-Path"))
+}
+
+// checkSessionCSRF refuses every cookie-authenticated request that did not pass
+// through api.WithCSRFRequest, so a mux without it would lock the Console out;
+// pinned here so a refactor of the chain cannot drop it unnoticed.
+func TestBuildHTTPMuxRecordsCSRFRequestState(t *testing.T) {
+	t.Parallel()
+	recorded := false
+	mux, err := buildHTTPMux(uiConfig(false, false), idgen.NewULID(),
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			recorded = api.CSRFRequestRecorded(r.Context())
+			w.WriteHeader(http.StatusTeapot)
+		}),
+		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
+		nil)
+	require.NoError(t, err)
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/teams", nil))
+	require.Equal(t, http.StatusTeapot, rec.Code, "the request must reach the API handler")
+	require.True(t, recorded, "api.WithCSRFRequest must wrap the API handler")
 }

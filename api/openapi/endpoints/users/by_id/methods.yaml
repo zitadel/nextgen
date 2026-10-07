@@ -21,6 +21,11 @@ get:
 
         Only active memberships match. A user who has been invited but has not
         accepted is not served.
+
+        It reads the user's memberships, so it takes the same permission as the
+        `team_id` filter on `POST /users/query`: `team_membership.read` for a
+        project secret, read on the whole project for a Console session.
+        Otherwise the answer is `403 user.permission_denied`.
       schema:
         $ref: ../../../components/schemas/team-id.yaml
     - name: user_id

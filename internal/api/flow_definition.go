@@ -43,7 +43,7 @@ func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefini
 }
 
 func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDefinitionsParams) (api.ListFlowDefinitionsRes, error) {
-	ctx, err := h.requireProjectListAccess(ctx, string(params.ProjectID), flowDefinitionAccess, domain.ResourceKindFlowDefinition)
+	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), flowDefinitionAccess, domain.ResourceKindFlowDefinition)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDef
 // exactly like reading them at GET /schemas (a caller without schema read
 // access gets an error, not a silently missing property).
 func (h Handler) expandUserSchemas(ctx context.Context, projectID string, definitions []api.FlowDefinitionResponse) error {
-	ctx, err := h.requireProjectListAccess(ctx, projectID, schemaAccess, domain.ResourceKindSchema)
+	ctx, _, err := h.requireProjectListAccess(ctx, projectID, schemaAccess, domain.ResourceKindSchema)
 	if err != nil {
 		return err
 	}
