@@ -105,7 +105,7 @@ From the configuration surface, flow engine, and branding. Long-form in [`platfo
 | **flow** | The UI-orchestration state machine — decides *which step renders when*. Does **not** hold auth primitives (those live in auth_attempts). Detail in [`flowengine/flow-engine.md`](flowengine/flow-engine.md). |
 | **flow definition** | The declarative spec uploaded via `npx zitadel push` that configures a flow. |
 | **audience** | The resolution hierarchy for flow definitions: `app > team > schema > project default`. |
-| **environment** | A config-version slot: `development`, `preview`, `production`. Governs origin wildcard rules (see [`api/security-and-origins.md`](api/security-and-origins.md)). |
+| **environment** | A client-side binding of a directory to a `(server, project)` pair, held in `.env.<name>.local` and selected by `--env`, `ZITADEL_ENV` or a platform signal, `development` by default. The name never reaches the server; no server resource is keyed on it. See §7. |
 | **drift** | Divergence between the repo's `zitadel.json` and server-side state. Resolves silently in favor of repo. |
 | **branding** | The per-project login-appearance resource: layout, asset URLs, and the Liquid template, published as immutable revisions via the Branding API / `zitadel apply`. Flow responses resolve the newest revision. Decisions in [ADR 040](../adrs/040-tenant-login-templates-editable-config.md). Carries widget appearance, widget structure, and project translations — not page chrome. Placement of each kind of change: [`branding/customization-strategy.md`](branding/customization-strategy.md), [ADR 057](../adrs/057-login-customization-categories.md). |
 | **translations** | Project-scoped locale × key copy overlays for login strings ([ADR 045](../adrs/045-copy-overlays-as-branding-revisions.md)). A different setting from branding appearance ([#1038](https://github.com/zitadel/nextgen/issues/1038)). Page-local override is `lang` / `locales` on the element ([ADR 018](../adrs/018-widget-owned-locale-resolution.md)). Placement: [`branding/customization-strategy.md`](branding/customization-strategy.md), [ADR 057](../adrs/057-login-customization-categories.md). |
@@ -121,13 +121,32 @@ From the configuration surface, flow engine, and branding. Long-form in [`platfo
 
 ---
 
-## 7. URL shape
+## 7. Releases and deployments
+
+How configuration reaches a project, and what each URL of it serves. Long-form in [`platform/releases-without-environments/`](platform/releases-without-environments/README.md).
+
+| Term | Meaning |
+|---|---|
+| **release** | An immutable bundle of resource revisions, identified on the wire by its content digest. Built by `POST /releases` from a `bundle` of file content (the CLI) or from `pointers` to revision ids (the console). **LOCKED** |
+| **origin** | An entry in a project's `origins`: a URL pattern with a `kind`. `primary` admits requests from matching URLs; `preview` only bounds which URLs the preview credential may register. `*` matches one or more non-dot characters; a literal beats a wildcard. Managed by `POST /projects/{id}/origins` and `zitadel origin add\|rm\|list`. **LOCKED** |
+| **primary** / **preview** (kind) | The two origin kinds. Say "primary origins", never "production origins": a staging host is a primary too. **LOCKED** |
+| **preview** (resource) | A live preview URL: one `previews` row per exact URL with an expiry, written by `zitadel preview` and gone when it expires or on `zitadel preview rm`. The preview admits requests from its URL; a `preview` pattern on its own admits none. Listed by `GET /previews` and `zitadel preview list`. **LOCKED** |
+| **target** | What a deployment points at: the project default (`""`), the keyword `primary` (every primary origin), or one exact origin. The only meaning of "target" in these docs. **LOCKED** |
+| **deployment** | The operation, `dep_…`: one release to a set of targets, in one transaction, append-only. Storage keeps one target row per origin under it; what an origin serves is its newest target row. `rollback` is a new deployment whose `rollback_of` names the one it reversed. `zitadel deployment list\|rollback`. **LOCKED** |
+| **project default** | The target with origin `""`, served to every caller that sends no `Origin`. A real target, not a fallback computed from the others. **LOCKED** |
+| **mode** | `project.mode`: `sandbox` or `production`. `production` rejects loopback and wildcard primaries, requires at least one origin, and confines a pinned release to what was deployed to the matched target. **LOCKED** |
+| **environment resolution** | How the CLI finds the server, project and credential a command runs against: `--server`, `--env-file`, `process.env`, then the `.env` files of the environment. `apps/cli/src/lib/environment.ts`. **LOCKED** |
+| **CLI grammar** | `zitadel <noun> <verb>`, noun singular: `deployment`, `preview`, `origin`, `variable`, `release`, `env`. `add` puts something on a list, `create` makes a resource, `set` is a key and a value, `rm` removes. `deploy` and `preview` are the two bare verbs, because a pipeline types them. Shipped verbs (`setup`, `apply`, `plan`, `claim`) stay. **LOCKED** |
+
+---
+
+## 8. URL shape
 
 **LOCKED: no version segment in paths.** All endpoints live directly under the root (`POST /users`, `GET /teams/{id}`). Header-selected versioning (`Zitadel-Version`, pinned per API key and per webhook endpoint) is target design — the shipped API is unversioned; breaking changes ride the alpha release train. See [`api/conventions.md`](api/conventions.md#direction-not-shipped).
 
 ---
 
-## 8. Orthogonal axes
+## 9. Orthogonal axes
 
 Four independent axes the system moves on.
 
@@ -135,12 +154,14 @@ Four independent axes the system moves on.
 |---|---|
 | **Lifecycle** | pre-claim → claimed |
 | **Tier** | Free, Pro, Enterprise (team-scoped billing inside the platform project) |
-| **Environment** | development, preview, production |
+| **Mode** | sandbox, production (`project.mode`, §7) |
 | **Integration level** | 1 (SSR + in-app), 2 (SPA), 3 (Hosted), 4 (White-label) |
+
+An environment is not an axis the server moves on: it is a client-side binding (§6, §7).
 
 ---
 
-## 9. Renames (LOCKED)
+## 10. Renames (LOCKED)
 
 | Was | Now | Notes |
 |---|---|---|
@@ -154,6 +175,12 @@ Four independent axes the system moves on.
 | `zp_…` | **`sk_proj_…`** | Pre-claim anonymous secret is `sk_proj_` with `pre_claim: true`. |
 | `zpp_…` | **`sk_proj_…`** (origin-scoped) | Origin-scoped variant for preview deploys. |
 | path version segment | **no version segment** | Versioning via header only. |
+| allowlist / `allowed_origins` | **origins** | The project's URL patterns. Being on the list already says "allowed". |
+| `origins` table (live preview rows) | **previews** | `GET /previews`, `zitadel preview list\|rm`. "Origin" then only ever means the URL or its pattern. |
+| `class` | **mode** | `project.mode: sandbox \| production`. |
+| `deploy_id` / `dpl_…` | **deployment** (`dep_…`) | The deployment is the operation; its per-origin rows are targets with no id of their own. |
+| target resolution (CLI) | **environment resolution** | `lib/target.ts` → `lib/environment.ts`; "target" is reserved for what a deployment points at. |
+| `zitadel deployments`, `rollback`, `allowlist`, `vars`, `releases revoke` | **`deployment list`, `deployment rollback`, `origin`, `variable`, `release revoke`** | The noun-verb grammar of §7. |
 
 ### "Instance" disambiguation
 
@@ -169,15 +196,17 @@ Five distinct uses of "instance" existed in the branch. Each resolves to a diffe
 
 ---
 
-## 10. Prose exceptions
+## 11. Prose exceptions
 
 - **developer** — allowed in audience/marketing prose ("developer-first audience"). Not the API resource term.
 - **organization** (plain English) — avoid. Use "team" even in prose.
 - **platform_user** — never in prose. Say "a user in the platform project" or "a developer".
+- **production origin** — avoid. A primary origin may be a staging host; say "primary origin".
+- **allowlist** — avoid for a project's origins. Say "origins".
 
 ---
 
-## 11. See also
+## 12. See also
 
 - [`api/README.md`](api/README.md) — API design guide index
 - [`platform/README.md`](platform/README.md) — platform lifecycle, claim, configuration

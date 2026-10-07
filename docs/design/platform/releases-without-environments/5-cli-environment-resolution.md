@@ -7,10 +7,11 @@
 How the CLI decides which server and which project a command addresses, from the
 process environment and `.env` files. Nothing here reaches the server.
 
-## Target resolution
+## Environment resolution
 
 Two values per invocation: a server URL and a project id, plus a credential for
-writes. Each resolves independently, highest priority first:
+writes. Together they are the environment a command runs against, and each
+resolves independently, highest priority first:
 
 1. `--server` — where to send, which the credential does not say
 2. `--env-file <path>` — for the keys it defines; no other file is read

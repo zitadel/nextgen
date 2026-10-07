@@ -58,7 +58,7 @@ ZITADEL_PROJECT_SECRET=sk_proj_9f2Hx8LqT4vRmYpN2wCbVa
 ```
 
 One file per environment, all of them local, or one file named outright with
-[`--env-file`](5-cli-target-resolution.md#naming-one-file-instead-of-the-convention).
+[`--env-file`](5-cli-environment-resolution.md#naming-one-file-instead-of-the-convention).
 Because nothing is committed, there is no reason to split the public values from
 the secret across two files — the split would buy nothing mechanical.
 `.env.example`, which **is** committed, carries the key names with empty values
@@ -73,16 +73,16 @@ Three reasons this beats a block in `zitadel.json`:
   copies have to agree.
 - **A platform's environment store cannot write `zitadel.json`.** Vercel and
   Netlify inject `process.env`, which wins at step 3 of
-  [target resolution](5-cli-target-resolution.md#target-resolution). A committed
+  [environment resolution](5-cli-environment-resolution.md#environment-resolution). A committed
   map would therefore be silently overridden in exactly the deployment where
   being wrong matters most — authoritative-looking and inert.
 - **`zitadel.json` stays purely configuration content.** It describes what gets
   built into a release. Connection details are not that, and keeping them out
   means the bundle needs no carve-out for the parts of the file that must not
   ship. The
-  [allowed origins](2-origins.md#why-the-allowlist-is-not-in-zitadeljson) are
-  out for the same reason and fail the same way: a list that differs per project
-  has nothing correct to say in a file every project shares.
+  [origins](2-origins.md#why-the-origins-are-not-in-zitadeljson) are out for
+  the same reason and fail the same way: a list that differs per project has
+  nothing correct to say in a file every project shares.
 
 ### What a platform build holds
 
@@ -200,8 +200,8 @@ available:
 $ zitadel env add production
 server?   https://api.zitadel.cloud
 project?  2 projects this team owns
-          [x] acme          prj_01K9AA9M3K7E2QX8VB4T   class=production
-          [ ] acme-admin    prj_01KBB2M4P7S9WQZ3F8N    class=sandbox
+          [x] acme          prj_01K9AA9M3K7E2QX8VB4T   mode=production
+          [ ] acme-admin    prj_01KBB2M4P7S9WQZ3F8N    mode=sandbox
           [ ] create a new one
 ```
 
@@ -225,14 +225,14 @@ server?           https://api.zitadel.cloud
 project?          [x] create a new one   [ ] bind an existing one
 name?             acme
 
-created           prj_01K9AA9M3K7E2QX8VB4T   class=sandbox   unclaimed
+created           prj_01K9AA9M3K7E2QX8VB4T   mode=sandbox   unclaimed
 wrote             .env.production.local   URL, PROJECT_ID, PUBLISHABLE_KEY, PROJECT_SECRET
 
 next
-  zitadel allowlist add https://app.acme.com --kind primary  allow the origin
+  zitadel origin add https://app.acme.com --kind primary     allow the origin
   zitadel deploy --env production                            ship configuration
   zitadel claim --env production                             attach an owner
-  zitadel projects promote --env production                  class=production
+  zitadel projects promote --env production                  mode=production
 
 platform          the build needs these; nothing on this machine puts them there
   production scope   ZITADEL_URL, ZITADEL_PROJECT_ID, ZITADEL_PUBLISHABLE_KEY,
@@ -264,11 +264,11 @@ holds the project secret and knows which project the token is for.
 exists, created by a teammate or by `zitadel projects create`. The two steps are
 separable because they are two concepts; offering to create one is only sugar.
 `--project` means "bind this id" here and nowhere else — it is
-[not a resolution override](5-cli-target-resolution.md#target-resolution).
+[not a resolution override](5-cli-environment-resolution.md#environment-resolution).
 
 ```
 $ zitadel env list
-ENVIRONMENT   SERVER                       PROJECT                   CLASS     CLAIMED
+ENVIRONMENT   SERVER                       PROJECT                   MODE      CLAIMED
 development   local                        prj_01KDEV7T9QX3M2E8      sandbox   —
 production    https://api.zitadel.cloud    prj_01K9AA9M3K7E2QX8VB4T  sandbox   no
 
@@ -295,15 +295,15 @@ one is the right one turns on a single question: should staging share
 production's users?
 
 **Shared users — one project, one more primary.** `staging.acme.com` is a
-`primary` literal in the allowlist, deployed on its own:
+`primary` literal among the origins, deployed on its own:
 
 ```
-$ zitadel allowlist add https://staging.acme.com --kind primary
+$ zitadel origin add https://staging.acme.com --kind primary
 $ zitadel deploy --origin https://staging.acme.com -m "try the new flow"
 ```
 
 A primary has no expiry, so an idle staging branch does not go dark, and it is
-answered by layer 2 like any production hostname. Promotion is
+answered by layer 2 like any primary hostname. Promotion is
 `zitadel deploy` with no `--origin`, which moves `(default)` and the rest of
 the primaries to what staging already runs. On the platform, `staging.acme.com`
 is a branch domain on the production project; its build runs
@@ -324,8 +324,8 @@ scopes preview variables per branch, Netlify has a per-branch
 separate Pages project for staging. Promotion is the
 [digest assertion](1-data-model.md#promotion) between the two projects.
 
-A long-lived `preview` origin is the one shape to avoid for staging: its row
-expires, so a staging that nobody pushed to for a week answers
+A long-lived `preview` origin is the one shape to avoid for staging: its
+preview expires, so a staging that nobody pushed to for a week answers
 `403 proj.preview_not_live` to the first person who tries it.
 
 ### Shipping to it
@@ -343,12 +343,12 @@ release      sha256:4a5b6c7d  (new in this project)
   targets: (default), https://app.acme.com  (primary, already allowed)
 
 continue? [y/N] y
-deployed     dpl_01KC4N8P2S5WQZ   2 deployment records written
+deployed     dep_01KC4N8P2S5WQZ   2 targets
 ```
 
-The allowlist is read here, never written. `deploy` fans out over the `primary`
+The origins are read here, never written. `deploy` fans out over the `primary`
 origins the project already allows, so
-[allowing one](2-origins.md#why-the-allowlist-is-not-in-zitadeljson) is the
+[allowing one](2-origins.md#why-the-origins-are-not-in-zitadeljson) is the
 step before this rather than part of it — which is why `zitadel env add`
 suggests it first.
 
@@ -359,7 +359,7 @@ two would match and `deploy` could assert it — see [Open 1](1-data-model.md#op
 
 ### Making it production
 
-The class belongs to the project, so the verb is a project verb, addressed by
+The mode belongs to the project, so the verb is a project verb, addressed by
 the environment that selects it.
 
 ```
@@ -370,7 +370,7 @@ $ zitadel projects promote --env production
 revalidating 2 origins against the production rules
   https://app.acme.com           primary   exact origin               ✓
   https://*-acmeinc.vercel.app   preview   bounded by label `-acmeinc` ✓
-class      sandbox -> production
+mode       sandbox -> production
 ```
 
 `promote` is free as a verb because release promotion no longer needs it.
