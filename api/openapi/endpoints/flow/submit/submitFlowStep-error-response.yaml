@@ -22,10 +22,17 @@ content:
         - $ref: '../../../components/schemas/errors/flow-not_found.yaml'
         - $ref: '../../../components/schemas/errors/flow-restart_required.yaml'
         - $ref: '../../../components/schemas/errors/flow-unsupported.yaml'
+        - $ref: '../../../components/schemas/errors/idp-endpoint_cleartext.yaml'
+        - $ref: '../../../components/schemas/errors/idp-endpoints_partial.yaml'
+        - $ref: '../../../components/schemas/errors/idp-oauth2_unsupported.yaml'
+        - $ref: '../../../components/schemas/errors/idp-protocol_block_missing.yaml'
+        - $ref: '../../../components/schemas/errors/idp-scopes_missing_openid.yaml'
+        - $ref: '../../../components/schemas/errors/idp-strategy_pointer_unsupported.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
+        - $ref: '../../../components/schemas/errors/att-sso_state_invalid.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
         - $ref: '../../../components/schemas/errors/unavailable.yaml'
         - $ref: '../../../components/schemas/errors/user-already_exists.yaml'
@@ -54,10 +61,17 @@ content:
           flow.not_found: '../../../components/schemas/errors/flow-not_found.yaml'
           flow.restart_required: '../../../components/schemas/errors/flow-restart_required.yaml'
           flow.unsupported: '../../../components/schemas/errors/flow-unsupported.yaml'
+          idp.endpoint_cleartext: '../../../components/schemas/errors/idp-endpoint_cleartext.yaml'
+          idp.endpoints_partial: '../../../components/schemas/errors/idp-endpoints_partial.yaml'
+          idp.oauth2_unsupported: '../../../components/schemas/errors/idp-oauth2_unsupported.yaml'
+          idp.protocol_block_missing: '../../../components/schemas/errors/idp-protocol_block_missing.yaml'
+          idp.scopes_missing_openid: '../../../components/schemas/errors/idp-scopes_missing_openid.yaml'
+          idp.strategy_pointer_unsupported: '../../../components/schemas/errors/idp-strategy_pointer_unsupported.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
+          att.sso_state_invalid: '../../../components/schemas/errors/att-sso_state_invalid.yaml'
           enc_key.unknown_alg: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
           unavailable: '../../../components/schemas/errors/unavailable.yaml'
           user.already_exists: '../../../components/schemas/errors/user-already_exists.yaml'
@@ -156,6 +170,36 @@ content:
         value:
           code: flow.unsupported
           message: 'flow feature is not supported'
+      idp.endpoint_cleartext:
+        summary: idp.endpoint_cleartext
+        value:
+          code: idp.endpoint_cleartext
+          message: 'identity provider connection: an endpoint is not https'
+      idp.endpoints_partial:
+        summary: idp.endpoints_partial
+        value:
+          code: idp.endpoints_partial
+          message: 'identity provider connection: the endpoints are partially set'
+      idp.oauth2_unsupported:
+        summary: idp.oauth2_unsupported
+        value:
+          code: idp.oauth2_unsupported
+          message: 'identity provider connection: the oauth2 protocol is not supported yet'
+      idp.protocol_block_missing:
+        summary: idp.protocol_block_missing
+        value:
+          code: idp.protocol_block_missing
+          message: 'identity provider connection: the protocol block is missing'
+      idp.scopes_missing_openid:
+        summary: idp.scopes_missing_openid
+        value:
+          code: idp.scopes_missing_openid
+          message: 'identity provider connection: OIDC scopes must contain openid'
+      idp.strategy_pointer_unsupported:
+        summary: idp.strategy_pointer_unsupported
+        value:
+          code: idp.strategy_pointer_unsupported
+          message: 'identity provider connection: an oidc connection cannot verify a property by strategy'
       internal:
         summary: internal
         value:
@@ -176,6 +220,11 @@ content:
         value:
           code: req.invalid
           message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+      att.sso_state_invalid:
+        summary: att.sso_state_invalid
+        value:
+          code: att.sso_state_invalid
+          message: 'The SSO state is not valid.'
       enc_key.unknown_alg:
         summary: enc_key.unknown_alg
         value:
