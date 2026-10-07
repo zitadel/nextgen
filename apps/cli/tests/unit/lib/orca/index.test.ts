@@ -289,9 +289,7 @@ describe("Orca.scaffold", () => {
       hint: expect.stringContaining("lowercase npm-package-safe"),
       details: expect.objectContaining({
         name: expect.stringContaining("Zitadel-Orca-Bad"),
-        validation_errors: expect.arrayContaining([
-          "name can no longer contain capital letters",
-        ]),
+        validation_errors: expect.arrayContaining(["name can no longer contain capital letters"]),
       }),
     });
     expect(scaffold).not.toHaveBeenCalled();

@@ -9,9 +9,7 @@ import { bail } from "./cancel";
  * `Orca.availableFrameworks`.
  */
 export class PickFrameworkPrompt {
-  async ask(
-    choices: ReadonlyArray<{ id: string; displayName: string }>,
-  ): Promise<string> {
+  async ask(choices: ReadonlyArray<{ id: string; displayName: string }>): Promise<string> {
     intro("Zitadel setup — new project");
     const picked = await select({
       message: "Choose a framework to scaffold",

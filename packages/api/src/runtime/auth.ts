@@ -48,7 +48,11 @@ interface CsrfSlot {
 
 function csrfSlot(): CsrfSlot {
   const global = globalThis as Record<symbol, CsrfSlot | undefined>;
-  return (global[CSRF_SLOT] ??= {});
+  const existing = global[CSRF_SLOT];
+  if (existing) return existing;
+  const slot: CsrfSlot = {};
+  global[CSRF_SLOT] = slot;
+  return slot;
 }
 
 function pageOrigin(): string | undefined {

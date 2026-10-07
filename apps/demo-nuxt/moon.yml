@@ -8,11 +8,6 @@ dependsOn:
   - "sdk-nuxt"
 
 tasks:
-  lint:
-    command: "corepack pnpm exec oxlint ."
-    deps:
-      - "sdk-nuxt:build"
-
   typecheck:
     command: "corepack pnpm run typecheck"
     deps:

@@ -1,12 +1,7 @@
 import { Flags } from "@oclif/core";
 import { cancel, isCancel, password, text } from "@clack/prompts";
 
-import {
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankArg,
-  OwnerCommand,
-} from "../../lib/oclif";
+import { CommandGroups, type JsonEnvelope, nonBlankArg, OwnerCommand } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { ZitadelError } from "../../lib/errors";
 import {

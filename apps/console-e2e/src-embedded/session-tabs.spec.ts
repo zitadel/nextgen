@@ -67,7 +67,9 @@ async function markDocument(page: Page): Promise<() => Promise<boolean>> {
     (window as unknown as { __sameDocument?: boolean }).__sameDocument = true;
   });
   return () =>
-    page.evaluate(() => (window as unknown as { __sameDocument?: boolean }).__sameDocument === true);
+    page.evaluate(
+      () => (window as unknown as { __sameDocument?: boolean }).__sameDocument === true,
+    );
 }
 
 test("a write after the same person signed in again in another tab goes through", async ({

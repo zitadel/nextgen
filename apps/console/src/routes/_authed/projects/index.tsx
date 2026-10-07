@@ -209,7 +209,6 @@ function ProjectsScreen() {
   );
 }
 
-
 /**
  * The row menu.
  *

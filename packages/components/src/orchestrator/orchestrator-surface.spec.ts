@@ -5,7 +5,7 @@ import "./zitadel-login.js";
 import "./zitadel-logout.js";
 import "./zitadel-session.js";
 import { ZitadelLogin } from "./zitadel-login.js";
-import { ZitadelLogout } from "./zitadel-logout.js";
+import type { ZitadelLogout } from "./zitadel-logout.js";
 import { ZitadelSession } from "./zitadel-session.js";
 
 /**

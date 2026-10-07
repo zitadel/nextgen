@@ -93,11 +93,31 @@ describe("report-moon-failures", () => {
     expect(
       normalizeFailures({
         actions: [
-          { label: "RunTask(a:lint)", status: "failed", node: { action: "run-task", params: { target: "a:lint" } } },
-          { label: "RunTask(a:test)", status: "invalid", node: { action: "run-task", params: { target: "a:test" } } },
-          { label: "RunTask(a:build)", status: "timed-out", node: { action: "run-task", params: { target: "a:build" } } },
-          { label: "RunTask(a:typecheck)", status: "passed", node: { action: "run-task", params: { target: "a:typecheck" } } },
-          { label: "RunTask(a:format)", status: "skipped", node: { action: "run-task", params: { target: "a:format" } } },
+          {
+            label: "RunTask(a:lint)",
+            status: "failed",
+            node: { action: "run-task", params: { target: "a:lint" } },
+          },
+          {
+            label: "RunTask(a:test)",
+            status: "invalid",
+            node: { action: "run-task", params: { target: "a:test" } },
+          },
+          {
+            label: "RunTask(a:build)",
+            status: "timed-out",
+            node: { action: "run-task", params: { target: "a:build" } },
+          },
+          {
+            label: "RunTask(a:typecheck)",
+            status: "passed",
+            node: { action: "run-task", params: { target: "a:typecheck" } },
+          },
+          {
+            label: "RunTask(a:format)",
+            status: "skipped",
+            node: { action: "run-task", params: { target: "a:format" } },
+          },
         ],
       }),
     ).toEqual([
@@ -112,9 +132,9 @@ describe("report-moon-failures", () => {
     expect(formatGithubAnnotations(normalizeFailures(failedRunTaskReport()))).toEqual([
       "::error title=Moon task failed::server:format failed (exit 1)",
     ]);
-    expect(
-      formatGithubAnnotations([{ name: "a:build", status: "timed-out", detail: "" }]),
-    ).toEqual(["::error title=Moon task failed::a:build timed-out"]);
+    expect(formatGithubAnnotations([{ name: "a:build", status: "timed-out", detail: "" }])).toEqual(
+      ["::error title=Moon task failed::a:build timed-out"],
+    );
   });
 
   it("escapes workflow-command special characters in annotations", async () => {

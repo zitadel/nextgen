@@ -38,6 +38,16 @@ tasks:
     inputs:
       - "@group(benchInputs)"
 
+  # This is a Go project, so it inherits no Biome lint task, but it owns a
+  # JavaScript k6 script (scripts/*.js). Lint it here so a change to it cannot
+  # bypass Biome; the JS files are inputs, so `moon ci :lint` selects this task
+  # when a script changes. Mirrors the server launcher (apps/server/moon.yml).
+  lint:
+    command: "corepack pnpm exec biome check scripts --no-errors-on-unmatched"
+    inputs:
+      - "scripts/**/*.js"
+      - "/biome.json"
+
   # The CI build #1096 asks for: the module and the binary compile. No load
   # is generated here. dist/ is what every project builds into and is
   # gitignored at the root.

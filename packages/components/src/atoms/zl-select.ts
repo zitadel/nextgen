@@ -51,10 +51,7 @@ export class ZlSelect extends LitElement {
     delegatesFocus: true,
   };
 
-  static override styles = [
-    baseHostStyles,
-    ...surfaceStyles(selectStyles),
-  ];
+  static override styles = [baseHostStyles, ...surfaceStyles(selectStyles)];
 
   /**
    * Field name — used as the key in form submission and in `zl-change` detail.
@@ -265,9 +262,9 @@ export class ZlSelect extends LitElement {
     return html`
       <label class="zr-select__label" part="label" id=${labelId} @click=${this.handleLabelClick}>
         <span>${this.label}</span>
-        ${this.required
-          ? html`<span class="zr-select__required" aria-hidden="true">*</span>`
-          : null}
+        ${
+          this.required ? html`<span class="zr-select__required" aria-hidden="true">*</span>` : null
+        }
       </label>
     `;
   }
