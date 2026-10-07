@@ -9,7 +9,6 @@
     "@zitadel/sdk-nuxt": "workspace:*",
     "@playwright/test": "catalog:",
     "@zitadel/api-mock": "workspace:*",
-    "eslint-plugin-playwright": "catalog:",
     "typescript": "catalog:"
   }
 }

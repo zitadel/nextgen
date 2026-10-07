@@ -65,11 +65,17 @@ export async function mintSession(
         },
       };
     }
-    response = await flowFetch(handle, jar, origin, `/flow/${encodeURIComponent(response.id)}/submit`, {
-      session_token: response.session_token,
-      action: "submit",
-      fields: collectFields(response, values),
-    });
+    response = await flowFetch(
+      handle,
+      jar,
+      origin,
+      `/flow/${encodeURIComponent(response.id)}/submit`,
+      {
+        session_token: response.session_token,
+        action: "submit",
+        fields: collectFields(response, values),
+      },
+    );
   }
 
   throw new Error(
@@ -118,8 +124,7 @@ async function flowFetch(
   jar.absorb(response);
   const parsed = (await response.json().catch(() => undefined)) as CreateFlow201 | undefined;
   if (!response.ok || !parsed) {
-    const detail =
-      parsed && typeof parsed === "object" ? ` — ${JSON.stringify(parsed)}` : "";
+    const detail = parsed && typeof parsed === "object" ? ` — ${JSON.stringify(parsed)}` : "";
     // An origin-allowlist rejection without an Origin header is a
     // configuration gap, not a flow problem — say how to close it. (No eager
     // check: a project with an empty allowlist may accept originless calls.)
@@ -138,7 +143,10 @@ async function flowFetch(
  * convention — from the known email/password values. An unknown required
  * field means this flow needs more than a password login can provide.
  */
-function collectFields(response: CreateFlow201, values: Record<string, string>): Record<string, string> {
+function collectFields(
+  response: CreateFlow201,
+  values: Record<string, string>,
+): Record<string, string> {
   const fields: Record<string, string> = {};
   for (const field of response.step.fields ?? []) {
     const value = values[fieldKey(field)];

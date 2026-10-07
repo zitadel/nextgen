@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 /**
  * `MetaItem` — the small uppercase annotation that sits beside a label.
@@ -13,10 +13,7 @@ import { cn } from "@/lib/utils"
  * sentence case — the design's text node reads `OPTIONAL`, which renders
  * identically.
  */
-export function MetaItem({
-  className,
-  ...props
-}: React.ComponentProps<"span">) {
+export function MetaItem({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
       data-slot="meta-item"
@@ -26,5 +23,5 @@ export function MetaItem({
       )}
       {...props}
     />
-  )
+  );
 }

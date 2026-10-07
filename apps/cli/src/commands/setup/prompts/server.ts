@@ -86,9 +86,7 @@ async function detectLocalServer(cwd: string): Promise<string | undefined> {
   s.start("Checking for a local Zitadel server");
   const detected = await detectHealthyLocalServer(cwd);
   s.stop(
-    detected
-      ? `Found local Zitadel server at ${detected}.`
-      : "No local Zitadel server detected.",
+    detected ? `Found local Zitadel server at ${detected}.` : "No local Zitadel server detected.",
   );
   return detected;
 }

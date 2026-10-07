@@ -22,12 +22,19 @@ const stages = cfg.stages;
 const CONFIG_LABELS = { "with-skill": "With skill", baseline: "Baseline (no skill)" };
 
 const esc = (s) =>
-  String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  String(s).replace(
+    /[&<>"]/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
+  );
 
 // --- Run metadata -----------------------------------------------------------
 const git = (args) => {
   try {
-    return execSync(`git ${args}`, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return execSync(`git ${args}`, {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
   } catch {
     return "";
   }
@@ -52,9 +59,36 @@ const meta = {
 marked.setOptions({ gfm: true });
 const SANITIZE = {
   allowedTags: [
-    "p", "br", "hr", "strong", "em", "b", "i", "s", "del", "code", "pre", "kbd",
-    "blockquote", "a", "ul", "ol", "li", "table", "thead", "tbody", "tr", "th", "td",
-    "h1", "h2", "h3", "h4", "h5", "h6", "span",
+    "p",
+    "br",
+    "hr",
+    "strong",
+    "em",
+    "b",
+    "i",
+    "s",
+    "del",
+    "code",
+    "pre",
+    "kbd",
+    "blockquote",
+    "a",
+    "ul",
+    "ol",
+    "li",
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "th",
+    "td",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "span",
   ],
   allowedAttributes: { a: ["href", "title"], th: ["align"], td: ["align"] },
   allowedSchemes: ["http", "https", "mailto"],
@@ -73,8 +107,7 @@ const durFallback = (ms) => {
   const r = s % 60;
   return `${h ? h + "h " : ""}${m ? m + "m " : ""}${r}s`;
 };
-const dur = (ms) =>
-  ms ? `<span class="dur" data-ms="${ms}">${esc(durFallback(ms))}</span>` : "";
+const dur = (ms) => (ms ? `<span class="dur" data-ms="${ms}">${esc(durFallback(ms))}</span>` : "");
 const timeEl = (iso) =>
   `<time class="ts" datetime="${esc(iso)}" data-iso="${esc(iso)}">${esc(iso)}</time>`;
 

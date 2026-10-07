@@ -562,9 +562,9 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     const mark = element.shadowRoot?.querySelector(".zl-attribution") as HTMLElement;
     expect(mark.closest(".zl-split__form")).toBeTruthy();
     expect(mark.getAttribute("slot")).toBeNull();
-    expect(
-      Math.round(mark.getBoundingClientRect().top - card.getBoundingClientRect().bottom),
-    ).toBe(24);
+    expect(Math.round(mark.getBoundingClientRect().top - card.getBoundingClientRect().bottom)).toBe(
+      24,
+    );
   });
 
   it("a split template with no anchor still slots the trustmark into the shell footer", async () => {

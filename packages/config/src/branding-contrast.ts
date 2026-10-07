@@ -54,24 +54,90 @@ export type ContrastPair = {
  * background those two disagree about.
  */
 export const BRANDING_CONTRAST_PAIRS: readonly ContrastPair[] = [
-  { id: "text/background", foreground: "text", background: "background", minimum: CONTRAST_AA_TEXT, describes: "body text on the page" },
-  { id: "text/surface", foreground: "text", background: "surface", minimum: CONTRAST_AA_TEXT, describes: "body text on the card" },
-  { id: "text_muted/surface", foreground: "text_muted", background: "surface", minimum: CONTRAST_AA_TEXT, describes: "secondary text on the card" },
+  {
+    id: "text/background",
+    foreground: "text",
+    background: "background",
+    minimum: CONTRAST_AA_TEXT,
+    describes: "body text on the page",
+  },
+  {
+    id: "text/surface",
+    foreground: "text",
+    background: "surface",
+    minimum: CONTRAST_AA_TEXT,
+    describes: "body text on the card",
+  },
+  {
+    id: "text_muted/surface",
+    foreground: "text_muted",
+    background: "surface",
+    minimum: CONTRAST_AA_TEXT,
+    describes: "secondary text on the card",
+  },
   // `muted` fills the secondary button and the alert, both of which draw text
   // on it — a palette can read perfectly on the card and be unreadable here.
-  { id: "text/muted", foreground: "text", background: "muted", minimum: CONTRAST_AA_TEXT, describes: "the secondary button's label" },
-  { id: "text_muted/muted", foreground: "text_muted", background: "muted", minimum: CONTRAST_AA_TEXT, describes: "supporting text in an alert" },
-  { id: "on_primary/primary", foreground: "on_primary", background: "primary", minimum: CONTRAST_AA_TEXT, describes: "the primary button's label" },
-  { id: "link/surface", foreground: "link", background: "surface", minimum: CONTRAST_AA_TEXT, describes: "links on the card" },
-  { id: "error/surface", foreground: "error", background: "surface", minimum: CONTRAST_AA_TEXT, describes: "error text on the card" },
-  { id: "success/surface", foreground: "success", background: "surface", minimum: CONTRAST_AA_TEXT, describes: "success text on the card" },
-  { id: "warning/surface", foreground: "warning", background: "surface", minimum: CONTRAST_AA_TEXT, describes: "warning text on the card" },
+  {
+    id: "text/muted",
+    foreground: "text",
+    background: "muted",
+    minimum: CONTRAST_AA_TEXT,
+    describes: "the secondary button's label",
+  },
+  {
+    id: "text_muted/muted",
+    foreground: "text_muted",
+    background: "muted",
+    minimum: CONTRAST_AA_TEXT,
+    describes: "supporting text in an alert",
+  },
+  {
+    id: "on_primary/primary",
+    foreground: "on_primary",
+    background: "primary",
+    minimum: CONTRAST_AA_TEXT,
+    describes: "the primary button's label",
+  },
+  {
+    id: "link/surface",
+    foreground: "link",
+    background: "surface",
+    minimum: CONTRAST_AA_TEXT,
+    describes: "links on the card",
+  },
+  {
+    id: "error/surface",
+    foreground: "error",
+    background: "surface",
+    minimum: CONTRAST_AA_TEXT,
+    describes: "error text on the card",
+  },
+  {
+    id: "success/surface",
+    foreground: "success",
+    background: "surface",
+    minimum: CONTRAST_AA_TEXT,
+    describes: "success text on the card",
+  },
+  {
+    id: "warning/surface",
+    foreground: "warning",
+    background: "surface",
+    minimum: CONTRAST_AA_TEXT,
+    describes: "warning text on the card",
+  },
   // The one pair that is not text. A field outline is a user-interface
   // component boundary, which WCAG 2.2 holds to 3:1 rather than 4.5:1 — an
   // input the visitor cannot find is a real failure, not decoration. Dropping
   // it would make `required` a constant, which is the only argument for
   // leaving it out.
-  { id: "border/surface", foreground: "border", background: "surface", minimum: CONTRAST_AA_LARGE, describes: "the outline of inputs" },
+  {
+    id: "border/surface",
+    foreground: "border",
+    background: "surface",
+    minimum: CONTRAST_AA_LARGE,
+    describes: "the outline of inputs",
+  },
 ];
 
 export type ContrastFinding = ContrastPair & {
@@ -108,7 +174,9 @@ function ratioOf(a: Rgba, b: Rgba): number {
  * rather than reported: an omitted key takes the maintained default for that
  * side, which the design system already holds to this bar.
  */
-export function checkPaletteContrast(palette: BrandingPaletteColors | undefined): ContrastFinding[] {
+export function checkPaletteContrast(
+  palette: BrandingPaletteColors | undefined,
+): ContrastFinding[] {
   if (!palette) return [];
   // `currentColor` on a palette key means the text colour it would inherit.
   // Everything the pairs below draw sits on the card, so that is the side's
@@ -183,7 +251,10 @@ function resolveSurface(
  * Warning-only by decision: a failing pair never blocks saving or publishing.
  */
 export function contrastIssues(branding: {
-  theme?: { light?: { palette?: BrandingPaletteColors }; dark?: { palette?: BrandingPaletteColors } };
+  theme?: {
+    light?: { palette?: BrandingPaletteColors };
+    dark?: { palette?: BrandingPaletteColors };
+  };
 }): ContrastIssue[] {
   const byTheme = checkBrandingContrast(branding);
   const issues: ContrastIssue[] = [];
@@ -213,7 +284,10 @@ export type ContrastIssue = {
 
 /** Both sides of a revision, keyed by the side each finding belongs to. */
 export function checkBrandingContrast(branding: {
-  theme?: { light?: { palette?: BrandingPaletteColors }; dark?: { palette?: BrandingPaletteColors } };
+  theme?: {
+    light?: { palette?: BrandingPaletteColors };
+    dark?: { palette?: BrandingPaletteColors };
+  };
 }): { light: ContrastFinding[]; dark: ContrastFinding[] } {
   return {
     light: checkPaletteContrast(branding.theme?.light?.palette),

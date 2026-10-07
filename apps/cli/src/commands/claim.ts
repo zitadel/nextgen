@@ -126,7 +126,8 @@ export default class Claim extends BaseCommand {
         data: {
           title: "Zitadel claim was not started.",
           project_id: secret.project_id,
-          would: "Open a browser to claim this project, then record the owning team in .zitadel/secret.",
+          would:
+            "Open a browser to claim this project, then record the owning team in .zitadel/secret.",
         },
         nextCommands: ["zitadel claim"],
       });

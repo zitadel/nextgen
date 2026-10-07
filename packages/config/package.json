@@ -93,8 +93,7 @@
     "typecheck": "tsc --build tsconfig.json",
     "pretest": "pnpm run sync-schemas",
     "test": "vitest run",
-    "test:all": "pnpm run test",
-    "lint": "oxlint ."
+    "test:all": "pnpm run test"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",

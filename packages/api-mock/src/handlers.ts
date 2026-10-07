@@ -392,7 +392,10 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       ),
     ),
     http.delete("*/sessions/me", () =>
-      HttpResponse.json({ code: "auth.unauthorized", message: "no session cookie" }, { status: 401 }),
+      HttpResponse.json(
+        { code: "auth.unauthorized", message: "no session cookie" },
+        { status: 401 },
+      ),
     ),
   ];
 

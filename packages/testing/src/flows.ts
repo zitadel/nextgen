@@ -185,7 +185,10 @@ export async function loginWithPassword(
  * headless runs — the ceremony completes automatically once the widget
  * issues the WebAuthn challenge.
  */
-export async function loginWithPasskey(page: Page, options: { email?: string } = {}): Promise<void> {
+export async function loginWithPasskey(
+  page: Page,
+  options: { email?: string } = {},
+): Promise<void> {
   if (options.email !== undefined) {
     await emailField(page).fill(options.email);
   }
@@ -250,7 +253,11 @@ async function advanceToRegistration(
   profile: ProfileEntry[] | undefined,
 ): Promise<void> {
   await emailField(page).fill(email);
-  if (await passwordField(page).isVisible().catch(() => false)) {
+  if (
+    await passwordField(page)
+      .isVisible()
+      .catch(() => false)
+  ) {
     await flowAction(page, "register").click();
   } else {
     await flowAction(page, "submit").click();

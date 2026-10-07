@@ -135,7 +135,6 @@ export type ZitadelLoginProps = ZitadelLoginConfig &
  */
 export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
   const host = useSignal<ZitadelLoginElement>();
-  // eslint-disable-next-line qwik/no-use-visible-task
   useVisibleTask$(
     ({ track, cleanup }) => {
       const el = track(() => host.value);
@@ -204,7 +203,6 @@ export type ZitadelLogoutProps = ZitadelLogoutConfig &
  */
 export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   const host = useSignal<ZitadelLogoutElement>();
-  // eslint-disable-next-line qwik/no-use-visible-task
   useVisibleTask$(
     ({ track, cleanup }) => {
       const el = track(() => host.value);
@@ -260,7 +258,6 @@ export type ZitadelSessionProps = ZitadelSessionConfig &
  */
 export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
   const host = useSignal<ZitadelSessionElement>();
-  // eslint-disable-next-line qwik/no-use-visible-task
   useVisibleTask$(
     ({ track, cleanup }) => {
       const el = track(() => host.value);

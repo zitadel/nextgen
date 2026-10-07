@@ -176,8 +176,7 @@ export function generateSchema(source: string, emitted: ReadonlySet<string>): Sc
 }
 
 const isDirectRun =
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 
 if (isDirectRun) {
   const sources = findSources(join(ROOT, "api/openapi"));

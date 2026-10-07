@@ -83,7 +83,12 @@ function emittedCorpus(): string[] {
     }
   }
   corpus.push(reactRenderer.templates.customElementsDts!().contents);
-  corpus.push(appVueTemplate(), indexPageTemplate(), componentsPluginTemplate(), authPluginTemplate());
+  corpus.push(
+    appVueTemplate(),
+    indexPageTemplate(),
+    componentsPluginTemplate(),
+    authPluginTemplate(),
+  );
   for (const frameworkId of ["next", "nuxt", "react"]) {
     for (const posture of postures) {
       for (const preset of ["password-first", "passkey-first"]) {
@@ -117,7 +122,9 @@ function exportedSubpaths(packageDir: string): Set<string> | undefined {
 describe("emitted @zitadel specifiers", () => {
   it("resolve in the workspace packages' export maps", () => {
     expect(existsSync(join(WORKSPACE_ROOT, "pnpm-workspace.yaml"))).toBe(true);
-    const specifiers = new Set(emittedCorpus().flatMap((text) => text.match(SPECIFIER_PATTERN) ?? []));
+    const specifiers = new Set(
+      emittedCorpus().flatMap((text) => text.match(SPECIFIER_PATTERN) ?? []),
+    );
     expect(specifiers.size).toBeGreaterThan(0);
     for (const specifier of specifiers) {
       const [scope, name, ...rest] = specifier.split("/");

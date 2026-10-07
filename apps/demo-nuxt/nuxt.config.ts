@@ -21,11 +21,7 @@ export default defineNuxtConfig({
   css: ["~/assets/css/demo-host.css"],
   ssr: true,
   build: {
-    transpile: [
-      "@zitadel/api",
-      "@zitadel/components",
-      "@zitadel/design-tokens",
-    ],
+    transpile: ["@zitadel/api", "@zitadel/components", "@zitadel/design-tokens"],
   },
   runtimeConfig: {
     zitadelUrl: process.env.ZITADEL_URL ?? "http://localhost:8080",

@@ -175,7 +175,11 @@ export function createZitadelClient(
   sanitize: SanitizeOptions = {},
 ): ZitadelClient {
   const onResolve = sanitize.verbatim ? <T>(value: T): T => value : sanitizeResponse;
-  const client = createRawClient({ signal: interruptSignal(), timeoutMs: REQUEST_TIMEOUT_MS, ...opts });
+  const client = createRawClient({
+    signal: interruptSignal(),
+    timeoutMs: REQUEST_TIMEOUT_MS,
+    ...opts,
+  });
   return new Proxy(client, {
     get(target, prop, receiver) {
       const value = Reflect.get(target, prop, receiver);

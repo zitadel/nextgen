@@ -11,33 +11,15 @@
  * turn from the OpenAPI YAML by `scripts/generate-meta-schemas.ts` at the repo
  * root, so the YAML is the only thing to edit.
  */
-import authMethodMetaSchema from "../meta-schemas/auth-method.json" with {
-  type: "json",
-};
-import authMethodsMetaSchema from "../meta-schemas/auth-methods.json" with {
-  type: "json",
-};
-import brandingMetaSchema from "../meta-schemas/branding.json" with {
-  type: "json",
-};
-import flowDefinitionMetaSchema from "../meta-schemas/flow-definition.json" with {
-  type: "json",
-};
-import idpConnectionMetaSchema from "../meta-schemas/idp-connection.json" with {
-  type: "json",
-};
-import propertyNameMetaSchema from "../meta-schemas/property-name.json" with {
-  type: "json",
-};
-import ssoAuthMethodMetaSchema from "../meta-schemas/sso-auth-method.json" with {
-  type: "json",
-};
-import userPropertyMetaSchema from "../meta-schemas/user-property.json" with {
-  type: "json",
-};
-import userSchemaMetaSchema from "../meta-schemas/user-schema.json" with {
-  type: "json",
-};
+import authMethodMetaSchema from "../meta-schemas/auth-method.json" with { type: "json" };
+import authMethodsMetaSchema from "../meta-schemas/auth-methods.json" with { type: "json" };
+import brandingMetaSchema from "../meta-schemas/branding.json" with { type: "json" };
+import flowDefinitionMetaSchema from "../meta-schemas/flow-definition.json" with { type: "json" };
+import idpConnectionMetaSchema from "../meta-schemas/idp-connection.json" with { type: "json" };
+import propertyNameMetaSchema from "../meta-schemas/property-name.json" with { type: "json" };
+import ssoAuthMethodMetaSchema from "../meta-schemas/sso-auth-method.json" with { type: "json" };
+import userPropertyMetaSchema from "../meta-schemas/user-property.json" with { type: "json" };
+import userSchemaMetaSchema from "../meta-schemas/user-schema.json" with { type: "json" };
 
 /** Project-relative directory setup writes the meta-schemas to. */
 export const META_SCHEMA_DIR = ".zitadel/meta";

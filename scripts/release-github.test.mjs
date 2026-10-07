@@ -126,7 +126,11 @@ test("collectPackageChangeSections extracts one version and skips dependency-onl
     repoRoot,
     metadata: fakeMetadata([
       { name: "@zitadel/cli", version: "0.1.0-alpha.9", path: "apps/cli" },
-      { name: "@zitadel/server-linux-x64", version: "0.1.0-alpha.9", path: "apps/server-linux-x64" },
+      {
+        name: "@zitadel/server-linux-x64",
+        version: "0.1.0-alpha.9",
+        path: "apps/server-linux-x64",
+      },
       { name: "@zitadel/sdk-next", version: "0.1.0-alpha.9", path: "packages/sdk-next" },
     ]),
   });
@@ -147,7 +151,9 @@ test("extractVersionSection returns only the requested version's lines", () => {
 
 test("normalizeChangelogSection keeps only meaningful change groups", () => {
   assert.equal(
-    normalizeChangelogSection("### Patch Changes\n\n- Updated dependencies []:\n  - @zitadel/api@0.1.0-alpha.9\n"),
+    normalizeChangelogSection(
+      "### Patch Changes\n\n- Updated dependencies []:\n  - @zitadel/api@0.1.0-alpha.9\n",
+    ),
     "",
   );
   assert.equal(
@@ -172,7 +178,10 @@ test("upsertGeneratedBlock replaces only the managed block and preserves human p
 
 test("upsertGeneratedBlock appends a block when an existing body has none", () => {
   const nextBlock = `${GENERATED_BLOCK_START}\ngenerated facts\n${GENERATED_BLOCK_END}`;
-  assert.equal(upsertGeneratedBlock("Human release notes.", nextBlock), `Human release notes.\n\n${nextBlock}`);
+  assert.equal(
+    upsertGeneratedBlock("Human release notes.", nextBlock),
+    `Human release notes.\n\n${nextBlock}`,
+  );
 });
 
 test("fitGeneratedReleaseFacts keeps every section when the block fits", () => {
@@ -239,9 +248,16 @@ test("dry run caps the created release body at the GitHub limit", async () => {
     { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
   ];
   const repoRoot = await writeChangelogFixture(packages);
-  const metadata = fakeMetadata(packages.map(({ name, path, version }) => ({ name, path, version })));
+  const metadata = fakeMetadata(
+    packages.map(({ name, path, version }) => ({ name, path, version })),
+  );
 
-  const result = await upsertProductGithubRelease({ repoRoot, metadata, dryRun: true, log: () => {} });
+  const result = await upsertProductGithubRelease({
+    repoRoot,
+    metadata,
+    dryRun: true,
+    log: () => {},
+  });
 
   assert.equal(result.action, "dry-run");
   assert.deepEqual(result.omittedPackages, ["@x/huge"]);
@@ -257,7 +273,9 @@ test("update path preserves product notes and fits the body around them", async 
     { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
   ];
   const repoRoot = await writeChangelogFixture(packages);
-  const metadata = fakeMetadata(packages.map(({ name, path, version }) => ({ name, path, version })));
+  const metadata = fakeMetadata(
+    packages.map(({ name, path, version }) => ({ name, path, version })),
+  );
 
   const productNotes = `# Highlights\n\n${"n".repeat(60000)}`;
   const staleBlock = `${GENERATED_BLOCK_START}\nstale facts\n${GENERATED_BLOCK_END}`;
@@ -300,7 +318,9 @@ test("update path fails loudly when product notes alone exceed the limit", async
     { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
   ];
   const repoRoot = await writeChangelogFixture(packages);
-  const metadata = fakeMetadata(packages.map(({ name, path, version }) => ({ name, path, version })));
+  const metadata = fakeMetadata(
+    packages.map(({ name, path, version }) => ({ name, path, version })),
+  );
 
   const existingBody = [
     "n".repeat(GITHUB_RELEASE_BODY_MAX_CHARS + 1),
@@ -328,7 +348,9 @@ test("create path posts a draft prerelease when no release exists for the tag", 
     { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
   ];
   const repoRoot = await writeChangelogFixture(packages);
-  const metadata = fakeMetadata(packages.map(({ name, path, version }) => ({ name, path, version })));
+  const metadata = fakeMetadata(
+    packages.map(({ name, path, version }) => ({ name, path, version })),
+  );
 
   const calls = [];
   const fetchImpl = async (url, init = {}) => {
@@ -361,7 +383,9 @@ test("existing releases are found by scanning paginated release listings", async
     { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
   ];
   const repoRoot = await writeChangelogFixture(packages);
-  const metadata = fakeMetadata(packages.map(({ name, path, version }) => ({ name, path, version })));
+  const metadata = fakeMetadata(
+    packages.map(({ name, path, version }) => ({ name, path, version })),
+  );
 
   const firstPage = Array.from({ length: 100 }, (_, index) => ({
     id: index + 1,
@@ -406,7 +430,9 @@ test("dry runs never call GitHub", async () => {
     { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
   ];
   const repoRoot = await writeChangelogFixture(packages);
-  const metadata = fakeMetadata(packages.map(({ name, path, version }) => ({ name, path, version })));
+  const metadata = fakeMetadata(
+    packages.map(({ name, path, version }) => ({ name, path, version })),
+  );
 
   let called = false;
   const result = await upsertProductGithubRelease({
@@ -429,7 +455,9 @@ test("real release creation fails clearly when required env is missing", async (
     { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
   ];
   const repoRoot = await writeChangelogFixture(packages);
-  const metadata = fakeMetadata(packages.map(({ name, path, version }) => ({ name, path, version })));
+  const metadata = fakeMetadata(
+    packages.map(({ name, path, version }) => ({ name, path, version })),
+  );
 
   await assert.rejects(
     upsertProductGithubRelease({
@@ -448,7 +476,9 @@ test("renderGeneratedReleaseFacts still renders the untruncated block", async ()
     { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
   ];
   const repoRoot = await writeChangelogFixture(packages);
-  const metadata = fakeMetadata(packages.map(({ name, path, version }) => ({ name, path, version })));
+  const metadata = fakeMetadata(
+    packages.map(({ name, path, version }) => ({ name, path, version })),
+  );
 
   const block = await renderGeneratedReleaseFacts({ repoRoot, metadata });
 

@@ -7,12 +7,6 @@ dependsOn:
   - "design-tokens"
 
 tasks:
-  lint:
-    command: "corepack pnpm exec oxlint ."
-    deps:
-      - "components:build"
-      - "design-tokens:build"
-
   typecheck:
     command: "corepack pnpm run typecheck"
     deps:

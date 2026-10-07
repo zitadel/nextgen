@@ -151,7 +151,10 @@ export abstract class AbstractRulePatcher implements Patcher {
       configEdits: this.routeConfigEdits(view),
       guidanceFiles: ["AGENTS.md", "README.md"],
       fileClasses: Object.fromEntries(
-        markedFiles.map((path) => [path, infrastructure.has(path) ? "infrastructure" : "presentation"]),
+        markedFiles.map((path) => [
+          path,
+          infrastructure.has(path) ? "infrastructure" : "presentation",
+        ]),
       ),
       conditionalFiles: this.conditionallyScaffoldedFiles(view),
       retiredAlternates: this.retiredAlternateFiles(view),

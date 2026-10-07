@@ -33,7 +33,10 @@ export async function upsertProductGithubRelease(options = {}) {
     return { action: "dry-run", tag, body, omittedPackages: omitted };
   }
 
-  const github = githubReleaseConfig(options.env ?? process.env, options.fetchImpl ?? globalThis.fetch);
+  const github = githubReleaseConfig(
+    options.env ?? process.env,
+    options.fetchImpl ?? globalThis.fetch,
+  );
   const existing = await findGithubReleaseByTag({ ...github, tag });
 
   if (!existing) {
@@ -52,7 +55,8 @@ export async function upsertProductGithubRelease(options = {}) {
   const fitted = fitGeneratedReleaseFacts({
     metadata,
     sections,
-    fits: (block) => upsertGeneratedBlock(existing.body ?? "", block).length <= GITHUB_RELEASE_BODY_MAX_CHARS,
+    fits: (block) =>
+      upsertGeneratedBlock(existing.body ?? "", block).length <= GITHUB_RELEASE_BODY_MAX_CHARS,
   });
   if (!fitted.fits) {
     throw new Error(
@@ -67,7 +71,13 @@ export async function upsertProductGithubRelease(options = {}) {
   });
   options.log?.(`updated GitHub Release ${tag} generated facts block`);
   logOmittedPackageChanges(options.log, tag, fitted.omitted);
-  return { action: "update", tag, release: updated, body: updatedBody, omittedPackages: fitted.omitted };
+  return {
+    action: "update",
+    tag,
+    release: updated,
+    body: updatedBody,
+    omittedPackages: fitted.omitted,
+  };
 }
 
 function fitInitialReleaseBody({ metadata, sections, tag }) {
@@ -218,7 +228,10 @@ export function extractVersionSection(source, version) {
 
   const next = lines.findIndex((line, index) => index > start && /^##\s+/.test(line));
   const end = next === -1 ? lines.length : next;
-  return lines.slice(start + 1, end).join("\n").trim();
+  return lines
+    .slice(start + 1, end)
+    .join("\n")
+    .trim();
 }
 
 export function normalizeChangelogSection(section) {
@@ -346,10 +359,13 @@ function githubReleaseConfig(env, fetchImpl) {
 async function findGithubReleaseByTag(options) {
   let page = 1;
   while (true) {
-    const response = await options.fetchImpl(`${options.apiBase}/releases?per_page=100&page=${page}`, {
-      method: "GET",
-      headers: githubHeaders(options.token),
-    });
+    const response = await options.fetchImpl(
+      `${options.apiBase}/releases?per_page=100&page=${page}`,
+      {
+        method: "GET",
+        headers: githubHeaders(options.token),
+      },
+    );
     if (!response.ok) {
       throw new Error(`GitHub Release lookup failed: ${await responseText(response)}`);
     }

@@ -32,9 +32,7 @@ export function nuxtConfigEdit(opts: {
 
     const nextgen = ensureEditableObject(config, "nextgen");
     if (nextgen.url === undefined) {
-      nextgen.url = builders.raw(
-        `process.env.ZITADEL_URL ?? ${JSON.stringify(opts.server)}`,
-      );
+      nextgen.url = builders.raw(`process.env.ZITADEL_URL ?? ${JSON.stringify(opts.server)}`);
       changed = true;
     }
     if (nextgen.loginPath === undefined) {
@@ -69,11 +67,7 @@ export function nuxtConfigEdit(opts: {
     // (matching the repo's own demo-nuxt config) or the build fails on the
     // untranspiled ESM those transitive packages ship.
     const build = ensureEditableObject(config, "build");
-    for (const dep of [
-      "@zitadel/api",
-      "@zitadel/components",
-      "@zitadel/design-tokens",
-    ]) {
+    for (const dep of ["@zitadel/api", "@zitadel/components", "@zitadel/design-tokens"]) {
       if (ensureArrayItem(build, "transpile", dep)) {
         changed = true;
       }

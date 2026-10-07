@@ -6,11 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { ZitadelError } from "../../../../src/lib/errors";
-import {
-  applySsoToFlow,
-  applySsoToSchema,
-  ssoEditRefusal,
-} from "../../../../src/lib/idp";
+import { applySsoToFlow, applySsoToSchema, ssoEditRefusal } from "../../../../src/lib/idp";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../../../../..");
 
@@ -27,7 +23,10 @@ function targetsOf(flow: object, step: string): Record<string, string> {
     | Record<string, { target?: string }>
     | undefined;
   return Object.fromEntries(
-    Object.entries(transitions ?? {}).map(([outcome, transition]) => [outcome, transition.target ?? ""]),
+    Object.entries(transitions ?? {}).map(([outcome, transition]) => [
+      outcome,
+      transition.target ?? "",
+    ]),
   );
 }
 
@@ -47,12 +46,18 @@ function shippedFlow(): Record<string, unknown> {
 
 describe("applySsoToSchema", () => {
   it("enables the provider without touching password or passkey", () => {
-    const schema = getDefaultHumanUserSchema({ useCase: "minimal" }) as unknown as Record<string, unknown>;
+    const schema = getDefaultHumanUserSchema({ useCase: "minimal" }) as unknown as Record<
+      string,
+      unknown
+    >;
     const before = structuredClone(schema["x-auth-methods"]) as Record<string, unknown>;
 
     const { document, changed } = applySsoToSchema(schema, "google");
 
-    const methods = (document as Record<string, unknown>)["x-auth-methods"] as Record<string, unknown>;
+    const methods = (document as Record<string, unknown>)["x-auth-methods"] as Record<
+      string,
+      unknown
+    >;
     expect(changed).toBe(true);
     expect(methods.sso).toEqual({ enabled: true, providers: ["google"] });
     expect(methods.password).toEqual(before.password);
@@ -71,7 +76,10 @@ describe("applySsoToSchema", () => {
     const first = applySsoToSchema(getDefaultHumanUserSchema({ useCase: "minimal" }), "google");
     const second = applySsoToSchema(first.document, "github");
 
-    const methods = (second.document as Record<string, unknown>)["x-auth-methods"] as Record<string, unknown>;
+    const methods = (second.document as Record<string, unknown>)["x-auth-methods"] as Record<
+      string,
+      unknown
+    >;
     expect((methods.sso as { providers: string[] }).providers).toEqual(["google", "github"]);
   });
 });
@@ -129,11 +137,17 @@ describe("applySsoToFlow", () => {
   });
 
   it("offers only the methods the schema enables on the conflict step", () => {
-    const { document } = applySsoToFlow(shippedFlow(), "google", { password: false, passkey: true });
+    const { document } = applySsoToFlow(shippedFlow(), "google", {
+      password: false,
+      passkey: true,
+    });
     const step = stepNamed(document, "sso-conflict");
 
     expect(step.fields).toEqual([]);
-    expect((step.actions as Array<{ name: string }>).map((a) => a.name)).toEqual(["passkey", "sign_in"]);
+    expect((step.actions as Array<{ name: string }>).map((a) => a.name)).toEqual([
+      "passkey",
+      "sign_in",
+    ]);
     expect(step.transitions).not.toHaveProperty("submit");
   });
 
@@ -206,7 +220,9 @@ describe("applySsoToFlow", () => {
     const conflict = stepNamed(document, "sso-conflict");
 
     expect(conflict.transitions).not.toHaveProperty("sign_in");
-    expect((conflict.actions as Array<{ name: string }>).map((a) => a.name)).not.toContain("sign_in");
+    expect((conflict.actions as Array<{ name: string }>).map((a) => a.name)).not.toContain(
+      "sign_in",
+    );
   });
 
   it("is a no-op the second time", () => {
@@ -257,7 +273,8 @@ describe("applySsoToFlow", () => {
     const found: string[] = [];
     for (const step of (flow as { steps: Array<Record<string, unknown>> }).steps) {
       for (const key of Object.keys((step.transitions as object | undefined) ?? {})) {
-        if (key === "callback" || key === "identity_unknown") found.push(`${String(step.name)}.${key}`);
+        if (key === "callback" || key === "identity_unknown")
+          found.push(`${String(step.name)}.${key}`);
       }
     }
     return found;
@@ -297,12 +314,17 @@ describe("applySsoToFlow", () => {
     // the action's, not the old SSO outcome, and must stay with it.
     const legacy = previousCliFlow();
     const register = legacy.steps.find((s) => s.name === "register")!;
-    register.actions = [...((register.actions as unknown[]) ?? []), { name: "callback", kind: "submit" }];
+    register.actions = [
+      ...((register.actions as unknown[]) ?? []),
+      { name: "callback", kind: "submit" },
+    ];
     const ownTarget = (register.transitions as Record<string, unknown>).callback;
 
     const { document } = applySsoToFlow(legacy, "google", bothMethods);
 
-    expect((stepNamed(document, "register").transitions as Record<string, unknown>).callback).toEqual(ownTarget);
+    expect(
+      (stepNamed(document, "register").transitions as Record<string, unknown>).callback,
+    ).toEqual(ownTarget);
     expect(targetsOf(document, "identifier").callback).toBeUndefined();
     expect(targetsOf(document, "identifier").sso_authenticated).toBe("done");
   });
@@ -313,7 +335,10 @@ describe("applySsoToFlow", () => {
     // generated SSO target without saying so.
     const legacy = previousCliFlow();
     const identifier = legacy.steps.find((s) => s.name === "identifier")!;
-    identifier.actions = [...((identifier.actions as unknown[]) ?? []), { name: "sso_authenticated", kind: "submit" }];
+    identifier.actions = [
+      ...((identifier.actions as unknown[]) ?? []),
+      { name: "sso_authenticated", kind: "submit" },
+    ];
     const before = structuredClone(legacy);
 
     let caught: unknown;
@@ -333,31 +358,34 @@ describe("applySsoToFlow", () => {
   it.each([
     ["callback", "sso_authenticated"],
     ["identity_unknown", "sso_user_not_found"],
-  ])("refuses to migrate %s onto an action named %s on a step sso enable does not write", (old, next) => {
-    // The collision check covers only the steps sso enable writes. Elsewhere
-    // the rename would drop the legacy key and leave the outcome on the action's route.
-    const legacy = previousCliFlow();
-    legacy.steps.push({
-      name: "custom",
-      fields: ["email"],
-      actions: [{ name: next, kind: "submit" }],
-      transitions: { [old]: { target: "done" }, [next]: { target: "register" } },
-    });
-    const before = structuredClone(legacy);
+  ])(
+    "refuses to migrate %s onto an action named %s on a step sso enable does not write",
+    (old, next) => {
+      // The collision check covers only the steps sso enable writes. Elsewhere
+      // the rename would drop the legacy key and leave the outcome on the action's route.
+      const legacy = previousCliFlow();
+      legacy.steps.push({
+        name: "custom",
+        fields: ["email"],
+        actions: [{ name: next, kind: "submit" }],
+        transitions: { [old]: { target: "done" }, [next]: { target: "register" } },
+      });
+      const before = structuredClone(legacy);
 
-    let caught: unknown;
-    try {
-      applySsoToFlow(legacy, "github", bothMethods);
-    } catch (error) {
-      caught = error;
-    }
+      let caught: unknown;
+      try {
+        applySsoToFlow(legacy, "github", bothMethods);
+      } catch (error) {
+        caught = error;
+      }
 
-    expect(caught).toBeInstanceOf(ZitadelError);
-    expect((caught as ZitadelError).code).toBe("E_VALIDATION");
-    expect((caught as ZitadelError).message).toContain("custom");
-    expect((caught as ZitadelError).message).toContain(next);
-    expect(legacy).toEqual(before);
-  });
+      expect(caught).toBeInstanceOf(ZitadelError);
+      expect((caught as ZitadelError).code).toBe("E_VALIDATION");
+      expect((caught as ZitadelError).message).toContain("custom");
+      expect((caught as ZitadelError).message).toContain(next);
+      expect(legacy).toEqual(before);
+    },
+  );
 
   it.each([
     ["purpose", { purpose: "register" }],
@@ -390,8 +418,14 @@ describe("applySsoToFlow", () => {
     // loop would overwrite its route with the generated SSO target.
     const flow = structuredClone(shippedFlow()) as { steps: Array<Record<string, unknown>> };
     const identifier = flow.steps.find((s) => s.name === "identifier")!;
-    identifier.actions = [...((identifier.actions as unknown[]) ?? []), { name: "sso_authenticated", kind: "submit" }];
-    identifier.transitions = { ...(identifier.transitions as object), sso_authenticated: { target: "register" } };
+    identifier.actions = [
+      ...((identifier.actions as unknown[]) ?? []),
+      { name: "sso_authenticated", kind: "submit" },
+    ];
+    identifier.transitions = {
+      ...(identifier.transitions as object),
+      sso_authenticated: { target: "register" },
+    };
     const before = structuredClone(flow);
 
     let caught: unknown;
@@ -454,7 +488,9 @@ describe("applySsoToFlow", () => {
 
   it("adds the new steps before the terminal step", () => {
     const { document } = applySsoToFlow(shippedFlow(), "google", bothMethods);
-    const names = ((document as { steps: Array<Record<string, unknown>> }).steps ?? []).map((s) => s.name);
+    const names = ((document as { steps: Array<Record<string, unknown>> }).steps ?? []).map(
+      (s) => s.name,
+    );
 
     expect(names.indexOf("register-sso")).toBeLessThan(names.indexOf("done"));
     expect(names.indexOf("sso-conflict")).toBeLessThan(names.indexOf("done"));
@@ -486,7 +522,10 @@ describe("register-sso collects what registration collects", () => {
     // a password box here would collect something the mutation never stores.
     for (const useCase of ["minimal", "consumer", "business"] as const) {
       const fields = ssoFields(useCase) as string[];
-      expect(fields.some((field) => field.startsWith("x-auth-methods#")), useCase).toBe(false);
+      expect(
+        fields.some((field) => field.startsWith("x-auth-methods#")),
+        useCase,
+      ).toBe(false);
     }
   });
 
@@ -524,8 +563,12 @@ describe("the terminal the generated routes point at", () => {
       password: true,
       passkey: false,
     });
-    const steps = (document as { steps: { name: string; transitions?: Record<string, { target: string }> }[] }).steps;
-    const targets = steps.flatMap((step) => Object.values(step.transitions ?? {}).map((t) => t.target));
+    const steps = (
+      document as { steps: { name: string; transitions?: Record<string, { target: string }> }[] }
+    ).steps;
+    const targets = steps.flatMap((step) =>
+      Object.values(step.transitions ?? {}).map((t) => t.target),
+    );
 
     expect(targets).toContain("complete");
     expect(targets).not.toContain("done");
@@ -536,12 +579,16 @@ describe("the terminal the generated routes point at", () => {
       password: false,
       passkey: true,
     });
-    const steps = (document as { steps: { name: string; transitions?: Record<string, { target: string }> }[] }).steps;
+    const steps = (
+      document as { steps: { name: string; transitions?: Record<string, { target: string }> }[] }
+    ).steps;
     const names = new Set(steps.map((step) => step.name));
 
     for (const step of steps) {
       for (const [outcome, transition] of Object.entries(step.transitions ?? {})) {
-        expect(names, `${step.name}.${outcome} targets a missing step`).toContain(transition.target);
+        expect(names, `${step.name}.${outcome} targets a missing step`).toContain(
+          transition.target,
+        );
       }
     }
   });
@@ -551,8 +598,12 @@ describe("the terminal the generated routes point at", () => {
       password: true,
       passkey: false,
     });
-    const steps = (document as { steps: { name: string; transitions?: Record<string, { target: string }> }[] }).steps;
-    const targets = steps.flatMap((step) => Object.values(step.transitions ?? {}).map((t) => t.target));
+    const steps = (
+      document as { steps: { name: string; transitions?: Record<string, { target: string }> }[] }
+    ).steps;
+    const targets = steps.flatMap((step) =>
+      Object.values(step.transitions ?? {}).map((t) => t.target),
+    );
 
     expect(targets).toContain("done");
   });
@@ -586,9 +637,9 @@ describe("a hand-edited owned step", () => {
       password: true,
       passkey: true,
     });
-    const conflict = (document as { steps: { name: string; sso_providers?: unknown[] }[] }).steps.find(
-      (step) => step.name === "sso-conflict",
-    );
+    const conflict = (
+      document as { steps: { name: string; sso_providers?: unknown[] }[] }
+    ).steps.find((step) => step.name === "sso-conflict");
 
     expect(skipped.map((entry) => entry.region)).toContain("steps.sso-conflict");
     expect(conflict?.sso_providers).toEqual(["github"]);
@@ -611,9 +662,9 @@ describe("a hand-edited owned step", () => {
       "google",
       { password: true, passkey: true },
     );
-    const conflict = (document as { steps: { name: string; sso_providers?: unknown[] }[] }).steps.find(
-      (step) => step.name === "sso-conflict",
-    );
+    const conflict = (
+      document as { steps: { name: string; sso_providers?: unknown[] }[] }
+    ).steps.find((step) => step.name === "sso-conflict");
 
     expect(skipped).toEqual([]);
     expect(conflict?.sso_providers).toEqual(["google"]);

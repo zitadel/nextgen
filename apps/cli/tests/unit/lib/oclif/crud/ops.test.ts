@@ -219,7 +219,10 @@ describe("wire conventions", () => {
     const command = bindOperation(ListOperation, definition);
     const result = await command.run(["--filter", "state=active", "--limit", "5", "--json"]);
 
-    expect(sent).toEqual({ size: 5, where: [{ field: "state", operation: "equals", value: "active" }] });
+    expect(sent).toEqual({
+      size: 5,
+      where: [{ field: "state", operation: "equals", value: "active" }],
+    });
     const data = (result as { data: Record<string, unknown> }).data;
     expect(data.next_cursor).toBe("c2");
     expect(data.next_page_token).toBeUndefined();

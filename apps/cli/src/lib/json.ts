@@ -180,7 +180,11 @@ function skipValue(source: string, index: number): number {
   }
   // Primitive: number, boolean, null — runs until a structural delimiter.
   let cursor = index;
-  while (cursor < source.length && !",}]".includes(source[cursor]!) && !isWhitespace(source[cursor]!)) {
+  while (
+    cursor < source.length &&
+    !",}]".includes(source[cursor]!) &&
+    !isWhitespace(source[cursor]!)
+  ) {
     cursor += 1;
   }
   return cursor;
