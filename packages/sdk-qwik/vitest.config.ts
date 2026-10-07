@@ -1,9 +1,10 @@
 import { qwikVite } from "@qwik.dev/core/optimizer";
 import { playwright } from "@vitest/browser-playwright";
+import { chromium } from "playwright";
 import { apiMockPublicDir } from "@zitadel/api-mock/public-dir";
 import { defineConfig } from "vitest/config";
 
-import { baseTest } from "../../vitest.shared.mjs";
+import { baseTest, sharedChromium } from "../../vitest.shared.mjs";
 
 // Runs in real Chromium via Playwright (mirroring the `@zitadel/components`
 // browser lane) rather than jsdom. Qwik 2's client `render` locates its root
@@ -27,7 +28,7 @@ export default defineConfig({
     setupFiles: ["src/test-setup.ts"],
     browser: {
       enabled: true,
-      provider: playwright(),
+      provider: sharedChromium({ playwright, chromium }),
       headless: true,
       instances: [{ browser: "chromium" }],
     },

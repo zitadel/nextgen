@@ -3,9 +3,10 @@ import { fileURLToPath } from "node:url";
 
 import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
 import { playwright } from "@vitest/browser-playwright";
+import { chromium } from "playwright";
 import { defineConfig } from "vitest/config";
 
-import { baseTest } from "../../vitest.shared.mjs";
+import { baseTest, sharedChromium } from "../../vitest.shared.mjs";
 import { optimizeDepsExclude, optimizeDepsInclude } from "./.storybook/optimize-deps.js";
 
 const dir = dirname(fileURLToPath(import.meta.url));
@@ -56,7 +57,7 @@ export default defineConfig({
           name: "storybook",
           browser: {
             enabled: true,
-            provider: playwright(),
+            provider: sharedChromium({ playwright, chromium }),
             headless: true,
             instances: [{ browser: "chromium" }],
           },

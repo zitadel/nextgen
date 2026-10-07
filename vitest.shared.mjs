@@ -1,3 +1,7 @@
+import { existsSync, mkdirSync, readFileSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 /**
  * Shared Vitest `test` defaults, spread into every project's own config:
  *
@@ -63,3 +67,127 @@ export const baseTest = {
  * code. Spread into `resolve.conditions` for workspace-source consumers.
  */
 export const sourceConditions = ["@zitadel/source"];
+
+// ---------------------------------------------------------------------------
+// SPIKE (#1499): share ONE real Chromium across the separate browser-mode
+// `vitest` processes instead of each one launching its own. Every browser suite
+// is its own moon task = its own `vitest` process; with four of them each
+// booting a Chromium, a busy CI runner starves them and drops module fetches
+// ("Failed to fetch dynamically imported module"). Here the first process to
+// start launches a Playwright browser SERVER and records its wsEndpoint in a
+// tmp lockfile; the rest CONNECT to it. A refcount keeps the shared browser
+// alive until the last process releases it; the owner (launcher) waits for the
+// count to drain, then closes it. Logs loudly so CI shows one LAUNCH and N
+// REUSE on the same endpoint. The config passes in its own `playwright` factory
+// and `chromium` (pnpm: this root file can't resolve them, the package can).
+// ---------------------------------------------------------------------------
+const SB_DIR = join(tmpdir(), "zitadel-vitest-shared-chromium");
+const SB_LOCK = `${SB_DIR}.lock`;
+const SB_REG = join(SB_DIR, "registry.json");
+let sbOwnedServer = null;
+const sbLog = (m) => console.log(`[shared-chromium pid=${process.pid}] ${m}`);
+
+async function sbWithLock(fn) {
+  mkdirSync(SB_DIR, { recursive: true });
+  for (let i = 0; i < 4000; i += 1) {
+    try {
+      mkdirSync(SB_LOCK);
+    } catch {
+      await new Promise((r) => setTimeout(r, 5));
+      continue;
+    }
+    try {
+      return await fn();
+    } finally {
+      try {
+        rmdirSync(SB_LOCK);
+      } catch {}
+    }
+  }
+  throw new Error("[shared-chromium] lock timeout");
+}
+
+const sbReadReg = () => (existsSync(SB_REG) ? JSON.parse(readFileSync(SB_REG, "utf8")) : null);
+const sbWriteReg = (r) => writeFileSync(SB_REG, JSON.stringify(r));
+
+async function sbAcquire(chromium) {
+  return sbWithLock(async () => {
+    const reg = sbReadReg();
+    if (reg?.wsEndpoint) {
+      try {
+        const probe = await chromium.connect(reg.wsEndpoint, { timeout: 5000 });
+        await probe.close();
+        reg.refs += 1;
+        sbWriteReg(reg);
+        sbLog(`REUSE shared browser  ws=…${reg.wsEndpoint.slice(-18)}  refcount=${reg.refs}`);
+        return { wsEndpoint: reg.wsEndpoint, owner: false };
+      } catch {
+        sbLog("registry endpoint is stale, relaunching");
+      }
+    }
+    const server = await chromium.launchServer({ headless: true });
+    sbOwnedServer = server;
+    const wsEndpoint = server.wsEndpoint();
+    sbWriteReg({ wsEndpoint, refs: 1, ownerPid: process.pid, chromePid: server.process()?.pid });
+    sbLog(`LAUNCH shared browser  chromePid=${server.process()?.pid}  ws=…${wsEndpoint.slice(-18)}  refcount=1`);
+    return { wsEndpoint, owner: true };
+  });
+}
+
+async function sbRelease(owner) {
+  await sbWithLock(async () => {
+    const reg = sbReadReg();
+    if (!reg) return;
+    reg.refs = Math.max(0, reg.refs - 1);
+    sbWriteReg(reg);
+    sbLog(`release  refcount=${reg.refs}`);
+  });
+  if (owner && sbOwnedServer) {
+    for (let i = 0; i < 600; i += 1) {
+      const reg = sbReadReg();
+      if (!reg || reg.refs <= 0) break;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    sbLog("owner closing the shared browser");
+    await sbOwnedServer.close().catch(() => {});
+    sbOwnedServer = null;
+    try {
+      unlinkSync(SB_REG);
+    } catch {}
+  }
+}
+
+/**
+ * Wrap `@vitest/browser-playwright`'s `playwright()` provider so the four
+ * browser suites share one Chromium. Pass the package's own `playwright`
+ * factory and `chromium` (from `playwright`): `provider: sharedChromium({ playwright, chromium })`.
+ *
+ * @param {{ playwright: Function, chromium: any, options?: object }} deps
+ */
+export function sharedChromium({ playwright, chromium, options = {} }) {
+  const descriptor = playwright(options);
+  const originalFactory = descriptor.providerFactory;
+  descriptor.providerFactory = (project) => {
+    const provider = originalFactory(project);
+    const originalOpen = provider.openBrowser.bind(provider);
+    const originalClose = provider.close.bind(provider);
+    let owner = false;
+    provider.openBrowser = async (...args) => {
+      if (!provider.options.connectOptions?.wsEndpoint) {
+        const got = await sbAcquire(chromium);
+        owner = got.owner;
+        provider.options.connectOptions = {
+          ...(provider.options.connectOptions || {}),
+          wsEndpoint: got.wsEndpoint,
+        };
+      }
+      return originalOpen(...args);
+    };
+    provider.close = async () => {
+      await originalClose().catch((e) => sbLog(`close error: ${e.message}`));
+      await sbRelease(owner);
+    };
+    return provider;
+  };
+  return descriptor;
+}

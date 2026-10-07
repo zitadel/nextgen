@@ -22,3 +22,15 @@ export interface BaseTest {
 
 export declare const baseTest: BaseTest;
 export declare const sourceConditions: string[];
+
+/**
+ * SPIKE (#1499): wrap `@vitest/browser-playwright`'s `playwright()` so the
+ * browser suites share one Chromium across their separate `vitest` processes.
+ * The caller passes its own `playwright` factory and `chromium` (pnpm: this
+ * root file cannot resolve them). Returns the provider descriptor for `provider:`.
+ */
+export declare function sharedChromium(deps: {
+  playwright: (options?: object) => unknown;
+  chromium: unknown;
+  options?: object;
+}): unknown;

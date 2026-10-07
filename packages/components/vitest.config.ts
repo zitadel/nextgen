@@ -1,7 +1,8 @@
 import { playwright } from "@vitest/browser-playwright";
+import { chromium } from "playwright";
 import { defineConfig } from "vitest/config";
 
-import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
+import { baseTest, sharedChromium, sourceConditions } from "../../vitest.shared.mjs";
 import { liquidRaw } from "./vite-liquid-plugin.js";
 
 /** Shared plugins for every project in this config. */
@@ -53,7 +54,7 @@ export default defineConfig({
           include: ["src/**/*.browser.spec.ts"],
           browser: {
             enabled: true,
-            provider: playwright(),
+            provider: sharedChromium({ playwright, chromium }),
             headless: true,
             instances: [{ browser: "chromium" }],
           },
