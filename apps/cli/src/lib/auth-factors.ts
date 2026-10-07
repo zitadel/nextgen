@@ -226,12 +226,17 @@ function loginJourney(flow: Record<string, unknown>): Record<string, unknown> {
     reached.add(name);
     const transitions = isObject(step.transitions) ? Object.values(step.transitions) : [];
     for (const transition of transitions) {
-      // A transition into another purpose (register, say) leaves the login
-      // journey, so its target is not a sign-in step.
+      // Mirrors the validator's local adjacency: a transition with an
+      // `action` goes to another flow, whose step names are not this flow's,
+      // and one into another purpose (register, say) leaves the login
+      // journey. A null `action` or `purpose` is the same as an absent one.
       if (
         isObject(transition) &&
         typeof transition.target === "string" &&
-        (transition.purpose === undefined || transition.purpose === "login")
+        (transition.action === undefined || transition.action === null) &&
+        (transition.purpose === undefined ||
+          transition.purpose === null ||
+          transition.purpose === "login")
       ) {
         queue.push(transition.target);
       }

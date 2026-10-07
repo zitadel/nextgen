@@ -273,6 +273,39 @@ describe("reachableSignInMethods", () => {
     expect(reachableSignInMethods(both, [combined])).toEqual(["passkey"]);
   });
 
+  it("follows a local transition with null action and purpose", () => {
+    const flow = {
+      purposes: { login: "identifier" },
+      steps: [
+        {
+          name: "identifier",
+          transitions: { submit: { target: "password", action: null, purpose: null } },
+        },
+        { name: "password", fields: ["x-auth-methods#password"] },
+      ],
+    };
+
+    expect(reachableSignInMethods(schema({ password: { enabled: true } }), [flow])).toEqual([
+      "password",
+    ]);
+  });
+
+  it("does not follow a transition into another flow", () => {
+    // `switch` targets a step of another flow that shares a name with a local one.
+    const flow = {
+      purposes: { login: "identifier" },
+      steps: [
+        {
+          name: "identifier",
+          transitions: { other: { target: "password", action: "switch" } },
+        },
+        { name: "password", fields: ["x-auth-methods#password"] },
+      ],
+    };
+
+    expect(reachableSignInMethods(schema({ password: { enabled: true } }), [flow])).toEqual([]);
+  });
+
   it("does not count a flow that only registers passkeys", () => {
     const passkeyOnly = schema({ password: { enabled: false }, passkey: { enabled: true } });
     const registerOnly = {
