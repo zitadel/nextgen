@@ -89,6 +89,25 @@ describe("flowsForSchema", () => {
     expect(names(flows)).toEqual(["login"]);
   });
 
+  it("still matches a flow an interrupted apply left on the previous id", async () => {
+    // apply records the new id and previousId before it re-pins the flows.
+    const cwd = await projectWithFlows(
+      { login: "sch_OLD" },
+      JSON.stringify({
+        resources: {
+          ".zitadel/schemas/customers.json": { id: "sch_NEW", previousId: "sch_OLD" },
+        },
+      }),
+    );
+
+    const flows = await flowsForSchema(
+      cwd,
+      schemaFile("customers", { $id: "https://a.test/customers.json" }),
+    );
+
+    expect(names(flows)).toEqual(["login"]);
+  });
+
   it("refuses a state file it cannot read rather than guess", async () => {
     const cwd = await projectWithFlows({ login: "https://a.test/customers.json" }, "{not json");
 

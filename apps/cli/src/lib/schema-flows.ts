@@ -11,9 +11,9 @@ import { readState } from "./sync/state";
  * never returned, so changing customers never touches the employee journey.
  */
 export async function flowsForSchema(cwd: string, schema: SchemaFile): Promise<FlowFile[]> {
-  const publishedSchemaId = await publishedIdOf(cwd, schema.path);
+  const publishedIds = await publishedIdsOf(cwd, schema.path);
   return (await readFlowFiles(cwd)).filter((flow) =>
-    flowUsesSchema(flow.body, schema, publishedSchemaId),
+    flowUsesSchema(flow.body, schema, publishedIds),
   );
 }
 
@@ -25,7 +25,7 @@ export async function flowsForSchema(cwd: string, schema: SchemaFile): Promise<F
 function flowUsesSchema(
   flow: Record<string, unknown>,
   schema: SchemaFile,
-  publishedSchemaId: string | undefined,
+  publishedIds: readonly string[],
 ): boolean {
   const used = flow.user_schema;
   if (typeof used !== "string") {
@@ -34,7 +34,7 @@ function flowUsesSchema(
   // Once a Project has been applied, the flow names the schema by the id the
   // platform assigned, which `.zitadel/state.json` records against the schema
   // file. Before that it still carries the scaffolded URL.
-  if (publishedSchemaId !== undefined && used === publishedSchemaId) {
+  if (publishedIds.includes(used)) {
     return true;
   }
   const id = schema.body.$id;
@@ -51,7 +51,10 @@ function flowUsesSchema(
 }
 
 /**
- * The platform id a local file was last synced as, from `.zitadel/state.json`.
+ * The platform ids a local file is known by, from `.zitadel/state.json`: the
+ * id it was last synced as, and the one it replaced. `apply` records the
+ * replaced id before it re-pins the flows, so a flow left behind by an
+ * interrupted run still names it, and must still count as this schema's flow.
  * Absent before the first `apply`, and absent entirely on a Project that has
  * never synced — both mean "fall back to matching on the scaffolded URL".
  *
@@ -60,13 +63,16 @@ function flowUsesSchema(
  * suffix rather than an id, so it could pick a flow bound to a different
  * schema. Saying so beats editing the wrong flow quietly.
  */
-async function publishedIdOf(cwd: string, path: string): Promise<string | undefined> {
+async function publishedIdsOf(cwd: string, path: string): Promise<string[]> {
   try {
     const state = await readState(cwd);
-    return state.resources?.[path]?.id;
+    const entry = state.resources?.[path];
+    return [entry?.id, entry?.previousId].filter(
+      (id): id is string => typeof id === "string" && id !== "",
+    );
   } catch (error) {
     if (isErrno(error, "ENOENT")) {
-      return undefined;
+      return [];
     }
     throw new ZitadelError(
       "E_VALIDATION",
