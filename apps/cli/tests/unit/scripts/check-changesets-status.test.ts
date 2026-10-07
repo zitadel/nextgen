@@ -262,7 +262,9 @@ Keep private mocks aligned with public CLI behavior.
 `,
       },
       runChangesetStatus: async () => {
-        throw new Error("Found mixed changeset mixed: ignored @zitadel/api-mock and not ignored @zitadel/cli");
+        throw new Error(
+          "Found mixed changeset mixed: ignored @zitadel/api-mock and not ignored @zitadel/cli",
+        );
       },
     });
 
@@ -312,7 +314,11 @@ This package is private.
     const report = await checkChangesetsStatus({
       entries: [{ status: "M", file: "docs/release.md" }],
       config: {
-        fixed: [publicPackages.map((pkg) => pkg.name).filter((name) => name !== "@zitadel/server-linux-x64")],
+        fixed: [
+          publicPackages
+            .map((pkg) => pkg.name)
+            .filter((name) => name !== "@zitadel/server-linux-x64"),
+        ],
       },
     });
 
@@ -515,12 +521,12 @@ describe("release publish guard", () => {
     const { shouldFailManualPublishSkip } = await loadReleaseModule();
     const workflowDispatchEnv = { GITHUB_EVENT_NAME: "workflow_dispatch" } as NodeJS.ProcessEnv;
 
-    expect(shouldFailManualPublishSkip({ dryRun: false, recoverVersion: "" }, workflowDispatchEnv)).toBe(
-      true,
-    );
-    expect(shouldFailManualPublishSkip({ dryRun: true, recoverVersion: "" }, workflowDispatchEnv)).toBe(
-      false,
-    );
+    expect(
+      shouldFailManualPublishSkip({ dryRun: false, recoverVersion: "" }, workflowDispatchEnv),
+    ).toBe(true);
+    expect(
+      shouldFailManualPublishSkip({ dryRun: true, recoverVersion: "" }, workflowDispatchEnv),
+    ).toBe(false);
     expect(
       shouldFailManualPublishSkip(
         { dryRun: false, recoverVersion: "0.1.0-alpha.14" },

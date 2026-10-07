@@ -1,6 +1,4 @@
-import idpConnectionMetaSchema from "../../meta-schemas/idp-connection.json" with {
-  type: "json",
-};
+import idpConnectionMetaSchema from "../../meta-schemas/idp-connection.json" with { type: "json" };
 
 /**
  * The issuer values a connection may name: HTTPS anywhere, or HTTP on
@@ -36,5 +34,4 @@ export function isSupportedIssuer(value: string): boolean {
 }
 
 /** What to tell someone who typed an issuer the contract does not allow. */
-export const ISSUER_REQUIREMENT =
-  "Use an https:// URL, or http:// on localhost or 127.0.0.1.";
+export const ISSUER_REQUIREMENT = "Use an https:// URL, or http:// on localhost or 127.0.0.1.";

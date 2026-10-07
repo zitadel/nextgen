@@ -21,30 +21,18 @@
     "test": "vitest run",
     "test:all": "vitest run",
     "test:watch": "vitest --watch",
-    "typecheck": "cd ../../packages/api && node --run generate && cd ../../apps/mock-zitadel && tsc --noEmit",
-    "lint": "eslint ."
+    "typecheck": "cd ../../packages/api && node --run generate && cd ../../apps/mock-zitadel && tsc --noEmit"
   },
   "dependencies": {
     "@zitadel/api-mock": "workspace:*"
   },
   "devDependencies": {
-    "@eslint/js": "catalog:",
-    "@eslint/json": "catalog:",
-    "@eslint/markdown": "catalog:",
     "@types/express": "catalog:",
     "@types/node": "catalog:",
-    "eslint": "catalog:",
-    "eslint-config-prettier": "catalog:",
-    "eslint-import-resolver-typescript": "catalog:",
-    "eslint-plugin-import": "catalog:",
-    "eslint-plugin-perfectionist": "catalog:",
-    "eslint-plugin-prettier": "catalog:",
     "express": "catalog:",
-    "prettier": "catalog:",
     "tsdown": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",
-    "typescript-eslint": "catalog:",
     "vitest": "catalog:"
   }
 }

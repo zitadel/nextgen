@@ -106,7 +106,7 @@ export abstract class AbstractRulePatcher implements Patcher {
         continue;
       }
       const candidates = typeof op.path === "string" ? [op.path] : op.path;
-      let path = candidates[0]!;
+      let path = candidates[0] ?? "";
       let source: string | undefined;
       for (const candidate of candidates) {
         const contents = await readTextIfExists(join(opts.cwd, candidate));
@@ -151,7 +151,10 @@ export abstract class AbstractRulePatcher implements Patcher {
       configEdits: this.routeConfigEdits(view),
       guidanceFiles: ["AGENTS.md", "README.md"],
       fileClasses: Object.fromEntries(
-        markedFiles.map((path) => [path, infrastructure.has(path) ? "infrastructure" : "presentation"]),
+        markedFiles.map((path) => [
+          path,
+          infrastructure.has(path) ? "infrastructure" : "presentation",
+        ]),
       ),
       conditionalFiles: this.conditionallyScaffoldedFiles(view),
       retiredAlternates: this.retiredAlternateFiles(view),

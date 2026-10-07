@@ -31,8 +31,7 @@
     "build": "vite build && ngc -p tsconfig.lib.json",
     "typecheck": "tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
-    "test:all": "vitest run",
-    "lint": "eslint ."
+    "test:all": "vitest run"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
@@ -54,23 +53,12 @@
     "@angular/core": "^22.0.5",
     "@angular/platform-browser": "^22.0.5",
     "@angular/router": "^22.0.5",
-    "@eslint/js": "catalog:",
-    "@eslint/json": "catalog:",
-    "@eslint/markdown": "catalog:",
     "@testing-library/angular": "^19.4.1",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",
-    "eslint": "catalog:",
-    "eslint-config-prettier": "catalog:",
-    "eslint-import-resolver-typescript": "catalog:",
-    "eslint-plugin-import": "catalog:",
-    "eslint-plugin-perfectionist": "catalog:",
-    "eslint-plugin-prettier": "catalog:",
     "jsdom": "catalog:",
     "msw": "catalog:",
-    "prettier": "catalog:",
     "typescript": "catalog:",
-    "typescript-eslint": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",
     "zone.js": "~0.16.0"

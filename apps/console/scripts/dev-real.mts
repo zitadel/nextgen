@@ -67,7 +67,7 @@ const PLATFORM_PROJECT_ID = "proj_platform";
 // way: `zitadel start` bootstraps the platform project by default, and that
 // pins the console's default project to `proj_platform` — which would leave
 // DEV_USER, seeded in the project this script bootstraps, unable to sign in.
-process.env["NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"] = claimMode ? "true" : "false";
+process.env.NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT = claimMode ? "true" : "false";
 
 /**
  * The account you sign in as. Fixed rather than random so the credentials stay
@@ -124,7 +124,6 @@ if (configuredServerBinary) {
 }
 
 // Signal handlers close over this before the asynchronous boot assigns it.
-// oxlint-disable-next-line prefer-const
 let zitadel: LocalZitadel | undefined;
 let stopping: Promise<void> | undefined;
 
@@ -161,11 +160,16 @@ zitadel = await startLocalZitadel({
 const seeded: SeededUser[] = [];
 try {
   seeded.push(await zitadel.seedUser(DEV_USER));
+  const extraUserAt = (index: number): (typeof EXTRA_USERS)[number] => {
+    const user = EXTRA_USERS[index];
+    if (!user) throw new Error(`[console-dev-real] no seed user at index ${index}`);
+    return user;
+  };
   seeded.push(
     ...(await zitadel.seedUsers(EXTRA_USERS.length, {
-      email: (index) => EXTRA_USERS[index]!.email,
+      email: (index) => extraUserAt(index).email,
       attributes: (index) => {
-        const { email: _email, ...attributes } = EXTRA_USERS[index]!;
+        const { email: _email, ...attributes } = extraUserAt(index);
         return attributes;
       },
     })),

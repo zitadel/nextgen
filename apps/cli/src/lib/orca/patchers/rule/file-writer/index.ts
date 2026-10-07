@@ -2,12 +2,7 @@ import { chmod, mkdir, readFile, rename, stat, writeFile } from "node:fs/promise
 import { dirname, join } from "node:path";
 
 import { ZitadelError } from "../../../../errors";
-import {
-  isObject,
-  parseJsonObject,
-  setTopLevelJsonKey,
-  stableStringify,
-} from "../../../../json";
+import { isObject, parseJsonObject, setTopLevelJsonKey, stableStringify } from "../../../../json";
 import type { PatchedFile } from "../../types";
 import type { FileOp, ScaffoldPlan, ScaffoldResult } from "./types";
 
@@ -194,7 +189,7 @@ async function ensureDir(
     existed &&
     mode !== undefined &&
     process.platform !== "win32" &&
-    (pre!.mode & 0o777) !== mode;
+    ((pre?.mode ?? 0) & 0o777) !== mode;
   if (dryRun) {
     if (!existed) {
       record(result, path, "dir", "create");
@@ -407,9 +402,7 @@ async function addDependency(
 
 /** Rebuilds an object with lexicographically sorted keys (dependency maps). */
 function sortByKey(value: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
-  );
+  return Object.fromEntries(Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
 }
 
 async function readIfExists(path: string): Promise<string | undefined> {

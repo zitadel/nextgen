@@ -70,8 +70,7 @@ export function resolveTelemetryToken(env: NodeJS.ProcessEnv): string | undefine
   if (override) {
     return override;
   }
-  const token =
-    resolveChannel(env) === "production" ? PROD_TELEMETRY_TOKEN : DEV_TELEMETRY_TOKEN;
+  const token = resolveChannel(env) === "production" ? PROD_TELEMETRY_TOKEN : DEV_TELEMETRY_TOKEN;
   return token.length > 0 ? token : undefined;
 }
 

@@ -92,8 +92,22 @@ If the agent is asking you something, reply briefly and concretely from your pre
   mkdirSync(simHome, { recursive: true });
   const r = spawnSync(
     "claude",
-    ["-p", prompt, "--model", SIM_MODEL, "--output-format", "json", "--max-turns", "1", "--dangerously-skip-permissions"],
-    { encoding: "utf8", maxBuffer: 32 * 1024 * 1024, env: { ...process.env, CLAUDE_CONFIG_DIR: simHome } },
+    [
+      "-p",
+      prompt,
+      "--model",
+      SIM_MODEL,
+      "--output-format",
+      "json",
+      "--max-turns",
+      "1",
+      "--dangerously-skip-permissions",
+    ],
+    {
+      encoding: "utf8",
+      maxBuffer: 32 * 1024 * 1024,
+      env: { ...process.env, CLAUDE_CONFIG_DIR: simHome },
+    },
   );
   try {
     return (JSON.parse(r.stdout || "{}").result || "").trim();
@@ -120,7 +134,7 @@ for (const stage of cfg.stages) {
     for (let round = 0; round < MAX_QA; round += 1) {
       const answer = simReply(stage.user, lastText);
       if (!answer || answer === DONE || answer.endsWith(DONE)) break;
-      appendFileSync(stageFile, JSON.stringify({ type: "sim_user", text: answer }) + "\n");
+      appendFileSync(stageFile, `${JSON.stringify({ type: "sim_user", text: answer })}\n`);
       ({ sessionId, lastText, isError } = agentTurn(stageFile, answer, sessionId));
       if (isError) break;
     }

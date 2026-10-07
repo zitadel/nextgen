@@ -34,7 +34,9 @@ async function skillMarkdown(): Promise<string[]> {
   return [
     join(root, "README.md"),
     join(skillDir, "SKILL.md"),
-    ...refs.filter((name) => name.endsWith(".md")).map((name) => join(skillDir, "references", name)),
+    ...refs
+      .filter((name) => name.endsWith(".md"))
+      .map((name) => join(skillDir, "references", name)),
   ];
 }
 

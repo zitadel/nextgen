@@ -93,8 +93,7 @@
     "typecheck": "tsc --build tsconfig.json",
     "pretest": "node --run sync-schemas",
     "test": "vitest run",
-    "test:all": "node --run sync-schemas && vitest run",
-    "lint": "oxlint ."
+    "test:all": "node --run sync-schemas && vitest run"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",

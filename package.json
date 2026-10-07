@@ -16,14 +16,13 @@
     "release:publish": "moon run release:publish"
   },
   "devDependencies": {
+    "@biomejs/biome": "catalog:",
     "@changesets/changelog-github": "^0.7.0",
     "@changesets/cli": "^2.31.0",
     "@moonrepo/cli": "catalog:",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "oxfmt": "catalog:",
-    "oxlint": "catalog:",
     "sharp": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",

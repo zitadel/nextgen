@@ -20,11 +20,6 @@ tasks:
       - "src/generated/tailwind.css"
       - "src/generated/shadcn.css"
 
-  lint:
-    command: "corepack pnpm exec oxlint ."
-    deps:
-      - "generate"
-
   typecheck:
     command: "corepack pnpm exec tsc --build tsconfig.json"
     deps:

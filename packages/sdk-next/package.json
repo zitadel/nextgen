@@ -57,8 +57,7 @@
     "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json && node -e \"require('node:fs').copyFileSync('src/jsx.d.ts', 'dist/jsx.d.ts')\"",
     "typecheck": "tsc --build tsconfig.json",
     "test": "vitest run",
-    "test:all": "vitest run",
-    "lint": "eslint ."
+    "test:all": "vitest run"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
@@ -72,28 +71,13 @@
     "react-dom": ">=18"
   },
   "devDependencies": {
-    "@eslint/js": "catalog:",
-    "@eslint/json": "catalog:",
-    "@eslint/markdown": "catalog:",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",
     "@types/react": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "eslint": "catalog:",
-    "eslint-config-prettier": "catalog:",
-    "eslint-import-resolver-typescript": "catalog:",
-    "eslint-plugin-import": "catalog:",
-    "eslint-plugin-jsx-a11y": "^6.10.0",
-    "eslint-plugin-perfectionist": "catalog:",
-    "eslint-plugin-prettier": "catalog:",
-    "eslint-plugin-react": "^7.37.0",
-    "eslint-plugin-react-hooks": "^5.0.0",
-    "eslint-plugin-testing-library": "^7.0.0",
     "jsdom": "catalog:",
     "next": "^16.2.11",
-    "prettier": "catalog:",
     "typescript": "^5.7.3",
-    "typescript-eslint": "catalog:",
     "vitest": "catalog:"
   }
 }

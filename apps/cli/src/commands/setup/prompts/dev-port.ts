@@ -21,9 +21,7 @@ export class DevPortPrompt implements SetupPrompt {
       initialValue: String(answers.devPort),
       validate: (input) => {
         const num = Number.parseInt(input ?? "", 10);
-        return Number.isFinite(num) && num > 0 && num < 65536
-          ? undefined
-          : "Must be a port number";
+        return Number.isFinite(num) && num > 0 && num < 65536 ? undefined : "Must be a port number";
       },
     });
     bail(value);

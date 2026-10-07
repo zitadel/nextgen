@@ -35,7 +35,14 @@ export async function prepareLocalRegistry(input) {
   await writeVerdaccioNpmrc(paths.npmrcPath, input.registryUrl, input);
 
   await buildPackages(input.repoRoot, input.run, env, log, input.prebuiltTarballsDir);
-  await packPackages(input.repoRoot, paths.tarballsDir, input.run, env, log, input.prebuiltTarballsDir);
+  await packPackages(
+    input.repoRoot,
+    paths.tarballsDir,
+    input.run,
+    env,
+    log,
+    input.prebuiltTarballsDir,
+  );
   await verifyTarballs(input.repoRoot, paths.tarballsDir, input.run, env);
   const startRegistry = input.startLocalRegistry ?? startLocalRegistry;
   const registry = await startRegistry({
@@ -59,7 +66,13 @@ export async function prepareLocalRegistry(input) {
   return { paths, registry, env: npmEnvironment(env, input.registryUrl, paths.npmrcPath) };
 }
 
-export async function buildPackages(repoRoot, run, env, log = () => undefined, prebuiltTarballsDir = "") {
+export async function buildPackages(
+  repoRoot,
+  run,
+  env,
+  log = () => undefined,
+  prebuiltTarballsDir = "",
+) {
   if (prebuiltTarballsDir) {
     log(`using prebuilt release npm tarballs from ${prebuiltTarballsDir}`);
     return;
@@ -69,7 +82,14 @@ export async function buildPackages(repoRoot, run, env, log = () => undefined, p
   await run("moon", ["run", "release:pack"], { cwd: repoRoot, env });
 }
 
-export async function packPackages(repoRoot, tarballsDir, _run, _env, log = () => undefined, prebuiltTarballsDir = "") {
+export async function packPackages(
+  repoRoot,
+  tarballsDir,
+  _run,
+  _env,
+  log = () => undefined,
+  prebuiltTarballsDir = "",
+) {
   log(`copying npm tarballs into ${tarballsDir}`);
   const version = prebuiltTarballsDir ? "" : await packageVersion(repoRoot, "apps/server");
   const sourceDir = prebuiltTarballsDir || join(repoRoot, "dist", "release", version, "npm");
@@ -83,17 +103,14 @@ export async function packPackages(repoRoot, tarballsDir, _run, _env, log = () =
 }
 
 export async function verifyTarballs(repoRoot, tarballsDir, run, env) {
-  await run("node", [
-    "apps/cli-journey-e2e/scripts/verify-tarballs.mjs",
-    tarballsDir,
-  ], { cwd: repoRoot, env });
+  await run("node", ["apps/cli-journey-e2e/scripts/verify-tarballs.mjs", tarballsDir], {
+    cwd: repoRoot,
+    env,
+  });
 }
 
 export async function publishTarballs(repoRoot, tarballsDir, registryUrl, npmrcPath, run, env) {
-  await run("node", [
-    "apps/cli-journey-e2e/scripts/publish-tarballs.mjs",
-    tarballsDir,
-  ], {
+  await run("node", ["apps/cli-journey-e2e/scripts/publish-tarballs.mjs", tarballsDir], {
     cwd: repoRoot,
     env: {
       ...env,
@@ -162,7 +179,9 @@ export async function waitForHttp(url, label, child, log = () => undefined) {
   let lastError;
   while (Date.now() < deadline) {
     if (child?.spawnError) {
-      throw new Error(`${label} failed to start; see ${child.logFile}: ${child.spawnError.message}`);
+      throw new Error(
+        `${label} failed to start; see ${child.logFile}: ${child.spawnError.message}`,
+      );
     }
     if (child && child.exitCode !== null) {
       throw new Error(`${label} exited before becoming ready; see ${child.logFile}`);
@@ -202,9 +221,7 @@ export function npmEnvironment(env, registryUrl, npmrcPath) {
 }
 
 export async function packageName(repoRoot, relativePath) {
-  const manifest = JSON.parse(
-    await readFile(join(repoRoot, relativePath, "package.json"), "utf8"),
-  );
+  const manifest = JSON.parse(await readFile(join(repoRoot, relativePath, "package.json"), "utf8"));
   if (typeof manifest.name !== "string" || manifest.name.length === 0) {
     throw new Error(`${relativePath}/package.json has no name`);
   }
@@ -212,9 +229,7 @@ export async function packageName(repoRoot, relativePath) {
 }
 
 export async function packageVersion(repoRoot, relativePath) {
-  const manifest = JSON.parse(
-    await readFile(join(repoRoot, relativePath, "package.json"), "utf8"),
-  );
+  const manifest = JSON.parse(await readFile(join(repoRoot, relativePath, "package.json"), "utf8"));
   if (typeof manifest.version !== "string" || manifest.version.length === 0) {
     throw new Error(`${relativePath}/package.json has no version`);
   }
