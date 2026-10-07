@@ -24,6 +24,7 @@ Keep Shadow DOM for styling, fix form behaviour with web platform features. Spec
 | Form value participation | [Form-associated custom elements](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_custom_elements#form-associated_custom_elements) (`static formAssociated = true` + `attachInternals().setFormValue()`) | `zl-field`, `zl-select`, `zl-checkbox`, `zl-button` |
 | Real `<form>` element | Rendered inside `<zitadel-login>`'s shadow root, wraps the Liquid output | `<zitadel-login>` |
 | Submit interception | Native `submit` event listener on the shadow root; `preventDefault()` then call the flow API | `<zitadel-login>` |
+| Credential pairing on a password-only step | A plain `<input>` rendered into the same `<form>`, carrying `step.identifier`'s value and `autocomplete="username"`, with no `name` so it is never submitted | `<zitadel-login>` |
 | Enter-to-submit | Each field forwards `keydown[Enter]` to `internals.form.requestSubmit()` | `<zl-field>` |
 | Validity state | `internals.setValidity()` mirrors `required` / step-level errors | each input atom |
 | Reset / restore | `formResetCallback`, `formStateRestoreCallback` clear / restore `value` | each input atom |
@@ -35,6 +36,7 @@ Why these specifically:
 
 - **Form-associated custom elements** are W3C standard and shipped in every evergreen browser since 2023 (Safari 16.4 was the last to land). Modern password managers (1Password 8+, Bitwarden, browser built-ins) walk the form by talking to the platform, not by piercing shadow roots, so once each atom calls `setFormValue` they're visible.
 - **Real `<form>`** is what password managers and the browser's autofill / save-password heuristics actually look for. We don't navigate on submit (we own the cycle via fetch), but the form being present is what triggers detection.
+- **The paired identifier is a plain `<input>`, not an atom.** A manager saves an identifier and a password as one credential and reads both from the same form, so a step collecting only the password has to carry the identifier beside it. The orchestrator renders it rather than the template: the sanitiser drops a raw `<input>` out of template output, and an ejected template then keeps the behaviour for free. It needs no form association because it is not in a nested shadow root — it sits directly in the form. Omitting `name` is what keeps it out of the submission, so no engine-side tolerance for an extra field is required.
 - **`delegatesFocus: true`** makes the shadow boundary transparent for keyboard tab order. It also lets `:focus-visible` styling on the host work as users expect.
 - **Step-change focus move** keeps screen-reader and keyboard users oriented across step swaps.
 

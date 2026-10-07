@@ -129,12 +129,12 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
    */
   function resolveSsoOutcome(slug: string | null, email: string | undefined): SsoOutcome {
     if (!slug || !email) {
-      return "identity_unknown";
+      return "sso_user_not_found";
     }
     if (ssoIdentities.isLinked(slug, email)) {
-      return "callback";
+      return "sso_authenticated";
     }
-    return authn.hasAccount(email) ? "user_already_exists" : "identity_unknown";
+    return authn.hasAccount(email) ? "user_already_exists" : "sso_user_not_found";
   }
 
   function reset(): void {
@@ -382,6 +382,18 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       captured.push({ kind: "exchangeHandoff", body, projectId });
       return getExchangeHandoffResponseMock();
     }),
+    // The session endpoints `<zitadel-session>` and `<zitadel-logout>` read on
+    // mount. In-process there is no session cookie to present, so both answer
+    // the contract's 401 for a signed-out browser.
+    http.get("*/sessions/me", () =>
+      HttpResponse.json(
+        { code: "auth.unauthorized", message: "no session cookie" },
+        { status: 401, headers: { "Cache-Control": "private, no-store" } },
+      ),
+    ),
+    http.delete("*/sessions/me", () =>
+      HttpResponse.json({ code: "auth.unauthorized", message: "no session cookie" }, { status: 401 }),
+    ),
   ];
 
   return { handlers, reset, getCaptured, registerCredential, returnFromProvider };

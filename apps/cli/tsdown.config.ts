@@ -27,11 +27,12 @@ export default defineConfig({
   },
   outDir: "dist",
   format: ["esm"],
+  failOnWarn: true,
   dts: false,
   sourcemap: true,
   clean: true,
   shims: true,
-  external: [/^@oclif\//],
+  deps: { neverBundle: [/^@oclif\//] },
   target: false,
   define: {
     __ZITADEL_TELEMETRY_CHANNEL__: JSON.stringify(telemetryChannel),

@@ -31,21 +31,13 @@
         {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
         ></zl-select>
       {% else %}
-        {% assign autocomplete_val = '' %}
-        {% if f.name == 'email' %}
-          {% assign autocomplete_val = 'email' %}
-        {% elsif f.type == 'password' and step.name contains 'register' %}
-          {% assign autocomplete_val = 'new-password' %}
-        {% elsif f.type == 'password' %}
-          {% assign autocomplete_val = 'current-password' %}
-        {% endif %}
         <zl-field
           name="{{ f.name }}"
           data-testid="zitadel-field-{{ f.name | testid }}"
           label="{{ f.text_key | t }}"
           type="{{ f.type }}"
           value="{{ f.value }}"
-          {% if autocomplete_val != '' %}autocomplete="{{ autocomplete_val }}"{% endif %}
+          {% if f.autocomplete %}autocomplete="{{ f.autocomplete }}"{% endif %}
           {% if f.required %}required{% endif %}
           {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
           {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}

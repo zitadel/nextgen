@@ -4,6 +4,7 @@ layer: "library"
 stack: "frontend"
 dependsOn:
   - "api"
+  - "api-mock"
   - "components"
   - "sdk-core"
 
@@ -51,4 +52,7 @@ tasks:
   test:
     command: "corepack pnpm run test:all"
     deps:
+      # api-mock serves the Flow API to the specs (test-setup.ts); its no-op
+      # build is the edge that re-runs this when api-mock source changes.
+      - "api-mock:build"
       - "build"

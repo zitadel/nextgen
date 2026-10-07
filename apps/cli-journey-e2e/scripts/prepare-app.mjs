@@ -97,6 +97,9 @@ export async function prepareApp(options = {}) {
         "local",
         "--dev-port",
         String(appPort),
+        // `start` ran first and left `.zitadel/local` in the app dir, so the
+        // directory is no longer empty; --force scaffolds (or patches) into it.
+        "--force",
         ...(preset ? ["--preset", preset] : []),
       ],
       writeFile: fs.writeFile,

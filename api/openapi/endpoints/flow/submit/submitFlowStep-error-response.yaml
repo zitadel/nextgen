@@ -20,6 +20,7 @@ content:
         - $ref: '../../../components/schemas/errors/flow-integrity.yaml'
         - $ref: '../../../components/schemas/errors/flow-invalid_action.yaml'
         - $ref: '../../../components/schemas/errors/flow-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/flow-restart_required.yaml'
         - $ref: '../../../components/schemas/errors/flow-unsupported.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
@@ -30,6 +31,8 @@ content:
         - $ref: '../../../components/schemas/errors/user-already_exists.yaml'
         - $ref: '../../../components/schemas/errors/user-invalid.yaml'
         - $ref: '../../../components/schemas/errors/user-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/user-password_empty.yaml'
+        - $ref: '../../../components/schemas/errors/user-password_too_long.yaml'
       discriminator:
         propertyName: code
         mapping:
@@ -49,6 +52,7 @@ content:
           flow.integrity: '../../../components/schemas/errors/flow-integrity.yaml'
           flow.invalid_action: '../../../components/schemas/errors/flow-invalid_action.yaml'
           flow.not_found: '../../../components/schemas/errors/flow-not_found.yaml'
+          flow.restart_required: '../../../components/schemas/errors/flow-restart_required.yaml'
           flow.unsupported: '../../../components/schemas/errors/flow-unsupported.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
@@ -59,6 +63,8 @@ content:
           user.already_exists: '../../../components/schemas/errors/user-already_exists.yaml'
           user.invalid: '../../../components/schemas/errors/user-invalid.yaml'
           user.not_found: '../../../components/schemas/errors/user-not_found.yaml'
+          user.password_empty: '../../../components/schemas/errors/user-password_empty.yaml'
+          user.password_too_long: '../../../components/schemas/errors/user-password_too_long.yaml'
     examples:
       att.already_handed_off:
         summary: att.already_handed_off
@@ -140,6 +146,11 @@ content:
         value:
           code: flow.not_found
           message: 'flow not found'
+      flow.restart_required:
+        summary: flow.restart_required
+        value:
+          code: flow.restart_required
+          message: 'the flow must be restarted'
       flow.unsupported:
         summary: flow.unsupported
         value:
@@ -190,3 +201,13 @@ content:
         value:
           code: user.not_found
           message: 'user not found'
+      user.password_empty:
+        summary: user.password_empty
+        value:
+          code: user.password_empty
+          message: 'The password must not be empty.'
+      user.password_too_long:
+        summary: user.password_too_long
+        value:
+          code: user.password_too_long
+          message: 'The password is too long. It can be at most 64 characters.'
