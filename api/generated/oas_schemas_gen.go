@@ -32221,6 +32221,10 @@ func (*ListProjectAdminsNotFound) listProjectAdminsRes() {}
 // Ref: #
 type ListProjectAdminsResponse struct {
 	Admins []ProjectAdmin `json:"admins"`
+	// True when more than 1000 people administer the project. `admins` then
+	// holds the first 1000 by `user_id`, and the rest are left out. It happens
+	// only when a very large team holds an admin grant or owns the project.
+	Truncated bool `json:"truncated"`
 }
 
 // GetAdmins returns the value of Admins.
@@ -32228,9 +32232,19 @@ func (s *ListProjectAdminsResponse) GetAdmins() []ProjectAdmin {
 	return s.Admins
 }
 
+// GetTruncated returns the value of Truncated.
+func (s *ListProjectAdminsResponse) GetTruncated() bool {
+	return s.Truncated
+}
+
 // SetAdmins sets the value of Admins.
 func (s *ListProjectAdminsResponse) SetAdmins(val []ProjectAdmin) {
 	s.Admins = val
+}
+
+// SetTruncated sets the value of Truncated.
+func (s *ListProjectAdminsResponse) SetTruncated(val bool) {
+	s.Truncated = val
 }
 
 func (*ListProjectAdminsResponse) listProjectAdminsRes() {}
@@ -33301,6 +33315,51 @@ func (o NilCurrentDeployment) Get() (v CurrentDeployment, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o NilCurrentDeployment) Or(d CurrentDeployment) CurrentDeployment {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewNilTeamID returns new NilTeamID with value set to v.
+func NewNilTeamID(v TeamID) NilTeamID {
+	return NilTeamID{
+		Value: v,
+	}
+}
+
+// NilTeamID is nullable TeamID.
+type NilTeamID struct {
+	Value TeamID
+	Null  bool
+}
+
+// SetTo sets value to v.
+func (o *NilTeamID) SetTo(v TeamID) {
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o NilTeamID) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *NilTeamID) SetToNull() {
+	o.Null = true
+	var v TeamID
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o NilTeamID) Get() (v TeamID, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o NilTeamID) Or(d TeamID) TeamID {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -42517,69 +42576,6 @@ func (o OptNilTeamDeactivatedEventActorType) Or(d TeamDeactivatedEventActorType)
 	return d
 }
 
-// NewOptNilTeamID returns new OptNilTeamID with value set to v.
-func NewOptNilTeamID(v TeamID) OptNilTeamID {
-	return OptNilTeamID{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptNilTeamID is optional nullable TeamID.
-type OptNilTeamID struct {
-	Value TeamID
-	Set   bool
-	Null  bool
-}
-
-// IsSet returns true if OptNilTeamID was set.
-func (o OptNilTeamID) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptNilTeamID) Reset() {
-	var v TeamID
-	o.Value = v
-	o.Set = false
-	o.Null = false
-}
-
-// SetTo sets value to v.
-func (o *OptNilTeamID) SetTo(v TeamID) {
-	o.Set = true
-	o.Null = false
-	o.Value = v
-}
-
-// IsNull returns true if value is Null.
-func (o OptNilTeamID) IsNull() bool { return o.Null }
-
-// SetToNull sets value to null.
-func (o *OptNilTeamID) SetToNull() {
-	o.Set = true
-	o.Null = true
-	var v TeamID
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptNilTeamID) Get() (v TeamID, ok bool) {
-	if o.Null {
-		return v, false
-	}
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptNilTeamID) Or(d TeamID) TeamID {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptNilTeamResponse returns new OptNilTeamResponse with value set to v.
 func NewOptNilTeamResponse(v TeamResponse) OptNilTeamResponse {
 	return OptNilTeamResponse{
@@ -50501,11 +50497,11 @@ type ProjectDetailResponse struct {
 	PasswordHash OptNilPasswordHashPolicy `json:"password_hash"`
 	// The team that owns the project (ADR 054 §2), which is how its
 	// members administer it. Null when no team owns the project, for
-	// example before it is claimed. The server always sends the field.
+	// example before it is claimed.
 	// The team lives in the platform project, so its id is an opaque
 	// reference here. `GET /projects/{project_id}/admins` lists the
 	// people who administer the project through it.
-	OwningTeamID OptNilTeamID `json:"owning_team_id"`
+	OwningTeamID NilTeamID `json:"owning_team_id"`
 }
 
 // GetID returns the value of ID.
@@ -50539,7 +50535,7 @@ func (s *ProjectDetailResponse) GetPasswordHash() OptNilPasswordHashPolicy {
 }
 
 // GetOwningTeamID returns the value of OwningTeamID.
-func (s *ProjectDetailResponse) GetOwningTeamID() OptNilTeamID {
+func (s *ProjectDetailResponse) GetOwningTeamID() NilTeamID {
 	return s.OwningTeamID
 }
 
@@ -50574,7 +50570,7 @@ func (s *ProjectDetailResponse) SetPasswordHash(val OptNilPasswordHashPolicy) {
 }
 
 // SetOwningTeamID sets the value of OwningTeamID.
-func (s *ProjectDetailResponse) SetOwningTeamID(val OptNilTeamID) {
+func (s *ProjectDetailResponse) SetOwningTeamID(val NilTeamID) {
 	s.OwningTeamID = val
 }
 

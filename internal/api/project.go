@@ -56,7 +56,11 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 		}
 		return nil, err
 	}
-	return h.projectDetailResponse(ctx, project)
+	owningTeamID, err := h.projectService.OwningTeamID(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	return projectDetailResponse(project, owningTeamID), nil
 }
 
 func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest, params api.PatchProjectParams) (api.PatchProjectRes, error) {
@@ -77,11 +81,17 @@ func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest
 		update.PasswordHashPolicy = &policy
 	}
 
+	// Read before the update: a failed read then refuses the PATCH instead of
+	// answering 500 for a change that was already saved.
+	owningTeamID, err := h.projectService.OwningTeamID(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
 	project, err := h.projectService.Update(ctx, update)
 	if err != nil {
 		return nil, err
 	}
-	return h.projectDetailResponse(ctx, project)
+	return projectDetailResponse(project, owningTeamID), nil
 }
 
 // QueryProjects has no project parameter: results are restricted to the
@@ -241,8 +251,9 @@ func mapQueryProjectsToService(projectID string, req *api.QueryProjectsRequest) 
 	return svcReq
 }
 
-// projectResponse is the shared project body: getProject, patchProject, and
-// every item in queryProjects answer with it.
+// projectResponse is the project body every item in queryProjects and
+// listMyProjects answers with. getProject and patchProject answer with
+// projectDetailResponse, which carries the same fields.
 func projectResponse(project *domain.Project) *api.ProjectResponse {
 	return &api.ProjectResponse{
 		ID:             project.ID,
@@ -254,26 +265,24 @@ func projectResponse(project *domain.Project) *api.ProjectResponse {
 	}
 }
 
-func (h *Handler) projectDetailResponse(ctx context.Context, project *domain.Project) (*api.ProjectDetailResponse, error) {
-	owningTeamID, err := h.projectService.OwningTeamID(ctx, project.ID)
-	if err != nil {
-		return nil, err
-	}
-	base := projectResponse(project)
+// projectDetailResponse is projectResponse plus the owning team, which only the
+// single-project reads carry: a listing would need one owning-team read per
+// row. TestProjectDetailResponseCarriesProjectResponse keeps the two in step.
+func projectDetailResponse(project *domain.Project, owningTeamID string) *api.ProjectDetailResponse {
 	resp := &api.ProjectDetailResponse{
-		ID:             base.ID,
-		Name:           base.Name,
-		PreviewOrigins: base.PreviewOrigins,
-		PasswordHash:   base.PasswordHash,
-		CreatedAt:      base.CreatedAt,
-		UpdatedAt:      base.UpdatedAt,
+		ID:             project.ID,
+		Name:           project.Name,
+		PreviewOrigins: project.PreviewOrigins,
+		PasswordHash:   passwordHashPolicyResponse(project.PasswordHashPolicy),
+		CreatedAt:      project.CreatedAt,
+		UpdatedAt:      project.UpdatedAt,
 	}
 	if owningTeamID != "" {
-		resp.OwningTeamID = api.NewOptNilTeamID(api.TeamID(owningTeamID))
+		resp.OwningTeamID = api.NewNilTeamID(api.TeamID(owningTeamID))
 	} else {
 		resp.OwningTeamID.SetToNull()
 	}
-	return resp, nil
+	return resp
 }
 
 // ------------------ Errors ---------------

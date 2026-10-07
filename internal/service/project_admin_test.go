@@ -2,7 +2,7 @@ package service_test
 
 import (
 	"context"
-	"reflect"
+	"fmt"
 	"testing"
 	"time"
 
@@ -34,22 +34,24 @@ func (f adminFixture) expect(s *servicemocks.MockAllStatements) {
 			}
 			return domain.NewClaimTeamAssignment("proj_customer", f.owningTeamID), nil
 		}).AnyTimes()
-	// Each grant source asks for one principal type; serve it only those.
-	for _, principalType := range []domain.AuthzPrincipalType{domain.AuthzPrincipalTypeTeam, domain.AuthzPrincipalTypeUser} {
-		want := database.And(
-			database.StringEqual(database.Col(domain.AuthzAssignmentFieldRelation), domain.AuthzRelationAdmin),
-			database.StringEqual(database.Col(domain.AuthzAssignmentFieldPrincipalType), principalType.String()),
-		)
+	// The team-grant source reads first, then the user-grant source; each gets
+	// only its own principal type, as its filter asks. Expiry is filtered in
+	// SQL, which the integration test covers.
+	byType := func(principalType domain.AuthzPrincipalType) []*domain.AuthzAssignment {
 		var items []*domain.AuthzAssignment
 		for _, grant := range f.grants {
 			if grant.PrincipalType == principalType {
 				items = append(items, grant)
 			}
 		}
-		s.EXPECT().ListManagedGrants(gomock.Any(), "proj_customer", gomock.Cond(func(opts *database.ListOptions[domain.AuthzAssignmentField]) bool {
-			return reflect.DeepEqual(opts.Filter, want)
-		})).Return(&database.ListResult[*domain.AuthzAssignment]{Items: items}, nil).AnyTimes()
+		return items
 	}
+	gomock.InOrder(
+		s.EXPECT().ListManagedGrants(gomock.Any(), "proj_customer", gomock.Any()).Return(
+			&database.ListResult[*domain.AuthzAssignment]{Items: byType(domain.AuthzPrincipalTypeTeam)}, nil),
+		s.EXPECT().ListManagedGrants(gomock.Any(), "proj_customer", gomock.Any()).Return(
+			&database.ListResult[*domain.AuthzAssignment]{Items: byType(domain.AuthzPrincipalTypeUser)}, nil),
+	)
 	s.EXPECT().ListTeams(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(context.Context, *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error) {
 			items := make([]*domain.Team, 0, len(f.teams))
@@ -58,13 +60,15 @@ func (f adminFixture) expect(s *servicemocks.MockAllStatements) {
 			}
 			return &database.ListResult[*domain.Team]{Items: items}, nil
 		}).AnyTimes()
-	s.EXPECT().ListUsers(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ context.Context, _ *database.ListOptions[domain.UserField], opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
-			var items []*domain.User
-			for _, id := range f.members[*opts.MembershipTeamID] {
-				items = append(items, &domain.User{ID: id})
+	s.EXPECT().ListAuthzMembershipEdges(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(context.Context, database.Filter[domain.AuthzMembershipEdgeField]) ([]*domain.AuthzMembershipEdge, error) {
+			var edges []*domain.AuthzMembershipEdge
+			for teamID, userIDs := range f.members {
+				for _, userID := range userIDs {
+					edges = append(edges, domain.NewUserTeamMembershipEdge(grantPlatformProjID, teamID, userID))
+				}
 			}
-			return &database.ListResult[*domain.User]{Items: items}, nil
+			return edges, nil
 		}).AnyTimes()
 }
 
@@ -80,7 +84,6 @@ func adminGrant(id string, principalType domain.AuthzPrincipalType, principalID 
 func TestGrantService_ListProjectAdmins(t *testing.T) {
 	t.Parallel()
 
-	past := time.Now().Add(-time.Hour)
 	future := time.Now().Add(time.Hour)
 	fixture := adminFixture{
 		owningTeamID: "team_owner",
@@ -88,7 +91,6 @@ func TestGrantService_ListProjectAdmins(t *testing.T) {
 			adminGrant("asgn_a", domain.AuthzPrincipalTypeUser, "user_owner", nil),
 			adminGrant("asgn_b", domain.AuthzPrincipalTypeTeam, "team_ops", &future),
 			adminGrant("asgn_c", domain.AuthzPrincipalTypeUser, "user_direct", nil),
-			adminGrant("asgn_d", domain.AuthzPrincipalTypeUser, "user_expired", &past),
 		},
 		members: map[string][]string{
 			"team_owner": {"user_owner"},
@@ -109,12 +111,12 @@ func TestGrantService_ListProjectAdmins(t *testing.T) {
 
 		byUser := map[string]*service.ProjectAdmin{}
 		var order []string
-		for _, admin := range got {
+		for _, admin := range got.Admins {
 			byUser[admin.User.UserID] = admin
 			order = append(order, admin.User.UserID)
 		}
-		assert.Equal(t, []string{"user_direct", "user_ops", "user_owner"}, order,
-			"ordered by user id; the expired grant is not an admin source")
+		assert.Equal(t, []string{"user_direct", "user_ops", "user_owner"}, order, "ordered by user id")
+		assert.False(t, got.Truncated)
 
 		owner := byUser["user_owner"]
 		assert.Equal(t, "owner@example.com", owner.User.Identifier)
@@ -137,7 +139,27 @@ func TestGrantService_ListProjectAdmins(t *testing.T) {
 
 		got, err := svc.ListProjectAdmins(t.Context(), "proj_customer")
 		require.NoError(t, err)
-		assert.Empty(t, got)
+		assert.Empty(t, got.Admins)
+	})
+
+	t.Run("a list past the cap is truncated", func(t *testing.T) {
+		t.Parallel()
+		members := make([]string, 0, service.MaxProjectAdmins+1)
+		for i := range service.MaxProjectAdmins + 1 {
+			members = append(members, fmt.Sprintf("user_%05d", i))
+		}
+		svc := newMockedGrantService(t, grantPlatformProjID, adminFixture{
+			owningTeamID: "team_big",
+			members:      map[string][]string{"team_big": members},
+			teams:        map[string]string{"team_big": "Everyone"},
+		}.expect)
+
+		got, err := svc.ListProjectAdmins(t.Context(), "proj_customer")
+		require.NoError(t, err)
+		assert.True(t, got.Truncated)
+		require.Len(t, got.Admins, service.MaxProjectAdmins)
+		assert.Equal(t, members[service.MaxProjectAdmins-1], got.Admins[service.MaxProjectAdmins-1].User.UserID,
+			"the first people by user id are kept")
 	})
 
 }

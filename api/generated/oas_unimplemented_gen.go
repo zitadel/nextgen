@@ -806,14 +806,17 @@ func (UnimplementedHandler) ListMyProjects(ctx context.Context, params ListMyPro
 // - `grant`: an unexpired `admin` grant on the project, either to the
 // person (`grant_id` only) or to a team they are an active member of
 // (`grant_id` and `team`). Revoking that grant removes this source.
-// Only access that authorizes today is listed: grants that expired or
-// carry a lower role, and team members who are not active, are left out. A
-// person whose only access is a `viewer` or `editor` grant is not an admin
-// and is not listed. A grant to a person is listed whatever the person's
-// status, as `POST /grants/query` lists it.
+// The list follows the authorization check: team membership is read from
+// the same membership projection the check expands, so a person who left a
+// team, or whose team or user was deactivated, is not listed through it.
+// Grants that expired or carry a lower role are left out. A person whose
+// only access is a `viewer` or `editor` grant is not an admin and is not
+// listed. Like the check, the list does not look at a person's user status
+// beyond that, so a direct grant to a suspended person is listed.
 // Ordered by `user_id`. The list is not paginated, an exception to ADR 027:
 // it merges grants and team memberships, so it cannot be paged in the
-// database, and the people who administer one project are few.
+// database, and the people who administer one project are few. It is capped
+// at 1000 people; `truncated` reports a longer list.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
 // session cookie (`nextgenSession`) that can read the project.
 //

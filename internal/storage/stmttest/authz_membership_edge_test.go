@@ -136,3 +136,49 @@ func TestAuthzMembershipEdgeStatements_DeleteByMemberAndSet(t *testing.T) {
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }
+
+// ListBySets reads the members of chosen sets through a filter: only those
+// sets' edges come back, ordered by set and member, and a set without members
+// yields none.
+func TestAuthzMembershipEdgeStatements_ListBySets(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		suffix := uniqueSuffix(t)
+		teamA, teamB, teamC := "team-list-a-"+suffix, "team-list-b-"+suffix, "team-list-c-"+suffix
+		for _, teamID := range []string{teamA, teamB, teamC} {
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamID)))
+		}
+		userOne, userTwo := "usr-list-1-"+suffix, "usr-list-2-"+suffix
+		for _, userID := range []string{userOne, userTwo} {
+			require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "List User")))
+		}
+		for _, edge := range []struct{ teamID, userID string }{
+			{teamB, userTwo}, {teamA, userTwo}, {teamA, userOne}, {teamC, userOne},
+		} {
+			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(),
+				domain.NewUserTeamMembershipEdge(projectID, edge.teamID, edge.userID)))
+		}
+
+		bySets := func(setIDs ...string) []string {
+			t.Helper()
+			sets := make([]database.Filter[domain.AuthzMembershipEdgeField], 0, len(setIDs))
+			for _, setID := range setIDs {
+				sets = append(sets, database.Equal(database.Col(domain.AuthzMembershipEdgeFieldSetID), setID))
+			}
+			edges, err := d.stmts.ListAuthzMembershipEdges(t.Context(), database.And(
+				database.Equal(database.Col(domain.AuthzMembershipEdgeFieldProjectID), projectID),
+				database.Equal(database.Col(domain.AuthzMembershipEdgeFieldSetType), domain.AuthzSetTypeTeam),
+				database.Or(sets...),
+			))
+			require.NoError(t, err)
+			out := make([]string, 0, len(edges))
+			for _, edge := range edges {
+				out = append(out, edge.SetID+"/"+edge.MemberID)
+			}
+			return out
+		}
+
+		assert.Equal(t, []string{teamA + "/" + userOne, teamA + "/" + userTwo, teamB + "/" + userTwo}, bySets(teamA, teamB))
+		assert.Empty(t, bySets("team-list-none-"+suffix))
+	})
+}

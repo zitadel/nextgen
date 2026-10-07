@@ -605,31 +605,19 @@ func (s *GrantService) hydrate(ctx context.Context, includePrincipal bool, asgns
 }
 
 func (s *GrantService) grantsByPrincipalHome(ctx context.Context, grants []*Grant) (map[string][]*Grant, error) {
-	if s.platformProjectID != "" {
-		return map[string][]*Grant{s.platformProjectID: grants}, nil
+	ids := make([]string, 0, len(grants))
+	for _, g := range grants {
+		ids = append(ids, g.Assignment.PrincipalID)
 	}
-	stmts := s.v2Pool.Statements()
-	homeByPrincipal := make(map[string]string, len(grants))
+	homes, err := s.principalHomes(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
 	grouped := map[string][]*Grant{}
 	for _, g := range grants {
-		pid := g.Assignment.PrincipalID
-		home, ok := homeByPrincipal[pid]
-		if !ok {
-			scope, err := stmts.GetResourceScope(ctx, pid)
-			if err != nil {
-				if _, miss := errors.AsType[*database.NoRowFoundError](err); miss {
-					homeByPrincipal[pid] = ""
-					continue
-				}
-				return nil, domain.ErrInternal(err).WithMessage("failed to resolve grant principal homes")
-			}
-			home = scope.ProjectID
-			homeByPrincipal[pid] = home
+		if home := homes[g.Assignment.PrincipalID]; home != "" {
+			grouped[home] = append(grouped[home], g)
 		}
-		if home == "" {
-			continue
-		}
-		grouped[home] = append(grouped[home], g)
 	}
 	return grouped, nil
 }

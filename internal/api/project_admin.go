@@ -16,11 +16,11 @@ func (h *Handler) ListProjectAdmins(ctx context.Context, params api.ListProjectA
 	if err != nil {
 		return nil, err
 	}
-	admins := make([]api.ProjectAdmin, 0, len(listed))
-	for _, admin := range listed {
+	admins := make([]api.ProjectAdmin, 0, len(listed.Admins))
+	for _, admin := range listed.Admins {
 		admins = append(admins, projectAdminResponse(admin))
 	}
-	return &api.ListProjectAdminsResponse{Admins: admins}, nil
+	return &api.ListProjectAdminsResponse{Admins: admins, Truncated: listed.Truncated}, nil
 }
 
 func projectAdminResponse(admin *service.ProjectAdmin) api.ProjectAdmin {

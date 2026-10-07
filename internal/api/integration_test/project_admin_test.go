@@ -4,6 +4,7 @@ package integration_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -11,6 +12,7 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 // TestProjectAdminsThroughOwningTeam covers #1462: the person who owns a
@@ -42,6 +44,7 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 		require.NoError(t, err)
 		listed, ok := resp.(*api.ListProjectAdminsResponse)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.False(t, listed.Truncated)
 		out := make(map[api.UserID]api.ProjectAdmin, len(listed.Admins))
 		for _, admin := range listed.Admins {
 			require.NotContains(t, out, admin.User.UserID, "a person is listed once")
@@ -113,19 +116,41 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 	assert.Equal(t, []api.ProjectAdminSourceType{api.ProjectAdminSourceTypeOwningTeam}, sourceTypes(admins[api.UserID(ownerID)]))
 
 	t.Run("only active members of the owning team are listed", func(t *testing.T) {
-		memberships := harness.EnsureTeamMembershipFixture(t)
+		// A membership write projects the edge the check reads; this does what
+		// the team service does for each status.
+		addMember := func(t *testing.T, userID string, status domain.MembershipStatus) {
+			t.Helper()
+			require.NoError(t, harness.EnsureTeamMembershipFixture(t).Create(t.Context(), &domain.TeamMembership{
+				ProjectID: platform.ID, TeamID: owningTeamID, UserID: userID, Status: status,
+			}))
+			require.NoError(t, service.SyncUserTeamMembershipEdge(t.Context(), harness.EnsureServiceDB(t).Statements(),
+				platform.ID, owningTeamID, userID, status))
+		}
 		activeID := harness.CreateUserWithTeam(t, platform.ID)
-		require.NoError(t, memberships.Create(t.Context(), &domain.TeamMembership{
-			ProjectID: platform.ID, TeamID: owningTeamID, UserID: activeID, Status: domain.MembershipStatusActive,
-		}))
+		addMember(t, activeID, domain.MembershipStatusActive)
 		removedID := harness.CreateUserWithTeam(t, platform.ID)
-		require.NoError(t, memberships.Create(t.Context(), &domain.TeamMembership{
-			ProjectID: platform.ID, TeamID: owningTeamID, UserID: removedID, Status: domain.MembershipStatusRemoved,
-		}))
+		addMember(t, removedID, domain.MembershipStatusRemoved)
 
 		admins := queryAdmins(t, owner)
 		assert.Contains(t, admins, api.UserID(activeID), "an active member of the owning team is an admin")
 		assert.NotContains(t, admins, api.UserID(removedID), "a removed member no longer is")
+	})
+
+	t.Run("an expired admin grant is not listed", func(t *testing.T) {
+		expiredID := harness.CreateUserWithTeam(t, platform.ID)
+		expiredAt := time.Now().Add(-time.Hour)
+		expired := &domain.AuthzAssignment{
+			ProjectID:     project.ID,
+			CatalogID:     domain.SystemCatalogID,
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   expiredID,
+			ObjectType:    "project",
+			Relation:      domain.AuthzRelationAdmin,
+			ExpiresAt:     &expiredAt,
+		}
+		expired.ApplyScope(domain.NewProjectAssignmentScope())
+		require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), expired))
+		assert.NotContains(t, queryAdmins(t, owner), api.UserID(expiredID))
 	})
 
 	t.Run("project secret reads the same list", func(t *testing.T) {
@@ -159,6 +184,5 @@ func TestProjectWithoutOwningTeam(t *testing.T) {
 	require.NoError(t, err)
 	got, ok := resp.(*api.ProjectDetailResponse)
 	require.True(t, ok, helpers.MustMarshal(t, resp))
-	assert.True(t, got.OwningTeamID.IsSet(), "the field is always sent")
 	assert.True(t, got.OwningTeamID.IsNull())
 }

@@ -2,8 +2,16 @@ type: object
 description: The people who administer a project.
 required:
   - admins
+  - truncated
 properties:
   admins:
     type: array
+    maxItems: 1000
     items:
       $ref: project-admin.yaml
+  truncated:
+    type: boolean
+    description: |
+      True when more than 1000 people administer the project. `admins` then
+      holds the first 1000 by `user_id`, and the rest are left out. It happens
+      only when a very large team holds an admin grant or owns the project.

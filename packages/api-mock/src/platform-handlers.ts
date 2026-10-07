@@ -787,6 +787,9 @@ export function setupPlatformHandlers() {
         name: project.name,
         created_at: project.createdAt,
         updated_at: project.updatedAt,
+        // The claim's team owns the project, as the server's owning-team
+        // assignment does; null until the project is claimed.
+        owning_team_id: store.claims.get(project.id)?.teamId ?? null,
       };
       const out = parse(GetProjectResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {

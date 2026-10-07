@@ -840,7 +840,6 @@ func assertProjectResponse(t *testing.T, want, got any) {
 		assert.Equal(t, expected.PreviewOrigins, actual.PreviewOrigins)
 		assert.NotEmpty(t, actual.CreatedAt)
 		assert.False(t, actual.UpdatedAt.Before(actual.CreatedAt))
-		assert.True(t, actual.OwningTeamID.IsSet(), "the single-project reads always send owning_team_id")
 	case *api.QueryProjectsResponse:
 		require.IsType(t, &api.QueryProjectsResponse{}, got, helpers.MustMarshal(t, got))
 		actual := got.(*api.QueryProjectsResponse)

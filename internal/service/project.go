@@ -313,14 +313,7 @@ func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, e
 }
 
 func (s *projectService) OwningTeamID(ctx context.Context, projectID string) (string, error) {
-	grant, err := s.v2Pool.Statements().GetActiveOwningTeamGrant(ctx, projectID)
-	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return "", nil
-		}
-		return "", domain.ErrInternal(err).WithMessage("failed to load the project's owning team")
-	}
-	return grant.PrincipalID, nil
+	return activeOwningTeamID(ctx, s.v2Pool.Statements(), projectID)
 }
 
 func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string) (*domain.Project, error) {

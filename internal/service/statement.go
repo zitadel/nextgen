@@ -645,11 +645,15 @@ type AuthzAssignmentStatements interface {
 //   - DeleteAuthzMembershipEdges: column-shaped deletes via Filter (single edge, by member, by set).
 //   - DeleteAuthzMembershipEdgesForTeamDeactivate: team deactivate (team set + lifecycle-owned users).
 //   - Get/ListByMember: resolver / dual-write test reads.
+//   - ListAuthzMembershipEdges: column-shaped reads via Filter (members of a set).
 type AuthzMembershipEdgeStatements interface {
 	Statements
 	UpsertAuthzMembershipEdge(ctx context.Context, edge *domain.AuthzMembershipEdge) error
 	GetAuthzMembershipEdge(ctx context.Context, key domain.AuthzMembershipEdgeKey) (*domain.AuthzMembershipEdge, error)
 	ListAuthzMembershipEdgesByMember(ctx context.Context, projectID string, memberType domain.AuthzMemberType, memberID string) ([]*domain.AuthzMembershipEdge, error)
+	// ListAuthzMembershipEdges returns the edges matching a column-shaped
+	// filter, ordered by set and member. The filter is required.
+	ListAuthzMembershipEdges(ctx context.Context, filter database.Filter[domain.AuthzMembershipEdgeField]) ([]*domain.AuthzMembershipEdge, error)
 	DeleteAuthzMembershipEdges(ctx context.Context, filter database.Filter[domain.AuthzMembershipEdgeField]) error
 	DeleteAuthzMembershipEdgesForTeamDeactivate(ctx context.Context, projectID, teamID string) error
 }
