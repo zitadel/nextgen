@@ -94,11 +94,12 @@ export abstract class AuthFactorCommand extends BaseCommand {
     if (change.changed.length > 0) {
       if (enabled) {
         refuseMissingIdentifier(schema, change.changed);
-      } else {
-        // Before the last-factor guard: these refusals have no override, so
-        // nobody should be asked to confirm a change that fails anyway.
-        refuseBrokenFlows(schema, change.document, flows);
       }
+      // Both directions: a changed schema re-pins its flows, so `plan` would
+      // reject one it cannot check either way. Before the last-factor guard,
+      // because these refusals have no override, and nobody should be asked
+      // to confirm a change that fails anyway.
+      refuseBrokenFlows(schema, change.document, flows);
     }
     if (lastFactor && !force) {
       // ADR 064 §10: a terminal asks; a script or a dry run needs --force.
@@ -307,7 +308,7 @@ function refuseBrokenFlows(
     throw flowRefusal(
       schema.path,
       unchecked,
-      "A login flow has errors, so it cannot be checked for the factor being disabled:",
+      "A login flow has errors, so it cannot be checked against the changed schema:",
       "Fix those errors first (`plan` reports them too), then run the command again.",
     );
   }

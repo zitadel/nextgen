@@ -287,6 +287,24 @@ describe("auth-factor", () => {
       ]);
     });
 
+    it("refuses to enable while a flow has errors that prevent checking it", async () => {
+      const broken = { ...passwordFlow(), purposes: { login: "identifier", register: "missing" } };
+      const cwd = await makeProject(
+        {
+          "default-human-user": {
+            ...passwordSchema(),
+            "x-auth-methods": { password: { enabled: true }, passkey: { enabled: false } },
+          },
+        },
+        { "default-human-user-login": broken },
+      );
+
+      const { envelope } = await run(cwd, "enable", "--mode", "passkey");
+
+      expect(envelope.code).toBe("E_VALIDATION");
+      expect(envelope.details?.issues).toEqual([expect.objectContaining({ rule: "definition" })]);
+    });
+
     it("refuses to disable while a flow has errors that prevent checking it", async () => {
       const broken = { ...passwordFlow(), purposes: { login: "identifier", register: "missing" } };
       const cwd = await makeProject(undefined, { "default-human-user-login": broken });
