@@ -3,18 +3,18 @@
   "compilerOptions": {
     "rootDir": "src",
     "lib": [
-      "ES2022"
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
     ],
-    "types": [
-      "node"
-    ],
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
     "declaration": true,
     "declarationMap": true
   },
   "include": [
     "src/**/*.ts",
-    "src/**/*.tsx",
-    "src/**/*.json"
+    "src/**/*.tsx"
   ],
   "exclude": [
     "src/**/*.spec.ts",

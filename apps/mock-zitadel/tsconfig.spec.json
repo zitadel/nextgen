@@ -8,12 +8,7 @@
       "vitest",
       "vitest/globals",
       "vitest/importMeta"
-    ],
-    "lib": [
-      "ES2022",
-      "DOM"
-    ],
-    "jsx": "react-jsx"
+    ]
   },
   "include": [
     "*.config.mts",

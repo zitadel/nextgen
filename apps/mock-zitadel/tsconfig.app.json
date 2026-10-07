@@ -1,20 +1,26 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "allowJs": true,
+    "rootDir": ".",
     "lib": [
       "ES2022",
       "DOM",
       "DOM.Iterable"
     ],
-    "noEmit": true,
     "types": [
       "node"
     ]
   },
   "include": [
-    "playwright*.config.mts",
-    "src-real/**/*.ts",
+    "api/**/*.ts",
     "src/**/*.ts"
+  ],
+  "exclude": [
+    "src/**/*.spec.ts",
+    "src/**/*.spec.tsx",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**",
+    "src/test-setup.ts"
   ]
 }

@@ -1,14 +1,29 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "./tsconfig.lib.json",
   "compilerOptions": {
-    "outDir": "./out-tsc/vitest",
-    "types": ["node"],
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "composite": false,
-    "declarationMap": false,
-    "emitDeclarationOnly": false,
-    "declaration": false
+    "rootDir": ".",
+    "noEmit": true,
+    "types": [
+      "node",
+      "vitest",
+      "vitest/globals",
+      "vitest/importMeta"
+    ]
   },
-  "include": ["vitest.config.ts", "vitest.integration.config.ts", "tests/**/*.ts"]
+  "include": [
+    "*.config.mts",
+    "*.config.ts",
+    "scripts/**/*.ts",
+    "src/**/*.d.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.spec.tsx",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**/*.ts",
+    "src/**/__tests__/**/*.tsx",
+    "src/test-setup.ts",
+    "tests/**/*.ts",
+    "tests/**/*.tsx"
+  ],
+  "exclude": []
 }

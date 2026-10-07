@@ -3,18 +3,16 @@
   "compilerOptions": {
     "rootDir": "src",
     "lib": [
-      "ES2022"
-    ],
-    "types": [
-      "node"
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
     ],
     "declaration": true,
     "declarationMap": true
   },
   "include": [
     "src/**/*.ts",
-    "src/**/*.tsx",
-    "src/**/*.json"
+    "src/**/*.tsx"
   ],
   "exclude": [
     "src/**/*.spec.ts",
@@ -22,6 +20,9 @@
     "src/**/*.test.ts",
     "src/**/*.test.tsx",
     "src/**/__tests__/**",
-    "src/test-setup.ts"
+    "src/test-setup.ts",
+    "src/module.ts",
+    "src/runtime/plugin.ts",
+    "src/runtime/composables/useAuth.ts"
   ]
 }

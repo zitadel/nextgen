@@ -15,6 +15,7 @@ import { defineConfig } from "tsdown";
 export default defineConfig({
   entry: { app: "src/app.ts" },
   outDir: "dist",
+  tsconfig: "tsconfig.app.json",
   format: ["esm"],
   failOnWarn: true,
   platform: "node",

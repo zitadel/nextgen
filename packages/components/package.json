@@ -71,18 +71,19 @@
   },
   "devDependencies": {
     "@tsdown/css": "catalog:",
+    "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
+    "@zitadel/api": "workspace:*",
     "@zitadel/api-mock": "workspace:*",
+    "@zitadel/design-tokens": "workspace:*",
     "jsdom": "catalog:",
+    "lightningcss": "catalog:",
     "msw": "catalog:",
     "playwright": "catalog:",
     "ts-lit-plugin": "catalog:",
-    "lightningcss": "catalog:",
     "tsdown": "catalog:",
-    "tslib": "catalog:",
-    "@zitadel/api": "workspace:*",
-    "@zitadel/design-tokens": "workspace:*"
+    "tslib": "catalog:"
   }
 }

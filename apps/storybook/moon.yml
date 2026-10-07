@@ -10,11 +10,8 @@ dependsOn:
 
 tasks:
   typecheck:
-    # Runs `tsc --build`: it compiles the referenced `api`/`api-mock` composite
-    # projects (their `dist/*.d.ts` are not produced by their tsdown/no-op
-    # `build` tasks) before type-checking the Storybook program. `api-mock:build`
-    # is a no-op, but the dep edge makes Moon re-run this when api-mock source
-    # changes, since `tsc --build` reads that source directly.
+    # Resolves workspace packages from source via the `@zitadel/source`
+    # condition; the api build dep keeps its generated client present.
     command: "corepack pnpm run typecheck"
     deps:
       - "api:build"

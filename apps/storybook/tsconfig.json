@@ -15,7 +15,6 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noEmit": true,
-    "composite": false,
     "types": []
   },
   // api + api-mock resolve to their source via the `@zitadel/source` condition

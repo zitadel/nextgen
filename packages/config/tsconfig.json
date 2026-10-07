@@ -1,5 +1,14 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "files": [],
-  "include": []
+  "extends": "./tsconfig.spec.json",
+  "include": [
+    "*.config.mts",
+    "*.config.ts",
+    "defaults/**/*.json",
+    "meta-schemas/*.json",
+    "scripts/**/*.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx"
+  ]
 }
