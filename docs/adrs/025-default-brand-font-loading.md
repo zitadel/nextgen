@@ -66,6 +66,10 @@ orchestrator independently of branding. Headings use the same family rendered
    distinguished by weight (`font-weight: 700` on `.zl-card-title`), not by a
    separate family.
 
+   > **Amendment (2026-10-04):** the `--zl-font-family-heading` stack leads
+   > with `"APK Futural"`, then `"Arimo"`
+   > (`packages/design-tokens/src/overrides.ts`).
+
 ### Asset strategy: linked stylesheet, not bundled bytes
 
 The default loads via a stylesheet URL rather than a self-hosted font file
