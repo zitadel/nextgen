@@ -44,7 +44,7 @@ func (h *Handler) GetBrandingById(ctx context.Context, params api.GetBrandingByI
 }
 
 func (h *Handler) ListBranding(ctx context.Context, params api.ListBrandingParams) (api.ListBrandingRes, error) {
-	ctx, err := h.requireProjectListAccess(ctx, string(params.ProjectID), brandingAccess, domain.ResourceKindBranding)
+	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), brandingAccess, domain.ResourceKindBranding)
 	if err != nil {
 		return nil, err
 	}

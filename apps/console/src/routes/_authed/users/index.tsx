@@ -83,7 +83,7 @@ function UsersScreen() {
   const paging = useLoadMore(
     loaded,
     async (pageToken): Promise<UsersPage> => {
-      const page = await fetchUsers(projectId, pageToken);
+      const page = await fetchUsers(projectId, pageToken, teamsExpanded);
       return {
         items: page.users,
         nextPageToken: page.next_page_token ?? undefined,
