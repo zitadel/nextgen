@@ -38,6 +38,7 @@ type fakeAuthAttempts struct {
 	consumeErr       error
 	setResultCheck   *domain.SSOCallbackCheck
 	setResult        *domain.SSOCallbackResult
+	setResultEvent   domain.EventType
 	// setResultErrs answers SetSSOCallbackResult calls in order; a call past
 	// the end succeeds.
 	setResultErrs []error
@@ -78,8 +79,8 @@ func (f *fakeAuthAttempts) ConsumeSSOState(_ context.Context, _, state, bindingN
 	return f.consumeCheck, f.consumeErr
 }
 
-func (f *fakeAuthAttempts) SetSSOCallbackResult(_ context.Context, _ string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult) error {
-	f.setResultCheck, f.setResult = check, result
+func (f *fakeAuthAttempts) SetSSOCallbackResult(_ context.Context, _ string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult, eventType domain.EventType) error {
+	f.setResultCheck, f.setResult, f.setResultEvent = check, result, eventType
 	if len(f.setResultErrs) == 0 {
 		return nil
 	}

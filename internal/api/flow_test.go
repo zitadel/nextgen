@@ -81,7 +81,7 @@ func (stubAuthAttempt) IssueSSOState(context.Context, service.IssueSSOStateInput
 func (stubAuthAttempt) ConsumeSSOState(context.Context, string, string, string) (*domain.SSOCallbackCheck, error) {
 	return nil, errors.New("stub auth attempt")
 }
-func (stubAuthAttempt) SetSSOCallbackResult(context.Context, string, *domain.SSOCallbackCheck, *domain.SSOCallbackResult) error {
+func (stubAuthAttempt) SetSSOCallbackResult(context.Context, string, *domain.SSOCallbackCheck, *domain.SSOCallbackResult, domain.EventType) error {
 	return errors.New("stub auth attempt")
 }
 func (stubAuthAttempt) VerifyProof(context.Context, service.VerifyProofInput) (*domain.AuthAttempt, error) {

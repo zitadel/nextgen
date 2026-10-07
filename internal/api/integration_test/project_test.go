@@ -83,7 +83,7 @@ func (s *stubAuthAttemptService) ConsumeSSOState(ctx context.Context, projectID,
 	return nil, nil
 }
 
-func (s *stubAuthAttemptService) SetSSOCallbackResult(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult) error {
+func (s *stubAuthAttemptService) SetSSOCallbackResult(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult, eventType domain.EventType) error {
 	return nil
 }
 

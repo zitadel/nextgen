@@ -505,27 +505,29 @@ func TestAuthAttemptService_SetSSOCallbackResult(t *testing.T) {
 	sessionID := "sess-1"
 	check := &domain.SSOCallbackCheck{ID: "chk-1", StateHash: "state-hash", AuthAttemptID: "att-1"}
 	tests := []struct {
-		name      string
-		result    *domain.SSOCallbackResult
-		writeErr  error
-		wantErr   error
-		wantEvent domain.EventType
+		name     string
+		result   *domain.SSOCallbackResult
+		writeErr error
+		wantErr  error
+		// eventType is passed in and must be emitted unchanged.
+		eventType domain.EventType
 	}{
 		{
-			name:      "a failed result emits auth.check.failed",
+			name:      "a failed result emits the given event",
 			result:    &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
-			wantEvent: domain.EventTypeAuthCheckFailed,
+			eventType: domain.EventTypeAuthSSOAuthorizationFailed,
 		},
 		{
-			name:      "a successful result emits auth.check.succeeded",
+			name:      "a successful result emits the given event",
 			result:    &domain.SSOCallbackResult{Subject: "sub-1"},
-			wantEvent: domain.EventTypeAuthCheckSucceeded,
+			eventType: domain.EventTypeAuthSSOExchangeSucceeded,
 		},
 		{
-			name:     "a refused write emits nothing",
-			result:   &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
-			writeErr: domain.ErrSSOStateInvalid(),
-			wantErr:  domain.ErrSSOStateInvalid(),
+			name:      "a refused write emits nothing",
+			result:    &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			writeErr:  domain.ErrSSOStateInvalid(),
+			wantErr:   domain.ErrSSOStateInvalid(),
+			eventType: domain.EventTypeAuthSSOExchangeFailed,
 		},
 	}
 	for _, tt := range tests {
@@ -551,7 +553,7 @@ func TestAuthAttemptService_SetSSOCallbackResult(t *testing.T) {
 			statementer.EXPECT().Statements().Return(stmts).AnyTimes()
 			svc := service.NewAuthAttemptService(service.NewPool(pool), nil, nil, nil)
 
-			err := svc.SetSSOCallbackResult(t.Context(), "proj", check, tt.result)
+			err := svc.SetSSOCallbackResult(t.Context(), "proj", check, tt.result, tt.eventType)
 
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
@@ -559,7 +561,7 @@ func TestAuthAttemptService_SetSSOCallbackResult(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.NotNil(t, gotEvent)
-			assert.Equal(t, tt.wantEvent, gotEvent.EventType)
+			assert.Equal(t, tt.eventType, gotEvent.EventType)
 			assert.Equal(t, "proj", gotEvent.ProjectID)
 			require.NotNil(t, gotEvent.EntityID)
 			assert.Equal(t, "chk-1", *gotEvent.EntityID)

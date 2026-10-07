@@ -62,6 +62,8 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 		// wantResult is what must have been stored on the record; nil means
 		// nothing was stored.
 		wantResult *domain.SSOCallbackResult
+		// wantEvent is the event the stored result was written with.
+		wantEvent domain.EventType
 	}{
 		{
 			name:    "a state without a project part is invalid and never looked up",
@@ -78,16 +80,19 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			name:       "access_denied stores the cancelled key",
 			in:         service.FlowSSOCallbackInput{State: ssoCallbackState, Error: "access_denied", ErrorDescription: "the provider's words"},
 			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
+			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
 		},
 		{
 			name:       "every other provider code stores the failed key",
 			in:         service.FlowSSOCallbackInput{State: ssoCallbackState, Error: "temporarily_unavailable"},
 			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
 		},
 		{
 			name:       "neither code nor error stores the failed key",
 			in:         service.FlowSSOCallbackInput{State: ssoCallbackState},
 			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
 		},
 		{
 			name: "a vanished revision stores the failed key",
@@ -96,6 +101,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").Return(nil, domain.ErrIDPConnectionNotFound())
 			},
 			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
 			name: "a missing client_secret variable stores the failed key without a token request",
@@ -108,6 +114,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 				m.EXPECT().GetDecryptedVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, "GOOGLE_SECRET").Return(nil, nil)
 			},
 			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
 			name: "a client_secret variable not marked secret stores the failed key without a token request",
@@ -121,6 +128,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 					Return([]*domain.Variable{{Name: "GOOGLE_SECRET", Value: "plain", IsSecret: false}}, nil)
 			},
 			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
 			name: "a literal client_secret stores the failed key without a token request",
@@ -131,6 +139,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 					Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: doc}, nil)
 			},
 			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
 			name: "an internal failure stores the failed key",
@@ -139,6 +148,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").Return(nil, domain.ErrInternal(errors.New("db down")))
 			},
 			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
 			name:          "a refused result write passes through",
@@ -146,6 +156,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			setResultErrs: []error{domain.ErrSSOStateInvalid()},
 			wantErr:       domain.ErrSSOStateInvalid(),
 			wantResult:    &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
+			wantEvent:     domain.EventTypeAuthSSOAuthorizationFailed,
 		},
 		{
 			name: "a failed write of the failed key passes through",
@@ -156,6 +167,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			setResultErrs: []error{domain.ErrUnavailable()},
 			wantErr:       domain.ErrUnavailable(),
 			wantResult:    &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantEvent:     domain.EventTypeAuthSSOExchangeFailed,
 		},
 	}
 	for _, tt := range tests {
@@ -180,6 +192,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			out, err := svc.Process(t.Context(), tt.in)
 
 			assert.Equal(t, tt.wantResult, attempts.setResult)
+			assert.Equal(t, tt.wantEvent, attempts.setResultEvent)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				return
@@ -339,25 +352,31 @@ func TestFlowSSOCallback_Process_StoresTheIdentity(t *testing.T) {
 		wantErr       error
 		// wantErrorKey is the key stored last; "" means the identity was.
 		wantErrorKey string
+		// wantEvent is the event the last write was made with.
+		wantEvent domain.EventType
 	}{
 		{
-			name: "the identity is stored",
+			name:      "the identity is stored",
+			wantEvent: domain.EventTypeAuthSSOExchangeSucceeded,
 		},
 		{
 			name:          "a failed identity write stores the failed key",
 			setResultErrs: []error{domain.ErrUnavailable()},
 			wantErrorKey:  domain.FlowStepErrorSSOFailed,
+			wantEvent:     domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
 			name:          "a failed write of the failed key passes through",
 			setResultErrs: []error{domain.ErrUnavailable(), domain.ErrUnavailable()},
 			wantErr:       domain.ErrUnavailable(),
 			wantErrorKey:  domain.FlowStepErrorSSOFailed,
+			wantEvent:     domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
 			name:          "a refused identity write passes through without a second write",
 			setResultErrs: []error{domain.ErrSSOStateInvalid()},
 			wantErr:       domain.ErrSSOStateInvalid(),
+			wantEvent:     domain.EventTypeAuthSSOExchangeSucceeded,
 		},
 	}
 	for _, tt := range tests {
@@ -382,6 +401,7 @@ func TestFlowSSOCallback_Process_StoresTheIdentity(t *testing.T) {
 			assert.Equal(t, "bind-1", attempts.consumeNonce)
 			require.NotNil(t, attempts.setResult)
 			assert.Equal(t, tt.wantErrorKey, attempts.setResult.ErrorKey)
+			assert.Equal(t, tt.wantEvent, attempts.setResultEvent)
 			if tt.wantErrorKey == "" {
 				assert.Equal(t, "user-1", attempts.setResult.Subject)
 				assert.Equal(t, "idprev_1", attempts.setResult.ConnectionRevisionID)

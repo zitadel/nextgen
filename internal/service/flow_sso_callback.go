@@ -96,15 +96,15 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 			slog.String("error_description", in.ErrorDescription),
 			slog.String("error_uri", in.ErrorURI),
 		)
-		return c.park(ctx, projectID, check, key)
+		return c.park(ctx, projectID, check, key, domain.EventTypeAuthSSOAuthorizationFailed)
 	}
 	if in.Code == "" {
-		return c.fail(ctx, projectID, check, errors.New("the callback carried neither a code nor an error"))
+		return c.fail(ctx, projectID, check, errors.New("the callback carried neither a code nor an error"), domain.EventTypeAuthSSOAuthorizationFailed)
 	}
 
 	identity, err := c.exchange(ctx, projectID, in.Code, pending)
 	if err != nil {
-		return c.fail(ctx, projectID, check, err)
+		return c.fail(ctx, projectID, check, err, domain.EventTypeAuthSSOExchangeFailed)
 	}
 	result := &domain.SSOCallbackResult{
 		Subject:              identity.Subject,
@@ -112,13 +112,13 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 		Claims:               identity.Claims,
 		Verified:             identity.Verified,
 	}
-	if err := c.attempts.SetSSOCallbackResult(ctx, projectID, check, result); err != nil {
+	if err := c.attempts.SetSSOCallbackResult(ctx, projectID, check, result, domain.EventTypeAuthSSOExchangeSucceeded); err != nil {
 		// The row was replaced or removed, so storing the error key would
 		// fail the same way.
 		if errors.Is(err, domain.ErrSSOStateInvalid()) {
 			return FlowSSOCallbackOutput{}, err
 		}
-		return c.fail(ctx, projectID, check, domain.ErrInternal(err))
+		return c.fail(ctx, projectID, check, domain.ErrInternal(err), domain.EventTypeAuthSSOExchangeFailed)
 	}
 	return FlowSSOCallbackOutput{ReturnTarget: pending.ReturnTarget}, nil
 }
@@ -189,9 +189,10 @@ func (c *FlowSSOCallback) resolveClientSecret(ctx context.Context, projectID str
 }
 
 // fail logs the cause the user must not see and stores the generic failure
-// key. An internal error is still stored, so the user can retry from the step:
-// the state is already consumed, and the error page has no way back.
-func (c *FlowSSOCallback) fail(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, cause error) (FlowSSOCallbackOutput, error) {
+// key with eventType. An internal error is still stored, so the user can retry
+// from the step: the state is already consumed, and the error page has no way
+// back.
+func (c *FlowSSOCallback) fail(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, cause error, eventType domain.EventType) (FlowSSOCallbackOutput, error) {
 	// A cancelled request is not the provider's fault, and the client is
 	// gone, so nothing is logged. A deadline is still logged.
 	if !errors.Is(ctx.Err(), context.Canceled) {
@@ -206,14 +207,15 @@ func (c *FlowSSOCallback) fail(ctx context.Context, projectID string, check *dom
 			slog.Any("error", cause),
 		)
 	}
-	return c.park(ctx, projectID, check, domain.FlowStepErrorSSOFailed)
+	return c.park(ctx, projectID, check, domain.FlowStepErrorSSOFailed, eventType)
 }
 
-// park stores an error result on the consumed record and sends the browser
-// back to the return target, where the originating step shows the key.
-func (c *FlowSSOCallback) park(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, key string) (FlowSSOCallbackOutput, error) {
+// park stores an error result on the consumed record, emitting eventType, and
+// sends the browser back to the return target, where the originating step
+// shows the key.
+func (c *FlowSSOCallback) park(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, key string, eventType domain.EventType) (FlowSSOCallbackOutput, error) {
 	result := &domain.SSOCallbackResult{ErrorKey: key}
-	if err := c.attempts.SetSSOCallbackResult(ctx, projectID, check, result); err != nil {
+	if err := c.attempts.SetSSOCallbackResult(ctx, projectID, check, result, eventType); err != nil {
 		return FlowSSOCallbackOutput{}, err
 	}
 	return FlowSSOCallbackOutput{ReturnTarget: check.Pending.ReturnTarget}, nil

@@ -67,12 +67,13 @@ type AuthAttemptService interface {
 	// issued state; a second write, or a write after a re-issue, returns
 	// ErrSSOStateInvalid.
 	//
-	// The write emits the ceremony's outcome: auth.check.failed for a result
-	// with an error key, auth.check.succeeded otherwise. The bind later emits
-	// its own event for the user factor it adds.
+	// The write emits eventType, the ceremony's outcome. The caller chooses it
+	// because only the caller knows whether a code arrived: an error key alone
+	// does not say. The bind later emits auth.check.succeeded for the user
+	// factor it adds.
 	//
 	// errors: domain.ErrSSOStateInvalid, domain.ErrInternal
-	SetSSOCallbackResult(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult) error
+	SetSSOCallbackResult(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult, eventType domain.EventType) error
 
 	// VerifyProof verifies the submitted proof against the challenge identified by ChallengeID.
 	//
@@ -446,7 +447,7 @@ func (s *authAttemptService) ConsumeSSOState(ctx context.Context, projectID, sta
 
 // SetSSOCallbackResult implements [AuthAttemptService]. check is the record
 // ConsumeSSOState returned.
-func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult) error {
+func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult, eventType domain.EventType) error {
 	return s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().SetSSOCallbackResult(ctx, projectID, check.StateHash, result); err != nil {
 			return err
@@ -455,10 +456,6 @@ func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID
 		attempt, err := tx.Statements().GetAuthAttemptByID(ctx, projectID, check.AuthAttemptID)
 		if err != nil {
 			return err
-		}
-		eventType := domain.EventTypeAuthCheckSucceeded
-		if result.ErrorKey != "" {
-			eventType = domain.EventTypeAuthCheckFailed
 		}
 		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
 			Type:       eventType,
