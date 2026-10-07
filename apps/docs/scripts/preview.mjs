@@ -1,9 +1,14 @@
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 
-// Without VERCEL, waku serves the local build instead of expecting Vercel's.
-const env = { ...process.env };
-delete env.VERCEL;
+// waku picks its adapter from VERCEL at build time, and moon's `preview` task
+// builds first with the caller's environment. A local preview needs the local
+// adapter for both steps, so refuse rather than serve a mismatched build.
+if (process.env.VERCEL) {
+  console.error("docs preview: unset VERCEL to preview the local build (it selects the Vercel adapter)");
+  process.exit(1);
+}
+const env = process.env;
 
 // moon's `preview` task builds first. waku's CLI runs under node rather than
 // through `pnpm exec` (this helper already runs under `pnpm run preview`, and a

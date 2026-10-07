@@ -94,11 +94,30 @@ export function startsPackageManager(body) {
     const [command = "", ...args] = commandWords(words);
     const executable = command.split("/").pop();
     if (SHELLS.has(executable)) {
-      const flag = args.indexOf("-c");
+      // `-c`, alone or grouped (`-lc`, `-ec`): the next argument is the script.
+      const flag = args.findIndex((arg) => /^-[A-Za-z]*c[A-Za-z]*$/.test(arg));
       return flag !== -1 && startsPackageManager(args[flag + 1] ?? "");
     }
-    return PACKAGE_MANAGERS.has(executable) || (executable === "node" && args[0] === "--run");
+    if (executable === "node") return nodeRunsScript(args);
+    return PACKAGE_MANAGERS.has(executable);
   });
+}
+
+/** Node options that take the following argument as their value. */
+const NODE_VALUE_OPTIONS = new Set(["-r", "--require", "--import", "--loader", "--experimental-loader", "-C", "--conditions", "--env-file", "--title"]);
+
+/**
+ * Whether node's own options include `--run` (`--run build`, `--run=build`),
+ * before the script path: after it, `--run` is just an argument to the script.
+ */
+function nodeRunsScript(args) {
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === "--run" || arg.startsWith("--run=")) return true;
+    if (!arg.startsWith("-") || arg === "--" || arg === "-e" || arg === "--eval" || arg === "-p") return false;
+    if (NODE_VALUE_OPTIONS.has(arg)) i += 1;
+  }
+  return false;
 }
 
 const SHELLS = new Set(["sh", "bash", "zsh", "dash"]);
@@ -202,7 +221,7 @@ const KEYWORDS = new Set(["if", "then", "else", "elif", "do", "while", "until", 
 function commandWords(words) {
   let i = 0;
   while (i < words.length && (KEYWORDS.has(words[i]) || ASSIGNMENT.test(words[i]))) i += 1;
-  if (words[i] !== "env") return words.slice(i);
+  if (words[i]?.split("/").pop() !== "env") return words.slice(i);
   i += 1;
   while (i < words.length) {
     const word = words[i];

@@ -85,6 +85,13 @@ describe("package-script contract", () => {
     "echo \"$(echo $(pnpm test))\"",
     "sh -c 'pnpm run test'",
     'bash -c "npm run build"',
+    "sh -lc 'pnpm run test'",
+    "bash -ec 'pnpm install'",
+    "node --run=build",
+    "node --no-warnings --run build",
+    "node --require ./setup.cjs --run build",
+    "/usr/bin/env pnpm run test",
+    "/usr/bin/env CI=1 npm run build",
   ])("detects a package manager in %s", (body) => {
     expect(startsPackageManager(body)).toBe(true);
   });
@@ -108,6 +115,10 @@ describe("package-script contract", () => {
     "echo '\"$(pnpm test)\"'",
     "sh -c 'vitest run'",
     "bash scripts/run.sh",
+    "node tools/build.mjs --run build",
+    "node --no-warnings tools/build.mjs",
+    "sh -lc 'vitest run'",
+    "/usr/bin/env node scripts/doctor.mjs",
   ])("does not flag %s", (body) => {
     expect(startsPackageManager(body)).toBe(false);
   });
