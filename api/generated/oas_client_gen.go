@@ -660,10 +660,9 @@ type Invoker interface {
 	// only access is a `viewer` or `editor` grant is not an admin and is not
 	// listed. Like the check, the list does not look at a person's user status
 	// beyond that, so a direct grant to a suspended person is listed.
-	// Ordered by `user_id`. The list is not paginated, an exception to ADR 027:
-	// it merges grants and team memberships, so it cannot be paged in the
-	// database, and the people who administer one project are few. It is capped
-	// at 1000 people; `truncated` reports a longer list.
+	// A person whose access comes only through teams the caller is not a
+	// member of is listed by `user_id` alone, and those teams by `team_id`.
+	// Ordered by `user_id` and paginated with `page_token`.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
 	// session cookie (`nextgenSession`) that can read the project.
 	//
@@ -9430,10 +9429,9 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 // only access is a `viewer` or `editor` grant is not an admin and is not
 // listed. Like the check, the list does not look at a person's user status
 // beyond that, so a direct grant to a suspended person is listed.
-// Ordered by `user_id`. The list is not paginated, an exception to ADR 027:
-// it merges grants and team memberships, so it cannot be paged in the
-// database, and the people who administer one project are few. It is capped
-// at 1000 people; `truncated` reports a longer list.
+// A person whose access comes only through teams the caller is not a
+// member of is listed by `user_id` alone, and those teams by `team_id`.
+// Ordered by `user_id` and paginated with `page_token`.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
 // session cookie (`nextgenSession`) that can read the project.
 //
@@ -9505,6 +9503,50 @@ func (c *Client) sendListProjectAdmins(ctx context.Context, params ListProjectAd
 	}
 	pathParts[2] = "/admins"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "limit" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "limit",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Limit.Get(); ok {
+				if unwrapped := int(val); true {
+					return e.EncodeValue(conv.IntToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "page_token" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "page_token",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.PageToken.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "GET", u)

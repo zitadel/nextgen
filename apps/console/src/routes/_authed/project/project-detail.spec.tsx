@@ -17,11 +17,11 @@ vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 const PROJECT_ID = "proj_1";
 const PROJECT_URL = `http://localhost/api/projects/${PROJECT_ID}`;
-// The page also reads the project's grants for its admins section (#1238); an
+// The page also reads the project's admins for its admins section (#1238); an
 // empty list, as a base handler that survives `resetHandlers`, keeps these
 // tests about the project itself.
 const server = setupServer(
-  http.post("http://localhost/api/grants/query", () => HttpResponse.json({ grants: [] })),
+  http.get(`${PROJECT_URL}/admins`, () => HttpResponse.json({ admins: [] })),
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));

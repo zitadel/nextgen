@@ -349,6 +349,25 @@ type AuthzMembershipEdge struct {
 	CreatedAt  time.Time
 }
 
+// ProjectAdminSourceRow is one way one person administers a project: through
+// the owning team, an admin grant to a team they are an active member of, or
+// an admin grant to them.
+type ProjectAdminSourceRow struct {
+	UserID string
+	// HomeProjectID is the project the user lives in.
+	HomeProjectID string
+	OwningTeam    bool
+	// GrantID is the admin grant, empty for the owning team.
+	GrantID string
+	// TeamID names the team, empty for a grant to the user.
+	TeamID string
+	// Visible is whether the viewer may see the person through this source: a
+	// grant to them, or a team the viewer is an active member of.
+	Visible bool
+	// TeamName is set for a team the viewer may see.
+	TeamName string
+}
+
 // AuthzMembershipEdgeKey identifies one authz_membership_edges row.
 type AuthzMembershipEdgeKey struct {
 	ProjectID  string

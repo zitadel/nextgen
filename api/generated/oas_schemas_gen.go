@@ -32617,6 +32617,10 @@ func (s *ListMyProjectsResponseHeaders) SetResponse(val ListMyProjectsResponse) 
 
 func (*ListMyProjectsResponseHeaders) listMyProjectsRes() {}
 
+type ListProjectAdminsBadRequest ErrorDetails
+
+func (*ListProjectAdminsBadRequest) listProjectAdminsRes() {}
+
 // ListProjectAdminsErrorResponse represents sum type.
 type ListProjectAdminsErrorResponse struct {
 	Type                 ListProjectAdminsErrorResponseType // switch on this field
@@ -32833,14 +32837,13 @@ type ListProjectAdminsNotFound ErrorDetails
 
 func (*ListProjectAdminsNotFound) listProjectAdminsRes() {}
 
-// The people who administer a project.
+// A page of the people who administer a project.
 // Ref: #
 type ListProjectAdminsResponse struct {
 	Admins []ProjectAdmin `json:"admins"`
-	// True when more than 1000 people administer the project. `admins` then
-	// holds the first 1000 by `user_id`, and the rest are left out. It happens
-	// only when a very large team holds an admin grant or owns the project.
-	Truncated bool `json:"truncated"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
 }
 
 // GetAdmins returns the value of Admins.
@@ -32848,9 +32851,9 @@ func (s *ListProjectAdminsResponse) GetAdmins() []ProjectAdmin {
 	return s.Admins
 }
 
-// GetTruncated returns the value of Truncated.
-func (s *ListProjectAdminsResponse) GetTruncated() bool {
-	return s.Truncated
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListProjectAdminsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
 }
 
 // SetAdmins sets the value of Admins.
@@ -32858,9 +32861,9 @@ func (s *ListProjectAdminsResponse) SetAdmins(val []ProjectAdmin) {
 	s.Admins = val
 }
 
-// SetTruncated sets the value of Truncated.
-func (s *ListProjectAdminsResponse) SetTruncated(val bool) {
-	s.Truncated = val
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListProjectAdminsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
 }
 
 func (*ListProjectAdminsResponse) listProjectAdminsRes() {}

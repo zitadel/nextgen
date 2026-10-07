@@ -96,27 +96,6 @@ func (s authzMembershipEdgeStatements) ListAuthzMembershipEdgesByMember(ctx cont
 	return edges, nil
 }
 
-// ListAuthzMembershipEdges implements [service.AuthzMembershipEdgeStatements].
-func (s authzMembershipEdgeStatements) ListAuthzMembershipEdges(ctx context.Context, filter database.Filter[domain.AuthzMembershipEdgeField]) ([]*domain.AuthzMembershipEdge, error) {
-	if filter == nil {
-		return nil, fmt.Errorf("AuthzMembershipEdge filter is required")
-	}
-	var c statementCompiler
-	c.WriteString("SELECT project_id, member_type, member_id, set_type, set_id, created_at FROM authz_membership_edges WHERE ")
-	compileFilter(&c, filter, authz.MembershipEdgeSchema)
-	c.WriteString(" ORDER BY set_type, set_id, member_type, member_id")
-	rows, err := s.client.Query(ctx, c.String(), c.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	defer rows.Close()
-	edges, err := collectRows(rows, scanAuthzMembershipEdge)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	return edges, nil
-}
-
 // DeleteAuthzMembershipEdges implements [service.AuthzMembershipEdgeStatements].
 func (s authzMembershipEdgeStatements) DeleteAuthzMembershipEdges(ctx context.Context, filter database.Filter[domain.AuthzMembershipEdgeField]) error {
 	if filter == nil {

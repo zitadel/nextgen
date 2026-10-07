@@ -617,6 +617,13 @@ type AuthzAssignmentStatements interface {
 	// into the SELECT so a caller cannot list across projects.
 	ListManagedGrants(ctx context.Context, projectID string, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)
 	RevokeAuthzAssignment(ctx context.Context, projectID, id string) error
+	// ListProjectAdminSources returns every way the first limit people with a
+	// user id after afterUserID administer the project: as active members of
+	// the owning team, as active members of a team with an unexpired admin
+	// grant, and as existing users with an unexpired admin grant. Each row says
+	// whether viewerUserID may see the person through it. Rows come ordered by
+	// user id, then owning team, team grants and user grants, each by grant id.
+	ListProjectAdminSources(ctx context.Context, projectID, afterUserID, viewerUserID string, limit uint32) ([]*domain.ProjectAdminSourceRow, error)
 	// GetActiveOwningTeamGrant returns the project's active owning-team grant
 	// (object project, relation team) or NoRowFoundError when the project is
 	// unclaimed. The unique active grant is the claim source of truth
@@ -657,15 +664,11 @@ type AuthzAssignmentStatements interface {
 //   - DeleteAuthzMembershipEdges: column-shaped deletes via Filter (single edge, by member, by set).
 //   - DeleteAuthzMembershipEdgesForTeamDeactivate: team deactivate (team set + lifecycle-owned users).
 //   - Get/ListByMember: resolver / dual-write test reads.
-//   - ListAuthzMembershipEdges: column-shaped reads via Filter (members of a set).
 type AuthzMembershipEdgeStatements interface {
 	Statements
 	UpsertAuthzMembershipEdge(ctx context.Context, edge *domain.AuthzMembershipEdge) error
 	GetAuthzMembershipEdge(ctx context.Context, key domain.AuthzMembershipEdgeKey) (*domain.AuthzMembershipEdge, error)
 	ListAuthzMembershipEdgesByMember(ctx context.Context, projectID string, memberType domain.AuthzMemberType, memberID string) ([]*domain.AuthzMembershipEdge, error)
-	// ListAuthzMembershipEdges returns the edges matching a column-shaped
-	// filter, ordered by set and member. The filter is required.
-	ListAuthzMembershipEdges(ctx context.Context, filter database.Filter[domain.AuthzMembershipEdgeField]) ([]*domain.AuthzMembershipEdge, error)
 	DeleteAuthzMembershipEdges(ctx context.Context, filter database.Filter[domain.AuthzMembershipEdgeField]) error
 	DeleteAuthzMembershipEdgesForTeamDeactivate(ctx context.Context, projectID, teamID string) error
 }

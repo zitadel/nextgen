@@ -807,3 +807,39 @@ func grantField(field string) (domain.AuthzAssignmentField, error) {
 		return domain.AuthzAssignmentFieldUnspecified, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", field))
 	}
 }
+
+// principalHomes returns the project each grant principal lives in, or "" for
+// one that cannot be found. With a platform project pinned, every principal is
+// taken to live there without a lookup, so a principal that no longer exists
+// still gets a home: callers that care check existence themselves.
+func (s *GrantService) principalHomes(ctx context.Context, principalIDs []string) (map[string]string, error) {
+	homes := make(map[string]string, len(principalIDs))
+	for _, id := range principalIDs {
+		if _, ok := homes[id]; ok {
+			continue
+		}
+		if s.platformProjectID != "" {
+			homes[id] = s.platformProjectID
+			continue
+		}
+		scope, err := s.v2Pool.Statements().GetResourceScope(ctx, id)
+		switch {
+		case err == nil:
+			homes[id] = scope.ProjectID
+		case isNoRowFound(err):
+			homes[id] = ""
+		case errors.Is(err, new(database.MultipleRowsFoundError)):
+			// The id names resources in several projects, which a project can
+			// cause for another one (a user schema's $id is stored verbatim),
+			// so the principal is left out rather than failing every list
+			// that names it.
+			getLoggingContext(ctx, "grant").Warn("grant principal id is ambiguous across projects",
+				slog.String("principal_id", id),
+			)
+			homes[id] = ""
+		default:
+			return nil, domain.ErrInternal(err).WithMessage("failed to resolve grant principal homes")
+		}
+	}
+	return homes, nil
+}

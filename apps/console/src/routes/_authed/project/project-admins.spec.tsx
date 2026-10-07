@@ -27,12 +27,12 @@ const { NEUTRAL_MESSAGE, SELF_MESSAGE } = await import("@/components/add-admin-d
 /**
  * The admins section of the project page (#1238). Grants are project-level
  * data: the section reads, adds and removes against the route's project id,
- * never the console's own (platform) project.
+ * never the console's own (platform) project. A row is a person with every way
+ * they hold admin access (#1462).
  */
 const PROJECT_ID = "proj_1";
 const PROJECTS_URL = "http://localhost/api/projects";
 const GRANTS_URL = "http://localhost/api/grants";
-const GRANTS_QUERY_URL = `${GRANTS_URL}/query`;
 const USERS_QUERY_URL = "http://localhost/api/users/query";
 /** The signed-in address, read from the fixture rather than restated here. */
 const SELF = makeTestSession().user?.identifier ?? "";
@@ -61,57 +61,40 @@ function project(id = PROJECT_ID, name = "Acme") {
   return { id, name, created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" };
 }
 
-function grant(overrides: Record<string, unknown> = {}) {
-  return {
-    id: "asgn_1",
-    project_id: PROJECT_ID,
-    object_type: "project",
-    relation: "admin",
-    created_at: "2026-09-01T10:00:00Z",
-    user: { user_id: "user_1" },
-    ...overrides,
-  };
+type Source = Record<string, unknown>;
+
+/** A person as the admins list carries them: a user-ref and how they got in. */
+function admin(user: Record<string, unknown>, ...sources: Source[]) {
+  return { user: { user_id: "user_1", ...user }, sources };
+}
+
+const OWNING_TEAM: Source = {
+  type: "owning_team",
+  team: { team_id: "team_owner", name: "Owners" },
+};
+
+function directGrant(grantId = "asgn_1"): Source {
+  return { type: "grant", grant_id: grantId };
+}
+
+function teamGrant(grantId = "asgn_1", name = "Platform"): Source {
+  return { type: "grant", grant_id: grantId, team: { team_id: "team_1", name } };
 }
 
 /**
- * A user as `expand: ["principal"]` inlines it: extras live on the same
- * `user` object as the ref (`user_id`, never `id`).
+ * The project and its admins. Returns the project id of every admins read, so
+ * which project each was scoped to can be asserted.
  */
-function grantUser(identity: Record<string, unknown>) {
-  return {
-    user_id: "user_1",
-    schema: "sch_1",
-    attributes: {},
-    metadata: {
-      created_at: "2026-09-01T10:00:00Z",
-      updated_at: "2026-09-01T10:00:00Z",
-      status: "active",
-    },
-    ...identity,
-  };
-}
-
-/** One `POST /grants/query` as the section sends it: which project, and what body. */
-interface GrantsQuery {
-  projectId: string | null;
-  body: Record<string, unknown>;
-}
-
-/**
- * The project and its grants. Records every `POST /grants/query`, so both the
- * project each request was scoped to and the expansion sent can be asserted.
- */
-function stubProject(grants: Record<string, unknown>[], record = project()) {
-  const queries: GrantsQuery[] = [];
+function stubProject(admins: Record<string, unknown>[], record = project()) {
+  const reads: string[] = [];
   server.use(
     http.get(`${PROJECTS_URL}/:id`, () => HttpResponse.json(record)),
-    http.post(GRANTS_QUERY_URL, async ({ request }) => {
-      const projectId = new URL(request.url).searchParams.get("project_id");
-      queries.push({ projectId, body: (await request.json()) as Record<string, unknown> });
-      return HttpResponse.json({ grants });
+    http.get(`${PROJECTS_URL}/:id/admins`, ({ params }) => {
+      reads.push(params.id as string);
+      return HttpResponse.json({ admins });
     }),
   );
-  return queries;
+  return reads;
 }
 
 /** One `POST /grants` as the dialog sends it: which project, and what body. */
@@ -155,19 +138,17 @@ async function openAddAdmin() {
 }
 
 describe("project admins", () => {
-  it("reads the grants of the route's project, with their principals", async () => {
-    // One request, scoped to the project on the URL — not to the console's own
-    // project — and not a read per row: the principal rides along on the list
-    // (ADR 059), and ADR 058's resolved identity is what the row shows.
-    const queries = stubProject([
-      grant({ user: grantUser({ display: "Maya Patel", identifier: "maya@acme.com" }) }),
-      grant({ id: "asgn_2", user: grantUser({ user_id: "user_2", identifier: "sol@acme.com" }) }),
+  it("reads the admins of the route's project", async () => {
+    // One request, scoped to the project on the URL, not to the console's own
+    // project. A row shows the user-ref's resolved identity (ADR 058).
+    const reads = stubProject([
+      admin({ display: "Maya Patel", identifier: "maya@acme.com" }, directGrant()),
+      admin({ user_id: "user_2", identifier: "sol@acme.com" }, directGrant("asgn_2")),
     ]);
     await renderProject();
 
     const section = within(await screen.findByRole("region", { name: "Admins" }));
-    expect(queries).toHaveLength(1);
-    expect(queries[0]).toMatchObject({ projectId: PROJECT_ID, body: { expand: ["principal"] } });
+    expect(reads).toEqual([PROJECT_ID]);
     expect(section.getByText("Maya Patel")).toBeInTheDocument();
     // No display designated, so the identifier is the label rather than the id.
     expect(section.getByText("sol@acme.com")).toBeInTheDocument();
@@ -176,92 +157,95 @@ describe("project admins", () => {
   it("shows the granted person to themselves on the granter's project", async () => {
     // The person owns nothing: the page opens because somebody granted them
     // access to their project, and they see themselves in it.
-    const queries = stubProject(
-      [
-        grant({
-          project_id: "proj_theirs",
-          user: grantUser({ user_id: "user_test", identifier: SELF }),
-        }),
-      ],
+    const reads = stubProject(
+      [admin({ user_id: "user_test", identifier: SELF }, directGrant())],
       project("proj_theirs", "Granted to me"),
     );
     await renderProject("proj_theirs");
 
     expect(await screen.findByRole("heading", { name: "Granted to me" })).toBeInTheDocument();
     expect(admins().getByText(SELF)).toBeInTheDocument();
-    expect(queries.map((query) => query.projectId)).toEqual(["proj_theirs"]);
+    expect(reads).toEqual(["proj_theirs"]);
   });
 
-  it("falls back to the principal id when the principal cannot be loaded", async () => {
-    // A deleted user's surviving grant is a degraded ref: `user_id` only.
-    stubProject([grant({ user: { user_id: "user_1" } })]);
+  it("falls back to the user id when the person cannot be shown", async () => {
+    // A bare ref: the caller cannot see the person, or the schema designates
+    // neither a display nor an identifier.
+    stubProject([admin({}, teamGrant())]);
     await renderProject();
 
     await screen.findByRole("region", { name: "Admins" });
     expect(admins().getByText("user_1")).toBeInTheDocument();
   });
 
-  it("renders whatever relation a grant carries, not just admin", async () => {
-    // The section only creates `admin`, but the catalog has three relations and
-    // a grant made elsewhere must not be mislabelled.
-    stubProject([grant({ relation: "viewer", user: grantUser({ identifier: "vi@acme.com" }) })]);
+  it("lists the owning team's members, with nothing to revoke", async () => {
+    // Right after claiming: the owner holds no grant, and is an admin anyway.
+    // The grants API cannot take that access away, so the row has no menu.
+    stubProject([admin({ display: "Olu Owner" }, OWNING_TEAM)]);
     await renderProject();
 
     await screen.findByRole("region", { name: "Admins" });
-    expect(admins().getByText("Viewer")).toBeInTheDocument();
+    const row = within(admins().getByRole("row", { name: /Olu Owner/ }));
+    expect(row.getByText("Via owning Team")).toBeInTheDocument();
+    expect(row.queryByRole("button", { name: "Actions for Olu Owner" })).not.toBeInTheDocument();
   });
 
-  it("labels a team principal by its name", async () => {
-    // A team grant carries `team` and omits `user`. `name` is already on the ref.
+  it("shows a person with several ways in once, labelled with each", async () => {
     stubProject([
-      grant({
-        user: undefined,
-        team: {
-          team_id: "team_1",
-          name: "Platform",
-          status: "active",
-          created_at: "2026-09-01T10:00:00Z",
-          updated_at: "2026-09-01T10:00:00Z",
-        },
-      }),
+      admin({ display: "Maya Patel" }, OWNING_TEAM, teamGrant(), directGrant("asgn_2")),
     ]);
     await renderProject();
 
     await screen.findByRole("region", { name: "Admins" });
-    expect(admins().getByText("Platform")).toBeInTheDocument();
+    expect(admins().getAllByText("Maya Patel")).toHaveLength(1);
+    expect(
+      admins().getByText("Via owning Team, Via Team Platform, Direct grant"),
+    ).toBeInTheDocument();
   });
 
-  it("says so when nobody has been granted access", async () => {
-    // Right after claiming: the owner's access comes through the owning team,
-    // not an admin grant, so their own project lists nobody.
+  it("labels a team that can no longer be loaded by its id", async () => {
+    stubProject([
+      admin(
+        { display: "Maya Patel" },
+        { type: "grant", grant_id: "asgn_1", team: { team_id: "team_1" } },
+      ),
+    ]);
+    await renderProject();
+
+    await screen.findByRole("region", { name: "Admins" });
+    expect(admins().getByText("Via Team team_1")).toBeInTheDocument();
+  });
+
+  it("says so when nobody administers the project", async () => {
     stubProject([]);
     await renderProject();
 
     await screen.findByRole("region", { name: "Admins" });
-    expect(admins().getByText("No additional admins have been added.")).toBeInTheDocument();
+    expect(admins().getByText("No admins yet.")).toBeInTheDocument();
     expect(admins().getByRole("button", { name: "Add admin" })).toBeInTheDocument();
   });
 
-  const OWNING_TEAM_LINE = "You have admin access as a member of this Project’s owning Team.";
-
-  it("tells the owner their access comes through the owning team", async () => {
-    // Whoever reaches this page can manage the project; with no grant of their
-    // own, that access is the owning team's. The line stays once admins exist.
-    stubProject([grant({ user: grantUser({ identifier: "colleague@acme.com" }) })]);
+  it("reads every page of admins", async () => {
+    const pageTokens: (string | null)[] = [];
+    server.use(
+      http.get(`${PROJECTS_URL}/:id`, () => HttpResponse.json(project())),
+      http.get(`${PROJECTS_URL}/:id/admins`, ({ request }) => {
+        const pageToken = new URL(request.url).searchParams.get("page_token");
+        pageTokens.push(pageToken);
+        return pageToken
+          ? HttpResponse.json({ admins: [admin({ user_id: "user_2", display: "Second Page" }, OWNING_TEAM)] })
+          : HttpResponse.json({
+              admins: [admin({ display: "First Page" }, OWNING_TEAM)],
+              next_page_token: "page-2",
+            });
+      }),
+    );
     await renderProject();
 
     await screen.findByRole("region", { name: "Admins" });
-    expect(admins().getByText(OWNING_TEAM_LINE)).toBeInTheDocument();
-    expect(admins().getByText("colleague@acme.com")).toBeInTheDocument();
-  });
-
-  it("does not claim owning-team access for a granted admin", async () => {
-    // The session fixture signs in as `user_test`.
-    stubProject([grant({ user: { user_id: "user_test" } })]);
-    await renderProject();
-
-    await screen.findByRole("region", { name: "Admins" });
-    expect(admins().queryByText(OWNING_TEAM_LINE)).not.toBeInTheDocument();
+    expect(await admins().findByText("First Page")).toBeInTheDocument();
+    expect(admins().getByText("Second Page")).toBeInTheDocument();
+    expect(pageTokens).toEqual([null, "page-2"]);
   });
 
   it("grants by the address that was typed, on the route's project", async () => {
@@ -385,23 +369,56 @@ describe("project admins", () => {
     );
   });
 
-  it("names the relation the row holds, not always admin", async () => {
-    // The section only creates `admin`, but the list shows whatever a grant
-    // carries, and "Remove admin" over a `viewer` row would misdescribe the
-    // click.
-    stubProject([grant({ relation: "viewer", user: grantUser({ display: "Sasha Kim" }) })]);
+  it("does not say access is gone when the person keeps it another way", async () => {
+    // Revoking the direct grant leaves the owning team's access, and the
+    // confirmation says so rather than claiming they lose access.
+    stubProject([admin({ display: "Maya Patel" }, OWNING_TEAM, directGrant())]);
     await renderProject();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Actions for Sasha Kim" }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove viewer" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove direct grant" }));
     const dialog = within(await screen.findByRole("alertdialog"));
-    expect(dialog.getByText("Remove viewer?")).toBeInTheDocument();
+    expect(dialog.getByText("Remove direct grant?")).toBeInTheDocument();
+    expect(
+      dialog.getByText(/Maya Patel keeps admin access through the owning Team\./),
+    ).toBeInTheDocument();
+    expect(dialog.queryByText(/loses admin access/)).not.toBeInTheDocument();
   });
 
-  it("removes an admin from the route's project after confirming", async () => {
+  it("says a person's only grant takes their access with it", async () => {
+    stubProject([admin({ display: "Maya Patel" }, directGrant())]);
+    await renderProject();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove direct grant" }));
+    const dialog = within(await screen.findByRole("alertdialog"));
+    expect(
+      dialog.getByText(/Maya Patel immediately loses admin access to this project\./),
+    ).toBeInTheDocument();
+  });
+
+  it("offers one revoke per grant, and says a team grant is the team's", async () => {
+    // Each grant is revoked on its own; the one to a team ends that access for
+    // every member, which the confirmation names.
+    stubProject([admin({ display: "Maya Patel" }, teamGrant(), directGrant("asgn_2"))]);
+    await renderProject();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
+    expect(
+      await screen.findByRole("menuitem", { name: "Remove direct grant" }),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("menuitem", { name: "Remove grant to Team Platform" }));
+    const dialog = within(await screen.findByRole("alertdialog"));
+    expect(dialog.getByText(/Every member of Team Platform loses/)).toBeInTheDocument();
+    expect(
+      dialog.getByText(/Maya Patel keeps admin access through a direct grant\./),
+    ).toBeInTheDocument();
+  });
+
+  it("revokes the grant on the route's project after confirming", async () => {
     // The revoke is scoped like the read: `DELETE /grants/{id}` carries the
     // route's project, not the console's own.
-    stubProject([grant({ user: grantUser({ display: "Maya Patel" }) })]);
+    stubProject([admin({ display: "Maya Patel" }, directGrant())]);
     let deleted: { id: string; projectId: string | null } | undefined;
     server.use(
       http.delete(`${GRANTS_URL}/:id`, ({ params, request }) => {
@@ -415,10 +432,10 @@ describe("project admins", () => {
     await renderProject();
 
     await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove admin" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove direct grant" }));
     const dialog = within(await screen.findByRole("alertdialog"));
-    expect(dialog.getByText("Remove admin?")).toBeInTheDocument();
-    await userEvent.click(dialog.getByRole("button", { name: "Remove admin" }));
+    expect(dialog.getByText("Remove direct grant?")).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("button", { name: "Remove direct grant" }));
 
     await waitFor(() => expect(deleted).toEqual({ id: "asgn_1", projectId: PROJECT_ID }));
   });
@@ -426,7 +443,7 @@ describe("project admins", () => {
   it("does not carry a failed removal into the next opening", async () => {
     // The dialog content is mounted per opening, so the error from one attempt
     // is not sitting there when the operator opens it again.
-    stubProject([grant({ user: grantUser({ display: "Maya Patel" }) })]);
+    stubProject([admin({ display: "Maya Patel" }, directGrant())]);
     server.use(
       http.delete(`${GRANTS_URL}/:id`, () =>
         HttpResponse.json({ code: "grant.not_found", message: "no such grant" }, { status: 404 }),
@@ -435,9 +452,11 @@ describe("project admins", () => {
     await renderProject();
 
     await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove admin" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove direct grant" }));
     await userEvent.click(
-      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Remove admin" }),
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "Remove direct grant",
+      }),
     );
     expect(await screen.findByText("no such grant")).toBeInTheDocument();
 
@@ -445,14 +464,14 @@ describe("project admins", () => {
       within(screen.getByRole("alertdialog")).getByRole("button", { name: "Cancel" }),
     );
     await userEvent.click(screen.getByRole("button", { name: "Actions for Maya Patel" }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove admin" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove direct grant" }));
 
     await screen.findByRole("alertdialog");
     expect(screen.queryByText("no such grant")).not.toBeInTheDocument();
   });
 
   it("keeps the row when the removal is cancelled", async () => {
-    stubProject([grant({ user: grantUser({ display: "Maya Patel" }) })]);
+    stubProject([admin({ display: "Maya Patel" }, directGrant())]);
     let deleteCalls = 0;
     server.use(
       http.delete(`${GRANTS_URL}/:id`, () => {
@@ -463,7 +482,7 @@ describe("project admins", () => {
     await renderProject();
 
     await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove admin" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove direct grant" }));
     await userEvent.click(
       within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Cancel" }),
     );

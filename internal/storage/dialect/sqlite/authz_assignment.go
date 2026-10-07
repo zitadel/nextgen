@@ -305,3 +305,28 @@ func scanAuthzAssignment(rows *sql.Rows) (*domain.AuthzAssignment, error) {
 }
 
 var _ service.AuthzAssignmentStatements = (*authzAssignmentStatements)(nil)
+
+// ListProjectAdminSources implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectAdminSources(ctx context.Context, projectID, afterUserID, viewerUserID string, limit uint32) ([]*domain.ProjectAdminSourceRow, error) {
+	var c statementCompiler
+	authz.WriteProjectAdminSources(&c, sqliteAuthzEnv(), projectID, afterUserID, viewerUserID, limit)
+	rows, err := s.client.Query(ctx, c.String(), c.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	sources, err := collectRows(rows, func(rows *sql.Rows) (*domain.ProjectAdminSourceRow, error) {
+		var (
+			source   domain.ProjectAdminSourceRow
+			rank     int64
+			teamName sql.NullString
+		)
+		if err := rows.Scan(&source.UserID, &source.HomeProjectID, &rank, &source.GrantID, &source.TeamID, &source.Visible, &teamName); err != nil {
+			return nil, err
+		}
+		source.OwningTeam = rank == 0
+		source.TeamName = teamName.String
+		return &source, nil
+	})
+	return sources, wrapError(err)
+}

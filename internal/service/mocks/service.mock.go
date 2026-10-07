@@ -4067,45 +4067,6 @@ func (c *MockAllStatementsListAuthzAssignmentsCall) DoAndReturn(f func(context.C
 	return c
 }
 
-// ListAuthzMembershipEdges mocks base method.
-func (m *MockAllStatements) ListAuthzMembershipEdges(ctx context.Context, filter database.Filter[domain.AuthzMembershipEdgeField]) ([]*domain.AuthzMembershipEdge, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListAuthzMembershipEdges", ctx, filter)
-	ret0, _ := ret[0].([]*domain.AuthzMembershipEdge)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListAuthzMembershipEdges indicates an expected call of ListAuthzMembershipEdges.
-func (mr *MockAllStatementsMockRecorder) ListAuthzMembershipEdges(ctx, filter any) *MockAllStatementsListAuthzMembershipEdgesCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAuthzMembershipEdges", reflect.TypeOf((*MockAllStatements)(nil).ListAuthzMembershipEdges), ctx, filter)
-	return &MockAllStatementsListAuthzMembershipEdgesCall{Call: call}
-}
-
-// MockAllStatementsListAuthzMembershipEdgesCall wrap *gomock.Call
-type MockAllStatementsListAuthzMembershipEdgesCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsListAuthzMembershipEdgesCall) Return(arg0 []*domain.AuthzMembershipEdge, arg1 error) *MockAllStatementsListAuthzMembershipEdgesCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsListAuthzMembershipEdgesCall) Do(f func(context.Context, database.Filter[domain.AuthzMembershipEdgeField]) ([]*domain.AuthzMembershipEdge, error)) *MockAllStatementsListAuthzMembershipEdgesCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsListAuthzMembershipEdgesCall) DoAndReturn(f func(context.Context, database.Filter[domain.AuthzMembershipEdgeField]) ([]*domain.AuthzMembershipEdge, error)) *MockAllStatementsListAuthzMembershipEdgesCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // ListAuthzMembershipEdgesByMember mocks base method.
 func (m *MockAllStatements) ListAuthzMembershipEdgesByMember(ctx context.Context, projectID string, memberType domain.AuthzMemberType, memberID string) ([]*domain.AuthzMembershipEdge, error) {
 	m.ctrl.T.Helper()
@@ -4648,6 +4609,45 @@ func (c *MockAllStatementsListManagedGrantsCall) Do(f func(context.Context, stri
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsListManagedGrantsCall) DoAndReturn(f func(context.Context, string, *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)) *MockAllStatementsListManagedGrantsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListProjectAdminSources mocks base method.
+func (m *MockAllStatements) ListProjectAdminSources(ctx context.Context, projectID, afterUserID, viewerUserID string, limit uint32) ([]*domain.ProjectAdminSourceRow, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjectAdminSources", ctx, projectID, afterUserID, viewerUserID, limit)
+	ret0, _ := ret[0].([]*domain.ProjectAdminSourceRow)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjectAdminSources indicates an expected call of ListProjectAdminSources.
+func (mr *MockAllStatementsMockRecorder) ListProjectAdminSources(ctx, projectID, afterUserID, viewerUserID, limit any) *MockAllStatementsListProjectAdminSourcesCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectAdminSources", reflect.TypeOf((*MockAllStatements)(nil).ListProjectAdminSources), ctx, projectID, afterUserID, viewerUserID, limit)
+	return &MockAllStatementsListProjectAdminSourcesCall{Call: call}
+}
+
+// MockAllStatementsListProjectAdminSourcesCall wrap *gomock.Call
+type MockAllStatementsListProjectAdminSourcesCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListProjectAdminSourcesCall) Return(arg0 []*domain.ProjectAdminSourceRow, arg1 error) *MockAllStatementsListProjectAdminSourcesCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListProjectAdminSourcesCall) Do(f func(context.Context, string, string, string, uint32) ([]*domain.ProjectAdminSourceRow, error)) *MockAllStatementsListProjectAdminSourcesCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListProjectAdminSourcesCall) DoAndReturn(f func(context.Context, string, string, string, uint32) ([]*domain.ProjectAdminSourceRow, error)) *MockAllStatementsListProjectAdminSourcesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -11448,6 +11448,45 @@ func (c *MockAuthzAssignmentStatementsListManagedGrantsCall) DoAndReturn(f func(
 	return c
 }
 
+// ListProjectAdminSources mocks base method.
+func (m *MockAuthzAssignmentStatements) ListProjectAdminSources(ctx context.Context, projectID, afterUserID, viewerUserID string, limit uint32) ([]*domain.ProjectAdminSourceRow, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjectAdminSources", ctx, projectID, afterUserID, viewerUserID, limit)
+	ret0, _ := ret[0].([]*domain.ProjectAdminSourceRow)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjectAdminSources indicates an expected call of ListProjectAdminSources.
+func (mr *MockAuthzAssignmentStatementsMockRecorder) ListProjectAdminSources(ctx, projectID, afterUserID, viewerUserID, limit any) *MockAuthzAssignmentStatementsListProjectAdminSourcesCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectAdminSources", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).ListProjectAdminSources), ctx, projectID, afterUserID, viewerUserID, limit)
+	return &MockAuthzAssignmentStatementsListProjectAdminSourcesCall{Call: call}
+}
+
+// MockAuthzAssignmentStatementsListProjectAdminSourcesCall wrap *gomock.Call
+type MockAuthzAssignmentStatementsListProjectAdminSourcesCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthzAssignmentStatementsListProjectAdminSourcesCall) Return(arg0 []*domain.ProjectAdminSourceRow, arg1 error) *MockAuthzAssignmentStatementsListProjectAdminSourcesCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthzAssignmentStatementsListProjectAdminSourcesCall) Do(f func(context.Context, string, string, string, uint32) ([]*domain.ProjectAdminSourceRow, error)) *MockAuthzAssignmentStatementsListProjectAdminSourcesCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthzAssignmentStatementsListProjectAdminSourcesCall) DoAndReturn(f func(context.Context, string, string, string, uint32) ([]*domain.ProjectAdminSourceRow, error)) *MockAuthzAssignmentStatementsListProjectAdminSourcesCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // RevokeAuthzAssignment mocks base method.
 func (m *MockAuthzAssignmentStatements) RevokeAuthzAssignment(ctx context.Context, projectID, id string) error {
 	m.ctrl.T.Helper()
@@ -11657,45 +11696,6 @@ func (c *MockAuthzMembershipEdgeStatementsIsStatementsCall) Do(f func()) *MockAu
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAuthzMembershipEdgeStatementsIsStatementsCall) DoAndReturn(f func()) *MockAuthzMembershipEdgeStatementsIsStatementsCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// ListAuthzMembershipEdges mocks base method.
-func (m *MockAuthzMembershipEdgeStatements) ListAuthzMembershipEdges(ctx context.Context, filter database.Filter[domain.AuthzMembershipEdgeField]) ([]*domain.AuthzMembershipEdge, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListAuthzMembershipEdges", ctx, filter)
-	ret0, _ := ret[0].([]*domain.AuthzMembershipEdge)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListAuthzMembershipEdges indicates an expected call of ListAuthzMembershipEdges.
-func (mr *MockAuthzMembershipEdgeStatementsMockRecorder) ListAuthzMembershipEdges(ctx, filter any) *MockAuthzMembershipEdgeStatementsListAuthzMembershipEdgesCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAuthzMembershipEdges", reflect.TypeOf((*MockAuthzMembershipEdgeStatements)(nil).ListAuthzMembershipEdges), ctx, filter)
-	return &MockAuthzMembershipEdgeStatementsListAuthzMembershipEdgesCall{Call: call}
-}
-
-// MockAuthzMembershipEdgeStatementsListAuthzMembershipEdgesCall wrap *gomock.Call
-type MockAuthzMembershipEdgeStatementsListAuthzMembershipEdgesCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAuthzMembershipEdgeStatementsListAuthzMembershipEdgesCall) Return(arg0 []*domain.AuthzMembershipEdge, arg1 error) *MockAuthzMembershipEdgeStatementsListAuthzMembershipEdgesCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAuthzMembershipEdgeStatementsListAuthzMembershipEdgesCall) Do(f func(context.Context, database.Filter[domain.AuthzMembershipEdgeField]) ([]*domain.AuthzMembershipEdge, error)) *MockAuthzMembershipEdgeStatementsListAuthzMembershipEdgesCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAuthzMembershipEdgeStatementsListAuthzMembershipEdgesCall) DoAndReturn(f func(context.Context, database.Filter[domain.AuthzMembershipEdgeField]) ([]*domain.AuthzMembershipEdge, error)) *MockAuthzMembershipEdgeStatementsListAuthzMembershipEdgesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

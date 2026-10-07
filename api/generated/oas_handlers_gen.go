@@ -11081,10 +11081,9 @@ func (s *Server) handleListMyProjectsRequest(args [0]string, argsEscaped bool, w
 // only access is a `viewer` or `editor` grant is not an admin and is not
 // listed. Like the check, the list does not look at a person's user status
 // beyond that, so a direct grant to a suspended person is listed.
-// Ordered by `user_id`. The list is not paginated, an exception to ADR 027:
-// it merges grants and team memberships, so it cannot be paged in the
-// database, and the people who administer one project are few. It is capped
-// at 1000 people; `truncated` reports a longer list.
+// A person whose access comes only through teams the caller is not a
+// member of is listed by `user_id` alone, and those teams by `team_id`.
+// Ordered by `user_id` and paginated with `page_token`.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
 // session cookie (`nextgenSession`) that can read the project.
 //
@@ -11245,6 +11244,14 @@ func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
+				{
+					Name: "limit",
+					In:   "query",
+				}: params.Limit,
+				{
+					Name: "page_token",
+					In:   "query",
+				}: params.PageToken,
 				{
 					Name: "project_id",
 					In:   "path",

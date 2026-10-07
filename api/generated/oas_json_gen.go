@@ -57011,6 +57011,44 @@ func (s *ListMyProjectsResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes ListProjectAdminsBadRequest as json.
+func (s *ListProjectAdminsBadRequest) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes ListProjectAdminsBadRequest from json.
+func (s *ListProjectAdminsBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListProjectAdminsBadRequest to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = ListProjectAdminsBadRequest(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ListProjectAdminsBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListProjectAdminsBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes ListProjectAdminsErrorResponse as json.
 func (s ListProjectAdminsErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -57311,14 +57349,16 @@ func (s *ListProjectAdminsResponse) encodeFields(e *jx.Encoder) {
 		e.ArrEnd()
 	}
 	{
-		e.FieldStart("truncated")
-		e.Bool(s.Truncated)
+		if s.NextPageToken.Set {
+			e.FieldStart("next_page_token")
+			s.NextPageToken.Encode(e)
+		}
 	}
 }
 
 var jsonFieldsNameOfListProjectAdminsResponse = [2]string{
 	0: "admins",
-	1: "truncated",
+	1: "next_page_token",
 }
 
 // Decode decodes ListProjectAdminsResponse from json.
@@ -57348,17 +57388,15 @@ func (s *ListProjectAdminsResponse) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"admins\"")
 			}
-		case "truncated":
-			requiredBitSet[0] |= 1 << 1
+		case "next_page_token":
 			if err := func() error {
-				v, err := d.Bool()
-				s.Truncated = bool(v)
-				if err != nil {
+				s.NextPageToken.Reset()
+				if err := s.NextPageToken.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"truncated\"")
+				return errors.Wrap(err, "decode field \"next_page_token\"")
 			}
 		default:
 			return d.Skip()
@@ -57370,7 +57408,7 @@ func (s *ListProjectAdminsResponse) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000011,
+		0b00000001,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.

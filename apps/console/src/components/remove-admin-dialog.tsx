@@ -17,18 +17,23 @@ import { api } from "../api/zitadel";
 import { describeError } from "../lib/api-error";
 
 /**
- * The revoke confirmation (`Remove admin?` frame).
+ * The revoke confirmation (`Remove admin?` frame), for one admin grant.
  *
- * The action names the relation the row holds rather than always saying
- * "admin": this screen only creates `admin`, but the list shows whatever a
- * grant carries.
+ * **It revokes a grant, not a person.** A person can hold admin access several
+ * ways (#1462), and `DELETE /grants/{id}` removes only one of them, so the
+ * action names the grant and the copy names what the person keeps. Telling
+ * someone who stays admin through the owning team that they lose access would
+ * be false, and so would the reverse.
  *
- * **The copy is literally true.** `DELETE /grants/{id}` revokes one binding on
- * one project — the `projectId` of the project page whose admins section
- * renders this, never the console's own project (#1238). It does not touch the user record, and it does not touch any
- * other grant that person holds, so the design's "their user account isn't
- * deleted, and their other team memberships aren't affected" is accurate rather
- * than reassuring.
+ * **A team grant is the team's.** Revoking it removes the access it gives every
+ * member of the team, not only the person whose row opened this, so the copy
+ * says so.
+ *
+ * **The copy is otherwise literally true.** The grant lives on one project: the
+ * `projectId` of the project page whose admins section renders this, never the
+ * console's own project (#1238). It does not touch any user record, and it does
+ * not touch any other grant, so "access to other projects isn't affected" is
+ * accurate rather than reassuring.
  *
  * Unlike the delete-user dialog there is no type-to-confirm step: removing a
  * grant is reversible by adding the person again, where deleting a user is not.
@@ -37,7 +42,8 @@ export function RemoveAdminDialog({
   projectId,
   grantId,
   name,
-  level,
+  team,
+  keeps,
   open,
   onOpenChange,
   onRemoved,
@@ -45,9 +51,12 @@ export function RemoveAdminDialog({
   /** The project the grant lives on. */
   projectId: string;
   grantId: string;
+  /** The person whose row the revoke was started from. */
   name: string;
-  /** The relation being revoked, title-cased, e.g. `Admin`. */
-  level: string;
+  /** The team the grant is to; absent for a grant to the person. */
+  team?: string;
+  /** The person's other ways in, each phrased to finish "keeps admin access ...". */
+  keeps: string[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRemoved: () => void;
@@ -67,7 +76,8 @@ export function RemoveAdminDialog({
           projectId={projectId}
           grantId={grantId}
           name={name}
-          level={level}
+          team={team}
+          keeps={keeps}
           onOpenChange={onOpenChange}
           onRemoved={onRemoved}
         />
@@ -80,14 +90,16 @@ function RemoveAdminBody({
   projectId,
   grantId,
   name,
-  level,
+  team,
+  keeps,
   onOpenChange,
   onRemoved,
 }: {
   projectId: string;
   grantId: string;
   name: string;
-  level: string;
+  team?: string;
+  keeps: string[];
   onOpenChange: (open: boolean) => void;
   onRemoved: () => void;
 }) {
@@ -100,27 +112,31 @@ function RemoveAdminBody({
     try {
       await api.deleteGrant(grantId, { project_id: projectId });
       // Raised before the dialog closes, from the root-mounted toaster.
-      toast.success(`${name} removed`, {
-        description: "They no longer have access to this project.",
+      toast.success("Grant removed", {
+        description: keeping ?? `${name} no longer has admin access to this project.`,
       });
       onOpenChange(false);
       onRemoved();
     } catch (cause) {
-      setError(describeError(cause, "The admin could not be removed."));
+      setError(describeError(cause, "The grant could not be removed."));
     } finally {
       setSubmitting(false);
     }
   }
 
-  const action = `Remove ${level.toLowerCase()}`;
+  const action = removeGrantAction(team);
+  const keeping =
+    keeps.length > 0 ? `${name} keeps admin access ${keeps.join(" and ")}.` : undefined;
 
   return (
     <>
       <AlertDialogHeader>
         <AlertDialogTitle>{action}?</AlertDialogTitle>
         <AlertDialogDescription>
-          They immediately lose access to this project. Their user account isn&apos;t deleted, and
-          their access to other projects isn&apos;t affected.
+          {team &&
+            `Every member of Team ${team} loses the access this grant gives, not only ${name}. `}
+          {keeping ?? `${name} immediately loses admin access to this project.`} No user account is
+          deleted, and access to other projects isn&apos;t affected.
         </AlertDialogDescription>
       </AlertDialogHeader>
       {/* The API owns this copy (ADR 030), so the message is rendered verbatim
@@ -135,4 +151,12 @@ function RemoveAdminBody({
       </AlertDialogFooter>
     </>
   );
+}
+
+/**
+ * The revoke's label, on the row menu, the dialog title and its button alike.
+ * It names the grant rather than the person, who may keep access another way.
+ */
+export function removeGrantAction(team?: string): string {
+  return team ? `Remove grant to Team ${team}` : "Remove direct grant";
 }

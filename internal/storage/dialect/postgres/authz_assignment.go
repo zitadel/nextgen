@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -271,3 +272,27 @@ func scanAuthzAssignment(row pgx.CollectableRow) (*domain.AuthzAssignment, error
 }
 
 var _ service.AuthzAssignmentStatements = (*authzAssignmentStatements)(nil)
+
+// ListProjectAdminSources implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectAdminSources(ctx context.Context, projectID, afterUserID, viewerUserID string, limit uint32) ([]*domain.ProjectAdminSourceRow, error) {
+	var c statementCompiler
+	authz.WriteProjectAdminSources(&c, postgresAuthzEnv(), projectID, afterUserID, viewerUserID, limit)
+	rows, err := s.client.Query(ctx, c.String(), c.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	sources, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*domain.ProjectAdminSourceRow, error) {
+		var (
+			source   domain.ProjectAdminSourceRow
+			rank     int64
+			teamName sql.NullString
+		)
+		if err := row.Scan(&source.UserID, &source.HomeProjectID, &rank, &source.GrantID, &source.TeamID, &source.Visible, &teamName); err != nil {
+			return nil, err
+		}
+		source.OwningTeam = rank == 0
+		source.TeamName = teamName.String
+		return &source, nil
+	})
+	return sources, wrapError(err)
+}

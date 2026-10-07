@@ -330,3 +330,28 @@ func owningTeamKey(a *domain.AuthzAssignment) *string {
 }
 
 var _ service.AuthzAssignmentStatements = (*authzAssignmentStatements)(nil)
+
+// ListProjectAdminSources implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectAdminSources(ctx context.Context, projectID, afterUserID, viewerUserID string, limit uint32) ([]*domain.ProjectAdminSourceRow, error) {
+	var c statementCompiler
+	authz.WriteProjectAdminSources(&c, spannerAuthzEnv(), projectID, afterUserID, viewerUserID, limit)
+	var sources []*domain.ProjectAdminSourceRow
+	err := s.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
+		var qErr error
+		sources, qErr = collectRows(iter, func(row *spanner.Row) (*domain.ProjectAdminSourceRow, error) {
+			var (
+				source   domain.ProjectAdminSourceRow
+				rank     int64
+				teamName spanner.NullString
+			)
+			if err := row.Columns(&source.UserID, &source.HomeProjectID, &rank, &source.GrantID, &source.TeamID, &source.Visible, &teamName); err != nil {
+				return nil, err
+			}
+			source.OwningTeam = rank == 0
+			source.TeamName = teamName.StringVal
+			return &source, nil
+		})
+		return qErr
+	})
+	return sources, wrapError(err)
+}

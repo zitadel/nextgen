@@ -4,6 +4,7 @@ import (
 	"context"
 
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -12,15 +13,27 @@ func (h *Handler) ListProjectAdmins(ctx context.Context, params api.ListProjectA
 	if err := h.requireProjectAccess(ctx, projectID, projectAccess, opRead); err != nil {
 		return nil, err
 	}
-	listed, err := h.grantService.ListProjectAdmins(ctx, projectID)
+	var viewerUserID string
+	if scope, ok := GetScopeContext(ctx); ok && scope.PrincipalType == domain.AuthzPrincipalTypeUser {
+		viewerUserID = scope.PrincipalID
+	}
+	listed, err := h.grantService.ListProjectAdmins(ctx, service.ListProjectAdminsInput{
+		ProjectID:    projectID,
+		ViewerUserID: viewerUserID,
+		PageToken:    string(params.PageToken.Value),
+		Limit:        int(params.Limit.Value),
+	})
 	if err != nil {
 		return nil, err
 	}
-	admins := make([]api.ProjectAdmin, 0, len(listed.Admins))
-	for _, admin := range listed.Admins {
-		admins = append(admins, projectAdminResponse(admin))
+	res := &api.ListProjectAdminsResponse{Admins: make([]api.ProjectAdmin, 0, len(listed.Admins))}
+	if listed.NextPageToken != "" {
+		res.NextPageToken = api.NewOptNilPageToken(api.PageToken(listed.NextPageToken))
 	}
-	return &api.ListProjectAdminsResponse{Admins: admins, Truncated: listed.Truncated}, nil
+	for _, admin := range listed.Admins {
+		res.Admins = append(res.Admins, projectAdminResponse(admin))
+	}
+	return res, nil
 }
 
 func projectAdminResponse(admin *service.ProjectAdmin) api.ProjectAdmin {
