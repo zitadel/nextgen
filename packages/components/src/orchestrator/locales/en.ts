@@ -232,7 +232,7 @@ export const en: Record<string, string> = {
   "error.sso_cancelled.title": "Sign-in cancelled",
   "error.sso_cancelled.body": "You cancelled signing in with the provider, or it declined the request. You can try again or use another method.",
   "error.sso_failed.title": "Sign-in failed",
-  "error.sso_failed.body": "The provider could not complete the sign-in. Please try again.",
+  "error.sso_failed.body": "The sign-in could not be completed. Please try again.",
   "error.more_info": "More information",
 };
 

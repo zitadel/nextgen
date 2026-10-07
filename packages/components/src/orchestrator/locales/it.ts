@@ -213,6 +213,6 @@ export const it: Locale = {
   "error.sso_cancelled.title": "Accesso annullato",
   "error.sso_cancelled.body": "Hai annullato l'accesso con il provider, oppure la richiesta è stata rifiutata. Riprova o usa un altro metodo.",
   "error.sso_failed.title": "Accesso non riuscito",
-  "error.sso_failed.body": "Il provider non ha potuto completare l'accesso. Riprova.",
+  "error.sso_failed.body": "Non è stato possibile completare l'accesso. Riprova.",
   "error.more_info": "Maggiori informazioni",
 };

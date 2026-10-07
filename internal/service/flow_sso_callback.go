@@ -57,11 +57,12 @@ type FlowSSOCallbackOutput struct {
 }
 
 // Process consumes the state record and stores the ceremony's outcome on it.
-// A provider or configuration failure is stored as a generic error key and
-// logged, and the browser still goes back to the return target, where the
-// originating step shows the error. Process itself returns an error only when
-// the state cannot be consumed or this process failed: for both, the handler
-// has no return target and answers its uniform error page.
+// Any failure after the consume, the provider's, the configuration's or this
+// process's, is stored as a generic error key and logged, and the browser
+// still goes back to the return target, where the originating step shows the
+// error. Process itself returns an error only when the state cannot be
+// consumed or the outcome cannot be stored: for both, the handler answers its
+// uniform error page.
 func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) (FlowSSOCallbackOutput, error) {
 	// The project is read from the state because the lookup needs one and
 	// this request carries no other project source. A state without one is
@@ -112,7 +113,12 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 		Verified:             identity.Verified,
 	}
 	if err := c.attempts.SetSSOCallbackResult(ctx, projectID, check, result); err != nil {
-		return FlowSSOCallbackOutput{}, err
+		// The row was replaced or removed, so storing the error key would
+		// fail the same way.
+		if errors.Is(err, domain.ErrSSOStateInvalid()) {
+			return FlowSSOCallbackOutput{}, err
+		}
+		return c.fail(ctx, projectID, check, domain.ErrInternal(err))
 	}
 	return FlowSSOCallbackOutput{ReturnTarget: pending.ReturnTarget}, nil
 }
@@ -183,16 +189,18 @@ func (c *FlowSSOCallback) resolveClientSecret(ctx context.Context, projectID str
 }
 
 // fail logs the cause the user must not see and stores the generic failure
-// key. An internal error is a bug in this process, not a ceremony outcome,
-// and is returned instead.
+// key. An internal error is still stored, so the user can retry from the step:
+// the state is already consumed, and the error page has no way back.
 func (c *FlowSSOCallback) fail(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, cause error) (FlowSSOCallbackOutput, error) {
-	if errors.Is(cause, domain.ErrInternal(nil)) {
-		return FlowSSOCallbackOutput{}, domain.ErrInternal(cause)
-	}
 	// A cancelled request is not the provider's fault, and the client is
-	// gone, so no warning. A deadline is still logged.
+	// gone, so nothing is logged. A deadline is still logged.
 	if !errors.Is(ctx.Err(), context.Canceled) {
-		getLoggingContext(ctx, "flow").Warn("sso callback failed",
+		// An internal error is a bug in this process, not a ceremony outcome.
+		level := slog.LevelWarn
+		if errors.Is(cause, domain.ErrInternal(nil)) {
+			level = slog.LevelError
+		}
+		getLoggingContext(ctx, "flow").Log(ctx, level, "sso callback failed",
 			slog.String("project_id", projectID),
 			slog.String("slug", check.Pending.ProviderSlug),
 			slog.Any("error", cause),

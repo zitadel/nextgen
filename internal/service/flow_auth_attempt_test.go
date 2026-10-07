@@ -38,7 +38,9 @@ type fakeAuthAttempts struct {
 	consumeErr       error
 	setResultCheck   *domain.SSOCallbackCheck
 	setResult        *domain.SSOCallbackResult
-	setResultErr     error
+	// setResultErrs answers SetSSOCallbackResult calls in order; a call past
+	// the end succeeds.
+	setResultErrs []error
 }
 
 func (f *fakeAuthAttempts) Create(_ context.Context, in service.CreateAuthAttemptInput) (*domain.AuthAttempt, error) {
@@ -78,7 +80,12 @@ func (f *fakeAuthAttempts) ConsumeSSOState(_ context.Context, _, state, bindingN
 
 func (f *fakeAuthAttempts) SetSSOCallbackResult(_ context.Context, _ string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult) error {
 	f.setResultCheck, f.setResult = check, result
-	return f.setResultErr
+	if len(f.setResultErrs) == 0 {
+		return nil
+	}
+	err := f.setResultErrs[0]
+	f.setResultErrs = f.setResultErrs[1:]
+	return err
 }
 
 func (f *fakeAuthAttempts) BeginPasskeyEnrollment(context.Context, service.BeginPasskeyEnrollmentInput) (*service.BeginPasskeyEnrollmentOutput, error) {

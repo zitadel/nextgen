@@ -52,13 +52,13 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 
 	revisionDoc := ssoConnectionDocument(false)
 	tests := []struct {
-		name         string
-		in           service.FlowSSOCallbackInput
-		consumeErr   error
-		setResultErr error
-		connections  func(m *servicemocks.MockIDPConnectionService)
-		variables    func(m *servicemocks.MockVariableService)
-		wantErr      error
+		name          string
+		in            service.FlowSSOCallbackInput
+		consumeErr    error
+		setResultErrs []error
+		connections   func(m *servicemocks.MockIDPConnectionService)
+		variables     func(m *servicemocks.MockVariableService)
+		wantErr       error
 		// wantResult is what must have been stored on the record; nil means
 		// nothing was stored.
 		wantResult *domain.SSOCallbackResult
@@ -133,19 +133,29 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
 		},
 		{
-			name: "an internal failure is returned and stores nothing",
+			name: "an internal failure stores the failed key",
 			in:   service.FlowSSOCallbackInput{State: ssoCallbackState, Code: "the-code"},
 			connections: func(m *servicemocks.MockIDPConnectionService) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").Return(nil, domain.ErrInternal(errors.New("db down")))
 			},
-			wantErr: domain.ErrInternal(nil),
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
 		},
 		{
-			name:         "a refused result write passes through",
-			in:           service.FlowSSOCallbackInput{State: ssoCallbackState, Error: "access_denied"},
-			setResultErr: domain.ErrSSOStateInvalid(),
-			wantErr:      domain.ErrSSOStateInvalid(),
-			wantResult:   &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
+			name:          "a refused result write passes through",
+			in:            service.FlowSSOCallbackInput{State: ssoCallbackState, Error: "access_denied"},
+			setResultErrs: []error{domain.ErrSSOStateInvalid()},
+			wantErr:       domain.ErrSSOStateInvalid(),
+			wantResult:    &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
+		},
+		{
+			name: "a failed write of the failed key passes through",
+			in:   service.FlowSSOCallbackInput{State: ssoCallbackState, Code: "the-code"},
+			connections: func(m *servicemocks.MockIDPConnectionService) {
+				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").Return(nil, domain.ErrInternal(errors.New("db down")))
+			},
+			setResultErrs: []error{domain.ErrUnavailable()},
+			wantErr:       domain.ErrUnavailable(),
+			wantResult:    &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
 		},
 	}
 	for _, tt := range tests {
@@ -161,9 +171,9 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 				tt.variables(variables)
 			}
 			attempts := &fakeAuthAttempts{
-				consumeCheck: &domain.SSOCallbackCheck{Pending: ssoCallbackPending()},
-				consumeErr:   tt.consumeErr,
-				setResultErr: tt.setResultErr,
+				consumeCheck:  &domain.SSOCallbackCheck{Pending: ssoCallbackPending()},
+				consumeErr:    tt.consumeErr,
+				setResultErrs: tt.setResultErrs,
 			}
 			svc := service.NewFlowSSOCallback(connections, attempts, servicemocks.NewMockKeyService(ctrl), variables, &http.Client{Transport: tripwireTransport{t}})
 
@@ -323,24 +333,65 @@ func ssoCallbackProvider(t *testing.T) (doc []byte) {
 
 func TestFlowSSOCallback_Process_StoresTheIdentity(t *testing.T) {
 	t.Parallel()
-	ctrl := gomock.NewController(t)
-	connections := servicemocks.NewMockIDPConnectionService(ctrl)
-	connections.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
-		Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: ssoCallbackProvider(t)}, nil)
-	variables := servicemocks.NewMockVariableService(ctrl)
-	variables.EXPECT().GetDecryptedVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, "GOOGLE_SECRET").
-		Return([]*domain.Variable{{Name: "GOOGLE_SECRET", Value: "secret-1", IsSecret: true}}, nil)
-	attempts := &fakeAuthAttempts{consumeCheck: &domain.SSOCallbackCheck{Pending: ssoCallbackPending()}}
-	svc := service.NewFlowSSOCallback(connections, attempts, servicemocks.NewMockKeyService(ctrl), variables, &http.Client{})
+	tests := []struct {
+		name          string
+		setResultErrs []error
+		wantErr       error
+		// wantErrorKey is the key stored last; "" means the identity was.
+		wantErrorKey string
+	}{
+		{
+			name: "the identity is stored",
+		},
+		{
+			name:          "a failed identity write stores the failed key",
+			setResultErrs: []error{domain.ErrUnavailable()},
+			wantErrorKey:  domain.FlowStepErrorSSOFailed,
+		},
+		{
+			name:          "a failed write of the failed key passes through",
+			setResultErrs: []error{domain.ErrUnavailable(), domain.ErrUnavailable()},
+			wantErr:       domain.ErrUnavailable(),
+			wantErrorKey:  domain.FlowStepErrorSSOFailed,
+		},
+		{
+			name:          "a refused identity write passes through without a second write",
+			setResultErrs: []error{domain.ErrSSOStateInvalid()},
+			wantErr:       domain.ErrSSOStateInvalid(),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+			connections := servicemocks.NewMockIDPConnectionService(ctrl)
+			connections.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
+				Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: ssoCallbackProvider(t)}, nil)
+			variables := servicemocks.NewMockVariableService(ctrl)
+			variables.EXPECT().GetDecryptedVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, "GOOGLE_SECRET").
+				Return([]*domain.Variable{{Name: "GOOGLE_SECRET", Value: "secret-1", IsSecret: true}}, nil)
+			attempts := &fakeAuthAttempts{
+				consumeCheck:  &domain.SSOCallbackCheck{Pending: ssoCallbackPending()},
+				setResultErrs: tt.setResultErrs,
+			}
+			svc := service.NewFlowSSOCallback(connections, attempts, servicemocks.NewMockKeyService(ctrl), variables, &http.Client{})
 
-	out, err := svc.Process(t.Context(), service.FlowSSOCallbackInput{State: ssoCallbackState, Code: "the-code", BindingNonce: "bind-1"})
-	require.NoError(t, err)
+			out, err := svc.Process(t.Context(), service.FlowSSOCallbackInput{State: ssoCallbackState, Code: "the-code", BindingNonce: "bind-1"})
 
-	assert.Equal(t, ssoCallbackState, attempts.consumeState)
-	assert.Equal(t, "bind-1", attempts.consumeNonce)
-	assert.Equal(t, "https://app.example.com/login?flow=flow-1", out.ReturnTarget)
-	require.NotNil(t, attempts.setResult)
-	assert.Equal(t, "user-1", attempts.setResult.Subject)
-	assert.Equal(t, "idprev_1", attempts.setResult.ConnectionRevisionID)
-	assert.False(t, attempts.setResult.IsError())
+			assert.Equal(t, ssoCallbackState, attempts.consumeState)
+			assert.Equal(t, "bind-1", attempts.consumeNonce)
+			require.NotNil(t, attempts.setResult)
+			assert.Equal(t, tt.wantErrorKey, attempts.setResult.ErrorKey)
+			if tt.wantErrorKey == "" {
+				assert.Equal(t, "user-1", attempts.setResult.Subject)
+				assert.Equal(t, "idprev_1", attempts.setResult.ConnectionRevisionID)
+			}
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, "https://app.example.com/login?flow=flow-1", out.ReturnTarget)
+		})
+	}
 }

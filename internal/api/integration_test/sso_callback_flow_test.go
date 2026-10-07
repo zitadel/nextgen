@@ -242,9 +242,12 @@ func TestSSOCallbackOnTheProxyStrippedPath(t *testing.T) {
 
 // A declined consent comes back as error=access_denied with no code. The
 // browser still returns to the page the sign-in started on, where the step
-// renders the cancelled key; the provider is never asked for a token.
-func TestSSOCallbackProviderDeclineRendersCancelledOnTheStep(t *testing.T) {
+// renders the cancelled key; the provider is never asked for a token. A new
+// submission from that step replaces the parked row and signs the user in.
+func TestSSOCallbackProviderDeclineRendersCancelledAndAllowsARetry(t *testing.T) {
 	f := newSSOCallbackFixture(t)
+	userID := f.createUser(t, defaultSchemaURL())
+	f.link(t, f.connection.ID, "sub-1", userID)
 	flow := f.startFlow(t, "")
 	authorize, binding := f.submitSSO(t, flow)
 
@@ -260,6 +263,12 @@ func TestSSOCallbackProviderDeclineRendersCancelledOnTheStep(t *testing.T) {
 	require.True(t, step.Error.IsSet(), helpers.MustMarshal(t, stepResp))
 	assert.Equal(t, domain.FlowStepErrorSSOCancelled, step.Error.Value)
 	assert.Equal(t, "identifier", step.Name, "the flow stays on the step the sign-in started from")
+
+	retry, retryCookie := f.submitSSO(t, flow)
+	resp = f.callback(t, iapi.IDPCallbackPath,
+		"state="+url.QueryEscape(retry.Query().Get("state"))+"&code=the-code", retryCookie)
+	require.Equal(t, http.StatusSeeOther, resp.StatusCode)
+	requireAuthenticated(t, f.getStep(t, flow))
 }
 
 // A callback without the binding cookie must not consume the state: the record
