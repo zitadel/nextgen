@@ -18107,7 +18107,9 @@ type FinishUserPasskeyRegistrationErrorResponse struct {
 	ReqInvalid              ReqInvalid
 	UserInvalid             UserInvalid
 	UserNotFound            UserNotFound
+	UserPasswordEmpty       UserPasswordEmpty
 	UserPasswordRateLimited UserPasswordRateLimited
+	UserPasswordTooLong     UserPasswordTooLong
 	UserPermissionDenied    UserPermissionDenied
 }
 
@@ -18129,7 +18131,9 @@ const (
 	ReqInvalidFinishUserPasskeyRegistrationErrorResponse              FinishUserPasskeyRegistrationErrorResponseType = "req.invalid"
 	UserInvalidFinishUserPasskeyRegistrationErrorResponse             FinishUserPasskeyRegistrationErrorResponseType = "user.invalid"
 	UserNotFoundFinishUserPasskeyRegistrationErrorResponse            FinishUserPasskeyRegistrationErrorResponseType = "user.not_found"
+	UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse       FinishUserPasskeyRegistrationErrorResponseType = "user.password_empty"
 	UserPasswordRateLimitedFinishUserPasskeyRegistrationErrorResponse FinishUserPasskeyRegistrationErrorResponseType = "user.password_rate_limited"
+	UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse     FinishUserPasskeyRegistrationErrorResponseType = "user.password_too_long"
 	UserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse    FinishUserPasskeyRegistrationErrorResponseType = "user.permission_denied"
 )
 
@@ -18198,9 +18202,19 @@ func (s FinishUserPasskeyRegistrationErrorResponse) IsUserNotFound() bool {
 	return s.Type == UserNotFoundFinishUserPasskeyRegistrationErrorResponse
 }
 
+// IsUserPasswordEmpty reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordEmpty.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsUserPasswordEmpty() bool {
+	return s.Type == UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse
+}
+
 // IsUserPasswordRateLimited reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordRateLimited.
 func (s FinishUserPasskeyRegistrationErrorResponse) IsUserPasswordRateLimited() bool {
 	return s.Type == UserPasswordRateLimitedFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsUserPasswordTooLong reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordTooLong.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsUserPasswordTooLong() bool {
+	return s.Type == UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse
 }
 
 // IsUserPermissionDenied reports whether FinishUserPasskeyRegistrationErrorResponse is UserPermissionDenied.
@@ -18481,6 +18495,27 @@ func NewUserNotFoundFinishUserPasskeyRegistrationErrorResponse(v UserNotFound) F
 	return s
 }
 
+// SetUserPasswordEmpty sets FinishUserPasskeyRegistrationErrorResponse to UserPasswordEmpty.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetUserPasswordEmpty(v UserPasswordEmpty) {
+	s.Type = UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse
+	s.UserPasswordEmpty = v
+}
+
+// GetUserPasswordEmpty returns UserPasswordEmpty and true boolean if FinishUserPasskeyRegistrationErrorResponse is UserPasswordEmpty.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpty, ok bool) {
+	if !s.IsUserPasswordEmpty() {
+		return v, false
+	}
+	return s.UserPasswordEmpty, true
+}
+
+// NewUserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from UserPasswordEmpty.
+func NewUserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse(v UserPasswordEmpty) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetUserPasswordEmpty(v)
+	return s
+}
+
 // SetUserPasswordRateLimited sets FinishUserPasskeyRegistrationErrorResponse to UserPasswordRateLimited.
 func (s *FinishUserPasskeyRegistrationErrorResponse) SetUserPasswordRateLimited(v UserPasswordRateLimited) {
 	s.Type = UserPasswordRateLimitedFinishUserPasskeyRegistrationErrorResponse
@@ -18499,6 +18534,27 @@ func (s FinishUserPasskeyRegistrationErrorResponse) GetUserPasswordRateLimited()
 func NewUserPasswordRateLimitedFinishUserPasskeyRegistrationErrorResponse(v UserPasswordRateLimited) FinishUserPasskeyRegistrationErrorResponse {
 	var s FinishUserPasskeyRegistrationErrorResponse
 	s.SetUserPasswordRateLimited(v)
+	return s
+}
+
+// SetUserPasswordTooLong sets FinishUserPasskeyRegistrationErrorResponse to UserPasswordTooLong.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetUserPasswordTooLong(v UserPasswordTooLong) {
+	s.Type = UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse
+	s.UserPasswordTooLong = v
+}
+
+// GetUserPasswordTooLong returns UserPasswordTooLong and true boolean if FinishUserPasskeyRegistrationErrorResponse is UserPasswordTooLong.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetUserPasswordTooLong() (v UserPasswordTooLong, ok bool) {
+	if !s.IsUserPasswordTooLong() {
+		return v, false
+	}
+	return s.UserPasswordTooLong, true
+}
+
+// NewUserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from UserPasswordTooLong.
+func NewUserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse(v UserPasswordTooLong) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetUserPasswordTooLong(v)
 	return s
 }
 
@@ -47160,6 +47216,52 @@ func (o OptUserNotFoundDetails) Or(d UserNotFoundDetails) UserNotFoundDetails {
 	return d
 }
 
+// NewOptUserPasswordEmptyDetails returns new OptUserPasswordEmptyDetails with value set to v.
+func NewOptUserPasswordEmptyDetails(v UserPasswordEmptyDetails) OptUserPasswordEmptyDetails {
+	return OptUserPasswordEmptyDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserPasswordEmptyDetails is optional UserPasswordEmptyDetails.
+type OptUserPasswordEmptyDetails struct {
+	Value UserPasswordEmptyDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUserPasswordEmptyDetails was set.
+func (o OptUserPasswordEmptyDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserPasswordEmptyDetails) Reset() {
+	var v UserPasswordEmptyDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserPasswordEmptyDetails) SetTo(v UserPasswordEmptyDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserPasswordEmptyDetails) Get() (v UserPasswordEmptyDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserPasswordEmptyDetails) Or(d UserPasswordEmptyDetails) UserPasswordEmptyDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptUserPasswordRateLimitedDetails returns new OptUserPasswordRateLimitedDetails with value set to v.
 func NewOptUserPasswordRateLimitedDetails(v UserPasswordRateLimitedDetails) OptUserPasswordRateLimitedDetails {
 	return OptUserPasswordRateLimitedDetails{
@@ -47200,6 +47302,52 @@ func (o OptUserPasswordRateLimitedDetails) Get() (v UserPasswordRateLimitedDetai
 
 // Or returns value if set, or given parameter if does not.
 func (o OptUserPasswordRateLimitedDetails) Or(d UserPasswordRateLimitedDetails) UserPasswordRateLimitedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUserPasswordTooLongDetails returns new OptUserPasswordTooLongDetails with value set to v.
+func NewOptUserPasswordTooLongDetails(v UserPasswordTooLongDetails) OptUserPasswordTooLongDetails {
+	return OptUserPasswordTooLongDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserPasswordTooLongDetails is optional UserPasswordTooLongDetails.
+type OptUserPasswordTooLongDetails struct {
+	Value UserPasswordTooLongDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUserPasswordTooLongDetails was set.
+func (o OptUserPasswordTooLongDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserPasswordTooLongDetails) Reset() {
+	var v UserPasswordTooLongDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserPasswordTooLongDetails) SetTo(v UserPasswordTooLongDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserPasswordTooLongDetails) Get() (v UserPasswordTooLongDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserPasswordTooLongDetails) Or(d UserPasswordTooLongDetails) UserPasswordTooLongDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -58871,6 +59019,8 @@ type SetUserPasswordErrorResponse struct {
 	ReqInvalid           ReqInvalid
 	UserInvalid          UserInvalid
 	UserNotFound         UserNotFound
+	UserPasswordEmpty    UserPasswordEmpty
+	UserPasswordTooLong  UserPasswordTooLong
 	UserPermissionDenied UserPermissionDenied
 }
 
@@ -58885,6 +59035,8 @@ const (
 	ReqInvalidSetUserPasswordErrorResponse           SetUserPasswordErrorResponseType = "req.invalid"
 	UserInvalidSetUserPasswordErrorResponse          SetUserPasswordErrorResponseType = "user.invalid"
 	UserNotFoundSetUserPasswordErrorResponse         SetUserPasswordErrorResponseType = "user.not_found"
+	UserPasswordEmptySetUserPasswordErrorResponse    SetUserPasswordErrorResponseType = "user.password_empty"
+	UserPasswordTooLongSetUserPasswordErrorResponse  SetUserPasswordErrorResponseType = "user.password_too_long"
 	UserPermissionDeniedSetUserPasswordErrorResponse SetUserPasswordErrorResponseType = "user.permission_denied"
 )
 
@@ -58916,6 +59068,16 @@ func (s SetUserPasswordErrorResponse) IsUserInvalid() bool {
 // IsUserNotFound reports whether SetUserPasswordErrorResponse is UserNotFound.
 func (s SetUserPasswordErrorResponse) IsUserNotFound() bool {
 	return s.Type == UserNotFoundSetUserPasswordErrorResponse
+}
+
+// IsUserPasswordEmpty reports whether SetUserPasswordErrorResponse is UserPasswordEmpty.
+func (s SetUserPasswordErrorResponse) IsUserPasswordEmpty() bool {
+	return s.Type == UserPasswordEmptySetUserPasswordErrorResponse
+}
+
+// IsUserPasswordTooLong reports whether SetUserPasswordErrorResponse is UserPasswordTooLong.
+func (s SetUserPasswordErrorResponse) IsUserPasswordTooLong() bool {
+	return s.Type == UserPasswordTooLongSetUserPasswordErrorResponse
 }
 
 // IsUserPermissionDenied reports whether SetUserPasswordErrorResponse is UserPermissionDenied.
@@ -59046,6 +59208,48 @@ func (s SetUserPasswordErrorResponse) GetUserNotFound() (v UserNotFound, ok bool
 func NewUserNotFoundSetUserPasswordErrorResponse(v UserNotFound) SetUserPasswordErrorResponse {
 	var s SetUserPasswordErrorResponse
 	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPasswordEmpty sets SetUserPasswordErrorResponse to UserPasswordEmpty.
+func (s *SetUserPasswordErrorResponse) SetUserPasswordEmpty(v UserPasswordEmpty) {
+	s.Type = UserPasswordEmptySetUserPasswordErrorResponse
+	s.UserPasswordEmpty = v
+}
+
+// GetUserPasswordEmpty returns UserPasswordEmpty and true boolean if SetUserPasswordErrorResponse is UserPasswordEmpty.
+func (s SetUserPasswordErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpty, ok bool) {
+	if !s.IsUserPasswordEmpty() {
+		return v, false
+	}
+	return s.UserPasswordEmpty, true
+}
+
+// NewUserPasswordEmptySetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from UserPasswordEmpty.
+func NewUserPasswordEmptySetUserPasswordErrorResponse(v UserPasswordEmpty) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordTooLong sets SetUserPasswordErrorResponse to UserPasswordTooLong.
+func (s *SetUserPasswordErrorResponse) SetUserPasswordTooLong(v UserPasswordTooLong) {
+	s.Type = UserPasswordTooLongSetUserPasswordErrorResponse
+	s.UserPasswordTooLong = v
+}
+
+// GetUserPasswordTooLong returns UserPasswordTooLong and true boolean if SetUserPasswordErrorResponse is UserPasswordTooLong.
+func (s SetUserPasswordErrorResponse) GetUserPasswordTooLong() (v UserPasswordTooLong, ok bool) {
+	if !s.IsUserPasswordTooLong() {
+		return v, false
+	}
+	return s.UserPasswordTooLong, true
+}
+
+// NewUserPasswordTooLongSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from UserPasswordTooLong.
+func NewUserPasswordTooLongSetUserPasswordErrorResponse(v UserPasswordTooLong) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetUserPasswordTooLong(v)
 	return s
 }
 
@@ -59368,7 +59572,9 @@ type SubmitFlowStepErrorResponse struct {
 	UserAlreadyExists       UserAlreadyExists
 	UserInvalid             UserInvalid
 	UserNotFound            UserNotFound
+	UserPasswordEmpty       UserPasswordEmpty
 	UserPasswordRateLimited UserPasswordRateLimited
+	UserPasswordTooLong     UserPasswordTooLong
 }
 
 // SubmitFlowStepErrorResponseType is oneOf type of SubmitFlowStepErrorResponse.
@@ -59403,7 +59609,9 @@ const (
 	UserAlreadyExistsSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "user.already_exists"
 	UserInvalidSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "user.invalid"
 	UserNotFoundSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "user.not_found"
+	UserPasswordEmptySubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "user.password_empty"
 	UserPasswordRateLimitedSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "user.password_rate_limited"
+	UserPasswordTooLongSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "user.password_too_long"
 )
 
 // IsAttAlreadyHandedOff reports whether SubmitFlowStepErrorResponse is AttAlreadyHandedOff.
@@ -59541,9 +59749,19 @@ func (s SubmitFlowStepErrorResponse) IsUserNotFound() bool {
 	return s.Type == UserNotFoundSubmitFlowStepErrorResponse
 }
 
+// IsUserPasswordEmpty reports whether SubmitFlowStepErrorResponse is UserPasswordEmpty.
+func (s SubmitFlowStepErrorResponse) IsUserPasswordEmpty() bool {
+	return s.Type == UserPasswordEmptySubmitFlowStepErrorResponse
+}
+
 // IsUserPasswordRateLimited reports whether SubmitFlowStepErrorResponse is UserPasswordRateLimited.
 func (s SubmitFlowStepErrorResponse) IsUserPasswordRateLimited() bool {
 	return s.Type == UserPasswordRateLimitedSubmitFlowStepErrorResponse
+}
+
+// IsUserPasswordTooLong reports whether SubmitFlowStepErrorResponse is UserPasswordTooLong.
+func (s SubmitFlowStepErrorResponse) IsUserPasswordTooLong() bool {
+	return s.Type == UserPasswordTooLongSubmitFlowStepErrorResponse
 }
 
 // SetAttAlreadyHandedOff sets SubmitFlowStepErrorResponse to AttAlreadyHandedOff.
@@ -60113,6 +60331,27 @@ func NewUserNotFoundSubmitFlowStepErrorResponse(v UserNotFound) SubmitFlowStepEr
 	return s
 }
 
+// SetUserPasswordEmpty sets SubmitFlowStepErrorResponse to UserPasswordEmpty.
+func (s *SubmitFlowStepErrorResponse) SetUserPasswordEmpty(v UserPasswordEmpty) {
+	s.Type = UserPasswordEmptySubmitFlowStepErrorResponse
+	s.UserPasswordEmpty = v
+}
+
+// GetUserPasswordEmpty returns UserPasswordEmpty and true boolean if SubmitFlowStepErrorResponse is UserPasswordEmpty.
+func (s SubmitFlowStepErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpty, ok bool) {
+	if !s.IsUserPasswordEmpty() {
+		return v, false
+	}
+	return s.UserPasswordEmpty, true
+}
+
+// NewUserPasswordEmptySubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from UserPasswordEmpty.
+func NewUserPasswordEmptySubmitFlowStepErrorResponse(v UserPasswordEmpty) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUserPasswordEmpty(v)
+	return s
+}
+
 // SetUserPasswordRateLimited sets SubmitFlowStepErrorResponse to UserPasswordRateLimited.
 func (s *SubmitFlowStepErrorResponse) SetUserPasswordRateLimited(v UserPasswordRateLimited) {
 	s.Type = UserPasswordRateLimitedSubmitFlowStepErrorResponse
@@ -60131,6 +60370,27 @@ func (s SubmitFlowStepErrorResponse) GetUserPasswordRateLimited() (v UserPasswor
 func NewUserPasswordRateLimitedSubmitFlowStepErrorResponse(v UserPasswordRateLimited) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetUserPasswordRateLimited(v)
+	return s
+}
+
+// SetUserPasswordTooLong sets SubmitFlowStepErrorResponse to UserPasswordTooLong.
+func (s *SubmitFlowStepErrorResponse) SetUserPasswordTooLong(v UserPasswordTooLong) {
+	s.Type = UserPasswordTooLongSubmitFlowStepErrorResponse
+	s.UserPasswordTooLong = v
+}
+
+// GetUserPasswordTooLong returns UserPasswordTooLong and true boolean if SubmitFlowStepErrorResponse is UserPasswordTooLong.
+func (s SubmitFlowStepErrorResponse) GetUserPasswordTooLong() (v UserPasswordTooLong, ok bool) {
+	if !s.IsUserPasswordTooLong() {
+		return v, false
+	}
+	return s.UserPasswordTooLong, true
+}
+
+// NewUserPasswordTooLongSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from UserPasswordTooLong.
+func NewUserPasswordTooLongSubmitFlowStepErrorResponse(v UserPasswordTooLong) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUserPasswordTooLong(v)
 	return s
 }
 
@@ -64511,6 +64771,59 @@ func (s *UserNotFoundDetails) init() UserNotFoundDetails {
 
 // Merged schema.
 // Ref: #
+type UserPasswordEmpty struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUserPasswordEmptyDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UserPasswordEmpty) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UserPasswordEmpty) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UserPasswordEmpty) GetDetails() OptUserPasswordEmptyDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UserPasswordEmpty) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UserPasswordEmpty) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UserPasswordEmpty) SetDetails(val OptUserPasswordEmptyDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UserPasswordEmptyDetails map[string]jx.Raw
+
+func (s *UserPasswordEmptyDetails) init() UserPasswordEmptyDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type UserPasswordRateLimited struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -64554,6 +64867,59 @@ func (s *UserPasswordRateLimited) SetDetails(val OptUserPasswordRateLimitedDetai
 type UserPasswordRateLimitedDetails map[string]jx.Raw
 
 func (s *UserPasswordRateLimitedDetails) init() UserPasswordRateLimitedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type UserPasswordTooLong struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUserPasswordTooLongDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UserPasswordTooLong) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UserPasswordTooLong) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UserPasswordTooLong) GetDetails() OptUserPasswordTooLongDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UserPasswordTooLong) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UserPasswordTooLong) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UserPasswordTooLong) SetDetails(val OptUserPasswordTooLongDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UserPasswordTooLongDetails map[string]jx.Raw
+
+func (s *UserPasswordTooLongDetails) init() UserPasswordTooLongDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -66230,7 +66596,9 @@ type VerifyChallengeProofErrorResponse struct {
 	UserAlreadyExists       UserAlreadyExists
 	UserInvalid             UserInvalid
 	UserNotFound            UserNotFound
+	UserPasswordEmpty       UserPasswordEmpty
 	UserPasswordRateLimited UserPasswordRateLimited
+	UserPasswordTooLong     UserPasswordTooLong
 }
 
 // VerifyChallengeProofErrorResponseType is oneOf type of VerifyChallengeProofErrorResponse.
@@ -66252,7 +66620,9 @@ const (
 	UserAlreadyExistsVerifyChallengeProofErrorResponse       VerifyChallengeProofErrorResponseType = "user.already_exists"
 	UserInvalidVerifyChallengeProofErrorResponse             VerifyChallengeProofErrorResponseType = "user.invalid"
 	UserNotFoundVerifyChallengeProofErrorResponse            VerifyChallengeProofErrorResponseType = "user.not_found"
+	UserPasswordEmptyVerifyChallengeProofErrorResponse       VerifyChallengeProofErrorResponseType = "user.password_empty"
 	UserPasswordRateLimitedVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "user.password_rate_limited"
+	UserPasswordTooLongVerifyChallengeProofErrorResponse     VerifyChallengeProofErrorResponseType = "user.password_too_long"
 )
 
 // IsAttAlreadyHandedOff reports whether VerifyChallengeProofErrorResponse is AttAlreadyHandedOff.
@@ -66325,9 +66695,19 @@ func (s VerifyChallengeProofErrorResponse) IsUserNotFound() bool {
 	return s.Type == UserNotFoundVerifyChallengeProofErrorResponse
 }
 
+// IsUserPasswordEmpty reports whether VerifyChallengeProofErrorResponse is UserPasswordEmpty.
+func (s VerifyChallengeProofErrorResponse) IsUserPasswordEmpty() bool {
+	return s.Type == UserPasswordEmptyVerifyChallengeProofErrorResponse
+}
+
 // IsUserPasswordRateLimited reports whether VerifyChallengeProofErrorResponse is UserPasswordRateLimited.
 func (s VerifyChallengeProofErrorResponse) IsUserPasswordRateLimited() bool {
 	return s.Type == UserPasswordRateLimitedVerifyChallengeProofErrorResponse
+}
+
+// IsUserPasswordTooLong reports whether VerifyChallengeProofErrorResponse is UserPasswordTooLong.
+func (s VerifyChallengeProofErrorResponse) IsUserPasswordTooLong() bool {
+	return s.Type == UserPasswordTooLongVerifyChallengeProofErrorResponse
 }
 
 // SetAttAlreadyHandedOff sets VerifyChallengeProofErrorResponse to AttAlreadyHandedOff.
@@ -66624,6 +67004,27 @@ func NewUserNotFoundVerifyChallengeProofErrorResponse(v UserNotFound) VerifyChal
 	return s
 }
 
+// SetUserPasswordEmpty sets VerifyChallengeProofErrorResponse to UserPasswordEmpty.
+func (s *VerifyChallengeProofErrorResponse) SetUserPasswordEmpty(v UserPasswordEmpty) {
+	s.Type = UserPasswordEmptyVerifyChallengeProofErrorResponse
+	s.UserPasswordEmpty = v
+}
+
+// GetUserPasswordEmpty returns UserPasswordEmpty and true boolean if VerifyChallengeProofErrorResponse is UserPasswordEmpty.
+func (s VerifyChallengeProofErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpty, ok bool) {
+	if !s.IsUserPasswordEmpty() {
+		return v, false
+	}
+	return s.UserPasswordEmpty, true
+}
+
+// NewUserPasswordEmptyVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from UserPasswordEmpty.
+func NewUserPasswordEmptyVerifyChallengeProofErrorResponse(v UserPasswordEmpty) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetUserPasswordEmpty(v)
+	return s
+}
+
 // SetUserPasswordRateLimited sets VerifyChallengeProofErrorResponse to UserPasswordRateLimited.
 func (s *VerifyChallengeProofErrorResponse) SetUserPasswordRateLimited(v UserPasswordRateLimited) {
 	s.Type = UserPasswordRateLimitedVerifyChallengeProofErrorResponse
@@ -66642,6 +67043,27 @@ func (s VerifyChallengeProofErrorResponse) GetUserPasswordRateLimited() (v UserP
 func NewUserPasswordRateLimitedVerifyChallengeProofErrorResponse(v UserPasswordRateLimited) VerifyChallengeProofErrorResponse {
 	var s VerifyChallengeProofErrorResponse
 	s.SetUserPasswordRateLimited(v)
+	return s
+}
+
+// SetUserPasswordTooLong sets VerifyChallengeProofErrorResponse to UserPasswordTooLong.
+func (s *VerifyChallengeProofErrorResponse) SetUserPasswordTooLong(v UserPasswordTooLong) {
+	s.Type = UserPasswordTooLongVerifyChallengeProofErrorResponse
+	s.UserPasswordTooLong = v
+}
+
+// GetUserPasswordTooLong returns UserPasswordTooLong and true boolean if VerifyChallengeProofErrorResponse is UserPasswordTooLong.
+func (s VerifyChallengeProofErrorResponse) GetUserPasswordTooLong() (v UserPasswordTooLong, ok bool) {
+	if !s.IsUserPasswordTooLong() {
+		return v, false
+	}
+	return s.UserPasswordTooLong, true
+}
+
+// NewUserPasswordTooLongVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from UserPasswordTooLong.
+func NewUserPasswordTooLongVerifyChallengeProofErrorResponse(v UserPasswordTooLong) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetUserPasswordTooLong(v)
 	return s
 }
 

@@ -1,12 +1,20 @@
 package domain
 
 import (
+	"errors"
 	"time"
+	"unicode/utf8"
+
+	"golang.org/x/text/unicode/norm"
 
 	"github.com/zitadel/nextgen/internal/crypto"
 )
 
 const PrefixUserPassword ResourcePrefix = "upw"
+
+// MaxPasswordLength is the most Unicode code points a password can have after
+// [NormalizePassword].
+const MaxPasswordLength = 64
 
 const UserPasswordHistoryDepth = 4
 
@@ -58,8 +66,33 @@ func (f UserPasswordFailures) NextRetryTime() time.Time {
 	return f.LastFailedAt.Add(timeToWait)
 }
 
+func ErrUserPasswordEmpty() Error {
+	return newError("user.password_empty", "The password must not be empty.", nil, nil)
+}
+
+func ErrUserPasswordTooLong() Error {
+	return newError("user.password_too_long", "The password is too long. It can be at most 64 characters.", nil, nil)
+}
+
+func NormalizePassword(password string) string {
+	return norm.NFC.String(password)
+}
+
 func HashPassword(password string, hasher crypto.Hasher) (string, error) {
-	hash, err := hasher.Hash(password)
+	normalized := NormalizePassword(password)
+	if normalized == "" {
+		return "", ErrUserPasswordEmpty()
+	}
+	if utf8.RuneCountInString(normalized) > MaxPasswordLength {
+		return "", ErrUserPasswordTooLong()
+	}
+	hash, err := hasher.Hash(normalized)
+	if errors.Is(err, crypto.ErrPasswordTooLong) {
+		// bcrypt takes 72 bytes, fewer than 64 code points can need.
+		return "", ErrUserPasswordTooLong().
+			WithMessage("The password is too long for the project's password hashing method. Choose a shorter password.").
+			WithParent(err)
+	}
 	if err != nil {
 		return "", ErrInternal(err).WithMessage("failed to hash password")
 	}
@@ -75,7 +108,8 @@ type UserPassword struct {
 }
 
 func (u *UserPassword) Verify(password string, verifier crypto.HashVerifier) error {
-	if err := verifier.VerifyHash(u.EncodedHash, password); err != nil {
+	normalized := NormalizePassword(password)
+	if verifier.VerifyHash(u.EncodedHash, normalized) != nil {
 		return ErrUserPasswordInvalid()
 	}
 	return nil
