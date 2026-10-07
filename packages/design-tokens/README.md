@@ -4,7 +4,7 @@ The single source of truth for ZITADEL NextGen visual design. Pulls
 Variables from the published [Zitadel Design System — External][figma]
 Figma library, supplements them with the few values Figma doesn't
 publish (typography stacks, motion, focus ring, breakpoints, container
-widths), and emits three artifacts consumers can rely on:
+widths), and emits four artifacts consumers can rely on:
 
 | Surface              | Path                                          | Consumer                                                |
 | -------------------- | --------------------------------------------- | ------------------------------------------------------- |
@@ -18,16 +18,12 @@ block) so it never collides with consumer tokens.
 
 [figma]: https://www.figma.com/design/8UjCXw8yemgljmbkWGrSfE/Zitadel---Design-System---External
 
-## Two token systems, side by side
+## Colour surfaces
 
-The package currently emits **two** colour surfaces so consumers can migrate
-incrementally rather than in one breaking change:
-
-| System | Var shape | Source | Status |
-| --- | --- | --- | --- |
-| Legacy | `--zl-color-surface-*`, `--zl-color-text-*`, `--zl-color-gray-*`, `--zl-spacing-*` | `src/legacy.tokens.json` (frozen) | being migrated away from |
-| shadcn | `--zl-background`, `--zl-foreground`, `--zl-primary`, `--zl-card`, `--zl-border`, `--zl-sidebar-*`, `--zl-chart-*` | designer DTCG export (`figma-export/`) | the target surface |
-| Themed groups | `--zl-syntax-*`, `--zl-gradient-*` | designer DTCG export (`figma-export/`) | additive |
+| System | Var shape | Source |
+| --- | --- | --- |
+| shadcn | `--zl-background`, `--zl-foreground`, `--zl-primary`, `--zl-card`, `--zl-border`, `--zl-sidebar-*`, `--zl-chart-*` | designer DTCG export (`figma-export/`) |
+| Themed groups | `--zl-syntax-*`, `--zl-gradient-*` | designer DTCG export (`figma-export/`) |
 
 Themed groups are the designer's Light/Dark collections beyond the shadcn
 roles — syntax highlighting colours and gradient stops. They live under
@@ -43,15 +39,13 @@ rather than a colour, so it has no `bg-zl-*` alias: read it as
 `cssVars.gradient.red`.
 
 All are themed: dark values live on `:root` / `[data-theme="dark"]`, light
-overrides on `[data-theme="light"]`. The new shadcn names never collide with the
-legacy `--zl-color-*` namespace, so a file can reference either (or both) during
-migration. In the typed export, legacy colours stay under `tokens.color.*` and the
-new surface lives under `tokens.theme.*`.
+overrides on `[data-theme="light"]`. In the typed export the shadcn colours
+live under `tokens.theme.*`.
 
 ## Why a separate package?
 
-Lit web components and React console components need to render the same
-pixels. Without a shared token surface, each side ends up re-typing hex
+The Lit login surface and the React console share tokens and nothing else
+(ADR 055). Without a shared token surface, each side ends up re-typing hex
 codes and slowly drifting. This package owns that surface so the
 contract is one rebuild away, never a copy-paste.
 
@@ -101,7 +95,7 @@ Sync **never** commits to `main` directly.
 - **Pinned library version.** Designers can edit Figma freely; production
   only sees changes when the lockfile is bumped in a PR.
 - **Snapshot test.** `src/tokens.snapshot.spec.ts` locks every public
-  token name (both legacy `tokens.color.*` and new `tokens.theme.*`). A
+  token name. A
   rename or deletion fails CI before consumers break.
 - **Resolver unit test.** `src/sync-from-export.spec.ts` covers alias
   resolution, base-group flattening, concrete-wins conflicts, and fail-loud
@@ -135,13 +129,12 @@ packages/design-tokens/
 ├── scripts/
 │   ├── sync-from-export.ts           ← figma-export/*.json → figma.tokens.json (generic resolver)
 │   ├── sync-from-figma.ts            ← Figma REST → figma.tokens.json
-│   └── build.ts                      ← legacy.tokens.json + figma.tokens.json + overrides → outputs
+│   └── build.ts                      ← figma.tokens.json + overrides → outputs
 ├── src/
 │   ├── collections.ts                ← what each Figma collection is (roles)
-│   ├── legacy.tokens.json            ← frozen legacy colour source (committed)
 │   ├── overrides.ts                  ← typography, motion, focus, breakpoints,
 │   │                                   container widths (committed)
-│   ├── tokens.snapshot.spec.ts       ← public-name guard (both surfaces)
+│   ├── tokens.snapshot.spec.ts       ← public-name guard
 │   ├── sync-from-export.spec.ts      ← resolver unit + real-export test
 │   └── generated/                    ← all committed; built by `:generate`
 │       ├── figma.tokens.json         ← resolved shadcn surface (written by :sync-export)
@@ -149,7 +142,7 @@ packages/design-tokens/
 │       ├── tokens.ts
 │       ├── tailwind.css
 │       └── shadcn.css                ← shadcn utility bridge for apps/console
-└── dist/                             ← gitignored; built by tsdown for npm
+└── dist/                             ← gitignored; built by tsdown
 ```
 
 The export currently contains nine collections (Tailwind primitives, named
@@ -184,6 +177,6 @@ For values Figma doesn't own (typography stacks, motion, etc.), edit
 Both were considered. Style Dictionary needs config, transforms, and
 formats registered for our three target surfaces; Tokens Studio's
 GitHub bot writes to the repo without a PR review by default. A
-~200-line build script is more readable, easier to debug, and keeps the
+single build script is more readable, easier to debug, and keeps the
 PR-gated review property intact. Swap if the token surface grows past
 what the script can serve cleanly.
