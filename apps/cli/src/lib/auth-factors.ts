@@ -69,11 +69,27 @@ export function usableSignInMethods(schema: Record<string, unknown>): string[] {
   }
   const on = (name: string) => isObject(methods[name]) && methods[name].enabled === true;
   const usable: string[] = AUTH_FACTORS.filter(on);
-  const sso = methods.sso;
-  if (on("sso") && isObject(sso) && Array.isArray(sso.providers) && sso.providers.length > 0) {
+  if (on("sso") && enabledProviders(schema).length > 0) {
     usable.push("sso");
   }
   return usable.sort();
+}
+
+/** The provider slug format the SSO auth-method meta-schema allows. */
+const PROVIDER_SLUG = /^[a-z0-9][a-z0-9_-]*$/;
+
+/**
+ * The SSO providers the schema enables, keeping only well-formed slugs: an
+ * entry like `7` names no connection, so it is no way to sign in.
+ */
+function enabledProviders(schema: Record<string, unknown>): string[] {
+  const methods = schema["x-auth-methods"];
+  const sso = isObject(methods) ? methods.sso : undefined;
+  return isObject(sso) && Array.isArray(sso.providers)
+    ? sso.providers.filter(
+        (p): p is string => typeof p === "string" && p.length <= 64 && PROVIDER_SLUG.test(p),
+      )
+    : [];
 }
 
 /**
@@ -234,14 +250,6 @@ function signsInWithPasskey(flow: Record<string, unknown>): boolean {
       Array.isArray(step.actions) &&
       step.actions.some((action) => isObject(action) && action.kind === "passkey"),
   );
-}
-
-function enabledProviders(schema: Record<string, unknown>): string[] {
-  const methods = schema["x-auth-methods"];
-  const sso = isObject(methods) ? methods.sso : undefined;
-  return isObject(sso) && Array.isArray(sso.providers)
-    ? sso.providers.filter((p): p is string => typeof p === "string")
-    : [];
 }
 
 function offersSso(flow: Record<string, unknown>, providers: readonly string[]): boolean {

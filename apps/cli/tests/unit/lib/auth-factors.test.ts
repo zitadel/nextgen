@@ -114,6 +114,12 @@ describe("usableSignInMethods", () => {
     expect(methods).toEqual(["sso"]);
   });
 
+  it("does not count SSO whose providers are not valid slugs", () => {
+    expect(
+      usableSignInMethods(schema({ sso: { enabled: true, providers: [7, "Not A Slug", ""] } })),
+    ).toEqual([]);
+  });
+
   it("does not count SSO without a provider", () => {
     expect(usableSignInMethods(schema({ sso: { enabled: true, providers: [] } }))).toEqual([]);
   });
