@@ -9,9 +9,6 @@ type ListOptions[F ~uint8] struct {
 
 // WithLimit returns a shallow copy of opts with the pagination limit replaced.
 func (o *ListOptions[F]) WithLimit(limit uint32) *ListOptions[F] {
-	if o == nil {
-		return &ListOptions[F]{Pagination: Page[F]{Limit: limit}}
-	}
 	out := *o
 	out.Pagination.Limit = limit
 	return &out

@@ -15,8 +15,9 @@ import (
 )
 
 // GET /schemas pages with a cursor (#924): a page-token walk covers every
-// revision exactly once, a full page carries a token, the page past the end
-// does not, and a malformed token is rejected rather than silently ignored.
+// revision exactly once, each page but the last carries a token, the final
+// page carries none even when it is full (#849), and a malformed token is
+// rejected rather than silently ignored.
 func TestListSchemasPagination(t *testing.T) {
 	t.Parallel()
 

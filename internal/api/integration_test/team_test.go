@@ -1148,6 +1148,9 @@ func TestQueryTeamsPageTokenRequiresMatchingSorting(t *testing.T) {
 	}, params)
 	require.NoError(t, err)
 	require.IsType(t, &api.QueryTeamsBadRequest{}, mismatch, helpers.MustMarshal(t, mismatch))
+	bad := mismatch.(*api.QueryTeamsBadRequest)
+	assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), bad.Code)
+	assert.Contains(t, string(helpers.MustMarshal(t, bad)), "page token does not match the requested sorting")
 
 	matched, err := client.QueryTeams(t.Context(), &api.QueryTeamsRequest{
 		Limit:     api.NewOptLimit(1),

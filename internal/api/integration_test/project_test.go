@@ -727,29 +727,6 @@ func TestQueryProjects(t *testing.T) {
 	}
 }
 
-// TestQueryProjectsSoleFullPageHasNoCursor proves that a full page which is
-// also the last one carries no cursor: a project secret sees only its own
-// project, so a limit-1 query returns that one row and no next-page token —
-// no phantom trailing page (#849).
-func TestQueryProjectsSoleFullPageHasNoCursor(t *testing.T) {
-	t.Parallel()
-
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
-	require.NoError(t, err)
-
-	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
-	require.NoError(t, err)
-	harness.SetProjectSecretOnApiClient(t, client, project)
-
-	req := &api.QueryProjectsRequest{Limit: api.NewOptLimit(1)}
-	first, err := client.QueryProjects(t.Context(), req)
-	require.NoError(t, err)
-	require.IsType(t, &api.QueryProjectsResponse{}, first, helpers.MustMarshal(t, first))
-	firstPage := first.(*api.QueryProjectsResponse)
-	require.Len(t, firstPage.Projects, 1)
-	assert.False(t, firstPage.NextPageToken.IsSet(), "the sole full page carries no cursor")
-}
-
 // assertProjectResponse covers every operation answering with the shared
 // project body: getProject, patchProject, and each item of queryProjects.
 func assertProjectResponse(t *testing.T, want, got any) {

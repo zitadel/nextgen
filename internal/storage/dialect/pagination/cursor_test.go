@@ -3,6 +3,7 @@ package pagination_test
 import (
 	"encoding/base64"
 	"encoding/json"
+	"math"
 	"testing"
 	"time"
 
@@ -142,11 +143,28 @@ func TestPage(t *testing.T) {
 	assert.Equal(t, all, page)
 	assert.Nil(t, token, "zero limit is unbounded")
 
-	// No OrderBy: still trims the probe, but has no keyset to tokenize.
-	page, token, err = pagination.Page(database.Page[domain.ProjectField]{Limit: 2}, schema, source(all))
+	// No OrderBy: there is no keyset to resume, so Page skips the probe,
+	// fetches exactly the limit, and emits no token.
+	page, token, err = pagination.Page(database.Page[domain.ProjectField]{Limit: 2}, schema, func(limit uint32) ([]*domain.Project, error) {
+		gotFetch = limit
+		return source(all)(limit)
+	})
 	require.NoError(t, err)
+	assert.Equal(t, uint32(2), gotFetch, "empty OrderBy skips the look-ahead probe")
 	assert.Equal(t, []string{"proj_1", "proj_2"}, ids(page))
 	assert.Nil(t, token, "empty OrderBy has no keyset")
+
+	// The maximum limit cannot be probed: limit+1 is unrepresentable, so Page
+	// fetches the limit as-is and emits no token, since no result set holds a
+	// further page beyond 2^32 rows.
+	page, token, err = pagination.Page(pageOf(math.MaxUint32), schema, func(limit uint32) ([]*domain.Project, error) {
+		gotFetch = limit
+		return source(all)(limit)
+	})
+	require.NoError(t, err)
+	assert.Equal(t, uint32(math.MaxUint32), gotFetch, "the max limit is fetched without +1")
+	assert.Equal(t, all, page)
+	assert.Nil(t, token, "the max limit has no successor page")
 
 	_, _, err = pagination.Page(pageOf(2), schema, func(uint32) ([]*domain.Project, error) {
 		return nil, assert.AnError

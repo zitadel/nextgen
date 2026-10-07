@@ -31,20 +31,20 @@ func New[F ~uint8](orderBy database.OrderBy[F], values []any) *Cursor[F] {
 
 // Page runs one keyset page: run fetches the requested limit plus a look-ahead
 // probe row, and Page trims the probe and returns the rows to serve with the
-// next-page token. Fetch and trim are a single operation, so they cannot drift.
-// A token is emitted only when the probe proved a further page exists, so an
-// exact-multiple final page reports none (#849). limit 0 is unbounded; an empty
-// OrderBy still trims but emits no token.
+// next-page token. Page owns the +1 and the trim. A token is emitted only when
+// the probe proves a further page exists, so an exact-multiple final page
+// reports none (#849). limit 0 is unbounded; with no OrderBy there is no keyset
+// to resume, so Page skips the probe and emits no token.
 func Page[F ~uint8, T any](
 	p database.Page[F],
 	schema database.Schema[F, T],
 	run func(limit uint32) ([]*T, error),
 ) ([]*T, []byte, error) {
-	// Fetch one extra row as the probe. At the uint32 maximum limit+1 is
-	// unrepresentable, but no result set can hold 2^32 rows, so a page that
-	// large has no successor and emitting no token is correct.
+	// Only an ordered page can resume via a token, so only it needs the probe.
+	// At the uint32 maximum limit+1 is unrepresentable, but no result set holds
+	// 2^32 rows, so that page has no successor and emitting no token is correct.
 	fetch := p.Limit
-	if fetch != 0 && fetch != math.MaxUint32 {
+	if len(p.OrderBy.Columns) > 0 && fetch != 0 && fetch != math.MaxUint32 {
 		fetch++
 	}
 	items, err := run(fetch)
@@ -55,9 +55,6 @@ func Page[F ~uint8, T any](
 		return items, nil, nil
 	}
 	page := items[:p.Limit]
-	if len(p.OrderBy.Columns) == 0 {
-		return page, nil, nil
-	}
 	token := New(p.OrderBy, schema.ValuesFrom(page[len(page)-1], p.OrderBy.Columns)).Marshal()
 	return page, token, nil
 }
