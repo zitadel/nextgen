@@ -17,6 +17,10 @@
 > the shell has no such lane and no such flag. The full platform-project
 > provisioner, first-party Console session authorization, effective-permission
 > exposure, and seed-input contract remain future work.
+> **Amendment (2026-10-04):** two items above have moved, as the amendments in
+> the body record. The api-mock serves its own runtime document (2026-09-30),
+> so `vite preview` is the only run that opts into the fallback. First-party
+> Console session authorization has landed (2026-09-25, #1300).
 > **Scope:** `apps/console`, plus the server-owned bootstrap and authorization
 > contracts on which it depends. §2 and §3's runtime-document rules also bind
 > `apps/login-ui`, which reads the same document. See

@@ -26,7 +26,15 @@ const OPTIONS: ZlSelectOption[] = [
 // `options` is a complex value, so it's a property binding (`.options`), not an
 // attribute. Shared by the Lit, React, and Parity stories so all three drive the
 // same surface.
-const litSelect = ({ label, placeholder, value, disabled, required, error, open }: SelectArgs) => html`
+const litSelect = ({
+  label,
+  placeholder,
+  value,
+  disabled,
+  required,
+  error,
+  open,
+}: SelectArgs) => html`
   <zl-select
     name="country"
     label=${label || nothing}
@@ -75,9 +83,7 @@ const meta: Meta<SelectArgs> = {
       description: "Preview the open menu without a real click.",
     },
   },
-  decorators: [
-    (story) => html`<div style="width: 20rem; min-height: 18rem;">${story()}</div>`,
-  ],
+  decorators: [(story) => html`<div style="width: 20rem; min-height: 18rem;">${story()}</div>`],
 };
 
 export default meta;

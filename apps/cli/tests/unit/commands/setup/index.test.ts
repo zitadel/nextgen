@@ -454,9 +454,7 @@ describe("setup command pre-flight", () => {
     // maintained component, so nothing under .zitadel/branding/ is written
     // and no branding revision is created on the platform.
     expect(existsSync(join(cwd, ".zitadel/branding"))).toBe(false);
-    expect(json.data.files_written.some((file) => file.includes(".zitadel/branding/"))).toBe(
-      false,
-    );
+    expect(json.data.files_written.some((file) => file.includes(".zitadel/branding/"))).toBe(false);
     expect(capture.requests).not.toContain("POST /branding");
     // The envelope no longer carries a design, and the look guidance must not
     // claim a revision is live.
@@ -624,9 +622,9 @@ async function startHealthServer(): Promise<string> {
 
 async function startNotFoundServer(): Promise<string> {
   const server = createServer((_req, res) => {
-    res.writeHead(404, { "content-type": "application/json" }).end(
-      JSON.stringify({ message: "not found" }),
-    );
+    res
+      .writeHead(404, { "content-type": "application/json" })
+      .end(JSON.stringify({ message: "not found" }));
   });
   servers.push(server);
   await new Promise<void>((resolve) => server.listen(0, "localhost", () => resolve()));

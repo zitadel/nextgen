@@ -60,7 +60,9 @@ describe("<zl-icon>", () => {
   it("adds the spin modifier class when spin is set", async () => {
     const el = mount(`<zl-icon name="spinner" spin decorative></zl-icon>`);
     await el.updateComplete;
-    expect(el.shadowRoot?.querySelector(".zr-icon")?.classList.contains("zr-icon--spin")).toBe(true);
+    expect(el.shadowRoot?.querySelector(".zr-icon")?.classList.contains("zr-icon--spin")).toBe(
+      true,
+    );
   });
 
   it("adds a tone modifier class for non-default tones", async () => {

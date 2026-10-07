@@ -43,7 +43,9 @@ export class NextDetector implements Detector {
       throw new ZitadelError(
         "E_UNSUPPORTED_PROJECT_SHAPE",
         `Next.js "${belowFloor}" is below the supported floor — the CLI integrates Next.js 15 and newer`,
-        { hint: "Upgrade the app to Next 15+ (e.g. `npx @next/codemod@latest upgrade`) and rerun." },
+        {
+          hint: "Upgrade the app to Next 15+ (e.g. `npx @next/codemod@latest upgrade`) and rerun.",
+        },
       );
     }
 

@@ -41,7 +41,9 @@ export function flowPurposeSummary(definition: FlowDefinition): string {
   const purposes = Object.keys(definition.purposes ?? {});
   const known = PURPOSE_ORDER.filter((purpose) => purposes.includes(purpose));
   const rest = purposes.filter((purpose) => !PURPOSE_ORDER.includes(purpose)).sort();
-  return [...known, ...rest].map((purpose) => PURPOSE_LABELS[purpose] ?? humanise(purpose)).join(" + ");
+  return [...known, ...rest]
+    .map((purpose) => PURPOSE_LABELS[purpose] ?? humanise(purpose))
+    .join(" + ");
 }
 
 /** `default-login` → `Default login`. The API has no display-name field. */

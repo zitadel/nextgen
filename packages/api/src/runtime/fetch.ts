@@ -25,7 +25,6 @@ export class ApiError extends Error {
   }
 }
 
-
 /**
  * Thrown when a request got no response at all: the connection was refused or
  * reset, the host did not resolve, or the server accepted the connection but
@@ -41,7 +40,12 @@ export class NetworkError extends Error {
   /** `timeout` when a deadline cut the request off, `unreachable` otherwise. */
   readonly reason: "unreachable" | "timeout";
 
-  constructor(url: string, reason: "unreachable" | "timeout", message: string, options?: ErrorOptions) {
+  constructor(
+    url: string,
+    reason: "unreachable" | "timeout",
+    message: string,
+    options?: ErrorOptions,
+  ) {
     super(message, options);
     this.name = "NetworkError";
     this.url = url;
@@ -90,8 +94,11 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
     headers.set("authorization", `Bearer ${token}`);
   }
 
-  const { res, rawBody } = await request(url, { ...options, headers }, requestPolicy, async (res) =>
-    [204, 205, 304].includes(res.status) ? "" : await res.text(),
+  const { res, rawBody } = await request(
+    url,
+    { ...options, headers },
+    requestPolicy,
+    async (res) => ([204, 205, 304].includes(res.status) ? "" : await res.text()),
   );
   const parsed = rawBody ? (safeJsonParse(rawBody) as unknown) : undefined;
 

@@ -100,9 +100,7 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
         template = lookupKey;
         if (lookupKey !== "" && !warnedMissingKeys.has(lookupKey)) {
           warnedMissingKeys.add(lookupKey);
-          console.warn(
-            `[zitadel-login] missing text key "${lookupKey}" — rendering the raw key`,
-          );
+          console.warn(`[zitadel-login] missing text key "${lookupKey}" — rendering the raw key`);
         }
       }
       return interpolate(template, args.map(stringify));
@@ -330,10 +328,7 @@ export function parseSsoError(raw: string): FlowError[] | null {
   }
 }
 
-export function localiseFlowErrorKeys(
-  raw: string,
-  ctx: FlowErrorKeyContext,
-): FlowError[] | null {
+export function localiseFlowErrorKeys(raw: string, ctx: FlowErrorKeyContext): FlowError[] | null {
   const segments = raw.split("; ");
   if (!segments.every((segment) => segment.startsWith("error."))) return null;
   return segments.map((key) => localiseFlowErrorKey(key, ctx));

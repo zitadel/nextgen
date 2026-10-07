@@ -83,7 +83,7 @@ A runtime action's `kind` is one of `submit`, `passkey`, `passkey_register`, `na
 |---|---|---|
 | `captcha` gate | *not built* | Bot-protection block. Should fit into forms without looking like a normal user-data field. |
 | `challenge` (passkey) | `zl-passkey` | Runs the WebAuthn ceremony for a pending challenge. Passkeys are modelled as a challenge on the step, not as a gate. |
-| `sso_providers` | *not built* | Provider button group or list. Supports SSO-first or SSO-secondary layouts. |
+| `sso_providers` | `zl-sso-providers` | Provider button group or list. Supports SSO-first or SSO-secondary layouts. |
 | `messages` | *not built* | Informational or warning notices. The component passes an empty list today. |
 | `errors` | `zl-alert` for step-level errors; the field atom's `error` attribute for field-level ones | Step-level or form-level errors. |
 | `texts.title_key` | Template heading | Screen title, rendered by the Liquid template into the card's `header` slot. |
@@ -100,6 +100,7 @@ The shipped atoms (`packages/components/src/manifests.ts`):
 | `zl-checkbox` | `checkbox` fields. |
 | `zl-button` | Primary and secondary actions. |
 | `zl-passkey` | The passkey ceremony. |
+| `zl-sso-providers` | The SSO provider buttons. |
 | `zl-alert` | Errors. |
 | `zl-card`, `zl-page-shell` | The card and the shell around it. |
 | `zl-icon`, `zl-pill` | Glyphs and status pills. |

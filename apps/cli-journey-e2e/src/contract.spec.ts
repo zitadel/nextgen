@@ -47,9 +47,9 @@ test("doctor detects and repairs managed-file drift", async () => {
   };
   expect(fix.status).toBe("ok");
   expect(fix.data.ok).toBe(true);
-  expect(
-    (fix.data.checks ?? []).find((check) => check.name === "managed-files")?.status,
-  ).toBe("pass");
+  expect((fix.data.checks ?? []).find((check) => check.name === "managed-files")?.status).toBe(
+    "pass",
+  );
 });
 
 async function expectLocalLockfileResolution(input: {

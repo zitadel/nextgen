@@ -77,28 +77,28 @@ func (b brandingStatements) GetBrandingByID(ctx context.Context, projectID, id s
 
 // ListBrandings implements [service.BrandingStatements].
 func (b brandingStatements) ListBrandings(ctx context.Context, filter *database.ListOptions[domain.BrandingField]) (*database.ListResult[*domain.Branding], error) {
-	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, brandingQuery, filter, branding.Schema, "branding", "id"); err != nil {
-		return nil, err
-	}
+	items, nextCursor, err := pagination.Page(filter.Pagination, branding.Schema, func(limit uint32) ([]*domain.Branding, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileList(ctx, &compiler, brandingQuery, filter, branding.Schema, "branding", "id"); err != nil {
+			return nil, err
+		}
 
-	var items []*domain.Branding
-	err := b.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
-		var err error
-		items, err = collectRows(iter, b.scanBranding)
-		return err
+		var items []*domain.Branding
+		err := b.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+			var err error
+			items, err = collectRows(iter, b.scanBranding)
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		return items, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	nextCursor := pagination.MarshalNext(
-		filter.Pagination.OrderBy,
-		items,
-		branding.Schema,
-		filter.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.Branding]{
 		Items:      items,
 		NextCursor: nextCursor,
