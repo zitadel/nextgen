@@ -262,8 +262,11 @@ unchanged; only the cookie-authenticated browser leg it opens is affected.
 >   `POST …/query` reads. A refusal is `403 auth.csrf_invalid`, listed in each
 >   affected operation's default error responses.
 >
-> Session liveness (the "active user session" condition above) is tracked
-> separately.
+> Session liveness (the "active user session" condition above) needs no
+> check of its own: revoking or rotating a session deletes its token records,
+> a token record expires with its session, and every request introspects the
+> cookie against that record, so a signed-out session is refused at once.
+> `TestConsoleSessionRevokedStopsAuthorizing` pins it.
 
 ### 6. Project discovery is an authorization query
 
@@ -303,6 +306,17 @@ The ADR 033 denial contract applies unchanged:
 For a foreign human principal, an unknown target and a real but unauthorized
 target must be indistinguishable. The existing operator delete-idempotency
 exception for project secrets does not extend to foreign human sessions.
+
+> **Implementation note (2026-10-05, #1300):** creates keep ADR 033's
+> existing answer for a project without a foothold instead of `404`. Creating
+> a user, a schema, a flow definition or a branding revision in such a project
+> answers `400` with the resource's `*.invalid` code and the detail "project
+> does not exist" (`writeMiss` in `internal/api/authz.go`); teams and grants
+> already answer `404`. The answer is identical for a project that does not
+> exist, so the boundary above holds, and project-secret callers keep the
+> shape they already rely on. `TestConsoleSessionForeignTargetIsIndistinguishable`
+> pins both: every operation the Console calls answers a real foreign target
+> exactly as it answers a missing one.
 
 ### 8. Audit events are written in the protected project
 
