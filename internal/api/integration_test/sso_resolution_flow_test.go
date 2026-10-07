@@ -18,6 +18,9 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+// Every test creates a project, a connection and users; the Spanner emulator
+// starves when that setup runs in parallel, so these tests run sequentially.
+
 // The callback route is not built yet, so these tests park the provider's
 // result on the attempt through the same statements the callback will use,
 // then drive the resolution through GET /flow/{id}.
@@ -87,6 +90,24 @@ func (f *ssoResolutionFixture) createUser(t *testing.T, schemaURL string) string
 	id := "user_" + helpers.RandString(8)
 	createAttemptUser(t, f.project, f.team, schemaURL, id, map[string]string{"email": helpers.RandString(8) + "@example.com"})
 	return id
+}
+
+// createStaffSchema adds a second user schema whose email is also
+// project-unique, so its users can hold a value the flow's schema looks up.
+func (f *ssoResolutionFixture) createStaffSchema(t *testing.T) string {
+	t.Helper()
+	return harness.CreateUserSchema(t, f.project, `{
+		"title": "SSOStaffUser",
+		"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
+		"$id": "https://sso-staff.example.com/schemas/staff-user.json",
+		"kind": "user-schema",
+		"type": "object",
+		"x-identifier": "email",
+		"x-auth-methods": {"password": {"enabled": true}},
+		"properties": {
+			"email": {"type": "string", "x-unique": "project"}
+		}
+	}`)
 }
 
 // link pins subject on connectionID to userID and returns the link.
@@ -161,7 +182,6 @@ func requireAuthenticated(t *testing.T, resp api.GetFlowStepRes) *api.FlowRespon
 // A reload racing a submit must not roll the cookie back to the step before
 // the submit.
 func TestGetFlowStepWithoutParkedIdentityLeavesCookie(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	flow := f.startFlow(t, "")
 
@@ -173,7 +193,6 @@ func TestGetFlowStepWithoutParkedIdentityLeavesCookie(t *testing.T) {
 // A flow that was complete before the request still answers 410: only a
 // render that itself completes the flow returns the terminal step.
 func TestGetFlowStep_AlreadyCompleted_Still410(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	flow := f.startFlow(t, "")
 	state := openFlowState(t, f.project.ID, flow.zflow)
@@ -185,7 +204,6 @@ func TestGetFlowStep_AlreadyCompleted_Still410(t *testing.T) {
 }
 
 func TestSSOResolutionExistingLinkRoutesAuthenticated(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	userID := f.createUser(t, defaultSchemaURL())
 	f.link(t, f.connection.ID, "sub-1", userID)
@@ -234,7 +252,6 @@ func TestSSOResolutionSubmitAfterHandoffReturns409(t *testing.T) {
 }
 
 func TestSSOResolutionLaterRevisionResolvesSameLink(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	userID := f.createUser(t, defaultSchemaURL())
 	f.link(t, f.connection.ID, "sub-1", userID)
@@ -249,7 +266,6 @@ func TestSSOResolutionLaterRevisionResolvesSameLink(t *testing.T) {
 }
 
 func TestSSOResolutionOtherConnectionSameSubjectDoesNotMatch(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	other := f.create(t, helpers.OIDCConnection("corp"))
 	f.link(t, f.connection.ID, "sub-1", f.createUser(t, defaultSchemaURL()))
@@ -261,12 +277,14 @@ func TestSSOResolutionOtherConnectionSameSubjectDoesNotMatch(t *testing.T) {
 	got := resp.(*api.FlowResponseHeaders).Response
 	assert.Equal(t, "identifier", got.Step.Name, "no link on the other connection, so nobody signs in")
 	assert.False(t, got.HandoffToken.Set)
+	// The unverified email cannot create a user, so the identity is collected;
+	// this definition does not route that outcome.
+	assert.Equal(t, domain.FlowImplicitOutcomeSSOUserNotFound, got.Step.Error.Value)
 	_, parked := f.attempt(t, flow).SSOCallback()
-	assert.True(t, parked, "an unlinked identity under creation auto stays parked")
+	assert.True(t, parked, "a collected identity stays parked for the prefill")
 }
 
 func TestSSOResolutionStoresNoProviderToken(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	userID := f.createUser(t, defaultSchemaURL())
 	link := f.link(t, f.connection.ID, "sub-1", userID)
@@ -287,20 +305,8 @@ func TestSSOResolutionStoresNoProviderToken(t *testing.T) {
 }
 
 func TestSSOResolutionOtherSchemaReturns409(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
-	staffSchemaURL := harness.CreateUserSchema(t, f.project, `{
-		"title": "SSOStaffUser",
-		"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
-		"$id": "https://sso-staff.example.com/schemas/staff-user.json",
-		"kind": "user-schema",
-		"type": "object",
-		"x-identifier": "email",
-		"x-auth-methods": {"password": {"enabled": true}},
-		"properties": {
-			"email": {"type": "string", "x-unique": "project"}
-		}
-	}`)
+	staffSchemaURL := f.createStaffSchema(t)
 	f.link(t, f.connection.ID, "sub-1", f.createUser(t, staffSchemaURL))
 	flow := f.startFlow(t, "")
 	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-1", emailClaims(), nil)
@@ -315,7 +321,6 @@ func TestSSOResolutionOtherSchemaReturns409(t *testing.T) {
 }
 
 func TestSSOResolutionCreationDisabledRerendersWithError(t *testing.T) {
-	t.Parallel()
 	connection := helpers.OIDCConnection("google")
 	connection.Provisioning = api.NewOptIdpConnectionProvisioning(api.IdpConnectionProvisioning{
 		Creation: api.NewOptIdpConnectionProvisioningCreation(api.IdpConnectionProvisioningCreationDisabled),
@@ -342,7 +347,6 @@ func TestSSOResolutionCreationDisabledRerendersWithError(t *testing.T) {
 }
 
 func TestSSOResolutionOnBoundAttemptRebindsNothing(t *testing.T) {
-	t.Parallel()
 	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
 	userA := f.createUser(t, defaultSchemaURL())
 	userB := f.createUser(t, defaultSchemaURL())
@@ -364,4 +368,221 @@ func TestSSOResolutionOnBoundAttemptRebindsNothing(t *testing.T) {
 	))
 	require.NoError(t, err)
 	assert.Equal(t, userB, link.UserID, "the link is untouched")
+}
+
+// linkFor returns the link of subject on the fixture's connection.
+func (f *ssoResolutionFixture) linkFor(t *testing.T, subject string) (*domain.IDPIdentityLink, error) {
+	t.Helper()
+	return harness.EnsureServiceDB(t).Statements().GetIDPIdentityLink(t.Context(), database.And(
+		database.Equal(database.Col(domain.IDPIdentityLinkFieldProjectID), f.project.ID),
+		database.Equal(database.Col(domain.IDPIdentityLinkFieldConnectionID), f.connection.ID),
+		database.Equal(database.Col(domain.IDPIdentityLinkFieldSubject), subject),
+	))
+}
+
+func (f *ssoResolutionFixture) userByEmail(t *testing.T, email string) (*domain.User, error) {
+	t.Helper()
+	return harness.EnsureUserFixture(t).GetByAttributes(t.Context(), f.project.ID, []domain.Attribute{{Key: "email", Value: email}})
+}
+
+// requireCollected asserts sso_user_not_found on a definition that does not
+// route it, with nothing created and the parked row kept for the prefill.
+func (f *ssoResolutionFixture) requireCollected(t *testing.T, flow ssoFlow, resp api.GetFlowStepRes, subject string) *domain.SSOCallbackCheck {
+	t.Helper()
+	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
+	got := resp.(*api.FlowResponseHeaders).Response
+	assert.Equal(t, "identifier", got.Step.Name)
+	assert.Equal(t, domain.FlowImplicitOutcomeSSOUserNotFound, got.Step.Error.Value)
+	assert.False(t, got.HandoffToken.Set)
+	attempt := f.attempt(t, flow)
+	_, bound := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
+	assert.False(t, bound, "nobody is bound")
+	_, err := f.linkFor(t, subject)
+	require.ErrorAs(t, err, new(*database.NoRowFoundError), "nothing is linked")
+	parked, ok := attempt.SSOCallback()
+	require.True(t, ok, "the parked row stays for the prefill")
+	require.NotNil(t, parked.Result)
+	return parked
+}
+
+func TestSSOResolutionCollisionBindsAndKeepsParked(t *testing.T) {
+	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
+	email := helpers.RandString(8) + "@example.com"
+	ownerID := "user_" + helpers.RandString(8)
+	createAttemptUser(t, f.project, f.team, defaultSchemaURL(), ownerID, map[string]string{"email": email})
+	flow := f.startFlow(t, "")
+	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-new", map[string]any{"email": email}, map[string]bool{"email": true})
+
+	resp := f.getStep(t, flow)
+	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
+	got := resp.(*api.FlowResponseHeaders).Response
+	// The outcome routes back to the identifier step, where the owner signs in.
+	assert.Equal(t, "identifier", got.Step.Name)
+	assert.False(t, got.Step.Error.Set)
+	assert.False(t, got.HandoffToken.Set, "the owner still has to prove a factor")
+
+	attempt := f.attempt(t, flow)
+	userFactor, ok := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
+	require.True(t, ok)
+	assert.Equal(t, ownerID, userFactor.UserID, "the attempt is bound to the existing user")
+	_, hasSSO := domain.CheckAs[*domain.AuthFactorSSO](attempt, domain.AuthCheckTypeSSO)
+	assert.False(t, hasSSO, "a collision proves nothing about the account")
+	row, parked := attempt.SSOCallback()
+	require.True(t, parked, "the parked row stays, so a lost cookie can be recovered")
+	require.NotNil(t, row.Result)
+	assert.Equal(t, &domain.SSOCallbackResult{CollisionUserID: ownerID}, row.Result,
+		"the row holds only the marker: the provider's subject and claims are gone")
+	_, err := f.linkFor(t, "sub-new")
+	require.ErrorAs(t, err, new(*database.NoRowFoundError), "a collision links nothing")
+	owner, err := f.userByEmail(t, email)
+	require.NoError(t, err)
+	assert.Equal(t, ownerID, owner.ID, "no second user was created")
+
+	// The client lost the sealed cookie and retries with the one it had
+	// before: the marker catches the state up and the same outcome is raised.
+	retry := f.getStep(t, flow)
+	require.IsType(t, &api.FlowResponseHeaders{}, retry, helpers.MustMarshal(t, retry))
+	assert.Equal(t, "identifier", retry.(*api.FlowResponseHeaders).Response.Step.Name)
+	userFactor, ok = domain.CheckAs[*domain.AuthFactorUser](f.attempt(t, flow), domain.AuthCheckTypeUser)
+	require.True(t, ok)
+	assert.Equal(t, ownerID, userFactor.UserID)
+}
+
+// The registry key has no schema, so a user of another schema can own the
+// claimed value. The flow cannot continue with that user: it restarts, and
+// nothing is bound, linked or created.
+func TestSSOResolutionCollisionWithOtherSchemaOwnerReturns409(t *testing.T) {
+	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
+	staffSchemaURL := f.createStaffSchema(t)
+	email := helpers.RandString(8) + "@example.com"
+	ownerID := "user_" + helpers.RandString(8)
+	createAttemptUser(t, f.project, f.team, staffSchemaURL, ownerID, map[string]string{"email": email})
+	flow := f.startFlow(t, "")
+	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-new", map[string]any{"email": email}, map[string]bool{"email": true})
+
+	resp := f.getStep(t, flow)
+	require.IsType(t, &api.GetFlowStepConflict{}, resp, helpers.MustMarshal(t, resp))
+	assert.Equal(t, "flow.restart_required", string(resp.(*api.GetFlowStepConflict).Code))
+	body := helpers.MustMarshal(t, resp)
+	for _, leaked := range []string{staffSchemaURL, ownerID, email, "sub-new"} {
+		assert.False(t, strings.Contains(body, leaked), "the response must not carry %q: %s", leaked, body)
+	}
+
+	_, bound := domain.CheckAs[*domain.AuthFactorUser](f.attempt(t, flow), domain.AuthCheckTypeUser)
+	assert.False(t, bound, "the owner of another schema is not bound")
+	_, err := f.linkFor(t, "sub-new")
+	require.ErrorAs(t, err, new(*database.NoRowFoundError), "nothing is linked")
+	owner, err := f.userByEmail(t, email)
+	require.NoError(t, err)
+	assert.Equal(t, ownerID, owner.ID, "no second user was created")
+}
+
+func TestSSOResolutionAutoCreateCreatesUserAndLinkAtomically(t *testing.T) {
+	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
+	email := helpers.RandString(8) + "@example.com"
+	flow := f.startFlow(t, "")
+	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-new", map[string]any{"email": email}, map[string]bool{"email": true})
+
+	requireAuthenticated(t, f.getStep(t, flow))
+
+	user, err := f.userByEmail(t, email)
+	require.NoError(t, err)
+	assert.Equal(t, defaultSchemaURL(), user.SchemaURL)
+	link, err := f.linkFor(t, "sub-new")
+	require.NoError(t, err)
+	assert.Equal(t, user.ID, link.UserID)
+	attempt := f.attempt(t, flow)
+	userFactor, ok := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
+	require.True(t, ok)
+	assert.Equal(t, user.ID, userFactor.UserID)
+	ssoFactor, ok := domain.CheckAs[*domain.AuthFactorSSO](attempt, domain.AuthCheckTypeSSO)
+	require.True(t, ok)
+	assert.Equal(t, f.connection.ID, ssoFactor.ConnectionID)
+	assert.Equal(t, link.ID, ssoFactor.LinkID)
+	_, parked := attempt.SSOCallback()
+	assert.False(t, parked, "the parked row is deleted")
+}
+
+// Through GET the link lookup runs before creation, so a link insert only
+// fails when another sign-in links the subject in between. This drives the
+// create directly to land in that window: the user insert succeeds, the link
+// trips the pair index, and the whole transaction rolls back.
+func TestSSOResolutionAutoCreateRollsBackOnLinkFailure(t *testing.T) {
+	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
+	f.link(t, f.connection.ID, "sub-taken", f.createUser(t, defaultSchemaURL()))
+	flow := f.startFlow(t, "")
+	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-taken", emailClaims(), map[string]bool{"email": true})
+	email := helpers.RandString(8) + "@example.com"
+	resolver := service.NewFlowSSOIdentityResolver(
+		harness.EnsureServiceDB(t), harness.EnsureIDPConnectionService(t), harness.EnsureUserService(t), harness.EnsureSchemaStore(t),
+	)
+	parked, ok := f.attempt(t, flow).SSOCallback()
+	require.True(t, ok)
+
+	_, err := resolver.CreateLinked(t.Context(), domain.FlowSSOCreateInput{
+		ProjectID:     f.project.ID,
+		AttemptID:     flow.attemptID,
+		CheckID:       parked.ID,
+		UserSchemaURL: defaultSchemaURL(),
+		ConnectionID:  f.connection.ID,
+		Subject:       "sub-taken",
+		Attributes:    map[string]any{"email": email},
+	})
+	require.ErrorIs(t, err, domain.ErrUserAlreadyExists())
+
+	_, err = f.userByEmail(t, email)
+	require.ErrorAs(t, err, new(*database.NoRowFoundError), "the user rolls back with the link")
+	attempt := f.attempt(t, flow)
+	_, bound := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
+	assert.False(t, bound, "no factor is recorded")
+	survived, ok := attempt.SSOCallback()
+	require.True(t, ok, "the parked row survives the rollback")
+	assert.Equal(t, parked.ID, survived.ID)
+}
+
+func TestSSOResolutionMissingRequiredRoutesSSOUserNotFound(t *testing.T) {
+	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
+	flow := f.startFlow(t, "")
+	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-new", map[string]any{}, nil)
+
+	resp := f.getStep(t, flow)
+	f.requireCollected(t, flow, resp, "sub-new")
+
+	// The rotated cookie remembers the row, so a reload renders the step
+	// instead of resolving the identity again.
+	flow.zflow = mustExtractZflow(t, resp.(*api.FlowResponseHeaders).SetCookie)
+	reload := f.getStep(t, flow)
+	require.IsType(t, &api.FlowResponseHeaders{}, reload, helpers.MustMarshal(t, reload))
+	assert.False(t, reload.(*api.FlowResponseHeaders).Response.Step.Error.Set)
+}
+
+func TestSSOResolutionUnverifiedUniqueRoutesSSOUserNotFound(t *testing.T) {
+	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
+	email := helpers.RandString(8) + "@example.com"
+	flow := f.startFlow(t, "")
+	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-new", map[string]any{"email": email}, map[string]bool{"email": false})
+
+	parked := f.requireCollected(t, flow, f.getStep(t, flow), "sub-new")
+	verified, ok := parked.Result.Verified["email"]
+	assert.True(t, ok)
+	assert.False(t, verified, "the prefill knows the email still needs proving")
+	_, err := f.userByEmail(t, email)
+	require.ErrorAs(t, err, new(*database.NoRowFoundError), "no user is created from an unverified email")
+}
+
+// A flow started on a signed-in session carries that session's user on its
+// attempt. An unlinked identity that does not collide with that user cannot
+// register a new one there, nor be collected: the flow starts over.
+func TestSSOResolutionUnlinkedIdentityOnSessionBoundAttemptRestarts(t *testing.T) {
+	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
+	userA := f.createUser(t, defaultSchemaURL())
+	session := harness.CreateActiveSession(t, f.project.ID, userA)
+	flow := f.startFlow(t, session.ID)
+	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-new", map[string]any{}, nil)
+
+	resp := f.getStep(t, flow)
+	require.IsType(t, &api.GetFlowStepConflict{}, resp, helpers.MustMarshal(t, resp))
+	assert.Equal(t, "flow.restart_required", string(resp.(*api.GetFlowStepConflict).Code))
+	_, err := f.linkFor(t, "sub-new")
+	require.ErrorAs(t, err, new(*database.NoRowFoundError), "nothing is linked")
 }

@@ -1,0 +1,109 @@
+name: spanner
+
+# The Spanner emulator suite, split out of ci.yml's required `full-pr` job.
+# Spanner support is not on the critical path at this stage, and the emulator
+# serves one transaction at a time, so the lane was the slowest Go suite on
+# every PR. It runs here instead: nightly on main, on demand against any branch
+# (`gh workflow run spanner.yml --ref <branch>`), and on PRs that change this
+# file. It is not a required check.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"
+  pull_request:
+    paths:
+      - .github/workflows/spanner.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spanner-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  spanner-emulator:
+    # A plain GitHub-hosted runner is enough: the emulator serves one
+    # transaction at a time, so only the dependency builds use the extra cores
+    # a Depot runner would bring. It also keeps fork PRs off Depot (see ci.yml).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      # Uncomment together with the Spanner test-instance steps below to mint the
+      # OIDC token for Workload Identity Federation (trusted runs only).
+      # id-token: write
+    env:
+      # See ci.yml: names failed tasks in plain text and replays their output.
+      MOON_SUMMARY: detailed
+    steps:
+      # Full history, same as ci.yml: in CI, `moon run` loads changed files
+      # against `main` before running anything, and fails outright on a shallow
+      # clone where that ref does not exist.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # server:test-spanner depends on console:build and login-ui:build, which
+      # the Go //go:embed needs.
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      # Bare `moon` below is the workspace's own pinned @moonrepo/cli.
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      # ---------------------------------------------------------------------
+      # Spanner test instance — kept, deliberately not wired (#788, removal #793).
+      #
+      # The flake this was built for turned out to be an application bug, not an
+      # emulator limitation, so CI runs the emulator only: it is what forces the
+      # aborts that keep the abort-retry path honest. Re-enable ONLY if the
+      # emulator is shown to be inadequate, never to make a failing test pass.
+      #
+      # To re-wire: uncomment `id-token: write` in permissions above, uncomment
+      # the two steps below, add an `if` guard to the emulator step so the two
+      # do not both run:
+      #   if: ${{ steps.spanner-auth.outcome != 'success' }}
+      # and set the `SPANNER_TEST_INSTANCE` variable plus the
+      # `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_SERVICE_ACCOUNT` secrets.
+      # The Go side (internal/storage/testdb) already supports this and needs
+      # no change.
+      #
+      # Auth when SPANNER_TEST_INSTANCE is set (trusted runs). Vars are safe in
+      # if:; secrets stay only in with:. Unset var / forks → emulator step.
+      # Auth hard-fails if the var is set but WIF is broken (no silent fallback).
+      #
+      # - name: Authenticate to Google Cloud (Spanner test instance)
+      #   id: spanner-auth
+      #   if: ${{ (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) && vars.SPANNER_TEST_INSTANCE != '' }}
+      #   uses: google-github-actions/auth@v2
+      #   with:
+      #     workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      #     service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      #
+      # - name: Run Go integration tests (spanner test instance)
+      #   if: ${{ steps.spanner-auth.outcome == 'success' }}
+      #   env:
+      #     ZITADEL_TEST_SPANNER_INSTANCE: ${{ vars.SPANNER_TEST_INSTANCE }}
+      #   run: moon run server:test-spanner
+      # ---------------------------------------------------------------------
+
+      # The emulator is the canary: its one-transaction-at-a-time limit forces the
+      # aborts that prove the retry path still works. Do not move these off it.
+      - name: Run Go integration tests (spanner emulator)
+        run: moon run server:test-spanner

@@ -87,6 +87,11 @@ contract) with a menu whose only entry is **Sign out**
 console-local (bucket 2 of the root AGENTS.md styling rule) — the dark-only
 `<zitadel-session>`/`<zitadel-logout>` pairs are not theme-portable yet.
 
+> **Amendment (2026-10-04):** the root `AGENTS.md` styling rule now names two
+> surfaces, and the login surface themes light and dark. This chrome stays
+> console-local because the console does not compose login-surface elements
+> (root ADR 055).
+
 A data-load `401` now means "session ended mid-use": the shared error
 boundary drops the session cache and redirects to `/login?next=…` instead of
 rendering dead-end copy (the hook ADR 0002 §3 anticipated). `403` stays a
@@ -133,6 +138,10 @@ does not change.
   dark-only login tokens (root ADR 014 §5), so the login screen renders the
   dark treatment in both console themes. Accepted for v1; resolves as the login
   atoms migrate onto the shadcn token roles.
+
+  > **Amendment (2026-10-04):** the login atoms use the shared token roles and
+  > theme light and dark; `/login` passes the console's resolved theme to the
+  > widget (`src/routes/login.tsx`).
 - **Full-page reload on sign-in.** The widget's document navigation reboots
   the SPA with the cookie present. Accepted; an `onFlowComplete` +
   `router.navigate` in-SPA handoff is possible later.

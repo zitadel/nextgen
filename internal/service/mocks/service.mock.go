@@ -5235,6 +5235,44 @@ func (c *MockAllStatementsMarkChallengeCompletedCall) DoAndReturn(f func(context
 	return c
 }
 
+// MarkSSOCallbackCollision mocks base method.
+func (m *MockAllStatements) MarkSSOCallbackCollision(ctx context.Context, projectID, authAttemptID, checkID, userID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MarkSSOCallbackCollision", ctx, projectID, authAttemptID, checkID, userID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MarkSSOCallbackCollision indicates an expected call of MarkSSOCallbackCollision.
+func (mr *MockAllStatementsMockRecorder) MarkSSOCallbackCollision(ctx, projectID, authAttemptID, checkID, userID any) *MockAllStatementsMarkSSOCallbackCollisionCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkSSOCallbackCollision", reflect.TypeOf((*MockAllStatements)(nil).MarkSSOCallbackCollision), ctx, projectID, authAttemptID, checkID, userID)
+	return &MockAllStatementsMarkSSOCallbackCollisionCall{Call: call}
+}
+
+// MockAllStatementsMarkSSOCallbackCollisionCall wrap *gomock.Call
+type MockAllStatementsMarkSSOCallbackCollisionCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsMarkSSOCallbackCollisionCall) Return(arg0 error) *MockAllStatementsMarkSSOCallbackCollisionCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsMarkSSOCallbackCollisionCall) Do(f func(context.Context, string, string, string, string) error) *MockAllStatementsMarkSSOCallbackCollisionCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsMarkSSOCallbackCollisionCall) DoAndReturn(f func(context.Context, string, string, string, string) error) *MockAllStatementsMarkSSOCallbackCollisionCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // NewManagedID mocks base method.
 func (m *MockAllStatements) NewManagedID(prefix string) (string, error) {
 	m.ctrl.T.Helper()
@@ -8627,6 +8665,44 @@ func (c *MockAuthAttemptStatementsIssueSSOStateCall) Do(f func(context.Context, 
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAuthAttemptStatementsIssueSSOStateCall) DoAndReturn(f func(context.Context, string, string, *domain.SSOCallbackCheck) error) *MockAuthAttemptStatementsIssueSSOStateCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// MarkSSOCallbackCollision mocks base method.
+func (m *MockAuthAttemptStatements) MarkSSOCallbackCollision(ctx context.Context, projectID, authAttemptID, checkID, userID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MarkSSOCallbackCollision", ctx, projectID, authAttemptID, checkID, userID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MarkSSOCallbackCollision indicates an expected call of MarkSSOCallbackCollision.
+func (mr *MockAuthAttemptStatementsMockRecorder) MarkSSOCallbackCollision(ctx, projectID, authAttemptID, checkID, userID any) *MockAuthAttemptStatementsMarkSSOCallbackCollisionCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkSSOCallbackCollision", reflect.TypeOf((*MockAuthAttemptStatements)(nil).MarkSSOCallbackCollision), ctx, projectID, authAttemptID, checkID, userID)
+	return &MockAuthAttemptStatementsMarkSSOCallbackCollisionCall{Call: call}
+}
+
+// MockAuthAttemptStatementsMarkSSOCallbackCollisionCall wrap *gomock.Call
+type MockAuthAttemptStatementsMarkSSOCallbackCollisionCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthAttemptStatementsMarkSSOCallbackCollisionCall) Return(arg0 error) *MockAuthAttemptStatementsMarkSSOCallbackCollisionCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthAttemptStatementsMarkSSOCallbackCollisionCall) Do(f func(context.Context, string, string, string, string) error) *MockAuthAttemptStatementsMarkSSOCallbackCollisionCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthAttemptStatementsMarkSSOCallbackCollisionCall) DoAndReturn(f func(context.Context, string, string, string, string) error) *MockAuthAttemptStatementsMarkSSOCallbackCollisionCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

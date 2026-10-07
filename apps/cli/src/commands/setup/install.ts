@@ -134,6 +134,11 @@ function outcome(input: {
       : []),
     { text: `Start your project (then open ${input.issuer}/login):`, command: input.devCommand },
     { text: verifyLoginAction() },
+    // The dev server holds the terminal it starts in, and every later command
+    // reads `.zitadel/` from this directory.
+    {
+      text: "The dev server keeps its terminal busy. Open a second terminal in this directory for further commands.",
+    },
     {
       text: "Once login works, this shows your next steps (customizing is covered in your README's Zitadel section):",
       command: statusCommand,

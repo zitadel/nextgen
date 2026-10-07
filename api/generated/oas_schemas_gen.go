@@ -15920,6 +15920,7 @@ type Event struct {
 	FlowdefDeletedEvent            FlowdefDeletedEvent
 	FlowdefUpdatedEvent            FlowdefUpdatedEvent
 	IdpCreatedEvent                IdpCreatedEvent
+	IdpIdentityLinkCreatedEvent    IdpIdentityLinkCreatedEvent
 	IdpUpdatedEvent                IdpUpdatedEvent
 	ProjectCreatedEvent            ProjectCreatedEvent
 	ProjectDeletedEvent            ProjectDeletedEvent
@@ -15960,6 +15961,7 @@ const (
 	FlowdefDeletedEventEvent            EventType = "flowdef.deleted"
 	FlowdefUpdatedEventEvent            EventType = "flowdef.updated"
 	IdpCreatedEventEvent                EventType = "idp.created"
+	IdpIdentityLinkCreatedEventEvent    EventType = "idp.identity_link.created"
 	IdpUpdatedEventEvent                EventType = "idp.updated"
 	ProjectCreatedEventEvent            EventType = "project.created"
 	ProjectDeletedEventEvent            EventType = "project.deleted"
@@ -16030,6 +16032,11 @@ func (s Event) IsFlowdefUpdatedEvent() bool { return s.Type == FlowdefUpdatedEve
 
 // IsIdpCreatedEvent reports whether Event is IdpCreatedEvent.
 func (s Event) IsIdpCreatedEvent() bool { return s.Type == IdpCreatedEventEvent }
+
+// IsIdpIdentityLinkCreatedEvent reports whether Event is IdpIdentityLinkCreatedEvent.
+func (s Event) IsIdpIdentityLinkCreatedEvent() bool {
+	return s.Type == IdpIdentityLinkCreatedEventEvent
+}
 
 // IsIdpUpdatedEvent reports whether Event is IdpUpdatedEvent.
 func (s Event) IsIdpUpdatedEvent() bool { return s.Type == IdpUpdatedEventEvent }
@@ -16433,6 +16440,27 @@ func (s Event) GetIdpCreatedEvent() (v IdpCreatedEvent, ok bool) {
 func NewIdpCreatedEventEvent(v IdpCreatedEvent) Event {
 	var s Event
 	s.SetIdpCreatedEvent(v)
+	return s
+}
+
+// SetIdpIdentityLinkCreatedEvent sets Event to IdpIdentityLinkCreatedEvent.
+func (s *Event) SetIdpIdentityLinkCreatedEvent(v IdpIdentityLinkCreatedEvent) {
+	s.Type = IdpIdentityLinkCreatedEventEvent
+	s.IdpIdentityLinkCreatedEvent = v
+}
+
+// GetIdpIdentityLinkCreatedEvent returns IdpIdentityLinkCreatedEvent and true boolean if Event is IdpIdentityLinkCreatedEvent.
+func (s Event) GetIdpIdentityLinkCreatedEvent() (v IdpIdentityLinkCreatedEvent, ok bool) {
+	if !s.IsIdpIdentityLinkCreatedEvent() {
+		return v, false
+	}
+	return s.IdpIdentityLinkCreatedEvent, true
+}
+
+// NewIdpIdentityLinkCreatedEventEvent returns new Event from IdpIdentityLinkCreatedEvent.
+func NewIdpIdentityLinkCreatedEventEvent(v IdpIdentityLinkCreatedEvent) Event {
+	var s Event
+	s.SetIdpIdentityLinkCreatedEvent(v)
 	return s
 }
 
@@ -18079,6 +18107,8 @@ type FinishUserPasskeyRegistrationErrorResponse struct {
 	ReqInvalid           ReqInvalid
 	UserInvalid          UserInvalid
 	UserNotFound         UserNotFound
+	UserPasswordEmpty    UserPasswordEmpty
+	UserPasswordTooLong  UserPasswordTooLong
 	UserPermissionDenied UserPermissionDenied
 }
 
@@ -18100,6 +18130,8 @@ const (
 	ReqInvalidFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "req.invalid"
 	UserInvalidFinishUserPasskeyRegistrationErrorResponse          FinishUserPasskeyRegistrationErrorResponseType = "user.invalid"
 	UserNotFoundFinishUserPasskeyRegistrationErrorResponse         FinishUserPasskeyRegistrationErrorResponseType = "user.not_found"
+	UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse    FinishUserPasskeyRegistrationErrorResponseType = "user.password_empty"
+	UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse  FinishUserPasskeyRegistrationErrorResponseType = "user.password_too_long"
 	UserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse FinishUserPasskeyRegistrationErrorResponseType = "user.permission_denied"
 )
 
@@ -18166,6 +18198,16 @@ func (s FinishUserPasskeyRegistrationErrorResponse) IsUserInvalid() bool {
 // IsUserNotFound reports whether FinishUserPasskeyRegistrationErrorResponse is UserNotFound.
 func (s FinishUserPasskeyRegistrationErrorResponse) IsUserNotFound() bool {
 	return s.Type == UserNotFoundFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsUserPasswordEmpty reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordEmpty.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsUserPasswordEmpty() bool {
+	return s.Type == UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsUserPasswordTooLong reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordTooLong.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsUserPasswordTooLong() bool {
+	return s.Type == UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse
 }
 
 // IsUserPermissionDenied reports whether FinishUserPasskeyRegistrationErrorResponse is UserPermissionDenied.
@@ -18443,6 +18485,48 @@ func (s FinishUserPasskeyRegistrationErrorResponse) GetUserNotFound() (v UserNot
 func NewUserNotFoundFinishUserPasskeyRegistrationErrorResponse(v UserNotFound) FinishUserPasskeyRegistrationErrorResponse {
 	var s FinishUserPasskeyRegistrationErrorResponse
 	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPasswordEmpty sets FinishUserPasskeyRegistrationErrorResponse to UserPasswordEmpty.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetUserPasswordEmpty(v UserPasswordEmpty) {
+	s.Type = UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse
+	s.UserPasswordEmpty = v
+}
+
+// GetUserPasswordEmpty returns UserPasswordEmpty and true boolean if FinishUserPasskeyRegistrationErrorResponse is UserPasswordEmpty.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpty, ok bool) {
+	if !s.IsUserPasswordEmpty() {
+		return v, false
+	}
+	return s.UserPasswordEmpty, true
+}
+
+// NewUserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from UserPasswordEmpty.
+func NewUserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse(v UserPasswordEmpty) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordTooLong sets FinishUserPasskeyRegistrationErrorResponse to UserPasswordTooLong.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetUserPasswordTooLong(v UserPasswordTooLong) {
+	s.Type = UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse
+	s.UserPasswordTooLong = v
+}
+
+// GetUserPasswordTooLong returns UserPasswordTooLong and true boolean if FinishUserPasskeyRegistrationErrorResponse is UserPasswordTooLong.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetUserPasswordTooLong() (v UserPasswordTooLong, ok bool) {
+	if !s.IsUserPasswordTooLong() {
+		return v, false
+	}
+	return s.UserPasswordTooLong, true
+}
+
+// NewUserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from UserPasswordTooLong.
+func NewUserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse(v UserPasswordTooLong) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetUserPasswordTooLong(v)
 	return s
 }
 
@@ -23606,6 +23690,8 @@ type GetFlowStepErrorResponse struct {
 	TknInvalid              TknInvalid
 	ReqInvalid              ReqInvalid
 	EncKeyUnknownAlg        EncKeyUnknownAlg
+	UserAlreadyExists       UserAlreadyExists
+	UserInvalid             UserInvalid
 }
 
 // GetFlowStepErrorResponseType is oneOf type of GetFlowStepErrorResponse.
@@ -23640,6 +23726,8 @@ const (
 	TknInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "tkn.invalid"
 	ReqInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "enc_key.unknown_alg"
+	UserAlreadyExistsGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "user.already_exists"
+	UserInvalidGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "user.invalid"
 )
 
 // IsAttAlreadyHandedOff reports whether GetFlowStepErrorResponse is AttAlreadyHandedOff.
@@ -23775,6 +23863,16 @@ func (s GetFlowStepErrorResponse) IsReqInvalid() bool {
 // IsEncKeyUnknownAlg reports whether GetFlowStepErrorResponse is EncKeyUnknownAlg.
 func (s GetFlowStepErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgGetFlowStepErrorResponse
+}
+
+// IsUserAlreadyExists reports whether GetFlowStepErrorResponse is UserAlreadyExists.
+func (s GetFlowStepErrorResponse) IsUserAlreadyExists() bool {
+	return s.Type == UserAlreadyExistsGetFlowStepErrorResponse
+}
+
+// IsUserInvalid reports whether GetFlowStepErrorResponse is UserInvalid.
+func (s GetFlowStepErrorResponse) IsUserInvalid() bool {
+	return s.Type == UserInvalidGetFlowStepErrorResponse
 }
 
 // SetAttAlreadyHandedOff sets GetFlowStepErrorResponse to AttAlreadyHandedOff.
@@ -24341,6 +24439,48 @@ func (s GetFlowStepErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg, ok 
 func NewEncKeyUnknownAlgGetFlowStepErrorResponse(v EncKeyUnknownAlg) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
+// SetUserAlreadyExists sets GetFlowStepErrorResponse to UserAlreadyExists.
+func (s *GetFlowStepErrorResponse) SetUserAlreadyExists(v UserAlreadyExists) {
+	s.Type = UserAlreadyExistsGetFlowStepErrorResponse
+	s.UserAlreadyExists = v
+}
+
+// GetUserAlreadyExists returns UserAlreadyExists and true boolean if GetFlowStepErrorResponse is UserAlreadyExists.
+func (s GetFlowStepErrorResponse) GetUserAlreadyExists() (v UserAlreadyExists, ok bool) {
+	if !s.IsUserAlreadyExists() {
+		return v, false
+	}
+	return s.UserAlreadyExists, true
+}
+
+// NewUserAlreadyExistsGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserAlreadyExists.
+func NewUserAlreadyExistsGetFlowStepErrorResponse(v UserAlreadyExists) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUserAlreadyExists(v)
+	return s
+}
+
+// SetUserInvalid sets GetFlowStepErrorResponse to UserInvalid.
+func (s *GetFlowStepErrorResponse) SetUserInvalid(v UserInvalid) {
+	s.Type = UserInvalidGetFlowStepErrorResponse
+	s.UserInvalid = v
+}
+
+// GetUserInvalid returns UserInvalid and true boolean if GetFlowStepErrorResponse is UserInvalid.
+func (s GetFlowStepErrorResponse) GetUserInvalid() (v UserInvalid, ok bool) {
+	if !s.IsUserInvalid() {
+		return v, false
+	}
+	return s.UserInvalid, true
+}
+
+// NewUserInvalidGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserInvalid.
+func NewUserInvalidGetFlowStepErrorResponse(v UserInvalid) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUserInvalid(v)
 	return s
 }
 
@@ -29132,6 +29272,482 @@ func (s *IdpFilterField) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// Merged schema.
+// Ref: #
+type IdpIdentityLinkCreatedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category IdpIdentityLinkCreatedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilIdpIdentityLinkCreatedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptIdpIdentityLinkCreatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                    `json:"delegation_id"`
+	Grantor        OptString                                    `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString                  `json:"flow_id"`
+	Metadata OptEventMetadata              `json:"metadata"`
+	Payload  IdpIdentityLinkCreatedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *IdpIdentityLinkCreatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *IdpIdentityLinkCreatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *IdpIdentityLinkCreatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *IdpIdentityLinkCreatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *IdpIdentityLinkCreatedEvent) GetCategory() IdpIdentityLinkCreatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *IdpIdentityLinkCreatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *IdpIdentityLinkCreatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *IdpIdentityLinkCreatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *IdpIdentityLinkCreatedEvent) GetActorType() OptNilIdpIdentityLinkCreatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *IdpIdentityLinkCreatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *IdpIdentityLinkCreatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *IdpIdentityLinkCreatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *IdpIdentityLinkCreatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *IdpIdentityLinkCreatedEvent) GetDelegationType() OptIdpIdentityLinkCreatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *IdpIdentityLinkCreatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *IdpIdentityLinkCreatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *IdpIdentityLinkCreatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *IdpIdentityLinkCreatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *IdpIdentityLinkCreatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *IdpIdentityLinkCreatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *IdpIdentityLinkCreatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *IdpIdentityLinkCreatedEvent) GetPayload() IdpIdentityLinkCreatedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *IdpIdentityLinkCreatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *IdpIdentityLinkCreatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *IdpIdentityLinkCreatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *IdpIdentityLinkCreatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *IdpIdentityLinkCreatedEvent) SetCategory(val IdpIdentityLinkCreatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *IdpIdentityLinkCreatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *IdpIdentityLinkCreatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *IdpIdentityLinkCreatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *IdpIdentityLinkCreatedEvent) SetActorType(val OptNilIdpIdentityLinkCreatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *IdpIdentityLinkCreatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *IdpIdentityLinkCreatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *IdpIdentityLinkCreatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *IdpIdentityLinkCreatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *IdpIdentityLinkCreatedEvent) SetDelegationType(val OptIdpIdentityLinkCreatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *IdpIdentityLinkCreatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *IdpIdentityLinkCreatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *IdpIdentityLinkCreatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *IdpIdentityLinkCreatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *IdpIdentityLinkCreatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *IdpIdentityLinkCreatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *IdpIdentityLinkCreatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *IdpIdentityLinkCreatedEvent) SetPayload(val IdpIdentityLinkCreatedPayload) {
+	s.Payload = val
+}
+
+type IdpIdentityLinkCreatedEventActorType string
+
+const (
+	IdpIdentityLinkCreatedEventActorTypeHuman   IdpIdentityLinkCreatedEventActorType = "human"
+	IdpIdentityLinkCreatedEventActorTypeService IdpIdentityLinkCreatedEventActorType = "service"
+	IdpIdentityLinkCreatedEventActorTypeSystem  IdpIdentityLinkCreatedEventActorType = "system"
+	IdpIdentityLinkCreatedEventActorTypeAgent   IdpIdentityLinkCreatedEventActorType = "agent"
+)
+
+// AllValues returns all IdpIdentityLinkCreatedEventActorType values.
+func (IdpIdentityLinkCreatedEventActorType) AllValues() []IdpIdentityLinkCreatedEventActorType {
+	return []IdpIdentityLinkCreatedEventActorType{
+		IdpIdentityLinkCreatedEventActorTypeHuman,
+		IdpIdentityLinkCreatedEventActorTypeService,
+		IdpIdentityLinkCreatedEventActorTypeSystem,
+		IdpIdentityLinkCreatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdpIdentityLinkCreatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case IdpIdentityLinkCreatedEventActorTypeHuman:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventActorTypeService:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventActorTypeSystem:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdpIdentityLinkCreatedEventActorType) UnmarshalText(data []byte) error {
+	switch IdpIdentityLinkCreatedEventActorType(data) {
+	case IdpIdentityLinkCreatedEventActorTypeHuman:
+		*s = IdpIdentityLinkCreatedEventActorTypeHuman
+		return nil
+	case IdpIdentityLinkCreatedEventActorTypeService:
+		*s = IdpIdentityLinkCreatedEventActorTypeService
+		return nil
+	case IdpIdentityLinkCreatedEventActorTypeSystem:
+		*s = IdpIdentityLinkCreatedEventActorTypeSystem
+		return nil
+	case IdpIdentityLinkCreatedEventActorTypeAgent:
+		*s = IdpIdentityLinkCreatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type IdpIdentityLinkCreatedEventCategory string
+
+const (
+	IdpIdentityLinkCreatedEventCategoryRequest IdpIdentityLinkCreatedEventCategory = "request"
+	IdpIdentityLinkCreatedEventCategoryAuth    IdpIdentityLinkCreatedEventCategory = "auth"
+	IdpIdentityLinkCreatedEventCategorySession IdpIdentityLinkCreatedEventCategory = "session"
+	IdpIdentityLinkCreatedEventCategoryAdmin   IdpIdentityLinkCreatedEventCategory = "admin"
+	IdpIdentityLinkCreatedEventCategoryEntity  IdpIdentityLinkCreatedEventCategory = "entity"
+	IdpIdentityLinkCreatedEventCategorySignal  IdpIdentityLinkCreatedEventCategory = "signal"
+)
+
+// AllValues returns all IdpIdentityLinkCreatedEventCategory values.
+func (IdpIdentityLinkCreatedEventCategory) AllValues() []IdpIdentityLinkCreatedEventCategory {
+	return []IdpIdentityLinkCreatedEventCategory{
+		IdpIdentityLinkCreatedEventCategoryRequest,
+		IdpIdentityLinkCreatedEventCategoryAuth,
+		IdpIdentityLinkCreatedEventCategorySession,
+		IdpIdentityLinkCreatedEventCategoryAdmin,
+		IdpIdentityLinkCreatedEventCategoryEntity,
+		IdpIdentityLinkCreatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdpIdentityLinkCreatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case IdpIdentityLinkCreatedEventCategoryRequest:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventCategoryAuth:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventCategorySession:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventCategoryAdmin:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventCategoryEntity:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdpIdentityLinkCreatedEventCategory) UnmarshalText(data []byte) error {
+	switch IdpIdentityLinkCreatedEventCategory(data) {
+	case IdpIdentityLinkCreatedEventCategoryRequest:
+		*s = IdpIdentityLinkCreatedEventCategoryRequest
+		return nil
+	case IdpIdentityLinkCreatedEventCategoryAuth:
+		*s = IdpIdentityLinkCreatedEventCategoryAuth
+		return nil
+	case IdpIdentityLinkCreatedEventCategorySession:
+		*s = IdpIdentityLinkCreatedEventCategorySession
+		return nil
+	case IdpIdentityLinkCreatedEventCategoryAdmin:
+		*s = IdpIdentityLinkCreatedEventCategoryAdmin
+		return nil
+	case IdpIdentityLinkCreatedEventCategoryEntity:
+		*s = IdpIdentityLinkCreatedEventCategoryEntity
+		return nil
+	case IdpIdentityLinkCreatedEventCategorySignal:
+		*s = IdpIdentityLinkCreatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type IdpIdentityLinkCreatedEventDelegationType string
+
+const (
+	IdpIdentityLinkCreatedEventDelegationTypeDirect    IdpIdentityLinkCreatedEventDelegationType = "direct"
+	IdpIdentityLinkCreatedEventDelegationTypeDelegated IdpIdentityLinkCreatedEventDelegationType = "delegated"
+	IdpIdentityLinkCreatedEventDelegationTypePatShared IdpIdentityLinkCreatedEventDelegationType = "pat_shared"
+	IdpIdentityLinkCreatedEventDelegationTypeExchanged IdpIdentityLinkCreatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all IdpIdentityLinkCreatedEventDelegationType values.
+func (IdpIdentityLinkCreatedEventDelegationType) AllValues() []IdpIdentityLinkCreatedEventDelegationType {
+	return []IdpIdentityLinkCreatedEventDelegationType{
+		IdpIdentityLinkCreatedEventDelegationTypeDirect,
+		IdpIdentityLinkCreatedEventDelegationTypeDelegated,
+		IdpIdentityLinkCreatedEventDelegationTypePatShared,
+		IdpIdentityLinkCreatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s IdpIdentityLinkCreatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case IdpIdentityLinkCreatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case IdpIdentityLinkCreatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *IdpIdentityLinkCreatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch IdpIdentityLinkCreatedEventDelegationType(data) {
+	case IdpIdentityLinkCreatedEventDelegationTypeDirect:
+		*s = IdpIdentityLinkCreatedEventDelegationTypeDirect
+		return nil
+	case IdpIdentityLinkCreatedEventDelegationTypeDelegated:
+		*s = IdpIdentityLinkCreatedEventDelegationTypeDelegated
+		return nil
+	case IdpIdentityLinkCreatedEventDelegationTypePatShared:
+		*s = IdpIdentityLinkCreatedEventDelegationTypePatShared
+		return nil
+	case IdpIdentityLinkCreatedEventDelegationTypeExchanged:
+		*s = IdpIdentityLinkCreatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Snapshot for `idp.identity_link.created`, written when a sign-in creates a
+// user and links the provider account to it. The link id is the event's
+// `entity_id`. The provider's subject and claims are never included.
+// Ref: #
+type IdpIdentityLinkCreatedPayload struct {
+	// The IdP connection the account signed in through.
+	ConnectionID string `json:"connection_id"`
+	// The user the provider account is linked to.
+	UserID string `json:"user_id"`
+}
+
+// GetConnectionID returns the value of ConnectionID.
+func (s *IdpIdentityLinkCreatedPayload) GetConnectionID() string {
+	return s.ConnectionID
+}
+
+// GetUserID returns the value of UserID.
+func (s *IdpIdentityLinkCreatedPayload) GetUserID() string {
+	return s.UserID
+}
+
+// SetConnectionID sets the value of ConnectionID.
+func (s *IdpIdentityLinkCreatedPayload) SetConnectionID(val string) {
+	s.ConnectionID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *IdpIdentityLinkCreatedPayload) SetUserID(val string) {
+	s.UserID = val
 }
 
 // Merged schema.
@@ -39148,6 +39764,52 @@ func (o OptIdpFieldImmutableDetails) Or(d IdpFieldImmutableDetails) IdpFieldImmu
 	return d
 }
 
+// NewOptIdpIdentityLinkCreatedEventDelegationType returns new OptIdpIdentityLinkCreatedEventDelegationType with value set to v.
+func NewOptIdpIdentityLinkCreatedEventDelegationType(v IdpIdentityLinkCreatedEventDelegationType) OptIdpIdentityLinkCreatedEventDelegationType {
+	return OptIdpIdentityLinkCreatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptIdpIdentityLinkCreatedEventDelegationType is optional IdpIdentityLinkCreatedEventDelegationType.
+type OptIdpIdentityLinkCreatedEventDelegationType struct {
+	Value IdpIdentityLinkCreatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptIdpIdentityLinkCreatedEventDelegationType was set.
+func (o OptIdpIdentityLinkCreatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptIdpIdentityLinkCreatedEventDelegationType) Reset() {
+	var v IdpIdentityLinkCreatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptIdpIdentityLinkCreatedEventDelegationType) SetTo(v IdpIdentityLinkCreatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptIdpIdentityLinkCreatedEventDelegationType) Get() (v IdpIdentityLinkCreatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptIdpIdentityLinkCreatedEventDelegationType) Or(d IdpIdentityLinkCreatedEventDelegationType) IdpIdentityLinkCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptIdpNotFoundDetails returns new OptIdpNotFoundDetails with value set to v.
 func NewOptIdpNotFoundDetails(v IdpNotFoundDetails) OptIdpNotFoundDetails {
 	return OptIdpNotFoundDetails{
@@ -41373,6 +42035,69 @@ func (o OptNilIdpCreatedEventActorType) Get() (v IdpCreatedEventActorType, ok bo
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilIdpCreatedEventActorType) Or(d IdpCreatedEventActorType) IdpCreatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilIdpIdentityLinkCreatedEventActorType returns new OptNilIdpIdentityLinkCreatedEventActorType with value set to v.
+func NewOptNilIdpIdentityLinkCreatedEventActorType(v IdpIdentityLinkCreatedEventActorType) OptNilIdpIdentityLinkCreatedEventActorType {
+	return OptNilIdpIdentityLinkCreatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilIdpIdentityLinkCreatedEventActorType is optional nullable IdpIdentityLinkCreatedEventActorType.
+type OptNilIdpIdentityLinkCreatedEventActorType struct {
+	Value IdpIdentityLinkCreatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilIdpIdentityLinkCreatedEventActorType was set.
+func (o OptNilIdpIdentityLinkCreatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilIdpIdentityLinkCreatedEventActorType) Reset() {
+	var v IdpIdentityLinkCreatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilIdpIdentityLinkCreatedEventActorType) SetTo(v IdpIdentityLinkCreatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilIdpIdentityLinkCreatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilIdpIdentityLinkCreatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v IdpIdentityLinkCreatedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilIdpIdentityLinkCreatedEventActorType) Get() (v IdpIdentityLinkCreatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilIdpIdentityLinkCreatedEventActorType) Or(d IdpIdentityLinkCreatedEventActorType) IdpIdentityLinkCreatedEventActorType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -46800,6 +47525,98 @@ func (o OptUserNotFoundDetails) Get() (v UserNotFoundDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptUserNotFoundDetails) Or(d UserNotFoundDetails) UserNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUserPasswordEmptyDetails returns new OptUserPasswordEmptyDetails with value set to v.
+func NewOptUserPasswordEmptyDetails(v UserPasswordEmptyDetails) OptUserPasswordEmptyDetails {
+	return OptUserPasswordEmptyDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserPasswordEmptyDetails is optional UserPasswordEmptyDetails.
+type OptUserPasswordEmptyDetails struct {
+	Value UserPasswordEmptyDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUserPasswordEmptyDetails was set.
+func (o OptUserPasswordEmptyDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserPasswordEmptyDetails) Reset() {
+	var v UserPasswordEmptyDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserPasswordEmptyDetails) SetTo(v UserPasswordEmptyDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserPasswordEmptyDetails) Get() (v UserPasswordEmptyDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserPasswordEmptyDetails) Or(d UserPasswordEmptyDetails) UserPasswordEmptyDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUserPasswordTooLongDetails returns new OptUserPasswordTooLongDetails with value set to v.
+func NewOptUserPasswordTooLongDetails(v UserPasswordTooLongDetails) OptUserPasswordTooLongDetails {
+	return OptUserPasswordTooLongDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserPasswordTooLongDetails is optional UserPasswordTooLongDetails.
+type OptUserPasswordTooLongDetails struct {
+	Value UserPasswordTooLongDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUserPasswordTooLongDetails was set.
+func (o OptUserPasswordTooLongDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserPasswordTooLongDetails) Reset() {
+	var v UserPasswordTooLongDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserPasswordTooLongDetails) SetTo(v UserPasswordTooLongDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserPasswordTooLongDetails) Get() (v UserPasswordTooLongDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserPasswordTooLongDetails) Or(d UserPasswordTooLongDetails) UserPasswordTooLongDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -58689,6 +59506,8 @@ type SetUserPasswordErrorResponse struct {
 	ReqInvalid           ReqInvalid
 	UserInvalid          UserInvalid
 	UserNotFound         UserNotFound
+	UserPasswordEmpty    UserPasswordEmpty
+	UserPasswordTooLong  UserPasswordTooLong
 	UserPermissionDenied UserPermissionDenied
 }
 
@@ -58703,6 +59522,8 @@ const (
 	ReqInvalidSetUserPasswordErrorResponse           SetUserPasswordErrorResponseType = "req.invalid"
 	UserInvalidSetUserPasswordErrorResponse          SetUserPasswordErrorResponseType = "user.invalid"
 	UserNotFoundSetUserPasswordErrorResponse         SetUserPasswordErrorResponseType = "user.not_found"
+	UserPasswordEmptySetUserPasswordErrorResponse    SetUserPasswordErrorResponseType = "user.password_empty"
+	UserPasswordTooLongSetUserPasswordErrorResponse  SetUserPasswordErrorResponseType = "user.password_too_long"
 	UserPermissionDeniedSetUserPasswordErrorResponse SetUserPasswordErrorResponseType = "user.permission_denied"
 )
 
@@ -58734,6 +59555,16 @@ func (s SetUserPasswordErrorResponse) IsUserInvalid() bool {
 // IsUserNotFound reports whether SetUserPasswordErrorResponse is UserNotFound.
 func (s SetUserPasswordErrorResponse) IsUserNotFound() bool {
 	return s.Type == UserNotFoundSetUserPasswordErrorResponse
+}
+
+// IsUserPasswordEmpty reports whether SetUserPasswordErrorResponse is UserPasswordEmpty.
+func (s SetUserPasswordErrorResponse) IsUserPasswordEmpty() bool {
+	return s.Type == UserPasswordEmptySetUserPasswordErrorResponse
+}
+
+// IsUserPasswordTooLong reports whether SetUserPasswordErrorResponse is UserPasswordTooLong.
+func (s SetUserPasswordErrorResponse) IsUserPasswordTooLong() bool {
+	return s.Type == UserPasswordTooLongSetUserPasswordErrorResponse
 }
 
 // IsUserPermissionDenied reports whether SetUserPasswordErrorResponse is UserPermissionDenied.
@@ -58864,6 +59695,48 @@ func (s SetUserPasswordErrorResponse) GetUserNotFound() (v UserNotFound, ok bool
 func NewUserNotFoundSetUserPasswordErrorResponse(v UserNotFound) SetUserPasswordErrorResponse {
 	var s SetUserPasswordErrorResponse
 	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPasswordEmpty sets SetUserPasswordErrorResponse to UserPasswordEmpty.
+func (s *SetUserPasswordErrorResponse) SetUserPasswordEmpty(v UserPasswordEmpty) {
+	s.Type = UserPasswordEmptySetUserPasswordErrorResponse
+	s.UserPasswordEmpty = v
+}
+
+// GetUserPasswordEmpty returns UserPasswordEmpty and true boolean if SetUserPasswordErrorResponse is UserPasswordEmpty.
+func (s SetUserPasswordErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpty, ok bool) {
+	if !s.IsUserPasswordEmpty() {
+		return v, false
+	}
+	return s.UserPasswordEmpty, true
+}
+
+// NewUserPasswordEmptySetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from UserPasswordEmpty.
+func NewUserPasswordEmptySetUserPasswordErrorResponse(v UserPasswordEmpty) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordTooLong sets SetUserPasswordErrorResponse to UserPasswordTooLong.
+func (s *SetUserPasswordErrorResponse) SetUserPasswordTooLong(v UserPasswordTooLong) {
+	s.Type = UserPasswordTooLongSetUserPasswordErrorResponse
+	s.UserPasswordTooLong = v
+}
+
+// GetUserPasswordTooLong returns UserPasswordTooLong and true boolean if SetUserPasswordErrorResponse is UserPasswordTooLong.
+func (s SetUserPasswordErrorResponse) GetUserPasswordTooLong() (v UserPasswordTooLong, ok bool) {
+	if !s.IsUserPasswordTooLong() {
+		return v, false
+	}
+	return s.UserPasswordTooLong, true
+}
+
+// NewUserPasswordTooLongSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from UserPasswordTooLong.
+func NewUserPasswordTooLongSetUserPasswordErrorResponse(v UserPasswordTooLong) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetUserPasswordTooLong(v)
 	return s
 }
 
@@ -59186,6 +60059,8 @@ type SubmitFlowStepErrorResponse struct {
 	UserAlreadyExists   UserAlreadyExists
 	UserInvalid         UserInvalid
 	UserNotFound        UserNotFound
+	UserPasswordEmpty   UserPasswordEmpty
+	UserPasswordTooLong UserPasswordTooLong
 }
 
 // SubmitFlowStepErrorResponseType is oneOf type of SubmitFlowStepErrorResponse.
@@ -59220,6 +60095,8 @@ const (
 	UserAlreadyExistsSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "user.already_exists"
 	UserInvalidSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "user.invalid"
 	UserNotFoundSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "user.not_found"
+	UserPasswordEmptySubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "user.password_empty"
+	UserPasswordTooLongSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "user.password_too_long"
 )
 
 // IsAttAlreadyHandedOff reports whether SubmitFlowStepErrorResponse is AttAlreadyHandedOff.
@@ -59355,6 +60232,16 @@ func (s SubmitFlowStepErrorResponse) IsUserInvalid() bool {
 // IsUserNotFound reports whether SubmitFlowStepErrorResponse is UserNotFound.
 func (s SubmitFlowStepErrorResponse) IsUserNotFound() bool {
 	return s.Type == UserNotFoundSubmitFlowStepErrorResponse
+}
+
+// IsUserPasswordEmpty reports whether SubmitFlowStepErrorResponse is UserPasswordEmpty.
+func (s SubmitFlowStepErrorResponse) IsUserPasswordEmpty() bool {
+	return s.Type == UserPasswordEmptySubmitFlowStepErrorResponse
+}
+
+// IsUserPasswordTooLong reports whether SubmitFlowStepErrorResponse is UserPasswordTooLong.
+func (s SubmitFlowStepErrorResponse) IsUserPasswordTooLong() bool {
+	return s.Type == UserPasswordTooLongSubmitFlowStepErrorResponse
 }
 
 // SetAttAlreadyHandedOff sets SubmitFlowStepErrorResponse to AttAlreadyHandedOff.
@@ -59921,6 +60808,48 @@ func (s SubmitFlowStepErrorResponse) GetUserNotFound() (v UserNotFound, ok bool)
 func NewUserNotFoundSubmitFlowStepErrorResponse(v UserNotFound) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPasswordEmpty sets SubmitFlowStepErrorResponse to UserPasswordEmpty.
+func (s *SubmitFlowStepErrorResponse) SetUserPasswordEmpty(v UserPasswordEmpty) {
+	s.Type = UserPasswordEmptySubmitFlowStepErrorResponse
+	s.UserPasswordEmpty = v
+}
+
+// GetUserPasswordEmpty returns UserPasswordEmpty and true boolean if SubmitFlowStepErrorResponse is UserPasswordEmpty.
+func (s SubmitFlowStepErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpty, ok bool) {
+	if !s.IsUserPasswordEmpty() {
+		return v, false
+	}
+	return s.UserPasswordEmpty, true
+}
+
+// NewUserPasswordEmptySubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from UserPasswordEmpty.
+func NewUserPasswordEmptySubmitFlowStepErrorResponse(v UserPasswordEmpty) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordTooLong sets SubmitFlowStepErrorResponse to UserPasswordTooLong.
+func (s *SubmitFlowStepErrorResponse) SetUserPasswordTooLong(v UserPasswordTooLong) {
+	s.Type = UserPasswordTooLongSubmitFlowStepErrorResponse
+	s.UserPasswordTooLong = v
+}
+
+// GetUserPasswordTooLong returns UserPasswordTooLong and true boolean if SubmitFlowStepErrorResponse is UserPasswordTooLong.
+func (s SubmitFlowStepErrorResponse) GetUserPasswordTooLong() (v UserPasswordTooLong, ok bool) {
+	if !s.IsUserPasswordTooLong() {
+		return v, false
+	}
+	return s.UserPasswordTooLong, true
+}
+
+// NewUserPasswordTooLongSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from UserPasswordTooLong.
+func NewUserPasswordTooLongSubmitFlowStepErrorResponse(v UserPasswordTooLong) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUserPasswordTooLong(v)
 	return s
 }
 
@@ -64334,6 +65263,112 @@ func (s *UserNotFoundDetails) init() UserNotFoundDetails {
 
 // Merged schema.
 // Ref: #
+type UserPasswordEmpty struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUserPasswordEmptyDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UserPasswordEmpty) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UserPasswordEmpty) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UserPasswordEmpty) GetDetails() OptUserPasswordEmptyDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UserPasswordEmpty) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UserPasswordEmpty) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UserPasswordEmpty) SetDetails(val OptUserPasswordEmptyDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UserPasswordEmptyDetails map[string]jx.Raw
+
+func (s *UserPasswordEmptyDetails) init() UserPasswordEmptyDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type UserPasswordTooLong struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUserPasswordTooLongDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UserPasswordTooLong) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UserPasswordTooLong) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UserPasswordTooLong) GetDetails() OptUserPasswordTooLongDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UserPasswordTooLong) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UserPasswordTooLong) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UserPasswordTooLong) SetDetails(val OptUserPasswordTooLongDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UserPasswordTooLongDetails map[string]jx.Raw
+
+func (s *UserPasswordTooLongDetails) init() UserPasswordTooLongDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type UserPermissionDenied struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -66000,6 +67035,8 @@ type VerifyChallengeProofErrorResponse struct {
 	UserAlreadyExists   UserAlreadyExists
 	UserInvalid         UserInvalid
 	UserNotFound        UserNotFound
+	UserPasswordEmpty   UserPasswordEmpty
+	UserPasswordTooLong UserPasswordTooLong
 }
 
 // VerifyChallengeProofErrorResponseType is oneOf type of VerifyChallengeProofErrorResponse.
@@ -66021,6 +67058,8 @@ const (
 	UserAlreadyExistsVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "user.already_exists"
 	UserInvalidVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "user.invalid"
 	UserNotFoundVerifyChallengeProofErrorResponse        VerifyChallengeProofErrorResponseType = "user.not_found"
+	UserPasswordEmptyVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "user.password_empty"
+	UserPasswordTooLongVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "user.password_too_long"
 )
 
 // IsAttAlreadyHandedOff reports whether VerifyChallengeProofErrorResponse is AttAlreadyHandedOff.
@@ -66091,6 +67130,16 @@ func (s VerifyChallengeProofErrorResponse) IsUserInvalid() bool {
 // IsUserNotFound reports whether VerifyChallengeProofErrorResponse is UserNotFound.
 func (s VerifyChallengeProofErrorResponse) IsUserNotFound() bool {
 	return s.Type == UserNotFoundVerifyChallengeProofErrorResponse
+}
+
+// IsUserPasswordEmpty reports whether VerifyChallengeProofErrorResponse is UserPasswordEmpty.
+func (s VerifyChallengeProofErrorResponse) IsUserPasswordEmpty() bool {
+	return s.Type == UserPasswordEmptyVerifyChallengeProofErrorResponse
+}
+
+// IsUserPasswordTooLong reports whether VerifyChallengeProofErrorResponse is UserPasswordTooLong.
+func (s VerifyChallengeProofErrorResponse) IsUserPasswordTooLong() bool {
+	return s.Type == UserPasswordTooLongVerifyChallengeProofErrorResponse
 }
 
 // SetAttAlreadyHandedOff sets VerifyChallengeProofErrorResponse to AttAlreadyHandedOff.
@@ -66384,6 +67433,48 @@ func (s VerifyChallengeProofErrorResponse) GetUserNotFound() (v UserNotFound, ok
 func NewUserNotFoundVerifyChallengeProofErrorResponse(v UserNotFound) VerifyChallengeProofErrorResponse {
 	var s VerifyChallengeProofErrorResponse
 	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPasswordEmpty sets VerifyChallengeProofErrorResponse to UserPasswordEmpty.
+func (s *VerifyChallengeProofErrorResponse) SetUserPasswordEmpty(v UserPasswordEmpty) {
+	s.Type = UserPasswordEmptyVerifyChallengeProofErrorResponse
+	s.UserPasswordEmpty = v
+}
+
+// GetUserPasswordEmpty returns UserPasswordEmpty and true boolean if VerifyChallengeProofErrorResponse is UserPasswordEmpty.
+func (s VerifyChallengeProofErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpty, ok bool) {
+	if !s.IsUserPasswordEmpty() {
+		return v, false
+	}
+	return s.UserPasswordEmpty, true
+}
+
+// NewUserPasswordEmptyVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from UserPasswordEmpty.
+func NewUserPasswordEmptyVerifyChallengeProofErrorResponse(v UserPasswordEmpty) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordTooLong sets VerifyChallengeProofErrorResponse to UserPasswordTooLong.
+func (s *VerifyChallengeProofErrorResponse) SetUserPasswordTooLong(v UserPasswordTooLong) {
+	s.Type = UserPasswordTooLongVerifyChallengeProofErrorResponse
+	s.UserPasswordTooLong = v
+}
+
+// GetUserPasswordTooLong returns UserPasswordTooLong and true boolean if VerifyChallengeProofErrorResponse is UserPasswordTooLong.
+func (s VerifyChallengeProofErrorResponse) GetUserPasswordTooLong() (v UserPasswordTooLong, ok bool) {
+	if !s.IsUserPasswordTooLong() {
+		return v, false
+	}
+	return s.UserPasswordTooLong, true
+}
+
+// NewUserPasswordTooLongVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from UserPasswordTooLong.
+func NewUserPasswordTooLongVerifyChallengeProofErrorResponse(v UserPasswordTooLong) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetUserPasswordTooLong(v)
 	return s
 }
 
