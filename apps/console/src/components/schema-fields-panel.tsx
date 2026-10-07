@@ -162,7 +162,7 @@ function Breadcrumb({
       {visible.map((segment, index) => {
         const current = segment.depth === last;
         return (
-          <Fragment key={`${segment.label}-${index}`}>
+          <Fragment key={segment.depth}>
             {index > 0 && (
               <span aria-hidden className="text-[13px] text-muted-foreground">
                 ›

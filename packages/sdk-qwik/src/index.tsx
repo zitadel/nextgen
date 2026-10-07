@@ -135,6 +135,7 @@ export type ZitadelLoginProps = ZitadelLoginConfig &
  */
 export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
   const host = useSignal<ZitadelLoginElement>();
+  // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
   useVisibleTask$(
     ({ track, cleanup }) => {
       const el = track(() => host.value);
@@ -203,6 +204,7 @@ export type ZitadelLogoutProps = ZitadelLogoutConfig &
  */
 export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   const host = useSignal<ZitadelLogoutElement>();
+  // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
   useVisibleTask$(
     ({ track, cleanup }) => {
       const el = track(() => host.value);
@@ -258,6 +260,7 @@ export type ZitadelSessionProps = ZitadelSessionConfig &
  */
 export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
   const host = useSignal<ZitadelSessionElement>();
+  // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
   useVisibleTask$(
     ({ track, cleanup }) => {
       const el = track(() => host.value);

@@ -134,7 +134,7 @@ for (const stage of cfg.stages) {
     for (let round = 0; round < MAX_QA; round += 1) {
       const answer = simReply(stage.user, lastText);
       if (!answer || answer === DONE || answer.endsWith(DONE)) break;
-      appendFileSync(stageFile, JSON.stringify({ type: "sim_user", text: answer }) + "\n");
+      appendFileSync(stageFile, `${JSON.stringify({ type: "sim_user", text: answer })}\n`);
       ({ sessionId, lastText, isError } = agentTurn(stageFile, answer, sessionId));
       if (isError) break;
     }

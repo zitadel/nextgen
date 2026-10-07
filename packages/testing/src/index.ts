@@ -47,7 +47,7 @@ export async function startLocalZitadel(
   options: StartLocalZitadelOptions = {},
 ): Promise<LocalZitadel> {
   const server = await bootLocalServer(options);
-  let bootstrapped;
+  let bootstrapped: Awaited<ReturnType<typeof bootstrapProject>>;
   try {
     bootstrapped = await bootstrapProject({
       baseUrl: server.baseUrl,

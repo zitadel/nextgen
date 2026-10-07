@@ -147,7 +147,7 @@ async function isWsl(deps: BrowserDeps): Promise<boolean> {
     return true;
   }
   const version = await deps.readProcVersion();
-  return version !== undefined && version.toLowerCase().includes("microsoft");
+  return version?.toLowerCase().includes("microsoft") ?? false;
 }
 
 /**

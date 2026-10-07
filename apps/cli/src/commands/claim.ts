@@ -138,7 +138,7 @@ export default class Claim extends BaseCommand {
       token: secret.project_secret,
     });
 
-    let challenge;
+    let challenge: Awaited<ReturnType<typeof client.initClaim>>;
     try {
       challenge = await client.initClaim(secret.project_id);
     } catch (error) {

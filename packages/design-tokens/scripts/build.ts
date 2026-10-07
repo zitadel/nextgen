@@ -31,11 +31,6 @@ import { overrides } from "../src/overrides.ts";
 
 type Hex = string;
 type Px = number;
-type PrimitiveRef = { primitive: string };
-type SemanticValue = Hex | PrimitiveRef;
-/** A semantic colour that resolves differently per theme mode. */
-type ModeValue = { dark: SemanticValue; light?: SemanticValue };
-type ColorToken = SemanticValue | ModeValue;
 
 /**
  * The new themed surface produced by `scripts/sync-from-export.ts` from the

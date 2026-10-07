@@ -186,7 +186,10 @@ async function ensureDir(
   const pre = await stat(path).catch(() => undefined);
   const existed = pre?.isDirectory() ?? false;
   const healsMode =
-    existed && mode !== undefined && process.platform !== "win32" && (pre!.mode & 0o777) !== mode;
+    existed &&
+    mode !== undefined &&
+    process.platform !== "win32" &&
+    ((pre?.mode ?? 0) & 0o777) !== mode;
   if (dryRun) {
     if (!existed) {
       record(result, path, "dir", "create");

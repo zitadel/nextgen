@@ -81,9 +81,11 @@ export function DocumentViewer({ document, noun }: { document: unknown; noun: st
         <code>
           {lines
             ? lines.map((line, index) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: static syntax-highlighted lines, never reordered
                 <Fragment key={index}>
                   {index > 0 && "\n"}
                   {line.map((token, position) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: static highlight tokens within a line, never reordered
                     <span key={position} style={{ color: token.color }}>
                       {token.content}
                     </span>

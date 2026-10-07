@@ -79,9 +79,9 @@ describe("bodyFieldFlags", () => {
       string,
       { helpGroup?: string; description?: string; options?: string[]; multiple?: boolean }
     >;
-    expect(flags["relation"]?.helpGroup).toBe("REQUIRED FIELD");
-    expect(flags["relation"]?.options).toEqual(["viewer", "editor", "admin"]);
-    expect(flags["relation"]?.description).toMatch(/^\(required\) /);
+    expect(flags.relation?.helpGroup).toBe("REQUIRED FIELD");
+    expect(flags.relation?.options).toEqual(["viewer", "editor", "admin"]);
+    expect(flags.relation?.description).toMatch(/^\(required\) /);
     expect(flags["expires-at"]?.helpGroup).toBe("OPTIONAL FIELD");
     expect(flags["expires-at"]?.description).not.toMatch(/^\(required\)/);
   });

@@ -279,14 +279,13 @@ const queryParams = (parsed: readonly ParsedFilter[]): Json =>
     const key = field.params?.[operation] ?? field.field;
     const existing = params[key];
     if (field.combine !== "or") {
-      return { ...params, [key]: value };
+      params[key] = value;
+      return params;
     }
-    return {
-      ...params,
-      [key]: Array.isArray(existing)
-        ? [...existing, value]
-        : existing === undefined
-          ? [value]
-          : [existing, value],
-    };
+    params[key] = Array.isArray(existing)
+      ? [...existing, value]
+      : existing === undefined
+        ? [value]
+        : [existing, value];
+    return params;
   }, {});

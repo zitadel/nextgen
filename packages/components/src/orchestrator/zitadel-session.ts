@@ -171,7 +171,7 @@ export class ZitadelSession extends ZitadelSurface {
    */
   private maybeLoadIdentity(): void {
     if (this.identityRequested) return;
-    let api;
+    let api: ReturnType<typeof resolveApi>["api"];
     try {
       ({ api } = resolveApi(this.project, this.projectAttrs, "<zitadel-session>"));
     } catch {

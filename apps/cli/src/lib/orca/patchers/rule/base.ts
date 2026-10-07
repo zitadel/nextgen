@@ -106,7 +106,7 @@ export abstract class AbstractRulePatcher implements Patcher {
         continue;
       }
       const candidates = typeof op.path === "string" ? [op.path] : op.path;
-      let path = candidates[0]!;
+      let path = candidates[0] ?? "";
       let source: string | undefined;
       for (const candidate of candidates) {
         const contents = await readTextIfExists(join(opts.cwd, candidate));

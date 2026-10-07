@@ -75,8 +75,8 @@ function makeWebRequest(
   method = "GET",
 ): Request {
   const headers: Record<string, string> = {};
-  if (cookie) headers["cookie"] = cookie;
-  if (authorization) headers["authorization"] = authorization;
+  if (cookie) headers.cookie = cookie;
+  if (authorization) headers.authorization = authorization;
   return new Request(url, { headers, method });
 }
 

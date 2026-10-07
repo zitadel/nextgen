@@ -181,7 +181,7 @@ export function checkPaletteContrast(
   // `currentColor` on a palette key means the text colour it would inherit.
   // Everything the pairs below draw sits on the card, so that is the side's
   // own `text` — which is why this is answerable here and not in general CSS.
-  const context = { currentColor: palette["text"] };
+  const context = { currentColor: palette.text };
   const findings: ContrastFinding[] = [];
   for (const pair of BRANDING_CONTRAST_PAIRS) {
     const foreground = palette[pair.foreground];

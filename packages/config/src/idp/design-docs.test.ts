@@ -482,7 +482,7 @@ describe("x-auth-methods snippets (2-auth-method-selection.md · Decision)", () 
   });
 
   it("the sso slot is the sso-auth-method schema", () => {
-    expect(shippedAuthMethods.properties["sso"]).toEqual({ $ref: "sso-auth-method.json" });
+    expect(shippedAuthMethods.properties.sso).toEqual({ $ref: "sso-auth-method.json" });
   });
 
   it("both validate against the shipped composite", () => {
@@ -548,21 +548,21 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
       for (const outcome of ["sso_authenticated", "sso_user_not_found", "user_already_exists"]) {
         expect(step.transitions?.[outcome], `${step.name} routes ${outcome}`).toBeDefined();
       }
-      expect(step.transitions!["sso_user_not_found"]!.target).toBe("register-sso");
+      expect(step.transitions!.sso_user_not_found!.target).toBe("register-sso");
     }
     // user_not_found stays the typed-email outcome with the shipped target.
-    expect(ssoSteps[0]!.transitions!["user_not_found"]).toEqual({ target: "register" });
-    expect(ssoSteps[1]!.transitions!["user_not_found"]).toBeUndefined();
+    expect(ssoSteps[0]!.transitions!.user_not_found).toEqual({ target: "register" });
+    expect(ssoSteps[1]!.transitions!.user_not_found).toBeUndefined();
   });
 
   it("both firing points reach sso-conflict, whose sign-in re-purposes to login's entry; no pivot anywhere", () => {
     const byName = new Map(flow.steps.map((s) => [s.name, s]));
     for (const name of ["identifier", "register", "register-password", "register-sso"]) {
-      expect(byName.get(name)!.transitions!["user_already_exists"]!.target).toBe("sso-conflict");
+      expect(byName.get(name)!.transitions!.user_already_exists!.target).toBe("sso-conflict");
     }
     expect(byName.get("register-sso")!.on_success).toBe("create_user_with_sso");
-    expect(byName.get("sso-conflict")!.transitions!["sign_in"]).toEqual({
-      target: flow.purposes["login"],
+    expect(byName.get("sso-conflict")!.transitions!.sign_in).toEqual({
+      target: flow.purposes.login,
       purpose: "login",
     });
     // One-step recovery for every account type: password field, passkey
@@ -573,7 +573,7 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
       "passkey",
       "navigate",
     ]);
-    expect(byName.get("sso-conflict")!.transitions!["user_already_exists"]!.target).toBe(
+    expect(byName.get("sso-conflict")!.transitions!.user_already_exists!.target).toBe(
       "sso-conflict",
     );
     for (const step of flow.steps) {
@@ -605,7 +605,7 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
       }
     }
     for (const name of ["register", "register-password"]) {
-      byName.get(name)!.transitions!["user_already_exists"] = { target: "password" };
+      byName.get(name)!.transitions!.user_already_exists = { target: "password" };
     }
     const shipped = JSON.parse(
       readFileSync(join(repoRoot, "packages/config/defaults/default-login.json"), "utf8"),
@@ -629,17 +629,17 @@ describe("forward compatibility (1-resource-model.md · Forward compatibility)",
     for (const block of ["oidc", "oauth2"]) {
       const b = extended.properties[block]!;
       b.required = b.required.filter((r) => r !== "client_secret");
-      b.properties["secret_strategy"] = {
+      b.properties.secret_strategy = {
         type: "string",
         enum: ["static", "apple_jwt"],
         default: "static",
       };
-      b.properties["response_mode"] = {
+      b.properties.response_mode = {
         type: "string",
         enum: ["query", "form_post"],
         default: "query",
       };
-      b.properties["secret_params"] = {
+      b.properties.secret_params = {
         type: "object",
         additionalProperties: false,
         properties: {
@@ -655,6 +655,7 @@ describe("forward compatibility (1-resource-model.md · Forward compatibility)",
             properties: { secret_strategy: { const: "apple_jwt" } },
             required: ["secret_strategy"],
           },
+          // biome-ignore lint/suspicious/noThenProperty: JSON Schema if/then/else keyword, not a thenable
           then: {
             required: ["secret_params"],
             properties: { secret_params: { required: ["team_id", "key_id", "private_key_env"] } },
@@ -663,9 +664,9 @@ describe("forward compatibility (1-resource-model.md · Forward compatibility)",
         },
       ];
     }
-    const provisioning = extended.properties["provisioning"]!;
-    provisioning.properties["is_auto_update"] = { type: "boolean", default: false };
-    (provisioning.properties["creation"] as { enum: string[] }).enum.push("auto_only");
+    const provisioning = extended.properties.provisioning!;
+    provisioning.properties.is_auto_update = { type: "boolean", default: false };
+    (provisioning.properties.creation as { enum: string[] }).enum.push("auto_only");
     const validateExtended = ajv().compile(extended);
     expect(validateExtended(googleExample)).toBe(true);
     expect(validateExtended(githubExample)).toBe(true);

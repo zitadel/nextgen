@@ -64,7 +64,11 @@ function installFlowFetchStub(response: CreateFlow201): { restore: () => void } 
         headers: { "content-type": "application/json" },
       }),
   ) as unknown as typeof fetch;
-  return { restore: () => void (globalThis.fetch = original) };
+  return {
+    restore: () => {
+      globalThis.fetch = original;
+    },
+  };
 }
 
 async function waitFor<T>(probe: () => T | null | undefined, timeout = 3000): Promise<T> {

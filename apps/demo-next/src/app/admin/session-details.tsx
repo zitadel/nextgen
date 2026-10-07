@@ -70,8 +70,11 @@ export function SessionDetails() {
             Verified factors
           </h3>
           <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "14px" }}>
-            {session.factors.map((f: GetMySession200FactorsItem, i: number) => (
-              <li key={i} style={{ padding: "4px 0", color: "#374151" }}>
+            {session.factors.map((f: GetMySession200FactorsItem) => (
+              <li
+                key={`${f.method}-${f.verified_at}`}
+                style={{ padding: "4px 0", color: "#374151" }}
+              >
                 <strong>{f.method}</strong>{" "}
                 <span style={{ color: "#9ca3af" }}>
                   — {new Date(f.verified_at).toLocaleString()}
