@@ -92,7 +92,7 @@ export function startsPackageManager(body) {
   if (substitutions(body).some(startsPackageManager)) return true;
   return simpleCommands(body).some((words) => {
     const [command = "", ...args] = commandWords(words);
-    const executable = command.split("/").pop();
+    const executable = executableName(command);
     if (SHELLS.has(executable)) {
       // `-c`, alone or grouped (`-lc`, `-ec`): the next argument is the script.
       const flag = args.findIndex((arg) => /^-[A-Za-z]*c[A-Za-z]*$/.test(arg));
@@ -121,6 +121,18 @@ function nodeRunsScript(args) {
 }
 
 const SHELLS = new Set(["sh", "bash", "zsh", "dash"]);
+
+/**
+ * A command word's program name: its basename (either path separator),
+ * lowercased, without a Windows launcher extension (`pnpm.cmd`, `node.exe`).
+ */
+export function executableName(word) {
+  return word
+    .split(/[\\/]/)
+    .pop()
+    .toLowerCase()
+    .replace(/\.(?:cmd|exe|bat|ps1)$/, "");
+}
 
 /**
  * The bodies of the command substitutions (`$(…)`, backticks) a shell would
@@ -176,7 +188,7 @@ export function unsupportedSyntax(body) {
   if (substitutions(body).length > 0) return "command substitution";
   for (const words of simpleCommands(body)) {
     const [command = "", ...args] = commandWords(words);
-    const executable = command.split("/").pop();
+    const executable = executableName(command);
     if (EVALUATORS.has(executable)) return `\`${executable}\``;
     if (COMMAND_RUNNERS.has(executable)) return `the command wrapper \`${executable}\``;
     if (command.includes("$")) return "a variable in the command position";
@@ -212,7 +224,8 @@ function simpleCommands(text) {
       let j = i + 1;
       let quoted = "";
       while (j < text.length && text[j] !== '"') {
-        if (text[j] === "\\" && j + 1 < text.length) {
+        // Inside double quotes a backslash only escapes $ ` " \ and newline.
+        if (text[j] === "\\" && j + 1 < text.length && '$`"\\\n'.includes(text[j + 1])) {
           quoted += text[j + 1];
           j += 2;
         } else {
@@ -273,7 +286,7 @@ function commandWords(input) {
       i += wrapper === "exec" && words[i] === "-a" ? 2 : 1;
     }
   }
-  if (words[i]?.split("/").pop() !== "env") return words.slice(i);
+  if (executableName(words[i] ?? "") !== "env") return words.slice(i);
   i += 1;
   while (i < words.length) {
     const word = words[i];

@@ -110,6 +110,10 @@ describe("package-script contract", () => {
     "time -p pnpm test",
     "command -p pnpm test",
     "exec -a name -- pnpm run build",
+    "pnpm.cmd run build",
+    "npm.cmd run build",
+    "node.exe --run build",
+    '"C:\\tools\\PNPM.EXE" install',
   ])("detects a package manager in %s", (body) => {
     expect(startsPackageManager(body)).toBe(true);
   });
@@ -186,6 +190,7 @@ describe("package-script contract", () => {
     "command -- tsc --noEmit",
     "time -p vitest run",
     "command -p tsc --noEmit",
+    "node.exe scripts/doctor.mjs",
   ])("allows plain commands like %s", (body) => {
     expect(unsupportedSyntax(body)).toBeNull();
   });
