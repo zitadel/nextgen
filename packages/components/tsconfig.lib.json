@@ -7,8 +7,14 @@
     "emitDeclarationOnly": false,
     "module": "esnext",
     "moduleResolution": "bundler",
-    "lib": ["ES2022", "dom", "DOM.Iterable"],
-    "types": ["node"],
+    "lib": [
+      "ES2022",
+      "dom",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "node"
+    ],
     "experimentalDecorators": true,
     "plugins": [
       {
@@ -16,9 +22,16 @@
       }
     ],
     "composite": false,
-    "declarationMap": false,
-    "declaration": false
+    "declaration": false,
+    "declarationMap": false
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/css-inline.d.ts"],
-  "exclude": ["src/**/*.spec.ts", "src/jsx.d.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.d.ts",
+    "src/css-inline.d.ts"
+  ],
+  "exclude": [
+    "src/**/*.spec.ts",
+    "src/jsx.d.ts"
+  ]
 }
