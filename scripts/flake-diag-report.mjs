@@ -55,6 +55,18 @@ for (const file of files) {
     }
   }
 
+  const networkChangedCode = netlog.constants?.netError?.ERR_NETWORK_CHANGED;
+  let networkChanges = 0;
+  let killedByNetworkChange = 0;
+  for (const event of netlog.events ?? []) {
+    const type = eventTypes[event.type] ?? "";
+    if (type.startsWith("NETWORK_") && type.endsWith("CHANGED")) networkChanges += 1;
+    if (event.params?.net_error === networkChangedCode) killedByNetworkChange += 1;
+  }
+  console.log(
+    `[flake-diag-report] ${file}: network-change events=${networkChanges} requests killed by ERR_NETWORK_CHANGED=${killedByNetworkChange}`,
+  );
+
   let abnormal = 0;
   for (const [id, url] of urls) {
     if (!/\/\/(localhost|127\.0\.0\.1)[:/]/.test(url)) continue;

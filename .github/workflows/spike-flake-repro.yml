@@ -1,0 +1,96 @@
+# SPIKE (#1490) — not for merge.
+#
+# Controlled experiment for the browser-mode flake. Chromium aborts every
+# in-flight request (ERR_NETWORK_CHANGED) when the host's IP addresses change,
+# and every Docker container start/stop adds or removes a host veth interface.
+# Run the components browser suite twice under the same deliberate container
+# churn (a throwaway container started and removed every second): once with the
+# kernel defaults (control), then with IPv6 disabled on newly created
+# interfaces, so Docker's veths never get a link-local address (fix). The
+# report prints, per suite, how many network-change events Chromium saw and how
+# many requests it killed for them.
+name: spike-flake-repro
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/spike-flake-repro.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  network-change:
+    runs-on: depot-ubuntu-24.04-16
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Install Playwright Chromium
+        run: corepack pnpm --filter @zitadel/components exec playwright install chromium
+
+      - name: Build what the components browser suite needs
+        run: moon run components:build api:build api-mock:build config:build design-tokens:build
+
+      - name: Pre-pull the churn image
+        run: docker pull public.ecr.aws/docker/library/busybox:latest
+
+      - name: "A (control): browser suite under container churn, kernel defaults"
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          echo "net.ipv6.conf.default.disable_ipv6 = $(sysctl -n net.ipv6.conf.default.disable_ipv6)"
+          ( while true; do docker run --rm public.ecr.aws/docker/library/busybox:latest true >/dev/null 2>&1; sleep 1; done ) &
+          churn=$!
+          rm -rf flake-diag
+          ( cd packages/components && corepack pnpm exec vitest run --project browser )
+          rc=$?
+          kill "$churn"
+          node scripts/flake-diag-report.mjs flake-diag | grep -E "network-change|abnormal"
+          mkdir -p flake-repro/control && mv flake-diag/* flake-repro/control/
+          echo "control exit code: $rc"
+          exit "$rc"
+
+      - name: "B (fix): same churn, IPv6 disabled on new interfaces"
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+          echo "net.ipv6.conf.default.disable_ipv6 = $(sysctl -n net.ipv6.conf.default.disable_ipv6)"
+          ( while true; do docker run --rm public.ecr.aws/docker/library/busybox:latest true >/dev/null 2>&1; sleep 1; done ) &
+          churn=$!
+          rm -rf flake-diag
+          ( cd packages/components && corepack pnpm exec vitest run --project browser )
+          rc=$?
+          kill "$churn"
+          node scripts/flake-diag-report.mjs flake-diag | grep -E "network-change|abnormal"
+          mkdir -p flake-repro/fix && mv flake-diag/* flake-repro/fix/
+          echo "fix exit code: $rc"
+          exit "$rc"
+
+      - name: Upload NetLogs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: flake-repro
+          path: flake-repro
+          if-no-files-found: ignore
+          retention-days: 7
