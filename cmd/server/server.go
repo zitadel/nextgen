@@ -729,10 +729,10 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 		mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
 	}
 
-	chain := func(h http.Handler) http.Handler {
+	chain := func(h http.Handler, redactQuery ...string) http.Handler {
 		return middleware.Chain(h,
 			func(next http.Handler) http.Handler { return middleware.WithRequestContextMiddleware(reqIdGen, next) },
-			middleware.WithLogging,
+			func(next http.Handler) http.Handler { return middleware.WithLogging(next, redactQuery...) },
 			api.WithRequestHostMiddleware,
 			middleware.WithUserAgentMiddleware,
 			api.WithSessionStateNoStore,
@@ -740,12 +740,15 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 		)
 	}
 	// Exact paths, so they win over the API catch-all. The same chain: the
-	// callback reads its cookie by the request scheme (WithRequestHostMiddleware)
-	// and its log line is where the code/state redaction applies. Both spellings
-	// serve one handler: the prefixed path arrives when the instance is the
-	// browser origin, the stripped one through a scaffolded app's SDK proxy.
-	mux.Handle(api.IDPCallbackPath, chain(idpCallbackHandler))
-	mux.Handle(api.IDPCallbackUpstreamPath, chain(idpCallbackHandler))
+	// callback reads its cookie by the request scheme (WithRequestHostMiddleware).
+	// Its code is a credential and its state is single-use, so the request log
+	// hides both: a log line must not be able to replay a sign-in. Both
+	// spellings serve one handler: the prefixed path arrives when the instance
+	// is the browser origin, the stripped one through a scaffolded app's SDK
+	// proxy.
+	callback := chain(idpCallbackHandler, "code", "state")
+	mux.Handle(api.IDPCallbackPath, callback)
+	mux.Handle(api.IDPCallbackUpstreamPath, callback)
 	mux.Handle("/", chain(apiHandler))
 	return mux, nil
 }

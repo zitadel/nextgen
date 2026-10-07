@@ -42,21 +42,21 @@ func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
 	defer h.testServer.mutex.Unlock()
 
 	if h.testServer.value == nil {
-		callback := api.NewIDPCallbackHandler(service.NewFlowSSOCallback(
+		callback := h.withServerLog(api.NewIDPCallbackHandler(service.NewFlowSSOCallback(
 			h.EnsureIDPConnectionService(t),
 			h.EnsureAuthAttemptService(t),
 			h.EnsureKeyService(t),
 			h.EnsureVariableService(t),
 			h.EnsureHttpClient(t),
-		))
+		)), "code", "state")
 		// The same paths as the production mux (buildHTTPMux), not its
 		// middleware chain: the callback on both its spellings, ahead of the
 		// API catch-all.
 		mux := http.NewServeMux()
 		mux.Handle(api.IDPCallbackPath, callback)
 		mux.Handle(api.IDPCallbackUpstreamPath, callback)
-		mux.Handle("/", api.WithSessionStateNoStore(h.EnsureGeneratedServer(t)))
-		h.testServer.value = httptest.NewServer(h.withServerLog(mux))
+		mux.Handle("/", h.withServerLog(api.WithSessionStateNoStore(h.EnsureGeneratedServer(t))))
+		h.testServer.value = httptest.NewServer(mux)
 	}
 	return h.testServer.value
 }
@@ -64,9 +64,10 @@ func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
 // withServerLog hands every request a logger collecting into the harness, the
 // way the production middleware hands one writing to the process log, and runs
 // the production request logging on top so the buffer holds real log lines.
-func (h *Harness) withServerLog(next http.Handler) http.Handler {
+// redactQuery is the mount's opt-in, as in production.
+func (h *Harness) withServerLog(next http.Handler, redactQuery ...string) http.Handler {
 	logger := slog.New(slog.NewTextHandler(&h.serverLog, nil))
-	logging := middleware.WithLogging(next)
+	logging := middleware.WithLogging(next, redactQuery...)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logging.ServeHTTP(w, r.WithContext(zlog.WithLoggingContext(r.Context(), logger)))
 	})
