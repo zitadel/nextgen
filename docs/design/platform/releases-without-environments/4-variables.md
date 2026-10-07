@@ -5,9 +5,9 @@
 > here is implemented.
 
 A variable belongs to a project or to one environment of it. Removing
-environments removes one of those two owners. The CLI calls them `vars`, because
-they are variables and secrets rather than process environment variables, and
-`env` names the
+environments removes one of those two owners. The CLI noun is `variable`,
+because they are variables and secrets rather than process environment
+variables, and `env` names the
 [client-side environment](7-cli-environments.md#environments-pointing-one-repository-at-several-projects).
 
 ## The environment scope today
@@ -77,11 +77,11 @@ answer is a third `applies_to` value, not a flag on the deploy.
 ## Setting one
 
 ```
-$ zitadel vars set GOOGLE_CLIENT_SECRET --secret
+$ zitadel variable set GOOGLE_CLIENT_SECRET --secret
 value: ********
 stored, encrypted. not live until the next deploy.
 
-$ zitadel vars list
+$ zitadel variable list
 NAME                  TYPE    ALL DEPLOYS                 PREVIEWS
 GOOGLE_CLIENT_ID      value   prod-abc.apps.googleu…      preview-xyz.apps.goog…
 GOOGLE_CLIENT_SECRET  secret  set 10-02                   set 09-14
@@ -94,7 +94,7 @@ get the same value".
 ## How a preview gets different values
 
 The value is set once, against the project, and the pipeline is told nothing —
-`zitadel vars set GOOGLE_CLIENT_SECRET --secret --preview`, then
+`zitadel variable set GOOGLE_CLIENT_SECRET --secret --preview`, then
 `zitadel preview --ttl 7d` in the job.
 
 **The deploy request carries no variable names and no values**: a release and
@@ -118,9 +118,9 @@ origins     https://acme-git-sso-acmeinc.vercel.app
 release     sha256:9f2c1a7b  (exists, reusing)
 
 warning  GOOGLE_CLIENT_SECRET has no preview value — serving the production one
-         set one: zitadel vars set GOOGLE_CLIENT_SECRET --secret --preview
+         set one: zitadel variable set GOOGLE_CLIENT_SECRET --secret --preview
 
-deployed    dpl_01KB3F8N2P9S5WQZ   2 deployment records written
+deployed    dep_01KB3F8N2P9S5WQZ   2 targets
 ```
 
 Secrets only. A non-secret taking the `all` value is ordinary and usually
@@ -139,7 +139,7 @@ With no environment there is no scope holding "the current values", and the
 deployment history is
 [append-only](1-data-model.md#why-there-is-no-pointer-column). So each
 deployment freezes what it resolved, in one new table written in the same
-transaction as the deployment row and never updated:
+transaction as the deployment and never updated:
 
 ```jsonc
 // NEW TABLE - keyed (project_id, deployment_id, name). Same columns as the
@@ -157,7 +157,7 @@ Freezing is not an extra. Without it **rollback would lie**: it restores the
 release and not the values, so rolling back to a release that needed last
 month's client secret would hand it this month's. Two more properties follow
 from the table being separate and write-once — editing the store reaches no
-deployment, so `zitadel vars set` during a sign-in changes nothing that sign-in
+deployment, so `zitadel variable set` during a sign-in changes nothing that sign-in
 can see, and a flow that
 [seals the deployment id](3-release-resolution.md#the-three-layers) pins the
 resources and the values with one pointer.
@@ -172,7 +172,7 @@ Reading it takes an origin rather than an environment name, since that is what
 identifies a target now:
 
 ```
-$ zitadel vars resolve --origin https://acme-git-sso-acmeinc.vercel.app
+$ zitadel variable resolve --origin https://acme-git-sso-acmeinc.vercel.app
 serving dep_01KB3F8N2P9S5WQZ   deployed 10-02 14:10
 
 NAME                  SERVING NOW                FROM
@@ -189,8 +189,8 @@ SUPPORT_EMAIL         help@acme.com              all deploys
   nothing today when the named release is already running, so the key has to
   become the release *and* the resolved values, or a deploy whose only purpose
   is a changed variable is silently discarded.
-- **A deploy may carry only a variable change.** Same release, new deployment
-  row, so the history shows one digest twice with different values. That is the
+- **A deploy may carry only a variable change.** Same release, new deployment,
+  so the history shows one digest twice with different values. That is the
   fix for a wrong value: a deploy, not an edit.
 - **Variables never move onto the release.** The same release has to run with
   different values on different origins, which is the preview case above.
