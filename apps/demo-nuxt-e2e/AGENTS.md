@@ -44,8 +44,8 @@ moon run demo-nuxt-e2e:e2e
 ```
 
 Moon rebuilds `@zitadel/components` first through task dependencies, then
-Playwright boots `api-mock` (`:8081`) and `demo-nuxt` (`:3001`) through
-direct `pnpm --filter` commands.
+Playwright boots `api-mock` (`:8081`) and `demo-nuxt` (`:3001`) by running
+each package's own script with `node --run` in that package (no nested pnpm).
 
 The api-mock listens on `:8081` here (not the default `:8080` used by
 `apps/demo-next-e2e/`) so this project can run in parallel with it under
