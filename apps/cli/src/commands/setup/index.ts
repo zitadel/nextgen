@@ -38,12 +38,7 @@ import {
   type SecretPublisher,
 } from "../../lib/idp";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
-import {
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "../../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { serverKind } from "../../lib/oclif/server-kind";
 import { findLocalAdminFor } from "../../lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
@@ -72,12 +67,7 @@ import {
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
 import { installDependenciesForSetup } from "./install";
-import {
-  PickFrameworkPrompt,
-  SETUP_PROMPTS,
-  type SetupAnswers,
-  type SsoAnswer,
-} from "./prompts";
+import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers, type SsoAnswer } from "./prompts";
 import {
   detectProjectFacts,
   fileNameOf,
@@ -110,9 +100,7 @@ const FRAMEWORK_OPTIONS = createOrca()
  * guaranteed to fail and an explicit pass is rejected at parse time — before
  * any remote project is created.
  */
-const UNAVAILABLE_RENDERER_IDS = RENDERER_IDS.filter(
-  (id) => !AVAILABLE_RENDERER_IDS.includes(id),
-);
+const UNAVAILABLE_RENDERER_IDS = RENDERER_IDS.filter((id) => !AVAILABLE_RENDERER_IDS.includes(id));
 const RENDERER_FLAG_DESCRIPTION =
   UNAVAILABLE_RENDERER_IDS.length === 0
     ? "Renderer (default: react)."
@@ -219,10 +207,7 @@ export default class Setup extends BaseCommand {
         `Detected ${framework.id}${framework.devPort ? ` (dev port ${framework.devPort})` : ""}`,
       );
     } catch (error) {
-      if (
-        error instanceof ZitadelError &&
-        error.code === "E_FRAMEWORK_NOT_DETECTED"
-      ) {
+      if (error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED") {
         const target = await inspectScaffoldTarget(cwd);
         if (!target.scaffoldable && !force) {
           throw frameworkDetectionWithScaffoldTarget(error, cwd, target);
@@ -572,7 +557,9 @@ export default class Setup extends BaseCommand {
           // The console lists only projects the signed-in person can manage,
           // so an unattached project is one the local admin never sees. A
           // server started by hand has no local admin anywhere, hence the "if".
-          reportWarning(`No local admin for ${answers.server} in ${cwd} or its parents, so the project is not attached to a team and the local console will not list it. If \`zitadel start\` started this server, run setup from the directory it ran in, or one inside it.`);
+          reportWarning(
+            `No local admin for ${answers.server} in ${cwd} or its parents, so the project is not attached to a team and the local console will not list it. If \`zitadel start\` started this server, run setup from the directory it ran in, or one inside it.`,
+          );
         }
         if (admin) {
           const owner = await claimProjectAsAdmin({
@@ -803,10 +790,7 @@ async function resolveScaffoldFramework(
  * that accepts and stalls cannot hang setup after the real work is done.
  * Exported so the fail-closed behavior is testable without a live server.
  */
-export async function localServerHostsPlatform(
-  server: string,
-  timeoutMs = 1500,
-): Promise<boolean> {
+export async function localServerHostsPlatform(server: string, timeoutMs = 1500): Promise<boolean> {
   return Boolean(await readPlatformRuntime(server, timeoutMs));
 }
 
@@ -1074,10 +1058,7 @@ function ssoRecovery(
     // somewhere nobody asked for. Both callers of this are local-server
     // failures, so `local` is the server meant in every case.
     commands: remaining.map((provider) =>
-      publicCliCommand(
-        `sso enable --provider ${provider.provider} --server local`,
-        cliVersion,
-      ),
+      publicCliCommand(`sso enable --provider ${provider.provider} --server local`, cliVersion),
     ),
   };
 }
@@ -1242,16 +1223,8 @@ function buildSummary(opts: {
   scaffoldedFramework: boolean;
   sso: readonly SsoAnswer[];
 }): Section[] {
-  const {
-    projectFacts,
-    writtenRel,
-    depsAdded,
-    project,
-    server,
-    issuer,
-    scaffoldedFramework,
-    sso,
-  } = opts;
+  const { projectFacts, writtenRel, depsAdded, project, server, issuer, scaffoldedFramework, sso } =
+    opts;
   const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
 
   const detected: Row[] = [{ label: "Framework", value: formatFrameworkLine(projectFacts) }];

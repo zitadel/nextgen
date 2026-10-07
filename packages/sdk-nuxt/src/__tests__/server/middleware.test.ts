@@ -75,8 +75,8 @@ function makeWebRequest(
   method = "GET",
 ): Request {
   const headers: Record<string, string> = {};
-  if (cookie) headers["cookie"] = cookie;
-  if (authorization) headers["authorization"] = authorization;
+  if (cookie) headers.cookie = cookie;
+  if (authorization) headers.authorization = authorization;
   return new Request(url, { headers, method });
 }
 
@@ -96,7 +96,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown = undefined;
+    let capturedAuth: unknown;
     app.use("/", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -151,7 +151,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown = undefined;
+    let capturedAuth: unknown;
     app.use("/admin", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -198,7 +198,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown = undefined;
+    let capturedAuth: unknown;
     app.use("/admin", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -253,7 +253,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown = undefined;
+    let capturedAuth: unknown;
     app.use("/", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -293,7 +293,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown = undefined;
+    let capturedAuth: unknown;
     app.use("/admin", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -323,7 +323,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown = undefined;
+    let capturedAuth: unknown;
     app.use("/", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -414,7 +414,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown = undefined;
+    let capturedAuth: unknown;
     app.use("/admin", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -555,7 +555,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown = undefined;
+    let capturedAuth: unknown;
     app.use("/", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -592,7 +592,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown = undefined;
+    let capturedAuth: unknown;
     app.use("/", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -620,7 +620,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown = undefined;
+    let capturedAuth: unknown;
     app.use("/", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };

@@ -33,7 +33,9 @@ try {
   }
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
-  process.exit(typeof error === "object" && error !== null && typeof error.code === "number" ? error.code : 1);
+  process.exit(
+    typeof error === "object" && error !== null && typeof error.code === "number" ? error.code : 1,
+  );
 }
 
 async function runBinary(command, binaryArgs, cwd) {

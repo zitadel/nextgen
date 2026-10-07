@@ -54,7 +54,11 @@ const SCHEMA = { title: "Minimal", type: "object" };
 
 // `expand=user_schema` embeds the same envelope `GET /schemas/{id}` returns,
 // not the bare document — the row reads the name one level in.
-const SCHEMA_EMBED = { id: "sch_1", schema: SCHEMA, metadata: { created_at: "2026-01-01T00:00:00Z" } };
+const SCHEMA_EMBED = {
+  id: "sch_1",
+  schema: SCHEMA,
+  metadata: { created_at: "2026-01-01T00:00:00Z" },
+};
 
 const DETAIL_RESPONSE = {
   id: "flow_1",
@@ -73,7 +77,9 @@ async function renderAt(path: string, project?: string) {
     import("@tanstack/react-router"),
     import("../../../router"),
   ]);
-  const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [scopedPath(path, project)] }) });
+  const router = createAppRouter({
+    history: createMemoryHistory({ initialEntries: [scopedPath(path, project)] }),
+  });
   render(<RouterProvider router={router} />);
   return router;
 }
@@ -167,7 +173,10 @@ describe("login flow detail", () => {
     await renderAt("/flow-definitions/flow_1");
 
     expect(await screen.findByRole("heading", { name: "Default login" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Minimal" })).toHaveAttribute("href", scopedPath("/schemas/sch_1"));
+    expect(screen.getByRole("link", { name: "Minimal" })).toHaveAttribute(
+      "href",
+      scopedPath("/schemas/sch_1"),
+    );
     expect(screen.getByText("flow_1")).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "submit, passkey" })).toBeInTheDocument();
     // A terminal step collects nothing and offers nothing.

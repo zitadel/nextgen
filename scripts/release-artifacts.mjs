@@ -169,7 +169,10 @@ export async function createArchives(options = {}) {
       const stagingDir = join(outDir, "archive-staging", name);
       await rm(stagingDir, { recursive: true, force: true });
       await mkdir(stagingDir, { recursive: true });
-      await copyFile(join(sourceDir, binaryName(platform.goos)), join(stagingDir, binaryName(platform.goos)));
+      await copyFile(
+        join(sourceDir, binaryName(platform.goos)),
+        join(stagingDir, binaryName(platform.goos)),
+      );
       await copyFile(join(repoRoot, "LICENSE"), join(stagingDir, "LICENSE"));
       await copyFile(join(repoRoot, "README.md"), join(stagingDir, "README.md"));
       const archivePath = join(archivesDir, `${name}.zip`);
@@ -268,17 +271,29 @@ export async function buildContainerImage(options = {}) {
   const runFn = options.run ?? run;
   const platformList = options.platforms ?? CONTAINER_PLATFORMS;
   const contextPlatforms = options.contextPlatforms ?? platformList;
-  const contextDir = options.contextDir ??
+  const contextDir =
+    options.contextDir ??
     (await prepareDockerContext({
       repoRoot,
       outDir,
       version: release.version,
       platforms: contextPlatforms,
     }));
-  const platformArgs = platformList.map((platform) => `${platform.goos}/${platform.goarch}`).join(",");
+  const platformArgs = platformList
+    .map((platform) => `${platform.goos}/${platform.goarch}`)
+    .join(",");
   const image = options.image ?? SERVER_IMAGE;
-  const tags = options.tags ?? containerTags({ image, version: release.version, prerelease: release.prerelease });
-  const args = ["buildx", "build", "--platform", platformArgs, "-f", join(contextDir, "Dockerfile")];
+  const tags =
+    options.tags ??
+    containerTags({ image, version: release.version, prerelease: release.prerelease });
+  const args = [
+    "buildx",
+    "build",
+    "--platform",
+    platformArgs,
+    "-f",
+    join(contextDir, "Dockerfile"),
+  ];
 
   for (const tag of tags) {
     args.push("-t", tag);
@@ -335,7 +350,11 @@ export async function writeReleaseMetadata(options = {}) {
     shortCommit: info.shortCommit,
     date: info.date,
     image: SERVER_IMAGE,
-    imageTags: containerTags({ image: SERVER_IMAGE, version: release.version, prerelease: release.prerelease }),
+    imageTags: containerTags({
+      image: SERVER_IMAGE,
+      version: release.version,
+      prerelease: release.prerelease,
+    }),
     packages,
   };
   await mkdir(outDir, { recursive: true });
@@ -368,7 +387,9 @@ export function artifactImageRows(metadata) {
 }
 
 export function artifactPackageRows(metadata) {
-  return (metadata.packages ?? []).map((pkg) => `| \`${pkg.name}\` | \`${pkg.version}\` |`).join("\n");
+  return (metadata.packages ?? [])
+    .map((pkg) => `| \`${pkg.name}\` | \`${pkg.version}\` |`)
+    .join("\n");
 }
 
 export async function verifyLocalArtifacts(options = {}) {
@@ -378,7 +399,11 @@ export async function verifyLocalArtifacts(options = {}) {
   const missing = [];
   for (const platform of SERVER_PLATFORMS) {
     const extension = platform.goos === "windows" ? "zip" : "tar.gz";
-    const archive = join(outDir, "archives", `nextgen_${release.version}_${platformName(platform)}.${extension}`);
+    const archive = join(
+      outDir,
+      "archives",
+      `nextgen_${release.version}_${platformName(platform)}.${extension}`,
+    );
     if (!(await exists(archive))) {
       missing.push(archive);
     }

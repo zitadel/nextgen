@@ -43,7 +43,7 @@ const wellKnownDir = resolve(
 await mkdir(wellKnownDir, { recursive: true });
 await writeFile(
   resolve(wellKnownDir, "openid-configuration"),
-  JSON.stringify(document, null, 2) + "\n",
+  `${JSON.stringify(document, null, 2)}\n`,
 );
 
 console.log(`[mock-zitadel] wrote public/.well-known/openid-configuration (issuer ${issuer})`);

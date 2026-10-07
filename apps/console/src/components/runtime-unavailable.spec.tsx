@@ -37,7 +37,10 @@ describe("runtime unavailable screen", () => {
     );
 
     render(
-      <RuntimeUnavailable failure={{ detail: "the request failed (network down)" }} onRetry={onRetry} />,
+      <RuntimeUnavailable
+        failure={{ detail: "the request failed (network down)" }}
+        onRetry={onRetry}
+      />,
     );
 
     await user.click(screen.getByRole("button", { name: "Try again" }));

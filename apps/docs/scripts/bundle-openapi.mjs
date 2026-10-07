@@ -13,23 +13,9 @@ const moduleOutput = resolve(outputDir, "openapi.mjs");
 
 await mkdir(dirname(yamlOutput), { recursive: true });
 
-await run("npx", [
-  "--yes",
-  "@redocly/cli@2.31.5",
-  "bundle",
-  input,
-  "--output",
-  yamlOutput,
-]);
+await run("npx", ["--yes", "@redocly/cli@2.31.5", "bundle", input, "--output", yamlOutput]);
 
-await run("npx", [
-  "--yes",
-  "@redocly/cli@2.31.5",
-  "bundle",
-  input,
-  "--output",
-  jsonOutput,
-]);
+await run("npx", ["--yes", "@redocly/cli@2.31.5", "bundle", input, "--output", jsonOutput]);
 
 const bundledJson = await readFile(jsonOutput, "utf8");
 await writeFile(moduleOutput, `export default ${bundledJson.trim()};\n`);
