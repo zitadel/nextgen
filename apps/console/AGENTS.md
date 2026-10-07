@@ -63,10 +63,10 @@ change rather than letting code and decision drift.
 
 Before building any console UI, read
 [`docs/styling.md`](docs/styling.md) — where a component lives decides how it
-is styled (unprefixed shadcn utilities for console chrome vs a Lit+React pair),
-and the retired `*-zl-*` console utility names must not come back. The 3-way
-classification and token authority live there; the pair recipe lives in
-[`apps/storybook/AGENTS.md`](../storybook/AGENTS.md).
+is styled (unprefixed shadcn utilities for console UI; login atoms are Lit with
+their own CSS), and the retired `*-zl-*` console utility names must not come
+back. The surface decision and token authority live there; the atom recipe lives
+in [`apps/storybook/AGENTS.md`](../storybook/AGENTS.md).
 
 ## Screen conventions
 
@@ -75,10 +75,8 @@ List/detail screens follow the shipped patterns under `src/routes/_authed/`
 the resource has lifecycle state, `$param` detail routes. A list screen composes
 `src/components/resource-list.tsx` and a detail screen
 `src/components/detail-page.tsx` rather than measuring its own frame — see
-"Resource list layout" and "Resource detail layout" in `docs/styling.md`. The sessions screen
-speaks `POST /sessions/query` (structured filters + cursor pagination); there
-is no `GET /sessions` list, and sessions have no `revoked` state — revocation
-deletes the session.
+"Resource list layout" and "Resource detail layout" in `docs/styling.md`. There
+is no sessions screen.
 
 A screen that acts on one project declares `staticData.scope: "project"` and
 reads the **selected** project — `?project=`, retained by the `_authed` layout —
@@ -150,8 +148,8 @@ The console manages an instance, so **use `console:dev-real`** — it boots a re
 ephemeral instance and seeds users, so list screens show real API responses.
 `@zitadel/api-mock` has no user store; a users list read from it is a fiction.
 
-Why the mock cannot substitute (authorization, the `user.read` scope, and the
-publishable-key refusal) is documented canonically in the Local development
-section of [`README.md`](README.md) — read it for all three backends and when
-each applies. The mock's flow-shape authority rule lives in
+Why the mock cannot substitute (it has no user store, and nothing about
+authorization can be proven against it) is documented canonically in the Local
+development section of [`README.md`](README.md) — read it for all three backends
+and when each applies. The mock's flow-shape authority rule lives in
 [`packages/api-mock/AGENTS.md`](../../packages/api-mock/AGENTS.md).
