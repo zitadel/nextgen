@@ -475,6 +475,28 @@ describe("auth-factor", () => {
       ]);
     });
 
+    it("joins a schema name that starts with a dash to its option", async () => {
+      const cwd = await makeProject(
+        {
+          "--force": {
+            ...passwordSchema("--force"),
+            "x-auth-methods": { password: { enabled: false }, passkey: { enabled: true } },
+          },
+        },
+        {},
+      );
+
+      const { envelope } = await run(cwd, "disable", "--mode", "passkey");
+
+      expect(envelope.next_commands ?? []).toEqual([]);
+      expect(envelope.details).toMatchObject({
+        retry_args: expect.arrayContaining(["--schema=--force", "--force"]),
+      });
+      expect(envelope.details).toMatchObject({
+        retry_args: expect.not.arrayContaining(["--schema"]),
+      });
+    });
+
     it("refuses an enabled value that is not a boolean", async () => {
       const cwd = await makeProject(
         {

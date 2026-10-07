@@ -58,7 +58,7 @@ export abstract class AuthFactorCommand extends BaseCommand {
     await this.toMeta(flags, { resolveServer: false });
     const { cwd, dryRun, force, nonInteractive, cliVersion } = this.meta;
     // A follow-up run from where the user stands must reach the same Project.
-    const cwdArgs = flags.cwd === undefined ? [] : ["--cwd", cwd];
+    const cwdArgs = flags.cwd === undefined ? [] : optionArgs("--cwd", cwd);
     const verb = enabled ? "enable" : "disable";
 
     const factors = [...new Set(flags.mode ?? [])] as AuthFactor[];
@@ -245,8 +245,7 @@ function refuseLastFactor(
     "auth-factor",
     "disable",
     ...disabling.flatMap((factor) => ["--mode", factor]),
-    "--schema",
-    schema.name,
+    ...optionArgs("--schema", schema.name),
     ...cwdArgs,
     "--force",
   ];
@@ -264,8 +263,7 @@ function refuseLastFactor(
       "enable",
       "--mode",
       factor,
-      "--schema",
-      schema.name,
+      ...optionArgs("--schema", schema.name),
       ...cwdArgs,
     ]),
   ];
@@ -344,4 +342,13 @@ function flowRefusal(
       },
     },
   );
+}
+
+/**
+ * An option and its value as arguments. A value that starts with `-` would be
+ * read as the next flag, so it is joined with `=` instead. That token is not a
+ * portable shell word, so it also keeps the string form out of next_commands.
+ */
+function optionArgs(option: string, value: string): string[] {
+  return value.startsWith("-") ? [`${option}=${value}`] : [option, value];
 }

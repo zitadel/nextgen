@@ -166,8 +166,10 @@ export function flowOffers(flow: Record<string, unknown>, factor: AuthFactor): b
 }
 
 /**
- * The methods a schema enables that some active flow also offers: the ways a
- * user can actually sign in. SSO is offered by a step that names a provider.
+ * The methods a schema enables that some active flow lets an existing user
+ * sign in with. Passkey counts only through a `passkey` action:
+ * `passkey_register` enrols a new credential and signs nobody in. SSO counts
+ * only through a step offering a provider the schema itself enables.
  */
 export function reachableSignInMethods(
   schema: Record<string, unknown>,
@@ -175,14 +177,41 @@ export function reachableSignInMethods(
 ): string[] {
   return usableSignInMethods(schema).filter((method) =>
     activeFlows.some((flow) =>
-      method === "sso" ? offersSso(flow) : flowOffers(flow, method as AuthFactor),
+      method === "sso"
+        ? offersSso(flow, enabledProviders(schema))
+        : method === "passkey"
+          ? signsInWithPasskey(flow)
+          : flowOffers(flow, method as AuthFactor),
     ),
   );
 }
 
-function offersSso(flow: Record<string, unknown>): boolean {
-  const steps = Array.isArray(flow.steps) ? flow.steps.filter(isObject) : [];
-  return steps.some((step) => Array.isArray(step.sso_providers) && step.sso_providers.length > 0);
+function steps(flow: Record<string, unknown>): Record<string, unknown>[] {
+  return Array.isArray(flow.steps) ? flow.steps.filter(isObject) : [];
+}
+
+function signsInWithPasskey(flow: Record<string, unknown>): boolean {
+  return steps(flow).some(
+    (step) =>
+      Array.isArray(step.actions) &&
+      step.actions.some((action) => isObject(action) && action.kind === "passkey"),
+  );
+}
+
+function enabledProviders(schema: Record<string, unknown>): string[] {
+  const methods = schema["x-auth-methods"];
+  const sso = isObject(methods) ? methods.sso : undefined;
+  return isObject(sso) && Array.isArray(sso.providers)
+    ? sso.providers.filter((p): p is string => typeof p === "string")
+    : [];
+}
+
+function offersSso(flow: Record<string, unknown>, providers: readonly string[]): boolean {
+  return steps(flow).some(
+    (step) =>
+      Array.isArray(step.sso_providers) &&
+      step.sso_providers.some((p) => typeof p === "string" && providers.includes(p)),
+  );
 }
 
 /**

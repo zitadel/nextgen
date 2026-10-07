@@ -237,6 +237,22 @@ describe("reachableSignInMethods", () => {
     expect(reachableSignInMethods(passkeyOnly, [passwordFlow])).toEqual([]);
   });
 
+  it("does not count a flow that only registers passkeys", () => {
+    const passkeyOnly = schema({ password: { enabled: false }, passkey: { enabled: true } });
+    const registerOnly = {
+      steps: [{ name: "register", actions: [{ name: "enrol", kind: "passkey_register" }] }],
+    };
+
+    expect(reachableSignInMethods(passkeyOnly, [registerOnly])).toEqual([]);
+  });
+
+  it("does not count SSO for a provider the schema does not enable", () => {
+    const sso = schema({ sso: { enabled: true, providers: ["google"] } });
+    const githubFlow = { steps: [{ name: "identifier", sso_providers: ["github"] }] };
+
+    expect(reachableSignInMethods(sso, [githubFlow])).toEqual([]);
+  });
+
   it("counts SSO on a step that names a provider", () => {
     const sso = schema({ sso: { enabled: true, providers: ["google"] } });
     const ssoFlow = { steps: [{ name: "identifier", sso_providers: ["google"] }] };
