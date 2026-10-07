@@ -343,29 +343,25 @@ async function runFrameworkJourney(context) {
     );
 
     log(`[${prefix}] running Playwright journey`);
-    await run(
-      process.execPath,
-      [playwrightCli, "test", "--config", "playwright.config.mts"],
-      {
-        cwd: projectRoot,
-        env: {
-          ...process.env,
-          JOURNEY_APP_DIR: context.appDir,
-          JOURNEY_APP_URL: context.appUrl,
-          JOURNEY_FRAMEWORK: framework.id,
-          JOURNEY_OUTPUT_DIR: context.frameworkWorkDir,
-          JOURNEY_PLAYWRIGHT_OUTPUT_DIR: context.playwrightOutputDir,
-          JOURNEY_PLAYWRIGHT_REPORT_DIR: context.playwrightReportDir,
-          // The claim spec spawns the CLI through the journey registry, which
-          // needs the same npmrc the prepare-app steps used.
-          NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
-          // Always explicit ("" = default preset / fresh scaffold): see the
-          // prepare-app note.
-          JOURNEY_PREEXISTING_APP: context.preexistingApp ? "1" : "",
-          JOURNEY_PRESET: context.preset,
-        },
+    await run(process.execPath, [playwrightCli, "test", "--config", "playwright.config.mts"], {
+      cwd: projectRoot,
+      env: {
+        ...process.env,
+        JOURNEY_APP_DIR: context.appDir,
+        JOURNEY_APP_URL: context.appUrl,
+        JOURNEY_FRAMEWORK: framework.id,
+        JOURNEY_OUTPUT_DIR: context.frameworkWorkDir,
+        JOURNEY_PLAYWRIGHT_OUTPUT_DIR: context.playwrightOutputDir,
+        JOURNEY_PLAYWRIGHT_REPORT_DIR: context.playwrightReportDir,
+        // The claim spec spawns the CLI through the journey registry, which
+        // needs the same npmrc the prepare-app steps used.
+        NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
+        // Always explicit ("" = default preset / fresh scaffold): see the
+        // prepare-app note.
+        JOURNEY_PREEXISTING_APP: context.preexistingApp ? "1" : "",
+        JOURNEY_PRESET: context.preset,
       },
-    );
+    });
     log(`[${prefix}] journey passed`);
   } catch (error) {
     await collectDiagnostics(context);
