@@ -1,7 +1,122 @@
+import { createServer as createHttpServer } from "node:http";
+import { createServer, type AddressInfo, type Server, type Socket } from "node:net";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { getApiCsrfToken, setApiCsrfRejectionHandler, setApiCsrfToken } from "./auth";
-import { ApiError, CSRF_HEADER, apiErrorCode, customFetch } from "./fetch";
+import {
+  ApiError,
+  CSRF_HEADER,
+  NetworkError,
+  apiErrorCode,
+  customFetch,
+  request,
+  setRequestPolicy,
+} from "./fetch";
+
+const servers: Server[] = [];
+const sockets: Socket[] = [];
+
+afterEach(async () => {
+  setRequestPolicy({});
+  for (const socket of sockets.splice(0)) socket.destroy();
+  await Promise.all(servers.splice(0).map((s) => new Promise((done) => s.close(done))));
+});
+
+async function listening(server: Server): Promise<string> {
+  servers.push(server);
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+}
+
+/** A port nothing listens on: bound once to learn a free number, then released. */
+async function closedPort(): Promise<string> {
+  const server = createServer();
+  const url = await listening(server);
+  await new Promise((done) => server.close(done));
+  servers.splice(servers.indexOf(server), 1);
+  return url;
+}
+
+/** Accepts the connection and never answers. */
+function silent(): Promise<string> {
+  return listening(createServer((socket) => sockets.push(socket)));
+}
+
+describe("customFetch", () => {
+  it("rejects a refused connection with an unreachable NetworkError", async () => {
+    const base = await closedPort();
+
+    const error = await customFetch(`${base}/health`, { method: "GET" }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(NetworkError);
+    expect(error).toMatchObject({ reason: "unreachable", url: `${base}/health` });
+    expect((error as Error).message).toBe(`GET ${base}/health got no response (ECONNREFUSED)`);
+  });
+
+  it("rejects a server that never answers with a timeout NetworkError", async () => {
+    const base = await silent();
+    setRequestPolicy({ timeoutMs: 50 });
+
+    const error = await customFetch(`${base}/health`, { method: "GET" }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(NetworkError);
+    expect(error).toMatchObject({ reason: "timeout" });
+  });
+
+  it("rejects with the caller's abort reason when the policy signal fires", async () => {
+    const base = await silent();
+    const controller = new AbortController();
+    const cancelled = new Error("cancelled by the user");
+    setRequestPolicy({ signal: controller.signal });
+
+    const pending = customFetch(`${base}/health`, { method: "GET" }).catch((e: unknown) => e);
+    controller.abort(cancelled);
+
+    expect(await pending).toBe(cancelled);
+  });
+
+  it("treats a per-call timeout signal as a timeout", async () => {
+    const base = await silent();
+
+    const error = await customFetch(`${base}/health`, {
+      method: "GET",
+      signal: AbortSignal.timeout(50),
+    }).catch((e: unknown) => e);
+
+    expect(error).toMatchObject({ name: "NetworkError", reason: "timeout" });
+  });
+
+  it("still rejects a failing status with an ApiError", async () => {
+    const http = createHttpServer((_req, res) => {
+      res.writeHead(503, { "content-type": "application/json" });
+      res.end(JSON.stringify({ code: "unavailable", message: "down" }));
+    });
+    const base = await listening(http as unknown as Server);
+
+    const error = await customFetch(`${base}/health`, { method: "GET" }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 503 });
+  });
+});
+
+describe("request", () => {
+  it("is bound only by the policy it is given, not by a client's", async () => {
+    const base = await silent();
+    setRequestPolicy({ timeoutMs: 10 });
+
+    const outcome = await Promise.race([
+      request(`${base}/x`, { method: "GET" }).then(
+        () => "settled",
+        () => "settled",
+      ),
+      new Promise((done) => setTimeout(() => done("still waiting"), 100)),
+    ]);
+
+    expect(outcome).toBe("still waiting");
+  });
+});
 
 function captureFetch() {
   const seen: Headers[] = [];
@@ -38,7 +153,6 @@ function scriptedFetch(responses: Array<() => Response>) {
 
 const csrfRefused = () =>
   new Response(JSON.stringify({ code: "auth.csrf_invalid", message: "refused" }), { status: 403 });
-
 
 describe("customFetch CSRF header", () => {
   it("sends the token on unsafe methods", async () => {
@@ -79,16 +193,43 @@ describe("customFetch CSRF refusal", () => {
     const sent = scriptedFetch([csrfRefused, created]);
     setApiCsrfToken("stale");
     setApiCsrfRejectionHandler(async () => "fresh");
-    await expect(customFetch("http://api.test/teams", { method: "POST", body: "{}" })).resolves.toEqual({
+    await expect(
+      customFetch("http://api.test/teams", { method: "POST", body: "{}" }),
+    ).resolves.toEqual({
       id: "team_1",
     });
     expect(sent).toEqual(["stale", "fresh"]);
   });
 
+  // The client sets the request policy per call. Another call made while the
+  // session is re-checked must not put its signal or deadline on this retry.
+  it("retries under the policy the request started with", async () => {
+    const responses = [csrfRefused, created];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) => {
+        if (init.signal?.aborted) throw init.signal.reason;
+        const next = responses.shift();
+        if (!next) throw new Error("unexpected request");
+        return next();
+      }),
+    );
+    setApiCsrfToken("stale");
+    setApiCsrfRejectionHandler(async () => {
+      setRequestPolicy({ signal: AbortSignal.abort(new Error("another call's signal")) });
+      return "fresh";
+    });
+    await expect(customFetch("http://api.test/teams", { method: "POST" })).resolves.toEqual({
+      id: "team_1",
+    });
+  });
+
   it("recovers a write that went out without a token", async () => {
     const sent = scriptedFetch([csrfRefused, created]);
     setApiCsrfRejectionHandler(async () => "fresh");
-    await expect(customFetch("http://api.test/teams", { method: "POST" })).resolves.toEqual({ id: "team_1" });
+    await expect(customFetch("http://api.test/teams", { method: "POST" })).resolves.toEqual({
+      id: "team_1",
+    });
     expect(sent).toEqual([null, "fresh"]);
   });
 
@@ -98,7 +239,9 @@ describe("customFetch CSRF refusal", () => {
     const sent = scriptedFetch([csrfRefused]);
     setApiCsrfToken("stale");
     setApiCsrfRejectionHandler(async () => undefined);
-    await expect(customFetch("http://api.test/teams", { method: "POST" })).rejects.toBeInstanceOf(ApiError);
+    await expect(customFetch("http://api.test/teams", { method: "POST" })).rejects.toBeInstanceOf(
+      ApiError,
+    );
     expect(sent).toEqual(["stale"]);
   });
 
@@ -107,7 +250,9 @@ describe("customFetch CSRF refusal", () => {
     setApiCsrfToken("stale");
     const onRejected = vi.fn(async () => "fresh");
     setApiCsrfRejectionHandler(onRejected);
-    await expect(customFetch("http://api.test/teams", { method: "POST" })).rejects.toBeInstanceOf(ApiError);
+    await expect(customFetch("http://api.test/teams", { method: "POST" })).rejects.toBeInstanceOf(
+      ApiError,
+    );
     expect(sent).toEqual(["stale", "fresh"]);
     expect(onRejected).toHaveBeenCalledOnce();
   });
@@ -126,21 +271,30 @@ describe("customFetch CSRF refusal", () => {
 
   it("leaves other 403 answers and safe methods alone", async () => {
     scriptedFetch([
-      () => new Response(JSON.stringify({ code: "team.permission_denied", message: "no" }), { status: 403 }),
+      () =>
+        new Response(JSON.stringify({ code: "team.permission_denied", message: "no" }), {
+          status: 403,
+        }),
       csrfRefused,
     ]);
     setApiCsrfToken("tok");
     const onRejected = vi.fn(async () => "fresh");
     setApiCsrfRejectionHandler(onRejected);
-    await expect(customFetch("http://api.test/teams", { method: "POST" })).rejects.toBeInstanceOf(ApiError);
-    await expect(customFetch("http://api.test/teams", { method: "GET" })).rejects.toBeInstanceOf(ApiError);
+    await expect(customFetch("http://api.test/teams", { method: "POST" })).rejects.toBeInstanceOf(
+      ApiError,
+    );
+    await expect(customFetch("http://api.test/teams", { method: "GET" })).rejects.toBeInstanceOf(
+      ApiError,
+    );
     expect(onRejected).not.toHaveBeenCalled();
   });
 });
 
 describe("apiErrorCode", () => {
   it("reads the envelope code from an ApiError or a parsed body", () => {
-    expect(apiErrorCode(new ApiError(403, "u", { code: "auth.csrf_invalid" }, "m"))).toBe("auth.csrf_invalid");
+    expect(apiErrorCode(new ApiError(403, "u", { code: "auth.csrf_invalid" }, "m"))).toBe(
+      "auth.csrf_invalid",
+    );
     expect(apiErrorCode({ code: "user.not_found" })).toBe("user.not_found");
     expect(apiErrorCode({ raw: "<html>" })).toBeUndefined();
     expect(apiErrorCode(new Error("x"))).toBeUndefined();

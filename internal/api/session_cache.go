@@ -1,19 +1,49 @@
 package api
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+)
 
 const sessionStateCacheControl = "private, no-store"
 
-// WithSessionStateNoStore prevents any GET /sessions/me or GET
-// /sessions/me/csrf response from being stored. It wraps the generated server
-// so the header is also present on security and decoding errors emitted
-// before the operation handler runs. TestWithSessionStateNoStoreCoversTheSpec
-// keeps the path list in step with the OpenAPI source.
+// WithSessionStateNoStore prevents responses that carry session state or a
+// credential from being stored: GET /sessions/me and GET /sessions/me/csrf, and
+// the flow start, step render and submit, which set the flow cookie and can
+// return the single-use handoff token. It wraps the generated server so the
+// header is also present on security and decoding errors emitted before the
+// operation handler runs. TestWithSessionStateNoStoreCoversTheSpec keeps the
+// GET paths in step with the OpenAPI source.
 func WithSessionStateNoStore(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && (r.URL.Path == "/sessions/me" || r.URL.Path == "/sessions/me/csrf") {
+		if isNoStoreOperation(r.Method, r.URL.Path) {
 			w.Header().Set("Cache-Control", sessionStateCacheControl)
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func isNoStoreOperation(method, path string) bool {
+	if method == http.MethodGet && (path == "/sessions/me" || path == "/sessions/me/csrf") {
+		return true
+	}
+	// Flow start shares the step response, and with it the documented header.
+	if method == http.MethodPost && path == "/flow" {
+		return true
+	}
+	rest, ok := strings.CutPrefix(path, "/flow/")
+	if !ok || rest == "" {
+		return false
+	}
+	id, sub, nested := strings.Cut(rest, "/")
+	if id == "" {
+		return false
+	}
+	switch {
+	case method == http.MethodGet && !nested:
+		return true
+	case method == http.MethodPost && nested && sub == "submit":
+		return true
+	}
+	return false
 }

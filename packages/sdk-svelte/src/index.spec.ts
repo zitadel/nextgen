@@ -12,7 +12,7 @@ import {
   ZITADEL_LOGOUT_EVENT_HANDLERS,
   ZITADEL_SESSION_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { businessLocales } from "./lib/index";
 import ZitadelLogin from "./lib/ZitadelLogin.svelte";
@@ -20,13 +20,6 @@ import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
-
-beforeEach(() => {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(() => Promise.reject(new Error("no network"))),
-  );
-});
 
 describe("ZitadelLogin", () => {
   it("binds the project handle as a property", () => {

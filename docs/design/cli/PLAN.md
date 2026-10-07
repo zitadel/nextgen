@@ -7,7 +7,7 @@
 ## Where the CLI stands
 
 The shipped surface (see [`apps/cli/README.md`](../../../apps/cli/README.md)
-for the generated reference and [`apps/cli/SKILLS.md`](../../../apps/cli/SKILLS.md)
+for the generated reference and [`apps/cli/skills/zitadel-cli/SKILL.md`](../../../apps/cli/skills/zitadel-cli/SKILL.md)
 for the agent contract):
 
 | Area | Shipped commands |

@@ -28,6 +28,17 @@ describe("console", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
     });
+
+    describe("that refuses connections", () => {
+      it("fails", async () => {
+        const app = await aSetUpApp();
+        platform.refusesConnections();
+
+        const result = await app.run(["console", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+    });
   });
 
   describe("against a valid server", () => {
@@ -45,7 +56,7 @@ describe("console", () => {
 
         const result = await app.run(["console", "--json"]);
 
-        expect(result).toExplain("No local admin in this directory");
+        expect(result).toExplain("No local admin in this directory or its parents");
       });
 
       it("refuses a directory that was never set up", async () => {

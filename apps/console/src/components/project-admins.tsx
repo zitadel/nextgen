@@ -39,6 +39,11 @@ type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
  * project manageable; deactivating *that* is the lockout path, and #1231 guards
  * it.
  *
+ * **The viewer's own access is a line above the table.** The project resource
+ * does not name its owning team (#1462 is the follow-up that shows that access
+ * here), so it is inferred: whoever reaches this page can manage the project,
+ * and when no grant is theirs, that access is the owning team's.
+ *
  * **Not an invite flow.** The design draws `Invite`, a `Pending` status and
  * revoke/resend actions, but a grant is only ever created against a person who
  * already exists: `POST /grants` takes a user locator, and the grant resource
@@ -54,14 +59,18 @@ type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
 export function ProjectAdmins({
   projectId,
   grants,
+  viewerUserId,
   onChanged,
 }: {
   projectId: string;
   grants: Grant[];
+  /** The signed-in user, to tell their own grant from the owning team's access. */
+  viewerUserId?: string;
   /** Called after a grant was added or removed, to reload the page's data. */
   onChanged: () => void;
 }) {
   const rows = grants.map(toAdminRow);
+  const viaOwningTeam = !grants.some((grant) => grant.user?.user_id === viewerUserId);
   return (
     // Labelled so the section is a landmark assistive tech can jump to.
     <Card className="mt-8 gap-0 rounded-xl py-0" role="region" aria-labelledby="project-admins">
@@ -79,6 +88,11 @@ export function ProjectAdmins({
             </Button>
           </AddAdminDialog>
         </div>
+        {viaOwningTeam && (
+          <p className="text-muted-foreground text-sm">
+            You have admin access as a member of this Project’s owning Team.
+          </p>
+        )}
         <Separator />
         <Table className="text-xs">
           <TableHeader>
@@ -95,7 +109,7 @@ export function ProjectAdmins({
             {rows.length === 0 ? (
               <TableRow className="border-0 hover:bg-transparent">
                 <TableCell colSpan={3} className="text-muted-foreground h-24 text-center">
-                  No admins yet.
+                  No additional admins have been added.
                 </TableCell>
               </TableRow>
             ) : (
