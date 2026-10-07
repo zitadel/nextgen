@@ -1,8 +1,8 @@
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
-import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
 import { flakeDiagLaunchArgs, flakeDiagPlugin } from "../../vitest.flake-diag.mjs";
+import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
 
 /**
  * Two projects in one config, selected per lane (no separate config files):

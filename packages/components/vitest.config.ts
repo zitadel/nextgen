@@ -1,8 +1,8 @@
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
-import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
 import { flakeDiagLaunchArgs, flakeDiagPlugin } from "../../vitest.flake-diag.mjs";
+import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
 import { liquidRaw } from "./vite-liquid-plugin.js";
 
 /** Shared plugins for every project in this config. */

@@ -3,8 +3,8 @@ import { playwright } from "@vitest/browser-playwright";
 import { apiMockPublicDir } from "@zitadel/api-mock/public-dir";
 import { defineConfig } from "vitest/config";
 
-import { baseTest } from "../../vitest.shared.mjs";
 import { flakeDiagLaunchArgs, flakeDiagPlugin } from "../../vitest.flake-diag.mjs";
+import { baseTest } from "../../vitest.shared.mjs";
 
 // Runs in real Chromium via Playwright (mirroring the `@zitadel/components`
 // browser lane) rather than jsdom. Qwik 2's client `render` locates its root
