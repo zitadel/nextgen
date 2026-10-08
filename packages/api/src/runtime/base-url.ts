@@ -1,3 +1,4 @@
+// Spike: harmless comment to exercise affected-task selection.
 let proxyPath = "";
 
 export function getProxyPath(): string {
