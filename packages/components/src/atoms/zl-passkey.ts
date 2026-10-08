@@ -2,6 +2,8 @@ import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import { bufferToBase64Url, base64UrlToBuffer } from "../internal/base64url.js";
+import { emit } from "../internal/emit.js";
+import { parseJsonAttribute } from "../internal/json-attribute.js";
 import type { AtomManifest } from "../manifest.js";
 
 import "./zl-alert.js";
@@ -120,12 +122,7 @@ export class ZlPasskey extends LitElement {
     attribute: "options",
     converter: {
       fromAttribute(value: string | null) {
-        if (!value) return null;
-        try {
-          return JSON.parse(value) as Record<string, unknown>;
-        } catch {
-          return null;
-        }
+        return (parseJsonAttribute(value) ?? null) as Record<string, unknown> | null;
       },
       toAttribute(value: Record<string, unknown> | null) {
         return value ? JSON.stringify(value) : null;
@@ -138,7 +135,7 @@ export class ZlPasskey extends LitElement {
    * Challenge method echoed back in the result event so the orchestrator
    * can include it in `challenge_response.method`. Defaults to `"passkey"`.
    */
-  @property({ type: String }) accessor method = "passkey";
+  @property() accessor method = "passkey";
 
   /**
    * When true, the ceremony is not started automatically on mount.
@@ -406,13 +403,7 @@ export class ZlPasskey extends LitElement {
       method: this.method,
       proof,
     };
-    this.dispatchEvent(
-      new CustomEvent("zl-passkey-result", {
-        bubbles: true,
-        composed: true,
-        detail,
-      }),
-    );
+    emit(this, "zl-passkey-result", detail);
   }
 
   private emitError(message: string, aborted: boolean, timedOut = false): void {
@@ -422,13 +413,7 @@ export class ZlPasskey extends LitElement {
       aborted,
       timed_out: timedOut,
     };
-    this.dispatchEvent(
-      new CustomEvent("zl-passkey-error", {
-        bubbles: true,
-        composed: true,
-        detail,
-      }),
-    );
+    emit(this, "zl-passkey-error", detail);
   }
 
   private emitStarted(): void {
@@ -436,13 +421,7 @@ export class ZlPasskey extends LitElement {
       challenge_id: this.challengeId,
       method: this.method,
     };
-    this.dispatchEvent(
-      new CustomEvent("zl-passkey-started", {
-        bubbles: true,
-        composed: true,
-        detail,
-      }),
-    );
+    emit(this, "zl-passkey-started", detail);
   }
 
   /**

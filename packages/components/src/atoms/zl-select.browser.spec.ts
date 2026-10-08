@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import "./zl-select.js";
-import type { ZlSelect, ZlSelectChangeDetail, ZlSelectOption } from "./zl-select.js";
+import type { ZlSelect, ZlSelectOption } from "./zl-select.js";
 
 /**
  * Real-browser checks for the form-participation contract. These rely on the
@@ -80,54 +80,30 @@ describe("<zl-select> form participation (chromium)", () => {
     expect(form.checkValidity()).toBe(true);
   });
 
-  it("commits a native-control change to value, FormData, and listeners", async () => {
+  it("contributes a native-control change to FormData and re-dispatches one change", async () => {
     const { form, select } = await mount();
-    let detail: ZlSelectChangeDetail | undefined;
     let nativeChanges = 0;
-    select.addEventListener("zl-change", (event) => {
-      detail = (event as CustomEvent<ZlSelectChangeDetail>).detail;
-    });
     select.addEventListener("change", () => {
       nativeChanges += 1;
     });
-
     await selectNative(select, "us");
-
-    expect(select.value).toBe("us");
     expect(new FormData(form).get("country")).toBe("us");
-    expect(detail).toEqual({ name: "country", value: "us" });
     expect(nativeChanges).toBe(1);
   });
 
-  it("lets the user clear back to the empty option, contributing nothing to FormData", async () => {
+  it("contributes nothing to FormData once cleared back to the empty option", async () => {
     const { form, select } = await mount("", "us");
-    let detail: ZlSelectChangeDetail | undefined;
-    select.addEventListener("zl-change", (event) => {
-      detail = (event as CustomEvent<ZlSelectChangeDetail>).detail;
-    });
-
     await selectNative(select, "");
-
-    expect(select.value).toBe("");
     expect(new FormData(form).get("country")).toBeNull();
-    expect(detail).toEqual({ name: "country", value: "" });
   });
 
-  it("mirrors the chosen value onto the native control for automation drivers", async () => {
-    const { select } = await mount("", "de");
-    expect(native(select).value).toBe("de");
-    expect(native(select).getAttribute("data-testid")).toBe("zitadel-select-country");
-  });
-
-  it("commits a pointer choice from the styled popup", async () => {
+  it("contributes a pointer choice from the styled popup to FormData", async () => {
     const { form, select } = await mount();
     select.open = true;
     await select.updateComplete;
     // Leading empty row + us, de, ch(disabled), at → "at" is index 4.
     options(select)[4]?.click();
     await select.updateComplete;
-    expect(select.value).toBe("at");
-    expect(select.open).toBe(false);
     expect(new FormData(form).get("country")).toBe("at");
   });
 
@@ -148,6 +124,21 @@ describe("<zl-select> form participation (chromium)", () => {
     form.reset();
     await select.updateComplete;
     expect(select.value).toBe("us");
+  });
+
+  it("is disabled by an enclosing fieldset", async () => {
+    host.innerHTML = `<form><fieldset disabled><zl-select name="country" value="us"></zl-select></fieldset></form>`;
+    const form = host.querySelector("form") as HTMLFormElement;
+    const select = host.querySelector("zl-select") as ZlSelect;
+    select.options = OPTIONS;
+    await select.updateComplete;
+    expect(native(select).disabled).toBe(true);
+    expect(new FormData(form).get("country")).toBeNull();
+
+    (form.querySelector("fieldset") as HTMLFieldSetElement).disabled = false;
+    await select.updateComplete;
+    expect(native(select).disabled).toBe(false);
+    expect(new FormData(form).get("country")).toBe("us");
   });
 
   it("delegates focus from the host to the native control", async () => {

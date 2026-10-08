@@ -13,8 +13,7 @@
   display: none;
 }
 
-/* Atom playground only — `data-state` on `<zl-field>` documents the Figma state
-   columns without needing a real pointer or focus. Not product API. */
+/* Stories only: `data-state` forces an interaction state. Not product API. */
 :host([data-state="hovered"]:not([disabled])) .zr-field:not(.zr-field--invalid):not(.zr-field--success)
   .zr-field__wrap:not(:focus-within) {
   border-color: var(--zl-ring);
@@ -65,14 +64,12 @@
   line-height: var(--zl-text-sm-leading);
   color: inherit;
   text-decoration: none;
-  text-underline-offset: 4px;
+  text-underline-offset: var(--zl-spacing-1);
 }
 .zr-field__link:hover {
   text-decoration: underline;
 }
 .zr-field__link:focus-visible {
-  outline: var(--zl-focus-width) solid var(--zl-ring);
-  outline-offset: var(--zl-focus-offset);
   border-radius: var(--zl-radius-xs);
 }
 .zr-field__required {
@@ -148,7 +145,7 @@
   font-weight: var(--zl-font-weight-normal);
 }
 .zr-field__input[type="password"] {
-  letter-spacing: 0.125rem;
+  letter-spacing: var(--zl-spacing-0-5);
 }
 .zr-field__input::placeholder {
   color: var(--zl-muted-foreground);
@@ -187,8 +184,6 @@
   line-height: 0;
 }
 .zr-field__trailing-action:focus-visible {
-  outline: var(--zl-focus-width) solid var(--zl-ring);
-  outline-offset: var(--zl-focus-offset);
   border-radius: var(--zl-radius-xs);
 }
 .zr-field__trailing-action:disabled {
@@ -201,8 +196,8 @@
   color: var(--zl-success);
 }
 
-/* Description and validation copy all sit at the control's own text size — the
-   sign-up frame's password hint is 14/20, not a smaller caption. */
+/* Description and validation copy sit at the control's own text size, not a
+   smaller caption. */
 .zr-field__help {
   font-size: var(--zl-text-sm-size);
   line-height: var(--zl-text-sm-leading);
@@ -212,9 +207,4 @@
   font-size: var(--zl-text-sm-size);
   line-height: var(--zl-text-sm-leading);
   color: var(--zl-success);
-}
-.zr-field__error {
-  font-size: var(--zl-text-sm-size);
-  line-height: var(--zl-text-sm-leading);
-  color: var(--zl-destructive);
 }
