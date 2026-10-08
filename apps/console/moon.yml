@@ -38,8 +38,12 @@ tasks:
     deps:
       - "build"
 
+  # The same deps as build: sdk-react has no `@zitadel/source` entry, so the
+  # dev server loads its dist.
   dev:
     command: "corepack pnpm run dev"
+    deps:
+      - "sdk-react:build"
     options:
       persistent: true
       runInCI: false
@@ -51,6 +55,10 @@ tasks:
   # project graph, because server:build depends on console:build.
   dev-real:
     command: "corepack pnpm run dev:real"
+    # dev's deps, plus the built `zitadel` CLI the instance boots through.
+    deps:
+      - "sdk-react:build"
+      - "cli:build"
     options:
       persistent: true
       runInCI: false
@@ -61,6 +69,9 @@ tasks:
   # other screen is better served by `dev-real`.
   dev-claim:
     command: "corepack pnpm run dev:claim"
+    deps:
+      - "sdk-react:build"
+      - "cli:build"
     options:
       persistent: true
       runInCI: false

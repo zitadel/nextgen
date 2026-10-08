@@ -43,6 +43,11 @@ tasks:
       # src/app.css imports @zitadel/design-tokens/css/tokens.css.
       - "design-tokens:build"
       - "generate"
+    inputs:
+      - "**/*"
+      # waku picks its adapter from VERCEL, so a Vercel build is never
+      # restored from a local-adapter cache (or the reverse).
+      - "$VERCEL"
     options:
       # Runs waku directly (generation is the `generate` dep), replacing the
       # inherited `pnpm run build` arguments rather than adding to them.
