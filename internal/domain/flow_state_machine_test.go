@@ -4447,7 +4447,8 @@ func TestFlowStateMachine_Process_PurposeToggleDoesNotGrowState(t *testing.T) {
 
 // ssoSchemaContent is the schema behind [ssoRenderWorld]: email and username
 // are project-unique, so the collision check probes them; badge is
-// team-unique, which the probe skips; age is a type union no step renders.
+// team-unique, which the probe skips; age is a type union no step renders;
+// locale and address carry rules a step field does not check.
 const ssoSchemaContent string = `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
@@ -4460,7 +4461,17 @@ const ssoSchemaContent string = `{
 			"given_name":  { "type": "string", "minLength": 1, "maxLength": 200 },
 			"family_name": { "type": "string", "minLength": 1, "maxLength": 200 },
 			"badge":       { "type": "string", "x-unique": "team" },
-			"age":         { "type": ["string", "integer"] }
+			"age":         { "type": ["string", "integer"] },
+			"locale":      { "type": "string", "enum": ["en", "de", "fr"] },
+			"address": {
+				"type": "object",
+				"required": ["country"],
+				"properties": {
+					"street_address": { "type": "string" },
+					"locality":       { "type": "string" },
+					"country":        { "type": "string", "enum": ["DE", "CH"] }
+				}
+			}
 		}
 	}`
 
@@ -6276,24 +6287,57 @@ func TestFlowStateMachine_Process_SSOCollectionCreatesUser(t *testing.T) {
 		wantAttributes map[string]any
 		wantPassword   string
 	}{
-		// A hidden claim replaces what an earlier step collected; a claim no
-		// field can carry is dropped.
+		// A hidden claim replaces what an earlier step collected, and is stored
+		// whatever its type when it satisfies its property.
 		"submitted values and hidden claims": {
 			claims:    map[string]any{"email": "alice@example.com", "badge": "b-7", "age": 42},
 			verified:  map[string]bool{"email": true, "badge": true},
 			collected: map[string]any{"badge": "typed"},
 			edit:      func(map[string]any) {},
 			wantAttributes: map[string]any{
-				"email": "alice@example.com", "username": "alice", "given_name": "Alice", "family_name": "Liddell", "badge": "b-7",
+				"email": "alice@example.com", "username": "alice", "given_name": "Alice", "family_name": "Liddell", "badge": "b-7", "age": 42,
 			},
 		},
 		"hidden claim failing its property": {
 			fields:    []domain.Field{"email", "username", "family_name"},
-			claims:    map[string]any{"email": "alice@example.com", "given_name": "", "badge": "b-7"},
+			claims:    map[string]any{"email": "alice@example.com", "given_name": "", "badge": "b-7", "locale": "en-GB"},
 			collected: map[string]any{"given_name": "Typed"},
 			edit:      func(fields map[string]any) { delete(fields, "given_name") },
 			wantAttributes: map[string]any{
 				"email": "alice@example.com", "username": "alice", "given_name": "Typed", "family_name": "Liddell", "badge": "b-7",
+			},
+		},
+		// The typed leaf wins, and the hidden ones are stored beside it.
+		"hidden leaves beside a shown one": {
+			fields: []domain.Field{"email", "username", "given_name", "family_name", "address.street_address"},
+			claims: map[string]any{"email": "alice@example.com", "badge": "b-7", "address": map[string]any{
+				"street_address": "1 Main St", "locality": "Berlin", "country": "DE",
+			}},
+			edit: func(fields map[string]any) { fields["address.street_address"] = "2 Side St" },
+			wantAttributes: map[string]any{
+				"email": "alice@example.com", "username": "alice", "given_name": "Alice", "family_name": "Liddell", "badge": "b-7",
+				"address": map[string]any{"street_address": "2 Side St", "locality": "Berlin", "country": "DE"},
+			},
+		},
+		"hidden object with a key the schema does not define": {
+			claims: map[string]any{"email": "alice@example.com", "badge": "b-7", "address": map[string]any{
+				"locality": "Berlin", "country": "DE", "planet": "Earth",
+			}},
+			edit: func(map[string]any) {},
+			wantAttributes: map[string]any{
+				"email": "alice@example.com", "username": "alice", "given_name": "Alice", "family_name": "Liddell", "badge": "b-7",
+				"address": map[string]any{"locality": "Berlin", "country": "DE"},
+			},
+		},
+		// country fails its enum, and without it the object fails its own
+		// property, so none of it is stored.
+		"hidden object failing its property": {
+			claims: map[string]any{"email": "alice@example.com", "badge": "b-7", "address": map[string]any{
+				"locality": "Berlin", "country": "Germany",
+			}},
+			edit: func(map[string]any) {},
+			wantAttributes: map[string]any{
+				"email": "alice@example.com", "username": "alice", "given_name": "Alice", "family_name": "Liddell", "badge": "b-7",
 			},
 		},
 		"unverified unique value edited": {

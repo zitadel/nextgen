@@ -655,6 +655,63 @@ func ssoBoundUser(state *FlowState, parked *FlowSSOParkedIdentity) string {
 	return parked.AttemptUserID
 }
 
+// ssoHiddenClaim returns the part of a claim at path that the step does not
+// show and that satisfies its own property, whatever its type. The user cannot
+// see a hidden value to fix it, so an invalid one is left out. A shown field
+// keeps the typed value. An object is checked key by key, and keys the schema
+// does not define are left out. An object with no shown field below it must
+// also satisfy its own property, so an optional object the provider sent
+// incomplete is left out instead of blocking the creation.
+func ssoHiddenClaim(prop schemaReader, path AttributeKey, value any, fields []FlowField) (any, bool) {
+	var shown, below bool
+	for _, f := range fields {
+		shown = shown || f.Name == string(path)
+		below = below || strings.HasPrefix(f.Name, string(path)+".")
+	}
+	if shown {
+		return nil, false
+	}
+	object, ok := value.(map[string]any)
+	if !ok || !prop.HasProperties() {
+		// A shown field below a value that is no object: the claim does not
+		// have the shape the step collects.
+		if below || prop.s.Validate(value) != nil {
+			return nil, false
+		}
+		return value, true
+	}
+	kept := map[string]any{}
+	for key, v := range object {
+		sub, ok := prop.Property(key)
+		if !ok {
+			continue
+		}
+		if v, ok := ssoHiddenClaim(sub, path.AppendNode(key), v, fields); ok {
+			kept[key] = v
+		}
+	}
+	if len(kept) == 0 || (!below && prop.s.Validate(kept) != nil) {
+		return nil, false
+	}
+	return kept, true
+}
+
+// mergeSSOClaim merges the kept part of a claim over the value collected for
+// it, so the typed leaves of an object stay beside the hidden ones. It copies
+// every map it changes: the collected value is the flow state's.
+func mergeSSOClaim(collected, kept any) any {
+	keptObject, ok := kept.(map[string]any)
+	collectedObject, isObject := collected.(map[string]any)
+	if !ok || !isObject {
+		return kept
+	}
+	out := maps.Clone(collectedObject)
+	for key, value := range keptObject {
+		out[key] = mergeSSOClaim(collectedObject[key], value)
+	}
+	return out
+}
+
 // ssoSchemaClaims keeps the claims whose name is a top-level property of the
 // schema and drops the rest.
 func ssoSchemaClaims(schema *jsonschema.Schema, claims map[string]any) map[string]any {
@@ -1300,29 +1357,19 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 		return FlowStepResult{}, fmt.Errorf("flow state machine: load user schema for sso identity: %w", err)
 	}
 	claims := ssoSchemaClaims(schema, collected.Claims)
-	// What the steps collected, this submit's values merged in, and each claim
+	// What the steps collected, this submit's values merged in, and the claims
 	// the step does not show. A claim replaces what an earlier step collected,
-	// so a typed identifier cannot override the provider. A hidden claim that
-	// fails its property is dropped: the user cannot see it to fix it.
+	// so a typed identifier cannot override the provider.
 	attributes := maps.Clone(state.CollectedData.UserData)
 	if attributes == nil {
 		attributes = map[string]any{}
 	}
+	root := newSchemaReader(schema)
 	for name, value := range claims {
-		shown := slices.ContainsFunc(resolved.Fields, func(f FlowField) bool {
-			return f.Name == name || strings.HasPrefix(f.Name, name+".")
-		})
-		if shown {
-			continue
+		prop, _ := root.Property(name)
+		if kept, ok := ssoHiddenClaim(prop, AttributeKey(name), value, resolved.Fields); ok {
+			attributes[name] = mergeSSOClaim(attributes[name], kept)
 		}
-		hidden, err := r.fields.Resolve(schema, step.Name, []Field{Field(name)})
-		if err != nil {
-			continue
-		}
-		if err := r.fields.Validate(hidden, map[string]any{name: value}); err != nil {
-			continue
-		}
-		attributes[name] = value
 	}
 
 	_, uniqueClaims := ssoUniqueClaims(schema, claims)
