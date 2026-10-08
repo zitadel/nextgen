@@ -62,7 +62,8 @@ to be a fast answer to "can I build flow X right now?"
 ### Step response shape
 
 - `name`, `texts` (`title_key`, `description_key`), optional `error`, optional `complete`.
-- `fields` **ordered array** of entries carrying `name`, `type`, `text_key`, `required`, optional `value`, optional `validation` ([ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md)).
+- `fields` **ordered array** of entries carrying `name`, `type`, `text_key`, `required`, optional `value`, optional `read_only`, optional `validation` ([ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md)).
+- `read_only` is set on a `create_user_with_sso` step for a field prefilled from a verified unique claim, since the submit refuses a changed value. Only string claims are prefilled, so a number claim stays editable ([#779](https://github.com/zitadel/nextgen/issues/779)).
 - `actions` **ordered array** of entries carrying `name`, `kind`, `text_key`, and a `primary` flag. The LiquidJS template iterates the arrays in order and builds name-keyed indexes locally for lookup.
 - `challenge` populated on the issue leg of a two-phase ceremony (passkey today): `method`, `challenge_id`, ceremony-specific `options`.
 - `sso_providers` carries `{id, name, template}` per connection the step names, resolved on every render.

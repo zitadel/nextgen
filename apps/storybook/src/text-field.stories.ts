@@ -9,6 +9,7 @@ interface TextFieldArgs {
   placeholder: string;
   required: boolean;
   disabled: boolean;
+  readOnly: boolean;
   invalid: boolean;
   error: string;
   success: string;
@@ -19,7 +20,7 @@ interface TextFieldArgs {
  * Text field atom (`<zl-field>`).
  *
  * One controls-driven story: validity (`invalid`/`error`/`success`),
- * `required`, `disabled`, and the optional forgot-password link are knobs —
+ * `required`, `disabled`, `readOnly`, and the optional forgot-password link are knobs —
  * there are no per-state stories.
  */
 const meta: Meta<TextFieldArgs> = {
@@ -31,6 +32,7 @@ const meta: Meta<TextFieldArgs> = {
     placeholder: "you@example.com",
     required: false,
     disabled: false,
+    readOnly: false,
     invalid: false,
     error: "",
     success: "",
@@ -42,6 +44,7 @@ const meta: Meta<TextFieldArgs> = {
     placeholder: { control: "text" },
     required: { control: "boolean" },
     disabled: { control: "boolean" },
+    readOnly: { control: "boolean" },
     invalid: { control: "boolean" },
     error: { control: "text", description: "Inline error message (forces the invalid treatment)." },
     success: { control: "text", description: "Inline success message." },
@@ -62,6 +65,7 @@ export const Default: Story = {
     placeholder,
     required,
     disabled,
+    readOnly,
     invalid,
     error,
     success,
@@ -73,6 +77,7 @@ export const Default: Story = {
       placeholder=${placeholder}
       ?required=${required}
       ?disabled=${disabled}
+      ?readonly=${readOnly}
       ?invalid=${invalid}
       error=${error || nothing}
       success=${success || nothing}

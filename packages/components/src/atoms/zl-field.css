@@ -15,7 +15,7 @@
 
 /* Atom playground only — `data-state` on `<zl-field>` documents the Figma state
    columns without needing a real pointer or focus. Not product API. */
-:host([data-state="hovered"]:not([disabled])) .zr-field:not(.zr-field--invalid):not(.zr-field--success)
+:host([data-state="hovered"]:not([disabled]):not([readonly])) .zr-field:not(.zr-field--invalid):not(.zr-field--success)
   .zr-field__wrap:not(:focus-within) {
   border-color: var(--zl-ring);
 }
@@ -102,7 +102,7 @@
 .zr-field__wrap--trailing {
   padding-inline-end: var(--zl-spacing-8);
 }
-.zr-field:not(.zr-field--disabled) .zr-field__wrap:hover:not(:focus-within) {
+.zr-field:not(.zr-field--disabled):not(.zr-field--readonly) .zr-field__wrap:hover:not(:focus-within) {
   border-color: var(--zl-ring);
 }
 /* One ring, drawn outside the border, plus the control's own elevation. */
@@ -132,6 +132,11 @@
 .zr-field--disabled .zr-field__wrap:hover {
   border-color: var(--zl-input);
 }
+/* Read-only is a value the user submits, not an unavailable control: the
+   muted fill marks it as fixed, but the text keeps full contrast. */
+.zr-field--readonly .zr-field__wrap {
+  background: var(--zl-muted);
+}
 
 .zr-field__input {
   flex: 1 1 auto;
@@ -160,6 +165,9 @@
 }
 .zr-field__input:disabled {
   cursor: not-allowed;
+}
+.zr-field__input[readonly] {
+  cursor: default;
 }
 
 .zr-field__trailing {

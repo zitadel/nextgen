@@ -1017,7 +1017,8 @@ func (r *FlowStateMachineRuntime) resolveInputs(pc *processCtx) (FlowResolvedFie
 // supplied. A step that creates the user from an SSO identity takes the
 // provider's claims first, so the collected data fills only what the provider
 // left out. Without a parked identity that step renders empty: its submit
-// cannot succeed.
+// cannot succeed. A field showing a verified unique claim is read-only, since
+// the submit refuses a changed value.
 func (r *FlowStateMachineRuntime) prefillStep(ctx context.Context, state *FlowState, step *FlowDefinitionStep, resolved *FlowResolvedFields) error {
 	if step.OnSuccess != nil && *step.OnSuccess == FlowOnSuccessCreateUserWithSso {
 		collected, err := r.ssoIdentities.LoadCollected(ctx, FlowSSOLoadInput{
@@ -1033,6 +1034,17 @@ func (r *FlowStateMachineRuntime) prefillStep(ctx context.Context, state *FlowSt
 			return nil
 		}
 		prefillFromCollected(resolved, collected.Claims)
+		for i := range resolved.Fields {
+			f := &resolved.Fields[i]
+			if f.Unique == AttributeUniquenessUnspecified || !collected.Verified[f.Name] {
+				continue
+			}
+			// The submit refuses any value but this claim, so lock the field
+			// only when the prefill put the claim in it.
+			if _, fromClaim := collectedString(collected.Claims, f.Name); fromClaim {
+				f.ReadOnly = true
+			}
+		}
 	}
 	prefillFromCollected(resolved, state.CollectedData.UserData)
 	return nil

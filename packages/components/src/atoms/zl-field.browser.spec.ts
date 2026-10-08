@@ -129,6 +129,14 @@ describe("<zl-field> form participation (chromium)", () => {
     expect(field.shadowRoot?.activeElement).toBe(input);
   });
 
+  it("submits a read-only value with the form", async () => {
+    const { form, field } = mount(
+      `<form><zl-field name="email" value="alice@acme.com" readonly></zl-field></form>`,
+    );
+    await field.updateComplete;
+    expect(new FormData(form).get("email")).toBe("alice@acme.com");
+  });
+
   it("keeps the clear button out of the tab order but still clickable", async () => {
     const { field } = mount(`<form><zl-field name="email" value="a@b.c"></zl-field></form>`);
     await field.updateComplete;
