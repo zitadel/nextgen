@@ -7,6 +7,8 @@
  * subpaths instead (e.g. `@zitadel/components/atoms`).
  */
 
+import "./internal/lit-dev-mode.js";
+
 import "./atoms/index.js";
 import "./orchestrator/index.js";
 

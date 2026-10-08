@@ -100,7 +100,7 @@ func (h *Handler) GetDeploymentById(ctx context.Context, params api.GetDeploymen
 }
 
 func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeploymentsParams) (api.ListDeploymentsRes, error) {
-	ctx, err := h.requireProjectListAccess(ctx, string(params.ProjectID), deploymentAccess, domain.ResourceKindDeployment)
+	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), deploymentAccess, domain.ResourceKindDeployment)
 	if err != nil {
 		return nil, err
 	}

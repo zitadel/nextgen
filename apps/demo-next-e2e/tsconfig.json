@@ -2,13 +2,19 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "allowJs": true,
-    "outDir": "out-tsc/playwright",
-    "sourceMap": false,
-    "types": ["node"]
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "noEmit": true,
+    "types": [
+      "node"
+    ]
   },
-  // No project references: the specs' only workspace type dep
-  // (@zitadel/testing) resolves to source via the @zitadel/source condition.
-  // Referencing sdk-next/api-mock here redirects transitive @zitadel/api
-  // imports onto their stale out-tsc declaration outputs instead.
-  "include": ["playwright*.config.mts", "src/**/*.ts", "src-real/**/*.ts"]
+  "include": [
+    "playwright*.config.mts",
+    "src-real/**/*.ts",
+    "src/**/*.ts"
+  ]
 }

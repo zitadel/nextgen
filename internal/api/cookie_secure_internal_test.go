@@ -161,6 +161,23 @@ func TestWithRequestHostMiddleware_DrivesCookieSecure(t *testing.T) {
 // The generated client splits the first Set-Cookie line on commas, so no
 // cookie this package builds may contain one: Max-Age, never Expires, and
 // values that are base64url or a nonce.
+// A chain of proxies may append to either forwarded header; the first entry is
+// what the client's request arrived with.
+func TestWithRequestHostMiddleware_ForwardedLists(t *testing.T) {
+	t.Parallel()
+
+	req := httptest.NewRequest(http.MethodGet, "http://backend:8080/flow", nil)
+	req.Header.Set("X-Forwarded-Proto", "https, http")
+	req.Header.Set("X-Forwarded-Host", "app.example.com, lb.internal")
+
+	var got string
+	WithRequestHostMiddleware(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		got, _ = requestOriginFromContext(r.Context())
+	})).ServeHTTP(httptest.NewRecorder(), req)
+
+	assert.Equal(t, "https://app.example.com", got)
+}
+
 func TestCookies_HaveNoComma(t *testing.T) {
 	t.Parallel()
 

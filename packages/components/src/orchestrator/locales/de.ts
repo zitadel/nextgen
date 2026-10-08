@@ -221,6 +221,6 @@ export const de: Locale = {
     "Du hast die Anmeldung beim Anbieter abgebrochen, oder er hat die Anfrage abgelehnt. Versuche es erneut oder nutze eine andere Methode.",
   "error.sso_failed.title": "Anmeldung fehlgeschlagen",
   "error.sso_failed.body":
-    "Der Anbieter konnte die Anmeldung nicht abschließen. Bitte versuche es erneut.",
+    "Die Anmeldung konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
   "error.more_info": "Weitere Informationen",
 };

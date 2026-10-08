@@ -118,9 +118,9 @@ func TestQueryUsers_SessionCaller(t *testing.T) {
 		}
 	})
 
-	// #1300 §4 (relaxed): the session has passed the project Check, so its
-	// expansions and the membership filter run instead of answering 403.
-	t.Run("expand and membership filter pass for a session", func(t *testing.T) {
+	// #1300 §4: a session mints no scopes, so the list check's resolver answer
+	// stands in for them. Project-wide read (Allow) expands and filters.
+	t.Run("expand and membership filter pass for a session that reads the project", func(t *testing.T) {
 		tests := []struct {
 			name string
 			req  *api.QueryUsersRequest
@@ -140,6 +140,33 @@ func TestQueryUsers_SessionCaller(t *testing.T) {
 				}
 				if len(users.listProjectIDs) != 1 {
 					t.Fatalf("ListUsers must run once, got %v", users.listProjectIDs)
+				}
+			})
+		}
+	})
+
+	// A foothold short of project-wide read (Forbidden: a team- or
+	// resource-scoped grant) still lists, through the partial filter, but does
+	// not expand or filter on team_id: 403 user.permission_denied.
+	t.Run("expand and membership filter are refused on a partial foothold", func(t *testing.T) {
+		tests := []struct {
+			name string
+			req  *api.QueryUsersRequest
+		}{
+			{"expand teams", &api.QueryUsersRequest{Expand: []api.UserExpand{api.UserExpandTeams}}},
+			{"team_id filter", &api.QueryUsersRequest{Filter: []api.QueryUsersRequestFilterItem{{
+				Field: api.UserFilterFieldTeamID,
+			}}}},
+			{"expand owner team", &api.QueryUsersRequest{Expand: []api.UserExpand{api.UserExpandLifecycleOwnerTeam}}},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				users := &stubQueryUsersService{}
+				h := queryUsersHandler(t, false, true, users)
+				_, err := h.QueryUsers(userCtx, tt.req, api.QueryUsersParams{})
+				assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
+				if len(users.listProjectIDs) != 0 {
+					t.Fatalf("ListUsers must not run on a refused expansion, got %v", users.listProjectIDs)
 				}
 			})
 		}

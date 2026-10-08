@@ -22,6 +22,8 @@ tasks:
   # deployment check, which runs the npm script in a sandbox without Moon).
   typecheck:
     command: "corepack pnpm run typecheck"
+    deps:
+      - "api:generate"
 
   test:
     command: "corepack pnpm run test:all"
