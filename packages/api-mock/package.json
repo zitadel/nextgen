@@ -42,7 +42,8 @@
     "dev": "tsx watch bin/start.ts",
     "test": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
-    "test:all": "vitest run"
+    "test:all": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json"
   },
   "dependencies": {
     "@mswjs/http-middleware": "catalog:",
@@ -65,6 +66,7 @@
     "msw": "catalog:",
     "playwright": "catalog:",
     "tsx": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:",
     "zod": "catalog:"
   },

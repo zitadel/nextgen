@@ -87,6 +87,8 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   getMyUser: "the end user's own view of themselves, on their own credential",
   patchMyUser: "the end user's own view of themselves, on their own credential",
   getMySession: "the end user's own session, on their own credential",
+  getMySessionCsrfToken:
+    "the session's CSRF token (ADR 053 §5), read on the session's own credential; only the local-admin claim helper, not a command, uses it",
   listMyProjects: "the projects the signed-in user can act on, read on their own credential",
   revokeMySession: "the end user's own session, on their own credential",
 
@@ -196,7 +198,10 @@ const calledOperations = async (): Promise<ReadonlySet<string>> => {
   const context = { client, projectId: "proj_test" } as never;
 
   for (const resource of Object.values(RESOURCES)) {
-    const verbs = resource as Record<string, { call?: (...args: never[]) => unknown } | undefined>;
+    const verbs = resource as unknown as Record<
+      string,
+      { call?: (...args: never[]) => Promise<unknown> } | undefined
+    >;
     for (const verb of ["list", "get", "create", "update", "delete"] as const) {
       // A verb may branch on the shape of its argument — a schema is addressed
       // by revision id or by object type — so every branch is driven, or the
