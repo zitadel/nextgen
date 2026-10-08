@@ -29,17 +29,16 @@ what this ADR records.
 
 ## Decision
 
-**The project is the data boundary.** Users, sessions, tokens, credentials,
+The project is the data boundary. Users, sessions, tokens, credentials,
 audit events, variables and every other runtime record belong to a project.
 Nothing below the project partitions them. Two origins of one project, or a
 preview URL and the project default, read and write the same user base, and a
 session created while one origin served the request belongs to the project.
 
-**Only configuration differs by origin.** Each target serves the revisions
-pinned by its newest deployment's release, as ADR 035 defines a release. That is
-the whole of what varies inside a project.
+Only configuration differs by origin: each target serves the revisions
+pinned by its newest deployment's release, as ADR 035 defines a release.
 
-**Isolated data is a second project.** A staging whose users must not be
+Isolated data is a second project. A staging whose users must not be
 production's users, a sales demo that must not see customer records, a
 customer's own tenant: each is a project, on the same server or another. A
 release belongs to its project, so the same configuration reaches an isolated
@@ -47,7 +46,7 @@ project by being built there again from the same source. The content digest
 ([ADR 035](035-configuration-environments.md#release-bundle), idempotent on
 content) is what lets a pipeline assert that two projects run the same thing.
 
-**No environment entity exists on the server.** There is no `live`, no
+No environment entity exists on the server. There is no `live`, no
 `preview-<name>`, no seeded set, and no lifecycle. What a preview URL has is a
 row admitting that exact URL for a limited time; what a primary hostname has is
 a pattern on the project and its deployment history. The word "environment"
@@ -68,7 +67,7 @@ is bound to, and the server never sees it.
   not hold production secrets, becomes `applies_to` on the variable.
 - Realistic data for testing a promoted release is production's data, on the
   production project, behind a preview URL, or a second project with its own
-  data. There is no third shape.
+  data.
 - The exception ADR 035 notes, that a user record carries the user-schema
   revision it was created against, is unchanged and is per project like the
   user.
