@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { TEST_PROJECT_ID, scopedPath } from "@/test/project-scope.fixture";
+import { scopedPath } from "@/test/project-scope.fixture";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -111,15 +111,6 @@ describe("teams screen", () => {
     expect(await screen.findByText("No active teams yet.")).toBeInTheDocument();
   });
 
-  it("names the search term when nothing matches it", async () => {
-    server.use(http.post(TEAMS_URL, () => HttpResponse.json({ teams: [] })));
-    await renderTeams("/teams?q=zzz");
-
-    // An empty table means something different once a question has been asked
-    // of it: nothing matched, rather than there being nothing there.
-    expect(await screen.findByText("No teams match “zzz”.")).toBeInTheDocument();
-  });
-
   it("opens the team when the row is clicked", async () => {
     server.use(http.post(TEAMS_URL, () => HttpResponse.json({ teams: [team()] })));
     const router = await renderTeams();
@@ -203,41 +194,17 @@ describe("teams screen", () => {
     );
   });
 
-  it("filters by name once the search settles, and keeps the term in the URL", async () => {
+  it("starts from the tab the URL carries", async () => {
     const bodies = recordQueries(() => HttpResponse.json({ teams: [team()] }));
-    const router = await renderTeams();
-
-    await userEvent.type(await screen.findByLabelText("Search teams"), "acme");
-
-    await waitFor(() =>
-      expect(bodies.at(-1)).toMatchObject({
-        filter: [ACTIVE_FILTER, { field: "name", operation: "contains", value: "acme" }],
-      }),
-    );
-    // In the URL rather than in component state: a filtered list is linkable and
-    // moves with the back button.
-    expect(router.state.location.search).toEqual({
-      project: TEST_PROJECT_ID,
-      status: "active",
-      q: "acme",
-    });
-  });
-
-  it("starts from the tab and term the URL carries", async () => {
-    const bodies = recordQueries(() => HttpResponse.json({ teams: [team()] }));
-    await renderTeams("/teams?status=deactivated&q=acme");
+    await renderTeams("/teams?status=deactivated");
 
     await screen.findByRole("table");
     expect(bodies.at(-1)).toMatchObject({
-      filter: [
-        { field: "status", operation: "equals", value: "deactivated" },
-        { field: "name", operation: "contains", value: "acme" },
-      ],
+      filter: [{ field: "status", operation: "equals", value: "deactivated" }],
     });
     expect(screen.getByRole("tab", { name: "Deactivated" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
-    expect(screen.getByLabelText("Search teams")).toHaveValue("acme");
   });
 });

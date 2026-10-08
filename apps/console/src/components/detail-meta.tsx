@@ -20,7 +20,7 @@ import { EYEBROW } from "./typography";
 export function MetaCard({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <Card className={cn("max-w-full gap-0 overflow-x-auto py-0", className)}>
-      <CardContent className="flex flex-col px-5 py-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <CardContent className="flex flex-col px-5 py-3.5 sm:flex-row sm:flex-wrap sm:items-center">
         {children}
       </CardContent>
     </Card>
@@ -54,8 +54,8 @@ export function MetaValue({
           {value}
         </span>
         {/* Sized under the 19px value line so the copy affordance never drives
-            the row height — the card is 61px tall in the design, and a 24px
-            button pushes it to 69. */}
+            the row height — the card is 66px tall in the design, and a 24px
+            button pushes it to 71. */}
         {copyable && (
           <CopyButton
             value={value}

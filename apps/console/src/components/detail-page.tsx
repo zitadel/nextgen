@@ -17,8 +17,7 @@ import { EYEBROW, PAGE_TITLE } from "./typography";
  *
  * The schema and login-flow screens are a different composition — the whole
  * screen is one panel ({@link DetailPanel}) — and keep it. Both share the icon
- * tile ({@link ICON_PLATE}); the login-flow screen also shares the header card
- * (`MetaCard`), while the schema screen shows no id.
+ * tile ({@link ICON_PLATE}) and the header card (`MetaCard`).
  */
 
 /** Page wrapper: the list shell's gutter, 22px under the navbar. */

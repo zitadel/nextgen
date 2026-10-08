@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { Box, MoreVertical, Plus, Search, User } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Box, MoreVertical, Plus, User } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AddUserSheet } from "@/components/add-user-sheet";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
@@ -8,23 +8,21 @@ import {
   LoadMore,
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
-  RESOURCE_HEADER,
+  RESOURCE_TABLE_TOP,
   RESOURCE_TABLE_WRAP,
-  RESOURCE_TITLE,
   ResourceEmptyRow,
   ResourceHeadCell,
   ResourceHeaderRow,
   ResourceMenuHead,
   ResourcePage,
   ResourceRow,
+  ResourceTitle,
   RowMenu,
 } from "@/components/resource-list";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
-import { findShortcutLabel, useFindShortcut } from "@/hooks/use-find-shortcut";
 import { useLoadMore } from "@/hooks/use-load-more";
 import {
   projectScopeDeps,
@@ -69,9 +67,6 @@ function UsersScreen() {
   const projectId = useRequiredProjectScope();
   const loaded = Route.useLoaderData();
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const searchRef = useRef<HTMLInputElement>(null);
-  useFindShortcut(searchRef);
 
   const [columns, setColumns] = useState(loaded.columns);
   const [teamsExpanded, setTeamsExpanded] = useState(loaded.teamsExpanded);
@@ -105,74 +100,33 @@ function UsersScreen() {
 
   const users = useMemo(() => [...loaded.users, ...paging.extra], [loaded.users, paging.extra]);
 
-  // Search narrows the rows already fetched. `POST /users/query` does accept
-  // server-side filters, but not a free-text one across schema-driven
-  // attributes, so this cannot reach users outside the loaded page — which is
-  // why the table says so beneath it.
-  //
-  // It matches every rendered column rather than a fixed name/email/id triple:
-  // the columns are schema-driven, so a hardcoded set would silently fail to
-  // search whatever the project's schema actually defines.
-  const rows = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return users
-      .map((user, index) => toUserRow(user, index, columns))
-      .filter((row) => {
-        if (needle === "") return true;
-        // Team names only while the column is on screen. A later page served
-        // without the expansion drops the column while the rows fetched before it
-        // keep their memberships, and searching those would filter the table on
-        // something the operator cannot see.
-        const teams = teamsExpanded ? row.teams.map((team) => team.name) : [];
-        return [
-          row.id,
-          row.name,
-          row.identifier ?? "",
-          ...teams,
-          ...columns.map((column) => row.values[column.key] ?? ""),
-        ].some((value) => value.toLowerCase().includes(needle));
-      });
-  }, [users, query, columns, teamsExpanded]);
+  const rows = useMemo(
+    () => users.map((user, index) => toUserRow(user, index, columns)),
+    [users, columns],
+  );
 
   return (
     <ResourcePage>
-      <h1 className={`${RESOURCE_HEADER} ${RESOURCE_TITLE}`}>Users</h1>
-
-      <div
-        className={`${RESOURCE_HEADER} mt-6 flex flex-col gap-4 lg:h-10 lg:flex-row lg:items-center lg:justify-end`}
-      >
-        <div className="flex w-full flex-col gap-2.5 lg:w-auto lg:flex-row lg:items-center lg:gap-3">
-          <InputGroup className="lg:w-[373px]">
-            <InputGroupAddon>
-              <Search aria-hidden />
-            </InputGroupAddon>
-            <InputGroupInput
-              ref={searchRef}
-              type="search"
-              name="user-search"
-              placeholder="Search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              aria-label="Search users"
-            />
-            <InputGroupAddon align="inline-end">
-              <kbd className="bg-muted text-muted-foreground pointer-events-none flex h-5 items-center gap-0.5 rounded-sm! px-1.5 font-sans text-[10px] font-medium">
-                {findShortcutLabel()}
-              </kbd>
-            </InputGroupAddon>
-          </InputGroup>
+      {/* No search beside the title: it is out of the page headers until there
+          is a console-wide solution (D19). */}
+      <ResourceTitle
+        action={
           <AddUserSheet onCreated={() => router.invalidate()}>
-            <Button className="w-full lg:w-auto">
-              Add
+            {/* `px-2.5!` — `Button`'s `has-[>svg]:px-3` out-specifies a plain
+                `px-2.5`, which renders the 68px control at 72px. */}
+            <Button className="shrink-0 gap-1.5 px-2.5!">
               <Plus aria-hidden />
+              Add
             </Button>
           </AddUserSheet>
-        </div>
-      </div>
+        }
+      >
+        Users
+      </ResourceTitle>
 
       {/* The column set is schema-driven and so has no fixed width; the design
           scrolls the table horizontally rather than compressing cells. */}
-      <div className={`${RESOURCE_TABLE_WRAP} mt-6`}>
+      <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
         <Table className="text-xs">
           <TableHeader>
             <ResourceHeaderRow>
@@ -191,7 +145,7 @@ function UsersScreen() {
           <TableBody>
             {rows.length === 0 ? (
               <ResourceEmptyRow colSpan={columns.length + (teamsExpanded ? 6 : 5)}>
-                {users.length === 0 ? "No users yet." : "No users match the current filters."}
+                "No users yet."
               </ResourceEmptyRow>
             ) : (
               rows.map((user) => (

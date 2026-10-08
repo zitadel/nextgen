@@ -8,7 +8,7 @@ import {
   type PreviewState,
 } from "@/components/branding/login-preview";
 import { SettingsPanel } from "@/components/branding/settings-panel";
-import { RESOURCE_HEADER, RESOURCE_PAGE } from "@/components/resource-list";
+import { ResourcePage, ResourceTitle } from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -150,10 +150,8 @@ function BrandingScreen() {
   const revisionMode = revision.theme?.mode ?? "auto";
 
   return (
-    <div className={`${RESOURCE_PAGE} pt-4`}>
-      <div className={`${RESOURCE_HEADER} flex h-9 items-center`}>
-        <h1 className="font-serif text-2xl leading-6 tracking-tight text-foreground">Branding</h1>
-      </div>
+    <ResourcePage>
+      <ResourceTitle>Branding</ResourceTitle>
 
       {/* Three rows on a phone, one on a desktop: the flow selector, then the
           tabs with the environment buttons edge-aligned, then the state
@@ -270,7 +268,7 @@ function BrandingScreen() {
           <SettingsPanel revision={revision} />
         </Card>
       </div>
-    </div>
+    </ResourcePage>
   );
 }
 
