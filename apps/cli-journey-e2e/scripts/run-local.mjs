@@ -21,11 +21,6 @@ import { parseLocalJourneyArgs } from "./run-options.mjs";
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, "..");
 const repoRoot = resolve(projectRoot, "../..");
-// Playwright's CLI runs under node rather than through `pnpm exec` (a pnpm
-// started under `pnpm run e2e-local` re-checks every workspace package and
-// warns about the platform-specific server binaries) or its `.bin` shim
-// (which Windows only provides as a `.cmd` that spawn cannot start).
-const playwrightCli = join(projectRoot, "node_modules", "@playwright", "test", "cli.js");
 
 const options = parseArgsOrExit(process.argv.slice(2));
 if (options.help) {
@@ -343,25 +338,37 @@ async function runFrameworkJourney(context) {
     );
 
     log(`[${prefix}] running Playwright journey`);
-    await run(process.execPath, [playwrightCli, "test", "--config", "playwright.config.mts"], {
-      cwd: projectRoot,
-      env: {
-        ...process.env,
-        JOURNEY_APP_DIR: context.appDir,
-        JOURNEY_APP_URL: context.appUrl,
-        JOURNEY_FRAMEWORK: framework.id,
-        JOURNEY_OUTPUT_DIR: context.frameworkWorkDir,
-        JOURNEY_PLAYWRIGHT_OUTPUT_DIR: context.playwrightOutputDir,
-        JOURNEY_PLAYWRIGHT_REPORT_DIR: context.playwrightReportDir,
-        // The claim spec spawns the CLI through the journey registry, which
-        // needs the same npmrc the prepare-app steps used.
-        NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
-        // Always explicit ("" = default preset / fresh scaffold): see the
-        // prepare-app note.
-        JOURNEY_PREEXISTING_APP: context.preexistingApp ? "1" : "",
-        JOURNEY_PRESET: context.preset,
+    await run(
+      "corepack",
+      [
+        "pnpm",
+        "--filter",
+        "@zitadel/cli-journey-e2e",
+        "exec",
+        "playwright",
+        "test",
+        "--config",
+        "playwright.config.mts",
+      ],
+      {
+        env: {
+          ...process.env,
+          JOURNEY_APP_DIR: context.appDir,
+          JOURNEY_APP_URL: context.appUrl,
+          JOURNEY_FRAMEWORK: framework.id,
+          JOURNEY_OUTPUT_DIR: context.frameworkWorkDir,
+          JOURNEY_PLAYWRIGHT_OUTPUT_DIR: context.playwrightOutputDir,
+          JOURNEY_PLAYWRIGHT_REPORT_DIR: context.playwrightReportDir,
+          // The claim spec spawns the CLI through the journey registry, which
+          // needs the same npmrc the prepare-app steps used.
+          NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
+          // Always explicit ("" = default preset / fresh scaffold): see the
+          // prepare-app note.
+          JOURNEY_PREEXISTING_APP: context.preexistingApp ? "1" : "",
+          JOURNEY_PRESET: context.preset,
+        },
       },
-    });
+    );
     log(`[${prefix}] journey passed`);
   } catch (error) {
     await collectDiagnostics(context);
@@ -524,9 +531,15 @@ function validatePortValue(value, name) {
 
 async function ensurePlaywrightBrowsers() {
   log("ensuring Playwright Chromium browsers are installed");
-  await run(process.execPath, [playwrightCli, "install", "chromium"], {
-    cwd: projectRoot,
-  });
+  await run("corepack", [
+    "pnpm",
+    "--filter",
+    "@zitadel/cli-journey-e2e",
+    "exec",
+    "playwright",
+    "install",
+    "chromium",
+  ]);
 }
 
 async function buildJourneyRuntimeImage() {

@@ -33,7 +33,7 @@ export default defineConfig({
       include: [...(baseTest.coverage?.include ?? []), "dist/**/*.mjs"],
     },
     // The oclif dist the integration suite drives is built by the `pretest`
-    // hook for a direct `pnpm test`, and by the `build` task moon's `test`
-    // depends on for a moon run, so both start from a fresh build.
+    // hook (`pnpm run build`), so a direct `pnpm test` and a moon run are both
+    // self-contained with a fresh build. Same lifecycle-hook pattern as config.
   },
 });

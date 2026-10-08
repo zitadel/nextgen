@@ -93,8 +93,7 @@ jobs:
 
       - name: Install Playwright Chromium
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.browsers == 'true' }}
-        working-directory: packages/components
-        run: corepack pnpm exec playwright install chromium
+        run: corepack pnpm --filter @zitadel/components exec playwright install chromium
 
       - name: Keep Docker's interface churn away from Chromium
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}

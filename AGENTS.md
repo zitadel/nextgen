@@ -167,34 +167,6 @@ Moon release workflows, or package versioning behavior.
 Prefer Moon project tasks for narrow package work, for example
 `moon run cli:test`.
 
-### Package scripts and Moon tasks
-
-Moon orders work across packages; a package's scripts only do that package's
-own work.
-
-- When package B needs package A built first, that is a Moon dep (`deps` on
-  `a:build`, with the matching `package.json` dependency; see
-  [.moon/AGENTS.md](.moon/AGENTS.md)). A script never does another package's
-  work: no `cd ../other`, no `pnpm --filter`.
-- Inside one package, scripts may chain each other with `node --run` and
-  `pre<name>`/`post<name>` hooks (`enable-pre-post-scripts` is on), e.g. a
-  `pretest` that runs the package's own `build`.
-- A script never starts a package manager or Moon (`pnpm run`, `pnpm exec`,
-  `npx`, `bun`, `moon run`): a pnpm started from inside a pnpm script re-checks
-  every workspace package and prints "Unsupported platform" warnings for the
-  platform-specific `apps/server-*` packages, and a nested `moon run` hides a
-  task edge from the graph. Use `node --run` for the package's own scripts.
-- Scripts are plain commands: no command substitution, `eval`/`source`,
-  inline `sh -c` scripts, or wrappers that start other commands (`cross-env`,
-  `dotenv`, `run-s`, `concurrently`), which would hide a package manager from
-  the check.
-- Code that must start a tool from inside a script runs the tool's CLI file
-  with node (`[process.execPath, "node_modules/vite/bin/vite.js"]`), not
-  `pnpm exec`, and not the `node_modules/.bin` shim, which is a `.cmd` on
-  Windows that `spawn` cannot start without a shell.
-
-`scripts/check-package-scripts.mjs` enforces this in `workspace:test`.
-
 Moon manages TypeScript workspace targets, Go checks, and release build tasks.
 Long-running customer-style local orchestration still runs through repository
 scripts so server processes are signaled and cleaned up directly.

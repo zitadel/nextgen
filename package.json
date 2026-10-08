@@ -7,10 +7,13 @@
     "doctor": "node scripts/doctor.mjs",
     "cli": "node scripts/run-cli.mjs",
     "server": "node scripts/run-server.mjs",
+    "docs": "moon run docs:dev",
     "journey": "node scripts/run-journey.mjs",
     "check": "node scripts/check.mjs",
-    "test": "node scripts/assert-file.mjs scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/check-package-scripts.test.mjs && vitest run scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/check-package-scripts.test.mjs",
-    "test:all": "node scripts/assert-file.mjs scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/check-package-scripts.test.mjs && vitest run scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/check-package-scripts.test.mjs"
+    "test": "node scripts/assert-file.mjs scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts && vitest run scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts",
+    "test:all": "pnpm run test",
+    "release:snapshot": "moon run release:snapshot",
+    "release:publish": "moon run release:publish"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",

@@ -1,4 +1,4 @@
 ---
 ---
 
-Moon orders work across packages and package scripts stay inside their package; nothing ships.
+Moon tasks declare the builds they need from other packages; nothing ships.

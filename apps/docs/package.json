@@ -7,9 +7,9 @@
   "scripts": {
     "generate:openapi": "node scripts/bundle-openapi.mjs",
     "generate:source": "fumadocs-mdx",
-    "generate": "node scripts/bundle-openapi.mjs && fumadocs-mdx",
-    "dev": "node scripts/bundle-openapi.mjs && fumadocs-mdx && waku dev --port 3003",
-    "build": "node scripts/bundle-openapi.mjs && fumadocs-mdx && waku build",
+    "generate": "pnpm run generate:openapi && pnpm run generate:source",
+    "dev": "pnpm run generate && waku dev --port 3003",
+    "build": "pnpm run generate && waku build",
     "preview": "node scripts/preview.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json"
   },

@@ -81,9 +81,9 @@
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
-    "pretest": "node --run build",
+    "pretest": "pnpm run build",
     "test": "vitest run",
-    "test:all": "vitest run",
+    "test:all": "pnpm run test",
     "readme": "oclif readme",
     "prepack": "tsdown && oclif manifest",
     "postpack": "rm -f oclif.manifest.json"

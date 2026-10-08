@@ -88,13 +88,13 @@
   },
   "scripts": {
     "sync-schemas": "node scripts/sync-meta-schemas.mjs",
-    "prebuild": "node --run sync-schemas",
+    "prebuild": "pnpm run sync-schemas",
     "build": "tsdown",
-    "pretypecheck": "node --run sync-schemas",
+    "pretypecheck": "pnpm run sync-schemas",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
-    "pretest": "node --run sync-schemas",
+    "pretest": "pnpm run sync-schemas",
     "test": "vitest run",
-    "test:all": "node --run sync-schemas && vitest run"
+    "test:all": "pnpm run test"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",

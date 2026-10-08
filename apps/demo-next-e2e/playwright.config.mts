@@ -2,14 +2,6 @@ import { defineConfig, devices } from "@playwright/test";
 import { resolve } from "node:path";
 
 const workspaceRoot = resolve(import.meta.dirname, "../..");
-const apiMockDir = resolve(workspaceRoot, "packages", "api-mock");
-const demoDir = resolve(workspaceRoot, "apps", "demo-next");
-
-// Runs a package's CLI under this node rather than through its package script:
-// a script would hide a step from Moon's task graph, `node --run` does not pass
-// the runner's SIGTERM on, and the `.bin` shims are `.cmd` files on Windows.
-const nodeCli = (cli: string, ...args: string[]) =>
-  [process.execPath, cli, ...args].map((arg) => `"${arg}"`).join(" ");
 
 /**
  * E2E coverage for the embedded sign-in path:
@@ -35,30 +27,22 @@ export default defineConfig({
   // it on the very first request. `reuseExistingServer` lets developers
   // run either server manually and have Playwright skip its own boot.
   //
-  // These are api-mock's `start` and demo-next's `dev` scripts. Playwright owns
-  // the long-running processes; what they need built is the e2e task's deps.
+  // Direct pnpm filter commands keep these long-running processes outside
+  // Moon's task graph; Playwright owns their lifecycle for this e2e suite.
   webServer: [
     {
-      command: nodeCli(
-        resolve(apiMockDir, "node_modules", "tsx", "dist", "cli.mjs"),
-        "bin/start.ts",
-      ),
+      command: "pnpm --filter @zitadel/api-mock start",
       url: "http://localhost:8080/.well-known/jwks.json",
       reuseExistingServer: true,
-      cwd: apiMockDir,
+      cwd: workspaceRoot,
       stdout: "pipe",
       stderr: "pipe",
     },
     {
-      command: nodeCli(
-        resolve(demoDir, "node_modules", "next", "dist", "bin", "next"),
-        "dev",
-        "--port",
-        "3002",
-      ),
+      command: "pnpm --filter @zitadel/demo-next dev",
       url: "http://localhost:3002/login",
       reuseExistingServer: true,
-      cwd: demoDir,
+      cwd: workspaceRoot,
       stdout: "pipe",
       stderr: "pipe",
       timeout: 60_000,

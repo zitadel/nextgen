@@ -43,9 +43,9 @@ corepack pnpm exec playwright install        # one-time, browsers
 moon run demo-nuxt-e2e:e2e
 ```
 
-Moon builds `@zitadel/sdk-nuxt` (and the packages it pulls in) first through
-task dependencies, then Playwright boots `api-mock` (`:8081`) and `demo-nuxt`
-(`:3001`) by running the CLIs their `start` and `dev` scripts run, under node.
+Moon rebuilds `@zitadel/components` first through task dependencies, then
+Playwright boots `api-mock` (`:8081`) and `demo-nuxt` (`:3001`) through
+direct `pnpm --filter` commands.
 
 The api-mock listens on `:8081` here (not the default `:8080` used by
 `apps/demo-next-e2e/`) so this project can run in parallel with it under

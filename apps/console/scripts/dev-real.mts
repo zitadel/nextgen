@@ -313,17 +313,14 @@ if (seedOnly) {
 } else {
   // `--port` from the origin: everything else here honours CONSOLE_DEV_ORIGIN,
   // and without this vite stays pinned to its config's 5174 and a second
-  // worktree collides with the first. vite (the console's `dev` script) runs
-  // directly: a nested pnpm would warn about the platform-specific server
-  // packages, and `node --run` does not pass signals on to the script it
-  // starts.
+  // worktree collides with the first. Passed to the `dev` script rather than
+  // around it, so future flags on that script still apply here. No `--`
+  // separator: pnpm swallows the args with one and vite never sees them.
   const consolePort = new URL(consoleOrigin).port;
-  const viteArgs = consolePort ? ["--port", consolePort] : [];
-  // vite's CLI under node: its `.bin` shim is a `.cmd` on Windows, which spawn
-  // cannot start without a shell.
-  const viteCli = join(appDir, "node_modules", "vite", "bin", "vite.js");
-  const vite = spawn(process.execPath, [viteCli, ...viteArgs], {
-    cwd: appDir,
+  const viteArgs = ["pnpm", "--filter", "@zitadel/console", "dev"];
+  if (consolePort) viteArgs.push("--port", consolePort);
+  const vite = spawn("corepack", viteArgs, {
+    cwd: workspaceRoot,
     stdio: "inherit",
     env: {
       ...process.env,

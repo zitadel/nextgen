@@ -2,14 +2,6 @@ import { defineConfig, devices } from "@playwright/test";
 import { resolve } from "node:path";
 
 const workspaceRoot = resolve(import.meta.dirname, "../..");
-const apiMockDir = resolve(workspaceRoot, "packages", "api-mock");
-const demoDir = resolve(workspaceRoot, "apps", "demo-nuxt");
-
-// Runs a package's CLI under this node rather than through its package script:
-// a script would hide a step from Moon's task graph, `node --run` does not pass
-// the runner's SIGTERM on, and the `.bin` shims are `.cmd` files on Windows.
-const nodeCli = (cli: string, ...args: string[]) =>
-  [process.execPath, cli, ...args].map((arg) => `"${arg}"`).join(" ");
 
 /**
  * E2E coverage for the embedded sign-in path on Nuxt:
@@ -34,9 +26,8 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   // Boot the mock auth server first so Nitro can proxy to it on the very
-  // first request. These are api-mock's `start` and demo-nuxt's `dev` scripts.
-  // Playwright owns the long-running processes; what they need built is the
-  // e2e task's deps.
+  // first request. Direct pnpm filter commands keep these long-running
+  // processes outside Moon's task graph; Playwright owns their lifecycle.
   //
   // The api-mock listens on PORT 8081 here so this project can run in
   // parallel with `apps/demo-next-e2e/` (which uses the default 8080).
@@ -45,13 +36,10 @@ export default defineConfig({
   // application code changes.
   webServer: [
     {
-      command: nodeCli(
-        resolve(apiMockDir, "node_modules", "tsx", "dist", "cli.mjs"),
-        "bin/start.ts",
-      ),
+      command: "pnpm --filter @zitadel/api-mock start",
       url: "http://localhost:8081/.well-known/jwks.json",
       reuseExistingServer: true,
-      cwd: apiMockDir,
+      cwd: workspaceRoot,
       stdout: "pipe",
       stderr: "pipe",
       env: {
@@ -59,15 +47,10 @@ export default defineConfig({
       },
     },
     {
-      command: nodeCli(
-        resolve(demoDir, "node_modules", "nuxt", "bin", "nuxt.mjs"),
-        "dev",
-        "--port",
-        "3001",
-      ),
+      command: "pnpm --filter @zitadel/demo-nuxt dev",
       url: "http://localhost:3001/login",
       reuseExistingServer: true,
-      cwd: demoDir,
+      cwd: workspaceRoot,
       stdout: "pipe",
       stderr: "pipe",
       timeout: 120_000,

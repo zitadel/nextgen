@@ -9,8 +9,8 @@ export default defineConfig({
     name: "@zitadel/config",
     environment: "node",
     // meta-schemas are synced before Vitest runs, not by a global setup: the
-    // `pretest` hook (`node scripts/sync-meta-schemas.mjs`) covers a direct
-    // `pnpm test`, `test:all` runs the same sync itself, and the moon
-    // `sync-schemas` dep (mutex: generated-sources) covers the moon graph.
+    // `pretest` lifecycle hook (`pnpm run sync-schemas`) covers a direct
+    // `pnpm test` / `pnpm test:all`, and the moon `sync-schemas` dep
+    // (mutex: generated-sources) covers the moon graph.
   },
 });

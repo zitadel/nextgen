@@ -72,7 +72,7 @@
     "generate": "orval --config orval.config.ts --clean",
     "build": "tsdown",
     "test": "vitest run",
-    "test:all": "vitest run",
+    "test:all": "pnpm run test",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json"
   },
   "devDependencies": {

@@ -53,15 +53,8 @@ export default defineConfig({
       serverBinaryHint: "run `moon run server:build` first.",
     },
     app: {
-      // The console's `dev` script, run as vite's CLI under node: a nested
-      // pnpm would warn about the platform-specific server packages,
-      // `node --run` does not pass the runner's SIGTERM on (orphaning vite),
-      // and the `.bin` shim is a `.cmd` on Windows that spawn cannot start.
-      command: [
-        process.execPath,
-        join(workspaceRoot, "apps", "console", "node_modules", "vite", "bin", "vite.js"),
-      ],
-      cwd: join(workspaceRoot, "apps", "console"),
+      command: ["corepack", "pnpm", "--filter", "@zitadel/console", "dev"],
+      cwd: workspaceRoot,
       readyPath: "/projects",
       env: consoleAppEnv,
       gracefulShutdownMs: 10_000,

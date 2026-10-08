@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "test": "vitest run",
-    "test:all": "vitest run",
+    "test:all": "pnpm run test",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "prepare-app": "node scripts/prepare-app.mjs",
     "publish-tarballs": "node scripts/publish-tarballs.mjs",
