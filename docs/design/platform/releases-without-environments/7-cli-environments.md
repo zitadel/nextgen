@@ -214,8 +214,12 @@ as well as picking one from a list; the list only removes a copy-paste.
 $ zitadel setup
 server   local (http://localhost:8080)
 project  prj_01KDEV7T9QX3M2E8  (created)
-wrote    zitadel.json, .zitadel/secret, .env.local, .env.example
+wrote    zitadel.json, .zitadel/secret, .env.development.local, .env.example
 ```
+
+`setup` writes the development environment's own file and leaves `.env.local`
+alone, so a later `vercel env pull` fills `.env.local` without touching what
+`next dev` reads first.
 
 ### Adding production
 
