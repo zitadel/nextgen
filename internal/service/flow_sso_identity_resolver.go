@@ -420,7 +420,7 @@ func (r *FlowSSOIdentityResolver) FindUniqueOwner(ctx context.Context, projectID
 			slog.String("flow_schema_url", userSchemaURL),
 			slog.String("user_schema_url", user.SchemaURL),
 		)
-		return "", domain.ErrFlowRestartRequired()
+		return "", domain.ErrSSOOwnerOtherSchema
 	}
 	return user.ID, nil
 }

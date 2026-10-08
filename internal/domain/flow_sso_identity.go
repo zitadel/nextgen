@@ -1,6 +1,14 @@
 package domain
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+// ErrSSOOwnerOtherSchema reports a unique value held by a user of another
+// schema than the flow's. A provider's claim cannot be changed, so the
+// callback restarts the flow; a typed value can, so the step shows it taken.
+var ErrSSOOwnerOtherSchema = errors.New("sso: unique value is owned by a user of another schema")
 
 // FlowSSOIdentityService reads and settles the external identity an SSO
 // callback parked on the flow's auth attempt. The domain cannot parse a
@@ -37,7 +45,7 @@ type FlowSSOIdentityService interface {
 	// FindUniqueOwner returns the user owning value in the unique attribute,
 	// or "" with a nil error when nobody does. It only reads: unlike an
 	// identifier submission it records nothing on the attempt. It returns
-	// ErrFlowRestartRequired when the owner is a user of another schema than
+	// ErrSSOOwnerOtherSchema when the owner is a user of another schema than
 	// the flow's.
 	FindUniqueOwner(ctx context.Context, projectID, userSchemaURL, attribute, value string) (userID string, err error)
 	// CreateLinked creates the user, its identity link and the attempt

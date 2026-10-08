@@ -534,6 +534,9 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 			result, err := r.renderStepError(pc, resolvedFields, &msg)
 			return result, true, err
 		}
+		if errors.Is(err, ErrSSOOwnerOtherSchema) {
+			return FlowStepResult{}, false, ErrFlowRestartRequired().WithParent(err)
+		}
 		if err != nil {
 			return FlowStepResult{}, false, err
 		}
@@ -1402,6 +1405,11 @@ func (r *FlowStateMachineRuntime) ssoCollectionBindResult(pc *processCtx, resolv
 		return result, true, err
 	case errors.Is(err, errSSOUnroutable):
 		result, err := r.renderStepError(pc, resolved, new(FlowStepErrorSSOUnavailable))
+		return result, true, err
+	case errors.Is(err, ErrSSOOwnerOtherSchema):
+		// The user typed the value and can change it, so it shows taken, as
+		// for any other taken value. Only the log names the other schema.
+		result, err := r.renderStepError(pc, resolved, new(FlowStepErrorUserAlreadyExists))
 		return result, true, err
 	case err != nil:
 		return FlowStepResult{}, true, err

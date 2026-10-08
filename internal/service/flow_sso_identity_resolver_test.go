@@ -911,7 +911,7 @@ func TestFlowSSOIdentityResolver_FindUniqueOwner(t *testing.T) {
 		// another schema that also marks the property project-unique.
 		"owner of another schema": {
 			user:    &domain.User{ID: "user-9", SchemaURL: "https://example.test/user/v1/other.user.schema.json"},
-			wantErr: domain.ErrFlowRestartRequired(),
+			wantErr: domain.ErrSSOOwnerOtherSchema,
 		},
 		"error": {err: boom, wantErr: boom},
 	} {

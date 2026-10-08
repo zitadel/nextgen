@@ -4935,7 +4935,7 @@ func TestFlowStateMachine_Render_SSOCollisionOwnerOfAnotherSchemaRestarts(t *tes
 	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, nil), nil)
 	w.ssoIdentities.EXPECT().
 		FindUniqueOwner(gomock.Any(), testProjectID, defaultSchemaURL, "email", "alice@example.com").
-		Return("", domain.ErrFlowRestartRequired())
+		Return("", domain.ErrSSOOwnerOtherSchema)
 	w.ssoIdentities.EXPECT().BindCollision(gomock.Any(), gomock.Any()).Times(0)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
@@ -6429,6 +6429,15 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 				probeMisses(w)
 				w.expectCreateLinked(complete, "", "", domain.ErrUserAlreadyExists())
 				probeMisses(w)
+			},
+			wantErr: domain.FlowStepErrorUserAlreadyExists,
+		},
+		// Unlike the callback, the submit does not restart: the user typed the
+		// value and can change it.
+		"value held by a user of another schema": {
+			expect: func(w *flowTestWorld) {
+				w.expectOwner("email", "alice@example.com", "")
+				w.expectOwner("username", "alice", "").Return("", domain.ErrSSOOwnerOtherSchema)
 			},
 			wantErr: domain.FlowStepErrorUserAlreadyExists,
 		},
