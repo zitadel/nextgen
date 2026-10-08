@@ -298,3 +298,22 @@ instance; measure before deciding whether that needs a shorter schedule.
 
 Phase 1 is complete: database compatibility, raw TCP egress on 5432 with TLS,
 and platform latency are all proven.
+
+## Repo shape (decided 2026-10-07)
+
+The cloud is the product surface a visitor experiences: website, docs and
+the server. All three ship from this repo as sibling Vercel projects:
+
+- `apps/cloud` (this PR): the server container. It keeps its own hostnames
+  per the design docs (`{region}.zitadel.cloud`, dashboard subdomain)
+  because the API has no path prefix and cannot be path-composed under the
+  website's origin without shadowing marketing pages.
+- `apps/docs` (exists): composed under `zitadel.com/docs` via Vercel
+  Microfrontends, with the website as the default app.
+- `apps/website` (later): imported from `zitadel/new-website` onto moon,
+  biome and changesets; content PRs must not trigger the Go gates. Spike
+  first on a branch, then the microfrontends config.
+
+`apps/cloud` is **not** moved to the website or infra repos: the entrypoint
+mirrors server config semantics and the deploy is a function of the pinned
+server version, so it changes in the same PRs as the server.
