@@ -15,10 +15,6 @@ inheritedBy:
 # a tsconfig edit). These files change rarely; under-selection here previously
 # let such changes land with zero CI coverage.
 implicitInputs:
-  # Moon's automatic config input only covers `.moon/*.yml`, not this
-  # directory — without this self-reference, edits to scoped task configs are
-  # themselves invisible to `moon ci` selection.
-  - "/.moon/tasks/**/*.yml"
   # Extended by every {apps,packages}/*/tsconfig*.json.
   - "/tsconfig.base.json"
   # The shared Biome config that the inherited `lint` task below runs against;
@@ -31,12 +27,6 @@ implicitInputs:
   # (and unselected by `moon ci`), running stale config.
   - "/vitest.shared.mjs"
   - "/vitest.shared.d.mts"
-  # The resolved dependency versions. Projects run on the system toolchain, so
-  # moon hashes no package versions of its own; without these a dependency
-  # bump (a lockfile or catalog change) would replay every typecheck, build
-  # and test from the cache instead of running them against the new versions.
-  - "/pnpm-lock.yaml"
-  - "/pnpm-workspace.yaml"
 
 tasks:
   # Single standardized linter + formatter for every TypeScript project: Biome

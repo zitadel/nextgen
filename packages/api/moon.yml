@@ -7,11 +7,8 @@ tasks:
   generate:
     command: "corepack pnpm run generate"
     inputs:
+      - "**/*"
       - "/api/openapi/**/*.yaml"
-      - "orval.config.ts"
-      # Defines the `generate` script; explicit inputs drop the default `**/*`.
-      - "package.json"
-      - "src/runtime/**/*.ts"
     outputs:
       - "src/generated/**/*"
     options:
