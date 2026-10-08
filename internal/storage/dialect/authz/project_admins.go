@@ -15,8 +15,13 @@ import "github.com/zitadel/nextgen/internal/domain"
 // It follows the authorization check: team members are read from the
 // membership edges the resolver expands, grant expiry is compared to the
 // dialect clock, and a grant to a user only counts while the user exists.
-// Principals are located through resource_scope_index, so every lookup after
-// it is by primary key.
+//
+// It picks the page's people before reading everyone's sources: the
+// candidates are the members of the viewer's own admin teams and the users
+// granted directly, so a team the viewer is not in is never expanded, however
+// large. Sources are then read only for the page's people. Principals are
+// located through resource_scope_index, so every lookup after it is by
+// primary key.
 func WriteProjectAdminSources(w ArgWriter, env Env, projectID, afterUserID, viewerUserID string, limit uint32) {
 	w.WriteString(`
 WITH owning AS (
@@ -51,19 +56,17 @@ admin_teams AS (
   FROM admin_grants g
   WHERE g.principal_type = 'team'
 ),
-sources AS (
-  SELECT e.member_id AS user_id, e.project_id AS home_project_id, t.source_rank, t.grant_id, t.team_id
+team_homes AS (
+  SELECT t.team_id, t.grant_id, t.source_rank, r.project_id AS home_project_id
   FROM admin_teams t
   JOIN `)
 	writeTable(w, env, "resource_scope_index")
 	w.WriteString(` r ON r.resource_id = t.team_id AND r.resource_kind = `)
 	w.WriteArg(string(domain.ResourceKindTeam))
 	w.WriteString(`
-  JOIN `)
-	writeTable(w, env, "authz_membership_edges")
-	w.WriteString(` e ON e.project_id = r.project_id AND e.set_type = 'team' AND e.set_id = t.team_id AND e.member_type = 'user'
-  UNION ALL
-  SELECT u.id, u.project_id, 2, g.id, ''
+),
+direct AS (
+  SELECT u.id AS user_id, u.project_id AS home_project_id, g.id AS grant_id
   FROM admin_grants g
   JOIN `)
 	writeTable(w, env, "resource_scope_index")
@@ -76,23 +79,51 @@ sources AS (
   WHERE g.principal_type = 'user'
 ),
 viewer_teams AS (
-  SELECT DISTINCT team_id
-  FROM sources
-  WHERE user_id = `)
+  SELECT DISTINCT th.team_id
+  FROM team_homes th
+  JOIN `)
+	writeTable(w, env, "authz_membership_edges")
+	w.WriteString(` e ON e.project_id = th.home_project_id AND e.set_type = 'team' AND e.set_id = th.team_id
+    AND e.member_type = 'user' AND e.member_id = `)
 	w.WriteArg(viewerUserID)
-	w.WriteString(` AND team_id <> ''
+	w.WriteString(`
 ),
 people AS (
   SELECT DISTINCT user_id
-  FROM sources
-  WHERE user_id > `)
+  FROM (
+    SELECT e.member_id AS user_id
+    FROM team_homes th
+    JOIN `)
+	writeTable(w, env, "authz_membership_edges")
+	w.WriteString(` e ON e.project_id = th.home_project_id AND e.set_type = 'team' AND e.set_id = th.team_id
+      AND e.member_type = 'user'
+    WHERE th.team_id IN (SELECT team_id FROM viewer_teams) AND e.member_id > `)
 	w.WriteArg(afterUserID)
 	w.WriteString(`
-    AND (team_id = '' OR team_id IN (SELECT team_id FROM viewer_teams))
+    UNION ALL
+    SELECT d.user_id
+    FROM direct d
+    WHERE d.user_id > `)
+	w.WriteArg(afterUserID)
+	w.WriteString(`
+  ) candidates
   ORDER BY user_id
   LIMIT `)
 	w.WriteArg(int64(limit))
 	w.WriteString(`
+),
+sources AS (
+  SELECT p.user_id, th.home_project_id, th.source_rank, th.grant_id, th.team_id
+  FROM people p
+  CROSS JOIN team_homes th
+  JOIN `)
+	writeTable(w, env, "authz_membership_edges")
+	w.WriteString(` e ON e.project_id = th.home_project_id AND e.set_type = 'team' AND e.set_id = th.team_id
+    AND e.member_type = 'user' AND e.member_id = p.user_id
+  UNION ALL
+  SELECT d.user_id, d.home_project_id, 2, d.grant_id, ''
+  FROM direct d
+  JOIN people p ON p.user_id = d.user_id
 )
 SELECT s.user_id, s.home_project_id, s.source_rank, s.grant_id, s.team_id, tm.name
 FROM sources s
@@ -100,7 +131,6 @@ LEFT JOIN viewer_teams vt ON vt.team_id = s.team_id
 LEFT JOIN `)
 	writeTable(w, env, "teams")
 	w.WriteString(` tm ON vt.team_id IS NOT NULL AND tm.project_id = s.home_project_id AND tm.id = s.team_id
-WHERE s.user_id IN (SELECT user_id FROM people)
 ORDER BY s.user_id, s.source_rank, s.grant_id`)
 }
 
