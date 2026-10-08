@@ -19,6 +19,9 @@ import (
 // shared across the tests in this package.
 var testPool *Pool
 
+// testDSN is the connection string testPool was built from.
+var testDSN string
+
 func TestMain(m *testing.M) {
 	os.Exit(runTests(m))
 }
@@ -35,6 +38,7 @@ func runTests(m *testing.M) int {
 		return 1
 	}
 	defer stop()
+	testDSN = dsn
 
 	dialect, err := DecodeConfig(dsn)
 	if err != nil {

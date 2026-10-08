@@ -9,7 +9,11 @@ import { defineConfig, loadEnv, type ProxyOptions } from "vite";
 
 import { baseTest } from "../../vitest.shared.mjs";
 
-const consoleBase = "/ui/console/";
+// The public prefix the built console is served under. The Go server embeds
+// it at /ui/console (its server.console_path default); the hosted cloud serves
+// the same build as its own Vercel service at /console and sets this at build
+// time. The router and the auth routes read the prefix from Vite's BASE_URL.
+const consoleBase = normalizeBasePath(process.env.CONSOLE_BASE_PATH, "/ui/console/");
 const consoleOutDir = "../../internal/staticui/console/dist";
 const defaultApiBase = "/api";
 const defaultBackendUrl = "http://localhost:8080";
@@ -156,4 +160,9 @@ function keepGoEmbedPlaceholder(outDir: string) {
       writePlaceholder();
     },
   };
+}
+
+function normalizeBasePath(value: string | undefined, fallback: string): string {
+  const trimmed = (value ?? "").trim().replace(/^\/+|\/+$/g, "");
+  return trimmed ? `/${trimmed}/` : fallback;
 }

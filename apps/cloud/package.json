@@ -1,0 +1,34 @@
+{
+  "name": "@zitadel/cloud",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Vercel container deployment of the released nextgen server for the hosted preview cloud.",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cloud#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "apps/cloud"
+  },
+  "scripts": {
+    "dev": "vercel dev --cwd ../..",
+    "deploy": "vercel deploy --prod --cwd ../..",
+    "admin-user": "tsx scripts/admin-user.ts",
+    "smoke": "tsx scripts/smoke.ts",
+    "test": "vitest run",
+    "test:all": "pnpm run test",
+    "test:watch": "vitest --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vercel": "catalog:",
+    "vitest": "catalog:"
+  }
+}

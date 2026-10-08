@@ -1,0 +1,89 @@
+name: cloud-deploy
+
+# Main is production for the hosted preview cloud: every push to main deploys
+# the commit. Vercel builds every service from the repo (vercel.json at the
+# repo root): the server container compiles the Go binary from source
+# (Dockerfile.vercel), the console and the login UI build as their
+# own static services, plus docs, storybook and website. Version tags remain
+# the self-hoster artifact and are produced by release-publish.yml.
+#
+# Order matters: migrations run before the deploy, from a binary built from
+# the same commit. A binary ahead of its schema boots green and fails per
+# request, and a rollout runs old and new binaries side by side, so
+# migrations must be expand/contract and already applied when the new
+# deployment takes traffic. Git-triggered Vercel deployments are disabled in
+# vercel.json; this workflow is the only deployer and the only place that
+# holds the migrator credential (GitHub environment `cloud-preview`,
+# restricted to main). Serving containers refuse --migrate (entrypoint.sh)
+# and preview deployments carry no production secrets.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cloud-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: cloud-preview
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.PREVIEW_CLOUD_VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build the migrator from this commit
+        # The embedded UI dists are placeholders here; `migrate` never serves
+        # them. Same module, same migrations as the image Vercel builds below.
+        run: CGO_ENABLED=0 go build -trimpath -o /tmp/nextgen .
+
+      - name: Apply database migrations
+        # The migrate command loads the full config and mints a throwaway
+        # master key when none is configured; that is expected here. Do not
+        # set NEXTGEN_SERVER_GENERATE_MASTER_KEY=false on this step.
+        env:
+          NEXTGEN_DATABASE_POSTGRES: ${{ secrets.PREVIEW_CLOUD_MIGRATOR_DATABASE_URL }}
+        run: /tmp/nextgen migrate
+
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install the Vercel CLI from the workspace lockfile
+        run: corepack pnpm install --filter @zitadel/cloud... --frozen-lockfile
+
+      - name: Record the commit for the container build metadata
+        run: echo "$GITHUB_SHA" > apps/cloud/commit.txt
+
+      - name: Deploy to Vercel (production)
+        id: deploy
+        working-directory: apps/cloud
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        # The repo root is the deployment root (vercel.json defines the
+        # services and their roots), so the CLI runs with --cwd ../..
+        run: |
+          corepack pnpm exec vercel pull --cwd ../.. --yes --environment=production --token="$VERCEL_TOKEN"
+          url="$(corepack pnpm exec vercel deploy --cwd ../.. --prod --yes --token="$VERCEL_TOKEN")"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "deployed $url"
+
+      - name: Smoke test the production origin
+        working-directory: apps/cloud
+        env:
+          PUBLIC_BASE: ${{ vars.PREVIEW_CLOUD_PUBLIC_BASE }}
+        run: corepack pnpm run smoke -- "${PUBLIC_BASE:-${{ steps.deploy.outputs.url }}}"
