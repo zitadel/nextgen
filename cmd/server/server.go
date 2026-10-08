@@ -24,6 +24,7 @@ import (
 	slogctx "github.com/veqryn/slog-context"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel/log"
+	"go.opentelemetry.io/otel/propagation"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
@@ -416,7 +417,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	httpServer := &http.Server{
 		Addr:              cfg.Server.Address,
-		Handler:           mux,
+		Handler:           withIncomingTraceContext(cfg.Instrumentation.Trace, telemetry.TextMapPropagator(), mux),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -598,6 +599,8 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("instrumentation.log.errors.report_location", true)
 	v.SetDefault("instrumentation.log.errors.stack_trace", true)
 	v.SetDefault("instrumentation.trace.fraction", 1.0)
+	// Off: an incoming traceparent is not used. See ADR 068.
+	v.SetDefault("instrumentation.trace.trust_remote_spans", false)
 
 	// AutomaticEnv only resolves nested keys viper already knows about
 	// (via default, config file, fields of config struct or explicit BindEnv).
@@ -752,6 +755,19 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 	mux.Handle(api.IDPCallbackUpstreamPath, callback)
 	mux.Handle("/", chain(apiHandler))
 	return mux, nil
+}
+
+// withIncomingTraceContext decides what an incoming trace context means for
+// the server span. Unless cfg.TrustRemoteSpans is set it returns next
+// unchanged, so traceparent, tracestate and baggage are ignored and every
+// request starts a new trace. When set, the caller's context is extracted
+// ahead of everything else, so the request logs and the server span both see
+// it. ADR 068 records the decision.
+func withIncomingTraceContext(cfg instrumentation.TraceConfig, propagator propagation.TextMapPropagator, next http.Handler) http.Handler {
+	if !cfg.TrustRemoteSpans {
+		return next
+	}
+	return middleware.WithRemoteTraceContext(propagator)(next)
 }
 
 // ----------------------------- STORAGE --------------------------------------
