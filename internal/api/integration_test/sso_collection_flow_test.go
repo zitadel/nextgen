@@ -207,63 +207,70 @@ func TestSSOCollectionSubmitEditedVerifiedEmailIsRefused(t *testing.T) {
 }
 
 // A typed unique value another user holds binds that user, as a collision on
-// the render does: the owner then signs in on the identifier step.
-func TestSSOCollectionSubmitTypedUsernameCollisionBindsOwner(t *testing.T) {
-	f := newSSOCollectionFixture(t)
-	ownerID := "user_" + helpers.RandString(8)
-	createAttemptUser(t, f.project, f.team, f.schemaURL, ownerID, map[string]string{"email": "owner@example.com", "username": "taken"})
-	flow, _ := f.collect(t, "sub-new")
-
-	resp := f.submit(t, flow, map[string]string{"email": "alice@example.com", "username": "taken"})
-
-	require.IsType(t, &api.SubmitFlowStepOK{}, resp, helpers.MustMarshal(t, resp))
-	got := resp.(*api.SubmitFlowStepOK).Response
-	assert.Equal(t, "identifier", got.Step.Name)
-	assert.False(t, got.HandoffToken.Set, "the owner still has to prove a factor")
-	attempt := f.attempt(t, flow)
-	userFactor, ok := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
-	require.True(t, ok)
-	assert.Equal(t, ownerID, userFactor.UserID)
-	_, hasSSO := domain.CheckAs[*domain.AuthFactorSSO](attempt, domain.AuthCheckTypeSSO)
-	assert.False(t, hasSSO, "a collision proves nothing about the account")
-	_, err := f.linkFor(t, "sub-new")
-	require.ErrorAs(t, err, new(*database.NoRowFoundError), "a collision links nothing")
-	_, err = f.userByEmail(t, "alice@example.com")
-	require.ErrorAs(t, err, new(*database.NoRowFoundError), "no user is created")
-}
-
-// The probe looks up project-unique values only, so a taken team-unique value
-// shows up when the create is refused, with no owner to bind.
-func TestSSOCollectionSubmitTakenTeamUniqueValueShowsStepError(t *testing.T) {
-	f := newSSOCollectionFixture(t)
-	created := make(domain.CreateAttributes, 0, 3)
-	for _, attr := range []struct {
-		key    domain.AttributeKey
-		value  string
-		unique domain.AttributeUniqueness
+// the render does: the owner then signs in on the identifier step. The new
+// user has no team, so a team-unique value of a user with no team collides as
+// a project-unique one does.
+func TestSSOCollectionSubmitTypedCollisionBindsOwner(t *testing.T) {
+	for name, tc := range map[string]struct {
+		createOwner func(t *testing.T, f *ssoCollectionFixture, id string)
+		fields      map[string]string
 	}{
-		{"email", "owner@example.com", domain.AttributeUniquenessProject},
-		{"username", "owner", domain.AttributeUniquenessProject},
-		{"badge", "b-1", domain.AttributeUniquenessTeam},
+		"username": {
+			createOwner: func(t *testing.T, f *ssoCollectionFixture, id string) {
+				createAttemptUser(t, f.project, f.team, f.schemaURL, id, map[string]string{"email": "owner@example.com", "username": "taken"})
+			},
+			fields: map[string]string{"email": "alice@example.com", "username": "taken"},
+		},
+		"team-unique value of a user without a team": {
+			createOwner: func(t *testing.T, f *ssoCollectionFixture, id string) {
+				created := make(domain.CreateAttributes, 0, 3)
+				for _, attr := range []struct {
+					key    domain.AttributeKey
+					value  string
+					unique domain.AttributeUniqueness
+				}{
+					{"email", "owner@example.com", domain.AttributeUniquenessProject},
+					{"username", "owner", domain.AttributeUniquenessProject},
+					{"badge", "b-1", domain.AttributeUniquenessTeam},
+				} {
+					a, err := domain.NewCreateAttribute(attr.key, attr.value, attr.unique)
+					require.NoError(t, err)
+					created = append(created, *a)
+				}
+				require.NoError(t, harness.EnsureUserFixture(t).Create(t.Context(), &domain.CreateUser{
+					ProjectID:  f.project.ID,
+					SchemaURL:  f.schemaURL,
+					ID:         id,
+					Attributes: created,
+				}))
+			},
+			fields: map[string]string{"email": "alice@example.com", "username": "alice", "badge": "b-1"},
+		},
 	} {
-		a, err := domain.NewCreateAttribute(attr.key, attr.value, attr.unique)
-		require.NoError(t, err)
-		created = append(created, *a)
+		t.Run(name, func(t *testing.T) {
+			f := newSSOCollectionFixture(t)
+			ownerID := "user_" + helpers.RandString(8)
+			tc.createOwner(t, f, ownerID)
+			flow, _ := f.collect(t, "sub-new")
+
+			resp := f.submit(t, flow, tc.fields)
+
+			require.IsType(t, &api.SubmitFlowStepOK{}, resp, helpers.MustMarshal(t, resp))
+			got := resp.(*api.SubmitFlowStepOK).Response
+			assert.Equal(t, "identifier", got.Step.Name)
+			assert.False(t, got.HandoffToken.Set, "the owner still has to prove a factor")
+			attempt := f.attempt(t, flow)
+			userFactor, ok := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
+			require.True(t, ok)
+			assert.Equal(t, ownerID, userFactor.UserID)
+			_, hasSSO := domain.CheckAs[*domain.AuthFactorSSO](attempt, domain.AuthCheckTypeSSO)
+			assert.False(t, hasSSO, "a collision proves nothing about the account")
+			_, err := f.linkFor(t, "sub-new")
+			require.ErrorAs(t, err, new(*database.NoRowFoundError), "a collision links nothing")
+			_, err = f.userByEmail(t, "alice@example.com")
+			require.ErrorAs(t, err, new(*database.NoRowFoundError), "no user is created")
+		})
 	}
-	// A user without a team, as the sso create makes them.
-	require.NoError(t, harness.EnsureUserFixture(t).Create(t.Context(), &domain.CreateUser{
-		ProjectID:  f.project.ID,
-		SchemaURL:  f.schemaURL,
-		ID:         "user_" + helpers.RandString(8),
-		Attributes: created,
-	}))
-	flow, _ := f.collect(t, "sub-new")
-
-	resp := f.submit(t, flow, map[string]string{"email": "alice@example.com", "username": "alice", "badge": "b-1"})
-
-	f.requireStepError(t, flow, resp, "sub-new", domain.FlowStepErrorUserAlreadyExists)
-	_, err := f.userByEmail(t, "alice@example.com")
-	require.ErrorAs(t, err, new(*database.NoRowFoundError), "the user rolls back")
 }
 
 // Each field passes on its own; the user fails only as a whole, and zip is on
