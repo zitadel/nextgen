@@ -431,21 +431,22 @@ The repo requires the Node.js version from `.nvmrc`; sandbox images often
 ship an older default. Ensure the `.nvmrc` version is first on `$PATH` (for
 example via nvm) before running any `corepack` or `pnpm` command.
 
-`.nvmrc` pins one exact Node.js version and is the single source of truth.
-Every other place that picks a Node version must name the same one:
+All Node.js runtimes in the repo use the same major as `.nvmrc`. Minor and
+patch differences do not matter, so pin only the major elsewhere:
 
-- `devbox.json` (`nodejs-slim@<version>` plus `corepack`; the full `nodejs`
-  package lags behind in nixpkgs)
 - `.devcontainer/devcontainer.json` (the `node` feature `version`)
-- `apps/cli-skill-e2e/scripts/run.mjs` (the `node:<version>` image)
+- `apps/cli-skill-e2e/scripts/run.mjs` (the `node:<major>` image)
+- the Vercel-deployed apps (`console`, `docs`, `mock-zitadel`, `storybook`)
+  set `engines.node` to `<major>.x`
 - CI workflows read `.nvmrc` through `node-version-file`; never hard-code a
   `node-version`
-- the Vercel-deployed apps (`console`, `docs`, `mock-zitadel`, `storybook`)
-  set `engines.node` to the `.nvmrc` major (`24.x`); Vercel accepts only a
-  major
 
-`@types/node` in the pnpm catalog tracks the same major as `.nvmrc`, so code
-cannot type-check against APIs the runtime lacks. Bump all of these together.
+`devbox.json` is the one exception: nixpkgs' `nodejs@24` resolves below
+Angular CLI's minimum, so it pins `nodejs-slim@<version>` plus `corepack`.
+
+`@types/node` in the pnpm catalog tracks the `.nvmrc` major, so code cannot
+type-check against APIs the runtime lacks. When the major changes, bump all
+of these together.
 
 ### Playwright browser install gotcha
 

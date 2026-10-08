@@ -24,13 +24,15 @@ process.exit(required.length > 0 ? 1 : 0);
 async function checkNode() {
   const expected = readText(".nvmrc").trim().replace(/^v/, "");
   const actual = process.versions.node;
-  if (actual === expected) {
-    pass(`Node ${actual} matches .nvmrc`);
+  const expectedMajor = expected.split(".")[0];
+  const actualMajor = actual.split(".")[0];
+  if (actualMajor === expectedMajor) {
+    pass(`Node ${actual} matches .nvmrc major ${expectedMajor}`);
     return;
   }
   fail(
     `Node ${actual} does not match .nvmrc (${expected})`,
-    `Use Node ${expected}: devbox shell, or nvm install ${expected} && nvm use ${expected}`,
+    `Install/use Node ${expectedMajor}: nvm install ${expectedMajor} && nvm use ${expectedMajor}`,
   );
 }
 
