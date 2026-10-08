@@ -344,22 +344,31 @@ type AuthzMembershipEdge struct {
 	CreatedAt  time.Time
 }
 
-// ProjectAdminSourceRow is one way one person administers a project: through
-// the owning team, an admin grant to a team they are an active member of, or
-// an admin grant to them.
-type ProjectAdminSourceRow struct {
+// ProjectAdminRecord is one person who administers a project, with every way
+// they do.
+type ProjectAdminRecord struct {
 	UserID string
 	// HomeProjectID is the project the user lives in.
 	HomeProjectID string
-	OwningTeam    bool
+	// Visible is whether the viewer may see the person: through at least one
+	// source that is a grant to them, or a team the viewer is an active
+	// member of.
+	Visible bool
+	// Sources come owning team first, then team grants, then grants to the
+	// user, each by grant id.
+	Sources []ProjectAdminSourceRecord
+}
+
+// ProjectAdminSourceRecord is one way a person administers a project: through
+// the owning team, an admin grant to a team they are an active member of, or
+// an admin grant to them.
+type ProjectAdminSourceRecord struct {
+	OwningTeam bool
 	// GrantID is the admin grant, empty for the owning team.
 	GrantID string
 	// TeamID names the team, empty for a grant to the user.
 	TeamID string
-	// Visible is whether the viewer may see the person through this source: a
-	// grant to them, or a team the viewer is an active member of.
-	Visible bool
-	// TeamName is set for a team the viewer may see.
+	// TeamName is set for a team the viewer is a member of.
 	TeamName string
 }
 

@@ -273,26 +273,25 @@ func scanAuthzAssignment(row pgx.CollectableRow) (*domain.AuthzAssignment, error
 
 var _ service.AuthzAssignmentStatements = (*authzAssignmentStatements)(nil)
 
-// ListProjectAdminSources implements [service.AuthzAssignmentStatements].
-func (s authzAssignmentStatements) ListProjectAdminSources(ctx context.Context, projectID, afterUserID, viewerUserID string, limit uint32) ([]*domain.ProjectAdminSourceRow, error) {
+// ListProjectAdmins implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectAdmins(ctx context.Context, projectID, afterUserID, viewerUserID string, limit uint32) ([]*domain.ProjectAdminRecord, error) {
 	var c statementCompiler
 	authz.WriteProjectAdminSources(&c, postgresAuthzEnv(), projectID, afterUserID, viewerUserID, limit)
 	rows, err := s.client.Query(ctx, c.String(), c.args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	sources, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*domain.ProjectAdminSourceRow, error) {
+	sources, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (authz.ProjectAdminSourceRow, error) {
 		var (
-			source   domain.ProjectAdminSourceRow
-			rank     int64
+			source   authz.ProjectAdminSourceRow
 			teamName sql.NullString
 		)
-		if err := row.Scan(&source.UserID, &source.HomeProjectID, &rank, &source.GrantID, &source.TeamID, &source.Visible, &teamName); err != nil {
-			return nil, err
-		}
-		source.OwningTeam = rank == 0
+		err := row.Scan(&source.UserID, &source.HomeProjectID, &source.SourceRank, &source.GrantID, &source.TeamID, &source.Visible, &teamName)
 		source.TeamName = teamName.String
-		return &source, nil
+		return source, err
 	})
-	return sources, wrapError(err)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return authz.GroupProjectAdminSourcesByUser(sources), nil
 }

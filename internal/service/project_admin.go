@@ -67,34 +67,14 @@ func (s *GrantService) ListProjectAdmins(ctx context.Context, input ListProjectA
 	}
 	limit := normalizeLimit(input.Limit)
 	// One person more than the page holds tells whether another page follows.
-	rows, err := s.v2Pool.Statements().ListProjectAdminSources(ctx, input.ProjectID, after, input.ViewerUserID, uint32(limit+1))
+	records, err := s.v2Pool.Statements().ListProjectAdmins(ctx, input.ProjectID, after, input.ViewerUserID, uint32(limit+1))
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to list project admins")
 	}
-
-	var admins []*ProjectAdmin
-	homes := map[string]string{}
-	visible := map[string]bool{}
-	for _, row := range rows {
-		if len(admins) == 0 || admins[len(admins)-1].User.UserID != row.UserID {
-			admins = append(admins, &ProjectAdmin{User: domain.UserRef{UserID: row.UserID}})
-			homes[row.UserID] = row.HomeProjectID
-		}
-		source := ProjectAdminSource{Type: ProjectAdminSourceGrant, GrantID: row.GrantID}
-		if row.OwningTeam {
-			source.Type = ProjectAdminSourceOwningTeam
-		}
-		if row.TeamID != "" {
-			source.Team = &TeamRef{TeamID: row.TeamID, Name: row.TeamName}
-		}
-		visible[row.UserID] = visible[row.UserID] || row.Visible
-		admin := admins[len(admins)-1]
-		admin.Sources = append(admin.Sources, source)
-	}
-	out := &ProjectAdmins{Admins: admins}
-	if len(admins) > limit {
-		out.Admins = admins[:limit]
-		payload, err := json.Marshal(projectAdminsPageToken{After: admins[limit-1].User.UserID})
+	out := &ProjectAdmins{}
+	if len(records) > limit {
+		records = records[:limit]
+		payload, err := json.Marshal(projectAdminsPageToken{After: records[limit-1].UserID})
 		if err != nil {
 			return nil, domain.ErrInternal(err).WithMessage("failed to build the page token")
 		}
@@ -102,9 +82,23 @@ func (s *GrantService) ListProjectAdmins(ctx context.Context, input ListProjectA
 	}
 
 	var shown []*ProjectAdmin
-	for _, admin := range out.Admins {
-		if visible[admin.User.UserID] {
+	homes := map[string]string{}
+	for _, record := range records {
+		admin := &ProjectAdmin{User: domain.UserRef{UserID: record.UserID}}
+		for _, source := range record.Sources {
+			mapped := ProjectAdminSource{Type: ProjectAdminSourceGrant, GrantID: source.GrantID}
+			if source.OwningTeam {
+				mapped.Type = ProjectAdminSourceOwningTeam
+			}
+			if source.TeamID != "" {
+				mapped.Team = &TeamRef{TeamID: source.TeamID, Name: source.TeamName}
+			}
+			admin.Sources = append(admin.Sources, mapped)
+		}
+		out.Admins = append(out.Admins, admin)
+		if record.Visible {
 			shown = append(shown, admin)
+			homes[record.UserID] = record.HomeProjectID
 		}
 	}
 	if err := s.resolveAdminRefs(ctx, shown, homes); err != nil {

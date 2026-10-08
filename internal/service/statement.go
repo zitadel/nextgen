@@ -628,13 +628,12 @@ type AuthzAssignmentStatements interface {
 	// into the SELECT so a caller cannot list across projects.
 	ListManagedGrants(ctx context.Context, projectID string, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)
 	RevokeAuthzAssignment(ctx context.Context, projectID, id string) error
-	// ListProjectAdminSources returns every way the first limit people with a
-	// user id after afterUserID administer the project: as active members of
+	// ListProjectAdmins returns the first limit people, by user id, with a user
+	// id after afterUserID who administer the project: as active members of
 	// the owning team, as active members of a team with an unexpired admin
-	// grant, and as existing users with an unexpired admin grant. Each row says
-	// whether viewerUserID may see the person through it. Rows come ordered by
-	// user id, then owning team, team grants and user grants, each by grant id.
-	ListProjectAdminSources(ctx context.Context, projectID, afterUserID, viewerUserID string, limit uint32) ([]*domain.ProjectAdminSourceRow, error)
+	// grant, or as existing users with an unexpired admin grant. Each carries
+	// every way they do, and whether viewerUserID may see them.
+	ListProjectAdmins(ctx context.Context, projectID, afterUserID, viewerUserID string, limit uint32) ([]*domain.ProjectAdminRecord, error)
 	// GetActiveOwningTeamGrant returns the project's active owning-team grant
 	// (object project, relation team) or NoRowFoundError when the project is
 	// unclaimed. The unique active grant is the claim source of truth

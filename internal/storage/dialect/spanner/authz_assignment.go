@@ -331,27 +331,26 @@ func owningTeamKey(a *domain.AuthzAssignment) *string {
 
 var _ service.AuthzAssignmentStatements = (*authzAssignmentStatements)(nil)
 
-// ListProjectAdminSources implements [service.AuthzAssignmentStatements].
-func (s authzAssignmentStatements) ListProjectAdminSources(ctx context.Context, projectID, afterUserID, viewerUserID string, limit uint32) ([]*domain.ProjectAdminSourceRow, error) {
+// ListProjectAdmins implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectAdmins(ctx context.Context, projectID, afterUserID, viewerUserID string, limit uint32) ([]*domain.ProjectAdminRecord, error) {
 	var c statementCompiler
 	authz.WriteProjectAdminSources(&c, spannerAuthzEnv(), projectID, afterUserID, viewerUserID, limit)
-	var sources []*domain.ProjectAdminSourceRow
+	var sources []authz.ProjectAdminSourceRow
 	err := s.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
 		var qErr error
-		sources, qErr = collectRows(iter, func(row *spanner.Row) (*domain.ProjectAdminSourceRow, error) {
+		sources, qErr = collectRows(iter, func(row *spanner.Row) (authz.ProjectAdminSourceRow, error) {
 			var (
-				source   domain.ProjectAdminSourceRow
-				rank     int64
+				source   authz.ProjectAdminSourceRow
 				teamName spanner.NullString
 			)
-			if err := row.Columns(&source.UserID, &source.HomeProjectID, &rank, &source.GrantID, &source.TeamID, &source.Visible, &teamName); err != nil {
-				return nil, err
-			}
-			source.OwningTeam = rank == 0
+			err := row.Columns(&source.UserID, &source.HomeProjectID, &source.SourceRank, &source.GrantID, &source.TeamID, &source.Visible, &teamName)
 			source.TeamName = teamName.StringVal
-			return &source, nil
+			return source, err
 		})
 		return qErr
 	})
-	return sources, wrapError(err)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return authz.GroupProjectAdminSourcesByUser(sources), nil
 }

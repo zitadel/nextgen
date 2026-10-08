@@ -2,7 +2,7 @@ package authz
 
 import "github.com/zitadel/nextgen/internal/domain"
 
-// WriteProjectAdminSources emits the query behind ListProjectAdminSources: every
+// WriteProjectAdminSources emits the query behind ListProjectAdmins: every
 // way the first limit people with a user id after afterUserID, by user id,
 // administer a project. It selects user_id, home_project_id, source_rank
 // (0 owning team, 1 team grant, 2 user grant), grant_id, team_id, visible and
@@ -101,4 +101,36 @@ LEFT JOIN `)
 	w.WriteString(` tm ON vt.team_id IS NOT NULL AND tm.project_id = s.home_project_id AND tm.id = s.team_id
 WHERE s.user_id IN (SELECT user_id FROM people)
 ORDER BY s.user_id, s.source_rank, s.grant_id`)
+}
+
+// ProjectAdminSourceRow is one row of WriteProjectAdminSources' result.
+type ProjectAdminSourceRow struct {
+	UserID        string
+	HomeProjectID string
+	SourceRank    int64
+	GrantID       string
+	TeamID        string
+	Visible       bool
+	TeamName      string
+}
+
+// GroupProjectAdminSourcesByUser folds the rows into one record per person. The query
+// orders rows by user id, so a person's rows are adjacent: a new user id
+// starts the next person.
+func GroupProjectAdminSourcesByUser(rows []ProjectAdminSourceRow) []*domain.ProjectAdminRecord {
+	var admins []*domain.ProjectAdminRecord
+	for _, row := range rows {
+		if len(admins) == 0 || admins[len(admins)-1].UserID != row.UserID {
+			admins = append(admins, &domain.ProjectAdminRecord{UserID: row.UserID, HomeProjectID: row.HomeProjectID})
+		}
+		admin := admins[len(admins)-1]
+		admin.Visible = admin.Visible || row.Visible
+		admin.Sources = append(admin.Sources, domain.ProjectAdminSourceRecord{
+			OwningTeam: row.SourceRank == 0,
+			GrantID:    row.GrantID,
+			TeamID:     row.TeamID,
+			TeamName:   row.TeamName,
+		})
+	}
+	return admins
 }

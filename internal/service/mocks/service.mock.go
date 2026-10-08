@@ -4652,41 +4652,41 @@ func (c *MockAllStatementsListManagedGrantsCall) DoAndReturn(f func(context.Cont
 	return c
 }
 
-// ListProjectAdminSources mocks base method.
-func (m *MockAllStatements) ListProjectAdminSources(ctx context.Context, projectID, afterUserID, viewerUserID string, limit uint32) ([]*domain.ProjectAdminSourceRow, error) {
+// ListProjectAdmins mocks base method.
+func (m *MockAllStatements) ListProjectAdmins(ctx context.Context, projectID, afterUserID, viewerUserID string, limit uint32) ([]*domain.ProjectAdminRecord, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListProjectAdminSources", ctx, projectID, afterUserID, viewerUserID, limit)
-	ret0, _ := ret[0].([]*domain.ProjectAdminSourceRow)
+	ret := m.ctrl.Call(m, "ListProjectAdmins", ctx, projectID, afterUserID, viewerUserID, limit)
+	ret0, _ := ret[0].([]*domain.ProjectAdminRecord)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListProjectAdminSources indicates an expected call of ListProjectAdminSources.
-func (mr *MockAllStatementsMockRecorder) ListProjectAdminSources(ctx, projectID, afterUserID, viewerUserID, limit any) *MockAllStatementsListProjectAdminSourcesCall {
+// ListProjectAdmins indicates an expected call of ListProjectAdmins.
+func (mr *MockAllStatementsMockRecorder) ListProjectAdmins(ctx, projectID, afterUserID, viewerUserID, limit any) *MockAllStatementsListProjectAdminsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectAdminSources", reflect.TypeOf((*MockAllStatements)(nil).ListProjectAdminSources), ctx, projectID, afterUserID, viewerUserID, limit)
-	return &MockAllStatementsListProjectAdminSourcesCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectAdmins", reflect.TypeOf((*MockAllStatements)(nil).ListProjectAdmins), ctx, projectID, afterUserID, viewerUserID, limit)
+	return &MockAllStatementsListProjectAdminsCall{Call: call}
 }
 
-// MockAllStatementsListProjectAdminSourcesCall wrap *gomock.Call
-type MockAllStatementsListProjectAdminSourcesCall struct {
+// MockAllStatementsListProjectAdminsCall wrap *gomock.Call
+type MockAllStatementsListProjectAdminsCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsListProjectAdminSourcesCall) Return(arg0 []*domain.ProjectAdminSourceRow, arg1 error) *MockAllStatementsListProjectAdminSourcesCall {
+func (c *MockAllStatementsListProjectAdminsCall) Return(arg0 []*domain.ProjectAdminRecord, arg1 error) *MockAllStatementsListProjectAdminsCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsListProjectAdminSourcesCall) Do(f func(context.Context, string, string, string, uint32) ([]*domain.ProjectAdminSourceRow, error)) *MockAllStatementsListProjectAdminSourcesCall {
+func (c *MockAllStatementsListProjectAdminsCall) Do(f func(context.Context, string, string, string, uint32) ([]*domain.ProjectAdminRecord, error)) *MockAllStatementsListProjectAdminsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsListProjectAdminSourcesCall) DoAndReturn(f func(context.Context, string, string, string, uint32) ([]*domain.ProjectAdminSourceRow, error)) *MockAllStatementsListProjectAdminSourcesCall {
+func (c *MockAllStatementsListProjectAdminsCall) DoAndReturn(f func(context.Context, string, string, string, uint32) ([]*domain.ProjectAdminRecord, error)) *MockAllStatementsListProjectAdminsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -11526,41 +11526,41 @@ func (c *MockAuthzAssignmentStatementsListManagedGrantsCall) DoAndReturn(f func(
 	return c
 }
 
-// ListProjectAdminSources mocks base method.
-func (m *MockAuthzAssignmentStatements) ListProjectAdminSources(ctx context.Context, projectID, afterUserID, viewerUserID string, limit uint32) ([]*domain.ProjectAdminSourceRow, error) {
+// ListProjectAdmins mocks base method.
+func (m *MockAuthzAssignmentStatements) ListProjectAdmins(ctx context.Context, projectID, afterUserID, viewerUserID string, limit uint32) ([]*domain.ProjectAdminRecord, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListProjectAdminSources", ctx, projectID, afterUserID, viewerUserID, limit)
-	ret0, _ := ret[0].([]*domain.ProjectAdminSourceRow)
+	ret := m.ctrl.Call(m, "ListProjectAdmins", ctx, projectID, afterUserID, viewerUserID, limit)
+	ret0, _ := ret[0].([]*domain.ProjectAdminRecord)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListProjectAdminSources indicates an expected call of ListProjectAdminSources.
-func (mr *MockAuthzAssignmentStatementsMockRecorder) ListProjectAdminSources(ctx, projectID, afterUserID, viewerUserID, limit any) *MockAuthzAssignmentStatementsListProjectAdminSourcesCall {
+// ListProjectAdmins indicates an expected call of ListProjectAdmins.
+func (mr *MockAuthzAssignmentStatementsMockRecorder) ListProjectAdmins(ctx, projectID, afterUserID, viewerUserID, limit any) *MockAuthzAssignmentStatementsListProjectAdminsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectAdminSources", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).ListProjectAdminSources), ctx, projectID, afterUserID, viewerUserID, limit)
-	return &MockAuthzAssignmentStatementsListProjectAdminSourcesCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectAdmins", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).ListProjectAdmins), ctx, projectID, afterUserID, viewerUserID, limit)
+	return &MockAuthzAssignmentStatementsListProjectAdminsCall{Call: call}
 }
 
-// MockAuthzAssignmentStatementsListProjectAdminSourcesCall wrap *gomock.Call
-type MockAuthzAssignmentStatementsListProjectAdminSourcesCall struct {
+// MockAuthzAssignmentStatementsListProjectAdminsCall wrap *gomock.Call
+type MockAuthzAssignmentStatementsListProjectAdminsCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAuthzAssignmentStatementsListProjectAdminSourcesCall) Return(arg0 []*domain.ProjectAdminSourceRow, arg1 error) *MockAuthzAssignmentStatementsListProjectAdminSourcesCall {
+func (c *MockAuthzAssignmentStatementsListProjectAdminsCall) Return(arg0 []*domain.ProjectAdminRecord, arg1 error) *MockAuthzAssignmentStatementsListProjectAdminsCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAuthzAssignmentStatementsListProjectAdminSourcesCall) Do(f func(context.Context, string, string, string, uint32) ([]*domain.ProjectAdminSourceRow, error)) *MockAuthzAssignmentStatementsListProjectAdminSourcesCall {
+func (c *MockAuthzAssignmentStatementsListProjectAdminsCall) Do(f func(context.Context, string, string, string, uint32) ([]*domain.ProjectAdminRecord, error)) *MockAuthzAssignmentStatementsListProjectAdminsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAuthzAssignmentStatementsListProjectAdminSourcesCall) DoAndReturn(f func(context.Context, string, string, string, uint32) ([]*domain.ProjectAdminSourceRow, error)) *MockAuthzAssignmentStatementsListProjectAdminSourcesCall {
+func (c *MockAuthzAssignmentStatementsListProjectAdminsCall) DoAndReturn(f func(context.Context, string, string, string, uint32) ([]*domain.ProjectAdminRecord, error)) *MockAuthzAssignmentStatementsListProjectAdminsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

@@ -15,27 +15,18 @@ import (
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 )
 
-// adminRows serves ListProjectAdminSources for a first page of the default
-// size, one person more than it holds. Which rows the query returns, and what
-// it marks visible, is covered by the statement test; this pins what the
-// service makes of them.
-func adminRows(viewerUserID string, rows ...*domain.ProjectAdminSourceRow) func(*servicemocks.MockAllStatements) {
+// adminRecords serves ListProjectAdmins for a first page of the default size,
+// one person more than it holds. Which people the query returns, and what it
+// marks visible, is covered by the statement test; this pins what the service
+// makes of them.
+func adminRecords(viewerUserID string, records ...*domain.ProjectAdminRecord) func(*servicemocks.MockAllStatements) {
 	return func(s *servicemocks.MockAllStatements) {
-		s.EXPECT().ListProjectAdminSources(gomock.Any(), "proj_customer", "", viewerUserID, uint32(21)).Return(rows, nil)
+		s.EXPECT().ListProjectAdmins(gomock.Any(), "proj_customer", "", viewerUserID, uint32(21)).Return(records, nil)
 	}
 }
 
-// teamRow is a source through a team, named only when the viewer may see it.
-func teamRow(userID, grantID, teamID, teamName string, visible bool) *domain.ProjectAdminSourceRow {
-	row := &domain.ProjectAdminSourceRow{UserID: userID, HomeProjectID: grantPlatformProjID, OwningTeam: grantID == "", GrantID: grantID, TeamID: teamID, Visible: visible}
-	if visible {
-		row.TeamName = teamName
-	}
-	return row
-}
-
-func userGrantRow(userID, grantID string) *domain.ProjectAdminSourceRow {
-	return &domain.ProjectAdminSourceRow{UserID: userID, HomeProjectID: grantPlatformProjID, GrantID: grantID, Visible: true}
+func adminRecord(userID string, visible bool, sources ...domain.ProjectAdminSourceRecord) *domain.ProjectAdminRecord {
+	return &domain.ProjectAdminRecord{UserID: userID, HomeProjectID: grantPlatformProjID, Visible: visible, Sources: sources}
 }
 
 func listAdmins(t *testing.T, svc *service.GrantService, viewerUserID string) *service.ProjectAdmins {
@@ -55,51 +46,49 @@ func TestGrantService_ListProjectAdmins(t *testing.T) {
 			"user_ops":    {UserID: "user_ops", Identifier: "ops@example.com", IdentifierProperty: "email"},
 		}}
 	}
-	byUser := func(admins []*service.ProjectAdmin) map[string]*service.ProjectAdmin {
-		out := map[string]*service.ProjectAdmin{}
-		for _, admin := range admins {
-			out[admin.User.UserID] = admin
-		}
-		return out
-	}
+	// As the owner sees it: in the owning team, not in team_ops, whose name
+	// the query therefore leaves out.
+	opsGrant := domain.ProjectAdminSourceRecord{GrantID: "asgn_b", TeamID: "team_ops"}
+	owningTeam := domain.ProjectAdminSourceRecord{OwningTeam: true, TeamID: "team_owner", TeamName: "Acme"}
+	asOwner := adminRecords("user_owner",
+		adminRecord("user_direct", true, opsGrant, domain.ProjectAdminSourceRecord{GrantID: "asgn_c"}),
+		adminRecord("user_ops", false, opsGrant),
+		adminRecord("user_owner", true, owningTeam, domain.ProjectAdminSourceRecord{GrantID: "asgn_a"}),
+	)
 
 	t.Run("one entry per person with every source", func(t *testing.T) {
 		t.Parallel()
-		// As the owner sees it: in the owning team, not in team_ops.
 		ref := refs()
-		svc := newMockedGrantServiceWithRefs(t, grantPlatformProjID, ref, adminRows("user_owner",
-			teamRow("user_direct", "asgn_b", "team_ops", "Ops", false), userGrantRow("user_direct", "asgn_c"),
-			teamRow("user_ops", "asgn_b", "team_ops", "Ops", false),
-			teamRow("user_owner", "", "team_owner", "Acme", true), userGrantRow("user_owner", "asgn_a"),
-		))
+		svc := newMockedGrantServiceWithRefs(t, grantPlatformProjID, ref, asOwner)
 
 		got := listAdmins(t, svc, "user_owner")
 
+		byUser := map[string]*service.ProjectAdmin{}
 		var order []string
 		for _, admin := range got.Admins {
+			byUser[admin.User.UserID] = admin
 			order = append(order, admin.User.UserID)
 		}
-		assert.Equal(t, []string{"user_direct", "user_ops", "user_owner"}, order, "ordered by user id")
+		assert.Equal(t, []string{"user_direct", "user_ops", "user_owner"}, order, "in the order the query returns")
 		assert.Empty(t, got.NextPageToken)
 
-		admins := byUser(got.Admins)
-		assert.Equal(t, "owner@example.com", admins["user_owner"].User.Identifier)
+		assert.Equal(t, "owner@example.com", byUser["user_owner"].User.Identifier)
 		assert.Equal(t, []service.ProjectAdminSource{
 			{Type: service.ProjectAdminSourceOwningTeam, Team: &service.TeamRef{TeamID: "team_owner", Name: "Acme"}},
 			{Type: service.ProjectAdminSourceGrant, GrantID: "asgn_a"},
-		}, admins["user_owner"].Sources, "one row, both sources")
+		}, byUser["user_owner"].Sources, "one entry, both sources")
 		assert.Equal(t, []service.ProjectAdminSource{
 			{Type: service.ProjectAdminSourceGrant, GrantID: "asgn_b", Team: &service.TeamRef{TeamID: "team_ops"}},
 			{Type: service.ProjectAdminSourceGrant, GrantID: "asgn_c"},
-		}, admins["user_direct"].Sources)
-		assert.Equal(t, "direct@example.com", admins["user_direct"].User.Identifier, "one visible source shows the person")
-		assert.Equal(t, domain.UserRef{UserID: "user_ops"}, admins["user_ops"].User, "no visible source leaves the user id")
+		}, byUser["user_direct"].Sources)
+		assert.Equal(t, "direct@example.com", byUser["user_direct"].User.Identifier, "a visible person is shown")
+		assert.Equal(t, domain.UserRef{UserID: "user_ops"}, byUser["user_ops"].User, "a person the viewer may not see keeps the user id")
 		assert.ElementsMatch(t, []string{"user_direct", "user_owner"}, ref.gotUserIDs, "only the people shown are looked up")
 	})
 
-	t.Run("no sources is no admins", func(t *testing.T) {
+	t.Run("no admins", func(t *testing.T) {
 		t.Parallel()
-		svc := newMockedGrantService(t, grantPlatformProjID, adminRows(""))
+		svc := newMockedGrantService(t, grantPlatformProjID, adminRecords(""))
 
 		got := listAdmins(t, svc, "")
 		assert.Empty(t, got.Admins)
@@ -108,16 +97,16 @@ func TestGrantService_ListProjectAdmins(t *testing.T) {
 
 	t.Run("a full page links to the next", func(t *testing.T) {
 		t.Parallel()
-		page := make([]*domain.ProjectAdminSourceRow, 0, 21)
+		page := make([]*domain.ProjectAdminRecord, 0, 21)
 		for i := range 21 {
-			page = append(page, userGrantRow(fmt.Sprintf("user_%05d", i), fmt.Sprintf("asgn_%05d", i)))
+			page = append(page, adminRecord(fmt.Sprintf("user_%05d", i), true, domain.ProjectAdminSourceRecord{GrantID: fmt.Sprintf("asgn_%05d", i)}))
 		}
 		var after string
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
 			gomock.InOrder(
-				s.EXPECT().ListProjectAdminSources(gomock.Any(), "proj_customer", "", "", uint32(21)).Return(page, nil),
-				s.EXPECT().ListProjectAdminSources(gomock.Any(), "proj_customer", gomock.Any(), "", uint32(21)).DoAndReturn(
-					func(_ context.Context, _, afterUserID, _ string, _ uint32) ([]*domain.ProjectAdminSourceRow, error) {
+				s.EXPECT().ListProjectAdmins(gomock.Any(), "proj_customer", "", "", uint32(21)).Return(page, nil),
+				s.EXPECT().ListProjectAdmins(gomock.Any(), "proj_customer", gomock.Any(), "", uint32(21)).DoAndReturn(
+					func(_ context.Context, _, afterUserID, _ string, _ uint32) ([]*domain.ProjectAdminRecord, error) {
 						after = afterUserID
 						return page[20:], nil
 					}),
@@ -147,7 +136,7 @@ func TestGrantService_ListProjectAdmins(t *testing.T) {
 	t.Run("a failed read is internal", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().ListProjectAdminSources(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("boom"))
+			s.EXPECT().ListProjectAdmins(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("boom"))
 		})
 
 		_, err := svc.ListProjectAdmins(t.Context(), service.ListProjectAdminsInput{ProjectID: "proj_customer"})

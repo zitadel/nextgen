@@ -13,11 +13,11 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// ListProjectAdminSources reads who administers a project the way the
+// ListProjectAdmins reads who administers a project the way the
 // authorization check decides it: active members of the owning team and of
 // teams granted admin, and existing users granted admin, through unrevoked,
 // unexpired admin grants on that project only.
-func TestAuthzAssignmentStatements_ListProjectAdminSources(t *testing.T) {
+func TestAuthzAssignmentStatements_ListProjectAdmins(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		// The people and teams live in their own project, as in the platform
 		// project; the grants live on the customer project.
@@ -89,56 +89,70 @@ func TestAuthzAssignmentStatements_ListProjectAdminSources(t *testing.T) {
 
 		// Every source, then as a viewer in the given teams sees it: a grant to
 		// the person and a team the viewer is in are visible and named.
-		all := []*domain.ProjectAdminSourceRow{
-			{UserID: owner, HomeProjectID: home, OwningTeam: true, TeamID: owningTeam, TeamName: "owners"},
-			{UserID: owner, HomeProjectID: home, GrantID: opsGrant, TeamID: opsTeam, TeamName: "ops"},
-			{UserID: owner, HomeProjectID: home, GrantID: ownerGrant},
-			{UserID: teamMember, HomeProjectID: home, GrantID: opsGrant, TeamID: opsTeam, TeamName: "ops"},
-			{UserID: direct, HomeProjectID: home, GrantID: directGrant},
-			{UserID: expiring, HomeProjectID: home, GrantID: expiringGrant},
+		type person struct {
+			userID  string
+			sources []domain.ProjectAdminSourceRecord
 		}
-		seenBy := func(teams ...string) []*domain.ProjectAdminSourceRow {
-			out := make([]*domain.ProjectAdminSourceRow, 0, len(all))
-			for _, row := range all {
-				seen := *row
-				seen.Visible = seen.TeamID == "" || slices.Contains(teams, seen.TeamID)
-				if !seen.Visible {
-					seen.TeamName = ""
+		all := []person{
+			{owner, []domain.ProjectAdminSourceRecord{
+				{OwningTeam: true, TeamID: owningTeam, TeamName: "owners"},
+				{GrantID: opsGrant, TeamID: opsTeam, TeamName: "ops"},
+				{GrantID: ownerGrant},
+			}},
+			{teamMember, []domain.ProjectAdminSourceRecord{{GrantID: opsGrant, TeamID: opsTeam, TeamName: "ops"}}},
+			{direct, []domain.ProjectAdminSourceRecord{{GrantID: directGrant}}},
+			{expiring, []domain.ProjectAdminSourceRecord{{GrantID: expiringGrant}}},
+		}
+		// seenBy is every admin as a viewer in the given teams sees them: a
+		// grant to the person, or a team the viewer is in, shows the person,
+		// and only those teams are named.
+		seenBy := func(teams ...string) []*domain.ProjectAdminRecord {
+			out := make([]*domain.ProjectAdminRecord, 0, len(all))
+			for _, p := range all {
+				record := &domain.ProjectAdminRecord{UserID: p.userID, HomeProjectID: home}
+				for _, source := range p.sources {
+					visible := source.TeamID == "" || slices.Contains(teams, source.TeamID)
+					if !visible {
+						source.TeamName = ""
+					}
+					record.Visible = record.Visible || visible
+					record.Sources = append(record.Sources, source)
 				}
-				out = append(out, &seen)
+				out = append(out, record)
 			}
 			return out
 		}
 
-		got, err := d.stmts.ListProjectAdminSources(t.Context(), projectID, "", "", 100)
+		got, err := d.stmts.ListProjectAdmins(t.Context(), projectID, "", "", 100)
 		require.NoError(t, err)
 		want := seenBy()
 		assert.Equal(t, want, got,
-			"by user id, then owning team, team grants and user grants; deleted, viewer, editor, expired, revoked, foreign and departed left out")
+			"by user id, sources owning team, team grants and user grants; deleted, viewer, editor, expired, revoked, foreign and departed left out")
+		assert.False(t, got[1].Visible, "a person only in a team the viewer is not in is not visible")
 
-		asOwner, err := d.stmts.ListProjectAdminSources(t.Context(), projectID, "", owner, 100)
+		asOwner, err := d.stmts.ListProjectAdmins(t.Context(), projectID, "", owner, 100)
 		require.NoError(t, err)
 		assert.Equal(t, seenBy(owningTeam, opsTeam), asOwner, "the owner is in both teams")
-		asMember, err := d.stmts.ListProjectAdminSources(t.Context(), projectID, "", teamMember, 100)
+		asMember, err := d.stmts.ListProjectAdmins(t.Context(), projectID, "", teamMember, 100)
 		require.NoError(t, err)
 		assert.Equal(t, seenBy(opsTeam), asMember, "a member of ops sees ops, not the owning team")
-		asLeaver, err := d.stmts.ListProjectAdminSources(t.Context(), projectID, "", left, 100)
+		asLeaver, err := d.stmts.ListProjectAdmins(t.Context(), projectID, "", left, 100)
 		require.NoError(t, err)
 		assert.Equal(t, want, asLeaver, "a member who left sees no team")
 
-		limited, err := d.stmts.ListProjectAdminSources(t.Context(), projectID, "", "", 2)
+		limited, err := d.stmts.ListProjectAdmins(t.Context(), projectID, "", "", 2)
 		require.NoError(t, err)
-		assert.Equal(t, want[:4], limited, "the limit counts people, and keeps all of their sources")
+		assert.Equal(t, want[:2], limited, "the limit counts people, and keeps all of their sources")
 
-		next, err := d.stmts.ListProjectAdminSources(t.Context(), projectID, teamMember, "", 2)
+		next, err := d.stmts.ListProjectAdmins(t.Context(), projectID, teamMember, "", 2)
 		require.NoError(t, err)
-		assert.Equal(t, want[4:], next, "a page starts after the given user id")
+		assert.Equal(t, want[2:], next, "a page starts after the given user id")
 
-		pageAsOwner, err := d.stmts.ListProjectAdminSources(t.Context(), projectID, owner, owner, 1)
+		pageAsOwner, err := d.stmts.ListProjectAdmins(t.Context(), projectID, owner, owner, 1)
 		require.NoError(t, err)
-		assert.Equal(t, seenBy(owningTeam, opsTeam)[3:4], pageAsOwner, "a viewer off the page still decides what is visible")
+		assert.Equal(t, seenBy(owningTeam, opsTeam)[1:2], pageAsOwner, "a viewer off the page still decides what is visible")
 
-		none, err := d.stmts.ListProjectAdminSources(t.Context(), otherProjectID+"-missing", "", "", 100)
+		none, err := d.stmts.ListProjectAdmins(t.Context(), otherProjectID+"-missing", "", "", 100)
 		require.NoError(t, err)
 		assert.Empty(t, none)
 	})
