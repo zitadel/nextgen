@@ -5,7 +5,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { makeTestSession } from "../auth/session.fixture";
+import { makeTestSession } from "@/test/session.fixture";
 import { createAppRouter } from "../router";
 import { _resetRuntimeForTesting, _setRuntimeForTesting } from "../runtime/runtime";
 import { THEME_STORAGE_KEY } from "../theme";

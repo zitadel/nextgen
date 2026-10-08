@@ -1,9 +1,13 @@
 import { useState } from "react";
 
+import {
+  STANDALONE_BODY,
+  StandaloneMessage,
+  StandaloneScreen,
+} from "@/components/standalone-screen";
 import { Button } from "@/components/ui/button";
-
-import { RUNTIME_URL, type ConsoleRuntimeFailure } from "../runtime/runtime";
-import { ZitadelMark } from "./app-shell/icons";
+import { InlineCode } from "@/components/ui/inline-code";
+import { RUNTIME_URL, type ConsoleRuntimeFailure } from "@/runtime/runtime";
 
 /**
  * Boot-time connectivity error (Console ADR 0004 §3).
@@ -41,21 +45,19 @@ export function RuntimeUnavailable({ failure, onRetry }: RuntimeUnavailableProps
   };
 
   return (
-    <main className="flex min-h-svh flex-col items-center justify-center gap-8 bg-background px-4 py-10">
-      <ZitadelMark size={40} className="text-foreground" aria-hidden />
-      <div className="flex max-w-md flex-col items-center gap-4 text-center">
-        <h1 className="font-serif text-xl text-foreground">Server unavailable</h1>
-        <p className="text-sm text-muted-foreground">
+    <StandaloneScreen>
+      <StandaloneMessage title="Server unavailable" level={1} className="items-center gap-4">
+        <p className={STANDALONE_BODY}>
           The console could not read its runtime configuration from{" "}
-          <code className="rounded bg-accent px-1.5 py-0.5 text-foreground">{RUNTIME_URL}</code> —{" "}
-          {failure.detail}. Until it can, the console cannot tell whether this deployment has a
-          project yet, so it stops here instead of guessing. Check that the Zitadel server is
-          running and reachable from this origin, then try again.
+          <InlineCode>{RUNTIME_URL}</InlineCode> — {failure.detail}. Until it can, the console
+          cannot tell whether this deployment has a project yet, so it stops here instead of
+          guessing. Check that the Zitadel server is running and reachable from this origin, then
+          try again.
         </p>
         <Button onClick={handleRetry} disabled={retrying}>
           {retrying ? "Retrying…" : "Try again"}
         </Button>
-      </div>
-    </main>
+      </StandaloneMessage>
+    </StandaloneScreen>
   );
 }

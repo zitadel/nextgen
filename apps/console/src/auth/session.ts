@@ -6,8 +6,9 @@ import {
 } from "@zitadel/api/runtime/auth";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
-import { api, apiBase } from "../api/zitadel";
-import { clearSessionCaches } from "../lib/session-cache";
+import { api, apiBase } from "@/api/zitadel";
+import { clearSessionCaches } from "@/lib/session-cache";
+import { stringParam } from "@/lib/search-params";
 
 /**
  * Console session helpers (Console ADR 0003).
@@ -230,4 +231,9 @@ export function sanitizeNextPath(next: string | undefined): string | undefined {
     return undefined;
   }
   return next;
+}
+
+/** `validateSearch` for a route whose only search param is a sanitized `next`. */
+export function validateNextSearch(search: Record<string, unknown>): { next?: string } {
+  return { next: sanitizeNextPath(stringParam(search.next)) };
 }

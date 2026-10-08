@@ -1,23 +1,23 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { ZitadelLogin, type ZitadelProject } from "@zitadel/sdk-react";
+import { createFileRoute } from "@tanstack/react-router";
+import { ZitadelLogin } from "@zitadel/sdk-react";
 import { Loader2 } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-
-import { apiBase } from "../../api/zitadel";
-import { fetchSession } from "../../auth/session";
-import { ZitadelMark } from "../../components/app-shell/icons";
+import { fetchSession } from "@/auth/session";
+import { ClaimOutcomeCard } from "@/components/claim/claim-outcome";
 import {
-  type ClaimOutcome,
-  type ClaimWindow,
-  completeProjectClaim,
-  fetchClaimWindow,
-} from "../../lib/claim";
-import { clearSessionCaches } from "../../lib/session-cache";
-import { getConsoleProjectId, getPublishableKey } from "../../runtime/runtime";
-import { useTheme } from "../../theme";
+  NoProjectYet,
+  STANDALONE_BODY,
+  StandaloneMessage,
+  StandaloneScreen,
+} from "@/components/standalone-screen";
+import { Badge } from "@/components/ui/badge";
+import { useConsoleProject } from "@/hooks/use-console-project";
+import { withBasePath } from "@/lib/base-path";
+import { type ClaimOutcome, type ClaimWindow, fetchClaimWindow, spendClaim } from "@/lib/claim";
+import { stringParam } from "@/lib/search-params";
+import { clearSessionCaches } from "@/lib/session-cache";
+import { useTheme } from "@/theme";
 
 /**
  * The claim page (#615, Claim H1) — the browser leg of a project claim.
@@ -38,13 +38,12 @@ import { useTheme } from "../../theme";
  * cookie in place and completes the claim.
  *
  * Visual design for this page is still being refined; the layout mirrors the
- * login screen's centered column with token-correct styling until the frames
- * exist.
+ * login screen's centred column until a design exists.
  */
 export const Route = createFileRoute("/claim/")({
   validateSearch: (search: Record<string, unknown>): ClaimSearch => ({
-    challenge_id: typeof search.challenge_id === "string" ? search.challenge_id : undefined,
-    project_id: typeof search.project_id === "string" ? search.project_id : undefined,
+    challenge_id: stringParam(search.challenge_id),
+    project_id: stringParam(search.project_id),
   }),
   // Reads, not the completion: the mutation lives in the component so loader
   // re-runs (preloads, invalidations) can never spend the single-use
@@ -78,9 +77,6 @@ export interface ClaimSearch {
   project_id?: string;
 }
 
-const HEADING = "text-foreground font-serif text-xl";
-const BODY_TEXT = "text-muted-foreground text-sm";
-
 function ClaimScreen() {
   const { challenge_id, project_id } = Route.useSearch();
   const { session, window } = Route.useLoaderData();
@@ -88,12 +84,12 @@ function ClaimScreen() {
   if (!challenge_id || !project_id) {
     return (
       <ClaimShell>
-        <StateCard title="This claim link is not valid">
-          <p className={BODY_TEXT}>
+        <StandaloneMessage title="This claim link is not valid">
+          <p className={STANDALONE_BODY}>
             The link is missing its claim parameters. Copy the URL from your terminal again, or
             re-run the claim to mint a fresh one.
           </p>
-        </StateCard>
+        </StandaloneMessage>
       </ClaimShell>
     );
   }
@@ -131,24 +127,9 @@ function ClaimScreen() {
   );
 }
 
-/** The login screen's centered column (`login.tsx`), reused for every state. */
+/** The login screen's centred column, reused for every state. */
 function ClaimShell({ children }: { children: ReactNode }) {
-  return (
-    <main className="flex min-h-svh flex-col items-center justify-center gap-8 bg-background px-4 py-10">
-      <ZitadelMark size={40} className="text-foreground" aria-hidden />
-      <h1 className="sr-only">Claim your project</h1>
-      {children}
-    </main>
-  );
-}
-
-function StateCard({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div className="flex max-w-md flex-col gap-3 text-center">
-      <h2 className={HEADING}>{title}</h2>
-      {children}
-    </div>
-  );
+  return <StandaloneScreen heading="Claim your project">{children}</StandaloneScreen>;
 }
 
 /**
@@ -218,35 +199,22 @@ function ClaimLogin({
   window?: ClaimWindow;
 }) {
   const { resolved: theme } = useTheme();
-  const consoleProjectId = getConsoleProjectId();
-  const publishableKey = getPublishableKey();
-
-  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   const params = new URLSearchParams({ challenge_id: challengeId, project_id: projectId });
-  const postSignInUrl = `${base}/claim?${params.toString()}`;
-
-  const project = useMemo<ZitadelProject | undefined>(
-    () =>
-      consoleProjectId
-        ? Object.freeze({ projectId: consoleProjectId, proxyPath: apiBase, publishableKey })
-        : undefined,
-    [consoleProjectId, publishableKey],
-  );
+  const postSignInUrl = withBasePath(`/claim?${params.toString()}`);
+  const project = useConsoleProject();
 
   if (!project) {
     return (
-      <StateCard title="No project yet">
-        <p className={BODY_TEXT}>
-          This deployment has nothing to sign in to yet, so the claim cannot start. Finish the setup
-          in your terminal, then reopen the claim link.
-        </p>
-      </StateCard>
+      <NoProjectYet>
+        This deployment has nothing to sign in to yet, so the claim cannot start. Finish the setup
+        in your terminal, then reopen the claim link.
+      </NoProjectYet>
     );
   }
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <p className={BODY_TEXT}>Create an account or sign in to claim your project.</p>
+      <p className={STANDALONE_BODY}>Create an account or sign in to claim your project.</p>
       <ZitadelLogin
         project={project}
         purpose="register"
@@ -271,63 +239,9 @@ function ClaimLogin({
 /**
  * The completion leg. The challenge is single-use and first-claim-wins, so
  * one visit must spend it exactly once: the ref gates the effect against
- * re-renders and double-mounts, and only the explicit `Try again` button can
- * start another attempt.
+ * re-renders, `spendClaim` gates it across mounts, and only the explicit
+ * `Try again` button can start another attempt.
  */
-/**
- * One claim URL is spent once, however many times this component mounts.
- *
- * The ref inside the component gates the effect across re-renders; it cannot
- * gate mounts, because a fresh instance gets a fresh ref. That gap is not
- * theoretical: the page has been observed mounting twice on the way back from
- * the sign-in widget, and the second mount re-spends a challenge the first one
- * already completed. The server is right to refuse it -- a completed challenge
- * answers 409 `proj.already_claimed` by contract -- but the refusal resolves
- * last and replaces "Project claimed" with "Already claimed", so a developer
- * who just claimed their project is told someone else owns it.
- *
- * Keeping the attempt rather than a spent flag is what lets the second mount
- * render the first one's outcome instead of hanging on the spinner.
- *
- * Entries are never dropped: a page that has claimed one project holds one
- * entry, and forgetting it is what reopens the double-spend.
- */
-const ATTEMPTS_SLOT = Symbol.for("@zitadel/console/claim:attempts");
-
-function claimAttempts(): Map<string, Promise<ClaimOutcome>> {
-  const slots = globalThis as Record<symbol, unknown>;
-  // On globalThis under a Symbol.for key rather than a module-local Map, for
-  // the reason `@zitadel/api`'s config slot is: a second copy of this module
-  // in the same realm would otherwise keep its own gate, and a gate that only
-  // some of the mounts consult is not a gate. The bundler duplicating a route
-  // module is exactly the case that produced the double spend.
-  slots[ATTEMPTS_SLOT] ??= new Map<string, Promise<ClaimOutcome>>();
-  return slots[ATTEMPTS_SLOT] as Map<string, Promise<ClaimOutcome>>;
-}
-
-/**
- * Resets the spend gate. Only tests need this -- the gate deliberately outlives
- * a mount, so a spec that renders the same claim URL more than once would
- * otherwise replay the first render's outcome.
- */
-export function resetClaimAttemptsForTests() {
-  claimAttempts().clear();
-}
-
-function spendClaim(projectId: string, challengeId: string, retrying: boolean) {
-  const key = `${projectId}:${challengeId}`;
-  const attempts = claimAttempts();
-  const attempt = attempts.get(key);
-  // A retry is a deliberate second spend -- the outcomes that offer one are the
-  // ones a fresh attempt can resolve -- so it replaces the remembered attempt
-  // rather than reading it.
-  if (attempt && !retrying) return attempt;
-
-  const started = completeProjectClaim(projectId, challengeId);
-  attempts.set(key, started);
-  return started;
-}
-
 function CompleteClaim({
   projectId,
   challengeId,
@@ -375,172 +289,10 @@ function CompleteClaim({
   // by this attempt or an earlier one — there is nothing left to count down,
   // so the badge goes rather than contradicting the outcome above it.
   const settled = outcome.kind === "claimed" || outcome.kind === "already_claimed";
-  const card = outcomeCard(outcome, retry);
   return (
     <>
-      {card}
+      <ClaimOutcomeCard outcome={outcome} retry={retry} />
       {window && !settled && <ClaimWindowBadge window={window} />}
     </>
   );
-}
-
-/**
- * The screen for one completion outcome. Every branch is a state the contract
- * enumerates (`claim/complete` in the OpenAPI source), not an exception.
- */
-function outcomeCard(outcome: ClaimOutcome, retry: () => void) {
-  switch (outcome.kind) {
-    case "claimed":
-      return (
-        <StateCard title="Project claimed">
-          <p className={BODY_TEXT}>
-            Your project is now permanent. Open the console to manage it and start collaborating
-            with your team.
-          </p>
-          <Button asChild className="mx-auto w-fit">
-            <Link to="/">Open the console</Link>
-          </Button>
-        </StateCard>
-      );
-    case "already_claimed": {
-      const dashboardUrl = safeHttpUrl(outcome.dashboardUrl);
-      return (
-        <StateCard title="Already claimed">
-          <p className={BODY_TEXT}>{outcome.message}</p>
-          {dashboardUrl && (
-            <Button asChild variant="outline" className="mx-auto w-fit">
-              <a href={dashboardUrl}>Open the owning team&rsquo;s dashboard</a>
-            </Button>
-          )}
-        </StateCard>
-      );
-    }
-    case "expired":
-      return (
-        <StateCard title="Claim link expired">
-          <p className={BODY_TEXT}>{outcome.message}</p>
-          <p className={BODY_TEXT}>
-            Run the claim again from your terminal to mint a fresh link — this one is done.
-          </p>
-        </StateCard>
-      );
-    case "no_personal_team":
-      // The contract states this code clears itself: the next sign-in
-      // provisions the team. A retry is therefore honest here — unlike the
-      // not-active case below, where retrying can only fail again.
-      return (
-        <StateCard title="Your account has no team yet">
-          <p className={BODY_TEXT}>{outcome.message}</p>
-          <p className={BODY_TEXT}>
-            Signing in again normally provisions one. Retry, or reopen the link from your terminal.
-          </p>
-          <Button onClick={retry} variant="outline" className="mx-auto w-fit">
-            Try again
-          </Button>
-        </StateCard>
-      );
-    case "personal_team_not_active":
-      // Deliberately no retry: the membership exists and is not active, and
-      // the contract says provisioning will not change that. Only a person can.
-      return (
-        <StateCard title="This account cannot claim projects">
-          <p className={BODY_TEXT}>{outcome.message}</p>
-          <p className={BODY_TEXT}>{membershipRemedy(outcome.membershipStatus)}</p>
-        </StateCard>
-      );
-    case "invalid_challenge":
-      return (
-        <StateCard title="This claim link is not valid">
-          <p className={BODY_TEXT}>{outcome.message}</p>
-        </StateCard>
-      );
-    case "unauthenticated":
-      // NOT the sign-in widget again: the server collapses "wrong project" and
-      // "no platform project" into one opaque 401, so the page cannot tell
-      // which it is, and re-running sign-in against the same project mints the
-      // same session. Signing out is what the developer can act on, and it is
-      // the common case — a session left over from the app they just scaffolded
-      // on this origin. Offering the account a choice is the account-picker
-      // story, not this screen.
-      return (
-        <StateCard title="This account can't claim the project">
-          <p className={BODY_TEXT}>
-            The account you are signed in with belongs to a different project.
-          </p>
-          <p className={BODY_TEXT}>
-            If you signed in to the app you just set up, sign out of it — it shares this address.
-            Then reopen the claim link from your terminal to create an account or sign in for this
-            project.
-          </p>
-          <Button onClick={retry} variant="outline" className="mx-auto w-fit">
-            Try again
-          </Button>
-        </StateCard>
-      );
-    case "csrf_refused":
-      // Still refused after the shared fetch's one retry: someone else is
-      // signed in now (the session module may already have reloaded the page),
-      // or the request came from another site. Reloading starts over with the
-      // session this browser actually holds now.
-      return (
-        <StateCard title="The claim was not accepted from this page">
-          <p className={BODY_TEXT}>{outcome.message}</p>
-          <p className={BODY_TEXT}>
-            Your sign-in may have changed in another tab. Reload this page, or reopen the claim link
-            from your terminal.
-          </p>
-          <Button
-            onClick={() => window.location.reload()}
-            variant="outline"
-            className="mx-auto w-fit"
-          >
-            Reload
-          </Button>
-        </StateCard>
-      );
-    case "error":
-      return (
-        <StateCard title="The claim did not complete">
-          <p className={BODY_TEXT}>{outcome.message}</p>
-          <Button onClick={retry} variant="outline" className="mx-auto w-fit">
-            Try again
-          </Button>
-        </StateCard>
-      );
-  }
-}
-
-/**
- * Renders only http(s). The value comes from an error body — our own API,
- * declared `format: uri` — so this is defence in depth, but React will happily
- * render a `javascript:` href, and the sibling field is already read
- * defensively. A rejected URL costs the button, not the screen.
- */
-function safeHttpUrl(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  try {
-    const url = new URL(value, window.location.origin);
-    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * What actually unblocks each membership state, from the 403's contract text.
- * `removed` is the counter-intuitive one: deactivating a *user* cascades to
- * their memberships without touching the team, so the fix is the account's
- * access rather than the team's.
- */
-function membershipRemedy(status: string | undefined): string {
-  switch (status) {
-    case "removed":
-      return "The membership was withdrawn. Restoring this account's access is what unblocks the claim — the team itself may well still be active.";
-    case "inactive":
-      return "The membership is suspended. An administrator has to reactivate it before this account can claim a project.";
-    case "pending":
-      return "There is an invitation waiting to be accepted. Accept it, then reopen the claim link.";
-    default:
-      return "Ask an administrator to restore this account's team membership, then reopen the claim link.";
-  }
 }
