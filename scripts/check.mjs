@@ -106,12 +106,10 @@ async function phaseNode() {
 }
 
 async function phaseNodeE2e() {
-  await run("corepack", [
-    "pnpm",
-    "--filter",
-    "@zitadel/demo-next-e2e",
-    "exec",
-    "playwright",
+  // Playwright's CLI under node rather than `pnpm --filter … exec`, which
+  // starts a pnpm that warns about the platform-specific server packages.
+  await run(process.execPath, [
+    "apps/demo-next-e2e/node_modules/@playwright/test/cli.js",
     "install",
     "chromium",
   ]);

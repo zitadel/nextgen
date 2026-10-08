@@ -83,7 +83,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
     "pretest": "node --run build",
     "test": "vitest run",
-    "test:all": "vitest run",
+    "test:all": "node --run build && vitest run",
     "readme": "oclif readme",
     "prepack": "tsdown && oclif manifest",
     "postpack": "rm -f oclif.manifest.json"

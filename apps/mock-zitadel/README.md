@@ -60,9 +60,9 @@ Node built-ins. `src/app.ts` stays the source of truth — it is what
 1. Create a new Vercel project and connect it to the `zitadel/nextgen`
    GitHub repo (install the Vercel GitHub app if it isn't already).
 2. Set the project's **Root Directory** to `apps/mock-zitadel`. The
-   `installCommand`/`buildCommand` in `vercel.json` `cd` to the repo root
-   so the pnpm workspace (and the `catalog:` protocol) resolve with the
-   repo's pinned pnpm.
+   `installCommand` in `vercel.json` installs the whole pnpm workspace, and
+   the `buildCommand` runs `moon run mock-zitadel:generate-wellknown` from the
+   repo root, like the console and storybook projects.
 3. Leave the Framework Preset as **Other** (the `framework: null` in
    `vercel.json` enforces this).
 
