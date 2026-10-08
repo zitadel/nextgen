@@ -9,4 +9,4 @@ A user schema defines **what** the platform stores about a user and how that use
 
 `zitadel setup` scaffolds editable copies of the default user schema and login flow into `.zitadel/schemas/` and `.zitadel/flows/`, uploads them, and seeds `.zitadel/state.json` so the local files and the platform start in sync. Each folder contains a README explaining what you can change.
 
-The local files are the source of truth: edit them, then sync with [`plan` and `apply`](/docs/cli/plan-apply). Schema edits publish a new immutable revision (existing users keep validating against the previous one); flow edits update the flow in place.
+The local files are the source of truth: edit them, then sync with [`plan` and `apply`](/cli/plan-apply). Schema edits publish a new immutable revision (existing users keep validating against the previous one); flow edits update the flow in place.

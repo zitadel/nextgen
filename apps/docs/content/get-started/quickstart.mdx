@@ -32,7 +32,7 @@ Before setup, `doctor` checks local runtime prerequisites. After setup, it also 
 npx @zitadel/cli@alpha start
 ```
 
-By default this starts the matching `@zitadel/server` npm binary for the alpha train and stores runtime metadata under `.zitadel/local/runtime.json`. Runtime data is stored under `.zitadel/local/nextgen-data` (SQLite by default, see [Databases](/docs/concepts/databases)).
+By default this starts the matching `@zitadel/server` npm binary for the alpha train and stores runtime metadata under `.zitadel/local/runtime.json`. Runtime data is stored under `.zitadel/local/nextgen-data` (SQLite by default, see [Databases](/concepts/databases)).
 
 `start` also creates a local admin, `admin@zitadel.localhost`, and ends by printing a one-time sign-in link for the management console. Keep it: it is how you reach the console without a password. You can print a fresh one at any time with `zitadel console`.
 
@@ -74,7 +74,7 @@ The user you just registered is an end user of your app. The management console 
 npx @zitadel/cli@alpha console
 ```
 
-See [Local runtime commands](/docs/cli/local-runtime) for what that link does and how long it lasts.
+See [Local runtime commands](/cli/local-runtime) for what that link does and how long it lasts.
 
 ## Customize the login
 
@@ -85,7 +85,7 @@ npx @zitadel/cli@alpha plan
 npx @zitadel/cli@alpha apply
 ```
 
-See [Plan and apply](/docs/cli/plan-apply) for a walkthrough that adds a `company` field to registration.
+See [Plan and apply](/cli/plan-apply) for a walkthrough that adds a `company` field to registration.
 
 ## Stop or reset
 

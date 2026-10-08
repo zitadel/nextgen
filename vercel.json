@@ -69,13 +69,8 @@
     },
     {
       "source": "/docs",
-      "destination": "/docs/docs",
-      "permanent": false
-    },
-    {
-      "source": "/docs/",
-      "destination": "/docs/docs",
-      "permanent": false
+      "destination": "/docs/",
+      "permanent": true
     }
   ],
   "rewrites": [

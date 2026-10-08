@@ -49,7 +49,9 @@ export async function pageToFlexsearchIndex(page: unknown) {
     content: (await pageToLLMText(page)) ?? normalized.description ?? "",
     locale: normalized.locale ?? "",
     structuredData,
-    tag: normalized.path?.split("/")[0] ?? "docs",
+    // Search groups: the API reference versus everything else, which lives
+    // at the content root since the docs pages moved up from content/docs.
+    tag: normalized.path?.split("/")[0] === "reference" ? "reference" : "docs",
   };
 }
 

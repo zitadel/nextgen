@@ -439,8 +439,10 @@ The docs got a base path too (`DOCS_BASE_PATH=/docs`, Waku `basePath`), so
 the whole route table is one rewrite per app. Waku's Vercel adapter prefixes
 its routes for a base path but leaves the static files and the server
 function at the root of the Build Output, so `apps/docs/scripts/vercel-base-path.mjs`
-moves both under the prefix after the build. Until `content/docs` moves up
-a level, the overview page is `/docs/docs` and `/docs` redirects there.
+moves both under the prefix after the build. The docs pages moved from
+`content/docs` to the content root at the same time, so the overview is
+`/docs/` and every page keeps a single `docs` segment; the standalone docs
+site serves the same pages at `/`.
 
 Open follow-up in the server: an "external UI" mode. Today the server
 refuses to boot when an enabled UI is not embedded (`ValidateDist`) and

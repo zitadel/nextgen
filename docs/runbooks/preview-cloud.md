@@ -31,11 +31,10 @@ service, one exception (`/console/runtime.json` stays with the server) and
 the server catch-all. The server's own namespaces (`/projects`, `/users`,
 `/sessions`, …) never overlap with those prefixes. Bare prefixes redirect
 to the slash form (308), as the server's own UI handler does, because the
-static apps reference their assets relative to that directory. `/docs` and
-`/docs/` redirect to `/docs/docs`, the overview page: the docs site keeps its
-pages under its own `docs` section (`content/docs`) until that content moves
-up a level, which is the docs team's call because it changes the standalone
-site's URLs.
+static apps reference their assets relative to that directory. The docs
+pages live at the content root (`apps/docs/content`), so `/docs/` is the
+overview and `/docs/concepts/…`, `/docs/reference/api/…` follow; the
+standalone docs deployment serves the same pages at `/`.
 
 The server is told the UI prefixes too (`NEXTGEN_SERVER_CONSOLE_PATH`,
 `NEXTGEN_SERVER_LOGIN_PATH`), so the console base URL it derives for the
