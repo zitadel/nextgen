@@ -30,6 +30,7 @@
     "waku": "catalog:"
   },
   "devDependencies": {
+    "@redocly/cli": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@types/mdx": "catalog:",
     "@types/node": "catalog:",

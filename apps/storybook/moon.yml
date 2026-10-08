@@ -58,8 +58,13 @@ tasks:
       # clears the "Failed to fetch dynamically imported module" failure. (#1490)
       retryCount: 3
 
+  # Loads the same packages as build.
   dev:
     command: "corepack pnpm run dev"
+    deps:
+      - "api:build"
+      - "components:build"
+      - "design-tokens:build"
     options:
       persistent: true
       runInCI: false

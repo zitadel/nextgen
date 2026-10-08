@@ -15,11 +15,14 @@ tasks:
       # @zitadel/testing/playwright.
       - "testing:build"
 
+  # The suite runs api-mock's `start` and demo-next's `dev`, so it needs what
+  # those need rather than a production build of the demo.
   e2e:
     command: "corepack pnpm run e2e"
     deps:
       - "api-mock:build"
-      - "demo-next:build"
+      - "api:build"
+      - "sdk-next:build"
     options:
       runInCI: false
 
@@ -31,7 +34,9 @@ tasks:
       - "testing:build"
       - "cli:build"
       - "server:build"
-      - "demo-next:build"
+      # demo-next runs under `next dev`; see e2e.
+      - "api:build"
+      - "sdk-next:build"
     env:
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
       # server:build embeds the console/login UIs via its task deps; this

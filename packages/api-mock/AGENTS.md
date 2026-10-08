@@ -16,7 +16,7 @@ for the typed `@zitadel/api` Flow API. Consumers:
   their `test-setup.ts` calls `serveMockFlowApi()` from the test-only
   `./vitest` (`msw/node`) or `./vitest-browser` (`msw/browser`) entry point.
 - `apps/demo-next/` and `apps/demo-nuxt/` — hit the standalone TCP server
-  started by `pnpm --filter @zitadel/api-mock start` (not an
+  started like `moon run api-mock:start` (not an
   in-browser worker).
 
 It is **not** published. There is no built artifact; consumers import

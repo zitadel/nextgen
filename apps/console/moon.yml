@@ -43,8 +43,12 @@ tasks:
     deps:
       - "build"
 
+  # Vite resolves the workspace packages from source (the `@zitadel/source`
+  # condition), so dev needs only the generated API client.
   dev:
     command: "corepack pnpm run dev"
+    deps:
+      - "api:generate"
     options:
       persistent: true
       runInCI: false
@@ -56,6 +60,10 @@ tasks:
   # project graph, because server:build depends on console:build.
   dev-real:
     command: "corepack pnpm run dev-real"
+    # The instance boots through the built `zitadel` CLI.
+    deps:
+      - "api:generate"
+      - "cli:build"
     options:
       persistent: true
       runInCI: false
@@ -66,6 +74,9 @@ tasks:
   # other screen is better served by `dev-real`.
   dev-claim:
     command: "corepack pnpm run dev-claim"
+    deps:
+      - "api:generate"
+      - "cli:build"
     options:
       persistent: true
       runInCI: false

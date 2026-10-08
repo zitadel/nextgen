@@ -46,8 +46,23 @@ tasks:
   # unit tests cannot: the Dockerfile's data dir default against the non-root
   # USER it declares. Needs a local Docker daemon and an image built by
   # `node scripts/build-local-runtime-image.mjs`, so it stays out of CI.
+  # The local runtime image (ghcr.io/zitadel/nextgen:local-dev): the server
+  # cross-compiled for linux, with both UI dists embedded, in the release
+  # Dockerfile. Needs Docker, so it stays out of CI.
+  build-local-image:
+    command: "corepack pnpm run build-local-image"
+    deps:
+      - "console:build"
+      - "login-ui:build"
+    options:
+      cache: false
+      runInCI: false
+
+  # Runs the image build-local-image produced.
   smoke-container:
     command: "corepack pnpm run smoke-container"
+    deps:
+      - "build-local-image"
     options:
       cache: false
       runInCI: false
@@ -76,7 +91,8 @@ tasks:
       - "scripts/check-package-scripts.mjs"
       - "scripts/check-package-scripts.test.mjs"
       # The package-script contract test reads every package's scripts and
-      # moon tasks.
+      # moon tasks, the root project's included.
+      - "moon.yml"
       - "apps/*/package.json"
       - "apps/*/moon.yml"
       - "packages/*/package.json"
@@ -135,8 +151,8 @@ tasks:
       - "scripts/assert-file.mjs"
       - "scripts/testdata/openapi-casing/**"
       - "/redocly.yaml"
-      # The test reads the pinned redocly version from this file.
-      - "apps/server/moon.yml"
+      # The redocly version the test runs (the catalog pin).
+      - "pnpm-workspace.yaml"
       - "vitest.config.ts"
       - "vitest.shared.mjs"
       - "vitest.shared.d.mts"

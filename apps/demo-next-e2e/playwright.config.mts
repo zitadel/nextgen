@@ -2,6 +2,14 @@ import { defineConfig, devices } from "@playwright/test";
 import { resolve } from "node:path";
 
 const workspaceRoot = resolve(import.meta.dirname, "../..");
+const apiMockDir = resolve(workspaceRoot, "packages", "api-mock");
+const demoDir = resolve(workspaceRoot, "apps", "demo-next");
+
+// Runs a package's CLI under this node rather than through its package script:
+// a script would hide a step from Moon's task graph, `node --run` does not pass
+// the runner's SIGTERM on, and the `.bin` shims are `.cmd` files on Windows.
+const nodeCli = (cli: string, ...args: string[]) =>
+  [process.execPath, cli, ...args].map((arg) => JSON.stringify(arg)).join(" ");
 
 /**
  * E2E coverage for the embedded sign-in path:
@@ -27,24 +35,30 @@ export default defineConfig({
   // it on the very first request. `reuseExistingServer` lets developers
   // run either server manually and have Playwright skip its own boot.
   //
-  // `node --run` starts each package's own script without a nested pnpm
-  // (which would warn about the platform-specific server packages), and keeps
-  // these long-running processes outside Moon's task graph; Playwright owns
-  // their lifecycle for this e2e suite.
+  // These are api-mock's `start` and demo-next's `dev` scripts. Playwright owns
+  // the long-running processes; what they need built is the e2e task's deps.
   webServer: [
     {
-      command: "node --run start",
+      command: nodeCli(
+        resolve(apiMockDir, "node_modules", "tsx", "dist", "cli.mjs"),
+        "bin/start.ts",
+      ),
       url: "http://localhost:8080/.well-known/jwks.json",
       reuseExistingServer: true,
-      cwd: resolve(workspaceRoot, "packages", "api-mock"),
+      cwd: apiMockDir,
       stdout: "pipe",
       stderr: "pipe",
     },
     {
-      command: "node --run dev",
+      command: nodeCli(
+        resolve(demoDir, "node_modules", "next", "dist", "bin", "next"),
+        "dev",
+        "--port",
+        "3002",
+      ),
       url: "http://localhost:3002/login",
       reuseExistingServer: true,
-      cwd: resolve(workspaceRoot, "apps", "demo-next"),
+      cwd: demoDir,
       stdout: "pipe",
       stderr: "pipe",
       timeout: 60_000,
