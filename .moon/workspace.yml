@@ -1,3 +1,4 @@
+# spike: invalidate every moon task hash for a full uncached CI run — do not merge
 projects:
   sources:
     server: "apps/server"
