@@ -1,5 +1,7 @@
-import { configure } from "@testing-library/react";
-import { afterEach, beforeEach } from "vitest";
+import { format } from "node:util";
+
+import { cleanup, configure } from "@testing-library/react";
+import { afterEach, beforeEach, type MockInstance, vi } from "vitest";
 import { _resetConfigForTesting } from "@zitadel/api/config";
 import "@testing-library/jest-dom/vitest";
 
@@ -27,8 +29,31 @@ afterEach(_resetConfigForTesting);
 // otherwise carry one test's mocked answer into the next.
 beforeEach(clearSessionCaches);
 
-// @ts-expect-error Needed for tests
-global.IS_REACT_ACT_ENVIRONMENT = true;
+// React reports a state update outside `act(...)` on console.error and carries
+// on, so a test that ends while the router is still transitioning used to pass
+// and only flood stderr. Fail it instead. Testing Library's async utilities
+// (findBy*, waitFor, userEvent) already wrap their work in act; a warning means
+// the test stopped waiting too early or drove the page from outside them.
+// Cleanup runs first so an update that lands between the last assertion and
+// the unmount is counted against this test, not the next one.
+let consoleError: MockInstance<typeof console.error>;
+beforeEach(() => {
+  consoleError = vi.spyOn(console, "error");
+});
+afterEach(() => {
+  cleanup();
+  const actWarnings = consoleError.mock.calls
+    .map((args) => format(...args))
+    .filter((message) => message.includes("not wrapped in act("));
+  consoleError.mockRestore();
+  if (actWarnings.length > 0) {
+    throw new Error(
+      `${actWarnings.length} React state update(s) ran outside act(); the first was: ` +
+        `${actWarnings[0]?.split("\n")[0]} Wait for the screen to settle with findBy* or ` +
+        "waitFor before the test ends.",
+    );
+  }
+});
 
 // jsdom has no matchMedia; the theme hook (src/theme.ts) reads it. Default to
 // dark (no light-scheme match) and provide the add/removeEventListener surface.
