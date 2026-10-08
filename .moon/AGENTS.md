@@ -66,8 +66,8 @@ The exceptions name only what lies outside the project folder:
 Some edges are on another project's build artifact, not its code, and have no
 `package.json` entry: the server and the local runtime image embed the
 console and login UI builds, the e2e suites and `testing:test-integration` run
-built apps and the server binary (and the demos' dev servers load the SDK
-builds), the console's `dev-real` boots an instance through the built CLI, and
+built apps and the server binary (and demo-next's dev server loads the sdk-next
+build), the console's `dev-real` boots an instance through the built CLI, and
 the `release` tasks package everything.
 `release:build-public-packages` names every public package explicitly, because
 `release:check-graph` requires it.

@@ -39,7 +39,8 @@ tasks:
       - "testing:build"
       - "cli:build"
       - "server:build"
-      # demo-next runs under `next dev`; see e2e.
+      # demo-next runs under `next dev`; cli:build already builds the sdk-next
+      # it loads.
     env:
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
       # server:build embeds the console/login UIs via its task deps; this
