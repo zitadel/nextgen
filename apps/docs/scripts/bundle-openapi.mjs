@@ -2,13 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-  bundle,
-  formatProblems,
-  getTotals,
-  loadConfig,
-  stringifyYaml,
-} from "@redocly/openapi-core";
+import { bundle, formatProblems, getTotals, loadConfig } from "@redocly/openapi-core";
 
 const docsRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(docsRoot, "../..");
@@ -25,11 +19,10 @@ if (totals.errors > 0) {
   throw new Error(`bundling ${input} failed with ${totals.errors} error(s)`);
 }
 
-const json = JSON.stringify(result.parsed, null, 2);
+// press.config.tsx imports the bundle as a module, so it ships inside the
+// build instead of being read from a build-machine path at runtime.
 await mkdir(outputDir, { recursive: true });
 await writeFile(
-  resolve(outputDir, "openapi.yaml"),
-  stringifyYaml(result.parsed, { noRefs: true, lineWidth: -1 }),
+  resolve(outputDir, "openapi.mjs"),
+  `export default ${JSON.stringify(result.parsed, null, 2)};\n`,
 );
-await writeFile(resolve(outputDir, "openapi.json"), json);
-await writeFile(resolve(outputDir, "openapi.mjs"), `export default ${json};\n`);

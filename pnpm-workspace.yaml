@@ -21,9 +21,8 @@ catalog:
   '@oclif/plugin-version': ^2.2.46
   '@oclif/plugin-which': ^3.2.55
   "@playwright/test": ^1.60.0
-  # Exact, and in step: the OpenAPI lint gate runs the CLI, the casing-rule
-  # tests and the docs bundle call the library the CLI is built on.
-  "@redocly/cli": 2.31.5
+  # Exact: the OpenAPI lint gate, the casing-rule tests and the docs bundle all
+  # call the library the Redocly CLI is built on, so they must agree.
   "@redocly/openapi-core": 2.31.5
   "@scalar/api-client-react": ^2.0.26
   "@storybook/addon-a11y": ^10.3.6
