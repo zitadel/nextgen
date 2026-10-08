@@ -164,6 +164,8 @@ tasks:
       - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
+      # The Biome config the launcher check runs against.
+      - "/biome.json"
     options:
       runFromWorkspaceRoot: true
 

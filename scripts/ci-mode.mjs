@@ -30,10 +30,9 @@ import { isDirectRun } from "./dev-process.mjs";
 
 // Files whose effects moon cannot fully see (no task, or not every task they
 // reach, lists them as inputs) but which reach builds, tests, or release
-// artifacts anyway. Any touched
-// file matching here disables all gating for the run — even when the rest
-// of the diff produced a non-empty affected set, because moon's answer says
-// nothing about these files.
+// artifacts anyway. Any touched file matching here disables all gating for
+// the run — even when the rest of the diff produced a non-empty affected set,
+// because moon's answer says nothing about these files.
 const FORCE_FULL_PREFIXES = [".github/", ".moon/", "scripts/"];
 const FORCE_FULL_FILES = new Set([
   "package.json",
