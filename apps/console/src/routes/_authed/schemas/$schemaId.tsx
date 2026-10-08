@@ -3,6 +3,7 @@ import { Users } from "lucide-react";
 import { Fragment } from "react";
 
 import { api } from "@/api/zitadel";
+import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
 import { DetailPanel, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { DETAIL_PANEL_PAGE } from "@/components/layout";
@@ -10,6 +11,7 @@ import { SchemaFieldsPanel } from "@/components/schema-fields-panel";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatDate } from "@/lib/date";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { type UserSchema, schemaAuthMethods, schemaDisplayName } from "@/lib/schema";
 
@@ -22,12 +24,12 @@ export const Route = createFileRoute("/_authed/schemas/$schemaId")({
   loader: ({ params, deps }) =>
     api
       .getSchemaById(params.schemaId, { project_id: requireProjectScope(deps.project) })
-      .then((body) => body.schema as UserSchema),
+      .then((body) => ({ schema: body.schema as UserSchema, createdAt: body.metadata.created_at })),
   component: SchemaDetail,
 });
 
 function SchemaDetail() {
-  const schema = Route.useLoaderData();
+  const { schema, createdAt } = Route.useLoaderData();
   const { schemaId } = Route.useParams();
   const name = schemaDisplayName(schema, schemaId);
   const methods = schemaAuthMethods(schema);
@@ -35,9 +37,16 @@ function SchemaDetail() {
   return (
     <div className={DETAIL_PANEL_PAGE}>
       <DetailPanel>
-        {/* The schema's id is not repeated here: the list row carries it, and
-            the design's lockup has only the two lines. */}
-        <PanelTitle icon={Users} eyebrow="User schema" title={name} />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <PanelTitle icon={Users} title={name} />
+          {/* The same header card as Login flows. The design draws a third
+              value, `EXPIRES AT`; nothing on the schema resource backs it. */}
+          <MetaCard>
+            <MetaValue label="Schema ID" value={schemaId} copyable />
+            <MetaRule />
+            <MetaValue label="Created" value={formatDate(createdAt)} />
+          </MetaCard>
+        </div>
 
         <Separator />
 
