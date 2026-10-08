@@ -44,14 +44,6 @@ type projectAdminsPageToken struct {
 	After string `json:"after"`
 }
 
-// ListProjectAdmins lists the people who administer a project, ordered by user
-// id, as the viewer may see them.
-//
-// Viewers see a person in full only through a direct grant, which the grants
-// list shows anyway, or through a team the viewer is a member of. Anyone else
-// is listed by user id, and a team the viewer is not in by team id: an admin
-// grant can name any platform team, and listing its members must not reveal
-// more than the viewer could otherwise see.
 func (s *GrantService) ListProjectAdmins(ctx context.Context, input ListProjectAdminsInput) (*ProjectAdmins, error) {
 	if input.ProjectID == "" {
 		return nil, domain.ErrProjectMissingID()
@@ -81,40 +73,40 @@ func (s *GrantService) ListProjectAdmins(ctx context.Context, input ListProjectA
 		out.NextPageToken = base64.RawURLEncoding.EncodeToString(payload)
 	}
 
-	var shown []*ProjectAdmin
 	homes := map[string]string{}
 	for _, record := range records {
-		admin := &ProjectAdmin{User: domain.UserRef{UserID: record.UserID}}
-		for _, source := range record.Sources {
-			mapped := ProjectAdminSource{Type: ProjectAdminSourceGrant, GrantID: source.GrantID}
-			if source.OwningTeam {
-				mapped.Type = ProjectAdminSourceOwningTeam
-			}
-			if source.TeamID != "" {
-				mapped.Team = &TeamRef{TeamID: source.TeamID, Name: source.TeamName}
-			}
-			admin.Sources = append(admin.Sources, mapped)
-		}
-		out.Admins = append(out.Admins, admin)
-		if record.Visible {
-			shown = append(shown, admin)
-			homes[record.UserID] = record.HomeProjectID
-		}
+		out.Admins = append(out.Admins, projectAdminFromRecord(record))
+		homes[record.UserID] = record.HomeProjectID
 	}
-	if err := s.resolveAdminRefs(ctx, shown, homes); err != nil {
+
+	if err := s.resolveAdminRefs(ctx, out.Admins, homes); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// resolveAdminRefs fills in each admin's user-ref, one batch per home project.
-// An admin whose ref cannot be resolved keeps the bare user id.
+func projectAdminFromRecord(record *domain.ProjectAdminRecord) *ProjectAdmin {
+	admin := &ProjectAdmin{User: domain.UserRef{UserID: record.UserID}}
+	for _, source := range record.Sources {
+		mapped := ProjectAdminSource{Type: ProjectAdminSourceGrant, GrantID: source.GrantID}
+		if source.OwningTeam {
+			mapped.Type = ProjectAdminSourceOwningTeam
+		}
+		if source.TeamID != "" {
+			mapped.Team = &TeamRef{TeamID: source.TeamID, Name: source.TeamName}
+		}
+		admin.Sources = append(admin.Sources, mapped)
+	}
+	return admin
+}
+
 func (s *GrantService) resolveAdminRefs(ctx context.Context, admins []*ProjectAdmin, homes map[string]string) error {
 	byHome := map[string][]*ProjectAdmin{}
 	for _, admin := range admins {
 		home := homes[admin.User.UserID]
 		byHome[home] = append(byHome[home], admin)
 	}
+
 	for home, homeAdmins := range byHome {
 		userIDs := make([]string, 0, len(homeAdmins))
 		for _, admin := range homeAdmins {

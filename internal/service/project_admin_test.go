@@ -25,8 +25,8 @@ func adminRecords(viewerUserID string, records ...*domain.ProjectAdminRecord) fu
 	}
 }
 
-func adminRecord(userID string, visible bool, sources ...domain.ProjectAdminSourceRecord) *domain.ProjectAdminRecord {
-	return &domain.ProjectAdminRecord{UserID: userID, HomeProjectID: grantPlatformProjID, Visible: visible, Sources: sources}
+func adminRecord(userID string, sources ...domain.ProjectAdminSourceRecord) *domain.ProjectAdminRecord {
+	return &domain.ProjectAdminRecord{UserID: userID, HomeProjectID: grantPlatformProjID, Sources: sources}
 }
 
 func listAdmins(t *testing.T, svc *service.GrantService, viewerUserID string) *service.ProjectAdmins {
@@ -47,13 +47,12 @@ func TestGrantService_ListProjectAdmins(t *testing.T) {
 		}}
 	}
 	// As the owner sees it: in the owning team, not in team_ops, whose name
-	// the query therefore leaves out.
+	// the query therefore leaves out, as it leaves out people only in team_ops.
 	opsGrant := domain.ProjectAdminSourceRecord{GrantID: "asgn_b", TeamID: "team_ops"}
 	owningTeam := domain.ProjectAdminSourceRecord{OwningTeam: true, TeamID: "team_owner", TeamName: "Acme"}
 	asOwner := adminRecords("user_owner",
-		adminRecord("user_direct", true, opsGrant, domain.ProjectAdminSourceRecord{GrantID: "asgn_c"}),
-		adminRecord("user_ops", false, opsGrant),
-		adminRecord("user_owner", true, owningTeam, domain.ProjectAdminSourceRecord{GrantID: "asgn_a"}),
+		adminRecord("user_direct", opsGrant, domain.ProjectAdminSourceRecord{GrantID: "asgn_c"}),
+		adminRecord("user_owner", owningTeam, domain.ProjectAdminSourceRecord{GrantID: "asgn_a"}),
 	)
 
 	t.Run("one entry per person with every source", func(t *testing.T) {
@@ -69,7 +68,7 @@ func TestGrantService_ListProjectAdmins(t *testing.T) {
 			byUser[admin.User.UserID] = admin
 			order = append(order, admin.User.UserID)
 		}
-		assert.Equal(t, []string{"user_direct", "user_ops", "user_owner"}, order, "in the order the query returns")
+		assert.Equal(t, []string{"user_direct", "user_owner"}, order, "in the order the query returns")
 		assert.Empty(t, got.NextPageToken)
 
 		assert.Equal(t, "owner@example.com", byUser["user_owner"].User.Identifier)
@@ -81,9 +80,8 @@ func TestGrantService_ListProjectAdmins(t *testing.T) {
 			{Type: service.ProjectAdminSourceGrant, GrantID: "asgn_b", Team: &service.TeamRef{TeamID: "team_ops"}},
 			{Type: service.ProjectAdminSourceGrant, GrantID: "asgn_c"},
 		}, byUser["user_direct"].Sources)
-		assert.Equal(t, "direct@example.com", byUser["user_direct"].User.Identifier, "a visible person is shown")
-		assert.Equal(t, domain.UserRef{UserID: "user_ops"}, byUser["user_ops"].User, "a person the viewer may not see keeps the user id")
-		assert.ElementsMatch(t, []string{"user_direct", "user_owner"}, ref.gotUserIDs, "only the people shown are looked up")
+		assert.Equal(t, "direct@example.com", byUser["user_direct"].User.Identifier)
+		assert.ElementsMatch(t, []string{"user_direct", "user_owner"}, ref.gotUserIDs, "every person listed is looked up")
 	})
 
 	t.Run("no admins", func(t *testing.T) {
@@ -99,7 +97,7 @@ func TestGrantService_ListProjectAdmins(t *testing.T) {
 		t.Parallel()
 		page := make([]*domain.ProjectAdminRecord, 0, 21)
 		for i := range 21 {
-			page = append(page, adminRecord(fmt.Sprintf("user_%05d", i), true, domain.ProjectAdminSourceRecord{GrantID: fmt.Sprintf("asgn_%05d", i)}))
+			page = append(page, adminRecord(fmt.Sprintf("user_%05d", i), domain.ProjectAdminSourceRecord{GrantID: fmt.Sprintf("asgn_%05d", i)}))
 		}
 		var after string
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {

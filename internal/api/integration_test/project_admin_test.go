@@ -121,11 +121,18 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 	colleagueRow := admins[api.UserID(colleagueID)]
 	require.Equal(t, []api.ProjectAdminSourceType{api.ProjectAdminSourceTypeGrant}, sourceTypes(colleagueRow))
 	assert.False(t, colleagueRow.Sources[0].Team.IsSet(), "a direct grant names no team")
-	require.Contains(t, admins, api.UserID(teamMemberID), "a member of a team granted admin is an admin")
-	teamMemberRow := admins[api.UserID(teamMemberID)]
+	assert.NotContains(t, admins, api.UserID(teamMemberID), "the owner is not in the granted team, so its members are left out")
+	// The member sees themselves, through the team grant, with the team named.
+	member, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	member.SetSessionToken(platformSessionCookie(t, teamMemberID).Value)
+	asMember := queryAdmins(t, member)
+	require.Contains(t, asMember, api.UserID(teamMemberID), "a member of a team granted admin is an admin")
+	teamMemberRow := asMember[api.UserID(teamMemberID)]
 	require.Equal(t, []api.ProjectAdminSourceType{api.ProjectAdminSourceTypeGrant}, sourceTypes(teamMemberRow))
 	require.True(t, teamMemberRow.Sources[0].Team.IsSet(), "a team grant names its team")
 	assert.Equal(t, adminTeamID, teamMemberRow.Sources[0].Team.Value.TeamID)
+	assert.True(t, teamMemberRow.Sources[0].Team.Value.Name.IsSet(), "the member's own team is named")
 	assert.True(t, teamMemberRow.Sources[0].GrantID.IsSet())
 	require.Contains(t, admins, api.UserID(ownerID))
 	ownerRow = admins[api.UserID(ownerID)]
@@ -183,18 +190,14 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 		assert.NotContains(t, queryAdmins(t, owner), api.UserID(deletedID))
 	})
 
-	t.Run("a viewer sees only the people of teams they can read", func(t *testing.T) {
+	t.Run("a viewer sees only people with a grant or in their own teams", func(t *testing.T) {
 		reader, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
 		reader.SetSessionToken(platformSessionCookie(t, viewerID).Value)
 
 		admins := queryAdmins(t, reader)
-		require.Contains(t, admins, api.UserID(teamMemberID))
-		member := admins[api.UserID(teamMemberID)]
-		assert.False(t, member.User.Identifier.IsSet(), "a member of a team the viewer cannot read is only an id")
-		require.Len(t, member.Sources, 1)
-		require.True(t, member.Sources[0].Team.IsSet())
-		assert.False(t, member.Sources[0].Team.Value.Name.IsSet(), "nor is the team named")
+		assert.NotContains(t, admins, api.UserID(teamMemberID), "a member of a team the viewer is not in is left out")
+		assert.NotContains(t, admins, api.UserID(ownerID), "so is a member of the owning team")
 		require.Contains(t, admins, api.UserID(colleagueID))
 		assert.True(t, admins[api.UserID(colleagueID)].User.Identifier.IsSet(), "a direct grant shows the person")
 	})
@@ -216,8 +219,10 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 		assert.NotContains(t, queryAdmins(t, owner), api.UserID(expiredID))
 	})
 
-	t.Run("project secret reads the same list", func(t *testing.T) {
-		assert.Contains(t, queryAdmins(t, secret), api.UserID(ownerID))
+	t.Run("a project secret sees only people with a grant of their own", func(t *testing.T) {
+		admins := queryAdmins(t, secret)
+		assert.Contains(t, admins, api.UserID(colleagueID))
+		assert.NotContains(t, admins, api.UserID(ownerID), "a secret is in no team, so team members are left out")
 	})
 
 	t.Run("an invalid page token is refused", func(t *testing.T) {

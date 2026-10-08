@@ -343,7 +343,7 @@ func (s authzAssignmentStatements) ListProjectAdmins(ctx context.Context, projec
 				source   authz.ProjectAdminSourceRow
 				teamName spanner.NullString
 			)
-			err := row.Columns(&source.UserID, &source.HomeProjectID, &source.SourceRank, &source.GrantID, &source.TeamID, &source.Visible, &teamName)
+			err := row.Columns(&source.UserID, &source.HomeProjectID, &source.SourceRank, &source.GrantID, &source.TeamID, &teamName)
 			source.TeamName = teamName.StringVal
 			return source, err
 		})

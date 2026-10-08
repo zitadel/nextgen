@@ -103,22 +103,25 @@ func TestAuthzAssignmentStatements_ListProjectAdmins(t *testing.T) {
 			{direct, []domain.ProjectAdminSourceRecord{{GrantID: directGrant}}},
 			{expiring, []domain.ProjectAdminSourceRecord{{GrantID: expiringGrant}}},
 		}
-		// seenBy is every admin as a viewer in the given teams sees them: a
-		// grant to the person, or a team the viewer is in, shows the person,
-		// and only those teams are named.
+		// seenBy is the admins a viewer in the given teams sees: a person with
+		// a grant of their own, or in one of those teams, with every source,
+		// and only those teams named.
 		seenBy := func(teams ...string) []*domain.ProjectAdminRecord {
 			out := make([]*domain.ProjectAdminRecord, 0, len(all))
 			for _, p := range all {
 				record := &domain.ProjectAdminRecord{UserID: p.userID, HomeProjectID: home}
+				seen := false
 				for _, source := range p.sources {
 					visible := source.TeamID == "" || slices.Contains(teams, source.TeamID)
 					if !visible {
 						source.TeamName = ""
 					}
-					record.Visible = record.Visible || visible
+					seen = seen || visible
 					record.Sources = append(record.Sources, source)
 				}
-				out = append(out, record)
+				if seen {
+					out = append(out, record)
+				}
 			}
 			return out
 		}
@@ -128,7 +131,7 @@ func TestAuthzAssignmentStatements_ListProjectAdmins(t *testing.T) {
 		want := seenBy()
 		assert.Equal(t, want, got,
 			"by user id, sources owning team, team grants and user grants; deleted, viewer, editor, expired, revoked, foreign and departed left out")
-		assert.False(t, got[1].Visible, "a person only in a team the viewer is not in is not visible")
+		assert.NotContains(t, adminUserIDs(got), teamMember, "a person only in a team the viewer is not in is left out")
 
 		asOwner, err := d.stmts.ListProjectAdmins(t.Context(), projectID, "", owner, 100)
 		require.NoError(t, err)
@@ -142,18 +145,26 @@ func TestAuthzAssignmentStatements_ListProjectAdmins(t *testing.T) {
 
 		limited, err := d.stmts.ListProjectAdmins(t.Context(), projectID, "", "", 2)
 		require.NoError(t, err)
-		assert.Equal(t, want[:2], limited, "the limit counts people, and keeps all of their sources")
+		assert.Equal(t, want[:2], limited, "the limit counts the people listed, and keeps all of their sources")
 
-		next, err := d.stmts.ListProjectAdmins(t.Context(), projectID, teamMember, "", 2)
+		next, err := d.stmts.ListProjectAdmins(t.Context(), projectID, direct, "", 2)
 		require.NoError(t, err)
 		assert.Equal(t, want[2:], next, "a page starts after the given user id")
 
 		pageAsOwner, err := d.stmts.ListProjectAdmins(t.Context(), projectID, owner, owner, 1)
 		require.NoError(t, err)
-		assert.Equal(t, seenBy(owningTeam, opsTeam)[1:2], pageAsOwner, "a viewer off the page still decides what is visible")
+		assert.Equal(t, seenBy(owningTeam, opsTeam)[1:2], pageAsOwner, "a viewer off the page still decides who is listed")
 
 		none, err := d.stmts.ListProjectAdmins(t.Context(), otherProjectID+"-missing", "", "", 100)
 		require.NoError(t, err)
 		assert.Empty(t, none)
 	})
+}
+
+func adminUserIDs(records []*domain.ProjectAdminRecord) []string {
+	ids := make([]string, 0, len(records))
+	for _, record := range records {
+		ids = append(ids, record.UserID)
+	}
+	return ids
 }

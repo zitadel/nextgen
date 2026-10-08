@@ -320,7 +320,7 @@ func (s authzAssignmentStatements) ListProjectAdmins(ctx context.Context, projec
 			source   authz.ProjectAdminSourceRow
 			teamName sql.NullString
 		)
-		err := rows.Scan(&source.UserID, &source.HomeProjectID, &source.SourceRank, &source.GrantID, &source.TeamID, &source.Visible, &teamName)
+		err := rows.Scan(&source.UserID, &source.HomeProjectID, &source.SourceRank, &source.GrantID, &source.TeamID, &teamName)
 		source.TeamName = teamName.String
 		return source, err
 	})

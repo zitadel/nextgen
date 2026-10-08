@@ -11082,7 +11082,9 @@ func (s *Server) handleListMyProjectsRequest(args [0]string, argsEscaped bool, w
 // listed. Like the check, the list does not look at a person's user status
 // beyond that, so a direct grant to a suspended person is listed.
 // A person whose access comes only through teams the caller is not a
-// member of is listed by `user_id` alone, and those teams by `team_id`.
+// member of is left out, and a team the caller is not in is named by
+// `team_id` only. The grant to such a team still shows in the project's
+// grants.
 // Ordered by `user_id` and paginated with `page_token`.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
 // session cookie (`nextgenSession`) that can read the project.

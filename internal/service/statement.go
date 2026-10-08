@@ -631,8 +631,10 @@ type AuthzAssignmentStatements interface {
 	// ListProjectAdmins returns the first limit people, by user id, with a user
 	// id after afterUserID who administer the project: as active members of
 	// the owning team, as active members of a team with an unexpired admin
-	// grant, or as existing users with an unexpired admin grant. Each carries
-	// every way they do, and whether viewerUserID may see them.
+	// grant, or as existing users with an unexpired admin grant. Only people
+	// viewerUserID may see are listed: those with a grant of their own, or in
+	// a team viewerUserID is an active member of. Each carries every way they
+	// administer the project.
 	ListProjectAdmins(ctx context.Context, projectID, afterUserID, viewerUserID string, limit uint32) ([]*domain.ProjectAdminRecord, error)
 	// GetActiveOwningTeamGrant returns the project's active owning-team grant
 	// (object project, relation team) or NoRowFoundError when the project is

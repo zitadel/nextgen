@@ -350,10 +350,6 @@ type ProjectAdminRecord struct {
 	UserID string
 	// HomeProjectID is the project the user lives in.
 	HomeProjectID string
-	// Visible is whether the viewer may see the person: through at least one
-	// source that is a grant to them, or a team the viewer is an active
-	// member of.
-	Visible bool
 	// Sources come owning team first, then team grants, then grants to the
 	// user, each by grant id.
 	Sources []ProjectAdminSourceRecord
