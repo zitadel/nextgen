@@ -709,9 +709,6 @@ importers:
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../../packages/api-mock
-      '@zitadel/sdk-next':
-        specifier: workspace:*
-        version: link:../../packages/sdk-next
       '@zitadel/testing':
         specifier: workspace:*
         version: link:../../packages/testing

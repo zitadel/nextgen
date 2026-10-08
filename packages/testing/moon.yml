@@ -12,25 +12,18 @@ dependsOn:
 
 tasks:
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
-      - "api:build"
       - "config:build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
-      - "api:build"
       - "config:build"
-    outputs:
-      - "dist/**/*"
 
   build-release:
     script: |
       node ../../scripts/release-clean.mjs local-dist
       corepack pnpm run build
     deps:
-      - "api:build-release"
       - "config:build-release"
     outputs:
       - "dist/**/*"
@@ -45,7 +38,6 @@ tasks:
       runInCI: false
 
   test:
-    command: "corepack pnpm run test"
     deps:
       - "build"
 

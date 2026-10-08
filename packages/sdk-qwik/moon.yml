@@ -10,28 +10,21 @@ dependsOn:
 
 tasks:
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
-      - "api:build"
       - "api-mock:build"
       - "components:build"
       - "sdk-core:build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
-      - "api:build"
       - "components:build"
       - "sdk-core:build"
-    outputs:
-      - "dist/**/*"
 
   build-release:
     script: |
       node ../../scripts/release-clean.mjs local-dist
       corepack pnpm run build
     deps:
-      - "api:build-release"
       - "components:build-release"
       - "sdk-core:build-release"
     outputs:
@@ -54,7 +47,6 @@ tasks:
   # client render and the wrapped Lit web components need a real DOM. The
   # browser project pays a Chromium cold start, which this lane covers in CI.
   test:
-    command: "corepack pnpm run test"
     deps:
       # api-mock serves the Flow API to the specs (test-setup.ts).
       - "api-mock:build"

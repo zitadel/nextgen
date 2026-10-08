@@ -173,6 +173,9 @@ Moon owns the task graph; `package.json` scripts are its leaves.
 
 - Every script has a Moon task of the same name, and that task's command is
   exactly `corepack pnpm run <name>`. Add the script and the task together.
+  `typecheck`, `build` and `test` come from `.moon/tasks/typescript.yml`, so a
+  package only adds its own deps for those (see
+  [.moon/AGENTS.md](.moon/AGENTS.md)).
 - A script does one task's work (`tsdown`, `vitest run`, or the two `tsc`
   passes of a `typecheck`); it never runs a step that belongs to another task.
   It is written as plain commands: no command substitution, `eval`/`source`,
@@ -451,6 +454,10 @@ verify with `corepack pnpm exec changeset status --since origin/main`.
 - Do not reintroduce Nx or GoReleaser without updating the ADRs first.
 - When unsure about Moon flags, check `moon --help` or the task definition in
   the nearest `moon.yml` before guessing.
+- Before editing a `moon.yml` or `.moon/`, read
+  [.moon/AGENTS.md](.moon/AGENTS.md): the shared tasks, the inputs rule and the
+  dependency rules, and the `moon run workspace:check-moon-graph` check to run
+  afterwards.
 
 ## Ephemeral Development Environments
 

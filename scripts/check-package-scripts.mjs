@@ -47,6 +47,7 @@ const EXEMPT_TASKS = new Set([
   ".:server-debug",
   ".:journey",
   ".:check",
+  ".:check-moon-graph",
   "apps/cli-journey-e2e:e2e-local",
   "apps/cli-journey-e2e:e2e-testkit",
   // Diagnoses the toolchain, pnpm included, so it cannot run through pnpm.
@@ -490,14 +491,44 @@ export function projectIds(root = ".") {
   return ids;
 }
 
+/**
+ * A project's tasks as moon resolves them: the shared `.moon/tasks/<language>.yml`
+ * tasks it does not exclude, with its own moon.yml on top (a task there that
+ * names no command keeps the inherited one).
+ */
+export function effectiveTasks(root, project) {
+  const language = project?.language;
+  const sharedPath = join(root, ".moon", "tasks", `${language}.yml`);
+  const shared =
+    language && existsSync(sharedPath)
+      ? (parse(readFileSync(sharedPath, "utf8"))?.tasks ?? {})
+      : {};
+  const excluded = new Set(project?.workspace?.inheritedTasks?.exclude ?? []);
+  const tasks = {};
+  for (const [id, task] of Object.entries(shared)) {
+    // Shared tasks that run a tool directly (the Biome `lint`) are not package
+    // scripts; only `corepack pnpm run <id>` tasks are held to the contract.
+    if (!excluded.has(id) && task?.command === `corepack pnpm run ${id}`) tasks[id] = { ...task };
+  }
+  for (const [id, task] of Object.entries(project?.tasks ?? {})) {
+    const inherited = tasks[id] ?? {};
+    const own = task ?? {};
+    tasks[id] =
+      own.command || own.script
+        ? { ...inherited, ...own }
+        : { ...inherited, ...own, command: inherited.command, script: inherited.script };
+  }
+  return tasks;
+}
+
 export function checkWorkspace(root = ".") {
   const problems = [];
   for (const id of projectIds(root)) {
     const base = join(root, ...id.split("/"));
     const scripts = JSON.parse(readFileSync(join(base, "package.json"), "utf8")).scripts ?? {};
     const moonPath = join(base, "moon.yml");
-    const tasks = existsSync(moonPath) ? (parse(readFileSync(moonPath, "utf8"))?.tasks ?? {}) : {};
-    problems.push(...checkProject(id, scripts, tasks));
+    const project = existsSync(moonPath) ? parse(readFileSync(moonPath, "utf8")) : {};
+    problems.push(...checkProject(id, scripts, effectiveTasks(root, project)));
   }
   return problems;
 }

@@ -10,15 +10,11 @@ tasks:
   # tsdown.config.ts). The deployed entry imports this, not the workspace
   # TypeScript source.
   build:
-    command: "corepack pnpm run build"
     deps:
       - "api-mock:build"
-    outputs:
-      - "dist/**"
 
   # Its specs import @zitadel/api-mock.
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
       - "api-mock:build"
 
@@ -35,7 +31,6 @@ tasks:
       runInCI: false
 
   test:
-    command: "corepack pnpm run test"
     deps:
       - "api-mock:build"
 

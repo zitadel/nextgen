@@ -161,6 +161,22 @@ tasks:
       cache: true
       runInCI: true
 
+  # The moon graph rules in .moon/AGENTS.md: no transitive duplicate deps, and
+  # cross-project deps match each package.json.
+  check-moon-graph:
+    command: "node scripts/check-moon-graph.mjs"
+    inputs:
+      - "scripts/check-moon-graph.mjs"
+      - "moon.yml"
+      - "apps/*/moon.yml"
+      - "packages/*/moon.yml"
+      - "tools/*/moon.yml"
+      - "apps/*/package.json"
+      - "packages/*/package.json"
+    options:
+      cache: true
+      runInCI: true
+
   check-adrs:
     command: "corepack pnpm run check-adrs"
     inputs:

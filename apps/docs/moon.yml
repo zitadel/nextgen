@@ -2,16 +2,21 @@ id: "docs"
 language: "typescript"
 layer: "application"
 stack: "frontend"
+dependsOn:
+  - "design-tokens"
+
+workspace:
+  inheritedTasks:
+    # No unit tests; the site is checked by `typecheck` and `build`.
+    exclude:
+      - "test"
 
 tasks:
   generate-openapi:
     command: "corepack pnpm run generate-openapi"
     inputs:
-      - "package.json"
+      - "**/*"
       - "/api/openapi/**/*.yaml"
-      - "scripts/bundle-openapi.mjs"
-      # The redocly version (the catalog pin).
-      - "/pnpm-workspace.yaml"
     outputs:
       - ".generated/openapi.yaml"
       - ".generated/openapi.json"
@@ -21,33 +26,28 @@ tasks:
     command: "corepack pnpm run generate"
     deps:
       - "generate-openapi"
-    inputs:
-      - "package.json"
-      - "content/**/*"
-      - "source.config.ts"
     outputs:
       - ".source/**/*"
 
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
       - "generate"
 
   build:
-    command: "corepack pnpm run build"
     deps:
+      # src/app.css imports @zitadel/design-tokens/css/tokens.css.
+      - "design-tokens:build"
       - "generate"
     inputs:
       - "**/*"
       # waku picks its adapter from VERCEL, so a Vercel build is never
       # restored from a local-adapter cache (or the reverse).
       - "$VERCEL"
-    outputs:
-      - "dist/**/*"
 
   dev:
     command: "corepack pnpm run dev"
     deps:
+      - "design-tokens:build"
       - "generate"
     options:
       persistent: true

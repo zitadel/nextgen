@@ -7,9 +7,15 @@ dependsOn:
   - "demo-next"
   - "testing"
 
+workspace:
+  inheritedTasks:
+    # An e2e suite: nothing to build, and its specs run through the `e2e*` tasks.
+    exclude:
+      - "build"
+      - "test"
+
 tasks:
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
       # The real-instance config and src-real specs import
       # @zitadel/testing/playwright.
@@ -21,7 +27,6 @@ tasks:
     command: "corepack pnpm run e2e"
     deps:
       - "api-mock:build"
-      - "api:build"
       - "sdk-next:build"
     options:
       runInCI: false
@@ -35,8 +40,6 @@ tasks:
       - "cli:build"
       - "server:build"
       # demo-next runs under `next dev`; see e2e.
-      - "api:build"
-      - "sdk-next:build"
     env:
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
       # server:build embeds the console/login UIs via its task deps; this
