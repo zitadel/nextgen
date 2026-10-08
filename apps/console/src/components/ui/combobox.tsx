@@ -32,7 +32,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
  *   `pl-2.5 pr-1 py-1`, `rounded-md`, `border-input`, `shadow-xs`,
  *   `bg-background dark:bg-input/30`; optional inline addon glyph at 50% opacity;
  *   trailing 24px box holding a 12px chevron.
- * - List: `rounded-lg`, `bg-popover`,
+ * - List: `rounded-md`, `bg-popover`,
  *   `shadow-md`, hairline in `foreground/10`.
  * - Menu item: one-line (32px) and two-line (48px, label over description).
  * - Chip: the removable selection in a multiple trigger.
@@ -46,7 +46,7 @@ const TRIGGER_DISABLED = "cursor-not-allowed bg-input/50 opacity-50 dark:bg-inpu
 const TRIGGER_INVALID =
   "border-destructive ring-destructive/20 dark:ring-destructive/40 aria-invalid:ring-[3px]";
 
-const LIST = "w-(--radix-popover-trigger-width) rounded-lg border-foreground/10 p-0";
+const LIST = "w-(--radix-popover-trigger-width) rounded-md border-foreground/10 p-0";
 
 // One-line is 32px; two-line stacks a 14px label over a 12px description and
 // measures 48px.

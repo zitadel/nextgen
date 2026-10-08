@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { Box, Plus, Search } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Box, Plus } from "lucide-react";
 
 import { api } from "@/api/zitadel";
 import { AddTeamSheet } from "@/components/add-team-sheet";
@@ -24,13 +23,11 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { formatDate } from "@/lib/date";
 import { requireProjectScope, useRequiredProjectScope } from "@/lib/project-scope";
-import { stringParam } from "@/lib/search-params";
 
 /**
  * The two states `team-status` defines. The tabs filter on exactly these, so the
@@ -40,22 +37,18 @@ import { stringParam } from "@/lib/search-params";
 const STATUSES = ["active", "deactivated"] as const;
 type TeamStatus = (typeof STATUSES)[number];
 
-type TeamsSearch = { status: TeamStatus; q?: string };
+type TeamsSearch = { status: TeamStatus };
 
 export const Route = createFileRoute("/_authed/teams/")({
   staticData: { scope: "project", nav: { label: "Teams", order: 2, icon: Box } },
-  // The tab and the search term live in the URL: both are server-side filters,
-  // so they belong to the request the loader makes rather than to component
-  // state. A filtered list is then linkable, survives a reload, and moves with
-  // the back button — and changing either re-runs the loader, which resets the
-  // paged-in rows the way a create or a delete does.
-  validateSearch: (search: Record<string, unknown>): TeamsSearch => {
-    const q = stringParam(search.q)?.trim() ?? "";
-    return {
-      status: STATUSES.find((status) => status === search.status) ?? "active",
-      q: q === "" ? undefined : q,
-    };
-  },
+  // The tab lives in the URL: it is a server-side filter, so it belongs to the
+  // request the loader makes rather than to component state. A filtered list
+  // is then linkable, survives a reload, and moves with the back button — and
+  // changing it re-runs the loader, which resets the paged-in rows the way a
+  // create or a delete does.
+  validateSearch: (search: Record<string, unknown>): TeamsSearch => ({
+    status: STATUSES.find((status) => status === search.status) ?? "active",
+  }),
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
     const page = await api.queryTeams(
@@ -74,9 +67,6 @@ export const Route = createFileRoute("/_authed/teams/")({
  */
 const PAGE_SIZE = 25;
 
-/** How long typing settles before the URL — and so the request — moves. */
-const SEARCH_DEBOUNCE_MS = 250;
-
 /**
  * The design lays this table on a fixed 248px grid, so a long team name
  * truncates rather than pushing `Status` and `Created` out of place. The fourth
@@ -87,18 +77,9 @@ const COLUMN = "w-62";
 
 type TeamFilter = NonNullable<Parameters<typeof api.queryTeams>[0]["filter"]>;
 
-/**
- * The filter both the loader and `Load more` send.
- *
- * `contains` is a case-insensitive substring match on every team in the project,
- * not on the page already fetched — which is what let the search box be built at
- * all. D5 keeps client-side filtering out precisely because it would narrow the
- * loaded page while presenting itself as narrowing the set.
- */
-function teamFilter({ status, q }: TeamsSearch): TeamFilter {
-  const filter: TeamFilter = [{ field: "status", operation: "equals", value: status }];
-  if (q) filter.push({ field: "name", operation: "contains", value: q });
-  return filter;
+/** The filter both the loader and `Load more` send. */
+function teamFilter({ status }: TeamsSearch): TeamFilter {
+  return [{ field: "status", operation: "equals", value: status }];
 }
 
 function TeamsScreen() {
@@ -141,19 +122,18 @@ function TeamsScreen() {
         {/* 8px from the title row to the tabs on desktop, 24px on mobile, where
             the design gives the stacked header more room. */}
         <div className={`${RESOURCE_HEADER} flex flex-col gap-6 lg:gap-2`}>
-          <div className="flex flex-col gap-2 lg:h-9 lg:flex-row lg:items-center lg:justify-between">
+          {/* The title row: the Add button beside the title at every width
+              (D19); no search until there is a console-wide one. */}
+          <div className="flex min-h-6 items-center justify-between gap-3">
             <h1 className={RESOURCE_TITLE}>Teams</h1>
-            <div className="flex items-center gap-3">
-              <TeamSearch value={search.q} />
-              <AddTeamSheet onCreated={() => router.invalidate()}>
-                {/* `px-2.5!` — `Button`'s `has-[>svg]:px-3` out-specifies a plain
-                    `px-2.5`, which renders the 68px control at 72px. */}
-                <Button className="shrink-0 gap-1.5 px-2.5!">
-                  <Plus aria-hidden />
-                  Add
-                </Button>
-              </AddTeamSheet>
-            </div>
+            <AddTeamSheet onCreated={() => router.invalidate()}>
+              {/* `px-2.5!` — `Button`'s `has-[>svg]:px-3` out-specifies a plain
+                  `px-2.5`, which renders the 68px control at 72px. */}
+              <Button className="shrink-0 gap-1.5 px-2.5!">
+                <Plus aria-hidden />
+                Add
+              </Button>
+            </AddTeamSheet>
           </div>
 
           <TabsList aria-label="Filter teams by status">
@@ -235,61 +215,9 @@ function TeamsScreen() {
   );
 }
 
-/** What an empty table means depends on which question was asked of it. */
-function emptyMessage({ status, q }: TeamsSearch): string {
-  if (q) return `No teams match “${q}”.`;
+/** What an empty table means depends on which tab asked for it. */
+function emptyMessage({ status }: TeamsSearch): string {
   return status === "active" ? "No active teams yet." : "No deactivated teams.";
-}
-
-/**
- * The directory's search box.
- *
- * The field is typed into far faster than a request should be made, so the URL
- * — and with it the loader — moves only once typing settles. The input holds the
- * pending keystrokes in the meantime, and takes a value back from the URL only
- * when the URL moved somewhere the input did not send it (the back button, a
- * link): without that test, a term still being typed would be overwritten by the
- * term that was sent a moment ago.
- */
-function TeamSearch({ value }: { value?: string }) {
-  const navigate = useNavigate({ from: Route.fullPath });
-  const [query, setQuery] = useState(value ?? "");
-  const sent = useRef(value ?? "");
-
-  useEffect(() => {
-    if ((value ?? "") === sent.current) return;
-    sent.current = value ?? "";
-    setQuery(value ?? "");
-  }, [value]);
-
-  useEffect(() => {
-    if (query === sent.current) return;
-    const timer = setTimeout(() => {
-      sent.current = query;
-      void navigate({
-        search: (prev) => ({ ...prev, q: query.trim() === "" ? undefined : query.trim() }),
-        // One history entry for the search, not one per keystroke.
-        replace: true,
-      });
-    }, SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [query, navigate]);
-
-  return (
-    <InputGroup className="min-w-0 flex-1 lg:w-60.5 lg:flex-none">
-      <InputGroupAddon>
-        <Search aria-hidden strokeWidth={1.5} />
-      </InputGroupAddon>
-      <InputGroupInput
-        type="search"
-        name="team-search"
-        placeholder="Search"
-        aria-label="Search teams"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-      />
-    </InputGroup>
-  );
 }
 
 /**

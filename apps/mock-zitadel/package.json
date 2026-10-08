@@ -1,6 +1,9 @@
 {
   "name": "@zitadel/mock-zitadel",
   "version": "0.0.0",
+  "engines": {
+    "node": "24.x"
+  },
   "private": true,
   "type": "module",
   "description": "Per-PR mock Zitadel API deployed to Vercel (wraps @zitadel/api-mock).",

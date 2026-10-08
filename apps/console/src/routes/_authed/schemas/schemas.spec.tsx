@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { formatDate } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
@@ -107,18 +108,12 @@ async function renderAt(path: string, project?: string) {
 }
 
 describe("user schemas list", () => {
-  it("shows the schema name, its attributes and its enabled sign-in methods", async () => {
+  it("shows the schema name and its enabled sign-in methods", async () => {
     serveList(envelope("sch_business", BUSINESS));
     await renderAt("/schemas");
 
     expect(await screen.findByRole("heading", { name: "User schemas" })).toBeInTheDocument();
     expect(await screen.findByRole("link", { name: "Business" })).toBeInTheDocument();
-
-    // Attribute chips are the schema's own property names, nested objects
-    // included — the row advertises what the schema collects.
-    for (const attribute of ["email", "givenName", "address"]) {
-      expect(screen.getByText(attribute)).toBeInTheDocument();
-    }
 
     // Only the enabled methods — password is declared but off.
     expect(screen.getByText("Passkey")).toBeInTheDocument();
@@ -139,36 +134,33 @@ describe("user schemas list", () => {
     expect(await screen.findByText("Passkey + Password")).toBeInTheDocument();
   });
 
-  it("identifies a schema by its id and creation date (D10)", async () => {
+  it("lays the directory out as a resource table with a created column (D17)", async () => {
     serveList(envelope("sch_business", BUSINESS));
     await renderAt("/schemas");
     await screen.findByRole("link", { name: "Business" });
 
-    // A labelled pair each, so the row reads as `CREATED <date>` / `ID <id>`
-    // rather than two loose strings.
-    expect(screen.getByText("Created")).toBeInTheDocument();
+    const table = within(screen.getByRole("table"));
+    for (const column of ["Name", "Sign-in methods", "Created"]) {
+      expect(table.getByRole("columnheader", { name: column })).toBeInTheDocument();
+    }
     // Derived rather than hardcoded: the row renders the viewer's locale, so
     // asserting one locale's output would pass only on machines set to it.
-    const created = new Date(CREATED_AT).toLocaleDateString(undefined, {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-    expect(screen.getByText(created)).toBeInTheDocument();
-    expect(screen.getByText("ID")).toBeInTheDocument();
-    expect(screen.getByText("sch_business")).toBeInTheDocument();
+    expect(table.getByText(formatDate(CREATED_AT))).toBeInTheDocument();
+    // The id moved to the detail header card; the row no longer repeats it.
+    expect(table.queryByText("sch_business")).not.toBeInTheDocument();
   });
 
   it("makes the whole row the click target, not just the name", async () => {
-    // The design system's note on `Schema Row`: the row is the click target and
-    // hover is the affordance, so a stretched link covers it — one focusable
-    // control, still keyboard- and middle-click-navigable.
-    serveList(envelope("sch_business", BUSINESS));
+    // The name is a real link, so the row stays keyboard- and middle-click-
+    // navigable; a click anywhere else on the row opens the same schema.
+    serveBusiness();
     await renderAt("/schemas");
 
     const link = await screen.findByRole("link", { name: "Business" });
     expect(link).toHaveAttribute("href", scopedPath("/schemas/sch_business"));
-    expect(link.className).toContain("after:inset-0");
+
+    await userEvent.click(screen.getByText("Passkey"));
+    expect(await screen.findByRole("heading", { name: "Business" })).toBeInTheDocument();
   });
 
   it("offers no way to create, edit or delete a schema (D0b)", async () => {
@@ -263,15 +255,21 @@ describe("user schemas list", () => {
           return HttpResponse.json({ schemas: [envelope("sch_stale", DEEP)] });
         }
         firstPageCalls += 1;
+        // Titled per generation: the row shows the name, not the id.
         return HttpResponse.json({
-          schemas: [envelope(`sch_page1_${firstPageCalls}`, BUSINESS)],
+          schemas: [
+            envelope(`sch_page1_${firstPageCalls}`, {
+              ...BUSINESS,
+              title: `Business ${firstPageCalls}`,
+            }),
+          ],
           next_page_token: "tok_2",
         });
       }),
     );
 
     const router = await renderAt("/schemas");
-    await screen.findByText("sch_page1_1");
+    await screen.findByText("Business 1");
 
     // Start the fetch, then invalidate before letting it answer.
     await userEvent.click(screen.getByRole("button", { name: "Load more" }));
@@ -280,7 +278,7 @@ describe("user schemas list", () => {
     await act(async () => {
       await router.invalidate();
     });
-    await screen.findByText("sch_page1_2");
+    await screen.findByText("Business 2");
 
     releaseSecondPage();
 
@@ -290,8 +288,8 @@ describe("user schemas list", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Load more" })).toBeEnabled());
 
     // The in-flight page is discarded rather than appended to the new list.
-    expect(screen.queryByText("sch_stale")).not.toBeInTheDocument();
-    expect(screen.getByText("sch_page1_2")).toBeInTheDocument();
+    expect(screen.queryByText("Deep")).not.toBeInTheDocument();
+    expect(screen.getByText("Business 2")).toBeInTheDocument();
   });
 
   it("renders one list request and no per-row document fetches", async () => {
@@ -332,6 +330,19 @@ describe("user schema detail", () => {
     expect(path.getByText("address")).toHaveAttribute("aria-current", "true");
     await userEvent.click(path.getByRole("button", { name: "Schema" }));
     expect(await table().findByRole("cell", { name: "email" })).toBeInTheDocument();
+  });
+
+  it("carries the schema id and created date in the header card", async () => {
+    // The same card as Login flows: the id, copyable, beside the created date.
+    serveBusiness();
+    await renderAt("/schemas/sch_business");
+    await screen.findByRole("heading", { name: "Business" });
+
+    expect(screen.getByText("Schema ID")).toBeInTheDocument();
+    expect(screen.getByText("sch_business")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy Schema ID" })).toBeInTheDocument();
+    expect(screen.getByText("Created")).toBeInTheDocument();
+    expect(screen.getByText(formatDate(CREATED_AT))).toBeInTheDocument();
   });
 
   it("reads the schema in the selected project", async () => {
