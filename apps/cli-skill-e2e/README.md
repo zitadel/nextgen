@@ -10,6 +10,16 @@ installed exactly as a user would get it (`npx skills add`), across a single
 stateful journey (one project flows through every stage). The stages live in
 [`journey.config.json`](journey.config.json) — adding a question is a data edit.
 
+**Grading is outcome-first.** After each stage, the harness asks the *live local
+instance* what it actually holds — via the CLI's own read commands (`--json`) —
+and checks the stage's declared `assert` list against that. A stage passes only
+when reality matches, so "edited the file but never deployed", a no-op, or a
+confident-but-wrong answer all fail. Each assertion is
+`{ name, get, path, op, value }`: `get` is a read command, `path` points into its
+JSON, `op` is `exists` / `eq` / `neq` / `count-eq` / `count-gte`. A stage with no
+server-assertable outcome (e.g. "is this a client id?") falls back to a
+transcript check via its `grade` rule.
+
 **"Non-interactive" means the CLI, not the agent.** The agent always drives the
 CLI with `--non-interactive --json`, but it may still converse with the
 developer. A stage with a `user` persona is run as a **multi-turn conversation**:
@@ -59,17 +69,34 @@ its goal (the baseline is captured for comparison, not asserted), then in
 | --- | --- | --- |
 | `ENV_FILE` | — | file containing `ANTHROPIC_API_KEY=…` (recommended) |
 | `FRESH` | `0` | `1` re-runs the containers instead of reusing `out/` |
-| `BRANCH` | `feat/cli-installable-agent-skill` | which branch's skill to install |
+| `BRANCH` | `main` | which branch's skill to install |
 | `MODEL` | `sonnet` | model for the driving agent |
 | `SIM_MODEL` | `haiku` | model for the simulated user answering the agent |
-| `MAX_TURNS` | `40` | per-agent-turn turn cap |
-| `MAX_QA` | `6` | max question/answer rounds per interactive stage |
+| `MAX_TURNS` | `40` | reasoning-loop cap per `claude -p` call (with-skill) |
+| `BASELINE_MAX_TURNS` | `5` | tighter loop cap for the baseline (no-skill) config |
+| `MAX_QA` | `6` | max question/answer rounds per interactive stage (with-skill only) |
+| `CALL_TIMEOUT_MS` | `420000` | wall-clock timeout per `claude -p` call (anti-hang) |
+| `CLI_SPEC` | `@zitadel/cli@alpha` | the CLI package/tag used to read live state for assertions |
+
+**Two safeguards keep a run from dragging or hanging.** `MAX_TURNS` caps the
+*reasoning loop* (how many model↔tool steps a call may take); `CALL_TIMEOUT_MS`
+caps *wall-clock time*, killing a call that stalls inside a single turn (a wedged
+network call, a stuck child) — something a turn cap can't catch.
+
+The baseline is deliberately starved: a tight 5-turn cap and **no simulated-user
+Q&A** (one short attempt, not five rounds of the user spelling out requirements
+it can't act on). And because the journey is stateful, the driver **aborts the
+remaining stages** the moment a stage leaves no project behind (the baseline's
+usual fate). Together that turns the baseline from minutes of flailing into a
+single, fast, failed setup stage; the skipped stages have no trajectory file and
+grade as failures.
 
 ## Output
 
 `out/<config>/stage<N>.jsonl` (trajectories — the agent's stream-json plus a
 `{"type":"sim_user",…}` line per simulated-user answer), `out/<config>/after-stage<N>.json`
-(schema snapshots), `out/journey.html` (the tabbed report: one tab per stage,
-the full conversation — prompt, what the agent asked, what the user answered,
-every command with its output, per-stage tokens). Everything under `out/` is
-gitignored.
+(schema snapshots), `out/<config>/asserts-stage<N>.json` (each stage's
+live-instance assertion results — `{name, passed, evidence}`), `out/journey.html`
+(the tabbed report: one tab per stage, the full conversation — prompt, what the
+agent asked, what the user answered, every command with its output, the
+live-instance checks, per-stage tokens). Everything under `out/` is gitignored.

@@ -148,6 +148,19 @@ function convo(prompt, transcript) {
   return parts.join("\n");
 }
 
+// The live-instance outcome checks for a stage: what the harness asked the
+// running server after the agent's turn, and whether reality matched.
+function assertsBlock(asserts) {
+  if (!asserts || !asserts.length) return "";
+  const items = asserts
+    .map(
+      (a) =>
+        `<li class="asrt ${a.passed ? "ok" : "no"}"><span class="am">${a.passed ? "✓" : "✗"}</span><span class="an">${esc(a.name)}</span><span class="ae">${mdToHtml(a.evidence || "")}</span></li>`,
+    )
+    .join("");
+  return `<div class="asserts"><div class="asserts-h">Live-instance checks</div><ul class="asrt-list">${items}</ul></div>`;
+}
+
 // --- Grade each config once --------------------------------------------------
 const graded = {};
 for (const c of cfg.configs) {
@@ -192,7 +205,7 @@ const panels = stages
         if (!rows) return "";
         const r = rows.find((x) => x.stage === s.id);
         const t = r.ms ? ` · ${dur(r.ms)}` : "";
-        return `<details class="cfg"${c === "with-skill" ? " open" : ""}><summary>${badge(r.status)}<span class="cfg-name">${esc(CONFIG_LABELS[c] || c)}</span><span class="why">${esc(r.why)}</span><span class="stat">${r.turns} turns · ${r.tokens.toLocaleString()} tokens${t}</span></summary><div class="body">${convo(s.prompt, r.parsed.transcript)}</div></details>`;
+        return `<details class="cfg"${c === "with-skill" ? " open" : ""}><summary>${badge(r.status)}<span class="cfg-name">${esc(CONFIG_LABELS[c] || c)}</span><span class="why">${esc(r.why)}</span><span class="stat">${r.turns} turns · ${r.tokens.toLocaleString()} tokens${t}</span></summary><div class="body">${assertsBlock(r.asserts)}${convo(s.prompt, r.parsed.transcript)}</div></details>`;
       })
       .join("");
     return `<section class="stage-panel" role="tabpanel" id="stage-${s.id}" aria-labelledby="tab-${s.id}" tabindex="0"${i === 0 ? "" : " hidden"}><h2 class="stage-head">Stage ${s.id}: ${esc(s.title)}</h2>${cfgHtml}</section>`;
@@ -252,6 +265,15 @@ main{max-width:1000px;margin:0 auto;padding:24px clamp(16px,4vw,32px)}
 .why{color:var(--muted);font-size:12.5px}
 .stat{color:var(--muted);font-size:12px;margin-left:auto;white-space:nowrap}
 .dur{font-variant-numeric:tabular-nums}
+.asserts{margin:0 0 20px;border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--panel)}
+.asserts-h{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px}
+.asrt-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.asrt{display:grid;grid-template-columns:18px 1fr;gap:4px 8px;align-items:baseline;font-size:13px}
+.asrt .am{font-weight:800;text-align:center}
+.asrt.ok .am{color:#16a34a}.asrt.no .am{color:#dc2626}
+.asrt.no .an{font-weight:600}
+.asrt .ae{grid-column:2;color:var(--muted);font-size:11.5px}
+.asrt .ae code{font-size:11px}
 .cmd{margin:0 0 18px;border-radius:10px;overflow:hidden;border:1px solid var(--cmd-bg)}
 .cmd .c{background:var(--cmd-bg);color:#e5e7eb;padding:10px 14px;font:12px/1.5 ui-monospace,Menlo,monospace;display:flex;gap:12px;align-items:flex-start}
 .cmd .c code{background:none;color:inherit;font:inherit;white-space:pre-wrap;word-break:break-word;flex:1 1 auto;min-width:0}

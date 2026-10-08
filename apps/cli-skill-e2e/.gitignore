@@ -1,2 +1,5 @@
 out/
 *.html
+# Claude credential for local runs — never commit (see README "Prerequisites").
+.secret.env
+*.secret.env

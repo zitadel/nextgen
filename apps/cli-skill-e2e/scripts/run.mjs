@@ -20,6 +20,11 @@ const MODEL = process.env.MODEL || "sonnet";
 const SIM_MODEL = process.env.SIM_MODEL || "haiku";
 const IMAGE = process.env.IMAGE || "node:24";
 const MAX_TURNS = process.env.MAX_TURNS || "40";
+// The baseline (no skill) can't find the CLI; without a tight cap it burns the
+// full turn budget flailing on every stage. A small cap means "if it can't get
+// going in a few turns, that stage is a failure" — and the driver then aborts
+// the rest of the stateful journey (nothing for later stages to act on).
+const BASELINE_MAX_TURNS = process.env.BASELINE_MAX_TURNS || "5";
 const MAX_QA = process.env.MAX_QA || "6";
 const ENV_FILE = process.env.ENV_FILE || "";
 const FRESH = process.env.FRESH === "1";
@@ -76,6 +81,8 @@ function runConfig(name) {
   else if (process.env.CLAUDE_CODE_OAUTH_TOKEN) args.push("-e", "CLAUDE_CODE_OAUTH_TOKEN");
   else args.push("-e", "ANTHROPIC_API_KEY");
   args.push("-e", `MODEL=${MODEL}`, "-e", `SIM_MODEL=${SIM_MODEL}`, "-e", `MAX_TURNS=${MAX_TURNS}`);
+  args.push("-e", `BASELINE_MAX_TURNS=${BASELINE_MAX_TURNS}`, "-e", `CONFIG=${name}`);
+  if (process.env.CALL_TIMEOUT_MS) args.push("-e", `CALL_TIMEOUT_MS=${process.env.CALL_TIMEOUT_MS}`);
   args.push("-e", `MAX_QA=${MAX_QA}`, "-e", "OUT=/out", "-e", "WORK=/work", "-e", "IS_SANDBOX=1");
   args.push("-e", "ZITADEL_TELEMETRY=0", "-e", "DO_NOT_TRACK=1", "-e", "DISABLE_TELEMETRY=1");
   args.push("-e", "DISABLE_AUTOUPDATER=1", "-e", "DISABLE_ERROR_REPORTING=1");
