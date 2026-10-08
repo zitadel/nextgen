@@ -586,3 +586,37 @@ and are resolved to ids once, at creation; the stored record carries
 above — payload fields, `409` on a failed `expected_current_deployment_id`
 check, newest-first ordering — are unchanged; this amendment moves the paths,
 not the model. `rolled_back_from` was dropped from the payload by #532.
+
+## Amendment (2026-10-08): environments are removed; a deployment targets origins
+
+The environment entity this ADR introduced under [Environments](#environments)
+is withdrawn by the spike behind #1389 ([PR 1427](https://github.com/zitadel/nextgen/pull/1427)) and
+[ADR 068](068-project-is-the-data-boundary.md). What stands from this ADR is
+the release: an immutable bundle of resource revisions, idempotent on content,
+with its audit metadata. What changes is where a release runs.
+
+- A deployment targets **origins**: the project default (`""`), the primary
+  hostnames the project allows, or preview URLs. One deployment is one
+  operation with a target row per origin under it. There is no
+  `environments` resource, no seeded set, no `current_deployment_id` and no
+  `environment_id` on a deployment; what an origin serves is the newest
+  deployment to it, so the log is append-only and a rollback is another
+  deployment.
+- A request resolves its release from the `Origin` it arrives with, in three
+  layers (gate, target, release). Nothing on the request names an environment.
+- `promote` has no server surface: it is `deploy` against another project
+  with a content-digest assertion. `releases create` and `status` are
+  withdrawn from the CLI; `deploy`, `preview`, `deployment list` and
+  `deployment rollback` replace the loop described under [CLI](#cli).
+
+The items this ADR left [out of scope](#out-of-scope) resolve as follows.
+Lifecycle has no subject; data isolation is ADR 068; per-environment values
+are [ADR 062](062-per-environment-variables-and-secrets.md) as amended; the
+inner loop deploys each local save to the developer's own loopback origin, so
+every local save is a release and a deployment to one target; bare
+`zitadel deploy` targets the project default and every primary hostname, and
+previews are only ever written by `zitadel preview`.
+
+The amendments of 2026-09-02 and 2026-09-11 above stand where they concern
+releases; their environment paths and `environment_id` columns go with the
+entity.

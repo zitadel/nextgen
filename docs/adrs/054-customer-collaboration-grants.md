@@ -583,3 +583,10 @@ If accepted, follow-up documentation must:
   ownership relation; and
 - update the Console/customer-portal contract to use the authorization-filtered
   project query and explain effective-role sources.
+
+## Amendment (2026-10-08): no environment scope to defer
+
+The "environment security model" this ADR deferred to ADR 035 has no subject:
+there are no environments ([ADR 068](068-project-is-the-data-boundary.md)).
+Assignments are project-scoped and that is the only scope. The item under
+what this ADR does not decide about environment-specific grants is withdrawn.

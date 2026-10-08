@@ -454,3 +454,13 @@ Recorded here because §14 makes them the API's problem, not the CLI's:
 - Conventions must be adopted, not re-invented: a new resource that wants its
   own pagination, flag spelling, or error shape is a signal the API is wrong,
   not the CLI.
+
+## Amendment (2026-10-08): no `environments` resource
+
+`environments` is withdrawn from the registry: there is no server resource to
+list or get ([ADR 068](068-project-is-the-data-boundary.md)). The spelling
+question in the context note and under what this ADR does not decide is
+settled by removal. `zitadel env` stays, as the client-side verb that binds a
+directory to a `(server, project)` pair through `.env.<name>.local` files; it
+never addresses a server resource. `releases`, `flow-definitions`, `branding`
+and the runtime resources are unchanged.

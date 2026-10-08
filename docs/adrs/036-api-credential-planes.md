@@ -275,3 +275,25 @@ publishable-key wiring only.
 - Per-environment publishable keys before ADR 035 environments are
   implemented.
 - Per-operation scope enforcement in `HandleOAuth2` (#207).
+
+## Amendment (2026-10-08): one publishable key per project; allow-all is the absence of a pattern
+
+This ADR expected keys to be issued per environment once ADR 035 environments
+existed, with allow-all restricted to non-production environments. There are
+no environments ([ADR 068](068-project-is-the-data-boundary.md)), so:
+
+- A project has **one publishable key**. It resolves the project server-side
+  and nothing more; the request's `Origin` decides what the project serves.
+- The origin allowlist is the project's **origin patterns**, each marked
+  `primary` or `preview`. A project with no pattern admits every origin; the
+  first pattern closes it; a loopback origin is always admitted. That is the
+  development allowance this ADR tied to non-production environments,
+  carried by the pattern list instead of by a key.
+- `zitadel.json` holds no environment and no key. The public triple a
+  deployed app needs, `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and the publishable
+  key, lives in the platform's environment store; a directory's binding to a
+  `(server, project)` pair is a `.env.<name>.local` file the CLI writes.
+- The "per-environment publishable keys" item under what this ADR does not
+  decide is withdrawn.
+
+Design: [origins](https://github.com/zitadel/nextgen/pull/1427) in the spike behind #1389.

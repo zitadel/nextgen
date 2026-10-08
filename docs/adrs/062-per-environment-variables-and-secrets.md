@@ -256,3 +256,26 @@ open; it is not something to carry before there is a case for it.
 
 **Operating-system environment variables.** Out of scope by the issue: these are
 project data, set through Zitadel, read on the environment serving the request.
+
+## Amendment (2026-10-08): a variable's owner is the project
+
+The environment scope this ADR gives a variable goes with the environment
+entity ([ADR 068](068-project-is-the-data-boundary.md)). What remains:
+
+- A variable belongs to a **project**. `environment_id`, the generated
+  `environment_ref`, its foreign key and the `''` convention for a
+  project-level entry are withdrawn, and `environment_name` comes off the
+  four operations under [API](#api).
+- Of what the scope was doing, one rule survives: a preview must not hold
+  production secrets. It becomes **`applies_to`** on the variable, `all` or
+  `preview` and nothing else. A `preview` entry is what a preview deployment
+  resolves for that name; everything else resolves the `all` entry.
+- A deploy request carries no variable names and no values. Each deployment
+  **freezes the set it resolved** at creation, so what a target runs cannot
+  drift from the release it runs, and rollback restores values and release
+  together. A flow seals the deployment id, not the release, for the same
+  reason.
+- The format, the secret handling under [ADR 029](029-cryptography-secrets-and-key-lifecycle.md)
+  and the permission split stand.
+
+Design: [variables and secrets](https://github.com/zitadel/nextgen/pull/1427) in the spike behind #1389.

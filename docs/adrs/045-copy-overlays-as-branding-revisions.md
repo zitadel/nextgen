@@ -73,3 +73,11 @@ Implementation is deliberately fenced behind the templates-track milestone:
 this ADR seeks direction alignment only, and no code should be built ahead
 of acceptance (the built-ahead-of-alignment pattern is how parallel work has
 rotted before). The interim per-SDK wiring keeps delivering value until then.
+
+## Amendment (2026-10-08): effective for the request's target
+
+"Effective for the environment" and "the environment's current release" read
+as the release the request resolves to from its `Origin`, per the spike behind
+#1389 and [ADR 068](068-project-is-the-data-boundary.md). The release boundary
+rule stands unchanged: a copy-bearing revision is inert until a deployment
+containing it reaches the target the request resolves to.
