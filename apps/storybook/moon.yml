@@ -6,6 +6,7 @@ dependsOn:
   - "api"
   - "api-mock"
   - "components"
+  - "config"
   - "design-tokens"
 
 tasks:
@@ -17,13 +18,16 @@ tasks:
       - "api:build"
       - "api-mock:build"
       - "components:build"
+      - "config:build"
       - "design-tokens:build"
 
   build:
     command: "corepack pnpm run build"
     deps:
       - "api:build"
+      - "api-mock:build"
       - "components:build"
+      - "config:build"
       - "design-tokens:build"
     outputs:
       - "dist/**/*"
@@ -46,7 +50,9 @@ tasks:
     deps:
       - "install-browsers"
       - "api:build"
+      - "api-mock:build"
       - "components:build"
+      - "config:build"
       - "design-tokens:build"
     options:
       # Shared mutex with the other browser-mode suites so only one real-Chromium
@@ -60,6 +66,9 @@ tasks:
 
   dev:
     command: "corepack pnpm run dev"
+    deps:
+      # .storybook/main.ts imports @zitadel/api-mock/public-dir under Node.
+      - "api-mock:build"
     options:
       persistent: true
       runInCI: false

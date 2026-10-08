@@ -13,6 +13,7 @@ tasks:
     command: "corepack pnpm run typecheck"
     deps:
       - "api:build"
+      - "api-mock:build"
       - "config:build"
       - "design-tokens:build"
 

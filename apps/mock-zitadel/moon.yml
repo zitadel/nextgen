@@ -23,7 +23,7 @@ tasks:
   typecheck:
     command: "corepack pnpm run typecheck"
     deps:
-      - "api:generate"
+      - "api-mock:build"
 
   test:
     command: "corepack pnpm run test:all"

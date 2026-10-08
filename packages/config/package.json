@@ -80,6 +80,7 @@
     },
     "./defaults/default-human-user.json": "./defaults/default-human-user.json",
     "./defaults/default-login.json": "./defaults/default-login.json",
+    "./defaults/branding/*": "./defaults/branding/*",
     "./package.json": "./package.json"
   },
   "publishConfig": {
