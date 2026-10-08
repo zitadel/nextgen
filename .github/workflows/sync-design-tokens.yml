@@ -118,7 +118,7 @@ jobs:
           git push -q origin HEAD:design-tokens/figma-sync
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@v6
         with:
           run_install: false
 

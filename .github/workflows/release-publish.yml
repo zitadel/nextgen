@@ -67,7 +67,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         if: ${{ github.event_name == 'push' && steps.release-publish.outputs.should_run != 'true' }}
         with:
           run_install: false
@@ -108,7 +108,7 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
           run_install: false
 

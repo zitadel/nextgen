@@ -114,6 +114,11 @@ catalogMode: strict
 # installing fresh releases the way pnpm 10 did.
 minimumReleaseAge: 0
 
+# pnpm 12 runs an install before `pnpm run`/`pnpm exec` whenever node_modules
+# looks out of date. Moon tasks run scripts in parallel and Vercel installs a
+# filtered subset, so keep pnpm 10's behaviour of never installing implicitly.
+verifyDepsBeforeRun: false
+
 # `packages/config` and `apps/cli` rely on `pre*`/`post*` lifecycle scripts.
 enablePrePostScripts: true
 
