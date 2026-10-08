@@ -5,7 +5,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { scopedPath } from "@/lib/project-scope.fixture";
+import { scopedPath } from "@/test/project-scope.fixture";
 
 import { THEME_STORAGE_KEY } from "../../theme";
 import { createAppRouter } from "../../router";
@@ -14,7 +14,7 @@ import { createAppRouter } from "../../router";
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  const { makeTestSession } = await import("@/auth/session.fixture");
+  const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
@@ -22,15 +22,12 @@ vi.mock("@/auth/session", async (importOriginal) => {
  * The sidebar lists only screens that exist. Entries come from `staticData.nav`
  * on the route tree (Console ADR 0001) and every one is a link.
  *
- * It used to render the Figma mock's full 7 items, with the 4 unbuilt ones as
- * `aria-disabled` rows. That is what this spec now guards against: a disabled
- * row advertises a feature and reads as "you cannot do this" rather than "this
- * does not exist". Also covers the theme toggle writing `data-theme` and
- * persisting the preference.
+ * Guards against `aria-disabled` rows for unbuilt screens. Also covers the
+ * theme toggle writing `data-theme` and persisting the preference.
  */
 // The Projects overview first, then the selected project's contents in the
 // order the design puts them, then the project's own settings. `User schemas`
-// nests beneath `Users` (`Schema directory` frame) rather than adding a second
+// nests beneath `Users` rather than adding a second
 // top-level row.
 const NAV_ORDER = ["Projects", "Teams", "Users", "Login flows", "Project settings"];
 const NESTED_NAV = { parent: "Users", label: "User schemas" };
@@ -193,7 +190,7 @@ describe("settings view", () => {
   });
 
   it("drops the context bar in the settings view", async () => {
-    // The settings frames draw no bar. Its project switcher and theme toggle
+    // The settings design draws no bar. Its project switcher and theme toggle
     // are portal chrome; the sidebar keeps a trigger of its own, so the
     // collapse is not lost with them.
     renderShell("/settings");
@@ -227,7 +224,6 @@ describe("theme toggle", () => {
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
   });
   it("names the project from the API rather than a hardcoded label", async () => {
-    // The switcher used to hardcode "River".
     renderShell();
     const switcher = await screen.findByRole("button", { name: "Switch project" });
     await waitFor(() => expect(switcher).toHaveTextContent("console-dev"));

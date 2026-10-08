@@ -21,7 +21,7 @@ import { useTheme } from "../../theme";
  * Sonner renders in a portal outside the app subtree, so it cannot inherit the
  * token values through the cascade the way the rest of the UI does. The `style`
  * block below maps its private custom properties onto the same semantic tokens
- * (`--popover`, `--border`) every other surface uses, so it flips with
+ * (`--color-popover`, `--color-border`) every other surface uses, so it flips with
  * `data-theme` rather than needing a light and a dark variant.
  */
 function Toaster({ ...props }: ToasterProps) {
@@ -40,10 +40,10 @@ function Toaster({ ...props }: ToasterProps) {
       }}
       style={
         {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
-          "--border-radius": "var(--radius)",
+          "--normal-bg": "var(--color-popover)",
+          "--normal-text": "var(--color-popover-foreground)",
+          "--normal-border": "var(--color-border)",
+          "--border-radius": "var(--radius-lg)",
         } as React.CSSProperties
       }
       {...props}

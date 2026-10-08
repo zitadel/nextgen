@@ -2,53 +2,120 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+
+import { MetaCard } from "./detail-meta";
+import { EYEBROW, PAGE_TITLE } from "./typography";
 
 /**
  * Shared geometry for the console's resource detail screens (Users, Teams,
  * Project settings) — the detail counterpart of `resource-list.tsx`.
  *
- * The three screens had each measured "the detail frame" and landed on three
- * versions of it. One shell now draws all of them; its measurements live in
- * one place, "Resource detail layout" in `docs/styling.md`, which a change to
- * a value here updates too.
+ * One shell draws all three; its measurements live in "Resource detail layout"
+ * in `docs/styling.md`, which a change to a value here updates too.
  *
  * The schema and login-flow screens are a different composition — the whole
- * screen is one panel (`DETAIL_PANEL_PAGE`) — and keep it. Both share the icon
+ * screen is one panel ({@link DetailPanel}) — and keep it. Both share the icon
  * tile ({@link ICON_PLATE}); the login-flow screen also shares the header card
- * ({@link MetaCard}), while the schema screen shows no id.
+ * (`MetaCard`), while the schema screen shows no id.
  */
 
 /** Page wrapper: the list shell's gutter, 22px under the navbar. */
 export function DetailPage({ children }: { children: ReactNode }) {
-  return <div className="px-4 pt-[22px] pb-8">{children}</div>;
+  return <div className="px-4 pt-5.5 pb-8">{children}</div>;
 }
 
 /** The 24px gap between the header row and the first body element. */
 export const DETAIL_BODY = "mt-6";
 
 /** A detail screen's title: the 24/24 display face. */
-export const DETAIL_TITLE = "text-foreground font-serif text-2xl leading-6 tracking-tight";
+export const DETAIL_TITLE = PAGE_TITLE;
 
 /** The icon tile a detail title leads with. */
 export const ICON_PLATE =
   "bg-muted text-foreground flex size-9 shrink-0 items-center justify-center rounded-md";
 
+/** A body card: the stock `Card` with its own gap and padding removed. */
+export const DETAIL_CARD = "gap-0 py-0";
+
 /**
- * The card of labelled values (`MetaValue`, split by `MetaRule`) that identifies
- * a resource: stacked below `sm`, where the rule becomes a tick on its own row,
- * and in a row above it.
- *
- * `max-w-full` + `overflow-x-auto`: its width is set by the id, which is never
- * truncated, so a narrow screen scrolls the card rather than the page.
+ * A body card with a titled section: the eyebrow, an optional action beside it,
+ * an optional note under them, a rule, then `children`. Inset 24px, 20px top
+ * and bottom, 16px between parts.
  */
-export function MetaCard({ children, className }: { children: ReactNode; className?: string }) {
+export function DetailSection({
+  title,
+  titleId,
+  action,
+  note,
+  className,
+  children,
+  ...props
+}: Omit<React.ComponentProps<typeof Card>, "title"> & {
+  title: string;
+  /** Sets the eyebrow's id, for a card labelled by it. */
+  titleId?: string;
+  action?: ReactNode;
+  /** A line between the header and the rule. */
+  note?: ReactNode;
+}) {
+  const eyebrow = (
+    <span id={titleId} className={EYEBROW}>
+      {title}
+    </span>
+  );
   return (
-    <Card className={cn("max-w-full gap-0 overflow-x-auto rounded-xl py-0", className)}>
-      <CardContent className="flex flex-col px-5 py-3 sm:flex-row sm:flex-wrap sm:items-center">
+    <Card className={cn(DETAIL_CARD, className)} {...props}>
+      <CardContent className="flex flex-col gap-4 px-6 py-5">
+        {action ? (
+          <div className="flex items-center justify-between gap-4">
+            {eyebrow}
+            {action}
+          </div>
+        ) : (
+          eyebrow
+        )}
+        {note}
+        <Separator />
         {children}
       </CardContent>
     </Card>
+  );
+}
+
+/** The single panel card of a configuration detail screen (`DETAIL_PANEL_PAGE`). */
+export function DetailPanel({ children }: { children: ReactNode }) {
+  return <Card className="gap-4 border-foreground/10 px-6 py-5 shadow-xs">{children}</Card>;
+}
+
+/** A panel's title lockup: the icon tile, an optional eyebrow, and the `h1`. */
+export function PanelTitle({
+  icon: Icon,
+  eyebrow,
+  title,
+}: {
+  icon: LucideIcon;
+  eyebrow?: string;
+  title: string;
+}) {
+  const heading = (
+    <h1 className="truncate font-serif text-lg leading-6 text-foreground">{title}</h1>
+  );
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <span aria-hidden className={ICON_PLATE}>
+        <Icon className="size-4" strokeWidth={1.5} />
+      </span>
+      {eyebrow ? (
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className={EYEBROW}>{eyebrow}</span>
+          {heading}
+        </div>
+      ) : (
+        heading
+      )}
+    </div>
   );
 }
 
@@ -57,7 +124,7 @@ export function MetaCard({ children, className }: { children: ReactNode; classNa
  * the right.
  *
  * It wraps rather than overflows — the meta card's width is set by the id, so
- * when the title and the card no longer fit on one line the card drops below
+ * when the title and the card do not fit on one line the card drops below
  * instead of pushing off the page edge.
  */
 export function DetailHeader({

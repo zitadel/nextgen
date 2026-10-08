@@ -1,17 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Ellipsis, LogIn, Workflow } from "lucide-react";
+import { LogIn, Workflow } from "lucide-react";
 
-import { EYEBROW } from "@/components/detail-meta";
-import { StatusBadge } from "@/components/status-badge";
-import { RESOURCE_HEADER, RESOURCE_PAGE } from "@/components/resource-list";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { api } from "@/api/zitadel";
+import { EYEBROW } from "@/components/typography";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  DIRECTORY_CHIP,
+  DIRECTORY_ROW_LINK,
+  DirectoryCard,
+  DirectoryRow,
+} from "@/components/directory-list";
+import { ResourcePage, ResourceTitle } from "@/components/resource-list";
+import { StatusBadge } from "@/components/status-badge";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { InlineCode } from "@/components/ui/inline-code";
 import { formatDate } from "@/lib/date";
 import {
@@ -21,10 +21,8 @@ import {
   flowPurposeSummary,
   flowStepNames,
 } from "@/lib/flow-definition";
+import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { schemaDisplayName } from "@/lib/schema";
-
-import { api } from "../../../api/zitadel";
-import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scope";
 
 export const Route = createFileRoute("/_authed/flow-definitions/")({
   // Order 4: Users sits at 3.
@@ -74,69 +72,62 @@ function LoginFlowsScreen() {
   const { flows } = Route.useLoaderData();
 
   return (
-    <div className={`${RESOURCE_PAGE} pt-4`}>
-      <div className={`${RESOURCE_HEADER} flex h-9 items-center`}>
-        <h1 className="font-serif text-2xl leading-6 tracking-tight text-foreground">
-          Login flows
-        </h1>
-      </div>
+    <ResourcePage>
+      <ResourceTitle>Login flows</ResourceTitle>
 
-      {/* Rows carry their own `px-6`, so the dividers are full-bleed. */}
-      <Card className="mt-3 gap-0 overflow-hidden border-foreground/10 py-0 shadow-xs">
-        {flows.length === 0 ? (
-          <p className="px-6 py-8 text-center text-sm text-muted-foreground">
-            This project has no login flows.
-          </p>
-        ) : (
-          flows.map((flow) => <FlowRowItem key={flow.id} {...flow} />)
-        )}
-      </Card>
-    </div>
+      <DirectoryCard empty={flows.length === 0 ? "This project has no login flows." : undefined}>
+        {flows.map((flow) => (
+          <FlowRowItem key={flow.id} {...flow} />
+        ))}
+      </DirectoryCard>
+    </ResourcePage>
   );
 }
 
-/**
- * One row of the flows directory.
- *
- * The name's stretched link makes the whole row the click target while keeping
- * one focusable control, so anything else interactive has to sit above it.
- */
+/** One row of the flows directory. */
 function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRow) {
   const name = flowDisplayName(definition);
   const purposes = flowPurposeSummary(definition);
   const steps = flowStepNames(definition);
 
   return (
-    <div className="group relative flex flex-col gap-4 border-b border-border px-6 py-3.5 last:border-b-0 hover:bg-accent lg:flex-row lg:items-center lg:gap-6">
-      <div className="flex shrink-0 flex-col gap-1 lg:min-w-[220px]">
+    <DirectoryRow
+      name={name}
+      title={
         <div className="flex items-center gap-2">
           <Link
             to="/flow-definitions/$definitionId"
             params={{ definitionId: id }}
-            className="font-serif text-base leading-6 text-foreground opacity-90 group-hover:opacity-100 after:absolute after:inset-0 after:content-['']"
+            className={DIRECTORY_ROW_LINK}
           >
             {name}
           </Link>
-          {/* Drafts only: the engine never selects one, and the frames draw
+          {/* Drafts only: the engine never selects one, and the design draws
               only active flows. */}
           {definition.status === "draft" && <StatusBadge status={definition.status} />}
         </div>
-        {purposes && (
-          <span className="flex items-center gap-1 text-xs leading-4 font-medium text-muted-foreground">
+      }
+      caption={
+        purposes && (
+          <>
             <LogIn className="size-3" aria-hidden />
             {purposes}
-          </span>
-        )}
-      </div>
-
-      <div className="flex min-w-0 flex-1 flex-wrap items-start gap-1.5">
-        {steps.map((step) => (
-          <InlineCode key={step} className={CHIP}>
-            {step}
-          </InlineCode>
-        ))}
-      </div>
-
+          </>
+        )
+      }
+      chips={steps.map((step) => (
+        <InlineCode key={step} className={DIRECTORY_CHIP}>
+          {step}
+        </InlineCode>
+      ))}
+      menu={
+        <DropdownMenuItem asChild>
+          <Link to="/flow-definitions/$definitionId" params={{ definitionId: id }}>
+            View flow
+          </Link>
+        </DropdownMenuItem>
+      }
+    >
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         {schemaName && (
           <>
@@ -164,32 +155,6 @@ function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRo
         <dt className={EYEBROW}>Last change</dt>
         <dd className="font-medium text-foreground">{formatDate(updatedAt)}</dd>
       </dl>
-
-      {/* Above the stretched link, or it swallows the menu's clicks. */}
-      <div className="absolute top-3.5 right-4 lg:relative lg:top-auto lg:right-auto">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={`Actions for ${name}`}
-              className="relative z-10 opacity-50 group-hover:opacity-100"
-            >
-              <Ellipsis aria-hidden />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuItem asChild>
-              <Link to="/flow-definitions/$definitionId" params={{ definitionId: id }}>
-                View flow
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </div>
+    </DirectoryRow>
   );
 }
-
-/** `InlineCode` rests on `muted`, which equals the row's `accent` hover in light. */
-const CHIP = "group-hover:bg-card";
