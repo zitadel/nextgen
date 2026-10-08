@@ -110,6 +110,8 @@ describe("package-script contract", () => {
     "node node_modules/pnpm/bin/pnpm.cjs run test",
     'node "C:\\tools\\node_modules\\npm\\bin\\npm-cli.js" run build',
     "node --import tsx node_modules/@moonrepo/cli/moon.js run api:build",
+    'node "$npm_execpath" install',
+    "node $npm_execpath run build",
   ])("detects a package manager in %s", (body) => {
     expect(startsPackageManager(body)).toBe(true);
   });
@@ -184,6 +186,10 @@ describe("package-script contract", () => {
     ["run-s build test", "the command wrapper `run-s`"],
     ["npm-run-all build test", "the command wrapper `npm-run-all`"],
     ['concurrently "vite" "tsc --watch"', "the command wrapper `concurrently`"],
+    ["builtin eval 'pnpm i'", "`eval`"],
+    ["builtin source ./x.sh", "`source`"],
+    ["devbox run -- pnpm install", "the command wrapper `devbox`"],
+    ["proto run pnpm", "the command wrapper `proto`"],
   ])("rejects unsupported syntax in %s", (body, reason) => {
     expect(unsupportedSyntax(body)).toBe(reason);
   });
@@ -234,6 +240,12 @@ describe("package-script contract", () => {
     "env -C ../api tsdown",
     "env --chdir=../api tsdown",
     "env CI=1 -C /tmp vitest run",
+    "env -u FOO -C ../api tsdown",
+    "env -P /usr/bin -C ../api tsdown",
+    "env -C../api tsdown",
+    "builtin cd ../api && tsdown",
+    "CDPATH=../../packages cd api && tsdown",
+    "pushd -n ../api && tsdown",
     'cd "C:\\work\\api" && tsdown',
   ])("detects leaving the package in %s", (body) => {
     expect(leavesPackage(body)).toBe(true);

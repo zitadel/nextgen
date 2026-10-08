@@ -39,8 +39,8 @@ const PACKAGE_MANAGER_ENTRY =
 
 /**
  * Whether a script starts a package manager or moon. `node --run` is not one:
- * it runs a script of the same package without starting pnpm. The body is tokenized like a shell would: quotes are removed
- * but their text kept, and every simple command (split on newlines, `;`, `&`,
+ * it runs a script of the same package without starting pnpm. The body is
+ * tokenized like a shell would: quotes are removed but their text kept, and every simple command (split on newlines, `;`, `&`,
  * `|`, parentheses and braces) is checked after skipping shell keywords, env
  * assignments and an `env` wrapper (including `env -S '…'`). Command
  * substitutions run inside double quotes, so their bodies are checked too;
@@ -74,12 +74,15 @@ const NODE_VALUE_OPTIONS = new Set([
   "--title",
 ]);
 
-/** Whether node's script argument is a package manager's entry file. */
+/**
+ * Whether node's script argument is a package manager's entry file, or a
+ * variable (`node "$npm_execpath" install` starts whichever one ran the script).
+ */
 function nodeRunsPackageManager(args) {
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
     if (arg === "-e" || arg === "--eval" || arg === "-p") return false;
-    if (!arg.startsWith("-")) return PACKAGE_MANAGER_ENTRY.test(arg);
+    if (!arg.startsWith("-")) return arg.includes("$") || PACKAGE_MANAGER_ENTRY.test(arg);
     if (NODE_VALUE_OPTIONS.has(arg)) i += 1;
   }
   return false;
@@ -160,6 +163,9 @@ const COMMAND_RUNNERS = new Set([
   "caffeinate",
   "script",
   "busybox",
+  // Toolchain launchers: each starts the command it is given.
+  "devbox",
+  "proto",
   // Env loaders and script runners: each starts the command (or the package
   // scripts) it is given.
   "cross-env",
@@ -271,6 +277,7 @@ const KEYWORDS = new Set([
   "time",
   "exec",
   "command",
+  "builtin",
   "nohup",
 ]);
 
@@ -348,20 +355,25 @@ function outsidePackage(dir) {
  */
 export function leavesPackage(body) {
   return simpleCommands(body).some((raw) => {
+    // CDPATH makes a relative `cd` resolve against other directories.
+    if (raw.some((word) => word.startsWith("CDPATH="))) return true;
     for (let i = 0; i < raw.length; i += 1) {
       if (executableName(raw[i]) !== "env") continue;
       for (let j = i + 1; j < raw.length; j += 1) {
         const word = raw[j];
         if (word === "-C" || word === "--chdir") {
           if (outsidePackage(raw[j + 1] ?? "")) return true;
-        } else if (word.startsWith("--chdir=")) {
-          if (outsidePackage(word.slice(8))) return true;
+          j += 1;
+        } else if (/^-C./.test(word) || word.startsWith("--chdir=")) {
+          if (outsidePackage(word.slice(word.startsWith("-C") ? 2 : 8))) return true;
+        } else if (["-u", "-P", "--unset"].includes(word)) {
+          j += 1;
         } else if (!word.startsWith("-") && !ASSIGNMENT.test(word)) break;
       }
     }
     const [command = "", ...args] = commandWords(raw);
     if (!["cd", "pushd"].includes(executableName(command))) return false;
-    const target = args.find((arg) => !/^-[LPe@]+$/.test(arg) && arg !== "--");
+    const target = args.find((arg) => !/^-[LPen@]+$/.test(arg) && arg !== "--");
     // A bare `cd` goes to $HOME.
     return target === undefined || outsidePackage(target);
   });
