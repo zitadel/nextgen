@@ -15,7 +15,7 @@
     "directory": "apps/mock-zitadel"
   },
   "scripts": {
-    "dev": "tsx scripts/local-server.ts",
+    "dev": "tsx --conditions=@zitadel/source scripts/local-server.ts",
     "build": "tsdown",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",

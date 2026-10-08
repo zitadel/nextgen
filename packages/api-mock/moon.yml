@@ -18,6 +18,8 @@ tasks:
     deps:
       - "api:build"
       - "config:build"
+    outputs:
+      - "dist/**/*"
 
   # Chromium for the browser project. Self-contained (like storybook): the
   # `test` task depends on it so `moon ci :test` provisions it in CI.

@@ -6,32 +6,39 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "import": "./src/index.ts"
+      "@zitadel/source": "./src/index.ts",
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
     },
     "./openid-configuration": {
-      "types": "./src/openid-configuration.ts",
-      "import": "./src/openid-configuration.ts"
+      "@zitadel/source": "./src/openid-configuration.ts",
+      "types": "./dist/openid-configuration.d.mts",
+      "import": "./dist/openid-configuration.mjs"
     },
     "./platform": {
-      "types": "./src/platform-handlers.ts",
-      "import": "./src/platform-handlers.ts"
+      "@zitadel/source": "./src/platform-handlers.ts",
+      "types": "./dist/platform-handlers.d.mts",
+      "import": "./dist/platform-handlers.mjs"
     },
     "./public-dir": {
-      "types": "./src/public-dir.ts",
-      "import": "./src/public-dir.ts"
+      "@zitadel/source": "./src/public-dir.ts",
+      "types": "./dist/public-dir.d.mts",
+      "import": "./dist/public-dir.mjs"
     },
     "./server": {
-      "types": "./src/server.ts",
-      "import": "./src/server.ts"
+      "@zitadel/source": "./src/server.ts",
+      "types": "./dist/server.d.mts",
+      "import": "./dist/server.mjs"
     },
     "./vitest": {
-      "types": "./src/vitest.ts",
-      "import": "./src/vitest.ts"
+      "@zitadel/source": "./src/vitest.ts",
+      "types": "./dist/vitest.d.mts",
+      "import": "./dist/vitest.mjs"
     },
     "./vitest-browser": {
-      "types": "./src/vitest-browser.ts",
-      "import": "./src/vitest-browser.ts"
+      "@zitadel/source": "./src/vitest-browser.ts",
+      "types": "./dist/vitest-browser.d.mts",
+      "import": "./dist/vitest-browser.mjs"
     }
   },
   "bin": {
@@ -44,7 +51,7 @@
     "test:browser": "vitest run --project browser",
     "test:all": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
-    "build": "node -e \"process.exit(0)\"",
+    "build": "tsdown",
     "install-browsers": "playwright install chromium"
   },
   "dependencies": {
@@ -67,6 +74,7 @@
     "@vitest/browser-playwright": "catalog:",
     "msw": "catalog:",
     "playwright": "catalog:",
+    "tsdown": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",

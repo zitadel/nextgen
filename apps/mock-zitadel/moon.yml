@@ -16,12 +16,11 @@ tasks:
     outputs:
       - "dist/**"
 
-  # @zitadel/api's source is gitignored and produced by orval, so it is
-  # generated first.
+  # Its specs import @zitadel/api-mock.
   typecheck:
     command: "corepack pnpm run typecheck"
     deps:
-      - "api:generate"
+      - "api-mock:build"
 
   # The static discovery document the Vercel deploy serves, written after the
   # function bundle is built. It needs VERCEL_URL and so only runs there. Kept
