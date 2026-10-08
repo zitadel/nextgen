@@ -8346,7 +8346,7 @@ func (s *ProjectAdmin) Validate() error {
 	return nil
 }
 
-func (s *ProjectAdminSource) Validate() error {
+func (s *ProjectAdminGrantSource) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
@@ -8369,14 +8369,61 @@ func (s *ProjectAdminSource) Validate() error {
 	return nil
 }
 
-func (s ProjectAdminSourceType) Validate() error {
+func (s ProjectAdminGrantSourceType) Validate() error {
 	switch s {
-	case "owning_team":
-		return nil
 	case "grant":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s *ProjectAdminOwningTeamSource) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Type.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "type",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s ProjectAdminOwningTeamSourceType) Validate() error {
+	switch s {
+	case "owning_team":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s ProjectAdminSource) Validate() error {
+	switch s.Type {
+	case ProjectAdminOwningTeamSourceProjectAdminSource:
+		if err := s.ProjectAdminOwningTeamSource.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjectAdminGrantSourceProjectAdminSource:
+		if err := s.ProjectAdminGrantSource.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
 	}
 }
 

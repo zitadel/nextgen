@@ -27558,7 +27558,8 @@ func (s *GrantSortingField) UnmarshalText(data []byte) error {
 type GrantTeam struct {
 	// The referenced team's id (`team_<opaque>`). Always present.
 	TeamID string `json:"team_id"`
-	// The team's name. Absent when the team can no longer be loaded.
+	// The team's name. Absent when the team can no longer be loaded, or where
+	// the referencing endpoint leaves it out for a team the caller may not see.
 	Name OptString `json:"name"`
 	// Team lifecycle. Present only when the request asked for
 	// `expand: ["principal"]` and the team could be loaded.
@@ -50318,77 +50319,65 @@ func (s *ProjectAdmin) SetSources(val []ProjectAdminSource) {
 	s.Sources = val
 }
 
-// One way a person holds admin access to the project. Discriminate on `type`.
-// - `owning_team`: the person is an active member of the owning team named by
-// `team`. `grant_id` is absent: this access is not a grant and the grants
-// API cannot revoke it.
-// - `grant`: an `admin` grant on the project, named by `grant_id`. `team` is
-// present when the grant is to a team the person is an active member of, and
-// absent when it is to the person directly.
+// Admin access through an `admin` grant on the project, to the person or to a
+// team they are an active member of.
 // Ref: #
-type ProjectAdminSource struct {
-	// How the access is held.
-	Type ProjectAdminSourceType `json:"type"`
-	// The grant (`asgn_<opaque>`), as served by `GET /grants/{id}`. Present
-	// exactly when `type` is `grant`.
-	GrantID OptString `json:"grant_id"`
-	// The team the access comes through. Present for `owning_team`, and for a
-	// `grant` to a team.
+type ProjectAdminGrantSource struct {
+	Type ProjectAdminGrantSourceType `json:"type"`
+	// The grant (`asgn_<opaque>`), as served by `GET /grants/{id}`.
+	GrantID string `json:"grant_id"`
+	// The team the grant is to, absent for a grant to the person directly. Its
+	// `name` is present only when the caller is a member of it.
 	Team OptTeamRef `json:"team"`
 }
 
 // GetType returns the value of Type.
-func (s *ProjectAdminSource) GetType() ProjectAdminSourceType {
+func (s *ProjectAdminGrantSource) GetType() ProjectAdminGrantSourceType {
 	return s.Type
 }
 
 // GetGrantID returns the value of GrantID.
-func (s *ProjectAdminSource) GetGrantID() OptString {
+func (s *ProjectAdminGrantSource) GetGrantID() string {
 	return s.GrantID
 }
 
 // GetTeam returns the value of Team.
-func (s *ProjectAdminSource) GetTeam() OptTeamRef {
+func (s *ProjectAdminGrantSource) GetTeam() OptTeamRef {
 	return s.Team
 }
 
 // SetType sets the value of Type.
-func (s *ProjectAdminSource) SetType(val ProjectAdminSourceType) {
+func (s *ProjectAdminGrantSource) SetType(val ProjectAdminGrantSourceType) {
 	s.Type = val
 }
 
 // SetGrantID sets the value of GrantID.
-func (s *ProjectAdminSource) SetGrantID(val OptString) {
+func (s *ProjectAdminGrantSource) SetGrantID(val string) {
 	s.GrantID = val
 }
 
 // SetTeam sets the value of Team.
-func (s *ProjectAdminSource) SetTeam(val OptTeamRef) {
+func (s *ProjectAdminGrantSource) SetTeam(val OptTeamRef) {
 	s.Team = val
 }
 
-// How the access is held.
-type ProjectAdminSourceType string
+type ProjectAdminGrantSourceType string
 
 const (
-	ProjectAdminSourceTypeOwningTeam ProjectAdminSourceType = "owning_team"
-	ProjectAdminSourceTypeGrant      ProjectAdminSourceType = "grant"
+	ProjectAdminGrantSourceTypeGrant ProjectAdminGrantSourceType = "grant"
 )
 
-// AllValues returns all ProjectAdminSourceType values.
-func (ProjectAdminSourceType) AllValues() []ProjectAdminSourceType {
-	return []ProjectAdminSourceType{
-		ProjectAdminSourceTypeOwningTeam,
-		ProjectAdminSourceTypeGrant,
+// AllValues returns all ProjectAdminGrantSourceType values.
+func (ProjectAdminGrantSourceType) AllValues() []ProjectAdminGrantSourceType {
+	return []ProjectAdminGrantSourceType{
+		ProjectAdminGrantSourceTypeGrant,
 	}
 }
 
 // MarshalText implements encoding.TextMarshaler.
-func (s ProjectAdminSourceType) MarshalText() ([]byte, error) {
+func (s ProjectAdminGrantSourceType) MarshalText() ([]byte, error) {
 	switch s {
-	case ProjectAdminSourceTypeOwningTeam:
-		return []byte(s), nil
-	case ProjectAdminSourceTypeGrant:
+	case ProjectAdminGrantSourceTypeGrant:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -50396,17 +50385,153 @@ func (s ProjectAdminSourceType) MarshalText() ([]byte, error) {
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
-func (s *ProjectAdminSourceType) UnmarshalText(data []byte) error {
-	switch ProjectAdminSourceType(data) {
-	case ProjectAdminSourceTypeOwningTeam:
-		*s = ProjectAdminSourceTypeOwningTeam
-		return nil
-	case ProjectAdminSourceTypeGrant:
-		*s = ProjectAdminSourceTypeGrant
+func (s *ProjectAdminGrantSourceType) UnmarshalText(data []byte) error {
+	switch ProjectAdminGrantSourceType(data) {
+	case ProjectAdminGrantSourceTypeGrant:
+		*s = ProjectAdminGrantSourceTypeGrant
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// Admin access as an active member of the team that owns the project.
+// Ref: #
+type ProjectAdminOwningTeamSource struct {
+	Type ProjectAdminOwningTeamSourceType `json:"type"`
+	// The owning team. Its `name` is present only when the caller is a member
+	// of it.
+	Team TeamRef `json:"team"`
+}
+
+// GetType returns the value of Type.
+func (s *ProjectAdminOwningTeamSource) GetType() ProjectAdminOwningTeamSourceType {
+	return s.Type
+}
+
+// GetTeam returns the value of Team.
+func (s *ProjectAdminOwningTeamSource) GetTeam() TeamRef {
+	return s.Team
+}
+
+// SetType sets the value of Type.
+func (s *ProjectAdminOwningTeamSource) SetType(val ProjectAdminOwningTeamSourceType) {
+	s.Type = val
+}
+
+// SetTeam sets the value of Team.
+func (s *ProjectAdminOwningTeamSource) SetTeam(val TeamRef) {
+	s.Team = val
+}
+
+type ProjectAdminOwningTeamSourceType string
+
+const (
+	ProjectAdminOwningTeamSourceTypeOwningTeam ProjectAdminOwningTeamSourceType = "owning_team"
+)
+
+// AllValues returns all ProjectAdminOwningTeamSourceType values.
+func (ProjectAdminOwningTeamSourceType) AllValues() []ProjectAdminOwningTeamSourceType {
+	return []ProjectAdminOwningTeamSourceType{
+		ProjectAdminOwningTeamSourceTypeOwningTeam,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ProjectAdminOwningTeamSourceType) MarshalText() ([]byte, error) {
+	switch s {
+	case ProjectAdminOwningTeamSourceTypeOwningTeam:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ProjectAdminOwningTeamSourceType) UnmarshalText(data []byte) error {
+	switch ProjectAdminOwningTeamSourceType(data) {
+	case ProjectAdminOwningTeamSourceTypeOwningTeam:
+		*s = ProjectAdminOwningTeamSourceTypeOwningTeam
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// One way a person holds admin access to the project. Discriminate on `type`.
+// - `owning_team`: the person is an active member of the owning team named by
+// `team`. There is no `grant_id`: this access is not a grant and the grants
+// API cannot revoke it.
+// - `grant`: an `admin` grant on the project, named by `grant_id`. `team` is
+// present when the grant is to a team the person is an active member of, and
+// absent when it is to the person directly.
+// Ref: #
+// ProjectAdminSource represents sum type.
+type ProjectAdminSource struct {
+	Type                         ProjectAdminSourceType // switch on this field
+	ProjectAdminOwningTeamSource ProjectAdminOwningTeamSource
+	ProjectAdminGrantSource      ProjectAdminGrantSource
+}
+
+// ProjectAdminSourceType is oneOf type of ProjectAdminSource.
+type ProjectAdminSourceType string
+
+// Possible values for ProjectAdminSourceType.
+const (
+	ProjectAdminOwningTeamSourceProjectAdminSource ProjectAdminSourceType = "owning_team"
+	ProjectAdminGrantSourceProjectAdminSource      ProjectAdminSourceType = "grant"
+)
+
+// IsProjectAdminOwningTeamSource reports whether ProjectAdminSource is ProjectAdminOwningTeamSource.
+func (s ProjectAdminSource) IsProjectAdminOwningTeamSource() bool {
+	return s.Type == ProjectAdminOwningTeamSourceProjectAdminSource
+}
+
+// IsProjectAdminGrantSource reports whether ProjectAdminSource is ProjectAdminGrantSource.
+func (s ProjectAdminSource) IsProjectAdminGrantSource() bool {
+	return s.Type == ProjectAdminGrantSourceProjectAdminSource
+}
+
+// SetProjectAdminOwningTeamSource sets ProjectAdminSource to ProjectAdminOwningTeamSource.
+func (s *ProjectAdminSource) SetProjectAdminOwningTeamSource(v ProjectAdminOwningTeamSource) {
+	s.Type = ProjectAdminOwningTeamSourceProjectAdminSource
+	s.ProjectAdminOwningTeamSource = v
+}
+
+// GetProjectAdminOwningTeamSource returns ProjectAdminOwningTeamSource and true boolean if ProjectAdminSource is ProjectAdminOwningTeamSource.
+func (s ProjectAdminSource) GetProjectAdminOwningTeamSource() (v ProjectAdminOwningTeamSource, ok bool) {
+	if !s.IsProjectAdminOwningTeamSource() {
+		return v, false
+	}
+	return s.ProjectAdminOwningTeamSource, true
+}
+
+// NewProjectAdminOwningTeamSourceProjectAdminSource returns new ProjectAdminSource from ProjectAdminOwningTeamSource.
+func NewProjectAdminOwningTeamSourceProjectAdminSource(v ProjectAdminOwningTeamSource) ProjectAdminSource {
+	var s ProjectAdminSource
+	s.SetProjectAdminOwningTeamSource(v)
+	return s
+}
+
+// SetProjectAdminGrantSource sets ProjectAdminSource to ProjectAdminGrantSource.
+func (s *ProjectAdminSource) SetProjectAdminGrantSource(v ProjectAdminGrantSource) {
+	s.Type = ProjectAdminGrantSourceProjectAdminSource
+	s.ProjectAdminGrantSource = v
+}
+
+// GetProjectAdminGrantSource returns ProjectAdminGrantSource and true boolean if ProjectAdminSource is ProjectAdminGrantSource.
+func (s ProjectAdminSource) GetProjectAdminGrantSource() (v ProjectAdminGrantSource, ok bool) {
+	if !s.IsProjectAdminGrantSource() {
+		return v, false
+	}
+	return s.ProjectAdminGrantSource, true
+}
+
+// NewProjectAdminGrantSourceProjectAdminSource returns new ProjectAdminSource from ProjectAdminGrantSource.
+func NewProjectAdminGrantSourceProjectAdminSource(v ProjectAdminGrantSource) ProjectAdminSource {
+	var s ProjectAdminSource
+	s.SetProjectAdminGrantSource(v)
+	return s
 }
 
 // Merged schema.
@@ -61943,7 +62068,8 @@ func (s *TeamPermissionDeniedDetails) init() TeamPermissionDeniedDetails {
 type TeamRef struct {
 	// The referenced team's id (`team_<opaque>`). Always present.
 	TeamID string `json:"team_id"`
-	// The team's name. Absent when the team can no longer be loaded.
+	// The team's name. Absent when the team can no longer be loaded, or where
+	// the referencing endpoint leaves it out for a team the caller may not see.
 	Name OptString `json:"name"`
 }
 

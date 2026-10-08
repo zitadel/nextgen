@@ -39,18 +39,29 @@ func (h *Handler) ListProjectAdmins(ctx context.Context, params api.ListProjectA
 func projectAdminResponse(admin *service.ProjectAdmin) api.ProjectAdmin {
 	sources := make([]api.ProjectAdminSource, 0, len(admin.Sources))
 	for _, source := range admin.Sources {
-		out := api.ProjectAdminSource{Type: api.ProjectAdminSourceType(source.Type)}
-		if source.GrantID != "" {
-			out.GrantID = api.NewOptString(source.GrantID)
+		if source.Type == service.ProjectAdminSourceOwningTeam {
+			sources = append(sources, api.NewProjectAdminOwningTeamSourceProjectAdminSource(api.ProjectAdminOwningTeamSource{
+				Type: api.ProjectAdminOwningTeamSourceTypeOwningTeam,
+				Team: projectAdminTeamRef(source.Team),
+			}))
+			continue
 		}
+		grant := api.ProjectAdminGrantSource{Type: api.ProjectAdminGrantSourceTypeGrant, GrantID: source.GrantID}
 		if source.Team != nil {
-			team := api.TeamRef{TeamID: source.Team.TeamID}
-			if source.Team.Name != "" {
-				team.Name = api.NewOptString(source.Team.Name)
-			}
-			out.Team = api.NewOptTeamRef(team)
+			grant.Team = api.NewOptTeamRef(projectAdminTeamRef(source.Team))
 		}
-		sources = append(sources, out)
+		sources = append(sources, api.NewProjectAdminGrantSourceProjectAdminSource(grant))
 	}
 	return api.ProjectAdmin{User: userRefToAPI(admin.User), Sources: sources}
+}
+
+func projectAdminTeamRef(team *service.TeamRef) api.TeamRef {
+	if team == nil {
+		return api.TeamRef{}
+	}
+	out := api.TeamRef{TeamID: team.TeamID}
+	if team.Name != "" {
+		out.Name = api.NewOptString(team.Name)
+	}
+	return out
 }

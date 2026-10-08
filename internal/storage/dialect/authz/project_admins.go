@@ -25,15 +25,9 @@ import "github.com/zitadel/nextgen/internal/domain"
 func WriteProjectAdminSources(w ArgWriter, env Env, projectID, afterUserID, viewerUserID string, limit uint32) {
 	w.WriteString(`
 WITH owning AS (
-  SELECT principal_id AS team_id
-  FROM `)
-	writeTable(w, env, "authz_assignments")
+  `)
+	WriteActiveOwningTeamID(w, env, func(w ArgWriter) { w.WriteArg(projectID) })
 	w.WriteString(`
-  WHERE project_id = `)
-	w.WriteArg(projectID)
-	w.WriteString(` AND object_type = 'project' AND relation = 'team' AND revoked_at IS NULL
-  ORDER BY created_at, id
-  LIMIT 1
 ),
 admin_grants AS (
   SELECT a.id, a.principal_type, a.principal_id
@@ -49,7 +43,7 @@ admin_grants AS (
 	w.WriteString(`
 ),
 admin_teams AS (
-  SELECT o.team_id, '' AS grant_id, 0 AS source_rank
+  SELECT o.principal_id AS team_id, '' AS grant_id, 0 AS source_rank
   FROM owning o
   UNION ALL
   SELECT g.principal_id, g.id, 1
@@ -76,7 +70,15 @@ direct AS (
   JOIN `)
 	writeTable(w, env, "users")
 	w.WriteString(` u ON u.project_id = r.project_id AND u.id = g.principal_id
-  WHERE g.principal_type = 'user'
+  WHERE g.principal_type = 'user' AND g.principal_id > `)
+	w.WriteArg(afterUserID)
+	// Anyone on the page with a grant of their own ranks among the first
+	// limit such users, so no more are read.
+	w.WriteString(`
+  ORDER BY u.id
+  LIMIT `)
+	w.WriteArg(int64(limit))
+	w.WriteString(`
 ),
 viewer_teams AS (
   SELECT DISTINCT th.team_id
@@ -93,19 +95,17 @@ people AS (
   FROM (
     SELECT e.member_id AS user_id
     FROM team_homes th
+    JOIN viewer_teams vt ON vt.team_id = th.team_id
     JOIN `)
 	writeTable(w, env, "authz_membership_edges")
 	w.WriteString(` e ON e.project_id = th.home_project_id AND e.set_type = 'team' AND e.set_id = th.team_id
       AND e.member_type = 'user'
-    WHERE th.team_id IN (SELECT team_id FROM viewer_teams) AND e.member_id > `)
+    WHERE e.member_id > `)
 	w.WriteArg(afterUserID)
 	w.WriteString(`
     UNION ALL
     SELECT d.user_id
     FROM direct d
-    WHERE d.user_id > `)
-	w.WriteArg(afterUserID)
-	w.WriteString(`
   ) candidates
   ORDER BY user_id
   LIMIT `)
@@ -132,6 +132,19 @@ LEFT JOIN `)
 	writeTable(w, env, "teams")
 	w.WriteString(` tm ON vt.team_id IS NOT NULL AND tm.project_id = s.home_project_id AND tm.id = s.team_id
 ORDER BY s.user_id, s.source_rank, s.grant_id`)
+}
+
+// WriteActiveOwningTeamID emits a SELECT of the principal_id of a project's
+// active owning-team grant (ADR 054 §2). projectID writes the project id: an
+// argument, or a column of an enclosing query when the SELECT is a subquery. A
+// unique index allows at most one active owning-team grant per project, so the
+// SELECT yields at most one row.
+func WriteActiveOwningTeamID(w ArgWriter, env Env, projectID func(ArgWriter)) {
+	w.WriteString(`SELECT principal_id FROM `)
+	writeTable(w, env, "authz_assignments")
+	w.WriteString(` WHERE project_id = `)
+	projectID(w)
+	w.WriteString(` AND object_type = 'project' AND relation = 'team' AND revoked_at IS NULL`)
 }
 
 // ProjectAdminSourceRow is one row of WriteProjectAdminSources' result.

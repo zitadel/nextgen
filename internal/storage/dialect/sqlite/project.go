@@ -8,6 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	storageproject "github.com/zitadel/nextgen/internal/storage/project"
 )
@@ -25,17 +26,6 @@ RETURNING id, name, preview_origins, password_hash_policy, created_at, updated_a
 RETURNING id`
 
 	projectQuery = `SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at FROM projects`
-
-	// getProjectWithOwningTeamStmt reads one project with its owning team, the
-	// active owning-team grant GetActiveOwningTeamGrant reads, in one round trip.
-	// GetProject runs it only when asked for the owning team: GetProjectByID
-	// runs on hot paths and stays a plain read.
-	getProjectWithOwningTeamStmt = `SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at,
-  (SELECT a.principal_id FROM authz_assignments a
-   WHERE a.project_id = projects.id AND a.object_type = 'project' AND a.relation = 'team' AND a.revoked_at IS NULL
-   ORDER BY a.created_at, a.id LIMIT 1)
-FROM projects
-WHERE id = ?`
 )
 
 type projectStatements struct{ statement }
@@ -202,12 +192,24 @@ func scanProjectWith(rows *sql.Rows, extra ...any) (*domain.Project, error) {
 	return project, nil
 }
 
+// writeProjectWithOwningTeam reads one project with its owning team as an extra
+// column, in one round trip. GetProject runs it only when asked for the owning
+// team: GetProjectByID runs on hot paths and stays a plain read.
+func writeProjectWithOwningTeam(c *statementCompiler, id string) {
+	c.WriteString("SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at, (")
+	authz.WriteActiveOwningTeamID(c, sqliteAuthzEnv(), func(w authz.ArgWriter) { w.WriteString("projects.id") })
+	c.WriteString(") FROM projects WHERE id = ")
+	c.WriteArg(id)
+}
+
 // GetProject implements [service.ProjectStatements].
 func (ps projectStatements) GetProject(ctx context.Context, id string, opts service.ProjectQueryOptions) (*domain.Project, error) {
 	if !opts.OwningTeam {
 		return ps.GetProjectByID(ctx, id)
 	}
-	rows, err := ps.client.Query(ctx, getProjectWithOwningTeamStmt, id)
+	var c statementCompiler
+	writeProjectWithOwningTeam(&c, id)
+	rows, err := ps.client.Query(ctx, c.String(), c.args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}

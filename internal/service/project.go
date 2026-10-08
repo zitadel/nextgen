@@ -421,18 +421,17 @@ func (s *projectService) Update(ctx context.Context, req UpdateProjectRequest) (
 				return err
 			}
 		}
+		updated, err := tx.Statements().GetProject(ctx, req.ID, ProjectQueryOptions{OwningTeam: true})
+		if err != nil {
+			return err
+		}
+		*project = *updated
 		return emitProjectUpdated(ctx, tx.Statements(), project.ID, updateProjectPayload(req))
 	})
 	if err != nil {
 		return nil, s.mapUpdateError(err)
 	}
-	// Read after the commit, outside the write, so the caller is answered with
-	// the project as it now stands, owning team included.
-	updated, err := s.v2Pool.Statements().GetProject(ctx, req.ID, ProjectQueryOptions{OwningTeam: true})
-	if err != nil {
-		return nil, s.mapUpdateError(err)
-	}
-	return updated, nil
+	return project, nil
 }
 
 func (s *projectService) mapUpdateError(err error) error {

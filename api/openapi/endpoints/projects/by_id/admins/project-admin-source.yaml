@@ -3,28 +3,16 @@ description: |
   One way a person holds admin access to the project. Discriminate on `type`.
 
   - `owning_team`: the person is an active member of the owning team named by
-    `team`. `grant_id` is absent: this access is not a grant and the grants
+    `team`. There is no `grant_id`: this access is not a grant and the grants
     API cannot revoke it.
   - `grant`: an `admin` grant on the project, named by `grant_id`. `team` is
     present when the grant is to a team the person is an active member of, and
     absent when it is to the person directly.
-type: object
-required:
-  - type
-properties:
-  type:
-    type: string
-    enum:
-      - owning_team
-      - grant
-    description: How the access is held.
-  grant_id:
-    type: string
-    description: |
-      The grant (`asgn_<opaque>`), as served by `GET /grants/{id}`. Present
-      exactly when `type` is `grant`.
-  team:
-    description: |
-      The team the access comes through. Present for `owning_team`, and for a
-      `grant` to a team.
-    $ref: ../../../../components/schemas/team-ref.yaml
+oneOf:
+  - $ref: project-admin-owning-team-source.yaml
+  - $ref: project-admin-grant-source.yaml
+discriminator:
+  propertyName: type
+  mapping:
+    owning_team: project-admin-owning-team-source.yaml
+    grant: project-admin-grant-source.yaml

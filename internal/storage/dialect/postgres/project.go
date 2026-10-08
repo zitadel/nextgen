@@ -9,6 +9,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	storageproject "github.com/zitadel/nextgen/internal/storage/project"
 )
@@ -61,17 +62,6 @@ func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) (b
 }
 
 const projectQuery = "SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at FROM zitadel_nextgen.projects"
-
-// getProjectWithOwningTeamStmt reads one project with its owning team, the
-// active owning-team grant GetActiveOwningTeamGrant reads, in one round trip.
-// GetProject runs it only when asked for the owning team: GetProjectByID
-// runs on hot paths and stays a plain read.
-const getProjectWithOwningTeamStmt = `SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at,
-  (SELECT a.principal_id FROM zitadel_nextgen.authz_assignments a
-   WHERE a.project_id = projects.id AND a.object_type = 'project' AND a.relation = 'team' AND a.revoked_at IS NULL
-   ORDER BY a.created_at, a.id LIMIT 1)
-FROM zitadel_nextgen.projects
-WHERE id = $1`
 
 // GetProjectByID implements [service.ProjectStatements].
 func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*domain.Project, error) {
@@ -175,12 +165,24 @@ func (ps projectStatements) scanProjectWith(row pgx.CollectableRow, extra ...any
 	return project, nil
 }
 
+// writeProjectWithOwningTeam reads one project with its owning team as an extra
+// column, in one round trip. GetProject runs it only when asked for the owning
+// team: GetProjectByID runs on hot paths and stays a plain read.
+func writeProjectWithOwningTeam(c *statementCompiler, id string) {
+	c.WriteString("SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at, (")
+	authz.WriteActiveOwningTeamID(c, postgresAuthzEnv(), func(w authz.ArgWriter) { w.WriteString("projects.id") })
+	c.WriteString(") FROM zitadel_nextgen.projects WHERE id = ")
+	c.WriteArg(id)
+}
+
 // GetProject implements [service.ProjectStatements].
 func (ps projectStatements) GetProject(ctx context.Context, id string, opts service.ProjectQueryOptions) (*domain.Project, error) {
 	if !opts.OwningTeam {
 		return ps.GetProjectByID(ctx, id)
 	}
-	rows, err := ps.client.Query(ctx, getProjectWithOwningTeamStmt, id)
+	var c statementCompiler
+	writeProjectWithOwningTeam(&c, id)
+	rows, err := ps.client.Query(ctx, c.String(), c.args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}

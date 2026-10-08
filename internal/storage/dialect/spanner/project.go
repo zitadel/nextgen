@@ -8,6 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	storageproject "github.com/zitadel/nextgen/internal/storage/project"
 )
@@ -18,17 +19,6 @@ const (
 	updateProjectStmt     = `UPDATE projects SET name = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id, name, preview_origins, password_hash_policy, created_at, updated_at`
 	deleteByIDProjectStmt = `DELETE FROM projects WHERE id = @p1`
 	projectQuery          = "SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at FROM projects"
-
-	// getProjectWithOwningTeamStmt reads one project with its owning team, the
-	// active owning-team grant GetActiveOwningTeamGrant reads, in one round trip.
-	// GetProject runs it only when asked for the owning team: GetProjectByID
-	// runs on hot paths and stays a plain read.
-	getProjectWithOwningTeamStmt = `SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at,
-  (SELECT a.principal_id FROM authz_assignments a
-   WHERE a.project_id = projects.id AND a.object_type = 'project' AND a.relation = 'team' AND a.revoked_at IS NULL
-   ORDER BY a.created_at, a.id LIMIT 1)
-FROM projects
-WHERE id = @p1`
 
 	setProjectPasswordHashPolicyStmt = `UPDATE projects SET password_hash_policy = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id`
 )
@@ -225,13 +215,25 @@ func decodePreviewOrigins(value string) ([]string, error) {
 	return origins, nil
 }
 
+// writeProjectWithOwningTeam reads one project with its owning team as an extra
+// column, in one round trip. GetProject runs it only when asked for the owning
+// team: GetProjectByID runs on hot paths and stays a plain read.
+func writeProjectWithOwningTeam(c *statementCompiler, id string) {
+	c.WriteString("SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at, (")
+	authz.WriteActiveOwningTeamID(c, spannerAuthzEnv(), func(w authz.ArgWriter) { w.WriteString("projects.id") })
+	c.WriteString(") FROM projects WHERE id = ")
+	c.WriteArg(id)
+}
+
 // GetProject implements [service.ProjectStatements].
 func (ps projectStatements) GetProject(ctx context.Context, id string, opts service.ProjectQueryOptions) (*domain.Project, error) {
 	if !opts.OwningTeam {
 		return ps.GetProjectByID(ctx, id)
 	}
 	var project *domain.Project
-	err := ps.db.Query(ctx, buildStatement(getProjectWithOwningTeamStmt, id).statement(), func(iter *spanner.RowIterator) error {
+	var c statementCompiler
+	writeProjectWithOwningTeam(&c, id)
+	err := ps.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
 		var err error
 		project, err = collectOneRow(iter, func(row *spanner.Row) (*domain.Project, error) {
 			var owningTeamID spanner.NullString

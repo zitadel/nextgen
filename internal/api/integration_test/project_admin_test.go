@@ -3,6 +3,7 @@
 package integration_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -26,8 +27,25 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
+	// Users and teams live in the shared platform project, outside the test's
+	// own project, so the test removes them itself: each user is deleted and
+	// the team created with them deactivated, as teams have no delete.
+	cleanupPlatformUser := func(t *testing.T, userID string) string {
+		t.Helper()
+		t.Cleanup(func() {
+			ctx := context.Background()
+			stmts := harness.EnsureServiceDB(t).Statements()
+			if membership, err := stmts.GetEarliestTeamMembership(ctx, platform.ID, userID); err == nil {
+				_, _ = stmts.DeactivateTeam(ctx, platform.ID, membership.TeamID)
+			}
+			_ = stmts.DeleteUserByID(ctx, platform.ID, userID)
+		})
+		return userID
+	}
+
 	// The local journey's shape: the claimer's team owns the project.
 	ownerID, owningTeamID := harness.CreateUserOwnedByTeam(t, platform.ID)
+	cleanupPlatformUser(t, ownerID)
 	harness.SeedOwningTeam(t, project.ID, owningTeamID)
 
 	owner, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -65,6 +83,17 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 			params.PageToken = api.NewOptPageToken(token)
 		}
 	}
+	// teamOf is the team a source names: always for the owning team, and for a
+	// grant to a team.
+	teamOf := func(source api.ProjectAdminSource) api.TeamRef {
+		if source.Type == api.ProjectAdminOwningTeamSourceProjectAdminSource {
+			return source.ProjectAdminOwningTeamSource.Team
+		}
+		return source.ProjectAdminGrantSource.Team.Value
+	}
+	hasTeam := func(source api.ProjectAdminSource) bool {
+		return source.Type == api.ProjectAdminOwningTeamSourceProjectAdminSource || source.ProjectAdminGrantSource.Team.IsSet()
+	}
 	sourceTypes := func(admin api.ProjectAdmin) []api.ProjectAdminSourceType {
 		types := make([]api.ProjectAdminSourceType, 0, len(admin.Sources))
 		for _, source := range admin.Sources {
@@ -82,18 +111,19 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 	admins := queryAdmins(t, owner)
 	require.Contains(t, admins, api.UserID(ownerID), "the owner is an admin with no grant of their own")
 	ownerRow := admins[api.UserID(ownerID)]
-	assert.Equal(t, []api.ProjectAdminSourceType{api.ProjectAdminSourceTypeOwningTeam}, sourceTypes(ownerRow))
-	require.True(t, ownerRow.Sources[0].Team.IsSet())
-	assert.Equal(t, owningTeamID, ownerRow.Sources[0].Team.Value.TeamID)
-	assert.True(t, ownerRow.Sources[0].Team.Value.Name.IsSet(), "the source names the team")
-	assert.False(t, ownerRow.Sources[0].GrantID.IsSet(), "owning-team access is not a grant")
+	assert.Equal(t, []api.ProjectAdminSourceType{api.ProjectAdminOwningTeamSourceProjectAdminSource}, sourceTypes(ownerRow))
+	require.True(t, hasTeam(ownerRow.Sources[0]))
+	assert.Equal(t, owningTeamID, teamOf(ownerRow.Sources[0]).TeamID)
+	assert.True(t, teamOf(ownerRow.Sources[0]).Name.IsSet(), "the source names the team")
+	assert.Empty(t, ownerRow.Sources[0].ProjectAdminGrantSource.GrantID, "owning-team access is not a grant")
 	assert.True(t, ownerRow.User.Identifier.IsSet(), "the row is a resolved user-ref")
 
 	// A granted colleague, a viewer, an editor, and a team granted admin.
-	colleagueID := harness.CreateUserWithTeam(t, platform.ID)
-	viewerID := harness.CreateUserWithTeam(t, platform.ID)
-	editorID := harness.CreateUserWithTeam(t, platform.ID)
+	colleagueID := cleanupPlatformUser(t, harness.CreateUserWithTeam(t, platform.ID))
+	viewerID := cleanupPlatformUser(t, harness.CreateUserWithTeam(t, platform.ID))
+	editorID := cleanupPlatformUser(t, harness.CreateUserWithTeam(t, platform.ID))
 	teamMemberID, adminTeamID := harness.CreateUserOwnedByTeam(t, platform.ID)
+	cleanupPlatformUser(t, teamMemberID)
 	for _, grant := range []*api.CreateGrantRequest{
 		userIDGrant(colleagueID, api.CreateGrantRequestRelationAdmin),
 		userIDGrant(viewerID, api.CreateGrantRequestRelationViewer),
@@ -119,8 +149,8 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 	assert.NotContains(t, admins, api.UserID(editorID), "an editor grant does not make an admin")
 	require.Contains(t, admins, api.UserID(colleagueID))
 	colleagueRow := admins[api.UserID(colleagueID)]
-	require.Equal(t, []api.ProjectAdminSourceType{api.ProjectAdminSourceTypeGrant}, sourceTypes(colleagueRow))
-	assert.False(t, colleagueRow.Sources[0].Team.IsSet(), "a direct grant names no team")
+	require.Equal(t, []api.ProjectAdminSourceType{api.ProjectAdminGrantSourceProjectAdminSource}, sourceTypes(colleagueRow))
+	assert.False(t, hasTeam(colleagueRow.Sources[0]), "a direct grant names no team")
 	assert.NotContains(t, admins, api.UserID(teamMemberID), "the owner is not in the granted team, so its members are left out")
 	// The member sees themselves, through the team grant, with the team named.
 	member, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -129,16 +159,16 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 	asMember := queryAdmins(t, member)
 	require.Contains(t, asMember, api.UserID(teamMemberID), "a member of a team granted admin is an admin")
 	teamMemberRow := asMember[api.UserID(teamMemberID)]
-	require.Equal(t, []api.ProjectAdminSourceType{api.ProjectAdminSourceTypeGrant}, sourceTypes(teamMemberRow))
-	require.True(t, teamMemberRow.Sources[0].Team.IsSet(), "a team grant names its team")
-	assert.Equal(t, adminTeamID, teamMemberRow.Sources[0].Team.Value.TeamID)
-	assert.True(t, teamMemberRow.Sources[0].Team.Value.Name.IsSet(), "the member's own team is named")
-	assert.True(t, teamMemberRow.Sources[0].GrantID.IsSet())
+	require.Equal(t, []api.ProjectAdminSourceType{api.ProjectAdminGrantSourceProjectAdminSource}, sourceTypes(teamMemberRow))
+	require.True(t, hasTeam(teamMemberRow.Sources[0]), "a team grant names its team")
+	assert.Equal(t, adminTeamID, teamOf(teamMemberRow.Sources[0]).TeamID)
+	assert.True(t, teamOf(teamMemberRow.Sources[0]).Name.IsSet(), "the member's own team is named")
+	assert.NotEmpty(t, teamMemberRow.Sources[0].ProjectAdminGrantSource.GrantID)
 	require.Contains(t, admins, api.UserID(ownerID))
 	ownerRow = admins[api.UserID(ownerID)]
-	require.Equal(t, []api.ProjectAdminSourceType{api.ProjectAdminSourceTypeOwningTeam, api.ProjectAdminSourceTypeGrant}, sourceTypes(ownerRow),
+	require.Equal(t, []api.ProjectAdminSourceType{api.ProjectAdminOwningTeamSourceProjectAdminSource, api.ProjectAdminGrantSourceProjectAdminSource}, sourceTypes(ownerRow),
 		"both sources on one row, owning team first")
-	assert.Equal(t, ownGrant.ID, ownerRow.Sources[1].GrantID.Or(""))
+	assert.Equal(t, ownGrant.ID, ownerRow.Sources[1].ProjectAdminGrantSource.GrantID)
 
 	// Revoking the explicit grant leaves the access inherited through the team.
 	delResp, err := owner.DeleteGrant(t.Context(), api.DeleteGrantParams{ID: ownGrant.ID, ProjectID: api.ProjectID(project.ID)})
@@ -146,11 +176,11 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 	require.IsType(t, &api.DeleteGrantNoContent{}, delResp, helpers.MustMarshal(t, delResp))
 	admins = queryAdmins(t, owner)
 	require.Contains(t, admins, api.UserID(ownerID))
-	assert.Equal(t, []api.ProjectAdminSourceType{api.ProjectAdminSourceTypeOwningTeam}, sourceTypes(admins[api.UserID(ownerID)]))
+	assert.Equal(t, []api.ProjectAdminSourceType{api.ProjectAdminOwningTeamSourceProjectAdminSource}, sourceTypes(admins[api.UserID(ownerID)]))
 
 	t.Run("only active members of the owning team are listed", func(t *testing.T) {
 		// Membership writes project the edge the check reads.
-		memberID := harness.CreateUserWithTeam(t, platform.ID)
+		memberID := cleanupPlatformUser(t, harness.CreateUserWithTeam(t, platform.ID))
 		require.NoError(t, harness.EnsureTeamMembershipFixture(t).Create(t.Context(), &domain.TeamMembership{
 			ProjectID: platform.ID, TeamID: owningTeamID, UserID: memberID, Status: domain.MembershipStatusActive,
 		}))
@@ -162,7 +192,7 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 	})
 
 	t.Run("an admin grant with a future expiry is listed", func(t *testing.T) {
-		futureID := harness.CreateUserWithTeam(t, platform.ID)
+		futureID := cleanupPlatformUser(t, harness.CreateUserWithTeam(t, platform.ID))
 		expiresAt := time.Now().Add(time.Hour)
 		future := &domain.AuthzAssignment{
 			ProjectID:     project.ID,
@@ -179,7 +209,7 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 	})
 
 	t.Run("a deleted user's leftover grant is not listed", func(t *testing.T) {
-		deletedID := harness.CreateUserWithTeam(t, platform.ID)
+		deletedID := cleanupPlatformUser(t, harness.CreateUserWithTeam(t, platform.ID))
 		resp, err := owner.CreateGrant(t.Context(), userIDGrant(deletedID, api.CreateGrantRequestRelationAdmin), grantParams)
 		require.NoError(t, err)
 		require.IsType(t, &api.Grant{}, resp, helpers.MustMarshal(t, resp))
@@ -203,7 +233,7 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 	})
 
 	t.Run("an expired admin grant is not listed", func(t *testing.T) {
-		expiredID := harness.CreateUserWithTeam(t, platform.ID)
+		expiredID := cleanupPlatformUser(t, harness.CreateUserWithTeam(t, platform.ID))
 		expiredAt := time.Now().Add(-time.Hour)
 		expired := &domain.AuthzAssignment{
 			ProjectID:     project.ID,
@@ -237,7 +267,7 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 	t.Run("no foothold is not found", func(t *testing.T) {
 		stranger, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
-		stranger.SetSessionToken(platformSessionCookie(t, harness.CreateUserWithTeam(t, platform.ID)).Value)
+		stranger.SetSessionToken(platformSessionCookie(t, cleanupPlatformUser(t, harness.CreateUserWithTeam(t, platform.ID))).Value)
 		resp, err := stranger.ListProjectAdmins(t.Context(), adminParams)
 		require.NoError(t, err)
 		notFound, ok := resp.(*api.ListProjectAdminsNotFound)

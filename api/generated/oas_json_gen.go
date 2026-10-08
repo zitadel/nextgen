@@ -74425,23 +74425,21 @@ func (s *ProjectAdmin) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
-func (s *ProjectAdminSource) Encode(e *jx.Encoder) {
+func (s *ProjectAdminGrantSource) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields encodes fields.
-func (s *ProjectAdminSource) encodeFields(e *jx.Encoder) {
+func (s *ProjectAdminGrantSource) encodeFields(e *jx.Encoder) {
 	{
 		e.FieldStart("type")
 		s.Type.Encode(e)
 	}
 	{
-		if s.GrantID.Set {
-			e.FieldStart("grant_id")
-			s.GrantID.Encode(e)
-		}
+		e.FieldStart("grant_id")
+		e.Str(s.GrantID)
 	}
 	{
 		if s.Team.Set {
@@ -74451,16 +74449,16 @@ func (s *ProjectAdminSource) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfProjectAdminSource = [3]string{
+var jsonFieldsNameOfProjectAdminGrantSource = [3]string{
 	0: "type",
 	1: "grant_id",
 	2: "team",
 }
 
-// Decode decodes ProjectAdminSource from json.
-func (s *ProjectAdminSource) Decode(d *jx.Decoder) error {
+// Decode decodes ProjectAdminGrantSource from json.
+func (s *ProjectAdminGrantSource) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode ProjectAdminSource to nil")
+		return errors.New("invalid: unable to decode ProjectAdminGrantSource to nil")
 	}
 	var requiredBitSet [1]uint8
 
@@ -74477,9 +74475,11 @@ func (s *ProjectAdminSource) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"type\"")
 			}
 		case "grant_id":
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				s.GrantID.Reset()
-				if err := s.GrantID.Decode(d); err != nil {
+				v, err := d.Str()
+				s.GrantID = string(v)
+				if err != nil {
 					return err
 				}
 				return nil
@@ -74501,12 +74501,12 @@ func (s *ProjectAdminSource) Decode(d *jx.Decoder) error {
 		}
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode ProjectAdminSource")
+		return errors.Wrap(err, "decode ProjectAdminGrantSource")
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000001,
+		0b00000011,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -74518,8 +74518,8 @@ func (s *ProjectAdminSource) Decode(d *jx.Decoder) error {
 				bitIdx := bits.TrailingZeros8(result)
 				fieldIdx := i*8 + bitIdx
 				var name string
-				if fieldIdx < len(jsonFieldsNameOfProjectAdminSource) {
-					name = jsonFieldsNameOfProjectAdminSource[fieldIdx]
+				if fieldIdx < len(jsonFieldsNameOfProjectAdminGrantSource) {
+					name = jsonFieldsNameOfProjectAdminGrantSource[fieldIdx]
 				} else {
 					name = strconv.Itoa(fieldIdx)
 				}
@@ -74540,7 +74540,300 @@ func (s *ProjectAdminSource) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *ProjectAdminSource) MarshalJSON() ([]byte, error) {
+func (s *ProjectAdminGrantSource) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ProjectAdminGrantSource) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ProjectAdminGrantSourceType as json.
+func (s ProjectAdminGrantSourceType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes ProjectAdminGrantSourceType from json.
+func (s *ProjectAdminGrantSourceType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ProjectAdminGrantSourceType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch ProjectAdminGrantSourceType(v) {
+	case ProjectAdminGrantSourceTypeGrant:
+		*s = ProjectAdminGrantSourceTypeGrant
+	default:
+		*s = ProjectAdminGrantSourceType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ProjectAdminGrantSourceType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ProjectAdminGrantSourceType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *ProjectAdminOwningTeamSource) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ProjectAdminOwningTeamSource) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("type")
+		s.Type.Encode(e)
+	}
+	{
+		e.FieldStart("team")
+		s.Team.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfProjectAdminOwningTeamSource = [2]string{
+	0: "type",
+	1: "team",
+}
+
+// Decode decodes ProjectAdminOwningTeamSource from json.
+func (s *ProjectAdminOwningTeamSource) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ProjectAdminOwningTeamSource to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "type":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Type.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "team":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.Team.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"team\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ProjectAdminOwningTeamSource")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfProjectAdminOwningTeamSource) {
+					name = jsonFieldsNameOfProjectAdminOwningTeamSource[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ProjectAdminOwningTeamSource) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ProjectAdminOwningTeamSource) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ProjectAdminOwningTeamSourceType as json.
+func (s ProjectAdminOwningTeamSourceType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes ProjectAdminOwningTeamSourceType from json.
+func (s *ProjectAdminOwningTeamSourceType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ProjectAdminOwningTeamSourceType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch ProjectAdminOwningTeamSourceType(v) {
+	case ProjectAdminOwningTeamSourceTypeOwningTeam:
+		*s = ProjectAdminOwningTeamSourceTypeOwningTeam
+	default:
+		*s = ProjectAdminOwningTeamSourceType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ProjectAdminOwningTeamSourceType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ProjectAdminOwningTeamSourceType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ProjectAdminSource as json.
+func (s ProjectAdminSource) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s ProjectAdminSource) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case ProjectAdminOwningTeamSourceProjectAdminSource:
+		e.FieldStart("type")
+		e.Str("owning_team")
+		{
+			s := s.ProjectAdminOwningTeamSource
+			{
+				e.FieldStart("team")
+				s.Team.Encode(e)
+			}
+		}
+	case ProjectAdminGrantSourceProjectAdminSource:
+		e.FieldStart("type")
+		e.Str("grant")
+		{
+			s := s.ProjectAdminGrantSource
+			{
+				e.FieldStart("grant_id")
+				e.Str(s.GrantID)
+			}
+			{
+				if s.Team.Set {
+					e.FieldStart("team")
+					s.Team.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes ProjectAdminSource from json.
+func (s *ProjectAdminSource) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ProjectAdminSource to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "type":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "owning_team":
+					s.Type = ProjectAdminOwningTeamSourceProjectAdminSource
+					found = true
+				case "grant":
+					s.Type = ProjectAdminGrantSourceProjectAdminSource
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case ProjectAdminOwningTeamSourceProjectAdminSource:
+		if err := s.ProjectAdminOwningTeamSource.Decode(d); err != nil {
+			return err
+		}
+	case ProjectAdminGrantSourceProjectAdminSource:
+		if err := s.ProjectAdminGrantSource.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ProjectAdminSource) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
@@ -74548,46 +74841,6 @@ func (s *ProjectAdminSource) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *ProjectAdminSource) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes ProjectAdminSourceType as json.
-func (s ProjectAdminSourceType) Encode(e *jx.Encoder) {
-	e.Str(string(s))
-}
-
-// Decode decodes ProjectAdminSourceType from json.
-func (s *ProjectAdminSourceType) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode ProjectAdminSourceType to nil")
-	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
-	}
-	// Try to use constant string.
-	switch ProjectAdminSourceType(v) {
-	case ProjectAdminSourceTypeOwningTeam:
-		*s = ProjectAdminSourceTypeOwningTeam
-	case ProjectAdminSourceTypeGrant:
-		*s = ProjectAdminSourceTypeGrant
-	default:
-		*s = ProjectAdminSourceType(v)
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s ProjectAdminSourceType) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ProjectAdminSourceType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
