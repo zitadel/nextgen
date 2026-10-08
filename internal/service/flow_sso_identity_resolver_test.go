@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
@@ -60,6 +61,7 @@ type ssoResolverFixture struct {
 	stmts       *servicemocks.MockAllStatements
 	connections *servicemocks.MockIDPConnectionService
 	schemaStore *domainmock.MockJSONSchemaStore
+	hasher      *cryptomock.MockHasher
 	resolver    *service.FlowSSOIdentityResolver
 	// events are the events expectCreateUser saw inserted.
 	events []*domain.Event
@@ -72,6 +74,7 @@ func newSSOResolverFixture(t *testing.T) *ssoResolverFixture {
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 	connections := servicemocks.NewMockIDPConnectionService(ctrl)
 	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
+	hasher := cryptomock.NewMockHasher(ctrl)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	users := service.NewUserService(pool, schemaStore, nil, nil)
 	return &ssoResolverFixture{
@@ -79,7 +82,8 @@ func newSSOResolverFixture(t *testing.T) *ssoResolverFixture {
 		stmts:       stmts,
 		connections: connections,
 		schemaStore: schemaStore,
-		resolver:    service.NewFlowSSOIdentityResolver(pool, connections, users, schemaStore),
+		hasher:      hasher,
+		resolver:    service.NewFlowSSOIdentityResolver(pool, connections, users, schemaStore, service.FixedProjectHasherResolver{Hasher: hasher}),
 	}
 }
 
@@ -699,39 +703,65 @@ func TestFlowSSOIdentityResolver_BindCollision_SameUserAlreadyBoundSkipsAdd(t *t
 
 func TestFlowSSOIdentityResolver_CreateLinked_AppliesActionsInOneTransaction(t *testing.T) {
 	t.Parallel()
-	f := newSSOResolverFixture(t)
-	f.inTransaction(t)
-	var created *domain.IDPIdentityLink
-	f.expectAttempt(parkedAttempt(parkedResult()))
-	var written []domain.AuthFactor
-	record := func(_ context.Context, _, _ string, factor domain.AuthFactor) (string, error) {
-		written = append(written, factor)
-		return "ch-new", nil
-	}
-	// The exact parked row is claimed before the user insert, so a concurrent
-	// request on the attempt loses on the row. Then the link, the user factor
-	// (refused when one is stored) and the sso factor.
-	gomock.InOrder(
-		f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil),
-		f.expectCreateUser(nil),
-		f.stmts.EXPECT().CreateIDPIdentityLink(gomock.Any(), gomock.Any()).
-			DoAndReturn(func(_ context.Context, link *domain.IDPIdentityLink) error {
-				link.ID = "idplink-new"
-				created = link
-				return nil
-			}),
-		f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID, gomock.Any()).DoAndReturn(record),
-		f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID, gomock.Any()).DoAndReturn(record),
-	)
+	for name, password := range map[string]string{
+		"without a password": "",
+		"with a password":    "s3cret",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := newSSOResolverFixture(t)
+			f.inTransaction(t)
+			var created *domain.IDPIdentityLink
+			f.expectAttempt(parkedAttempt(parkedResult()))
+			var written []domain.AuthFactor
+			record := func(_ context.Context, _, _ string, factor domain.AuthFactor) (string, error) {
+				written = append(written, factor)
+				return "ch-new", nil
+			}
+			// The exact parked row is claimed before the user insert, so a
+			// concurrent request on the attempt loses on the row. Then the
+			// password, the link, the user factor (refused when one is stored)
+			// and the sso factor. No password factor: the provider is the proof.
+			calls := []any{
+				f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil),
+				f.expectCreateUser(nil),
+			}
+			var stored *domain.SetUserPassword
+			if password != "" {
+				f.hasher.EXPECT().Hash(password).Return("hash-s3cret", nil)
+				calls = append(calls, f.stmts.EXPECT().SetUserPassword(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, pw *domain.SetUserPassword) error {
+						stored = pw
+						return nil
+					}))
+			}
+			calls = append(calls,
+				f.stmts.EXPECT().CreateIDPIdentityLink(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, link *domain.IDPIdentityLink) error {
+						link.ID = "idplink-new"
+						created = link
+						return nil
+					}),
+				f.stmts.EXPECT().AddAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID, gomock.Any()).DoAndReturn(record),
+				f.stmts.EXPECT().SetAuthAttemptFactor(gomock.Any(), ssoProjectID, ssoAttemptID, gomock.Any()).DoAndReturn(record),
+			)
+			gomock.InOrder(calls...)
 
-	userID, err := f.resolver.CreateLinked(t.Context(), createInput())
-	require.NoError(t, err)
-	assert.Equal(t, "user_new", userID)
-	assert.Equal(t, &domain.IDPIdentityLink{ProjectID: ssoProjectID, ID: "idplink-new", ConnectionID: "idp-1", Subject: "sub-1", UserID: "user_new"}, created)
-	assert.Equal(t, []domain.AuthFactor{
-		&domain.AuthFactorUser{UserID: "user_new"},
-		&domain.AuthFactorSSO{ConnectionID: "idp-1", LinkID: "idplink-new", AttemptID: ssoAttemptID},
-	}, written, "the sso factor carries the link id the insert minted")
+			in := createInput()
+			in.Password = password
+			userID, err := f.resolver.CreateLinked(t.Context(), in)
+			require.NoError(t, err)
+			assert.Equal(t, "user_new", userID)
+			assert.Equal(t, &domain.IDPIdentityLink{ProjectID: ssoProjectID, ID: "idplink-new", ConnectionID: "idp-1", Subject: "sub-1", UserID: "user_new"}, created)
+			assert.Equal(t, []domain.AuthFactor{
+				&domain.AuthFactorUser{UserID: "user_new"},
+				&domain.AuthFactorSSO{ConnectionID: "idp-1", LinkID: "idplink-new", AttemptID: ssoAttemptID},
+			}, written, "the sso factor carries the link id the insert minted")
+			if password != "" {
+				assert.Equal(t, &domain.SetUserPassword{ProjectID: ssoProjectID, UserID: "user_new", EncodedHash: "hash-s3cret"}, stored)
+			}
+		})
+	}
 }
 
 func TestFlowSSOIdentityResolver_CreateLinked_UniqueErrorMapsToUserAlreadyExists(t *testing.T) {

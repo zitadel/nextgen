@@ -520,7 +520,7 @@ func TestSSOResolutionAutoCreateRollsBackOnLinkFailure(t *testing.T) {
 	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-taken", emailClaims(), map[string]bool{"email": true})
 	email := helpers.RandString(8) + "@example.com"
 	resolver := service.NewFlowSSOIdentityResolver(
-		harness.EnsureServiceDB(t), harness.EnsureIDPConnectionService(t), harness.EnsureUserService(t), harness.EnsureSchemaStore(t),
+		harness.EnsureServiceDB(t), harness.EnsureIDPConnectionService(t), harness.EnsureUserService(t), harness.EnsureSchemaStore(t), harness.EnsureProjectHashers(t),
 	)
 	parked, ok := f.attempt(t, flow).SSOCallback()
 	require.True(t, ok)

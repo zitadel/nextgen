@@ -6221,7 +6221,7 @@ func collectionSubmit(edit func(fields map[string]any)) domain.FlowSubmitInput {
 }
 
 // expectCreateLinked answers the creation of the collected identity.
-func (w *flowTestWorld) expectCreateLinked(attributes map[string]any, userID string, err error) *domainmock.MockFlowSSOIdentityServiceCreateLinkedCall {
+func (w *flowTestWorld) expectCreateLinked(attributes map[string]any, password, userID string, err error) *domainmock.MockFlowSSOIdentityServiceCreateLinkedCall {
 	return w.ssoIdentities.EXPECT().
 		CreateLinked(gomock.Any(), domain.FlowSSOCreateInput{
 			ProjectID:     testProjectID,
@@ -6231,6 +6231,7 @@ func (w *flowTestWorld) expectCreateLinked(attributes map[string]any, userID str
 			ConnectionID:  "idp-1",
 			Subject:       "sub-1",
 			Attributes:    attributes,
+			Password:      password,
 		}).
 		Return(userID, err)
 }
@@ -6247,6 +6248,7 @@ func TestFlowStateMachine_Process_SSOCollectionCreatesUser(t *testing.T) {
 		collected      map[string]any
 		edit           func(fields map[string]any)
 		wantAttributes map[string]any
+		wantPassword   string
 	}{
 		// A hidden claim replaces what an earlier step collected; a claim no
 		// field can carry is dropped.
@@ -6275,6 +6277,15 @@ func TestFlowStateMachine_Process_SSOCollectionCreatesUser(t *testing.T) {
 				"email": "alice@work.example.com", "username": "alice", "given_name": "Alice", "family_name": "Liddell", "badge": "b-7",
 			},
 		},
+		"password collected on the step": {
+			fields: []domain.Field{"email", "username", "given_name", "family_name", "x-auth-methods#password"},
+			claims: map[string]any{"email": "alice@example.com", "badge": "b-7"},
+			edit:   func(fields map[string]any) { fields["x-auth-methods#password"] = "correct-horse-battery-staple" },
+			wantAttributes: map[string]any{
+				"email": "alice@example.com", "username": "alice", "given_name": "Alice", "family_name": "Liddell", "badge": "b-7",
+			},
+			wantPassword: "correct-horse-battery-staple",
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -6290,7 +6301,7 @@ func TestFlowStateMachine_Process_SSOCollectionCreatesUser(t *testing.T) {
 			in := collectionSubmit(tc.edit)
 			w.expectOwner("email", tc.wantAttributes["email"].(string), "")
 			w.expectOwner("username", "alice", "")
-			w.expectCreateLinked(tc.wantAttributes, "user-1", nil)
+			w.expectCreateLinked(tc.wantAttributes, tc.wantPassword, "user-1", nil)
 
 			result, err := w.sm.Process(t.Context(), def, state, in)
 			require.NoError(t, err)
@@ -6324,7 +6335,7 @@ func TestFlowStateMachine_Process_SSOCollectionBindsCollision(t *testing.T) {
 				w.expectOwner("username", "taken", ""),
 				w.expectCreateLinked(map[string]any{
 					"email": "alice@example.com", "username": "taken", "given_name": "Alice", "family_name": "Liddell", "badge": "b-7",
-				}, "", domain.ErrUserAlreadyExists()),
+				}, "", "", domain.ErrUserAlreadyExists()),
 				w.expectOwner("email", "alice@example.com", ""),
 				w.expectOwner("username", "taken", "user-9"),
 				w.expectBindCollision("user-9", nil),
@@ -6382,14 +6393,14 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 		"values that fail only together": {
 			expect: func(w *flowTestWorld) {
 				probeMisses(w)
-				w.expectCreateLinked(complete, "", domain.ErrUserInvalid())
+				w.expectCreateLinked(complete, "", "", domain.ErrUserInvalid())
 			},
 			wantErr: domain.FlowStepErrorSSOUserInvalid,
 		},
 		"taken value without an owner": {
 			expect: func(w *flowTestWorld) {
 				probeMisses(w)
-				w.expectCreateLinked(complete, "", domain.ErrUserAlreadyExists())
+				w.expectCreateLinked(complete, "", "", domain.ErrUserAlreadyExists())
 				probeMisses(w)
 			},
 			wantErr: domain.FlowStepErrorUserAlreadyExists,
@@ -6476,7 +6487,7 @@ func TestFlowStateMachine_Process_SSOCollectionStaleRow(t *testing.T) {
 				w.expectOwner("username", "alice", "")
 				w.expectCreateLinked(map[string]any{
 					"email": "alice@example.com", "username": "alice", "given_name": "Alice", "family_name": "Liddell", "badge": "b-7",
-				}, "", domain.ErrSSOStateInvalid())
+				}, "", "", domain.ErrSSOStateInvalid())
 			}
 			w.ssoIdentities.EXPECT().
 				LoadParked(gomock.Any(), domain.FlowSSOLoadInput{

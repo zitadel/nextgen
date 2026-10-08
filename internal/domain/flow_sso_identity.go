@@ -100,4 +100,6 @@ type FlowSSOBindInput struct{ ProjectID, AttemptID, CheckID, UserID, ConnectionI
 type FlowSSOCreateInput struct {
 	ProjectID, AttemptID, CheckID, UserSchemaURL, ConnectionID, Subject string
 	Attributes                                                          map[string]any
+	// Password is empty unless the definition collects one on the way.
+	Password string
 }
