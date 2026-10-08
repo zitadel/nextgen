@@ -21,7 +21,7 @@ fileGroups:
     # Files the root packages bench imports compile in through //go:embed:
     # the JSON meta-schemas and the config defaults.
     - "/api/openapi/endpoints/schemas/*.json"
-    - "/packages/config/defaults/*"
+    - "/packages/config/defaults/**/*"
 
 tasks:
   # Tracked Go files only, as the server project checks them.
