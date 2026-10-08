@@ -41,6 +41,21 @@ describe("<zl-field> aria wiring", () => {
     expect(describedBy).toMatch(/-error$/);
   });
 
+  it("passes readonly to the input and drops the clear button", async () => {
+    const field = mount(`<zl-field name="email" value="alice@acme.com" readonly></zl-field>`);
+    await field.updateComplete;
+    const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    expect(field.readOnly).toBe(true);
+    expect(input.readOnly).toBe(true);
+    expect(field.shadowRoot?.querySelector('[part="trailing-action"]')).toBeNull();
+  });
+
+  it("keeps the error icon on a read-only field", async () => {
+    const field = mount(`<zl-field name="email" value="alice@acme.com" readonly error="Taken"></zl-field>`);
+    await field.updateComplete;
+    expect(field.shadowRoot?.querySelector('[part="trailing-icon"]')).not.toBeNull();
+  });
+
   it("reads formValue from the live input so autofill is captured", async () => {
     const field = mount(`<zl-field name="email" value="typed@acme.com"></zl-field>`);
     await field.updateComplete;
