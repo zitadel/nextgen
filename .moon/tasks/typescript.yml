@@ -15,10 +15,6 @@ inheritedBy:
 # a tsconfig edit). These files change rarely; under-selection here previously
 # let such changes land with zero CI coverage.
 implicitInputs:
-  # Moon's automatic config input only covers `.moon/*.yml`, not this
-  # directory — without this self-reference, edits to scoped task configs are
-  # themselves invisible to `moon ci` selection.
-  - "/.moon/tasks/**/*.yml"
   # Extended by every {apps,packages}/*/tsconfig*.json.
   - "/tsconfig.base.json"
   # The shared Biome config that the inherited `lint` task below runs against;
@@ -44,3 +40,20 @@ tasks:
   # and are not auto-formatted.
   lint:
     command: "corepack pnpm exec biome check ."
+
+  # The standard tasks every TypeScript project runs. A project's moon.yml adds
+  # only what is specific to it: its `deps` (appended to these), or options. A
+  # different `outputs` needs `options.mergeOutputs: "replace"` and a different
+  # command needs `options.mergeArgs: "replace"`; otherwise moon adds them to
+  # these instead of replacing them. A project with nothing to build or test
+  # opts out with `workspace.inheritedTasks.exclude`.
+  typecheck:
+    command: "corepack pnpm run typecheck"
+
+  build:
+    command: "corepack pnpm run build"
+    outputs:
+      - "dist/**/*"
+
+  test:
+    command: "corepack pnpm run test:all"
