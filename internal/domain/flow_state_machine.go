@@ -489,7 +489,10 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		}
 		state.SSOResolvedCheckID = parked.CheckID
 		recordResolvedUser(state, parked.CollisionUserID)
-		result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeUserAlreadyExists, false)
+		// The marker replaced the row a collection step creates from, so that
+		// step cannot be shown again. An entry step can: it starts a new ceremony.
+		collection := currentStep.OnSuccess != nil && *currentStep.OnSuccess == FlowOnSuccessCreateUserWithSso
+		result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeUserAlreadyExists, collection)
 		return result, true, err
 	}
 	if parked == nil {
@@ -1403,7 +1406,9 @@ func (r *FlowStateMachineRuntime) ssoCollectionBindResult(pc *processCtx, resolv
 	case err != nil:
 		return FlowStepResult{}, true, err
 	case bound:
-		result, err := r.routeOutcome(pc, resolved, FlowImplicitOutcomeUserAlreadyExists, false)
+		// The bind replaced the row this step creates from, so back to it
+		// could not create a user.
+		result, err := r.routeOutcome(pc, resolved, FlowImplicitOutcomeUserAlreadyExists, true)
 		return result, true, err
 	}
 	return FlowStepResult{}, false, nil

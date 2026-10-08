@@ -5816,22 +5816,48 @@ func TestFlowStateMachine_Render_SSOUnverifiedRequiredUniqueArrayFallsBackToColl
 
 // A concurrent collision bound "u-b" while this flow's cookie recorded the
 // row as collected: the state catches up and the collision outcome is raised.
+// Back to an entry step starts a new ceremony; back to the collection step
+// would find no row to create from, so it is not offered.
 func TestFlowStateMachine_Render_SSOCollisionReconcilesLostCookieRace(t *testing.T) {
 	t.Parallel()
-	w, def, state := ssoRenderWorld(t)
-	def = withSSOOutcomeSteps(def)
-	state.SSOResolvedCheckID = "ch-1"
-	w.ssoIdentities.EXPECT().
-		LoadParked(gomock.Any(), domain.FlowSSOLoadInput{
-			ProjectID: testProjectID, AttemptID: "att-1", UserSchemaURL: defaultSchemaURL, ResolvedCheckID: "ch-1",
-		}).
-		Return(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
+	for name, tc := range map[string]struct {
+		world    func(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *domain.FlowState)
+		wantBack bool
+	}{
+		"entry step": {
+			world: func(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *domain.FlowState) {
+				w, def, state := ssoRenderWorld(t)
+				state.SSOResolvedCheckID = "ch-1"
+				return w, withSSOOutcomeSteps(def), state
+			},
+			wantBack: true,
+		},
+		"collection step": {
+			world: func(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *domain.FlowState) {
+				w, def, state := submittableCollectionStepWorld(t)
+				// The marker is no collected row.
+				w.expectCollected(nil, nil)
+				return w, def, state
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			w, def, state := tc.world(t)
+			w.ssoIdentities.EXPECT().
+				LoadParked(gomock.Any(), domain.FlowSSOLoadInput{
+					ProjectID: testProjectID, AttemptID: "att-1", UserSchemaURL: defaultSchemaURL, ResolvedCheckID: "ch-1",
+				}).
+				Return(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", CollisionUserID: "u-b", AttemptUserID: "u-b"}, nil)
 
-	result, err := w.sm.Render(t.Context(), def, state)
-	require.NoError(t, err)
-	assert.Equal(t, "sso-conflict", result.Step.Name)
-	assert.Equal(t, "u-b", result.State.CollectedData.UserID)
-	assert.True(t, result.Reseal)
+			result, err := w.sm.Render(t.Context(), def, state)
+			require.NoError(t, err)
+			assert.Equal(t, "sso-conflict", result.Step.Name)
+			assert.Equal(t, "u-b", result.State.CollectedData.UserID)
+			assert.True(t, result.Reseal)
+			assert.Equal(t, tc.wantBack, len(result.State.BackStack) > 0)
+		})
+	}
 }
 
 // The catch-up runs on the step the cookie now holds, which may not route
@@ -6313,7 +6339,8 @@ func TestFlowStateMachine_Process_SSOCollectionCreatesUser(t *testing.T) {
 }
 
 // A unique value another user holds binds that user, as on the render: on the
-// probe, or on a creation that lost the value to another flow since.
+// probe, or on a creation that lost the value to another flow since. The bind
+// replaced the row the step creates from, so it offers no back.
 func TestFlowStateMachine_Process_SSOCollectionBindsCollision(t *testing.T) {
 	t.Parallel()
 	for name, tc := range map[string]struct {
@@ -6352,7 +6379,7 @@ func TestFlowStateMachine_Process_SSOCollectionBindsCollision(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, "sso-conflict", result.Step.Name)
 			assert.Equal(t, "user-9", result.State.CollectedData.UserID)
-			assert.NotEmpty(t, result.State.BackStack)
+			assert.Empty(t, result.State.BackStack)
 		})
 	}
 }
