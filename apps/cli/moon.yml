@@ -13,9 +13,9 @@ tasks:
     command: "corepack pnpm run typecheck"
     deps:
       - "api:build"
+      - "api-mock:build"
       - "config:build"
       - "sdk-next:build"
-      - "api-mock:build"
 
   build:
     command: "corepack pnpm run build"
@@ -66,8 +66,8 @@ tasks:
     inputs:
       - "**/*"
       # The @zitadel/server wrapper its server-wrapper test loads. An input,
-      # not a task dep: server already depends on console, so a cli -> server
-      # edge would close a project cycle once console depends on cli.
+      # not a task dep on server: server depends on console, and console's dev
+      # tasks depend on cli (#1487), so that edge would close a project cycle.
       - "/apps/server/bin/**/*"
     options:
       # The built oclif commands import @zitadel/{api,config,sdk-next} from

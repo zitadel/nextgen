@@ -18,17 +18,17 @@ tasks:
       - "api:build"
       - "api-mock:build"
       - "components:build"
-      - "design-tokens:build"
       - "config:build"
+      - "design-tokens:build"
 
   build:
     command: "corepack pnpm run build"
     deps:
       - "api:build"
-      - "components:build"
-      - "design-tokens:build"
       - "api-mock:build"
+      - "components:build"
       - "config:build"
+      - "design-tokens:build"
     outputs:
       - "dist/**/*"
     # Runs in CI: the Vercel deploy builds the static site from this task, and
@@ -50,10 +50,10 @@ tasks:
     deps:
       - "install-browsers"
       - "api:build"
-      - "components:build"
-      - "design-tokens:build"
       - "api-mock:build"
+      - "components:build"
       - "config:build"
+      - "design-tokens:build"
     options:
       # Shared mutex with the other browser-mode suites so only one real-Chromium
       # Vite server runs at a time; concurrent servers starve under moon's CI
@@ -67,7 +67,8 @@ tasks:
   dev:
     command: "corepack pnpm run dev"
     deps:
-      - "config:build"
+      # .storybook/main.ts imports @zitadel/api-mock/public-dir under Node.
+      - "api-mock:build"
     options:
       persistent: true
       runInCI: false

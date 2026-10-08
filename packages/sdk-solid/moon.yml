@@ -13,9 +13,9 @@ tasks:
     command: "corepack pnpm run typecheck"
     deps:
       - "api:build"
+      - "api-mock:build"
       - "components:build"
       - "sdk-core:build"
-      - "api-mock:build"
 
   build:
     command: "corepack pnpm run build"
