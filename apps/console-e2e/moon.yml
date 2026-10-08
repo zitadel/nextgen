@@ -37,7 +37,6 @@ tasks:
       - "testing:build"
       - "cli:build"
       - "server:build"
-      - "console:build"
     env:
       # A fixed pin, deliberately outside the deferred-bind blocks
       # (22000-23999 journey runner / 24000-31999 embedded-pg — doctrine in

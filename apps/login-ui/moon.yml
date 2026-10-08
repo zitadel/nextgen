@@ -10,17 +10,14 @@ tasks:
   typecheck:
     deps:
       - "components:build"
-      - "design-tokens:build"
 
   test:
     deps:
       - "components:build"
-      - "design-tokens:build"
 
   build:
     deps:
       - "components:build"
-      - "design-tokens:build"
     outputs:
       - "/internal/staticui/login/dist/**/*"
     options:
@@ -31,7 +28,6 @@ tasks:
     command: "corepack pnpm run build"
     deps:
       - "components:build-release"
-      - "design-tokens:build"
     outputs:
       - "/internal/staticui/login/dist/**/*"
     options:

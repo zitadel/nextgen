@@ -2,6 +2,8 @@ id: "docs"
 language: "typescript"
 layer: "application"
 stack: "frontend"
+dependsOn:
+  - "design-tokens"
 
 workspace:
   inheritedTasks:
@@ -38,6 +40,8 @@ tasks:
   build:
     command: "corepack pnpm exec waku build"
     deps:
+      # src/app.css imports @zitadel/design-tokens/css/tokens.css.
+      - "design-tokens:build"
       - "generate"
     options:
       # Runs waku directly (generation is the `generate` dep), replacing the
@@ -47,6 +51,7 @@ tasks:
   dev:
     command: "corepack pnpm exec waku dev --port 3003"
     deps:
+      - "design-tokens:build"
       - "generate"
     options:
       persistent: true

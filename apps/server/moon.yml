@@ -178,13 +178,11 @@ tasks:
     deps:
       - "openapi"
       - "format"
-      - "check-generate"
       - "vet"
       - "lint"
-      # Order UI builds before go test so a batched moon graph cannot compile
-      # //go:embed all:dist while vite emptyOutDir has cleared .gitkeep.
-      # Intentionally deps-only (not inputs): UI-only changes must not invalidate
-      # the Go test cache — see build.inputs note below.
+      # The test binary embeds both UI dists (//go:embed all:dist). Listed here
+      # and not only reached through vet: vet has no outputs, so moon would not
+      # hash these builds through it and a UI change would replay a cached run.
       - "console:build"
       - "login-ui:build"
     inputs:
