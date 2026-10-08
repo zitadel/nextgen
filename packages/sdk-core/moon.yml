@@ -9,7 +9,6 @@ dependsOn:
 tasks:
   typecheck:
     deps:
-      - "api:build"
       # contract.spec.ts imports @zitadel/components/events from its dist.
       - "components:build"
 
