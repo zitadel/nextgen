@@ -3,6 +3,10 @@
   "compilerOptions": {
     "rootDir": "src",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    // tsup's dts step (rollup-plugin-dts) sets the deprecated `baseUrl` itself,
+    // which TypeScript 6 rejects with TS5101 unless deprecations are ignored.
+    "ignoreDeprecations": "6.0",
     "declaration": true,
     "declarationMap": true
   },
