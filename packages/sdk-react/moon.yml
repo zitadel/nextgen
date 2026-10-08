@@ -10,6 +10,7 @@ dependsOn:
 
 tasks:
   typecheck:
+    command: "corepack pnpm run typecheck"
     deps:
       - "api:build"
       - "api-mock:build"
@@ -17,10 +18,13 @@ tasks:
       - "sdk-core:build"
 
   build:
+    command: "corepack pnpm run build"
     deps:
       - "api:build"
       - "components:build"
       - "sdk-core:build"
+    outputs:
+      - "dist/**/*"
 
   build-release:
     script: |
@@ -40,6 +44,7 @@ tasks:
       runInCI: false
 
   test:
+    command: "corepack pnpm run test:all"
     deps:
       # api-mock serves the Flow API to the specs (test-setup.ts).
       - "api-mock:build"

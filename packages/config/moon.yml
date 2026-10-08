@@ -23,14 +23,18 @@ tasks:
       mutex: "generated-sources"
 
   typecheck:
+    command: "corepack pnpm run typecheck"
     deps:
       - "api:build"
       - "sync-schemas"
 
   build:
+    command: "corepack pnpm run build"
     deps:
       - "api:build"
       - "sync-schemas"
+    outputs:
+      - "dist/**/*"
 
   build-release:
     script: |
@@ -55,6 +59,7 @@ tasks:
       mutex: "public-dist"
 
   test:
+    command: "corepack pnpm run test:all"
     deps:
       - "build"
       - "sync-schemas"

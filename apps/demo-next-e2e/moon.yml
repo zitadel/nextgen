@@ -7,15 +7,9 @@ dependsOn:
   - "demo-next"
   - "testing"
 
-workspace:
-  inheritedTasks:
-    # An e2e suite: nothing to build, and its specs run through the `e2e*` tasks.
-    exclude:
-      - "build"
-      - "test"
-
 tasks:
   typecheck:
+    command: "corepack pnpm run typecheck"
     deps:
       # The real-instance config and src-real specs import
       # @zitadel/testing/playwright.

@@ -10,6 +10,7 @@ dependsOn:
 
 tasks:
   typecheck:
+    command: "corepack pnpm run typecheck"
     deps:
       - "api:build"
       - "api-mock:build"
@@ -17,6 +18,7 @@ tasks:
       - "design-tokens:build"
 
   build:
+    command: "corepack pnpm run build"
     deps:
       - "api:build"
       # The standalone bundle inlines @zitadel/config/template (see
@@ -25,6 +27,8 @@ tasks:
       # a broken (and cached!) standalone.mjs.
       - "config:build"
       - "design-tokens:build"
+    outputs:
+      - "dist/**/*"
 
   build-release:
     script: |
@@ -63,6 +67,7 @@ tasks:
   # `pnpm test:browser` runs the browser project alone. The browser project
   # has a 60-120s Chromium cold start, which this lane pays in CI by design.
   test:
+    command: "corepack pnpm run test:all"
     deps:
       - "install-browsers"
       - "api:build"
