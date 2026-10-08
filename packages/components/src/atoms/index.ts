@@ -1,3 +1,5 @@
+import "../internal/lit-dev-mode.js";
+
 export { ZlAlert, zlAlertManifest } from "./zl-alert.js";
 export type { ZlSubmitDetail } from "./events.js";
 export { ZlButton, zlButtonManifest } from "./zl-button.js";

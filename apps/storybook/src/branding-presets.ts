@@ -14,18 +14,17 @@
  * not `getDefaultBrandingConfig()` — that helper reads from disk and is
  * Node-only.
  *
- * The legacy templates are read straight out of `@zitadel/components`' test
- * fixtures (`src/orchestrator/__fixtures__/legacy-designs/`), the single copy
- * the render specs also use. Moving or renaming those fixtures breaks these
- * imports; delete the three presets together with the split/hero chrome in
- * `layout-chrome.css` once published revisions no longer need it.
+ * The legacy templates come from `@zitadel/components/legacy-designs/*`, the
+ * same files its render specs use; delete the three presets together with the
+ * split/hero chrome in `layout-chrome.css` once published revisions no longer
+ * need it.
  */
 import type { Branding } from "@zitadel/components";
 
-import heroTemplate from "../../../packages/components/src/orchestrator/__fixtures__/legacy-designs/hero.liquid?raw";
-import splitRightTemplate from "../../../packages/components/src/orchestrator/__fixtures__/legacy-designs/split-right.liquid?raw";
-import splitTemplate from "../../../packages/components/src/orchestrator/__fixtures__/legacy-designs/split.liquid?raw";
-import minimalTemplate from "../../../packages/config/defaults/branding/minimal/login.liquid?raw";
+import heroTemplate from "@zitadel/components/legacy-designs/hero.liquid?raw";
+import splitRightTemplate from "@zitadel/components/legacy-designs/split-right.liquid?raw";
+import splitTemplate from "@zitadel/components/legacy-designs/split.liquid?raw";
+import minimalTemplate from "@zitadel/config/defaults/branding/minimal/login.liquid?raw";
 
 const INTER_FONT_URL =
   "https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700&display=swap";
