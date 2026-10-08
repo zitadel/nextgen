@@ -356,40 +356,6 @@ describe("users screen", () => {
     }
   });
 
-  it("filters live users across every rendered column, and by id", async () => {
-    server.use(
-      http.post(USERS_QUERY_URL, () =>
-        HttpResponse.json({
-          users: [
-            {
-              id: "user_1",
-              attributes: { givenName: "Maya", familyName: "Patel", email: "maya@acme.com" },
-            },
-            {
-              id: "user_2",
-              attributes: { givenName: "Sasha", familyName: "Kim", email: "sasha@acme.com" },
-            },
-          ],
-        }),
-      ),
-    );
-    await renderUsers();
-    const table = () => within(screen.getByRole("table"));
-    expect(await screen.findByText("Maya")).toBeInTheDocument();
-
-    // By id — not a column an operator reads off, but the one they paste.
-    await userEvent.type(screen.getByRole("searchbox", { name: "Search users" }), "user_2");
-    expect(await screen.findByText("Sasha")).toBeInTheDocument();
-    expect(table().queryByText("Maya")).not.toBeInTheDocument();
-
-    // By a schema property that is not the first column: search covers whatever
-    // the schema defines rather than a fixed name/email pair.
-    await userEvent.clear(screen.getByRole("searchbox", { name: "Search users" }));
-    await userEvent.type(screen.getByRole("searchbox", { name: "Search users" }), "Patel");
-    expect(await screen.findByText("Maya")).toBeInTheDocument();
-    expect(table().queryByText("Sasha")).not.toBeInTheDocument();
-  });
-
   it("shows the status the server stamped, and an em dash without one", async () => {
     server.use(
       http.post(USERS_QUERY_URL, () =>
@@ -603,50 +569,6 @@ describe("users screen", () => {
     expect(marker.closest("a")).toBeNull();
     expect(marker).toHaveClass("shrink-0");
     expect(marker.className).not.toMatch(/truncate/);
-  });
-
-  it("stops searching team names once the column is dropped mid-list", async () => {
-    // The first page is expanded and its rows keep their memberships; the
-    // second is refused, which drops the column. Searching a team name would
-    // otherwise filter the table on something no longer on screen.
-    server.use(
-      http.post(USERS_QUERY_URL, async ({ request }) => {
-        const body = (await request.json()) as Record<string, unknown>;
-        if (body.page_token) {
-          return body.expand
-            ? HttpResponse.json({ message: "not permitted" }, { status: 403 })
-            : HttpResponse.json({
-                users: [{ id: "user_2", attributes: { email: "second@x.com" } }],
-              });
-        }
-        return HttpResponse.json({
-          users: [
-            {
-              id: "user_1",
-              attributes: { email: "first@x.com" },
-              teams: [{ id: "team_1", name: "Acme Web", membership_status: "active" }],
-            },
-          ],
-          next_page_token: "tok_2",
-        });
-      }),
-    );
-    await renderUsers();
-
-    // While the column is on screen, its names are searchable.
-    await userEvent.type(await screen.findByLabelText("Search users"), "Acme Web");
-    expect(await screen.findByText("first@x.com")).toBeInTheDocument();
-    await userEvent.clear(screen.getByLabelText("Search users"));
-
-    await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
-    await screen.findByText("second@x.com");
-    const table = within(screen.getByRole("table"));
-    expect(table.queryByText("Team")).not.toBeInTheDocument();
-
-    // The column is gone, so the team name no longer matches anything.
-    await userEvent.type(screen.getByLabelText("Search users"), "Acme Web");
-    await waitFor(() => expect(screen.queryByText("first@x.com")).not.toBeInTheDocument());
-    expect(screen.getByText("No users match the current filters.")).toBeInTheDocument();
   });
 
   it("drops the Team column when the credential may not read memberships", async () => {

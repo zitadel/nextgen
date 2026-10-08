@@ -2,14 +2,13 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
-import { ZitadelMark } from "./app-shell/icons";
-
 /** Body copy under a `StandaloneMessage` title. */
 export const STANDALONE_BODY = "text-muted-foreground text-sm";
 
 /**
- * The shell-less screen: the mark over a centred column. Sign-in, the claim
- * page and the boot-time error all render outside the app shell.
+ * The shell-less screen: a centred column with nothing above it. Sign-in, the
+ * claim page and the boot-time error all render outside the app shell; the
+ * sign-in widget carries its own "Secured with" mark, so the screen draws none.
  */
 export function StandaloneScreen({
   heading,
@@ -21,7 +20,6 @@ export function StandaloneScreen({
 }) {
   return (
     <main className="flex min-h-svh flex-col items-center justify-center gap-8 bg-background px-4 py-10">
-      <ZitadelMark size={40} className="text-foreground" aria-hidden />
       {heading && <h1 className="sr-only">{heading}</h1>}
       {children}
     </main>

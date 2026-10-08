@@ -10,6 +10,8 @@ import {
   RESOURCE_HEADER,
   RESOURCE_ROW_ICON,
   RESOURCE_ROW_LINK,
+  RESOURCE_TABLE_FIXED,
+  RESOURCE_TABLE_TOP,
   RESOURCE_TABLE_WRAP,
   ResourceEmptyRow,
   ResourceHeadCell,
@@ -93,10 +95,10 @@ function ProjectsScreen() {
         </p>
       )}
 
-      <div className={`${RESOURCE_TABLE_WRAP} mt-5`}>
+      <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
         {/* Three equal columns, as the design lays them out; the trailing one
             carries the row menu. */}
-        <Table className="table-fixed text-xs">
+        <Table className={RESOURCE_TABLE_FIXED}>
           <TableHeader>
             <ResourceHeaderRow>
               <ResourceHeadCell className={COLUMN}>Name</ResourceHeadCell>
