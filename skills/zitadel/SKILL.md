@@ -75,18 +75,18 @@ Look the page up before you fetch it — don't guess URLs. The index lists every
 page with a one-line description:
 
 ```
-https://zitadel.com/docs/preview/llms.txt
+https://nextgen-docs-zitadel.vercel.app/llms.txt
 ```
 
 Links in the index are relative to the docs site, so prefix them with
-`https://zitadel.com/docs/preview`. Fetch only the pages you need. Do not fetch
-`llms-full.txt`: it is the whole site in one file and costs far more context than
-the one or two pages a question needs.
+`https://nextgen-docs-zitadel.vercel.app`. Fetch only the pages you need. Do not
+fetch `llms-full.txt`: it is the whole site in one file and costs far more
+context than the one or two pages a question needs.
 
 ### Fetching a page as Markdown
 
 Add `.md` to a page's URL to get it as Markdown instead of HTML, for example
-`https://zitadel.com/docs/preview/docs/concepts/databases.md`.
+`https://nextgen-docs-zitadel.vercel.app/docs/concepts/databases.md`.
 
 ### How far to trust the docs
 
