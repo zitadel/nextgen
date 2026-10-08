@@ -45,7 +45,7 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 	if err := h.requireProjectAccess(ctx, projectID, projectAccess, opRead); err != nil {
 		return nil, err
 	}
-	project, err := h.projectService.Get(ctx, projectID)
+	project, err := h.projectService.GetWithOwningTeam(ctx, projectID)
 	if err != nil {
 		// The guard already found the project for this caller (its own project
 		// for a secret, a granted one for a session), so this only fires if the
@@ -56,11 +56,7 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 		}
 		return nil, err
 	}
-	owningTeamID, err := h.projectService.OwningTeamID(ctx, projectID)
-	if err != nil {
-		return nil, err
-	}
-	return projectDetailResponse(project, owningTeamID), nil
+	return projectDetailResponse(project), nil
 }
 
 func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest, params api.PatchProjectParams) (api.PatchProjectRes, error) {
@@ -81,17 +77,11 @@ func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest
 		update.PasswordHashPolicy = &policy
 	}
 
-	// Read before the update: a failed read then refuses the PATCH instead of
-	// answering 500 for a change that was already saved.
-	owningTeamID, err := h.projectService.OwningTeamID(ctx, projectID)
-	if err != nil {
-		return nil, err
-	}
 	project, err := h.projectService.Update(ctx, update)
 	if err != nil {
 		return nil, err
 	}
-	return projectDetailResponse(project, owningTeamID), nil
+	return projectDetailResponse(project), nil
 }
 
 // QueryProjects has no project parameter: results are restricted to the
@@ -268,7 +258,7 @@ func projectResponse(project *domain.Project) *api.ProjectResponse {
 // projectDetailResponse is projectResponse plus the owning team, which only the
 // single-project reads carry: a listing would need one owning-team read per
 // row. TestProjectDetailResponseCarriesProjectResponse keeps the two in step.
-func projectDetailResponse(project *domain.Project, owningTeamID string) *api.ProjectDetailResponse {
+func projectDetailResponse(project *domain.Project) *api.ProjectDetailResponse {
 	resp := &api.ProjectDetailResponse{
 		ID:             project.ID,
 		Name:           project.Name,
@@ -277,8 +267,8 @@ func projectDetailResponse(project *domain.Project, owningTeamID string) *api.Pr
 		CreatedAt:      project.CreatedAt,
 		UpdatedAt:      project.UpdatedAt,
 	}
-	if owningTeamID != "" {
-		resp.OwningTeamID = api.NewNilTeamID(api.TeamID(owningTeamID))
+	if project.OwningTeamID != "" {
+		resp.OwningTeamID = api.NewNilTeamID(api.TeamID(project.OwningTeamID))
 	} else {
 		resp.OwningTeamID.SetToNull()
 	}

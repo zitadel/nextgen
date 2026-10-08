@@ -138,22 +138,3 @@ func (s *GrantService) resolveAdminRefs(ctx context.Context, admins []*ProjectAd
 	}
 	return nil
 }
-
-// owningTeamGrantStatements reads a project's owning-team assignment.
-type owningTeamGrantStatements interface {
-	GetActiveOwningTeamGrant(ctx context.Context, projectID string) (*domain.AuthzAssignment, error)
-}
-
-// activeOwningTeamID returns the team that owns the project (ADR 054 §2), or ""
-// when no team owns it. An owning-team assignment cannot expire: a CHECK
-// constraint forbids expires_at on it.
-func activeOwningTeamID(ctx context.Context, stmts owningTeamGrantStatements, projectID string) (string, error) {
-	grant, err := stmts.GetActiveOwningTeamGrant(ctx, projectID)
-	if err != nil {
-		if isNoRowFound(err) {
-			return "", nil
-		}
-		return "", domain.ErrInternal(err).WithMessage("failed to load the project's owning team")
-	}
-	return grant.PrincipalID, nil
-}

@@ -66,6 +66,9 @@ type ProjectStatements interface {
 	Statements
 	CreateProject(ctx context.Context, entity *domain.Project) error
 	GetProjectByID(ctx context.Context, id string) (*domain.Project, error)
+	// GetProjectWithOwningTeam is GetProjectByID with the project's owning
+	// team (ADR 054 §2) read in the same round trip.
+	GetProjectWithOwningTeam(ctx context.Context, id string) (*domain.Project, error)
 	UpdateProject(ctx context.Context, entity *domain.Project) error
 	// SetProjectPasswordHashPolicy writes the hashing method the project's
 	// passwords are written with. A nil policy clears the choice, which returns

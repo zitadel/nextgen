@@ -38,9 +38,8 @@ type ProjectService interface {
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
 	Get(ctx context.Context, id string) (*domain.Project, error)
 
-	// OwningTeamID returns the id of the team that owns the project (ADR 054
-	// §2), or "" when no team owns it, for example before it is claimed.
-	OwningTeamID(ctx context.Context, projectID string) (string, error)
+	// GetWithOwningTeam is Get with the project's owning team, in one read.
+	GetWithOwningTeam(ctx context.Context, id string) (*domain.Project, error)
 
 	// DefaultProject resolves the transitional standalone default retained by
 	// Console ADR 0004 §2's bootstrap cutover rule: the configured project when
@@ -312,8 +311,9 @@ func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, e
 	return project, mapStorageError(err)
 }
 
-func (s *projectService) OwningTeamID(ctx context.Context, projectID string) (string, error) {
-	return activeOwningTeamID(ctx, s.v2Pool.Statements(), projectID)
+func (s *projectService) GetWithOwningTeam(ctx context.Context, id string) (*domain.Project, error) {
+	project, err := s.v2Pool.Statements().GetProjectWithOwningTeam(ctx, id)
+	return project, mapStorageError(err)
 }
 
 func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string) (*domain.Project, error) {
@@ -423,30 +423,24 @@ func (s *projectService) Update(ctx context.Context, req UpdateProjectRequest) (
 				return err
 			}
 		}
-		// The name write reads the whole row back, so it runs second and lands
-		// the policy just written on the returned project. Without a rename the
-		// row is read instead, for the same reason: the caller is answered with
-		// the project as it now stands.
 		if req.Name != nil {
 			project.Name = *req.Name
 			if err := tx.Statements().UpdateProject(ctx, project); err != nil {
 				return err
 			}
-		} else {
-			updated, err := tx.Statements().GetProjectByID(ctx, req.ID)
-			if err != nil {
-				return err
-			}
-			*project = *updated
 		}
 		return emitProjectUpdated(ctx, tx.Statements(), project.ID, updateProjectPayload(req))
 	})
-
 	if err != nil {
 		return nil, s.mapUpdateError(err)
 	}
-
-	return project, nil
+	// Read after the commit, outside the write, so the caller is answered with
+	// the project as it now stands, owning team included.
+	updated, err := s.v2Pool.Statements().GetProjectWithOwningTeam(ctx, req.ID)
+	if err != nil {
+		return nil, s.mapUpdateError(err)
+	}
+	return updated, nil
 }
 
 func (s *projectService) mapUpdateError(err error) error {

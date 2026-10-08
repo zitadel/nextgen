@@ -187,7 +187,7 @@ func (f *fakeProjectService) Delete(context.Context, string) error {
 	panic("unused")
 }
 
-func (f *fakeProjectService) OwningTeamID(context.Context, string) (string, error) {
+func (f *fakeProjectService) GetWithOwningTeam(context.Context, string) (*domain.Project, error) {
 	panic("unused")
 }
 

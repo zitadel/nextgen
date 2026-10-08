@@ -19,6 +19,17 @@ const (
 	deleteByIDProjectStmt = `DELETE FROM projects WHERE id = @p1`
 	projectQuery          = "SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at FROM projects"
 
+	// getProjectWithOwningTeamStmt reads one project with its owning team, the
+	// active owning-team grant GetActiveOwningTeamGrant reads, in one round trip.
+	// Only the project reads that show the owner use it: GetProjectByID runs on
+	// hot paths and stays a plain read.
+	getProjectWithOwningTeamStmt = `SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at,
+  (SELECT a.principal_id FROM authz_assignments a
+   WHERE a.project_id = projects.id AND a.object_type = 'project' AND a.relation = 'team' AND a.revoked_at IS NULL
+   ORDER BY a.created_at, a.id LIMIT 1)
+FROM projects
+WHERE id = @p1`
+
 	setProjectPasswordHashPolicyStmt = `UPDATE projects SET password_hash_policy = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id`
 )
 
@@ -147,12 +158,17 @@ func (ps projectStatements) ListProjects(ctx context.Context, filter *database.L
 }
 
 func (ps projectStatements) scanProject(row *spanner.Row) (*domain.Project, error) {
+	return ps.scanProjectWith(row)
+}
+
+// scanProjectWith scans a project row followed by the extra columns.
+func (ps projectStatements) scanProjectWith(row *spanner.Row, extra ...any) (*domain.Project, error) {
 	project := new(domain.Project)
 	var (
 		previewOriginsJSON string
 		policyJSON         spanner.NullJSON
 	)
-	if err := row.Columns(&project.ID, &project.Name, &previewOriginsJSON, &policyJSON, &project.CreatedAt, &project.UpdatedAt); err != nil {
+	if err := row.Columns(append([]any{&project.ID, &project.Name, &previewOriginsJSON, &policyJSON, &project.CreatedAt, &project.UpdatedAt}, extra...)...); err != nil {
 		return nil, err
 	}
 	origins, err := decodePreviewOrigins(previewOriginsJSON)
@@ -207,6 +223,28 @@ func decodePreviewOrigins(value string) ([]string, error) {
 		return nil, err
 	}
 	return origins, nil
+}
+
+// GetProjectWithOwningTeam implements [service.ProjectStatements].
+func (ps projectStatements) GetProjectWithOwningTeam(ctx context.Context, id string) (*domain.Project, error) {
+	var project *domain.Project
+	err := ps.db.Query(ctx, buildStatement(getProjectWithOwningTeamStmt, id).statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		project, err = collectOneRow(iter, func(row *spanner.Row) (*domain.Project, error) {
+			var owningTeamID spanner.NullString
+			project, err := ps.scanProjectWith(row, &owningTeamID)
+			if err != nil {
+				return nil, err
+			}
+			project.OwningTeamID = owningTeamID.StringVal
+			return project, nil
+		})
+		return err
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return project, nil
 }
 
 var _ service.ProjectStatements = (*projectStatements)(nil)

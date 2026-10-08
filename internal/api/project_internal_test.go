@@ -32,8 +32,8 @@ func (s stubProjectService) CreateWithID(context.Context, string, string, []stri
 func (stubProjectService) Get(context.Context, string) (*domain.Project, error) {
 	return nil, domain.ErrProjectNotFound()
 }
-func (stubProjectService) OwningTeamID(context.Context, string) (string, error) {
-	return "", nil
+func (stubProjectService) GetWithOwningTeam(context.Context, string) (*domain.Project, error) {
+	return nil, domain.ErrProjectNotFound()
 }
 func (stubProjectService) DefaultProject(context.Context, string) (*domain.Project, error) {
 	return nil, nil
@@ -127,7 +127,8 @@ func TestProjectDetailResponseCarriesProjectResponse(t *testing.T) {
 		},
 	}
 	base := reflect.ValueOf(*projectResponse(project))
-	detail := reflect.ValueOf(*projectDetailResponse(project, "team_owner"))
+	project.OwningTeamID = "team_owner"
+	detail := reflect.ValueOf(*projectDetailResponse(project))
 	for i := range base.NumField() {
 		name := base.Type().Field(i).Name
 		require.False(t, base.Field(i).IsZero(), "the fixture must set %s so the comparison covers it", name)
@@ -136,5 +137,6 @@ func TestProjectDetailResponseCarriesProjectResponse(t *testing.T) {
 		assert.Equal(t, base.Field(i).Interface(), got.Interface(), "projectDetailResponse must copy %s", name)
 	}
 	assert.Equal(t, api.NewNilTeamID("team_owner"), detail.FieldByName("OwningTeamID").Interface())
-	assert.True(t, projectDetailResponse(project, "").OwningTeamID.IsNull(), "no owning team is null")
+	project.OwningTeamID = ""
+	assert.True(t, projectDetailResponse(project).OwningTeamID.IsNull(), "no owning team is null")
 }

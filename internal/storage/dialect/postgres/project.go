@@ -62,6 +62,17 @@ func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) (b
 
 const projectQuery = "SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at FROM zitadel_nextgen.projects"
 
+// getProjectWithOwningTeamStmt reads one project with its owning team, the
+// active owning-team grant GetActiveOwningTeamGrant reads, in one round trip.
+// Only the project reads that show the owner use it: GetProjectByID runs on
+// hot paths and stays a plain read.
+const getProjectWithOwningTeamStmt = `SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at,
+  (SELECT a.principal_id FROM zitadel_nextgen.authz_assignments a
+   WHERE a.project_id = projects.id AND a.object_type = 'project' AND a.relation = 'team' AND a.revoked_at IS NULL
+   ORDER BY a.created_at, a.id LIMIT 1)
+FROM zitadel_nextgen.projects
+WHERE id = $1`
+
 // GetProjectByID implements [service.ProjectStatements].
 func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*domain.Project, error) {
 	var compiler statementCompiler
@@ -146,9 +157,14 @@ func (ps projectStatements) ListProjects(ctx context.Context, filter *database.L
 }
 
 func (ps projectStatements) scanProject(row pgx.CollectableRow) (*domain.Project, error) {
+	return ps.scanProjectWith(row)
+}
+
+// scanProjectWith scans a project row followed by the extra columns.
+func (ps projectStatements) scanProjectWith(row pgx.CollectableRow, extra ...any) (*domain.Project, error) {
 	project := new(domain.Project)
 	var policy []byte
-	if err := row.Scan(&project.ID, &project.Name, &project.PreviewOrigins, &policy, &project.CreatedAt, &project.UpdatedAt); err != nil {
+	if err := row.Scan(append([]any{&project.ID, &project.Name, &project.PreviewOrigins, &policy, &project.CreatedAt, &project.UpdatedAt}, extra...)...); err != nil {
 		return nil, err
 	}
 	decoded, err := storageproject.UnmarshalPasswordHashPolicy(policy)
@@ -156,6 +172,25 @@ func (ps projectStatements) scanProject(row pgx.CollectableRow) (*domain.Project
 		return nil, err
 	}
 	project.PasswordHashPolicy = decoded
+	return project, nil
+}
+
+// GetProjectWithOwningTeam implements [service.ProjectStatements].
+func (ps projectStatements) GetProjectWithOwningTeam(ctx context.Context, id string) (*domain.Project, error) {
+	rows, err := ps.client.Query(ctx, getProjectWithOwningTeamStmt, id)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	var owningTeamID *string
+	project, err := pgx.CollectExactlyOneRow(rows, func(row pgx.CollectableRow) (*domain.Project, error) {
+		return ps.scanProjectWith(row, &owningTeamID)
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	if owningTeamID != nil {
+		project.OwningTeamID = *owningTeamID
+	}
 	return project, nil
 }
 
