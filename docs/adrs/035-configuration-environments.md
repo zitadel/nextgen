@@ -595,7 +595,7 @@ is withdrawn by the spike behind #1389 ([PR 1427](https://github.com/zitadel/nex
 the release: an immutable bundle of resource revisions, idempotent on content,
 with its audit metadata. What changes is where a release runs.
 
-- A deployment targets **origins**: the project default (`""`), the primary
+- A deployment targets origins: the project default (`""`), the primary
   hostnames the project allows, or preview URLs. One deployment is one
   operation with a target row per origin under it. There is no
   `environments` resource, no seeded set, no `current_deployment_id` and no

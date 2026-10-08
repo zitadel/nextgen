@@ -264,6 +264,6 @@ unchanged; only the key is.
 to: the newest deployment to the origin the request arrived with, or to the
 project default when it has none, per the spike behind #1389 and
 [ADR 068](068-project-is-the-data-boundary.md). Two origins of one project may
-run different branding; two environments no longer exist to. The rest of the
+run different branding, which is what two environments used to do. The rest of the
 resolution, one pinned immutable revision per release and `POST /branding`
 changing nothing until deployed, stands.

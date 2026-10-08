@@ -282,9 +282,9 @@ This ADR expected keys to be issued per environment once ADR 035 environments
 existed, with allow-all restricted to non-production environments. There are
 no environments ([ADR 068](068-project-is-the-data-boundary.md)), so:
 
-- A project has **one publishable key**. It resolves the project server-side
+- A project has one publishable key. It resolves the project server-side
   and nothing more; the request's `Origin` decides what the project serves.
-- The origin allowlist is the project's **origin patterns**, each marked
+- The origin allowlist is the project's origin patterns, each marked
   `primary` or `preview`. A project with no pattern admits every origin; the
   first pattern closes it; a loopback origin is always admitted. That is the
   development allowance this ADR tied to non-production environments,
