@@ -65,8 +65,8 @@ const (
 	// fix it; the flow definition must collect it.
 	FlowStepErrorSSOUserCannotBeCreated = "error.sso_user_cannot_be_created"
 	// FlowStepErrorUserAlreadyExists reports a unique value another user
-	// holds where the engine cannot find that user, so it cannot route
-	// user_already_exists: a team-scoped value, or an object or array.
+	// holds where the engine cannot bind that user, so it cannot route
+	// user_already_exists: a user of another schema.
 	FlowStepErrorUserAlreadyExists = "error.user_already_exists"
 )
 
@@ -726,34 +726,46 @@ func ssoSchemaClaims(schema *jsonschema.Schema, claims map[string]any) map[strin
 }
 
 // ssoUniqueClaims returns the claim names whose top-level schema property
-// carries an x-unique scope (unique), and the project-scoped subset the
-// collision check probes (probe), both sorted so the probe order is stable.
-// Team scope is not probed, because the probe only asks the project-scoped
-// registry; a team-scoped collision is still refused at creation and falls
-// back to collection. An object or array property is unique like any other
-// (the registry stores it), so it is in unique, but it is not probed: the
-// lookup takes a single value. The annotation is read directly, so a claim
-// whose property no flow step could render (a type union) is no error; a
-// claim the schema does not know is skipped.
+// carries an x-unique scope (unique), and the dotted path of each unique leaf
+// the collision check probes (probe), both sorted so the probe order is
+// stable. The annotation is read directly, so a claim whose property no flow
+// step could render (a type union) is no error; a claim the schema does not
+// know is skipped.
 func ssoUniqueClaims(schema *jsonschema.Schema, claims map[string]any) (probe, unique []string) {
 	root := newSchemaReader(schema)
 	for name := range claims {
-		prop, ok := root.Property(name)
-		if !ok {
-			continue
-		}
-		scope := deriveUnique(prop)
-		if scope == AttributeUniquenessUnspecified {
-			continue
-		}
-		unique = append(unique, name)
-		if t, _ := prop.JSONType(); scope == AttributeUniquenessProject && t != "object" && t != "array" {
-			probe = append(probe, name)
+		if prop, ok := root.Property(name); ok && deriveUnique(prop) != AttributeUniquenessUnspecified {
+			unique = append(unique, name)
 		}
 	}
+	probe = ssoUniqueLeaves(root, "", claims)
 	slices.Sort(probe)
 	slices.Sort(unique)
 	return probe, unique
+}
+
+// ssoUniqueLeaves returns the path of each value the creation would record in
+// the unique registry, walked as [CreateAttributes] flattens a user: an object
+// descends, and any other value is a leaf, an array included. The new user
+// has no team, so each of its registry rows has team scope "", whatever the
+// leaf's x-unique scope, and collides with any row of the same scope.
+func ssoUniqueLeaves(parent schemaReader, prefix AttributeKey, values map[string]any) []string {
+	var out []string
+	for name, value := range values {
+		prop, ok := parent.Property(name)
+		if !ok {
+			continue
+		}
+		path := prefix.AppendNode(name)
+		if nested, ok := value.(map[string]any); ok {
+			out = append(out, ssoUniqueLeaves(prop, path, nested)...)
+			continue
+		}
+		if deriveUnique(prop) != AttributeUniquenessUnspecified {
+			out = append(out, string(path))
+		}
+	}
+	return out
 }
 
 // errSSOUnroutable reports a collision or a creation on a step that cannot
@@ -761,7 +773,7 @@ func ssoUniqueClaims(schema *jsonschema.Schema, claims map[string]any) (probe, u
 // unavailable, as for a linked identity.
 var errSSOUnroutable = errors.New("flow state machine: sso outcome cannot route on this step")
 
-// bindSSOCollision looks up the value of each project-unique claim in values,
+// bindSSOCollision looks up the value at each unique leaf path in values,
 // verified or not, until one names an existing user, then binds that user by
 // id. Like a typed identifier it only binds the user: no link, no sso factor.
 // The bind checks the exact parked row first and replaces it by a marker of
@@ -771,8 +783,8 @@ var errSSOUnroutable = errors.New("flow state machine: sso outcome cannot route 
 // user_already_exists.
 func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, step *FlowDefinitionStep, parked *FlowSSOParkedIdentity, probeClaims []string, values map[string]any) (bool, error) {
 	for _, name := range probeClaims {
-		value, _ := values[name].(string)
-		if value == "" {
+		value, ok := maputil.GetNested[any](values, AttributeKey(name).Nodes())
+		if !ok || value == nil || value == "" {
 			continue
 		}
 		// A read-only lookup: an identifier submission that misses records a
@@ -1417,9 +1429,8 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 	})
 	switch {
 	case errors.Is(err, ErrUserAlreadyExists()):
-		// Another flow took a unique value since the probe: whoever took a
-		// probed value is bound. The probe cannot find an owner of a
-		// team-scoped value, or of an object or array.
+		// Another flow took a unique value since the probe: whoever took it
+		// is bound.
 		bound, err := r.bindSSOCollision(pc.ctx, state, step, collected, probe, attributes)
 		if result, handled, err := r.ssoCollectionBindResult(pc, resolved, loadInput, bound, err); handled {
 			return result, err

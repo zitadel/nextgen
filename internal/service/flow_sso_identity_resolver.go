@@ -235,7 +235,7 @@ func bindSSOIdentity(ctx context.Context, stmts AllStatements, in domain.FlowSSO
 	if err != nil {
 		return fmt.Errorf("bind sso identity: read attempt: %w", err)
 	}
-	// Creation without a project-unique claim reaches here with no earlier
+	// Creation without a unique claim reaches here with no earlier
 	// attempt check, so a dead attempt is refused here and every write before
 	// it rolls back.
 	if attempt.IsExpired() || attempt.IsHandedOff() {
@@ -391,11 +391,12 @@ func (a *ssoLinkAction) Apply(ctx context.Context, stmts AllStatements) error {
 
 var _ UserAction = (*ssoLinkAction)(nil)
 
-// FindUniqueOwner looks the value up in the project-scoped rows of the
-// unique-attributes registry, without recording anything on the attempt. A
-// team-scoped row for the same value would not collide with the new user, so
-// it does not count.
-func (r *FlowSSOIdentityResolver) FindUniqueOwner(ctx context.Context, projectID, userSchemaURL, attribute, value string) (string, error) {
+// FindUniqueOwner looks the value up in the rows of the unique-attributes
+// registry with team scope "", without recording anything on the attempt.
+// Those are the rows a new user with no team collides with: project-unique
+// values, and team-unique values of users with no team. A row of a team does
+// not collide, so it does not count.
+func (r *FlowSSOIdentityResolver) FindUniqueOwner(ctx context.Context, projectID, userSchemaURL, attribute string, value any) (string, error) {
 	user, err := r.db.Statements().GetUser(ctx,
 		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
 		UserQueryOptions{

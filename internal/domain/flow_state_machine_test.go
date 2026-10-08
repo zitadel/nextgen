@@ -4446,9 +4446,9 @@ func TestFlowStateMachine_Process_PurposeToggleDoesNotGrowState(t *testing.T) {
 }
 
 // ssoSchemaContent is the schema behind [ssoRenderWorld]: email and username
-// are project-unique, so the collision check probes them; badge is
-// team-unique, which the probe skips; age is a type union no step renders;
-// locale and address carry rules a step field does not check.
+// are project-unique and badge is team-unique, and the collision check probes
+// all three; account.handle is a nested unique leaf; age is a type union no
+// step renders; locale and address carry rules a step field does not check.
 const ssoSchemaContent string = `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
@@ -4463,6 +4463,10 @@ const ssoSchemaContent string = `{
 			"badge":       { "type": "string", "x-unique": "team" },
 			"age":         { "type": ["string", "integer"] },
 			"locale":      { "type": "string", "enum": ["en", "de", "fr"] },
+			"account": {
+				"type": "object",
+				"properties": { "handle": { "type": "string", "x-unique": "project" } }
+			},
 			"address": {
 				"type": "object",
 				"required": ["country"],
@@ -4963,7 +4967,7 @@ func TestFlowStateMachine_Render_SSOInvalidClaimRoutesUserNotFound(t *testing.T)
 	def = withSSOOutcomeSteps(def)
 	claims, verified := completeClaims()
 	w.expectParked(unlinkedParked(claims, verified), nil)
-	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
+	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(3)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrUserInvalid())
 
 	result, err := w.sm.Render(t.Context(), def, state)
@@ -4978,6 +4982,7 @@ func TestFlowStateMachine_Render_SSOAutoCreateRoutesAuthenticated(t *testing.T) 
 	w, def, state := ssoRenderWorld(t)
 	claims, verified := completeClaims()
 	w.expectParked(unlinkedParked(claims, verified), nil)
+	w.expectOwner("badge", "b-7", "")
 	w.expectOwner("email", "alice@example.com", "")
 	w.expectOwner("username", "alice", "")
 	w.ssoIdentities.EXPECT().
@@ -5012,7 +5017,7 @@ func TestFlowStateMachine_Render_SSOAutoCreateClearsBackStack(t *testing.T) {
 	def.Steps = append(def.Steps, domain.FlowDefinitionStep{Name: "enroll", Fields: []domain.Field{"email"}})
 	claims, verified := completeClaims()
 	w.expectParked(unlinkedParked(claims, verified), nil)
-	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
+	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(3)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("user-new", nil)
 
 	result, err := w.sm.Render(t.Context(), def, state)
@@ -5034,6 +5039,7 @@ func TestFlowStateMachine_Render_SSOUnroutableTransitionDoesNotCreate(t *testing
 			setSSOAuthenticatedTransition(def, transition)
 			claims, verified := completeClaims()
 			w.expectParked(unlinkedParked(claims, verified), nil)
+			w.expectOwner("badge", "b-7", "")
 			w.expectOwner("email", "alice@example.com", "")
 			w.expectOwner("username", "alice", "")
 			w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
@@ -5059,9 +5065,11 @@ func TestFlowStateMachine_Render_SSOCreateUniqueRaceFallsThroughToCollision(t *t
 	claims, verified := completeClaims()
 	w.expectParked(unlinkedParked(claims, verified), nil)
 	gomock.InOrder(
+		w.expectOwner("badge", "b-7", ""),
 		w.expectOwner("email", "alice@example.com", ""),
 		w.expectOwner("username", "alice", ""),
 		w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrUserAlreadyExists()),
+		w.expectOwner("badge", "b-7", ""),
 		w.expectOwner("email", "alice@example.com", "user-9"),
 		w.expectBindCollision("user-9", nil),
 	)
@@ -5080,7 +5088,7 @@ func TestFlowStateMachine_Render_SSOCreateUniqueRaceWithoutOwnerRoutesUserNotFou
 	def = withSSOOutcomeSteps(def)
 	claims, verified := completeClaims()
 	w.expectParked(unlinkedParked(claims, verified), nil)
-	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(4)
+	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(6)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrUserAlreadyExists())
 
 	result, err := w.sm.Render(t.Context(), def, state)
@@ -5114,8 +5122,7 @@ func TestFlowStateMachine_Render_SSOMissingRequiredRoutesUserNotFound(t *testing
 // someone's address, so it is collected instead of trusted.
 func TestFlowStateMachine_Render_SSOUnverifiedRequiredUniqueRoutesUserNotFound(t *testing.T) {
 	t.Parallel()
-	// The rule holds for every scope, including a team scope the collision
-	// check does not probe.
+	// The rule holds for every scope.
 	for _, unverified := range []string{"email", "badge"} {
 		t.Run(unverified, func(t *testing.T) {
 			t.Parallel()
@@ -5124,6 +5131,7 @@ func TestFlowStateMachine_Render_SSOUnverifiedRequiredUniqueRoutesUserNotFound(t
 			claims, verified := completeClaims()
 			verified[unverified] = false
 			w.expectParked(unlinkedParked(claims, verified), nil)
+			w.expectOwner("badge", "b-7", "")
 			w.expectOwner("email", "alice@example.com", "")
 			w.expectOwner("username", "alice", "")
 			w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
@@ -5135,25 +5143,25 @@ func TestFlowStateMachine_Render_SSOUnverifiedRequiredUniqueRoutesUserNotFound(t
 	}
 }
 
-// The identifier lookup is not scoped to a team, so probing a team-unique
-// claim could bind a user of another team. The claim is not probed; a real
-// collision in the new user's scope is refused by the create instead.
-func TestFlowStateMachine_Render_SSOTeamScopedUniqueClaimIsNotProbed(t *testing.T) {
+// The new user has no team, so a team-unique value of a user with no team
+// collides with it as a project-unique value does, and binds that user. The
+// lookup asks only rows with no team, so a user of a team is never bound.
+func TestFlowStateMachine_Render_SSOTeamUniqueClaimBindsOwnerWithoutTeam(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
 	def = withSSOOutcomeSteps(def)
 	claims, verified := completeClaims()
 	w.expectParked(unlinkedParked(claims, verified), nil)
-	w.ssoIdentities.EXPECT().
-		FindUniqueOwner(gomock.Any(), testProjectID, defaultSchemaURL, gomock.Cond(func(attribute string) bool { return attribute != "badge" }), gomock.Any()).
-		Return("", nil).
-		Times(4)
-	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrUserAlreadyExists())
+	gomock.InOrder(
+		w.expectOwner("badge", "b-7", "user-9"),
+		w.expectBindCollision("user-9", nil),
+	)
+	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
 	result, err := w.sm.Render(t.Context(), def, state)
 	require.NoError(t, err)
-	assert.Equal(t, "sso-register", result.Step.Name)
-	assert.Empty(t, result.State.CollectedData.UserID, "no user of another team is bound")
+	assert.Equal(t, "sso-conflict", result.Step.Name)
+	assert.Equal(t, "user-9", result.State.CollectedData.UserID)
 }
 
 // A step that does not route the outcome re-renders with the outcome as its
@@ -5366,7 +5374,7 @@ func TestFlowStateMachine_Render_SSOStaleParkedRowProvisioningRendersStep(t *tes
 		"create": func(w *flowTestWorld) {
 			claims, verified := completeClaims()
 			w.expectParked(unlinkedParked(claims, verified), nil)
-			w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
+			w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(3)
 			w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrSSOStateInvalid())
 			w.expectParked(nil, nil)
 		},
@@ -5417,6 +5425,7 @@ var ssoHandoffPaths = []struct {
 		expect: func(w *flowTestWorld) {
 			claims, verified := completeClaims()
 			w.expectParked(unlinkedParked(claims, verified), nil)
+			w.expectOwner("badge", "b-7", "")
 			w.expectOwner("email", "alice@example.com", "")
 			w.expectOwner("username", "alice", "")
 			w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("user-1", nil)
@@ -5527,6 +5536,7 @@ func TestFlowStateMachine_Render_SSOCollisionProbeMissesRecordNoProof(t *testing
 	claims, verified := completeClaims()
 	verified["email"] = false
 	w.expectParked(unlinkedParked(claims, verified), nil)
+	w.expectOwner("badge", "b-7", "")
 	w.expectOwner("email", "alice@example.com", "")
 	w.expectOwner("username", "alice", "")
 	w.authAttemptService.EXPECT().SubmitIdentifier(gomock.Any(), gomock.Any()).Times(0)
@@ -5711,7 +5721,7 @@ func TestFlowStateMachine_Render_SSOUnknownClaimIsNotPersisted(t *testing.T) {
 	withUnknown["nickname"] = "ali"
 	withUnknown["address.city"] = "Oxford"
 	w.expectParked(unlinkedParked(withUnknown, verified), nil)
-	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(2)
+	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(3)
 	w.ssoIdentities.EXPECT().
 		CreateLinked(gomock.Any(), gomock.Cond(func(in domain.FlowSSOCreateInput) bool {
 			return assert.ObjectsAreEqual(claims, in.Attributes)
@@ -5730,8 +5740,12 @@ func TestFlowStateMachine_Render_SSOUnknownClaimIsNotPersisted(t *testing.T) {
 // can point anywhere. Both fall back to collection.
 func TestFlowStateMachine_Render_SSONestedComposedRequiredFallsBackToCollection(t *testing.T) {
 	t.Parallel()
-	for name, schema := range map[string]string{
-		"nested allOf": `{
+	for name, tc := range map[string]struct {
+		schema string
+		// The nested unique leaf is probed like a top-level one.
+		probesNested bool
+	}{
+		"nested allOf": {probesNested: true, schema: `{
 			"$schema": "https://json-schema.org/draft/2020-12/schema",
 			"type": "object",
 			"x-auth-methods": { "password": { "enabled": true } },
@@ -5746,8 +5760,8 @@ func TestFlowStateMachine_Render_SSONestedComposedRequiredFallsBackToCollection(
 					"allOf": [ { "required": ["email"] } ]
 				}
 			}
-		}`,
-		"double not": `{
+		}`},
+		"double not": {probesNested: true, schema: `{
 			"$schema": "https://json-schema.org/draft/2020-12/schema",
 			"type": "object",
 			"x-auth-methods": { "password": { "enabled": true } },
@@ -5762,8 +5776,8 @@ func TestFlowStateMachine_Render_SSONestedComposedRequiredFallsBackToCollection(
 					"not": { "not": { "required": ["email"] } }
 				}
 			}
-		}`,
-		"ref": `{
+		}`},
+		"ref": {schema: `{
 			"$schema": "https://json-schema.org/draft/2020-12/schema",
 			"type": "object",
 			"x-auth-methods": { "password": { "enabled": true } },
@@ -5775,17 +5789,20 @@ func TestFlowStateMachine_Render_SSONestedComposedRequiredFallsBackToCollection(
 				"username": { "type": "string" },
 				"address":  { "$ref": "#/$defs/address" }
 			}
-		}`,
+		}`},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			w, def, state := ssoRenderWorldWithSchema(t, schema)
+			w, def, state := ssoRenderWorldWithSchema(t, tc.schema)
 			def = withSSOOutcomeSteps(def)
 			w.expectParked(unlinkedParked(
 				map[string]any{"email": "alice@example.com", "address": map[string]any{"email": "home@example.com"}},
 				map[string]bool{"email": true},
 			), nil)
 			w.expectOwner("email", "alice@example.com", "")
+			if tc.probesNested {
+				w.expectOwner("address.email", "home@example.com", "")
+			}
 			w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
 			result, err := w.sm.Render(t.Context(), def, state)
@@ -5797,7 +5814,7 @@ func TestFlowStateMachine_Render_SSONestedComposedRequiredFallsBackToCollection(
 
 // An array can carry x-unique and is stored in the uniqueness registry, so a
 // required unique array must arrive verified like any other unique property.
-// It is not probed: the collision lookup takes a single string value.
+// It is probed as one value, as the registry stores it.
 func TestFlowStateMachine_Render_SSOUnverifiedRequiredUniqueArrayFallsBackToCollection(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorldWithSchema(t, `{
@@ -5818,6 +5835,9 @@ func TestFlowStateMachine_Render_SSOUnverifiedRequiredUniqueArrayFallsBackToColl
 		map[string]bool{"email": true, "aliases": false},
 	), nil)
 	w.expectOwner("email", "alice@example.com", "")
+	w.ssoIdentities.EXPECT().
+		FindUniqueOwner(gomock.Any(), testProjectID, defaultSchemaURL, "aliases", []any{"ali"}).
+		Return("", nil)
 	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Times(0)
 
 	result, err := w.sm.Render(t.Context(), def, state)
@@ -6369,6 +6389,7 @@ func TestFlowStateMachine_Process_SSOCollectionCreatesUser(t *testing.T) {
 			state.CollectedData.UserData = tc.collected
 			w.expectCollected(unlinkedParked(tc.claims, tc.verified), nil).Times(2)
 			in := collectionSubmit(tc.edit)
+			w.expectOwner("badge", "b-7", "")
 			w.expectOwner("email", tc.wantAttributes["email"].(string), "")
 			w.expectOwner("username", "alice", "")
 			w.expectCreateLinked(tc.wantAttributes, tc.wantPassword, "user-1", nil)
@@ -6387,39 +6408,66 @@ func TestFlowStateMachine_Process_SSOCollectionCreatesUser(t *testing.T) {
 // replaced the row the step creates from, so it offers no back.
 func TestFlowStateMachine_Process_SSOCollectionBindsCollision(t *testing.T) {
 	t.Parallel()
+	takeUsername := func(fields map[string]any) { fields["username"] = "taken" }
 	for name, tc := range map[string]struct {
+		fields []domain.Field
 		claims map[string]any
+		edit   func(fields map[string]any)
 		expect func(w *flowTestWorld)
 	}{
 		// The bind creates nothing, so it does not need the properties a
 		// creation requires.
-		"probe": {claims: map[string]any{"email": "alice@example.com"}, expect: func(w *flowTestWorld) {
+		"probe": {claims: map[string]any{"email": "alice@example.com"}, edit: takeUsername, expect: func(w *flowTestWorld) {
 			gomock.InOrder(
 				w.expectOwner("email", "alice@example.com", ""),
 				w.expectOwner("username", "taken", "user-9"),
 				w.expectBindCollision("user-9", nil),
 			)
 		}},
-		"creation": {claims: map[string]any{"email": "alice@example.com", "badge": "b-7"}, expect: func(w *flowTestWorld) {
+		"creation": {claims: map[string]any{"email": "alice@example.com", "badge": "b-7"}, edit: takeUsername, expect: func(w *flowTestWorld) {
 			gomock.InOrder(
+				w.expectOwner("badge", "b-7", ""),
 				w.expectOwner("email", "alice@example.com", ""),
 				w.expectOwner("username", "taken", ""),
 				w.expectCreateLinked(map[string]any{
 					"email": "alice@example.com", "username": "taken", "given_name": "Alice", "family_name": "Liddell", "badge": "b-7",
 				}, "", "", domain.ErrUserAlreadyExists()),
+				w.expectOwner("badge", "b-7", ""),
 				w.expectOwner("email", "alice@example.com", ""),
 				w.expectOwner("username", "taken", "user-9"),
 				w.expectBindCollision("user-9", nil),
 			)
 		}},
+		// The new user has no team, so it collides with a team-unique value of
+		// a user with no team, which the lookup finds.
+		"team-unique value of a user without a team": {claims: map[string]any{"email": "alice@example.com", "badge": "b-7"}, edit: func(map[string]any) {}, expect: func(w *flowTestWorld) {
+			gomock.InOrder(
+				w.expectOwner("badge", "b-7", "user-9"),
+				w.expectBindCollision("user-9", nil),
+			)
+		}},
+		"nested value": {
+			fields: []domain.Field{"email", "username", "given_name", "family_name", "account.handle"},
+			claims: map[string]any{"email": "alice@example.com"},
+			edit:   func(fields map[string]any) { fields["account.handle"] = "taken" },
+			expect: func(w *flowTestWorld) {
+				gomock.InOrder(
+					w.expectOwner("account.handle", "taken", "user-9"),
+					w.expectBindCollision("user-9", nil),
+				)
+			},
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			w, def, state := submittableCollectionStepWorld(t)
+			if tc.fields != nil {
+				def.Steps[len(def.Steps)-1].Fields = tc.fields
+			}
 			w.expectCollected(unlinkedParked(tc.claims, nil), nil).Times(2)
 			tc.expect(w)
 
-			result, err := w.sm.Process(t.Context(), def, state, collectionSubmit(func(fields map[string]any) { fields["username"] = "taken" }))
+			result, err := w.sm.Process(t.Context(), def, state, collectionSubmit(tc.edit))
 			require.NoError(t, err)
 			require.Equal(t, "sso-conflict", result.Step.Name)
 			assert.Equal(t, "user-9", result.State.CollectedData.UserID)
@@ -6437,6 +6485,7 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 		"email": "alice@example.com", "username": "alice", "given_name": "Alice", "family_name": "Liddell", "badge": "b-7",
 	}
 	probeMisses := func(w *flowTestWorld) {
+		w.expectOwner("badge", "b-7", "")
 		w.expectOwner("email", "alice@example.com", "")
 		w.expectOwner("username", "alice", "")
 	}
@@ -6457,8 +6506,11 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 		// badge is required, the step has no field for it, and the provider
 		// sent none.
 		"required property neither shown nor claimed": {
-			claims:  map[string]any{"email": "alice@example.com"},
-			expect:  probeMisses,
+			claims: map[string]any{"email": "alice@example.com"},
+			expect: func(w *flowTestWorld) {
+				w.expectOwner("email", "alice@example.com", "")
+				w.expectOwner("username", "alice", "")
+			},
 			wantErr: domain.FlowStepErrorSSOUserCannotBeCreated,
 		},
 		"values that fail only together": {
@@ -6480,6 +6532,7 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 		// value and can change it.
 		"value held by a user of another schema": {
 			expect: func(w *flowTestWorld) {
+				w.expectOwner("badge", "b-7", "")
 				w.expectOwner("email", "alice@example.com", "")
 				w.expectOwner("username", "alice", "").Return("", domain.ErrSSOOwnerOtherSchema)
 			},
@@ -6488,6 +6541,7 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 		"collision the step cannot route": {
 			unrouted: true,
 			expect: func(w *flowTestWorld) {
+				w.expectOwner("badge", "b-7", "")
 				w.expectOwner("email", "alice@example.com", "user-9")
 			},
 			wantErr: domain.FlowStepErrorSSOUnavailable,
@@ -6563,6 +6617,7 @@ func TestFlowStateMachine_Process_SSOCollectionStaleRow(t *testing.T) {
 			step.Transitions[domain.FlowActionSubmit] = domain.FlowStepTransition{Target: "sso-conflict"}
 			w.expectCollected(tc.collected, nil).Times(2)
 			if tc.claimed {
+				w.expectOwner("badge", "b-7", "")
 				w.expectOwner("email", "alice@example.com", "")
 				w.expectOwner("username", "alice", "")
 				w.expectCreateLinked(map[string]any{
