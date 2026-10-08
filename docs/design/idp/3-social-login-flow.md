@@ -397,6 +397,12 @@ multiple identity providers.
   cannot override the provider.
   A hidden claim that fails its property's validation is dropped, because the
   user cannot see it to fix it.
+* **Password:** A password field on the step is optional for the flow author.
+  When the step has one, the password is stored with the user, in the same
+  transaction as the user and the link, so the user can also sign in with it
+  later.
+  The provider is still the proof for this sign-in, so the session records no
+  password factor.
 * **Step Errors:** A required property that no field on the step supplies
   gives `error.sso_user_cannot_be_created`; nothing on the step can fix it.
   Values that fail the schema only together give `error.sso_user_invalid`.

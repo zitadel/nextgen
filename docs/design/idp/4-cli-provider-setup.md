@@ -395,6 +395,9 @@ Modeled after `register-password`, this step creates the user from the external
 identity.
 *   **Fields:** Renders schema fields from the register entry (defaulting to
     `email` plus any active use-case properties).
+    The scaffold leaves out credential fields. A password field added by hand
+    stores the password with the user
+    ([area 3](3-social-login-flow.md#engine-rules-for-prefill--confirmation)).
 *   **Execution:** Pre-fills values from mapped IdP claims and enforces
     completion for empty required fields.
     A changed unique value the provider verified is refused
