@@ -41,21 +41,11 @@ tasks:
       # clears the "Failed to fetch dynamically imported module" failure. (#1490)
       retryCount: 3
 
-  # bin/start.ts imports api's generated client and config, as dev does.
+  # bin/start.ts imports api's generated client and config.
   start:
     command: "corepack pnpm run start"
     deps:
       - "build"
     options:
-      persistent: true
-      runInCI: false
-
-  # Mock server restarting on source changes, for development.
-  dev:
-    command: "corepack pnpm run dev"
-    deps:
-      - "build"
-    options:
-      cache: false
       persistent: true
       runInCI: false

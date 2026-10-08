@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { test } from "vitest";
 import { fileURLToPath } from "node:url";
 
@@ -11,16 +12,18 @@ const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const fixture = (name) =>
   fileURLToPath(new URL(`./testdata/openapi-casing/${name}`, import.meta.url));
 
-// The root devDependency server:openapi runs, so these tests validate the
-// redocly the pipeline gates on.
-const redocly = fileURLToPath(new URL("../node_modules/@redocly/cli/bin/cli.js", import.meta.url));
+// Read the pin from the task that actually gates CI, so a bump there cannot
+// leave these tests validating a redocly the pipeline no longer runs.
+const serverTasks = readFileSync(new URL("../apps/server/moon.yml", import.meta.url), "utf8");
+const redoclyPin = serverTasks.match(/@redocly\/cli@([\d.]+)/)?.[1];
+assert.ok(redoclyPin, "could not read the @redocly/cli pin from apps/server/moon.yml");
 
 /** Lints a fixture with the repo's redocly.yaml and returns only our rules' problems. */
 function wireProblems(name) {
-  const args = [redocly, "lint", fixture(name), "--format=json"];
+  const args = ["--yes", `@redocly/cli@${redoclyPin}`, "lint", fixture(name), "--format=json"];
   let stdout;
   try {
-    stdout = execFileSync(process.execPath, args, {
+    stdout = execFileSync("npx", args, {
       cwd: repoRoot,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],

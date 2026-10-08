@@ -18,28 +18,6 @@ tasks:
     deps:
       - "api-mock:build"
 
-  # The static discovery document the Vercel deploy serves, written after the
-  # function bundle is built. It needs VERCEL_URL and so only runs there. Kept
-  # out of CI; vercel.json unsets Vercel's CI markers to run it, as the CI
-  # workflow does for its own runInCI: false tasks.
-  generate-wellknown:
-    command: "corepack pnpm run generate-wellknown"
-    deps:
-      - "build"
-    options:
-      cache: false
-      runInCI: false
-
   test:
     deps:
       - "api-mock:build"
-
-  # Local mock server for development.
-  dev:
-    command: "corepack pnpm run dev"
-    deps:
-      - "api-mock:build"
-    options:
-      cache: false
-      persistent: true
-      runInCI: false

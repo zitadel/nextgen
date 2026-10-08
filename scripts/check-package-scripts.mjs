@@ -20,6 +20,13 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
+/** `<project>:<script>` entries allowed to leave their package. */
+const EXEMPT_SCRIPTS = new Set([
+  // The Vercel build: vercel.json runs it with only this package's dependency
+  // closure installed (no moon), so it builds api, config and api-mock itself.
+  "apps/mock-zitadel:build:vercel",
+]);
+
 // Moon too: a script that starts moon hides a task edge from the graph.
 const PACKAGE_MANAGERS = new Set([
   "pnpm",
@@ -390,7 +397,7 @@ export function checkProject(dir, scripts) {
     if (startsPackageManager(body)) {
       problems.push(`${dir}: script "${name}" starts a package manager or moon: ${body}`);
     }
-    if (leavesPackage(body)) {
+    if (leavesPackage(body) && !EXEMPT_SCRIPTS.has(`${dir}:${name}`)) {
       problems.push(
         `${dir}: script "${name}" changes into another directory; order other packages' work with moon deps`,
       );

@@ -106,8 +106,12 @@ async function phaseNode() {
 }
 
 async function phaseNodeE2e() {
-  await run(process.execPath, [
-    "apps/demo-next-e2e/node_modules/@playwright/test/cli.js",
+  await run("corepack", [
+    "pnpm",
+    "--filter",
+    "@zitadel/demo-next-e2e",
+    "exec",
+    "playwright",
     "install",
     "chromium",
   ]);

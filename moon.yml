@@ -140,8 +140,8 @@ tasks:
       - "scripts/assert-file.mjs"
       - "scripts/testdata/openapi-casing/**"
       - "/redocly.yaml"
-      # The redocly version the test runs (the catalog pin).
-      - "pnpm-workspace.yaml"
+      # The test reads the pinned redocly version from this file.
+      - "apps/server/moon.yml"
       - "vitest.config.ts"
       - "vitest.shared.mjs"
       - "vitest.shared.d.mts"
