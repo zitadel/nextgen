@@ -3,6 +3,12 @@ language: "typescript"
 layer: "application"
 stack: "frontend"
 
+workspace:
+  inheritedTasks:
+    # No unit tests; the site is checked by `typecheck` and `build`.
+    exclude:
+      - "test"
+
 tasks:
   generate-openapi:
     command: "corepack pnpm run generate:openapi"
@@ -26,7 +32,6 @@ tasks:
       - ".source/**/*"
 
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
       - "generate"
 
@@ -34,8 +39,10 @@ tasks:
     command: "corepack pnpm exec waku build"
     deps:
       - "generate"
-    outputs:
-      - "dist/**/*"
+    options:
+      # Runs waku directly (generation is the `generate` dep), replacing the
+      # inherited `pnpm run build` arguments rather than adding to them.
+      mergeArgs: "replace"
 
   dev:
     command: "corepack pnpm exec waku dev --port 3003"
