@@ -11,7 +11,7 @@
     "dev": "pnpm run generate && waku dev --port 3003",
     "build": "pnpm run generate && waku build && node scripts/vercel-base-path.mjs",
     "preview": "node scripts/preview.mjs",
-    "typecheck": "pnpm run generate && tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json"
   },
   "dependencies": {
     "@fumapress/ai": "catalog:",
@@ -31,6 +31,7 @@
     "waku": "catalog:"
   },
   "devDependencies": {
+    "@redocly/openapi-core": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@types/mdx": "catalog:",
     "@types/node": "catalog:",

@@ -7,26 +7,24 @@
  *
  * The `*-template` presets carry design templates as `liquid_template`:
  * `minimal-template` is the exact markup `branding eject` puts into a user's
- * repo; the split/hero presets are the retired page-layout designs (#1039),
+ * repo; the split/hero presets are the retired page-layout designs,
  * kept so revisions already published from them can still be reviewed. They
  * exist so the shipped designs can be reviewed here instead of only inside a
- * scaffolded app (the alpha.18 feedback round found empty-brand-pane and
- * badge-alignment regressions nobody had ever rendered). Raw vite imports,
+ * scaffolded app. Raw vite imports,
  * not `getDefaultBrandingConfig()` — that helper reads from disk and is
  * Node-only.
  *
- * The legacy templates are read straight out of `@zitadel/components`' test
- * fixtures (`src/orchestrator/__fixtures__/legacy-designs/`), the single copy
- * the render specs also use. Moving or renaming those fixtures breaks these
- * imports; delete the three presets together with the split/hero chrome in
- * `layout-chrome.css` once published revisions no longer need it.
+ * The legacy templates come from `@zitadel/components/legacy-designs/*`, the
+ * same files its render specs use; delete the three presets together with the
+ * split/hero chrome in `layout-chrome.css` once published revisions no longer
+ * need it.
  */
 import type { Branding } from "@zitadel/components";
 
-import heroTemplate from "../../../packages/components/src/orchestrator/__fixtures__/legacy-designs/hero.liquid?raw";
-import splitRightTemplate from "../../../packages/components/src/orchestrator/__fixtures__/legacy-designs/split-right.liquid?raw";
-import splitTemplate from "../../../packages/components/src/orchestrator/__fixtures__/legacy-designs/split.liquid?raw";
-import minimalTemplate from "../../../packages/config/defaults/branding/minimal/login.liquid?raw";
+import heroTemplate from "@zitadel/components/legacy-designs/hero.liquid?raw";
+import splitRightTemplate from "@zitadel/components/legacy-designs/split-right.liquid?raw";
+import splitTemplate from "@zitadel/components/legacy-designs/split.liquid?raw";
+import minimalTemplate from "@zitadel/config/defaults/branding/minimal/login.liquid?raw";
 
 const INTER_FONT_URL =
   "https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700&display=swap";

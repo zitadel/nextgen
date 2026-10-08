@@ -1,21 +1,34 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "./tsconfig.app.json",
   "compilerOptions": {
-    "outDir": "./out-tsc/vitest",
-    "types": ["vitest/globals", "vitest/importMeta", "node", "vitest"],
-    "lib": ["es2022", "dom"],
+    "rootDir": ".",
+    "noEmit": true,
+    "types": [
+      "node",
+      "vitest",
+      "vitest/globals",
+      "vitest/importMeta"
+    ],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
     "jsx": "react-jsx"
   },
   "include": [
-    "vitest.config.ts",
-    "tsdown.config.ts",
-    "src/**/*.spec.ts",
+    "*.config.mts",
+    "*.config.ts",
     "scripts/**/*.ts",
-    "tests/**/*.ts"
+    "src/**/*.d.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.spec.tsx",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**/*.ts",
+    "src/**/__tests__/**/*.tsx",
+    "src/test-setup.ts",
+    "tests/**/*.ts",
+    "tests/**/*.tsx"
   ],
-  "references": [
-    {
-      "path": "./tsconfig.app.json"
-    }
-  ]
+  "exclude": []
 }

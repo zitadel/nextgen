@@ -2,21 +2,18 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "out-tsc/lib",
-    "tsBuildInfoFile": "out-tsc/lib/tsconfig.lib.tsbuildinfo",
-    "emitDeclarationOnly": false,
-    "module": "esnext",
-    "moduleResolution": "bundler",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "types": [
       "node"
     ],
     "experimentalDecorators": true,
     "jsx": "react-jsx",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ]
+    "declaration": true,
+    "declarationMap": true
   },
   "include": [
     "src/**/*.ts",
@@ -24,17 +21,10 @@
   ],
   "exclude": [
     "src/**/*.spec.ts",
-    "src/**/*.test.ts"
-  ],
-  "references": [
-    {
-      "path": "../sdk-core/tsconfig.lib.json"
-    },
-    {
-      "path": "../components/tsconfig.lib.json"
-    },
-    {
-      "path": "../api/tsconfig.lib.json"
-    }
+    "src/**/*.spec.tsx",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**",
+    "src/test-setup.ts"
   ]
 }

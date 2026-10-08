@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-nuxt",
-  "version": "1.0.0-alpha.24",
+  "version": "1.0.0-alpha.25",
   "description": "Nuxt proxy middleware and helpers for the pre-release Zitadel preview.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-nuxt#readme",
   "bugs": {
@@ -19,6 +19,7 @@
       "import": "./dist/index.js"
     },
     "./module": {
+      "types": "./dist/module.d.ts",
       "import": "./dist/module.js"
     },
     "./server": {
@@ -33,9 +34,9 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/server.ts src/runtime/types.ts src/runtime/server/middleware.ts src/runtime/server/handler.ts --format esm --dts --clean --external '#imports' && tsup src/runtime/plugin.ts src/runtime/composables/useAuth.ts src/module.ts --format esm --no-clean --external @nuxt/kit --external '#imports'",
+    "build": "tsup --tsconfig tsconfig.lib.json src/index.ts src/server.ts src/runtime/types.ts src/runtime/server/middleware.ts src/runtime/server/handler.ts --format esm --dts --clean --external '#imports' && tsup --tsconfig tsconfig.lib.json src/runtime/plugin.ts src/runtime/composables/useAuth.ts src/module.ts --format esm --no-clean --external @nuxt/kit --external '#imports' && tsup --tsconfig tsconfig.lib.json src/module.ts --format esm --dts-only --no-clean --external @nuxt/kit",
     "dev": "tsup src/index.ts src/server.ts --format esm --dts --watch",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "test:all": "pnpm run test"
   },
@@ -49,11 +50,14 @@
     "nuxt": ">=4"
   },
   "devDependencies": {
+    "@nuxt/kit": "catalog:",
+    "@nuxt/schema": "catalog:",
+    "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "h3": "^1.15.3",
     "nuxt": "catalog:",
     "tsup": "catalog:",
-    "typescript": "^5.7.3",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   }
 }

@@ -1,11 +1,11 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { scopedPath } from "@/lib/project-scope.fixture";
+import { scopedPath } from "@/test/project-scope.fixture";
 
 import { THEME_STORAGE_KEY } from "../../theme";
 import { createAppRouter } from "../../router";
@@ -14,7 +14,7 @@ import { createAppRouter } from "../../router";
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  const { makeTestSession } = await import("@/auth/session.fixture");
+  const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
@@ -22,15 +22,12 @@ vi.mock("@/auth/session", async (importOriginal) => {
  * The sidebar lists only screens that exist. Entries come from `staticData.nav`
  * on the route tree (Console ADR 0001) and every one is a link.
  *
- * It used to render the Figma mock's full 7 items, with the 4 unbuilt ones as
- * `aria-disabled` rows. That is what this spec now guards against: a disabled
- * row advertises a feature and reads as "you cannot do this" rather than "this
- * does not exist". Also covers the theme toggle writing `data-theme` and
- * persisting the preference.
+ * Guards against `aria-disabled` rows for unbuilt screens. Also covers the
+ * theme toggle writing `data-theme` and persisting the preference.
  */
 // The Projects overview first, then the selected project's contents in the
 // order the design puts them, then the project's own settings. `User schemas`
-// nests beneath `Users` (`Schema directory` frame) rather than adding a second
+// nests beneath `Users` rather than adding a second
 // top-level row.
 const NAV_ORDER = ["Projects", "Teams", "Users", "Login flows", "Project settings"];
 const NESTED_NAV = { parent: "Users", label: "User schemas" };
@@ -137,9 +134,9 @@ describe("app shell navigation", () => {
       ),
     );
     const router = renderShell();
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
     const pill = await screen.findByRole("button", { name: "Switch project" });
-    await vi.waitFor(() => expect(pill).toHaveTextContent("Select a project"));
+    await waitFor(() => expect(pill).toHaveTextContent("Select a project"));
 
     const nav = within(screen.getByRole("navigation", { name: "Primary" }));
     const links = nav.queryAllByRole("link");
@@ -193,7 +190,7 @@ describe("settings view", () => {
   });
 
   it("drops the context bar in the settings view", async () => {
-    // The settings frames draw no bar. Its project switcher and theme toggle
+    // The settings design draws no bar. Its project switcher and theme toggle
     // are portal chrome; the sidebar keeps a trigger of its own, so the
     // collapse is not lost with them.
     renderShell("/settings");
@@ -227,10 +224,9 @@ describe("theme toggle", () => {
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
   });
   it("names the project from the API rather than a hardcoded label", async () => {
-    // The switcher used to hardcode "River".
     renderShell();
     const switcher = await screen.findByRole("button", { name: "Switch project" });
-    await vi.waitFor(() => expect(switcher).toHaveTextContent("console-dev"));
+    await waitFor(() => expect(switcher).toHaveTextContent("console-dev"));
     expect(switcher).not.toHaveTextContent("River");
   });
 });
@@ -254,7 +250,7 @@ describe("project pill", () => {
     renderShell();
 
     const pill = await screen.findByRole("button", { name: "Switch project" });
-    await vi.waitFor(() => expect(pill).toHaveTextContent("Granted to me"));
+    await waitFor(() => expect(pill).toHaveTextContent("Granted to me"));
   });
 
   it("marks the selected project and lists every one as a way to select it", async () => {
@@ -271,7 +267,7 @@ describe("project pill", () => {
     renderShell(scopedPath("/teams", "proj_2"));
 
     const pill = await screen.findByRole("button", { name: "Switch project" });
-    await vi.waitFor(() => expect(pill).toHaveTextContent("Delta"));
+    await waitFor(() => expect(pill).toHaveTextContent("Delta"));
     expect(pill).not.toHaveTextContent("River");
 
     await userEvent.click(pill);
@@ -335,18 +331,16 @@ describe("project pill", () => {
     const router = renderShell(scopedPath("/teams", "proj_1"));
 
     const pill = await screen.findByRole("button", { name: "Switch project" });
-    await vi.waitFor(() => expect(pill).toHaveTextContent("River"));
+    await waitFor(() => expect(pill).toHaveTextContent("River"));
     await userEvent.click(pill);
     const list = within(await screen.findByRole("list", { name: "Switch project" }));
     await userEvent.click(list.getByRole("link", { name: "Delta" }));
 
-    await vi.waitFor(() =>
-      expect(router.state.location.search).toMatchObject({ project: "proj_2" }),
-    );
+    await waitFor(() => expect(router.state.location.search).toMatchObject({ project: "proj_2" }));
     expect(router.state.location.pathname).toBe("/teams");
-    await vi.waitFor(() => expect(pill).toHaveTextContent("Delta"));
+    await waitFor(() => expect(pill).toHaveTextContent("Delta"));
     expect(screen.queryByRole("list", { name: "Switch project" })).not.toBeInTheDocument();
-    await vi.waitFor(() => expect(queried).toEqual(["proj_1", "proj_2"]));
+    await waitFor(() => expect(queried).toEqual(["proj_1", "proj_2"]));
   });
 
   it("lands on the new project's first screen when selected from an unscoped one", async () => {
@@ -363,19 +357,19 @@ describe("project pill", () => {
     const router = renderShell(scopedPath("/projects", "proj_1"));
 
     const pill = await screen.findByRole("button", { name: "Switch project" });
-    await vi.waitFor(() => expect(pill).toHaveTextContent("River"));
+    await waitFor(() => expect(pill).toHaveTextContent("River"));
     await userEvent.click(pill);
     const list = within(await screen.findByRole("list", { name: "Switch project" }));
     await userEvent.click(list.getByRole("link", { name: "Delta" }));
 
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
     expect(router.state.location.search).toMatchObject({ project: "proj_2" });
   });
 
   it("links to the overview of every project beneath the list", async () => {
     const router = renderShell();
     const pill = await screen.findByRole("button", { name: "Switch project" });
-    await vi.waitFor(() => expect(pill).toHaveTextContent("console-dev"));
+    await waitFor(() => expect(pill).toHaveTextContent("console-dev"));
     await userEvent.click(pill);
 
     const all = await screen.findByRole("link", { name: "All projects" });
@@ -383,7 +377,7 @@ describe("project pill", () => {
     expect(all).toHaveAttribute("href", scopedPath("/projects", "proj_1"));
     await userEvent.click(all);
 
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
     expect(screen.queryByRole("list", { name: "Switch project" })).not.toBeInTheDocument();
   });
 
@@ -392,7 +386,7 @@ describe("project pill", () => {
     renderShell();
 
     const pill = await screen.findByRole("button", { name: "Switch project" });
-    await vi.waitFor(() => expect(pill).toHaveTextContent("No projects"));
+    await waitFor(() => expect(pill).toHaveTextContent("No projects"));
 
     await userEvent.click(pill);
     const list = within(await screen.findByRole("list", { name: "Switch project" }));
@@ -401,11 +395,19 @@ describe("project pill", () => {
 
   it("falls back to the same empty state when the query fails", async () => {
     // The chrome is not worth an error boundary: a failed read degrades to the
-    // empty pill rather than taking every screen down with it.
-    server.use(http.get(MY_PROJECTS, () => new HttpResponse(null, { status: 500 })));
-    renderShell();
+    // empty pill rather than taking every screen down with it. The Projects
+    // screen reads the same list and does report the failure; that is expected.
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      server.use(http.get(MY_PROJECTS, () => new HttpResponse(null, { status: 500 })));
+      renderShell();
 
-    const pill = await screen.findByRole("button", { name: "Switch project" });
-    await vi.waitFor(() => expect(pill).toHaveTextContent("No projects"));
+      const pill = await screen.findByRole("button", { name: "Switch project" });
+      await waitFor(() => expect(pill).toHaveTextContent("No projects"));
+    } finally {
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
   });
 });

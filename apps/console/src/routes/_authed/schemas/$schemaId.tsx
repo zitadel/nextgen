@@ -2,18 +2,18 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Users } from "lucide-react";
 import { Fragment } from "react";
 
+import { api } from "@/api/zitadel";
+import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
+import { DetailPanel, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
-import { ICON_PLATE } from "@/components/detail-page";
 import { DETAIL_PANEL_PAGE } from "@/components/layout";
 import { SchemaFieldsPanel } from "@/components/schema-fields-panel";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatDate } from "@/lib/date";
+import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { type UserSchema, schemaAuthMethods, schemaDisplayName } from "@/lib/schema";
-
-import { api } from "../../../api/zitadel";
-import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scope";
 
 export const Route = createFileRoute("/_authed/schemas/$schemaId")({
   staticData: { scope: "project" },
@@ -24,58 +24,56 @@ export const Route = createFileRoute("/_authed/schemas/$schemaId")({
   loader: ({ params, deps }) =>
     api
       .getSchemaById(params.schemaId, { project_id: requireProjectScope(deps.project) })
-      .then((body) => body.schema as UserSchema),
+      .then((body) => ({ schema: body.schema as UserSchema, createdAt: body.metadata.created_at })),
   component: SchemaDetail,
 });
 
 function SchemaDetail() {
-  const schema = Route.useLoaderData();
+  const { schema, createdAt } = Route.useLoaderData();
   const { schemaId } = Route.useParams();
   const name = schemaDisplayName(schema, schemaId);
   const methods = schemaAuthMethods(schema);
 
   return (
     <div className={DETAIL_PANEL_PAGE}>
-      <Card className="gap-4 border-foreground/10 px-6 py-5 shadow-xs">
-        {/* The `Title` lockup: icon tile + eyebrow + title.
-            The schema's id is not repeated here — the list row carries it, and
-            the design's lockup has only the two lines. */}
-        <div className="flex items-center gap-3">
-          <span aria-hidden className={ICON_PLATE}>
-            <Users className="size-4" />
-          </span>
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <span className={OVERLINE}>User schema</span>
-            <h1 className="truncate font-serif text-lg leading-6 text-foreground">{name}</h1>
-          </div>
+      <DetailPanel>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <PanelTitle icon={Users} title={name} />
+          {/* The same header card as Login flows. The design draws a third
+              value, `EXPIRES AT`; nothing on the schema resource backs it. */}
+          <MetaCard>
+            <MetaValue label="Schema ID" value={schemaId} copyable />
+            <MetaRule />
+            <MetaValue label="Created" value={formatDate(createdAt)} />
+          </MetaCard>
         </div>
 
         <Separator />
 
-        <Tabs defaultValue="fields" className="gap-[18px]">
+        <Tabs defaultValue="fields" className="gap-4.5">
           {/* `py-[3px]` only — this strip has no horizontal padding, which is
               what puts the first trigger's box flush with the card's content
               edge and its label in line with `SCHEMA` below. (The viewer's own
               JSON/YAML strip does use `p-[3px]`.) */}
           <TabsList className="h-10 px-0 py-[3px]">
-            <TabsTrigger value="fields" className={TAB}>
+            <TabsTrigger value="fields" variant="muted">
               Fields
             </TabsTrigger>
-            <TabsTrigger value="authentication" className={TAB}>
+            <TabsTrigger value="authentication" variant="muted">
               Authentication
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="fields">
             {/* The field table is a fixed 468px and the viewer takes the rest,
-                matching height. Stacked below `lg` — the design's narrow frame
-                puts the viewer under the table.
+                matching height. Stacked below `lg`, where the design puts the
+                viewer under the table.
 
                 `pl-2` because the design insets this row by 8px on the left
                 while the tab strip above starts at the content edge: a tab
                 trigger is `px-2`, so the effect is that `SCHEMA` lines up with
                 the tab *label* and the tab's box sits just outside it. */}
-            <div className="flex flex-col gap-[18px] lg:flex-row lg:items-stretch lg:pl-2">
+            <div className="flex flex-col gap-4.5 lg:flex-row lg:items-stretch lg:pl-2">
               <div className="lg:w-[468px] lg:shrink-0">
                 <SchemaFieldsPanel schema={schema} />
               </div>
@@ -113,24 +111,13 @@ function SchemaDetail() {
             </section>
           </TabsContent>
         </Tabs>
-      </Card>
+      </DetailPanel>
     </div>
   );
 }
-
-// The display face, uppercase 12px with 0.72px tracking — the design's
-// `caption/overline` style, shared with the field table's column headers.
-const OVERLINE = "font-serif text-xs leading-4 tracking-[0.72px] text-muted-foreground uppercase";
 
 // The rules between sign-in methods take no vertical space: the design draws
 // them as zero-height lines with the hairline outside the box, so the 10px
 // column gap sits either side of the rule rather than 10px + the rule's own
 // height. `Separator` is `h-px`, which is enough to drift the rows below it.
 const RULE = "h-0 border-t border-border bg-transparent";
-
-// `flex-none` because shadcn's trigger is `flex-1`, which would stretch both
-// tabs to a shared width inside the `w-fit` list; the design hugs each label.
-// The active fill is `muted`, where the installed default paints `background`
-// in light and `input/30` in dark.
-const TAB =
-  "flex-none data-[state=active]:bg-muted dark:data-[state=active]:border-transparent dark:data-[state=active]:bg-muted";

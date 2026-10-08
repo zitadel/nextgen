@@ -16,5 +16,8 @@ export default defineConfig({
       external: [/^@zitadel\//, /^solid-js($|\/)/],
     },
   },
-  plugins: [solid(), dts({ include: ["src"], exclude: ["src/**/*.spec.*"] })],
+  plugins: [
+    solid(),
+    dts({ tsconfigPath: "./tsconfig.lib.json", include: ["src"], exclude: ["src/**/*.spec.*"] }),
+  ],
 });

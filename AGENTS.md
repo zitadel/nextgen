@@ -423,6 +423,10 @@ verify with `corepack pnpm exec changeset status --since origin/main`.
 - Do not reintroduce Nx or GoReleaser without updating the ADRs first.
 - When unsure about Moon flags, check `moon --help` or the task definition in
   the nearest `moon.yml` before guessing.
+- Before editing a `moon.yml` or `.moon/`, read
+  [.moon/AGENTS.md](.moon/AGENTS.md): the shared tasks, the inputs rule and the
+  dependency rules, and the `moon run workspace:check-moon-graph` check to run
+  afterwards.
 
 ## Ephemeral Development Environments
 

@@ -7,8 +7,8 @@ The package exports:
 
 - **Atoms** — `<zl-field>`, `<zl-button>`, `<zl-alert>`, `<zl-icon>`,
   `<zl-pill>`, `<zl-card>`, `<zl-checkbox>`, `<zl-select>`,
-  `<zl-page-shell>`, and `<zl-passkey>` (an invisible WebAuthn ceremony
-  handler — no rendered surface). Form-associated, accessible,
+  `<zl-page-shell>`, `<zl-sso-providers>`, and `<zl-passkey>` (a WebAuthn ceremony
+  handler that renders only its pending status and cancel button). Form-associated, accessible,
   branding-aware Lit elements that map 1:1 to the flow API
   field/action/error primitives and the Figma design system.
 - **Orchestrators** — `<zitadel-login>`, a single drop-in element that calls
@@ -38,7 +38,7 @@ for the form-association / accessibility decisions baked into every input atom.
 corepack pnpm add @zitadel/components
 ```
 
-`lit`, `liquidjs`, and `dompurify` are peer/runtime deps and are intentionally
+`lit`, `liquidjs`, `dompurify`, and `lucide` are runtime dependencies and are intentionally
 externalised so npm consumers dedupe with their own copies.
 
 ## Quickstart — drop on a page
@@ -145,10 +145,8 @@ fixtures:
 | **demo-next** | `moon run api-mock:start` + `moon run demo-next:dev` | Next.js SDK, middleware, cookies, built `dist/` ([:3002/login](http://localhost:3002/login)). See [`apps/demo-next`](../../apps/demo-next/README.md). |
 | **demo-nuxt** | mock on `:8080`, then `moon run demo-nuxt:dev` | Nuxt SDK, middleware, cookies, built `dist/` ([:3001/login](http://localhost:3001/login)). See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
 
-Storybook consumes the built `@zitadel/components` artifact, so rebuild
-after source changes (`moon run components:build`) or
-keep the Storybook dev server running — its tasks depend on the relevant
-build tasks.
+The Storybook dev server resolves `@zitadel/components` from source, so atom
+edits hot-reload without a rebuild.
 
 ### Atoms-only (bypass the orchestrator)
 
@@ -169,7 +167,7 @@ form-associated inputs.
 | --- | --- | --- |
 | SDK config | `configureZitadel({ projectId, proxyPath })` from `@zitadel/api/config` | every consumer — sets the project + proxy path the element reads |
 | Tokens (server) | branding payload returned from the server | tenant colour / logo / font, managed centrally |
-| Tokens (host page) | `zitadel-login { --zl-color-…: … }` in your own stylesheet | matching the widget to the app you embedded it in |
+| Tokens (host page) | `zitadel-login { --zl-…: … }` in your own stylesheet | matching the widget to the app you embedded it in |
 | Layout / placement | host CSS on `zitadel-login { ... }`, `variant`, `--zl-page-min-height` | sizing and positioning inside your layout |
 | CSS hooks | `zitadel-login::part(form)`, `zitadel-login::part(field-input)` | targeted overrides of atom internals |
 | Locale | `el.lang = 'de'` / `el.locales = { ... }` | i18n / custom copy |
@@ -188,8 +186,8 @@ embedding app wins:
 
 ```css
 zitadel-login {
-  --zl-color-text-primary-white: #101828;
-  --zl-color-surface-default-primary-gray: #ffffff;
+  --zl-foreground: #101828;
+  --zl-card: #ffffff;
   --zl-radius-md: 0.25rem;
 }
 ```
@@ -317,22 +315,23 @@ state, restores on form reset, and forwards Enter to `form.requestSubmit()`.
 | --- | --- | --- |
 | `name` | `string` | Form key |
 | `label` | `string` | Visible label (rendered above) |
+| `aria-label` | `string` | Accessible name for the input when there is no `label` |
 | `type` | `'text' \| 'email' \| 'password' \| ...` | Native input type |
 | `value` | `string` | Two-way bound; emits `zl-input` |
 | `placeholder`, `autocomplete`, `pattern` | `string` | Forwarded |
 | `required`, `disabled`, `invalid` | `boolean` | |
 | `error` | `string` | Custom validity message |
 
-Parts: `field`, `label`, `input`, `error`, `help`.
+Parts: `root`, `label-row`, `label`, `forgot-link`, `input-wrap`, `input`, `trailing-icon`, `trailing-action`, `help`, `success`, `error`.
 
 ### `<zl-button>`
 
-Single button atom covering the full Figma matrix:
+Single button atom covering every button variant:
 
 | Attribute | Values | Notes |
 | --- | --- | --- |
-| `hierarchy` | `primary \| secondary \| text` | Visual rank |
-| `size` | `medium \| small` | Figma surface sizes |
+| `hierarchy` | `primary \| secondary \| outline \| text` | Visual rank |
+| `size` | `medium \| small` | Surface size |
 | `type` | `submit \| button` | When `submit`, takes part in the host `<form>` |
 | `action` | `string` | Forwarded with the `zl-submit` CustomEvent |
 | `loading`, `disabled`, `block` | `boolean` | |
@@ -364,10 +363,10 @@ packages/components/
 ├── src/
 │   ├── atoms/             zl-field, zl-button, zl-alert, zl-icon, zl-pill,
 │   │                       zl-card, zl-checkbox, zl-select, zl-page-shell,
-│   │                       zl-passkey + tests
+│   │                       zl-sso-providers, zl-passkey + tests
 │   ├── orchestrator/      <zitadel-login>, <zitadel-logout>, <zitadel-session>,
 │   │                       api-client, liquid, branding
-│   │   ├── locales/       bundled English fallback
+│   │   ├── locales/       bundled locales (en, de, it) + business copy
 │   │   └── templates/     default.liquid (all steps) + layout-chrome.css
 │   ├── tokens/            re-export of @zitadel/design-tokens
 │   ├── styles/            shared host styles, focus ring, t() css-var bridge
@@ -409,8 +408,8 @@ moon run components:typecheck
 moon run components:build
 ```
 
-Storybook loads the built `dist/`, so run `moon run components:build` after
-source changes (its Storybook tasks already depend on the build).
+The Storybook dev server loads this package from source; `storybook:build` and
+`storybook:test` depend on `components:build`.
 
 **Framework demos** need the TCP mock plus a rebuild after orchestrator changes —
 see [`apps/demo-next/README.md`](../../apps/demo-next/README.md) and
@@ -438,4 +437,4 @@ else runs in jsdom.
 
 ## License
 
-MIT — see [LICENSE](../../LICENSE).
+MIT — see [LICENSE](LICENSE).
