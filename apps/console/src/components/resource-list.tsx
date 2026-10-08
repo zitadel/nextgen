@@ -1,17 +1,24 @@
-import type { MouseEvent, ReactNode } from "react";
+import { Ellipsis, type LucideIcon } from "lucide-react";
+import type { ComponentProps, MouseEvent, ReactNode } from "react";
 
-import { TableHead } from "@/components/ui/table";
+import { FormError } from "@/components/form-error";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { TableCell, TableHead, TableRow } from "@/components/ui/table";
+import type { LoadMoreState } from "@/hooks/use-load-more";
 import { cn } from "@/lib/utils";
+
+import { PAGE_TITLE } from "./typography";
 
 /**
  * Shared geometry for the console's resource list screens (Users, Teams,
  * Projects).
  *
- * Every list frame draws the same shell, and the three screens had drifted into
- * three versions of it — different page gutters, different cell padding, a
- * header label wrapped in a ghost-button-shaped span on one screen and not the
- * others. The numbers below are the ones measured off the Teams and Projects
- * hand-off frames and confirmed with a full-frame pixel diff:
+ * Every list screen draws the same shell:
  *
  * | Region        | Value                                              |
  * | ------------- | -------------------------------------------------- |
@@ -27,11 +34,28 @@ import { cn } from "@/lib/utils";
  * has no fixed grid to share.
  */
 
-/** Page wrapper. Vertical padding varies by frame, so it is passed in. */
+/** Page gutters. `ResourcePage` adds the 16px under the navbar. */
 export const RESOURCE_PAGE = "px-4 pb-8";
 
-/** Title row — the page gutter plus 8px, per the frames' page header. */
+/** Page wrapper for a list screen. */
+export function ResourcePage({ children }: { children: ReactNode }) {
+  return <div className={cn(RESOURCE_PAGE, "pt-4")}>{children}</div>;
+}
+
+/** Title row: the page gutter plus 8px, per the design's page header. */
 export const RESOURCE_HEADER = "px-2";
+
+/** A screen's title: the 24/24 display face, shared with the detail shell. */
+export const RESOURCE_TITLE = PAGE_TITLE;
+
+/** The 36px title row of a list screen that has no toolbar beside its title. */
+export function ResourceTitle({ children }: { children: ReactNode }) {
+  return (
+    <div className={cn(RESOURCE_HEADER, "flex h-9 items-center")}>
+      <h1 className={RESOURCE_TITLE}>{children}</h1>
+    </div>
+  );
+}
 
 /** The card the table sits on. */
 export const RESOURCE_TABLE_WRAP =
@@ -40,12 +64,15 @@ export const RESOURCE_TABLE_WRAP =
 /** One body cell: 56px tall, inset 24px. */
 export const RESOURCE_CELL = "h-14 px-6 py-2";
 
+/** A body cell holding secondary text. */
+export const RESOURCE_CELL_MUTED = "text-muted-foreground h-14 truncate px-6 py-2 text-sm";
+
 /** A row's leading glyph — the design draws Lucide at stroke 1.5, not the default 2. */
 export const RESOURCE_ROW_ICON = "text-muted-foreground size-4 shrink-0";
 
 /** The link in a row's first cell, with the design's 10px icon gap. */
 export const RESOURCE_ROW_LINK =
-  "text-foreground inline-flex items-center gap-[10px] truncate text-sm font-medium underline-offset-2 hover:underline";
+  "text-foreground inline-flex items-center gap-2.5 truncate text-sm font-medium underline-offset-2 hover:underline";
 
 /**
  * Whether a click on a resource row should open it.
@@ -66,10 +93,14 @@ export function opensRow(event: MouseEvent): boolean {
   return !target.closest("a, button, input, select, textarea, [role='menuitem']");
 }
 
+/** The table's header row: a hairline under it, no hover fill. */
+export function ResourceHeaderRow({ children }: { children: ReactNode }) {
+  return <TableRow className="border-border border-b hover:bg-transparent">{children}</TableRow>;
+}
+
 /**
- * Column header. Plain text in the display face — deliberately not wrapped in a
- * span with button geometry, which is what inset one screen's labels by a
- * further 10px and greyed them to `muted-foreground`.
+ * Column header: plain text in the display face, with no button geometry
+ * around it.
  */
 export function ResourceHeadCell({
   children,
@@ -87,5 +118,101 @@ export function ResourceHeadCell({
     >
       {children}
     </TableHead>
+  );
+}
+
+/** The empty header cell over the row menus. */
+export function ResourceMenuHead({ className }: { className?: string }) {
+  return <TableHead className={cn("h-14 px-6", className)} />;
+}
+
+/**
+ * A body row. With `onOpen` the whole row is a pointer target for its
+ * first-cell link, and `opensRow` keeps it out of that link's way.
+ */
+export function ResourceRow({
+  onOpen,
+  className,
+  ...props
+}: ComponentProps<typeof TableRow> & { onOpen?: () => void }) {
+  return (
+    <TableRow
+      className={cn("hover:bg-muted/40 border-0", onOpen && "cursor-pointer", className)}
+      onClick={
+        onOpen &&
+        ((event) => {
+          if (opensRow(event)) onOpen();
+        })
+      }
+      {...props}
+    />
+  );
+}
+
+/** The single row a table shows when it has nothing to list. */
+export function ResourceEmptyRow({ colSpan, children }: { colSpan: number; children: ReactNode }) {
+  return (
+    <TableRow className="border-0 hover:bg-transparent">
+      <TableCell colSpan={colSpan} className="text-muted-foreground h-24 text-center">
+        {children}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+/** A row's actions menu: a ghost icon button opening a dropdown of `children`. */
+export function RowMenu({
+  name,
+  icon: Icon = Ellipsis,
+  className,
+  contentClassName = "w-40",
+  children,
+}: {
+  /** The row's name, for the trigger's accessible name. */
+  name: string;
+  icon?: LucideIcon;
+  className?: string;
+  contentClassName?: string;
+  children: ReactNode;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Actions for ${name}`}
+          className={className}
+        >
+          <Icon aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className={contentClassName}>
+        {children}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/**
+ * `Load more` under a cursor-paginated list (decisions log D5: a button, not
+ * pagination controls). Its presence means there is more; its absence means the
+ * list is complete.
+ */
+export function LoadMore({ paging }: { paging: LoadMoreState }) {
+  return (
+    <>
+      <FormError message={paging.error} className="mt-3" />
+      {paging.hasMore && (
+        <Button
+          variant="secondary"
+          className="mt-6 h-9 w-full gap-1.5 px-2.5"
+          onClick={() => void paging.loadMore()}
+          loading={paging.loading}
+        >
+          Load more
+        </Button>
+      )}
+    </>
   );
 }

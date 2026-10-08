@@ -3,9 +3,7 @@
  * viewer's locale puts that date in.
  *
  * Day, short month and year are requested; the order and separators are the
- * viewer's, not ours. The Figma frames draw `12 Jul 2026` because that is how
- * the mock's locale renders it — not because the product should impose it, so
- * this deliberately does not pin the order. Tests derive the expected string
+ * viewer's and are deliberately not pinned. Tests derive the expected string
  * the same way rather than hardcoding one locale's output.
  *
  * Falls back to the raw value rather than rendering `Invalid Date` if the

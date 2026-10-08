@@ -46,7 +46,7 @@ export function TableLink({
 
 /**
  * "Coming soon" placeholder for screens whose backing API endpoint does not
- * exist yet (see the console-figma-api-buildability assessment). Honest empty
+ * exist yet. Honest empty
  * state rather than a fake list.
  */
 export function EmptyState({
