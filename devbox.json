@@ -3,8 +3,7 @@
   "env": {
     "GOMODCACHE":  "$PWD/.go",
     "GOTOOLCHAIN": "local",
-    "GOROOT":      null,
-    "DEVBOX_COREPACK_ENABLED": "true"
+    "GOROOT":      null
   },
-  "packages": ["go@1.26", "nodejs@24"]
+  "packages": ["go@1.26", "nodejs-slim@24.19.0", "corepack@0.36.0"]
 }

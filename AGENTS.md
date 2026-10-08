@@ -431,6 +431,19 @@ The repo requires the Node.js version from `.nvmrc`; sandbox images often
 ship an older default. Ensure the `.nvmrc` version is first on `$PATH` (for
 example via nvm) before running any `corepack` or `pnpm` command.
 
+`.nvmrc` pins one exact Node.js version and is the single source of truth.
+Every other place that picks a Node version must name the same one:
+
+- `devbox.json` (`nodejs-slim@<version>` plus `corepack`; the full `nodejs`
+  package lags behind in nixpkgs)
+- `.devcontainer/devcontainer.json` (the `node` feature `version`)
+- `apps/cli-skill-e2e/scripts/run.mjs` (the `node:<version>` image)
+- CI workflows read `.nvmrc` through `node-version-file`; never hard-code a
+  `node-version`
+
+`@types/node` in the pnpm catalog tracks the same major as `.nvmrc`, so code
+cannot type-check against APIs the runtime lacks. Bump all of these together.
+
 ### Playwright browser install gotcha
 
 The standard `playwright install --with-deps chromium` may hang during zip

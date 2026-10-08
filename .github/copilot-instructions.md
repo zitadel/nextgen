@@ -30,6 +30,11 @@ touched path** — read those first; the scoped files under
   reaches customer release notes. Guards:
   `node scripts/check-pr-title.mjs --title "<title>"` and
   `node scripts/check-changesets-status.mjs`.
+- Node version: `.nvmrc` pins one exact version. Flag any change that bumps
+  it without matching `devbox.json`, `.devcontainer/devcontainer.json` and
+  `apps/cli-skill-e2e/scripts/run.mjs`, any hard-coded `node-version` in a
+  workflow, or an `@types/node` major that differs from `.nvmrc`
+  ([`AGENTS.md` — Node.js version](../AGENTS.md#nodejs-version)).
 - Licensing split: [`LICENSING.md`](../LICENSING.md).
 - Journey-gate changes (`apps/cli-journey-e2e/**`, `ci.yml` journey steps):
   [`apps/cli-journey-e2e/AGENTS.md`](../apps/cli-journey-e2e/AGENTS.md) is
