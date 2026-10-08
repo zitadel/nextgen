@@ -18,10 +18,9 @@ fileGroups:
     - "/**/*.go"
     - "/go.mod"
     - "/go.sum"
-    # Files the root module compiles in through //go:embed, as in the server
-    # project's serverInputs: migrations, JSON meta-schemas, config defaults.
-    - "/**/*.sql"
-    - "/api/**/*.json"
+    # Files the root packages bench imports compile in through //go:embed:
+    # the JSON meta-schemas and the config defaults.
+    - "/api/openapi/endpoints/schemas/*.json"
     - "/packages/config/defaults/*"
 
 tasks:
@@ -52,6 +51,9 @@ tasks:
     inputs:
       - "scripts/**/*.js"
       - "/biome.json"
+      # The Biome version.
+      - "/pnpm-lock.yaml"
+      - "/pnpm-workspace.yaml"
 
   # The CI build #1096 asks for: the module and the binary compile. No load
   # is generated here. dist/ is what every project builds into and is

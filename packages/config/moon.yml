@@ -15,7 +15,7 @@ tasks:
     inputs:
       - "/api/openapi/endpoints/schemas/*.json"
       - "scripts/sync-meta-schemas.mjs"
-      # The script itself; explicit inputs drop the default `**/*`.
+      # Defines the `sync-schemas` script; explicit inputs drop the default `**/*`.
       - "package.json"
     outputs:
       - "meta-schemas/*.json"

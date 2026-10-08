@@ -13,16 +13,22 @@ fileGroups:
     - "/go.sum"
     - "/api/**/*.yaml"
     - "/api/**/*.json"
-    # Also compiled in through //go:embed: the default flow and user schema
-    # (packages/config/defaults) and the integration-test request fixtures.
-    - "/packages/config/defaults/*"
+    # Also compiled in through //go:embed or read by tests: the config defaults
+    # (incl. presets), the integration-test fixtures and the events catalog.
+    - "/packages/config/defaults/**/*"
     - "/internal/**/*.json"
+    - "/docs/design/api/events-catalog.md"
     - "/api/.ogen.yaml"
     - "/scripts/check-go-generate.mjs"
     - "/scripts/generate-meta-schemas.ts"
     - "moon.yml"
     - "package.json"
     - "bin/**"
+  # The npm tools some tasks run (Biome, and tsx with the yaml package behind
+  # `go generate`): the system toolchain hashes no package versions.
+  npmInputs:
+    - "/pnpm-lock.yaml"
+    - "/pnpm-workspace.yaml"
 
 tasks:
   openapi:
@@ -57,6 +63,7 @@ tasks:
     command: "node scripts/go-generate.mjs"
     inputs:
       - "@group(serverInputs)"
+      - "@group(npmInputs)"
       - "/scripts/go-generate.mjs"
       - "/scripts/dev-process.mjs"
     # Mirrored by GENERATED_GLOBS in scripts/generated-outputs.mjs, which is
@@ -94,6 +101,7 @@ tasks:
     command: "node scripts/check-go-generate.mjs"
     inputs:
       - "@group(serverInputs)"
+      - "@group(npmInputs)"
       - "/scripts/go-generate.mjs"
       - "/scripts/dev-process.mjs"
       # Imported at module scope, not only under --prune: GENERATED_GLOBS is
@@ -114,6 +122,7 @@ tasks:
     command: "node scripts/check-go-generate.mjs --prune"
     inputs:
       - "@group(serverInputs)"
+      - "@group(npmInputs)"
       - "/scripts/go-generate.mjs"
       - "/scripts/clean-generated.mjs"
       - "/scripts/generated-outputs.mjs"
@@ -163,6 +172,7 @@ tasks:
       - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
+      - "@group(npmInputs)"
     options:
       runFromWorkspaceRoot: true
 

@@ -28,8 +28,9 @@ import { isDirectRun } from "./dev-process.mjs";
 // file is on the explicit inert allowlist — unclaimed files are not assumed
 // inert. A gate may only ever skip work that provably cannot be affected.
 
-// Files whose effects moon cannot see (nothing lists them as task inputs)
-// but which reach builds, tests, or release artifacts anyway. Any touched
+// Files whose effects moon cannot fully see (no task, or not every task they
+// reach, lists them as inputs) but which reach builds, tests, or release
+// artifacts anyway. Any touched
 // file matching here disables all gating for the run — even when the rest
 // of the diff produced a non-empty affected set, because moon's answer says
 // nothing about these files.

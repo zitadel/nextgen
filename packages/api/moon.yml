@@ -9,7 +9,7 @@ tasks:
     inputs:
       - "/api/openapi/**/*.yaml"
       - "orval.config.ts"
-      # The script itself; explicit inputs drop the default `**/*`.
+      # Defines the `generate` script; explicit inputs drop the default `**/*`.
       - "package.json"
       - "src/runtime/**/*.ts"
     outputs:
