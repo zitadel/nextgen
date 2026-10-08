@@ -97,8 +97,10 @@ project's key-encryption key unwrappable ([ADR 029](../adrs/029-cryptography-sec
    Production target only. A preview deployment therefore has no database
    and no key: its server service fails to start, by design, while docs,
    storybook and website previews work. Previews with a working server need
-   their own PlanetScale branch and key under the Preview target; they must
-   never share the production database.
+   their own database, or their own schema in a shared preview branch
+   (`?search_path=pr_<n>` on the DSN, see the configuration guide), and a
+   preview master key under the Preview target; they must never share the
+   production database.
 
    `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true` is what makes this a cloud: the
    server provisions the reserved platform project, the Console signs into

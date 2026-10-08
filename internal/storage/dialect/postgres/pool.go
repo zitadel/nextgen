@@ -8,24 +8,36 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dialect/postgres/migration"
+	pgschema "github.com/zitadel/nextgen/internal/storage/dialect/postgres/schema"
 )
 
 type Pool struct {
 	pool       *pgxpool.Pool
+	schema     string
 	isMigrated bool
 	statements
 }
 
-func newPool(pool *pgxpool.Pool) *Pool {
+// newPool wraps pool for schema; an empty schema means [pgschema.Default].
+func newPool(pool *pgxpool.Pool, schema string) *Pool {
+	if schema == "" {
+		schema = pgschema.Default
+	}
 	return &Pool{
 		pool:       pool,
-		statements: newStatements(pool),
+		schema:     schema,
+		statements: newStatements(clientFor(pool, schema)),
 	}
+}
+
+// Schema returns the schema this pool reads and writes.
+func (p *Pool) Schema() string {
+	return p.schema
 }
 
 // Transaction implements [database.Pool].
 func (p *Pool) Transaction(ctx context.Context, fn func(ctx context.Context, tx service.Statementer[service.AllStatements]) error) error {
-	return executeTransaction(ctx, p.pool, fn)
+	return executeTransaction(ctx, clientFor(p.pool, p.schema), fn)
 }
 
 // Close implements [database.Pool].
@@ -46,13 +58,13 @@ func (p *Pool) Migrate(ctx context.Context) error {
 	}
 	db := stdlib.OpenDBFromPool(p.pool)
 	defer db.Close()
-	err := migration.Migrate(ctx, db)
+	err := migration.MigrateInto(ctx, db, p.schema)
 	p.isMigrated = err == nil
 	return wrapError(err)
 }
 
 func (p *Pool) Statements() service.AllStatements {
-	return newStatements(p.pool)
+	return newStatements(clientFor(p.pool, p.schema))
 }
 
 var (

@@ -85,6 +85,34 @@ non-ASCII case folding (for example `Ü`/`ü`) can diverge from Postgres.
 Spanner authentication uses Application Default Credentials (ADC); this guide
 does not cover IAM setup.
 
+### Postgres schema
+
+The Postgres dialect keeps its tables, types and migration history in the
+`zitadel_nextgen` schema. To run in another schema, name it as the first
+entry of the connection's `search_path`, or with a `schema` key beside the
+connection settings:
+
+```sh
+export NEXTGEN_DATABASE_POSTGRES='postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable&search_path=pr_42'
+```
+
+```yaml
+database:
+  postgres:
+    schema: pr_42
+    host: localhost
+    database: nextgen
+    user: zitadel
+```
+
+The schema is created on first start and every migration lands in it;
+nothing touches `zitadel_nextgen`. Several instances can share one database
+that way, and a throwaway environment is removed with
+`DROP SCHEMA pr_42 CASCADE`. The extensions the server needs (`pgcrypto`,
+`btree_gin`) are installed once per database into `public`, which is why
+`public` is kept on the `search_path`. A schema name is a plain lowercase
+identifier (`[a-z_][a-z0-9_]*`, at most 63 characters).
+
 Migrations run automatically when the server starts.
 
 ## Logging

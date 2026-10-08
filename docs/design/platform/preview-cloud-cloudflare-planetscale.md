@@ -450,3 +450,23 @@ mounts `/console/runtime.json` only while one is enabled, so the cloud image
 ships stub `index.html` files for both UIs. Serving the runtime endpoint
 with the embedded UIs disabled removes the stubs and makes the split honest.
 
+
+## One schema per PR preview (2026-10-08)
+
+The server now runs in any Postgres schema: `?search_path=<schema>` on the
+DSN (or `schema:` in the map form) redirects every statement and every
+migration, and the goose history lives in that schema too (see the
+configuration guide). That is what makes a working server preview per PR
+cheap without a database branch per PR: one PS-DEV branch `preview` holds a
+schema per pull request.
+
+- Per PR: `nextgen migrate` and `vercel deploy` both get
+  `NEXTGEN_DATABASE_POSTGRES=…?search_path=pr_<n>` plus a preview master key
+  under the Preview target; the schema is created by `migrate` itself, so no
+  admin role and no `CREATE DATABASE` step exist. The corpus is seeded
+  through the public API the way `console:dev-real` seeds a local instance.
+- On close: `DROP SCHEMA pr_<n> CASCADE`.
+- Extensions are per database and are pinned to `public` for every
+  non-default schema, so all previews share them.
+- Still open: the PR workflow itself, the corpus fixture, and the preview
+  key in the Vercel Preview target.
