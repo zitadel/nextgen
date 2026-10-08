@@ -611,7 +611,8 @@ with its audit metadata. What changes is where a release runs.
 
 The items this ADR left [out of scope](#out-of-scope) resolve as follows.
 Lifecycle has no subject; data isolation is ADR 068; per-environment values
-are [ADR 062](062-per-environment-variables-and-secrets.md) as amended; the
+are [ADR 062](062-per-environment-variables-and-secrets.md), whose environment
+scope is reworked under #1566; the
 inner loop deploys each local save to the developer's own loopback origin, so
 every local save is a release and a deployment to one target; bare
 `zitadel deploy` targets the project default and every primary hostname, and
