@@ -4,34 +4,44 @@
 > **Code:** [`apps/cloud/`](../../apps/cloud/)
 > **Design:** [preview-cloud-cloudflare-planetscale.md](../design/platform/preview-cloud-cloudflare-planetscale.md)
 
-The preview cloud is the server image of the current `main` commit
-(`ghcr.io/zitadel/nextgen:sha-<commit>`) running as a Vercel container in
-Frankfurt (`fra1`) against one PlanetScale Postgres database in AWS
-`eu-central-1`. **Main is production** for this cloud: every merge deploys.
-Version tags (`1.0.0-alpha.N`) are the self-hoster artifact and are not what
-the cloud runs. Production stays on GCP; this is a single-region preview
-offering with the same topology as self-hosted.
+The preview cloud is the server of the current `main` commit, compiled by
+Vercel from the repository and run as a container in Frankfurt (`fra1`)
+against one PlanetScale Postgres database in AWS `eu-central-1`. **Main is
+production** for this cloud: every merge deploys, and everything builds on
+Vercel. Version tags (`1.0.0-alpha.N`), their images and npm packages are the
+self-hoster artifact, produced separately by `release-publish.yml`, and are
+not what the cloud runs. Production stays on GCP; this is a single-region
+preview offering with the same topology as self-hosted.
 
-The Vercel project is one deployment with four
+The Vercel project is one deployment with six
 [services](https://vercel.com/docs/services), defined in the repo-root
 `vercel.json`:
 
 | Service | Root | What it is | Public paths |
 |---|---|---|---|
-| `server` | `apps/cloud` | the container above | everything not listed below |
-| `docs` | `apps/docs` | the docs site (Waku), built unchanged at base `/` | `/docs/*`, `/docs.md`, `/reference/*`, `/assets/*`, `/RSC/*`, `/api/search`, `/llms.txt`, `/llms-full.txt`, `/mcp/*` |
-| `storybook` | `apps/storybook` | the `@zitadel/components` workbench, static build relocated to `out/storybook` | `/storybook`, `/storybook/*` |
+| `server` | `.` | the Go server, compiled in `Dockerfile.vercel` (no embedded UIs) | everything not listed below, incl. `/console/runtime.json` |
+| `console` | `apps/console` | the console SPA, built with `CONSOLE_BASE_PATH=/console`, relocated to `out/console` | `/console/*` |
+| `login` | `apps/login-ui` | the login UI, built with `LOGIN_BASE_PATH=/login`, relocated to `out/login` | `/login/*` |
+| `docs` | `apps/docs` | the docs site (Waku), built with `DOCS_BASE_PATH=/docs`, output relocated by `scripts/vercel-base-path.mjs` | `/docs/*` |
+| `storybook` | `apps/storybook` | the `@zitadel/components` workbench, static build relocated to `out/storybook` | `/storybook/*` |
 | `website` | `apps/website` | the website scaffold (Next.js), one start page | `/`, `/_next/*` |
 
-The docs site serves its pages under `/docs` and `/reference` by itself, so
-no base path is configured; the top-level rewrites only hand those prefixes
-to the docs service. A new top-level path in the docs or website app (a
-plugin route, a page, a file in `public/`) needs a rewrite here, otherwise
-the server answers it with a 404. The server's own namespaces (`/projects`,
-`/users`, `/sessions`, `/ui/console`, …) never overlap with the docs and
-website prefixes. Once the website has real routes, move the server to its
-own hostname (route by host in the same file) so the website can own every
-path.
+Every app owns exactly one prefix, so the route table is one rewrite per
+service, one exception (`/console/runtime.json` stays with the server) and
+the server catch-all. The server's own namespaces (`/projects`, `/users`,
+`/sessions`, …) never overlap with those prefixes. Bare prefixes redirect
+to the slash form (308), as the server's own UI handler does, because the
+static apps reference their assets relative to that directory. `/docs` and
+`/docs/` redirect to `/docs/docs`, the overview page: the docs site keeps its
+pages under its own `docs` section (`content/docs`) until that content moves
+up a level, which is the docs team's call because it changes the standalone
+site's URLs.
+
+The server is told the UI prefixes too (`NEXTGEN_SERVER_CONSOLE_PATH`,
+`NEXTGEN_SERVER_LOGIN_PATH`), so the console base URL it derives for the
+platform project matches where the console service lives. Once the website
+has real routes, move the server to its own hostname (route by host in the
+same file) so the website can own every path.
 
 ## One-time setup
 
@@ -76,8 +86,10 @@ project's key-encryption key unwrappable ([ADR 029](../adrs/029-cryptography-sec
    | `NEXTGEN_INSTRUMENTATION_LOG_FORMAT` | `json` | no |
    | `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT` | `true` | no |
    | `BOOTSTRAP_ADMIN_USER_JSON_B64` | output of `pnpm run admin-user` (see below) | yes |
-   | `ENABLE_EXPERIMENTAL_COREPACK` | `1` (build time; the docs service installs with `corepack pnpm`, which pins the workspace's pnpm) | no |
+   | `ENABLE_EXPERIMENTAL_COREPACK` | `1` (build time; the UI services install with `corepack pnpm`, which pins the workspace's pnpm) | no |
    | `DOCS_SITE_URL` | the public origin, same as `NEXTGEN_SERVER_PUBLIC_BASE` (build time; canonical and sitemap URLs of the docs) | no |
+   | `DOCS_BASE_PATH`, `CONSOLE_BASE_PATH`, `LOGIN_BASE_PATH` | `/docs`, `/console`, `/login` (build time; the prefix each UI build is served under) | no |
+   | `NEXTGEN_SERVER_CONSOLE_PATH`, `NEXTGEN_SERVER_LOGIN_PATH` | `/console`, `/login` (the server derives the console base URL from it) | no |
 
    `PORT` is required: Vercel's container router defaults to 80 and the image
    runs as uid 65532, which cannot bind it.
@@ -138,63 +150,48 @@ can stay set. To rotate the password, mint a new document with the same
 ## Deploying
 
 - **Automatic:** every push to `main`.
-- **Manual:** run `cloud-deploy` from the Actions tab, optionally with
-  `image_tag` to deploy an existing image (`sha-<commit>` or a version tag)
-  instead of building one.
+- **Manual:** run `cloud-deploy` from the Actions tab.
 
-The workflow has two jobs:
-
-1. `image` builds the server for the commit (`moon run release:image`:
-   Go binary with the embedded console and login UI, linux/amd64) and
-   pushes it as `ghcr.io/zitadel/nextgen:sha-<commit>`, moving `main` along.
-   Skipped when `image_tag` is given.
-2. `deploy` checks the image exists, runs `nextgen migrate` from that exact
-   image against the production database, pins the tag into
-   `Dockerfile.vercel` for this build (the committed default is `main`),
-   deploys with `vercel deploy --prod` and runs the smoke test. A failed
-   migration stops the deploy.
+The workflow is one job, in order: `go build` of the commit (a migrator
+binary, the embedded UI placeholders are irrelevant for it), `nextgen
+migrate` against the production database, `vercel deploy --prod` (Vercel
+compiles the server and builds the five other services), smoke test. A
+failed migration stops the deploy. The workflow writes the commit into
+`apps/cloud/commit.txt` so the container build can stamp it into the
+binary; CLI deploys without the file report `local`.
 
 `migrate` is idempotent: on a docs-only merge it connects, finds nothing
 pending and exits. Only commits that add migrations apply something, and
-every migration must be expand/contract: the previous image keeps serving
-until the new deployment is promoted, and a rollback redeploys an older
-image on the newer schema.
+every migration must be expand/contract: the previous deployment keeps
+serving until the new one is promoted, and a rollback promotes an older
+deployment on the newer schema.
 
-All services are rebuilt on every deploy. The server image build is about
-15 s, the docs a few minutes, the storybook a few minutes (full workspace
-install plus the component builds), the website under a minute.
+All services are rebuilt on every deploy; the container layer cache has
+been cold on every build so far, so the Go compile runs from scratch each
+time. Measure the whole build in the deployment's inspector before deciding
+whether that needs attention.
 
 ### Manual and staged deploys
 
-A `vercel deploy` from a workstation builds `Dockerfile.vercel` as checked
-out, that is `FROM ghcr.io/zitadel/nextgen:main`, the image of whatever
-merged last, **without migrating**. That is fine for docs, storybook and
-website changes and wrong for a server change that ships a migration: pin
-the tag you migrated for (`sed -i 's|^ARG NEXTGEN_VERSION=.*|ARG
-NEXTGEN_VERSION=sha-…|' apps/cloud/Dockerfile.vercel`, do not commit it)
-or let the workflow do it. Vercel's `--build-env` does not reach Docker
-`ARG`s, which is why the workflow edits the file instead.
+A `vercel deploy` from a workstation builds exactly the checked-out tree,
+**without migrating**. That is fine for UI, docs, storybook and website
+changes and wrong for a server change that ships a migration: run the
+migration first (`go build -o /tmp/nextgen . && NEXTGEN_DATABASE_POSTGRES=…
+/tmp/nextgen migrate` with the migrator role), or let the workflow do it.
 
 Serving containers refuse `--migrate` (see `entrypoint.sh`), so no deploy
-of any kind can change the schema by starting; only the workflow's migrate
-step can.
-
-### Pinning a version instead of main
-
-Run the workflow manually with `image_tag` set to a version tag
-(`1.0.0-alpha.24`) or an older `sha-<commit>`. The migrate step is
-idempotent and skips applied migrations. A schema that the older binary
-cannot read is **not** rolled back automatically; that is what the
-expand/contract rule protects.
+of any kind can change the schema by starting; only an explicit migrate run
+can.
 
 ### Rollback
 
-1. Run the workflow manually with `image_tag` set to the last good
-   `sha-<commit>` (the image job is skipped, migrate finds nothing to do).
-2. For an instant switch without a build, promote the previous deployment in
-   the Vercel dashboard (Deployments → … → Promote to Production) or
-   `vercel promote <url>`. All services roll back together: they are one
-   deployment.
+Promote the previous deployment in the Vercel dashboard (Deployments → … →
+Promote to Production) or `vercel promote <url>`; its image is kept in the
+Vercel Container Registry. All services roll back together: they are one
+deployment. A schema that the older binary cannot read is **not** rolled
+back; that is what the expand/contract rule protects. To redeploy an older
+commit with a build, run the workflow from that commit (`workflow_dispatch`
+on a branch pointing at it).
 
 ## Lessons from the first deploy (2026-10-07)
 
@@ -223,6 +220,19 @@ expand/contract rule protects.
   and `/docs/a` but not `/docs/` (trailing slash, empty segment), which fell
   through to the server's 404. Each prefix is listed twice, bare and with
   `/(.*)`.
+- Serving a relocated static app at its bare prefix (`/storybook`) breaks
+  it: the page loads but its relative asset links resolve against `/`.
+  Bare prefixes redirect to the slash form instead.
+- The server validates at boot that every enabled embedded UI has an
+  `index.html` (`ValidateDist`) and mounts `/console/runtime.json` only while
+  a UI is enabled. With the UIs served as Vercel services, the container
+  image carries a stub `index.html` per UI so the server boots and keeps the
+  runtime endpoint; the stubs are shadowed by the route table. The clean
+  fix is a server change: serve the runtime endpoint with both embedded UIs
+  disabled (`console_enabled`/`login_enabled` false), then drop the stubs.
+- Vercel's `--build-env` does not reach Docker `ARG`s (verified with a
+  non-existent tag: the build still used the Dockerfile default). Anything
+  the container build must know goes in as a file in the build context.
 - A service object rejects `"framework": null`; with several frameworks
   detectable at the repo root (Vite, Storybook) every service must name its
   framework. Storybook builds with moon, so the upload must contain every
@@ -260,7 +270,7 @@ expand/contract rule protects.
   from `apps/cloud` builds with production settings without moving the
   production domain; smoke it with the project's protection-bypass header
   (`VERCEL_AUTOMATION_BYPASS_SECRET=… pnpm run smoke -- <url>`), then
-  `vercel promote <url>`. Mind the image tag rule above.
+  `vercel promote <url>`. Mind the migration rule above.
 
 - **Master key rotation:** add a second key under a new `MASTER_KEY_ID`
   following ADR 029; this wrapper supports exactly one key per deployment

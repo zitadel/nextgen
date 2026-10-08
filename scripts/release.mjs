@@ -12,7 +12,6 @@ import {
 } from "./release-automation.mjs";
 import {
   CONTAINER_PLATFORMS,
-  SERVER_IMAGE,
   buildContainerImage,
   buildServerBinaries,
   createArchives,
@@ -37,8 +36,6 @@ export async function main(args = forwardedArgs()) {
       return await commandVersion();
     case "snapshot":
       return await commandSnapshot(options);
-    case "image":
-      return await commandImage(options);
     case "pack":
       return await commandPack();
     case "publish":
@@ -81,52 +78,6 @@ async function commandSnapshot(options) {
 
   await verifyLocalArtifacts({ repoRoot, outDir, release });
   console.log(`release snapshot ready: ${outDir}`);
-}
-
-/**
- * Builds the server container for one commit and optionally pushes it. This is
- * the "main is production" artifact: the hosted cloud deploys every commit on
- * `main` from `ghcr.io/zitadel/nextgen:sha-<commit>` (immutable) while the
- * version tags remain the self-hoster artifact. Platforms default to
- * linux/amd64 (what Vercel runs); tags default to the commit's sha tag.
- */
-async function commandImage(options) {
-  const release = await readServerRelease(repoRoot);
-  const outDir = releaseDir(repoRoot, release.version);
-  const info = await gitInfo({ repoRoot });
-  const platforms = options.platforms.length > 0 ? options.platforms : [LINUX_AMD64];
-  const tags =
-    options.tags.length > 0
-      ? options.tags.map((tag) => (tag.includes(":") ? tag : `${SERVER_IMAGE}:${tag}`))
-      : [`${SERVER_IMAGE}:sha-${info.commit}`];
-
-  await run("go", ["mod", "download"], { cwd: repoRoot });
-  await buildServerBinaries({
-    repoRoot,
-    outDir,
-    version: release.version,
-    gitInfo: info,
-    platforms,
-  });
-  await buildContainerImage({
-    repoRoot,
-    outDir,
-    release,
-    platforms,
-    contextPlatforms: platforms,
-    tags,
-    push: options.push,
-    load: !options.push,
-  });
-  console.log(`container image ${options.push ? "pushed" : "built"}: ${tags.join(", ")}`);
-}
-
-const LINUX_AMD64 = { goos: "linux", goarch: "amd64" };
-
-function parsePlatform(value) {
-  const [goos, goarch] = value.split("/");
-  if (!goos || !goarch) usage(`--platform expects <goos>/<goarch>, got "${value}"`);
-  return { goos, goarch };
 }
 
 async function commandPack() {
@@ -226,15 +177,7 @@ async function commandVerify() {
 }
 
 function parseOptions(args) {
-  const parsed = {
-    dryRun: false,
-    skipContainer: false,
-    recoverVersion: "",
-    base: "",
-    push: false,
-    tags: [],
-    platforms: [],
-  };
+  const parsed = { dryRun: false, skipContainer: false, recoverVersion: "", base: "" };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     switch (arg) {
@@ -252,21 +195,6 @@ function parseOptions(args) {
         parsed.base = args[++index] ?? "";
         if (!parsed.base) usage("--base requires a value");
         break;
-      case "--push":
-        parsed.push = true;
-        break;
-      case "--tag": {
-        const tag = args[++index] ?? "";
-        if (!tag) usage("--tag requires a value");
-        parsed.tags.push(tag);
-        break;
-      }
-      case "--platform": {
-        const platform = args[++index] ?? "";
-        if (!platform) usage("--platform requires a value");
-        parsed.platforms.push(parsePlatform(platform));
-        break;
-      }
       case "--help":
       case "-h":
         usage();
@@ -321,7 +249,7 @@ function usage(error) {
     console.error(error);
     console.error("");
   }
-  console.log(`usage: node scripts/release.mjs <version|pack|snapshot|image|publish|verify> [options]
+  console.log(`usage: node scripts/release.mjs <version|pack|snapshot|publish|verify> [options]
 
 Options:
   --dry-run          Do not publish or mutate remote registries.
@@ -329,13 +257,6 @@ Options:
   --recover-version <v>
                      Publish recovery target version from release-publish.
   --base <ref>       Base ref for release publish detection.
-
-image options:
-  --push             Push the image instead of loading it into the local daemon.
-  --tag <tag>        Tag to apply (repeatable; "<tag>" or "<image>:<tag>").
-                     Default: ghcr.io/zitadel/nextgen:sha-<commit>.
-  --platform <os/arch>
-                     Platform to build (repeatable). Default: linux/amd64.
 `);
   process.exit(error ? 1 : 0);
 }

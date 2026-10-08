@@ -80,22 +80,6 @@ tasks:
       runFromWorkspaceRoot: true
       runInCI: false
 
-  # The container for one commit, pushed as ghcr.io/zitadel/nextgen:sha-<commit>
-  # (plus any extra --tag). The cloud-deploy workflow runs this for every push
-  # to main and deploys the hosted cloud from the sha tag; version tags stay
-  # the self-hoster artifact (publish below). Needs the embedded UI dists, same
-  # as snapshot/publish.
-  image:
-    command: "node scripts/release.mjs image"
-    deps:
-      - "console:build-release"
-      - "login-ui:build-release"
-    options:
-      cache: false
-      runDepsInParallel: false
-      runFromWorkspaceRoot: true
-      runInCI: false
-
   publish:
     command: "node scripts/release.mjs publish"
     deps:

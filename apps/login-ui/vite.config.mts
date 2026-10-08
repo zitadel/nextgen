@@ -4,7 +4,10 @@ import { defineConfig, loadEnv } from "vite";
 
 import { baseTest } from "../../vitest.shared.mjs";
 
-const uiBase = "/ui/login/";
+// The public prefix the built login UI is served under: /ui/login embedded in
+// the Go server (its server.login_path default), /login on the hosted cloud,
+// where the same build is its own Vercel service and sets this at build time.
+const uiBase = normalizeBasePath(process.env.LOGIN_BASE_PATH, "/ui/login/");
 const loginOutDir = "../../internal/staticui/login/dist";
 const defaultDevProxyPath = "/__nextgen";
 const defaultBackendUrl = "http://localhost:8080";
@@ -86,4 +89,9 @@ function keepGoEmbedPlaceholder(outDir: string) {
       writePlaceholder();
     },
   };
+}
+
+function normalizeBasePath(value: string | undefined, fallback: string): string {
+  const trimmed = (value ?? "").trim().replace(/^\/+|\/+$/g, "");
+  return trimmed ? `/${trimmed}/` : fallback;
 }

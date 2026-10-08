@@ -2,19 +2,39 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "services": {
     "server": {
-      "root": "apps/cloud",
-      "runtime": "container"
+      "root": ".",
+      "entrypoint": "Dockerfile.vercel"
+    },
+    "console": {
+      "root": "apps/console",
+      "framework": "vite",
+      "installCommand": "corepack pnpm install --frozen-lockfile",
+      "buildCommand": "cd ../.. && corepack pnpm exec moon run console:build && cd apps/console && rm -rf out && mkdir -p out/console && cp -R ../../internal/staticui/console/dist/. out/console/",
+      "outputDirectory": "out",
+      "rewrites": [
+        {
+          "source": "/console/(.*)",
+          "destination": "/console/index.html"
+        }
+      ]
+    },
+    "login": {
+      "root": "apps/login-ui",
+      "framework": "vite",
+      "installCommand": "corepack pnpm install --frozen-lockfile",
+      "buildCommand": "cd ../.. && corepack pnpm exec moon run login-ui:build && cd apps/login-ui && rm -rf out && mkdir -p out/login && cp -R ../../internal/staticui/login/dist/. out/login/",
+      "outputDirectory": "out",
+      "rewrites": [
+        {
+          "source": "/login/(.*)",
+          "destination": "/login/index.html"
+        }
+      ]
     },
     "docs": {
       "root": "apps/docs",
       "framework": "vite",
       "installCommand": "corepack pnpm install --filter @zitadel/docs... --frozen-lockfile",
-      "buildCommand": "corepack pnpm run build"
-    },
-    "website": {
-      "root": "apps/website",
-      "framework": "nextjs",
-      "installCommand": "corepack pnpm install --filter @zitadel/website... --frozen-lockfile",
       "buildCommand": "corepack pnpm run build"
     },
     "storybook": {
@@ -23,8 +43,41 @@
       "installCommand": "corepack pnpm install --frozen-lockfile",
       "buildCommand": "cd ../.. && corepack pnpm exec moon run storybook:build && cd apps/storybook && rm -rf out && mkdir -p out/storybook && cp -R dist/. out/storybook/",
       "outputDirectory": "out"
+    },
+    "website": {
+      "root": "apps/website",
+      "framework": "nextjs",
+      "installCommand": "corepack pnpm install --filter @zitadel/website... --frozen-lockfile",
+      "buildCommand": "corepack pnpm run build"
     }
   },
+  "redirects": [
+    {
+      "source": "/storybook",
+      "destination": "/storybook/",
+      "permanent": true
+    },
+    {
+      "source": "/console",
+      "destination": "/console/",
+      "permanent": true
+    },
+    {
+      "source": "/login",
+      "destination": "/login/",
+      "permanent": true
+    },
+    {
+      "source": "/docs",
+      "destination": "/docs/docs",
+      "permanent": false
+    },
+    {
+      "source": "/docs/",
+      "destination": "/docs/docs",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/",
@@ -39,9 +92,21 @@
       }
     },
     {
-      "source": "/storybook",
+      "source": "/console/runtime.json",
       "destination": {
-        "service": "storybook"
+        "service": "server"
+      }
+    },
+    {
+      "source": "/console/(.*)",
+      "destination": {
+        "service": "console"
+      }
+    },
+    {
+      "source": "/login/(.*)",
+      "destination": {
+        "service": "login"
       }
     },
     {
@@ -51,73 +116,7 @@
       }
     },
     {
-      "source": "/docs",
-      "destination": {
-        "service": "docs"
-      }
-    },
-    {
       "source": "/docs/(.*)",
-      "destination": {
-        "service": "docs"
-      }
-    },
-    {
-      "source": "/docs.md",
-      "destination": {
-        "service": "docs"
-      }
-    },
-    {
-      "source": "/reference",
-      "destination": {
-        "service": "docs"
-      }
-    },
-    {
-      "source": "/reference/(.*)",
-      "destination": {
-        "service": "docs"
-      }
-    },
-    {
-      "source": "/assets/(.*)",
-      "destination": {
-        "service": "docs"
-      }
-    },
-    {
-      "source": "/RSC/(.*)",
-      "destination": {
-        "service": "docs"
-      }
-    },
-    {
-      "source": "/api/search",
-      "destination": {
-        "service": "docs"
-      }
-    },
-    {
-      "source": "/llms.txt",
-      "destination": {
-        "service": "docs"
-      }
-    },
-    {
-      "source": "/llms-full.txt",
-      "destination": {
-        "service": "docs"
-      }
-    },
-    {
-      "source": "/mcp",
-      "destination": {
-        "service": "docs"
-      }
-    },
-    {
-      "source": "/mcp/(.*)",
       "destination": {
         "service": "docs"
       }

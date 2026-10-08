@@ -19,7 +19,7 @@ export default function Home() {
           Read the docs
         </a>
         <a
-          href="/ui/console"
+          href="/console"
           className="rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-medium transition hover:border-neutral-500 dark:border-neutral-700 dark:hover:border-neutral-400"
         >
           Open the console

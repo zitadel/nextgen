@@ -7,8 +7,10 @@
  *
  * Exercises readiness, anonymous project creation, the operator plane with
  * the project secret (user create and query), the session middleware, the
- * docs service mounted under /docs, the storybook under /storybook and the
- * website at /. Exits non-zero on the first failure.
+ * console and login UI services under /console and /login, the docs under
+ * /docs, the
+ * storybook under /storybook and the website at /. Exits non-zero on the
+ * first failure.
  * Creates one throwaway project.
  */
 
@@ -116,11 +118,27 @@ try {
 
   // The docs service shares the deployment: its pages and the static files
   // the top-level rewrites hand to it must answer on the same origin.
+  // /docs redirects to the overview page; fetch follows it.
   const docs = await call("docsIndex", "/docs", { expect: 200 });
   if (!/text\/html/.test(docs.headers.get("content-type") ?? "")) {
     throw new Error(`docsIndex: expected an HTML page, got ${docs.headers.get("content-type")}`);
   }
-  await call("docsLlmsTxt", "/llms.txt", { expect: 200 });
+  await call("docsLlmsTxt", "/docs/llms.txt", { expect: 200 });
+
+  // The console and the login UI are their own static services, built from
+  // the same commit as the server; the console still reads its runtime
+  // config from the server.
+  for (const [name, path] of [
+    ["consoleIndex", "/console/"],
+    ["consoleDeepLink", "/console/settings/team"],
+    ["loginIndex", "/login/"],
+  ] as const) {
+    const page = await call(name, path, { expect: 200 });
+    if (!/text\/html/.test(page.headers.get("content-type") ?? "")) {
+      throw new Error(`${name}: expected an HTML page, got ${page.headers.get("content-type")}`);
+    }
+  }
+  await call("consoleRuntime", "/console/runtime.json", { expect: 200 });
 
   // The storybook service documents @zitadel/components under /storybook.
   const storybook = await call("storybookIndex", "/storybook/", { expect: 200 });

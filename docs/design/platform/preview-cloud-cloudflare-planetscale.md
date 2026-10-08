@@ -389,21 +389,31 @@ the catch-all. Catalog entries cover react, the type packages, tailwindcss
 and typescript; `next` and `@tailwindcss/postcss` are pinned in the app like
 `apps/demo-next` does.
 
-## Main is production (2026-10-08)
+## Main is production, all on Vercel (2026-10-08)
 
-Decision: the cloud runs the server of the current `main` commit, built as
-`ghcr.io/zitadel/nextgen:sha-<commit>` by the deploy workflow itself
-(`moon run release:image`, linux/amd64, same binaries and embedded UIs as a
-release). Version tags stay the self-hoster artifact. Reasons: the preview
-cloud exists to show the latest state; a pinned tag goes stale by
-construction; the console and login UI are embedded in the binary, so they
-follow `main` with it, which removes the separate-console-build question.
+Decision: the cloud runs the server of the current `main` commit, compiled
+by Vercel itself from the repository (`Dockerfile.vercel`, Go
+only), with the console and the login UI built as their own static services
+at `/console` and `/login` from the same commit (their Vite base paths are
+build-time configurable; the embedded defaults stay `/ui/console` and
+`/ui/login` for self-hosters). Nothing passes
+through a registry: Vercel keeps one image per deployment in its container
+registry, and rollback is "promote the previous deployment". Version tags,
+their images and npm packages stay the self-hoster artifact, built by the
+unchanged release pipeline; PR checks stay in `ci.yml`. Reasons: the
+preview cloud exists to show the latest state; a pinned tag goes stale by
+construction; a GHCR `sha-` image built in GitHub (the first design of the
+day) only existed so that `migrate` could run from the identical image, and
+a `go build` of the same commit in the workflow gives the same migrations
+for a fraction of the machinery. Splitting the UIs out of the image is what
+makes the Vercel build cheap: the container build is a pure Go compile, the
+UIs get Vercel's native static builds.
 
 Safety rules that make this acceptable:
 
-- Migrations run only in the workflow, from the exact image being deployed,
-  before the deploy, with a credential that lives only in the `cloud-preview`
-  GitHub environment (restricted to `main`).
+- Migrations run only in the workflow, from a binary of the commit being
+  deployed, before the deploy, with a credential that lives only in the
+  `cloud-preview` GitHub environment (restricted to `main`).
 - Serving containers refuse `--migrate` (entrypoint guard with a test).
 - The database URL and the master key exist for the Production target only.
   A preview deployment has no database: its server fails to start, which is
@@ -412,14 +422,29 @@ Safety rules that make this acceptable:
   therefore impossible by configuration, not by discipline.
 - Vercel's `--build-env` does not reach Docker `ARG`s (verified with a
   non-existent tag: the build still pulled the Dockerfile default), so the
-  workflow pins the tag by editing `Dockerfile.vercel` in its ephemeral
-  checkout. The committed default is `main`.
-- Rollback is "deploy an older `sha-` tag" or promote a previous deployment;
-  both rely on expand/contract migrations.
+  only input to the container build is the tree itself; the workflow writes
+  the commit into `apps/cloud/commit.txt` for the version stamp.
+- Rollback promotes a previous deployment and relies on expand/contract
+  migrations.
 
-Storybook joined as the fourth service (`/storybook`): `@zitadel/components`
-is a published package and its storybook is product documentation, the same
+Storybook joined as a service (`/storybook`): `@zitadel/components` is a
+published package and its storybook is product documentation, the same
 argument as for the docs. The static build is relocatable (Vite base `./`),
 only the mock service worker URL had to follow the base so its scope stays
-under `/storybook/`.
+under `/storybook/`. Bare prefixes (`/storybook`, `/console`,
+`/login`) redirect to the slash form, because a relocated static app at
+its bare prefix resolves relative asset links against `/`.
+
+The docs got a base path too (`DOCS_BASE_PATH=/docs`, Waku `basePath`), so
+the whole route table is one rewrite per app. Waku's Vercel adapter prefixes
+its routes for a base path but leaves the static files and the server
+function at the root of the Build Output, so `apps/docs/scripts/vercel-base-path.mjs`
+moves both under the prefix after the build. Until `content/docs` moves up
+a level, the overview page is `/docs/docs` and `/docs` redirects there.
+
+Open follow-up in the server: an "external UI" mode. Today the server
+refuses to boot when an enabled UI is not embedded (`ValidateDist`) and
+mounts `/console/runtime.json` only while one is enabled, so the cloud image
+ships stub `index.html` files for both UIs. Serving the runtime endpoint
+with the embedded UIs disabled removes the stubs and makes the split honest.
 
