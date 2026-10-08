@@ -106,7 +106,7 @@ describe("local server binary helpers", () => {
   it("falls back from process-group SIGTERM to pid SIGTERM and reports a stale process", async () => {
     const kill = vi
       .spyOn(process, "kill")
-      .mockImplementation((_pid: number, signal?: NodeJS.Signals | number) => {
+      .mockImplementation((_pid: number, signal?: string | number) => {
         if (_pid === -12345 && signal === "SIGTERM") {
           throw errno("ESRCH");
         }
@@ -131,7 +131,7 @@ describe("local server binary helpers", () => {
     vi.useFakeTimers();
     const kill = vi
       .spyOn(process, "kill")
-      .mockImplementation((_pid: number, _signal?: NodeJS.Signals | number) => {
+      .mockImplementation((_pid: number, _signal?: string | number) => {
         return true;
       });
 

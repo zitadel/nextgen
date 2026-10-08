@@ -88,7 +88,7 @@
   "scripts": {
     "sync-schemas": "node scripts/sync-meta-schemas.mjs",
     "build": "tsdown",
-    "typecheck": "tsc --build tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run"
   },
   "dependencies": {
@@ -99,9 +99,11 @@
   },
   "devDependencies": {
     "@types/culori": "catalog:",
+    "@types/node": "catalog:",
     "ajv": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   }
 }

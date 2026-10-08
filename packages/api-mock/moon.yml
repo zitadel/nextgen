@@ -12,10 +12,6 @@ tasks:
     deps:
       - "api:build"
       - "config:build"
-    # The declarations `tsc --build` emits are what sdk-angular's typecheck
-    # resolves @zitadel/api-mock through, so a cache hit must restore them.
-    outputs:
-      - "out-tsc/**/*"
 
   build:
     command: "corepack pnpm run build"

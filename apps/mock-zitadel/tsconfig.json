@@ -1,9 +1,12 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "noEmit": true,
-    "types": ["node"],
-    "lib": ["ES2022", "DOM", "DOM.Iterable"]
-  },
-  "include": ["api/**/*", "scripts/**/*", "src/**/*"]
+  "extends": "./tsconfig.spec.json",
+  "include": [
+    "*.config.mts",
+    "*.config.ts",
+    "api/**/*.ts",
+    "scripts/**/*.ts",
+    "src/**/*.ts",
+    "tests/**/*.ts",
+    "tests/**/*.tsx"
+  ]
 }

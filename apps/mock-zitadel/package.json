@@ -18,7 +18,7 @@
     "dev": "tsx scripts/local-server.ts",
     "build": "tsdown",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
     "generate-wellknown": "tsx scripts/generate-wellknown.ts"
   },
   "dependencies": {

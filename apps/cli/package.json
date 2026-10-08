@@ -80,7 +80,7 @@
   "type": "module",
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc --build tsconfig.app.json",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "readme": "oclif readme",
     "prepack": "tsdown && oclif manifest",
@@ -120,6 +120,7 @@
     "msw": "catalog:",
     "oclif": "catalog:",
     "tsdown": "^0.21.10",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   }
 }

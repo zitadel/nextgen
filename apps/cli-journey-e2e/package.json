@@ -11,7 +11,9 @@
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
     "@zitadel/testing": "workspace:*",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

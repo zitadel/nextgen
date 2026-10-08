@@ -420,7 +420,11 @@ describe("local runtime commands", () => {
     const serverUrl = await startHealthServer();
     const port = Number(new URL(serverUrl).port);
     const recorded = { injected: ["NEXTGEN_GOOGLE_SECRET"] };
-    await writeRuntimeMetadata(cwd, { ...runtimeFor(cwd, serverUrl), image, env: recorded });
+    await writeRuntimeMetadata(cwd, {
+      ...runtimeFor(cwd, serverUrl),
+      image,
+      env: recorded,
+    } as Parameters<typeof writeRuntimeMetadata>[1]);
 
     const result = await runCliForTest(
       ["start", "--cwd", cwd, "--json", "--runtime", "docker", "--port", String(port)],

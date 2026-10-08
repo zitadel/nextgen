@@ -7,6 +7,7 @@
     "e2e": "playwright test"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "@zitadel/sdk-nuxt": "workspace:*",
     "@playwright/test": "catalog:",
     "@zitadel/api-mock": "workspace:*",

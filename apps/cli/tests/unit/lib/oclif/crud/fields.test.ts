@@ -69,7 +69,7 @@ describe("describeBody", () => {
 
   it("returns nothing for a schema it cannot introspect", () => {
     expect(describeBody(z.string())).toEqual([]);
-    expect(describeBody({ safeParse: () => ({ success: true }) })).toEqual([]);
+    expect(describeBody({ safeParse: () => ({ success: true, data: {} }) })).toEqual([]);
   });
 });
 

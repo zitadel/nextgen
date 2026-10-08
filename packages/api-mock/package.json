@@ -43,7 +43,7 @@
     "test": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
     "test:all": "vitest run",
-    "typecheck": "tsc --build tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "build": "node -e \"process.exit(0)\"",
     "install-browsers": "playwright install chromium"
   },
@@ -68,6 +68,7 @@
     "msw": "catalog:",
     "playwright": "catalog:",
     "tsx": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:",
     "zod": "catalog:"
   },

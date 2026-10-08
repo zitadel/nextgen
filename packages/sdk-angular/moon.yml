@@ -12,9 +12,6 @@ tasks:
   typecheck:
     command: "corepack pnpm run typecheck"
     deps:
-      # The spec program resolves @zitadel/api-mock (src/test-setup.ts) through
-      # its project reference, i.e. the declarations its `tsc --build` emits.
-      - "api-mock:typecheck"
       - "api:build"
       - "components:build"
       - "sdk-core:build"
