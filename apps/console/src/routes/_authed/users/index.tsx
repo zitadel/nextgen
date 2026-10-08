@@ -145,7 +145,7 @@ function UsersScreen() {
           <TableBody>
             {rows.length === 0 ? (
               <ResourceEmptyRow colSpan={columns.length + (teamsExpanded ? 6 : 5)}>
-                "No users yet."
+                No users yet.
               </ResourceEmptyRow>
             ) : (
               rows.map((user) => (
