@@ -90,7 +90,7 @@
     "prebuild": "node --run sync-schemas",
     "build": "tsdown",
     "pretypecheck": "node --run sync-schemas",
-    "typecheck": "tsc --build tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "pretest": "node --run sync-schemas",
     "test": "vitest run",
     "test:all": "node --run sync-schemas && vitest run"
@@ -103,9 +103,11 @@
   },
   "devDependencies": {
     "@types/culori": "catalog:",
+    "@types/node": "catalog:",
     "ajv": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   }
 }

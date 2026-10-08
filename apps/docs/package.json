@@ -11,7 +11,7 @@
     "dev": "node scripts/bundle-openapi.mjs && fumadocs-mdx && waku dev --port 3003",
     "build": "node scripts/bundle-openapi.mjs && fumadocs-mdx && waku build",
     "preview": "node scripts/preview.mjs",
-    "typecheck": "node scripts/bundle-openapi.mjs && fumadocs-mdx && tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
     "@fumapress/ai": "catalog:",

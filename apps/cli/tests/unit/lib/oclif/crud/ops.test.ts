@@ -13,6 +13,7 @@ import {
   type GetSpec,
   ListOperation,
   type ListSpec,
+  type OperationClass,
   type OperationDefinition,
   type ResourceDescriptor,
   UpdateOperation,
@@ -51,7 +52,7 @@ const options = {
   connect: async () => ({ token: "t" }),
   operations: ["equals", "contains"],
   flags: { extra: { type: "boolean" as const } },
-};
+} as unknown as OperationDefinition<Ctx, GetSpec<Ctx>>["options"];
 const definition = <Spec>(spec: Spec): OperationDefinition<Ctx, Spec> => ({
   topic: "teams",
   resource,
@@ -165,7 +166,7 @@ describe("operation statics", () => {
 
 describe("bindOperation", () => {
   it("produces a BaseCommand subclass carrying the definition and statics", () => {
-    const Bound = bindOperation(GetOperation, definition(get));
+    const Bound = bindOperation(GetOperation as OperationClass<Ctx, GetSpec<Ctx>>, definition(get));
     expect(Object.getPrototypeOf(Bound)).toBe(GetOperation);
     expect(Bound.prototype).toBeInstanceOf(BaseCommand);
     expect(Bound.description).toBe("Get one team by id.");
@@ -178,8 +179,11 @@ describe("bindOperation", () => {
   });
 
   it("keeps each bound class independent", () => {
-    const a = bindOperation(GetOperation, definition(get));
-    const b = bindOperation(GetOperation, { ...definition(get), topic: "users" });
+    const a = bindOperation(GetOperation as OperationClass<Ctx, GetSpec<Ctx>>, definition(get));
+    const b = bindOperation(GetOperation as OperationClass<Ctx, GetSpec<Ctx>>, {
+      ...definition(get),
+      topic: "users",
+    });
     expect(a).not.toBe(b);
     expect(a.examples).not.toEqual(b.examples);
   });
@@ -216,8 +220,17 @@ describe("wire conventions", () => {
       },
     };
 
-    const command = bindOperation(ListOperation, definition);
-    const result = await command.run(["--filter", "state=active", "--limit", "5", "--json"]);
+    const command = bindOperation(ListOperation as OperationClass<Ctx, ListSpec<Ctx>>, definition);
+    // `bindOperation` is typed as the abstract `typeof Command`, whose static
+    // `run` has a constructable-`this` constraint the abstract type does not
+    // satisfy; the bound class is concrete at runtime.
+    const result = await (command as unknown as { run(argv: string[]): Promise<unknown> }).run([
+      "--filter",
+      "state=active",
+      "--limit",
+      "5",
+      "--json",
+    ]);
 
     expect(sent).toEqual({
       size: 5,

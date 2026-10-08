@@ -21,7 +21,7 @@ tasks:
       - "src/generated/shadcn.css"
 
   typecheck:
-    command: "corepack pnpm exec tsc --build tsconfig.json"
+    command: "corepack pnpm run typecheck"
     deps:
       - "generate"
 
@@ -36,4 +36,3 @@ tasks:
     command: "corepack pnpm run test:all"
     deps:
       - "generate"
-

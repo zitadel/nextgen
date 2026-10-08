@@ -30,7 +30,7 @@
   },
   "scripts": {
     "build": "vite build",
-    "typecheck": "svelte-check --tsconfig ./tsconfig.json",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.lib.json && svelte-check --tsconfig ./tsconfig.spec.json",
     "test": "vitest run",
     "test:all": "vitest run"
   },
@@ -45,6 +45,7 @@
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@testing-library/svelte": "^5.3.1",
+    "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",
     "jsdom": "catalog:",
@@ -52,7 +53,7 @@
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",
     "svelte2tsx": "^0.7.0",
-    "typescript": "^5.7.3",
+    "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
   }

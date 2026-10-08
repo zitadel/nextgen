@@ -21,7 +21,7 @@
     "test": "vitest run",
     "test:all": "vitest run",
     "test:watch": "vitest --watch",
-    "typecheck": "cd ../../packages/api && node --run generate && cd ../../apps/mock-zitadel && tsc --noEmit"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json"
   },
   "dependencies": {
     "@zitadel/api-mock": "workspace:*"
