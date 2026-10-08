@@ -84,6 +84,13 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 	if token.UserID == "" && userBoundSessionOperations[operationName] {
 		return ctx, ogenerrors.ErrSkipServerSecurity
 	}
+	// The cookie is the credential from here on, so a state-changing request
+	// must pass the CSRF checks (ADR 053 §5). A Bearer that satisfied the
+	// operation returned above and never reaches this.
+	if err := checkSessionCSRF(ctx, operationName, t.APIKey); err != nil {
+		return nil, err
+	}
+	ctx = context.WithValue(ctx, sessionCookieKey{}, t.APIKey)
 	ctx = withActorFromToken(ctx, token)
 	if token.UserID != "" {
 		// Session.Token() never mints Scope (always empty). Users skip the
@@ -103,12 +110,13 @@ var _ api.SecurityHandler = (*SecurityHandler)(nil)
 // sessionCookieOperations is the session-only 401 rewrite allowlist.
 // Dual-scheme ops stay off it so a bad Bearer is not a missing-session message.
 var sessionCookieOperations = map[api.OperationName]bool{
-	api.GetMySessionOperation:    true,
-	api.RevokeMySessionOperation: true,
-	api.GetMyUserOperation:       true,
-	api.PatchMyUserOperation:     true,
-	api.CompleteClaimOperation:   true,
-	api.ListMyProjectsOperation:  true,
+	api.GetMySessionOperation:          true,
+	api.GetMySessionCsrfTokenOperation: true,
+	api.RevokeMySessionOperation:       true,
+	api.GetMyUserOperation:             true,
+	api.PatchMyUserOperation:           true,
+	api.CompleteClaimOperation:         true,
+	api.ListMyProjectsOperation:        true,
 }
 
 // userBoundSessionOperations require a session with UserID. Anonymous
@@ -127,7 +135,8 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.GetProjectOperation:        true,
 	api.PatchProjectOperation:      true,
 	api.ListProjectAdminsOperation: true,
-	// Console management screens (#1300 §1). CSRF for the writes is #1140.
+	// Console management screens (#1300 §1). Their writes need the CSRF token
+	// (ADR 053 §5, csrf.go).
 	api.CreateUserOperation:          true,
 	api.GetUserByIDOperation:         true,
 	api.ListUserPasskeysOperation:    true,
@@ -157,6 +166,15 @@ var secretHashOperations = map[api.OperationName]bool{
 
 type sessionTokenKey struct{}
 
+// sessionCookieKey carries the raw __nextgen_session value of a request the
+// cookie authenticated, so GET /sessions/me/csrf can derive its CSRF token.
+type sessionCookieKey struct{}
+
+func sessionCookieFromContext(ctx context.Context) (string, bool) {
+	v, ok := ctx.Value(sessionCookieKey{}).(string)
+	return v, ok && v != ""
+}
+
 // sessionTokenFromContext returns the session token parsed from the
 // __nextgen_session cookie by HandleNextgenSession.
 func sessionTokenFromContext(ctx context.Context) (*domain.Token, bool) {
@@ -173,10 +191,12 @@ type requestHostKey struct{}
 
 // WithRequestHostMiddleware injects the effective request proto+host into the
 // context so handlers can derive a WebAuthn RPID even when the browser omits
-// the Origin header (same-origin fetches).
+// the Origin header (same-origin fetches). A chain of proxies may send either
+// forwarded header as a comma-separated list; its first entry is the one the
+// client's request arrived with.
 func WithRequestHostMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		proto := r.Header.Get("X-Forwarded-Proto")
+		proto := firstForwarded(r.Header.Get("X-Forwarded-Proto"))
 		if proto == "" {
 			if r.TLS != nil {
 				proto = "https"
@@ -184,7 +204,7 @@ func WithRequestHostMiddleware(next http.Handler) http.Handler {
 				proto = "http"
 			}
 		}
-		host := r.Header.Get("X-Forwarded-Host")
+		host := firstForwarded(r.Header.Get("X-Forwarded-Host"))
 		if host == "" {
 			host = r.Host
 		}
@@ -195,6 +215,13 @@ func WithRequestHostMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// firstForwarded returns the first entry of a forwarded header that proxies
+// may have appended to ("a.example, b.internal").
+func firstForwarded(value string) string {
+	first, _, _ := strings.Cut(value, ",")
+	return strings.TrimSpace(first)
 }
 
 func requestOriginFromContext(ctx context.Context) (string, bool) {

@@ -22,5 +22,8 @@ export default defineConfig({
       external: [/^@zitadel\//, /^@qwik\.dev\//],
     },
   },
-  plugins: [qwikVite(), dts({ include: ["src"], exclude: ["src/**/*.spec.*"] })],
+  plugins: [
+    qwikVite(),
+    dts({ tsconfigPath: "./tsconfig.lib.json", include: ["src"], exclude: ["src/**/*.spec.*"] }),
+  ],
 });

@@ -368,11 +368,9 @@ func TestProjectStatements_List(t *testing.T) {
 			second, err := d.stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: filter, Pagination: page})
 			require.NoError(t, err)
 			assert.Equal(t, []string{ids[2]}, projectIDs(second.Items))
-
-			page.Cursor = second.NextCursor
-			third, err := d.stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: filter, Pagination: page})
-			require.NoError(t, err)
-			assert.Empty(t, projectIDs(third.Items))
+			// The two matches are an exact multiple of the limit, but the last
+			// page carries no token: look-ahead sees no further row (#849).
+			assert.Empty(t, second.NextCursor)
 		})
 	})
 }

@@ -77,8 +77,7 @@ export const it: Locale = {
   // Step: collect-passkey-email (solo e-mail — registrazione solo passkey)
   // ═══════════════════════════════════════════════════════════════════════════
   "collect-passkey-email.title": "Crea il tuo account",
-  "collect-passkey-email.description":
-    "Inserisci la tua e-mail per configurare una passkey",
+  "collect-passkey-email.description": "Inserisci la tua e-mail per configurare una passkey",
   "collect-passkey-email.field.email": "E-mail",
   "collect-passkey-email.field.email.placeholder": "tu@esempio.com",
   "collect-passkey-email.action.submit": "Continua",
@@ -211,8 +210,9 @@ export const it: Locale = {
   "error.sign_in_server.title": "Non è stato possibile completare l'accesso.",
   "error.sign_in_server.body": "Riprova tra qualche minuto",
   "error.sso_cancelled.title": "Accesso annullato",
-  "error.sso_cancelled.body": "Hai annullato l'accesso con il provider, oppure la richiesta è stata rifiutata. Riprova o usa un altro metodo.",
+  "error.sso_cancelled.body":
+    "Hai annullato l'accesso con il provider, oppure la richiesta è stata rifiutata. Riprova o usa un altro metodo.",
   "error.sso_failed.title": "Accesso non riuscito",
-  "error.sso_failed.body": "Il provider non ha potuto completare l'accesso. Riprova.",
+  "error.sso_failed.body": "Non è stato possibile completare l'accesso. Riprova.",
   "error.more_info": "Maggiori informazioni",
 };

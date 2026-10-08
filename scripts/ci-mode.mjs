@@ -28,11 +28,11 @@ import { isDirectRun } from "./dev-process.mjs";
 // file is on the explicit inert allowlist — unclaimed files are not assumed
 // inert. A gate may only ever skip work that provably cannot be affected.
 
-// Files whose effects moon cannot see (nothing lists them as task inputs)
-// but which reach builds, tests, or release artifacts anyway. Any touched
-// file matching here disables all gating for the run — even when the rest
-// of the diff produced a non-empty affected set, because moon's answer says
-// nothing about these files.
+// Files whose effects moon cannot fully see (no task, or not every task they
+// reach, lists them as inputs) but which reach builds, tests, or release
+// artifacts anyway. Any touched file matching here disables all gating for
+// the run — even when the rest of the diff produced a non-empty affected set,
+// because moon's answer says nothing about these files.
 const FORCE_FULL_PREFIXES = [".github/", ".moon/", "scripts/"];
 const FORCE_FULL_FILES = new Set([
   "package.json",
@@ -231,20 +231,20 @@ export function queryAffectedTargets(base, spawn = spawnSync) {
       Object.keys(projectTasks).map((task) => `${project}:${task}`),
     );
   } catch {
-    console.error(
-      `# moon query returned non-JSON stdout: ${String(result.stdout).slice(0, 200)}`,
-    );
+    console.error(`# moon query returned non-JSON stdout: ${String(result.stdout).slice(0, 200)}`);
     return null;
   }
 }
 
 function isVersionOutputFile(file) {
-  return file === "pnpm-lock.yaml" ||
+  return (
+    file === "pnpm-lock.yaml" ||
     file === ".changeset/pre.json" ||
     file === ".changeset/config.json" ||
     file.startsWith(".changeset/") ||
     file.endsWith("/package.json") ||
-    file.endsWith("/CHANGELOG.md");
+    file.endsWith("/CHANGELOG.md")
+  );
 }
 
 function main() {
@@ -275,7 +275,7 @@ function main() {
     console.log(`# gating: full run (${reason})`);
   }
   if (process.env.GITHUB_OUTPUT) {
-    appendFileSync(process.env.GITHUB_OUTPUT, lines.join("\n") + "\n");
+    appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`);
   }
   const skipped = ALL_GATES.filter((g) => !gates[g]);
   if (process.env.GITHUB_STEP_SUMMARY && mode === "full") {
@@ -284,7 +284,7 @@ function main() {
       : skipped.length === 0
         ? `CI gating: all lanes affected (journey matrix: ${matrix}).`
         : `CI gating: skipped by affected-selection: ${skipped.join(", ")} (journey matrix: ${matrix}).`;
-    appendFileSync(process.env.GITHUB_STEP_SUMMARY, note + "\n");
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${note}\n`);
   }
 }
 

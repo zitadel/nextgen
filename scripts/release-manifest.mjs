@@ -129,6 +129,6 @@ export const PUBLIC_RELEASE_PACKAGES = [
 
 export const PUBLIC_PACKAGE_DIRS = PUBLIC_RELEASE_PACKAGES.map((pkg) => pkg.dir);
 export const PUBLIC_PACKAGE_NAMES = PUBLIC_RELEASE_PACKAGES.map((pkg) => pkg.name);
-export const PUBLIC_PACKAGE_BUILD_TARGETS = PUBLIC_RELEASE_PACKAGES
-  .map((pkg) => pkg.buildTarget)
-  .filter(Boolean);
+export const PUBLIC_PACKAGE_BUILD_TARGETS = PUBLIC_RELEASE_PACKAGES.map(
+  (pkg) => pkg.buildTarget,
+).filter(Boolean);

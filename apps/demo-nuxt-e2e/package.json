@@ -6,10 +6,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "@zitadel/sdk-nuxt": "workspace:*",
     "@playwright/test": "catalog:",
     "@zitadel/api-mock": "workspace:*",
-    "eslint-plugin-playwright": "catalog:",
     "typescript": "catalog:"
   }
 }

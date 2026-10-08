@@ -3,13 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { scopedPath } from "@/lib/project-scope.fixture";
+import { scopedPath } from "@/test/project-scope.fixture";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  const { makeTestSession } = await import("@/auth/session.fixture");
+  const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
@@ -279,18 +279,18 @@ describe("add user sheet", () => {
   //   // vocabulary, so it opens genuinely empty.
   //   stubSchemas({ sch_business: BUSINESS }, [{ id: "proj_1", name: "console-dev" }]);
   //   await openSheet();
-//
+  //
   //   const project = await screen.findByRole("combobox", { name: "Select project" });
   //   // Roles cannot be chosen until a project is, matching the design's resting row.
   //   expect(screen.getByRole("combobox", { name: "Select roles" })).toHaveAttribute(
   //     "aria-disabled",
   //     "true",
   //   );
-//
+  //
   //   await userEvent.click(project);
   //   await userEvent.click(await screen.findByRole("option", { name: "console-dev" }));
   //   expect(project).toHaveTextContent("console-dev");
-//
+  //
   //   const roles = screen.getByRole("combobox", { name: "Select roles" });
   //   expect(roles).toBeEnabled();
   //   await userEvent.click(roles);
@@ -301,16 +301,16 @@ describe("add user sheet", () => {
   // it("hides + Add project once every project has a row, and restores it on remove", async () => {
   //   stubSchemas({ sch_business: BUSINESS }, [{ id: "proj_1", name: "console-dev" }]);
   //   await openSheet();
-//
+  //
   //   // One project, one row: nothing left to add.
   //   const project = await screen.findByRole("combobox", { name: "Select project" });
   //   expect(screen.queryByRole("button", { name: /Add project/ })).not.toBeInTheDocument();
-//
+  //
   //   // `Row · empty` carries no Remove — it appears once the row holds a project.
   //   expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
   //   await userEvent.click(project);
   //   await userEvent.click(await screen.findByRole("option", { name: "console-dev" }));
-//
+  //
   //   await userEvent.click(screen.getByRole("button", { name: "Remove" }));
   //   expect(screen.getByRole("button", { name: /Add project/ })).toBeInTheDocument();
   // });
@@ -328,12 +328,12 @@ describe("add user sheet", () => {
   //     }),
   //   );
   //   await openSheet();
-//
+  //
   //   await userEvent.click(await screen.findByRole("combobox", { name: "Select project" }));
   //   await userEvent.click(await screen.findByRole("option", { name: "console-dev" }));
   //   await userEvent.type(screen.getByLabelText("Email"), "a@acme.com");
   //   await userEvent.click(screen.getByRole("button", { name: "Add user" }));
-//
+  //
   //   await waitFor(() => expect(body).toBeDefined());
   //   expect(body).toEqual({ schema: "sch_business", attributes: { email: "a@acme.com" } });
   // });
@@ -345,10 +345,7 @@ describe("add user sheet", () => {
     await openSheet();
 
     const marker = (label: string) =>
-      screen
-        .getByLabelText(label)
-        .closest("[data-slot=field]")
-        ?.textContent?.includes("Optional");
+      screen.getByLabelText(label).closest("[data-slot=field]")?.textContent?.includes("Optional");
 
     await screen.findByLabelText("Email");
     // `BUSINESS` requires only `email`.

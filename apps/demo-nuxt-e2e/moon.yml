@@ -6,14 +6,17 @@ dependsOn:
   - "api-mock"
   - "demo-nuxt"
 
-tasks:
-  lint:
-    command: "corepack pnpm exec oxlint ."
+workspace:
+  inheritedTasks:
+    # An e2e suite: nothing to build, and its specs run through the `e2e` task.
+    exclude:
+      - "build"
+      - "test"
 
-  # No workspace build deps: the specs only import @playwright/test — the
-  # api-mock and demo-nuxt dependencies are dev-server commands, not types.
-  typecheck:
-    command: "corepack pnpm run typecheck"
+tasks:
+  # The inherited typecheck needs no workspace build deps: the specs only
+  # import @playwright/test; the api-mock and demo-nuxt dependencies are
+  # dev-server commands, not types.
 
   e2e:
     command: "corepack pnpm exec playwright test"

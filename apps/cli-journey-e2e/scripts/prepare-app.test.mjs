@@ -1,4 +1,3 @@
-/* oxlint-disable playwright/expect-expect */
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -99,7 +98,10 @@ test("prepares the customer local setup journey in the app root", async () => {
         ],
       ],
     );
-    assert.deepEqual(calls.map((call) => call.cwd), [appDir, appDir, appDir]);
+    assert.deepEqual(
+      calls.map((call) => call.cwd),
+      [appDir, appDir, appDir],
+    );
     assert.ok(calls.every((call) => call.env.ZITADEL_LOCAL_IMAGE === image));
     assert.ok(calls.every((call) => call.env.npm_config_cache === join(workDir, ".npm-cache")));
     assert.ok(calls.every((call) => call.env.npm_config_tmp === join(workDir, ".npm-tmp")));
@@ -478,7 +480,13 @@ function driftEnvelope() {
     code: "E_VALIDATION",
     message: "1 of 10 checks failed",
     details: {
-      checks: [{ name: "managed-files", status: "fail", message: "missing scaffolded infrastructure file(s): proxy.ts" }],
+      checks: [
+        {
+          name: "managed-files",
+          status: "fail",
+          message: "missing scaffolded infrastructure file(s): proxy.ts",
+        },
+      ],
     },
   };
 }

@@ -1,6 +1,7 @@
 import { Check, ChevronRight, X } from "lucide-react";
 import { Fragment, useState } from "react";
 
+import { OVERLINE, PANEL_BODY_CELL, PANEL_HEAD_CELL } from "@/components/typography";
 import {
   Table,
   TableBody,
@@ -34,9 +35,8 @@ const ROOT_LABEL = "Schema";
  * control is left out rather than shipped empty; add it with the schema that
  * needs it.
  *
- * The panel carries no timestamp: the design's `Last changed` line was removed
- * from both this component and the drill-in frame, and the date a
- * schema was created now lives on the list row instead.
+ * The panel carries no timestamp: the date a schema was created lives on the
+ * list row.
  */
 export function SchemaFieldsPanel({ schema }: { schema: UserSchema }) {
   const [path, setPath] = useState<string[]>([]);
@@ -87,19 +87,13 @@ export function SchemaFieldsPanel({ schema }: { schema: UserSchema }) {
   );
 }
 
-// Figma's column labels use the display face, uppercase 12px with 0.72px
-// tracking — the same treatment the users table gives its headers.
-const HEAD_CELL =
-  "h-auto px-0 py-3 font-serif text-xs font-normal tracking-[0.72px] text-muted-foreground uppercase";
-const BODY_CELL = "truncate px-0 py-3 text-sm";
+/** The standard focus ring, for the raw buttons below. */
+const FOCUS_RING = "outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
-function PropertyRow({
-  property,
-  onDrillIn,
-}: {
-  property: SchemaProperty;
-  onDrillIn: () => void;
-}) {
+const HEAD_CELL = PANEL_HEAD_CELL;
+const BODY_CELL = `${PANEL_BODY_CELL} truncate`;
+
+function PropertyRow({ property, onDrillIn }: { property: SchemaProperty; onDrillIn: () => void }) {
   return (
     <TableRow className={property.isObject ? "relative hover:bg-accent" : "hover:bg-transparent"}>
       <TableCell className={`${BODY_CELL} pl-2 text-foreground`}>
@@ -110,7 +104,7 @@ function PropertyRow({
           <button
             type="button"
             onClick={onDrillIn}
-            className="flex items-center gap-1.5 text-left after:absolute after:inset-0 after:content-['']"
+            className={`flex items-center gap-1.5 rounded-sm text-left after:absolute after:inset-0 ${FOCUS_RING}`}
           >
             {property.key}
             <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
@@ -148,7 +142,13 @@ function PropertyRow({
  * stays on one line; the ellipsis is inert because it stands for more than one
  * level and picking which to jump to would be a guess.
  */
-function Breadcrumb({ path, onNavigate }: { path: string[]; onNavigate: (next: string[]) => void }) {
+function Breadcrumb({
+  path,
+  onNavigate,
+}: {
+  path: string[];
+  onNavigate: (next: string[]) => void;
+}) {
   const segments = [ROOT_LABEL, ...path];
   const last = segments.length - 1;
   const at = (depth: number) => ({ label: segments[depth] ?? "", depth });
@@ -162,7 +162,7 @@ function Breadcrumb({ path, onNavigate }: { path: string[]; onNavigate: (next: s
       {visible.map((segment, index) => {
         const current = segment.depth === last;
         return (
-          <Fragment key={`${segment.label}-${index}`}>
+          <Fragment key={segment.depth}>
             {index > 0 && (
               <span aria-hidden className="text-[13px] text-muted-foreground">
                 ›
@@ -179,7 +179,7 @@ function Breadcrumb({ path, onNavigate }: { path: string[]; onNavigate: (next: s
               <button
                 type="button"
                 onClick={() => onNavigate(path.slice(0, segment.depth))}
-                className={`${SEGMENT} text-muted-foreground hover:text-foreground`}
+                className={`${SEGMENT} rounded-sm text-muted-foreground hover:text-foreground ${FOCUS_RING}`}
               >
                 {segment.label}
               </button>
@@ -191,4 +191,4 @@ function Breadcrumb({ path, onNavigate }: { path: string[]; onNavigate: (next: s
   );
 }
 
-const SEGMENT = "font-serif text-xs leading-4 tracking-[0.72px] uppercase";
+const SEGMENT = OVERLINE;

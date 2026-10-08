@@ -1,15 +1,15 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { scopedPath } from "@/lib/project-scope.fixture";
+import { scopedPath } from "@/test/project-scope.fixture";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  const { makeTestSession } = await import("@/auth/session.fixture");
+  const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
@@ -46,7 +46,11 @@ function stub({
     identifier: "maya@acme.com",
     identifier_property: "email",
     attributes: { email: "maya@acme.com", companyName: "Acme" },
-    metadata: { status: "active", created_at: "2026-07-12T09:00:00Z", updated_at: "2026-07-12T09:00:00Z" },
+    metadata: {
+      status: "active",
+      created_at: "2026-07-12T09:00:00Z",
+      updated_at: "2026-07-12T09:00:00Z",
+    },
   },
   passkeys = [{ id: "pk_1", name: "MacBook", created_at: "2026-07-01T00:00:00Z" }],
   passkeysStatus = 200,
@@ -244,7 +248,9 @@ describe("user detail", () => {
     await renderDetail();
 
     await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
-    expect(within(screen.getByRole("tabpanel")).getByText("Could not be loaded")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("tabpanel")).getByText("Could not be loaded"),
+    ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "maya@acme.com" })).toBeInTheDocument();
   });
 
@@ -270,8 +276,8 @@ describe("user detail", () => {
       within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete user" }),
     );
 
-    await vi.waitFor(() => expect(deleted).toBe(true));
+    await waitFor(() => expect(deleted).toBe(true));
     // The record the screen is about is gone, so staying on it would 404.
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/users"));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/users"));
   });
 });

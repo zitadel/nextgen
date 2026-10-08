@@ -586,18 +586,14 @@ func TestListFlowDefinitionsPagination(t *testing.T) {
 
 			gotIDs = append(gotIDs, page.FlowDefinitions[0].ID)
 			token, ok := page.NextPageToken.Get()
-			require.True(t, ok, "a full page carries a cursor")
+			if len(gotIDs) == totalFlowDefinitions {
+				assert.False(t, ok, "the final page carries no cursor (#849)")
+				break
+			}
+			require.True(t, ok, "a non-final full page carries a cursor")
 			pageToken = api.NewOptPageToken(token)
 		}
 		assert.Equal(t, wantIDs, gotIDs, "paging must cover the list in order, each row exactly once")
-
-		// fetch the last page (with no next token)
-		past := listFlowDefinitions(t, api.ListFlowDefinitionsParams{
-			Limit:     api.NewOptLimit(1),
-			PageToken: pageToken,
-		})
-		assert.Empty(t, past.FlowDefinitions)
-		assert.False(t, past.NextPageToken.IsSet())
 	})
 
 	t.Run("malformed page token", func(t *testing.T) {

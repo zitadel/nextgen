@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
 
 import "./zitadel-login.js";
-import minimalTemplate from "../../../config/defaults/branding/minimal/login.liquid";
+import minimalTemplate from "@zitadel/config/defaults/branding/minimal/login.liquid";
 // Raw imports via the liquidRaw Vite plugin — @zitadel/config/defaults reads
 // files with node:fs at call time, which cannot run inside Chromium. The
 // split/hero designs are retired (#1039); their fixtures stand in for
@@ -254,7 +254,11 @@ function installFlowFetchStub(responses: readonly CreateFlow201[]): { restore: (
   });
   const original = globalThis.fetch;
   globalThis.fetch = fetchStub as unknown as typeof fetch;
-  return { restore: () => void (globalThis.fetch = original) };
+  return {
+    restore: () => {
+      globalThis.fetch = original;
+    },
+  };
 }
 
 function centerX(element: Element): number {
@@ -562,9 +566,9 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     const mark = element.shadowRoot?.querySelector(".zl-attribution") as HTMLElement;
     expect(mark.closest(".zl-split__form")).toBeTruthy();
     expect(mark.getAttribute("slot")).toBeNull();
-    expect(
-      Math.round(mark.getBoundingClientRect().top - card.getBoundingClientRect().bottom),
-    ).toBe(24);
+    expect(Math.round(mark.getBoundingClientRect().top - card.getBoundingClientRect().bottom)).toBe(
+      24,
+    );
   });
 
   it("a split template with no anchor still slots the trustmark into the shell footer", async () => {

@@ -145,6 +145,10 @@ type GetLiveRes interface {
 	getLiveRes()
 }
 
+type GetMySessionCsrfTokenRes interface {
+	getMySessionCsrfTokenRes()
+}
+
 type GetMySessionRes interface {
 	getMySessionRes()
 }

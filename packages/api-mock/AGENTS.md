@@ -19,8 +19,10 @@ for the typed `@zitadel/api` Flow API. Consumers:
   started by `pnpm --filter @zitadel/api-mock start` (not an
   in-browser worker).
 
-It is **not** published. There is no built artifact; consumers import
-the source directly via the workspace export map.
+It is **not** published. It still builds to `dist/` like every other
+workspace package, so consumers resolve it through its export map (the
+`@zitadel/source` condition points in-repo tooling at the source) and depend
+on `api-mock:build` in moon like any other package.
 
 ## The flow shape must mirror the real default flow
 

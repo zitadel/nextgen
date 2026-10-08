@@ -1,0 +1,20 @@
+# Inherited task config for every `language: "javascript"` project (the root
+# `workspace` project, which owns the top-level `scripts/*.mjs`, and
+# `tools/release`). Mirrors the `lint` task in `typescript.yml` so these
+# projects' `.mjs`/`.cjs`/`.js` files get the same Biome lint + format gate
+# under `moon ci :lint` rather than going unchecked.
+inheritedBy:
+  language: "javascript"
+
+implicitInputs:
+  # The shared Biome config the lint task runs against.
+  - "/biome.json"
+
+tasks:
+  # Same single standardized Biome `check` (lint + format) as the TypeScript
+  # projects, resolved via `pnpm exec` from the workspace-root devDependency.
+  # `--no-errors-on-unmatched` keeps a JS project that owns no lintable files of
+  # its own a clean no-op: `tools/release` only defines tasks that run the
+  # root-owned `scripts/*.mjs` (covered by the `workspace` project's lint).
+  lint:
+    command: "corepack pnpm exec biome check . --no-errors-on-unmatched"

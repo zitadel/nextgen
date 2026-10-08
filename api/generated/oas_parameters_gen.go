@@ -3921,6 +3921,10 @@ type GetUserByIDParams struct {
 	// while owning their own lifecycle. See ADR 024.
 	// Only active memberships match. A user who has been invited but has not
 	// accepted is not served.
+	// It reads the user's memberships, so it takes the same permission as the
+	// `team_id` filter on `POST /users/query`: `team_membership.read` for a
+	// project secret, read on the whole project for a Console session.
+	// Otherwise the answer is `403 user.permission_denied`.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
 	UserID UserID
 }

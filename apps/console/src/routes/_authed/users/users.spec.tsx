@@ -3,13 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { scopedPath } from "@/lib/project-scope.fixture";
+import { scopedPath } from "@/test/project-scope.fixture";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  const { makeTestSession } = await import("@/auth/session.fixture");
+  const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
@@ -194,6 +194,33 @@ describe("users screen", () => {
     expect(table.getByText("maya@acme.com")).toBeInTheDocument();
   });
 
+  it("adds raw attribute columns for users whose schema did not load", async () => {
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            { id: "user_1", schema: "sch_business", attributes: { email: "maya@acme.com" } },
+            { id: "user_2", schema: "sch_gone", attributes: { email: "x@y.com", handle: "xy" } },
+          ],
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json({
+          id: "sch_business",
+          schema: { title: "Business", properties: { email: { type: "string" } } },
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_gone`, () => HttpResponse.json({}, { status: 404 })),
+    );
+    await renderUsers();
+
+    const table = within(await screen.findByRole("table"));
+    // The loaded schema's column, then the unreadable schema's keys that are not already columns.
+    expect(await table.findByText("handle")).toBeInTheDocument();
+    expect(table.getByText("xy")).toBeInTheDocument();
+    expect(table.getByText("x@y.com")).toBeInTheDocument();
+  });
+
   it("renders a placeholder where a user's schema does not define a column", async () => {
     // Columns union across schemas (D4), so a minimal user sits in a table that
     // also has business columns. The cell must read as empty, not as missing.
@@ -256,7 +283,10 @@ describe("users screen", () => {
               identifier_property: "email",
               attributes: { given_name: "Grace", family_name: "Hopper", email: "g@x.com" },
             },
-            { id: "user_3", attributes: { username: "nope", givenName: "Radia", email: "r@x.com" } },
+            {
+              id: "user_3",
+              attributes: { username: "nope", givenName: "Radia", email: "r@x.com" },
+            },
           ],
         }),
       ),
@@ -276,12 +306,14 @@ describe("users screen", () => {
     server.use(
       http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
-          users: [{
-            id: "user_1",
-            identifier: "kenji@acme.com",
-            identifier_property: "email",
-            attributes: { email: "kenji@acme.com", status: "Blocked" },
-          }],
+          users: [
+            {
+              id: "user_1",
+              identifier: "kenji@acme.com",
+              identifier_property: "email",
+              attributes: { email: "kenji@acme.com", status: "Blocked" },
+            },
+          ],
         }),
       ),
     );
@@ -329,8 +361,14 @@ describe("users screen", () => {
       http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
           users: [
-            { id: "user_1", attributes: { givenName: "Maya", familyName: "Patel", email: "maya@acme.com" } },
-            { id: "user_2", attributes: { givenName: "Sasha", familyName: "Kim", email: "sasha@acme.com" } },
+            {
+              id: "user_1",
+              attributes: { givenName: "Maya", familyName: "Patel", email: "maya@acme.com" },
+            },
+            {
+              id: "user_2",
+              attributes: { givenName: "Sasha", familyName: "Kim", email: "sasha@acme.com" },
+            },
           ],
         }),
       ),
@@ -358,7 +396,11 @@ describe("users screen", () => {
         HttpResponse.json({
           users: [
             { id: "user_1", metadata: { status: "active" }, attributes: { email: "a@x.com" } },
-            { id: "user_2", metadata: { status: "pending_purge" }, attributes: { email: "b@x.com" } },
+            {
+              id: "user_2",
+              metadata: { status: "pending_purge" },
+              attributes: { email: "b@x.com" },
+            },
             // Written before `metadata` existed: nothing is invented for it.
             { id: "user_3", attributes: { email: "c@x.com" } },
           ],
@@ -380,7 +422,9 @@ describe("users screen", () => {
     server.use(
       http.post(USERS_QUERY_URL, () =>
         HttpResponse.json({
-          users: [{ id: "user_1", metadata: { status: "active" }, attributes: { email: "a@x.com" } }],
+          users: [
+            { id: "user_1", metadata: { status: "active" }, attributes: { email: "a@x.com" } },
+          ],
         }),
       ),
     );
@@ -434,7 +478,9 @@ describe("users screen", () => {
         const { page_token: token } = (await request.json()) as { page_token?: string };
         if (token) {
           await secondPageSent;
-          return HttpResponse.json({ users: [{ id: "user_stale", attributes: { email: "stale@x.com" } }] });
+          return HttpResponse.json({
+            users: [{ id: "user_stale", attributes: { email: "stale@x.com" } }],
+          });
         }
         firstPageCalls += 1;
         return HttpResponse.json({
@@ -619,6 +665,29 @@ describe("users screen", () => {
     expect(table.queryByText("Team")).not.toBeInTheDocument();
     // The retry drops the expansion rather than the request.
     expect(bodies).toHaveLength(2);
+    expect(bodies.at(-1)).not.toHaveProperty("expand");
+  });
+
+  it("does not ask for the expansion again on Load more once it was refused", async () => {
+    // A refusal does not turn into a pass by paging, so a later page skips the
+    // refused attempt instead of costing two requests every time.
+    const bodies = recordQueries((body) => {
+      if (body.expand) return HttpResponse.json({ message: "not permitted" }, { status: 403 });
+      return body.page_token
+        ? HttpResponse.json({ users: [{ id: "user_2", attributes: { email: "omar@acme.com" } }] })
+        : HttpResponse.json({
+            users: [{ id: "user_1", attributes: { email: "maya@acme.com" } }],
+            next_page_token: "page-2",
+          });
+    });
+    await renderUsers();
+    expect(await screen.findByText("maya@acme.com")).toBeInTheDocument();
+    expect(bodies).toHaveLength(2);
+
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+    expect(await screen.findByText("omar@acme.com")).toBeInTheDocument();
+    expect(bodies).toHaveLength(3);
+    expect(bodies.at(-1)).toMatchObject({ page_token: "page-2" });
     expect(bodies.at(-1)).not.toHaveProperty("expand");
   });
 });

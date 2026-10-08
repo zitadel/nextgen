@@ -3,6 +3,10 @@ export default defineNuxtConfig({
   modules: ["@zitadel/sdk-nuxt/module"],
   typescript: {
     tsConfig: {
+      // Generated into the build dir (`.nuxt/`), hence three levels up. Nuxt's
+      // own compilerOptions are written into the generated file and win over
+      // the base; the base adds the repo's strictness and `@zitadel/source`.
+      extends: "../../../tsconfig.base.json",
       compilerOptions: {
         paths: {
           // vue-tsc cannot resolve @zitadel/api subpath exports from the
@@ -21,11 +25,7 @@ export default defineNuxtConfig({
   css: ["~/assets/css/demo-host.css"],
   ssr: true,
   build: {
-    transpile: [
-      "@zitadel/api",
-      "@zitadel/components",
-      "@zitadel/design-tokens",
-    ],
+    transpile: ["@zitadel/api", "@zitadel/components", "@zitadel/design-tokens"],
   },
   runtimeConfig: {
     zitadelUrl: process.env.ZITADEL_URL ?? "http://localhost:8080",

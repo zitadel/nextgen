@@ -64,9 +64,9 @@ describe("css colour resolution matches the browser", () => {
       const resolvedChannels = resolved(value).split(",").map(Number);
       const tolerance = [1, 1, 1, 0.01];
       for (let i = 0; i < tolerance.length; i += 1) {
-        expect(Math.abs((resolvedChannels[i] ?? 0) - (paintedChannels[i] ?? 0))).toBeLessThanOrEqual(
-          tolerance[i] as number,
-        );
+        expect(
+          Math.abs((resolvedChannels[i] ?? 0) - (paintedChannels[i] ?? 0)),
+        ).toBeLessThanOrEqual(tolerance[i] as number);
       }
     });
   }

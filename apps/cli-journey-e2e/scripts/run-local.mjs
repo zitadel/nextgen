@@ -58,7 +58,8 @@ let registryProcess;
 let registryLogsCollected = false;
 let cleanupStarted = false;
 let success = false;
-let localRuntimeImage = options.runtime === "docker" ? process.env.ZITADEL_LOCAL_IMAGE || options.image : "";
+let localRuntimeImage =
+  options.runtime === "docker" ? process.env.ZITADEL_LOCAL_IMAGE || options.image : "";
 
 process.on("SIGINT", () => void handleSignal("SIGINT"));
 process.on("SIGTERM", () => void handleSignal("SIGTERM"));
@@ -663,24 +664,42 @@ async function collectDiagnostics(context) {
 
   await mkdir(context.diagnosticsDir, { recursive: true });
   await collectLocalRuntimeLogs(context);
-  await copyIfExists(context.logPath, join(context.diagnosticsDir, `${context.framework.id}-app.log`));
-  await copyIfExists(join(context.frameworkWorkDir, "doctor.json"), join(context.diagnosticsDir, "doctor.json"));
+  await copyIfExists(
+    context.logPath,
+    join(context.diagnosticsDir, `${context.framework.id}-app.log`),
+  );
+  await copyIfExists(
+    join(context.frameworkWorkDir, "doctor.json"),
+    join(context.diagnosticsDir, "doctor.json"),
+  );
   await copyIfExists(
     join(context.frameworkWorkDir, "doctor.stderr.log"),
     join(context.diagnosticsDir, "doctor.stderr.log"),
   );
-  await copyIfExists(join(context.frameworkWorkDir, "start.json"), join(context.diagnosticsDir, "start.json"));
+  await copyIfExists(
+    join(context.frameworkWorkDir, "start.json"),
+    join(context.diagnosticsDir, "start.json"),
+  );
   await copyIfExists(
     join(context.frameworkWorkDir, "start.stderr.log"),
     join(context.diagnosticsDir, "start.stderr.log"),
   );
-  await copyIfExists(join(context.frameworkWorkDir, "setup.json"), join(context.diagnosticsDir, "setup.json"));
+  await copyIfExists(
+    join(context.frameworkWorkDir, "setup.json"),
+    join(context.diagnosticsDir, "setup.json"),
+  );
   await copyIfExists(
     join(context.frameworkWorkDir, "setup.stderr.log"),
     join(context.diagnosticsDir, "setup.stderr.log"),
   );
-  await copyIfExists(join(context.frameworkWorkDir, "metadata.json"), join(context.diagnosticsDir, "metadata.json"));
-  await copyIfExists(join(context.frameworkWorkDir, "logs.json"), join(context.diagnosticsDir, "logs.json"));
+  await copyIfExists(
+    join(context.frameworkWorkDir, "metadata.json"),
+    join(context.diagnosticsDir, "metadata.json"),
+  );
+  await copyIfExists(
+    join(context.frameworkWorkDir, "logs.json"),
+    join(context.diagnosticsDir, "logs.json"),
+  );
   await copyIfExists(
     join(context.frameworkWorkDir, "logs.stderr.log"),
     join(context.diagnosticsDir, "logs.stderr.log"),
@@ -706,8 +725,14 @@ async function collectDiagnostics(context) {
     join(context.appDir, "pnpm-lock.yaml"),
     join(context.diagnosticsDir, "generated-app", "pnpm-lock.yaml"),
   );
-  await copyIfExists(context.playwrightReportDir, join(context.diagnosticsDir, "playwright-report"));
-  await copyIfExists(context.playwrightOutputDir, join(context.diagnosticsDir, "playwright-output"));
+  await copyIfExists(
+    context.playwrightReportDir,
+    join(context.diagnosticsDir, "playwright-report"),
+  );
+  await copyIfExists(
+    context.playwrightOutputDir,
+    join(context.diagnosticsDir, "playwright-output"),
+  );
 }
 
 async function collectRegistryLogs() {
@@ -864,7 +889,8 @@ function npxEnv(context) {
   env.JOURNEY_RUNTIME = options.runtime;
   env.npm_config_cache = join(context.frameworkWorkDir, ".npm-cache");
   env.npm_config_tmp = join(context.frameworkWorkDir, ".npm-tmp");
-  const image = options.runtime === "docker" ? localRuntimeImage || process.env.ZITADEL_LOCAL_IMAGE : "";
+  const image =
+    options.runtime === "docker" ? localRuntimeImage || process.env.ZITADEL_LOCAL_IMAGE : "";
   if (image) {
     env.ZITADEL_LOCAL_IMAGE = image;
   }
@@ -880,10 +906,5 @@ function errorMessage(error) {
 }
 
 function isErrno(error, code) {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === code
-  );
+  return typeof error === "object" && error !== null && "code" in error && error.code === code;
 }

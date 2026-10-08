@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  const { makeTestSession } = await import("@/auth/session.fixture");
+  const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
@@ -54,7 +54,12 @@ describe("projects screen", () => {
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({
           projects: [
-            { id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+            {
+              id: "proj_1",
+              name: "River",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
           ],
         }),
       ),
@@ -74,7 +79,12 @@ describe("projects screen", () => {
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({
           projects: [
-            { id: "proj_theirs", name: "Granted to me", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+            {
+              id: "proj_theirs",
+              name: "Granted to me",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
           ],
         }),
       ),
@@ -110,7 +120,12 @@ describe("projects screen", () => {
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({
           projects: [
-            { id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+            {
+              id: "proj_1",
+              name: "River",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
           ],
         }),
       ),
@@ -130,8 +145,18 @@ describe("projects screen", () => {
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({
           projects: [
-            { id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
-            { id: "proj_2", name: "Delta", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+            {
+              id: "proj_1",
+              name: "River",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
+            {
+              id: "proj_2",
+              name: "Delta",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
           ],
         }),
       ),
@@ -148,8 +173,18 @@ describe("projects screen", () => {
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({
           projects: [
-            { id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
-            { id: "proj_2", name: "Delta", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+            {
+              id: "proj_1",
+              name: "River",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
+            {
+              id: "proj_2",
+              name: "Delta",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
           ],
         }),
       ),
@@ -167,8 +202,18 @@ describe("projects screen", () => {
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({
           projects: [
-            { id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
-            { id: "proj_2", name: "Delta", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+            {
+              id: "proj_1",
+              name: "River",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
+            {
+              id: "proj_2",
+              name: "Delta",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
           ],
         }),
       ),
@@ -197,13 +242,27 @@ describe("projects screen", () => {
         const cursor = new URL(request.url).searchParams.get("page_token");
         if (cursor === null) {
           return HttpResponse.json({
-            projects: [{ id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" }],
+            projects: [
+              {
+                id: "proj_1",
+                name: "River",
+                created_at: "2026-07-08T09:00:00Z",
+                updated_at: "2026-07-08T09:00:00Z",
+              },
+            ],
             next_page_token: "page-2",
           });
         }
         cursors.push(cursor);
         return HttpResponse.json({
-          projects: [{ id: "proj_2", name: "Delta", created_at: "2026-07-09T09:00:00Z", updated_at: "2026-07-09T09:00:00Z" }],
+          projects: [
+            {
+              id: "proj_2",
+              name: "Delta",
+              created_at: "2026-07-09T09:00:00Z",
+              updated_at: "2026-07-09T09:00:00Z",
+            },
+          ],
         });
       }),
     );

@@ -69,7 +69,7 @@ describe("describeBody", () => {
 
   it("returns nothing for a schema it cannot introspect", () => {
     expect(describeBody(z.string())).toEqual([]);
-    expect(describeBody({ safeParse: () => ({ success: true }) })).toEqual([]);
+    expect(describeBody({ safeParse: () => ({ success: true, data: {} }) })).toEqual([]);
   });
 });
 
@@ -79,9 +79,9 @@ describe("bodyFieldFlags", () => {
       string,
       { helpGroup?: string; description?: string; options?: string[]; multiple?: boolean }
     >;
-    expect(flags["relation"]?.helpGroup).toBe("REQUIRED FIELD");
-    expect(flags["relation"]?.options).toEqual(["viewer", "editor", "admin"]);
-    expect(flags["relation"]?.description).toMatch(/^\(required\) /);
+    expect(flags.relation?.helpGroup).toBe("REQUIRED FIELD");
+    expect(flags.relation?.options).toEqual(["viewer", "editor", "admin"]);
+    expect(flags.relation?.description).toMatch(/^\(required\) /);
     expect(flags["expires-at"]?.helpGroup).toBe("OPTIONAL FIELD");
     expect(flags["expires-at"]?.description).not.toMatch(/^\(required\)/);
   });
@@ -192,7 +192,9 @@ describe("bodyFromFlags", () => {
   });
 
   it("allows keys that merely mention a safe word", () => {
-    expect(bodyFromFlags(userFields, { attributes: ["passwordless=true", "tokenizer=v2"] })).toEqual({
+    expect(
+      bodyFromFlags(userFields, { attributes: ["passwordless=true", "tokenizer=v2"] }),
+    ).toEqual({
       attributes: { passwordless: "true", tokenizer: "v2" },
     });
   });

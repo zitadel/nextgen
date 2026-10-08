@@ -1,8 +1,9 @@
-import { AlertCircle, Loader2, TriangleAlert } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 
-import { Alert, AlertTitle } from "@/components/ui/alert";
+import { api } from "@/api/zitadel";
+import { FormError } from "@/components/form-error";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -15,11 +16,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-
-import { api } from "../api/zitadel";
-import { describeError } from "../lib/api-error";
+import { useSubmit } from "@/hooks/use-submit";
 
 /**
  * The word the operator has to type before the action unlocks. Compared
@@ -41,14 +40,10 @@ const CONFIRM_WORD = "DELETE";
 // and would otherwise win, leaving the dialog 512px wide.
 const CONTENT = "gap-0 rounded-xl p-0 sm:max-w-sm!";
 const HEADER = "flex flex-row items-start gap-6 p-6 text-left";
-// Flat 10% in both themes. Only the destructive *button* carries a dark-mode
-// lift (its token is `custom/destructive\10-dark:destructive\20`); the media
-// square's fill is a static 10% tint in the design, and bumping it in dark made
-// the icon plate read twice as strong as the node.
+// Flat 10% in both themes; only the destructive button lifts in dark.
 const MEDIA = "bg-destructive/10 text-destructive";
 const COLUMN = "flex min-w-0 flex-1 flex-col gap-1.5";
 const TITLE = "font-serif text-lg leading-7 font-normal";
-const CONFIRM_LABEL = "font-serif text-sm leading-5 font-normal text-foreground";
 const FOOTER = "flex-row items-center justify-end gap-2 px-6 pb-6";
 
 /**
@@ -127,29 +122,22 @@ function DeleteUserForm({
 }) {
   const confirmId = useId();
   const [confirmation, setConfirmation] = useState("");
-  const [deleting, setDeleting] = useState(false);
-  const [error, setError] = useState<string | undefined>(undefined);
   const confirmed = confirmation === CONFIRM_WORD;
 
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
+  // Kept open on failure: the operator has already typed the confirmation, and
+  // closing would discard both that and the reason it failed.
+  const remove = useSubmit(async () => {
+    await api.deleteUserByID(userId);
+    // Raised before the dialog closes, from the root-mounted toaster, so it
+    // outlives this subtree — the caller may navigate away on `onDeleted`.
+    toast.success(`${name} deleted`);
+    await onDeleted();
+    onClose();
+  }, "Could not delete the user.");
+
+  function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!confirmed || deleting) return;
-    setDeleting(true);
-    setError(undefined);
-    try {
-      await api.deleteUserByID(userId);
-      // Raised before the dialog closes, from the root-mounted toaster, so it
-      // outlives this subtree — the caller may navigate away on `onDeleted`.
-      toast.success(`${name} deleted`);
-      await onDeleted();
-      onClose();
-    } catch (cause) {
-      // Kept open on failure: the operator has already typed the confirmation,
-      // and closing would discard both that and the reason it failed.
-      setError(describeError(cause, "Could not delete the user."));
-    } finally {
-      setDeleting(false);
-    }
+    if (confirmed) void remove.run();
   }
 
   return (
@@ -161,15 +149,15 @@ function DeleteUserForm({
         <div className={COLUMN}>
           <AlertDialogTitle className={TITLE}>Delete {name}?</AlertDialogTitle>
           <AlertDialogDescription>
-            This permanently deletes the user and all associated sessions, grants, and
-            profile data. This action cannot be undone.
+            This permanently deletes the user and all associated sessions, grants, and profile data.
+            This action cannot be undone.
           </AlertDialogDescription>
           {/* The column's own 6px gap separates this from the description; the
               12px here is the field's internal label→input gap. */}
           <div className="flex flex-col gap-3">
-            <Label htmlFor={confirmId} className={CONFIRM_LABEL}>
+            <FieldLabel htmlFor={confirmId} className="text-foreground">
               Type {CONFIRM_WORD} to confirm
-            </Label>
+            </FieldLabel>
             <Input
               id={confirmId}
               name="confirmation"
@@ -181,27 +169,21 @@ function DeleteUserForm({
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck={false}
-              className="h-9 rounded-md px-2.5 py-1 text-sm"
             />
           </div>
-          {error && (
-            <Alert variant="destructive" className="mt-1.5">
-              <AlertCircle aria-hidden />
-              <AlertTitle>{error}</AlertTitle>
-            </Alert>
-          )}
+          <FormError message={remove.error} className="mt-1.5" />
         </div>
       </AlertDialogHeader>
 
       <AlertDialogFooter className={FOOTER}>
         {/* `type="button"` is load-bearing: the Radix primitive renders a bare
-            `<button>`, which inside a `<form>` defaults to `type="submit"` — so
-            Cancel submitted the form and deleted the user it was meant to spare.
+            `<button>`, which inside a `<form>` defaults to `type="submit"` and
+            would delete the user Cancel is meant to spare.
 
             `px-2.5!` — `AlertDialogCancel` puts this className on the element
             inside the Button's `asChild` slot, so it never passes through
             tailwind-merge and the size variant's `px-4` would otherwise win. */}
-        <AlertDialogCancel type="button" className="px-2.5!" disabled={deleting}>
+        <AlertDialogCancel type="button" className="px-2.5!" disabled={remove.pending}>
           Cancel
         </AlertDialogCancel>
         {/* Not `AlertDialogAction`: that primitive closes the dialog on click,
@@ -211,9 +193,9 @@ function DeleteUserForm({
           type="submit"
           variant="destructive"
           className="gap-1.5 px-2.5"
-          disabled={!confirmed || deleting}
+          disabled={!confirmed}
+          loading={remove.pending}
         >
-          {deleting && <Loader2 className="size-3 animate-spin" aria-hidden />}
           Delete user
         </Button>
       </AlertDialogFooter>

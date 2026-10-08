@@ -3,15 +3,15 @@ packages:
   - "packages/*"
 
 catalog:
+  "@biomejs/biome": ^2.5.15
   "@clack/prompts": ^1.2.0
-  "@eslint/js": ^9.0.0
-  "@eslint/json": ^0.11.0
-  "@eslint/markdown": ^6.0.0
   "@faker-js/faker": ^10.4.0
   '@fontsource/arimo': ^5.2.8
   "@fumapress/ai": ^0.6.2
   "@moonrepo/cli": ^2.4.6
   "@mswjs/http-middleware": ^0.10.3
+  "@nuxt/kit": ^4.5.1
+  "@nuxt/schema": ^4.5.1
   '@oclif/core': ^4.11.4
   '@oclif/plugin-autocomplete': ^3.2.50
   '@oclif/plugin-commands': ^4.1.55
@@ -27,7 +27,6 @@ catalog:
   "@storybook/web-components-vite": ^10.3.6
   "@tailwindcss/vite": ^4.2.4
   "@tanstack/devtools-vite": ^0.6.0
-  "@tanstack/eslint-plugin-router": ^1.161.6
   "@tanstack/react-devtools": ^0.10.2
   "@tanstack/react-query": ^5.100.6
   "@tanstack/react-router": ^1.168.23
@@ -36,7 +35,7 @@ catalog:
   "@testing-library/jest-dom": ^6.9.1
   "@testing-library/react": ^16.3.2
   "@testing-library/user-event": ^14.6.1
-  "@tsdown/css": ^0.21.10
+  "@tsdown/css": ^0.23.0
   '@types/cookie-parser': ^1.4.10
   '@types/culori': ^4.0.1
   "@types/express": ^4.17.21
@@ -57,13 +56,6 @@ catalog:
   cookie-parser: ^1.4.7
   culori: ^4.0.2
   dompurify: ^3.4.13
-  eslint: ^9.0.0
-  eslint-config-prettier: ^10.0.0
-  eslint-import-resolver-typescript: ^3.7.0
-  eslint-plugin-import: ^2.31.0
-  eslint-plugin-perfectionist: ^4.0.0
-  eslint-plugin-playwright: ^2.10.2
-  eslint-plugin-prettier: ^5.0.0
   express: ^4.18.2
   fumadocs-core: ^16.10.3
   fumadocs-mdx: ^15.0.12
@@ -84,10 +76,7 @@ catalog:
   nuxt: ^4.5.1
   oclif: ^4.17.46
   orval: ^8.37.0
-  oxfmt: ^0.46.0
-  oxlint: ^1.61.0
   playwright: ^1.60.0
-  prettier: ^3.0.0
   radix-ui: ^1.6.4
   react: ^19.2.8
   react-dom: ^19.2.8
@@ -102,15 +91,14 @@ catalog:
   tailwind-merge: ^3.6.0
   tailwindcss: ^4.2.4
   ts-lit-plugin: ^2.0.2
-  tsdown: ^0.21.10
+  tsdown: ^0.23.0
   tslib: ^2.8.1
   tsup: ^8.3.5
   tsx: ^4.21.0
   tw-animate-css: ^1.4.0
   typescript: ^6.0.3
-  typescript-eslint: ^8.0.0
   vite: ^8.3.1
-  vite-plugin-dts: ^4.5.0
+  vite-plugin-dts: ^5.1.2
   vite-plugin-web-components-hmr: ^0.1.3
   vitest: ^4.1.11
   vue: ^3.5.41

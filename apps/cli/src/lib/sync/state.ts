@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import type { ResourceEntry, ScaffoldManifest, ZitadelState } from "./types.js";
 
+export type { ZitadelState } from "./types.js";
+
 /**
  * Read and parse `.zitadel/state.json`. Throws if the file is
  * missing or malformed; callers run `zitadel setup` first to bring
@@ -19,11 +21,7 @@ export async function readState(cwd: string): Promise<ZitadelState> {
  * with sorted keys disabled (state is engine-managed, not human-
  * authored, so deterministic ordering isn't required here).
  */
-export async function updateState(
-  cwd: string,
-  key: string,
-  entry: ResourceEntry,
-): Promise<void> {
+export async function updateState(cwd: string, key: string, entry: ResourceEntry): Promise<void> {
   const current = await readState(cwd);
   const updated: ZitadelState = {
     ...current,

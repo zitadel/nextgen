@@ -7,37 +7,27 @@ dependsOn:
   - "design-tokens"
 
 tasks:
-  lint:
-    command: "corepack pnpm exec oxlint ."
-    deps:
-      - "components:build"
-      - "design-tokens:build"
-
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
       - "components:build"
-      - "design-tokens:build"
 
   test:
-    command: "corepack pnpm run test:all"
     deps:
       - "components:build"
-      - "design-tokens:build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
       - "components:build"
-      - "design-tokens:build"
     outputs:
       - "/internal/staticui/login/dist/**/*"
+    options:
+      # Replaces the inherited dist/**/* rather than adding to it.
+      mergeOutputs: "replace"
 
   build-release:
     command: "corepack pnpm run build"
     deps:
       - "components:build-release"
-      - "design-tokens:build"
     outputs:
       - "/internal/staticui/login/dist/**/*"
     options:

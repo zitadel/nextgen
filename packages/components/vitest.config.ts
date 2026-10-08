@@ -38,6 +38,9 @@ export default defineConfig({
         test: {
           name: "unit",
           globals: true,
+          // Specs import atoms directly, past the entries that silence Lit's
+          // dev-mode notice; load the same module first (see the module).
+          setupFiles: ["src/internal/lit-dev-mode.ts"],
           environment: "jsdom",
           include: ["src/**/*.spec.ts"],
           exclude: ["src/**/*.browser.spec.ts"],
@@ -50,6 +53,12 @@ export default defineConfig({
         test: {
           name: "browser",
           globals: true,
+          setupFiles: ["src/internal/lit-dev-mode.ts"],
+          // Serialize browser files so parallel Chromium contexts do not
+          // overwhelm the Vitest Vite server under CI load, which flakes the
+          // setup-module fetch (vitest-dev/vitest#9509). The jsdom `unit`
+          // project above still runs in parallel.
+          fileParallelism: false,
           include: ["src/**/*.browser.spec.ts"],
           browser: {
             enabled: true,

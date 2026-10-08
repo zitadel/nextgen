@@ -35,11 +35,19 @@ type ScaffoldStash = Readonly<{
  * internal to that patcher. Registries are injected so tests can supply fakes.
  */
 export class Orca {
+  private readonly detectors: ReadonlyArray<Detector>;
+  private readonly scaffolders: ReadonlyArray<Scaffolder>;
+  private readonly patchers: ReadonlyArray<Patcher>;
+
   constructor(
-    private readonly detectors: ReadonlyArray<Detector>,
-    private readonly scaffolders: ReadonlyArray<Scaffolder>,
-    private readonly patchers: ReadonlyArray<Patcher>,
-  ) {}
+    detectors: ReadonlyArray<Detector>,
+    scaffolders: ReadonlyArray<Scaffolder>,
+    patchers: ReadonlyArray<Patcher>,
+  ) {
+    this.detectors = detectors;
+    this.scaffolders = scaffolders;
+    this.patchers = patchers;
+  }
 
   /**
    * Detects the framework in `cwd` and extracts its {@link FrameworkFacts},
@@ -180,8 +188,7 @@ function assertNpmSafeScaffoldDirectoryName(cwd: string): void {
     "E_VALIDATION",
     `Fresh app directory name "${name}" is not npm-package-safe`,
     {
-      hint:
-        "Rename the directory to a lowercase npm-package-safe name, for example `my-zitadel-app`, then rerun setup.",
+      hint: "Rename the directory to a lowercase npm-package-safe name, for example `my-zitadel-app`, then rerun setup.",
       details: { cwd, name, validation_errors: errors },
     },
   );
@@ -207,7 +214,9 @@ function npmPackageNameErrors(name: string): string[] {
     errors.push("name cannot start with a period or underscore");
   }
   if (!/^[a-z0-9][a-z0-9._~-]*$/.test(name)) {
-    errors.push("name may only contain lowercase letters, numbers, dots, underscores, tildes, and hyphens");
+    errors.push(
+      "name may only contain lowercase letters, numbers, dots, underscores, tildes, and hyphens",
+    );
   }
   if (name === "node_modules" || name === "favicon.ico") {
     errors.push(`name "${name}" is reserved`);

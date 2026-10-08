@@ -152,7 +152,11 @@ function nextPort(): number {
  * literally, because a secret in version control cannot be scrubbed later.
  */
 class CommittedFiles {
-  constructor(private readonly root: string) {}
+  private readonly root: string;
+
+  constructor(root: string) {
+    this.root = root;
+  }
 
   idpConnection(slug: string): Promise<{ oidc: { client_id: string; client_secret: string } }> {
     return this.read(`.zitadel/idps/${slug}.json`) as Promise<{
@@ -191,9 +195,11 @@ class CommittedFiles {
  * command surfaces it. Sync state and the mock's own store are never read.
  */
 export class ScaffoldedApp {
+  readonly path: string;
   readonly committed: CommittedFiles;
 
-  constructor(readonly path: string) {
+  constructor(path: string) {
+    this.path = path;
     this.committed = new CommittedFiles(path);
   }
 
@@ -544,10 +550,13 @@ export class ScaffoldedApp {
 
 /** The project's files and their hashes at a moment in time. */
 export class ProjectSnapshot {
-  private constructor(
-    private readonly root: string,
-    private readonly files: Map<string, string>,
-  ) {}
+  private readonly root: string;
+  private readonly files: Map<string, string>;
+
+  private constructor(root: string, files: Map<string, string>) {
+    this.root = root;
+    this.files = files;
+  }
 
   static async of(root: string): Promise<ProjectSnapshot> {
     return new ProjectSnapshot(root, await hashTree(root));
@@ -643,7 +652,9 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
  */
 export async function anApp({
   nextVersion = "^16.0.0",
-}: { nextVersion?: string } = {}): Promise<ScaffoldedApp> {
+}: {
+  nextVersion?: string;
+} = {}): Promise<ScaffoldedApp> {
   const path = await mkdtemp(join(tmpdir(), "zitadel-next-"));
 
   await mkdir(join(path, "app"), { recursive: true });

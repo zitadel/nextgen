@@ -15,19 +15,45 @@ inheritedBy:
 # a tsconfig edit). These files change rarely; under-selection here previously
 # let such changes land with zero CI coverage.
 implicitInputs:
-  # Moon's automatic config input only covers `.moon/*.yml`, not this
-  # directory — without this self-reference, edits to scoped task configs are
-  # themselves invisible to `moon ci` selection.
-  - "/.moon/tasks/**/*.yml"
   # Extended by every {apps,packages}/*/tsconfig*.json.
   - "/tsconfig.base.json"
-  # Extended by every project-local .oxlintrc.json (oxlint lint tasks).
-  - "/.oxlintrc.json"
-  # Resolved upward from each linted file by prettier; enforced in the sdk-*
-  # eslint lint tasks via eslint-plugin-prettier.
-  - "/.prettierrc.json"
+  # The shared Biome config that the inherited `lint` task below runs against;
+  # a project-local biome.json (where present) extends it. Without this a
+  # config change would leave every project's lint task cache-hit (and
+  # unselected by `moon ci`), running stale rules.
+  - "/biome.json"
   # Spread into every project's vitest config's `test` block. Without these a
   # change to the shared base would leave every project's test task cache-hit
   # (and unselected by `moon ci`), running stale config.
   - "/vitest.shared.mjs"
   - "/vitest.shared.d.mts"
+
+tasks:
+  # Single standardized linter + formatter for every TypeScript project: Biome
+  # `check` (lint + format), run against the shared root biome.json. Biome is a
+  # self-contained, single-file tool (no cross-package type resolution), so
+  # unlike the previous oxlint/eslint tasks it needs no `api:build`/
+  # `components:build` dependency edges. It is resolved via `pnpm exec` from the
+  # workspace-root devDependency. Biome owns all JS/TS/JSX/TSX (lint + format);
+  # the repo no longer uses Prettier. File types Biome cannot parse reliably
+  # (CSS/Tailwind, Vue, Svelte, Markdown, data JSON) are excluded in biome.json
+  # and are not auto-formatted.
+  lint:
+    command: "corepack pnpm exec biome check ."
+
+  # The standard tasks every TypeScript project runs. A project's moon.yml adds
+  # only what is specific to it: its `deps` (appended to these), or options. A
+  # different `outputs` needs `options.mergeOutputs: "replace"` and a different
+  # command needs `options.mergeArgs: "replace"`; otherwise moon adds them to
+  # these instead of replacing them. A project with nothing to build or test
+  # opts out with `workspace.inheritedTasks.exclude`.
+  typecheck:
+    command: "corepack pnpm run typecheck"
+
+  build:
+    command: "corepack pnpm run build"
+    outputs:
+      - "dist/**/*"
+
+  test:
+    command: "corepack pnpm run test:all"

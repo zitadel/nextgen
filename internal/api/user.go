@@ -65,32 +65,30 @@ func (h *Handler) DeleteUserByID(ctx context.Context, params api.DeleteUserByIDP
 func (h *Handler) QueryUsers(ctx context.Context, req *api.QueryUsersRequest, params api.QueryUsersParams) (api.QueryUsersRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
 	projectID := string(params.ProjectID.Or(api.ProjectID(scopeCtx.ProjectID)))
-	ctx, err := h.requireProjectListAccess(ctx, projectID, userAccess, domain.ResourceKindUser)
+	ctx, projectWide, err := h.requireProjectListAccess(ctx, projectID, userAccess, domain.ResourceKindUser)
 	if err != nil {
 		return nil, err
 	}
 
 	input := mapQueryUsersToService(projectID, req)
-	// A Console session mints no scopes, so the expansion ceilings below would
-	// refuse it however much its grants allow. It skips them instead (#1300
-	// §4, relaxed): it has just passed the list check on this project, so an
-	// expansion only reads within a project it can list. Decided here, for
-	// this list, rather than in the shared ceiling, so another endpoint does
-	// not inherit it by accepting the cookie. Deriving the two permissions
-	// from the resolver is a follow-up (#1300).
-	session := scopeCtx.PrincipalType == domain.AuthzPrincipalTypeUser
 	// Expanding answers 403 rather than a silently missing property: a caller
 	// could not tell that from "this user has no teams". Filtering on team_id
 	// reads the same memberships by a different route — it answers "who is in
 	// this team", one page at a time — so it takes the same gate.
-	if (input.IncludeTeams || filtersOnTeamID(req.Filter)) && !session {
-		if err := requireMembershipRead(ctx); err != nil {
+	readsMemberships := input.IncludeTeams || filtersOnTeamID(req.Filter)
+	// A Console session mints no scopes, so the list check's resolver decision
+	// stands in for them (#1300 §4, see userReadsProject). Decided here, for this
+	// list, rather than in the shared ceiling, so another endpoint does not
+	// inherit it by accepting the cookie.
+	sessionReads := projectWide && scopeCtx.PrincipalType == domain.AuthzPrincipalTypeUser
+	if readsMemberships {
+		if err := requireMembershipReadUnless(ctx, sessionReads); err != nil {
 			return nil, err
 		}
 	}
 	// The owner team is a different resource under a different permission, so
 	// it is gated on its own rather than folded into the membership check.
-	if input.IncludeLifecycleOwnerTeam && !session {
+	if input.IncludeLifecycleOwnerTeam && !sessionReads {
 		if err := requireTeamRead(ctx); err != nil {
 			return nil, err
 		}
@@ -232,6 +230,16 @@ func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams)
 	}
 	var teamID *string
 	if params.TeamID.IsSet() {
+		// team_id answers "is this user an active member of that team", the
+		// membership read POST /users/query gates the same way: by scope for a
+		// project secret, by project-wide read for a session.
+		reads, err := h.userReadsProject(ctx, projectID)
+		if err != nil {
+			return nil, err
+		}
+		if err := requireMembershipReadUnless(ctx, reads); err != nil {
+			return nil, err
+		}
 		teamID = new(string(params.TeamID.Value))
 	}
 

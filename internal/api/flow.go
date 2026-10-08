@@ -205,7 +205,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is not on the request origin %q", rawTarget, requestOrigin))
 		}
 		submitReq.SSOReturn = &domain.FlowSSOReturn{
-			RedirectURI:  requestOrigin + idpCallbackPath,
+			RedirectURI:  requestOrigin + IDPCallbackPath,
 			ReturnTarget: returnTarget.String(),
 		}
 	}

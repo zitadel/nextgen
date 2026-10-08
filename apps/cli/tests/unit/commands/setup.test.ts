@@ -2,10 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import {
-  resetPlatformStore,
-  setupPlatformHandlers,
-} from "@zitadel/api-mock/platform";
+import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -624,8 +621,13 @@ describe("setup command", () => {
       http.post(`${local}/projects/:projectId/claim/init`, () =>
         HttpResponse.json({ challenge_id: "claim_ch_1" }, { status: 201 }),
       ),
-      http.post(`${local}/projects/:projectId/claim/complete`, () =>
-        HttpResponse.json({ team_id: "team_localadmin", claimed_at: "2027-01-01T00:00:00Z" }),
+      http.get(`${local}/sessions/me/csrf`, () => HttpResponse.json({ csrf_token: "csrf_admin" })),
+      // A cookie-authenticated write: refused without the session's CSRF
+      // token, as the server does (ADR 053 §5).
+      http.post(`${local}/projects/:projectId/claim/complete`, ({ request }) =>
+        request.headers.get("x-zitadel-csrf") === "csrf_admin"
+          ? HttpResponse.json({ team_id: "team_localadmin", claimed_at: "2027-01-01T00:00:00Z" })
+          : HttpResponse.json({ code: "auth.csrf_invalid", message: "no" }, { status: 403 }),
       ),
     );
 
