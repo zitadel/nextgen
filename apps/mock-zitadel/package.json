@@ -15,9 +15,9 @@
     "directory": "apps/mock-zitadel"
   },
   "scripts": {
-    "dev": "tsx scripts/local-server.ts",
+    "dev": "tsx --conditions=@zitadel/source scripts/local-server.ts",
     "build": "tsdown",
-    "build:vercel": "corepack pnpm --filter @zitadel/api run generate && corepack pnpm --filter @zitadel/api run build && corepack pnpm --filter @zitadel/config run sync-schemas && corepack pnpm --filter @zitadel/config run build && corepack pnpm run build && corepack pnpm exec tsx scripts/generate-wellknown.ts",
+    "build:vercel": "corepack pnpm --filter @zitadel/api run generate && corepack pnpm --filter @zitadel/api run build && corepack pnpm --filter @zitadel/config run sync-schemas && corepack pnpm --filter @zitadel/config run build && corepack pnpm --filter @zitadel/api-mock run build && corepack pnpm run build && corepack pnpm exec tsx scripts/generate-wellknown.ts",
     "test": "vitest run",
     "test:all": "pnpm run test",
     "test:watch": "vitest --watch",
