@@ -34,8 +34,7 @@ body {
  * The two screens the shell paints itself instead of the widget (`src/main.ts`):
  * the setup hint, when the deployment has no project yet, and the connectivity
  * error, when its runtime document could not be read at all. The widget paints
- * its own page chrome, so these have to bring their own surface — dark-only,
- * like the rest of the login surface (ADR 014 §5).
+ * its own page chrome, so these have to bring their own surface — dark-only.
  */
 .shell-notice {
   box-sizing: border-box;
@@ -82,7 +81,7 @@ body {
  * person who just wanted to sign in.
  */
 .shell-notice__detail {
-  color: var(--zl-color-text-disabled);
+  color: var(--zl-muted-foreground);
   font-size: 0.8125rem;
 }
 
@@ -96,9 +95,9 @@ body {
   margin-top: 0.5rem;
   border: none;
   border-radius: 8px;
-  background: var(--zl-color-surface-default-white);
+  background: var(--zl-primary);
   padding: 0.5rem 1.25rem;
-  color: var(--zl-color-text-button-default);
+  color: var(--zl-primary-foreground);
   font-family: inherit;
   font-size: 0.875rem;
   font-weight: 500;
@@ -106,7 +105,7 @@ body {
 }
 
 .shell-notice button:hover:not(:disabled) {
-  background: var(--zl-color-surface-hover-strong);
+  background: color-mix(in srgb, var(--zl-primary) 90%, var(--zl-background));
 }
 
 .shell-notice button:disabled {

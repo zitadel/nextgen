@@ -10,9 +10,6 @@
  *   - Step descriptions: `<step>.description`
  *   - Field labels:      `<step>.field.<field>`
  *   - Action labels:     `<step>.action.<action>`
- *
- * Copy aligned to Figma screens file `xkvBjkOJ8ENuHdTGZHXezK` (May 2026).
- * MVP only — multi-locale support is deferred.
  */
 export const en: Record<string, string> = {
   // ═══════════════════════════════════════════════════════════════════════════
@@ -207,7 +204,7 @@ export const en: Record<string, string> = {
   "error.sso_unavailable":
     "This sign-in provider is not available right now. Please try another way to sign in.",
 
-  // --- Field / form errors (Figma field annotations) ---
+  // --- Field / form errors ---
   "error.email_required": "Please enter an email address",
   "error.email_invalid": "Please enter a valid email",
   "error.password_required": "Please enter a password",

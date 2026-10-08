@@ -9,7 +9,7 @@
   background: var(--zl-background);
   color: var(--zl-foreground);
 }
-/* Playground / embed preview — parent sets height (e.g. `.page-shell-frame`). */
+/* Stories / embed preview — parent sets height (e.g. `.page-shell-frame`). */
 :host([data-embedded]) {
   min-height: 100%;
   height: 100%;
