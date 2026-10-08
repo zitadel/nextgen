@@ -32,7 +32,7 @@ touched path** — read those first; the scoped files under
   `node scripts/check-changesets-status.mjs`.
 - Node version: `.nvmrc` pins one exact version. Flag any change that bumps
   it without matching `devbox.json`, `.devcontainer/devcontainer.json` and
-  `apps/cli-skill-e2e/scripts/run.mjs`, any hard-coded `node-version` in a
+  `apps/cli-skill-e2e/scripts/run.mjs` and the Vercel apps' `engines.node`, any hard-coded `node-version` in a
   workflow, or an `@types/node` major that differs from `.nvmrc`
   ([`AGENTS.md` — Node.js version](../AGENTS.md#nodejs-version)).
 - Licensing split: [`LICENSING.md`](../LICENSING.md).

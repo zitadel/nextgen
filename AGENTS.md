@@ -440,6 +440,9 @@ Every other place that picks a Node version must name the same one:
 - `apps/cli-skill-e2e/scripts/run.mjs` (the `node:<version>` image)
 - CI workflows read `.nvmrc` through `node-version-file`; never hard-code a
   `node-version`
+- the Vercel-deployed apps (`console`, `docs`, `mock-zitadel`, `storybook`)
+  set `engines.node` to the `.nvmrc` major (`24.x`); Vercel accepts only a
+  major
 
 `@types/node` in the pnpm catalog tracks the same major as `.nvmrc`, so code
 cannot type-check against APIs the runtime lacks. Bump all of these together.
