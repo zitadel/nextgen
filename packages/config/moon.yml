@@ -57,3 +57,4 @@ tasks:
   test:
     deps:
       - "build"
+      - "sync-schemas"

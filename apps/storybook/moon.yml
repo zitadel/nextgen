@@ -12,16 +12,21 @@ dependsOn:
 tasks:
   typecheck:
     # Resolves workspace packages from source via the `@zitadel/source`
-    # condition; these build deps (through api:build) keep the generated
-    # api client present.
+    # condition; the api build dep keeps its generated client present.
     deps:
+      - "api:build"
       - "api-mock:build"
       - "components:build"
+      - "config:build"
+      - "design-tokens:build"
 
   build:
     deps:
+      - "api:build"
       - "api-mock:build"
       - "components:build"
+      - "config:build"
+      - "design-tokens:build"
     # Runs in CI: the Vercel deploy builds the static site from this task, and
     # Vercel is a CI environment, so a `runInCI: false` here would make moon
     # report "no tasks found" for `storybook:build` and fail the deploy.
@@ -39,8 +44,11 @@ tasks:
   test:
     deps:
       - "install-browsers"
+      - "api:build"
       - "api-mock:build"
       - "components:build"
+      - "config:build"
+      - "design-tokens:build"
     options:
       # Shared mutex with the other browser-mode suites so only one real-Chromium
       # Vite server runs at a time; concurrent servers starve under moon's CI

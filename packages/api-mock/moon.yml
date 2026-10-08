@@ -9,10 +9,12 @@ dependsOn:
 tasks:
   typecheck:
     deps:
+      - "api:build"
       - "config:build"
 
   build:
     deps:
+      - "api:build"
       - "config:build"
 
   # Chromium for the browser project. Self-contained (like storybook): the
@@ -30,6 +32,7 @@ tasks:
   test:
     deps:
       - "install-browsers"
+      - "api:build"
       - "config:build"
     options:
       # Shared mutex with the other browser-mode suites so only one real-Chromium

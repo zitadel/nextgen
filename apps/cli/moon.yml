@@ -11,11 +11,15 @@ dependsOn:
 tasks:
   typecheck:
     deps:
+      - "api:build"
       - "api-mock:build"
+      - "config:build"
       - "sdk-next:build"
 
   build:
     deps:
+      - "api:build"
+      - "config:build"
       - "sdk-next:build"
     inputs:
       # Default project files plus the telemetry build-channel env var, so a
@@ -32,6 +36,7 @@ tasks:
       ZITADEL_TELEMETRY_BUILD_CHANNEL: "production"
     deps:
       - "test"
+      - "api:build-release"
       - "sdk-next:build-release"
     inputs:
       - "**/*"

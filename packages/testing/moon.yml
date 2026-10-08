@@ -13,10 +13,12 @@ dependsOn:
 tasks:
   typecheck:
     deps:
+      - "api:build"
       - "config:build"
 
   build:
     deps:
+      - "api:build"
       - "config:build"
 
   build-release:
@@ -24,6 +26,7 @@ tasks:
       node ../../scripts/release-clean.mjs local-dist
       corepack pnpm run build
     deps:
+      - "api:build-release"
       - "config:build-release"
     outputs:
       - "dist/**/*"
