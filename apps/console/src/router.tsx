@@ -1,6 +1,7 @@
 import { type RouterHistory, createRouter } from "@tanstack/react-router";
 
 import { ErrorState, NotFoundState, PendingState } from "./components/boundaries";
+import { basePath } from "./lib/base-path";
 import { routeTree } from "./routeTree.gen";
 
 /**
@@ -15,7 +16,7 @@ import { routeTree } from "./routeTree.gen";
  * shared pending/error/not-found boundaries) with an in-memory history.
  */
 export function createAppRouter(options?: { history?: RouterHistory }) {
-  const basepath = import.meta.env.BASE_URL.replace(/\/$/, "") || undefined;
+  const basepath = basePath() || undefined;
 
   return createRouter({
     routeTree,

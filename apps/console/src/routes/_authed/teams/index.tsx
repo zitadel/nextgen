@@ -1,40 +1,36 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { Box, Ellipsis, Loader2, Plus, Search } from "lucide-react";
+import { Box, Plus, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { api } from "@/api/zitadel";
 import { AddTeamSheet } from "@/components/add-team-sheet";
 import {
+  LoadMore,
   RESOURCE_CELL,
+  RESOURCE_CELL_MUTED,
   RESOURCE_HEADER,
-  RESOURCE_PAGE,
   RESOURCE_ROW_ICON,
   RESOURCE_ROW_LINK,
   RESOURCE_TABLE_WRAP,
+  RESOURCE_TITLE,
+  ResourceEmptyRow,
   ResourceHeadCell,
-  opensRow,
+  ResourceHeaderRow,
+  ResourceMenuHead,
+  ResourcePage,
+  ResourceRow,
+  RowMenu,
 } from "@/components/resource-list";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-import { api } from "../../../api/zitadel";
-import { formatDate } from "../../../lib/date";
-import { requireProjectScope, useRequiredProjectScope } from "../../../lib/project-scope";
+import { useLoadMore } from "@/hooks/use-load-more";
+import { formatDate } from "@/lib/date";
+import { requireProjectScope, useRequiredProjectScope } from "@/lib/project-scope";
+import { stringParam } from "@/lib/search-params";
 
 /**
  * The two states `team-status` defines. The tabs filter on exactly these, so the
@@ -54,7 +50,7 @@ export const Route = createFileRoute("/_authed/teams/")({
   // the back button — and changing either re-runs the loader, which resets the
   // paged-in rows the way a create or a delete does.
   validateSearch: (search: Record<string, unknown>): TeamsSearch => {
-    const q = typeof search.q === "string" ? search.q.trim() : "";
+    const q = stringParam(search.q)?.trim() ?? "";
     return {
       status: STATUSES.find((status) => status === search.status) ?? "active",
       q: q === "" ? undefined : q,
@@ -87,9 +83,8 @@ const SEARCH_DEBOUNCE_MS = 250;
  * column is the one the design reserves for the row menu, and keeps the three
  * data columns where the design puts them.
  */
-const COLUMN = "w-[248px]";
+const COLUMN = "w-62";
 
-type Team = Awaited<ReturnType<typeof api.queryTeams>>["teams"][number];
 type TeamFilter = NonNullable<Parameters<typeof api.queryTeams>[0]["filter"]>;
 
 /**
@@ -113,54 +108,24 @@ function TeamsScreen() {
   const navigate = useNavigate({ from: Route.fullPath });
   const router = useRouter();
 
-  // Pages fetched after the first live here rather than in the loader, so `Load
-  // more` appends without re-running it and a route invalidation resets to the
-  // first page — the honest thing to show once the set has changed underneath.
-  const [extra, setExtra] = useState<Team[]>([]);
-  const [nextPageToken, setNextPageToken] = useState(loaded.nextPageToken);
-  const [loadingMore, setLoadingMore] = useState(false);
-
-  useEffect(() => {
-    setExtra([]);
-    setNextPageToken(loaded.nextPageToken);
-  }, [loaded]);
-
-  // The loader hands back a new object on every invalidation, so its identity is
-  // the generation of the list on screen. `loadMore` reads it after awaiting to
-  // tell whether the page it fetched still belongs to the set it asked for.
-  const loadedRef = useRef(loaded);
-  useEffect(() => {
-    loadedRef.current = loaded;
-  }, [loaded]);
-
-  const teams = [...loaded.teams, ...extra];
-
-  async function loadMore() {
-    if (!nextPageToken || loadingMore) return;
-    const generation = loaded;
-    setLoadingMore(true);
-    try {
+  const paging = useLoadMore(
+    loaded,
+    async (pageToken) => {
       const page = await api.queryTeams(
         // The same filter the token was issued under: a page token answers one
         // question, and asking a different one with it is not a narrower list
         // but a meaningless one.
-        { limit: PAGE_SIZE, page_token: nextPageToken, filter: teamFilter(search) },
+        { limit: PAGE_SIZE, page_token: pageToken, filter: teamFilter(search) },
         { project_id: projectId },
       );
-      // A page that lands after the list was invalidated answers a question about
-      // the previous set; appending it would re-add rows the server may no longer
-      // return. It is dropped, leaving the button ready to fetch the current
-      // page 2.
-      if (loadedRef.current !== generation) return;
-      setExtra((current) => [...current, ...page.teams]);
-      setNextPageToken(page.next_page_token ?? undefined);
-    } finally {
-      setLoadingMore(false);
-    }
-  }
+      return { items: page.teams, nextPageToken: page.next_page_token ?? undefined };
+    },
+    "Could not load more teams.",
+  );
+  const teams = [...loaded.teams, ...paging.extra];
 
   return (
-    <div className={`${RESOURCE_PAGE} pt-4`}>
+    <ResourcePage>
       {/* The tabs filter one list rather than switch between panels, so the
           table is the tab's panel: it renders under whichever tab is selected,
           which is also what keeps each trigger's `aria-controls` pointing at a
@@ -174,10 +139,10 @@ function TeamsScreen() {
         className="gap-4"
       >
         {/* 8px from the title row to the tabs on desktop, 24px on mobile, where
-            the frame gives the stacked header more room. */}
+            the design gives the stacked header more room. */}
         <div className={`${RESOURCE_HEADER} flex flex-col gap-6 lg:gap-2`}>
           <div className="flex flex-col gap-2 lg:h-9 lg:flex-row lg:items-center lg:justify-between">
-            <h1 className="text-foreground font-serif text-2xl leading-6 tracking-tight">Teams</h1>
+            <h1 className={RESOURCE_TITLE}>Teams</h1>
             <div className="flex items-center gap-3">
               <TeamSearch value={search.q} />
               <AddTeamSheet onCreated={() => router.invalidate()}>
@@ -213,20 +178,16 @@ function TeamsScreen() {
                   for the row menu. */}
               <Table className="table-fixed text-xs">
                 <TableHeader>
-                  <TableRow className="border-border border-b hover:bg-transparent">
+                  <ResourceHeaderRow>
                     <ResourceHeadCell className={COLUMN}>Name</ResourceHeadCell>
                     <ResourceHeadCell className={COLUMN}>Status</ResourceHeadCell>
                     <ResourceHeadCell className={COLUMN}>Created</ResourceHeadCell>
-                    <TableHead className={`${COLUMN} h-14 px-6`} />
-                  </TableRow>
+                    <ResourceMenuHead className={COLUMN} />
+                  </ResourceHeaderRow>
                 </TableHeader>
                 <TableBody>
                   {teams.length === 0 ? (
-                    <TableRow className="border-0 hover:bg-transparent">
-                      <TableCell colSpan={4} className="text-muted-foreground h-24 text-center">
-                        {emptyMessage(search)}
-                      </TableCell>
-                    </TableRow>
+                    <ResourceEmptyRow colSpan={4}>{emptyMessage(search)}</ResourceEmptyRow>
                   ) : (
                     teams.map((team) => (
                       // The whole row opens the team. The name is a real link so
@@ -234,14 +195,11 @@ function TeamsScreen() {
                       // the status bar; the row handler is the pointer
                       // affordance on top of it, and `opensRow` keeps it out of
                       // the link's way.
-                      <TableRow
+                      <ResourceRow
                         key={team.id}
-                        className="hover:bg-muted/40 cursor-pointer border-0"
-                        onClick={(event) => {
-                          if (opensRow(event)) {
-                            void navigate({ to: "/teams/$teamId", params: { teamId: team.id } });
-                          }
-                        }}
+                        onOpen={() =>
+                          void navigate({ to: "/teams/$teamId", params: { teamId: team.id } })
+                        }
                       >
                         <TableCell className={`${RESOURCE_CELL} truncate`}>
                           <Link
@@ -256,39 +214,24 @@ function TeamsScreen() {
                         <TableCell className={RESOURCE_CELL}>
                           <StatusBadge status={team.status} />
                         </TableCell>
-                        <TableCell
-                          className={`${RESOURCE_CELL} text-muted-foreground truncate text-sm`}
-                        >
+                        <TableCell className={RESOURCE_CELL_MUTED}>
                           {formatDate(team.created_at)}
                         </TableCell>
                         <TableCell className={`${RESOURCE_CELL} text-right`}>
                           <RowActions teamId={team.id} name={team.name} />
                         </TableCell>
-                      </TableRow>
+                      </ResourceRow>
                     ))
                   )}
                 </TableBody>
               </Table>
             </div>
 
-            {/* D5: `Load more` rather than pagination controls. The button's
-                presence means there is more; its absence means the list is
-                complete. */}
-            {nextPageToken && (
-              <Button
-                variant="secondary"
-                className="mt-6 h-9 w-full gap-1.5 px-2.5"
-                onClick={() => void loadMore()}
-                disabled={loadingMore}
-              >
-                {loadingMore && <Loader2 className="size-3 animate-spin" aria-hidden />}
-                Load more
-              </Button>
-            )}
+            <LoadMore paging={paging} />
           </TabsContent>
         ))}
       </Tabs>
-    </div>
+    </ResourcePage>
   );
 }
 
@@ -333,7 +276,7 @@ function TeamSearch({ value }: { value?: string }) {
   }, [query, navigate]);
 
   return (
-    <InputGroup className="min-w-0 flex-1 lg:w-[242px] lg:flex-none">
+    <InputGroup className="min-w-0 flex-1 lg:w-60.5 lg:flex-none">
       <InputGroupAddon>
         <Search aria-hidden strokeWidth={1.5} />
       </InputGroupAddon>
@@ -360,19 +303,12 @@ function TeamSearch({ value }: { value?: string }) {
  */
 function RowActions({ teamId, name }: { teamId: string; name: string }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label={`Actions for ${name}`}>
-          <Ellipsis aria-hidden />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
-        <DropdownMenuItem asChild>
-          <Link to="/teams/$teamId" params={{ teamId }}>
-            View team
-          </Link>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <RowMenu name={name}>
+      <DropdownMenuItem asChild>
+        <Link to="/teams/$teamId" params={{ teamId }}>
+          View team
+        </Link>
+      </DropdownMenuItem>
+    </RowMenu>
   );
 }
