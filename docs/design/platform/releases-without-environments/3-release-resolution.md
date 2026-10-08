@@ -443,7 +443,7 @@ own hostname.
 
 Developers sharing a project share its users and sessions. A developer who needs
 isolation uses their own project, which costs a `ZITADEL_PROJECT_ID` in
-`.env.local`.
+`.env.development.local`.
 
 ## Prerequisites
 
