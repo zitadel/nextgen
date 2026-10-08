@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { DETAIL_BODY } from "@/components/detail-page";
+import { DETAIL_BODY, DETAIL_CARD } from "@/components/detail-page";
 import { Card, CardContent } from "@/components/ui/card";
 import { FieldGroup } from "@/components/ui/field";
 
@@ -13,7 +13,7 @@ import { FieldGroup } from "@/components/ui/field";
  */
 export function SettingsCard({ children }: { children: ReactNode }) {
   return (
-    <Card className={`${DETAIL_BODY} gap-0 rounded-xl py-0`}>
+    <Card className={`${DETAIL_BODY} ${DETAIL_CARD}`}>
       <CardContent className="px-6 py-5">
         <FieldGroup className="gap-4">{children}</FieldGroup>
       </CardContent>

@@ -14,10 +14,12 @@ tasks:
       - "config:build"
 
   build:
-    command: 'node -e "process.exit(0)"'
+    command: "corepack pnpm run build"
     deps:
       - "api:build"
       - "config:build"
+    outputs:
+      - "dist/**/*"
 
   # Chromium for the browser project. Self-contained (like storybook): the
   # `test` task depends on it so `moon ci :test` provisions it in CI.

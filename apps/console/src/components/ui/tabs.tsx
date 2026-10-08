@@ -52,7 +52,14 @@ function TabsList({
   );
 }
 
-function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
+function TabsTrigger({
+  className,
+  variant = "default",
+  ...props
+}: React.ComponentProps<typeof TabsPrimitive.Trigger> & {
+  /** `muted` hugs its label and fills the active trigger with `muted`. */
+  variant?: "default" | "muted";
+}) {
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
@@ -68,6 +75,7 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
         // the page rather than a tint of it. Upstream shadcn uses `bg-background`
         // in light and `bg-input/30` + `border-input` in dark.
         "data-[state=active]:bg-card data-[state=active]:text-foreground",
+        variant === "muted" && "flex-none data-[state=active]:bg-muted",
         "after:absolute after:bg-foreground after:opacity-0 after:transition-opacity group-data-[orientation=horizontal]/tabs:after:inset-x-0 group-data-[orientation=horizontal]/tabs:after:bottom-[-5px] group-data-[orientation=horizontal]/tabs:after:h-0.5 group-data-[orientation=vertical]/tabs:after:inset-y-0 group-data-[orientation=vertical]/tabs:after:-right-1 group-data-[orientation=vertical]/tabs:after:w-0.5 group-data-[variant=line]/tabs-list:data-[state=active]:after:opacity-100",
         className,
       )}

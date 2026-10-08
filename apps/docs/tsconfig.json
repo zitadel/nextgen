@@ -1,3 +1,15 @@
 {
-  "extends": "./tsconfig.app.json"
+  "extends": "./tsconfig.spec.json",
+  "include": [
+    "press.config.tsx",
+    "source.config.ts",
+    "waku.config.ts",
+    "*.config.mts",
+    "*.config.ts",
+    "scripts/**/*.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx"
+  ]
 }

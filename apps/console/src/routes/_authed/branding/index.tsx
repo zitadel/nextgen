@@ -23,8 +23,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { BrandingRevision } from "@/lib/branding-palette";
 import { flowDisplayName } from "@/lib/flow-definition";
 
-import { api } from "../../../api/zitadel";
-import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scope";
+import { api } from "@/api/zitadel";
+import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 
 export const Route = createFileRoute("/_authed/branding/")({
   // Nested under Login flows, as in the design: branding is how those flows
@@ -100,12 +100,6 @@ const STATE_LABELS: Record<PreviewState, string> = {
   success: "Success",
 };
 
-// The flow selector is drawn as a ghost button, not a bordered select: no
-// border or shadow, and its icons take the foreground colour rather than the
-// muted one a bordered trigger uses.
-const GHOST_TRIGGER =
-  "h-9 gap-1.5 border-0 px-2.5 font-medium shadow-none hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:hover:bg-accent [&_svg:not([class*='text-'])]:text-foreground";
-
 /**
  * Which side the preview paints: a fixed side, or `revision` to leave it to
  * the revision's own `theme.mode` — what a visitor gets. A pinned side still
@@ -165,11 +159,11 @@ function BrandingScreen() {
           tabs with the environment buttons edge-aligned, then the state
           selector, which is too wide to share the tabs' row at that width.
           The separators only exist inline. */}
-      <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-[10px] lg:px-2">
+      <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-2.5 lg:px-2">
         {flows.length > 0 && (
-          <div className="flex items-center justify-between gap-[10px]">
+          <div className="flex items-center justify-between gap-2.5">
             <Select value={activeFlowName} onValueChange={setFlowName}>
-              <SelectTrigger aria-label="Previewed flow" className={GHOST_TRIGGER}>
+              <SelectTrigger aria-label="Previewed flow" variant="ghost">
                 <Workflow />
                 <SelectValue />
               </SelectTrigger>
@@ -189,7 +183,7 @@ function BrandingScreen() {
             <Separator orientation="vertical" className="hidden h-5! lg:block" />
           </div>
         )}
-        <div className="flex flex-wrap items-center gap-x-[10px] gap-y-2 lg:flex-1">
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 lg:flex-1">
           <Tabs
             value={activeJourney}
             onValueChange={(value) => setJourney(value as PreviewJourney)}
@@ -204,10 +198,10 @@ function BrandingScreen() {
           </Tabs>
           {/* After the tabs, as the design orders the row: flow, screen, state.
               No icon on this one; the flow selector alone carries its glyph. */}
-          <div className="order-last flex basis-full items-center gap-[10px] sm:order-none sm:basis-auto">
+          <div className="order-last flex basis-full items-center gap-2.5 sm:order-none sm:basis-auto">
             <Separator orientation="vertical" className="hidden h-5! lg:block" />
             <Select value={activeState} onValueChange={(value) => setState(value as PreviewState)}>
-              <SelectTrigger aria-label="Previewed state" className={GHOST_TRIGGER}>
+              <SelectTrigger aria-label="Previewed state" variant="ghost">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent position="popper" sideOffset={4}>
@@ -260,7 +254,7 @@ function BrandingScreen() {
         <Card className="flex min-h-[29rem] items-center justify-center overflow-auto border-foreground/10 p-6 shadow-xs lg:min-h-[32rem]">
           {/* The widget is content-sized, so the preview constrains the width
               rather than the element: that is what an embedding page does. */}
-          <div className={narrow ? "w-[24rem]" : "w-full max-w-[32rem]"}>
+          <div className={narrow ? "w-96" : "w-full max-w-lg"}>
             <LoginPreview
               journey={activeJourney}
               flowName={activeFlowName}

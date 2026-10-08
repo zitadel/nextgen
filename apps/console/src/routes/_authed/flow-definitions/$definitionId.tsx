@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Link2, Workflow } from "lucide-react";
 
+import { api } from "@/api/zitadel";
+import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
+import { DetailPanel, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { DETAIL_PANEL_PAGE } from "@/components/layout";
-import { EYEBROW, MetaRule, MetaValue } from "@/components/detail-meta";
-import { ICON_PLATE, MetaCard } from "@/components/detail-page";
+import { EYEBROW, PANEL_BODY_CELL, PANEL_HEAD_CELL } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
   Table,
@@ -24,10 +25,8 @@ import {
   stepActionNames,
   stepFieldNames,
 } from "@/lib/flow-definition";
+import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { schemaDisplayName } from "@/lib/schema";
-
-import { api } from "../../../api/zitadel";
-import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scope";
 
 export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")({
   staticData: { scope: "project" },
@@ -75,16 +74,11 @@ function FlowDefinitionDetail() {
 
   return (
     <div className={DETAIL_PANEL_PAGE}>
-      <Card className="gap-4 border-foreground/10 px-6 py-5 shadow-xs">
+      <DetailPanel>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           {/* Stacks below `sm` so a long schema name cannot squeeze the title. */}
           <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <span aria-hidden className={ICON_PLATE}>
-                <Workflow className="size-4" />
-              </span>
-              <h1 className="truncate font-serif text-lg leading-6 text-foreground">{name}</h1>
-            </div>
+            <PanelTitle icon={Workflow} title={name} />
             {schemaName && schemaId && (
               <Link to="/schemas/$schemaId" params={{ schemaId }} className="w-fit shrink-0">
                 <Badge variant="outline" className="h-5 gap-1 hover:bg-accent">
@@ -95,7 +89,7 @@ function FlowDefinitionDetail() {
             )}
           </div>
 
-          {/* The frame draws a third value, `EXPIRES AT`; nothing backs it. */}
+          {/* The design draws a third value, `EXPIRES AT`; nothing backs it. */}
           <MetaCard>
             <MetaValue label="Flow ID" value={definitionId} copyable />
             <MetaRule />
@@ -133,7 +127,7 @@ function FlowDefinitionDetail() {
         </section>
 
         <DocumentViewer document={definition} noun="definition" />
-      </Card>
+      </DetailPanel>
     </div>
   );
 }
@@ -152,7 +146,6 @@ function StepRow({ step }: { step: FlowStep }) {
   );
 }
 
-const HEAD_CELL =
-  "h-auto px-0 py-3 font-serif text-xs font-normal tracking-[0.72px] text-muted-foreground uppercase";
+const HEAD_CELL = PANEL_HEAD_CELL;
 // `whitespace-normal`: a register step's field list outruns a third of the panel.
-const BODY_CELL = "px-0 py-3 text-sm whitespace-normal";
+const BODY_CELL = `${PANEL_BODY_CELL} whitespace-normal`;
