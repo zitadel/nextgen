@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"maps"
+	"strings"
 	"testing"
 	"time"
 
@@ -4447,8 +4448,9 @@ func TestFlowStateMachine_Process_PurposeToggleDoesNotGrowState(t *testing.T) {
 
 // ssoSchemaContent is the schema behind [ssoRenderWorld]: email and username
 // are project-unique and badge is team-unique, and the collision check probes
-// all three; account.handle is a nested unique leaf; age is a type union no
-// step renders; locale and address carry rules a step field does not check.
+// all three; account.handle is a nested unique leaf; employee_id is a unique
+// number; age is a type union no step renders; locale and address carry rules
+// a step field does not check.
 const ssoSchemaContent string = `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
@@ -4461,6 +4463,7 @@ const ssoSchemaContent string = `{
 			"given_name":  { "type": "string", "minLength": 1, "maxLength": 200 },
 			"family_name": { "type": "string", "minLength": 1, "maxLength": 200 },
 			"badge":       { "type": "string", "x-unique": "team" },
+			"employee_id": { "type": "integer", "x-unique": "project" },
 			"age":         { "type": ["string", "integer"] },
 			"locale":      { "type": "string", "enum": ["en", "de", "fr"] },
 			"account": {
@@ -4960,21 +4963,93 @@ func TestFlowStateMachine_Render_SSOCollisionOwnerOfAnotherSchemaRestarts(t *tes
 }
 
 // A provider claim that fails the schema (too long, bad format) cannot create
-// a user unattended, so it is collected for the user to fix.
-func TestFlowStateMachine_Render_SSOInvalidClaimRoutesUserNotFound(t *testing.T) {
+// a user unattended. One the user may edit is collected for the user to fix;
+// a verified unique one the user may not change, so the entry step shows that
+// no user can be created, and nothing is collected.
+func TestFlowStateMachine_Render_SSOInvalidClaim(t *testing.T) {
 	t.Parallel()
-	w, def, state := ssoRenderWorld(t)
-	def = withSSOOutcomeSteps(def)
-	claims, verified := completeClaims()
-	w.expectParked(unlinkedParked(claims, verified), nil)
-	w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(3)
-	w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrUserInvalid())
+	long := strings.Repeat("a", 65)
+	for name, tc := range map[string]struct {
+		edit     func(claims map[string]any, verified map[string]bool)
+		probes   int
+		create   bool
+		wantStep string
+		wantErr  string
+	}{
+		"claim the user may edit": {
+			edit:     func(map[string]any, map[string]bool) {},
+			probes:   3,
+			create:   true,
+			wantStep: "sso-register",
+		},
+		"unverified unique claim": {
+			edit: func(claims map[string]any, verified map[string]bool) {
+				claims["username"] = long
+				verified["username"] = false
+			},
+			probes:   3,
+			wantStep: "sso-register",
+		},
+		"verified unique claim": {
+			edit:     func(claims map[string]any, _ map[string]bool) { claims["username"] = long },
+			probes:   3,
+			wantStep: "credentials",
+			wantErr:  domain.FlowStepErrorSSOUserCannotBeCreated,
+		},
+		"leaf of a verified unique object": {
+			edit: func(claims map[string]any, verified map[string]bool) {
+				claims["account"] = map[string]any{"handle": 42}
+				verified["account"] = true
+			},
+			probes:   4,
+			wantStep: "credentials",
+			wantErr:  domain.FlowStepErrorSSOUserCannotBeCreated,
+		},
+		// The user may edit a leaf that is not unique.
+		"leaf of a verified object that is not unique": {
+			edit: func(claims map[string]any, verified map[string]bool) {
+				claims["address"] = map[string]any{"country": "Germany"}
+				verified["address"] = true
+			},
+			probes:   3,
+			wantStep: "sso-register",
+		},
+		// The collection step leaves out a key the schema does not define.
+		"key a verified object has beyond the schema": {
+			edit: func(claims map[string]any, verified map[string]bool) {
+				claims["account"] = map[string]any{"handle": "ali", "id": "g-123"}
+				verified["account"] = true
+			},
+			probes:   4,
+			create:   true,
+			wantStep: "sso-register",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			w, def, state := ssoRenderWorld(t)
+			def = withSSOOutcomeSteps(def)
+			claims, verified := completeClaims()
+			tc.edit(claims, verified)
+			w.expectParked(unlinkedParked(claims, verified), nil)
+			w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(tc.probes)
+			if tc.create {
+				w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrUserInvalid())
+			}
 
-	result, err := w.sm.Render(t.Context(), def, state)
-	require.NoError(t, err)
-	assert.Equal(t, "sso-register", result.Step.Name)
-	assert.Empty(t, result.State.CollectedData.UserID)
-	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+			result, err := w.sm.Render(t.Context(), def, state)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantStep, result.Step.Name)
+			if tc.wantErr == "" {
+				assert.Nil(t, result.Step.Error)
+			} else {
+				require.NotNil(t, result.Step.Error)
+				assert.Equal(t, tc.wantErr, *result.Step.Error)
+			}
+			assert.Empty(t, result.State.CollectedData.UserID)
+			assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+		})
+	}
 }
 
 func TestFlowStateMachine_Render_SSOAutoCreateRoutesAuthenticated(t *testing.T) {
@@ -6306,6 +6381,7 @@ func TestFlowStateMachine_Process_SSOCollectionCreatesUser(t *testing.T) {
 		edit           func(fields map[string]any)
 		wantAttributes map[string]any
 		wantPassword   string
+		wantProbes     map[string]any
 	}{
 		// A hidden claim replaces what an earlier step collected, and is stored
 		// whatever its type when it satisfies its property.
@@ -6360,6 +6436,20 @@ func TestFlowStateMachine_Process_SSOCollectionCreatesUser(t *testing.T) {
 				"email": "alice@example.com", "username": "alice", "given_name": "Alice", "family_name": "Liddell", "badge": "b-7",
 			},
 		},
+		// The key the schema does not define is left out, which is no edit.
+		"verified object unchanged": {
+			fields: []domain.Field{"email", "username", "given_name", "family_name", "account.handle"},
+			claims: map[string]any{"email": "alice@example.com", "badge": "b-7", "account": map[string]any{
+				"handle": "ali", "id": "g-123",
+			}},
+			verified: map[string]bool{"email": true, "account": true},
+			edit:     func(fields map[string]any) { fields["account.handle"] = "ali" },
+			wantAttributes: map[string]any{
+				"email": "alice@example.com", "username": "alice", "given_name": "Alice", "family_name": "Liddell", "badge": "b-7",
+				"account": map[string]any{"handle": "ali"},
+			},
+			wantProbes: map[string]any{"account.handle": "ali"},
+		},
 		"unverified unique value edited": {
 			claims: map[string]any{"email": "alice@example.com", "badge": "b-7"},
 			edit:   func(fields map[string]any) { fields["email"] = "alice@work.example.com" },
@@ -6392,6 +6482,9 @@ func TestFlowStateMachine_Process_SSOCollectionCreatesUser(t *testing.T) {
 			w.expectOwner("badge", "b-7", "")
 			w.expectOwner("email", tc.wantAttributes["email"].(string), "")
 			w.expectOwner("username", "alice", "")
+			for attribute, value := range tc.wantProbes {
+				w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), testProjectID, defaultSchemaURL, attribute, value).Return("", nil)
+			}
 			w.expectCreateLinked(tc.wantAttributes, tc.wantPassword, "user-1", nil)
 
 			result, err := w.sm.Process(t.Context(), def, state, in)
@@ -6490,7 +6583,9 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 		w.expectOwner("username", "alice", "")
 	}
 	for name, tc := range map[string]struct {
+		fields   []domain.Field
 		claims   map[string]any
+		verified map[string]bool
 		edit     func(fields map[string]any)
 		route    *domain.FlowStepTransition
 		unrouted bool
@@ -6502,6 +6597,33 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 			edit:    func(fields map[string]any) { fields["email"] = "mallory@example.com" },
 			expect:  func(*flowTestWorld) {},
 			wantErr: domain.FlowStepErrorSSOVerifiedUniqueValueChanged,
+		},
+		// The step cannot prefill a number, and typed digits are a string, not
+		// the claimed number.
+		"verified number typed as digits": {
+			fields:   []domain.Field{"email", "username", "given_name", "family_name", "employee_id"},
+			claims:   map[string]any{"email": "alice@example.com", "badge": "b-7", "employee_id": float64(42)},
+			verified: map[string]bool{"email": true, "employee_id": true},
+			edit:     func(fields map[string]any) { fields["employee_id"] = "42" },
+			expect:   func(*flowTestWorld) {},
+			wantErr:  domain.FlowStepErrorSSOVerifiedUniqueValueChanged,
+		},
+		"unique leaf of a verified object edited": {
+			fields: []domain.Field{"email", "username", "given_name", "family_name", "account.handle"},
+			claims: map[string]any{"email": "alice@example.com", "badge": "b-7", "account": map[string]any{
+				"handle": "ali", "id": "g-123",
+			}},
+			verified: map[string]bool{"email": true, "account": true},
+			edit:     func(fields map[string]any) { fields["account.handle"] = "bob" },
+			expect:   func(*flowTestWorld) {},
+			wantErr:  domain.FlowStepErrorSSOVerifiedUniqueValueChanged,
+		},
+		// The schema changed since the callback, which refuses such a claim.
+		"verified unique claim the schema rejects": {
+			claims:   map[string]any{"email": "alice@example.com", "badge": "b-7", "username": strings.Repeat("a", 65)},
+			verified: map[string]bool{"email": true, "username": true},
+			expect:   func(*flowTestWorld) {},
+			wantErr:  domain.FlowStepErrorSSOUserCannotBeCreated,
 		},
 		// badge is required, the step has no field for it, and the provider
 		// sent none.
@@ -6556,6 +6678,9 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 			t.Parallel()
 			w, def, state := submittableCollectionStepWorld(t)
 			step := &def.Steps[len(def.Steps)-1]
+			if tc.fields != nil {
+				step.Fields = tc.fields
+			}
 			if tc.route != nil {
 				step.Transitions[domain.FlowActionSubmit] = *tc.route
 			}
@@ -6566,7 +6691,11 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 			if claims == nil {
 				claims = map[string]any{"email": "alice@example.com", "badge": "b-7"}
 			}
-			w.expectCollected(unlinkedParked(claims, map[string]bool{"email": true}), nil).MinTimes(1).MaxTimes(2)
+			verified := tc.verified
+			if verified == nil {
+				verified = map[string]bool{"email": true}
+			}
+			w.expectCollected(unlinkedParked(claims, verified), nil).MinTimes(1).MaxTimes(2)
 			tc.expect(w)
 			edit := tc.edit
 			if edit == nil {

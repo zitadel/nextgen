@@ -60,15 +60,21 @@ const (
 	// only together, such as a rule across fields. The user can still edit
 	// them on the step.
 	FlowStepErrorSSOUserInvalid = "error.sso_user_invalid"
-	// FlowStepErrorSSOUserCannotBeCreated reports a required property that
-	// neither the step nor the provider supplies. No edit on the step can
-	// fix it; the flow definition must collect it.
+	// FlowStepErrorSSOUserCannotBeCreated reports what no edit on the step
+	// can fix: a required property that neither the step nor the provider
+	// supplies, which the flow definition must collect, or a verified unique
+	// claim the user schema rejects, which the schema must accept.
 	FlowStepErrorSSOUserCannotBeCreated = "error.sso_user_cannot_be_created"
 	// FlowStepErrorUserAlreadyExists reports a unique value another user
 	// holds where the engine cannot bind that user, so it cannot route
 	// user_already_exists: a user of another schema.
 	FlowStepErrorUserAlreadyExists = "error.user_already_exists"
 )
+
+// errSSOClaimRejected reports a verified unique claim that fails its own
+// property. The user may not change a verified value, and the account cannot
+// hold this one, so nothing is created and no step is shown to collect it.
+var errSSOClaimRejected = errors.New("flow state machine: the user schema rejects a verified unique claim")
 
 // FlowStepErrorAllowed reports whether a step error value honors the
 // client contract: a localizable `error.*` text key or a reserved
@@ -537,6 +543,11 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		if errors.Is(err, ErrSSOOwnerOtherSchema) {
 			return FlowStepResult{}, false, ErrFlowRestartRequired().WithParent(err)
 		}
+		if errors.Is(err, errSSOClaimRejected) {
+			// The row stays parked, as under creation disabled.
+			result, err := r.renderStepError(pc, resolvedFields, new(FlowStepErrorSSOUserCannotBeCreated))
+			return result, true, err
+		}
 		if err != nil {
 			return FlowStepResult{}, false, err
 		}
@@ -600,6 +611,9 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	if ssoBoundUser(state, parked) != "" {
 		return "", ErrFlowRestartRequired()
 	}
+	if ssoVerifiedClaimRejected(schema, parked.Verified, claims) {
+		return "", errSSOClaimRejected
+	}
 	if !ssoClaimsComplete(schema, parked, claims, uniqueClaims) {
 		return FlowImplicitOutcomeSSOUserNotFound, nil
 	}
@@ -634,8 +648,8 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 		return FlowImplicitOutcomeSSOUserNotFound, nil
 	}
 	if errors.Is(err, ErrUserInvalid()) {
-		// A claim fails the schema (too long, bad format): collect it so the
-		// user can fix it.
+		// A claim the user may edit fails the schema (too long, bad format):
+		// collect it so the user can fix it.
 		return FlowImplicitOutcomeSSOUserNotFound, nil
 	}
 	if err != nil {
@@ -710,6 +724,33 @@ func mergeSSOClaim(collected, kept any) any {
 		out[key] = mergeSSOClaim(collectedObject[key], value)
 	}
 	return out
+}
+
+// ssoVerifiedClaimRejected reports whether a unique leaf of a verified claim
+// fails its own property. A leaf is unique by its own x-unique, as the
+// registry reads it ([CreateAttributes]). Keys the schema does not define are
+// skipped: the collection step leaves them out.
+func ssoVerifiedClaimRejected(schema *jsonschema.Schema, verified map[string]bool, claims map[string]any) bool {
+	var rejected func(prop schemaReader, value any) bool
+	rejected = func(prop schemaReader, value any) bool {
+		object, ok := value.(map[string]any)
+		if !ok {
+			return deriveUnique(prop) != AttributeUniquenessUnspecified && prop.s.Validate(value) != nil
+		}
+		for key, v := range object {
+			if sub, ok := prop.Property(key); ok && rejected(sub, v) {
+				return true
+			}
+		}
+		return false
+	}
+	root := newSchemaReader(schema)
+	for name, value := range claims {
+		if prop, ok := root.Property(name); ok && verified[name] && rejected(prop, value) {
+			return true
+		}
+	}
+	return false
 }
 
 // ssoSchemaClaims keeps the claims whose name is a top-level property of the
@@ -1384,10 +1425,30 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 		}
 	}
 
-	_, uniqueClaims := ssoUniqueClaims(schema, claims)
-	for _, name := range uniqueClaims {
-		value, ok := attributes[name]
-		if collected.Verified[name] && ok && !reflect.DeepEqual(value, claims[name]) {
+	// The callback refuses such a claim before the step; the schema may have
+	// changed since.
+	if ssoVerifiedClaimRejected(schema, collected.Verified, claims) {
+		return r.renderStepError(pc, resolved, new(FlowStepErrorSSOUserCannotBeCreated))
+	}
+	// A shown unique leaf of a verified claim must keep the claimed value. The
+	// step prefills only strings, so any value typed for a number claim is
+	// refused.
+	for _, f := range resolved.Fields {
+		path := AttributeKey(f.Name).Nodes()
+		claim, ok := maputil.GetNested[any](claims, path)
+		if !ok || !collected.Verified[path[0]] {
+			continue
+		}
+		prop, defined := root, true
+		for _, node := range path {
+			if prop, defined = prop.Property(node); !defined {
+				break
+			}
+		}
+		if !defined || deriveUnique(prop) == AttributeUniquenessUnspecified {
+			continue
+		}
+		if value, ok := maputil.GetNested[any](attributes, path); ok && !reflect.DeepEqual(value, claim) {
 			return r.renderStepError(pc, resolved, new(FlowStepErrorSSOVerifiedUniqueValueChanged))
 		}
 	}
