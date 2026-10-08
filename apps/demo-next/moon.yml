@@ -17,12 +17,10 @@ workspace:
 tasks:
   typecheck:
     deps:
-      - "api:build"
       - "sdk-next:build"
 
   build:
     deps:
-      - "api:build"
       - "sdk-next:build"
     outputs:
       - ".next/**/*"
@@ -33,7 +31,6 @@ tasks:
   dev:
     command: "corepack pnpm run dev"
     deps:
-      - "api:build"
       - "sdk-next:build"
     options:
       persistent: true

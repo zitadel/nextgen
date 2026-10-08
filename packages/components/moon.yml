@@ -11,14 +11,11 @@ dependsOn:
 tasks:
   typecheck:
     deps:
-      - "api:build"
       - "api-mock:build"
-      - "config:build"
       - "design-tokens:build"
 
   build:
     deps:
-      - "api:build"
       # The standalone bundle inlines @zitadel/config/template (see
       # tsdown.config.ts); without this edge the two builds race in the moon
       # graph and rolldown silently leaves the unresolvable import external —
@@ -32,7 +29,6 @@ tasks:
       corepack pnpm run build
       node scripts/check-standalone-artifact.mjs
     deps:
-      - "api:build-release"
       # Same edge as the dev build: the standalone bundle inlines
       # @zitadel/config/template, and without ordering the release builds
       # race — rolldown leaves the unresolvable import external and the
@@ -65,10 +61,7 @@ tasks:
   test:
     deps:
       - "install-browsers"
-      - "api:build"
       - "api-mock:build"
-      - "config:build"
-      - "design-tokens:build"
       # standalone-artifact.spec.ts reads dist/standalone.mjs — the unit suite
       # guards the built artifact, so the dev build must run first.
       - "build"
