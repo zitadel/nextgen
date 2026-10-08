@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 
-import { defineConfig, type Plugin } from "tsdown";
+import { defineConfig, type TsdownPlugin } from "tsdown";
 
 /**
  * Rolldown plugin that turns `.liquid` files into default-exported strings.
  * Mirrors what Vite does natively so `import tpl from "./file.liquid"` works
  * in both dev (Vite) and production (tsdown/rolldown) builds.
  */
-function liquidRaw(): Plugin {
+function liquidRaw(): TsdownPlugin {
   return {
     name: "liquid-raw",
     load(id) {
@@ -71,11 +71,10 @@ export default defineConfig([
     // `declare module "react"` block, which the dts bundler must not process
     // (see src/jsx.d.ts).
     copy: ["src/jsx.d.ts"],
-    // The tsc-emitted project-reference outputs now live in `out-tsc/lib`
-    // (tsconfig.lib.json outDir), so build and typecheck no longer share
-    // files. `clean: false` stays for a different reason: `clean: true`
-    // would also wipe the sibling standalone.mjs while the two build
-    // entries in this config race each other. tsdown still overwrites its
+    // Typecheck emits nothing, so tsdown is the only writer here. `clean:
+    // false` is still needed because `clean: true` would wipe the sibling
+    // standalone.mjs while the two build entries in this config race each
+    // other. tsdown still overwrites its
     // own outputs on each rebuild — stale files just accumulate harmlessly
     // until a full `git clean`.
     clean: false,

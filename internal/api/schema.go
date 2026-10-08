@@ -66,7 +66,7 @@ func (h *Handler) GetSchemaById(ctx context.Context, params api.GetSchemaByIdPar
 }
 
 func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams) (api.ListSchemasRes, error) {
-	ctx, err := h.requireProjectListAccess(ctx, string(params.ProjectID), schemaAccess, domain.ResourceKindSchema)
+	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), schemaAccess, domain.ResourceKindSchema)
 	if err != nil {
 		return nil, err
 	}

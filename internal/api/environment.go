@@ -10,7 +10,7 @@ import (
 )
 
 func (h *Handler) ListEnvironments(ctx context.Context, params api.ListEnvironmentsParams) (api.ListEnvironmentsRes, error) {
-	ctx, err := h.requireProjectListAccess(ctx, string(params.ProjectID), environmentAccess, domain.ResourceKindEnvironment)
+	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), environmentAccess, domain.ResourceKindEnvironment)
 	if err != nil {
 		return nil, err
 	}

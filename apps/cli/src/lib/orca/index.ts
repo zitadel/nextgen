@@ -35,11 +35,19 @@ type ScaffoldStash = Readonly<{
  * internal to that patcher. Registries are injected so tests can supply fakes.
  */
 export class Orca {
+  private readonly detectors: ReadonlyArray<Detector>;
+  private readonly scaffolders: ReadonlyArray<Scaffolder>;
+  private readonly patchers: ReadonlyArray<Patcher>;
+
   constructor(
-    private readonly detectors: ReadonlyArray<Detector>,
-    private readonly scaffolders: ReadonlyArray<Scaffolder>,
-    private readonly patchers: ReadonlyArray<Patcher>,
-  ) {}
+    detectors: ReadonlyArray<Detector>,
+    scaffolders: ReadonlyArray<Scaffolder>,
+    patchers: ReadonlyArray<Patcher>,
+  ) {
+    this.detectors = detectors;
+    this.scaffolders = scaffolders;
+    this.patchers = patchers;
+  }
 
   /**
    * Detects the framework in `cwd` and extracts its {@link FrameworkFacts},

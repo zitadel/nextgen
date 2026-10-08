@@ -8,6 +8,7 @@ import {
   installDependenciesForSetup,
   type SetupInstallInput,
 } from "../../../../src/commands/setup/install";
+import type { runPackageCommand } from "../../../../src/lib/package-manager";
 
 const dirs: string[] = [];
 
@@ -42,12 +43,12 @@ const planCommand = "npx @zitadel/cli@latest plan";
 describe("setup dependency installation", () => {
   it("installs when setup added a dependency", async () => {
     const cwd = await tempProject();
-    const run = vi.fn(async () => undefined);
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
 
     const result = await installDependenciesForSetup(input({ cwd, run }));
 
     expect(run).toHaveBeenCalledOnce();
-    expect(run.mock.calls[0]?.[0].display).toBe("npm install");
+    expect(run!.mock.calls[0]?.[0].display).toBe("npm install");
     expect(run.mock.calls[0]?.[1]).toMatchObject({
       cwd,
       redirectStdoutToStderr: true,
@@ -75,7 +76,7 @@ describe("setup dependency installation", () => {
 
   it("stages the human box to the verify mission while the JSON envelope stays complete", async () => {
     const cwd = await tempProject();
-    const run = vi.fn(async () => undefined);
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
 
     const result = await installDependenciesForSetup(input({ cwd, run }));
 
@@ -105,7 +106,7 @@ describe("setup dependency installation", () => {
 
   it("keeps the install step first in the box when installation was skipped", async () => {
     const cwd = await tempProject();
-    const run = vi.fn(async () => undefined);
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
 
     const result = await installDependenciesForSetup(input({ cwd, run, skipInstall: true }));
 
@@ -115,19 +116,19 @@ describe("setup dependency installation", () => {
 
   it("installs after fresh scaffolding even when no Zitadel dependency changed", async () => {
     const cwd = await tempProject({ packageManager: "pnpm@10.33.2" });
-    const run = vi.fn(async () => undefined);
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
 
     const result = await installDependenciesForSetup(
       input({ cwd, depsAdded: [], scaffoldedFramework: true, run }),
     );
 
-    expect(run.mock.calls[0]?.[0].display).toBe("pnpm install");
+    expect(run!.mock.calls[0]?.[0].display).toBe("pnpm install");
     expect(result.nextCommands).toEqual(["pnpm dev", planCommand]);
   });
 
   it("skips and recommends install when --skip-install is set", async () => {
     const cwd = await tempProject();
-    const run = vi.fn(async () => undefined);
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
 
     const result = await installDependenciesForSetup(input({ cwd, run, skipInstall: true }));
 
@@ -138,7 +139,7 @@ describe("setup dependency installation", () => {
 
   it("skips and recommends install during dry-run", async () => {
     const cwd = await tempProject();
-    const run = vi.fn(async () => undefined);
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
 
     const result = await installDependenciesForSetup(input({ cwd, dryRun: true, run }));
 
@@ -149,7 +150,7 @@ describe("setup dependency installation", () => {
 
   it("does not install when no dependency changed", async () => {
     const cwd = await tempProject();
-    const run = vi.fn(async () => undefined);
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
 
     const result = await installDependenciesForSetup(input({ cwd, depsAdded: [], run }));
 
@@ -160,7 +161,7 @@ describe("setup dependency installation", () => {
 
   it("surfaces install failures with remediation", async () => {
     const cwd = await tempProject();
-    const run = vi.fn(async () => {
+    const run = vi.fn<typeof runPackageCommand>(async () => {
       throw Object.assign(new Error("boom"), { code: 1 });
     });
 

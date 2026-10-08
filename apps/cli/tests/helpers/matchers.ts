@@ -205,7 +205,8 @@ expect.extend({
 });
 
 declare module "vitest" {
-  interface Matchers<T = unknown> {
+  // biome-ignore lint/suspicious/noExplicitAny: must match vitest's own `Matchers<T = any>` type parameter exactly for declaration merging (TS2428).
+  interface Matchers<T = any> {
     /** Exit 0 and an envelope that is not an error. */
     toSucceed(): T;
     /** Exit 0 and `status: "skipped"` — the command found nothing to do. */

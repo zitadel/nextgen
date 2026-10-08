@@ -415,12 +415,19 @@ async function checkPortAvailability(
 }
 
 class PortInUseCheckError extends Error {
+  readonly port: number;
+  readonly serverUrl: string;
+  readonly listeners: Awaited<ReturnType<typeof listenersForPort>>;
+
   constructor(
-    readonly port: number,
-    readonly serverUrl: string,
-    readonly listeners: Awaited<ReturnType<typeof listenersForPort>>,
+    port: number,
+    serverUrl: string,
+    listeners: Awaited<ReturnType<typeof listenersForPort>>,
   ) {
     super(`Port ${String(port)} is already in use by ${formatListeners(listeners)}`);
+    this.port = port;
+    this.serverUrl = serverUrl;
+    this.listeners = listeners;
   }
 }
 

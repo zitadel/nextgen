@@ -8,13 +8,13 @@ dependsOn:
 
 tasks:
   typecheck:
-    command: "corepack pnpm exec tsc --build tsconfig.json"
+    command: "corepack pnpm run typecheck"
     deps:
       - "api:build"
       - "config:build"
 
   build:
-    command: "node -e \"process.exit(0)\""
+    command: 'node -e "process.exit(0)"'
     deps:
       - "api:build"
       - "config:build"
