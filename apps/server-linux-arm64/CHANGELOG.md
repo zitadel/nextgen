@@ -1,5 +1,7 @@
 # @zitadel/server-linux-arm64
 
+## 1.0.0-alpha.25
+
 ## 1.0.0-alpha.24
 
 ## 1.0.0-alpha.23
