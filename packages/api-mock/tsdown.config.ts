@@ -1,10 +1,9 @@
 import { defineConfig } from "tsdown";
 
 /**
- * Build for `@zitadel/api-mock`. It is never published; the build exists so it
- * is consumed like every other workspace package (from `dist`, with the
- * `@zitadel/source` condition for in-repo source resolution) and so its moon
- * `build` task has outputs that invalidate dependents.
+ * Build for `@zitadel/api-mock`. Never published; it builds like the other
+ * workspace packages so consumers resolve it from `dist` and its moon `build`
+ * task has outputs.
  */
 export default defineConfig({
   entry: {
@@ -22,9 +21,7 @@ export default defineConfig({
   tsconfig: "tsconfig.lib.json",
   dts: true,
   sourcemap: true,
+  clean: true,
   target: "es2022",
-  // The test harnesses import their runners; consumers bring their own copy.
-  deps: {
-    neverBundle: [/^vitest(\/|$)/, /^@vitest\//, /^msw(\/|$)/, "zod"],
-  },
+  deps: { neverBundle: ["msw", "vitest", "zod"] },
 });
