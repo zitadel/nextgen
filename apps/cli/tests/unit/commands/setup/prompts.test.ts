@@ -60,6 +60,7 @@ function baseAnswers(over: Partial<SetupAnswers> = {}): SetupAnswers {
   return {
     server: "https://api.zitadel.cloud",
     devPort: 3000,
+    preset: "passkey-first",
     useCase: "minimal",
     sso: [],
     ...over,
@@ -331,7 +332,7 @@ describe("SocialSignInPrompt", () => {
     const options = vi.mocked(multiselect).mock.calls[0]?.[0]?.options ?? [];
     // No declining option: an empty selection is the decline, which is what
     // `required: false` on the multiselect allows.
-    expect(options.map((option: { value: string }) => option.value)).toEqual([...IDP_PROVIDERS]);
+    expect(options.map((option) => option.value)).toEqual([...IDP_PROVIDERS]);
   });
 
   it("captures the credentials and shows the redirect URI to register", async () => {

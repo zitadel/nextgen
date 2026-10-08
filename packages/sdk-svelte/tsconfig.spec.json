@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.lib.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    "types": ["node", "vitest", "vitest/globals", "vitest/importMeta"]
+  },
+  "include": [
+    "*.config.mts",
+    "*.config.ts",
+    "vite-plugin-svelte-types.ts",
+    "src/**/*.d.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.test.ts",
+    "src/**/__tests__/**/*.ts",
+    "src/test-setup.ts"
+  ],
+  "exclude": []
+}

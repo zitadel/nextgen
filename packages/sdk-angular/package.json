@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-angular",
-  "version": "1.0.0-alpha.24",
+  "version": "1.0.0-alpha.25",
   "description": "Angular components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-angular#readme",
   "bugs": {
@@ -29,7 +29,7 @@
   },
   "scripts": {
     "build": "vite build && ngc -p tsconfig.lib.json",
-    "typecheck": "tsc --noEmit -p tsconfig.spec.json",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "test:all": "pnpm run test"
   },
@@ -44,16 +44,17 @@
     "@angular/core": ">=17"
   },
   "devDependencies": {
-    "@analogjs/vite-plugin-angular": "^2.6.1",
-    "@analogjs/vitest-angular": "^2.6.1",
-    "@angular/build": "^22.0.5",
-    "@angular/common": "^22.0.5",
-    "@angular/compiler": "^22.0.5",
-    "@angular/compiler-cli": "^22.0.5",
-    "@angular/core": "^22.0.5",
-    "@angular/platform-browser": "^22.0.5",
-    "@angular/router": "^22.0.5",
+    "@analogjs/vite-plugin-angular": "^2.8.0",
+    "@analogjs/vitest-angular": "^2.8.0",
+    "@angular/build": "^22.2.2",
+    "@angular/common": "^22.2.1",
+    "@angular/compiler": "^22.2.1",
+    "@angular/compiler-cli": "^22.2.1",
+    "@angular/core": "^22.2.1",
+    "@angular/platform-browser": "^22.2.1",
+    "@angular/router": "^22.2.1",
     "@testing-library/angular": "^19.4.1",
+    "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",
     "jsdom": "catalog:",

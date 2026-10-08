@@ -19,8 +19,8 @@ post:
 
     Accepts either a project secret (`oauth2`) or a user-bound Console
     session cookie (`nextgenSession`). Session callers are authorized as
-    the human against the target project (home may differ). CSRF/Origin
-    for cookie mutations is a follow-up (#1140).
+    the human against the target project (home may differ). Cookie-authenticated
+    requests follow the scheme's CSRF rules (`nextgenSession`).
   tags:
     - Grants
   security:

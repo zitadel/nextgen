@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/components",
-  "version": "1.0.0-alpha.24",
+  "version": "1.0.0-alpha.25",
   "description": "Lit-based atomic web components and the <zitadel-login> orchestrator for the Zitadel auth UI.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/components#readme",
   "bugs": {
@@ -59,7 +59,8 @@
     "build": "tsdown",
     "test": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
-    "test:all": "vitest run"
+    "test:all": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json"
   },
   "dependencies": {
     "@zitadel/config": "workspace:*",
@@ -70,18 +71,22 @@
   },
   "devDependencies": {
     "@tsdown/css": "catalog:",
+    "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
+    "@zitadel/api": "workspace:*",
     "@zitadel/api-mock": "workspace:*",
+    "@zitadel/design-tokens": "workspace:*",
     "jsdom": "catalog:",
+    "lightningcss": "catalog:",
     "msw": "catalog:",
     "playwright": "catalog:",
     "ts-lit-plugin": "catalog:",
-    "lightningcss": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
-    "@zitadel/api": "workspace:*",
-    "@zitadel/design-tokens": "workspace:*"
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
   }
 }

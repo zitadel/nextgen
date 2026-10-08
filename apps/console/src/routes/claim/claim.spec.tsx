@@ -1,5 +1,5 @@
 import { RouterProvider, createBrowserHistory, createMemoryHistory } from "@tanstack/react-router";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -286,6 +286,28 @@ describe("claim page", () => {
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 
+  // A CSRF refusal is not a team problem: it must not take the "no team yet"
+  // branch, and a plain retry would be refused the same way.
+  it("does not mistake a CSRF refusal for a missing team", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    stubComplete(() =>
+      HttpResponse.json(
+        {
+          code: "auth.csrf_invalid",
+          message: "The request failed cross-site request forgery validation.",
+        },
+        { status: 403 },
+      ),
+    );
+    await renderAt(CLAIM_PATH);
+
+    expect(
+      await screen.findByRole("heading", { name: "The claim was not accepted from this page" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Your account has no team yet" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
+  });
+
   it("dead-ends claim.personal_team_not_active and names the remedy", async () => {
     // The mirror case: the membership exists but is not active, which
     // provisioning will not fix. `membership_status` decides the copy —
@@ -489,12 +511,17 @@ describe("claim window countdown", () => {
 
       // The exchange landed: a fresh read would now find a session.
       fetchSession.mockResolvedValue(makeTestSession());
-      window.history.pushState({ zl: true }, "");
-      window.history.back();
+      await act(async () => {
+        window.history.pushState({ zl: true }, "");
+        window.history.back();
+      });
       // jsdom delivers the popstate asynchronously; wait until the router has
-      // seen it before asserting that it changed nothing.
-      await waitFor(() => expect(router.state.location.state).not.toMatchObject({ zl: true }));
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      // seen it and settled, so any reload it triggered has run, before
+      // asserting that it changed nothing.
+      await waitFor(() => {
+        expect(router.state.location.state).not.toMatchObject({ zl: true });
+        expect(router.state.status).toBe("idle");
+      });
 
       expect(screen.getByTestId("zitadel-login")).toBeInTheDocument();
       expect(fetchSession).toHaveBeenCalledTimes(1);

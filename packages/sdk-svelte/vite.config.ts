@@ -18,5 +18,5 @@ export default defineConfig({
       external: [/^@zitadel\//, /^svelte($|\/)/],
     },
   },
-  plugins: [svelte(), svelteTypes({ input: "src/lib" })],
+  plugins: [svelte(), svelteTypes({ input: "src/lib", tsconfig: "tsconfig.lib.json" })],
 });
