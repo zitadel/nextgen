@@ -19,86 +19,78 @@ Then the release, in three layers:
    [preview](1-data-model.md#preview) for the exact URL → `403` as well; the
    preview is what admits a preview URL, the pattern only said it could be
    registered. `Origin` absent falls through; there is nothing to check.
-2. **Route.** A deployment target carrying this exact `Origin` → serve the
-   release the newest such target names. The caller sends nothing and needs to
-   know nothing, and this answers almost all browser traffic.
-3. **Fall back.** No `Origin` → the project default, the newest deployment
-   target with `origin = ""`.
+2. **Target.** The newest deployment target carrying this exact `Origin`.
+   Where there is none — a primary hostname nothing was ever deployed to, or
+   no `Origin` at all — the project default, the newest deployment target
+   with `origin = ""`. A preview URL with no target of its own is `403` here
+   too; it never falls through to the default. A project with no default
+   target has nothing to serve: `409 rel.no_default`.
+3. **Release.** The release the target's newest deployment names. An
+   `X-Zitadel-Release` header may **select** instead a release that was
+   deployed to that target, inside the pin window —
+   [pinning a release](#pinning-a-release). It never admits an origin and
+   never serves a release no deploy ever named; only `sandbox` mode lifts
+   that, for a draft nobody deployed. A revoked release is refused either way.
 
-Once a target is found, an `X-Zitadel-Release` header may **select** a release
-that was deployed to that target instead of the newest one —
-[pinning a release](#pinning-a-release). It never admits an origin and never
-serves a release no deploy ever named.
-
-Layer 3 is not a leftover: layer 2 needs an `Origin` to match, and a server-side
-app sends none. No layer reads a stored pointer; see
+The caller sends nothing and needs to know nothing: for almost all browser
+traffic, layer 2 finds the origin's own target and layer 3 serves its newest
+release. The default target is not a leftover: layer 2 needs an `Origin` to
+match, and a server-side app sends none, so the default is its target. No layer
+reads a stored pointer; see
 [why there is no pointer column](1-data-model.md#why-there-is-no-pointer-column).
 
 ### As a flow chart
 
-The same three layers, the pin, and every refusal, in the order the server
-checks them. `sandbox` is the project [mode](2-origins.md#project-mode).
+The three layers and the refusals they make, in the order the server checks
+them. `sandbox` is the project [mode](2-origins.md#project-mode). The project
+check that precedes the layers and the plain lookup errors of a digest are left
+out; [errors](#errors) lists every code.
 
 ```mermaid
 flowchart TD
-    REQ[Request: credential names the project] --> PM{body project_id<br/>agrees with credential?}
-    PM -- no --> E_MISMATCH[403 proj.mismatch]
-    PM -- yes --> HAS_ORIGIN{Origin header?}
+    REQ[Request] --> HAS_ORIGIN{Origin header?}
 
     subgraph L1 [Layer 1: gate]
-        HAS_ORIGIN -- present --> MATCH{matches an<br/>origins pattern?}
-        MATCH -- none --> LOOP{sandbox and<br/>loopback origin?}
-        LOOP -- no --> E_NOT_ALLOWED[403 proj.origin_not_allowed]
-        MATCH -- preview --> PREVIEW{live preview for<br/>this exact URL?}
-        PREVIEW -- no or expired --> E_NOT_LIVE[403 proj.preview_not_live]
+        HAS_ORIGIN -- present --> MATCH{matches a pattern,<br/>or loopback in sandbox?}
+        MATCH -- no --> E_NOT_ALLOWED[403 proj.origin_not_allowed]
+        MATCH -- preview --> PREVIEW{live preview<br/>for this exact URL?}
+        PREVIEW -- no --> E_NOT_LIVE[403 proj.preview_not_live]
     end
 
-    subgraph L2 [Layer 2: route]
-        MATCH -- primary --> NEWEST_ORIGIN[newest deployment target<br/>with origin = this URL]
-        LOOP -- yes --> NEWEST_ORIGIN
-        PREVIEW -- yes --> NEWEST_ORIGIN
-        NEWEST_ORIGIN --> FOUND_ORIGIN{target found?}
-        FOUND_ORIGIN -- yes --> T_ORIGIN[target = this origin]
-        FOUND_ORIGIN -- no, preview URL --> E_NOT_LIVE
-    end
-
-    subgraph L3 [Layer 3: fall back]
-        HAS_ORIGIN -- absent --> NEWEST_DEFAULT[newest deployment target<br/>with origin = empty]
-        FOUND_ORIGIN -- no, primary URL --> NEWEST_DEFAULT
-        NEWEST_DEFAULT --> FOUND_DEFAULT{target found?}
-        FOUND_DEFAULT -- yes --> T_DEFAULT[target = project default]
-        FOUND_DEFAULT -- no --> E_NO_DEFAULT[409 rel.no_default]
+    subgraph L2 [Layer 2: target]
+        MATCH -- primary or loopback --> BY_ORIGIN[newest target<br/>for this origin]
+        PREVIEW -- yes --> BY_ORIGIN
+        BY_ORIGIN -- found --> T_ORIGIN[target = this origin]
+        BY_ORIGIN -- none, preview --> E_NOT_LIVE
+        BY_ORIGIN -- none, primary --> DEFAULT[newest target<br/>with origin = empty]
+        HAS_ORIGIN -- absent --> DEFAULT
+        DEFAULT -- found --> T_DEFAULT[target = project default]
+        DEFAULT -- none --> E_NO_DEFAULT[409 rel.no_default]
     end
 
     T_ORIGIN --> PIN
     T_DEFAULT --> PIN
 
-    subgraph P [Pin: X-Zitadel-Release selects, never activates]
-        PIN{header present?}
-        PIN -- absent --> SERVE_NEWEST[serve the release the<br/>target's newest deployment names]
-        PIN -- present --> LOOKUP{release in this project?}
-        LOOKUP -- none --> E_NOT_FOUND[404 rel.not_found]
-        LOOKUP -- short digest, several --> E_AMBIGUOUS[400 rel.ambiguous]
-        LOOKUP -- one --> MODE{sandbox mode?}
-        MODE -- yes --> SERVE_PIN[serve the pinned release]
-        MODE -- no --> DEPLOYED{deployed to this target,<br/>inside the pin window?}
+    subgraph L3 [Layer 3: release]
+        PIN{X-Zitadel-Release?}
+        PIN -- absent --> NEWEST[release of the target's<br/>newest deployment]
+        PIN -- present --> DEPLOYED{deployed to this target<br/>inside the pin window,<br/>or sandbox?}
         DEPLOYED -- no --> E_NOT_DEPLOYED[409 rel.not_deployed]
-        DEPLOYED -- yes --> SERVE_PIN_DEP[serve the newest deployment<br/>of that release on the target]
+        DEPLOYED -- yes --> PINNED[that release, via its newest<br/>deployment on the target]
+        NEWEST --> REVOKED{revoked?}
+        PINNED --> REVOKED
+        REVOKED -- yes --> E_REVOKED[409 rel.revoked]
     end
 
-    SERVE_NEWEST --> REVOKED{release revoked?}
-    SERVE_PIN --> REVOKED
-    SERVE_PIN_DEP --> REVOKED
-    REVOKED -- yes --> E_REVOKED[409 rel.revoked]
     REVOKED -- no --> SEAL[seal the deployment id<br/>into the flow state]
 
     classDef refuse fill:#fde8e8,stroke:#c53030,color:#1a202c
-    class E_MISMATCH,E_NOT_ALLOWED,E_NOT_LIVE,E_NO_DEFAULT,E_NOT_FOUND,E_AMBIGUOUS,E_NOT_DEPLOYED,E_REVOKED refuse
+    class E_NOT_ALLOWED,E_NOT_LIVE,E_NO_DEFAULT,E_NOT_DEPLOYED,E_REVOKED refuse
 ```
 
 Two things the chart makes visible that the prose states separately: a
-preview URL never reaches layer 3, because a URL with no live preview fails
-closed rather than serving production; and the pin runs after a target is
+preview URL never reaches the default, because a URL with no live preview fails
+closed rather than serving production; and the pin runs only after a target is
 found, so it can only choose among what that target already served.
 
 **Sealing.** The resolved *deployment* id is written into the flow state at the
@@ -126,8 +118,8 @@ wants the two to move together bakes the digest in and
 **A caller with no `Origin` is answered by the project default.** That is
 server-side rendering, a backend, the CLI, CI, and native or mobile apps. The
 credential identifies the project — the project secret for a server, the
-publishable key for a shipped app — and layer 3 serves the newest deployment with
-`origin = ""`. A server-side app may [pin](#pinning-a-release) among what was
+publishable key for a shipped app — and layer 2 picks the default target, the
+newest deployment with `origin = ""`. A server-side app may [pin](#pinning-a-release) among what was
 deployed there; a native app takes the default and nothing else.
 
 The project default is a target like any other, not a fallback computed from the
@@ -280,7 +272,8 @@ Authorization: Bearer pk_7kR2pXq9vN3wLmYhT4cB8A
 | Layer | Outcome |
 |---|---|
 | 1 gate | matches `https://app.acme.com` (primary) ✓ |
-| 2 route | target found → `dep_01KA7T9QX3M2E8VB` → `sha256:4a5b…` |
+| 2 target | this origin, newest deployment `dep_01KA7T9QX3M2E8VB` |
+| 3 release | no header → `sha256:4a5b…` |
 
 Serves `sha256:4a5b…`, and the client sent no release and knows of none. Change
 only the `Origin` to `https://acme-git-sso-acmeinc.vercel.app` and the same
@@ -307,8 +300,8 @@ X-Zitadel-Release: sha256:81de4c…
 | Layer | Outcome |
 |---|---|
 | 1 gate | matches the preview pattern, preview live ✓ |
-| 2 route | newest target → `sha256:9f2c1a…` |
-| pin | `sha256:81de4c…` was deployed to this URL one push ago, inside the window → selected |
+| 2 target | this URL, whose newest deployment names `sha256:9f2c1a…` |
+| 3 release | `sha256:81de4c…` was deployed to this URL one push ago, inside the window → selected |
 
 The old tab keeps the configuration it was built against. Name a digest that
 was never deployed to this URL and it is `409 rel.not_deployed`, whatever
@@ -326,8 +319,8 @@ Authorization: Bearer sk_proj_9f2Hx8LqT4vRmYpN2wCbVa
 | Layer | Outcome |
 |---|---|
 | 1 gate | no `Origin`, nothing to check |
-| 2 route | nothing to match on |
-| 3 fall back | no header → newest deployment with `origin = ""` → `sha256:4a5b…` |
+| 2 target | nothing to match on → the project default |
+| 3 release | no header → newest deployment with `origin = ""` → `sha256:4a5b…` |
 
 This is why the project default exists: the caller has no origin, so there is no
 target to find. Add `X-Zitadel-Release` to select among the releases deployed to
@@ -370,8 +363,8 @@ X-Zitadel-Release: sha256:c3f7a8…
 | Layer | Outcome |
 |---|---|
 | 1 gate | loopback, permitted on `sandbox` ✓ |
-| 2 route | nothing deployed — nobody deploys to localhost |
-| 3 fall back | header present, no credential needed → `sha256:c3f7a8…` |
+| 2 target | nothing deployed to localhost → the project default |
+| 3 release | header present, `sandbox` lifts the deployed-only rule → `sha256:c3f7a8…` |
 
 The digest comes from the local runtime document rather than a build constant, so
 a `.zitadel/` edit shows on the next page load.
@@ -380,17 +373,17 @@ a `.zitadel/` edit shows on the next page load.
 
 | `Origin` | Credential | Header | Answered by | Result |
 |---|---|---|---|---|
-| primary | publishable key | — | layer 2 | production release |
-| primary | publishable key | deployed here, in window | layer 2 + pin | that release |
-| primary | publishable key | never deployed here | layer 2 + pin | `409 rel.not_deployed` |
-| preview, live | publishable key | — | layer 2 | branch release |
-| preview, live | publishable key | deployed here, in window | layer 2 + pin | that release |
-| preview, not live | any | any | layer 1 | `403 proj.preview_not_live` |
-| none | project secret | — | layer 3 | project default |
-| none | project secret | deployed to default | layer 3 + pin | that release |
-| unmatched | — | yes | layer 1 | `403 proj.origin_not_allowed` |
-| loopback (`sandbox`) | — | any release | layer 3 + pin | named release |
-| none, never deployed | project secret | — | layer 3 | `409 rel.no_default` |
+| primary | publishable key | — | target: origin | production release |
+| primary | publishable key | deployed here, in window | target: origin + pin | that release |
+| primary | publishable key | never deployed here | target: origin + pin | `409 rel.not_deployed` |
+| preview, live | publishable key | — | target: origin | branch release |
+| preview, live | publishable key | deployed here, in window | target: origin + pin | that release |
+| preview, not live | any | any | gate | `403 proj.preview_not_live` |
+| none | project secret | — | target: default | project default |
+| none | project secret | deployed to default | target: default + pin | that release |
+| unmatched | — | yes | gate | `403 proj.origin_not_allowed` |
+| loopback (`sandbox`) | — | any release | target: default + pin | named release |
+| none, never deployed | project secret | — | target: default | `409 rel.no_default` |
 
 ## Local development
 
