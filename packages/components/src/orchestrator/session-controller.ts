@@ -31,11 +31,18 @@ export class SessionController implements ReactiveController {
    *   resolvable.
    * @param onIdentitySettled Runs after the identity fetch resolves or fails.
    */
+  private readonly host: ReactiveControllerHost & HTMLElement;
+  private readonly resolve: () => Api;
+  private readonly onIdentitySettled?: () => void;
+
   constructor(
-    private readonly host: ReactiveControllerHost & HTMLElement,
-    private readonly resolve: () => Api,
-    private readonly onIdentitySettled?: () => void,
+    host: ReactiveControllerHost & HTMLElement,
+    resolve: () => Api,
+    onIdentitySettled?: () => void,
   ) {
+    this.host = host;
+    this.resolve = resolve;
+    this.onIdentitySettled = onIdentitySettled;
     host.addController(this);
   }
 
