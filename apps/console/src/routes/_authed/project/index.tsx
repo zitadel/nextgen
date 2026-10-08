@@ -35,27 +35,10 @@ import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scop
  *
  * Below the details, the project's admins (#1238): grants are project-level
  * data, so they live on the project's page rather than under account settings,
- * and the id every grant request carries is this route's. The section lists
- * people, each with every way they hold admin access (#1462), so it reads
- * `listProjectAdmins` rather than the project's grants. Loaded together with
+ * and the id every grant request carries is this route's. Loaded together with
  * the project: both reads are the same viewer check on the same project, so
  * they succeed or fail as one.
  */
-/**
- * Every admin of the project, page by page. The people who administer one
- * project are few, so the section shows them all rather than paging.
- */
-async function listAllProjectAdmins(projectId: string) {
-  const admins = [];
-  let pageToken: string | undefined;
-  do {
-    const page = await api.listProjectAdmins(projectId, { limit: 100, page_token: pageToken });
-    admins.push(...page.admins);
-    pageToken = page.next_page_token ?? undefined;
-  } while (pageToken);
-  return admins;
-}
-
 export const Route = createFileRoute("/_authed/project/")({
   // Last: the list above it is the project's contents, this is the project.
   staticData: {
@@ -65,17 +48,20 @@ export const Route = createFileRoute("/_authed/project/")({
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
     const projectId = requireProjectScope(deps.project);
-    const [project, admins] = await Promise.all([
+    const [project, grants] = await Promise.all([
       api.getProject(projectId),
-      listAllProjectAdmins(projectId),
+      // One page: a project's admins are a handful. Add paging with the first
+      // project that needs it.
+      api.queryGrants({ limit: 100, expand: ["principal"] }, { project_id: projectId }),
     ]);
-    return { project, admins };
+    return { project, grants: grants.grants };
   },
   component: ProjectDetail,
 });
 
 function ProjectDetail() {
-  const { project, admins } = Route.useLoaderData();
+  const { project, grants } = Route.useLoaderData();
+  const { session } = Route.useRouteContext();
   const router = useRouter();
 
   const [name, setName] = useState(project.name);
@@ -164,7 +150,8 @@ function ProjectDetail() {
 
       <ProjectAdmins
         projectId={project.id}
-        admins={admins}
+        grants={grants}
+        viewerUserId={session.user_id ?? undefined}
         onChanged={() => void router.invalidate()}
       />
     </DetailPage>

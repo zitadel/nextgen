@@ -167,10 +167,10 @@ test("gives a colleague admin access to the project, and takes it away", async (
   seed,
 }) => {
   // The whole journey of #769 against a live backend: the grant is created for
-  // somebody who already exists, shows up in the admins list with their
-  // resolved identity, and is revoked again. Asserted here rather than only
-  // over stubs because both writes and the admins read are server behaviour,
-  // and the unit specs prove only what the console does with them.
+  // somebody who already exists, shows up in the list with their resolved
+  // identity, and is revoked again. Asserted here rather than only over stubs
+  // because both writes and the `expand: ["principal"]` read are server
+  // behaviour, and the unit specs prove only what the console does with them.
   //
   // Admins live on the project's page (#1238). The operator needs access to the
   // project to open it — a seeded user can sign in but holds no grant.
@@ -192,12 +192,12 @@ test("gives a colleague admin access to the project, and takes it away", async (
   // whether or not anything was created, which is the point of it.
   const row = page.getByRole("row").filter({ hasText: colleague.email });
   await expect(row).toBeVisible();
-  await expect(row.getByText("Direct grant", { exact: true })).toBeVisible();
+  await expect(row.getByText("Admin", { exact: true })).toBeVisible();
 
   await row.getByRole("button", { name: `Actions for ${colleague.email}` }).click();
-  await page.getByRole("menuitem", { name: "Remove direct grant" }).click();
+  await page.getByRole("menuitem", { name: "Remove admin" }).click();
   const confirm = page.getByRole("alertdialog");
-  await confirm.getByRole("button", { name: "Remove direct grant", exact: true }).click();
+  await confirm.getByRole("button", { name: "Remove admin", exact: true }).click();
 
   // Gone from the list, which leaves the instance as this test found it.
   await expect(page.getByRole("row").filter({ hasText: colleague.email })).toHaveCount(0);
@@ -229,9 +229,7 @@ test("answers the same way for an address that belongs to nobody", async ({
   // before the submit, where there was no such row either — an assertion that
   // cannot fail.
   const refreshed = page.waitForResponse(
-    (response) =>
-      new URL(response.url()).pathname === `/api/projects/${zitadel.handle.projectId}/admins` &&
-      response.ok(),
+    (response) => new URL(response.url()).pathname === "/api/grants/query" && response.ok(),
   );
   await dialog.getByRole("button", { name: "Add admin", exact: true }).click();
 

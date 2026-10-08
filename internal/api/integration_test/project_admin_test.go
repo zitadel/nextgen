@@ -163,7 +163,7 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 			PrincipalType: domain.AuthzPrincipalTypeUser,
 			PrincipalID:   futureID,
 			ObjectType:    "project",
-			Relation:      domain.AuthzRelationAdmin,
+			Relation:      "admin",
 			ExpiresAt:     &expiresAt,
 		}
 		future.ApplyScope(domain.NewProjectAssignmentScope())
@@ -208,7 +208,7 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 			PrincipalType: domain.AuthzPrincipalTypeUser,
 			PrincipalID:   expiredID,
 			ObjectType:    "project",
-			Relation:      domain.AuthzRelationAdmin,
+			Relation:      "admin",
 			ExpiresAt:     &expiredAt,
 		}
 		expired.ApplyScope(domain.NewProjectAssignmentScope())

@@ -44,9 +44,9 @@ func projectRelation(op accessOp) string {
 	case opWrite:
 		return "editor"
 	case opDelete:
-		return domain.AuthzRelationAdmin
+		return "admin"
 	default:
-		return domain.AuthzRelationAdmin
+		return "admin"
 	}
 }
 

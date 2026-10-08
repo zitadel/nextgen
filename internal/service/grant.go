@@ -15,9 +15,9 @@ import (
 )
 
 var allowedGrantRelations = map[string]struct{}{
-	"viewer":                  {},
-	"editor":                  {},
-	domain.AuthzRelationAdmin: {},
+	"viewer": {},
+	"editor": {},
+	"admin":  {},
 }
 
 // isManagedGrant is the class this HTTP API may Get or Revoke: the system
@@ -605,19 +605,31 @@ func (s *GrantService) hydrate(ctx context.Context, includePrincipal bool, asgns
 }
 
 func (s *GrantService) grantsByPrincipalHome(ctx context.Context, grants []*Grant) (map[string][]*Grant, error) {
-	ids := make([]string, 0, len(grants))
-	for _, g := range grants {
-		ids = append(ids, g.Assignment.PrincipalID)
+	if s.platformProjectID != "" {
+		return map[string][]*Grant{s.platformProjectID: grants}, nil
 	}
-	homes, err := s.principalHomes(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
+	stmts := s.v2Pool.Statements()
+	homeByPrincipal := make(map[string]string, len(grants))
 	grouped := map[string][]*Grant{}
 	for _, g := range grants {
-		if home := homes[g.Assignment.PrincipalID]; home != "" {
-			grouped[home] = append(grouped[home], g)
+		pid := g.Assignment.PrincipalID
+		home, ok := homeByPrincipal[pid]
+		if !ok {
+			scope, err := stmts.GetResourceScope(ctx, pid)
+			if err != nil {
+				if _, miss := errors.AsType[*database.NoRowFoundError](err); miss {
+					homeByPrincipal[pid] = ""
+					continue
+				}
+				return nil, domain.ErrInternal(err).WithMessage("failed to resolve grant principal homes")
+			}
+			home = scope.ProjectID
+			homeByPrincipal[pid] = home
 		}
+		if home == "" {
+			continue
+		}
+		grouped[home] = append(grouped[home], g)
 	}
 	return grouped, nil
 }
@@ -806,40 +818,4 @@ func grantField(field string) (domain.AuthzAssignmentField, error) {
 	default:
 		return domain.AuthzAssignmentFieldUnspecified, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", field))
 	}
-}
-
-// principalHomes returns the project each grant principal lives in, or "" for
-// one that cannot be found. With a platform project pinned, every principal is
-// taken to live there without a lookup, so a principal that no longer exists
-// still gets a home: callers that care check existence themselves.
-func (s *GrantService) principalHomes(ctx context.Context, principalIDs []string) (map[string]string, error) {
-	homes := make(map[string]string, len(principalIDs))
-	for _, id := range principalIDs {
-		if _, ok := homes[id]; ok {
-			continue
-		}
-		if s.platformProjectID != "" {
-			homes[id] = s.platformProjectID
-			continue
-		}
-		scope, err := s.v2Pool.Statements().GetResourceScope(ctx, id)
-		switch {
-		case err == nil:
-			homes[id] = scope.ProjectID
-		case isNoRowFound(err):
-			homes[id] = ""
-		case errors.Is(err, new(database.MultipleRowsFoundError)):
-			// The id names resources in several projects, which a project can
-			// cause for another one (a user schema's $id is stored verbatim),
-			// so the principal is left out rather than failing every list
-			// that names it.
-			getLoggingContext(ctx, "grant").Warn("grant principal id is ambiguous across projects",
-				slog.String("principal_id", id),
-			)
-			homes[id] = ""
-		default:
-			return nil, domain.ErrInternal(err).WithMessage("failed to resolve grant principal homes")
-		}
-	}
-	return homes, nil
 }
