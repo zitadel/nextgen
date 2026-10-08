@@ -1,8 +1,8 @@
 name: cloud-deploy
 
 # Deploys the hosted preview cloud on Vercel: the server container from
-# apps/cloud and the docs from apps/docs, as two services of one deployment
-# (vercel.json at the repo root).
+# apps/cloud, the docs from apps/docs and the website from apps/website, as
+# three services of one deployment (vercel.json at the repo root).
 #
 # Order matters: migrations run from the pinned server image before the
 # deploy. A binary ahead of its schema boots green and fails per request,
@@ -17,6 +17,7 @@ on:
     paths:
       - "apps/cloud/**"
       - "apps/docs/**"
+      - "apps/website/**"
       - "api/openapi/**"
       - "vercel.json"
       - ".vercelignore"

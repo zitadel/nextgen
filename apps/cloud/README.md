@@ -8,10 +8,10 @@ topology as self-hosted.
 
 The Vercel project is a [services](https://vercel.com/docs/services)
 deployment defined in the repo-root `vercel.json`: the `server` service is
-this directory's container, the `docs` service is `apps/docs`, and the
-top-level rewrites give the docs their prefixes (`/docs`, `/reference`,
-`/assets`, …) while everything else reaches the server. Both build
-separately, deploy together.
+this directory's container, the `docs` service is `apps/docs`, the `website`
+service is `apps/website`, and the top-level rewrites give the website `/`
+and the docs their prefixes (`/docs`, `/reference`, `/assets`, …) while
+everything else reaches the server. All build separately, deploy together.
 
 Operations live in [docs/runbooks/preview-cloud.md](../../docs/runbooks/preview-cloud.md).
 The design and the platform research behind it are in
@@ -23,10 +23,10 @@ The design and the platform research behind it are in
 |---|---|
 | `Dockerfile.vercel` | `FROM ghcr.io/zitadel/nextgen:${NEXTGEN_VERSION}` plus the entrypoint. The version line is the only knob. |
 | `entrypoint.sh` | Renders the master key into `nextgen.yaml` from `MASTER_KEY_PEM_B64`, binds to `$PORT`, execs `nextgen server --config …`. Never migrates. |
-| `../../vercel.json` | Services (`server` = this directory, `docs` = `apps/docs`), the public route table, region `fra1`, a keep-warm cron on `/readyz`, Git deployments disabled so the workflow is the only deployer. |
+| `../../vercel.json` | Services (`server` = this directory, `docs` = `apps/docs`, `website` = `apps/website`), the public route table, region `fra1`, a keep-warm cron on `/readyz`, Git deployments disabled so the workflow is the only deployer. |
 | `../../.vercelignore` | Keeps Go sources and build artifacts out of CLI uploads; the repo root is the deployment root. |
 | `scripts/admin-user.ts` | Mints the seeded platform admin: credential file plus the base64 bootstrap document for `BOOTSTRAP_ADMIN_USER_JSON_B64`. |
-| `scripts/smoke.ts` | Post-deploy gate: readiness, project create, user create and query, session probe, docs page and static file. |
+| `scripts/smoke.ts` | Post-deploy gate: readiness, project create, user create and query, session probe, docs page and static file, website start page. |
 | `src/entrypoint.test.ts` | Runs `entrypoint.sh` against a stub binary and asserts the rendered config. |
 
 ## Why migrations run in CI, not in the container

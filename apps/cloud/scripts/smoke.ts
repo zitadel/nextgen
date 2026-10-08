@@ -6,8 +6,9 @@
  *   VERCEL_AUTOMATION_BYPASS_SECRET=… pnpm run smoke -- https://<deployment>.vercel.app
  *
  * Exercises readiness, anonymous project creation, the operator plane with
- * the project secret (user create and query), the session middleware, and
- * the docs service mounted under /docs. Exits non-zero on the first failure.
+ * the project secret (user create and query), the session middleware, the
+ * docs service mounted under /docs and the website at /. Exits non-zero on
+ * the first failure.
  * Creates one throwaway project.
  */
 
@@ -120,6 +121,12 @@ try {
     throw new Error(`docsIndex: expected an HTML page, got ${docs.headers.get("content-type")}`);
   }
   await call("docsLlmsTxt", "/llms.txt", { expect: 200 });
+
+  // The website service owns the root.
+  const site = await call("websiteIndex", "/", { expect: 200 });
+  if (!/text\/html/.test(site.headers.get("content-type") ?? "")) {
+    throw new Error(`websiteIndex: expected an HTML page, got ${site.headers.get("content-type")}`);
+  }
 
   console.table(steps);
   console.log(`smoke ok against ${base} (project ${project.id})`);

@@ -15,6 +15,7 @@
 /docs
 /.github
 dist
+.next
 .vercel
 test-output
 *.tsbuildinfo

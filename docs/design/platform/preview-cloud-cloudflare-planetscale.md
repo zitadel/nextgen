@@ -312,9 +312,12 @@ the server. All three ship from this repo:
   project, see the next section. The earlier plan of composing it under
   `zitadel.com/docs` via Vercel Microfrontends is unchanged for the
   website; the cloud host serves the same build under `/docs`.
-- `apps/website` (later): imported from `zitadel/new-website` onto moon,
-  biome and changesets; content PRs must not trigger the Go gates. Spike
-  first on a branch, then the microfrontends config.
+- `apps/website` (scaffolded 2026-10-08): the third service of the cloud
+  project, a Next.js app with the stack of `zitadel/new-website`
+  (`apps/website` there) and one start page; owns `/` and `/_next/*` on the
+  cloud host. Importing the real pages, theme and content from
+  `zitadel/new-website` is the next step; content PRs must not trigger the
+  Go gates.
 
 `apps/cloud` is **not** moved to the website or infra repos: the entrypoint
 mirrors server config semantics and the deploy is a function of the pinned
@@ -370,4 +373,19 @@ answered from the right service: `/readyz`, `/sessions/me` (401), unknown
 paths (server 404) from the container; `/docs`, `/docs.md`, `/docs/*`,
 `/reference/api/*`, `/assets/*`, `/api/search`, `/llms.txt` from the docs,
 `/` redirecting to `/docs`. Smoke test green, docs pages answer in ~10 ms.
+
+## Website scaffold (2026-10-08)
+
+`apps/website` joins as the third service: Next.js 16 (App Router), React
+19, Tailwind 4 through `@tailwindcss/postcss`, TypeScript on the workspace
+base config, one static start page linking to `/docs` and `/ui/console`.
+The stack is the one `zitadel/new-website` uses, minus its theme package,
+fonts, CSP, redirects, analytics and MDX content, so its pages can move here
+file by file. Routing: the website owns `/` and `/_next/*`; the server stays
+the catch-all. That is enough for a start page and wrong for a real site,
+whose pages would each need a rewrite; when the import happens the server
+moves to its own hostname with a route-by-host rewrite and the website takes
+the catch-all. Catalog entries cover react, the type packages, tailwindcss
+and typescript; `next` and `@tailwindcss/postcss` are pinned in the app like
+`apps/demo-next` does.
 

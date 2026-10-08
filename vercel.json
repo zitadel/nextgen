@@ -10,24 +10,98 @@
       "framework": "vite",
       "installCommand": "corepack pnpm install --filter @zitadel/docs... --frozen-lockfile",
       "buildCommand": "corepack pnpm run build"
+    },
+    "website": {
+      "root": "apps/website",
+      "framework": "nextjs",
+      "installCommand": "corepack pnpm install --filter @zitadel/website... --frozen-lockfile",
+      "buildCommand": "corepack pnpm run build"
     }
   },
-  "redirects": [
-    { "source": "/", "destination": "/docs", "permanent": false }
-  ],
   "rewrites": [
-    { "source": "/docs/:path*", "destination": { "service": "docs" } },
-    { "source": "/docs.md", "destination": { "service": "docs" } },
-    { "source": "/reference/:path*", "destination": { "service": "docs" } },
-    { "source": "/assets/:path*", "destination": { "service": "docs" } },
-    { "source": "/RSC/:path*", "destination": { "service": "docs" } },
-    { "source": "/api/search", "destination": { "service": "docs" } },
-    { "source": "/llms.txt", "destination": { "service": "docs" } },
-    { "source": "/llms-full.txt", "destination": { "service": "docs" } },
-    { "source": "/mcp/:path*", "destination": { "service": "docs" } },
-    { "source": "/(.*)", "destination": { "service": "server" } }
+    {
+      "source": "/",
+      "destination": {
+        "service": "website"
+      }
+    },
+    {
+      "source": "/_next/:path*",
+      "destination": {
+        "service": "website"
+      }
+    },
+    {
+      "source": "/docs/:path*",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/docs.md",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/reference/:path*",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/assets/:path*",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/RSC/:path*",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/api/search",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/llms.txt",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/llms-full.txt",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/mcp/:path*",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "server"
+      }
+    }
   ],
-  "regions": ["fra1"],
-  "crons": [{ "path": "/readyz", "schedule": "*/5 * * * *" }],
-  "git": { "deploymentEnabled": false }
+  "regions": [
+    "fra1"
+  ],
+  "crons": [
+    {
+      "path": "/readyz",
+      "schedule": "*/5 * * * *"
+    }
+  ],
+  "git": {
+    "deploymentEnabled": false
+  }
 }

@@ -9,7 +9,7 @@ running as a Vercel container in Frankfurt (`fra1`) against one PlanetScale
 Postgres database in AWS `eu-central-1`. Production stays on GCP; this is a
 single-region preview offering with the same topology as self-hosted.
 
-The Vercel project is one deployment with two
+The Vercel project is one deployment with three
 [services](https://vercel.com/docs/services), defined in the repo-root
 `vercel.json`:
 
@@ -17,13 +17,17 @@ The Vercel project is one deployment with two
 |---|---|---|---|
 | `server` | `apps/cloud` | the container above | everything not listed below |
 | `docs` | `apps/docs` | the docs site (Waku), built unchanged at base `/` | `/docs/*`, `/docs.md`, `/reference/*`, `/assets/*`, `/RSC/*`, `/api/search`, `/llms.txt`, `/llms-full.txt`, `/mcp/*` |
+| `website` | `apps/website` | the website scaffold (Next.js), one start page | `/`, `/_next/*` |
 
-`/` redirects to `/docs`. The docs site serves its pages under `/docs` and
-`/reference` by itself, so no base path is configured; the top-level rewrites
-only hand those prefixes to the docs service. A new top-level path in the docs
-app (a plugin route, a file in `public/`) needs a rewrite here, otherwise the
-server answers it with a 404. The server's own namespaces (`/projects`,
-`/users`, `/sessions`, `/ui/console`, …) never overlap with the docs prefixes.
+The docs site serves its pages under `/docs` and `/reference` by itself, so
+no base path is configured; the top-level rewrites only hand those prefixes
+to the docs service. A new top-level path in the docs or website app (a
+plugin route, a page, a file in `public/`) needs a rewrite here, otherwise
+the server answers it with a 404. The server's own namespaces (`/projects`,
+`/users`, `/sessions`, `/ui/console`, …) never overlap with the docs and
+website prefixes. Once the website has real routes, move the server to its
+own hostname (route by host in the same file) so the website can own every
+path.
 
 ## One-time setup
 
@@ -118,7 +122,7 @@ can stay set. To rotate the password, mint a new document with the same
 ## Deploying
 
 - **Automatic:** merge a change under `apps/cloud/`, `apps/docs/`,
-  `api/openapi/` or to the root `vercel.json` to `main`.
+  `apps/website/`, `api/openapi/` or to the root `vercel.json` to `main`.
 - **Manual:** run `cloud-deploy` from the Actions tab.
 
 Both run, in order: image existence check, `nextgen migrate` from the pinned
@@ -126,9 +130,9 @@ tag, `vercel deploy --prod`, smoke test. A failed migration stops the deploy.
 `migrate` is idempotent: on a docs-only merge it connects, finds nothing
 pending and exits; only a version bump applies migrations.
 
-Both services are rebuilt on every deploy. The server image build is about
-15 s, the docs build a few minutes; a docs-only merge therefore also rolls
-the server to a new deployment of the same image.
+All services are rebuilt on every deploy. The server image build is about
+15 s, the docs build a few minutes, the website under a minute; a docs-only
+merge therefore also rolls the server to a new deployment of the same image.
 
 ### Bumping the server version
 
@@ -155,6 +159,10 @@ expand/contract safe: for a short window both binaries serve traffic.
   on environment variables; use `vercel env add NAME production,preview
   --sensitive --yes` with the value on stdin. A `--value` flag with an open
   stdin hangs the CLI after a successful add.
+- This team stores new variables as **Secret** by default, so plain config
+  added without a flag ends up unreadable in the dashboard. Pass
+  `--no-sensitive` for config (`PORT`, `DOCS_SITE_URL`, …) and `--sensitive`
+  only for real secrets (database URL, master key, bootstrap document).
 - The team default Vercel Authentication (`all_except_custom_domains`) did
   not block the production alias `nextgen-preview-cloud.vercel.app`; it does
   protect preview and deployment URLs. Verify after any protection change.

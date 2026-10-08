@@ -19,7 +19,6 @@ tasks:
   # Vercel CLI directly.
   deploy:
     command: "corepack pnpm run deploy"
-    local: true
     options:
       cache: false
       runInCI: false
