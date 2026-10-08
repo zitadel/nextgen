@@ -62,9 +62,11 @@ is bound to, and the server never sees it.
   its endpoints and its event go.
 - Authorization scopes are project scopes. ADR 054's deferred "environment
   security model" closes with nothing to define.
-- A variable's owner is the project ([ADR 062](062-per-environment-variables-and-secrets.md)
-  as amended): the one rule the environment scope carried, that a preview must
-  not hold production secrets, becomes `applies_to` on the variable.
+- A variable's owner is the project. The one rule the environment scope of
+  [ADR 062](062-per-environment-variables-and-secrets.md) carried, that a
+  preview must not hold production secrets, stays a requirement; how a value
+  differs between previews and the rest is #1566's to decide, and ADR 062 is
+  amended with it.
 - Realistic data for testing a promoted release is production's data, on the
   production project, behind a preview URL, or a second project with its own
   data.
