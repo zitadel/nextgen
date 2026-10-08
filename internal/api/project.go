@@ -45,7 +45,7 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 	if err := h.requireProjectAccess(ctx, projectID, projectAccess, opRead); err != nil {
 		return nil, err
 	}
-	project, err := h.projectService.GetWithOwningTeam(ctx, projectID)
+	project, err := h.projectService.Get(ctx, projectID, service.ProjectQueryOptions{OwningTeam: true})
 	if err != nil {
 		// The guard already found the project for this caller (its own project
 		// for a secret, a granted one for a session), so this only fires if the

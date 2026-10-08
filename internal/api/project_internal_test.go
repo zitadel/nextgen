@@ -29,10 +29,7 @@ func (s stubProjectService) Create(context.Context, string, []string, bool) (*do
 func (s stubProjectService) CreateWithID(context.Context, string, string, []string, bool) (*domain.Project, error) {
 	return s.created, nil
 }
-func (stubProjectService) Get(context.Context, string) (*domain.Project, error) {
-	return nil, domain.ErrProjectNotFound()
-}
-func (stubProjectService) GetWithOwningTeam(context.Context, string) (*domain.Project, error) {
+func (stubProjectService) Get(context.Context, string, service.ProjectQueryOptions) (*domain.Project, error) {
 	return nil, domain.ErrProjectNotFound()
 }
 func (stubProjectService) DefaultProject(context.Context, string) (*domain.Project, error) {

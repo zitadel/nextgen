@@ -64,8 +64,8 @@ const projectQuery = "SELECT id, name, preview_origins, password_hash_policy, cr
 
 // getProjectWithOwningTeamStmt reads one project with its owning team, the
 // active owning-team grant GetActiveOwningTeamGrant reads, in one round trip.
-// Only the project reads that show the owner use it: GetProjectByID runs on
-// hot paths and stays a plain read.
+// GetProject runs it only when asked for the owning team: GetProjectByID
+// runs on hot paths and stays a plain read.
 const getProjectWithOwningTeamStmt = `SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at,
   (SELECT a.principal_id FROM zitadel_nextgen.authz_assignments a
    WHERE a.project_id = projects.id AND a.object_type = 'project' AND a.relation = 'team' AND a.revoked_at IS NULL
@@ -175,8 +175,11 @@ func (ps projectStatements) scanProjectWith(row pgx.CollectableRow, extra ...any
 	return project, nil
 }
 
-// GetProjectWithOwningTeam implements [service.ProjectStatements].
-func (ps projectStatements) GetProjectWithOwningTeam(ctx context.Context, id string) (*domain.Project, error) {
+// GetProject implements [service.ProjectStatements].
+func (ps projectStatements) GetProject(ctx context.Context, id string, opts service.ProjectQueryOptions) (*domain.Project, error) {
+	if !opts.OwningTeam {
+		return ps.GetProjectByID(ctx, id)
+	}
 	rows, err := ps.client.Query(ctx, getProjectWithOwningTeamStmt, id)
 	if err != nil {
 		return nil, wrapError(err)

@@ -247,7 +247,7 @@ func TestProjectService_Get(t *testing.T) {
 			name: "ok",
 			id:   "proj_aaa",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().GetProjectByID(gomock.Any(), "proj_aaa").Return(project, nil)
+				s.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{}).Return(project, nil)
 			},
 			want: project,
 		},
@@ -255,7 +255,7 @@ func TestProjectService_Get(t *testing.T) {
 			name: "not found",
 			id:   "proj_aaa",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().GetProjectByID(gomock.Any(), "proj_aaa").Return(nil, database.NewNoRowFoundError(nil))
+				s.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{}).Return(nil, database.NewNoRowFoundError(nil))
 			},
 			wantErr: database.NewNoRowFoundError(nil),
 		},
@@ -268,7 +268,7 @@ func TestProjectService_Get(t *testing.T) {
 			svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 			tc.setupStmt(statements)
 
-			got, err := svc.Get(context.Background(), tc.id)
+			got, err := svc.Get(context.Background(), tc.id, service.ProjectQueryOptions{})
 			if tc.wantErr != nil {
 				require.ErrorIs(t, err, tc.wantErr)
 				assert.Nil(t, got)
@@ -306,8 +306,8 @@ func TestProjectService_Update(t *testing.T) {
 						return nil
 					})
 				// The project is read back last, owning team included.
-				s.EXPECT().GetProjectWithOwningTeam(gomock.Any(), "proj_aaa").DoAndReturn(
-					func(context.Context, string) (*domain.Project, error) {
+				s.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{OwningTeam: true}).DoAndReturn(
+					func(context.Context, string, service.ProjectQueryOptions) (*domain.Project, error) {
 						return &domain.Project{ID: "proj_aaa", Name: written, CreatedAt: createdAt, UpdatedAt: updatedAt, OwningTeamID: "team_owner"}, nil
 					})
 			},
@@ -338,8 +338,8 @@ func TestProjectService_Update(t *testing.T) {
 						return nil
 					})
 				// The project is read back last, owning team included.
-				s.EXPECT().GetProjectWithOwningTeam(gomock.Any(), "proj_aaa").DoAndReturn(
-					func(context.Context, string) (*domain.Project, error) {
+				s.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{OwningTeam: true}).DoAndReturn(
+					func(context.Context, string, service.ProjectQueryOptions) (*domain.Project, error) {
 						return &domain.Project{ID: "proj_aaa", Name: written, CreatedAt: createdAt, UpdatedAt: updatedAt, OwningTeamID: "team_owner"}, nil
 					})
 			},
@@ -429,7 +429,7 @@ func TestProjectService_UpdatePasswordHashPolicy(t *testing.T) {
 		statements.EXPECT().SetProjectPasswordHashPolicy(gomock.Any(), "proj_aaa", want).Return(nil)
 		// No UpdateProject: the caller named no name, so nothing renames. The
 		// row is read instead, so the answer carries the project as it stands.
-		statements.EXPECT().GetProjectWithOwningTeam(gomock.Any(), "proj_aaa").
+		statements.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{OwningTeam: true}).
 			Return(&domain.Project{ID: "proj_aaa", Name: "kept", PasswordHashPolicy: want}, nil)
 
 		got, err := svc.Update(t.Context(), service.UpdateProjectRequest{
@@ -448,7 +448,7 @@ func TestProjectService_UpdatePasswordHashPolicy(t *testing.T) {
 		var cleared *domain.PasswordHashPolicy
 
 		statements.EXPECT().SetProjectPasswordHashPolicy(gomock.Any(), "proj_aaa", nil).Return(nil)
-		statements.EXPECT().GetProjectWithOwningTeam(gomock.Any(), "proj_aaa").
+		statements.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{OwningTeam: true}).
 			Return(&domain.Project{ID: "proj_aaa", Name: "kept"}, nil)
 
 		got, err := svc.Update(t.Context(), service.UpdateProjectRequest{
@@ -469,7 +469,7 @@ func TestProjectService_UpdatePasswordHashPolicy(t *testing.T) {
 			statements.EXPECT().SetProjectPasswordHashPolicy(gomock.Any(), "proj_aaa", want).Return(nil),
 			statements.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).Return(nil),
 			// Read last, so the policy just written reaches the response.
-			statements.EXPECT().GetProjectWithOwningTeam(gomock.Any(), "proj_aaa").
+			statements.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{OwningTeam: true}).
 				Return(&domain.Project{ID: "proj_aaa", Name: "renamed", PasswordHashPolicy: want}, nil),
 		)
 
@@ -489,7 +489,7 @@ func TestProjectService_UpdatePasswordHashPolicy(t *testing.T) {
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 		// No SetProjectPasswordHashPolicy: a rename must not clear a policy.
 		statements.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).Return(nil)
-		statements.EXPECT().GetProjectWithOwningTeam(gomock.Any(), "proj_aaa").Return(&domain.Project{ID: "proj_aaa", Name: "renamed"}, nil)
+		statements.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{OwningTeam: true}).Return(&domain.Project{ID: "proj_aaa", Name: "renamed"}, nil)
 
 		_, err := svc.Update(t.Context(), service.UpdateProjectRequest{
 			ID:   "proj_aaa",
@@ -958,7 +958,7 @@ func TestProjectService_DefaultProject(t *testing.T) {
 
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
-		statements.EXPECT().GetProjectByID(gomock.Any(), domain.PlatformProjectID).Return(platform, nil)
+		statements.EXPECT().GetProject(gomock.Any(), domain.PlatformProjectID, service.ProjectQueryOptions{}).Return(platform, nil)
 		statements.EXPECT().ListProjects(gomock.Any(), gomock.Any()).Times(0)
 
 		got, err := svc.DefaultProject(context.Background(), domain.PlatformProjectID)
@@ -990,7 +990,7 @@ func TestProjectService_DefaultProject(t *testing.T) {
 
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
-		statements.EXPECT().GetProjectByID(gomock.Any(), "proj_custom").Return(configured, nil)
+		statements.EXPECT().GetProject(gomock.Any(), "proj_custom", service.ProjectQueryOptions{}).Return(configured, nil)
 		statements.EXPECT().ListProjects(gomock.Any(), gomock.Any()).Times(0)
 
 		got, err := svc.DefaultProject(context.Background(), "proj_custom")
@@ -1005,7 +1005,7 @@ func TestProjectService_DefaultProject(t *testing.T) {
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
 		statements.EXPECT().
-			GetProjectByID(gomock.Any(), "proj_gone").
+			GetProject(gomock.Any(), "proj_gone", service.ProjectQueryOptions{}).
 			Return(nil, database.NewNoRowFoundError(errors.New("no rows")))
 		statements.EXPECT().ListProjects(gomock.Any(), gomock.Any()).Times(0)
 

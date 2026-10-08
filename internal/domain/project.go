@@ -73,7 +73,7 @@ type Project struct {
 	// runs on until an admin chooses otherwise. See [PasswordHashPolicy].
 	PasswordHashPolicy *PasswordHashPolicy
 	// OwningTeamID is the team that owns the project (ADR 054 §2), empty
-	// while none does. Only GetProjectWithOwningTeam reads it.
+	// while none does. Read only when a project read asks for it.
 	OwningTeamID string
 }
 

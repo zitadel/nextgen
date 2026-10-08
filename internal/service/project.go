@@ -34,12 +34,9 @@ type ProjectService interface {
 	// Create when the id is taken.
 	CreateWithID(ctx context.Context, id, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error)
 
-	// Get retrieves a project by ID.
+	// Get retrieves a project by ID, with what opts asks for besides.
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
-	Get(ctx context.Context, id string) (*domain.Project, error)
-
-	// GetWithOwningTeam is Get with the project's owning team, in one read.
-	GetWithOwningTeam(ctx context.Context, id string) (*domain.Project, error)
+	Get(ctx context.Context, id string, opts ProjectQueryOptions) (*domain.Project, error)
 
 	// DefaultProject resolves the transitional standalone default retained by
 	// Console ADR 0004 §2's bootstrap cutover rule: the configured project when
@@ -304,21 +301,16 @@ func emitFlowdefCreated(ctx context.Context, stmts EventStatements, flowDef *dom
 	})
 }
 
-func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, error) {
+func (s *projectService) Get(ctx context.Context, id string, opts ProjectQueryOptions) (*domain.Project, error) {
 	logger := getLoggingContext(ctx, "project")
 	logger.Info("getting project", slog.String("project_id", id))
-	project, err := s.v2Pool.Statements().GetProjectByID(ctx, id)
-	return project, mapStorageError(err)
-}
-
-func (s *projectService) GetWithOwningTeam(ctx context.Context, id string) (*domain.Project, error) {
-	project, err := s.v2Pool.Statements().GetProjectWithOwningTeam(ctx, id)
+	project, err := s.v2Pool.Statements().GetProject(ctx, id, opts)
 	return project, mapStorageError(err)
 }
 
 func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string) (*domain.Project, error) {
 	if cfgProjectID != "" {
-		project, err := s.Get(ctx, cfgProjectID)
+		project, err := s.Get(ctx, cfgProjectID, ProjectQueryOptions{})
 		if err != nil {
 			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 				return nil, domain.ErrProjectNotFound().
@@ -436,7 +428,7 @@ func (s *projectService) Update(ctx context.Context, req UpdateProjectRequest) (
 	}
 	// Read after the commit, outside the write, so the caller is answered with
 	// the project as it now stands, owning team included.
-	updated, err := s.v2Pool.Statements().GetProjectWithOwningTeam(ctx, req.ID)
+	updated, err := s.v2Pool.Statements().GetProject(ctx, req.ID, ProjectQueryOptions{OwningTeam: true})
 	if err != nil {
 		return nil, s.mapUpdateError(err)
 	}

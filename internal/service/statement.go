@@ -66,9 +66,9 @@ type ProjectStatements interface {
 	Statements
 	CreateProject(ctx context.Context, entity *domain.Project) error
 	GetProjectByID(ctx context.Context, id string) (*domain.Project, error)
-	// GetProjectWithOwningTeam is GetProjectByID with the project's owning
-	// team (ADR 054 §2) read in the same round trip.
-	GetProjectWithOwningTeam(ctx context.Context, id string) (*domain.Project, error)
+	// GetProject is GetProjectByID reading what opts asks for besides the
+	// project's own row, in the same round trip.
+	GetProject(ctx context.Context, id string, opts ProjectQueryOptions) (*domain.Project, error)
 	UpdateProject(ctx context.Context, entity *domain.Project) error
 	// SetProjectPasswordHashPolicy writes the hashing method the project's
 	// passwords are written with. A nil policy clears the choice, which returns
@@ -119,6 +119,14 @@ type CryptoKeyStatements interface {
 
 // JSONSchemaQueryOptions carries query modes for ListJSONSchemas that are not
 // column predicates. Column predicates stay in Filter / ListOptions.
+// ProjectQueryOptions selects what a project read loads besides the project's
+// own row.
+type ProjectQueryOptions struct {
+	// OwningTeam reads the team that owns the project (ADR 054 §2) into
+	// Project.OwningTeamID.
+	OwningTeam bool
+}
+
 type JSONSchemaQueryOptions struct {
 	// LatestRevisionPerObjectType keeps only the newest revision of each
 	// object_type. Rows without an object_type are revisions of nothing and
