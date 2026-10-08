@@ -65,8 +65,8 @@ describe("buildSyncPlan", () => {
       const actions = await buildSyncPlan(cwd, [syncer]);
 
       expect(actions).toHaveLength(1);
-      expect(actions[0].kind).toBe("create");
-      expect(actions[0].path).toBe(".zitadel/schemas/user.json");
+      expect(actions[0]!.kind).toBe("create");
+      expect(actions[0]!.path).toBe(".zitadel/schemas/user.json");
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
@@ -110,9 +110,9 @@ describe("buildSyncPlan", () => {
       const actions = await buildSyncPlan(cwd, [syncer]);
 
       expect(actions).toHaveLength(1);
-      expect(actions[0].kind).toBe("skip");
-      if (actions[0].kind === "skip") {
-        expect(actions[0].reason).toBe("no-change");
+      expect(actions[0]!.kind).toBe("skip");
+      if (actions[0]!.kind === "skip") {
+        expect(actions[0]!.reason).toBe("no-change");
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -132,9 +132,9 @@ describe("buildSyncPlan", () => {
       const actions = await buildSyncPlan(cwd, [syncer]);
 
       expect(actions).toHaveLength(1);
-      expect(actions[0].kind).toBe("skip");
-      if (actions[0].kind === "skip") {
-        expect(actions[0].reason).toBe("immutable");
+      expect(actions[0]!.kind).toBe("skip");
+      if (actions[0]!.kind === "skip") {
+        expect(actions[0]!.reason).toBe("immutable");
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -164,10 +164,10 @@ describe("buildSyncPlan", () => {
       const actions = await buildSyncPlan(cwd, [syncer]);
 
       expect(actions).toHaveLength(1);
-      expect(actions[0].kind).toBe("revise");
-      if (actions[0].kind === "revise") {
-        expect(actions[0].previousId).toBe("sch_A");
-        expect(actions[0].affectedPaths).toEqual([".zitadel/flows/signin.json"]);
+      expect(actions[0]!.kind).toBe("revise");
+      if (actions[0]!.kind === "revise") {
+        expect(actions[0]!.previousId).toBe("sch_A");
+        expect(actions[0]!.affectedPaths).toEqual([".zitadel/flows/signin.json"]);
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -190,9 +190,9 @@ describe("buildSyncPlan", () => {
       const actions = await buildSyncPlan(cwd, [syncer]);
 
       expect(actions).toHaveLength(1);
-      expect(actions[0].kind).toBe("skip");
-      if (actions[0].kind === "skip") {
-        expect(actions[0].reason).toBe("no-change");
+      expect(actions[0]!.kind).toBe("skip");
+      if (actions[0]!.kind === "skip") {
+        expect(actions[0]!.reason).toBe("no-change");
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -215,10 +215,10 @@ describe("buildSyncPlan", () => {
       const actions = await buildSyncPlan(cwd, [syncer]);
 
       expect(actions).toHaveLength(1);
-      expect(actions[0].kind).toBe("update");
-      if (actions[0].kind === "update") {
-        expect(actions[0].id).toBe("flow-001");
-        expect(actions[0].path).toBe(".zitadel/flows/default.json");
+      expect(actions[0]!.kind).toBe("update");
+      if (actions[0]!.kind === "update") {
+        expect(actions[0]!.id).toBe("flow-001");
+        expect(actions[0]!.path).toBe(".zitadel/flows/default.json");
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -238,10 +238,10 @@ describe("buildSyncPlan", () => {
       const actions = await buildSyncPlan(cwd, [syncer]);
 
       expect(actions).toHaveLength(1);
-      expect(actions[0].kind).toBe("delete");
-      if (actions[0].kind === "delete") {
-        expect(actions[0].id).toBe("old-id");
-        expect(actions[0].path).toBe(".zitadel/schemas/old.json");
+      expect(actions[0]!.kind).toBe("delete");
+      if (actions[0]!.kind === "delete") {
+        expect(actions[0]!.id).toBe("old-id");
+        expect(actions[0]!.path).toBe(".zitadel/schemas/old.json");
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -263,9 +263,9 @@ describe("buildSyncPlan", () => {
       const actions = await buildSyncPlan(cwd, [syncer], true);
 
       expect(fetchFn).toHaveBeenCalledWith("old-id");
-      expect(actions[0].kind).toBe("delete");
-      if (actions[0].kind === "delete") {
-        expect(actions[0].oldContent).toEqual(fetchedContent);
+      expect(actions[0]!.kind).toBe("delete");
+      if (actions[0]!.kind === "delete") {
+        expect(actions[0]!.oldContent).toEqual(fetchedContent);
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -309,9 +309,9 @@ describe("buildSyncPlan", () => {
       const syncer = makeSyncer({ fetch: fetchFn });
       const actions = await buildSyncPlan(cwd, [syncer], true);
 
-      expect(actions[0].kind).toBe("delete");
-      if (actions[0].kind === "delete") {
-        expect(actions[0].oldContent).toBeNull();
+      expect(actions[0]!.kind).toBe("delete");
+      if (actions[0]!.kind === "delete") {
+        expect(actions[0]!.oldContent).toBeNull();
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -472,7 +472,7 @@ describe("runSyncLoop", () => {
       const state = JSON.parse(
         await (await import("node:fs/promises")).readFile(join(cwd, ".zitadel/state.json"), "utf8"),
       ) as { resources: Record<string, { id: string }> };
-      expect(state.resources[".zitadel/schemas/user.json"].id).toBe("sch_B");
+      expect(state!.resources[".zitadel/schemas/user.json"]!.id).toBe("sch_B");
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
@@ -568,7 +568,7 @@ describe("normalized hashing and write-back", () => {
 
       // A legacy-format state hash must never read as an edit — a spurious
       // mismatch would publish an unintended update/revision.
-      expect(actions[0].kind).toBe("skip");
+      expect(actions[0]!.kind).toBe("skip");
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
@@ -592,7 +592,7 @@ describe("normalized hashing and write-back", () => {
       const syncer = makeSyncer({ directory: ".zitadel/flows", mutable: true });
       const actions = await buildSyncPlan(cwd, [syncer]);
 
-      expect(actions[0].kind).toBe("skip");
+      expect(actions[0]!.kind).toBe("skip");
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
@@ -611,7 +611,7 @@ describe("normalized hashing and write-back", () => {
 
       const actions = await buildSyncPlan(cwd, [syncer]);
 
-      expect(actions[0].kind).toBe("skip");
+      expect(actions[0]!.kind).toBe("skip");
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
@@ -635,7 +635,7 @@ describe("normalized hashing and write-back", () => {
 
       const actions = await buildSyncPlan(cwd, [syncer]);
 
-      expect(actions[0].kind).toBe("skip");
+      expect(actions[0]!.kind).toBe("skip");
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
@@ -1536,7 +1536,7 @@ describe("plan-time flow validation", () => {
         string,
         Record<string, { enabled: boolean }>
       >;
-      schemaBody["x-auth-methods"].passkey.enabled = false;
+      schemaBody["x-auth-methods"]!.passkey!.enabled = false;
       const schemaSyncer = makeSyncer({ normalize: normalizeSchemaBody });
       await writeState(cwd, {
         framework: "next",

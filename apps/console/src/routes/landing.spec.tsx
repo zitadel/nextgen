@@ -92,6 +92,16 @@ describe("landing routes", () => {
       http.get("http://localhost/api/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme"), project("proj_2", "Globex")] }),
       ),
+      // The link's own screen, once it is reached.
+      http.get("http://localhost/api/users/usr_1", () =>
+        HttpResponse.json({ id: "usr_1", schema: "sch_1", attributes: {}, metadata: {} }),
+      ),
+      http.get("http://localhost/api/users/usr_1/passkeys", () =>
+        HttpResponse.json({ passkeys: [] }),
+      ),
+      http.get("http://localhost/api/schemas/sch_1", () =>
+        HttpResponse.json({ id: "sch_1", schema: { properties: {} }, metadata: {} }),
+      ),
     );
     const router = await renderAt("/users/usr_1");
 
