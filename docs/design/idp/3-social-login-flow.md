@@ -381,9 +381,12 @@ multiple identity providers.
   A submit that changes it is refused with
   `error.sso_verified_unique_value_changed`: an edited, unregistered address
   would otherwise get an account linked to the editor's provider subject.
+  The engine sets `read_only` on that field, so the login components render
+  it read-only.
+  A template that ignores `read_only` keeps an editable field, and the submit
+  refusal still applies.
   `x-editable` was removed in
-  [#901](https://github.com/zitadel/nextgen/pull/901); the wire has no
-  attribute to render the refused field read-only.
+  [#901](https://github.com/zitadel/nextgen/pull/901).
 * **Verification Loss on Edit:** Editing any other prefilled value revokes its
   verified status.
   Because the provider only vouches for its own returned data, modified inputs
@@ -404,9 +407,9 @@ multiple identity providers.
   `error.user_already_exists`
   ([Trigger Points](#trigger-points)).
 
-* **No Wire Change:** `api/openapi/components/flows/field.yaml` already defines
-  `value` for prefilled fields. After a successful callback the engine fills it
-  from mapped claims.
+* **Wire:** `api/openapi/components/flows/field.yaml` defines `value` for
+  prefilled fields. After a successful callback the engine fills it from mapped
+  claims, and sets `read_only` on a field that shows a verified unique claim.
 
 ## The Resolved External Identity
 

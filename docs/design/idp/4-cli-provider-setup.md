@@ -397,8 +397,8 @@ identity.
     `email` plus any active use-case properties).
 *   **Execution:** Pre-fills values from mapped IdP claims and enforces
     completion for empty required fields.
-    A changed unique value the provider verified is refused
-    (`error.sso_verified_unique_value_changed`).
+    A unique value the provider verified is rendered read-only, and a submit
+    that changes it is refused (`error.sso_verified_unique_value_changed`).
     If a user modifies any other pre-filled value, its verification status is
     dropped.
 *   **Action:** Executes `on_success: "create_user_with_sso"` upon submission to

@@ -153,10 +153,15 @@ func TestSSOCollectionSubmitCreatesUserAndLinkAtomically(t *testing.T) {
 	f := newSSOCollectionFixture(t)
 	flow, step := f.collect(t, "sub-new")
 	prefill := map[string]string{}
+	var readOnly []string
 	for _, field := range step.Fields {
 		prefill[field.Name] = string(field.Value)
+		if field.ReadOnly.Value {
+			readOnly = append(readOnly, field.Name)
+		}
 	}
 	assert.Equal(t, `"alice@example.com"`, prefill["email"], "the step is prefilled with the provider's email")
+	assert.Equal(t, []string{"email"}, readOnly, "only the verified unique email is read-only")
 
 	resp := f.submit(t, flow, map[string]string{"email": "alice@example.com", "username": "alice"})
 
