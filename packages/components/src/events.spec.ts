@@ -9,10 +9,11 @@ import { DISPATCHED_EVENTS } from "./events.js";
 // URLs in the jsdom environment (same convention as standalone-artifact.spec.ts).
 const src = join(process.cwd(), "src");
 
-// Both dispatch forms, any quote style, digits allowed in the event name:
+// Both dispatch forms, any quote style, digits allowed in the event name. The
+// target may be a member expression, as in a controller's `emit(this.host, …)`:
 //   emit(this, "zitadel-…")   emit(host, 'zitadel-…')   new CustomEvent(`zitadel-…`)
 const WIDGET_EVENT =
-  /(?:emit\(\s*\w+\s*,\s*|new\s+CustomEvent\(\s*)["'`](zitadel-[a-z0-9-]+)["'`]/g;
+  /(?:emit\(\s*[\w.]+\s*,\s*|new\s+CustomEvent\(\s*)["'`](zitadel-[a-z0-9-]+)["'`]/g;
 
 function dispatchedWidgetEvents(): string[] {
   const events = new Set<string>();
