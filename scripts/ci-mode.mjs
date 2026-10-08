@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Spike: harmless comment to validate root workspace caching (do not merge).
 import { appendFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
