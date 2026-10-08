@@ -160,14 +160,15 @@ img[data-zl-asset-broken] {
    shell so it covers user-ejected templates too. Screen-reader-only rather
    than display:none — the step keeps its accessible name. */
 /* A terminal step is a heading with no form under it, so the heading is
-   centred in the card rather than left-aligned over fields that are not
-   there, and the card drops the gap it keeps for a body. */
+   centred in the card rather than left-aligned over fields that are not there.
+   The empty field group is already hidden (see `.zl-field-group:not(:has(*))`),
+   so the card's own region gap is what sits between the heading and the actions
+   — keep it, or the heading ends up flush against the buttons. When a terminal
+   step has no actions either, the empty body region hides itself and no gap
+   remains. */
 .zl-card--terminal .zl-card-title,
 .zl-card--terminal .zl-card-subtitle {
   text-align: center;
-}
-.zl-card--terminal::part(card) {
-  gap: 0;
 }
 [data-suppress-header] .zl-card-title,
 [data-suppress-header] .zl-card-subtitle {
