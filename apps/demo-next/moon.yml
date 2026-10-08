@@ -8,20 +8,27 @@ dependsOn:
   - "design-tokens"
   - "sdk-next"
 
+workspace:
+  inheritedTasks:
+    # A demo app with no unit tests; demo-next-e2e covers it.
+    exclude:
+      - "test"
+
 tasks:
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
       - "api:build"
       - "sdk-next:build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
       - "api:build"
       - "sdk-next:build"
     outputs:
       - ".next/**/*"
+    options:
+      # Replaces the inherited dist/**/* rather than adding to it.
+      mergeOutputs: "replace"
 
   dev:
     command: "corepack pnpm run dev"

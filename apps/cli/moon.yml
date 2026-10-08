@@ -10,7 +10,6 @@ dependsOn:
 
 tasks:
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
       - "api:build"
       - "api-mock:build"
@@ -18,7 +17,6 @@ tasks:
       - "sdk-next:build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
       - "api:build"
       - "config:build"
@@ -29,8 +27,6 @@ tasks:
       # a dev-stamped cache. See apps/cli/tsdown.config.ts.
       - "**/*"
       - "$ZITADEL_TELEMETRY_BUILD_CHANNEL"
-    outputs:
-      - "dist/**/*"
 
   build-release:
     script: |
@@ -59,7 +55,6 @@ tasks:
       runInCI: false
 
   test:
-    command: "corepack pnpm run test:all"
     deps:
       - "build"
       - "api-mock:build"

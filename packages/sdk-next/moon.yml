@@ -9,20 +9,16 @@ dependsOn:
 
 tasks:
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
       - "api:build"
       - "components:build"
       - "sdk-core:build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
       - "api:build"
       - "components:build"
       - "sdk-core:build"
-    outputs:
-      - "dist/**/*"
 
   build-release:
     script: |
@@ -47,6 +43,5 @@ tasks:
       mutex: "public-dist"
 
   test:
-    command: "corepack pnpm run test:all"
     deps:
       - "build"
