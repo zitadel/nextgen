@@ -110,6 +110,10 @@ catalog:
 
 catalogMode: strict
 
+# pnpm 12 refuses packages published less than a day ago by default; keep
+# installing fresh releases the way pnpm 10 did.
+minimumReleaseAge: 0
+
 # `packages/config` and `apps/cli` rely on `pre*`/`post*` lifecycle scripts.
 enablePrePostScripts: true
 
