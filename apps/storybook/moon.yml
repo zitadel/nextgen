@@ -6,6 +6,7 @@ dependsOn:
   - "api"
   - "api-mock"
   - "components"
+  - "config"
   - "design-tokens"
 
 tasks:
@@ -15,9 +16,11 @@ tasks:
     command: "corepack pnpm run typecheck"
     deps:
       - "api:build"
-      - "api-mock:build"
+      - target: "api-mock:build"
+        cacheStrategy: "hash"
       - "components:build"
       - "design-tokens:build"
+      - "config:build"
 
   build:
     command: "corepack pnpm run build"
@@ -25,6 +28,9 @@ tasks:
       - "api:build"
       - "components:build"
       - "design-tokens:build"
+      - target: "api-mock:build"
+        cacheStrategy: "hash"
+      - "config:build"
     outputs:
       - "dist/**/*"
     # Runs in CI: the Vercel deploy builds the static site from this task, and
@@ -48,6 +54,9 @@ tasks:
       - "api:build"
       - "components:build"
       - "design-tokens:build"
+      - target: "api-mock:build"
+        cacheStrategy: "hash"
+      - "config:build"
     options:
       # Shared mutex with the other browser-mode suites so only one real-Chromium
       # Vite server runs at a time; concurrent servers starve under moon's CI
@@ -60,6 +69,8 @@ tasks:
 
   dev:
     command: "corepack pnpm run dev"
+    deps:
+      - "config:build"
     options:
       persistent: true
       runInCI: false

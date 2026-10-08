@@ -15,6 +15,8 @@ tasks:
       - "api:build"
       - "config:build"
       - "sdk-next:build"
+      - target: "api-mock:build"
+        cacheStrategy: "hash"
 
   build:
     command: "corepack pnpm run build"
@@ -61,7 +63,14 @@ tasks:
     command: "corepack pnpm run test:all"
     deps:
       - "build"
-      - "api-mock:build"
+      - target: "api-mock:build"
+        cacheStrategy: "hash"
+    inputs:
+      - "**/*"
+      # The @zitadel/server wrapper its server-wrapper test loads. An input,
+      # not a task dep: server already depends on console, so a cli -> server
+      # edge would close a project cycle once console depends on cli.
+      - "/apps/server/bin/**/*"
     options:
       # The built oclif commands import @zitadel/{api,config,sdk-next} from
       # those packages' dist/ at runtime. Their build-release tasks rewrite

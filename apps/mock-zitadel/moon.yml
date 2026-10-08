@@ -12,7 +12,8 @@ tasks:
   build:
     command: "corepack pnpm run build"
     deps:
-      - "api-mock:build"
+      - target: "api-mock:build"
+        cacheStrategy: "hash"
     outputs:
       - "dist/**"
 
@@ -24,8 +25,11 @@ tasks:
     command: "corepack pnpm run typecheck"
     deps:
       - "api:generate"
+      - target: "api-mock:build"
+        cacheStrategy: "hash"
 
   test:
     command: "corepack pnpm run test:all"
     deps:
-      - "api-mock:build"
+      - target: "api-mock:build"
+        cacheStrategy: "hash"

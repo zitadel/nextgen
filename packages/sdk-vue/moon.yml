@@ -15,6 +15,8 @@ tasks:
       - "api:build"
       - "components:build"
       - "sdk-core:build"
+      - target: "api-mock:build"
+        cacheStrategy: "hash"
 
   build:
     command: "corepack pnpm run build"
@@ -47,5 +49,6 @@ tasks:
     deps:
       # api-mock serves the Flow API to the specs (test-setup.ts); its no-op
       # build is the edge that re-runs this when api-mock source changes.
-      - "api-mock:build"
+      - target: "api-mock:build"
+        cacheStrategy: "hash"
       - "build"

@@ -13,6 +13,10 @@ tasks:
       - "api:build"
       - "config:build"
 
+  # A no-op: consumers import the source (the exports point at src/). It
+  # exists as the edge to depend on, and declares no outputs, so moon ignores
+  # its hash by default; every dependent must list it with
+  # `cacheStrategy: "hash"` or an api-mock change will not invalidate it.
   build:
     command: 'node -e "process.exit(0)"'
     deps:
