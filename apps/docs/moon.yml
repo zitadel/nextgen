@@ -17,9 +17,9 @@ tasks:
     inputs:
       - "**/*"
       - "/api/openapi/**/*.yaml"
+      # The bundle applies the repo's Redocly config.
+      - "/redocly.yaml"
     outputs:
-      - ".generated/openapi.yaml"
-      - ".generated/openapi.json"
       - ".generated/openapi.mjs"
 
   generate:
@@ -27,9 +27,9 @@ tasks:
     inputs:
       - "**/*"
       - "/api/openapi/**/*.yaml"
+      # The bundle applies the repo's Redocly config.
+      - "/redocly.yaml"
     outputs:
-      - ".generated/openapi.yaml"
-      - ".generated/openapi.json"
       - ".generated/openapi.mjs"
       - ".source/**/*"
 

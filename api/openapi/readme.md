@@ -80,31 +80,13 @@ session_id:
 Once ogen#1617 is resolved, all `oneOf` nullable patterns in this spec can be
 migrated to the more concise `type: ["string", "null"]` form.
 
-### Spec merging: Redocly
+### Linting and bundling: Redocly
 
-- Github: [](https://github.com/Redocly/redocly-cli)
-- Docs: [](https://redocly.com/docs/cli)
-
-#### Install Redocly
-
-```shell
-npm install -g @redocly/cli
-```
-
-or docker
+The repo pins `@redocly/openapi-core` (the library behind the
+[Redocly CLI](https://redocly.com/docs/cli)) and applies `redocly.yaml` and
+`.redocly.lint-ignore.yaml` from the repo root. Nothing needs installing:
 
 ```shell
-docker pull redocly/cli
-```
-
-#### Merge spec
-
-```shell
-redocly bundle open-api-spec.yaml -o bundled.yaml 
-```
-
-or docker
-
-```shell
-docker run --rm -v $PWD:/spec redocly/cli bundle open-api-spec.yaml -o bundled.yaml 
+moon run server:openapi          # lint openapi-spec.yaml
+moon run docs:generate-openapi   # bundle it into apps/docs/.generated/openapi.mjs
 ```

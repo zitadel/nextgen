@@ -27,9 +27,10 @@ fileGroups:
 
 tasks:
   openapi:
-    command: "npx --yes @redocly/cli@2.31.5 lint api/openapi/openapi-spec.yaml --format=github-actions"
+    command: "node scripts/lint-openapi.mjs"
     inputs:
       - "@group(serverInputs)"
+      - "/scripts/lint-openapi.mjs"
       # Without these a lint-config change still cache-hits.
       - "/redocly.yaml"
       - "/.redocly.lint-ignore.yaml"
