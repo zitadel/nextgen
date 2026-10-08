@@ -13,7 +13,10 @@ tasks:
     deps:
       - "api-mock:build"
 
-  # Its specs import @zitadel/api-mock.
+  # The `typecheck` script generates @zitadel/api first (its source is
+  # gitignored and produced by orval), so it is self-contained — it passes
+  # whether run via Moon or standalone (e.g. the Vercel "TypeCheck"
+  # deployment check, which runs the npm script in a sandbox without Moon).
   typecheck:
     deps:
       - "api-mock:build"

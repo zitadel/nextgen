@@ -29,12 +29,9 @@ function artifactEdge(project, target) {
   if (project === "testing") return target === "server"; // integration tests boot the binary
   if (project === "console") return target === "cli"; // dev-real boots an instance through the built CLI
   if (project === "workspace") return target === "console" || target === "login-ui"; // the local image embeds the UI builds
-  // e2e suites run built apps and the server binary; the demos' dev servers load
-  // the SDKs' built packages.
-  if (project.endsWith("-e2e"))
-    return ["cli", "server", "console", "demo-next", "demo-nuxt", "sdk-next", "sdk-nuxt"].includes(
-      target,
-    );
+  // e2e suites run built apps and the server binary; demo-next's dev server
+  // loads the built sdk-next.
+  if (project.endsWith("-e2e")) return ["cli", "server", "console", "sdk-next"].includes(target);
   return false;
 }
 

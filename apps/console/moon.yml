@@ -38,8 +38,8 @@ tasks:
     deps:
       - "build"
 
-  # The same deps as build: sdk-react and components are loaded from their
-  # dist (only api and design-tokens have a `@zitadel/source` entry).
+  # The same deps as build: sdk-react has no `@zitadel/source` entry, so the
+  # dev server loads its dist.
   dev:
     command: "corepack pnpm run dev"
     deps:
