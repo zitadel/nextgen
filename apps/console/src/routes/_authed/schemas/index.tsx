@@ -1,16 +1,27 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Lock } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Users } from "lucide-react";
 
 import { api } from "@/api/zitadel";
 import {
-  DIRECTORY_CHIP,
-  DIRECTORY_ROW_LINK,
-  DirectoryCard,
-  DirectoryRow,
-} from "@/components/directory-list";
-import { LoadMore, ResourcePage, ResourceTitle } from "@/components/resource-list";
+  LoadMore,
+  RESOURCE_CELL,
+  RESOURCE_CELL_MUTED,
+  RESOURCE_ROW_ICON,
+  RESOURCE_ROW_LINK,
+  RESOURCE_TABLE_FIXED,
+  RESOURCE_TABLE_TOP,
+  RESOURCE_TABLE_WRAP,
+  ResourceEmptyRow,
+  ResourceHeadCell,
+  ResourceHeaderRow,
+  ResourceMenuHead,
+  ResourcePage,
+  ResourceRow,
+  ResourceTitle,
+  RowMenu,
+} from "@/components/resource-list";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { InlineCode } from "@/components/ui/inline-code";
+import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { formatDate } from "@/lib/date";
 import {
@@ -18,12 +29,7 @@ import {
   requireProjectScope,
   useRequiredProjectScope,
 } from "@/lib/project-scope";
-import {
-  type UserSchema,
-  schemaAuthMethods,
-  schemaDisplayName,
-  schemaProperties,
-} from "@/lib/schema";
+import { type UserSchema, schemaAuthMethods, schemaDisplayName } from "@/lib/schema";
 
 export const Route = createFileRoute("/_authed/schemas/")({
   staticData: { scope: "project", nav: { label: "User schemas", order: 1, parent: "/users" } },
@@ -101,19 +107,37 @@ function SchemasScreen() {
           everywhere it appears, which is also what the sidebar entry says. */}
       <ResourceTitle>User schemas</ResourceTitle>
 
-      <DirectoryCard empty={schemas.length === 0 ? "This project has no user schemas." : undefined}>
-        {schemas.map((entry) => (
-          <SchemaRow key={entry.id} {...entry} />
-        ))}
-      </DirectoryCard>
+      <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
+        {/* Four equal columns, as the design lays them out (D17); the trailing
+            one carries the row menu. */}
+        <Table className={RESOURCE_TABLE_FIXED}>
+          <TableHeader>
+            <ResourceHeaderRow>
+              <ResourceHeadCell className={COLUMN}>Name</ResourceHeadCell>
+              <ResourceHeadCell className={COLUMN}>Sign-in methods</ResourceHeadCell>
+              <ResourceHeadCell className={COLUMN}>Created</ResourceHeadCell>
+              <ResourceMenuHead className={COLUMN} />
+            </ResourceHeaderRow>
+          </TableHeader>
+          <TableBody>
+            {schemas.length === 0 ? (
+              <ResourceEmptyRow colSpan={4}>This project has no user schemas.</ResourceEmptyRow>
+            ) : (
+              schemas.map((entry) => <SchemaRow key={entry.id} {...entry} />)
+            )}
+          </TableBody>
+        </Table>
+      </div>
       <LoadMore paging={paging} />
     </ResourcePage>
   );
 }
 
+const COLUMN = "w-1/4";
+
 /**
- * One row of the schema directory: name and sign-in methods, the attributes it
- * collects, its metadata, and the row menu.
+ * One row of the schema directory: the name, its enabled sign-in methods, when
+ * it was created, and the row menu. The whole row opens the schema.
  */
 function SchemaRow({
   id,
@@ -124,8 +148,8 @@ function SchemaRow({
   createdAt: string;
   schema: UserSchema;
 }) {
+  const navigate = useNavigate();
   const name = schemaDisplayName(schema, id);
-  const attributes = schemaProperties(schema).map((property) => property.key);
   // "Passkey + Password" reads off the document's own `x-auth-methods`. The
   // annotation says which methods the user type supports; the order they are
   // offered in belongs to the flow, not to the schema.
@@ -135,56 +159,26 @@ function SchemaRow({
     .join(" + ");
 
   return (
-    <DirectoryRow
-      name={name}
-      title={
-        <Link to="/schemas/$schemaId" params={{ schemaId: id }} className={DIRECTORY_ROW_LINK}>
+    <ResourceRow
+      onOpen={() => void navigate({ to: "/schemas/$schemaId", params: { schemaId: id } })}
+    >
+      <TableCell className={`${RESOURCE_CELL} truncate`}>
+        <Link to="/schemas/$schemaId" params={{ schemaId: id }} className={RESOURCE_ROW_LINK}>
+          <Users aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
           {name}
         </Link>
-      }
-      caption={
-        signIn && (
-          <>
-            <Lock className="size-3" aria-hidden />
-            {signIn}
-          </>
-        )
-      }
-      chips={attributes.map((attribute) => (
-        <InlineCode key={attribute} className={DIRECTORY_CHIP}>
-          {attribute}
-        </InlineCode>
-      ))}
-      menu={
-        <DropdownMenuItem asChild>
-          <Link to="/schemas/$schemaId" params={{ schemaId: id }}>
-            View schema
-          </Link>
-        </DropdownMenuItem>
-      }
-    >
-      <dl className="flex shrink-0 flex-col gap-1 text-xs leading-4 text-muted-foreground">
-        <MetaLine label="Created">{formatDate(createdAt)}</MetaLine>
-        {/* The design mocks a short id; a real one is a 30-character `sch_*`,
-            so it is clamped with the whole value on hover and on the detail
-            screen. Together with the date it is what identifies one schema
-            among several (decisions log D10). */}
-        <MetaLine label="ID">
-          <span title={id} className="block max-w-45 truncate">
-            {id}
-          </span>
-        </MetaLine>
-      </dl>
-    </DirectoryRow>
-  );
-}
-
-/** One `CREATED 12 Jul 2026` line: a regular label, a medium value. */
-function MetaLine({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-start gap-1">
-      <dt className="font-normal uppercase">{label}</dt>
-      <dd className="font-medium">{children}</dd>
-    </div>
+      </TableCell>
+      <TableCell className={RESOURCE_CELL_MUTED}>{signIn}</TableCell>
+      <TableCell className={RESOURCE_CELL_MUTED}>{formatDate(createdAt)}</TableCell>
+      <TableCell className={`${RESOURCE_CELL} text-right`}>
+        <RowMenu name={name}>
+          <DropdownMenuItem asChild>
+            <Link to="/schemas/$schemaId" params={{ schemaId: id }}>
+              View schema
+            </Link>
+          </DropdownMenuItem>
+        </RowMenu>
+      </TableCell>
+    </ResourceRow>
   );
 }

@@ -56,13 +56,14 @@ export class ZitadelSession extends ZitadelSurface {
         display: block;
         width: 100%;
       }
+      /* The same title as the sign-in card's: xl, medium, on a single line
+         whose gap to the identity line does the separating. */
       .title {
         margin: 0;
         font-family: ${t.font.family.heading};
-        font-size: 2rem;
-        font-weight: 700;
-        line-height: 2.5rem;
-        letter-spacing: -0.02em;
+        font-size: var(--zl-text-xl-size);
+        font-weight: var(--zl-font-weight-medium);
+        line-height: 1;
         color: ${t.theme.foreground};
         text-align: left;
       }
