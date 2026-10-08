@@ -8,9 +8,9 @@ import { SettingsCard } from "@/components/settings-card";
 import { Field, FieldContent, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-import { api } from "../../../api/zitadel";
-import { field } from "../../../lib/record";
-import { userAttributes } from "../../../lib/user";
+import { api } from "@/api/zitadel";
+import { field } from "@/lib/record";
+import { userAttributes } from "@/lib/user";
 
 /**
  * Settings → Profile: the signed-in person's own account.
@@ -20,7 +20,7 @@ import { userAttributes } from "../../../lib/user";
  * pulled in and there is nothing to save.
  *
  * Composes the detail shell (`detail-page.tsx`) rather than measuring its own
- * frame; the title stands alone because a settings screen has no icon tile
+ * layout; the title stands alone because a settings screen has no icon tile
  * and no id card.
  */
 export const Route = createFileRoute("/_authed/settings/profile")({
@@ -48,7 +48,7 @@ function ProfileScreen() {
   return (
     <DetailPage>
       <SettingsColumn>
-        {/* No header gutter: the settings frame aligns the title with the card,
+        {/* No header gutter: the settings design aligns the title with the card,
             where a resource detail insets its title lockup by 8px. */}
         <h1 className={DETAIL_TITLE}>Profile</h1>
         <SettingsCard>
