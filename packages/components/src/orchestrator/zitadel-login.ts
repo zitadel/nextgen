@@ -1,4 +1,3 @@
-import type { ZitadelProject } from "@zitadel/api/config";
 import type {
   CreateFlow201,
   CreateFlow201Step,
@@ -15,6 +14,7 @@ import { css, html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import "../atoms/index.js";
+import type { ZlFieldInputDetail, ZlSubmitDetail } from "../atoms/index.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 
 import { emit } from "../internal/emit.js";
@@ -34,7 +34,7 @@ import { stampExportparts } from "./exportparts.js";
 import { createLiquidEngine, localiseFlowErrorKeys, parseSsoError } from "./liquid.js";
 import { en, builtinLocales, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
-import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
+import { resolveApi } from "./resolve-api.js";
 import { createSanitiser } from "./sanitiser.js";
 import { ZitadelSurface } from "./surface.js";
 import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
@@ -190,33 +190,6 @@ export class ZitadelLogin extends ZitadelSurface {
    * of picking one by audience. Omit to run the project's default flow.
    */
   @property({ type: String, attribute: "flow-name" }) accessor flowName = "";
-
-  /**
-   * SDK project handle returned by `configureZitadel()`. Set from JS (or a
-   * framework binding). When set, takes precedence over both the
-   * `project-id`/`proxy-path`/`url` attributes and the global singleton from
-   * `getZitadelConfig()`.
-   */
-  @property({ attribute: false }) accessor project: ZitadelProject | undefined;
-
-  /**
-   * Project ID, set declaratively in HTML. Lets the component be configured on
-   * a plain page without JS or `configureZitadel()`. Ignored when the `project`
-   * property or a `configureZitadel()` global is set. See {@link projectAttrs}.
-   */
-  @property({ type: String, attribute: "project-id" }) accessor projectId = "";
-
-  /**
-   * Proxy path for API requests (e.g. `/__nextgen`), set declaratively in HTML.
-   * Defaults to `/__nextgen` when omitted, matching `configureZitadel()`.
-   */
-  @property({ type: String, attribute: "proxy-path" }) accessor proxyPath = "";
-
-  /**
-   * Full URL of the Zitadel auth backend, set declaratively in HTML. Optional —
-   * not needed in client-only setups.
-   */
-  @property({ type: String }) accessor url = "";
 
   /**
    * URL to navigate to after a successful embedded sign-in. When set, the
@@ -528,7 +501,7 @@ export class ZitadelLogin extends ZitadelSurface {
         shell.toggleAttribute("data-suppress-header", this.suppressHeader === true);
       }
       // Stamped on the card too: its header REGION must leave the flex flow
-      // (card-host.css) or the card keeps a blank 32px header band — the
+      // (zl-card.css) or the card keeps a blank 32px header band — the
       // slotted headings alone going sr-only doesn't collapse the region.
       for (const card of this.shadowRoot.querySelectorAll("zl-card")) {
         card.toggleAttribute("data-suppress-header", this.suppressHeader === true);
@@ -665,9 +638,8 @@ export class ZitadelLogin extends ZitadelSurface {
   /**
    * Inject the attribution badge into the rendered template's
    * `<zl-page-shell>` footer slot. The attribution must live INSIDE the
-   * page-shell so it sits within the 100vh viewport rhythm (matching the
-   * Figma sign-in frame where the pill sits 24px below the card, both
-   * centred on the page). It can't be a sibling of the page-shell because
+   * page-shell so it sits within the 100vh viewport rhythm (the pill sits
+   * 24px below the card, both centred on the page). It can't be a sibling of the page-shell because
    * the page-shell already occupies the full viewport height.
    *
    * This markup is appended AFTER `renderStep` has sanitised the Liquid
@@ -739,11 +711,6 @@ export class ZitadelLogin extends ZitadelSurface {
       : `<a class="zl-trustmark__mark" part="attribution-mark" href="https://zitadel.com" aria-label="Secured with Zitadel">${zitadelTrustmarkInnerHtml()}</a>`;
     const slot = placement === "footer" ? ` slot="footer"` : "";
     return `<div${slot} part="attribution" class="zl-attribution zl-trustmark">${mark}<slot name="attribution-trailing"></slot></div>`;
-  }
-
-  /** Declarative config read from this element's attributes. */
-  private get projectAttrs(): ProjectAttrs {
-    return { projectId: this.projectId, proxyPath: this.proxyPath, url: this.url };
   }
 
   /**
@@ -1245,7 +1212,7 @@ export class ZitadelLogin extends ZitadelSurface {
    */
   private stepErrorDismissed = false;
 
-  private handleAtomInput = (event: CustomEvent<{ name: string; value: string }>): void => {
+  private handleAtomInput = (event: CustomEvent<ZlFieldInputDetail>): void => {
     if (!event.detail) return;
     const { name, value } = event.detail;
     if (!name) return;
@@ -1319,7 +1286,7 @@ export class ZitadelLogin extends ZitadelSurface {
     }
   }
 
-  private handleAtomSubmit = (event: CustomEvent<{ action: string | null }>): void => {
+  private handleAtomSubmit = (event: CustomEvent<ZlSubmitDetail>): void => {
     if (this.loading) return;
     void this.submit(event.detail?.action ?? null);
   };

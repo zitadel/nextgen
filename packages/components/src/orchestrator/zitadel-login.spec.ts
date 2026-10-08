@@ -450,8 +450,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(element.shadowRoot?.querySelector("zl-alert")?.textContent).toContain(serverMessage);
     // The failure keeps the login surface: the alert renders inside the same
     // page-shell/card chrome a step would, not bare on an otherwise empty
-    // page — a misconfigured origin is the common trigger and used to blank
-    // the app after the first step had painted normally.
+    // page — a misconfigured origin is the common trigger.
     const alert = element.shadowRoot?.querySelector("zl-alert");
     expect(alert?.closest("zl-card")).not.toBeNull();
     expect(alert?.closest("zl-page-shell")).not.toBeNull();
@@ -502,8 +501,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
   });
 
   it("renders a primary passkey action as exactly one button", async () => {
-    // Regression for the duplicate "Continue with passkey" button: the
-    // template renders primary actions generically AND has a dedicated
+    // The template renders primary actions generically AND has a dedicated
     // passkey block, which must skip a passkey that is already primary.
     server.use(
       http.post("*/flow", () =>
@@ -984,9 +982,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // One more frame so the post-render applyValuesToFields callback fires.
     await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
 
-    // Regression: empty defaults from the re-rendered step used to wipe
-    // formValues, which then propagated back to the field via
-    // applyValuesToFields. The typed input must survive.
+    // Empty defaults from the re-rendered step must not wipe formValues.
     const emailField = element.shadowRoot?.querySelector<HTMLElement & { value?: string }>(
       'zl-field[name="email"]',
     );
@@ -1765,9 +1761,8 @@ describe("<zitadel-login> against the typed Flow API", () => {
   });
 
   it("captures <zl-select> and <zl-checkbox> values on submit", async () => {
-    // A step whose only inputs are the non-text atoms. Regression: the
-    // orchestrator used to read `.value` from `<zl-field>` only, so a chosen
-    // select option and a ticked checkbox were submitted as empty strings.
+    // A step whose only inputs are the non-text atoms: values are read from
+    // `<zl-select>` and `<zl-checkbox>` too.
     server.use(
       http.post("*/flow", () =>
         HttpResponse.json(

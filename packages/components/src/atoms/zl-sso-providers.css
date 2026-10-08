@@ -45,7 +45,7 @@
    not repainted the way every other surface is. These roles are deliberately
    absent from `PALETTE_MAP` (`branding-to-tokens.ts`),
    which is what keeps branding out of them; their defaults are the design's
-   outline button, so the shipped page matches Figma with no tenant input.
+   outline button, so the shipped page matches the design with no tenant input.
    Hover and pressed mix toward the button's own foreground rather than
    `--zl-accent`, which branding does paint. */
 .zr-sso__list zl-button::part(root) {

@@ -7,11 +7,10 @@
  *
  * The `*-template` presets carry design templates as `liquid_template`:
  * `minimal-template` is the exact markup `branding eject` puts into a user's
- * repo; the split/hero presets are the retired page-layout designs (#1039),
+ * repo; the split/hero presets are the retired page-layout designs,
  * kept so revisions already published from them can still be reviewed. They
  * exist so the shipped designs can be reviewed here instead of only inside a
- * scaffolded app (the alpha.18 feedback round found empty-brand-pane and
- * badge-alignment regressions nobody had ever rendered). Raw vite imports,
+ * scaffolded app. Raw vite imports,
  * not `getDefaultBrandingConfig()` — that helper reads from disk and is
  * Node-only.
  *
