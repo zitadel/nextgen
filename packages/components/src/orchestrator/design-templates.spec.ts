@@ -5,7 +5,7 @@
  * the atoms a step needs. The authoring-side validation of the same files
  * lives in `packages/config/src/template.test.ts`.
  *
- * The retired page-layout designs (`split`, `split-right`, `hero`, #1039)
+ * The retired page-layout designs (`split`, `split-right`, `hero`)
  * are no longer ejectable, but revisions already published from them keep
  * rendering on the `layout-chrome.css` split/hero chrome. Their last shipped
  * templates live in `__fixtures__/legacy-designs/` so that promise stays

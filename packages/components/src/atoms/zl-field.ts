@@ -1,5 +1,5 @@
 import type { CreateFlow201StepFieldsItemType } from "@zitadel/api/generated/model";
-import { LitElement, html, nothing, type PropertyValues } from "lit";
+import { html, nothing, type PropertyValues } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { ifDefined } from "lit/directives/if-defined.js";
@@ -8,11 +8,13 @@ import { live } from "lit/directives/live.js";
 import fieldStyles from "./zl-field.css?inline";
 
 import { emit } from "../internal/emit.js";
+import { FormAtom } from "../internal/form-atom.js";
 import { hookName } from "../internal/hook-name.js";
 import { nextUid } from "../internal/unique-id.js";
 import type { AtomManifest } from "../manifest.js";
-import { baseHostStyles, surfaceStyles } from "../styles/index.js";
+import { baseHostStyles, sharedStyles, surfaceStyles } from "../styles/index.js";
 
+import type { ZlSubmitDetail } from "./events.js";
 import "./zl-icon.js";
 import type { IconName } from "./zl-icon.js";
 
@@ -39,35 +41,14 @@ export type ZlFieldInputDetail = { name: string; value: string };
  *                The clear button is a pointer-only affordance (`tabindex="-1"`)
  *                so Tab moves from one input straight to the next; keyboard
  *                users clear via the input itself.
- *   description  14/20 in `--zl-muted-foreground`, the size the sign-up
- *                frame's password hint uses
+ *   description  14/20 in `--zl-muted-foreground`
  *
  * Form participation: `<zl-field>` is a form-associated custom element.
  */
 @customElement("zl-field")
-export class ZlField extends LitElement {
-  static formAssociated = true;
+export class ZlField extends FormAtom {
+  static override styles = [baseHostStyles, ...surfaceStyles(sharedStyles, fieldStyles)];
 
-  static override shadowRootOptions: ShadowRootInit = {
-    ...LitElement.shadowRootOptions,
-    delegatesFocus: true,
-  };
-
-  static override styles = [baseHostStyles, ...surfaceStyles(fieldStyles)];
-
-  /**
-   * Field name — used as the key in form submission and in `zl-input` event
-   * detail. For form-associated custom elements the browser owns a native
-   * `name` property; using `@property()` would create a conflicting accessor
-   * that loses sync with the DOM attribute. We therefore manage it manually.
-   */
-  get name(): string {
-    return this.getAttribute("name") ?? "";
-  }
-
-  set name(value: string) {
-    this.setAttribute("name", value);
-  }
   @property() accessor label = "";
   @property() accessor type: ZlFieldType = "text";
   @property() accessor value = "";
@@ -76,7 +57,8 @@ export class ZlField extends LitElement {
   @property() accessor pattern: string | undefined = undefined;
   @property() accessor error = "";
   @property() accessor success = "";
-  @property({ attribute: "data-testid" }) accessor testId: string | undefined = undefined;
+  /** Accessible name for the native input when there is no visible `label`. */
+  @property({ attribute: "aria-label" }) accessor ariaLabelText: string | undefined = undefined;
   @property({ attribute: "forgot-password-href" }) accessor forgotPasswordHref: string | undefined =
     undefined;
   @property({ attribute: "forgot-password-label" }) accessor forgotPasswordLabel =
@@ -93,7 +75,6 @@ export class ZlField extends LitElement {
     | undefined = undefined;
   @property({ type: Boolean, attribute: "trailing-icon" }) accessor trailingIcon = true;
   @property({ type: Boolean }) accessor required = false;
-  @property({ type: Boolean, reflect: true }) accessor disabled = false;
   @property({ type: Boolean, reflect: true }) accessor invalid = false;
 
   @state() private accessor hasHelp = false;
@@ -102,16 +83,14 @@ export class ZlField extends LitElement {
   @query(".zr-field__input") private accessor inputEl: HTMLInputElement | null = null;
 
   private readonly inputId = nextUid("zl-field");
-  private readonly internals: ElementInternals;
-
-  constructor() {
-    super();
-    this.internals = this.attachInternals();
-  }
 
   override connectedCallback(): void {
     super.connectedCallback();
     this.syncFormState();
+  }
+
+  protected readDefaultFormValue(): string {
+    return this.getAttribute("value") ?? "";
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
@@ -120,32 +99,16 @@ export class ZlField extends LitElement {
     }
   }
 
-  formResetCallback(): void {
-    this.value = "";
-  }
-
-  formStateRestoreCallback(state: string | null): void {
-    this.value = state ?? "";
-  }
-
   override focus(options?: FocusOptions): void {
     this.inputEl?.focus(options);
   }
 
-  /**
-   * The string this control contributes to form submission — the uniform
-   * read/write contract `<zitadel-login>` uses to capture and restore field
-   * values without knowing each atom's internal shape. The getter reads the
-   * live `<input>` so browser/password-manager autofill that writes the native
-   * control directly (bypassing the `value` property and its `input` event) is
-   * still captured.
-   */
-  get formValue(): string {
+  override get formValue(): string {
     const native = this.inputEl ?? this.shadowRoot?.querySelector<HTMLInputElement>("input");
     return native ? native.value : this.value;
   }
 
-  set formValue(value: string) {
+  override set formValue(value: string) {
     this.value = value;
     const native = this.inputEl ?? this.shadowRoot?.querySelector<HTMLInputElement>("input");
     if (native && native.value !== value) {
@@ -171,9 +134,9 @@ export class ZlField extends LitElement {
       "zr-field": true,
       "zr-field--invalid": this.invalid || showError,
       "zr-field--success": showSuccess,
-      "zr-field--disabled": this.disabled,
+      "zr-field--disabled": this.isDisabled,
     });
-    const showDefaultTrailing = this.trailingIcon && !this.hasSuffixSlot && !this.disabled;
+    const showDefaultTrailing = this.trailingIcon && !this.hasSuffixSlot && !this.isDisabled;
     const trailing = showDefaultTrailing ? this.renderTrailingIcon() : null;
     const wrapClass = classMap({
       "zr-field__wrap": true,
@@ -197,7 +160,8 @@ export class ZlField extends LitElement {
             autocomplete=${ifDefined(this.autocomplete)}
             pattern=${ifDefined(this.pattern)}
             ?required=${this.required}
-            ?disabled=${this.disabled}
+            ?disabled=${this.isDisabled}
+            aria-label=${ifDefined(this.label ? undefined : this.ariaLabelText)}
             aria-invalid=${this.invalid || showError ? "true" : "false"}
             aria-describedby=${describedBy || nothing}
             @input=${this.handleInput}
@@ -219,7 +183,7 @@ export class ZlField extends LitElement {
         >
           ${this.success}
         </div>
-        <div class="zr-field__error" part="error" id=${errorId} role="alert" ?hidden=${!showError}>
+        <div class="zr-field__error zr-inline-error" part="error" id=${errorId} role="alert" ?hidden=${!showError}>
           ${this.error}
         </div>
       </div>
@@ -230,32 +194,26 @@ export class ZlField extends LitElement {
     if (!this.label) {
       return null;
     }
-    if (this.forgotPasswordHref) {
-      return html`
-        <div class="zr-field__label-row" part="label-row">
-          <label class="zr-field__label" part="label" id=${labelId} for=${this.inputId}>
-            <span>${this.label}</span>
-            ${
-              this.required
-                ? html`<span class="zr-field__required" aria-hidden="true">*</span>`
-                : null
-            }
-          </label>
-          <a
-            class="zr-field__link"
-            part="forgot-link"
-            href=${this.forgotPasswordHref}
-            @click=${this.onForgotPasswordClick}
-            >${this.forgotPasswordLabel}</a
-          >
-        </div>
-      `;
-    }
-    return html`
+    const label = html`
       <label class="zr-field__label" part="label" id=${labelId} for=${this.inputId}>
         <span>${this.label}</span>
         ${this.required ? html`<span class="zr-field__required" aria-hidden="true">*</span>` : null}
       </label>
+    `;
+    if (!this.forgotPasswordHref) {
+      return label;
+    }
+    return html`
+      <div class="zr-field__label-row" part="label-row">
+        ${label}
+        <a
+          class="zr-field__link zr-focus-ring"
+          part="forgot-link"
+          href=${this.forgotPasswordHref}
+          @click=${this.onForgotPasswordClick}
+          >${this.forgotPasswordLabel}</a
+        >
+      </div>
     `;
   }
 
@@ -284,11 +242,11 @@ export class ZlField extends LitElement {
       <span class="zr-field__trailing" part="trailing-icon">
         <button
           type="button"
-          class="zr-field__trailing-action"
+          class="zr-field__trailing-action zr-focus-ring"
           part="trailing-action"
           aria-label="Clear"
           tabindex="-1"
-          ?disabled=${this.disabled}
+          ?disabled=${this.isDisabled}
           @click=${this.handleClear}
         >
           ${icon}
@@ -334,7 +292,7 @@ export class ZlField extends LitElement {
   private onForgotPasswordClick = (event: MouseEvent): void => {
     if (!this.forgotPasswordAction) return;
     event.preventDefault();
-    emit<{ action: string | null }>(this, "zl-submit", { action: this.forgotPasswordAction });
+    emit<ZlSubmitDetail>(this, "zl-submit", { action: this.forgotPasswordAction });
   };
 
   private handleInput = (event: Event): void => {
@@ -372,17 +330,11 @@ export class ZlField extends LitElement {
   };
 
   private nativeInputTestId(): string | undefined {
-    if (this.name) {
-      // Field host hooks use zitadel-field-*; native hooks can be name-first
-      // without colliding with the host, unlike action buttons. The hook
-      // token is normalised (x-auth-methods#password → password) while
-      // `name` stays the raw form key.
-      return `zitadel-input-${hookName(this.name)}`;
-    }
-    if (this.testId) {
-      return `${this.testId}-input`;
-    }
-    return undefined;
+    // Field host hooks use zitadel-field-*; native hooks can be name-first
+    // without colliding with the host, unlike action buttons. The hook
+    // token is normalised (x-auth-methods#password → password) while
+    // `name` stays the raw form key.
+    return this.nativeTestId("input", "input", hookName(this.name));
   }
 
   private dispatchNativeInput(source?: Event): void {
@@ -401,10 +353,6 @@ export class ZlField extends LitElement {
     }
     this.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
   }
-
-  private dispatchNativeChange(): void {
-    this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
-  }
 }
 
 export const zlFieldManifest: AtomManifest = {
@@ -418,6 +366,7 @@ export const zlFieldManifest: AtomManifest = {
     "placeholder",
     "autocomplete",
     "pattern",
+    "aria-label",
     "data-testid",
     "required",
     "disabled",

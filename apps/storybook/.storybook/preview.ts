@@ -22,7 +22,7 @@ customElements.define = (name, ctor, options) => {
 import "@zitadel/design-tokens/css/tokens.css";
 // Side-effect: register every `<zl-*>` atom AND the `<zitadel-login>` orchestrator.
 import "@zitadel/components";
-// Workbench chrome (dark canvas to match the Figma dark mode).
+// Workbench chrome (dark canvas, the login surface's default mode).
 import "../src/preview.css";
 
 // Point the typed Flow API client at the story origin so the orchestrator's
@@ -61,8 +61,8 @@ const preview: Preview = {
     controls: { expanded: true },
     a11y: { test: "error" },
   },
-  // The design system ships a single dark mode (ADR 014); atoms render light
-  // text intended for a dark surface. Wrapping every story in the dark canvas
+  // Stories render in dark, the login surface's default mode, so atoms paint
+  // light text. Wrapping every story in the dark canvas
   // (rather than only styling `body.sb-show-main`) means the addon-vitest a11y
   // run sees the intended background, so contrast checks pass. Orchestrator
   // stories use `layout: "fullscreen"` and paint their own branding surface.
