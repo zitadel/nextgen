@@ -20,6 +20,19 @@
 #   NEXTGEN_BIN               test seam, the server binary to exec
 set -eu
 
+# Migrations belong to the deploy pipeline (nextgen migrate from the same
+# image, before the deploy), never to a serving container: a preview or a
+# manual deploy must not be able to change a schema by starting. Refuse the
+# server's --migrate flag no matter how it arrives (CMD, args, Vercel config).
+for arg in "$@"; do
+  case "$arg" in
+    --migrate | --migrate=*)
+      echo "preview-entrypoint: refusing --migrate; migrations run in cloud-deploy.yml, not in the container" >&2
+      exit 64
+      ;;
+  esac
+done
+
 : "${MASTER_KEY_PEM_B64:?MASTER_KEY_PEM_B64 must be set (base64 of the master key PEM)}"
 key_id="${MASTER_KEY_ID:-preview}"
 case "$key_id" in

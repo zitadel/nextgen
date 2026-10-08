@@ -6,7 +6,7 @@
 #
 # NEXTGEN_VERSION is the one knob: bump it in a PR. The deploy workflow reads
 # the same line and runs `nextgen migrate` from that tag before deploying.
-ARG NEXTGEN_VERSION=1.0.0-alpha.24
+ARG NEXTGEN_VERSION=main
 FROM ghcr.io/zitadel/nextgen:${NEXTGEN_VERSION}
 
 # The function filesystem is read-only except /tmp, and the data dir only

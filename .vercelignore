@@ -1,6 +1,7 @@
 # Upload filter for CLI deployments of the cloud project (repo root is the
 # deployment root, see vercel.json). Only paths no Vercel project builds from:
-# Go sources, repo tooling, build artifacts. Entries use gitignore syntax:
+# Go sources, build artifacts. `tools/` stays: moon resolves every project
+# source in .moon/workspace.yml and the storybook service builds with moon. Entries use gitignore syntax:
 # anchor directories with a leading slash, or `docs` would also drop
 # `apps/docs`.
 /internal
@@ -9,7 +10,6 @@
 /main.go
 /go.mod
 /go.sum
-/tools
 /examples
 /skills
 /docs
@@ -21,3 +21,4 @@ test-output
 *.tsbuildinfo
 /apps/docs/.source
 /apps/docs/.generated
+/apps/storybook/out

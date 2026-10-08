@@ -1,28 +1,34 @@
 name: cloud-deploy
 
-# Deploys the hosted preview cloud on Vercel: the server container from
-# apps/cloud, the docs from apps/docs and the website from apps/website, as
-# three services of one deployment (vercel.json at the repo root).
+# Main is production for the hosted preview cloud: every push to main builds
+# the server container for that commit, pushes it as
+# ghcr.io/zitadel/nextgen:sha-<commit> (immutable; `main` moves along), runs
+# `nextgen migrate` from that exact image against the production database,
+# and only then deploys the Vercel services (server container, docs, website,
+# storybook; vercel.json at the repo root). Version tags stay the self-hoster
+# artifact and are produced by release-publish.yml.
 #
-# Order matters: migrations run from the pinned server image before the
-# deploy. A binary ahead of its schema boots green and fails per request,
-# and a rollout runs old and new binaries side by side, so migrations must
-# be expand/contract and already applied when the new image takes traffic.
-# Git-triggered Vercel deployments are disabled in vercel.json; this
-# workflow is the only deployer.
+# Order matters: a binary ahead of its schema boots green and fails per
+# request, and a rollout runs old and new binaries side by side, so
+# migrations must be expand/contract and already applied when the new image
+# takes traffic. Git-triggered Vercel deployments are disabled in
+# vercel.json; this workflow is the only deployer, and the only place that
+# holds the migrator credential (GitHub environment `cloud-preview`,
+# restricted to main). Serving containers refuse --migrate (entrypoint.sh)
+# and preview deployments carry no production secrets.
 
 on:
   push:
     branches: [main]
-    paths:
-      - "apps/cloud/**"
-      - "apps/docs/**"
-      - "apps/website/**"
-      - "api/openapi/**"
-      - "vercel.json"
-      - ".vercelignore"
-      - ".github/workflows/cloud-deploy.yml"
   workflow_dispatch:
+    inputs:
+      image_tag:
+        description: >-
+          Deploy an existing ghcr.io/zitadel/nextgen tag (sha-<commit> or a
+          version such as 1.0.0-alpha.24) instead of building the image for
+          this commit. Leave empty to build and deploy the commit.
+        required: false
+        default: ""
 
 concurrency:
   group: cloud-deploy
@@ -32,8 +38,70 @@ permissions:
   contents: read
 
 jobs:
+  image:
+    # Builds and pushes the container for the commit being deployed. Skipped
+    # when a dispatch names an existing tag.
+    if: ${{ github.event_name == 'push' || inputs.image_tag == '' }}
+    runs-on: depot-ubuntu-24.04-16
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      # Bare `moon` below is the workspace's own pinned @moonrepo/cli.
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - id: tag
+        run: echo "tag=sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push the server image for this commit
+        # release:image is excluded from `moon ci`; unset only CI so Moon
+        # keeps the task in the action pipeline (same as release-publish.yml).
+        run: >-
+          env -u CI moon run release:image --
+          --push --platform linux/amd64
+          --tag "${{ steps.tag.outputs.tag }}" --tag main
+
   deploy:
+    needs: image
+    # Runs after a successful image build, or directly when the image job was
+    # skipped because a dispatch named an existing tag.
+    if: ${{ always() && (needs.image.result == 'success' || needs.image.result == 'skipped') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     environment: cloud-preview
     defaults:
       run:
@@ -44,16 +112,19 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Resolve the pinned server version
+      - name: Resolve the image to deploy
         id: version
+        env:
+          REQUESTED_TAG: ${{ inputs.image_tag }}
+          BUILT_TAG: ${{ needs.image.outputs.tag }}
         run: |
-          version="$(sed -n 's/^ARG NEXTGEN_VERSION=//p' Dockerfile.vercel)"
-          if [ -z "$version" ]; then
-            echo "Dockerfile.vercel has no ARG NEXTGEN_VERSION=<version> line" >&2
+          tag="${REQUESTED_TAG:-$BUILT_TAG}"
+          if [ -z "$tag" ]; then
+            echo "no image tag: the image job produced none and none was requested" >&2
             exit 1
           fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "image=ghcr.io/zitadel/nextgen:$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/zitadel/nextgen:$tag" >> "$GITHUB_OUTPUT"
 
       - name: Check the image exists before touching the database
         run: docker manifest inspect "${{ steps.version.outputs.image }}" > /dev/null
@@ -68,6 +139,14 @@ jobs:
           docker run --rm \
             -e NEXTGEN_DATABASE_POSTGRES \
             "${{ steps.version.outputs.image }}" migrate
+
+      - name: Pin the deployed image in the Dockerfile
+        # The working tree is ephemeral here: the ARG default (`main`) is
+        # replaced by the exact tag so the Vercel build pulls the image that
+        # was just migrated for, and rollback is "deploy an older tag".
+        run: |
+          sed -i "s|^ARG NEXTGEN_VERSION=.*|ARG NEXTGEN_VERSION=${{ steps.version.outputs.tag }}|" Dockerfile.vercel
+          grep -q "^ARG NEXTGEN_VERSION=${{ steps.version.outputs.tag }}$" Dockerfile.vercel
 
       - uses: pnpm/action-setup@v5
       - uses: actions/setup-node@v6
@@ -88,7 +167,7 @@ jobs:
           corepack pnpm exec vercel pull --cwd ../.. --yes --environment=production --token="$VERCEL_TOKEN"
           url="$(corepack pnpm exec vercel deploy --cwd ../.. --prod --yes --token="$VERCEL_TOKEN")"
           echo "url=$url" >> "$GITHUB_OUTPUT"
-          echo "deployed $url"
+          echo "deployed $url from ${{ steps.version.outputs.image }}"
 
       - name: Smoke test the production origin
         env:

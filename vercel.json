@@ -16,6 +16,13 @@
       "framework": "nextjs",
       "installCommand": "corepack pnpm install --filter @zitadel/website... --frozen-lockfile",
       "buildCommand": "corepack pnpm run build"
+    },
+    "storybook": {
+      "root": "apps/storybook",
+      "framework": "storybook",
+      "installCommand": "corepack pnpm install --frozen-lockfile",
+      "buildCommand": "cd ../.. && corepack pnpm exec moon run storybook:build && cd apps/storybook && rm -rf out && mkdir -p out/storybook && cp -R dist/. out/storybook/",
+      "outputDirectory": "out"
     }
   },
   "rewrites": [
@@ -26,13 +33,31 @@
       }
     },
     {
-      "source": "/_next/:path*",
+      "source": "/_next/(.*)",
       "destination": {
         "service": "website"
       }
     },
     {
-      "source": "/docs/:path*",
+      "source": "/storybook",
+      "destination": {
+        "service": "storybook"
+      }
+    },
+    {
+      "source": "/storybook/(.*)",
+      "destination": {
+        "service": "storybook"
+      }
+    },
+    {
+      "source": "/docs",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/docs/(.*)",
       "destination": {
         "service": "docs"
       }
@@ -44,19 +69,25 @@
       }
     },
     {
-      "source": "/reference/:path*",
+      "source": "/reference",
       "destination": {
         "service": "docs"
       }
     },
     {
-      "source": "/assets/:path*",
+      "source": "/reference/(.*)",
       "destination": {
         "service": "docs"
       }
     },
     {
-      "source": "/RSC/:path*",
+      "source": "/assets/(.*)",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/RSC/(.*)",
       "destination": {
         "service": "docs"
       }
@@ -80,7 +111,13 @@
       }
     },
     {
-      "source": "/mcp/:path*",
+      "source": "/mcp",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/mcp/(.*)",
       "destination": {
         "service": "docs"
       }

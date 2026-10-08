@@ -4,12 +4,15 @@
 > **Code:** [`apps/cloud/`](../../apps/cloud/)
 > **Design:** [preview-cloud-cloudflare-planetscale.md](../design/platform/preview-cloud-cloudflare-planetscale.md)
 
-The preview cloud is the released `ghcr.io/zitadel/nextgen:<version>` image
-running as a Vercel container in Frankfurt (`fra1`) against one PlanetScale
-Postgres database in AWS `eu-central-1`. Production stays on GCP; this is a
-single-region preview offering with the same topology as self-hosted.
+The preview cloud is the server image of the current `main` commit
+(`ghcr.io/zitadel/nextgen:sha-<commit>`) running as a Vercel container in
+Frankfurt (`fra1`) against one PlanetScale Postgres database in AWS
+`eu-central-1`. **Main is production** for this cloud: every merge deploys.
+Version tags (`1.0.0-alpha.N`) are the self-hoster artifact and are not what
+the cloud runs. Production stays on GCP; this is a single-region preview
+offering with the same topology as self-hosted.
 
-The Vercel project is one deployment with three
+The Vercel project is one deployment with four
 [services](https://vercel.com/docs/services), defined in the repo-root
 `vercel.json`:
 
@@ -17,6 +20,7 @@ The Vercel project is one deployment with three
 |---|---|---|---|
 | `server` | `apps/cloud` | the container above | everything not listed below |
 | `docs` | `apps/docs` | the docs site (Waku), built unchanged at base `/` | `/docs/*`, `/docs.md`, `/reference/*`, `/assets/*`, `/RSC/*`, `/api/search`, `/llms.txt`, `/llms-full.txt`, `/mcp/*` |
+| `storybook` | `apps/storybook` | the `@zitadel/components` workbench, static build relocated to `out/storybook` | `/storybook`, `/storybook/*` |
 | `website` | `apps/website` | the website scaffold (Next.js), one start page | `/`, `/_next/*` |
 
 The docs site serves its pages under `/docs` and `/reference` by itself, so
@@ -64,8 +68,8 @@ project's key-encryption key unwrappable ([ADR 029](../adrs/029-cryptography-sec
 
    | Name | Value | Sensitive |
    |---|---|---|
-   | `NEXTGEN_DATABASE_POSTGRES` | `postgresql://preview-server…:5432/postgres?sslmode=verify-full&sslrootcert=system` | yes |
-   | `MASTER_KEY_PEM_B64` | contents of `master-key.b64` | yes |
+   | `NEXTGEN_DATABASE_POSTGRES` | `postgresql://preview-server…:5432/postgres?sslmode=verify-full&sslrootcert=system` | yes, **Production only** |
+   | `MASTER_KEY_PEM_B64` | contents of `master-key.b64` | yes, **Production only** |
    | `MASTER_KEY_ID` | `preview-2026-10` (stable; rotation adds a new id) | no |
    | `PORT` | `8080` | no |
    | `NEXTGEN_SERVER_PUBLIC_BASE` | the public origin, e.g. `https://preview.zitadel.cloud` | no |
@@ -77,6 +81,13 @@ project's key-encryption key unwrappable ([ADR 029](../adrs/029-cryptography-sec
 
    `PORT` is required: Vercel's container router defaults to 80 and the image
    runs as uid 65532, which cannot bind it.
+
+   The database URL, the master key and the bootstrap document exist for the
+   Production target only. A preview deployment therefore has no database
+   and no key: its server service fails to start, by design, while docs,
+   storybook and website previews work. Previews with a working server need
+   their own PlanetScale branch and key under the Preview target; they must
+   never share the production database.
 
    `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true` is what makes this a cloud: the
    server provisions the reserved platform project, the Console signs into
@@ -101,6 +112,11 @@ Environment `preview-cloud` with:
 | secret | `PREVIEW_CLOUD_MIGRATOR_DATABASE_URL` (the `preview-migrator` role) |
 | variable | `PREVIEW_CLOUD_PUBLIC_BASE` (same value as `NEXTGEN_SERVER_PUBLIC_BASE`) |
 
+Restrict the environment to the `main` branch (Settings → Environments →
+`cloud-preview` → Deployment branches: selected branches, `main`). That is
+what keeps the migrator credential out of every pull-request workflow:
+migrations run only from this environment, only for commits on `main`.
+
 ### 5. Platform admin
 
 The platform project has no users until someone registers or a bootstrap
@@ -121,34 +137,64 @@ can stay set. To rotate the password, mint a new document with the same
 
 ## Deploying
 
-- **Automatic:** merge a change under `apps/cloud/`, `apps/docs/`,
-  `apps/website/`, `api/openapi/` or to the root `vercel.json` to `main`.
-- **Manual:** run `cloud-deploy` from the Actions tab.
+- **Automatic:** every push to `main`.
+- **Manual:** run `cloud-deploy` from the Actions tab, optionally with
+  `image_tag` to deploy an existing image (`sha-<commit>` or a version tag)
+  instead of building one.
 
-Both run, in order: image existence check, `nextgen migrate` from the pinned
-tag, `vercel deploy --prod`, smoke test. A failed migration stops the deploy.
+The workflow has two jobs:
+
+1. `image` builds the server for the commit (`moon run release:image`:
+   Go binary with the embedded console and login UI, linux/amd64) and
+   pushes it as `ghcr.io/zitadel/nextgen:sha-<commit>`, moving `main` along.
+   Skipped when `image_tag` is given.
+2. `deploy` checks the image exists, runs `nextgen migrate` from that exact
+   image against the production database, pins the tag into
+   `Dockerfile.vercel` for this build (the committed default is `main`),
+   deploys with `vercel deploy --prod` and runs the smoke test. A failed
+   migration stops the deploy.
+
 `migrate` is idempotent: on a docs-only merge it connects, finds nothing
-pending and exits; only a version bump applies migrations.
+pending and exits. Only commits that add migrations apply something, and
+every migration must be expand/contract: the previous image keeps serving
+until the new deployment is promoted, and a rollback redeploys an older
+image on the newer schema.
 
 All services are rebuilt on every deploy. The server image build is about
-15 s, the docs build a few minutes, the website under a minute; a docs-only
-merge therefore also rolls the server to a new deployment of the same image.
+15 s, the docs a few minutes, the storybook a few minutes (full workspace
+install plus the component builds), the website under a minute.
 
-### Bumping the server version
+### Manual and staged deploys
 
-Edit the `ARG NEXTGEN_VERSION=` line in `apps/cloud/Dockerfile.vercel`
-and open a PR. Every migration shipped between the old and new tag must be
-expand/contract safe: for a short window both binaries serve traffic.
+A `vercel deploy` from a workstation builds `Dockerfile.vercel` as checked
+out, that is `FROM ghcr.io/zitadel/nextgen:main`, the image of whatever
+merged last, **without migrating**. That is fine for docs, storybook and
+website changes and wrong for a server change that ships a migration: pin
+the tag you migrated for (`sed -i 's|^ARG NEXTGEN_VERSION=.*|ARG
+NEXTGEN_VERSION=sha-…|' apps/cloud/Dockerfile.vercel`, do not commit it)
+or let the workflow do it. Vercel's `--build-env` does not reach Docker
+`ARG`s, which is why the workflow edits the file instead.
+
+Serving containers refuse `--migrate` (see `entrypoint.sh`), so no deploy
+of any kind can change the schema by starting; only the workflow's migrate
+step can.
+
+### Pinning a version instead of main
+
+Run the workflow manually with `image_tag` set to a version tag
+(`1.0.0-alpha.24`) or an older `sha-<commit>`. The migrate step is
+idempotent and skips applied migrations. A schema that the older binary
+cannot read is **not** rolled back automatically; that is what the
+expand/contract rule protects.
 
 ### Rollback
 
-1. Revert the version bump PR, or run the workflow manually after setting
-   the old version. The migrate step is idempotent and skips applied
-   migrations. A schema that the old binary cannot read is **not** rolled
-   back automatically; that is what the expand/contract rule protects.
+1. Run the workflow manually with `image_tag` set to the last good
+   `sha-<commit>` (the image job is skipped, migrate finds nothing to do).
 2. For an instant switch without a build, promote the previous deployment in
-   the Vercel dashboard (Deployments → … → Promote to Production). Server
-   and docs roll back together: they are one deployment.
+   the Vercel dashboard (Deployments → … → Promote to Production) or
+   `vercel promote <url>`. All services roll back together: they are one
+   deployment.
 
 ## Lessons from the first deploy (2026-10-07)
 
@@ -173,6 +219,15 @@ expand/contract safe: for a short window both binaries serve traffic.
 - `.vercelignore` uses gitignore syntax: an unanchored `docs` also drops
   `apps/docs`, and the build then fails with "Service docs has root apps/docs
   but that directory does not exist". Anchor repo-root entries with `/`.
+- Rewrite sources use `(.*)`, not `:path*`: `/docs/:path*` matched `/docs`
+  and `/docs/a` but not `/docs/` (trailing slash, empty segment), which fell
+  through to the server's 404. Each prefix is listed twice, bare and with
+  `/(.*)`.
+- A service object rejects `"framework": null`; with several frameworks
+  detectable at the repo root (Vite, Storybook) every service must name its
+  framework. Storybook builds with moon, so the upload must contain every
+  moon project source (`tools/` stays out of `.vercelignore`); moon itself
+  runs fine without a `.git` directory.
 - The build log warns that the repo-root `api/` directory "will not be built
   because services are configured". That is Vercel's serverless-functions
   convention noticing a directory that is OpenAPI sources and Go code; the
@@ -203,8 +258,9 @@ expand/contract safe: for a short window both binaries serve traffic.
 
 - **Staged production deploy:** `vercel deploy --cwd ../.. --prod --skip-domain`
   from `apps/cloud` builds with production settings without moving the
-  production domain; smoke it with the project's protection-bypass header,
-  then `vercel promote <url>`.
+  production domain; smoke it with the project's protection-bypass header
+  (`VERCEL_AUTOMATION_BYPASS_SECRET=… pnpm run smoke -- <url>`), then
+  `vercel promote <url>`. Mind the image tag rule above.
 
 - **Master key rotation:** add a second key under a new `MASTER_KEY_ID`
   following ADR 029; this wrapper supports exactly one key per deployment

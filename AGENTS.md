@@ -75,8 +75,8 @@ Development and test surfaces (`apps/`):
 - `apps/cloud/` — deployment wrapper that runs the released
   server image as a Vercel container against PlanetScale Postgres for the
   hosted preview cloud. The repo-root `vercel.json` deploys it together with
-  `apps/docs` and `apps/website` as three services of one Vercel project
-  (runbook: `docs/runbooks/preview-cloud.md`).
+  `apps/docs`, `apps/storybook` and `apps/website` as four services of one
+  Vercel project (runbook: `docs/runbooks/preview-cloud.md`).
 - `apps/website/` — scaffold of the public website (Next.js, Tailwind), the
   `website` service of that deployment; owns `/` on the cloud host.
 

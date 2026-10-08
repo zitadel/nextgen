@@ -149,4 +149,14 @@ describe("entrypoint.sh", () => {
     expect(out.status).toBe(64);
     expect(out.stderr).toContain("bootstrap user document");
   });
+  it("refuses --migrate so a serving container can never change the schema", () => {
+    const result = run({ MASTER_KEY_PEM_B64: b64(PEM) }, "--migrate");
+    expect(result.status).toBe(64);
+    expect(result.stderr).toContain("refusing --migrate");
+    expect(result.stdout).not.toContain("ARGV:");
+
+    const assigned = run({ MASTER_KEY_PEM_B64: b64(PEM) }, "--log-level", "debug", "--migrate=true");
+    expect(assigned.status).toBe(64);
+    expect(assigned.stdout).not.toContain("ARGV:");
+  });
 });

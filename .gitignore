@@ -123,3 +123,6 @@ tsconfig.tsbuildinfo
 
 # Vercel CLI link state (apps/cloud, apps/mock-zitadel)
 .vercel/
+
+# Storybook output relocated under /storybook for the cloud deployment (vercel.json)
+apps/storybook/out/

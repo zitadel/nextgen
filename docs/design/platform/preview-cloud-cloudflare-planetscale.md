@@ -389,3 +389,37 @@ the catch-all. Catalog entries cover react, the type packages, tailwindcss
 and typescript; `next` and `@tailwindcss/postcss` are pinned in the app like
 `apps/demo-next` does.
 
+## Main is production (2026-10-08)
+
+Decision: the cloud runs the server of the current `main` commit, built as
+`ghcr.io/zitadel/nextgen:sha-<commit>` by the deploy workflow itself
+(`moon run release:image`, linux/amd64, same binaries and embedded UIs as a
+release). Version tags stay the self-hoster artifact. Reasons: the preview
+cloud exists to show the latest state; a pinned tag goes stale by
+construction; the console and login UI are embedded in the binary, so they
+follow `main` with it, which removes the separate-console-build question.
+
+Safety rules that make this acceptable:
+
+- Migrations run only in the workflow, from the exact image being deployed,
+  before the deploy, with a credential that lives only in the `cloud-preview`
+  GitHub environment (restricted to `main`).
+- Serving containers refuse `--migrate` (entrypoint guard with a test).
+- The database URL and the master key exist for the Production target only.
+  A preview deployment has no database: its server fails to start, which is
+  the intended failure mode until previews get their own PlanetScale branch
+  and key. "A preview silently migrates the production database" is
+  therefore impossible by configuration, not by discipline.
+- Vercel's `--build-env` does not reach Docker `ARG`s (verified with a
+  non-existent tag: the build still pulled the Dockerfile default), so the
+  workflow pins the tag by editing `Dockerfile.vercel` in its ephemeral
+  checkout. The committed default is `main`.
+- Rollback is "deploy an older `sha-` tag" or promote a previous deployment;
+  both rely on expand/contract migrations.
+
+Storybook joined as the fourth service (`/storybook`): `@zitadel/components`
+is a published package and its storybook is product documentation, the same
+argument as for the docs. The static build is relocatable (Vite base `./`),
+only the mock service worker URL had to follow the base so its scope stays
+under `/storybook/`.
+
