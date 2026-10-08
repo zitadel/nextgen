@@ -431,8 +431,8 @@ The repo requires the Node.js version from `.nvmrc`; sandbox images often
 ship an older default. Ensure the `.nvmrc` version is first on `$PATH` (for
 example via nvm) before running any `corepack` or `pnpm` command.
 
-All Node.js runtimes in the repo use the same major as `.nvmrc`. Minor and
-patch differences do not matter, so pin only the major elsewhere:
+`.nvmrc` names only the Node.js major (`24`), and every runtime in the repo
+uses that major. Minor and patch versions do not matter, so never pin one:
 
 - `.devcontainer/devcontainer.json` (the `node` feature `version`)
 - `apps/cli-skill-e2e/scripts/run.mjs` (the `node:<major>` image)
@@ -440,9 +440,6 @@ patch differences do not matter, so pin only the major elsewhere:
   set `engines.node` to `<major>.x`
 - CI workflows read `.nvmrc` through `node-version-file`; never hard-code a
   `node-version`
-
-`devbox.json` is the one exception: nixpkgs' `nodejs@24` resolves below
-Angular CLI's minimum, so it pins `nodejs-slim@<version>` plus `corepack`.
 
 `@types/node` in the pnpm catalog tracks the `.nvmrc` major, so code cannot
 type-check against APIs the runtime lacks. When the major changes, bump all
