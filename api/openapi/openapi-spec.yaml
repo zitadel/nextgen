@@ -1,4 +1,5 @@
 openapi: 3.1.0
+# spike: semantics-free comment to validate moon cache invalidation (do not merge)
 info: 
   # TODO: set correct information
   title: Zitadel NextGen
