@@ -121,6 +121,8 @@ minimumReleaseAgeExclude:
 
 enablePrePostScripts: true
 
+pmOnFail: warn
+
 allowBuilds:
   "esbuild": true
   "sharp": true
