@@ -23,7 +23,7 @@ const ctx: PatchContext = {
   server: "http://localhost:8080",
   cliVersion: "0.1.0-alpha.15",
   preset: "passkey-first",
-} as PatchContext;
+} as unknown as PatchContext;
 
 describe("upsertGuidanceSection", () => {
   const section = "## Authentication (Zitadel)\n\nbody";

@@ -28,7 +28,7 @@ tasks:
       - ".source/**/*"
 
   typecheck:
-    command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
+    command: "corepack pnpm run typecheck"
     deps:
       - "generate"
 

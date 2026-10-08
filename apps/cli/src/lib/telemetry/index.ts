@@ -56,13 +56,25 @@ export type TelemetryDeps = {
 export class Telemetry {
   private readonly pending: Promise<void>[] = [];
 
+  private readonly client: MixpanelClient | undefined;
+  readonly distinctId: string;
+  readonly isFirstRun: boolean;
+  private readonly debug: boolean;
+  private readonly newId: () => string;
+
   private constructor(
-    private readonly client: MixpanelClient | undefined,
-    readonly distinctId: string,
-    readonly isFirstRun: boolean,
-    private readonly debug: boolean,
-    private readonly newId: () => string,
-  ) {}
+    client: MixpanelClient | undefined,
+    distinctId: string,
+    isFirstRun: boolean,
+    debug: boolean,
+    newId: () => string,
+  ) {
+    this.client = client;
+    this.distinctId = distinctId;
+    this.isFirstRun = isFirstRun;
+    this.debug = debug;
+    this.newId = newId;
+  }
 
   /** Whether events will actually be sent (consent granted and a token configured). */
   get enabled(): boolean {
