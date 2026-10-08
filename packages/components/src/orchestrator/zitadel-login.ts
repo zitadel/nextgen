@@ -139,6 +139,18 @@ function returnTargetFor(flowId: string): string {
 }
 
 /**
+ * Add the `manual` attribute to every `<zl-passkey>` in rendered step markup so
+ * the WebAuthn ceremony never auto-starts on mount. Applied after the template
+ * renders, so it holds for ANY template — the bundled `default.liquid`, a tenant
+ * `liquid_template`, or a legacy design — rather than only templates that opt in.
+ * Idempotent: a tag that already declares `manual` is left untouched. Gated by
+ * the `manual-ceremony` host flag at the call site.
+ */
+function forceManualCeremony(markup: string): string {
+  return markup.replace(/<zl-passkey\b(?![^>]*\smanual[\s>])/g, "<zl-passkey manual");
+}
+
+/**
  * Drop the `flow` handle from the URL, keeping every other parameter and the
  * hash, so a reload does not resume a flow the server refused to continue.
  */
@@ -272,6 +284,18 @@ export class ZitadelLogin extends ZitadelSurface {
    * server's `<step>.title` / `<step>.description` convention.
    */
   @property({ type: String, attribute: "preview-success-step" }) accessor previewSuccessStep = "";
+
+  /**
+   * Render WebAuthn challenges inert: the `<zl-passkey>` the template mounts gets
+   * `manual`, so it does NOT auto-start the `navigator.credentials` ceremony on
+   * connect. For previews and the workbench (operator console previews, Storybook,
+   * visual tests), where the real platform prompt can't complete — the passkey
+   * screen renders, nothing is submitted, and no OS dialog is raised. A host
+   * concern, not a flow field: the engine says passkey is *offered*; whether the
+   * client *runs* the ceremony during a preview is the embedder's call. Off by
+   * default, so ordinary logins run the ceremony as before.
+   */
+  @property({ type: Boolean, attribute: "manual-ceremony" }) accessor manualCeremony = false;
 
   /**
    * The preview state in effect: {@link previewState} when it names a known
@@ -1113,7 +1137,12 @@ export class ZitadelLogin extends ZitadelSurface {
     }
 
     const patched = patchMandatoryGates(raw, step, this.resolveLocale());
-    return this.sanitise(patched);
+    const sanitised = this.sanitise(patched);
+    // Enforce `manual-ceremony` AFTER the template renders, so it holds for any
+    // template — the bundled one, a tenant `liquid_template`, or a legacy design
+    // — not just templates that opt in. Without this, a custom template's
+    // `<zl-passkey>` would still auto-start WebAuthn despite the host flag.
+    return this.manualCeremony ? forceManualCeremony(sanitised) : sanitised;
   }
 
   /**
