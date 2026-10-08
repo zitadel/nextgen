@@ -39,7 +39,7 @@ export class QwikPatcher extends AbstractRulePatcher implements ViteSupport {
       { kind: "merge-env", path: ".env.example", entries: { VITE_ZITADEL_PROJECT_ID: "" } },
       {
         kind: "merge-env",
-        path: ".env.local",
+        path: ".env.development.local",
         entries: { VITE_ZITADEL_PROJECT_ID: ctx.project.id },
       },
       {

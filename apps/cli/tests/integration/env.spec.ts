@@ -23,7 +23,7 @@ describe("env", () => {
     expect(result).toSucceed();
     const { data } = app.envelopeOf<Resolved>(result);
     expect(data.environment).toEqual({ value: "development", source: "default" });
-    expect(data.project_id?.source).toBe(".env.local");
+    expect(data.project_id?.source).toBe(".env.development.local");
     expect(data.consulted.map((entry) => entry.source)).toContain(".zitadel/secret");
   });
 

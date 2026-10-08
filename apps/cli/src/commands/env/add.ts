@@ -279,11 +279,11 @@ async function ask<T>(answer: Promise<T | symbol>): Promise<T> {
 /**
  * The names the app's client code reads the project id under, such as
  * `NEXT_PUBLIC_ZITADEL_PROJECT_ID` or `VITE_ZITADEL_PROJECT_ID`. Setup wrote
- * the framework's alias into `.env.local` and `.env.example`; whichever of
+ * the framework's alias into `.env.development.local` and `.env.example`; whichever of
  * them exists says what this environment's file has to carry as well.
  */
 async function publicProjectIdKeys(cwd: string): Promise<string[]> {
-  for (const file of [".env.local", ".env.example"]) {
+  for (const file of [".env.development.local", ".env.local", ".env.example"]) {
     let contents: string;
     try {
       contents = await readFile(join(cwd, file), "utf8");

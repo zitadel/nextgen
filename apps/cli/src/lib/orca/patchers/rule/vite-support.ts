@@ -19,7 +19,7 @@ import {
  * frameworks (React, Vue, Solid, Svelte, Qwik). It forwards same-origin
  * `/__nextgen/*` calls to the
  * backend, strips the prefix, and attaches the project's service-key secret
- * (read from `ZITADEL_PROJECT_SECRET` in `.env.local`) only to the current
+ * (read from `ZITADEL_PROJECT_SECRET` in `.env.development.local`) only to the current
  * app-plane `POST /sessions/exchange` operation. The secret stays server-side:
  * Vite only exposes vars with the configured `envPrefix` (default `VITE_`) to
  * client bundles, so this server-only key never leaks into the browser.
@@ -32,7 +32,7 @@ function proxyEntryCode(server: string): string {
   configure: (proxy) => {
     const secret = loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_SECRET;
     if (!secret) {
-      throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.local (zitadel setup writes it).");
+      throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.development.local (zitadel setup writes it).");
     }
     const bearer = \`Bearer \${secret}\`;
     proxy.on("proxyReq", (proxyReq) => {
@@ -77,7 +77,7 @@ function isLegacyManagedProxy(source: string): boolean {
   }
   return [
     'loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_SECRET',
-    'throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.local (zitadel setup writes it).")',
+    'throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.development.local (zitadel setup writes it).")',
     "const bearer = `Bearer ${secret}`;",
   ].every((fingerprint) => source.includes(fingerprint)) && LEGACY_PROXY_REQUEST_LISTENER.test(source);
 }

@@ -20,7 +20,7 @@ describe("viteProxyEdit", () => {
     // Bind the exact issuer port or fail — never drift to a port not in preview_origins.
     expect(out).toContain("strictPort: true");
     expect(out).toContain("changeOrigin: false");
-    // The bearer comes from .env.local via Vite's loadEnv, never from the
+    // The bearer comes from .env.development.local via Vite's loadEnv, never from the
     // gitignored secret file directly.
     expect(out).not.toContain("readFileSync");
     expect(out).not.toContain(".zitadel/secret");
@@ -63,7 +63,7 @@ export default defineConfig({
         configure: (proxy) => {
           const secret = loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_SECRET;
           if (!secret) {
-            throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.local (zitadel setup writes it).")
+            throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.development.local (zitadel setup writes it).")
           }
           const bearer = \`Bearer \${secret}\`;
           proxy.on("proxyReq", (proxyReq) => {

@@ -36,7 +36,7 @@ import { reclaimableOps, withoutExistingTargets } from "./reclaim";
  * framework-specific routes/middleware.
  */
 /**
- * Written above the scaffolded entries in `.env.example` and `.env.local`.
+ * Written above the scaffolded entries in `.env.example` and `.env.development.local`.
  * `zitadel start` hands every `NEXTGEN_*` variable in these files to the
  * local server, so the files are also where a developer configures it.
  */
@@ -146,7 +146,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       markedFiles,
       rootConfigFiles: ["zitadel.json"],
       directories: [".zitadel"],
-      envBackups: [".env.local"],
+      envBackups: [".env.development.local"],
       dependencies: this.routeDeps(view),
       configEdits: this.routeConfigEdits(view),
       guidanceFiles: ["AGENTS.md", "README.md"],
@@ -257,7 +257,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       },
       {
         kind: "merge-env",
-        path: ".env.local",
+        path: ".env.development.local",
         comment: LOCAL_SERVER_ENV_COMMENT,
         entries: {
           ZITADEL_URL: ctx.server,

@@ -200,7 +200,7 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
     { kind: "merge-env", path: ".env.example", entries: { NEXT_PUBLIC_ZITADEL_PROJECT_ID: "" } },
     {
       kind: "merge-env",
-      path: ".env.local",
+      path: ".env.development.local",
       entries: { NEXT_PUBLIC_ZITADEL_PROJECT_ID: ctx.project.id },
     },
     {

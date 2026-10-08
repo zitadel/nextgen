@@ -66,7 +66,7 @@ export class NuxtPatcher extends AbstractRulePatcher {
       { kind: "merge-env", path: ".env.example", entries: { NUXT_PUBLIC_ZITADEL_PROJECT_ID: "" } },
       {
         kind: "merge-env",
-        path: ".env.local",
+        path: ".env.development.local",
         entries: { NUXT_PUBLIC_ZITADEL_PROJECT_ID: ctx.project.id },
       },
       {

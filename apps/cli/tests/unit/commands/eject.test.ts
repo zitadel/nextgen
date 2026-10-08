@@ -33,7 +33,7 @@ const tempDirs: string[] = [];
 /**
  * Builds a managed project with the full set of files eject is expected to
  * touch: config/state/secret/schemas, a managed login page (with marker), an
- * unmanaged register page (no marker), and a .env.local.
+ * unmanaged register page (no marker), and a .env.development.local.
  */
 async function makeManagedProject(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-"));
@@ -58,7 +58,7 @@ async function makeManagedProject(): Promise<string> {
   );
   // Register page lacks the managed marker, so eject must preserve it.
   await writeFile(join(cwd, "app/register/page.tsx"), "export default function R() {}\n");
-  await writeFile(join(cwd, ".env.local"), "ZITADEL_PROJECT_ID=proj-001\n");
+  await writeFile(join(cwd, ".env.development.local"), "ZITADEL_PROJECT_ID=proj-001\n");
   return cwd;
 }
 
@@ -139,11 +139,11 @@ describe("eject command", () => {
     expect(json.data.files_preserved).toContain("app/register/page.tsx");
     expect(await exists(join(cwd, "app/register/page.tsx"))).toBe(true);
 
-    // .env.local is renamed to a timestamped backup, not deleted.
+    // .env.development.local is renamed to a timestamped backup, not deleted.
     expect(json.data.backed_up.length).toBe(1);
-    expect(await exists(join(cwd, ".env.local"))).toBe(false);
+    expect(await exists(join(cwd, ".env.development.local"))).toBe(false);
     const entries = await readdir(cwd);
-    expect(entries.some((name) => name.startsWith(".env.local.ejected-"))).toBe(true);
+    expect(entries.some((name) => name.startsWith(".env.development.local.ejected-"))).toBe(true);
   });
 
   it("reports what would be removed in dry-run without touching the filesystem", async () => {
@@ -156,13 +156,13 @@ describe("eject command", () => {
       data: { files_removed: string[]; backed_up: string[] };
     };
     expect(json.data.files_removed).toContain("zitadel.json");
-    // Dry-run must still preview the .env.local backup, not silently omit it.
-    expect(json.data.backed_up.some((entry) => entry.startsWith(".env.local"))).toBe(true);
+    // Dry-run must still preview the .env.development.local backup, not silently omit it.
+    expect(json.data.backed_up.some((entry) => entry.startsWith(".env.development.local"))).toBe(true);
 
     // Dry-run leaves everything in place.
     expect(await exists(join(cwd, "zitadel.json"))).toBe(true);
     expect(await exists(join(cwd, ".zitadel"))).toBe(true);
-    expect(await exists(join(cwd, ".env.local"))).toBe(true);
+    expect(await exists(join(cwd, ".env.development.local"))).toBe(true);
   });
 
   it("strips guidance sections and deletes scaffold-created husks", async () => {

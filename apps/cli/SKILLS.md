@@ -339,8 +339,8 @@ The groups below mirror the ones `zitadel --help` prints.
   the binary was built from, which after a Moon cache hit can be an earlier
   commit whose server sources are byte-identical. Use `--runtime docker` or
   `--image` for the Docker backend. The project's env files configure the
-  local server: every `NEXTGEN_*` variable in `.env.local` and `.env` (the
-  former wins; empty values are skipped) is handed to the runtime through its
+  local server: every `NEXTGEN_*` variable in `.env.development.local`, `.env.local` and
+  `.env` (earlier files win; empty values are skipped) is handed to the runtime through its
   environment only (bare `--env NAME` on Docker), so no value reaches `argv`,
   logs, `runtime.json`, or `--json`. The address, data dir and public base the
   CLI sets itself always win. `data.runtime.env` and `runtime.json` carry
@@ -348,7 +348,7 @@ The groups below mirror the ones `zitadel --help` prints.
   after changing a value run `stop` then `start`. An unreadable env file fails
   `start` with `E_VALIDATION` before any runtime is stopped. `setup` writes a
   comment saying so at the top of the scaffolded `.env.example` and
-  `.env.local`.
+  `.env.development.local`.
   The server boots with the platform project
   and a local admin, so the developer exists on their own server without
   signing up: the admin signs in as `admin@zitadel.localhost`, and a
@@ -359,7 +359,7 @@ The groups below mirror the ones `zitadel --help` prints.
   directory from before the local admin existed), `data.console.error` and
   `data.console.hint` say why, `start` still succeeds, and `zitadel console`
   drops out of `next_commands`. Setting `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false`,
-  in the shell or in `.env.local` / `.env`, opts out of both the platform project
+  in the shell or in `.env.development.local` / `.env`, opts out of both the platform project
   and the local admin, for harnesses that
   want a bare single-project server; `data.console` is then absent.
 - `console` — print (and, interactively, open) a fresh one-time sign-in link

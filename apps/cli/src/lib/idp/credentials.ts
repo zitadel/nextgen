@@ -42,7 +42,7 @@ export type SecretOutcome = {
  * Nothing is written to disk. The value is a credential, the project stores it
  * encrypted under the project's own key (ADR 029), and no runtime reads it
  * from the environment — the token exchange happens on the server. A copy in
- * `.env.local` would be a credential sitting in the working tree for the
+ * `.env.development.local` would be a credential sitting in the working tree for the
  * convenience of nobody, and one `git add -A` away from being published.
  *
  * Passing no value publishes nothing and is not an error: the developer may

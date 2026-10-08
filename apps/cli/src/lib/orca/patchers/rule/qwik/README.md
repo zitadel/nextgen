@@ -9,7 +9,7 @@ Integrates Zitadel auth into a Vite + Qwik single-page app.
   entry mounted by `main.tsx`)
 - `vite.config.*` — merges the `/__nextgen` dev-server proxy into the first
   matching `vite.config.{ts,mts,js,mjs}`
-- `.env.example`, `.env.local` — `VITE_ZITADEL_PROJECT_ID` (client-exposed), plus
+- `.env.example`, `.env.development.local` — `VITE_ZITADEL_PROJECT_ID` (client-exposed), plus
   the shared `ZITADEL_*` keys the base patcher writes (`ZITADEL_URL`, `ZITADEL_PROJECT_ID`,
   `ZITADEL_PUBLISHABLE_KEY`, `ZITADEL_PROJECT_SECRET`) — the dev proxy reads `ZITADEL_PROJECT_SECRET`
 - `package.json` — adds `@zitadel/sdk-qwik`

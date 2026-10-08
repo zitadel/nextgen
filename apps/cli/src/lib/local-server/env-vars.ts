@@ -2,7 +2,7 @@
  * Dev-runtime secret join (issue #1049).
  *
  * The developer's env files configure the local server. When `zitadel start`
- * spawns it, the CLI reads `.env.local`, then `.env`, and hands every
+ * spawns it, the CLI reads `.env.development.local`, `.env.local`, then `.env`, and hands every
  * `NEXTGEN_*` variable to the runtime: that is the server's own configuration
  * namespace (`server.data_dir` is `NEXTGEN_SERVER_DATA_DIR`, and so on). The
  * three keys the CLI sets itself, address, data dir and public base, are not
@@ -20,7 +20,7 @@ import { ZitadelError } from "../errors";
 import { isObject } from "../json";
 
 /** Highest priority first. */
-export const ENV_FILES = [".env.local", ".env"] as const;
+export const ENV_FILES = [".env.development.local", ".env.local", ".env"] as const;
 
 /** Variables handed to the runtime: the server's config prefix, upper-case. */
 export const ENV_PREFIX = "NEXTGEN_";
@@ -52,7 +52,7 @@ export const envSummary = ({ injected }: EnvSummary): EnvSummary => ({ injected 
 
 /**
  * Reads the project's env files into one map. Earlier files win, so a key in
- * `.env.local` shadows the same key in `.env`. Missing files are skipped.
+ * `.env.development.local` shadows the same key in `.env.local` and `.env`. Missing files are skipped.
  */
 export const loadEnvFiles = async (
   cwd: string,

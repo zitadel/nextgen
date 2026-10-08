@@ -361,7 +361,7 @@ describe("sso enable secret handling", () => {
     expect(result.exitCode).toBe(0);
     // Nothing is written to disk: the secret goes to the project's variables
     // and nowhere else, so there is no copy in the working tree to leak.
-    await expect(readFile(join(cwd, ".env.local"), "utf8")).rejects.toThrow();
+    await expect(readFile(join(cwd, ".env.development.local"), "utf8")).rejects.toThrow();
     expect(result.stdout).not.toContain("piped-secret");
     expect(result.stderr).not.toContain("piped-secret");
   });

@@ -53,7 +53,7 @@ attaches the new project to the local admin's team, so the project is owned
 from the start and `zitadel claim` reports it as already owned. If you opted
 out with `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false`, there is no local admin
 and the project has no owning team; that server cannot claim projects.
-Setup writes `.env.local` and `.zitadel/`, and installs
+Setup writes `.env.development.local` and `.zitadel/`, and installs
 dependencies with the detected package manager. Pass `--skip-install` to install
 them yourself. The project's default user schema and login flow are provisioned
 from versioned local defaults; setup writes editable copies into

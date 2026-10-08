@@ -26,7 +26,7 @@ type ScaffoldAccumulator = {
 /**
  * Records one touched artifact, deduplicating by path: several plan ops can
  * legitimately hit the same file (the base and framework op lists both merge
- * into `.env.local`, for example), but the report should carry it once, with
+ * into `.env.development.local`, for example), but the report should carry it once, with
  * the first action as the net one — a file created and then extended in the
  * same run was created by the run.
  */

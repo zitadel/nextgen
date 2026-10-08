@@ -1194,7 +1194,7 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   ".zitadel/secret": { subject: "the local project secret" },
   "zitadel.json": { subject: "the Zitadel project configuration" },
   ".env.example": { subject: "the .env example template" },
-  ".env.local": { subject: "the local development environment variables" },
+  ".env.development.local": { subject: "the local development environment variables" },
   ".zitadel/state.json": { subject: "the sync state file" },
   ".zitadel/flows/default-login.json": { subject: "the editable default login flow" },
   ".zitadel/flows/README.md": { subject: "the flows folder README" },
@@ -1277,7 +1277,7 @@ function buildSummary(opts: {
     ["Login page", "pages/login.vue"],
     ["Register page", "pages/register.vue"],
     ["Profile page", "pages/profile.vue"],
-    ["Env vars", ".env.local"],
+    ["Env vars", ".env.development.local"],
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
     if (hit) installedRows.push({ label, value: stylePath(hit) });

@@ -11,7 +11,7 @@ import {
  * renders the `@zitadel/sdk-angular` widgets based on the current path. The
  * project id (public, not secret) is inlined; the dev proxy in `proxy.conf.cjs`
  * attaches the project service-key secret as the bearer server-side only to
- * `POST /sessions/exchange` (read from `.env.local`), and no secret reaches
+ * `POST /sessions/exchange` (read from `.env.development.local`), and no secret reaches
  * the browser.
  *
  * Projects set up with the business use case additionally expose the SDK's
@@ -109,7 +109,7 @@ export function appTemplateHtml(ctx: PatchContext): string {
  * backend and attaches the project's service-key secret only to the current
  * app-plane `POST /sessions/exchange` request. Both the backend URL
  * (`ZITADEL_URL`) and the secret
- * (`ZITADEL_PROJECT_SECRET`) are read from `.env.local`, which `zitadel setup`
+ * (`ZITADEL_PROJECT_SECRET`) are read from `.env.development.local`, then `.env.local`, which `zitadel setup`
  * writes and `.gitignore` excludes — Angular's CLI does not auto-load env files
  * into the dev-server process, so this file does it itself with a small inline
  * parser. The prefix strip and the bearer are each provided in both the
@@ -122,14 +122,16 @@ export function proxyConfTemplate(): string {
 const { readFileSync, existsSync } = require("node:fs");
 
 function loadEnvLocal() {
-  if (!existsSync(".env.local")) return {};
   const out = {};
-  for (const line of readFileSync(".env.local", "utf8").split(/\\r?\\n/)) {
-    const m = line.match(/^\\s*(?:export\\s+)?([A-Z_][A-Z0-9_]*)\\s*=\\s*(.*)$/);
-    if (m) {
-      const raw = m[2].trim();
-      const quoted = raw.match(/^(['"])(.*)\\1\\s*(?:#.*)?$/);
-      out[m[1]] = quoted ? quoted[2] : raw.replace(/\\s+#.*$/, "").trim();
+  for (const file of [".env.local", ".env.development.local"]) {
+    if (!existsSync(file)) continue;
+    for (const line of readFileSync(file, "utf8").split(/\\r?\\n/)) {
+      const m = line.match(/^\\s*(?:export\\s+)?([A-Z_][A-Z0-9_]*)\\s*=\\s*(.*)$/);
+      if (m) {
+        const raw = m[2].trim();
+        const quoted = raw.match(/^(['"])(.*)\\1\\s*(?:#.*)?$/);
+        out[m[1]] = quoted ? quoted[2] : raw.replace(/\\s+#.*$/, "").trim();
+      }
     }
   }
   return out;
@@ -139,10 +141,10 @@ const env = loadEnvLocal();
 const server = process.env.ZITADEL_URL ?? env.ZITADEL_URL;
 const secret = process.env.ZITADEL_PROJECT_SECRET ?? env.ZITADEL_PROJECT_SECRET;
 if (!server) {
-  throw new Error("ZITADEL_URL is not set; add it to .env.local (zitadel setup writes it).");
+  throw new Error("ZITADEL_URL is not set; add it to .env.development.local (zitadel setup writes it).");
 }
 if (!secret) {
-  throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.local (zitadel setup writes it).");
+  throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.development.local (zitadel setup writes it).");
 }
 const bearer = \`Bearer \${secret}\`;
 

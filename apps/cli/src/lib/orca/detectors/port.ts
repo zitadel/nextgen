@@ -30,7 +30,7 @@ export async function detectDevPort(cwd: string, pkg: PackageJson): Promise<numb
 }
 
 async function portFromEnvFile(cwd: string): Promise<number | undefined> {
-  for (const candidate of [".env.local", ".env"]) {
+  for (const candidate of [".env.development.local", ".env.local", ".env"]) {
     try {
       const contents = await readFile(join(cwd, candidate), "utf8");
       const match = contents.match(/^\s*PORT\s*=\s*(\d+)/m);
