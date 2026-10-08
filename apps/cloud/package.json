@@ -15,8 +15,8 @@
     "directory": "apps/cloud"
   },
   "scripts": {
-    "dev": "vercel dev",
-    "deploy": "vercel deploy --prod",
+    "dev": "vercel dev --cwd ../..",
+    "deploy": "vercel deploy --prod --cwd ../..",
     "admin-user": "tsx scripts/admin-user.ts",
     "smoke": "tsx scripts/smoke.ts",
     "test": "vitest run",

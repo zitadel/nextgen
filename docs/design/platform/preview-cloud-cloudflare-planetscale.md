@@ -299,17 +299,19 @@ instance; measure before deciding whether that needs a shorter schedule.
 Phase 1 is complete: database compatibility, raw TCP egress on 5432 with TLS,
 and platform latency are all proven.
 
-## Repo shape (decided 2026-10-07)
+## Repo shape (decided 2026-10-07, revised 2026-10-08)
 
 The cloud is the product surface a visitor experiences: website, docs and
-the server. All three ship from this repo as sibling Vercel projects:
+the server. All three ship from this repo:
 
 - `apps/cloud` (this PR): the server container. It keeps its own hostnames
   per the design docs (`{region}.zitadel.cloud`, dashboard subdomain)
   because the API has no path prefix and cannot be path-composed under the
   website's origin without shadowing marketing pages.
-- `apps/docs` (exists): composed under `zitadel.com/docs` via Vercel
-  Microfrontends, with the website as the default app.
+- `apps/docs` (exists): since 2026-10-08 a second **service** of the cloud
+  project, see the next section. The earlier plan of composing it under
+  `zitadel.com/docs` via Vercel Microfrontends is unchanged for the
+  website; the cloud host serves the same build under `/docs`.
 - `apps/website` (later): imported from `zitadel/new-website` onto moon,
   biome and changesets; content PRs must not trigger the Go gates. Spike
   first on a branch, then the microfrontends config.
@@ -317,3 +319,55 @@ the server. All three ship from this repo as sibling Vercel projects:
 `apps/cloud` is **not** moved to the website or infra repos: the entrypoint
 mirrors server config semantics and the deploy is a function of the pinned
 server version, so it changes in the same PRs as the server.
+
+## Docs as a second service (2026-10-08)
+
+Vercel Services (Beta) let one project build several roots separately and
+route between them at the edge. Three options were weighed for "API plus
+docs on the cloud host":
+
+| | Services | Wrapper project with rewrites | Microfrontends |
+|---|---|---|---|
+| Build per app | yes | yes | yes |
+| Deploy and roll back per app | no, one deployment | yes | yes |
+| Extra hop | none | one (edge → target project) | none |
+| Cost | included | included | 2 projects included, $250/project beyond |
+
+Services were chosen: the server image rebuilds in about 15 s, so a docs
+merge rolling the server to a new deployment of the same image costs nothing
+noticeable, and one deployment means one route table, one Deployment
+Protection setting and one firewall for both. Independent lifecycles were
+not needed yet; if they become needed, the same path map moves into
+Microfrontends or a wrapper project without touching the apps.
+
+What the spike settled:
+
+- `vercel.json` lives at the repository root, because service roots are
+  relative to it and the two roots (`apps/cloud`, `apps/docs`) have no common
+  ancestor below the root. All other Vercel projects of this repo set a Root
+  Directory, so the file is only read by the cloud project. A `.vercelignore`
+  keeps Go sources and artifacts out of CLI uploads (~9 MB, 2.3k files).
+- The docs service builds **unchanged** at base `/`: the site already serves
+  `/docs/*` and `/reference/*` and answers 404 at `/`, so no base path is
+  needed. Waku supports `basePath`, but its Vercel build enhancer keeps the
+  RSC function at `/RSC` while rewriting to `<base>/RSC/`, so a prefixed
+  mount would need post-build patching. Listing the docs prefixes in the
+  top-level rewrites was the smaller contract.
+- `installCommand` per service runs in the service root; `corepack pnpm
+  install --filter @zitadel/docs...` from `apps/docs` resolves the workspace
+  upward. `ENABLE_EXPERIMENTAL_COREPACK=1` on the project pins pnpm to the
+  workspace's `packageManager`; without it Vercel would run the oldest pnpm
+  for an override install command.
+- `regions`, `crons`, `redirects` and `git` stay top-level in services mode.
+- Per-service `ignoreCommand` was not tested: the server build is too cheap
+  to justify skipping it.
+
+First services deploy (2026-10-08, staged with `--prod --skip-domain`, then
+promoted): upload 9.1 MB / 2.3k files, container service built in 3 s (layer
+cache cold), docs service in 2 min (install, OpenAPI bundle, four Vite
+environments, 341 static files), whole build 2 min 20 s. Every probed path
+answered from the right service: `/readyz`, `/sessions/me` (401), unknown
+paths (server 404) from the container; `/docs`, `/docs.md`, `/docs/*`,
+`/reference/api/*`, `/assets/*`, `/api/search`, `/llms.txt` from the docs,
+`/` redirecting to `/docs`. Smoke test green, docs pages answer in ~10 ms.
+

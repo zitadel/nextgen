@@ -29,7 +29,11 @@ export default defineConfig({
   },
   site: {
     name: "Zitadel Preview Docs",
-    baseUrl: import.meta.env.DEV ? "http://localhost:3003" : "https://zitadel.com/docs/preview",
+    // DOCS_SITE_URL is the public origin the site is served from (set per
+    // deployment, e.g. the cloud host that mounts the docs under /docs).
+    baseUrl: import.meta.env.DEV
+      ? "http://localhost:3003"
+      : (process.env.DOCS_SITE_URL ?? "https://zitadel.com/docs/preview"),
     git: {
       user: "zitadel",
       repo: "nextgen",

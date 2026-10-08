@@ -1,6 +1,8 @@
 name: cloud-deploy
 
-# Deploys apps/cloud to the hosted preview cloud on Vercel.
+# Deploys the hosted preview cloud on Vercel: the server container from
+# apps/cloud and the docs from apps/docs, as two services of one deployment
+# (vercel.json at the repo root).
 #
 # Order matters: migrations run from the pinned server image before the
 # deploy. A binary ahead of its schema boots green and fails per request,
@@ -14,6 +16,10 @@ on:
     branches: [main]
     paths:
       - "apps/cloud/**"
+      - "apps/docs/**"
+      - "api/openapi/**"
+      - "vercel.json"
+      - ".vercelignore"
       - ".github/workflows/cloud-deploy.yml"
   workflow_dispatch:
 
@@ -75,9 +81,11 @@ jobs:
         id: deploy
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        # The repo root is the deployment root (vercel.json defines the
+        # services and their roots), so the CLI runs with --cwd ../..
         run: |
-          corepack pnpm exec vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
-          url="$(corepack pnpm exec vercel deploy --prod --yes --token="$VERCEL_TOKEN")"
+          corepack pnpm exec vercel pull --cwd ../.. --yes --environment=production --token="$VERCEL_TOKEN"
+          url="$(corepack pnpm exec vercel deploy --cwd ../.. --prod --yes --token="$VERCEL_TOKEN")"
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "deployed $url"
 

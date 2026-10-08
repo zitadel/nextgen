@@ -3,11 +3,12 @@
  * Post-deploy smoke test for the preview cloud.
  *
  *   pnpm run smoke -- https://preview.example.com
+ *   VERCEL_AUTOMATION_BYPASS_SECRET=… pnpm run smoke -- https://<deployment>.vercel.app
  *
  * Exercises readiness, anonymous project creation, the operator plane with
- * the project secret (user create and query), and the session CSRF handshake,
- * which only succeeds when the platform forwards the public origin correctly.
- * Exits non-zero on the first failure. Creates one throwaway project.
+ * the project secret (user create and query), the session middleware, and
+ * the docs service mounted under /docs. Exits non-zero on the first failure.
+ * Creates one throwaway project.
  */
 
 // pnpm forwards its `--` separator as an argument; ignore it.
@@ -17,6 +18,14 @@ if (!base) {
   console.error("usage: smoke.ts <public base url>");
   process.exit(2);
 }
+
+// Deployment URLs behind Vercel Authentication (a staged production deploy
+// made with --skip-domain, a preview) accept the project's automation bypass
+// secret as a header. The production domain needs none.
+const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+const bypassHeaders: Record<string, string> = bypassSecret
+  ? { "x-vercel-protection-bypass": bypassSecret }
+  : {};
 
 const SCHEMA_URL = "https://nextgen.com/api/schemas/default-human-user.json";
 
@@ -33,7 +42,10 @@ async function call(
   init: RequestInit & { expect: number },
 ): Promise<Response> {
   const started = performance.now();
-  const response = await fetch(`${base}${path}`, init);
+  const response = await fetch(`${base}${path}`, {
+    ...init,
+    headers: { ...bypassHeaders, ...(init.headers as Record<string, string> | undefined) },
+  });
   const ms = Math.round(performance.now() - started);
   steps.push({ name, status: response.status, ms });
   if (response.status !== init.expect) {
@@ -100,6 +112,14 @@ try {
   // is the expected, healthy answer. (/sessions/me/csrf is newer than
   // 1.0.0-alpha.24, so the probe uses the long-standing /sessions/me.)
   await call("sessionWithoutCookie", "/sessions/me", { expect: 401 });
+
+  // The docs service shares the deployment: its pages and the static files
+  // the top-level rewrites hand to it must answer on the same origin.
+  const docs = await call("docsIndex", "/docs", { expect: 200 });
+  if (!/text\/html/.test(docs.headers.get("content-type") ?? "")) {
+    throw new Error(`docsIndex: expected an HTML page, got ${docs.headers.get("content-type")}`);
+  }
+  await call("docsLlmsTxt", "/llms.txt", { expect: 200 });
 
   console.table(steps);
   console.log(`smoke ok against ${base} (project ${project.id})`);

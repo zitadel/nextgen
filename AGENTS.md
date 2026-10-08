@@ -74,7 +74,9 @@ Development and test surfaces (`apps/`):
   `packages/api-mock` as a live per-PR preview endpoint.
 - `apps/cloud/` — deployment wrapper that runs the released
   server image as a Vercel container against PlanetScale Postgres for the
-  hosted preview cloud (runbook: `docs/runbooks/preview-cloud.md`).
+  hosted preview cloud. The repo-root `vercel.json` deploys it together with
+  `apps/docs` as two services of one Vercel project (runbook:
+  `docs/runbooks/preview-cloud.md`).
 
 Published libraries (`packages/`):
 

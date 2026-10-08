@@ -9,6 +9,22 @@ running as a Vercel container in Frankfurt (`fra1`) against one PlanetScale
 Postgres database in AWS `eu-central-1`. Production stays on GCP; this is a
 single-region preview offering with the same topology as self-hosted.
 
+The Vercel project is one deployment with two
+[services](https://vercel.com/docs/services), defined in the repo-root
+`vercel.json`:
+
+| Service | Root | What it is | Public paths |
+|---|---|---|---|
+| `server` | `apps/cloud` | the container above | everything not listed below |
+| `docs` | `apps/docs` | the docs site (Waku), built unchanged at base `/` | `/docs/*`, `/docs.md`, `/reference/*`, `/assets/*`, `/RSC/*`, `/api/search`, `/llms.txt`, `/llms-full.txt`, `/mcp/*` |
+
+`/` redirects to `/docs`. The docs site serves its pages under `/docs` and
+`/reference` by itself, so no base path is configured; the top-level rewrites
+only hand those prefixes to the docs service. A new top-level path in the docs
+app (a plugin route, a file in `public/`) needs a rewrite here, otherwise the
+server answers it with a 404. The server's own namespaces (`/projects`,
+`/users`, `/sessions`, `/ui/console`, …) never overlap with the docs prefixes.
+
 ## One-time setup
 
 ### 1. PlanetScale
@@ -34,13 +50,13 @@ project's key-encryption key unwrappable ([ADR 029](../adrs/029-cryptography-sec
 
 ### 3. Vercel project
 
-1. Create a project in the team with Framework Preset **Container** and
-   **no Root Directory**: both the workflow and the CLI deploy from inside
-   `apps/cloud`, so the uploaded tree *is* the project root (a Root
-   Directory setting makes `vercel deploy` fail with "does not exist"). Connecting the GitHub repo is fine; the
-   `git.deploymentEnabled: false` in `vercel.json` keeps Git pushes from
-   deploying so the workflow stays the only deployer.
-2. Environment variables (Production):
+1. Create a project in the team with **no Root Directory**: the repository
+   root is the deployment root, `vercel.json` there defines the services and
+   their roots. Both the workflow and the CLI deploy from the repo root
+   (`vercel deploy --cwd ../..` from `apps/cloud`). Connecting the GitHub
+   repo is fine; the `git.deploymentEnabled: false` in `vercel.json` keeps
+   Git pushes from deploying so the workflow stays the only deployer.
+2. Environment variables (Production; the build-time ones also for Preview):
 
    | Name | Value | Sensitive |
    |---|---|---|
@@ -52,6 +68,8 @@ project's key-encryption key unwrappable ([ADR 029](../adrs/029-cryptography-sec
    | `NEXTGEN_INSTRUMENTATION_LOG_FORMAT` | `json` | no |
    | `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT` | `true` | no |
    | `BOOTSTRAP_ADMIN_USER_JSON_B64` | output of `pnpm run admin-user` (see below) | yes |
+   | `ENABLE_EXPERIMENTAL_COREPACK` | `1` (build time; the docs service installs with `corepack pnpm`, which pins the workspace's pnpm) | no |
+   | `DOCS_SITE_URL` | the public origin, same as `NEXTGEN_SERVER_PUBLIC_BASE` (build time; canonical and sitemap URLs of the docs) | no |
 
    `PORT` is required: Vercel's container router defaults to 80 and the image
    runs as uid 65532, which cannot bind it.
@@ -99,11 +117,18 @@ can stay set. To rotate the password, mint a new document with the same
 
 ## Deploying
 
-- **Automatic:** merge a change under `apps/cloud/` to `main`.
+- **Automatic:** merge a change under `apps/cloud/`, `apps/docs/`,
+  `api/openapi/` or to the root `vercel.json` to `main`.
 - **Manual:** run `cloud-deploy` from the Actions tab.
 
 Both run, in order: image existence check, `nextgen migrate` from the pinned
 tag, `vercel deploy --prod`, smoke test. A failed migration stops the deploy.
+`migrate` is idempotent: on a docs-only merge it connects, finds nothing
+pending and exits; only a version bump applies migrations.
+
+Both services are rebuilt on every deploy. The server image build is about
+15 s, the docs build a few minutes; a docs-only merge therefore also rolls
+the server to a new deployment of the same image.
 
 ### Bumping the server version
 
@@ -118,7 +143,8 @@ expand/contract safe: for a short window both binaries serve traffic.
    migrations. A schema that the old binary cannot read is **not** rolled
    back automatically; that is what the expand/contract rule protects.
 2. For an instant switch without a build, promote the previous deployment in
-   the Vercel dashboard (Deployments → … → Promote to Production).
+   the Vercel dashboard (Deployments → … → Promote to Production). Server
+   and docs roll back together: they are one deployment.
 
 ## Lessons from the first deploy (2026-10-07)
 
@@ -136,6 +162,13 @@ expand/contract safe: for a short window both binaries serve traffic.
   test probes `/sessions/me` instead.
 - Measured on the first deploy: build 13 s, cold start 3.7–5.3 s, warm
   `/readyz` 0.19 s, `POST /users` 0.23 s.
+- `.vercelignore` uses gitignore syntax: an unanchored `docs` also drops
+  `apps/docs`, and the build then fails with "Service docs has root apps/docs
+  but that directory does not exist". Anchor repo-root entries with `/`.
+- The build log warns that the repo-root `api/` directory "will not be built
+  because services are configured". That is Vercel's serverless-functions
+  convention noticing a directory that is OpenAPI sources and Go code; the
+  docs service reads `api/openapi` as files, nothing is lost.
 - Without `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT` the Console picked the oldest
   customer project as its standalone target, which was a local test project
   whose keys were wrapped with a discarded master key, so
@@ -159,6 +192,11 @@ expand/contract safe: for a short window both binaries serve traffic.
   ```sh
   corepack pnpm --filter @zitadel/cloud run smoke -- https://preview.zitadel.cloud
   ```
+
+- **Staged production deploy:** `vercel deploy --cwd ../.. --prod --skip-domain`
+  from `apps/cloud` builds with production settings without moving the
+  production domain; smoke it with the project's protection-bypass header,
+  then `vercel promote <url>`.
 
 - **Master key rotation:** add a second key under a new `MASTER_KEY_ID`
   following ADR 029; this wrapper supports exactly one key per deployment
