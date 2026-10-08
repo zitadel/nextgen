@@ -24,3 +24,13 @@ tasks:
   test:
     deps:
       - "api-mock:build"
+
+  # The static discovery document the Vercel deploy serves, written after the
+  # function bundle is built. It needs VERCEL_URL, so only the Vercel build
+  # (vercel.json) runs it; `moon ci` never requests it.
+  generate-wellknown:
+    command: "corepack pnpm run generate-wellknown"
+    deps:
+      - "build"
+    options:
+      cache: false
