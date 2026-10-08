@@ -1,0 +1,37 @@
+# The server configuration of both benchmark lanes (ADR 069). One file, so the
+# lanes cannot drift apart: there is deliberately no `database:` key here. The
+# SQLite lane runs with no dialect configured, which makes the server fall back
+# to SQLite at <data_dir>/zitadel.db; the PostgreSQL lane adds
+# NEXTGEN_DATABASE_POSTGRES to the process environment and nothing else.
+#
+# The data directory and listen address come from the lane tooling through
+# NEXTGEN_SERVER_DATA_DIR and NEXTGEN_SERVER_ADDRESS, because the data
+# directory must be on the lane's local volume.
+#
+# This file is not named nextgen.yaml on purpose: the root .gitignore ignores
+# that name as local runtime config.
+server:
+  address: "127.0.0.1:8080"
+  # Both embedded UIs off: the lanes drive the API only, and serving static
+  # assets is not what they measure.
+  console_enabled: false
+  login_enabled: false
+
+# Pinned instead of left to the default so it is visible here and so the
+# partition sizing reads it from this file: every in-flight password
+# verification holds `memory` KiB, so the API server's memory.max bounds login
+# concurrency (see BENCH_LOGIN_CONCURRENCY in lanes/common.env).
+password_hasher:
+  hasher:
+    algorithm: argon2id
+    time: 3
+    memory: 65536 # KiB, 64 MiB
+    threads: 4
+
+# The request log is a measured throughput cost, and the log file competes for
+# the measured disk.
+instrumentation:
+  log:
+    level: warn
+    add_source: false
+    streams: [runtime, ready]

@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Run the harness once per measurement window, inside the load generator's
+# cgroup (ADR 069).
+#
+#   bench-measure --k6 dist/k6 --state FILE --lane LANE --out DIR \
+#                 [--scenarios login,getUser] [--vus 1,5,20] [--duration 20s]
+#
+# One window is one scenario at one VU count: the harness's `sweep` is invoked
+# once per pair, each wrapped in `bench-window run`, so the cgroup snapshots, the
+# boot marker and the process count are taken at the start and end of every
+# window and an invalid one is named. Windows run one after another and never
+# overlap. Every window is attempted; the exit status is 3 if any was invalid
+# or any run failed, after all records are written.
+#
+# The harness never starts a server (ADR 067): the target is the one `bench-lane
+# up` started, and the state file comes from `k6 x nextgen bootstrap`.
+# `--declare` flags (from `bench-lane declare-args`) are passed on when the
+# harness's sweep accepts them.
+#
+# BENCH_MEASURE_DRY_RUN=1 prints the commands instead of running them.
+set -euo pipefail
+shopt -s inherit_errexit
+
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# shellcheck source=../lib/common.sh
+. "$HERE/lib/common.sh"
+
+bench_trap_errors
+bench_elevate "$@"
+
+k6='' state='' lane='' out='' scenarios='login,getUser' vus='1,5,20' duration='20s'
+while (($#)); do
+  case $1 in
+    --k6) k6=$2; shift 2 ;;
+    --state) state=$2; shift 2 ;;
+    --lane) lane=$2; shift 2 ;;
+    --out) out=$2; shift 2 ;;
+    --scenarios) scenarios=$2; shift 2 ;;
+    --vus) vus=$2; shift 2 ;;
+    --duration) duration=$2; shift 2 ;;
+    -h | --help) sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d;s/^# \{0,1\}//'; exit 0 ;;
+    *) bench_die "unknown argument '$1'" ;;
+  esac
+done
+[[ -n $k6 && -n $state && -n $lane && -n $out ]] || bench_die "--k6, --state, --lane and --out are required (try --help)"
+
+dry=${BENCH_MEASURE_DRY_RUN:-0}
+run() {
+  if [[ $dry == 1 ]]; then printf '+ %s\n' "$*"; else "$@"; fi
+}
+
+declare -a declare_args=()
+# The fixture state file is `--state` in the first harness layer and `--manifest`
+# once the fixture-manifest layer (#1415) lands; take whichever this k6 has.
+state_flag=--state
+if [[ $dry != 1 ]]; then
+  if "$k6" x nextgen sweep --help 2>&1 | grep -q -- '--manifest'; then state_flag=--manifest; fi
+  if "$k6" x nextgen sweep --help 2>&1 | grep -q -- '--declare'; then
+    mapfile -t declare_args < <("$HERE/bin/bench-lane" declare-args)
+  else
+    bench_warn "this harness's sweep has no --declare yet (needs the doctor layer, #1415): run metadata carries the facts in run-metadata.json instead"
+  fi
+fi
+
+IFS=, read -ra scenario_list <<<"$scenarios"
+IFS=, read -ra vu_list <<<"$vus"
+bad=0
+for s in "${scenario_list[@]}"; do
+  for v in "${vu_list[@]}"; do
+    window="${s}-vus${v}"
+    if [[ $dry == 1 ]]; then
+      printf '+ bench-window run %s -- bench-partition exec loadgen -- %s x nextgen sweep --state %s --lane %s --scenarios %s --vus %s --duration %s --out %s/sweeps/%s\n' \
+        "$window" "$k6" "$state" "$lane" "$s" "$v" "$duration" "$out" "$window"
+      continue
+    fi
+    run "$HERE/bin/bench-window" run "$window" -- \
+      "$HERE/bin/bench-partition" exec loadgen -- \
+      "$k6" x nextgen sweep "$state_flag" "$state" --lane "$lane" --scenarios "$s" --vus "$v" --duration "$duration" \
+      --out "$out/sweeps/$window" "${declare_args[@]}" || bad=1
+  done
+done
+((bad == 0)) || bench_die "at least one window was invalid or failed; see $out and the windows/ records"

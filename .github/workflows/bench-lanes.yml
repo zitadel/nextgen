@@ -1,0 +1,227 @@
+name: bench-lanes
+
+# The two benchmark lanes (ADR 069, #1097): the same server build and the same
+# collector configuration on SQLite and on PostgreSQL, the machine partitioned by
+# cgroup between the database, the API server and the load generator. Provisioning
+# is .github/bench/; this file sequences it on a Depot runner.
+#
+# The runner is an ephemeral virtual machine per job where the job has
+# passwordless sudo, so the partition is made by root in the VM: the lane's
+# cores become a cpuset partition root, which takes them out of every other
+# cgroup, the runner agent included. What the machine exposes is recorded in the
+# run metadata; vCPUs, sibling threads and the host beneath are the provider's.
+#
+# Triggers:
+#   pull_request   same-repo PRs that touch the lane tooling run the whole proof
+#                  (both lanes: partition, isolation, single server, validity
+#                  rules, teardown) on the 16 vCPU size, without needing
+#                  tools/bench. Fork PRs never reach a Depot runner (they would
+#                  inject DEPOT_CACHE_TOKEN into untrusted code, see ci.yml).
+#   workflow_dispatch / workflow_call
+#                  the same, on the 32 vCPU size, plus the measured windows
+#                  through tools/bench once it is on main.
+# Never on every PR: a performance run on every PR is a flake generator (#1094).
+
+on:
+  pull_request:
+    paths:
+      - ".github/bench/**"
+      - ".github/actions/bench-lane/**"
+      - ".github/workflows/bench-lanes.yml"
+  workflow_dispatch:
+    inputs:
+      lanes:
+        description: "Which lanes to run, one after the other on the same VM"
+        type: choice
+        options: [both, sqlite, postgres]
+        default: both
+      scenarios:
+        description: "Harness scenarios, comma separated"
+        default: "login,getUser"
+      vus:
+        description: "VU counts, comma separated; one measurement window each"
+        default: "1,5,20"
+      duration:
+        description: "Duration of each window"
+        default: "20s"
+  workflow_call:
+    inputs:
+      lanes:
+        type: string
+        default: both
+      scenarios:
+        type: string
+        default: "login,getUser"
+      vus:
+        type: string
+        default: "1,5,20"
+      duration:
+        type: string
+        default: "20s"
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      # The tests need no privileges: cgroupfs and the CPU topology are stand-ins.
+      - name: Test the lane tooling
+        run: .github/bench/test/run.sh
+
+  lanes:
+    needs: selftest
+    # Fork PRs execute untrusted code and stay off Depot runners (ci.yml).
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork }}
+    # 16 vCPU = an m8i.4xlarge: 8 cores of 2 threads, 64 GiB, enough for the proof
+    # with every core given out. 32 vCPU = an m8i.8xlarge: 16 cores of 2 threads,
+    # 128 GiB, the measurement budget. Both expose SMT siblings, which "whole
+    # physical cores" needs; the 8 and 64 vCPU sizes are other CPUs with no SMT
+    # exposed and are not used. Single-tenant ephemeral VM per job: one lane at a
+    # time on it, so the two lanes share hardware and a concurrency group is not
+    # needed.
+    runs-on: ${{ github.event_name == 'pull_request' && 'depot-ubuntu-24.04-16' || 'depot-ubuntu-24.04-32' }}
+    timeout-minutes: 60
+    env:
+      BENCH_PARTITION_MODE: host
+      BENCH_IMAGE_TAG: ${{ github.sha }}
+      BENCH_SERVER_BIN: dist/nextgen-server
+      # Depot exposes no local disk the guest can tell is local: the root volume
+      # is a cloud block volume (EBS, about 4 ms per synchronous 4 KiB write when
+      # measured) on the AWS-backed VMs, sometimes with RAM in front of it, and a
+      # paravirtual disk on the others. The lane refuses these kinds unless this
+      # says so, and records the kind and the measured write cost either way.
+      BENCH_ALLOW_DISK_KINDS: network-block virtual-disk memory-cached
+      # The proof job gives out all 8 cores of the 16 vCPU size.
+      BENCH_CORES_SYSTEM: ${{ github.event_name == 'pull_request' && '1' || '' }}
+      BENCH_CORES_SERVER: ${{ github.event_name == 'pull_request' && '2' || '' }}
+      BENCH_CORES_DB: ${{ github.event_name == 'pull_request' && '2' || '' }}
+      BENCH_CORES_COLLECTOR: ${{ github.event_name == 'pull_request' && '1' || '' }}
+      BENCH_CORES_LOADGEN: ${{ github.event_name == 'pull_request' && '2' || '' }}
+      # Result caching would let a lane report numbers it did not measure (#974).
+      MOON_CACHE: off
+    steps:
+      - uses: actions/checkout@v6
+
+      # What the runner exposes, in the log, before anything depends on it. The
+      # same facts are recorded in each lane's run-metadata.json.
+      - name: Record what the runner exposes
+        run: |
+          echo "user: $(id)"; sudo -n true && echo "sudo: ok"
+          echo "kernel: $(uname -r); cgroup fs: $(stat -fc %T /sys/fs/cgroup)"
+          echo "root controllers: $(cat /sys/fs/cgroup/cgroup.controllers); enabled for children: $(cat /sys/fs/cgroup/cgroup.subtree_control)"
+          echo "runner cgroup: $(cat /proc/self/cgroup); cpuset.cpus.effective of the root: $(cat /sys/fs/cgroup/cpuset.cpus.effective)"
+          echo "machine: $(cat /sys/class/dmi/id/sys_vendor /sys/class/dmi/id/product_name | tr '\n' ' '), $(systemd-detect-virt)"
+          lscpu | grep -E "Model name|Thread|Core|Socket|^CPU\(s\)|Hypervisor|L3"
+          lscpu -e
+          lsblk -d -o NAME,ROTA,SIZE,MODEL | grep -v loop
+          grep -E "MemTotal|SwapTotal" /proc/meminfo
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Built before the partition goes up, so a compiler never competes with a
+      # measurement and the server binary is the same file in both lanes.
+      - name: Build the server
+        run: go build -o dist/nextgen-server .
+
+      - name: Locate PostgreSQL
+        if: ${{ inputs.lanes != 'sqlite' }}
+        run: |
+          find_bin() { find /usr/lib/postgresql -path '*/bin/initdb' 2>/dev/null | sort -V | tail -n 1; }
+          if [ -z "$(find_bin)" ]; then
+            sudo apt-get update -q && sudo apt-get install -y -q postgresql
+          fi
+          # The packaged service must not run next to the lane's own cluster.
+          sudo systemctl stop postgresql 2>/dev/null || true
+          bindir=$(dirname "$(find_bin)")
+          # The server's migrations need contrib (btree_gin, pgcrypto).
+          find /usr/share/postgresql -name btree_gin.control | grep -q .
+          echo "BENCH_PG_BIN=$bindir" >> "$GITHUB_ENV"
+          "$bindir/postgres" --version
+
+      # tools/bench is the k6 harness (#1413). The proof does not need it; the
+      # measured windows do, and are skipped, loudly, until it is on main.
+      - name: Is the harness here
+        id: harness
+        run: |
+          if [ -f tools/bench/moon.yml ] && [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::measured windows skipped: tools/bench is not in this checkout (needs #1413) or this is a pull request run"
+          fi
+
+      - uses: pnpm/action-setup@v5
+        if: ${{ steps.harness.outputs.present == 'true' }}
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        if: ${{ steps.harness.outputs.present == 'true' }}
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Build the harness
+        if: ${{ steps.harness.outputs.present == 'true' }}
+        run: |
+          corepack pnpm install --frozen-lockfile
+          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+          PATH="$PWD/node_modules/.bin:$PATH" moon run bench:build
+
+      - name: Choose where the lanes' data lives
+        run: |
+          # The root volume. bench-lane records its kind and the policy above applies.
+          echo "BENCH_DATA_ROOT=$RUNNER_TEMP/bench-data" >> "$GITHUB_ENV"
+
+      # Fail before any lane starts if this VM cannot host the partition.
+      - name: Check the VM can host the partition
+        run: .github/bench/bin/bench-partition preflight
+
+      - uses: ./.github/actions/bench-lane
+        if: ${{ inputs.lanes != 'postgres' }}
+        with:
+          lane: sqlite
+          measure: ${{ steps.harness.outputs.present }}
+          scenarios: ${{ inputs.scenarios || 'login,getUser' }}
+          vus: ${{ inputs.vus || '1,5,20' }}
+          duration: ${{ inputs.duration || '20s' }}
+
+      - uses: ./.github/actions/bench-lane
+        if: ${{ !cancelled() && inputs.lanes != 'sqlite' }}
+        with:
+          lane: postgres
+          measure: ${{ steps.harness.outputs.present }}
+          scenarios: ${{ inputs.scenarios || 'login,getUser' }}
+          vus: ${{ inputs.vus || '1,5,20' }}
+          duration: ${{ inputs.duration || '20s' }}
+
+      # Two lanes are comparable only if they differ in the database: the same
+      # server build, server configuration, collector configuration, hardware and
+      # allocation.
+      - name: Check the lanes differ in the database only
+        if: ${{ !cancelled() && (inputs.lanes == '' || inputs.lanes == 'both') }}
+        run: .github/bench/bin/bench-lane compare dist/bench-run/sqlite/run-metadata.json dist/bench-run/postgres/run-metadata.json
+
+      # Last, whatever happened: nothing of either lane is left on the VM.
+      - name: Confirm nothing is left behind
+        if: ${{ always() }}
+        run: sudo -n -E env "PATH=$PATH" .github/bench/bin/bench-lane assert-clean
+
+      # Run metadata, window and isolation records and logs. The harness target
+      # file (it carries the project secret) is outside this directory.
+      - name: Upload the run records
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-run
+          path: dist/bench-run
+          if-no-files-found: warn
+          retention-days: 30

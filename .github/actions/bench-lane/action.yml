@@ -1,0 +1,88 @@
+name: bench-lane
+description: >-
+  Bring one benchmark lane up on the VM, demonstrate the partition, optionally
+  measure through the k6 harness, prove the validity rules fire, and tear the
+  lane down (always, including after a cancelled job). ADR 069.
+
+inputs:
+  lane:
+    description: "sqlite or postgres"
+    required: true
+  measure:
+    description: "true to provision fixtures and run the harness windows (needs tools/bench)"
+    default: "false"
+  scenarios:
+    default: "login,getUser"
+  vus:
+    default: "1,5,20"
+  duration:
+    default: "20s"
+
+runs:
+  using: composite
+  steps:
+    - name: Bring the ${{ inputs.lane }} lane up
+      shell: bash
+      run: |
+        echo "BENCH_RUN_DIR=$GITHUB_WORKSPACE/dist/bench-run/${{ inputs.lane }}" >> "$GITHUB_ENV"
+        BENCH_RUN_DIR="$GITHUB_WORKSPACE/dist/bench-run/${{ inputs.lane }}" .github/bench/bin/bench-lane up "${{ inputs.lane }}"
+
+    # A second server on the data directory is refused by the lock, and the one
+    # server still answers.
+    - name: Refuse a second server on the data directory
+      shell: bash
+      run: .github/bench/bin/bench-lane assert-single-server
+
+    # Busy loops saturate the load generator's cores while the server's cpuset,
+    # throttling and memory counters are watched. Fails the lane unless it passed
+    # with a real cpuset: "incomplete" is a failure here.
+    - name: Demonstrate the partition
+      shell: bash
+      run: .github/bench/bin/bench-verify-isolation --seconds 8 --out "$BENCH_RUN_DIR/isolation.json"
+
+    - name: Provision the fixtures
+      if: ${{ inputs.measure == 'true' }}
+      shell: bash
+      run: |
+        # `--state` in the first harness layer, `--manifest` once #1415 lands.
+        state_flag=--state
+        if tools/bench/dist/k6 x nextgen bootstrap --help 2>&1 | grep -q -- '--manifest'; then state_flag=--manifest; fi
+        .github/bench/bin/bench-partition exec loadgen -- \
+          tools/bench/dist/k6 x nextgen bootstrap \
+            --base "http://127.0.0.1:8080" --fixtures tools/bench/fixtures/local.json \
+            "$state_flag" "dist/bench-target-${{ inputs.lane }}.json" --lane "${{ inputs.lane }}"
+
+    # Inputs reach the script through the environment, never interpolated into
+    # the shell body.
+    - name: Measure
+      if: ${{ inputs.measure == 'true' }}
+      shell: bash
+      env:
+        SCENARIOS: ${{ inputs.scenarios }}
+        VUS: ${{ inputs.vus }}
+        DURATION: ${{ inputs.duration }}
+      run: |
+        .github/bench/bin/bench-measure \
+          --k6 "$PWD/tools/bench/dist/k6" --state "dist/bench-target-${{ inputs.lane }}.json" \
+          --lane "${{ inputs.lane }}" --out "$BENCH_RUN_DIR" \
+          --scenarios "$SCENARIOS" --vus "$VUS" --duration "$DURATION"
+
+    # Last, because it restarts the server: the validity rules have to fire on
+    # this kernel (a CPU quota on the server, a restart behind a boot marker), not
+    # only be written down.
+    - name: Prove the validity rules fire
+      shell: bash
+      run: .github/bench/bin/bench-verify-isolation --seconds 4 --negative-controls --out "$BENCH_RUN_DIR/controls.json"
+
+    # Runs when an earlier step failed and when the job was cancelled; idempotent.
+    # `assert-clean` fails the step if anything of the lane is left.
+    - name: Tear the ${{ inputs.lane }} lane down
+      if: ${{ always() }}
+      shell: bash
+      run: |
+        BENCH_RUN_DIR="$GITHUB_WORKSPACE/dist/bench-run/${{ inputs.lane }}"
+        .github/bench/bin/bench-lane down
+        .github/bench/bin/bench-lane assert-clean
+        if [ -r "$BENCH_RUN_DIR/run-metadata.json" ]; then
+          .github/bench/bin/bench-summary "$BENCH_RUN_DIR" | tee -a "$GITHUB_STEP_SUMMARY"
+        fi
