@@ -1,0 +1,87 @@
+name: cloud-deploy
+
+# Deploys apps/cloud to the hosted preview cloud on Vercel.
+#
+# Order matters: migrations run from the pinned server image before the
+# deploy. A binary ahead of its schema boots green and fails per request,
+# and a rollout runs old and new binaries side by side, so migrations must
+# be expand/contract and already applied when the new image takes traffic.
+# Git-triggered Vercel deployments are disabled in vercel.json; this
+# workflow is the only deployer.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/cloud/**"
+      - ".github/workflows/cloud-deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: cloud-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment: cloud-preview
+    defaults:
+      run:
+        working-directory: apps/cloud
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.PREVIEW_CLOUD_VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve the pinned server version
+        id: version
+        run: |
+          version="$(sed -n 's/^ARG NEXTGEN_VERSION=//p' Dockerfile.vercel)"
+          if [ -z "$version" ]; then
+            echo "Dockerfile.vercel has no ARG NEXTGEN_VERSION=<version> line" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/zitadel/nextgen:$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check the image exists before touching the database
+        run: docker manifest inspect "${{ steps.version.outputs.image }}" > /dev/null
+
+      - name: Apply database migrations
+        # The migrate command loads the full config and mints a throwaway
+        # master key when none is configured; that is expected here. Do not
+        # set NEXTGEN_SERVER_GENERATE_MASTER_KEY=false on this step.
+        env:
+          NEXTGEN_DATABASE_POSTGRES: ${{ secrets.PREVIEW_CLOUD_MIGRATOR_DATABASE_URL }}
+        run: |
+          docker run --rm \
+            -e NEXTGEN_DATABASE_POSTGRES \
+            "${{ steps.version.outputs.image }}" migrate
+
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install the Vercel CLI from the workspace lockfile
+        working-directory: .
+        run: corepack pnpm install --filter @zitadel/cloud... --frozen-lockfile
+
+      - name: Deploy to Vercel (production)
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          corepack pnpm exec vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+          url="$(corepack pnpm exec vercel deploy --prod --yes --token="$VERCEL_TOKEN")"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "deployed $url"
+
+      - name: Smoke test the production origin
+        env:
+          PUBLIC_BASE: ${{ vars.PREVIEW_CLOUD_PUBLIC_BASE }}
+        run: corepack pnpm run smoke -- "${PUBLIC_BASE:-${{ steps.deploy.outputs.url }}}"

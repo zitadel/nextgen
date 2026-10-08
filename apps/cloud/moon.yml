@@ -1,0 +1,25 @@
+id: "cloud"
+language: "typescript"
+layer: "application"
+stack: "backend"
+
+tasks:
+  # No `build` task on purpose: the deployable artifact is the container
+  # image Vercel builds from Dockerfile.vercel, which needs Docker and Vercel
+  # credentials. Keeping `build` out keeps `moon ci :build` Docker-free;
+  # `typecheck` and `test` are the gates.
+  typecheck:
+    command: "corepack pnpm run typecheck"
+
+  test:
+    command: "corepack pnpm run test:all"
+
+  # Deploys to production. Not a CI task: the GitHub workflow
+  # `cloud-deploy.yml` runs migrations first and then calls the
+  # Vercel CLI directly.
+  deploy:
+    command: "corepack pnpm run deploy"
+    local: true
+    options:
+      cache: false
+      runInCI: false

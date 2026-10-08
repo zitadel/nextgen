@@ -43,6 +43,7 @@
     "@zitadel/demo-nuxt",
     "@zitadel/demo-nuxt-e2e",
     "@zitadel/login-ui",
+    "@zitadel/cloud",
     "@zitadel/storybook"
   ]
 }

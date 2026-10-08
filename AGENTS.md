@@ -72,6 +72,9 @@ Development and test surfaces (`apps/`):
   temporary registry).
 - `apps/mock-zitadel/` — thin deployment wrapper that serves
   `packages/api-mock` as a live per-PR preview endpoint.
+- `apps/cloud/` — deployment wrapper that runs the released
+  server image as a Vercel container against PlanetScale Postgres for the
+  hosted preview cloud (runbook: `docs/runbooks/preview-cloud.md`).
 
 Published libraries (`packages/`):
 

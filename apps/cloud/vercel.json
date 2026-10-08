@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "container",
+  "installCommand": "echo 'container deployment: nothing to install'",
+  "regions": ["fra1"],
+  "crons": [{ "path": "/readyz", "schedule": "*/5 * * * *" }],
+  "git": { "deploymentEnabled": false }
+}
