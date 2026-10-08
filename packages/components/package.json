@@ -40,6 +40,10 @@
       "types": "./dist/manifests.d.mts",
       "import": "./dist/manifests.mjs"
     },
+    "./events": {
+      "types": "./dist/events.d.mts",
+      "import": "./dist/events.mjs"
+    },
     "./tokens": {
       "types": "./dist/tokens/index.d.mts",
       "import": "./dist/tokens/index.mjs"
@@ -50,7 +54,8 @@
     },
     "./jsx": {
       "types": "./dist/jsx.d.ts"
-    }
+    },
+    "./legacy-designs/*": "./dist/legacy-designs/*"
   },
   "publishConfig": {
     "access": "public"
