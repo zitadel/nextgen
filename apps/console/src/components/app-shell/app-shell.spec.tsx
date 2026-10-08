@@ -399,11 +399,19 @@ describe("project pill", () => {
 
   it("falls back to the same empty state when the query fails", async () => {
     // The chrome is not worth an error boundary: a failed read degrades to the
-    // empty pill rather than taking every screen down with it.
-    server.use(http.get(MY_PROJECTS, () => new HttpResponse(null, { status: 500 })));
-    renderShell();
+    // empty pill rather than taking every screen down with it. The Projects
+    // screen reads the same list and does report the failure; that is expected.
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      server.use(http.get(MY_PROJECTS, () => new HttpResponse(null, { status: 500 })));
+      renderShell();
 
-    const pill = await screen.findByRole("button", { name: "Switch project" });
-    await waitFor(() => expect(pill).toHaveTextContent("No projects"));
+      const pill = await screen.findByRole("button", { name: "Switch project" });
+      await waitFor(() => expect(pill).toHaveTextContent("No projects"));
+    } finally {
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
   });
 });
