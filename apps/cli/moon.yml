@@ -15,8 +15,7 @@ tasks:
       - "api:build"
       - "config:build"
       - "sdk-next:build"
-      - target: "api-mock:build"
-        cacheStrategy: "hash"
+      - "api-mock:build"
 
   build:
     command: "corepack pnpm run build"
@@ -63,8 +62,7 @@ tasks:
     command: "corepack pnpm run test:all"
     deps:
       - "build"
-      - target: "api-mock:build"
-        cacheStrategy: "hash"
+      - "api-mock:build"
     inputs:
       - "**/*"
       # The @zitadel/server wrapper its server-wrapper test loads. An input,

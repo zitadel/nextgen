@@ -15,8 +15,7 @@ tasks:
       - "api:build"
       - "config:build"
       - "design-tokens:build"
-      - target: "api-mock:build"
-        cacheStrategy: "hash"
+      - "api-mock:build"
 
   build:
     command: "corepack pnpm run build"
@@ -72,8 +71,7 @@ tasks:
     deps:
       - "install-browsers"
       - "api:build"
-      - target: "api-mock:build"
-        cacheStrategy: "hash"
+      - "api-mock:build"
       - "config:build"
       - "design-tokens:build"
       # standalone-artifact.spec.ts reads dist/standalone.mjs — the unit suite

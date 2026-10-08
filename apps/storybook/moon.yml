@@ -16,8 +16,7 @@ tasks:
     command: "corepack pnpm run typecheck"
     deps:
       - "api:build"
-      - target: "api-mock:build"
-        cacheStrategy: "hash"
+      - "api-mock:build"
       - "components:build"
       - "design-tokens:build"
       - "config:build"
@@ -28,8 +27,7 @@ tasks:
       - "api:build"
       - "components:build"
       - "design-tokens:build"
-      - target: "api-mock:build"
-        cacheStrategy: "hash"
+      - "api-mock:build"
       - "config:build"
     outputs:
       - "dist/**/*"
@@ -54,8 +52,7 @@ tasks:
       - "api:build"
       - "components:build"
       - "design-tokens:build"
-      - target: "api-mock:build"
-        cacheStrategy: "hash"
+      - "api-mock:build"
       - "config:build"
     options:
       # Shared mutex with the other browser-mode suites so only one real-Chromium

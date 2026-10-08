@@ -18,8 +18,7 @@ tasks:
   e2e:
     command: "corepack pnpm exec playwright test"
     deps:
-      - target: "api-mock:build"
-        cacheStrategy: "hash"
+      - "api-mock:build"
       - "demo-next:build"
     options:
       runInCI: false

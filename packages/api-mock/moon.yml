@@ -13,15 +13,13 @@ tasks:
       - "api:build"
       - "config:build"
 
-  # A no-op: consumers import the source (the exports point at src/). It
-  # exists as the edge to depend on, and declares no outputs, so moon ignores
-  # its hash by default; every dependent must list it with
-  # `cacheStrategy: "hash"` or an api-mock change will not invalidate it.
   build:
-    command: 'node -e "process.exit(0)"'
+    command: "corepack pnpm run build"
     deps:
       - "api:build"
       - "config:build"
+    outputs:
+      - "dist/**/*"
 
   # Chromium for the browser project. Self-contained (like storybook): the
   # `test` task depends on it so `moon ci :test` provisions it in CI.

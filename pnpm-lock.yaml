@@ -1083,6 +1083,9 @@ importers:
       playwright:
         specifier: 'catalog:'
         version: 1.60.0
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.0(@tsdown/css@0.23.0)(@typescript/native-preview@7.0.0-dev.20260421.2)(@volar/typescript@2.4.28)(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
       tsx:
         specifier: 'catalog:'
         version: 4.21.0
