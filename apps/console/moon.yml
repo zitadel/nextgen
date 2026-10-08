@@ -9,20 +9,21 @@ dependsOn:
 
 tasks:
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
       - "api:build"
       - "design-tokens:build"
       - "sdk-react:build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
       - "api:build"
       - "design-tokens:build"
       - "sdk-react:build"
     outputs:
       - "/internal/staticui/console/dist/**/*"
+    options:
+      # Replaces the inherited dist/**/* rather than adding to it.
+      mergeOutputs: "replace"
 
   build-release:
     command: "corepack pnpm run build"
@@ -39,7 +40,6 @@ tasks:
       runInCI: false
 
   test:
-    command: "corepack pnpm run test:all"
     deps:
       - "build"
 

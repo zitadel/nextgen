@@ -40,3 +40,18 @@ tasks:
   # and are not auto-formatted.
   lint:
     command: "corepack pnpm exec biome check ."
+
+  # The standard tasks every TypeScript project runs. A project's moon.yml adds
+  # only what is specific to it: its `deps` (appended to these), a different
+  # `outputs`, or options. A project with nothing to build or test opts out
+  # with `workspace.inheritedTasks.exclude`.
+  typecheck:
+    command: "corepack pnpm run typecheck"
+
+  build:
+    command: "corepack pnpm run build"
+    outputs:
+      - "dist/**/*"
+
+  test:
+    command: "corepack pnpm run test:all"
