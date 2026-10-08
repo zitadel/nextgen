@@ -8,3 +8,4 @@ export * from "./types";
 // Re-exported so scaffolded apps can wire the business copy overlay without a
 // direct @zitadel/components dependency (strict package managers reject those).
 export { businessLocales } from "@zitadel/components";
+// Spike: a single-package change to validate moon affected tasks and the remote cache.
