@@ -9,7 +9,7 @@ const demoDir = resolve(workspaceRoot, "apps", "demo-next");
 // a script would hide a step from Moon's task graph, `node --run` does not pass
 // the runner's SIGTERM on, and the `.bin` shims are `.cmd` files on Windows.
 const nodeCli = (cli: string, ...args: string[]) =>
-  [process.execPath, cli, ...args].map((arg) => JSON.stringify(arg)).join(" ");
+  [process.execPath, cli, ...args].map((arg) => `"${arg}"`).join(" ");
 
 /**
  * E2E coverage for the embedded sign-in path:

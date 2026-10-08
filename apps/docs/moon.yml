@@ -10,6 +10,8 @@ tasks:
       - "package.json"
       - "/api/openapi/**/*.yaml"
       - "scripts/bundle-openapi.mjs"
+      # The redocly version (the catalog pin).
+      - "/pnpm-workspace.yaml"
     outputs:
       - ".generated/openapi.yaml"
       - ".generated/openapi.json"

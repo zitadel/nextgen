@@ -49,9 +49,9 @@ moon run demo-next-e2e:e2e                   # mock lane
 moon run demo-next-e2e:e2e-real              # real-instance lane (@zitadel/testing)
 ```
 
-Moon rebuilds `@zitadel/components` first through task dependencies, then
-Playwright boots `api-mock` (`:8080`) and `demo-next` (`:3002`) by running
-each package's own script with `node --run` in that package (no nested pnpm).
+Moon builds `@zitadel/sdk-next` (and the packages it pulls in) first through
+task dependencies, then Playwright boots `api-mock` (`:8080`) and `demo-next`
+(`:3002`) by running the CLIs their `start` and `dev` scripts run, under node.
 
 ## When Adding A Spec
 

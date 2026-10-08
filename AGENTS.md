@@ -173,13 +173,16 @@ Moon owns the task graph; `package.json` scripts are its leaves.
 
 - Every script has a Moon task of the same name, and that task's command is
   exactly `corepack pnpm run <name>`. Add the script and the task together.
-- A script is one step (`tsdown`, `vitest run`, `tsc --build tsconfig.json`),
-  written as plain commands: no command substitution, `eval`/`source`, or
-  inline `sh -c` scripts.
-  It never starts pnpm or another script (`pnpm run`, `pnpm exec`,
-  `pnpm --filter`, `node --run`): a pnpm started from inside a pnpm script
-  re-checks every workspace package and prints "Unsupported platform"
-  warnings for the platform-specific `apps/server-*` packages.
+- A script does one task's work (`tsdown`, `vitest run`, or the two `tsc`
+  passes of a `typecheck`); it never runs a step that belongs to another task.
+  It is written as plain commands: no command substitution, `eval`/`source`,
+  inline `sh -c` scripts, or wrappers that start other commands (`cross-env`,
+  `dotenv`, `run-s`, `concurrently`).
+  It never starts a package manager, Moon, or another script (`pnpm run`,
+  `pnpm exec`, `pnpm --filter`, `npx`, `bun`, `moon run`, `node --run`): a
+  pnpm started from inside a pnpm script re-checks every workspace package and
+  prints "Unsupported platform" warnings for the platform-specific
+  `apps/server-*` packages, and a nested `moon run` hides a task edge.
 - Ordering lives in Moon `deps`, never in `pre<name>`/`post<name>` hooks.
   A direct `pnpm run test` runs only that step; `moon run <project>:test`
   runs its prerequisites first.
@@ -192,10 +195,11 @@ Moon owns the task graph; `package.json` scripts are its leaves.
 
 `scripts/check-package-scripts.mjs` enforces this in `workspace:test`. Its
 exemption lists say why each exception exists: the Go server, `build-release`,
-npm pack hooks, the `components`/`api-mock` `test:all` lanes, and the
+npm lifecycle scripts, the `components`/`api-mock` `test:all` lanes, the
 orchestrators that start Moon themselves (root `cli`, `server`,
 `server-debug`, `journey` and `check`; `cli-journey-e2e` `e2e-local` and
-`e2e-testkit`), which Moon runs with node directly. Tasks inherited from
+`e2e-testkit`), which Moon runs with node directly, and root `doctor`, which
+diagnoses pnpm and so must not run through it. Tasks inherited from
 `.moon/tasks/*.yml` (the workspace-wide Biome `lint`) are not per-package
 scripts and run their tool directly.
 
@@ -218,7 +222,7 @@ interaction is in
 [CONTRIBUTING.md](CONTRIBUTING.md#running-integration-and-end-to-end-tests)):
 
 ```sh
-corepack pnpm --filter @zitadel/demo-next-e2e exec playwright install
+moon run components:install-browsers
 moon run demo-next-e2e:e2e
 moon run demo-nuxt-e2e:e2e
 ```

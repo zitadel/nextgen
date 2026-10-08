@@ -49,6 +49,8 @@ const EXEMPT_TASKS = new Set([
   ".:check",
   "apps/cli-journey-e2e:e2e-local",
   "apps/cli-journey-e2e:e2e-testkit",
+  // Diagnoses the toolchain, pnpm included, so it cannot run through pnpm.
+  ".:doctor",
   // The CI gate runs both Vitest projects through `test:all`.
   "packages/api-mock:test",
   "packages/components:test",
@@ -60,11 +62,15 @@ const EXEMPT_SCRIPTS = new Set([
   "*:prepack",
   "*:postpack",
   "*:postinstall",
+  "*:prepare",
+  "*:preinstall",
+  "*:prepublishOnly",
   // The entry points behind the orchestrator tasks above.
   ".:cli",
   ".:server",
   ".:journey",
   ".:check",
+  ".:doctor",
   "apps/cli-journey-e2e:e2e-local",
   "apps/cli-journey-e2e:e2e-testkit",
   // The Vitest lanes behind the test:all exceptions above.
@@ -76,8 +82,30 @@ const EXEMPT_SCRIPTS = new Set([
   "packages/components:test:all",
 ]);
 
-const NPM_LIFECYCLE = new Set(["prepack", "postpack", "postinstall", "prepare", "preinstall"]);
-const PACKAGE_MANAGERS = new Set(["pnpm", "npm", "npx", "yarn", "corepack"]);
+const NPM_LIFECYCLE = new Set([
+  "prepack",
+  "postpack",
+  "postinstall",
+  "prepare",
+  "preinstall",
+  "prepublishOnly",
+]);
+// Moon too: a script that starts moon hides a task edge from the graph.
+const PACKAGE_MANAGERS = new Set([
+  "pnpm",
+  "pnpx",
+  "npm",
+  "npx",
+  "yarn",
+  "corepack",
+  "bun",
+  "bunx",
+  "moon",
+]);
+
+/** A package manager's (or moon's) entry file, started with node directly. */
+const PACKAGE_MANAGER_ENTRY =
+  /(?:^|[\\/])node_modules[\\/](?:pnpm|npm|yarn|corepack|bun|@moonrepo[\\/]cli)[\\/]|(?:^|[\\/])(?:pnpm|pnpx|npm-cli|npx-cli|yarn|corepack)\.(?:c?js|mjs)$/i;
 
 /**
  * Whether a script starts a package manager (or chains to another script with
@@ -98,7 +126,7 @@ export function startsPackageManager(body) {
       const flag = args.findIndex((arg) => /^-[A-Za-z]*c[A-Za-z]*$/.test(arg));
       return flag !== -1 && startsPackageManager(args[flag + 1] ?? "");
     }
-    if (executable === "node") return nodeRunsScript(args);
+    if (executable === "node") return nodeRunsScript(args) || nodeRunsPackageManager(args);
     return PACKAGE_MANAGERS.has(executable);
   });
 }
@@ -126,6 +154,17 @@ function nodeRunsScript(args) {
     if (arg === "--run" || arg.startsWith("--run=")) return true;
     if (!arg.startsWith("-") || arg === "--" || arg === "-e" || arg === "--eval" || arg === "-p")
       return false;
+    if (NODE_VALUE_OPTIONS.has(arg)) i += 1;
+  }
+  return false;
+}
+
+/** Whether node's script argument is a package manager's entry file. */
+function nodeRunsPackageManager(args) {
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === "-e" || arg === "--eval" || arg === "-p") return false;
+    if (!arg.startsWith("-")) return PACKAGE_MANAGER_ENTRY.test(arg);
     if (NODE_VALUE_OPTIONS.has(arg)) i += 1;
   }
   return false;
@@ -206,6 +245,15 @@ const COMMAND_RUNNERS = new Set([
   "caffeinate",
   "script",
   "busybox",
+  // Env loaders and script runners: each starts the command (or the package
+  // scripts) it is given.
+  "cross-env",
+  "dotenv",
+  "run-s",
+  "run-p",
+  "npm-run-all",
+  "npm-run-all2",
+  "concurrently",
 ]);
 
 /**
@@ -361,7 +409,7 @@ function commandWords(input) {
     if (word.startsWith("--split-string=")) {
       return commandWords([...(simpleCommands(word.slice(15))[0] ?? []), ...words.slice(i + 1)]);
     }
-    if (word === "-u" || word === "-C" || word === "--unset" || word === "--chdir") {
+    if (["-u", "-C", "-P", "--unset", "--chdir"].includes(word)) {
       i += 2;
     } else if (word.startsWith("-") || ASSIGNMENT.test(word)) {
       i += 1;
@@ -412,6 +460,8 @@ export function checkProject(dir, scripts, tasks) {
     const command = task?.command ?? task?.script;
     if (command !== `corepack pnpm run ${id}`) {
       problems.push(`${dir}: task "${id}" must run \`corepack pnpm run ${id}\`, not: ${command}`);
+    } else if (task?.args !== undefined) {
+      problems.push(`${dir}: task "${id}" adds \`args\`; put them in the "${id}" script`);
     } else if (!Object.hasOwn(scripts, id)) {
       problems.push(`${dir}: task "${id}" runs a script "${id}" that does not exist`);
     }

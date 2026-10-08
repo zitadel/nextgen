@@ -405,7 +405,7 @@ These tests start real servers and require a browser install, so they are opt-in
 locally. The demo suites exercise the checked-in framework demos:
 
 ```sh
-corepack pnpm --filter @zitadel/demo-next-e2e exec playwright install
+moon run components:install-browsers
 moon run demo-next-e2e:e2e
 moon run demo-nuxt-e2e:e2e
 ```

@@ -43,12 +43,14 @@ tasks:
     deps:
       - "build"
 
-  # Vite resolves the workspace packages from source (the `@zitadel/source`
-  # condition), so dev needs only the generated API client.
+  # The same deps as build: sdk-react and components are loaded from their
+  # dist (only api and design-tokens have a `@zitadel/source` entry).
   dev:
     command: "corepack pnpm run dev"
     deps:
-      - "api:generate"
+      - "api:build"
+      - "design-tokens:build"
+      - "sdk-react:build"
     options:
       persistent: true
       runInCI: false
@@ -60,9 +62,11 @@ tasks:
   # project graph, because server:build depends on console:build.
   dev-real:
     command: "corepack pnpm run dev-real"
-    # The instance boots through the built `zitadel` CLI.
+    # dev's deps, plus the built `zitadel` CLI the instance boots through.
     deps:
-      - "api:generate"
+      - "api:build"
+      - "design-tokens:build"
+      - "sdk-react:build"
       - "cli:build"
     options:
       persistent: true
@@ -75,7 +79,9 @@ tasks:
   dev-claim:
     command: "corepack pnpm run dev-claim"
     deps:
-      - "api:generate"
+      - "api:build"
+      - "design-tokens:build"
+      - "sdk-react:build"
       - "cli:build"
     options:
       persistent: true

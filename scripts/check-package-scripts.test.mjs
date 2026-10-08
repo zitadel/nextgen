@@ -135,6 +135,14 @@ describe("package-script contract", () => {
     "command time -f %E pnpm run test",
     "time -o timing.txt pnpm install",
     "time --format=%E pnpm test",
+    "pnpx tsdown",
+    "bunx vitest",
+    "bun run test",
+    "moon run api:build",
+    "env -P /usr/bin pnpm test",
+    "node node_modules/pnpm/bin/pnpm.cjs run test",
+    'node "C:\\tools\\node_modules\\npm\\bin\\npm-cli.js" run build',
+    "node --import tsx node_modules/@moonrepo/cli/moon.js run api:build",
   ])("detects a package manager in %s", (body) => {
     expect(startsPackageManager(body)).toBe(true);
   });
@@ -162,9 +170,28 @@ describe("package-script contract", () => {
     "node --no-warnings tools/build.mjs",
     "sh -lc 'vitest run'",
     "/usr/bin/env node scripts/doctor.mjs",
+    "node scripts/pnpm-audit.mjs",
+    "env -P /usr/bin vitest run",
   ])("does not flag %s", (body) => {
     expect(startsPackageManager(body)).toBe(false);
   });
+
+  it("rejects a task that appends args to its script", () => {
+    expect(
+      checkProject(
+        "apps/x",
+        { test: "vitest run" },
+        { test: { command: "corepack pnpm run test", args: ["--", "pnpm", "install"] } },
+      ),
+    ).toEqual(['apps/x: task "test" adds `args`; put them in the "test" script']);
+  });
+
+  it.each(["prepare", "preinstall", "prepublishOnly"])(
+    "needs no task for the npm lifecycle script %s",
+    (name) => {
+      expect(checkProject("apps/x", { [name]: "tsdown" }, {})).toEqual([]);
+    },
+  );
 
   it("rejects a task whose same-named script is missing", () => {
     expect(checkProject("apps/x", {}, { build: { command: "corepack pnpm run build" } })).toEqual([
@@ -202,6 +229,11 @@ describe("package-script contract", () => {
     ["ksh -c 'npm run build'", "an inline `ksh -c` script"],
     ["tcsh -c 'pnpm test'", "an inline `tcsh -c` script"],
     ["busybox sh -c 'pnpm run test'", "the command wrapper `busybox`"],
+    ["cross-env CI=1 vitest run", "the command wrapper `cross-env`"],
+    ["dotenv -- pnpm run test", "the command wrapper `dotenv`"],
+    ["run-s build test", "the command wrapper `run-s`"],
+    ["npm-run-all build test", "the command wrapper `npm-run-all`"],
+    ['concurrently "vite" "tsc --watch"', "the command wrapper `concurrently`"],
   ])("rejects unsupported syntax in %s", (body, reason) => {
     expect(unsupportedSyntax(body)).toBe(reason);
   });
