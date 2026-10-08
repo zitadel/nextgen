@@ -257,13 +257,3 @@ meta-schema accepts either the string or the reference, and the CLI replaces
 any `$file` reference with the file's content before upload and writes the
 published value back to the file. The on-disk layout and the round-trip are
 unchanged; only the key is.
-
-## Amendment (2026-10-08): branding resolves from the request's release
-
-"The environment's active release" reads as the release the request resolves
-to: the newest deployment to the origin the request arrived with, or to the
-project default when it has none, per the spike behind #1389 and
-[ADR 068](068-project-is-the-data-boundary.md). Two origins of one project may
-run different branding, which is what two environments used to do. The rest of the
-resolution, one pinned immutable revision per release and `POST /branding`
-changing nothing until deployed, stands.
