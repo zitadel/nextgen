@@ -59,6 +59,11 @@ export default defineConfig([
       manifests: "src/manifests.ts",
       "tokens/index": "src/tokens/index.ts",
       "orchestrator/index": "src/orchestrator/index.ts",
+      // Not a public subpath. As its own entry it stays a separate file that
+      // the entries import ahead of the chunks that load `lit`; inlined, it
+      // would land below the hoisted `import "lit"` and run too late (see
+      // src/internal/lit-dev-mode.ts).
+      "internal/lit-dev-mode": "src/internal/lit-dev-mode.ts",
     },
     outDir: "dist",
     format: ["esm"],
