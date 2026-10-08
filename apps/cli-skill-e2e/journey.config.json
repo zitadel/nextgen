@@ -75,7 +75,12 @@
         {
           "name": "a phone field is live on the deployed schema",
           "get": "schemas get human-user",
-          "path": "schema.properties.phoneNumber",
+          "path": [
+            "schema.properties.phoneNumber",
+            "schema.properties.telephoneNumber",
+            "schema.properties.phone",
+            "schema.properties.telephone"
+          ],
           "op": "exists"
         }
       ]
