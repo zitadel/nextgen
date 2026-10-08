@@ -15,10 +15,6 @@ inheritedBy:
 # a tsconfig edit). These files change rarely; under-selection here previously
 # let such changes land with zero CI coverage.
 implicitInputs:
-  # Moon's automatic config input only covers `.moon/*.yml`, not this
-  # directory — without this self-reference, edits to scoped task configs are
-  # themselves invisible to `moon ci` selection.
-  - "/.moon/tasks/**/*.yml"
   # Extended by every {apps,packages}/*/tsconfig*.json.
   - "/tsconfig.base.json"
   # The shared Biome config that the inherited `lint` task below runs against;
