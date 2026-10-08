@@ -124,6 +124,12 @@ enablePrePostScripts: true
 allowBuilds:
   "esbuild": true
   "sharp": true
+  "@parcel/watcher": false
+  "@swc/core": false
+  "lmdb": false
+  "msgpackr-extract": false
+  "msw": false
+  "vue-demi": false
 
 supportedArchitectures:
   os:
