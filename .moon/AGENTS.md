@@ -8,12 +8,13 @@ before editing any `moon.yml` or a file under `.moon/`.
 - `.moon/tasks/all.yml` applies to every project. Its `implicitInputs` are the
   root files that decide the toolchain and the installed dependencies
   (`pnpm-lock.yaml`, `pnpm-workspace.yaml`, the root `package.json`, `.npmrc`,
-  `.nvmrc`, `devbox.json`, `devbox.lock`), so a change to any of them re-runs
-  every task.
+  `.nvmrc`, `devbox.json`, `devbox.lock`) plus `.moon/tasks/**/*.yml`, so a
+  change to any of them re-runs every task.
 - `.moon/tasks/typescript.yml` applies to every TypeScript project. It defines
   the standard tasks once: `lint`, `typecheck`, `build` (with
-  `outputs: dist/**/*`) and `test`, plus the shared configs every project
-  extends (`tsconfig.base.json`, `biome.json`, `vitest.shared.*`).
+  `outputs: dist/**/*`) and `test`. Its `implicitInputs` add the shared
+  configs every project extends (`tsconfig.base.json`, `biome.json`,
+  `vitest.shared.*`).
 - `.moon/tasks/javascript.yml` gives the JavaScript projects (the root
   `workspace` project and `tools/release`) the same `lint`.
 
@@ -43,8 +44,8 @@ The exceptions name only what lies outside the project folder:
 - The Go projects (`server`, `bench`) keep their file groups, because their
   code lives at the repo root, not in their folders. Anything compiled in
   through `//go:embed` or read by a test belongs in them.
-- The root `workspace` project lists its files, because its folder is the
-  whole repo.
+- The root `workspace` project's `test` and `check-*` tasks list their files,
+  because its folder is the whole repo.
 
 ## Dependencies between projects
 
@@ -71,14 +72,15 @@ binary, and the `release` tasks package everything.
 
 ## Check the graph
 
-Run this after changing any `moon.yml`, `.moon/` file or workspace dependency:
+CI runs this as `workspace:check-moon-graph`. Run it after changing any
+`moon.yml`, `.moon/` file or workspace dependency:
 
 ```sh
-node scripts/check-moon-graph.mjs
+moon run workspace:check-moon-graph
 ```
 
 It reads the resolved graph from `moon query projects` and fails on a
-transitive duplicate, a cross-project dependency with no matching
+transitive duplicate reached through hashed edges, a cross-project dependency with no matching
 `package.json` entry, or a declared workspace package that no task reaches. Its
 allowlists hold the exceptions above; extend them only for the same kind of
 case, with a comment saying why.

@@ -417,7 +417,7 @@ verify with `corepack pnpm exec changeset status --since origin/main`.
   the nearest `moon.yml` before guessing.
 - Before editing a `moon.yml` or `.moon/`, read
   [.moon/AGENTS.md](.moon/AGENTS.md): the shared tasks, the inputs rule and the
-  dependency rules, and the `node scripts/check-moon-graph.mjs` check to run
+  dependency rules, and the `moon run workspace:check-moon-graph` check to run
   afterwards.
 
 ## Ephemeral Development Environments

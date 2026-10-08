@@ -38,10 +38,13 @@ const UNREACHED_ALLOWED = new Set([
   "console:@zitadel/testing", // dev-real only, resolved from source
 ]);
 
-const output = execFileSync("corepack", ["pnpm", "exec", "moon", "query", "projects"], {
+// moon's own entry point under this node: no package manager in between, so
+// nothing else writes to stdout, and no `.bin` shim (a `.cmd` on Windows).
+const moon = join(root, "node_modules", "@moonrepo", "cli", "moon.js");
+const output = execFileSync(process.execPath, [moon, "query", "projects"], {
   cwd: root,
   encoding: "utf8",
-  stdio: ["ignore", "pipe", "ignore"],
+  stdio: ["ignore", "pipe", "inherit"],
   maxBuffer: 256 * 1024 * 1024,
 });
 const { projects } = JSON.parse(output.slice(output.indexOf("{")));
