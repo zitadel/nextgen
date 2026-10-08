@@ -9,6 +9,7 @@ tasks:
     inputs:
       - "/api/openapi/**/*.yaml"
       - "orval.config.ts"
+      - "scripts/bundle-spec.ts"
       - "src/runtime/**/*.ts"
     outputs:
       - "src/generated/**/*"

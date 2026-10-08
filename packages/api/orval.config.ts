@@ -1,15 +1,15 @@
 import { defineConfig } from "orval";
+import { bundleSpec } from "./scripts/bundle-spec";
+
+// `api/openapi/` is split one file per endpoint (see api/openapi/AGENTS.md).
+// It is bundled here rather than by orval so that self-referencing schemas
+// keep their recursion; see `bundleSpec`.
+const spec = bundleSpec(new URL("../../api/openapi/openapi-spec.yaml", import.meta.url).pathname);
 
 export default defineConfig({
   zitadel: {
     input: {
-      target: "../../api/openapi/openapi-spec.yaml",
-      // `api/openapi/` is split one file per endpoint (see api/openapi/AGENTS.md),
-      // so the spec is almost entirely `$ref`s into sibling files. orval 8.37
-      // stopped following external `$ref`s unless allow-listed — a fetch guard
-      // aimed at remote documents. Every target is a local file checked in beside
-      // the root, so allowing all adds no network reach.
-      parserOptions: { externalRefs: { allow: ["*"] } },
+      target: spec,
     },
     output: {
       target: "./src/generated/endpoints",
@@ -44,9 +44,7 @@ export default defineConfig({
   },
   zitadelZod: {
     input: {
-      target: "../../api/openapi/openapi-spec.yaml",
-      // See the note on the `zitadel` input above.
-      parserOptions: { externalRefs: { allow: ["*"] } },
+      target: spec,
     },
     output: {
       mode: "split",

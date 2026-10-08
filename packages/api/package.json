@@ -83,7 +83,8 @@
     "tsdown": "catalog:",
     "tslib": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "yaml": "catalog:"
   },
   "peerDependencies": {
     "@tanstack/react-query": "catalog:",
