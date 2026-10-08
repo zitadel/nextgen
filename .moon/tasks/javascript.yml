@@ -11,6 +11,11 @@ implicitInputs:
   - "/.moon/tasks/**/*.yml"
   # The shared Biome config the lint task runs against.
   - "/biome.json"
+  # The resolved dependency versions, as in typescript.yml: moon hashes no
+  # package versions on the system toolchain, so a dependency bump would
+  # otherwise replay these tasks from the cache.
+  - "/pnpm-lock.yaml"
+  - "/pnpm-workspace.yaml"
 
 tasks:
   # Same single standardized Biome `check` (lint + format) as the TypeScript

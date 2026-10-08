@@ -18,6 +18,11 @@ fileGroups:
     - "/**/*.go"
     - "/go.mod"
     - "/go.sum"
+    # Files the root module compiles in through //go:embed, as in the server
+    # project's serverInputs: migrations, JSON meta-schemas, config defaults.
+    - "/**/*.sql"
+    - "/api/**/*.json"
+    - "/packages/config/defaults/*"
 
 tasks:
   # Tracked Go files only, as the server project checks them.

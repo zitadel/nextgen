@@ -13,6 +13,10 @@ fileGroups:
     - "/go.sum"
     - "/api/**/*.yaml"
     - "/api/**/*.json"
+    # Also compiled in through //go:embed: the default flow and user schema
+    # (packages/config/defaults) and the integration-test request fixtures.
+    - "/packages/config/defaults/*"
+    - "/internal/**/*.json"
     - "/api/.ogen.yaml"
     - "/scripts/check-go-generate.mjs"
     - "/scripts/generate-meta-schemas.ts"
