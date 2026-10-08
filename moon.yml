@@ -135,8 +135,6 @@ tasks:
       - "scripts/assert-file.mjs"
       - "scripts/testdata/openapi-casing/**"
       - "/redocly.yaml"
-      # The test reads the pinned redocly version from this file.
-      - "apps/server/moon.yml"
       - "vitest.config.ts"
       - "vitest.shared.mjs"
       - "vitest.shared.d.mts"

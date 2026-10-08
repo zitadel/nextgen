@@ -21,6 +21,9 @@ catalog:
   '@oclif/plugin-version': ^2.2.46
   '@oclif/plugin-which': ^3.2.55
   "@playwright/test": ^1.60.0
+  # Exact: the OpenAPI lint gate, the casing-rule tests and the docs bundle
+  # must all run the same redocly.
+  "@redocly/cli": 2.31.5
   "@scalar/api-client-react": ^2.0.26
   "@storybook/addon-a11y": ^10.3.6
   "@storybook/addon-vitest": ^10.3.6

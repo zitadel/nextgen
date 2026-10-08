@@ -27,7 +27,11 @@ fileGroups:
 
 tasks:
   openapi:
-    command: "npx --yes @redocly/cli@2.31.5 lint api/openapi/openapi-spec.yaml --format=github-actions"
+    # The pinned root devDependency (see the pnpm-workspace.yaml catalog).
+    command: "corepack pnpm exec redocly lint api/openapi/openapi-spec.yaml --format=github-actions"
+    env:
+      # Its telemetry runs `npm -v`, which warns about pnpm's config.
+      REDOCLY_TELEMETRY: "off"
     inputs:
       - "@group(serverInputs)"
       # Without these a lint-config change still cache-hits.

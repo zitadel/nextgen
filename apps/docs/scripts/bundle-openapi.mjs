@@ -10,12 +10,15 @@ const outputDir = resolve(docsRoot, ".generated");
 const yamlOutput = resolve(outputDir, "openapi.yaml");
 const jsonOutput = resolve(outputDir, "openapi.json");
 const moduleOutput = resolve(outputDir, "openapi.mjs");
+// The pinned devDependency, run under this node: nothing is downloaded at
+// build time.
+const redocly = resolve(docsRoot, "node_modules", "@redocly", "cli", "bin", "cli.js");
 
 await mkdir(dirname(yamlOutput), { recursive: true });
 
-await run("npx", ["--yes", "@redocly/cli@2.31.5", "bundle", input, "--output", yamlOutput]);
+await run(process.execPath, [redocly, "bundle", input, "--output", yamlOutput]);
 
-await run("npx", ["--yes", "@redocly/cli@2.31.5", "bundle", input, "--output", jsonOutput]);
+await run(process.execPath, [redocly, "bundle", input, "--output", jsonOutput]);
 
 const bundledJson = await readFile(jsonOutput, "utf8");
 await writeFile(moduleOutput, `export default ${bundledJson.trim()};\n`);
@@ -24,6 +27,8 @@ function run(command, args) {
   return new Promise((resolveRun, reject) => {
     const child = spawn(command, args, {
       cwd: repoRoot,
+      // Its telemetry runs `npm -v`, which warns about pnpm's config.
+      env: { ...process.env, REDOCLY_TELEMETRY: "off" },
       stdio: "inherit",
     });
 
