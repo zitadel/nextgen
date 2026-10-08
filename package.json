@@ -20,6 +20,7 @@
     "@changesets/changelog-github": "^0.7.0",
     "@changesets/cli": "^2.31.0",
     "@moonrepo/cli": "catalog:",
+    "@redocly/openapi-core": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "sharp": "catalog:",
