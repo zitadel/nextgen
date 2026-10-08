@@ -48,7 +48,7 @@ export function DocumentViewer({ document, noun }: { document: unknown; noun: st
     // `flex-1 min-w-0` so the viewer takes the width the field table leaves and
     // its own long lines scroll inside it — without it the `pre` sizes to its
     // content and pushes the panel out of the card.
-    <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border">
+    <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-border">
       {/* 4px vertical inset: the header is 48px around a 40px tab strip. */}
       <div className="flex items-center justify-between border-b border-border py-1 pr-2.5 pl-3">
         <Tabs value={format} onValueChange={(next) => setFormat(next as CodeLanguage)}>

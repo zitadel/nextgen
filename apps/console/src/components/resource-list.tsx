@@ -23,7 +23,10 @@ import { PAGE_TITLE } from "./typography";
  * | Region        | Value                                              |
  * | ------------- | -------------------------------------------------- |
  * | Page gutter   | 16px — the table's own inset                        |
- * | Header gutter | 24px — the page gutter plus 8px                     |
+ * | Page top      | 20px at `lg`, 16px below — the page-header block    |
+ * | Header gutter | 24px at `lg` — the page gutter plus 8px; 16px below  |
+ * | Title row     | 24px, or 36px with the Add button beside the title  |
+ * | Table top     | 20px under the title row at `lg`, 16px below        |
  * | Table head    | 56px tall, 24px leading / 16px trailing inset       |
  * | Table cell    | 56px tall, 24px inset, 8px block padding            |
  * | Head label    | display face, 12/16, 0.72px tracking, `foreground`  |
@@ -34,32 +37,50 @@ import { PAGE_TITLE } from "./typography";
  * has no fixed grid to share.
  */
 
-/** Page gutters. `ResourcePage` adds the 16px under the navbar. */
+/** Page gutters. `ResourcePage` adds the page-header block's top padding. */
 export const RESOURCE_PAGE = "px-4 pb-8";
 
-/** Page wrapper for a list screen. */
+/** Page wrapper for a list screen: 20px under the navbar at `lg`, 16px below. */
 export function ResourcePage({ children }: { children: ReactNode }) {
-  return <div className={cn(RESOURCE_PAGE, "pt-4")}>{children}</div>;
+  return <div className={cn(RESOURCE_PAGE, "pt-4 lg:pt-5")}>{children}</div>;
 }
 
-/** Title row: the page gutter plus 8px, per the design's page header. */
-export const RESOURCE_HEADER = "px-2";
+/**
+ * Title row. The page header block insets 24px at `lg` (the page gutter plus
+ * 8px) and 16px below it, where it sits flush with the table.
+ */
+export const RESOURCE_HEADER = "px-0 lg:px-2";
+
+/** The table's distance from the title row. */
+export const RESOURCE_TABLE_TOP = "mt-4 lg:mt-5";
+
+/**
+ * A table on a fractional grid. Below 576px the card scrolls it sideways, as
+ * the Users table scrolls, rather than squeezing the columns into cells too
+ * narrow to read; the design draws no narrow variant of these tables.
+ */
+export const RESOURCE_TABLE_FIXED = "min-w-[36rem] table-fixed text-xs";
 
 /** A screen's title: the 24/24 display face, shared with the detail shell. */
 export const RESOURCE_TITLE = PAGE_TITLE;
 
-/** The 36px title row of a list screen that has no toolbar beside its title. */
-export function ResourceTitle({ children }: { children: ReactNode }) {
+/**
+ * The title row of a list screen: the heading with, where the screen has one,
+ * its primary action beside it at every width (D19). 24px tall on its own,
+ * 36px with the button.
+ */
+export function ResourceTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
-    <div className={cn(RESOURCE_HEADER, "flex h-9 items-center")}>
+    <div className={cn(RESOURCE_HEADER, "flex min-h-6 items-center justify-between gap-3")}>
       <h1 className={RESOURCE_TITLE}>{children}</h1>
+      {action}
     </div>
   );
 }
 
 /** The card the table sits on. */
 export const RESOURCE_TABLE_WRAP =
-  "border-sidebar-border bg-card overflow-x-auto rounded-2xl border";
+  "border-sidebar-border bg-card overflow-x-auto rounded-md border";
 
 /** One body cell: 56px tall, inset 24px. */
 export const RESOURCE_CELL = "h-14 px-6 py-2";
