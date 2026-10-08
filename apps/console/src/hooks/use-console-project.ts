@@ -1,8 +1,8 @@
 import type { ZitadelProject } from "@zitadel/sdk-react";
 import { useMemo } from "react";
 
-import { apiBase } from "../api/zitadel";
-import { getConsoleProjectId, getPublishableKey } from "../runtime/runtime";
+import { apiBase } from "@/api/zitadel";
+import { getConsoleProjectId, getPublishableKey } from "@/runtime/runtime";
 
 /**
  * The per-element `ZitadelProject` handle the sign-in screen hands to the

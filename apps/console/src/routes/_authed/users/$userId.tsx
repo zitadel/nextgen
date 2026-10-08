@@ -1,11 +1,19 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { Key, User, UserRoundCog } from "lucide-react";
+import { Key, type LucideIcon, User, UserRoundCog } from "lucide-react";
 import { useId } from "react";
 
+import { api } from "@/api/zitadel";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
-import { EYEBROW, MetaRule, MetaValue } from "@/components/detail-meta";
-import { DETAIL_BODY, DetailHeader, DetailPage, ICON_PLATE } from "@/components/detail-page";
+import { MetaRule, MetaValue } from "@/components/detail-meta";
+import {
+  DETAIL_BODY,
+  DETAIL_CARD,
+  DetailHeader,
+  DetailPage,
+  ICON_PLATE,
+} from "@/components/detail-page";
 import { StatusBadge } from "@/components/status-badge";
+import { EYEBROW } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,13 +21,11 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-import { api } from "../../../api/zitadel";
-import { formatDate } from "../../../lib/date";
-import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scope";
-import { displayValue, field } from "../../../lib/record";
-import { type UserSchema, schemaDisplayName, schemaFields } from "../../../lib/schema";
-import { userAttributes, userIdentity, userIdentitySecondary } from "../../../lib/user";
+import { formatDate } from "@/lib/date";
+import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
+import { displayValue, field } from "@/lib/record";
+import { type UserSchema, schemaDisplayName, schemaFields } from "@/lib/schema";
+import { userAttributes, userIdentity, userIdentitySecondary, userMetadata } from "@/lib/user";
 
 /**
  * User detail — the overview and authentication tabs.
@@ -68,12 +74,11 @@ export const Route = createFileRoute("/_authed/users/$userId")({
 
 // Long utility strings live as named constants so Tailwind's scanner sees the
 // full literal (it never sees a concatenated fragment).
-const CARD = "gap-0 rounded-xl py-0";
 // The panel body is 24px in from the card edge and 20px down, with 16px between
 // the header, the divider and the content.
 const CARD_HEAD = "flex items-center gap-3 px-6 pt-5 pb-4";
-// 18px between fields on both axes — not a 4px-scale step, so it is written out.
-const GRID = "grid gap-[18px] px-6 pt-4 pb-5 sm:grid-cols-2";
+// 18px between fields on both axes.
+const GRID = "grid gap-4.5 px-6 pt-4 pb-5 sm:grid-cols-2";
 const ROW = "flex items-center justify-between gap-4 px-6 pt-4 pb-5";
 // The divider sits inside the body padding rather than spanning the card, and
 // `w-full` is applied by an orientation variant that out-specifies a plain
@@ -90,6 +95,7 @@ function UserDetail() {
   const secondary = userIdentitySecondary(user);
   const fields = schema ? schemaFields(schema) : [];
   const metadata = userMetadata(user);
+  const schemaName = schema ? schemaDisplayName(schema, "Unknown") : "Unknown";
 
   return (
     <DetailPage>
@@ -120,18 +126,8 @@ function UserDetail() {
         </TabsList>
 
         <TabsContent value="overview" className="flex flex-col gap-4">
-          <Card className={CARD}>
-            <div className={CARD_HEAD}>
-              <span className={ICON_PLATE} aria-hidden>
-                <UserRoundCog className="size-[18px]" />
-              </span>
-              <div className="flex flex-col">
-                <span className={EYEBROW}>User schema</span>
-                <span className="text-foreground text-base leading-6">
-                  {schema ? schemaDisplayName(schema, "Unknown") : "Unknown"}
-                </span>
-              </div>
-            </div>
+          <Card className={DETAIL_CARD}>
+            <CardHead icon={UserRoundCog} eyebrow="User schema" title={schemaName} />
             <Separator className={PANEL_RULE} />
             {fields.length === 0 ? (
               <p className="text-muted-foreground px-6 py-5 text-sm">
@@ -150,8 +146,8 @@ function UserDetail() {
             )}
           </Card>
 
-          <Card className={CARD}>
-            <CardContent className="flex flex-col gap-4 px-5 py-[18px] sm:flex-row sm:items-center sm:justify-between">
+          <Card className={DETAIL_CARD}>
+            <CardContent className="flex flex-col gap-4 px-5 py-4.5 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-4">
                 <span className="text-foreground font-serif text-base leading-none">
                   Delete user
@@ -177,20 +173,9 @@ function UserDetail() {
         </TabsContent>
 
         <TabsContent value="authentication">
-          <Card className={CARD}>
-            <div className={CARD_HEAD}>
-              {/* `Lucide Icon / Key` — the design names the glyph,
-                  so it is read off the node rather than picked by meaning. */}
-              <span className={ICON_PLATE} aria-hidden>
-                <Key className="size-[18px]" />
-              </span>
-              <div className="flex flex-col">
-                <span className={EYEBROW}>Authentication</span>
-                <span className="text-foreground text-base leading-6">
-                  {schema ? schemaDisplayName(schema, "Unknown") : "Unknown"}
-                </span>
-              </div>
-            </div>
+          <Card className={DETAIL_CARD}>
+            {/* Key glyph, as the design names it. */}
+            <CardHead icon={Key} eyebrow="Authentication" title={schemaName} />
             <Separator className={PANEL_RULE} />
             {/* Only Passkey is listed. The design's Password row shows a "last
                 changed" date the API does not expose, and its `Set` pill would
@@ -231,29 +216,33 @@ function ProfileField({ label, value }: { label: string; value: string }) {
 
   return (
     <Field>
-      <FieldLabel htmlFor={id} className="text-foreground font-serif text-sm leading-5 font-normal">
+      <FieldLabel htmlFor={id} className="text-foreground">
         {label}
       </FieldLabel>
-      {/* `bg-background`, not the card's own fill: the design resolves the input
-          to `base/background`, which is what makes it read as inset against the
-          lighter card rather than dissolving into it. */}
-      <Input
-        id={id}
-        readOnly
-        value={value}
-        className="bg-background h-9 rounded-md px-2.5 py-1 text-sm"
-      />
+      <Input id={id} readOnly value={value} />
     </Field>
   );
 }
 
-/**
- * The server-owned `metadata` block. Read defensively: it sits on an otherwise
- * open record, so a user written before it existed simply has none.
- */
-function userMetadata(user: Record<string, unknown>): { status?: string; createdAt?: string } {
-  const metadata = user.metadata;
-  if (!metadata || typeof metadata !== "object") return {};
-  const record = metadata as Record<string, unknown>;
-  return { status: field(record, "status"), createdAt: field(record, "created_at") };
+/** A body card's head: the icon tile beside an eyebrow and a title. */
+function CardHead({
+  icon: Icon,
+  eyebrow,
+  title,
+}: {
+  icon: LucideIcon;
+  eyebrow: string;
+  title: string;
+}) {
+  return (
+    <div className={CARD_HEAD}>
+      <span className={ICON_PLATE} aria-hidden>
+        <Icon className="size-4.5" />
+      </span>
+      <div className="flex flex-col">
+        <span className={EYEBROW}>{eyebrow}</span>
+        <span className="text-foreground text-base leading-6">{title}</span>
+      </div>
+    </div>
+  );
 }
