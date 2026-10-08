@@ -19500,6 +19500,12 @@ type Field struct {
 	Required OptBool `json:"required"`
 	// Pre-filled value (e.g., an identifier carried over from a pivot).
 	Value jx.Raw `json:"value"`
+	// The server refuses a submitted value that differs from `value`, so
+	// render the input read-only. Submit the value unchanged: a read-only
+	// input is still sent with the form, unlike a disabled one.
+	// Set on a step that creates the user from an SSO identity, for a
+	// field prefilled from a provider claim that is verified and unique.
+	ReadOnly OptBool `json:"read_only"`
 	// Schema-derived rules the frontend SHOULD apply at input time. The
 	// server runs the same rules on submit and is the only authority on
 	// whether the step advances — these rules are a UX hint to reduce
@@ -19540,6 +19546,11 @@ func (s *Field) GetValue() jx.Raw {
 	return s.Value
 }
 
+// GetReadOnly returns the value of ReadOnly.
+func (s *Field) GetReadOnly() OptBool {
+	return s.ReadOnly
+}
+
 // GetValidation returns the value of Validation.
 func (s *Field) GetValidation() OptFieldValidation {
 	return s.Validation
@@ -19573,6 +19584,11 @@ func (s *Field) SetRequired(val OptBool) {
 // SetValue sets the value of Value.
 func (s *Field) SetValue(val jx.Raw) {
 	s.Value = val
+}
+
+// SetReadOnly sets the value of ReadOnly.
+func (s *Field) SetReadOnly(val OptBool) {
+	s.ReadOnly = val
 }
 
 // SetValidation sets the value of Validation.

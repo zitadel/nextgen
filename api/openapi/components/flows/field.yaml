@@ -57,6 +57,16 @@ properties:
       schema's top-level `required` array.
   value:
     description: Pre-filled value (e.g., an identifier carried over from a pivot).
+  read_only:
+    type: boolean
+    default: false
+    description: |
+      The server refuses a submitted value that differs from `value`, so
+      render the input read-only. Submit the value unchanged: a read-only
+      input is still sent with the form, unlike a disabled one.
+
+      Set on a step that creates the user from an SSO identity, for a
+      field prefilled from a provider claim that is verified and unique.
   validation:
     type: object
     description: |

@@ -6059,6 +6059,59 @@ func TestFlowStateMachine_Render_SSOCollectionStepWithoutParkedRowRendersEmpty(t
 	assert.Empty(t, renderedValues(result.Step.Fields))
 }
 
+// A field showing a verified unique claim renders read-only, since the submit
+// refuses a changed value. Every other field stays editable.
+func TestFlowStateMachine_Render_SSOCollectionStepReadOnlyFields(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		parked    *domain.FlowSSOParkedIdentity
+		collected map[string]any
+		want      []string
+	}{
+		{
+			name:   "verified unique claim",
+			parked: unlinkedParked(map[string]any{"email": "alice@example.com"}, map[string]bool{"email": true}),
+			want:   []string{"email"},
+		},
+		{
+			name:   "unverified unique claim",
+			parked: unlinkedParked(map[string]any{"email": "alice@example.com"}, map[string]bool{"email": false}),
+		},
+		{
+			name:   "verified claim that is not unique",
+			parked: unlinkedParked(map[string]any{"given_name": "Alice"}, map[string]bool{"given_name": true}),
+		},
+		{
+			name:      "verified unique claim that is not a string",
+			parked:    unlinkedParked(map[string]any{"username": 42}, map[string]bool{"username": true}),
+			collected: map[string]any{"username": "typed"},
+		},
+		{
+			name:      "no parked row",
+			collected: map[string]any{"email": "typed@example.com"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			w, def, state := collectionStepWorld(t)
+			state.CollectedData.UserData = tc.collected
+			w.expectCollected(tc.parked, nil)
+
+			result, err := w.sm.Render(t.Context(), def, state)
+			require.NoError(t, err)
+			var readOnly []string
+			for _, f := range result.Step.Fields {
+				if f.ReadOnly {
+					readOnly = append(readOnly, f.Name)
+				}
+			}
+			assert.Equal(t, tc.want, readOnly)
+		})
+	}
+}
+
 func TestFlowStateMachine_Render_SSOCollectionStepLoadErrorPropagates(t *testing.T) {
 	t.Parallel()
 	w, def, state := collectionStepWorld(t)

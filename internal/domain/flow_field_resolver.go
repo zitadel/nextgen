@@ -78,6 +78,10 @@ type FlowField struct {
 	// from a pivot). Nil when no pre-fill applies.
 	Value *string
 
+	// ReadOnly marks a Value the submit refuses to change: a verified unique
+	// provider claim on a step that creates the user from an SSO identity.
+	ReadOnly bool
+
 	// Validation carries the schema-derived validation rules. Nil when
 	// the property has no rules beyond its JSON type.
 	Validation *FlowFieldValidation
