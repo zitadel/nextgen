@@ -63,6 +63,9 @@ catalogs:
     '@redocly/cli':
       specifier: 2.31.5
       version: 2.31.5
+    '@redocly/openapi-core':
+      specifier: 2.31.5
+      version: 2.31.5
     '@scalar/api-client-react':
       specifier: ^2.0.26
       version: 2.0.26
@@ -358,6 +361,9 @@ importers:
       '@redocly/cli':
         specifier: 'catalog:'
         version: 2.31.5(@opentelemetry/api@1.9.1)(core-js@3.50.0)(encoding@0.1.13)
+      '@redocly/openapi-core':
+        specifier: 'catalog:'
+        version: 2.31.5
       '@types/node':
         specifier: ^25.6.0
         version: 25.6.0
@@ -813,9 +819,9 @@ importers:
         specifier: 'catalog:'
         version: 1.0.0-beta.3(@types/node@25.6.0)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(react-dom@19.2.8(react@19.2.8))(react-server-dom-webpack@19.2.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.106.2(esbuild@0.28.2)))(react@19.2.8)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.0)
     devDependencies:
-      '@redocly/cli':
+      '@redocly/openapi-core':
         specifier: 'catalog:'
-        version: 2.31.5(@opentelemetry/api@1.9.1)(core-js@3.50.0)(encoding@0.1.13)
+        version: 2.31.5
       '@tailwindcss/vite':
         specifier: 'catalog:'
         version: 4.2.4(vite@8.3.1(@types/node@25.6.0)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.0))

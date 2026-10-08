@@ -31,7 +31,7 @@
     "waku": "catalog:"
   },
   "devDependencies": {
-    "@redocly/cli": "catalog:",
+    "@redocly/openapi-core": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@types/mdx": "catalog:",
     "@types/node": "catalog:",
