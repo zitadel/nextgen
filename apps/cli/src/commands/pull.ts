@@ -117,7 +117,16 @@ export default class Pull extends BaseCommand {
       { baseUrl: source, token: secret.project_secret },
       { verbatim: true },
     );
-    const syncers = makeSyncers({ client, projectId: secret.project_id, env, cwd });
+    // Viewed through the `ResourceSyncer` interface, not the concrete tuple
+    // `makeSyncers` returns: pull routes by the interface's optional capability
+    // members (`newestRevision`, `localise`), which the concrete classes that
+    // cannot pull do not declare.
+    const syncers: ReadonlyArray<ResourceSyncer> = makeSyncers({
+      client,
+      projectId: secret.project_id,
+      env,
+      cwd,
+    });
     // A kind is pullable when its syncer can find and read a revision; the set
     // follows the syncers, so a new revisioned kind needs no change here.
     const pullable = syncers.filter(

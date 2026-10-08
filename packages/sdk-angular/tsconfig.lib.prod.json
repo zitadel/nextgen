@@ -1,13 +1,10 @@
 {
-  "extends": "./tsconfig.json",
+  "extends": "./tsconfig.lib.json",
   "compilerOptions": {
-    "outDir": "./dist",
+    "outDir": "dist",
     "declaration": false,
     "declarationMap": false,
     "emitDeclarationOnly": false
-  },
-  "angularCompilerOptions": {
-    "compilationMode": "partial"
   },
   "files": ["src/public-api.ts"]
 }

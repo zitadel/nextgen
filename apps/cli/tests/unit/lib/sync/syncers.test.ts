@@ -9,7 +9,7 @@ import { FLOWS_DIR } from "../../../../src/lib/flows";
 import { IDPS_DIR } from "../../../../src/lib/idp";
 import { SCHEMAS_DIR } from "../../../../src/lib/user-schema";
 import { makeSyncers } from "../../../../src/lib/sync/syncers";
-import { FatalFetchError } from "../../../../src/lib/sync/types";
+import { FatalFetchError, type ResourceSyncer } from "../../../../src/lib/sync/types";
 import { ZitadelError } from "../../../../src/lib/errors";
 
 /**
@@ -1003,7 +1003,7 @@ describe("newestRevision", () => {
   });
 
   it("leaves idp and branding unpullable", () => {
-    const [, idp, , branding] = makeSyncers({
+    const [, idp, , branding]: ReadonlyArray<ResourceSyncer> = makeSyncers({
       client,
       projectId: "proj-1",
       env: {},
@@ -1095,7 +1095,7 @@ describe("localise", () => {
   });
 
   it("writes a schema body verbatim — a schema references nothing", () => {
-    const [schema] = makeSyncers({
+    const [schema]: ReadonlyArray<ResourceSyncer> = makeSyncers({
       client,
       projectId: "proj-1",
       env: {},

@@ -198,8 +198,8 @@ describe("root help from the published manifest", () => {
     expect(manifest.commands.setup).toMatchObject({ group: "Project commands", groupOrder: 1 });
     // A manifest that lost the statics is what a regression would ship; the
     // screen must visibly change, proving the manifest is what was rendered.
-    delete manifest.commands.setup.group;
-    delete manifest.commands.setup.groupOrder;
+    delete manifest!.commands.setup!.group;
+    delete manifest!.commands.setup!.groupOrder;
     await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
 
     const { stdout } = await runCliForTest(["--help"], {}, root);

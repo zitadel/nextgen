@@ -75,7 +75,7 @@ func (h *Handler) GetReleaseById(ctx context.Context, params api.GetReleaseByIdP
 }
 
 func (h *Handler) ListReleases(ctx context.Context, params api.ListReleasesParams) (api.ListReleasesRes, error) {
-	ctx, err := h.requireProjectListAccess(ctx, string(params.ProjectID), releaseAccess, domain.ResourceKindRelease)
+	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), releaseAccess, domain.ResourceKindRelease)
 	if err != nil {
 		return nil, err
 	}

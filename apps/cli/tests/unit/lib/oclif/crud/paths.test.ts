@@ -55,7 +55,7 @@ describe("fieldPaths", () => {
 
   it("is undefined for a shape it cannot read, so the caller can fall back", () => {
     expect(fieldPaths(undefined)).toBeUndefined();
-    expect(fieldPaths({ safeParse: () => ({ success: true }) })).toBeUndefined();
+    expect(fieldPaths({ safeParse: () => ({ success: true, data: {} }) })).toBeUndefined();
   });
 
   it("reads a simpler resource the same way", () => {

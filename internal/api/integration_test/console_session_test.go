@@ -15,6 +15,7 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 // TestConsoleManagementAcceptsSession pins #1300 §1: the embedded Console
@@ -459,10 +460,10 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 	})
 }
 
-// TestConsoleSessionExpandsUserTeams pins #1300 §4 (relaxed): a session mints
-// no scopes, so the team_membership.read / team.read ceilings on
-// queryUsers' expansions let a user principal through once it has passed the
-// Check on the target project. The Console's Team column depends on it.
+// TestConsoleSessionExpandsUserTeams pins #1300 §4: a session mints no
+// scopes, so queryUsers' team_membership.read / team.read expansions ask the
+// resolver for read authority on the target project instead. The Console's
+// Team column depends on it.
 func TestConsoleSessionExpandsUserTeams(t *testing.T) {
 	t.Parallel()
 
@@ -495,6 +496,171 @@ func TestConsoleSessionExpandsUserTeams(t *testing.T) {
 	assert.Equal(t, memberTeamID, owner.ID)
 }
 
+// TestConsoleSessionPartialAccessDoesNotExpand pins #1300 §4 hardened: the
+// expand permissions come from the resolver (viewer on the target project),
+// not from passing the list check. A viewer grant scoped to one team is a
+// foothold, so the list answers with the users that team's scope reaches, but
+// it is not project-wide read authority, so expanding memberships or the
+// owner team is refused.
+func TestConsoleSessionPartialAccessDoesNotExpand(t *testing.T) {
+	t.Parallel()
+
+	_, operatorID, cookie := ownSessionUser(t)
+
+	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	_, teamID := harness.CreateUserOwnedByTeam(t, customer.ID)
+	asgn := &domain.AuthzAssignment{
+		ProjectID:     customer.ID,
+		CatalogID:     domain.SystemCatalogID,
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   operatorID,
+		ObjectType:    "project",
+		Relation:      "viewer",
+	}
+	asgn.ApplyScope(domain.NewTeamAssignmentScope(teamID))
+	require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), asgn))
+
+	session, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	session.SetSessionToken(cookie.Value)
+	params := api.QueryUsersParams{ProjectID: api.NewOptProjectID(api.ProjectID(customer.ID))}
+
+	listed, err := session.QueryUsers(t.Context(), &api.QueryUsersRequest{}, params)
+	require.NoError(t, err)
+	require.IsType(t, &api.QueryUsersResponse{}, listed, "the foothold still lists: %s", helpers.MustMarshal(t, listed))
+
+	byTeam := &api.QueryUsersRequest{}
+	require.NoError(t, byTeam.UnmarshalJSON([]byte(`{"filter":[{"field":"team_id","operation":"equals","value":"`+teamID+`"}]}`)))
+	for name, req := range map[string]*api.QueryUsersRequest{
+		"expand teams":                {Expand: []api.UserExpand{api.UserExpandTeams}},
+		"expand lifecycle owner team": {Expand: []api.UserExpand{api.UserExpandLifecycleOwnerTeam}},
+		// The filter reads the same memberships by another route, so it takes
+		// the same gate.
+		"team_id filter": byTeam,
+	} {
+		t.Run(name, func(t *testing.T) {
+			resp, err := session.QueryUsers(t.Context(), req, params)
+			require.NoError(t, err)
+			require.IsType(t, &api.QueryUsersForbidden{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, api.ErrorCode("user.permission_denied"), resp.(*api.QueryUsersForbidden).Code)
+		})
+	}
+}
+
+// TestConsoleSessionByIDTeamFilterNeedsProjectRead closes the side door next
+// to TestConsoleSessionPartialAccessDoesNotExpand: GET /users/{id}?team_id=
+// answers "is this user an active member of that team", the membership read
+// POST /users/query gates behind project-wide read for a session. A viewer
+// grant on just this user reads the user, but not their memberships.
+func TestConsoleSessionByIDTeamFilterNeedsProjectRead(t *testing.T) {
+	t.Parallel()
+
+	_, operatorID, cookie := ownSessionUser(t)
+	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	memberID, teamID := harness.CreateUserOwnedByTeam(t, customer.ID)
+	asgn := &domain.AuthzAssignment{
+		ProjectID:     customer.ID,
+		CatalogID:     domain.SystemCatalogID,
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   operatorID,
+		ObjectType:    "project",
+		Relation:      "viewer",
+	}
+	asgn.ApplyScope(domain.NewResourceAssignmentScope(memberID))
+	require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), asgn))
+
+	session, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	session.SetSessionToken(cookie.Value)
+
+	read, err := session.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(memberID)})
+	require.NoError(t, err)
+	require.IsType(t, &api.User{}, read, "the grant reads the user: %s", helpers.MustMarshal(t, read))
+
+	byTeam, err := session.GetUserByID(t.Context(), api.GetUserByIDParams{
+		UserID: api.UserID(memberID),
+		TeamID: api.NewOptTeamID(api.TeamID(teamID)),
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.GetUserByIDErrorResponseStatusCode{}, byTeam, helpers.MustMarshal(t, byTeam))
+	refused := byTeam.(*api.GetUserByIDErrorResponseStatusCode)
+	assert.Equal(t, http.StatusForbidden, refused.StatusCode)
+	assert.True(t, refused.Response.IsUserPermissionDenied(), helpers.MustMarshal(t, byTeam))
+}
+
+// TestConsoleSessionProjectViewerReadsMemberships is the allowed side of the
+// two refusals above: read on the whole project, the plain viewer grant and the
+// least the rule asks for, is enough for every membership read a session can
+// make. TestConsoleSessionExpandsUserTeams shows the same with an admin grant.
+func TestConsoleSessionProjectViewerReadsMemberships(t *testing.T) {
+	t.Parallel()
+
+	_, operatorID, cookie := ownSessionUser(t)
+	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	memberID, teamID := harness.CreateUserOwnedByTeam(t, customer.ID)
+	_, otherTeamID := harness.CreateUserOwnedByTeam(t, customer.ID)
+	harness.SeedProjectViewer(t, customer.ID, operatorID)
+
+	session, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	session.SetSessionToken(cookie.Value)
+	params := api.QueryUsersParams{ProjectID: api.NewOptProjectID(api.ProjectID(customer.ID))}
+
+	t.Run("expansions", func(t *testing.T) {
+		resp, err := session.QueryUsers(t.Context(), &api.QueryUsersRequest{
+			Expand: []api.UserExpand{api.UserExpandTeams, api.UserExpandLifecycleOwnerTeam},
+		}, params)
+		require.NoError(t, err)
+		listed, ok := resp.(*api.QueryUsersResponse)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		idx := slices.IndexFunc(listed.Users, func(u api.User) bool { return userID(t, u) == memberID })
+		require.GreaterOrEqual(t, idx, 0, helpers.MustMarshal(t, listed))
+		member := listed.Users[idx]
+		assert.True(t, slices.ContainsFunc(member.Teams, func(team api.UserTeam) bool { return team.ID == teamID }),
+			"expand teams must embed the member's team: %s", helpers.MustMarshal(t, member))
+		owner, ok := member.Metadata.LifecycleOwnerTeam.Get()
+		require.True(t, ok, "expand lifecycle_owner_team must embed the owner: %s", helpers.MustMarshal(t, member))
+		assert.Equal(t, teamID, owner.ID)
+	})
+
+	t.Run("team_id filter", func(t *testing.T) {
+		byTeam := &api.QueryUsersRequest{}
+		require.NoError(t, byTeam.UnmarshalJSON([]byte(`{"filter":[{"field":"team_id","operation":"equals","value":"`+teamID+`"}]}`)))
+		resp, err := session.QueryUsers(t.Context(), byTeam, params)
+		require.NoError(t, err)
+		listed, ok := resp.(*api.QueryUsersResponse)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		ids := make([]string, 0, len(listed.Users))
+		for _, u := range listed.Users {
+			ids = append(ids, userID(t, u))
+		}
+		assert.Equal(t, []string{memberID}, ids)
+	})
+
+	t.Run("by id with team_id", func(t *testing.T) {
+		read, err := session.GetUserByID(t.Context(), api.GetUserByIDParams{
+			UserID: api.UserID(memberID),
+			TeamID: api.NewOptTeamID(api.TeamID(teamID)),
+		})
+		require.NoError(t, err)
+		user, ok := read.(*api.User)
+		require.True(t, ok, helpers.MustMarshal(t, read))
+		assert.Equal(t, memberID, userID(t, *user))
+
+		// Past the gate, the parameter answers the membership question: not a
+		// member of that team is 404, not 403.
+		miss, err := session.GetUserByID(t.Context(), api.GetUserByIDParams{
+			UserID: api.UserID(memberID),
+			TeamID: api.NewOptTeamID(api.TeamID(otherTeamID)),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetUserByIDNotFound{}, miss, helpers.MustMarshal(t, miss))
+	})
+}
+
 // TestConsoleManagementBearerIgnoresStaleCookie pins the dual-scheme
 // precedence: a valid project secret authorizes the request even when a stale
 // or malformed session cookie rides along, instead of the cookie's failure
@@ -515,6 +681,44 @@ func TestConsoleManagementBearerIgnoresStaleCookie(t *testing.T) {
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+}
+
+// TestConsoleSessionRevokedStopsAuthorizing pins session liveness (ADR 053
+// §5): a signed-out session's cookie still decrypts, but it must stop
+// authorizing management calls at once rather than when the cookie expires.
+// No extra session lookup provides this: revoking a session deletes its token
+// records in the same transaction, and IntrospectToken rejects a cookie whose
+// record is gone. The 401 is what sends the Console back to its login screen.
+func TestConsoleSessionRevokedStopsAuthorizing(t *testing.T) {
+	t.Parallel()
+
+	home, operatorID, cookie := ownSessionUser(t)
+	harness.SeedProjectAdmin(t, home.ID, operatorID)
+
+	session, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	session.SetSessionToken(cookie.Value)
+
+	queryUsers := func() int {
+		t.Helper()
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+			harness.EnsureTestServer(t).URL+"/users/query?project_id="+home.ID, strings.NewReader(`{}`))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(cookie)
+		resp, err := harness.EnsureHttpClient(t).Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	require.Equal(t, http.StatusOK, queryUsers(), "the live session authorizes")
+
+	revoked, err := session.RevokeMySession(t.Context())
+	require.NoError(t, err)
+	require.IsType(t, &api.RevokeMySessionNoContent{}, revoked, helpers.MustMarshal(t, revoked))
+
+	assert.Equal(t, http.StatusUnauthorized, queryUsers(), "the revoked session's cookie must not authorize")
 }
 
 // requireUsersNotFound pins a refused users list to its not-found shape: 404
