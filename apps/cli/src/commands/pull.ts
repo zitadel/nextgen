@@ -4,7 +4,11 @@ import { dirname, join } from "node:path";
 import { Args } from "@oclif/core";
 import { consola } from "consola";
 
-import { createZitadelClient, escapeControlCharacters } from "../lib/api-client";
+import {
+  createZitadelClient,
+  escapeControlCharacters,
+  type ZitadelClient,
+} from "../lib/api-client";
 import { ZitadelError } from "../lib/errors";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankArg } from "../lib/oclif";
 import { readZitadelSecret } from "../lib/project";
@@ -17,6 +21,26 @@ type PullableSyncer = ResourceSyncer & {
   newestRevision: NonNullable<ResourceSyncer["newestRevision"]>;
   fetch: NonNullable<ResourceSyncer["fetch"]>;
 };
+
+/** A kind is pullable when its syncer can both find and read a revision. */
+function isPullable(syncer: ResourceSyncer): syncer is PullableSyncer {
+  return syncer.newestRevision !== undefined && syncer.fetch !== undefined;
+}
+
+/**
+ * The kinds pull accepts, read from the syncer set so a new revisioned kind is
+ * listed with no edit here. Pullability is a static capability of each syncer
+ * class, independent of project context, so a stub context is enough to probe
+ * it — the constructors only store what they are handed.
+ */
+const PULLABLE_KINDS = makeSyncers({
+  client: {} as ZitadelClient,
+  projectId: "",
+  env: {},
+  cwd: "",
+})
+  .filter(isPullable)
+  .map((syncer) => syncer.kind);
 
 /** A handle is a single file-name segment, so it can never escape the kind's directory. */
 const HANDLE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -90,7 +114,7 @@ export default class Pull extends BaseCommand {
   static override args = {
     kind: Args.string({
       required: true,
-      description: "Resource kind to pull; the error hint lists the kinds pull supports.",
+      description: `Resource kind to pull (${PULLABLE_KINDS.join(", ")}).`,
     }),
     handle: nonBlankArg({
       required: true,
@@ -127,12 +151,8 @@ export default class Pull extends BaseCommand {
       env,
       cwd,
     });
-    // A kind is pullable when its syncer can find and read a revision; the set
-    // follows the syncers, so a new revisioned kind needs no change here.
-    const pullable = syncers.filter(
-      (candidate): candidate is PullableSyncer =>
-        candidate.newestRevision !== undefined && candidate.fetch !== undefined,
-    );
+    // The set follows the syncers, so a new revisioned kind needs no change here.
+    const pullable = syncers.filter(isPullable);
     const syncer = pullable.find((candidate) => candidate.kind === kind);
     if (syncer === undefined) {
       throw new ZitadelError("E_VALIDATION", `Cannot pull a ${kind}.`, {
