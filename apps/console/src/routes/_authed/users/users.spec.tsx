@@ -3,13 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { scopedPath } from "@/lib/project-scope.fixture";
+import { scopedPath } from "@/test/project-scope.fixture";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  const { makeTestSession } = await import("@/auth/session.fixture");
+  const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
@@ -192,6 +192,33 @@ describe("users screen", () => {
     const table = within(screen.getByRole("table"));
     expect(table.getByText("Acme")).toBeInTheDocument();
     expect(table.getByText("maya@acme.com")).toBeInTheDocument();
+  });
+
+  it("adds raw attribute columns for users whose schema did not load", async () => {
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            { id: "user_1", schema: "sch_business", attributes: { email: "maya@acme.com" } },
+            { id: "user_2", schema: "sch_gone", attributes: { email: "x@y.com", handle: "xy" } },
+          ],
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json({
+          id: "sch_business",
+          schema: { title: "Business", properties: { email: { type: "string" } } },
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_gone`, () => HttpResponse.json({}, { status: 404 })),
+    );
+    await renderUsers();
+
+    const table = within(await screen.findByRole("table"));
+    // The loaded schema's column, then the unreadable schema's keys that are not already columns.
+    expect(await table.findByText("handle")).toBeInTheDocument();
+    expect(table.getByText("xy")).toBeInTheDocument();
+    expect(table.getByText("x@y.com")).toBeInTheDocument();
   });
 
   it("renders a placeholder where a user's schema does not define a column", async () => {
