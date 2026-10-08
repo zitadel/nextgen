@@ -121,17 +121,19 @@ the flow to it (via `play`). Covered: `identifier` (SignIn), `register` (SignUp)
 passkey offer (PasskeyOffered), and the passkey ceremony step `passkey-login`
 (PasskeyLogin).
 
-`passkey-login` is special: the step mounts `<zl-passkey>`, which would auto-run a
-real `navigator.credentials.get()` ceremony on mount — the OS passkey prompt,
-which can't complete in the workbench. Rather than mock the browser API, the story
-sets the **`manual-ceremony`** host prop on `<zitadel-login>` (a real preview
-capability — see `packages/components`): the orchestrator then renders
-`<zl-passkey manual>`, so the ceremony never auto-starts and no prompt is raised.
-The story shows the passkey screen **at rest** — the "waiting for your passkey"
-in-flight UI is not shown, because nothing is running (manual mode). This replaced
-an earlier `freezePasskeyCeremony()` stub that patched `navigator.credentials`;
-don't bring the stub back — the component flag is the supported way. `<zl-passkey>`
-still has no atom story (its only visible state is the in-flight ceremony).
+`passkey-login` is special: the step mounts an invisible `<zl-passkey>` that
+auto-runs a real `navigator.credentials.get()` ceremony on mount — the OS passkey
+prompt, which can't complete in the workbench. The suppression is kept **in the
+workbench, not on the shipped component**: `freezePasskeyCeremony()`
+(`orchestrator-shared.ts`) stubs `navigator.credentials` with a promise that never
+settles (the same `Promise.race([])` stub the component specs use), so the atom
+stays in its `pending` state and shows its real "waiting for your passkey" UI
+instead of raising the prompt. It mocks a browser API the same way `msw` mocks the
+network; the story installs it in `beforeEach` and the returned teardown restores
+`navigator.credentials` so no other story is affected. This is deliberately a
+test-harness stub, not a host prop on the component — the login element has no
+"skip the ceremony" flag, and we are not adding one. `<zl-passkey>` has no atom
+story for the same reason (its only visible state is the in-flight ceremony).
 
 **Not storied on purpose:** `passkey-setup` / `passkey-upsell` (legacy; the
 default flow no longer routes through them — don't revive them to force a story),

@@ -272,7 +272,6 @@ renders the bundled `default.liquid`. Tracked as a follow-up.
 | `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh |
 | `previewState` / `preview-state` | `'default' \| 'validation_error' \| 'submission_error' \| 'loading' \| 'success'` | Preview mode for operator surfaces such as the console's branding screen. The flow still starts, so the step is the one the project serves; the element then shows it in this state and submits nothing. Only the purpose's entry step can be previewed. `LOGIN_PREVIEW_STATES` lists the values, and `loginPreviewStatesFor(step)` the ones that show a served step differently from `default`; any other value runs the flow for real |
 | `previewSuccessStep` / `preview-success-step` | `string` | The terminal step the `success` preview paints, for a flow definition that names it differently from the default flow's `done` |
-| `manualCeremony` / `manual-ceremony` | `boolean` | Render a passkey challenge inert (`<zl-passkey manual>`) so it does **not** auto-start the `navigator.credentials` WebAuthn ceremony on mount. Lets an operator preview or workbench show the passkey screen without raising the OS prompt (which can't complete there); nothing is submitted. Off by default — ordinary logins run the ceremony |
 
 Events: `zitadel-flow-input`, `zitadel-flow-step`, `zitadel-flow-complete`,
 `zitadel-flow-error`, `zitadel-flow-redirect`. `zitadel-flow-step` fires for

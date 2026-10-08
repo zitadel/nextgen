@@ -1,8 +1,8 @@
 import type { StoryObj } from "@storybook/web-components-vite";
-import { html } from "lit";
 
 import {
   clickAction,
+  freezePasskeyCeremony,
   mock,
   orchestratorArgTypes,
   orchestratorBeforeEach,
@@ -65,15 +65,15 @@ export const PasskeyOffered: Story = { args: { passkey: true } };
 
 /**
  * The dedicated passkey sign-in step (`passkey-login`), reached by choosing "Sign
- * in with a passkey" on the identifier. That step mounts `<zl-passkey>`, which
- * would normally fire a real `navigator.credentials.get()` ceremony -- the OS
- * passkey prompt -- the instant it renders. The host prop `manual-ceremony`
- * renders it inert instead (`<zl-passkey manual>`), so the passkey screen shows
- * without a prompt that cannot complete in the workbench. It's the step at rest:
- * the "waiting for your passkey" in-flight state is not shown, because nothing is
- * running. The legacy `passkey-setup` / `passkey-upsell` pair is deliberately not
- * storied -- the default flow no longer routes through it. See
- * apps/storybook/AGENTS.md.
+ * in with a passkey" on the identifier. That step mounts the invisible
+ * `<zl-passkey>`, which fires a real `navigator.credentials.get()` ceremony -- the
+ * OS passkey prompt -- the instant it renders, and that can't complete in the
+ * workbench. `freezePasskeyCeremony` stubs `navigator.credentials` with a promise
+ * that never settles (kept in the workbench, not on the shipped component), so the
+ * atom stays in its in-flight state and shows the real "waiting for your passkey"
+ * UI instead of raising the prompt; the returned teardown restores it. The legacy
+ * `passkey-setup` / `passkey-upsell` pair is deliberately not storied -- the
+ * default flow no longer routes through it. See apps/storybook/AGENTS.md.
  */
 export const PasskeyLogin: Story = {
   args: { passkey: true },
@@ -83,17 +83,13 @@ export const PasskeyLogin: Story = {
   argTypes: {
     previewState: { control: false, table: { disable: true } },
   },
-  render: ({ purpose, variant, theme }) =>
-    html`<zitadel-login
-      variant=${variant}
-      .purpose=${purpose}
-      theme=${theme}
-      ?manual-ceremony=${true}
-    ></zitadel-login>`,
+  beforeEach: () => freezePasskeyCeremony(),
   play: async ({ canvasElement }) => {
     await clickAction(canvasElement, "passkey");
     await waitFor(() =>
-      canvasElement.querySelector("zitadel-login")?.shadowRoot?.querySelector("zl-passkey"),
+      canvasElement
+        .querySelector("zitadel-login")
+        ?.shadowRoot?.querySelector('[data-testid="zitadel-passkey-pending"]'),
     );
   },
 };

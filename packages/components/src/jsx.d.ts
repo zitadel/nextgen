@@ -38,7 +38,6 @@ declare module "react" {
           "resume-flow-id"?: string;
           "preview-state"?: ZitadelLogin["previewState"];
           "preview-success-step"?: string;
-          "manual-ceremony"?: boolean;
           lang?: string;
           locales?: ZitadelLogin["locales"];
         };
