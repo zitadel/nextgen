@@ -34,7 +34,6 @@ export class ZlCheckbox extends FormAtom {
   @property() accessor label = "";
   @property() accessor value = "on";
   @property({ type: Boolean, reflect: true }) accessor checked = false;
-  @property({ type: Boolean, reflect: true }) accessor disabled = false;
   @property({ type: Boolean }) accessor required = false;
   /**
    * Inline validation message shown under the control (empty = none). Set by
@@ -55,12 +54,15 @@ export class ZlCheckbox extends FormAtom {
   @query(".zr-checkbox__input") private accessor inputEl: HTMLInputElement | null = null;
 
   private readonly inputId = nextUid("zl-checkbox");
-  private defaultChecked = false;
 
   override connectedCallback(): void {
     super.connectedCallback();
-    this.defaultChecked = this.hasAttribute("checked");
     this.syncFormState();
+  }
+
+  /** Ticked in the markup contributes its value token, as it would on submit. */
+  protected readDefaultFormValue(): string {
+    return this.hasAttribute("checked") ? this.value : "";
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
@@ -69,30 +71,19 @@ export class ZlCheckbox extends FormAtom {
     }
   }
 
-  formResetCallback(): void {
-    this.checked = this.defaultChecked;
-  }
-
-  formStateRestoreCallback(state: string | null): void {
-    this.checked = state === this.value;
-  }
-
   override focus(options?: FocusOptions): void {
     this.inputEl?.focus(options);
   }
 
   /**
-   * The string this control contributes to form submission — the uniform
-   * read/write contract `<zitadel-login>` uses to capture and restore field
-   * values without knowing each atom's internal shape. Like a native checkbox
-   * this is the value token only when checked, empty otherwise; assigning it
-   * back restores the checked state.
+   * Like a native checkbox this is the value token only when checked, empty
+   * otherwise; assigning it back restores the checked state.
    */
-  get formValue(): string {
+  override get formValue(): string {
     return this.checked ? this.value : "";
   }
 
-  set formValue(value: string) {
+  override set formValue(value: string) {
     this.checked = value !== "";
   }
 
@@ -102,7 +93,7 @@ export class ZlCheckbox extends FormAtom {
     const rootClass = classMap({
       "zr-checkbox": true,
       "zr-checkbox--invalid": this.invalid || showError,
-      "zr-checkbox--disabled": this.disabled,
+      "zr-checkbox--disabled": this.isDisabled,
     });
     const labelText = this.label;
     return html`
@@ -117,7 +108,7 @@ export class ZlCheckbox extends FormAtom {
             .checked=${live(this.checked)}
             value=${this.value}
             ?required=${this.required}
-            ?disabled=${this.disabled}
+            ?disabled=${this.isDisabled}
             aria-label=${ifDefined(labelText ? undefined : this.ariaLabelText)}
             aria-invalid=${this.invalid || showError ? "true" : "false"}
             aria-describedby=${showError ? errorId : nothing}

@@ -27,7 +27,8 @@ Keep Shadow DOM for styling, fix form behaviour with web platform features. Spec
 | Credential pairing on a password-only step | A plain `<input>` rendered into the same `<form>`, carrying `step.identifier`'s value and `autocomplete="username"`, with no `name` so it is never submitted | `<zitadel-login>` |
 | Enter-to-submit | Each field forwards `keydown[Enter]` to `internals.form.requestSubmit()` | `<zl-field>` |
 | Validity state | `internals.setValidity()` mirrors `required` / step-level errors | each input atom |
-| Reset / restore | `formResetCallback`, `formStateRestoreCallback` clear / restore `value` | each input atom |
+| Reset / restore | `formResetCallback`, `formStateRestoreCallback` write the default or the submitted state through `formValue` | `FormAtom`, shared by every input atom |
+| `<fieldset disabled>` | `formDisabledCallback` disables the native control and takes the atom out of submission | `FormAtom` |
 | Focus delegation | `static shadowRootOptions = { delegatesFocus: true }` | the form atoms (`zl-field`, `zl-select`, `zl-checkbox`, `zl-button`) + orchestrator |
 | Step-change focus | Orchestrator focuses the first field when `step` changes. On the first render it does so only in `variant="page"`, so an embedded widget does not take focus from its page on load | `<zitadel-login>` |
 | Aria refs | `aria-describedby` only references ids that have content (no dangling refs) | `<zl-field>` |

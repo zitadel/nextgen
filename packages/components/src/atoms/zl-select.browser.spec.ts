@@ -126,6 +126,21 @@ describe("<zl-select> form participation (chromium)", () => {
     expect(select.value).toBe("us");
   });
 
+  it("is disabled by an enclosing fieldset", async () => {
+    host.innerHTML = `<form><fieldset disabled><zl-select name="country" value="us"></zl-select></fieldset></form>`;
+    const form = host.querySelector("form") as HTMLFormElement;
+    const select = host.querySelector("zl-select") as ZlSelect;
+    select.options = OPTIONS;
+    await select.updateComplete;
+    expect(native(select).disabled).toBe(true);
+    expect(new FormData(form).get("country")).toBeNull();
+
+    (form.querySelector("fieldset") as HTMLFieldSetElement).disabled = false;
+    await select.updateComplete;
+    expect(native(select).disabled).toBe(false);
+    expect(new FormData(form).get("country")).toBe("us");
+  });
+
   it("delegates focus from the host to the native control", async () => {
     const { select } = await mount();
     select.focus();

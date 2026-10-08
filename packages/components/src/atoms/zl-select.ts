@@ -76,7 +76,6 @@ export class ZlSelect extends FormAtom {
    */
   @property() accessor error = "";
   @property({ type: Boolean, reflect: true }) accessor invalid = false;
-  @property({ type: Boolean, reflect: true }) accessor disabled = false;
   @property({ type: Boolean, reflect: true }) accessor open = false;
   @property({ attribute: "aria-label" }) accessor ariaLabelText: string | undefined = undefined;
 
@@ -85,13 +84,9 @@ export class ZlSelect extends FormAtom {
   @query(".zr-select__native") private accessor nativeEl: HTMLSelectElement | null = null;
 
   private readonly baseId = nextUid("zl-select");
-  private defaultValue = "";
 
   override connectedCallback(): void {
     super.connectedCallback();
-    // Reset default mirrors native form controls: the initial `value` attribute,
-    // not a property assigned later (see `<zl-checkbox>` reading `checked`).
-    this.defaultValue = this.getAttribute("value") ?? "";
     this.syncFormState();
     document.addEventListener("pointerdown", this.handleDocumentPointerDown, true);
     document.addEventListener("keydown", this.handleDocumentKeydown, true);
@@ -107,35 +102,30 @@ export class ZlSelect extends FormAtom {
     if (changed.has("value") || changed.has("required")) {
       this.syncFormState();
     }
-    if (changed.has("disabled") && this.disabled) {
+    // Disabled by its own attribute or by an enclosing fieldset: never open.
+    if (this.isDisabled && this.open) {
       this.open = false;
     }
   }
 
-  formResetCallback(): void {
-    this.value = this.defaultValue;
-    this.open = false;
+  protected readDefaultFormValue(): string {
+    return this.getAttribute("value") ?? "";
   }
 
-  formStateRestoreCallback(state: string | null): void {
-    this.value = state ?? "";
+  override formResetCallback(): void {
+    super.formResetCallback();
+    this.open = false;
   }
 
   override focus(options?: FocusOptions): void {
     this.nativeEl?.focus(options);
   }
 
-  /**
-   * The string this control contributes to form submission — the uniform
-   * read/write contract `<zitadel-login>` uses to capture and restore field
-   * values without knowing each atom's internal shape. For a select that is
-   * simply the chosen option's value (empty = nothing chosen).
-   */
-  get formValue(): string {
+  override get formValue(): string {
     return this.value;
   }
 
-  set formValue(value: string) {
+  override set formValue(value: string) {
     this.value = value;
   }
 
@@ -162,7 +152,7 @@ export class ZlSelect extends FormAtom {
       "zr-select": true,
       "zr-select--open": this.open,
       "zr-select--invalid": this.invalid || showError,
-      "zr-select--disabled": this.disabled,
+      "zr-select--disabled": this.isDisabled,
     });
 
     return html`
@@ -178,7 +168,7 @@ export class ZlSelect extends FormAtom {
             aria-label=${ifDefined(this.label ? undefined : this.ariaLabelText)}
             aria-invalid=${this.invalid || showError ? "true" : "false"}
             aria-describedby=${showError ? errorId : nothing}
-            ?disabled=${this.disabled}
+            ?disabled=${this.isDisabled}
             ?required=${this.required}
             @change=${this.handleNativeChange}
           >
@@ -258,13 +248,13 @@ export class ZlSelect extends FormAtom {
   }
 
   private handleLabelClick = (): void => {
-    if (!this.disabled) {
+    if (!this.isDisabled) {
       this.nativeEl?.focus();
     }
   };
 
   private handleTriggerClick = (): void => {
-    if (this.disabled) {
+    if (this.isDisabled) {
       return;
     }
     this.open = !this.open;

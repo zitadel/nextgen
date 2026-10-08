@@ -75,7 +75,6 @@ export class ZlField extends FormAtom {
     | undefined = undefined;
   @property({ type: Boolean, attribute: "trailing-icon" }) accessor trailingIcon = true;
   @property({ type: Boolean }) accessor required = false;
-  @property({ type: Boolean, reflect: true }) accessor disabled = false;
   @property({ type: Boolean, reflect: true }) accessor invalid = false;
 
   @state() private accessor hasHelp = false;
@@ -84,13 +83,14 @@ export class ZlField extends FormAtom {
   @query(".zr-field__input") private accessor inputEl: HTMLInputElement | null = null;
 
   private readonly inputId = nextUid("zl-field");
-  private defaultValue = "";
 
   override connectedCallback(): void {
     super.connectedCallback();
-    // Reset restores the `value` attribute the field connected with.
-    this.defaultValue = this.getAttribute("value") ?? "";
     this.syncFormState();
+  }
+
+  protected readDefaultFormValue(): string {
+    return this.getAttribute("value") ?? "";
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
@@ -99,32 +99,16 @@ export class ZlField extends FormAtom {
     }
   }
 
-  formResetCallback(): void {
-    this.value = this.defaultValue;
-  }
-
-  formStateRestoreCallback(state: string | null): void {
-    this.value = state ?? "";
-  }
-
   override focus(options?: FocusOptions): void {
     this.inputEl?.focus(options);
   }
 
-  /**
-   * The string this control contributes to form submission — the uniform
-   * read/write contract `<zitadel-login>` uses to capture and restore field
-   * values without knowing each atom's internal shape. The getter reads the
-   * live `<input>` so browser/password-manager autofill that writes the native
-   * control directly (bypassing the `value` property and its `input` event) is
-   * still captured.
-   */
-  get formValue(): string {
+  override get formValue(): string {
     const native = this.inputEl ?? this.shadowRoot?.querySelector<HTMLInputElement>("input");
     return native ? native.value : this.value;
   }
 
-  set formValue(value: string) {
+  override set formValue(value: string) {
     this.value = value;
     const native = this.inputEl ?? this.shadowRoot?.querySelector<HTMLInputElement>("input");
     if (native && native.value !== value) {
@@ -150,9 +134,9 @@ export class ZlField extends FormAtom {
       "zr-field": true,
       "zr-field--invalid": this.invalid || showError,
       "zr-field--success": showSuccess,
-      "zr-field--disabled": this.disabled,
+      "zr-field--disabled": this.isDisabled,
     });
-    const showDefaultTrailing = this.trailingIcon && !this.hasSuffixSlot && !this.disabled;
+    const showDefaultTrailing = this.trailingIcon && !this.hasSuffixSlot && !this.isDisabled;
     const trailing = showDefaultTrailing ? this.renderTrailingIcon() : null;
     const wrapClass = classMap({
       "zr-field__wrap": true,
@@ -176,7 +160,7 @@ export class ZlField extends FormAtom {
             autocomplete=${ifDefined(this.autocomplete)}
             pattern=${ifDefined(this.pattern)}
             ?required=${this.required}
-            ?disabled=${this.disabled}
+            ?disabled=${this.isDisabled}
             aria-label=${ifDefined(this.label ? undefined : this.ariaLabelText)}
             aria-invalid=${this.invalid || showError ? "true" : "false"}
             aria-describedby=${describedBy || nothing}
@@ -262,7 +246,7 @@ export class ZlField extends FormAtom {
           part="trailing-action"
           aria-label="Clear"
           tabindex="-1"
-          ?disabled=${this.disabled}
+          ?disabled=${this.isDisabled}
           @click=${this.handleClear}
         >
           ${icon}
