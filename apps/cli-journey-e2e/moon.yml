@@ -32,10 +32,8 @@ tasks:
     options:
       runInCI: false
 
-  # e2e-local and e2e-testkit start moon themselves (`release:pack`), so moon
-  # runs them with node directly: under `pnpm run`, the moon they start would
-  # inherit pnpm's environment and warn about the platform-specific server
-  # packages.
+  # Runs the script with node rather than through `pnpm run e2e-local`, so the
+  # tools it starts are not children of a pnpm script (see run-local.mjs).
   e2e-local:
     command: "node scripts/run-local.mjs"
     env:

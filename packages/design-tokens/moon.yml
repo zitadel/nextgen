@@ -13,7 +13,7 @@ tasks:
       runInCI: false
 
   sync-export:
-    command: "corepack pnpm run sync-export"
+    command: "corepack pnpm run sync:export"
 
   generate:
     command: "corepack pnpm run generate"

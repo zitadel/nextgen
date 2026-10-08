@@ -40,7 +40,8 @@
     "build": "tsdown",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
-    "test-integration": "vitest run --config vitest.integration.config.ts"
+    "test:all": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",

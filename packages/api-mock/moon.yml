@@ -18,26 +18,20 @@ tasks:
   # Chromium for the browser project. Self-contained (like storybook): the
   # `test` task depends on it so `moon ci :test` provisions it in CI.
   install-browsers:
-    command: "corepack pnpm run install-browsers"
+    command: "corepack pnpm exec playwright install chromium"
     options:
       cache: false
 
   # Full lane (the CI gate): `test:all` runs the node `unit` project and the
   # real-Chromium `browser` smoke test in one Vitest process, so both land in
-  # one aggregated junit.xml. Unlike other packages, this `test` task runs
-  # `test:all`, so CI covers both projects. The fast unit-only lane is
-  # `pnpm test` for local iteration; `pnpm test:browser` runs the browser
-  # project alone.
-  # Runs `test:all`: the node unit project and the Chromium browser project
-  # together (see the package's vitest.config.ts).
+  # one aggregated junit.xml. moon invokes `test:all` uniformly across every
+  # package. The fast unit-only lane is `pnpm test` for local iteration;
+  # `pnpm test:browser` runs the browser project alone.
   test:
-    command: "corepack pnpm run test:all"
     deps:
       - "install-browsers"
       - "config:build"
     options:
-      # Replaces the inherited `pnpm run test` arguments rather than adding to them.
-      mergeArgs: "replace"
       # Shared mutex with the other browser-mode suites so only one real-Chromium
       # Vite server runs at a time; concurrent servers starve under moon's CI
       # graph and drop module fetches. (#1490)

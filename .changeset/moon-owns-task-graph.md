@@ -1,4 +1,4 @@
 ---
 ---
 
-Moon owns the task graph and package scripts are single steps; nothing ships.
+Moon orders work across packages and package scripts stay inside their package; nothing ships.

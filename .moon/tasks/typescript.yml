@@ -56,4 +56,4 @@ tasks:
       - "dist/**/*"
 
   test:
-    command: "corepack pnpm run test"
+    command: "corepack pnpm run test:all"

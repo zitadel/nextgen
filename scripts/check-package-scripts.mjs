@@ -1,96 +1,25 @@
 /**
  * Guards the package-script contract (AGENTS.md, "Package scripts and Moon
- * tasks"): moon owns the task graph, and package.json scripts are its leaves.
+ * tasks"): moon orders work across packages, and a package's scripts only
+ * ever do that package's own work.
  *
- * For every workspace package (and the repo root):
+ * For every workspace package (and the repo root), no script:
  *
- * - every script has a moon task of the same name, and that task's command is
- *   exactly `corepack pnpm run <name>`;
- * - every moon task runs its same-named script that way;
- * - no script starts a package manager or chains to another script
- *   (`pnpm run`/`exec`/`--filter`, `npm run`, `node --run`): a pnpm started
- *   from inside a pnpm script re-checks every workspace package and warns
- *   about the platform-specific server binaries;
- * - no `pre<name>`/`post<name>` hooks order work; ordering lives in moon deps;
- * - script names are kebab-case: moon task ids cannot contain `:`.
+ * - starts a package manager or moon (`pnpm run`/`exec`/`--filter`,
+ *   `npm run`, `npx`, `moon run`): a pnpm started from inside a pnpm script
+ *   re-checks every workspace package and warns about the platform-specific
+ *   server binaries, and a nested moon hides a task edge from the graph;
+ * - changes into another directory outside the package (`cd ../api`) to do
+ *   that package's work, which belongs in a moon dep;
+ * - uses shell constructs that would let either hide from these checks.
  *
- * The EXEMPT_* lists hold the deliberate exceptions. Shrink them; never grow
- * them without a reason next to the entry.
+ * A script may chain the package's own scripts with `node --run` and pre/post
+ * hooks: ordering inside one package is the package's business.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { parse } from "yaml";
-
-/** Projects outside the contract. */
-const EXEMPT_PROJECTS = new Set([
-  // Go project; its tasks run go directly.
-  "apps/server",
-  // Standalone agent eval, deliberately not a moon project.
-  "apps/cli-skill-e2e",
-]);
-
-/** Task ids exempt in every project. */
-const EXEMPT_TASK_IDS = new Set([
-  // Release orchestration: cleans dist, then runs the `build` script.
-  "build-release",
-]);
-
-/** `<project>:<task>` entries that may run something other than their script. */
-const EXEMPT_TASKS = new Set([
-  // Orchestrators that start moon themselves. Launched through `pnpm run`,
-  // the moon they start would inherit pnpm's environment and every task under
-  // it would warn, so moon runs them with node directly.
-  ".:cli",
-  ".:server",
-  ".:server-debug",
-  ".:journey",
-  ".:check",
-  ".:check-moon-graph",
-  "apps/cli-journey-e2e:e2e-local",
-  "apps/cli-journey-e2e:e2e-testkit",
-  // Diagnoses the toolchain, pnpm included, so it cannot run through pnpm.
-  ".:doctor",
-  // The CI gate runs both Vitest projects through `test:all`.
-  "packages/api-mock:test",
-  "packages/components:test",
-]);
-
-/** `<project>:<script>` entries (`*` for any project) that need no task. */
-const EXEMPT_SCRIPTS = new Set([
-  // npm lifecycle hooks, run by `pnpm pack` and installs, not the task graph.
-  "*:prepack",
-  "*:postpack",
-  "*:postinstall",
-  "*:prepare",
-  "*:preinstall",
-  "*:prepublishOnly",
-  // The entry points behind the orchestrator tasks above.
-  ".:cli",
-  ".:server",
-  ".:journey",
-  ".:check",
-  ".:doctor",
-  "apps/cli-journey-e2e:e2e-local",
-  "apps/cli-journey-e2e:e2e-testkit",
-  // The Vitest lanes behind the test:all exceptions above.
-  "packages/api-mock:test",
-  "packages/api-mock:test:browser",
-  "packages/api-mock:test:all",
-  "packages/components:test",
-  "packages/components:test:browser",
-  "packages/components:test:all",
-]);
-
-const NPM_LIFECYCLE = new Set([
-  "prepack",
-  "postpack",
-  "postinstall",
-  "prepare",
-  "preinstall",
-  "prepublishOnly",
-]);
 // Moon too: a script that starts moon hides a task edge from the graph.
 const PACKAGE_MANAGERS = new Set([
   "pnpm",
@@ -109,8 +38,8 @@ const PACKAGE_MANAGER_ENTRY =
   /(?:^|[\\/])node_modules[\\/](?:pnpm|npm|yarn|corepack|bun|@moonrepo[\\/]cli)[\\/]|(?:^|[\\/])(?:pnpm|pnpx|npm-cli|npx-cli|yarn|corepack)\.(?:c?js|mjs)$/i;
 
 /**
- * Whether a script starts a package manager (or chains to another script with
- * `node --run`). The body is tokenized like a shell would: quotes are removed
+ * Whether a script starts a package manager or moon. `node --run` is not one:
+ * it runs a script of the same package without starting pnpm. The body is tokenized like a shell would: quotes are removed
  * but their text kept, and every simple command (split on newlines, `;`, `&`,
  * `|`, parentheses and braces) is checked after skipping shell keywords, env
  * assignments and an `env` wrapper (including `env -S '…'`). Command
@@ -127,7 +56,7 @@ export function startsPackageManager(body) {
       const flag = args.findIndex((arg) => /^-[A-Za-z]*c[A-Za-z]*$/.test(arg));
       return flag !== -1 && startsPackageManager(args[flag + 1] ?? "");
     }
-    if (executable === "node") return nodeRunsScript(args) || nodeRunsPackageManager(args);
+    if (executable === "node") return nodeRunsPackageManager(args);
     return PACKAGE_MANAGERS.has(executable);
   });
 }
@@ -144,21 +73,6 @@ const NODE_VALUE_OPTIONS = new Set([
   "--env-file",
   "--title",
 ]);
-
-/**
- * Whether node's own options include `--run` (`--run build`, `--run=build`),
- * before the script path: after it, `--run` is just an argument to the script.
- */
-function nodeRunsScript(args) {
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    if (arg === "--run" || arg.startsWith("--run=")) return true;
-    if (!arg.startsWith("-") || arg === "--" || arg === "-e" || arg === "--eval" || arg === "-p")
-      return false;
-    if (NODE_VALUE_OPTIONS.has(arg)) i += 1;
-  }
-  return false;
-}
 
 /** Whether node's script argument is a package manager's entry file. */
 function nodeRunsPackageManager(args) {
@@ -258,7 +172,7 @@ const COMMAND_RUNNERS = new Set([
 ]);
 
 /**
- * Shell constructs a single-step script has no use for, and that would let a
+ * Shell constructs a package script has no use for, and that would let a
  * nested package manager hide from the checks above: command substitution,
  * `eval`/`source`, and inline `sh -c` scripts. Returns a description, or null.
  */
@@ -421,19 +335,40 @@ function commandWords(input) {
   return commandWords(words.slice(i));
 }
 
-function isHook(name, scripts) {
-  if (NPM_LIFECYCLE.has(name)) return false;
-  const match = /^(pre|post)(.+)$/.exec(name);
-  // `preview` is only a hook when a `view` script exists.
-  return match !== null && Object.hasOwn(scripts, match[2]);
+/** A directory outside the package: a parent, an absolute path, or one only known at run time. */
+function outsidePackage(dir) {
+  return (
+    /^(?:\.\.(?:[\\/]|$)|[\\/]|~|[A-Za-z]:[\\/]|\$)/.test(dir) || /[\\/]\.\.(?:[\\/]|$)/.test(dir)
+  );
 }
 
-function exempt(set, dir, name) {
-  return set.has(`${dir}:${name}`) || set.has(`*:${name}`);
+/**
+ * Whether a script changes into a directory outside its package: `cd`/`pushd`
+ * to one, or an `env -C`/`--chdir` wrapper that runs its command there.
+ */
+export function leavesPackage(body) {
+  return simpleCommands(body).some((raw) => {
+    for (let i = 0; i < raw.length; i += 1) {
+      if (executableName(raw[i]) !== "env") continue;
+      for (let j = i + 1; j < raw.length; j += 1) {
+        const word = raw[j];
+        if (word === "-C" || word === "--chdir") {
+          if (outsidePackage(raw[j + 1] ?? "")) return true;
+        } else if (word.startsWith("--chdir=")) {
+          if (outsidePackage(word.slice(8))) return true;
+        } else if (!word.startsWith("-") && !ASSIGNMENT.test(word)) break;
+      }
+    }
+    const [command = "", ...args] = commandWords(raw);
+    if (!["cd", "pushd"].includes(executableName(command))) return false;
+    const target = args.find((arg) => !/^-[LPe@]+$/.test(arg) && arg !== "--");
+    // A bare `cd` goes to $HOME.
+    return target === undefined || outsidePackage(target);
+  });
 }
 
 /** Every violation of the contract for one project, as readable lines. */
-export function checkProject(dir, scripts, tasks) {
+export function checkProject(dir, scripts) {
   const problems = [];
   for (const [name, body] of Object.entries(scripts)) {
     const unsupported = unsupportedSyntax(body);
@@ -441,49 +376,27 @@ export function checkProject(dir, scripts, tasks) {
       problems.push(`${dir}: script "${name}" uses ${unsupported}; keep scripts to plain commands`);
     }
     if (startsPackageManager(body)) {
-      problems.push(`${dir}: script "${name}" starts a package manager: ${body}`);
+      problems.push(`${dir}: script "${name}" starts a package manager or moon: ${body}`);
     }
-    if (isHook(name, scripts)) {
-      problems.push(`${dir}: script "${name}" is a pre/post hook; order work with moon deps`);
-    }
-    if (exempt(EXEMPT_SCRIPTS, dir, name)) continue;
-    if (name.includes(":")) {
+    if (leavesPackage(body)) {
       problems.push(
-        `${dir}: script "${name}" must be kebab-case (moon task ids cannot contain ":")`,
+        `${dir}: script "${name}" changes into another directory; order other packages' work with moon deps`,
       );
-    }
-    if (!Object.hasOwn(tasks, name)) {
-      problems.push(`${dir}: script "${name}" has no moon task of the same name`);
-    }
-  }
-  for (const [id, task] of Object.entries(tasks)) {
-    if (EXEMPT_TASK_IDS.has(id) || exempt(EXEMPT_TASKS, dir, id)) continue;
-    const command = task?.command ?? task?.script;
-    if (command !== `corepack pnpm run ${id}`) {
-      problems.push(`${dir}: task "${id}" must run \`corepack pnpm run ${id}\`, not: ${command}`);
-    } else if (task?.args !== undefined) {
-      problems.push(`${dir}: task "${id}" adds \`args\`; put them in the "${id}" script`);
-    } else if (!Object.hasOwn(scripts, id)) {
-      problems.push(`${dir}: task "${id}" runs a script "${id}" that does not exist`);
     }
   }
   return problems;
 }
 
 /**
- * Workspace project ids, `/`-separated on every platform so they match the
- * exemption keys; `join()` is only used for the filesystem paths.
+ * Workspace project ids, `/`-separated on every platform so problems read the
+ * same everywhere; `join()` is only used for the filesystem paths.
  */
 export function projectIds(root = ".") {
   const ids = ["."];
   for (const group of ["apps", "packages"]) {
     for (const entry of readdirSync(join(root, group), { withFileTypes: true })) {
       const id = `${group}/${entry.name}`;
-      if (
-        entry.isDirectory() &&
-        existsSync(join(root, group, entry.name, "package.json")) &&
-        !EXEMPT_PROJECTS.has(id)
-      ) {
+      if (entry.isDirectory() && existsSync(join(root, group, entry.name, "package.json"))) {
         ids.push(id);
       }
     }
@@ -491,44 +404,12 @@ export function projectIds(root = ".") {
   return ids;
 }
 
-/**
- * A project's tasks as moon resolves them: the shared `.moon/tasks/<language>.yml`
- * tasks it does not exclude, with its own moon.yml on top (a task there that
- * names no command keeps the inherited one).
- */
-export function effectiveTasks(root, project) {
-  const language = project?.language;
-  const sharedPath = join(root, ".moon", "tasks", `${language}.yml`);
-  const shared =
-    language && existsSync(sharedPath)
-      ? (parse(readFileSync(sharedPath, "utf8"))?.tasks ?? {})
-      : {};
-  const excluded = new Set(project?.workspace?.inheritedTasks?.exclude ?? []);
-  const tasks = {};
-  for (const [id, task] of Object.entries(shared)) {
-    // Shared tasks that run a tool directly (the Biome `lint`) are not package
-    // scripts; only `corepack pnpm run <id>` tasks are held to the contract.
-    if (!excluded.has(id) && task?.command === `corepack pnpm run ${id}`) tasks[id] = { ...task };
-  }
-  for (const [id, task] of Object.entries(project?.tasks ?? {})) {
-    const inherited = tasks[id] ?? {};
-    const own = task ?? {};
-    tasks[id] =
-      own.command || own.script
-        ? { ...inherited, ...own }
-        : { ...inherited, ...own, command: inherited.command, script: inherited.script };
-  }
-  return tasks;
-}
-
 export function checkWorkspace(root = ".") {
   const problems = [];
   for (const id of projectIds(root)) {
-    const base = join(root, ...id.split("/"));
-    const scripts = JSON.parse(readFileSync(join(base, "package.json"), "utf8")).scripts ?? {};
-    const moonPath = join(base, "moon.yml");
-    const project = existsSync(moonPath) ? parse(readFileSync(moonPath, "utf8")) : {};
-    problems.push(...checkProject(id, scripts, effectiveTasks(root, project)));
+    const manifest = join(root, ...id.split("/"), "package.json");
+    const scripts = JSON.parse(readFileSync(manifest, "utf8")).scripts ?? {};
+    problems.push(...checkProject(id, scripts));
   }
   return problems;
 }
@@ -540,6 +421,6 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     for (const problem of problems) console.error(`  ${problem}`);
     process.exitCode = 1;
   } else {
-    console.log("package scripts: ok - every script is a moon task leaf");
+    console.log("package scripts: ok - every script stays inside its package");
   }
 }

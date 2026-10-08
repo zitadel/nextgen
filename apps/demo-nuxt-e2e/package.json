@@ -3,8 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "e2e": "playwright test"
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
     "@types/node": "catalog:",

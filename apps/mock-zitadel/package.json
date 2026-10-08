@@ -17,9 +17,11 @@
   "scripts": {
     "dev": "tsx --conditions=@zitadel/source scripts/local-server.ts",
     "build": "tsdown",
+    "generate-wellknown": "tsx scripts/generate-wellknown.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
-    "generate-wellknown": "tsx scripts/generate-wellknown.ts"
+    "test:all": "vitest run",
+    "test:watch": "vitest --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json"
   },
   "dependencies": {
     "@zitadel/api-mock": "workspace:*"

@@ -10,11 +10,7 @@
     "journey": "node scripts/run-journey.mjs",
     "check": "node scripts/check.mjs",
     "test": "node scripts/assert-file.mjs scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/check-package-scripts.test.mjs && vitest run scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/check-package-scripts.test.mjs",
-    "build-local-image": "node scripts/build-local-runtime-image.mjs",
-    "smoke-container": "node scripts/smoke-container.mjs",
-    "check-typecheck": "node scripts/assert-file.mjs scripts/check-typecheck-programs.test.mjs && vitest run scripts/check-typecheck-programs.test.mjs && node scripts/check-typecheck-programs.mjs",
-    "check-openapi-rules": "node scripts/assert-file.mjs scripts/openapi-casing-rules.test.mjs && vitest run scripts/openapi-casing-rules.test.mjs",
-    "check-adrs": "node scripts/check-adrs-index.mjs"
+    "test:all": "node scripts/assert-file.mjs scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/check-package-scripts.test.mjs && vitest run scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/check-package-scripts.test.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",

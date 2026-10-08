@@ -9,7 +9,7 @@
     "build": "storybook build --output-dir dist",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run --project=storybook",
-    "install-browsers": "playwright install chromium"
+    "test:all": "vitest run --project=storybook"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",

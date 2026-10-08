@@ -54,7 +54,7 @@ tasks:
   # runs `moon run server:build` itself; a task dep on it here would cycle the
   # project graph, because server:build depends on console:build.
   dev-real:
-    command: "corepack pnpm run dev-real"
+    command: "corepack pnpm run dev:real"
     # dev's deps, plus the built `zitadel` CLI the instance boots through.
     deps:
       - "sdk-react:build"
@@ -68,7 +68,7 @@ tasks:
   # `dev-real` deliberately does not boot. Opt-in for that one screen; every
   # other screen is better served by `dev-real`.
   dev-claim:
-    command: "corepack pnpm run dev-claim"
+    command: "corepack pnpm run dev:claim"
     deps:
       - "sdk-react:build"
       - "cli:build"

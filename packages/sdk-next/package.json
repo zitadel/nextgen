@@ -56,7 +56,8 @@
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json && node -e \"require('node:fs').copyFileSync('src/jsx.d.ts', 'dist/jsx.d.ts')\"",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:all": "vitest run"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",

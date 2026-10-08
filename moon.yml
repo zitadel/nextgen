@@ -4,18 +4,12 @@ layer: "tool"
 stack: "infrastructure"
 
 tasks:
-  # Diagnoses the toolchain, pnpm included, so it runs with node directly: a
-  # broken corepack or pnpm must not stop it from reporting.
   doctor:
     command: "node scripts/doctor.mjs"
     options:
       cache: false
       runInCI: false
 
-  # cli, server, server-debug, journey and check start moon themselves, so
-  # moon runs them with node directly: launched through `pnpm run`, the moon
-  # they start would inherit pnpm's environment and every task under it would
-  # warn about the platform-specific server packages.
   cli:
     command: "node scripts/run-cli.mjs"
     options:
@@ -47,7 +41,7 @@ tasks:
   # cross-compiled for linux, with both UI dists embedded, in the release
   # Dockerfile. Needs Docker, so it stays out of CI.
   build-local-image:
-    command: "corepack pnpm run build-local-image"
+    command: "node scripts/build-local-runtime-image.mjs"
     deps:
       - "console:build"
       - "login-ui:build"
@@ -61,7 +55,7 @@ tasks:
   # default against the non-root USER it declares. Needs a local Docker daemon,
   # so it stays out of CI.
   smoke-container:
-    command: "corepack pnpm run smoke-container"
+    command: "node scripts/smoke-container.mjs"
     deps:
       - "build-local-image"
     options:
@@ -78,7 +72,7 @@ tasks:
   # affected-gate and release-body logic never become test files nothing
   # executes.
   test:
-    command: "corepack pnpm run test"
+    command: "corepack pnpm run test:all"
     inputs:
       - "scripts/ci-mode.mjs"
       - "scripts/ci-mode.test.mjs"
@@ -91,13 +85,9 @@ tasks:
       - "scripts/release-manifest.mjs"
       - "scripts/check-package-scripts.mjs"
       - "scripts/check-package-scripts.test.mjs"
-      # The package-script contract test reads every package's scripts and
-      # moon tasks, the root project's included.
-      - "moon.yml"
+      # The package-script contract test reads every package's scripts.
       - "apps/*/package.json"
-      - "apps/*/moon.yml"
       - "packages/*/package.json"
-      - "packages/*/moon.yml"
       # The task delegates to the package `test` script and its file-existence
       # guard, so both are behavioral inputs.
       - "package.json"
@@ -117,9 +107,8 @@ tasks:
     # file would stop running unnoticed. node:test used to error on a missing
     # file; this restores that fail-loud behavior, cross-platform (POSIX `test`
     # is unavailable on Windows shells).
-    command: "corepack pnpm run check-typecheck"
+    script: "node scripts/assert-file.mjs scripts/check-typecheck-programs.test.mjs && corepack pnpm exec vitest run scripts/check-typecheck-programs.test.mjs && node scripts/check-typecheck-programs.mjs"
     inputs:
-      - "package.json"
       - "scripts/check-typecheck-programs.mjs"
       - "scripts/check-typecheck-programs.test.mjs"
       - "scripts/assert-file.mjs"
@@ -145,9 +134,8 @@ tasks:
     # file would stop running unnoticed. node:test used to error on a missing
     # file; this restores that fail-loud behavior, cross-platform (POSIX `test`
     # is unavailable on Windows shells).
-    command: "corepack pnpm run check-openapi-rules"
+    script: "node scripts/assert-file.mjs scripts/openapi-casing-rules.test.mjs && corepack pnpm exec vitest run scripts/openapi-casing-rules.test.mjs"
     inputs:
-      - "package.json"
       - "scripts/openapi-casing-rules.test.mjs"
       - "scripts/assert-file.mjs"
       - "scripts/testdata/openapi-casing/**"
@@ -178,9 +166,8 @@ tasks:
       runInCI: true
 
   check-adrs:
-    command: "corepack pnpm run check-adrs"
+    command: "node scripts/check-adrs-index.mjs"
     inputs:
-      - "package.json"
       - "docs/adrs/**/*.md"
       - "scripts/check-adrs-index.mjs"
       - "scripts/dev-process.mjs"

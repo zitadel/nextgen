@@ -50,9 +50,8 @@
     "test": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
     "test:all": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "build": "tsdown",
-    "install-browsers": "playwright install chromium"
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json"
   },
   "dependencies": {
     "@mswjs/http-middleware": "catalog:",

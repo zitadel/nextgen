@@ -29,7 +29,7 @@ tasks:
   # Installs the Chromium that @storybook/addon-vitest drives. Mirrors the
   # journey e2e pattern (browsers aren't preinstalled on CI runners).
   install-browsers:
-    command: "corepack pnpm run install-browsers"
+    command: "corepack pnpm exec playwright install chromium"
     options:
       cache: false
 

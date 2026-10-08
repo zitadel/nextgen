@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   checkProject,
   checkWorkspace,
+  leavesPackage,
   projectIds,
   startsPackageManager,
   unsupportedSyntax,
@@ -13,67 +14,38 @@ describe("package-script contract", () => {
     expect(checkWorkspace()).toEqual([]);
   });
 
-  it("accepts a script run by its same-named moon task", () => {
+  it("accepts a package chaining its own scripts", () => {
     expect(
-      checkProject(
-        "apps/x",
-        { test: "vitest run" },
-        { test: { command: "corepack pnpm run test" } },
-      ),
+      checkProject("apps/x", {
+        prebuild: "node --run sync",
+        build: "tsdown",
+        sync: "node scripts/sync.mjs",
+        "test:all": "node --run sync && vitest run",
+        lint: "node --run build && biome check .",
+      }),
     ).toEqual([]);
   });
 
   it("rejects a script that starts pnpm", () => {
-    expect(
-      checkProject(
-        "apps/x",
-        { "test-all": "pnpm run test" },
-        { "test-all": { command: "corepack pnpm run test-all" } },
-      ),
-    ).toEqual(['apps/x: script "test-all" starts a package manager: pnpm run test']);
-  });
-
-  it("rejects a pre/post hook", () => {
-    const problems = checkProject(
-      "apps/x",
-      { build: "tsdown", prebuild: "node sync.mjs" },
-      {
-        build: { command: "corepack pnpm run build" },
-        prebuild: { command: "corepack pnpm run prebuild" },
-      },
-    );
-    expect(problems).toContain(
-      'apps/x: script "prebuild" is a pre/post hook; order work with moon deps',
-    );
-  });
-
-  it("rejects a script without a task, and a task inlining its command", () => {
-    expect(
-      checkProject(
-        "apps/x",
-        { lint: "oxlint ." },
-        { build: { command: "corepack pnpm exec tsdown" } },
-      ),
-    ).toEqual([
-      'apps/x: script "lint" has no moon task of the same name',
-      'apps/x: task "build" must run `corepack pnpm run build`, not: corepack pnpm exec tsdown',
+    expect(checkProject("apps/x", { "test:all": "pnpm run test" })).toEqual([
+      'apps/x: script "test:all" starts a package manager or moon: pnpm run test',
     ]);
   });
 
-  it("rejects a script name moon cannot use as a task id", () => {
-    expect(
-      checkProject("apps/x", { "dev:real": "tsx dev.ts" }, { "dev:real": { command: "x" } }),
-    ).toContain('apps/x: script "dev:real" must be kebab-case (moon task ids cannot contain ":")');
+  it("rejects a script that starts moon", () => {
+    expect(checkProject(".", { docs: "moon run docs:dev" })).toEqual([
+      '.: script "docs" starts a package manager or moon: moon run docs:dev',
+    ]);
   });
 
-  it("does not treat preview as a hook without a view script", () => {
+  it("rejects a script that does another package's work", () => {
     expect(
-      checkProject(
-        "apps/x",
-        { preview: "vite preview" },
-        { preview: { command: "corepack pnpm run preview" } },
-      ),
-    ).toEqual([]);
+      checkProject("apps/x", {
+        "build:vercel": "cd ../../packages/api && node --run build && cd - && tsdown",
+      }),
+    ).toEqual([
+      'apps/x: script "build:vercel" changes into another directory; order other packages\' work with moon deps',
+    ]);
   });
 
   it.each([
@@ -89,7 +61,6 @@ describe("package-script contract", () => {
     "env CI=1 pnpm run test",
     "env -u CI pnpm run test",
     "env -u CI -u VERCEL -- pnpm install",
-    "node --run build",
     'echo "$(pnpm run test)"',
     "echo $(pnpm test)",
     "echo `pnpm test`",
@@ -107,9 +78,6 @@ describe("package-script contract", () => {
     'bash -c "npm run build"',
     "sh -lc 'pnpm run test'",
     "bash -ec 'pnpm install'",
-    "node --run=build",
-    "node --no-warnings --run build",
-    "node --require ./setup.cjs --run build",
     "/usr/bin/env pnpm run test",
     "/usr/bin/env CI=1 npm run build",
     "2>/dev/null pnpm run test",
@@ -126,7 +94,6 @@ describe("package-script contract", () => {
     "exec -a name -- pnpm run build",
     "pnpm.cmd run build",
     "npm.cmd run build",
-    "node.exe --run build",
     '"C:\\tools\\PNPM.EXE" install',
     "pnpm>out.log test",
     "vitest run && pnpm>>out.log install",
@@ -172,37 +139,20 @@ describe("package-script contract", () => {
     "/usr/bin/env node scripts/doctor.mjs",
     "node scripts/pnpm-audit.mjs",
     "env -P /usr/bin vitest run",
+    "node --run build",
+    "node --run=build",
+    "node --no-warnings --run build",
+    "node --require ./setup.cjs --run build",
+    "node.exe --run build",
+    "node --run sync-schemas && vitest run",
   ])("does not flag %s", (body) => {
     expect(startsPackageManager(body)).toBe(false);
-  });
-
-  it("rejects a task that appends args to its script", () => {
-    expect(
-      checkProject(
-        "apps/x",
-        { test: "vitest run" },
-        { test: { command: "corepack pnpm run test", args: ["--", "pnpm", "install"] } },
-      ),
-    ).toEqual(['apps/x: task "test" adds `args`; put them in the "test" script']);
-  });
-
-  it.each(["prepare", "preinstall", "prepublishOnly"])(
-    "needs no task for the npm lifecycle script %s",
-    (name) => {
-      expect(checkProject("apps/x", { [name]: "tsdown" }, {})).toEqual([]);
-    },
-  );
-
-  it("rejects a task whose same-named script is missing", () => {
-    expect(checkProject("apps/x", {}, { build: { command: "corepack pnpm run build" } })).toEqual([
-      'apps/x: task "build" runs a script "build" that does not exist',
-    ]);
   });
 
   it("names projects with forward slashes on every platform", () => {
     const ids = projectIds();
     expect(ids).toContain("apps/cli");
-    expect(ids).not.toContain("apps/server");
+    expect(ids).toContain(".");
     expect(ids.filter((id) => id.includes("\\"))).toEqual([]);
   });
 
@@ -264,28 +214,40 @@ describe("package-script contract", () => {
   });
 
   it("reports unsupported syntax as a contract violation", () => {
-    expect(
-      checkProject(
-        "apps/x",
-        { test: "eval 'vitest run'" },
-        { test: { command: "corepack pnpm run test" } },
-      ),
-    ).toEqual(['apps/x: script "test" uses `eval`; keep scripts to plain commands']);
+    expect(checkProject("apps/x", { test: "eval 'vitest run'" })).toEqual([
+      'apps/x: script "test" uses `eval`; keep scripts to plain commands',
+    ]);
   });
 
-  it("only counts a project's own scripts and tasks", () => {
-    expect(checkProject("apps/x", { constructor: "vitest run" }, {})).toEqual([
-      'apps/x: script "constructor" has no moon task of the same name',
-    ]);
-    expect(
-      checkProject("apps/x", {}, { constructor: { command: "corepack pnpm run constructor" } }),
-    ).toEqual(['apps/x: task "constructor" runs a script "constructor" that does not exist']);
-    expect(
-      checkProject(
-        "apps/x",
-        { preconstructor: "vitest run" },
-        { preconstructor: { command: "corepack pnpm run preconstructor" } },
-      ),
-    ).toEqual([]);
+  it.each([
+    "cd ../api && node --run build",
+    "cd .. && vitest run",
+    "cd ../../packages/config && tsdown",
+    "cd /tmp && vitest run",
+    "cd ~/src && vitest run",
+    "cd $DIR && vitest run",
+    "cd",
+    "cd -P ../api && tsdown",
+    "cd scripts/../../api && tsdown",
+    "pushd ../api && tsdown",
+    "tsdown && (cd ../api && tsdown)",
+    "env -C ../api tsdown",
+    "env --chdir=../api tsdown",
+    "env CI=1 -C /tmp vitest run",
+    'cd "C:\\work\\api" && tsdown',
+  ])("detects leaving the package in %s", (body) => {
+    expect(leavesPackage(body)).toBe(true);
+  });
+
+  it.each([
+    "vitest run",
+    "cd scripts && node build.mjs",
+    "cd src/generated && tsc",
+    "tsc -p ../../tsconfig.base.json",
+    "env -C dist node server.mjs",
+    "echo 'cd ../api'",
+    "vitest run --dir ../shared",
+  ])("allows staying in the package in %s", (body) => {
+    expect(leavesPackage(body)).toBe(false);
   });
 });

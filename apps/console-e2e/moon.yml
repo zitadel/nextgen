@@ -23,7 +23,7 @@ tasks:
       - "testing:build"
 
   e2e:
-    command: "corepack pnpm run e2e"
+    command: "corepack pnpm exec playwright test"
     deps:
       - "console:build"
     options:
@@ -32,7 +32,7 @@ tasks:
   # Live console resource coverage through the Vite server-side API proxy.
   # Boots one ephemeral real Zitadel instance shared by Playwright workers.
   e2e-real:
-    command: "corepack pnpm run e2e-real"
+    command: "corepack pnpm exec playwright test --config playwright.real.config.mts"
     deps:
       - "testing:build"
       - "cli:build"
@@ -78,7 +78,7 @@ tasks:
   # /api -> /. This is the only lane where the console's API base and the Go
   # mux's routing table have to agree (Console ADR 0002 §4).
   e2e-embedded:
-    command: "corepack pnpm run e2e-embedded"
+    command: "corepack pnpm exec playwright test --config playwright.embedded.config.mts"
     deps:
       - "testing:build"
       - "cli:build"
@@ -109,7 +109,7 @@ tasks:
   # switches the platform project off to sign its seeded users into the
   # harness's own project.
   e2e-platform:
-    command: "corepack pnpm run e2e-platform"
+    command: "corepack pnpm exec playwright test --config playwright.platform.config.mts"
     deps:
       - "testing:build"
       - "cli:build"

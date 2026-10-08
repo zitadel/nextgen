@@ -13,7 +13,7 @@ workspace:
 
 tasks:
   generate-openapi:
-    command: "corepack pnpm run generate-openapi"
+    command: "corepack pnpm run generate:openapi"
     inputs:
       - "**/*"
       - "/api/openapi/**/*.yaml"
@@ -24,9 +24,13 @@ tasks:
 
   generate:
     command: "corepack pnpm run generate"
-    deps:
-      - "generate-openapi"
+    inputs:
+      - "**/*"
+      - "/api/openapi/**/*.yaml"
     outputs:
+      - ".generated/openapi.yaml"
+      - ".generated/openapi.json"
+      - ".generated/openapi.mjs"
       - ".source/**/*"
 
   typecheck:
@@ -34,6 +38,7 @@ tasks:
       - "generate"
 
   build:
+    command: "corepack pnpm exec waku build"
     deps:
       # src/app.css imports @zitadel/design-tokens/css/tokens.css.
       - "design-tokens:build"
@@ -43,9 +48,13 @@ tasks:
       # waku picks its adapter from VERCEL, so a Vercel build is never
       # restored from a local-adapter cache (or the reverse).
       - "$VERCEL"
+    options:
+      # Runs waku directly (generation is the `generate` dep), replacing the
+      # inherited `pnpm run build` arguments rather than adding to them.
+      mergeArgs: "replace"
 
   dev:
-    command: "corepack pnpm run dev"
+    command: "corepack pnpm exec waku dev --port 3003"
     deps:
       - "design-tokens:build"
       - "generate"

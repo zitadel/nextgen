@@ -32,7 +32,8 @@ export default defineConfig({
       // emits sourcemaps, so v8 reports these back against `src`.
       include: [...(baseTest.coverage?.include ?? []), "dist/**/*.mjs"],
     },
-    // The oclif dist the integration suite drives is built by the `build` task
-    // moon's `test` depends on; a direct `pnpm test` needs a prior build.
+    // The oclif dist the integration suite drives is built by the `pretest`
+    // hook for a direct `pnpm test`, and by the `build` task moon's `test`
+    // depends on for a moon run, so both start from a fresh build.
   },
 });
