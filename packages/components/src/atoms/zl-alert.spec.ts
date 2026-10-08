@@ -58,6 +58,18 @@ describe("<zl-alert>", () => {
     expect(el.shadowRoot?.querySelector(".zr-alert__title")?.textContent).toBe("Heads up");
   });
 
+  it("projects the detail and link slots under the message", async () => {
+    const el = mount(
+      `<zl-alert severity="error">Boom<span slot="detail">Why</span><a slot="link" href="#">More</a></zl-alert>`,
+    );
+    await el.updateComplete;
+    const detail = el.shadowRoot?.querySelector<HTMLSlotElement>('slot[name="detail"]');
+    const link = el.shadowRoot?.querySelector<HTMLSlotElement>('slot[name="link"]');
+    expect(detail?.getAttribute("part")).toBe("detail");
+    expect(link?.getAttribute("part")).toBe("link");
+    expect(detail?.closest(".zr-alert__body")).toBeTruthy();
+  });
+
   it("does not render a close button unless dismissible", async () => {
     const el = mount(`<zl-alert severity="info">msg</zl-alert>`);
     await el.updateComplete;

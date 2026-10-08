@@ -4,7 +4,7 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { _resetSessionForTesting, fetchSession, sessionPage } from "../auth/session";
-import { makeTestSession } from "../auth/session.fixture";
+import { makeTestSession } from "@/test/session.fixture";
 import { completeProjectClaim } from "./claim";
 
 const server = setupServer();

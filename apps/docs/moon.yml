@@ -2,13 +2,21 @@ id: "docs"
 language: "typescript"
 layer: "application"
 stack: "frontend"
+dependsOn:
+  - "design-tokens"
+
+workspace:
+  inheritedTasks:
+    # No unit tests; the site is checked by `typecheck` and `build`.
+    exclude:
+      - "test"
 
 tasks:
   generate-openapi:
     command: "corepack pnpm run generate:openapi"
     inputs:
+      - "**/*"
       - "/api/openapi/**/*.yaml"
-      - "scripts/bundle-openapi.mjs"
     outputs:
       - ".generated/openapi.yaml"
       - ".generated/openapi.json"
@@ -17,10 +25,8 @@ tasks:
   generate:
     command: "corepack pnpm run generate"
     inputs:
+      - "**/*"
       - "/api/openapi/**/*.yaml"
-      - "content/**/*"
-      - "source.config.ts"
-      - "scripts/bundle-openapi.mjs"
     outputs:
       - ".generated/openapi.yaml"
       - ".generated/openapi.json"
@@ -28,20 +34,24 @@ tasks:
       - ".source/**/*"
 
   typecheck:
-    command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
     deps:
       - "generate"
 
   build:
     command: "corepack pnpm exec waku build"
     deps:
+      # src/app.css imports @zitadel/design-tokens/css/tokens.css.
+      - "design-tokens:build"
       - "generate"
-    outputs:
-      - "dist/**/*"
+    options:
+      # Runs waku directly (generation is the `generate` dep), replacing the
+      # inherited `pnpm run build` arguments rather than adding to them.
+      mergeArgs: "replace"
 
   dev:
     command: "corepack pnpm exec waku dev --port 3003"
     deps:
+      - "design-tokens:build"
       - "generate"
     options:
       persistent: true

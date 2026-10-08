@@ -4,19 +4,17 @@ layer: "library"
 stack: "frontend"
 dependsOn:
   - "api"
+  - "components"
 
 tasks:
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
-      - "api:build"
+      # contract.spec.ts imports @zitadel/components/events from its dist.
+      - "components:build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
       - "api:build"
-    outputs:
-      - "dist/**/*"
 
   build-release:
     script: |
@@ -34,4 +32,6 @@ tasks:
       runInCI: false
 
   test:
-    command: "corepack pnpm run test:all"
+    deps:
+      # contract.spec.ts imports @zitadel/components/events from its dist.
+      - "components:build"

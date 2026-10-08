@@ -11,8 +11,7 @@ import type { ZitadelSession } from "./zitadel-session.js";
  * `variant="widget"` is content-sized and transparent through every layer
  * (host, `zl-page-shell` host, inner `.zr-page-shell`), while
  * `variant="page"` claims the viewport and paints the surface — on the
- * internal page shell, since the session host itself no longer carries the
- * page paint. Theme resolution reaches real pixels the same way as the
+ * internal page shell: the session host carries no page paint. Theme resolution reaches real pixels the same way as the
  * login surface.
  */
 

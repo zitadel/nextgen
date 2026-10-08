@@ -46,7 +46,7 @@ export function TableLink({
 
 /**
  * "Coming soon" placeholder for screens whose backing API endpoint does not
- * exist yet (see the console-figma-api-buildability assessment). Honest empty
+ * exist yet. Honest empty
  * state rather than a fake list.
  */
 export function EmptyState({
@@ -61,7 +61,7 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-card px-6 py-16 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-md border border-dashed border-border bg-card px-6 py-16 text-center">
       <span className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <Icon size={22} aria-hidden />
       </span>
@@ -74,7 +74,7 @@ export function EmptyState({
 
 // Shared table look. Kept as named constants so the (verbose) utility strings
 // live in one place and Tailwind's scanner still sees full literals.
-const TABLE_WRAP = "overflow-hidden rounded-xl border border-border bg-card";
+const TABLE_WRAP = "overflow-hidden rounded-md border border-border bg-card";
 const TABLE =
   "w-full border-collapse text-sm [&_tbody_tr:last-child_td]:border-0 [&_tbody_tr:last-child_th]:border-0";
 const CELL = "border-b border-border px-4 py-3 text-left";

@@ -13,7 +13,7 @@ import {
   invalidateSessionCache,
   sessionPage,
 } from "./session";
-import { makeTestSession } from "./session.fixture";
+import { makeTestSession } from "@/test/session.fixture";
 
 const server = setupServer();
 

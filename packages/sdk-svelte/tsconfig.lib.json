@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    // svelte2tsx (the vite build's `.d.ts` emitter) always reports diagnostics
+    // on its synthesized component program; with `noEmitOnError` it would
+    // silently emit no declarations. svelte-check is the type gate instead.
+    "noEmitOnError": false,
+    "declaration": true,
+    // svelteTypes() emits into a temp dir one level below dist and copies the
+    // files up, so declaration maps would point one directory too deep.
+    "declarationMap": false
+  },
+  "include": ["src/**/*.ts", "src/**/*.svelte"],
+  "exclude": ["src/**/*.spec.ts", "src/**/*.test.ts", "src/**/__tests__/**", "src/test-setup.ts"]
+}
