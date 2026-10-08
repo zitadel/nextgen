@@ -1,3 +1,4 @@
+# spike: invalidate every task hash — do not merge
 # Inherited by every project, whatever its language. These root files decide
 # the toolchain and the installed dependencies, so a change to any of them
 # re-runs every task. Projects run on the system toolchain, so moon hashes no
