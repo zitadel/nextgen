@@ -163,6 +163,13 @@ export interface SchemaAuthMethod {
   key: string;
   label: string;
   enabled: boolean;
+  /**
+   * The connection slugs an enabled `sso` lists in `providers`, verbatim and in
+   * the document's order. Empty for every other method, and for `sso` while it
+   * is disabled: the meta-schema forbids `providers` then, so a stray list on a
+   * disabled method describes nothing a user can sign in with.
+   */
+  providers: string[];
 }
 
 /**
@@ -184,13 +191,45 @@ export function schemaAuthMethods(schema: UserSchema): SchemaAuthMethod[] {
   return Object.entries(methods as Record<string, unknown>)
     .map(([key, value]) => {
       const entry = (value ?? {}) as Record<string, unknown>;
+      const enabled = entry.enabled === true;
       return {
         key,
         label: AUTH_METHOD_LABELS[key] ?? key,
-        enabled: entry.enabled === true,
+        enabled,
+        providers: key === "sso" && enabled ? readProviders(entry.providers) : [],
       };
     })
     .sort((a, b) => a.key.localeCompare(b.key));
+}
+
+/**
+ * The connection slugs a schema's latest revision makes available to its users
+ * (`x-auth-methods.sso.providers`), or none when SSO is off or undeclared.
+ */
+export function schemaSsoProviders(schema: UserSchema): string[] {
+  return schemaAuthMethods(schema).find((method) => method.key === "sso")?.providers ?? [];
+}
+
+/**
+ * `"Passkey + SSO (google, github)"` — the enabled methods as one line, for the
+ * schemas list. The slugs are shown raw: resolving them to connection names
+ * needs `idp.read`, which the schema screens do not assume.
+ */
+export function schemaSignInSummary(schema: UserSchema): string {
+  return schemaAuthMethods(schema)
+    .filter((method) => method.enabled)
+    .map((method) =>
+      method.providers.length > 0
+        ? `${method.label} (${method.providers.join(", ")})`
+        : method.label,
+    )
+    .join(" + ");
+}
+
+function readProviders(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((slug): slug is string => typeof slug === "string")
+    : [];
 }
 
 /**

@@ -123,6 +123,21 @@ describe("user schemas list", () => {
     expect(await screen.findByText("Passkey + Password")).toBeInTheDocument();
   });
 
+  it("names the SSO providers a schema lists in its sign-in methods", async () => {
+    const withSso = {
+      ...BUSINESS,
+      "x-auth-methods": {
+        ...BUSINESS["x-auth-methods"],
+        sso: { enabled: true, providers: ["google", "github"] },
+      },
+    };
+    serveList(envelope("sch_sso", withSso), envelope("sch_business", BUSINESS));
+    await renderAt("/schemas");
+    expect(await screen.findByText("Passkey + SSO (google, github)")).toBeInTheDocument();
+    // No `sso` at all: no provider list.
+    expect(screen.getByText("Passkey")).toBeInTheDocument();
+  });
+
   it("lays the directory out as a resource table with a created column (D17)", async () => {
     serveList(envelope("sch_business", BUSINESS));
     await renderAt("/schemas");
@@ -397,6 +412,53 @@ describe("user schema detail", () => {
     // Same stable alphabetical order as the list chip, for the same reason.
     const text = screen.getByRole("tabpanel").textContent ?? "";
     expect(text.indexOf("Passkey")).toBeLessThan(text.indexOf("Password"));
+  });
+
+  it("lists the SSO provider slugs next to the SSO state", async () => {
+    const withSso = {
+      ...BUSINESS,
+      "x-auth-methods": {
+        ...BUSINESS["x-auth-methods"],
+        sso: { enabled: true, providers: ["google", "github"] },
+      },
+    };
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json(envelope("sch_business", withSso)),
+      ),
+    );
+    await renderAt("/schemas/sch_business");
+    await screen.findByRole("heading", { name: "Business" });
+    await userEvent.click(screen.getByRole("tab", { name: "Authentication" }));
+
+    const sso = within(await screen.findByRole("tabpanel")).getByText("SSO").nextSibling;
+    expect(sso).toHaveTextContent("google");
+    expect(sso).toHaveTextContent("github");
+    expect(sso).toHaveTextContent("Enabled");
+  });
+
+  it("lists no providers for a disabled SSO method", async () => {
+    // `providers` on a disabled method is forbidden by the meta-schema; a
+    // stray one describes nothing a user can sign in with.
+    const disabled = {
+      ...BUSINESS,
+      "x-auth-methods": {
+        ...BUSINESS["x-auth-methods"],
+        sso: { enabled: false, providers: ["google"] },
+      },
+    };
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json(envelope("sch_business", disabled)),
+      ),
+    );
+    await renderAt("/schemas/sch_business");
+    await screen.findByRole("heading", { name: "Business" });
+    await userEvent.click(screen.getByRole("tab", { name: "Authentication" }));
+
+    const sso = within(await screen.findByRole("tabpanel")).getByText("SSO").nextSibling;
+    expect(sso).toHaveTextContent("Disabled");
+    expect(sso).not.toHaveTextContent("google");
   });
 
   it("renders the document as JSON and as YAML", async () => {
