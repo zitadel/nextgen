@@ -237,7 +237,7 @@ func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjec
 // unchanged.
 //
 // POST /releases
-func (UnimplementedHandler) CreateRelease(ctx context.Context, req *CreateReleaseRequest, params CreateReleaseParams) (r CreateReleaseRes, _ error) {
+func (UnimplementedHandler) CreateRelease(ctx context.Context, req CreateReleaseRequest, params CreateReleaseParams) (r CreateReleaseRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

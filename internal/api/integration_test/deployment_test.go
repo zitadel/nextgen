@@ -25,7 +25,7 @@ type deploymentFixture struct {
 func newDeploymentFixture(t *testing.T) deploymentFixture {
 	t.Helper()
 	fixture := newReleaseFixture(t)
-	resp := fixture.create(t, &api.CreateReleaseRequest{Pointers: fixture.pointers()})
+	resp := fixture.create(t, &api.CreateReleaseFromPointers{Pointers: fixture.pointers()})
 	require.IsType(t, &api.CreateReleaseCreated{}, resp, helpers.MustMarshal(t, resp))
 	return deploymentFixture{
 		releaseFixture: fixture,
@@ -46,7 +46,7 @@ func (f deploymentFixture) newRelease(t *testing.T) string {
 			pointers[i].RevisionID = brandingID
 		}
 	}
-	resp := f.create(t, &api.CreateReleaseRequest{Pointers: pointers})
+	resp := f.create(t, &api.CreateReleaseFromPointers{Pointers: pointers})
 	require.IsType(t, &api.CreateReleaseCreated{}, resp, helpers.MustMarshal(t, resp))
 	return string(resp.(*api.CreateReleaseCreated).ID)
 }

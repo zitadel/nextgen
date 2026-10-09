@@ -797,7 +797,7 @@ func (s *Server) decodeCreateProjectRequest(r *http.Request) (
 }
 
 func (s *Server) decodeCreateReleaseRequest(r *http.Request) (
-	req *CreateReleaseRequest,
+	req CreateReleaseRequest,
 	rawBody []byte,
 	close func() error,
 	rerr error,
@@ -869,7 +869,7 @@ func (s *Server) decodeCreateReleaseRequest(r *http.Request) (
 		}(); err != nil {
 			return req, rawBody, close, errors.Wrap(err, "validate")
 		}
-		return &request, rawBody, close, nil
+		return request, rawBody, close, nil
 	default:
 		return req, rawBody, close, validate.InvalidContentType(ct)
 	}
