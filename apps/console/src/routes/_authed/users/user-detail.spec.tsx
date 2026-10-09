@@ -100,6 +100,9 @@ describe("user detail", () => {
     stub();
     const projects: (string | null)[] = [];
     server.use(
+      http.get("*/api/projects/proj_other", () =>
+        HttpResponse.json({ id: "proj_other", name: "Other project" }),
+      ),
       http.get(`${SCHEMAS_URL}/sch_business`, ({ request }) => {
         projects.push(new URL(request.url).searchParams.get("project_id"));
         return HttpResponse.json({ id: "sch_business", schema: BUSINESS });

@@ -343,6 +343,9 @@ describe("user schema detail", () => {
     // same `$id` everywhere), so the id alone could resolve in the caller's own.
     const projects: (string | null)[] = [];
     server.use(
+      http.get("*/api/projects/proj_other", () =>
+        HttpResponse.json({ id: "proj_other", name: "Other project" }),
+      ),
       http.get(`${SCHEMAS_URL}/sch_business`, ({ request }) => {
         projects.push(new URL(request.url).searchParams.get("project_id"));
         return HttpResponse.json(envelope("sch_business", BUSINESS));
