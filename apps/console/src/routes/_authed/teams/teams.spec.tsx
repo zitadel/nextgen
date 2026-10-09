@@ -1,9 +1,9 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
+import { server } from "@/test/msw";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -13,17 +13,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
-
 const TEAMS_URL = "http://localhost/api/teams/query";
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => {
-  server.close();
-  vi.unstubAllEnvs();
-});
 
 /** The same locale-derived string the screen renders, rather than one locale's output. */
 function expectedDate(value: string): string {
@@ -112,13 +102,20 @@ describe("teams screen", () => {
   });
 
   it("opens the team when the row is clicked", async () => {
-    server.use(http.post(TEAMS_URL, () => HttpResponse.json({ teams: [team()] })));
+    server.use(
+      http.post(TEAMS_URL, () => HttpResponse.json({ teams: [team()] })),
+      // The click opens the team's page, whose loader reads the team.
+      http.get(`http://localhost/api/teams/${team().id}`, () => HttpResponse.json(team())),
+    );
     const router = await renderTeams();
 
     const row = (await screen.findByRole("link", { name: "Acme Web" })).closest("tr");
     expect(row).not.toBeNull();
     await userEvent.click(row as HTMLElement);
 
+    // The team's page, not only its URL: the test ends once the page has read
+    // its team, rather than with that read still in flight.
+    expect(await screen.findByRole("heading", { name: "Acme Web" })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe(`/teams/${team().id}`);
   });
 

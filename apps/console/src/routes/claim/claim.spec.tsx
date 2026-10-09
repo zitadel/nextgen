@@ -2,14 +2,14 @@ import { RouterProvider, createBrowserHistory, createMemoryHistory } from "@tans
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { makeTestSession } from "@/test/session.fixture";
 import { listMyProjectsCached } from "../../lib/project-scope";
 import { _setRuntimeForTesting } from "../../runtime/runtime";
 import { createAppRouter } from "../../router";
 import { _resetClaimAttemptsForTesting } from "../../lib/claim";
+import { server } from "@/test/msw";
 
 /**
  * The claim page (#615): `claim/init` hands the CLI a URL of the form
@@ -55,15 +55,8 @@ const PROJECT_ID = "proj_claimme";
 const CHALLENGE_ID = "chal_1";
 const CLAIM_PATH = `/claim?challenge_id=${CHALLENGE_ID}&project_id=${PROJECT_ID}`;
 
-// A path pattern rather than an absolute URL: this spec imports the router
-// statically, so `api/zitadel.ts` binds its base before any `stubEnv`.
 const COMPLETE_PATTERN = `*/api/projects/${PROJECT_ID}/claim/complete`;
 const WINDOW_PATTERN = `*/api/projects/${PROJECT_ID}/claim/window`;
-
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterAll(() => server.close());
 
 beforeEach(() => {
   fetchSession.mockReset();
@@ -74,11 +67,9 @@ beforeEach(() => {
   // The widget renders only when a project id resolves (ADR 0004 §§2–3). A
   // claim signs in to the platform project, which the runtime document names.
   _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_platform" });
-});
-
-afterEach(() => {
-  vi.unstubAllEnvs();
-  server.resetHandlers();
+  // The page always reads the claim window for its countdown; an open one
+  // keeps the cases that are not about the countdown about the claim.
+  stubWindow(7);
 });
 
 async function renderAt(path: string) {
