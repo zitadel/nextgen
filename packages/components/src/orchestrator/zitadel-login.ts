@@ -215,6 +215,16 @@ export class ZitadelLogin extends ZitadelSurface {
   @property({ type: String, attribute: "resume-flow-id" }) accessor resumeFlowId = "";
 
   /**
+   * Hide the show/hide button on password fields. The button is shown by
+   * default — NIST SP 800-63B recommends offering it — so this is an opt-out,
+   * named negatively because a boolean attribute can only switch something
+   * on. Local to the embedding page, and applied to the rendered fields
+   * directly, so it holds for custom templates too.
+   */
+  @property({ type: Boolean, attribute: "suppress-password-toggle" })
+  accessor suppressPasswordToggle = false;
+
+  /**
    * Preview mode, for an operator surface such as the console's branding
    * screen. Set, the element starts the flow as usual so the step it paints
    * is the one the project serves, then shows it in the named state and
@@ -475,6 +485,26 @@ export class ZitadelLogin extends ZitadelSurface {
     this.setAttribute("aria-busy", this.loading ? "true" : "false");
   }
 
+  /**
+   * Set on the fields rather than written by the template: the toggle is the
+   * embedding page's choice, not the flow's, so it reaches ejected templates
+   * without their cooperation. Runs before the fresh fields' first render, so
+   * the button never flashes in or out.
+   */
+  private applyPasswordToggle(root: ShadowRoot): void {
+    // Compared, not passed through: an unset framework prop arrives as
+    // `undefined`, which must keep the default (toggle shown).
+    const enabled = this.suppressPasswordToggle !== true;
+    const locale = this.resolveLocale();
+    const show = locale["action.show_password"] ?? en["action.show_password"];
+    const hide = locale["action.hide_password"] ?? en["action.hide_password"];
+    for (const field of root.querySelectorAll("zl-field")) {
+      field.passwordToggle = enabled;
+      if (show) field.showPasswordLabel = show;
+      if (hide) field.hidePasswordLabel = hide;
+    }
+  }
+
   override updated(changed: PropertyValues<this>): void {
     // Re-stamp part forwarding and widget-mode chrome on every commit:
     // `unsafeHTML` re-parses whenever the rendered string changes (step
@@ -506,6 +536,7 @@ export class ZitadelLogin extends ZitadelSurface {
       for (const card of this.shadowRoot.querySelectorAll("zl-card")) {
         card.toggleAttribute("data-suppress-header", this.suppressHeader === true);
       }
+      this.applyPasswordToggle(this.shadowRoot);
     }
     const previousTheme = this.lastRenderedTheme;
     this.lastRenderedTheme = this.themeController.theme;

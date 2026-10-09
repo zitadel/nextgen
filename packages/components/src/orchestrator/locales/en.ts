@@ -152,6 +152,11 @@ export const en: Record<string, string> = {
   "submit.continue": "Continue",
   "submit.signin": "Sign in",
   "action.forgot_password": "Forgot password?",
+  // The password toggle's name. Kept free of "password" so a label lookup for
+  // the field still finds exactly one control; the button is described by the
+  // field's label instead.
+  "action.show_password": "Show",
+  "action.hide_password": "Hide",
   "action.cancel": "Cancel",
   // Generic fallback for the engine-injected `<step>.action.back` key on
   // custom step names (see INJECTED_KEY_FALLBACKS in liquid.ts).

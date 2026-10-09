@@ -37,10 +37,12 @@ export type ZlFieldInputDetail = { name: string; value: string };
  *   input        36px tall, 10px/4px padding, `--zl-radius-md`, a
  *                `--zl-input` edge over `--zl-input-fill`
  *   focus        the edge takes `--zl-ring` and a 3px ring sits outside it
- *   trailing     cross (clear) | alert-circle (error) | check (success).
- *                The clear button is a pointer-only affordance (`tabindex="-1"`)
- *                so Tab moves from one input straight to the next; keyboard
- *                users clear via the input itself.
+ *   trailing     cross (clear) | alert-circle (error) | check (success), or
+ *                eye / eye-off on a password field with `passwordToggle` — the
+ *                toggle takes the slot in every state, so the field never
+ *                shows two icons. Both buttons are pointer-only affordances
+ *                (`tabindex="-1"`) so Tab moves from one input straight to
+ *                the next; keyboard users clear via the input itself.
  *   description  14/20 in `--zl-muted-foreground`
  *
  * Form participation: `<zl-field>` is a form-associated custom element.
@@ -74,9 +76,26 @@ export class ZlField extends FormAtom {
     | string
     | undefined = undefined;
   @property({ type: Boolean, attribute: "trailing-icon" }) accessor trailingIcon = true;
+  /**
+   * Offer a show/hide button on a `type="password"` field. Property-only and
+   * left out of the manifest: `<zitadel-login>` sets it on its fields after
+   * each render from its own `suppress-password-toggle`, so neither a
+   * template nor markup decides it.
+   */
+  @property({ attribute: false }) accessor passwordToggle = false;
+  /**
+   * The toggle's accessible name. Deliberately without "password": label
+   * lookups (`getByLabel("Password")`, agents reading the accessibility tree)
+   * match by substring, and a "Show password" button would make the field
+   * ambiguous. The button points at the field's label for that context.
+   */
+  @property({ attribute: false }) accessor showPasswordLabel = "Show";
+  @property({ attribute: false }) accessor hidePasswordLabel = "Hide";
   @property({ type: Boolean }) accessor required = false;
   @property({ type: Boolean, reflect: true }) accessor invalid = false;
 
+  /** Whether a toggle-enabled password field currently shows its value. */
+  @state() private accessor revealed = false;
   @state() private accessor hasHelp = false;
   @state() private accessor hasSuffixSlot = false;
 
@@ -97,6 +116,46 @@ export class ZlField extends FormAtom {
     if (changed.has("value") || changed.has("required") || changed.has("error")) {
       this.syncFormState();
     }
+    // Whenever the button is not drawn there is no way to hide the value
+    // again, so it must not stay revealed.
+    if (this.revealed && (!this.hasPasswordToggle || this.hasSuffixSlot || this.isDisabled)) {
+      this.revealed = false;
+    }
+  }
+
+  /**
+   * Form-associated lifecycle: the browser calls this whenever the owning
+   * form changes, including `null` on removal. The submit listener lives on
+   * the form because every submit path — a submit button and Enter alike —
+   * ends in `form.requestSubmit()`, which dispatches `submit` synchronously.
+   */
+  formAssociatedCallback(form: HTMLFormElement | null): void {
+    this.associatedForm?.removeEventListener("submit", this.concealOnSubmit, true);
+    this.associatedForm = form;
+    form?.addEventListener("submit", this.concealOnSubmit, true);
+  }
+
+  private associatedForm: HTMLFormElement | null = null;
+
+  /**
+   * Hide the value before the submit event reaches anyone else on the form.
+   * Setting `revealed` alone is not enough: Lit applies it on a later
+   * microtask, after the submit has already been dispatched with the input
+   * still `type="text"`.
+   */
+  private concealOnSubmit = (): void => {
+    if (!this.revealed) return;
+    this.revealed = false;
+    if (this.inputEl) this.inputEl.type = this.type;
+  };
+
+  override formResetCallback(): void {
+    this.revealed = false;
+    super.formResetCallback();
+  }
+
+  private get hasPasswordToggle(): boolean {
+    return this.passwordToggle === true && this.type === "password";
   }
 
   override focus(options?: FocusOptions): void {
@@ -136,11 +195,26 @@ export class ZlField extends FormAtom {
       "zr-field--success": showSuccess,
       "zr-field--disabled": this.isDisabled,
     });
-    const showDefaultTrailing = this.trailingIcon && !this.hasSuffixSlot && !this.isDisabled;
-    const trailing = showDefaultTrailing ? this.renderTrailingIcon() : null;
+    const passwordToggle = this.hasPasswordToggle;
+    const showDefaultTrailing =
+      (this.trailingIcon || passwordToggle) && !this.hasSuffixSlot && !this.isDisabled;
+    // The toggle lives in the trailing slot, so a filled `suffix` (or a
+    // disabled field) means it is not drawn. Everything that assumes our
+    // button — the revealed type, hiding Edge's own reveal — keys off this.
+    const toggleShown = passwordToggle && showDefaultTrailing;
+    const trailing = !showDefaultTrailing
+      ? null
+      : toggleShown
+        ? this.renderPasswordToggle(this.label ? labelId : undefined)
+        : this.renderTrailingIcon();
+    // A revealed password is a `type="text"` input, which browsers hand to
+    // spellcheck and autocorrect — and "enhanced" spellcheck sends the text to
+    // a cloud service. Opting out up front covers the revealed state.
+    const revealed = toggleShown && this.revealed;
     const wrapClass = classMap({
       "zr-field__wrap": true,
       "zr-field__wrap--trailing": showDefaultTrailing,
+      "zr-field__wrap--toggle": toggleShown,
     });
 
     return html`
@@ -154,7 +228,10 @@ export class ZlField extends FormAtom {
             id=${this.inputId}
             data-testid=${ifDefined(this.nativeInputTestId())}
             name=${this.name}
-            type=${this.type}
+            type=${revealed ? "text" : this.type}
+            spellcheck=${ifDefined(toggleShown ? "false" : undefined)}
+            autocapitalize=${ifDefined(toggleShown ? "off" : undefined)}
+            autocorrect=${ifDefined(toggleShown ? "off" : undefined)}
             .value=${live(this.value)}
             placeholder=${this.placeholder}
             autocomplete=${ifDefined(this.autocomplete)}
@@ -254,6 +331,35 @@ export class ZlField extends FormAtom {
       </span>
     `;
   }
+
+  private renderPasswordToggle(labelId: string | undefined) {
+    const label = this.revealed ? this.hidePasswordLabel : this.showPasswordLabel;
+    return html`
+      <span class="zr-field__trailing zr-field__trailing--toggle" part="trailing-icon">
+        <button
+          type="button"
+          class="zr-field__trailing-action zr-focus-ring"
+          part="trailing-action password-toggle"
+          aria-label=${label}
+          aria-pressed=${this.revealed ? "true" : "false"}
+          aria-controls=${this.inputId}
+          aria-describedby=${ifDefined(labelId)}
+          title=${label}
+          tabindex="-1"
+          @click=${this.handlePasswordToggle}
+        >
+          <zl-icon name=${this.revealed ? "eye-off" : "eye"} size="16" decorative></zl-icon>
+        </button>
+      </span>
+    `;
+  }
+
+  private handlePasswordToggle = (): void => {
+    this.revealed = !this.revealed;
+    // The button is out of the tab order, so a click would otherwise leave
+    // focus on it rather than back in the field the user is typing into.
+    this.inputEl?.focus();
+  };
 
   private syncFormState(): void {
     this.internals.setFormValue?.(this.value);
@@ -387,6 +493,7 @@ export const zlFieldManifest: AtomManifest = {
     "input",
     "trailing-icon",
     "trailing-action",
+    "password-toggle",
     "help",
     "success",
     "error",

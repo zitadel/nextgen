@@ -55,6 +55,7 @@ export default defineComponent({
     variant: { type: String as PropType<"widget" | "page">, default: undefined },
     theme: { type: String as PropType<"light" | "dark" | "auto">, default: undefined },
     suppressHeader: { type: Boolean, default: undefined },
+    suppressPasswordToggle: { type: Boolean, default: undefined },
   },
   emits: ["flowStep", "flowInput", "flowComplete", "flowRedirect", "flowError"],
   setup(props, { emit, expose }) {
@@ -82,6 +83,7 @@ export default defineComponent({
         variant: props.variant,
         theme: props.theme,
         suppressHeader: props.suppressHeader,
+        suppressPasswordToggle: props.suppressPasswordToggle,
         onZitadelFlowStep: (event: CustomEvent<ZitadelFlowStepDetail>) => {
           emit("flowStep", event.detail);
         },

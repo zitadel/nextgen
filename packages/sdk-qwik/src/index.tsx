@@ -64,6 +64,9 @@ function bindLoginConfig(el: ZitadelLoginElement, props: ZitadelLoginProps): voi
   setProp(el, "variant", props.variant);
   setProp(el, "theme", props.theme);
   setProp(el, "suppressHeader", props.suppressHeader);
+  // A concrete boolean, not the raw prop: `setProp` skips `undefined`, so
+  // going from `true` back to unset would otherwise leave the toggle hidden.
+  setProp(el, "suppressPasswordToggle", props.suppressPasswordToggle === true);
   setProp(el, "locales", props.locales);
   setProp(el, "lang", props.lang);
 }

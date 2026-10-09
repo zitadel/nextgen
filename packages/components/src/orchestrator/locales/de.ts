@@ -152,6 +152,8 @@ export const de: Locale = {
   "submit.continue": "Weiter",
   "submit.signin": "Anmelden",
   "action.forgot_password": "Passwort vergessen?",
+  "action.show_password": "Anzeigen",
+  "action.hide_password": "Verbergen",
   "action.cancel": "Abbrechen",
   // Generische Rückfalloption für den von der Engine injizierten
   // `<step>.action.back`-Schlüssel (siehe INJECTED_KEY_FALLBACKS in liquid.ts).
