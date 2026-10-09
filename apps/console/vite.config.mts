@@ -82,11 +82,10 @@ export default defineConfig(({ command, mode, isPreview }) => ({
       VITE_CONSOLE_RUNTIME_FALLBACK: "",
     },
     unstubEnvs: true,
-    // The per-test runner budget must exceed the RTL asyncUtilTimeout (60s, set
-    // in test-setup.ts); otherwise a slow query hits the testTimeout before its
-    // own wait window elapses, cutting the findBy short and hiding Testing
-    // Library's diagnostic. A test makes several such queries, hence 5 minutes.
-    testTimeout: 300_000,
+    // Above the RTL asyncUtilTimeout (5s, set in test-setup.ts) with room for a
+    // test that makes several queries, so a slow query reports its own Testing
+    // Library diagnostic rather than being cut short by this budget.
+    testTimeout: 20_000,
   },
 }));
 
