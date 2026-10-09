@@ -8,6 +8,10 @@ export default defineConfig({
     ...baseTest,
     name: "@zitadel/cli",
     environment: "node",
+    // The integration specs drive the built CLI; keep their telemetry off with
+    // the cross-tool standard (https://consoledonottrack.com) so a unit run
+    // never ships events, independent of the moon/CI env.
+    env: { DO_NOT_TRACK: "1" },
     // Both suffixes, for the same reason the shared base matches both: a
     // renamed suite must not vanish silently. Specs are `*.spec.ts`, unit
     // tests `*.test.ts` (tests/AGENTS.md).
