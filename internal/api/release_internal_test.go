@@ -79,9 +79,9 @@ func TestReleaseAccessRow(t *testing.T) {
 }
 
 // Pins the request contract of POST /releases at the decoder: exactly one of
-// pointers and bundle, and a bundle that is closed and carries something. A
-// generator or schema change that loosens any of these fails here rather than
-// reaching the handler.
+// pointers and bundle, and a bundle that refuses unknown keys. A generator or
+// schema change that loosens either fails here rather than reaching the
+// handler.
 func TestCreateReleaseRequestShape(t *testing.T) {
 	t.Parallel()
 
@@ -97,6 +97,13 @@ func TestCreateReleaseRequestShape(t *testing.T) {
 			body: `{"bundle":{"brandings":[{}]}}`,
 			want: api.CreateReleaseFromBundleCreateReleaseRequest,
 		},
+		// Every kind is optional, and a project that never ejected its
+		// branding sends it empty. An empty bundle as a whole is the
+		// server's to refuse, not the decoder's.
+		"bundle with an empty kind": {
+			body: `{"bundle":{"flow_definitions":[],"brandings":[]}}`,
+			want: api.CreateReleaseFromBundleCreateReleaseRequest,
+		},
 	}
 	for name, tc := range accepted {
 		t.Run(name, func(t *testing.T) {
@@ -110,8 +117,6 @@ func TestCreateReleaseRequestShape(t *testing.T) {
 	refused := map[string]string{
 		"both":               `{"pointers":[{"kind":"schema","revision_id":"sch_1"}],"bundle":{"brandings":[{}]}}`,
 		"neither":            `{"message":"no content"}`,
-		"empty bundle":       `{"bundle":{}}`,
-		"empty kind":         `{"bundle":{"schemas":[]}}`,
 		"unknown bundle key": `{"bundle":{"flowDefinitions":[{}]}}`,
 		"empty pointers":     `{"pointers":[]}`,
 	}

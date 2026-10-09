@@ -16,30 +16,27 @@ description: |
   handle. A bundle that references only resources it carries builds the
   same release on any project.
 
-  Carries at least one resource and at most 50 across all kinds, the most a
-  release pins; a kind with nothing to send is omitted rather than sent
-  empty. Unknown keys are refused. More kinds join as they become release
-  kinds.
+  Each kind is optional and may be empty: a project that never ejected its
+  branding sends none. Across all kinds the bundle carries at least one
+  resource and at most 50, the most a release pins; the server refuses
+  anything outside that with `rel.invalid`. Unknown keys are refused. More
+  kinds join as they become release kinds.
 additionalProperties: false
-minProperties: 1
 properties:
   schemas:
     type: array
-    minItems: 1
     maxItems: 50
     description: User schemas, one per `.zitadel/schemas/*.json`.
     items:
       $ref: ../schemas/user-schema.yaml
   flow_definitions:
     type: array
-    minItems: 1
     maxItems: 50
     description: Flow definitions, one per `.zitadel/flows/*.json`.
     items:
       $ref: ../../components/flows/flow-definition.yaml
   brandings:
     type: array
-    minItems: 1
     maxItems: 1
     description: |
       The descriptor from `.zitadel/branding/branding.json` with its template
