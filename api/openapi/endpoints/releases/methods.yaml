@@ -42,10 +42,10 @@ post:
     because a release pins many and the code alone does not say which one
     failed.
 
-    Idempotent on the pinned set: metadata is excluded from the comparison,
-    so re-submitting the same content with a different `message` answers
-    `200` with the release that already pins it rather than creating a
-    second one. A release the project did not hold before answers `201`.
+    Idempotent on content: the content digest excludes metadata, so
+    re-submitting the same content with a different `message` answers `200`
+    with the release that already has it rather than creating a second one.
+    A release the project did not hold before answers `201`.
 
     Creating a release does not deploy it. A release is not tied to an
     origin, and the same release can later be deployed to any number of
@@ -160,6 +160,7 @@ post:
               value:
                 id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
                 project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                content_hash: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
                 metadata:
                   message: add phone_number to human-user
                   git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
@@ -194,6 +195,7 @@ post:
               value:
                 id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
                 project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                content_hash: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
                 metadata:
                   message: add phone_number to human-user
                   git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
@@ -222,6 +224,7 @@ post:
               value:
                 id: rel_01KX4A2B9C7F0N9WD3P2E4YM5D2
                 project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                content_hash: sha256:4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293
                 metadata:
                   message: deploy from CI
                   git_sha: 8d4e1a0f2b3c4d5e6f708192a3b4c5d6e7f80912
@@ -285,12 +288,19 @@ get:
   description: |
     Lists the project's releases, newest first.
 
-    Entries carry metadata only — the pinned set is omitted. Read one release
-    with `GET /releases/{release_id}` to get its pointers.
+    Entries carry the digest and the metadata — the pinned set is omitted.
+    Read one release with `GET /releases/{release_id}` to get its pointers.
+
+    `content_hash` looks a release up by its content, as the CLI does when a
+    person types the digest a transcript printed. The project holds at most
+    one release per digest, so the filtered list has one entry or none, and
+    an unknown digest is an empty list rather than an error. Paths take the
+    `rel_` id only; the matched entry's `id` is what to use there.
   tags:
     - Releases
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/release-content-hash-filter.yaml
     - $ref: ../../components/parameters/limit.yaml
     - $ref: ../../components/parameters/page-token.yaml
   security:
@@ -310,6 +320,7 @@ get:
                 releases:
                   - id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
                     project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    content_hash: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
                     metadata:
                       message: add phone_number to human-user
                       git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
@@ -319,6 +330,7 @@ get:
                       created_by_type: human
                   - id: rel_01KX2ZJ4B8C7F0N9WD3P2E4YM5
                     project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    content_hash: sha256:0f1e2d3c4b5a69788796a5b4c3d2e1f0091827364554637281909a8b7c6d5e4f
                     metadata:
                       message: initial import
                       git_sha: 0f1e2d3c4b5a69788796a5b4c3d2e1f009182736
@@ -336,6 +348,7 @@ get:
                 releases:
                   - id: rel_01KX2ZJ4B8C7F0N9WD3P2E4YM5
                     project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    content_hash: sha256:0f1e2d3c4b5a69788796a5b4c3d2e1f0091827364554637281909a8b7c6d5e4f
                     metadata:
                       message: initial import
                       git_sha: null
@@ -343,5 +356,27 @@ get:
                       created_at: '2026-07-13T08:00:00Z'
                       created_by: null
                       created_by_type: null
+            byContentHash:
+              summary: Looked up by digest
+              description: |
+                The `content_hash` filter matched one release. The same filter
+                with a digest no release of the project carries answers
+                `releases: []`.
+              value:
+                releases:
+                  - id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    content_hash: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
+                    metadata:
+                      message: add phone_number to human-user
+                      git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+                      git_dirty: false
+                      created_at: '2026-07-14T09:11:00Z'
+                      created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                      created_by_type: human
+            unknownDigest:
+              summary: A digest no release carries
+              value:
+                releases: []
     default:
       $ref: listReleases-error-response.yaml

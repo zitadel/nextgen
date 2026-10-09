@@ -222,10 +222,10 @@ type Invoker interface {
 	// `flow_definition default-login: user_schema human-user not found`,
 	// because a release pins many and the code alone does not say which one
 	// failed.
-	// Idempotent on the pinned set: metadata is excluded from the comparison,
-	// so re-submitting the same content with a different `message` answers
-	// `200` with the release that already pins it rather than creating a
-	// second one. A release the project did not hold before answers `201`.
+	// Idempotent on content: the content digest excludes metadata, so
+	// re-submitting the same content with a different `message` answers `200`
+	// with the release that already has it rather than creating a second one.
+	// A release the project did not hold before answers `201`.
 	// Creating a release does not deploy it. A release is not tied to an
 	// origin, and the same release can later be deployed to any number of
 	// origins unchanged.
@@ -521,8 +521,10 @@ type Invoker interface {
 	GetReady(ctx context.Context) (GetReadyRes, error)
 	// GetReleaseById invokes getReleaseById operation.
 	//
-	// Reads one release: its metadata and the `(kind, handle, revision_id)`
-	// tuples it pins.
+	// Reads one release: its digest, its metadata and the
+	// `(kind, handle, revision_id)` tuples it pins.
+	// The path takes the `rel_` id only. To find a release from its digest,
+	// list with the `content_hash` filter and read the matched entry's `id`.
 	// Does not embed resource content. Resolve each `revision_id` through the
 	// per-kind read endpoints when the bytes are needed.
 	// The lookup is scoped to the project in `project_id`: a release id belonging
@@ -686,8 +688,13 @@ type Invoker interface {
 	// ListReleases invokes listReleases operation.
 	//
 	// Lists the project's releases, newest first.
-	// Entries carry metadata only — the pinned set is omitted. Read one release
-	// with `GET /releases/{release_id}` to get its pointers.
+	// Entries carry the digest and the metadata — the pinned set is omitted.
+	// Read one release with `GET /releases/{release_id}` to get its pointers.
+	// `content_hash` looks a release up by its content, as the CLI does when a
+	// person types the digest a transcript printed. The project holds at most
+	// one release per digest, so the filtered list has one entry or none, and
+	// an unknown digest is an empty list rather than an error. Paths take the
+	// `rel_` id only; the matched entry's `id` is what to use there.
 	//
 	// GET /releases
 	ListReleases(ctx context.Context, params ListReleasesParams) (ListReleasesRes, error)
@@ -2477,10 +2484,10 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 // `flow_definition default-login: user_schema human-user not found`,
 // because a release pins many and the code alone does not say which one
 // failed.
-// Idempotent on the pinned set: metadata is excluded from the comparison,
-// so re-submitting the same content with a different `message` answers
-// `200` with the release that already pins it rather than creating a
-// second one. A release the project did not hold before answers `201`.
+// Idempotent on content: the content digest excludes metadata, so
+// re-submitting the same content with a different `message` answers `200`
+// with the release that already has it rather than creating a second one.
+// A release the project did not hold before answers `201`.
 // Creating a release does not deploy it. A release is not tied to an
 // origin, and the same release can later be deployed to any number of
 // origins unchanged.
@@ -6612,8 +6619,10 @@ func (c *Client) sendGetReady(ctx context.Context) (res GetReadyRes, err error) 
 
 // GetReleaseById invokes getReleaseById operation.
 //
-// Reads one release: its metadata and the `(kind, handle, revision_id)`
-// tuples it pins.
+// Reads one release: its digest, its metadata and the
+// `(kind, handle, revision_id)` tuples it pins.
+// The path takes the `rel_` id only. To find a release from its digest,
+// list with the `content_hash` filter and read the matched entry's `id`.
 // Does not embed resource content. Resolve each `revision_id` through the
 // per-kind read endpoints when the bytes are needed.
 // The lookup is scoped to the project in `project_id`: a release id belonging
@@ -9571,8 +9580,13 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 // ListReleases invokes listReleases operation.
 //
 // Lists the project's releases, newest first.
-// Entries carry metadata only — the pinned set is omitted. Read one release
-// with `GET /releases/{release_id}` to get its pointers.
+// Entries carry the digest and the metadata — the pinned set is omitted.
+// Read one release with `GET /releases/{release_id}` to get its pointers.
+// `content_hash` looks a release up by its content, as the CLI does when a
+// person types the digest a transcript printed. The project holds at most
+// one release per digest, so the filtered list has one entry or none, and
+// an unknown digest is an empty list rather than an error. Paths take the
+// `rel_` id only; the matched entry's `id` is what to use there.
 //
 // GET /releases
 func (c *Client) ListReleases(ctx context.Context, params ListReleasesParams) (ListReleasesRes, error) {
@@ -9634,6 +9648,26 @@ func (c *Client) sendListReleases(ctx context.Context, params ListReleasesParams
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if unwrapped := string(params.ProjectID); true {
 				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "content_hash" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "content_hash",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ContentHash.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
 			}
 			return nil
 		}); err != nil {

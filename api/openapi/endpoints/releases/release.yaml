@@ -10,10 +10,15 @@ description: |
 
   A release exists on its own and is not tied to an origin. Deploying it is a
   separate call.
+
+  Two identifiers: `id` is the one paths and `release_id` fields take;
+  `content_hash` is the digest of the content the release pins, printed by
+  the CLI and pinned by builds, and looked up through fields that name it.
 type: object
 required:
   - id
   - project_id
+  - content_hash
   - metadata
   - pointers
 properties:
@@ -25,6 +30,12 @@ properties:
     readOnly: true
     description: The project this release belongs to.
     $ref: ../../components/schemas/project-id.yaml
+  content_hash:
+    readOnly: true
+    description: |
+      The digest of the pinned content. Identical for two releases with the
+      same content, which is why a project never holds two such releases.
+    $ref: ../../components/schemas/release-content-hash.yaml
   metadata:
     readOnly: true
     $ref: release-metadata.yaml

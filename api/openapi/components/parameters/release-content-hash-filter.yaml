@@ -1,0 +1,14 @@
+name: content_hash
+in: query
+required: false
+description: |
+  Narrows the list to the release with this content digest, given in full
+  with its `sha256:` prefix. A project holds at most one release per digest,
+  so the result has one entry or none.
+
+  A digest no release of the project carries answers an empty list, not an
+  error: the filter asks which release has this content, and "none" is a
+  valid answer. Paths never take a digest; read the matched entry's `id`
+  and use that.
+schema:
+  $ref: '../schemas/release-content-hash.yaml'

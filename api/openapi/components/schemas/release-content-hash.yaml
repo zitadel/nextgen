@@ -1,0 +1,38 @@
+title: ReleaseContentHash
+type: string
+description: |
+  The content digest of a release: `sha256:` followed by 64 lowercase hex
+  characters. Always the full digest; no short form is accepted anywhere.
+
+  The digest covers the content of the resources the release pins and
+  nothing else. Revision ids, metadata and the project are not part of it.
+  A bundle that carries every resource it references therefore has the same
+  digest on every project, and a client can compute it before sending
+  anything. When a bundle leaves a referenced resource to the project, the
+  release pins the project's revision of it too, and the digest covers that
+  resource as the project holds it.
+
+  To compute it:
+
+  1. Take every resource in the release as the `bundle` of
+     `POST /releases` carries it, with `kind` set to `schema`,
+     `flow_definition` or `branding`, and `handle` set to the schema's
+     `objectType`, the flow definition's `name`, or `default` for branding.
+  2. Build the JSON document
+     `{"version": 1, "resources": [{"kind": …, "handle": …, "content": …}, …]}`,
+     with `resources` sorted by `kind`, then by `handle`.
+  3. Serialise that document as canonical JSON (RFC 8785).
+  4. The digest is the SHA-256 of those bytes, written as `sha256:` and
+     lowercase hex.
+
+  A release built from `pointers` has the digest its pinned revisions would
+  have if they were sent as a bundle.
+
+  The digest identifies a release on the wire but never appears in a path,
+  which takes the `rel_` id. Fields that look a release up by content say
+  so by name: the `content_hash` filter of `GET /releases`, and
+  `content_hash` in place of `release_id` on `POST /deployments`.
+pattern: '^sha256:[0-9a-f]{64}$'
+minLength: 71
+maxLength: 71
+example: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
