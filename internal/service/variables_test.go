@@ -44,11 +44,7 @@ func newMockedVariableService(t *testing.T) (service.VariableService, *servicemo
 }
 
 var (
-	variablesOwner = domain.VariableOwner{
-		ProjectID:     "project-1",
-		EnvironmentID: "env_prod",
-	}
-	variablesProjectOwner = domain.VariableOwner{ProjectID: variablesOwner.ProjectID}
+	variablesOwner = domain.VariableOwner{ProjectID: "project-1"}
 )
 
 // testCrypter is a real AES256GCM crypter, not a stand-in: it writes the key id
@@ -71,7 +67,7 @@ func TestVariableService_GetVariables(t *testing.T) {
 	t.Run("passes the owner and names through", func(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
-		stored := []*domain.Variable{testVariable(t, "theme", variablesProjectOwner, "dark")}
+		stored := []*domain.Variable{testVariable(t, "theme", variablesOwner, "dark")}
 		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, "theme").Return(stored, nil)
 
 		got, err := svc.GetVariables(t.Context(), variablesOwner, "theme")
@@ -452,8 +448,8 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 
 		// No key service EXPECT: nothing here is secret, so no key is needed.
 		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return([]*domain.Variable{
-			testVariable(t, "url", variablesProjectOwner, "https://example.test"),
-			testVariable(t, "port", variablesProjectOwner, 8080),
+			testVariable(t, "url", variablesOwner, "https://example.test"),
+			testVariable(t, "port", variablesOwner, 8080),
 		}, nil)
 
 		doc := map[string]any{
@@ -501,7 +497,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 
 		// Storage returns the whole ladder because variables do not override.
 		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return([]*domain.Variable{
-			testVariable(t, "url", variablesProjectOwner, "https://project"),
+			testVariable(t, "url", variablesOwner, "https://project"),
 			testVariable(t, "url", variablesOwner, "https://user"),
 		}, nil)
 
@@ -514,7 +510,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 		svc, statements, keys := newMockedVariableService(t)
 
 		crypter := testCrypter("key-1")
-		secret, err := domain.NewSecretVariable("token", variablesProjectOwner, "s3cret", crypter)
+		secret, err := domain.NewSecretVariable("token", variablesOwner, "s3cret", crypter)
 		require.NoError(t, err)
 		require.NotEqual(t, "s3cret", secret.Value)
 
@@ -534,7 +530,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 		svc, statements, keys := newMockedVariableService(t)
 
 		retired := testCrypter("key-1")
-		secret, err := domain.NewSecretVariable("token", variablesProjectOwner, "s3cret", retired)
+		secret, err := domain.NewSecretVariable("token", variablesOwner, "s3cret", retired)
 		require.NoError(t, err)
 
 		// No GetProjectCrypter EXPECT: asking for the project's active key
@@ -552,9 +548,9 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 		svc, statements, keys := newMockedVariableService(t)
 
 		crypter := testCrypter("key-1")
-		first, err := domain.NewSecretVariable("first", variablesProjectOwner, "one", crypter)
+		first, err := domain.NewSecretVariable("first", variablesOwner, "one", crypter)
 		require.NoError(t, err)
-		second, err := domain.NewSecretVariable("second", variablesProjectOwner, "two", crypter)
+		second, err := domain.NewSecretVariable("second", variablesOwner, "two", crypter)
 		require.NoError(t, err)
 
 		keys.EXPECT().GetCrypter(gomock.Any(), "key-1", jose.A256GCM).Return(crypter, nil).Times(1)
@@ -574,7 +570,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
 		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return([]*domain.Variable{
-			testVariable(t, "host", variablesProjectOwner, "example.test"),
+			testVariable(t, "host", variablesOwner, "example.test"),
 		}, nil)
 
 		doc := map[string]any{"callback": "https://${{ host }}/callback"}
@@ -595,7 +591,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 	t.Run("refuses a document that would expand beyond the budget", func(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
-		big := testVariable(t, "big", variablesProjectOwner, strings.Repeat("A", domain.MaxVariableStringLength))
+		big := testVariable(t, "big", variablesOwner, strings.Repeat("A", domain.MaxVariableStringLength))
 		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return([]*domain.Variable{big}, nil)
 
 		doc := make(map[string]any, 200)
@@ -611,7 +607,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 	t.Run("refuses a secret referenced as part of a larger string", func(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
-		secret, err := domain.NewSecretVariable("token", variablesProjectOwner, "s3cret", testCrypter("key-1"))
+		secret, err := domain.NewSecretVariable("token", variablesOwner, "s3cret", testCrypter("key-1"))
 		require.NoError(t, err)
 		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return([]*domain.Variable{secret}, nil)
 
@@ -626,7 +622,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 	t.Run("reports a key lookup failure", func(t *testing.T) {
 		svc, statements, keys := newMockedVariableService(t)
 
-		secret, err := domain.NewSecretVariable("token", variablesProjectOwner, "s3cret", testCrypter("key-1"))
+		secret, err := domain.NewSecretVariable("token", variablesOwner, "s3cret", testCrypter("key-1"))
 		require.NoError(t, err)
 
 		sentinel := errors.New("no key with that id")
@@ -645,7 +641,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 
 		broken := &domain.Variable{
 			Name:     "token",
-			Owner:    variablesProjectOwner,
+			Owner:    variablesOwner,
 			Value:    "not-ciphertext",
 			IsSecret: true,
 		}
