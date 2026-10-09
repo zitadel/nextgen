@@ -27,18 +27,26 @@ jobs:
       # pass/fail list; the replay section is empty when nothing failed.
       MOON_SUMMARY: detailed
     steps:
-      # SPIKE (network-capture-cache): observe-only egress capture. Must be the
-      # first step so the eBPF agent is loaded before any other step touches the
-      # network. audit mode blocks nothing — it records every outbound DNS/TLS
-      # call, correlated to the step that made it, and prints a per-step domain
-      # list in the job log plus a run-scoped insights link. Supported on Depot
-      # runners since v2.20.0, so it works on both runner types this job targets.
-      # Reading the results tells us whether a one-leaf incremental run stays
-      # isolated (only the cache/registry endpoints) or re-downloads toolchains.
-      - name: Capture outbound network (audit)
-        uses: step-security/harden-runner@v2
-        with:
-          egress-policy: audit
+      # SPIKE (network-capture-cache): self-contained egress capture that works
+      # on Depot runners (harden-runner's audit is a no-op there without a
+      # StepSecurity org enrolment). A fresh runner has an empty DNS cache, so
+      # every distinct host the job contacts emits a DNS query — capturing only
+      # port 53 gives the full domain list for a tiny pcap, no matter how much
+      # HTTPS payload follows. tcpdump starts here, before any other step
+      # touches the network, and keeps running on the VM across steps; the
+      # summarise/upload steps at the end of the job read it back.
+      - name: Start DNS capture
+        run: |
+          set -euo pipefail
+          command -v tcpdump >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq tcpdump; }
+          CAP_DIR="${RUNNER_TEMP}/netcap"
+          mkdir -p "$CAP_DIR"
+          echo "CAP_DIR=$CAP_DIR" >> "$GITHUB_ENV"
+          # -U flushes each packet so a killed capture still has a complete file.
+          sudo tcpdump -i any -nn -U -w "$CAP_DIR/dns.pcap" 'port 53' \
+            >/dev/null 2>"$CAP_DIR/tcpdump.err" &
+          sleep 1
+          echo "DNS capture started -> $CAP_DIR/dns.pcap"
 
       - uses: actions/checkout@v6
         with:
@@ -258,5 +266,41 @@ jobs:
           path: |
             apps/console-e2e/test-results
             apps/console-e2e/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # SPIKE (network-capture-cache): stop the capture and list every unique
+      # host the job resolved. An empty or short list means the run stayed
+      # isolated (cache/registry endpoints only); a long one, or unexpected
+      # hosts, points at a toolchain re-download or a cache-isolation gap.
+      - name: Summarise captured domains
+        if: ${{ always() }}
+        run: |
+          set -uo pipefail
+          CAP_DIR="${CAP_DIR:-${RUNNER_TEMP}/netcap}"
+          sudo pkill -f "tcpdump .*port 53" || true
+          sleep 1
+          [ -f "$CAP_DIR/dns.pcap" ] || { echo "no capture file"; exit 0; }
+          # tcpdump's query lines carry the name right after the record type,
+          # e.g. "... A? registry.npmjs.org. (36)"; pull A/AAAA/HTTPS lookups.
+          domains="$(sudo tcpdump -nn -r "$CAP_DIR/dns.pcap" 2>/dev/null \
+            | grep -oE '(A|AAAA|HTTPS)\? [^ ]+' \
+            | awk '{print $2}' | sed 's/\.$//' | sort -u)"
+          count="$(printf '%s\n' "$domains" | grep -c . || true)"
+          {
+            echo "## Unique domains resolved ($count)"
+            echo '```'
+            printf '%s\n' "$domains"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "=== Unique domains resolved ($count) ==="
+          printf '%s\n' "$domains"
+
+      - name: Upload DNS capture
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: dns-capture
+          path: ${{ env.CAP_DIR }}/dns.pcap
           if-no-files-found: ignore
           retention-days: 7
