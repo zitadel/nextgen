@@ -1,8 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
+import { server } from "@/test/msw";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -19,14 +19,7 @@ const FLOWS_URL = "http://localhost/api/flow_definitions";
 const FLOW_URL = "http://localhost/api/flow_definitions/flow_1";
 const SCHEMA_URL = "http://localhost/api/schemas/sch_1";
 
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => {
-  server.close();
-  vi.unstubAllEnvs();
-});
+afterAll(() => vi.unstubAllEnvs());
 
 /**
  * A definition serving both purposes out of order, so the row's fixed purpose
@@ -189,6 +182,9 @@ describe("login flow detail", () => {
     const projects: (string | null)[] = [];
     server.use(
       http.get(FLOW_URL, () => HttpResponse.json(DETAIL_RESPONSE)),
+      http.get("*/api/projects/proj_other", () =>
+        HttpResponse.json({ id: "proj_other", name: "Other project" }),
+      ),
       http.get(SCHEMA_URL, ({ request }) => {
         projects.push(new URL(request.url).searchParams.get("project_id"));
         return HttpResponse.json({ schema: SCHEMA });
