@@ -12,7 +12,7 @@ import (
 	"go.k6.io/k6/v2/lib/netext/httpext"
 	"go.k6.io/k6/v2/metrics"
 
-	"github.com/zitadel/nextgen/tools/bench/harness"
+	"github.com/zitadel/zitadel/v5/tools/bench/harness"
 )
 
 // doer is the request path ADR 067 fixes: the generated client encodes the

@@ -12,7 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/zitadel/nextgen/internal/httputil"
+	"github.com/zitadel/zitadel/v5/internal/httputil"
 )
 
 func newClient(t *testing.T, cfg httputil.ClientConfig) *http.Client {

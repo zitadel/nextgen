@@ -7,8 +7,8 @@ import (
 	"github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/zitadel/nextgen/internal/crypto"
-	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
+	"github.com/zitadel/zitadel/v5/internal/crypto"
+	cryptomock "github.com/zitadel/zitadel/v5/internal/crypto/mock"
 	"go.uber.org/mock/gomock"
 )
 

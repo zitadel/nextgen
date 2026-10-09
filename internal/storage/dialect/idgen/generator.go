@@ -3,7 +3,7 @@
 // Ownership and dialect strategies are recorded in ADR 047.
 package idgen
 
-//go:generate go tool mockgen -typed -package idgenmock -destination ./idgenmock/idgen.mock.go github.com/zitadel/nextgen/internal/storage/dialect/idgen Generator
+//go:generate go tool mockgen -typed -package idgenmock -destination ./idgenmock/idgen.mock.go github.com/zitadel/zitadel/v5/internal/storage/dialect/idgen Generator
 
 // Generator generates unique, prefixed resource IDs.
 // Implementations must be safe for concurrent use.

@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/zitadel/nextgen/internal/authz/resolver"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service/mocks"
+	"github.com/zitadel/zitadel/v5/internal/authz/resolver"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service/mocks"
 )
 
 func TestCheck_Orchestration(t *testing.T) {

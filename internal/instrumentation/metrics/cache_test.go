@@ -8,7 +8,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
-	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
+	"github.com/zitadel/zitadel/v5/internal/instrumentation/metrics"
 )
 
 // collect reads the instruments back through a real SDK reader, which is what

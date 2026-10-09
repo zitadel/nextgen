@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-faster/jx"
-	api "github.com/zitadel/nextgen/api/generated"
+	api "github.com/zitadel/zitadel/v5/api/generated"
 )
 
 // TestErrorCodesDecode holds the code vocabulary to the generated client: a

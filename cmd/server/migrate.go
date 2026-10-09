@@ -7,8 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
-	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
+	"github.com/zitadel/zitadel/v5/internal/instrumentation/zlog"
+	"github.com/zitadel/zitadel/v5/internal/instrumentation/zotel"
 )
 
 func newMigrateCommand(configPath *string) *cobra.Command {

@@ -7,9 +7,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/audit"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/audit"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 // ClaimService is the claim use-case surface (ADR 046): the server side of the

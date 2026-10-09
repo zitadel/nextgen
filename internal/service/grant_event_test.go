@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/zitadel/nextgen/internal/audit"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
-	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
+	"github.com/zitadel/zitadel/v5/internal/audit"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service"
+	servicemocks "github.com/zitadel/zitadel/v5/internal/service/mocks"
 )
 
 func TestGrantService_Create_EventUsesAssignmentProject(t *testing.T) {

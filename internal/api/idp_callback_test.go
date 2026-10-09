@@ -12,11 +12,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/zitadel/nextgen/internal/api"
-	"github.com/zitadel/nextgen/internal/api/middleware"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
-	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/api"
+	"github.com/zitadel/zitadel/v5/internal/api/middleware"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/instrumentation/zlog"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 type stubSSOCallback struct {

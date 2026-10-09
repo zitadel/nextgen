@@ -10,7 +10,7 @@ import (
 
 	"github.com/ianlancetaylor/jsonschema"
 
-	"github.com/zitadel/nextgen/internal/maputil"
+	"github.com/zitadel/zitadel/v5/internal/maputil"
 )
 
 // Step error text keys the state machine emits when an auth-attempt

@@ -3,7 +3,7 @@ package helpers
 import (
 	"testing"
 
-	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
+	"github.com/zitadel/zitadel/v5/internal/api/integration_test/test_data"
 )
 
 func (h *Harness) EnsureTestData(t *testing.T) *test_data.TestData {

@@ -13,8 +13,8 @@ import (
 	"github.com/go-faster/jx"
 	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/ogen-go/ogen/validate"
-	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/domain"
+	api "github.com/zitadel/zitadel/v5/api/generated"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // FullErrorInResponse attaches the unwrapped cause of an error to the response

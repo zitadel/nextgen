@@ -3,7 +3,7 @@ package authz
 import (
 	"errors"
 
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // ErrSKTeamProjectScope is returned when an sk_team_ grant for a team-bound

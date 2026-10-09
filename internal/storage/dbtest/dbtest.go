@@ -8,8 +8,8 @@ package dbtest
 import (
 	"fmt"
 
-	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 // Pool is a migrated v2 pool usable for both storage lifecycle and statements.

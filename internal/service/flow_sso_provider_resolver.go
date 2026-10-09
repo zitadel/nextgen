@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // FlowSSOProviderResolver implements [domain.FlowSSOProviderResolver] over

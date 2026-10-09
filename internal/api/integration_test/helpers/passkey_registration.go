@@ -6,8 +6,8 @@ import (
 
 	"github.com/descope/virtualwebauthn"
 	"github.com/stretchr/testify/require"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 // PasskeyRelyingParty is the relying party [Harness.RegisterPasskey] registers

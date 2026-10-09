@@ -5,8 +5,8 @@ package dbtest
 import (
 	"context"
 
-	v2postgres "github.com/zitadel/nextgen/internal/storage/dialect/postgres"
-	"github.com/zitadel/nextgen/internal/storage/testdb"
+	v2postgres "github.com/zitadel/zitadel/v5/internal/storage/dialect/postgres"
+	"github.com/zitadel/zitadel/v5/internal/storage/testdb"
 )
 
 // Postgres returns a connected v2 pool for the Postgres integration tests.

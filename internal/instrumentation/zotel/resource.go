@@ -1,7 +1,7 @@
 package zotel
 
 import (
-	"github.com/zitadel/nextgen/internal/build"
+	"github.com/zitadel/zitadel/v5/internal/build"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"

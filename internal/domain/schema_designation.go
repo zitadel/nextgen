@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zitadel/nextgen/internal/maputil"
+	"github.com/zitadel/zitadel/v5/internal/maputil"
 )
 
 // DesignatedIdentifier reads the root x-identifier designation from a raw

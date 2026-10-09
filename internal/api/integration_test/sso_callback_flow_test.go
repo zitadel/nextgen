@@ -19,12 +19,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	api "github.com/zitadel/nextgen/api/generated"
-	iapi "github.com/zitadel/nextgen/internal/api"
-	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
+	api "github.com/zitadel/zitadel/v5/api/generated"
+	iapi "github.com/zitadel/zitadel/v5/internal/api"
+	"github.com/zitadel/zitadel/v5/internal/api/integration_test/helpers"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 // These tests drive the real callback route mounted on the harness server,

@@ -3,8 +3,8 @@ package zlog
 import (
 	"log/slog"
 
-	"github.com/zitadel/nextgen/internal/build"
 	"github.com/zitadel/sloggcp"
+	"github.com/zitadel/zitadel/v5/internal/build"
 )
 
 const (

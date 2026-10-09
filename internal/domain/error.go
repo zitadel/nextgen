@@ -4,7 +4,7 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/zitadel/nextgen/internal/errreport"
+	"github.com/zitadel/zitadel/v5/internal/errreport"
 )
 
 type Error struct {

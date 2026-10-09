@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/ianlancetaylor/jsonschema"
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // resolveDefaultFields resolves every property in defaultSchemaBytes()

@@ -3,7 +3,7 @@ package helpers
 import (
 	"testing"
 
-	"github.com/zitadel/nextgen/internal/secrets"
+	"github.com/zitadel/zitadel/v5/internal/secrets"
 )
 
 func (h *Harness) EnsureSecretGenerator(t *testing.T) secrets.Generator {

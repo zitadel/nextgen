@@ -60,8 +60,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/zitadel/nextgen/api/internal/erroranalysis"
-	"github.com/zitadel/nextgen/internal/httputil"
+	"github.com/zitadel/zitadel/v5/api/internal/erroranalysis"
+	"github.com/zitadel/zitadel/v5/internal/httputil"
 )
 
 // Regexps for `go generate -run`, matched against a directive's full source

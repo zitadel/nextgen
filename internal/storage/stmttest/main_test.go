@@ -11,9 +11,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/dbtest"
-	"github.com/zitadel/nextgen/internal/storage/dialect/schematest"
+	"github.com/zitadel/zitadel/v5/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/storage/dbtest"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/schematest"
 )
 
 type dialectOpener struct {

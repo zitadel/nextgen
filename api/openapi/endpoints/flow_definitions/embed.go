@@ -8,9 +8,9 @@ import (
 	"slices"
 	"strings"
 
-	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/domain"
-	configdefaults "github.com/zitadel/nextgen/packages/config/defaults"
+	api "github.com/zitadel/zitadel/v5/api/generated"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	configdefaults "github.com/zitadel/zitadel/v5/packages/config/defaults"
 )
 
 func DefaultLoginFlowDefinitions(serverURL string, projectID string, userSchemaURL string) ([]*domain.FlowDefinition, error) {

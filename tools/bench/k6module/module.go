@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	api "github.com/zitadel/nextgen/api/generated"
+	api "github.com/zitadel/zitadel/v5/api/generated"
 	"go.k6.io/k6/v2/js/modules"
 	"go.k6.io/k6/v2/metrics"
 
-	"github.com/zitadel/nextgen/tools/bench/harness"
+	"github.com/zitadel/zitadel/v5/tools/bench/harness"
 )
 
 func init() {

@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/zitadel/nextgen/internal/audit"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/idp"
+	"github.com/zitadel/zitadel/v5/internal/audit"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/idp"
 )
 
 // oauthErrorAccessDenied is the one authorization error code that means the

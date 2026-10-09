@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // pointer is one entry of the structure stored inside the pointers column.

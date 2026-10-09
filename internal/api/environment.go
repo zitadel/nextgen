@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
-	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
+	api "github.com/zitadel/zitadel/v5/api/generated"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 func (h *Handler) ListEnvironments(ctx context.Context, params api.ListEnvironmentsParams) (api.ListEnvironmentsRes, error) {

@@ -6,9 +6,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/zitadel/nextgen/internal/api/middleware"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/events"
+	"github.com/zitadel/zitadel/v5/internal/api/middleware"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/storage/events"
 )
 
 // Untrusted header persist caps (Go's default header limit is ~1 MiB).

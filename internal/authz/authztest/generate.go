@@ -8,8 +8,8 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/zitadel/nextgen/internal/authz"
-	"github.com/zitadel/nextgen/internal/authz/profile"
+	"github.com/zitadel/zitadel/v5/internal/authz"
+	"github.com/zitadel/zitadel/v5/internal/authz/profile"
 )
 
 type genMode uint8

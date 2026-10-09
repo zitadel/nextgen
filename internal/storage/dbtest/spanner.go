@@ -5,8 +5,8 @@ package dbtest
 import (
 	"context"
 
-	v2spannerdialect "github.com/zitadel/nextgen/internal/storage/dialect/spanner"
-	"github.com/zitadel/nextgen/internal/storage/testdb"
+	v2spannerdialect "github.com/zitadel/zitadel/v5/internal/storage/dialect/spanner"
+	"github.com/zitadel/zitadel/v5/internal/storage/testdb"
 )
 
 // Spanner returns a connected v2 pool for the Spanner integration tests.

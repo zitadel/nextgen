@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 // projectIsClaimed reports whether a project has completed claim (ADR 046 / 049):

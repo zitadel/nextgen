@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zitadel/nextgen/internal/httputil"
+	"github.com/zitadel/zitadel/v5/internal/httputil"
 )
 
 // clearDefaultDataDir removes the data dir beside the test binary so an earlier

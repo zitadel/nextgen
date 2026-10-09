@@ -3,8 +3,8 @@
 package userteam
 
 import (
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 // Schema binds user-team list/filter/order fields for all dialects.

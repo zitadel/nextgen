@@ -5,11 +5,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
-	"github.com/zitadel/nextgen/internal/storage/dialect/compare"
-	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
-	"github.com/zitadel/nextgen/internal/storage/dialect/pattern"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/authz"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/compare"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/pagination"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/pattern"
 )
 
 type statementCompiler struct {

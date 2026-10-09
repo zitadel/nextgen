@@ -14,7 +14,7 @@ import (
 	"go.k6.io/k6/v2/metrics"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/zitadel/nextgen/tools/bench/harness"
+	"github.com/zitadel/zitadel/v5/tools/bench/harness"
 )
 
 // testVU builds a VU in the VU context with the slice of lib.State that

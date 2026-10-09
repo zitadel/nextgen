@@ -10,10 +10,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	api "github.com/zitadel/nextgen/api/generated"
-	internalapi "github.com/zitadel/nextgen/internal/api"
-	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
-	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
+	api "github.com/zitadel/zitadel/v5/api/generated"
+	internalapi "github.com/zitadel/zitadel/v5/internal/api"
+	"github.com/zitadel/zitadel/v5/internal/api/integration_test/helpers"
+	"github.com/zitadel/zitadel/v5/internal/api/integration_test/test_data"
 )
 
 // consoleCall sends one request with the session cookie, and the CSRF token on

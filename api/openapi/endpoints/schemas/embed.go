@@ -5,7 +5,7 @@ import (
 	"embed"
 	"strings"
 
-	configdefaults "github.com/zitadel/nextgen/packages/config/defaults"
+	configdefaults "github.com/zitadel/zitadel/v5/packages/config/defaults"
 )
 
 // FS holds the embedded JSON schema files from this directory.

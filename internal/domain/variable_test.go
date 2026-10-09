@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/zitadel/nextgen/internal/crypto"
-	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/crypto"
+	cryptomock "github.com/zitadel/zitadel/v5/internal/crypto/mock"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 var variableOwner = domain.VariableOwner{

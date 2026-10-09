@@ -12,7 +12,7 @@ import (
 	"github.com/go-faster/jx"
 	"github.com/ogen-go/ogen/json"
 	"github.com/ogen-go/ogen/validate"
-	"github.com/zitadel/nextgen/internal/api/ogenx"
+	"github.com/zitadel/zitadel/v5/internal/api/ogenx"
 )
 
 // Encode implements json.Marshaler.

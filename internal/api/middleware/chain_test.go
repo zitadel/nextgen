@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/zitadel/v5/internal/api/middleware"
 )
 
 func TestChain_AppliesFirstListedOutermost(t *testing.T) {

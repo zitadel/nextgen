@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 // ColumnNullability pairs a bound column with the DDL nullability its schema

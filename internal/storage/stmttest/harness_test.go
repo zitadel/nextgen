@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 func uniqueSuffix(t *testing.T) string {

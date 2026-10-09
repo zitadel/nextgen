@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // ExchangeStore is the dialect IO surface used by [RunExchange].

@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/zitadel/nextgen/internal/domain"
-	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	servicemocks "github.com/zitadel/zitadel/v5/internal/service/mocks"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 	"go.uber.org/mock/gomock"
 )
 

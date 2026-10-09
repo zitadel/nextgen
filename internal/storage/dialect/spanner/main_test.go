@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/testdb"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/storage/testdb"
 )
 
 // testClient is a v2 spanner client connected to the migrated test database,

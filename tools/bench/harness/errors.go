@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	api "github.com/zitadel/nextgen/api/generated"
+	api "github.com/zitadel/zitadel/v5/api/generated"
 )
 
 // RequestTimeout bounds every request the module performs. It is explicit

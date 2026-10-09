@@ -56,7 +56,7 @@ async function loadModule(): Promise<ServerBuildModule> {
 }
 
 // `go list` is the only capture buildLocalServer makes once gitInfo is injected.
-function goListStub(importPath = "github.com/zitadel/nextgen/internal/build"): RunCapture {
+function goListStub(importPath = "github.com/zitadel/zitadel/v5/internal/build"): RunCapture {
   return async () => ({ stdout: `${importPath}\n` });
 }
 
@@ -97,7 +97,7 @@ describe("server build metadata", () => {
           "build",
           "-trimpath",
           "-ldflags",
-          "-X github.com/zitadel/nextgen/internal/build.version=dev+abcdef123456 -X github.com/zitadel/nextgen/internal/build.commit=abcdef1234567890 -X github.com/zitadel/nextgen/internal/build.date=2026-06-16T00:00:00Z",
+          "-X github.com/zitadel/zitadel/v5/internal/build.version=dev+abcdef123456 -X github.com/zitadel/zitadel/v5/internal/build.commit=abcdef1234567890 -X github.com/zitadel/zitadel/v5/internal/build.date=2026-06-16T00:00:00Z",
           "-o",
           output,
           ".",
@@ -152,7 +152,7 @@ describe("server build metadata", () => {
     await expect(
       assertServerBuildPackage({
         repoRoot: "/repo",
-        runCapture: goListStub("github.com/zitadel/nextgen/internal/buildinfo"),
+        runCapture: goListStub("github.com/zitadel/zitadel/v5/internal/buildinfo"),
       }),
     ).rejects.toThrow("server build metadata package moved");
   });

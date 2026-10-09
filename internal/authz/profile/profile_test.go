@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zitadel/nextgen/internal/authz"
-	"github.com/zitadel/nextgen/internal/authz/openfga"
-	"github.com/zitadel/nextgen/internal/authz/profile"
+	"github.com/zitadel/zitadel/v5/internal/authz"
+	"github.com/zitadel/zitadel/v5/internal/authz/openfga"
+	"github.com/zitadel/zitadel/v5/internal/authz/profile"
 )
 
 func TestValidateAcceptsSupportedProfile(t *testing.T) {

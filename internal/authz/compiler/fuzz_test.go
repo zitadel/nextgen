@@ -3,7 +3,7 @@ package compiler_test
 import (
 	"testing"
 
-	"github.com/zitadel/nextgen/internal/authz/authztest"
+	"github.com/zitadel/zitadel/v5/internal/authz/authztest"
 )
 
 func FuzzCompileInvariants(f *testing.F) {

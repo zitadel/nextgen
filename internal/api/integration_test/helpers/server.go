@@ -9,11 +9,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	generated "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/api"
-	"github.com/zitadel/nextgen/internal/api/middleware"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
-	"github.com/zitadel/nextgen/internal/service"
+	generated "github.com/zitadel/zitadel/v5/api/generated"
+	"github.com/zitadel/zitadel/v5/internal/api"
+	"github.com/zitadel/zitadel/v5/internal/api/middleware"
+	"github.com/zitadel/zitadel/v5/internal/instrumentation/zlog"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 // serverLog is a concurrency-safe sink for the test server's request logs.

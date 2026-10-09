@@ -5,10 +5,10 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/pagination"
 )
 
 const createJSONSchemaStmt = `INSERT INTO zitadel_nextgen.json_schemas (project_id, url, object_type, kind, payload) VALUES ($1, $2, $3, $4, $5) RETURNING project_id, url, object_type, kind, created_at, payload`

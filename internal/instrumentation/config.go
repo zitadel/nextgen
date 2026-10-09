@@ -7,11 +7,11 @@ import (
 
 	slogctx "github.com/veqryn/slog-context"
 	slogotel "github.com/veqryn/slog-context/otel"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog/extractors"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog/replacers"
-	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 	"github.com/zitadel/sloggcp"
+	"github.com/zitadel/zitadel/v5/internal/instrumentation/zlog"
+	"github.com/zitadel/zitadel/v5/internal/instrumentation/zlog/extractors"
+	"github.com/zitadel/zitadel/v5/internal/instrumentation/zlog/replacers"
+	"github.com/zitadel/zitadel/v5/internal/instrumentation/zotel"
 )
 
 type Config struct {

@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/zitadel/v5/internal/api/middleware"
 )
 
 func ExtractRequestID(ctx context.Context, _ time.Time, _ slog.Level, _ string) []slog.Attr {

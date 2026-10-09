@@ -3,7 +3,7 @@ package helpers
 import (
 	"testing"
 
-	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 func (h *Harness) EnsureAuthAttemptService(t *testing.T) service.AuthAttemptService {

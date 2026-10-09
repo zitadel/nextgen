@@ -12,8 +12,8 @@ import (
 	"github.com/zitadel/passwap/argon2"
 	"github.com/zitadel/passwap/bcrypt"
 
-	"github.com/zitadel/nextgen/internal/instrumentation"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/zitadel/v5/internal/instrumentation"
+	"github.com/zitadel/zitadel/v5/internal/instrumentation/zlog"
 )
 
 func TestLoadConfigReadsPostgresDatabaseEnv(t *testing.T) {

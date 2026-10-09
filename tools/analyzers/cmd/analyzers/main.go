@@ -12,7 +12,7 @@ package main
 import (
 	"golang.org/x/tools/go/analysis/multichecker"
 
-	"github.com/zitadel/nextgen/tools/analyzers/egresslint"
+	"github.com/zitadel/zitadel/v5/tools/analyzers/egresslint"
 )
 
 func main() {

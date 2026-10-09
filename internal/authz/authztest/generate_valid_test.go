@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/zitadel/nextgen/internal/authz/authztest"
-	"github.com/zitadel/nextgen/internal/authz/compiler"
+	"github.com/zitadel/zitadel/v5/internal/authz/authztest"
+	"github.com/zitadel/zitadel/v5/internal/authz/compiler"
 )
 
 func TestGenerateValidModelAlwaysCompiles(t *testing.T) {

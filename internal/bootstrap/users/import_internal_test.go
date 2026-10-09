@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 func scopesOf(t *testing.T, attrs domain.CreateAttributes) map[domain.AttributeKey]domain.AttributeUniqueness {

@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver used for migrations
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/testdb"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/storage/testdb"
 )
 
 // testPool is a v2 postgres pool connected to the migrated test database,

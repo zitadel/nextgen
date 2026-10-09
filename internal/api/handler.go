@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/service"
+	api "github.com/zitadel/zitadel/v5/api/generated"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 type Handler struct {

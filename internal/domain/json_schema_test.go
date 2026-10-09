@@ -19,10 +19,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/zitadel/nextgen/internal/domain"
-	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
-	"github.com/zitadel/nextgen/internal/httputil"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	domainmock "github.com/zitadel/zitadel/v5/internal/domain/mock"
+	"github.com/zitadel/zitadel/v5/internal/httputil"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 func mustJSONSchemaCache(t *testing.T, size int) *lru.TwoQueueCache[string, *jsonschema.Schema] {

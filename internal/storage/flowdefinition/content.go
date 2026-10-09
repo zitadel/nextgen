@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // Content is the structure stored inside the definition JSON/JSONB column.

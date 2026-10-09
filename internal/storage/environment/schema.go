@@ -1,8 +1,8 @@
 package environment
 
 import (
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 var Schema = database.NewSchema(map[domain.EnvironmentField]database.FieldBinding[domain.Environment]{

@@ -12,4 +12,4 @@ package cryptomock
 // generated before this one is reached. That is what lets generation bootstrap
 // from a tree with no generated files in it.
 
-//go:generate go tool mockgen -typed -package cryptomock -destination ./crypto.mock.go github.com/zitadel/nextgen/internal/crypto Hasher,HashVerifier,HashValidator,Encrypter,Decrypter,Crypter
+//go:generate go tool mockgen -typed -package cryptomock -destination ./crypto.mock.go github.com/zitadel/zitadel/v5/internal/crypto Hasher,HashVerifier,HashValidator,Encrypter,Decrypter,Crypter

@@ -1,6 +1,6 @@
 // Package authz holds the shared intermediate representation for permission
 // catalogs. OpenFGA DSL/JSON is normalized into these types by
-// [github.com/zitadel/nextgen/internal/authz/openfga]; profile validation and
+// [github.com/zitadel/zitadel/v5/internal/authz/openfga]; profile validation and
 // compilation consume the same Model without depending on OpenFGA protobufs.
 package authz
 

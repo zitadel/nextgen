@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/zitadel/nextgen/internal/errreport"
 	"github.com/zitadel/sloggcp"
+	"github.com/zitadel/zitadel/v5/internal/errreport"
 )
 
 type stubReportLocation struct {

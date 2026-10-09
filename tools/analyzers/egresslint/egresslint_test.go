@@ -5,7 +5,7 @@ import (
 
 	"golang.org/x/tools/go/analysis/analysistest"
 
-	"github.com/zitadel/nextgen/tools/analyzers/egresslint"
+	"github.com/zitadel/zitadel/v5/tools/analyzers/egresslint"
 )
 
 func TestViolations(t *testing.T) {
@@ -21,7 +21,7 @@ func TestSanctionedPackageIsSkipped(t *testing.T) {
 	if err := a.Flags.Set("sanctioned", "sanctioned"); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = a.Flags.Set("sanctioned", "github.com/zitadel/nextgen/internal/httputil") })
+	t.Cleanup(func() { _ = a.Flags.Set("sanctioned", "github.com/zitadel/zitadel/v5/internal/httputil") })
 	analysistest.Run(t, analysistest.TestData(), a, "sanctioned")
 }
 

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // metadata is the structure stored inside the metadata column: why the

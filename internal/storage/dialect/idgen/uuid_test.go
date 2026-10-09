@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/idgen"
 )
 
 func TestUUID_New(t *testing.T) {

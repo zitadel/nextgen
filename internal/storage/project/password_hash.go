@@ -5,8 +5,8 @@ package project
 import (
 	"encoding/json"
 
-	"github.com/zitadel/nextgen/internal/crypto"
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/crypto"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // passwordHashPolicy is the stored shape of [domain.PasswordHashPolicy]. The

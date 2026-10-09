@@ -10,8 +10,8 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/stretchr/testify/require"
 
-	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/domain"
+	api "github.com/zitadel/zitadel/v5/api/generated"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 //go:embed examples/*/flow-definition.json

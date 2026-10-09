@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"cloud.google.com/go/spanner"
-	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 type Client struct {

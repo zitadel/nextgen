@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
-	"github.com/zitadel/nextgen/internal/domain"
-	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
+	cryptomock "github.com/zitadel/zitadel/v5/internal/crypto/mock"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	domainmock "github.com/zitadel/zitadel/v5/internal/domain/mock"
 )
 
 func containsFieldName(fields []domain.FlowField, name string) bool {

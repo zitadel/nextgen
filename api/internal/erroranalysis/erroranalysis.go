@@ -104,19 +104,19 @@ func (c *Config) withDefaults() {
 		c.Patterns = []string{"./internal/..."}
 	}
 	if c.ModulePrefix == "" {
-		c.ModulePrefix = "github.com/zitadel/nextgen/"
+		c.ModulePrefix = "github.com/zitadel/zitadel/v5/"
 	}
 	if c.DomainPkgPath == "" {
-		c.DomainPkgPath = "github.com/zitadel/nextgen/internal/domain"
+		c.DomainPkgPath = "github.com/zitadel/zitadel/v5/internal/domain"
 	}
 	if c.EntryPkgPath == "" {
-		c.EntryPkgPath = "github.com/zitadel/nextgen/internal/service"
+		c.EntryPkgPath = "github.com/zitadel/zitadel/v5/internal/service"
 	}
 	if c.InterfaceSuffix == "" {
 		c.InterfaceSuffix = "Service"
 	}
 	if c.HandlerPkgPath == "" {
-		c.HandlerPkgPath = "github.com/zitadel/nextgen/internal/api"
+		c.HandlerPkgPath = "github.com/zitadel/zitadel/v5/internal/api"
 	}
 	if c.HandlerTypeName == "" {
 		c.HandlerTypeName = "Handler"

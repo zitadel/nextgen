@@ -10,8 +10,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/events"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/storage/events"
 )
 
 // SinkConfig is a deployment-configured event sink (no project CRUD in v1).

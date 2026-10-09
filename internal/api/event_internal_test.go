@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // Pins the events resource-flavored answers through the resolver gate.

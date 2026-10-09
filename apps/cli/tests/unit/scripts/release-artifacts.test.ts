@@ -94,7 +94,7 @@ describe("release artifact helpers", () => {
       },
       platforms: [{ goos: "linux", goarch: "amd64" }],
       // The ldflags target package is verified via `go list` before any build.
-      runCapture: async () => ({ stdout: "github.com/zitadel/nextgen/internal/build\n" }),
+      runCapture: async () => ({ stdout: "github.com/zitadel/zitadel/v5/internal/build\n" }),
       run: async (command, args) => {
         calls.push({ command, args });
       },
@@ -107,7 +107,7 @@ describe("release artifact helpers", () => {
         "build",
         "-trimpath",
         "-ldflags",
-        "-s -w -X github.com/zitadel/nextgen/internal/build.version=0.1.0-alpha.6 -X github.com/zitadel/nextgen/internal/build.commit=abcdef1234567890 -X github.com/zitadel/nextgen/internal/build.date=2026-06-16T00:00:00Z",
+        "-s -w -X github.com/zitadel/zitadel/v5/internal/build.version=0.1.0-alpha.6 -X github.com/zitadel/zitadel/v5/internal/build.commit=abcdef1234567890 -X github.com/zitadel/zitadel/v5/internal/build.date=2026-06-16T00:00:00Z",
         "-o",
         expect.stringMatching(/dist\/release\/0\.1\.0-alpha\.6\/build\/linux\/amd64\/nextgen$/),
         ".",

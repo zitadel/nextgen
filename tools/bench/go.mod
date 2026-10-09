@@ -1,4 +1,4 @@
-module github.com/zitadel/nextgen/tools/bench
+module github.com/zitadel/zitadel/v5/tools/bench
 
 go 1.26.0
 
@@ -6,7 +6,7 @@ require (
 	github.com/go-faster/jx v1.2.0
 	github.com/ogen-go/ogen v1.20.3
 	github.com/spf13/cobra v1.10.2
-	github.com/zitadel/nextgen v0.0.0
+	github.com/zitadel/zitadel/v5 v5.0.0
 	go.k6.io/k6/v2 v2.3.0
 	gopkg.in/guregu/null.v3 v3.3.0
 )
@@ -110,4 +110,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/zitadel/nextgen => ../..
+replace github.com/zitadel/zitadel/v5 => ../..
