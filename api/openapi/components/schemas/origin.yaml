@@ -1,0 +1,10 @@
+title: Origin
+type: string
+description: |
+  A web origin: scheme, host and, when it is not the scheme's default, port.
+  No path, query or fragment, and no trailing slash. Compared exactly, so
+  `https://app.acme.com` and `https://app.acme.com:443` are different
+  strings.
+pattern: '^https?://[^/?#\s]+$'
+maxLength: 2048
+example: https://app.acme.com

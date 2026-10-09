@@ -7,8 +7,8 @@ content:
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../components/schemas/errors/dep-not_found.yaml'
         - $ref: '../../components/schemas/errors/dep-permission_denied.yaml'
-        - $ref: '../../components/schemas/errors/env-not_found.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
+        - $ref: '../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
       discriminator:
         propertyName: code
@@ -16,8 +16,8 @@ content:
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
           dep.not_found: '../../components/schemas/errors/dep-not_found.yaml'
           dep.permission_denied: '../../components/schemas/errors/dep-permission_denied.yaml'
-          env.not_found: '../../components/schemas/errors/env-not_found.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
+          not_implemented: '../../components/schemas/errors/not_implemented.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
     examples:
       auth.unauthorized:
@@ -35,16 +35,16 @@ content:
         value:
           code: dep.permission_denied
           message: 'deployment: requires an operator-grade token bound to the project (project.write or a deployment.* scope)'
-      env.not_found:
-        summary: env.not_found
-        value:
-          code: env.not_found
-          message: 'environment not found'
       internal:
         summary: internal
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      not_implemented:
+        summary: not_implemented
+        value:
+          code: not_implemented
+          message: 'This feature is not implemented yet.'
       req.invalid:
         summary: req.invalid
         value:

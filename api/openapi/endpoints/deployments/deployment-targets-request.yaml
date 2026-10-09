@@ -1,0 +1,22 @@
+title: DeploymentTargetsRequest
+type: array
+minItems: 1
+maxItems: 50
+uniqueItems: true
+description: |
+  Where the release goes live. Each entry is one of:
+
+  - `primary` — every primary origin of the project, expanded when the
+    deployment is created. The deployment records the origins it expanded
+    to, so a primary origin added later is not part of it.
+  - An exact origin, such as `https://app.acme.com`, which must be one of
+    the project's primary origins.
+
+  The deployment covers every target in one transaction: either all of
+  them serve the release afterwards or none does.
+items:
+  type: string
+  pattern: '^(primary|https?://[^/?#\s]+)$'
+  maxLength: 2048
+example:
+  - primary

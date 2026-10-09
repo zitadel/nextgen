@@ -29,7 +29,7 @@ flows:
       release.write: Permission to create project configuration releases
       environment.read: Permission to read project environments
       deployment.read: Permission to read deployments
-      deployment.write: Permission to create deployments (deploy, promote, roll back)
+      deployment.write: Permission to create deployments (deploy, roll back)
       events.read: Permission to list and get project audit events
       variable.read: Permission to read project variables (a secret's value is never returned)
       variable.write: Permission to create and manage project variables and secrets
@@ -78,7 +78,7 @@ flows:
       release.write: Permission to create project configuration releases
       environment.read: Permission to read project environments
       deployment.read: Permission to read deployments
-      deployment.write: Permission to create deployments (deploy, promote, roll back)
+      deployment.write: Permission to create deployments (deploy, roll back)
       events.read: Permission to list and get project audit events
       variable.read: Permission to read project variables (a secret's value is never returned)
       variable.write: Permission to create and manage project variables and secrets
