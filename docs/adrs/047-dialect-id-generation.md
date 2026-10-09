@@ -68,6 +68,7 @@ the dialect generator is the only mint path, not that create always overwrites.
 | token row | `tkn` |
 | user agent | `ua` |
 | user password row | `upw` |
+| user password failure (`user_password_failures`, storage-only) | `upwf` |
 | user TOTP row | `utotp` |
 | user recovery codes row | `urc` |
 | user passkey row | `upk` |

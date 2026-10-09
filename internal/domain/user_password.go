@@ -22,6 +22,50 @@ func ErrUserPasswordInvalid() Error {
 	return newError("user.password_invalid", "The password provided is invalid.", nil, nil)
 }
 
+const PrefixUserPasswordFailure ResourcePrefix = "upwf"
+
+const (
+	UserPasswordFreeFailures  = 5
+	UserPasswordBackoffBase   = 30 * time.Second
+	UserPasswordBackoffMax    = 15 * time.Minute
+	UserPasswordFailureWindow = 24 * time.Hour
+)
+
+func ErrUserPasswordRateLimited() Error {
+	return newError("user.password_rate_limited", "Too many failed password attempts, try again later.", nil, nil)
+}
+
+func UserPasswordFailuresSince(now time.Time) time.Time {
+	return now.Add(-UserPasswordFailureWindow)
+}
+
+type UserPasswordFailures struct {
+	Count        int
+	LastFailedAt time.Time
+}
+
+func (f UserPasswordFailures) CheckRateLimit() error {
+	if f.NextRetryTime().After(time.Now()) {
+		return ErrUserPasswordRateLimited()
+	}
+	return nil
+}
+
+func (f UserPasswordFailures) NextRetryTime() time.Time {
+	penalizedFailures := int64(f.Count - UserPasswordFreeFailures)
+	if penalizedFailures <= 0 || f.LastFailedAt.IsZero() {
+		return time.Time{}
+	}
+
+	maxPenalized := int64(UserPasswordBackoffMax / UserPasswordBackoffBase)
+	if penalizedFailures >= maxPenalized {
+		return f.LastFailedAt.Add(UserPasswordBackoffMax)
+	}
+
+	timeToWait := time.Duration(int64(UserPasswordBackoffBase) * penalizedFailures)
+	return f.LastFailedAt.Add(timeToWait)
+}
+
 func ErrUserPasswordEmpty() Error {
 	return newError("user.password_empty", "The password must not be empty.", nil, nil)
 }

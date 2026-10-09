@@ -19,6 +19,7 @@ content:
         - $ref: '../../../../../components/schemas/errors/user-invalid.yaml'
         - $ref: '../../../../../components/schemas/errors/user-not_found.yaml'
         - $ref: '../../../../../components/schemas/errors/user-password_empty.yaml'
+        - $ref: '../../../../../components/schemas/errors/user-password_rate_limited.yaml'
         - $ref: '../../../../../components/schemas/errors/user-password_too_long.yaml'
       discriminator:
         propertyName: code
@@ -38,6 +39,7 @@ content:
           user.invalid: '../../../../../components/schemas/errors/user-invalid.yaml'
           user.not_found: '../../../../../components/schemas/errors/user-not_found.yaml'
           user.password_empty: '../../../../../components/schemas/errors/user-password_empty.yaml'
+          user.password_rate_limited: '../../../../../components/schemas/errors/user-password_rate_limited.yaml'
           user.password_too_long: '../../../../../components/schemas/errors/user-password_too_long.yaml'
     examples:
       att.already_handed_off:
@@ -115,6 +117,11 @@ content:
         value:
           code: user.password_empty
           message: 'The password must not be empty.'
+      user.password_rate_limited:
+        summary: user.password_rate_limited
+        value:
+          code: user.password_rate_limited
+          message: 'Too many failed password attempts, try again later.'
       user.password_too_long:
         summary: user.password_too_long
         value:

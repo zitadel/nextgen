@@ -469,6 +469,13 @@ type UserPasswordStatements interface {
 	GetUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField]) (*domain.UserPassword, error)
 	ListUserPasswords(ctx context.Context, filter *database.ListOptions[domain.UserPasswordField]) (*database.ListResult[*domain.UserPassword], error)
 	GetUserPasswordHistory(ctx context.Context, projectID, userID string) ([]*domain.UserPassword, error)
+	// LockUserPassword reads the user's current password and locks its row
+	// until the surrounding transaction ends, so concurrent password checks
+	// of one user are admitted one at a time.
+	LockUserPassword(ctx context.Context, projectID, userID string) (*domain.UserPassword, error)
+	GetUserPasswordFailures(ctx context.Context, projectID, userID string, since time.Time) (domain.UserPasswordFailures, error)
+	AddUserPasswordFailure(ctx context.Context, projectID, userID string, at, forgetBefore time.Time) error
+	ClearUserPasswordFailures(ctx context.Context, projectID, userID string, until time.Time) error
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

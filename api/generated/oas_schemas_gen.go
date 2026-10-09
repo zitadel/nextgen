@@ -19752,23 +19752,24 @@ func (*FinishUserPasskeyRegistrationBadRequest) finishUserPasskeyRegistrationRes
 
 // FinishUserPasskeyRegistrationErrorResponse represents sum type.
 type FinishUserPasskeyRegistrationErrorResponse struct {
-	Type                 FinishUserPasskeyRegistrationErrorResponseType // switch on this field
-	AttAlreadyHandedOff  AttAlreadyHandedOff
-	AttInvalidProof      AttInvalidProof
-	AttInvalidRequest    AttInvalidRequest
-	AttInvalidState      AttInvalidState
-	AttNotFound          AttNotFound
-	AttProofRejected     AttProofRejected
-	AttStaleChallenge    AttStaleChallenge
-	AuthUnauthorized     AuthUnauthorized
-	EvtInvalid           EvtInvalid
-	Internal             Internal
-	ReqInvalid           ReqInvalid
-	UserInvalid          UserInvalid
-	UserNotFound         UserNotFound
-	UserPasswordEmpty    UserPasswordEmpty
-	UserPasswordTooLong  UserPasswordTooLong
-	UserPermissionDenied UserPermissionDenied
+	Type                    FinishUserPasskeyRegistrationErrorResponseType // switch on this field
+	AttAlreadyHandedOff     AttAlreadyHandedOff
+	AttInvalidProof         AttInvalidProof
+	AttInvalidRequest       AttInvalidRequest
+	AttInvalidState         AttInvalidState
+	AttNotFound             AttNotFound
+	AttProofRejected        AttProofRejected
+	AttStaleChallenge       AttStaleChallenge
+	AuthUnauthorized        AuthUnauthorized
+	EvtInvalid              EvtInvalid
+	Internal                Internal
+	ReqInvalid              ReqInvalid
+	UserInvalid             UserInvalid
+	UserNotFound            UserNotFound
+	UserPasswordEmpty       UserPasswordEmpty
+	UserPasswordRateLimited UserPasswordRateLimited
+	UserPasswordTooLong     UserPasswordTooLong
+	UserPermissionDenied    UserPermissionDenied
 }
 
 // FinishUserPasskeyRegistrationErrorResponseType is oneOf type of FinishUserPasskeyRegistrationErrorResponse.
@@ -19776,22 +19777,23 @@ type FinishUserPasskeyRegistrationErrorResponseType string
 
 // Possible values for FinishUserPasskeyRegistrationErrorResponseType.
 const (
-	AttAlreadyHandedOffFinishUserPasskeyRegistrationErrorResponse  FinishUserPasskeyRegistrationErrorResponseType = "att.already_handed_off"
-	AttInvalidProofFinishUserPasskeyRegistrationErrorResponse      FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_proof"
-	AttInvalidRequestFinishUserPasskeyRegistrationErrorResponse    FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_request"
-	AttInvalidStateFinishUserPasskeyRegistrationErrorResponse      FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_state"
-	AttNotFoundFinishUserPasskeyRegistrationErrorResponse          FinishUserPasskeyRegistrationErrorResponseType = "att.not_found"
-	AttProofRejectedFinishUserPasskeyRegistrationErrorResponse     FinishUserPasskeyRegistrationErrorResponseType = "att.proof_rejected"
-	AttStaleChallengeFinishUserPasskeyRegistrationErrorResponse    FinishUserPasskeyRegistrationErrorResponseType = "att.stale_challenge"
-	AuthUnauthorizedFinishUserPasskeyRegistrationErrorResponse     FinishUserPasskeyRegistrationErrorResponseType = "auth.unauthorized"
-	EvtInvalidFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "evt.invalid"
-	InternalFinishUserPasskeyRegistrationErrorResponse             FinishUserPasskeyRegistrationErrorResponseType = "internal"
-	ReqInvalidFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "req.invalid"
-	UserInvalidFinishUserPasskeyRegistrationErrorResponse          FinishUserPasskeyRegistrationErrorResponseType = "user.invalid"
-	UserNotFoundFinishUserPasskeyRegistrationErrorResponse         FinishUserPasskeyRegistrationErrorResponseType = "user.not_found"
-	UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse    FinishUserPasskeyRegistrationErrorResponseType = "user.password_empty"
-	UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse  FinishUserPasskeyRegistrationErrorResponseType = "user.password_too_long"
-	UserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse FinishUserPasskeyRegistrationErrorResponseType = "user.permission_denied"
+	AttAlreadyHandedOffFinishUserPasskeyRegistrationErrorResponse     FinishUserPasskeyRegistrationErrorResponseType = "att.already_handed_off"
+	AttInvalidProofFinishUserPasskeyRegistrationErrorResponse         FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_proof"
+	AttInvalidRequestFinishUserPasskeyRegistrationErrorResponse       FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_request"
+	AttInvalidStateFinishUserPasskeyRegistrationErrorResponse         FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_state"
+	AttNotFoundFinishUserPasskeyRegistrationErrorResponse             FinishUserPasskeyRegistrationErrorResponseType = "att.not_found"
+	AttProofRejectedFinishUserPasskeyRegistrationErrorResponse        FinishUserPasskeyRegistrationErrorResponseType = "att.proof_rejected"
+	AttStaleChallengeFinishUserPasskeyRegistrationErrorResponse       FinishUserPasskeyRegistrationErrorResponseType = "att.stale_challenge"
+	AuthUnauthorizedFinishUserPasskeyRegistrationErrorResponse        FinishUserPasskeyRegistrationErrorResponseType = "auth.unauthorized"
+	EvtInvalidFinishUserPasskeyRegistrationErrorResponse              FinishUserPasskeyRegistrationErrorResponseType = "evt.invalid"
+	InternalFinishUserPasskeyRegistrationErrorResponse                FinishUserPasskeyRegistrationErrorResponseType = "internal"
+	ReqInvalidFinishUserPasskeyRegistrationErrorResponse              FinishUserPasskeyRegistrationErrorResponseType = "req.invalid"
+	UserInvalidFinishUserPasskeyRegistrationErrorResponse             FinishUserPasskeyRegistrationErrorResponseType = "user.invalid"
+	UserNotFoundFinishUserPasskeyRegistrationErrorResponse            FinishUserPasskeyRegistrationErrorResponseType = "user.not_found"
+	UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse       FinishUserPasskeyRegistrationErrorResponseType = "user.password_empty"
+	UserPasswordRateLimitedFinishUserPasskeyRegistrationErrorResponse FinishUserPasskeyRegistrationErrorResponseType = "user.password_rate_limited"
+	UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse     FinishUserPasskeyRegistrationErrorResponseType = "user.password_too_long"
+	UserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse    FinishUserPasskeyRegistrationErrorResponseType = "user.permission_denied"
 )
 
 // IsAttAlreadyHandedOff reports whether FinishUserPasskeyRegistrationErrorResponse is AttAlreadyHandedOff.
@@ -19862,6 +19864,11 @@ func (s FinishUserPasskeyRegistrationErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordEmpty.
 func (s FinishUserPasskeyRegistrationErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsUserPasswordRateLimited reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordRateLimited.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsUserPasswordRateLimited() bool {
+	return s.Type == UserPasswordRateLimitedFinishUserPasskeyRegistrationErrorResponse
 }
 
 // IsUserPasswordTooLong reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordTooLong.
@@ -20165,6 +20172,27 @@ func (s FinishUserPasskeyRegistrationErrorResponse) GetUserPasswordEmpty() (v Us
 func NewUserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse(v UserPasswordEmpty) FinishUserPasskeyRegistrationErrorResponse {
 	var s FinishUserPasskeyRegistrationErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordRateLimited sets FinishUserPasskeyRegistrationErrorResponse to UserPasswordRateLimited.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetUserPasswordRateLimited(v UserPasswordRateLimited) {
+	s.Type = UserPasswordRateLimitedFinishUserPasskeyRegistrationErrorResponse
+	s.UserPasswordRateLimited = v
+}
+
+// GetUserPasswordRateLimited returns UserPasswordRateLimited and true boolean if FinishUserPasskeyRegistrationErrorResponse is UserPasswordRateLimited.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetUserPasswordRateLimited() (v UserPasswordRateLimited, ok bool) {
+	if !s.IsUserPasswordRateLimited() {
+		return v, false
+	}
+	return s.UserPasswordRateLimited, true
+}
+
+// NewUserPasswordRateLimitedFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from UserPasswordRateLimited.
+func NewUserPasswordRateLimitedFinishUserPasskeyRegistrationErrorResponse(v UserPasswordRateLimited) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetUserPasswordRateLimited(v)
 	return s
 }
 
@@ -49393,6 +49421,52 @@ func (o OptUserPasswordEmptyDetails) Or(d UserPasswordEmptyDetails) UserPassword
 	return d
 }
 
+// NewOptUserPasswordRateLimitedDetails returns new OptUserPasswordRateLimitedDetails with value set to v.
+func NewOptUserPasswordRateLimitedDetails(v UserPasswordRateLimitedDetails) OptUserPasswordRateLimitedDetails {
+	return OptUserPasswordRateLimitedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserPasswordRateLimitedDetails is optional UserPasswordRateLimitedDetails.
+type OptUserPasswordRateLimitedDetails struct {
+	Value UserPasswordRateLimitedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUserPasswordRateLimitedDetails was set.
+func (o OptUserPasswordRateLimitedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserPasswordRateLimitedDetails) Reset() {
+	var v UserPasswordRateLimitedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserPasswordRateLimitedDetails) SetTo(v UserPasswordRateLimitedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserPasswordRateLimitedDetails) Get() (v UserPasswordRateLimitedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserPasswordRateLimitedDetails) Or(d UserPasswordRateLimitedDetails) UserPasswordRateLimitedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptUserPasswordTooLongDetails returns new OptUserPasswordTooLongDetails with value set to v.
 func NewOptUserPasswordTooLongDetails(v UserPasswordTooLongDetails) OptUserPasswordTooLongDetails {
 	return OptUserPasswordTooLongDetails{
@@ -61769,36 +61843,37 @@ func (*SubmitFlowStepBadRequest) submitFlowStepRes() {}
 
 // SubmitFlowStepErrorResponse represents sum type.
 type SubmitFlowStepErrorResponse struct {
-	Type                SubmitFlowStepErrorResponseType // switch on this field
-	AttAlreadyHandedOff AttAlreadyHandedOff
-	AttInvalidRequest   AttInvalidRequest
-	AttInvalidState     AttInvalidState
-	AttNotCompleted     AttNotCompleted
-	AttNotFound         AttNotFound
-	AttProofRejected    AttProofRejected
-	AttStaleChallenge   AttStaleChallenge
-	EncKeyDecryptFailed EncKeyDecryptFailed
-	EncKeyEncryptFailed EncKeyEncryptFailed
-	EncKeyNotFound      EncKeyNotFound
-	EvtInvalid          EvtInvalid
-	FlowCookieExpired   FlowCookieExpired
-	FlowCookieInvalid   FlowCookieInvalid
-	FlowIntegrity       FlowIntegrity
-	FlowInvalidAction   FlowInvalidAction
-	FlowNotFound        FlowNotFound
-	FlowRestartRequired FlowRestartRequired
-	FlowUnsupported     FlowUnsupported
-	Internal            Internal
-	TknInvalid          TknInvalid
-	NotImplemented      NotImplemented
-	ReqInvalid          ReqInvalid
-	EncKeyUnknownAlg    EncKeyUnknownAlg
-	Unavailable         Unavailable
-	UserAlreadyExists   UserAlreadyExists
-	UserInvalid         UserInvalid
-	UserNotFound        UserNotFound
-	UserPasswordEmpty   UserPasswordEmpty
-	UserPasswordTooLong UserPasswordTooLong
+	Type                    SubmitFlowStepErrorResponseType // switch on this field
+	AttAlreadyHandedOff     AttAlreadyHandedOff
+	AttInvalidRequest       AttInvalidRequest
+	AttInvalidState         AttInvalidState
+	AttNotCompleted         AttNotCompleted
+	AttNotFound             AttNotFound
+	AttProofRejected        AttProofRejected
+	AttStaleChallenge       AttStaleChallenge
+	EncKeyDecryptFailed     EncKeyDecryptFailed
+	EncKeyEncryptFailed     EncKeyEncryptFailed
+	EncKeyNotFound          EncKeyNotFound
+	EvtInvalid              EvtInvalid
+	FlowCookieExpired       FlowCookieExpired
+	FlowCookieInvalid       FlowCookieInvalid
+	FlowIntegrity           FlowIntegrity
+	FlowInvalidAction       FlowInvalidAction
+	FlowNotFound            FlowNotFound
+	FlowRestartRequired     FlowRestartRequired
+	FlowUnsupported         FlowUnsupported
+	Internal                Internal
+	TknInvalid              TknInvalid
+	NotImplemented          NotImplemented
+	ReqInvalid              ReqInvalid
+	EncKeyUnknownAlg        EncKeyUnknownAlg
+	Unavailable             Unavailable
+	UserAlreadyExists       UserAlreadyExists
+	UserInvalid             UserInvalid
+	UserNotFound            UserNotFound
+	UserPasswordEmpty       UserPasswordEmpty
+	UserPasswordRateLimited UserPasswordRateLimited
+	UserPasswordTooLong     UserPasswordTooLong
 }
 
 // SubmitFlowStepErrorResponseType is oneOf type of SubmitFlowStepErrorResponse.
@@ -61806,35 +61881,36 @@ type SubmitFlowStepErrorResponseType string
 
 // Possible values for SubmitFlowStepErrorResponseType.
 const (
-	AttAlreadyHandedOffSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "att.already_handed_off"
-	AttInvalidRequestSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "att.invalid_request"
-	AttInvalidStateSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "att.invalid_state"
-	AttNotCompletedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "att.not_completed"
-	AttNotFoundSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "att.not_found"
-	AttProofRejectedSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "att.proof_rejected"
-	AttStaleChallengeSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "att.stale_challenge"
-	EncKeyDecryptFailedSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "enc_key.decrypt_failed"
-	EncKeyEncryptFailedSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "enc_key.encrypt_failed"
-	EncKeyNotFoundSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "enc_key.not_found"
-	EvtInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "evt.invalid"
-	FlowCookieExpiredSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.cookie_expired"
-	FlowCookieInvalidSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.cookie_invalid"
-	FlowIntegritySubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.integrity"
-	FlowInvalidActionSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.invalid_action"
-	FlowNotFoundSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "flow.not_found"
-	FlowRestartRequiredSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "flow.restart_required"
-	FlowUnsupportedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "flow.unsupported"
-	InternalSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "internal"
-	TknInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "tkn.invalid"
-	NotImplementedSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "not_implemented"
-	ReqInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
-	UnavailableSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "unavailable"
-	UserAlreadyExistsSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "user.already_exists"
-	UserInvalidSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "user.invalid"
-	UserNotFoundSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "user.not_found"
-	UserPasswordEmptySubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "user.password_empty"
-	UserPasswordTooLongSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "user.password_too_long"
+	AttAlreadyHandedOffSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "att.already_handed_off"
+	AttInvalidRequestSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "att.invalid_request"
+	AttInvalidStateSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "att.invalid_state"
+	AttNotCompletedSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "att.not_completed"
+	AttNotFoundSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "att.not_found"
+	AttProofRejectedSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "att.proof_rejected"
+	AttStaleChallengeSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "att.stale_challenge"
+	EncKeyDecryptFailedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyEncryptFailedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "enc_key.encrypt_failed"
+	EncKeyNotFoundSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "enc_key.not_found"
+	EvtInvalidSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "evt.invalid"
+	FlowCookieExpiredSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.cookie_expired"
+	FlowCookieInvalidSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.cookie_invalid"
+	FlowIntegritySubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "flow.integrity"
+	FlowInvalidActionSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.invalid_action"
+	FlowNotFoundSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "flow.not_found"
+	FlowRestartRequiredSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "flow.restart_required"
+	FlowUnsupportedSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "flow.unsupported"
+	InternalSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "internal"
+	TknInvalidSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "tkn.invalid"
+	NotImplementedSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "not_implemented"
+	ReqInvalidSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
+	UnavailableSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "unavailable"
+	UserAlreadyExistsSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "user.already_exists"
+	UserInvalidSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "user.invalid"
+	UserNotFoundSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "user.not_found"
+	UserPasswordEmptySubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "user.password_empty"
+	UserPasswordRateLimitedSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "user.password_rate_limited"
+	UserPasswordTooLongSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "user.password_too_long"
 )
 
 // IsAttAlreadyHandedOff reports whether SubmitFlowStepErrorResponse is AttAlreadyHandedOff.
@@ -61975,6 +62051,11 @@ func (s SubmitFlowStepErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether SubmitFlowStepErrorResponse is UserPasswordEmpty.
 func (s SubmitFlowStepErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptySubmitFlowStepErrorResponse
+}
+
+// IsUserPasswordRateLimited reports whether SubmitFlowStepErrorResponse is UserPasswordRateLimited.
+func (s SubmitFlowStepErrorResponse) IsUserPasswordRateLimited() bool {
+	return s.Type == UserPasswordRateLimitedSubmitFlowStepErrorResponse
 }
 
 // IsUserPasswordTooLong reports whether SubmitFlowStepErrorResponse is UserPasswordTooLong.
@@ -62567,6 +62648,27 @@ func (s SubmitFlowStepErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpty
 func NewUserPasswordEmptySubmitFlowStepErrorResponse(v UserPasswordEmpty) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordRateLimited sets SubmitFlowStepErrorResponse to UserPasswordRateLimited.
+func (s *SubmitFlowStepErrorResponse) SetUserPasswordRateLimited(v UserPasswordRateLimited) {
+	s.Type = UserPasswordRateLimitedSubmitFlowStepErrorResponse
+	s.UserPasswordRateLimited = v
+}
+
+// GetUserPasswordRateLimited returns UserPasswordRateLimited and true boolean if SubmitFlowStepErrorResponse is UserPasswordRateLimited.
+func (s SubmitFlowStepErrorResponse) GetUserPasswordRateLimited() (v UserPasswordRateLimited, ok bool) {
+	if !s.IsUserPasswordRateLimited() {
+		return v, false
+	}
+	return s.UserPasswordRateLimited, true
+}
+
+// NewUserPasswordRateLimitedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from UserPasswordRateLimited.
+func NewUserPasswordRateLimitedSubmitFlowStepErrorResponse(v UserPasswordRateLimited) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUserPasswordRateLimited(v)
 	return s
 }
 
@@ -67024,6 +67126,59 @@ func (s *UserPasswordEmptyDetails) init() UserPasswordEmptyDetails {
 
 // Merged schema.
 // Ref: #
+type UserPasswordRateLimited struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUserPasswordRateLimitedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UserPasswordRateLimited) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UserPasswordRateLimited) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UserPasswordRateLimited) GetDetails() OptUserPasswordRateLimitedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UserPasswordRateLimited) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UserPasswordRateLimited) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UserPasswordRateLimited) SetDetails(val OptUserPasswordRateLimitedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UserPasswordRateLimitedDetails map[string]jx.Raw
+
+func (s *UserPasswordRateLimitedDetails) init() UserPasswordRateLimitedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type UserPasswordTooLong struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -68728,23 +68883,24 @@ func (*Variables) updateVariablesRes() {}
 
 // VerifyChallengeProofErrorResponse represents sum type.
 type VerifyChallengeProofErrorResponse struct {
-	Type                VerifyChallengeProofErrorResponseType // switch on this field
-	AttAlreadyHandedOff AttAlreadyHandedOff
-	AttInvalidProof     AttInvalidProof
-	AttInvalidRequest   AttInvalidRequest
-	AttInvalidState     AttInvalidState
-	AttNotFound         AttNotFound
-	AttProofRejected    AttProofRejected
-	AttStaleChallenge   AttStaleChallenge
-	AuthUnauthorized    AuthUnauthorized
-	EvtInvalid          EvtInvalid
-	Internal            Internal
-	ReqInvalid          ReqInvalid
-	UserAlreadyExists   UserAlreadyExists
-	UserInvalid         UserInvalid
-	UserNotFound        UserNotFound
-	UserPasswordEmpty   UserPasswordEmpty
-	UserPasswordTooLong UserPasswordTooLong
+	Type                    VerifyChallengeProofErrorResponseType // switch on this field
+	AttAlreadyHandedOff     AttAlreadyHandedOff
+	AttInvalidProof         AttInvalidProof
+	AttInvalidRequest       AttInvalidRequest
+	AttInvalidState         AttInvalidState
+	AttNotFound             AttNotFound
+	AttProofRejected        AttProofRejected
+	AttStaleChallenge       AttStaleChallenge
+	AuthUnauthorized        AuthUnauthorized
+	EvtInvalid              EvtInvalid
+	Internal                Internal
+	ReqInvalid              ReqInvalid
+	UserAlreadyExists       UserAlreadyExists
+	UserInvalid             UserInvalid
+	UserNotFound            UserNotFound
+	UserPasswordEmpty       UserPasswordEmpty
+	UserPasswordRateLimited UserPasswordRateLimited
+	UserPasswordTooLong     UserPasswordTooLong
 }
 
 // VerifyChallengeProofErrorResponseType is oneOf type of VerifyChallengeProofErrorResponse.
@@ -68752,22 +68908,23 @@ type VerifyChallengeProofErrorResponseType string
 
 // Possible values for VerifyChallengeProofErrorResponseType.
 const (
-	AttAlreadyHandedOffVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "att.already_handed_off"
-	AttInvalidProofVerifyChallengeProofErrorResponse     VerifyChallengeProofErrorResponseType = "att.invalid_proof"
-	AttInvalidRequestVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "att.invalid_request"
-	AttInvalidStateVerifyChallengeProofErrorResponse     VerifyChallengeProofErrorResponseType = "att.invalid_state"
-	AttNotFoundVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "att.not_found"
-	AttProofRejectedVerifyChallengeProofErrorResponse    VerifyChallengeProofErrorResponseType = "att.proof_rejected"
-	AttStaleChallengeVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "att.stale_challenge"
-	AuthUnauthorizedVerifyChallengeProofErrorResponse    VerifyChallengeProofErrorResponseType = "auth.unauthorized"
-	EvtInvalidVerifyChallengeProofErrorResponse          VerifyChallengeProofErrorResponseType = "evt.invalid"
-	InternalVerifyChallengeProofErrorResponse            VerifyChallengeProofErrorResponseType = "internal"
-	ReqInvalidVerifyChallengeProofErrorResponse          VerifyChallengeProofErrorResponseType = "req.invalid"
-	UserAlreadyExistsVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "user.already_exists"
-	UserInvalidVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "user.invalid"
-	UserNotFoundVerifyChallengeProofErrorResponse        VerifyChallengeProofErrorResponseType = "user.not_found"
-	UserPasswordEmptyVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "user.password_empty"
-	UserPasswordTooLongVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "user.password_too_long"
+	AttAlreadyHandedOffVerifyChallengeProofErrorResponse     VerifyChallengeProofErrorResponseType = "att.already_handed_off"
+	AttInvalidProofVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "att.invalid_proof"
+	AttInvalidRequestVerifyChallengeProofErrorResponse       VerifyChallengeProofErrorResponseType = "att.invalid_request"
+	AttInvalidStateVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "att.invalid_state"
+	AttNotFoundVerifyChallengeProofErrorResponse             VerifyChallengeProofErrorResponseType = "att.not_found"
+	AttProofRejectedVerifyChallengeProofErrorResponse        VerifyChallengeProofErrorResponseType = "att.proof_rejected"
+	AttStaleChallengeVerifyChallengeProofErrorResponse       VerifyChallengeProofErrorResponseType = "att.stale_challenge"
+	AuthUnauthorizedVerifyChallengeProofErrorResponse        VerifyChallengeProofErrorResponseType = "auth.unauthorized"
+	EvtInvalidVerifyChallengeProofErrorResponse              VerifyChallengeProofErrorResponseType = "evt.invalid"
+	InternalVerifyChallengeProofErrorResponse                VerifyChallengeProofErrorResponseType = "internal"
+	ReqInvalidVerifyChallengeProofErrorResponse              VerifyChallengeProofErrorResponseType = "req.invalid"
+	UserAlreadyExistsVerifyChallengeProofErrorResponse       VerifyChallengeProofErrorResponseType = "user.already_exists"
+	UserInvalidVerifyChallengeProofErrorResponse             VerifyChallengeProofErrorResponseType = "user.invalid"
+	UserNotFoundVerifyChallengeProofErrorResponse            VerifyChallengeProofErrorResponseType = "user.not_found"
+	UserPasswordEmptyVerifyChallengeProofErrorResponse       VerifyChallengeProofErrorResponseType = "user.password_empty"
+	UserPasswordRateLimitedVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "user.password_rate_limited"
+	UserPasswordTooLongVerifyChallengeProofErrorResponse     VerifyChallengeProofErrorResponseType = "user.password_too_long"
 )
 
 // IsAttAlreadyHandedOff reports whether VerifyChallengeProofErrorResponse is AttAlreadyHandedOff.
@@ -68843,6 +69000,11 @@ func (s VerifyChallengeProofErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether VerifyChallengeProofErrorResponse is UserPasswordEmpty.
 func (s VerifyChallengeProofErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptyVerifyChallengeProofErrorResponse
+}
+
+// IsUserPasswordRateLimited reports whether VerifyChallengeProofErrorResponse is UserPasswordRateLimited.
+func (s VerifyChallengeProofErrorResponse) IsUserPasswordRateLimited() bool {
+	return s.Type == UserPasswordRateLimitedVerifyChallengeProofErrorResponse
 }
 
 // IsUserPasswordTooLong reports whether VerifyChallengeProofErrorResponse is UserPasswordTooLong.
@@ -69162,6 +69324,27 @@ func (s VerifyChallengeProofErrorResponse) GetUserPasswordEmpty() (v UserPasswor
 func NewUserPasswordEmptyVerifyChallengeProofErrorResponse(v UserPasswordEmpty) VerifyChallengeProofErrorResponse {
 	var s VerifyChallengeProofErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordRateLimited sets VerifyChallengeProofErrorResponse to UserPasswordRateLimited.
+func (s *VerifyChallengeProofErrorResponse) SetUserPasswordRateLimited(v UserPasswordRateLimited) {
+	s.Type = UserPasswordRateLimitedVerifyChallengeProofErrorResponse
+	s.UserPasswordRateLimited = v
+}
+
+// GetUserPasswordRateLimited returns UserPasswordRateLimited and true boolean if VerifyChallengeProofErrorResponse is UserPasswordRateLimited.
+func (s VerifyChallengeProofErrorResponse) GetUserPasswordRateLimited() (v UserPasswordRateLimited, ok bool) {
+	if !s.IsUserPasswordRateLimited() {
+		return v, false
+	}
+	return s.UserPasswordRateLimited, true
+}
+
+// NewUserPasswordRateLimitedVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from UserPasswordRateLimited.
+func NewUserPasswordRateLimitedVerifyChallengeProofErrorResponse(v UserPasswordRateLimited) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetUserPasswordRateLimited(v)
 	return s
 }
 
