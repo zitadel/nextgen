@@ -2,13 +2,13 @@ import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { makeTestSession } from "@/test/session.fixture";
 import { createAppRouter } from "../router";
 import { _resetRuntimeForTesting, _setRuntimeForTesting } from "../runtime/runtime";
 import { THEME_STORAGE_KEY } from "../theme";
+import { server } from "@/test/msw";
 
 /**
  * Console authentication guard (Console ADR 0003): the `_authed` pathless
@@ -56,16 +56,15 @@ vi.mock("@zitadel/sdk-react", () => ({
  */
 // `/` lands on Teams and the redirect test asks for `/schemas`; both are
 // project-scoped, so the guard selects the visitor's only project.
-const server = setupServer(
-  http.post("*/api/teams/query", () => HttpResponse.json({ teams: [] })),
-  http.get("*/api/schemas", () => HttpResponse.json({ schemas: [] })),
-  http.get("*/api/users/me/projects", () =>
-    HttpResponse.json({ projects: [{ id: "proj_test", name: "Test" }] }),
+beforeEach(() =>
+  server.use(
+    http.post("*/api/teams/query", () => HttpResponse.json({ teams: [] })),
+    http.get("*/api/schemas", () => HttpResponse.json({ schemas: [] })),
+    http.get("*/api/users/me/projects", () =>
+      HttpResponse.json({ projects: [{ id: "proj_test", name: "Test" }] }),
+    ),
   ),
 );
-
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterAll(() => server.close());
 
 async function renderAt(path: string) {
   const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
