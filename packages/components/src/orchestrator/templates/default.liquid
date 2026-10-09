@@ -51,6 +51,7 @@
           {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
           {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
           {% if recover and f.type == 'password' %}forgot-password-href="#" forgot-password-action="{{ recover.name }}" forgot-password-label="{{ recover.text_key | t }}"{% endif %}
+          {% if options.password_toggle and f.type == 'password' %}password-toggle show-password-label="{{ 'action.show_password' | t }}" hide-password-label="{{ 'action.hide_password' | t }}"{% endif %}
         >
           {% if field_help != "" %}
             <span slot="help">{{ field_help }}</span>

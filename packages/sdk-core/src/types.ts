@@ -161,6 +161,12 @@ export interface ZitadelLoginConfig {
    * @default false
    */
   readonly suppressHeader?: boolean;
+  /**
+   * Hide the show/hide button on password fields. The button is shown by
+   * default, as NIST SP 800-63B recommends.
+   * @default false
+   */
+  readonly suppressPasswordToggle?: boolean;
   /** Flow purpose. @default "login" */
   readonly purpose?: CreateFlowBodyPurpose;
   /**

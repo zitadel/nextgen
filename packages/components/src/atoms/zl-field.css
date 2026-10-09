@@ -195,6 +195,16 @@
 .zr-field--success .zr-field__trailing {
   color: var(--zl-success);
 }
+/* The show/hide toggle is a control, not a status mark, so it keeps the muted
+   tone in every state — the edge and the message already carry the error. */
+.zr-field .zr-field__trailing--toggle {
+  color: var(--zl-muted-foreground);
+}
+/* Edge paints its own reveal button on password inputs; with ours present
+   the field would show two. */
+.zr-field__wrap--toggle .zr-field__input::-ms-reveal {
+  display: none;
+}
 
 /* Description and validation copy sit at the control's own text size, not a
    smaller caption. */

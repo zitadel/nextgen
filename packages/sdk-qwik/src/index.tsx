@@ -64,6 +64,7 @@ function bindLoginConfig(el: ZitadelLoginElement, props: ZitadelLoginProps): voi
   setProp(el, "variant", props.variant);
   setProp(el, "theme", props.theme);
   setProp(el, "suppressHeader", props.suppressHeader);
+  setProp(el, "suppressPasswordToggle", props.suppressPasswordToggle);
   setProp(el, "locales", props.locales);
   setProp(el, "lang", props.lang);
 }

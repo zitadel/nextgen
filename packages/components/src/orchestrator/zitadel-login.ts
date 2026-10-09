@@ -215,6 +215,16 @@ export class ZitadelLogin extends ZitadelSurface {
   @property({ type: String, attribute: "resume-flow-id" }) accessor resumeFlowId = "";
 
   /**
+   * Hide the show/hide button on password fields. The button is shown by
+   * default — NIST SP 800-63B recommends offering it — so this is an opt-out,
+   * named negatively because a boolean attribute can only switch something
+   * on. Local to the embedding page; a custom template honours it by reading
+   * `options.password_toggle`.
+   */
+  @property({ type: Boolean, attribute: "suppress-password-toggle" })
+  accessor suppressPasswordToggle = false;
+
+  /**
    * Preview mode, for an operator surface such as the console's branding
    * screen. Set, the element starts the flow as usual so the step it paints
    * is the one the project serves, then shows it in the named state and
@@ -1056,6 +1066,11 @@ export class ZitadelLogin extends ZitadelSurface {
       errors,
       branding: this.brandingForTemplate(),
       loading: this.loading,
+      options: {
+        // Compared, not passed through: an unset framework prop arrives as
+        // `undefined`, which must keep the default (toggle shown).
+        password_toggle: this.suppressPasswordToggle !== true,
+      },
     };
 
     let raw: string;

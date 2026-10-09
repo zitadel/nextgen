@@ -152,6 +152,8 @@ export const en: Record<string, string> = {
   "submit.continue": "Continue",
   "submit.signin": "Sign in",
   "action.forgot_password": "Forgot password?",
+  "action.show_password": "Show password",
+  "action.hide_password": "Hide password",
   "action.cancel": "Cancel",
   // Generic fallback for the engine-injected `<step>.action.back` key on
   // custom step names (see INJECTED_KEY_FALLBACKS in liquid.ts).

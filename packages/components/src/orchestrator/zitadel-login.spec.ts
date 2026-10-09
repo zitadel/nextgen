@@ -161,6 +161,34 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(submitted?.body.fields).toEqual({ email: "alice@acme.com" });
   });
 
+  it("offers the password show/hide toggle by default", async () => {
+    const element = await mount(host);
+    type(element, "email", "alice@acme.com");
+    submit(element);
+    const field = await waitFor(() =>
+      element.shadowRoot?.querySelector(`zl-field[name="${PASSWORD_FIELD}"]`),
+    );
+    expect(field.hasAttribute("password-toggle")).toBe(true);
+    expect(field.getAttribute("show-password-label")).toBe("Show password");
+    expect(field.getAttribute("hide-password-label")).toBe("Hide password");
+  });
+
+  it.each([
+    ["suppress-password-toggle", true, false],
+    // An unset framework prop reaches the element as `undefined`.
+    ["unset suppressPasswordToggle", undefined, true],
+  ])("%s decides the password toggle", async (_label, suppress, shown) => {
+    const element = attachLogin(host);
+    element.suppressPasswordToggle = suppress as unknown as boolean;
+    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+    type(element, "email", "alice@acme.com");
+    submit(element);
+    const field = await waitFor(() =>
+      element.shadowRoot?.querySelector(`zl-field[name="${PASSWORD_FIELD}"]`),
+    );
+    expect(field.hasAttribute("password-toggle")).toBe(shown);
+  });
+
   it("starts a flow from project-id / proxy-path attributes with no global config", async () => {
     // Clear the global so the attributes are the only thing that can configure
     // the element — proves declarative HTML config works on its own.

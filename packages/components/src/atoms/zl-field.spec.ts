@@ -154,3 +154,106 @@ describe("<zl-field> aria wiring", () => {
     expect(input.value).toBe("restored@acme.com");
   });
 });
+
+describe("<zl-field> password toggle", () => {
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  async function mount(html: string): Promise<ZlField> {
+    host.innerHTML = html;
+    const field = host.querySelector("zl-field") as ZlField;
+    await field.updateComplete;
+    return field;
+  }
+
+  const input = (field: ZlField) => field.shadowRoot?.querySelector("input") as HTMLInputElement;
+  const toggle = (field: ZlField) =>
+    field.shadowRoot?.querySelector<HTMLButtonElement>('[part~="password-toggle"]') ?? null;
+
+  it("is off unless the field opts in", async () => {
+    const field = await mount(`<zl-field name="pw" type="password"></zl-field>`);
+    expect(toggle(field)).toBeNull();
+    expect(input(field).hasAttribute("spellcheck")).toBe(false);
+  });
+
+  it("ignores the attribute on a non-password field", async () => {
+    const field = await mount(`<zl-field name="email" type="email" password-toggle></zl-field>`);
+    expect(toggle(field)).toBeNull();
+  });
+
+  it("replaces the clear button, so the field shows one icon", async () => {
+    const field = await mount(
+      `<zl-field name="pw" type="password" value="hunter2" password-toggle></zl-field>`,
+    );
+    const actions = field.shadowRoot?.querySelectorAll('[part~="trailing-action"]') ?? [];
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.getAttribute("aria-label")).toBe("Show password");
+  });
+
+  it("keeps the toggle in the error state instead of the alert icon", async () => {
+    const field = await mount(
+      `<zl-field name="pw" type="password" error="Wrong" password-toggle></zl-field>`,
+    );
+    expect(toggle(field)).not.toBeNull();
+    expect(field.shadowRoot?.querySelector('zl-icon[name="alert-circle"]')).toBeNull();
+  });
+
+  it("reveals and hides the value, keeping it out of the tab order", async () => {
+    const field = await mount(
+      `<zl-field name="pw" type="password" value="hunter2" password-toggle
+        show-password-label="Anzeigen" hide-password-label="Verbergen"></zl-field>`,
+    );
+    const button = toggle(field)!;
+    expect(button.tabIndex).toBe(-1);
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+    expect(input(field).type).toBe("password");
+
+    button.click();
+    await field.updateComplete;
+    expect(input(field).type).toBe("text");
+    expect(input(field).value).toBe("hunter2");
+    expect(toggle(field)!.getAttribute("aria-pressed")).toBe("true");
+    expect(toggle(field)!.getAttribute("aria-label")).toBe("Verbergen");
+
+    toggle(field)!.click();
+    await field.updateComplete;
+    expect(input(field).type).toBe("password");
+    expect(toggle(field)!.getAttribute("aria-label")).toBe("Anzeigen");
+  });
+
+  it("opts the input out of spellcheck and autocorrect", async () => {
+    const field = await mount(`<zl-field name="pw" type="password" password-toggle></zl-field>`);
+    expect(input(field).getAttribute("spellcheck")).toBe("false");
+    expect(input(field).getAttribute("autocapitalize")).toBe("off");
+    expect(input(field).getAttribute("autocorrect")).toBe("off");
+  });
+
+  it("hides the value again when the toggle is withdrawn", async () => {
+    const field = await mount(`<zl-field name="pw" type="password" password-toggle></zl-field>`);
+    toggle(field)!.click();
+    await field.updateComplete;
+    field.passwordToggle = false;
+    await field.updateComplete;
+    expect(input(field).type).toBe("password");
+    field.passwordToggle = true;
+    await field.updateComplete;
+    expect(input(field).type).toBe("password");
+  });
+
+  it("hides the value again on form reset", async () => {
+    const field = await mount(`<zl-field name="pw" type="password" password-toggle></zl-field>`);
+    toggle(field)!.click();
+    await field.updateComplete;
+    field.formResetCallback();
+    await field.updateComplete;
+    expect(input(field).type).toBe("password");
+  });
+});

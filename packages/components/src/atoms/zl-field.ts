@@ -37,10 +37,12 @@ export type ZlFieldInputDetail = { name: string; value: string };
  *   input        36px tall, 10px/4px padding, `--zl-radius-md`, a
  *                `--zl-input` edge over `--zl-input-fill`
  *   focus        the edge takes `--zl-ring` and a 3px ring sits outside it
- *   trailing     cross (clear) | alert-circle (error) | check (success).
- *                The clear button is a pointer-only affordance (`tabindex="-1"`)
- *                so Tab moves from one input straight to the next; keyboard
- *                users clear via the input itself.
+ *   trailing     cross (clear) | alert-circle (error) | check (success), or
+ *                eye / eye-off on a `password-toggle` password field — the
+ *                toggle takes the slot in every state, so the field never
+ *                shows two icons. Both buttons are pointer-only affordances
+ *                (`tabindex="-1"`) so Tab moves from one input straight to
+ *                the next; keyboard users clear via the input itself.
  *   description  14/20 in `--zl-muted-foreground`
  *
  * Form participation: `<zl-field>` is a form-associated custom element.
@@ -74,9 +76,19 @@ export class ZlField extends FormAtom {
     | string
     | undefined = undefined;
   @property({ type: Boolean, attribute: "trailing-icon" }) accessor trailingIcon = true;
+  /**
+   * Offer a show/hide button on a `type="password"` field. Opt-in at the
+   * atom so a standalone `<zl-field>` keeps plain password semantics;
+   * `<zitadel-login>` turns it on by default through its template.
+   */
+  @property({ type: Boolean, attribute: "password-toggle" }) accessor passwordToggle = false;
+  @property({ attribute: "show-password-label" }) accessor showPasswordLabel = "Show password";
+  @property({ attribute: "hide-password-label" }) accessor hidePasswordLabel = "Hide password";
   @property({ type: Boolean }) accessor required = false;
   @property({ type: Boolean, reflect: true }) accessor invalid = false;
 
+  /** Whether a toggle-enabled password field currently shows its value. */
+  @state() private accessor revealed = false;
   @state() private accessor hasHelp = false;
   @state() private accessor hasSuffixSlot = false;
 
@@ -97,6 +109,18 @@ export class ZlField extends FormAtom {
     if (changed.has("value") || changed.has("required") || changed.has("error")) {
       this.syncFormState();
     }
+    if ((changed.has("type") || changed.has("passwordToggle")) && !this.hasPasswordToggle) {
+      this.revealed = false;
+    }
+  }
+
+  override formResetCallback(): void {
+    this.revealed = false;
+    super.formResetCallback();
+  }
+
+  private get hasPasswordToggle(): boolean {
+    return this.passwordToggle === true && this.type === "password";
   }
 
   override focus(options?: FocusOptions): void {
@@ -136,11 +160,22 @@ export class ZlField extends FormAtom {
       "zr-field--success": showSuccess,
       "zr-field--disabled": this.isDisabled,
     });
-    const showDefaultTrailing = this.trailingIcon && !this.hasSuffixSlot && !this.isDisabled;
-    const trailing = showDefaultTrailing ? this.renderTrailingIcon() : null;
+    const passwordToggle = this.hasPasswordToggle;
+    const showDefaultTrailing =
+      (this.trailingIcon || passwordToggle) && !this.hasSuffixSlot && !this.isDisabled;
+    const trailing = !showDefaultTrailing
+      ? null
+      : passwordToggle
+        ? this.renderPasswordToggle()
+        : this.renderTrailingIcon();
+    // A revealed password is a `type="text"` input, which browsers hand to
+    // spellcheck and autocorrect — and "enhanced" spellcheck sends the text to
+    // a cloud service. Opting out up front covers the revealed state.
+    const revealed = passwordToggle && this.revealed;
     const wrapClass = classMap({
       "zr-field__wrap": true,
       "zr-field__wrap--trailing": showDefaultTrailing,
+      "zr-field__wrap--toggle": passwordToggle,
     });
 
     return html`
@@ -154,7 +189,10 @@ export class ZlField extends FormAtom {
             id=${this.inputId}
             data-testid=${ifDefined(this.nativeInputTestId())}
             name=${this.name}
-            type=${this.type}
+            type=${revealed ? "text" : this.type}
+            spellcheck=${ifDefined(passwordToggle ? "false" : undefined)}
+            autocapitalize=${ifDefined(passwordToggle ? "off" : undefined)}
+            autocorrect=${ifDefined(passwordToggle ? "off" : undefined)}
             .value=${live(this.value)}
             placeholder=${this.placeholder}
             autocomplete=${ifDefined(this.autocomplete)}
@@ -255,6 +293,33 @@ export class ZlField extends FormAtom {
     `;
   }
 
+  private renderPasswordToggle() {
+    const label = this.revealed ? this.hidePasswordLabel : this.showPasswordLabel;
+    return html`
+      <span class="zr-field__trailing zr-field__trailing--toggle" part="trailing-icon">
+        <button
+          type="button"
+          class="zr-field__trailing-action zr-focus-ring"
+          part="trailing-action password-toggle"
+          aria-label=${label}
+          aria-pressed=${this.revealed ? "true" : "false"}
+          title=${label}
+          tabindex="-1"
+          @click=${this.handlePasswordToggle}
+        >
+          <zl-icon name=${this.revealed ? "eye-off" : "eye"} size="16" decorative></zl-icon>
+        </button>
+      </span>
+    `;
+  }
+
+  private handlePasswordToggle = (): void => {
+    this.revealed = !this.revealed;
+    // The button is out of the tab order, so a click would otherwise leave
+    // focus on it rather than back in the field the user is typing into.
+    this.inputEl?.focus();
+  };
+
   private syncFormState(): void {
     this.internals.setFormValue?.(this.value);
     if (this.required && !this.value) {
@@ -324,6 +389,7 @@ export class ZlField extends FormAtom {
       const form = this.internals.form;
       if (form) {
         event.preventDefault();
+        this.revealed = false;
         form.requestSubmit();
       }
     }
@@ -377,6 +443,9 @@ export const zlFieldManifest: AtomManifest = {
     "forgot-password-label",
     "forgot-password-action",
     "trailing-icon",
+    "password-toggle",
+    "show-password-label",
+    "hide-password-label",
   ],
   parts: [
     "root",
@@ -387,6 +456,7 @@ export const zlFieldManifest: AtomManifest = {
     "input",
     "trailing-icon",
     "trailing-action",
+    "password-toggle",
     "help",
     "success",
     "error",
