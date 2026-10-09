@@ -1,133 +1,168 @@
-# ADR 069: CLI Commands to Enable and Disable Password and Passkey Sign-In
+# ADR 069: CLI Commands to Enable and Disable Sign-In Methods
 
 > **Status:** Proposed
-> **Date:** 2026-10-07
+> **Date:** 2026-10-09
 > **Context:** [#1488](https://github.com/zitadel/nextgen/issues/1488)
 > **Relates to:** [ADR 007](007-gitops-configuration-surface.md), [ADR 035](035-configuration-environments.md), [ADR 064](064-cli-resource-commands.md)
 
 ## Context
 
-A user schema says which sign-in methods its users have through
-`x-auth-methods`: `password.enabled` and `passkey.enabled` today, beside the
-`sso` entry `zitadel sso enable` writes. Turning one of them on or off means
-opening `.zitadel/schemas/<name>.json` and editing that object by hand, and a
-mistake only shows up on the next `plan`, when the flow validator reports a
-login flow that still asks for a method the schema no longer enables.
+A user schema lists the ways its users can sign in under `x-auth-methods`.
+The meta-schema allows five entries: `password`, `passkey`, `sso`, `otp` and
+`magic_link`. Each has an `enabled` flag, and `sso` also names the identity
+providers it offers:
 
-`sso enable` already gives SSO a command. Password and passkey have none.
+```json
+"x-auth-methods": {
+  "password": { "enabled": true },
+  "passkey": { "enabled": true },
+  "sso": { "enabled": true, "providers": ["google"] }
+}
+```
+
+`zitadel setup` writes this section. After that, the only command that changes
+it is `zitadel sso enable --provider <name>` (issue
+[#1048](https://github.com/zitadel/nextgen/issues/1048)), which adds a provider.
+Turning password or passkey on or off, or removing a provider, means editing the
+schema by hand, and a mistake only shows up on the next `plan`, when the flow
+validator reports a login flow that asks for a method the schema no longer
+enables.
 
 ## Decision
 
-### 1. Two verbs under an `auth-factor` topic
+### 1. One topic, one command per method
 
 ```
-zitadel auth-factor enable  --mode password [--mode passkey] [--schema <name>]
-zitadel auth-factor disable --mode passkey  [--schema <name>] [--force]
+zitadel auth-method password enable|disable [--schema <name>]
+zitadel auth-method passkey  enable|disable [--schema <name>]
+zitadel auth-method sso      enable  --provider <slug> [--client-id <id>] [--schema <name>]
+zitadel auth-method sso      disable --provider <slug> [--schema <name>]
 ```
 
-- **The topic is `auth-factor`, not `auth`.** In other developer CLIs, `auth`
-  means the CLI's own login: `gh auth login`, `gcloud auth login`, `vercel
-login`. A developer who reads `zitadel auth enable` could take it to mean
-  "let this CLI sign in", which is not what it does. `zitadel auth` stays free
-  in case the CLI later gets a login of its own. A nested `auth factor` would
-  not solve this, because it still takes the `auth` topic. One hyphenated word
-  does, in the same way `flow-definitions` is spelled.
-- **It is a factor.** Password and passkey are what a user proves sign-in with,
-  so "factor" names the thing being turned on or off. "Method" would also
-  describe SSO, which is not part of this command.
-- **`auth-factor` is a topic, not a resource.** ADR 064's `<resource> <verb>`
-  grammar is for runtime resources on the server. This command edits a local
-  configuration file, like `sso enable`, so it follows that command's shape
-  rather than ADR 064's.
-- **`--mode` is repeatable and required.** It takes `password` or `passkey`,
-  and several modes can change in one run. Naming the mode is required for the
-  same reason `sso enable` requires `--provider`: a command that guesses which
-  method to switch off is not one to trust.
+- **The method is the noun.** Following ADR 064's resource-first grammar, each
+  method is its own command with its own flags. `password` and `passkey` take
+  none of their own. `sso` takes `--provider` and the provider's credentials.
+  A single command with a `--mode` switch was rejected, because flags such as
+  `--client-id` would then mean something for one mode and nothing for the
+  others, and help could not show which flags go together.
+- **One topic keeps them together.** `zitadel auth-method --help` lists every
+  method, so there is one place to look for all of them.
+- **The topic is `auth-method`, not `auth` or `auth-factor`.** It matches the
+  `x-auth-methods` key it edits. In other developer CLIs, `auth` means the
+  CLI's own login (`gh auth login`, `gcloud auth login`), so `zitadel auth`
+  stays free in case the CLI gets one. `auth-factor` was considered and dropped,
+  because SSO is a sign-in method but not a factor.
 - **`--schema` chooses the user schema** when the Project has more than one,
-  with the same rules as `sso enable`.
-- **SSO is not a mode.** Enabling a provider needs credentials and a
-  connection file, so it stays with `sso enable`.
+  with the same rules on every command.
 
-### 2. It edits the schema file and nothing else
+### 2. What each command edits
 
-The command sets `x-auth-methods.<mode>.enabled` in the selected schema and
-writes the file back. The other methods keep their values. The file is
-rewritten with sorted keys, as `sso enable` does. Nothing is sent to the
-server. The change is published by whatever ships configuration edits, like
-any other edit, and the result lists those commands as `next_commands`. Today
-those commands are `plan` and `apply` (ADR 007). [ADR 035
-§CLI](035-configuration-environments.md) removes `plan` and replaces `apply`
-with `deploy`. When that lands, `next_commands` changes with it, and this
-command does not change.
+Nothing is sent to the server. Changes are published by the commands that ship
+configuration edits, and the result lists them as `next_commands`. Today those
+are `plan` and `apply` (ADR 007). [ADR 035 §CLI](035-configuration-environments.md)
+removes `plan` and replaces `apply` with `deploy`. When that lands,
+`next_commands` changes with it, and these commands do not change.
 
-Running it twice is safe. A mode already in the requested state is reported as
-unchanged, and the file is not rewritten.
+- **password and passkey** set `x-auth-methods.<method>.enabled` in the schema
+  and edit nothing else. Login flows are not edited, because adding or removing
+  a password step or a passkey action changes the shape of a journey that the
+  developer owns.
+- **sso enable** does what `sso enable` did before this ADR: it creates or
+  reuses the connection file, publishes the client id and secret as variables,
+  adds the provider to the schema, and adds it to the login flows. The secret
+  is prompted for or read from stdin, never taken as a flag.
+- **sso disable** removes the provider from `x-auth-methods.sso.providers` and
+  from every step's `sso_providers` in the flows that run against the schema.
+  When no provider is left, `sso` is set to `{ "enabled": false }`. The routes
+  and steps that `sso enable` added stay in the flow: without a provider they
+  are never reached, and they come back into use if a provider is enabled
+  again. The connection file and its stored credentials are kept, so enabling
+  the provider again does not ask for them.
 
-Login flows are not edited. Adding or removing a password step or a passkey
-action changes the shape of a journey, and doing that automatically would
-overwrite choices the developer made in the flow file.
+Files are rewritten with sorted keys. Running a command twice is safe: a method
+already in the requested state is reported as unchanged, and nothing is
+written.
 
-### 3. It refuses changes that would fail later
+### 3. Refusals
 
 Every refusal happens before anything is written, including under `--dry-run`.
 
 - **A flow would break.** Before any change, the command validates each login
-  flow that runs against the schema, using the schema as it would be after the
-  change. It uses the validator `plan` uses. If the change adds an error, such
-  as a step that still collects `x-auth-methods#password` or still offers a
-  `passkey` action, the command refuses and names each flow and step. Errors
-  the flow already had do not count. The command matches flows to a schema by
-  the published id, by the schema's `$id`, or by file name, which is broader
-  than `plan`'s matching before the first `apply`. So it can be stricter than
-  `plan`, but never looser.
-- **A flow cannot be checked.** The validator skips the sign-in method rules
-  for a flow with a structural error, such as a purpose that points at a
-  missing step. The command cannot tell whether such a flow still uses the
-  method, and `plan` would reject it once the changed schema re-pins it, so
-  enabling and disabling both refuse until the flow is fixed.
-- **No factor would be left.** Disabling the schema's last enabled way to
-  sign in is guarded. Only password, passkey and SSO with at least one
-  provider count. `otp` and `magic_link` are allowed by the meta-schema but
-  not supported by the login engine yet, so they do not count. This guard is
-  CLI policy, not a server rule. The server accepts a schema with every method
-  disabled, because a schema whose users are only created and managed through
-  the API never needs a sign-in method. Most of the time, though, it is a
-  mistake, so it is guarded the way
+  flow that runs against the schema, using the schema and flows as they would
+  be after the change. It uses the validator `plan` uses. If the change adds an
+  error, such as a step that still collects `x-auth-methods#password` or still
+  offers a `passkey` action, the command refuses and names each flow and step.
+  Errors the flow already had do not count. The command matches flows to a
+  schema by the published id, the id it replaced, the schema's `$id`, or the
+  file name. Before the first `apply` that is broader than `plan`'s matching,
+  so the command can be stricter than `plan`, but never looser.
+- **A flow cannot be checked.** A flow file that does not match the flow
+  schema, or that has a structural error such as a purpose pointing at a
+  missing step, is not checked for sign-in methods by the validator. The
+  command cannot tell whether such a flow still uses the method, and `plan`
+  would reject it once the changed schema re-pins it, so every command refuses
+  until the flow is fixed.
+- **No way to sign in would be left.** Disabling the schema's last enabled
+  method is guarded. Only password, passkey and SSO with at least one
+  well-formed provider count. This guard is CLI policy, not a server rule. The
+  server accepts a schema with every method disabled, because a schema whose
+  users are only created and managed through the API never needs a sign-in
+  method. Most of the time, though, it is a mistake, so it is guarded the way
   [ADR 064 §10](064-cli-resource-commands.md) guards destructive verbs. In a
-  terminal the command asks for confirmation, and declining ends as
-  `skipped`. Non-interactively, and under `--dry-run`, it refuses unless
-  `--force` is passed, and the refusal carries the exact command to re-run
-  with `--force`. `--force` overrides this guard only. The other refusals
-  protect against a `plan` or `apply` that would fail, so no flag overrides
-  them, and they are checked before the prompt.
+  terminal the command asks for confirmation, and declining ends as `skipped`.
+  Non-interactively, and under `--dry-run`, it refuses unless `--force` is
+  passed, and the refusal carries the exact command to re-run with `--force`.
+  `--force` overrides this guard only. The other refusals protect against a
+  `plan` or `apply` that would fail, so no flag overrides them, and they are
+  checked before the prompt.
 
   The guard reads the schema alone. Whether anyone can actually sign in also
-  depends on the active flows: a factor is only reachable when the schema
-  enables it and an active flow offers it. The command cannot remove a factor
-  that an active flow offers, because the flow refusal above stops it first.
-  So the only way to lose every reachable factor is to edit a flow, which this
-  command never does. To make that visible, every run warns when, after the
-  change, no active flow offers any factor the schema enables.
+  depends on the active flows: a method is only reachable when the schema
+  enables it and an active flow's login journey offers it. The commands cannot
+  remove a method that an active flow offers, because the flow refusal above
+  stops them first, so losing every reachable method takes a flow edit. To make
+  that visible, every run warns when, after the change, no active flow offers
+  any method the schema enables.
 
 - **Password needs an identifier.** Enabling password on a schema without
   `x-identifier` is refused, because the server rejects that combination and
   `plan` does not catch it.
+- **Values that are not the right shape are refused, not overwritten.** This
+  covers an `x-auth-methods` that is not an object, an entry without a boolean
+  `enabled`, and a schema that points at an external URL instead of holding
+  its own methods.
 
-### 4. Enabling does not make a factor appear
+### 4. Enabling does not make a method appear
 
-Enabling passkey on a schema whose active flows offer no passkey action changes
-nothing on the sign-in screen. The command reports this in the envelope's
-`warnings` and in `data.not_offered`, and does not fail, because enabling the
-factor first and editing the flow second is a normal order of work.
+Enabling passkey on a schema whose active flows offer no passkey sign-in
+changes nothing on the sign-in screen. The command reports this in the
+envelope's `warnings` and in `data.not_offered`, and does not fail, because
+enabling the method first and editing the flow second is a normal order of work.
+
+### 5. `otp` and `magic_link` come later
+
+The meta-schema already accepts `otp` and `magic_link`, but the login engine
+cannot serve them yet. They get `zitadel auth-method otp enable|disable` and
+`zitadel auth-method magic_link enable|disable` when it can, as new commands
+under the same topic with whatever flags they need. Until then they are not
+commands, and they do not count as a way to sign in for the guard in §3.
+
+### 6. `sso enable` becomes a deprecated alias
+
+`zitadel sso enable` keeps working and runs `zitadel auth-method sso enable`
+with the same flags. Each run reports a deprecation warning that names the new
+command. CLI output, `setup`'s suggestions and the agent contract
+(`SKILL.md`) point at the new command. Removing the alias is a separate change.
 
 ## Consequences
 
-- Password and passkey can be switched without editing JSON, and a change
-  that would break `plan` or `apply` is caught before the file is written.
-  The same refusals apply to `deploy` once ADR 035 replaces `apply`.
-- Disabling a factor that a flow uses is still two steps: edit the flow, then
-  run the command. A later decision can let the command rewrite the shipped
+- Every sign-in method is turned on or off from one topic, with no JSON
+  editing, and each command only accepts the flags that apply to it.
+- A change that would break `plan` or `apply` is caught before the file is
+  written.
+- Disabling a method that a flow uses is still two steps: edit the flow, then
+  run the command. A later decision can let the commands rewrite the shipped
   default flow, but not hand-edited ones.
 - `zitadel auth` is left unused.
-- The command contract (`--mode`, the envelope, the refusals) goes into
-  `SKILL.md` alongside `sso enable`.
+- Adding `otp`, `magic_link` or a new SSO provider adds commands or provider
+  settings without changing the existing commands.
