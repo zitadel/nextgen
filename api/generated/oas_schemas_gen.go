@@ -9657,10 +9657,11 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 // handle that neither holds refuses the release, naming the pointer and the
 // handle. A bundle that references only resources it carries builds the
 // same release on any project.
-// Carries at least one resource and at most 50 across all kinds, the most a
-// release pins; a kind with nothing to send is omitted rather than sent
-// empty. Unknown keys are refused. More kinds join as they become release
-// kinds.
+// Each kind is optional and may be empty: a project that never ejected its
+// branding sends none. Across all kinds the bundle carries at least one
+// resource and at most 50, the most a release pins; the server refuses
+// anything outside that with `rel.invalid`. Unknown keys are refused. More
+// kinds join as they become release kinds.
 // Ref: #
 type ConfigurationBundle struct {
 	// User schemas, one per `.zitadel/schemas/*.json`.

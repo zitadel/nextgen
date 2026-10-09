@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 
@@ -12,8 +12,6 @@ vi.mock("@/auth/session", async (importOriginal) => {
   const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
-
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 const USERS_URL = "http://localhost/api/users";
 const USERS_QUERY_URL = `${USERS_URL}/query`;
@@ -37,8 +35,6 @@ beforeEach(() =>
     ),
   ),
 );
-
-afterAll(() => vi.unstubAllEnvs());
 
 /**
  * Opens the dialog the way an operator does — through the list row's menu —

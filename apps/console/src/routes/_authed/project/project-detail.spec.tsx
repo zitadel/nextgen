@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 
@@ -12,8 +12,6 @@ vi.mock("@/auth/session", async (importOriginal) => {
   const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
-
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 const PROJECT_ID = "proj_1";
 const PROJECT_URL = `http://localhost/api/projects/${PROJECT_ID}`;
@@ -29,8 +27,6 @@ beforeEach(() =>
     ),
   ),
 );
-
-afterAll(() => vi.unstubAllEnvs());
 
 function project(overrides: Record<string, unknown> = {}) {
   return {

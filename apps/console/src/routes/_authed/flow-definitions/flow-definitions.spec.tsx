@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 
@@ -13,13 +13,9 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 // Absolute base so requests parse under jsdom/undici and MSW can intercept.
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
-
 const FLOWS_URL = "http://localhost/api/flow_definitions";
 const FLOW_URL = "http://localhost/api/flow_definitions/flow_1";
 const SCHEMA_URL = "http://localhost/api/schemas/sch_1";
-
-afterAll(() => vi.unstubAllEnvs());
 
 /**
  * A definition serving both purposes out of order, so the row's fixed purpose
