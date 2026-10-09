@@ -99,10 +99,12 @@ func prepareMigration(extra []string) ([]string, error) {
 }
 
 // resolveDatabaseURL applies the one schema rule of the cloud: a URL that
-// already names a search_path is used as is, production and local runs use
-// the URL as configured, and a preview deployment appends the schema of its
-// pull request (pr_<id>) or, without one, of its branch (br_<name>). The
-// server appends public to the search_path itself.
+// already names a schema (`schema=` or `search_path=`) is used as is,
+// production and local runs use the URL as configured, and a preview
+// deployment appends the schema of its pull request (pr_<id>) or, without
+// one, of its branch (br_<name>) as the `schema` parameter, which the server
+// consumes itself and never sends to the database, so the same URL works
+// through PlanetScale's PgBouncer.
 func resolveDatabaseURL(base, env string) (dsn, schema string, err error) {
 	if base == "" {
 		if env == "production" || env == "preview" {
@@ -110,8 +112,8 @@ func resolveDatabaseURL(base, env string) (dsn, schema string, err error) {
 		}
 		return "", pgschema.Default, nil
 	}
-	if strings.Contains(base, "search_path=") {
-		return base, "<from search_path>", nil
+	if namesSchema(base) {
+		return base, "<from the URL>", nil
 	}
 	if env != "preview" {
 		return base, pgschema.Default, nil
@@ -131,7 +133,18 @@ func resolveDatabaseURL(base, env string) (dsn, schema string, err error) {
 	if strings.Contains(base, "?") {
 		separator = "&"
 	}
-	return base + separator + "search_path=" + schema, schema, nil
+	return base + separator + "schema=" + schema, schema, nil
+}
+
+// namesSchema reports whether a URL already carries a schema, as the
+// server's `schema` parameter or as a `search_path`.
+func namesSchema(dsn string) bool {
+	for _, key := range []string{"schema=", "search_path="} {
+		if strings.Contains(dsn, "?"+key) || strings.Contains(dsn, "&"+key) {
+			return true
+		}
+	}
+	return false
 }
 
 var notSchemaChar = regexp.MustCompile(`[^a-z0-9_]+`)

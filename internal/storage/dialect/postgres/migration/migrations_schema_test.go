@@ -51,5 +51,14 @@ func TestMigrateIntoAppliesSchemaIdempotently(t *testing.T) {
 	).Scan(&extensionSchema))
 	assert.Equal(t, "public", extensionSchema, "extensions are shared by every schema of the database")
 
+	// The connection above carries no search_path, so this also proves that
+	// the migrations qualify every object they create: nothing may land in
+	// public, which is what a `schema=` DSN through a pooler relies on.
+	var inPublic int
+	require.NoError(t, db.QueryRowContext(ctx,
+		"SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind IN ('r', 'i', 'S', 'v')",
+	).Scan(&inPublic))
+	assert.Zero(t, inPublic, "no table, index, sequence or view may be created in public")
+
 	assert.Error(t, migrationpkg.MigrateInto(ctx, db, "Not Valid"))
 }

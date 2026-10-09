@@ -354,6 +354,74 @@ runs; Vercel checks or a `deployment_status` action can bring it back) and
 the `main`-only migrator credential in a GitHub environment, replaced by the
 branch guard plus "who can create production builds".
 
+## Back to the container, through PgBouncer (2026-10-08, evening)
+
+Decision: the `server` service is a container image again
+(`Dockerfile.vercel`, the launcher as entrypoint), the migrations run in
+the build of a second, internal Go-runtime service `migrate` that no
+rewrite exposes, and the runtime connects through PlanetScale's PgBouncer.
+Three measurements led there, all on 2026-10-08 against the preview
+database (PS-DEV, `max_connections` 25 of which PlanetScale's own
+processes hold about 13).
+
+**The Go runtime is not on Fluid compute** (the Fluid page lists Node.js,
+Python, Edge, Bun and Rust) and serves one request per instance. Under 24
+concurrent `GET /console/runtime.json` it answered `FUNCTION_INVOCATION_FAILED`
+for 10, then 4, then 1 of 16 requests. The earlier "Fluid compute is on"
+note was the project toggle, which does not apply to Go.
+
+**A container instance serves concurrent requests.** Vercel's function
+detail shows runtime `Container` with "Peak Concurrency 4 Requests" on one
+invocation, and one warm instance served 14 overlapping project creations
+(each about 0.35 s of server time) at about 1 s each, all 201. The
+community report of one request per container instance did not reproduce
+here.
+
+**Vercel fans out, and the database pays.** A cold burst of 24 requests
+started 24 instances; a burst against one warm instance still added about
+ten. Every instance is a full server with its own pgx pool and touches the
+database at boot (platform project bootstrap). Sampled during a burst, the
+preview role went from 2 to 18 connections in 1.5 s, then the cluster
+refused everything with `remaining connection slots are reserved for roles
+with the SUPERUSER attribute`. Instances that hit that at boot died, which
+Vercel reports as `FUNCTION_INVOCATION_FAILED`; instances that were up
+failed requests with 500. That is what the Go runtime's failures were too.
+
+| 24 concurrent `POST /projects` | cold | 201 | 500 |
+|---|---|---|---|
+| container, direct port, no warm instance | 24 | 11–13 | 11–13 |
+| container, direct port, warm instances | 0 | 9–13 | 11–15 |
+| container, PgBouncer, one warm instance | 10 | 24 | 0 |
+| container, PgBouncer, warm instances (twice) | 0 | 24 | 0 |
+
+Through PgBouncer the server-side connections of the preview role stayed
+at 13 during the bursts; the direct port was saturated by PgBouncer's own
+server pool plus PlanetScale's processes, which is a PS-DEV sizing fact
+rather than an application one.
+
+**What changed:**
+
+- `schema` is a connection-string parameter now, consumed by the dialect
+  and never sent to the database. PgBouncer rejects `search_path` as a
+  startup parameter (`unsupported startup parameter`, 08P01), so a schema
+  named that way could never go through the pooler. Every statement and
+  migration qualifies its objects, so the schema is not needed on the
+  `search_path`; the migration test now asserts that nothing lands in
+  `public` without one.
+- Runtime connections go to port 6432 (transaction pooling, 20 server
+  connections per role shared by every instance) with
+  `default_query_exec_mode=cache_describe` so pgx never relies on named
+  prepared statements, and `pool_max_conns=4` per instance. The migrator
+  URL stays on 5432: goose holds a session advisory lock, which transaction
+  pooling cannot keep. Verified locally against PlanetScale: boot with
+  platform bootstrap, project and user creation, queries, 20 concurrent
+  reads and 12 concurrent seeded creates, zero errors.
+- The keep-warm cron is back for production: a container cold start is
+  about 2.4 s.
+- The container build (buildah, no layer cache, toolchain image pull,
+  module download, compile, push) is the long pole again at six to seven
+  minutes per deployment, against about 2.5 minutes with the Go runtime.
+
 ## Regions (deferred, needs a buyer)
 
 Customer-chosen regions require a global layer. The cheapest version is

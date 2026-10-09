@@ -88,12 +88,13 @@ does not cover IAM setup.
 ### Postgres schema
 
 The Postgres dialect keeps its tables, types and migration history in the
-`zitadel_nextgen` schema. To run in another schema, name it as the first
-entry of the connection's `search_path`, or with a `schema` key beside the
-connection settings:
+`zitadel_nextgen` schema. To run in another schema, name it with the
+`schema` parameter of the connection string, with a `schema` key beside the
+map-form connection settings, or as the first entry of the connection's
+`search_path`:
 
 ```sh
-export NEXTGEN_DATABASE_POSTGRES='postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable&search_path=pr_42'
+export NEXTGEN_DATABASE_POSTGRES='postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable&schema=pr_42'
 ```
 
 ```yaml
@@ -105,13 +106,24 @@ database:
     user: zitadel
 ```
 
-The schema is created on first start and every migration lands in it;
+The schema is created by the migrations and every migration lands in it;
 nothing touches `zitadel_nextgen`. Several instances can share one database
 that way, and a throwaway environment is removed with
-`DROP SCHEMA pr_42 CASCADE`. The extensions the server needs (`pgcrypto`,
-`btree_gin`) are installed once per database into `public`, which is why
-`public` is kept on the `search_path`. A schema name is a plain lowercase
-identifier (`[a-z_][a-z0-9_]*`, at most 63 characters).
+`DROP SCHEMA pr_42 CASCADE`. The `schema` parameter is consumed by the
+server and never sent to the database, so it works through connection
+poolers such as PgBouncer that reject unknown startup parameters;
+`search_path` is a real server setting and travels in the startup packet.
+Every statement and migration qualifies its objects, so the schema does not
+have to be on the `search_path`. The extensions the server needs
+(`pgcrypto`, `btree_gin`) are installed once per database into `public`,
+which the default `search_path` already lists; when you configure a
+`search_path` yourself, `public` is appended unless listed. A schema name is
+a plain lowercase identifier (`[a-z_][a-z0-9_]*`, at most 63 characters).
+
+Behind a transaction-pooling PgBouncer, add pgx's
+`default_query_exec_mode=cache_describe` to the connection string so the
+server never relies on named prepared statements, and run the migrations
+over a direct connection: they hold a session-level advisory lock.
 
 Migrations run when the server starts with `--migrate`, or on their own with
 `nextgen migrate`; a server started without the flag never changes the schema.

@@ -28,6 +28,23 @@ func TestDecodeConfigSchema(t *testing.T) {
 		assert.NotContains(t, config.ConnConfig.RuntimeParams, searchPathParam)
 	})
 
+	t.Run("the schema DSN parameter names the schema and is not sent to the server", func(t *testing.T) {
+		t.Parallel()
+
+		config := decode(t, "postgres://user:pass@localhost:5432/dbname?sslmode=disable&schema=pr_42")
+		assert.Equal(t, "pr_42", config.Schema)
+		assert.NotContains(t, config.ConnConfig.RuntimeParams, schemaKey, "a pooler would reject it as a startup parameter")
+		assert.NotContains(t, config.ConnConfig.RuntimeParams, searchPathParam)
+	})
+
+	t.Run("the schema DSN parameter wins over search_path", func(t *testing.T) {
+		t.Parallel()
+
+		config := decode(t, "postgres://user:pass@localhost:5432/dbname?schema=pr_42&search_path=other,public")
+		assert.Equal(t, "pr_42", config.Schema)
+		assert.Equal(t, "other,public", config.ConnConfig.RuntimeParams[searchPathParam], "search_path is still a server setting and travels as configured")
+	})
+
 	t.Run("search_path names the schema and keeps public reachable", func(t *testing.T) {
 		t.Parallel()
 
@@ -48,6 +65,8 @@ func TestDecodeConfigSchema(t *testing.T) {
 		t.Parallel()
 
 		_, err := DecodeConfig("postgres://user:pass@localhost:5432/dbname?search_path=Pr-42")
+		assert.Error(t, err)
+		_, err = DecodeConfig("postgres://user:pass@localhost:5432/dbname?schema=Pr-42")
 		assert.Error(t, err)
 	})
 

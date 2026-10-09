@@ -1,0 +1,18 @@
+# Build context filter for Dockerfile.vercel (BuildKit reads
+# <Dockerfile>.dockerignore in preference to .dockerignore, which here is the
+# release image's and keeps only linux/ and LICENSE). The Go build needs the
+# sources, go.mod and go.sum; everything generated or unrelated stays out.
+.git
+.vercel
+node_modules
+**/node_modules
+**/dist
+**/.next
+**/out
+**/.source
+**/.generated
+**/test-output
+**/*.tsbuildinfo
+docs
+examples
+skills

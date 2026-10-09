@@ -3,6 +3,10 @@
   "services": {
     "server": {
       "root": ".",
+      "entrypoint": "Dockerfile.vercel"
+    },
+    "migrate": {
+      "root": ".",
       "framework": "go",
       "buildCommand": "sh apps/cloud/vercel-build.sh"
     },
@@ -187,6 +191,12 @@
   ],
   "regions": [
     "fra1"
+  ],
+  "crons": [
+    {
+      "path": "/readyz",
+      "schedule": "*/5 * * * *"
+    }
   ],
   "git": {
     "deploymentEnabled": true

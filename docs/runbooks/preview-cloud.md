@@ -5,22 +5,22 @@
 > **Design:** [preview-cloud-vercel-planetscale.md](../design/platform/preview-cloud-vercel-planetscale.md)
 
 The preview cloud is the server of the current `main` commit, compiled by
-Vercel from the repository and run as a function on Vercel's Go runtime in
-Frankfurt (`fra1`) against one PlanetScale Postgres database in AWS
-`eu-central-1`. **Main is production** for this cloud: every push to `main`
+Vercel from the repository and run as a container image in Frankfurt
+(`fra1`) against one PlanetScale Postgres database in AWS `eu-central-1`. **Main is production** for this cloud: every push to `main`
 deploys, every pull request gets a preview, and everything builds on Vercel.
 Version tags (`1.0.0-alpha.N`), their images and npm packages are the
 self-hoster artifact, produced separately by `release-publish.yml`, and are
 not what the cloud runs. Production stays on GCP; this is a single-region
 preview offering with the same topology as self-hosted.
 
-The Vercel project is one deployment with six
+The Vercel project is one deployment with seven
 [services](https://vercel.com/docs/services), defined in the repo-root
 `vercel.json`:
 
 | Service | Root | What it is | Public paths |
 |---|---|---|---|
-| `server` | `.` | the Go server, compiled by `apps/cloud/vercel-build.sh` on Vercel's Go runtime and started by `apps/cloud/launcher` (no embedded UIs) | everything not listed below, incl. `/console/runtime.json` |
+| `server` | `.` | the Go server as a container image (`Dockerfile.vercel`: one static binary, `apps/cloud/launcher`, no embedded UIs) | everything not listed below, incl. `/console/runtime.json` |
+| `migrate` | `.` | internal, never routed: a Go-runtime service whose build step runs the migrations (`apps/cloud/vercel-build.sh`) | none |
 | `console` | `apps/console` | the console SPA, built with `CONSOLE_BASE_PATH=/console`, relocated to `out/console` | `/console/*` |
 | `login` | `apps/login-ui` | the login UI, built with `LOGIN_BASE_PATH=/login`, relocated to `out/login` | `/login/*` |
 | `docs` | `apps/docs` | the docs site (Waku), built unchanged at base `/` | `/docs*`, `/reference/*`, `/assets/*`, `/RSC/*`, `/api/search`, `/llms.txt`, `/llms-full.txt`, `/mcp*` |
@@ -57,8 +57,14 @@ same file) so the website can own every path.
    role `preview-pr` that inherits `postgres`: it creates the schema of each
    pull request and installs the extensions into `public`. Every preview is
    a schema of this database, never a branch.
-3. Use the direct port `5432` with `sslmode=verify-full&sslrootcert=system`.
-   The pooled port is not needed: the server keeps a small pgx pool.
+3. Two ports per database: the running server connects through the local
+   PgBouncer on `6432` (transaction pooling, 20 server connections per role
+   shared by every instance), the migrations through the direct port
+   `5432`, because goose holds a session advisory lock. Both with
+   `sslmode=verify-full&sslrootcert=system`. Vercel starts one container
+   per simultaneous request when none is warm, each with its own pgx
+   pool, so without the pooler a burst exhausts a small cluster's
+   `max_connections` (PS-DEV: 25) within seconds.
 
 ### 2. Master keys
 
@@ -83,13 +89,14 @@ project's key-encryption key unwrappable ([ADR 029](../adrs/029-cryptography-sec
 
    | Name | Target | Value |
    |---|---|---|
-   | `NEXTGEN_DATABASE_POSTGRES` | Production, secret | `postgresql://preview-server…:5432/postgres?sslmode=verify-full&sslrootcert=system` |
-   | `CLOUD_MIGRATOR_DATABASE_URL` | Production, secret | the `preview-migrator` role; only `launcher migrate` reads it |
+   | `NEXTGEN_DATABASE_POSTGRES` | Production, secret | `postgresql://preview-server…:6432/postgres?sslmode=verify-full&sslrootcert=system&default_query_exec_mode=cache_describe&pool_max_conns=4` (the pooled port; `cache_describe` keeps pgx off named prepared statements) |
+   | `CLOUD_MIGRATOR_DATABASE_URL` | Production, secret | the `preview-migrator` role on the direct port `5432`; only `launcher migrate` reads it |
    | `MASTER_KEY_PEM_B64` | Production, secret | contents of the production `master-key.b64` |
    | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Production, secret | the platform admin's bootstrap document (section 5) |
    | `NEXTGEN_SERVER_PUBLIC_BASE` | Production | the public origin, e.g. `https://preview.zitadel.cloud` |
    | `DOCS_SITE_URL` | Production | the public origin (canonical and sitemap URLs of the docs) |
-   | `NEXTGEN_DATABASE_POSTGRES` | Preview, secret | the `preview-pr` role of `zitadel-preview`; each preview appends `search_path=pr_<n>` itself |
+   | `NEXTGEN_DATABASE_POSTGRES` | Preview, secret | the `preview-pr` role of `zitadel-preview` on the pooled port, same parameters as production; each preview appends `schema=pr_<n>` itself |
+   | `CLOUD_MIGRATOR_DATABASE_URL` | Preview, secret | the same role on the direct port `5432`, for the build step's migrate run |
    | `MASTER_KEY_PEM_B64` | Preview, secret | contents of the preview `master-key.b64` |
    | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Preview, secret | a preview admin document (section 5) |
    | `MASTER_KEY_ID` | both | `preview-2026-10` (stable; rotation adds a new id) |
@@ -110,7 +117,8 @@ project's key-encryption key unwrappable ([ADR 029](../adrs/029-cryptography-sec
    in standalone mode and manages whichever customer project was created
    first, which on a shared host is whatever the smoke test created.
 3. Function settings: memory 2 GB (default), max duration 60 s is plenty.
-   Fluid compute is on.
+   `PORT=8080` must stay set: the container runs as uid 65532, which cannot
+   bind Vercel's default port 80.
 4. Domain: assign the custom domain and set `NEXTGEN_SERVER_PUBLIC_BASE` to
    match it exactly. CSRF and WebAuthn derive the origin from Vercel's
    `X-Forwarded-Host` / `X-Forwarded-Proto`, which already carry the custom
@@ -164,20 +172,25 @@ Preview target gets its own document the same way.
 
 ## Deploying
 
-- **Production:** every push to `main`. Vercel builds all six services;
-  the `server` service's build step (`apps/cloud/vercel-build.sh`) compiles
+- **Production:** every push to `main`. Vercel builds all seven services;
+  the `migrate` service's build step (`apps/cloud/vercel-build.sh`) compiles
   the launcher and then runs `launcher migrate`, which applies the
   migrations against the production database with the migrator role
-  (`CLOUD_MIGRATOR_DATABASE_URL`) **before** the deployment goes live. A
-  failed migration fails the build and the previous deployment keeps
+  (`CLOUD_MIGRATOR_DATABASE_URL`) **before** the deployment goes live, while
+  the `server` container builds beside it (a Docker build has neither the
+  environment nor the network to migrate, hence the separate service). A
+  failed migration fails the whole deployment and the previous one keeps
   serving. The launcher refuses to migrate production unless
   `VERCEL_GIT_COMMIT_REF` is `main`, so a `vercel deploy --prod` from a
   feature branch fails its build instead of changing the production schema.
 - **Previews:** every push to a pull request branch. The same build step
   migrates the preview database in the schema `pr_<number>` (branch name
-  without a pull request: `br_<name>`), the function serves from that
+  without a pull request: `br_<name>`), the container serves from that
   schema, and nothing is shared between previews except the database's
-  extensions in `public`. See the configuration guide on Postgres schemas.
+  extensions in `public`. The schema travels as the `schema` parameter of
+  the connection string, which the server consumes itself: PgBouncer
+  rejects `search_path` as a startup parameter. See the configuration
+  guide on Postgres schemas.
 - **Startup never migrates:** the function starts the server without
   `--migrate` and refuses one.
 
@@ -188,10 +201,10 @@ serving until the new one is live, and a rollback promotes an older
 deployment on the newer schema. The build script stamps the version, the
 deployment's commit (`VERCEL_GIT_COMMIT_SHA`) and the date into the binary.
 
-All services are rebuilt on every deploy. The Go step downloads the
-toolchain and the modules each time and still takes well under a minute
-plus the migration run; the whole deployment is bounded by the UI builds
-(about 2.5 minutes on 2026-10-08).
+All services are rebuilt on every deploy. The container build (toolchain
+image pull, module download, compile, image push, no layer cache) is the
+long pole at six to seven minutes; the migrate service's Go build takes
+under a minute plus the migration run.
 
 ### Manual and staged deploys
 
@@ -200,8 +213,9 @@ A `vercel deploy` from the repo root builds exactly the checked-out tree
 preview deploy migrates the schema of the local branch (`br_<name>`, or
 `pr_<n>` when the branch has a pull request), a `--prod` deploy migrates
 production only when the local branch is `main`. To point a manual preview
-at an existing schema, pass the URL with its `search_path` to both the build
-and the function: `--build-env NEXTGEN_DATABASE_POSTGRES=… -e NEXTGEN_DATABASE_POSTGRES=…`.
+at an existing schema, pass the URLs with `schema=<name>` to both the build
+and the function: `--build-env CLOUD_MIGRATOR_DATABASE_URL=<direct port>…`
+and `-e NEXTGEN_DATABASE_POSTGRES=<pooled port>…`.
 A CLI upload carries no Git metadata, so the binary of a manual deploy
 reports the commit as `unknown` unless `--build-env VERCEL_GIT_COMMIT_SHA=…`
 is passed as well.
@@ -277,14 +291,36 @@ older state is a revert on `main`.
   prefix list) needs a post-build relocation of Waku's Vercel output and
   moves the pages out of `content/docs` to avoid a `/docs/docs` segment. Not
   worth it; the prefix list stays.
+- Vercel's Go runtime (Beta) is not on Fluid compute: one request per
+  instance, and under 24 concurrent requests it failed 10 outright. The
+  container image serves concurrent requests per instance (Vercel reports
+  the peak concurrency in the function detail). Both fan out to one
+  instance per simultaneous request from cold.
+- PlanetScale's PgBouncer rejects `search_path` as a startup parameter
+  (`unsupported startup parameter`, 08P01); that is why the schema is a
+  `schema` parameter the server consumes. `pool_max_conns` and
+  `default_query_exec_mode` are consumed by pgx the same way.
 
 ## Operating
 
 - **Logs:** Vercel runtime logs of the `server` function. Add a log drain
   for retention.
-- **Cold starts:** Fluid compute scales idle functions to zero. The Go
-  function's cold `/readyz` measured 0.3–0.45 s (2026-10-08), warm 0.2 s;
-  no keep-warm cron.
+- **Cold starts:** container instances scale to zero after 5 minutes idle
+  in production and 30 seconds in previews; a cold start is about 2.4 s
+  (image start plus server boot), warm requests 0.2 s. The cron in
+  `vercel.json` hits `/readyz` every 5 minutes on production to keep one
+  instance warm; previews pay the cold start per visit.
+- **Bursts and database connections:** Vercel starts one container per
+  simultaneous request when none is warm and adds instances under load;
+  each instance is a full server with its own pgx pool. Through PgBouncer
+  the server-side connection count stays flat (measured: three bursts of
+  24 seeded project creations, 72 of 72 answered 201); on the direct port
+  the same bursts exhausted a PS-DEV cluster's 25 connections within
+  seconds and the instances that could not reach the database failed
+  their boot, which Vercel reports as `FUNCTION_INVOCATION_FAILED`. The
+  migrate step still uses the direct port, so a production build during a
+  heavy burst on a small cluster can fail on a refused connection; retry
+  the deployment. See the design note for the measurements.
 - **Egress:** no static IP for functions. The database is protected by TLS
   and the role password only.
 - **Smoke test by hand:**
@@ -308,8 +344,9 @@ older state is a revert on `main`.
 
 ## Known limits
 
-- Vercel functions: request and response bodies are capped at 4.5 MB, max
-  duration per plan (300 s default).
+- Vercel container images (Beta) and functions: request and response bodies
+  are capped at 4.5 MB, max duration per plan (300 s default), SIGTERM with
+  a 30 s grace period on scale-in.
 - Scale-to-zero means in-process state (the request wide-event buffer of
   [ADR 048](../adrs/048-wide-events-internal-audit-primitive.md)) can be lost
   on scale-down; the server flushes on `SIGTERM`.

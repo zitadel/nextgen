@@ -152,7 +152,7 @@ func TestResolveDatabaseURLPicksTheSchemaOfTheDeployment(t *testing.T) {
 		t.Setenv("VERCEL_GIT_COMMIT_REF", "feature/x")
 		dsn, schema, err := resolveDatabaseURL(previewDSN, "preview")
 		require.NoError(t, err)
-		assert.Equal(t, previewDSN+"&search_path=pr_1518", dsn)
+		assert.Equal(t, previewDSN+"&schema=pr_1518", dsn)
 		assert.Equal(t, "pr_1518", schema)
 	})
 
@@ -160,15 +160,25 @@ func TestResolveDatabaseURLPicksTheSchemaOfTheDeployment(t *testing.T) {
 		t.Setenv("VERCEL_GIT_COMMIT_REF", "claude/Nextgen-Deployment research--3b5ebe")
 		dsn, schema, err := resolveDatabaseURL("postgresql://u:p@db.example:5432/postgres", "preview")
 		require.NoError(t, err)
-		assert.Equal(t, "postgresql://u:p@db.example:5432/postgres?search_path=br_claude_nextgen_deployment_research_3b5ebe", dsn)
+		assert.Equal(t, "postgresql://u:p@db.example:5432/postgres?schema=br_claude_nextgen_deployment_research_3b5ebe", dsn)
 		assert.Equal(t, "br_claude_nextgen_deployment_research_3b5ebe", schema)
 	})
 
-	t.Run("an explicit search_path wins", func(t *testing.T) {
+	t.Run("an explicit schema or search_path wins", func(t *testing.T) {
 		t.Setenv("VERCEL_GIT_PULL_REQUEST_ID", "1518")
-		dsn, _, err := resolveDatabaseURL(previewDSN+"&search_path=pr_demo2", "preview")
+		for _, explicit := range []string{"&schema=pr_demo2", "&search_path=pr_demo2"} {
+			dsn, _, err := resolveDatabaseURL(previewDSN+explicit, "preview")
+			require.NoError(t, err)
+			assert.Equal(t, previewDSN+explicit, dsn)
+		}
+	})
+
+	t.Run("a parameter that merely contains the word schema does not count", func(t *testing.T) {
+		t.Setenv("VERCEL_GIT_PULL_REQUEST_ID", "1518")
+		dsn, schema, err := resolveDatabaseURL(previewDSN+"&default_query_exec_mode=cache_describe", "preview")
 		require.NoError(t, err)
-		assert.Equal(t, previewDSN+"&search_path=pr_demo2", dsn)
+		assert.Equal(t, previewDSN+"&default_query_exec_mode=cache_describe&schema=pr_1518", dsn)
+		assert.Equal(t, "pr_1518", schema)
 	})
 
 	t.Run("a preview needs a pull request or a branch", func(t *testing.T) {
@@ -223,7 +233,7 @@ func TestPrepareMigrationGuardsProductionAndResolvesTheSchema(t *testing.T) {
 		args, err := prepareMigration(nil)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"migrate"}, args)
-		assert.Equal(t, previewDSN+"&search_path=pr_77", os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
+		assert.Equal(t, previewDSN+"&schema=pr_77", os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
 	})
 }
 
@@ -235,5 +245,5 @@ func TestPrepareServesTheSameSchemaTheBuildMigrated(t *testing.T) {
 
 	_, err := prepare(nil)
 	require.NoError(t, err)
-	assert.Equal(t, previewDSN+"&search_path=pr_77", os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
+	assert.Equal(t, previewDSN+"&schema=pr_77", os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
 }

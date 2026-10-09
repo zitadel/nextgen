@@ -61,12 +61,15 @@ var _ database.Dialect = (*PoolConfig)(nil)
 
 var _ database.Dialect = (*Config)(nil)
 
-// schemaKey is the map-form configuration key that names the schema. It sits
-// beside the connection settings, not inside them.
+// schemaKey names the schema: as a key beside the map-form connection
+// settings, or as a DSN parameter (`postgres://…/db?schema=pr_42`). It is
+// consumed here and never sent to the server, so it works through
+// connection poolers that reject unknown startup parameters.
 const schemaKey = "schema"
 
-// searchPathParam is the connection parameter a DSN can carry the schema in,
-// for example `postgres://…/db?search_path=pr_42`.
+// searchPathParam is the connection parameter a DSN can carry the schema in
+// instead, for example `postgres://…/db?search_path=pr_42`. Unlike schemaKey
+// it is a real server setting and travels in the startup packet.
 const searchPathParam = "search_path"
 
 func DecodeConfig(input any) (database.Dialect, error) {
@@ -76,7 +79,9 @@ func DecodeConfig(input any) (database.Dialect, error) {
 		if err != nil {
 			return nil, err
 		}
-		schema, err := resolveSchema("", config.ConnConfig)
+		explicit := config.ConnConfig.RuntimeParams[schemaKey]
+		delete(config.ConnConfig.RuntimeParams, schemaKey)
+		schema, err := resolveSchema(explicit, config.ConnConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -135,10 +140,12 @@ func popSchemaKey(connMap map[string]any) (string, error) {
 }
 
 // resolveSchema picks the schema a connection works in: the explicit value
-// when one is configured, else the first entry of the connection's
-// search_path, else [pgschema.Default]. The extensions the migrations rely
-// on are shared by every schema of a database and live in public, so public
-// is appended to a search_path that does not list it.
+// when one is configured (the schema key or DSN parameter), else the first
+// entry of the connection's search_path, else [pgschema.Default]. Every
+// statement and migration qualifies its objects, so the schema never has to
+// be on the search_path; when a search_path is configured anyway, public is
+// appended to it unless listed, because the extensions the migrations rely
+// on are shared by every schema of a database and live there.
 func resolveSchema(explicit string, conn *pgx.ConnConfig) (string, error) {
 	schema := explicit
 	searchPath := conn.RuntimeParams[searchPathParam]
