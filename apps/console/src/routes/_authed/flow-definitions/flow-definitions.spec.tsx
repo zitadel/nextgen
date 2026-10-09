@@ -178,6 +178,9 @@ describe("login flow detail", () => {
     const projects: (string | null)[] = [];
     server.use(
       http.get(FLOW_URL, () => HttpResponse.json(DETAIL_RESPONSE)),
+      http.get("*/api/projects/proj_other", () =>
+        HttpResponse.json({ id: "proj_other", name: "Other project" }),
+      ),
       http.get(SCHEMA_URL, ({ request }) => {
         projects.push(new URL(request.url).searchParams.get("project_id"));
         return HttpResponse.json({ schema: SCHEMA });

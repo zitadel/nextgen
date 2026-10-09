@@ -211,6 +211,9 @@ describe("branding screen", () => {
     const acme = { ...FLOW, flow_definition: { ...FLOW.flow_definition, name: "acme-login" } };
     serveRevision();
     server.use(
+      http.get("*/api/projects/proj_other", () =>
+        HttpResponse.json({ id: "proj_other", name: "Other project" }),
+      ),
       http.get(FLOWS_URL, ({ request }) =>
         HttpResponse.json({
           flow_definitions:

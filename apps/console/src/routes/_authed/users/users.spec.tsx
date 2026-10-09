@@ -49,6 +49,9 @@ describe("users screen", () => {
     // not the one selected here.
     const projects: (string | null)[] = [];
     server.use(
+      http.get("*/api/projects/proj_other", () =>
+        HttpResponse.json({ id: "proj_other", name: "Other project" }),
+      ),
       http.post(USERS_QUERY_URL, async ({ request }) => {
         projects.push(new URL(request.url).searchParams.get("project_id"));
         const body = (await request.json()) as { page_token?: string };
@@ -83,6 +86,9 @@ describe("users screen", () => {
     // ambiguous one in the caller's own project unless `project_id` names it.
     const schemaProjects: Record<string, string | null> = {};
     server.use(
+      http.get("*/api/projects/proj_other", () =>
+        HttpResponse.json({ id: "proj_other", name: "Other project" }),
+      ),
       http.post(USERS_QUERY_URL, async ({ request }) => {
         const body = (await request.json()) as { page_token?: string };
         return HttpResponse.json(

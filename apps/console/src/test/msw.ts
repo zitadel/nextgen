@@ -21,20 +21,21 @@ import { TEST_PROJECT_ID } from "./project-scope.fixture";
  */
 
 /**
- * Reads every `_authed` screen makes for its chrome rather than for the screen
- * under test. The context switcher and the `_authed` guard both list the
- * person's projects; the default lists the fixture's project, so the selection
- * most specs open under is a listed one. A selection the list does not carry —
- * a spec opening under another project — is named by `GET /projects/{id}`.
- * A spec about the switcher, the guard or a project's own screen overrides
- * these with `server.use(...)`.
+ * The one read every `_authed` screen makes for its chrome rather than for the
+ * screen under test: the context switcher and the `_authed` guard both list the
+ * person's projects, and the default lists the fixture's project so the
+ * selection most specs open under is a listed one. A spec about the switcher or
+ * the guard overrides it with `server.use(...)`.
+ *
+ * `GET /projects/{id}` is deliberately not defaulted: the switcher reads it only
+ * for a selection the list does not carry, which is a spec opening under another
+ * project, and a catch-all there would answer a forgotten mock with made-up data
+ * instead of erroring. The two specs that do this (`app-shell`, `branding`) add
+ * the handler themselves.
  */
 const shellHandlers = [
   http.get("*/api/users/me/projects", () =>
     HttpResponse.json({ projects: [{ id: TEST_PROJECT_ID, name: "Test project" }] }),
-  ),
-  http.get("*/api/projects/:projectId", ({ params }) =>
-    HttpResponse.json({ id: params.projectId, name: String(params.projectId) }),
   ),
 ];
 
