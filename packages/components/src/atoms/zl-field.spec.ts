@@ -167,9 +167,10 @@ describe("<zl-field> password toggle", () => {
     host.remove();
   });
 
-  async function mount(html: string): Promise<ZlField> {
+  async function mount(html: string, props: Partial<ZlField> = {}): Promise<ZlField> {
     host.innerHTML = html;
     const field = host.querySelector("zl-field") as ZlField;
+    Object.assign(field, props);
     await field.updateComplete;
     return field;
   }
@@ -178,39 +179,48 @@ describe("<zl-field> password toggle", () => {
   const toggle = (field: ZlField) =>
     field.shadowRoot?.querySelector<HTMLButtonElement>('[part~="password-toggle"]') ?? null;
 
-  it("is off unless the field opts in", async () => {
+  it("is off unless the property is set", async () => {
     const field = await mount(`<zl-field name="pw" type="password"></zl-field>`);
     expect(toggle(field)).toBeNull();
     expect(input(field).hasAttribute("spellcheck")).toBe(false);
   });
 
-  it("ignores the attribute on a non-password field", async () => {
-    const field = await mount(`<zl-field name="email" type="email" password-toggle></zl-field>`);
+  it("cannot be switched on from markup", async () => {
+    const field = await mount(`<zl-field name="pw" type="password" password-toggle></zl-field>`);
+    expect(field.passwordToggle).toBe(false);
+    expect(toggle(field)).toBeNull();
+  });
+
+  it("ignores the property on a non-password field", async () => {
+    const field = await mount(`<zl-field name="email" type="email"></zl-field>`, {
+      passwordToggle: true,
+    });
     expect(toggle(field)).toBeNull();
   });
 
   it("replaces the clear button, so the field shows one icon", async () => {
-    const field = await mount(
-      `<zl-field name="pw" type="password" value="hunter2" password-toggle></zl-field>`,
-    );
+    const field = await mount(`<zl-field name="pw" type="password" value="hunter2"></zl-field>`, {
+      passwordToggle: true,
+    });
     const actions = field.shadowRoot?.querySelectorAll('[part~="trailing-action"]') ?? [];
     expect(actions).toHaveLength(1);
     expect(actions[0]?.getAttribute("aria-label")).toBe("Show password");
   });
 
   it("keeps the toggle in the error state instead of the alert icon", async () => {
-    const field = await mount(
-      `<zl-field name="pw" type="password" error="Wrong" password-toggle></zl-field>`,
-    );
+    const field = await mount(`<zl-field name="pw" type="password" error="Wrong"></zl-field>`, {
+      passwordToggle: true,
+    });
     expect(toggle(field)).not.toBeNull();
     expect(field.shadowRoot?.querySelector('zl-icon[name="alert-circle"]')).toBeNull();
   });
 
   it("reveals and hides the value, keeping it out of the tab order", async () => {
-    const field = await mount(
-      `<zl-field name="pw" type="password" value="hunter2" password-toggle
-        show-password-label="Anzeigen" hide-password-label="Verbergen"></zl-field>`,
-    );
+    const field = await mount(`<zl-field name="pw" type="password" value="hunter2"></zl-field>`, {
+      passwordToggle: true,
+      showPasswordLabel: "Anzeigen",
+      hidePasswordLabel: "Verbergen",
+    });
     const button = toggle(field)!;
     expect(button.tabIndex).toBe(-1);
     expect(button.getAttribute("aria-pressed")).toBe("false");
@@ -230,14 +240,18 @@ describe("<zl-field> password toggle", () => {
   });
 
   it("opts the input out of spellcheck and autocorrect", async () => {
-    const field = await mount(`<zl-field name="pw" type="password" password-toggle></zl-field>`);
+    const field = await mount(`<zl-field name="pw" type="password"></zl-field>`, {
+      passwordToggle: true,
+    });
     expect(input(field).getAttribute("spellcheck")).toBe("false");
     expect(input(field).getAttribute("autocapitalize")).toBe("off");
     expect(input(field).getAttribute("autocorrect")).toBe("off");
   });
 
   it("hides the value again when the toggle is withdrawn", async () => {
-    const field = await mount(`<zl-field name="pw" type="password" password-toggle></zl-field>`);
+    const field = await mount(`<zl-field name="pw" type="password"></zl-field>`, {
+      passwordToggle: true,
+    });
     toggle(field)!.click();
     await field.updateComplete;
     field.passwordToggle = false;
@@ -249,7 +263,9 @@ describe("<zl-field> password toggle", () => {
   });
 
   it("hides the value again on form reset", async () => {
-    const field = await mount(`<zl-field name="pw" type="password" password-toggle></zl-field>`);
+    const field = await mount(`<zl-field name="pw" type="password"></zl-field>`, {
+      passwordToggle: true,
+    });
     toggle(field)!.click();
     await field.updateComplete;
     field.formResetCallback();

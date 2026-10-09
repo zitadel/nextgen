@@ -24,6 +24,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import "./zitadel-login.js";
 import type { ZlAlert } from "../atoms/zl-alert.js";
+import type { ZlField } from "../atoms/zl-field.js";
 import { loginPreviewStatesFor, type ZitadelLogin } from "./zitadel-login.js";
 
 const API_BASE = "https://flow.test.invalid";
@@ -166,11 +167,13 @@ describe("<zitadel-login> against the typed Flow API", () => {
     type(element, "email", "alice@acme.com");
     submit(element);
     const field = await waitFor(() =>
-      element.shadowRoot?.querySelector(`zl-field[name="${PASSWORD_FIELD}"]`),
+      element.shadowRoot?.querySelector<ZlField>(`zl-field[name="${PASSWORD_FIELD}"]`),
     );
-    expect(field.hasAttribute("password-toggle")).toBe(true);
-    expect(field.getAttribute("show-password-label")).toBe("Show password");
-    expect(field.getAttribute("hide-password-label")).toBe("Hide password");
+    expect(field.passwordToggle).toBe(true);
+    expect(field.showPasswordLabel).toBe("Show password");
+    expect(field.hidePasswordLabel).toBe("Hide password");
+    // The choice is applied to the field, never written into the markup.
+    expect(field.hasAttribute("password-toggle")).toBe(false);
   });
 
   it.each([
@@ -184,9 +187,9 @@ describe("<zitadel-login> against the typed Flow API", () => {
     type(element, "email", "alice@acme.com");
     submit(element);
     const field = await waitFor(() =>
-      element.shadowRoot?.querySelector(`zl-field[name="${PASSWORD_FIELD}"]`),
+      element.shadowRoot?.querySelector<ZlField>(`zl-field[name="${PASSWORD_FIELD}"]`),
     );
-    expect(field.hasAttribute("password-toggle")).toBe(shown);
+    expect(field.passwordToggle).toBe(shown);
   });
 
   it("starts a flow from project-id / proxy-path attributes with no global config", async () => {

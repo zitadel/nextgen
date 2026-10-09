@@ -14,7 +14,6 @@
  * 2. `messages` — populated by orchestrator decoration hooks (info banners,
  *    sticky notices); not on the wire.
  * 3. `identity` — resolved client-side for greet-by-name; not on the wire.
- * 4. `options` — the embedding page's rendering choices; not on the wire.
  */
 import type {
   CreateFlow201Step,
@@ -79,15 +78,4 @@ export type LiquidContext = {
   errors: readonly FlowError[];
   branding: Branding | Record<string, never>;
   loading: boolean;
-  /**
-   * Choices the embedding page made on `<zitadel-login>`. Local to the page,
-   * never stored with the branding, so a template only honours them by
-   * reading them here.
-   */
-  options?: FlowRenderOptions;
-};
-
-export type FlowRenderOptions = {
-  /** Offer the show/hide button on password fields (`password-toggle`). */
-  password_toggle: boolean;
 };

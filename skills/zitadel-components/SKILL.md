@@ -85,9 +85,8 @@ Theming levers (strongest-first resolution, documented in the README):
   heading — use it when the host page already shows a title and you want to
   avoid a duplicate. Otherwise control chrome through `variant` and tokens.
 - **`suppress-password-toggle`** (boolean attribute) hides the show/hide button
-  the login shows on password fields by default. A custom Liquid template
-  honours it by reading `options.password_toggle` and setting
-  `password-toggle` on its password `<zl-field>`.
+  the login shows on password fields by default. It applies to custom Liquid
+  templates too; templates have nothing to wire.
 
 Automation hooks (stable `data-testid`s the default template emits): host atoms
 `zitadel-field-email` / `zitadel-field-password` / `zitadel-action-submit`;

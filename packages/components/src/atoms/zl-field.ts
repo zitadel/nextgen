@@ -38,7 +38,7 @@ export type ZlFieldInputDetail = { name: string; value: string };
  *                `--zl-input` edge over `--zl-input-fill`
  *   focus        the edge takes `--zl-ring` and a 3px ring sits outside it
  *   trailing     cross (clear) | alert-circle (error) | check (success), or
- *                eye / eye-off on a `password-toggle` password field — the
+ *                eye / eye-off on a password field with `passwordToggle` — the
  *                toggle takes the slot in every state, so the field never
  *                shows two icons. Both buttons are pointer-only affordances
  *                (`tabindex="-1"`) so Tab moves from one input straight to
@@ -77,13 +77,14 @@ export class ZlField extends FormAtom {
     | undefined = undefined;
   @property({ type: Boolean, attribute: "trailing-icon" }) accessor trailingIcon = true;
   /**
-   * Offer a show/hide button on a `type="password"` field. Opt-in at the
-   * atom so a standalone `<zl-field>` keeps plain password semantics;
-   * `<zitadel-login>` turns it on by default through its template.
+   * Offer a show/hide button on a `type="password"` field. Property-only and
+   * left out of the manifest: `<zitadel-login>` sets it on its fields after
+   * each render from its own `suppress-password-toggle`, so neither a
+   * template nor markup decides it.
    */
-  @property({ type: Boolean, attribute: "password-toggle" }) accessor passwordToggle = false;
-  @property({ attribute: "show-password-label" }) accessor showPasswordLabel = "Show password";
-  @property({ attribute: "hide-password-label" }) accessor hidePasswordLabel = "Hide password";
+  @property({ attribute: false }) accessor passwordToggle = false;
+  @property({ attribute: false }) accessor showPasswordLabel = "Show password";
+  @property({ attribute: false }) accessor hidePasswordLabel = "Hide password";
   @property({ type: Boolean }) accessor required = false;
   @property({ type: Boolean, reflect: true }) accessor invalid = false;
 
@@ -443,9 +444,6 @@ export const zlFieldManifest: AtomManifest = {
     "forgot-password-label",
     "forgot-password-action",
     "trailing-icon",
-    "password-toggle",
-    "show-password-label",
-    "hide-password-label",
   ],
   parts: [
     "root",

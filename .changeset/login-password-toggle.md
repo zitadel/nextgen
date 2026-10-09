@@ -1,6 +1,5 @@
 ---
 "@zitadel/components": minor
-"@zitadel/config": minor
 "@zitadel/sdk-core": minor
 "@zitadel/sdk-react": minor
 "@zitadel/sdk-vue": minor
@@ -19,8 +18,6 @@ branding.
 The button replaces the clear button on password fields, so the field shows
 one icon, and like the clear button it is out of the tab order. A revealed
 field opts out of spellcheck and autocorrect, and it is hidden again on
-submit, form reset and step change. `<zl-field>` gains the opt-in
-`password-toggle`, `show-password-label` and `hide-password-label`
-attributes, and Liquid templates read the widget's choice from
-`options.password_toggle` — the bundled default and the centered and minimal
-starter designs already do.
+submit, form reset and step change. The widget applies the setting to its
+fields directly, so it also holds for ejected templates; it is not a
+`<zl-field>` attribute.
