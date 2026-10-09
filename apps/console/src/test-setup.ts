@@ -10,11 +10,11 @@ import { _resetRuntimeForTesting } from "./runtime/runtime";
 import { server } from "./test/msw";
 
 // Console screens render after a router load, an API fetch and component
-// effects. `findBy*`/`waitFor` resolve as soon as the screen matches; this is
-// only how long they keep looking before giving up, so it is set for a loaded
-// CI runner, where a cold first render can take tens of seconds, not for a
-// developer's machine.
-configure({ asyncUtilTimeout: 60_000 });
+// effects, so `findBy*`/`waitFor` need more than RTL's 1s default to settle —
+// but not much more once requests are mocked (the earlier flake was a screen
+// that never finished because a request was unmocked, not a slow one). 5s is
+// the give-up window; a real failure still reports in ~5s, not a minute.
+configure({ asyncUtilTimeout: 5_000 });
 
 // configureZitadel is write-once on globalThis so duplicate module copies
 // share one slot. That slot also survives Vitest's per-file isolate, and
