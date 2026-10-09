@@ -37,10 +37,6 @@ const NESTED_BRANDING = { parent: "Login flows", label: "Branding" };
 //   - Sessions was built, but `POST /sessions/query` answers 501 (#699)
 const NEVER_SHOWN = ["App groups", "Applications", "Analytics", "Activity Log", "Sessions"];
 
-// A path pattern rather than an absolute URL: this spec imports the router
-// statically, so `api/zitadel.ts` evaluates its base URL before `vi.stubEnv`
-// could run — the request goes to the relative default.
-//
 // `GET /users/me/projects` is the authorized-projects query (#1228): what the
 // signed-in person can act on, read with the session cookie.
 const MY_PROJECTS = "*/api/users/me/projects";

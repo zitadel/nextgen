@@ -51,8 +51,7 @@ vi.mock("@zitadel/sdk-react", () => ({
 /**
  * The redirect target below is a real screen with a loader, so the guard tests
  * need its data call answered — an empty list is enough to prove the redirect
- * landed. A path pattern rather than an absolute URL: this spec imports the
- * router statically, so `api/zitadel.ts` binds its base before any `stubEnv`.
+ * landed.
  */
 // `/` lands on Teams and the redirect test asks for `/schemas`; both are
 // project-scoped, so the guard selects the visitor's only project.
@@ -82,7 +81,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.unstubAllEnvs();
   localStorage.removeItem(THEME_STORAGE_KEY);
 });
 
