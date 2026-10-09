@@ -31,12 +31,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      # SPIKE: drop-in replacement for actions/setup-go with per-job isolated,
-      # branch-aware Go cache (https://github.com/cloudx-io/setup-go). It takes
-      # go-version (not go-version-file) and a required cache-key-prefix; go.mod
-      # pins `go 1.26`, which setup-go resolves to the same patch as the
-      # baseline's go-version-file. Revert to actions/setup-go before merge.
-      - uses: cloudx-io/setup-go@8b45cf394acf101459db0d47aa9735a4fe5eea63 # v1.0.0
+      # SPIKE: cloudx-io/setup-go vendored locally (.github/actions/cloudx-setup-go)
+      # because the published action fails to load — its action.yml references
+      # its own sub-action as `uses: $/trim-gocache`, which is not valid syntax.
+      # The vendored copy is verbatim at the pinned SHA with that one line
+      # repaired to a ./-relative path. Per-job isolated, branch-aware Go cache.
+      # It takes go-version (not go-version-file) and a required cache-key-prefix;
+      # go.mod pins `go 1.26`, resolved to the same patch as the baseline's
+      # go-version-file. Revert to actions/setup-go before merge.
+      - uses: ./.github/actions/cloudx-setup-go
         with:
           go-version: "1.26"
           cache-key-prefix: ci

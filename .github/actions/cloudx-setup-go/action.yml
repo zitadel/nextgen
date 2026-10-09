@@ -67,7 +67,7 @@ runs:
     # pinned. A workspace-relative path like ./.github/actions/... only works
     # when the action lives in the consumer repo.
     - name: trim GOCACHE
-      uses: $/trim-gocache
+      uses: ./.github/actions/cloudx-setup-go/trim-gocache
       with:
         gocache: ${{ steps.get-cache-paths.outputs.gocache }}
         max-staleness-hours: ${{ inputs.max-staleness-hours }}
