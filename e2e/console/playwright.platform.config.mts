@@ -1,7 +1,7 @@
 import { join } from "node:path";
 
 import { defineConfig, devices } from "@playwright/test";
-import { withZitadel } from "@zitadel/testing/playwright";
+import { fastChromiumLaunchOptions, withZitadel } from "@zitadel/testing/playwright";
 
 /**
  * The embedded console against a deployment with the platform project
@@ -53,7 +53,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], launchOptions: fastChromiumLaunchOptions },
     },
   ],
 });

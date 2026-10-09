@@ -1,7 +1,7 @@
 import { join } from "node:path";
 
 import { defineConfig, devices } from "@playwright/test";
-import { withZitadel, type AppEnvTemplate } from "@zitadel/testing/playwright";
+import { fastChromiumLaunchOptions, withZitadel, type AppEnvTemplate } from "@zitadel/testing/playwright";
 
 /**
  * Real-instance console coverage:
@@ -63,7 +63,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], launchOptions: fastChromiumLaunchOptions },
     },
   ],
 });

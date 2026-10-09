@@ -1,7 +1,7 @@
 import { join } from "node:path";
 
 import { defineConfig, devices } from "@playwright/test";
-import { nextAppEnv, withZitadel } from "@zitadel/testing/playwright";
+import { fastChromiumLaunchOptions, nextAppEnv, withZitadel } from "@zitadel/testing/playwright";
 
 /**
  * Real-instance variant of the embedded sign-in e2e:
@@ -49,7 +49,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], launchOptions: fastChromiumLaunchOptions },
     },
   ],
 });

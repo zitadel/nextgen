@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { resolve } from "node:path";
+import { fastChromiumLaunchOptions } from "@zitadel/testing/playwright";
 
 const workspaceRoot = resolve(import.meta.dirname, "../..");
 
@@ -31,7 +32,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], launchOptions: fastChromiumLaunchOptions },
     },
   ],
 });

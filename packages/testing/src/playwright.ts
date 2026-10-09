@@ -114,6 +114,30 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
 });
 
 export { expect } from "@playwright/test";
+
+/**
+ * Chromium launch flags that keep headless runs fast and CI-safe:
+ * - `--disable-dev-shm-usage`: use /tmp instead of the small /dev/shm, the
+ *   usual cause of renderer crashes in CI containers.
+ * - `--disable-gpu`: no GPU path in headless.
+ * - `--no-sandbox` / `--disable-setuid-sandbox`: CI containers run as root
+ *   where the sandbox cannot start; a no-op on a normal local machine.
+ * - the backgrounding flags: a hidden/occluded page (e.g. a second worker's
+ *   tab) is not throttled, so parallel workers do not slow each other.
+ * Spread into a project's `use.launchOptions`.
+ */
+export const fastChromiumLaunchOptions = {
+  args: [
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-background-timer-throttling",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-renderer-backgrounding",
+    "--disable-features=TranslateUI",
+  ],
+};
 export { applyAppEnvTemplate, nextAppEnv } from "./app-env";
 export type { AppEnvTemplate } from "./app-env";
 export {
