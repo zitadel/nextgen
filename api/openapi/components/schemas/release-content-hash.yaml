@@ -5,9 +5,12 @@ description: |
   characters. Always the full digest; no short form is accepted anywhere.
 
   The digest covers the content of the resources the release pins and
-  nothing else. Revision ids, metadata and the project are not part of it,
-  so the same `.zitadel/` directory has the same digest on every project,
-  and a client can compute it before sending anything.
+  nothing else. Revision ids, metadata and the project are not part of it.
+  A bundle that carries every resource it references therefore has the same
+  digest on every project, and a client can compute it before sending
+  anything. When a bundle leaves a referenced resource to the project, the
+  release pins the project's revision of it too, and the digest covers that
+  resource as the project holds it.
 
   To compute it:
 
