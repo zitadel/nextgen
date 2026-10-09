@@ -1,0 +1,39 @@
+title: ConfigurationBundle
+type: object
+description: |
+  The resources of a project's `.zitadel/` directory as authored on disk,
+  grouped by kind. The server turns the bundle into a release in one
+  transaction: for every resource it compares the content against the
+  project's newest revision of the same handle, reuses that revision when the
+  content matches and allocates a new one otherwise. The caller keeps no
+  state, so the same directory builds the same release on any project.
+
+  Resources reference each other by handle: a flow definition's
+  `user_schema` names a schema by its `objectType`. A reference must resolve
+  to a resource in this bundle or to one the project already holds; a release
+  is refused when it does not, naming the pointer and the handle.
+
+  At least one resource across all kinds. More kinds join as they become
+  release kinds.
+properties:
+  schemas:
+    type: array
+    maxItems: 50
+    description: User schemas, one per `.zitadel/schemas/*.json`.
+    items:
+      $ref: ../schemas/user-schema.yaml
+  flow_definitions:
+    type: array
+    maxItems: 50
+    description: Flow definitions, one per `.zitadel/flows/*.json`.
+    items:
+      $ref: ../../components/flows/flow-definition.yaml
+  brandings:
+    type: array
+    maxItems: 1
+    description: |
+      The descriptor from `.zitadel/branding/branding.json` with its template
+      inlined, exactly as `POST /branding` takes it. A project has one
+      branding, so at most one entry.
+    items:
+      $ref: ../../components/flows/branding.yaml

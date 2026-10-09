@@ -1,0 +1,22 @@
+title: ReleaseContentHash
+type: string
+description: |
+  The content digest of a release: `sha256:` followed by 64 lowercase hex
+  characters. Always the full digest — no short form is accepted anywhere.
+
+  The digest is computed over the sorted pointer set and nothing else, so two
+  bundles that pin the same revisions are one release, whatever message or
+  commit they were sent with. Canonical form: the pointers are ordered by
+  `kind`, then `handle`, then `revision_id`; the preimage is the version tag
+  `rel-v1` followed by a NUL byte, then for every pointer its `kind`,
+  `handle` and `revision_id` in that order, each written as
+  `<byte length>:<value>`; the SHA-256 of that preimage is the digest.
+
+  Identifier on the wire, not in paths: paths take the `rel_` id. Where a
+  release is looked up by content the field says so by name — the
+  `content_hash` filter of `GET /releases`, or `content_hash` in place of
+  `release_id` on `POST /deployments`.
+pattern: '^sha256:[0-9a-f]{64}$'
+minLength: 71
+maxLength: 71
+example: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f

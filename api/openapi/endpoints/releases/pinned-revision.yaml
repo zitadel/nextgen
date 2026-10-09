@@ -1,0 +1,33 @@
+title: PinnedRevision
+type: object
+description: |
+  What `POST /releases` did for one resource of the release: which revision
+  it pinned and whether this call allocated it.
+required:
+  - kind
+  - handle
+  - revision_id
+  - created
+properties:
+  kind:
+    $ref: ../../components/schemas/release-pointer-kind.yaml
+  handle:
+    type: string
+    minLength: 1
+    maxLength: 256
+    description: The resource's handle, as recorded on the release pointer.
+    example: human-user
+  revision_id:
+    type: string
+    minLength: 1
+    maxLength: 512
+    description: The revision the release pins for this resource.
+    example: sch_01KWHF2XY6RN7F0N9WD3P2E4YM
+  created:
+    type: boolean
+    description: |
+      `true` when this call allocated the revision because the bundled
+      content differed from the project's newest revision of that handle;
+      `false` when an existing revision was pinned. The `pointers` form never
+      allocates, so every entry it returns reads `false`, as does every entry
+      of a `200` answer.

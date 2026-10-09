@@ -23,7 +23,7 @@ func createdRelease(t *testing.T, fixture releaseFixture, pointers []api.CreateR
 		Message:  api.NewOptString(message),
 	})
 	require.IsType(t, &api.CreateReleaseCreated{}, resp, "create release: %s", helpers.MustMarshal(t, resp))
-	return api.Release(*resp.(*api.CreateReleaseCreated))
+	return resp.(*api.CreateReleaseCreated).Release
 }
 
 // TestGetReleaseById reads back a release with the set it pins.
