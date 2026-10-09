@@ -4,7 +4,6 @@ import (
 	"context"
 
 	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -13,13 +12,9 @@ func (h *Handler) ListProjectAdmins(ctx context.Context, params api.ListProjectA
 	if err := h.requireProjectAccess(ctx, projectID, projectAccess, opRead); err != nil {
 		return nil, err
 	}
-	var viewerUserID string
-	if scope, ok := GetScopeContext(ctx); ok && scope.PrincipalType == domain.AuthzPrincipalTypeUser {
-		viewerUserID = scope.PrincipalID
-	}
 	listed, err := h.grantService.ListProjectAdmins(ctx, service.ListProjectAdminsInput{
 		ProjectID:    projectID,
-		ViewerUserID: viewerUserID,
+		ViewerUserID: grantCallerUserID(ctx),
 		PageToken:    string(params.PageToken.Value),
 		Limit:        int(params.Limit.Value),
 	})

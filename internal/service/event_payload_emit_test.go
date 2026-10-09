@@ -15,6 +15,7 @@ import (
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 func TestProjectCreate_EventPayloadIncludesPreviewOrigins(t *testing.T) {
@@ -115,7 +116,7 @@ func TestProjectUpdate_EventPayloadNameDelta(t *testing.T) {
 		},
 	)
 	statements.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).Return(nil)
-	statements.EXPECT().GetProject(gomock.Any(), "proj_1", service.ProjectQueryOptions{OwningTeam: true}).Return(&domain.Project{ID: "proj_1", Name: "renamed"}, nil)
+	statements.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
 
 	const baseURL = "https://example.com/api/schemas"
 	schemaValidator, err := domain.NewSchemaValidator(baseURL)

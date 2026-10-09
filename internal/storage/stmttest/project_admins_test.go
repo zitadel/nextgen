@@ -4,6 +4,7 @@ package stmttest
 
 import (
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 )
 
 // ListProjectAdmins reads who administers a project the way the
@@ -76,6 +79,18 @@ func TestAuthzAssignmentStatements_ListProjectAdmins(t *testing.T) {
 		opsGrant := grant(projectID, domain.AuthzPrincipalTypeTeam, opsTeam, "admin", nil)
 		ownerGrant := grant(projectID, domain.AuthzPrincipalTypeUser, owner, "admin", nil)
 		directGrant := grant(projectID, domain.AuthzPrincipalTypeUser, direct, "admin", nil)
+		// A delegated row is a second admin row for the same person; it must
+		// not take a second place on a page.
+		delegated := &domain.AuthzAssignment{
+			ProjectID: projectID, CatalogID: domain.SystemCatalogID,
+			PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: direct,
+			ObjectType: "project", Relation: "admin",
+			GrantorType: new("user"), GrantorID: new(owner), DelegationID: new("dlg-" + suffix),
+		}
+		delegated.ApplyScope(domain.NewProjectAssignmentScope())
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), delegated))
+		directSources := []domain.ProjectAdminSourceRecord{{GrantID: directGrant}, {GrantID: delegated.ID}}
+		slices.SortFunc(directSources, func(a, b domain.ProjectAdminSourceRecord) int { return strings.Compare(a.GrantID, b.GrantID) })
 		expiringGrant := grant(projectID, domain.AuthzPrincipalTypeUser, expiring, "admin", &future)
 		grant(projectID, domain.AuthzPrincipalTypeUser, deleted, "admin", nil)
 		grant(projectID, domain.AuthzPrincipalTypeUser, viewer, "viewer", nil)
@@ -100,7 +115,7 @@ func TestAuthzAssignmentStatements_ListProjectAdmins(t *testing.T) {
 				{GrantID: ownerGrant},
 			}},
 			{teamMember, []domain.ProjectAdminSourceRecord{{GrantID: opsGrant, TeamID: opsTeam, TeamName: "ops"}}},
-			{direct, []domain.ProjectAdminSourceRecord{{GrantID: directGrant}}},
+			{direct, directSources},
 			{expiring, []domain.ProjectAdminSourceRecord{{GrantID: expiringGrant}}},
 		}
 		// seenBy is the admins a viewer in the given teams sees: a person with
@@ -126,38 +141,85 @@ func TestAuthzAssignmentStatements_ListProjectAdmins(t *testing.T) {
 			return out
 		}
 
-		got, err := d.stmts.ListProjectAdmins(t.Context(), projectID, "", "", 100)
-		require.NoError(t, err)
+		byUserID := database.OrderBy[domain.ProjectAdminField]{
+			Columns:   []database.Column[domain.ProjectAdminField]{database.Col(domain.ProjectAdminFieldUserID)},
+			Direction: database.OrderAsc,
+		}
+		list := func(viewer string, limit uint32, order database.OrderBy[domain.ProjectAdminField], cursor []byte) *database.ListResult[*domain.ProjectAdminRecord] {
+			t.Helper()
+			got, err := d.stmts.ListProjectAdmins(t.Context(), projectID, viewer, database.Page[domain.ProjectAdminField]{
+				Limit: limit, OrderBy: order, Cursor: cursor,
+			})
+			require.NoError(t, err)
+			return got
+		}
+
 		want := seenBy()
-		assert.Equal(t, want, got,
+		got := list("", 100, byUserID, nil)
+		assert.Equal(t, want, got.Items,
 			"by user id, sources owning team, team grants and user grants; deleted, viewer, editor, expired, revoked, foreign and departed left out")
-		assert.NotContains(t, adminUserIDs(got), teamMember, "a person only in a team the viewer is not in is left out")
+		assert.Empty(t, got.NextCursor)
+		assert.NotContains(t, adminUserIDs(got.Items), teamMember, "a person only in a team the viewer is not in is left out")
 
-		asOwner, err := d.stmts.ListProjectAdmins(t.Context(), projectID, "", owner, 100)
-		require.NoError(t, err)
-		assert.Equal(t, seenBy(owningTeam, opsTeam), asOwner, "the owner is in both teams")
-		asMember, err := d.stmts.ListProjectAdmins(t.Context(), projectID, "", teamMember, 100)
-		require.NoError(t, err)
-		assert.Equal(t, seenBy(opsTeam), asMember, "a member of ops sees ops, not the owning team")
-		asLeaver, err := d.stmts.ListProjectAdmins(t.Context(), projectID, "", left, 100)
-		require.NoError(t, err)
-		assert.Equal(t, want, asLeaver, "a member who left sees no team")
+		assert.Equal(t, seenBy(owningTeam, opsTeam), list(owner, 100, byUserID, nil).Items, "the owner is in both teams")
+		assert.Equal(t, seenBy(opsTeam), list(teamMember, 100, byUserID, nil).Items, "a member of ops sees ops, not the owning team")
+		assert.Equal(t, want, list(left, 100, byUserID, nil).Items, "a member who left sees no team")
 
-		limited, err := d.stmts.ListProjectAdmins(t.Context(), projectID, "", "", 2)
-		require.NoError(t, err)
-		assert.Equal(t, want[:2], limited, "the limit counts the people listed, and keeps all of their sources")
+		// Paging: people, not rows, fill a page, even someone with two admin
+		// rows, and the cursor resumes after the last person.
+		first := list("", 2, byUserID, nil)
+		assert.Equal(t, want[:2], first.Items, "the limit counts people, and keeps all of their sources")
+		require.NotEmpty(t, first.NextCursor, "a third person means another page")
+		second := list("", 2, byUserID, first.NextCursor)
+		assert.Equal(t, want[2:], second.Items)
+		assert.Empty(t, second.NextCursor)
 
-		next, err := d.stmts.ListProjectAdmins(t.Context(), projectID, direct, "", 2)
-		require.NoError(t, err)
-		assert.Equal(t, want[2:], next, "a page starts after the given user id")
+		byUserIDDesc := byUserID
+		byUserIDDesc.Direction = database.OrderDesc
+		reversed := slices.Clone(want)
+		slices.Reverse(reversed)
+		firstDesc := list("", 2, byUserIDDesc, nil)
+		assert.Equal(t, reversed[:2], firstDesc.Items, "descending order pages from the other end")
+		assert.Equal(t, reversed[2:], list("", 2, byUserIDDesc, firstDesc.NextCursor).Items)
 
-		pageAsOwner, err := d.stmts.ListProjectAdmins(t.Context(), projectID, owner, owner, 1)
-		require.NoError(t, err)
-		assert.Equal(t, seenBy(owningTeam, opsTeam)[1:2], pageAsOwner, "a viewer off the page still decides who is listed")
+		ownerFirst := list(owner, 1, byUserID, nil)
+		assert.Equal(t, seenBy(owningTeam, opsTeam)[:1], ownerFirst.Items)
+		assert.Equal(t, seenBy(owningTeam, opsTeam)[1:2], list(owner, 1, byUserID, ownerFirst.NextCursor).Items,
+			"a viewer off the page still decides who is listed")
 
-		none, err := d.stmts.ListProjectAdmins(t.Context(), otherProjectID+"-missing", "", "", 100)
+		_, err := d.stmts.ListProjectAdmins(t.Context(), projectID, "", database.Page[domain.ProjectAdminField]{
+			Limit: 2, OrderBy: byUserID, Cursor: pagination.New(byUserID, []any{"user\x00"}).Marshal(),
+		})
+		assert.ErrorIs(t, err, database.ErrInvalidCursor(), "a NUL byte in the cursor is an invalid cursor, not a database error")
+		_, err = d.stmts.ListProjectAdmins(t.Context(), projectID, "", database.Page[domain.ProjectAdminField]{
+			Limit: 2, OrderBy: byUserIDDesc, Cursor: first.NextCursor,
+		})
+		assert.ErrorIs(t, err, database.ErrCursorOrderMismatch())
+
+		none, err := d.stmts.ListProjectAdmins(t.Context(), otherProjectID+"-missing", "", database.Page[domain.ProjectAdminField]{Limit: 100, OrderBy: byUserID})
 		require.NoError(t, err)
-		assert.Empty(t, none)
+		assert.Empty(t, none.Items)
+
+		// The list must say what the authorization check says: everyone the
+		// owner sees (both admin teams) is exactly who CheckAuthz allows admin
+		// on the project. The deleted user is left out of the comparison: the
+		// check reads only assignments, and a deleted user cannot sign in.
+		catalogID, err := d.stmts.ActiveSystemCatalogID(t.Context())
+		require.NoError(t, err)
+		var allowed []string
+		for _, userID := range []string{owner, teamMember, direct, expiring, viewer, expired, revoked, elsewhere, left} {
+			ok, _, err := d.stmts.CheckAuthz(t.Context(), domain.AuthzCheckParams{
+				CatalogID: catalogID, ProjectID: projectID, PrincipalHomeProjectID: home,
+				PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: userID,
+				ObjectType: "project", Relation: "admin",
+			})
+			require.NoError(t, err)
+			if ok {
+				allowed = append(allowed, userID)
+			}
+		}
+		assert.ElementsMatch(t, allowed, adminUserIDs(list(owner, 100, byUserID, nil).Items),
+			"the list follows the authorization check")
 	})
 }
 

@@ -355,6 +355,15 @@ type ProjectAdminRecord struct {
 	Sources []ProjectAdminSourceRecord
 }
 
+// ProjectAdminField enumerates the fields a project admins list orders and
+// pages by.
+type ProjectAdminField uint8
+
+const (
+	ProjectAdminFieldUnspecified ProjectAdminField = iota
+	ProjectAdminFieldUserID
+)
+
 // ProjectAdminSourceRecord is one way a person administers a project: through
 // the owning team, an admin grant to a team they are an active member of, or
 // an admin grant to them.

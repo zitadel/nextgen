@@ -1,9 +1,7 @@
 package service_test
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,15 +11,26 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// adminRecords serves ListProjectAdmins for a first page of the default size,
-// one person more than it holds. Which people the query returns, and what it
-// marks visible, is covered by the statement test; this pins what the service
-// makes of them.
+// firstPage is the page the service asks for when the caller names none: the
+// default size, ordered by user id.
+var firstPage = database.Page[domain.ProjectAdminField]{
+	Limit: 20,
+	OrderBy: database.OrderBy[domain.ProjectAdminField]{
+		Columns:   []database.Column[domain.ProjectAdminField]{database.Col(domain.ProjectAdminFieldUserID)},
+		Direction: database.OrderAsc,
+	},
+}
+
+// adminRecords serves ListProjectAdmins for the first page. Which people the
+// query returns, what it marks visible, and how it pages, is covered by the
+// statement test; this pins what the service makes of them.
 func adminRecords(viewerUserID string, records ...*domain.ProjectAdminRecord) func(*servicemocks.MockAllStatements) {
 	return func(s *servicemocks.MockAllStatements) {
-		s.EXPECT().ListProjectAdmins(gomock.Any(), "proj_customer", "", viewerUserID, uint32(21)).Return(records, nil)
+		s.EXPECT().ListProjectAdmins(gomock.Any(), "proj_customer", viewerUserID, firstPage).
+			Return(&database.ListResult[*domain.ProjectAdminRecord]{Items: records}, nil)
 	}
 }
 
@@ -93,39 +102,36 @@ func TestGrantService_ListProjectAdmins(t *testing.T) {
 		assert.Empty(t, got.NextPageToken)
 	})
 
-	t.Run("a full page links to the next", func(t *testing.T) {
+	t.Run("the page token passes through both ways", func(t *testing.T) {
 		t.Parallel()
-		page := make([]*domain.ProjectAdminRecord, 0, 21)
-		for i := range 21 {
-			page = append(page, adminRecord(fmt.Sprintf("user_%05d", i), domain.ProjectAdminSourceRecord{GrantID: fmt.Sprintf("asgn_%05d", i)}))
-		}
-		var after string
+		next := firstPage
+		next.Cursor = []byte("token-1")
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
 			gomock.InOrder(
-				s.EXPECT().ListProjectAdmins(gomock.Any(), "proj_customer", "", "", uint32(21)).Return(page, nil),
-				s.EXPECT().ListProjectAdmins(gomock.Any(), "proj_customer", gomock.Any(), "", uint32(21)).DoAndReturn(
-					func(_ context.Context, _, afterUserID, _ string, _ uint32) ([]*domain.ProjectAdminRecord, error) {
-						after = afterUserID
-						return page[20:], nil
-					}),
+				s.EXPECT().ListProjectAdmins(gomock.Any(), "proj_customer", "", firstPage).Return(&database.ListResult[*domain.ProjectAdminRecord]{
+					Items:      []*domain.ProjectAdminRecord{adminRecord("user_a", domain.ProjectAdminSourceRecord{GrantID: "asgn_a"})},
+					NextCursor: []byte("token-1"),
+				}, nil),
+				s.EXPECT().ListProjectAdmins(gomock.Any(), "proj_customer", "", next).Return(&database.ListResult[*domain.ProjectAdminRecord]{
+					Items: []*domain.ProjectAdminRecord{adminRecord("user_b", domain.ProjectAdminSourceRecord{GrantID: "asgn_b"})},
+				}, nil),
 			)
 		})
 
 		first := listAdmins(t, svc, "")
-		require.Len(t, first.Admins, 20, "the default page size")
-		require.NotEmpty(t, first.NextPageToken, "a 21st person means another page")
-
+		assert.Equal(t, "token-1", first.NextPageToken)
 		second, err := svc.ListProjectAdmins(t.Context(), service.ListProjectAdminsInput{ProjectID: "proj_customer", PageToken: first.NextPageToken})
 		require.NoError(t, err)
-		assert.Equal(t, "user_00019", after, "the next page starts after the last person listed")
 		require.Len(t, second.Admins, 1)
-		assert.Equal(t, "user_00020", second.Admins[0].User.UserID)
+		assert.Equal(t, "user_b", second.Admins[0].User.UserID)
 		assert.Empty(t, second.NextPageToken)
 	})
 
-	t.Run("an invalid page token is refused", func(t *testing.T) {
+	t.Run("an invalid page token is a bad request", func(t *testing.T) {
 		t.Parallel()
-		svc := newMockedGrantService(t, grantPlatformProjID, func(*servicemocks.MockAllStatements) {})
+		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().ListProjectAdmins(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.ErrInvalidCursor())
+		})
 
 		_, err := svc.ListProjectAdmins(t.Context(), service.ListProjectAdminsInput{ProjectID: "proj_customer", PageToken: "not a token"})
 		assert.ErrorIs(t, err, domain.ErrRequestInvalid())
@@ -134,7 +140,7 @@ func TestGrantService_ListProjectAdmins(t *testing.T) {
 	t.Run("a failed read is internal", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().ListProjectAdmins(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("boom"))
+			s.EXPECT().ListProjectAdmins(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("boom"))
 		})
 
 		_, err := svc.ListProjectAdmins(t.Context(), service.ListProjectAdminsInput{ProjectID: "proj_customer"})

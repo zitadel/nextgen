@@ -316,25 +316,35 @@ func scanAuthzAssignment(rows *sql.Rows) (*domain.AuthzAssignment, error) {
 var _ service.AuthzAssignmentStatements = (*authzAssignmentStatements)(nil)
 
 // ListProjectAdmins implements [service.AuthzAssignmentStatements].
-func (s authzAssignmentStatements) ListProjectAdmins(ctx context.Context, projectID, afterUserID, viewerUserID string, limit uint32) ([]*domain.ProjectAdminRecord, error) {
-	var c statementCompiler
-	authz.WriteProjectAdminSources(&c, sqliteAuthzEnv(), projectID, afterUserID, viewerUserID, limit)
-	rows, err := s.client.Query(ctx, c.String(), c.args...)
+func (s authzAssignmentStatements) ListProjectAdmins(ctx context.Context, projectID, viewerUserID string, page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error) {
+	cursor, err := authz.ProjectAdminsCursorFrom(page)
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, err
 	}
-	defer rows.Close()
-	sources, err := collectRows(rows, func(rows *sql.Rows) (authz.ProjectAdminSourceRow, error) {
-		var (
-			source   authz.ProjectAdminSourceRow
-			teamName sql.NullString
-		)
-		err := rows.Scan(&source.UserID, &source.HomeProjectID, &source.SourceRank, &source.GrantID, &source.TeamID, &teamName)
-		source.TeamName = teamName.String
-		return source, err
+	admins, next, err := pagination.Page(page, authz.ProjectAdminSchema, func(limit uint32) ([]*domain.ProjectAdminRecord, error) {
+		var c statementCompiler
+		authz.WriteProjectAdminSources(&c, sqliteAuthzEnv(), projectID, viewerUserID, cursor, page.OrderBy.Direction == database.OrderDesc, limit)
+		rows, err := s.client.Query(ctx, c.String(), c.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		defer rows.Close()
+		sources, err := collectRows(rows, func(rows *sql.Rows) (authz.ProjectAdminSourceRow, error) {
+			var (
+				source   authz.ProjectAdminSourceRow
+				teamName sql.NullString
+			)
+			err := rows.Scan(&source.UserID, &source.HomeProjectID, &source.SourceRank, &source.GrantID, &source.TeamID, &teamName)
+			source.TeamName = teamName.String
+			return source, err
+		})
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return authz.GroupProjectAdminSourcesByUser(sources), nil
 	})
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, err
 	}
-	return authz.GroupProjectAdminSourcesByUser(sources), nil
+	return &database.ListResult[*domain.ProjectAdminRecord]{Items: admins, NextCursor: next}, nil
 }

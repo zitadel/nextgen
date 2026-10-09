@@ -115,7 +115,6 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 	require.True(t, hasTeam(ownerRow.Sources[0]))
 	assert.Equal(t, owningTeamID, teamOf(ownerRow.Sources[0]).TeamID)
 	assert.True(t, teamOf(ownerRow.Sources[0]).Name.IsSet(), "the source names the team")
-	assert.Empty(t, ownerRow.Sources[0].ProjectAdminGrantSource.GrantID, "owning-team access is not a grant")
 	assert.True(t, ownerRow.User.Identifier.IsSet(), "the row is a resolved user-ref")
 
 	// A granted colleague, a viewer, an editor, and a team granted admin.

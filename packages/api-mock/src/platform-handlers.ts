@@ -171,10 +171,10 @@ function queryRecord(request: Request): Record<string, string> {
 }
 
 /**
- * Server-side record for a project. Strict superset of the spec response
- * types (`CreateProject201`, `GetProject200`): includes the server-only
- * secrets and `updatedAt`. Handlers project from this record to the right
- * wire shape at the boundary.
+ * Server-side record for a project: the server-only secrets and `updatedAt`
+ * on top of the spec's project fields. It does not hold `owning_team_id`,
+ * which `GetProject200` requires: the handlers derive that from the claims at
+ * the boundary, where they project this record to the right wire shape.
  */
 type ProjectRecord = {
   id: string;

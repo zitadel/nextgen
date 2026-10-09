@@ -2,10 +2,9 @@ package service
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 type ProjectAdminSourceType string
@@ -39,42 +38,28 @@ type ProjectAdmins struct {
 	NextPageToken string
 }
 
-// projectAdminsPageToken is the opaque page token: the last user id listed.
-type projectAdminsPageToken struct {
-	After string `json:"after"`
-}
-
 func (s *GrantService) ListProjectAdmins(ctx context.Context, input ListProjectAdminsInput) (*ProjectAdmins, error) {
 	if input.ProjectID == "" {
 		return nil, domain.ErrProjectMissingID()
 	}
-	var after string
+	page := database.Page[domain.ProjectAdminField]{
+		Limit: uint32(normalizeLimit(input.Limit)),
+		OrderBy: database.OrderBy[domain.ProjectAdminField]{
+			Columns:   []database.Column[domain.ProjectAdminField]{database.Col(domain.ProjectAdminFieldUserID)},
+			Direction: database.OrderAsc,
+		},
+	}
 	if input.PageToken != "" {
-		decoded, err := base64.RawURLEncoding.DecodeString(input.PageToken)
-		var token projectAdminsPageToken
-		if err != nil || json.Unmarshal(decoded, &token) != nil || token.After == "" {
-			return nil, domain.ErrRequestInvalid().WithDetails("invalid page token")
-		}
-		after = token.After
+		page.Cursor = []byte(input.PageToken)
 	}
-	limit := normalizeLimit(input.Limit)
-	// One person more than the page holds tells whether another page follows.
-	records, err := s.v2Pool.Statements().ListProjectAdmins(ctx, input.ProjectID, after, input.ViewerUserID, uint32(limit+1))
+	listed, err := s.v2Pool.Statements().ListProjectAdmins(ctx, input.ProjectID, input.ViewerUserID, page)
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to list project admins")
+		return nil, mapListError(err, "failed to list project admins")
 	}
-	out := &ProjectAdmins{}
-	if len(records) > limit {
-		records = records[:limit]
-		payload, err := json.Marshal(projectAdminsPageToken{After: records[limit-1].UserID})
-		if err != nil {
-			return nil, domain.ErrInternal(err).WithMessage("failed to build the page token")
-		}
-		out.NextPageToken = base64.RawURLEncoding.EncodeToString(payload)
-	}
+	out := &ProjectAdmins{NextPageToken: string(listed.NextCursor)}
 
 	homes := map[string]string{}
-	for _, record := range records {
+	for _, record := range listed.Items {
 		out.Admins = append(out.Admins, projectAdminFromRecord(record))
 		homes[record.UserID] = record.HomeProjectID
 	}

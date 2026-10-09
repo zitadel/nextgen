@@ -292,8 +292,15 @@ func writeUserMembershipInTeam(w ArgWriter, env Env, projectID, setIDExpr, setID
 // It takes no Env: the caller writes the FROM clause, so nothing here needs the
 // schema qualifier or the dialect clock.
 func writeMembershipEdgeMatch(w ArgWriter, projectID, setIDExpr, setID, memberIDExpr, memberID string) {
+	writeMembershipEdgeMatchIn(w, "", projectID, setIDExpr, setID, memberIDExpr, memberID)
+}
+
+// writeMembershipEdgeMatchIn is writeMembershipEdgeMatch with the home project
+// as an expression or an argument, like the set. An empty member pair omits
+// the member filter, for a caller that ranges over members itself.
+func writeMembershipEdgeMatchIn(w ArgWriter, projectIDExpr, projectID, setIDExpr, setID, memberIDExpr, memberID string) {
 	w.WriteString(`e.project_id = `)
-	w.WriteArg(projectID)
+	writeExprOrArg(w, projectIDExpr, projectID)
 	w.WriteString(`
           AND e.set_type = 'team'`)
 	if setIDExpr != "" || setID != "" {
@@ -302,9 +309,12 @@ func writeMembershipEdgeMatch(w ArgWriter, projectID, setIDExpr, setID, memberID
 		writeExprOrArg(w, setIDExpr, setID)
 	}
 	w.WriteString(`
-          AND e.member_type = 'user'
+          AND e.member_type = 'user'`)
+	if memberIDExpr != "" || memberID != "" {
+		w.WriteString(`
           AND e.member_id = `)
-	writeExprOrArg(w, memberIDExpr, memberID)
+		writeExprOrArg(w, memberIDExpr, memberID)
+	}
 }
 
 // writeDirectPrincipal emits the principal identity test on an assignment row:

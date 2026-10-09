@@ -421,6 +421,7 @@ func (s *projectService) Update(ctx context.Context, req UpdateProjectRequest) (
 				return err
 			}
 		}
+
 		updated, err := tx.Statements().GetProject(ctx, req.ID, ProjectQueryOptions{OwningTeam: true})
 		if err != nil {
 			return err

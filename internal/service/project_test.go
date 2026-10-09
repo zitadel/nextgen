@@ -299,17 +299,16 @@ func TestProjectService_Update(t *testing.T) {
 			id:          "proj_aaa",
 			projectName: "updated project name",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				var written string
+				// The rename reads the row back; only the owning team is read
+				// besides.
 				s.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(_ context.Context, project *domain.Project) error {
-						written = project.Name
+						project.CreatedAt = createdAt
+						project.UpdatedAt = updatedAt
 						return nil
 					})
-				// The project is read back last, owning team included.
-				s.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{OwningTeam: true}).DoAndReturn(
-					func(context.Context, string, service.ProjectQueryOptions) (*domain.Project, error) {
-						return &domain.Project{ID: "proj_aaa", Name: written, CreatedAt: createdAt, UpdatedAt: updatedAt, OwningTeamID: "team_owner"}, nil
-					})
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_aaa").
+					Return(domain.NewClaimTeamAssignment("proj_aaa", "team_owner"), nil)
 			},
 			check: func(t *testing.T, got *domain.Project) {
 				assert.Equal(t, "proj_aaa", got.ID)
@@ -331,17 +330,16 @@ func TestProjectService_Update(t *testing.T) {
 			id:          "proj_aaa",
 			projectName: "  updated project name  ",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				var written string
+				// The rename reads the row back; only the owning team is read
+				// besides.
 				s.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(_ context.Context, project *domain.Project) error {
-						written = project.Name
+						project.CreatedAt = createdAt
+						project.UpdatedAt = updatedAt
 						return nil
 					})
-				// The project is read back last, owning team included.
-				s.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{OwningTeam: true}).DoAndReturn(
-					func(context.Context, string, service.ProjectQueryOptions) (*domain.Project, error) {
-						return &domain.Project{ID: "proj_aaa", Name: written, CreatedAt: createdAt, UpdatedAt: updatedAt, OwningTeamID: "team_owner"}, nil
-					})
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_aaa").
+					Return(domain.NewClaimTeamAssignment("proj_aaa", "team_owner"), nil)
 			},
 			check: func(t *testing.T, got *domain.Project) {
 				assert.Equal(t, "updated project name", got.Name)
@@ -467,10 +465,14 @@ func TestProjectService_UpdatePasswordHashPolicy(t *testing.T) {
 
 		gomock.InOrder(
 			statements.EXPECT().SetProjectPasswordHashPolicy(gomock.Any(), "proj_aaa", want).Return(nil),
-			statements.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).Return(nil),
-			// Read last, so the policy just written reaches the response.
-			statements.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{OwningTeam: true}).
-				Return(&domain.Project{ID: "proj_aaa", Name: "renamed", PasswordHashPolicy: want}, nil),
+			// The rename runs second and reads the row back, which is how the
+			// policy just written reaches the response.
+			statements.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, project *domain.Project) error {
+					project.PasswordHashPolicy = want
+					return nil
+				}),
+			statements.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_aaa").Return(nil, database.NewNoRowFoundError(nil)),
 		)
 
 		got, err := svc.Update(t.Context(), service.UpdateProjectRequest{
@@ -489,7 +491,7 @@ func TestProjectService_UpdatePasswordHashPolicy(t *testing.T) {
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 		// No SetProjectPasswordHashPolicy: a rename must not clear a policy.
 		statements.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).Return(nil)
-		statements.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{OwningTeam: true}).Return(&domain.Project{ID: "proj_aaa", Name: "renamed"}, nil)
+		statements.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_aaa").Return(nil, database.NewNoRowFoundError(nil))
 
 		_, err := svc.Update(t.Context(), service.UpdateProjectRequest{
 			ID:   "proj_aaa",

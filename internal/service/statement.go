@@ -117,8 +117,6 @@ type CryptoKeyStatements interface {
 // 	Transactioner[JSONSchemaStatements]
 // }
 
-// JSONSchemaQueryOptions carries query modes for ListJSONSchemas that are not
-// column predicates. Column predicates stay in Filter / ListOptions.
 // ProjectQueryOptions selects what a project read loads besides the project's
 // own row.
 type ProjectQueryOptions struct {
@@ -127,6 +125,8 @@ type ProjectQueryOptions struct {
 	OwningTeam bool
 }
 
+// JSONSchemaQueryOptions carries query modes for ListJSONSchemas that are not
+// column predicates. Column predicates stay in Filter / ListOptions.
 type JSONSchemaQueryOptions struct {
 	// LatestRevisionPerObjectType keeps only the newest revision of each
 	// object_type. Rows without an object_type are revisions of nothing and
@@ -628,14 +628,14 @@ type AuthzAssignmentStatements interface {
 	// into the SELECT so a caller cannot list across projects.
 	ListManagedGrants(ctx context.Context, projectID string, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)
 	RevokeAuthzAssignment(ctx context.Context, projectID, id string) error
-	// ListProjectAdmins returns the first limit people, by user id, with a user
-	// id after afterUserID who administer the project: as active members of
-	// the owning team, as active members of a team with an unexpired admin
-	// grant, or as existing users with an unexpired admin grant. Only people
-	// viewerUserID may see are listed: those with a grant of their own, or in
-	// a team viewerUserID is an active member of. Each carries every way they
-	// administer the project.
-	ListProjectAdmins(ctx context.Context, projectID, afterUserID, viewerUserID string, limit uint32) ([]*domain.ProjectAdminRecord, error)
+	// ListProjectAdmins returns a page of the people, by user id, who
+	// administer the project: as active members of the owning team, as active
+	// members of a team with an unexpired admin grant, or as existing users
+	// with an unexpired admin grant. Only people viewerUserID may see are
+	// listed: those with a grant of their own, or members of one of the
+	// project's admin teams that viewerUserID is also an active member of.
+	// Each carries every way they administer the project.
+	ListProjectAdmins(ctx context.Context, projectID, viewerUserID string, page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error)
 	// GetActiveOwningTeamGrant returns the project's active owning-team grant
 	// (object project, relation team) or NoRowFoundError when the project is
 	// unclaimed. The unique active grant is the claim source of truth
