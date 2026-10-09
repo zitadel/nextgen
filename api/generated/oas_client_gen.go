@@ -204,34 +204,7 @@ type Invoker interface {
 	// Every resource in a bundle is validated as its kind's create endpoint
 	// validates it, and every failure is reported at once rather than only the
 	// first: the request answers `400` with `rel.invalid`, and
-	// `details.resources` lists each resource that failed. An entry carries the
-	// resource's `kind`, its `index` in that kind's array, its `handle` when it
-	// declares one, and the `code` and `message` its own create endpoint would
-	// have answered:
-	// ```json
-	// {
-	// "code": "rel.invalid",
-	// "message": "release: invalid",
-	// "details": {
-	// "resources": [
-	// {
-	// "kind": "schema",
-	// "index": 0,
-	// "handle": "human-user",
-	// "code": "sch.invalid_request",
-	// "message": "properties.email: x-unique must be project"
-	// },
-	// {
-	// "kind": "flow_definition",
-	// "index": 1,
-	// "handle": "b2b-login",
-	// "code": "flowdef.invalid",
-	// "message": "steps[2]: unknown step type"
-	// }
-	// ]
-	// }
-	// }
-	// ```
+	// `details.resources` lists each resource that failed.
 	// `pointers` needs `release.write`. A bundle also writes revisions, so it
 	// needs, in addition, the write scope of every kind it carries a resource
 	// of — `schema.write`, `flow_definition.write` and `branding.write`, as the
@@ -2486,34 +2459,7 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 // Every resource in a bundle is validated as its kind's create endpoint
 // validates it, and every failure is reported at once rather than only the
 // first: the request answers `400` with `rel.invalid`, and
-// `details.resources` lists each resource that failed. An entry carries the
-// resource's `kind`, its `index` in that kind's array, its `handle` when it
-// declares one, and the `code` and `message` its own create endpoint would
-// have answered:
-// ```json
-// {
-// "code": "rel.invalid",
-// "message": "release: invalid",
-// "details": {
-// "resources": [
-// {
-// "kind": "schema",
-// "index": 0,
-// "handle": "human-user",
-// "code": "sch.invalid_request",
-// "message": "properties.email: x-unique must be project"
-// },
-// {
-// "kind": "flow_definition",
-// "index": 1,
-// "handle": "b2b-login",
-// "code": "flowdef.invalid",
-// "message": "steps[2]: unknown step type"
-// }
-// ]
-// }
-// }
-// ```
+// `details.resources` lists each resource that failed.
 // `pointers` needs `release.write`. A bundle also writes revisions, so it
 // needs, in addition, the write scope of every kind it carries a resource
 // of — `schema.write`, `flow_definition.write` and `branding.write`, as the
