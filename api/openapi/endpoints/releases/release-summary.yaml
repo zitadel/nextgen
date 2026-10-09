@@ -22,7 +22,7 @@ properties:
     $ref: ../../components/schemas/project-id.yaml
   content_hash:
     readOnly: true
-    description: The digest of the pinned set.
+    description: The digest of the pinned content.
     $ref: ../../components/schemas/release-content-hash.yaml
   metadata:
     readOnly: true

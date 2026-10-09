@@ -210,11 +210,10 @@ type Invoker interface {
 	// `flow_definition default-login: user_schema human-user not found`,
 	// because a release pins many and the code alone does not say which one
 	// failed.
-	// Idempotent on the pinned set: the content digest is computed over the
-	// sorted pointers with metadata excluded, so re-submitting the same content
-	// with a different `message` answers `200` with the release that already
-	// pins it rather than creating a second one. A release the project did not
-	// hold before answers `201`.
+	// Idempotent on content: the content digest excludes metadata, so
+	// re-submitting the same content with a different `message` answers `200`
+	// with the release that already has it rather than creating a second one.
+	// A release the project did not hold before answers `201`.
 	// Creating a release does not deploy it. A release is not tied to a target,
 	// and the same release can later be deployed to any number of targets
 	// unchanged.
@@ -2461,11 +2460,10 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 // `flow_definition default-login: user_schema human-user not found`,
 // because a release pins many and the code alone does not say which one
 // failed.
-// Idempotent on the pinned set: the content digest is computed over the
-// sorted pointers with metadata excluded, so re-submitting the same content
-// with a different `message` answers `200` with the release that already
-// pins it rather than creating a second one. A release the project did not
-// hold before answers `201`.
+// Idempotent on content: the content digest excludes metadata, so
+// re-submitting the same content with a different `message` answers `200`
+// with the release that already has it rather than creating a second one.
+// A release the project did not hold before answers `201`.
 // Creating a release does not deploy it. A release is not tied to a target,
 // and the same release can later be deployed to any number of targets
 // unchanged.
