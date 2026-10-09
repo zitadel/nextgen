@@ -48,7 +48,7 @@ export class SocialSignInPrompt implements SetupPrompt {
       const flagged = answers.sso.find((answer) => answer.provider === provider);
       const entry = idpProvider(provider);
       // Before the announcement, which names the vendor's console: on a
-      // development build the provider may not be the vendor at all.
+      // development run (ZITADEL_CLI_DEV) the provider may not be the vendor at all.
       const endpoints =
         flagged?.endpoints ??
         (await askConnectionEndpoints({
