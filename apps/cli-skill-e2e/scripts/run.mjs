@@ -16,7 +16,14 @@ const REPO = process.env.REPO || "zitadel/nextgen";
 // Default to the published default branch; override with BRANCH=<name> to
 // validate a skill change pre-merge (e.g. this feature branch).
 const BRANCH = process.env.BRANCH || "main";
-const MODEL = process.env.MODEL || "sonnet";
+// Driver models to compare (the agent doing the work). A comma list makes a
+// matrix: every (config, model) cell runs REPEATS times so we get a success
+// *rate* and can compare models (e.g. MODELS=haiku,sonnet).
+const MODELS = (process.env.MODELS || process.env.MODEL || "sonnet")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+const REPEATS = Math.max(1, Number(process.env.REPEATS || "1"));
 const SIM_MODEL = process.env.SIM_MODEL || "haiku";
 const IMAGE = process.env.IMAGE || "node:24";
 const MAX_TURNS = process.env.MAX_TURNS || "40";
@@ -49,15 +56,18 @@ node /harness/scripts/drive.mjs
 mkdir -p /out/artifacts && cp -r .zitadel /out/artifacts/ 2>/dev/null || true
 cp zitadel.json .env .env.local /out/artifacts/ 2>/dev/null || true`;
 
-function runConfig(name) {
-  const dir = join(OUT, name);
+// One (config, model, repeat) cell → one container. Results live under
+// out/<config>/<model>/r<k>/ so the report can group repeats and compare models.
+function runCell(config, model, rep) {
+  const dir = join(OUT, config, model, `r${rep}`);
+  const label = `${config}/${model}/r${rep}`;
   if (!FRESH && existsSync(join(dir, "stage1.jsonl"))) {
-    console.log(`>> ${name}: reusing existing results (set FRESH=1 to re-run)`);
+    console.log(`>> ${label}: reusing existing results (set FRESH=1 to re-run)`);
     return;
   }
   if (!hasCred) {
     console.error(
-      `No credential to run '${name}'. Set ENV_FILE=<file with ANTHROPIC_API_KEY=…>, ` +
+      `No credential to run '${label}'. Set ENV_FILE=<file with ANTHROPIC_API_KEY=…>, ` +
         "or ANTHROPIC_API_KEY / CLAUDE_CODE_OAUTH_TOKEN (mint one with `claude setup-token`). " +
         "To just regrade existing results, leave FRESH unset.",
     );
@@ -65,10 +75,10 @@ function runConfig(name) {
   }
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
-  console.log(`>> ${name}: running…`);
+  console.log(`>> ${label}: running…`);
 
   const install =
-    name === "with-skill"
+    config === "with-skill"
       ? // `--full-depth` is required: the repo now ships a shallow root skill
         // (`skills/zitadel`, the router) as well as the deeper `zitadel-cli`
         // (`apps/cli/skills/zitadel-cli`). Without it, `skills add` stops at the
@@ -80,8 +90,8 @@ function runConfig(name) {
   if (ENV_FILE) args.push("--env-file", ENV_FILE);
   else if (process.env.CLAUDE_CODE_OAUTH_TOKEN) args.push("-e", "CLAUDE_CODE_OAUTH_TOKEN");
   else args.push("-e", "ANTHROPIC_API_KEY");
-  args.push("-e", `MODEL=${MODEL}`, "-e", `SIM_MODEL=${SIM_MODEL}`, "-e", `MAX_TURNS=${MAX_TURNS}`);
-  args.push("-e", `BASELINE_MAX_TURNS=${BASELINE_MAX_TURNS}`, "-e", `CONFIG=${name}`);
+  args.push("-e", `MODEL=${model}`, "-e", `SIM_MODEL=${SIM_MODEL}`, "-e", `MAX_TURNS=${MAX_TURNS}`);
+  args.push("-e", `BASELINE_MAX_TURNS=${BASELINE_MAX_TURNS}`, "-e", `CONFIG=${config}`);
   if (process.env.CALL_TIMEOUT_MS) args.push("-e", `CALL_TIMEOUT_MS=${process.env.CALL_TIMEOUT_MS}`);
   args.push("-e", `MAX_QA=${MAX_QA}`, "-e", "OUT=/out", "-e", "WORK=/work", "-e", "IS_SANDBOX=1");
   args.push("-e", "ZITADEL_TELEMETRY=0", "-e", "DO_NOT_TRACK=1", "-e", "DISABLE_TELEMETRY=1");
@@ -92,9 +102,17 @@ function runConfig(name) {
   args.push(IMAGE, "bash", "-lc", CONTAINER.replace("__INSTALL__", install));
 
   const r = spawnSync("docker", args, { stdio: "inherit" });
-  if (r.status !== 0) console.error(`!! ${name} docker exited ${r.status}`);
+  if (r.status !== 0) console.error(`!! ${label} docker exited ${r.status}`);
 }
 
 mkdirSync(OUT, { recursive: true });
-for (const c of cfg.configs) runConfig(c);
+console.log(`matrix: models [${MODELS.join(", ")}] × ${REPEATS} repeat(s) × configs [${cfg.configs.join(", ")}]`);
+for (const model of MODELS) {
+  for (const config of cfg.configs) {
+    // The baseline fails fast and deterministically (it never finds the CLI),
+    // so one repeat is enough; only the with-skill runs need repeating for a rate.
+    const reps = config === "baseline" ? 1 : REPEATS;
+    for (let k = 1; k <= reps; k += 1) runCell(config, model, k);
+  }
+}
 console.log("done. results in", OUT);

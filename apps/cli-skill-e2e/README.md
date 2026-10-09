@@ -70,7 +70,9 @@ its goal (the baseline is captured for comparison, not asserted), then in
 | `ENV_FILE` | — | file containing `ANTHROPIC_API_KEY=…` (recommended) |
 | `FRESH` | `0` | `1` re-runs the containers instead of reusing `out/` |
 | `BRANCH` | `main` | which branch's skill to install |
-| `MODEL` | `sonnet` | model for the driving agent |
+| `MODELS` | `sonnet` | driver model(s), comma-separated — several makes a model×repeat matrix (e.g. `haiku,sonnet`) |
+| `REPEATS` | `1` | times to repeat each with-skill (config, model) cell, for a success *rate* (baseline runs once) |
+| `MODEL` | `sonnet` | single driver model; `MODELS` takes precedence |
 | `SIM_MODEL` | `haiku` | model for the simulated user answering the agent |
 | `MAX_TURNS` | `40` | reasoning-loop cap per `claude -p` call (with-skill) |
 | `BASELINE_MAX_TURNS` | `5` | tighter loop cap for the baseline (no-skill) config |
@@ -93,10 +95,13 @@ grade as failures.
 
 ## Output
 
-`out/<config>/stage<N>.jsonl` (trajectories — the agent's stream-json plus a
-`{"type":"sim_user",…}` line per simulated-user answer), `out/<config>/after-stage<N>.json`
-(schema snapshots), `out/<config>/asserts-stage<N>.json` (each stage's
-live-instance assertion results — `{name, passed, evidence}`), `out/journey.html`
-(the tabbed report: one tab per stage, the full conversation — prompt, what the
-agent asked, what the user answered, every command with its output, the
-live-instance checks, per-stage tokens). Everything under `out/` is gitignored.
+Each run cell writes under `out/<config>/<model>/r<k>/`:
+`stage<N>.jsonl` (trajectories — the agent's stream-json plus a
+`{"type":"sim_user",…}` line per simulated-user answer), `after-stage<N>.json`
+(schema snapshots), `asserts-stage<N>.json` (each stage's live-instance
+assertion results — `{name, passed, evidence}`), and `asserts-raw-stage<N>.json`
+(the raw read responses, for debugging a wrong assertion `path`). The report at
+`out/journey.html` aggregates the whole matrix: a metrics table (verified
+success rate, false-completion rate, median time, tokens/success, per-stage pass
+counts) over the repeats, plus a tab per stage showing one representative run's
+full conversation and live-instance checks. Everything under `out/` is gitignored.

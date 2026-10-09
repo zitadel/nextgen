@@ -1,7 +1,34 @@
 // Shared parsing + grading for the zitadel-cli skill journey eval.
 // Pure Node, no deps, so Vitest and the report generator both use it.
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+
+/**
+ * Discover the run cells on disk: out/<config>/<model>/r<k>/ dirs that actually
+ * produced a stage-1 trajectory. Lets the report and test enumerate a
+ * model×repeat matrix without knowing which models/repeats were chosen.
+ */
+export function listCells(outDir, configs) {
+  const dirs = (p) => {
+    try {
+      return readdirSync(p, { withFileTypes: true })
+        .filter((d) => d.isDirectory())
+        .map((d) => d.name);
+    } catch {
+      return [];
+    }
+  };
+  const cells = [];
+  for (const config of configs) {
+    for (const model of dirs(join(outDir, config))) {
+      for (const rep of dirs(join(outDir, config, model))) {
+        const dir = join(outDir, config, model, rep);
+        if (existsSync(join(dir, "stage1.jsonl"))) cells.push({ config, model, rep, dir });
+      }
+    }
+  }
+  return cells;
+}
 
 /**
  * Parse one stage trajectory (stream-json JSONL) into a conversation.
