@@ -2401,7 +2401,7 @@ func (s *Server) handleCreateReleaseRequest(args [0]string, argsEscaped bool, w 
 		}
 
 		type (
-			Request  = *CreateReleaseRequest
+			Request  = CreateReleaseRequest
 			Params   = CreateReleaseParams
 			Response = CreateReleaseRes
 		)

@@ -18,7 +18,7 @@ import (
 // not each repeat the fixture wiring.
 func createdRelease(t *testing.T, fixture releaseFixture, pointers []api.CreateReleasePointer, message string) api.Release {
 	t.Helper()
-	resp := fixture.create(t, &api.CreateReleaseRequest{
+	resp := fixture.create(t, &api.CreateReleaseFromPointers{
 		Pointers: pointers,
 		Message:  api.NewOptString(message),
 	})
