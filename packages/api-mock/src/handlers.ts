@@ -30,6 +30,7 @@ import type {
 import { http, HttpResponse, type RequestHandler } from "msw";
 
 import { withBranding } from "./branding.js";
+import { withPasskey } from "./passkey.js";
 import { withSsoProviders } from "./sso-providers.js";
 import {
   doneStep,
@@ -195,7 +196,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
    * can start a sign-in. Both are off unless a caller opted in.
    */
   async function currentResponse(): Promise<CreateFlow201> {
-    return withSsoProviders(await renderCurrentStep());
+    return withPasskey(withSsoProviders(await renderCurrentStep()));
   }
 
   async function renderCurrentStep(): Promise<CreateFlow201> {

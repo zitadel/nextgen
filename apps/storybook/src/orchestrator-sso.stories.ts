@@ -1,6 +1,5 @@
 import type { StoryObj } from "@storybook/web-components-vite";
 import { html } from "lit";
-import { mswLoader } from "msw-storybook-addon";
 
 import {
   orchestratorArgTypes,
@@ -25,12 +24,11 @@ import {
 export default {
   title: "Orchestrator/Login/SSO",
   tags: ["no-test"],
-  loaders: [mswLoader],
   parameters: {
     layout: "fullscreen",
     msw: { handlers: mock.handlers },
   },
-  args: { ...orchestratorDefaultArgs, sso: true },
+  args: { ...orchestratorDefaultArgs, sso: "on" },
   argTypes: orchestratorArgTypes,
   beforeEach: orchestratorBeforeEach,
   render: orchestratorRender,
@@ -43,10 +41,10 @@ type Story = StoryObj<OrchestratorArgs>;
  * atom canvas. Choosing one asks the server for a redirect, which the mock
  * answers with an `sso-redirect` step.
  */
-export const WithSsoProviders: Story = { args: { sso: true } };
+export const WithSsoProviders: Story = { args: { sso: "on" } };
 
 /** The same buttons on the sign-up step, which can also start a sign-in. */
-export const SignUpWithSsoProviders: Story = { args: { sso: true, purpose: "register" } };
+export const SignUpWithSsoProviders: Story = { args: { sso: "on", purpose: "register" } };
 
 /**
  * Coming back from the provider as a new identity: the step collects what the
@@ -60,13 +58,14 @@ export const SignUpWithSsoProviders: Story = { args: { sso: true, purpose: "regi
  * does with `?flow=<id>`.
  */
 export const RegisterAfterProvider: Story = {
-  args: { sso: true },
-  render: ({ purpose, theme }) => {
+  args: { sso: "on" },
+  render: ({ purpose, variant, theme, previewState }) => {
     const flowId = mock.returnFromProvider({ provider: "google", email: "ada@example.com" });
     return html`<zitadel-login
-      variant="page"
+      variant=${variant}
       .purpose=${purpose}
       theme=${theme}
+      preview-state=${previewState}
       resume-flow-id=${flowId}
     ></zitadel-login>`;
   },
@@ -78,13 +77,14 @@ export const RegisterAfterProvider: Story = {
  * theirs with a method the schema enables.
  */
 export const ConflictAfterProvider: Story = {
-  args: { sso: true },
-  render: ({ purpose, theme }) => {
+  args: { sso: "on" },
+  render: ({ purpose, variant, theme, previewState }) => {
     const flowId = mock.returnFromProvider({ provider: "google", email: "exists@example.com" });
     return html`<zitadel-login
-      variant="page"
+      variant=${variant}
       .purpose=${purpose}
       theme=${theme}
+      preview-state=${previewState}
       resume-flow-id=${flowId}
     ></zitadel-login>`;
   },

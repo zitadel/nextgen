@@ -35,9 +35,120 @@ environment), as does `storybook:test`.
   gates render + a11y for every story. Add a `play` function only when no lower
   layer proves the behaviour — the atoms own toggle/form/focus in
   `packages/components` specs, so their stories generally carry no `play`.
-- **MSW is orchestrator-only.** The atoms make no requests, so
-  `msw-storybook-addon` is wired on the orchestrator stories (not globally),
-  and those stories are tagged `no-test` to keep network out of the test run.
+- **MSW handlers are orchestrator-only.** `msw-storybook-addon` starts one
+  worker for the whole preview (`.storybook/preview.ts`); only the orchestrator
+  stories give it handlers, through `parameters.msw`. The atoms make no
+  requests, and the orchestrator stories are tagged `no-test` to keep network
+  out of the test run.
+
+## Orchestrator stories & the flow engine
+
+The `<zitadel-login>` orchestrator renders **whatever the flow engine returns** —
+it has no opinion of its own. In Storybook that engine is `@zitadel/api-mock`
+(an xstate machine + fixtures), driven through `msw-storybook-addon`. So its
+controls split in two, grouped with `argTypes.<name>.table.category`:
+
+- **Component** — host props set on the element: `purpose`, `variant`, `theme`,
+  `previewState`.
+- **Flow engine** — what the backend returns (applied as mock overlays in
+  `beforeEach`, not element props): `branding`, `sso`, `passkey`.
+
+### Theming has two separate systems — do not conflate them
+
+- **Atoms** read the design-system default tokens, which carry both modes, and
+  switch on `data-theme` on `<html>` (dark `:root`, light `:root[data-theme=…]`).
+- **The orchestrator does NOT read document `data-theme`.** It paints from the
+  **branding** the flow returns, resolved by `ThemeController`. The `theme`
+  property can override, with this precedence (`theme-controller.ts`):
+  1. **If the branding publishes only one palette side, that side wins and
+     `theme` is ignored** (you can't select a mode with no colours).
+  2. otherwise: element `theme` → `branding.theme.mode` → variant default
+     (`page` → dark, `widget` → auto).
+  So the `theme` control only visibly toggles when the selected `branding` ships
+  **both** sides: `centered` (now two-sided), `two-sided`, and `none` (no
+  branding → design-system defaults) toggle; `dark` / `light-only` / `split` are
+  single-sided and force their one side. This is the #1 source of "the theme
+  toggle doesn't work" confusion.
+
+### What each control is, and where it comes from
+
+- **`variant`** (`widget` | `page`) — a **host prop**, front-end only. `page`
+  fills its container and paints its own background; `widget` is content-sized
+  and transparent for embedding. It does not come from the backend.
+- **`layout`** (`centered` | `split`) — comes from the **backend**
+  (`branding.layout`), there is **no** element prop for it. `split` is **retired**
+  (#1039): it only renders via the legacy `*-template` liquid presets, not the
+  default template — a bare `layout: "split"` is a no-op. Don't add a `layout`
+  control expecting split to render.
+- **`branding`** — backend-returned; there is no `branding` prop. The Storybook
+  presets (`branding-presets.ts`) are fixtures overlaid via `applyBranding`.
+  `none` applies nothing → design-system defaults.
+- **`sso`** — backend overlay via `applySsoProviders`, a scalar `off` / `on` so
+  it round-trips in the URL. The provider **list is derived**, not hard-coded:
+  `on` offers every brand mark `@zitadel/components` ships
+  (`SHIPPED_BRAND_ICON_NAMES`, mapped `brand-google` → a Google provider) plus one
+  synthetic provider with no mark, to keep showing the labelled-button fallback.
+  Add a glyph in `@zitadel/components` and it appears here automatically — don't
+  re-introduce a hard-coded Google/GitHub list, and don't depend on
+  `@zitadel/config` (Storybook depends on `@zitadel/components`, not config).
+- **`passkey`** — backend overlay via `applyPasskey` (off by default). When on,
+  the identifier step gains a "Sign in with a passkey" action. Both overlays are
+  off by default so the mock keeps mirroring the shipped flow (and the api-mock
+  conformance spec stays green).
+
+### Shareable links
+
+Storybook encodes args in the URL (`?path=…&args=branding:dark;sso:on`), so
+every control change is a shareable link. Keep controls **scalar** (enums /
+booleans) so they serialise cleanly; editable object/array controls do **not**
+round-trip and break the shareable-link guarantee.
+
+### Stateful-element isolation (don't remove)
+
+`.storybook/preview.ts` keys each mock-backed story's subtree on the story id
+**and args**, so switching stories or flipping a knob rebuilds the stateful
+`<zitadel-login>`. Without it, a flow driven to its terminal "signed-in" step
+leaks into the next render and the next story shows blank.
+
+### Step coverage (and what can't be a story)
+
+One-story-with-knobs is the **atom** rule; the orchestrator additionally has
+step-journey stories, because a backend-driven step can only be shown by driving
+the flow to it (via `play`). Covered: `identifier` (SignIn), `register` (SignUp),
+`password` (PasswordStep), `register-password` (RegisterPasswordStep), `recover`
+(RecoverStep), `done` (SignedIn), `register-sso` (RegisterAfterProvider),
+`sso-conflict` (ConflictAfterProvider), identifier + providers, identifier +
+passkey offer (PasskeyOffered), and the passkey ceremony step `passkey-login`
+(PasskeyLogin).
+
+`passkey-login` is special: the step mounts an invisible `<zl-passkey>` that
+auto-runs a real `navigator.credentials.get()` ceremony on mount — the OS passkey
+prompt, which can't complete in the workbench. The suppression is kept **in the
+workbench, not on the shipped component**: `freezePasskeyCeremony()`
+(`orchestrator-shared.ts`) stubs `navigator.credentials` with a promise that never
+settles (the same `Promise.race([])` stub the component specs use), so the atom
+stays in its `pending` state and shows its real "waiting for your passkey" UI
+instead of raising the prompt. It mocks a browser API the same way `msw` mocks the
+network; the story installs it in `beforeEach` and the returned teardown restores
+`navigator.credentials` so no other story is affected. This is deliberately a
+test-harness stub, not a host prop on the component — the login element has no
+"skip the ceremony" flag, and we are not adding one. `<zl-passkey>` has no atom
+story for the same reason (its only visible state is the in-flight ceremony).
+
+**Not storied on purpose:** `passkey-setup` / `passkey-upsell` (legacy; the
+default flow no longer routes through them — don't revive them to force a story),
+and `sso-redirect` (transient — it navigates away).
+
+The password field renders with name **`x-auth-methods#password`** (the schema
+pointer, exported as `PASSWORD_FIELD`), not `"password"` — use `PASSWORD_FIELD`
+when a `play` fills or waits on it.
+
+### Verify permutations for real
+
+When you change a control or preset, **load the stories and read the component's
+resolved state** — host `data-theme`, provider-button count, the rendered step —
+across branding × theme × sso. Do not assume from the code; the single-sided
+gating above has repeatedly made "looks done" wrong.
 
 ## Recipe: add an atom (Figma → Storybook)
 

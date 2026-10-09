@@ -2,7 +2,6 @@ import { applyBranding, clearBranding } from "@zitadel/api-mock";
 import type { Meta, StoryObj } from "@storybook/web-components-vite";
 import { http, HttpResponse } from "msw";
 import { html } from "lit";
-import { mswLoader } from "msw-storybook-addon";
 
 import "@zitadel/components";
 
@@ -48,7 +47,6 @@ interface SessionArgs {
 const meta: Meta<SessionArgs> = {
   title: "Orchestrator/Session",
   tags: ["no-test"],
-  loaders: [mswLoader],
   parameters: { layout: "fullscreen", msw: { handlers: sessionHandlers } },
   args: { branding: "centered" },
   argTypes: {

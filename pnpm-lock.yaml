@@ -208,8 +208,8 @@ catalogs:
       specifier: ^2.14.6
       version: 2.14.6
     msw-storybook-addon:
-      specifier: ^2.0.7
-      version: 2.0.7
+      specifier: ^3.0.3
+      version: 3.0.3
     nuxt:
       specifier: ^4.5.1
       version: 4.5.2
@@ -984,7 +984,7 @@ importers:
         version: 1.20.0(react@19.2.8)
       msw-storybook-addon:
         specifier: 'catalog:'
-        version: 2.0.7(msw@2.14.6(@types/node@24.19.1)(typescript@6.0.3))
+        version: 3.0.3(msw@2.14.6(@types/node@24.19.1)(typescript@6.0.3))(storybook@10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.14)(prettier@3.8.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))
       playwright:
         specifier: 'catalog:'
         version: 1.60.0
@@ -11549,10 +11549,12 @@ packages:
   msgpackr@1.12.1:
     resolution: {integrity: sha512-4EUH9tQHnMmEgzW/MdAP0KIfa1T9AF+htl0ffe2n5vb2EKn9y2co8ccpgWko6S52Jy1PQZKwRnx5/KkYjtd9MQ==}
 
-  msw-storybook-addon@2.0.7:
-    resolution: {integrity: sha512-TGmlxXy2TsaB6QcClVKRxqvay5f93xoLguHOihRFQ+gIEIyiyvcoQjkEeuOe7Y9qvddzGB1LyFomzPo9/EpnuQ==}
+  msw-storybook-addon@3.0.3:
+    resolution: {integrity: sha512-4Jh4oKxqdHzqoBwe5mke9eCxfUQud5TaU5PME1476GDfelSXMkZLBTkDFehPvq5hMC8ksOkEjL5fAo4kS8d4pg==}
+    hasBin: true
     peerDependencies:
-      msw: ^2.0.0
+      msw: '>=2'
+      storybook: ^9.0.0 || ^10.0.0 || ^11.0.0-0
 
   msw@2.14.6:
     resolution: {integrity: sha512-ALe+N10S72cyx94cMcy3Zs4HhXCj35sgeAL4c+WTvKi0zWnbd8/h0lcFqv0mb2P+aSgAdD7p9HzvA0DiUPxsyg==}
@@ -26176,10 +26178,10 @@ snapshots:
       msgpackr-extract: 3.0.4
     optional: true
 
-  msw-storybook-addon@2.0.7(msw@2.14.6(@types/node@24.19.1)(typescript@6.0.3)):
+  msw-storybook-addon@3.0.3(msw@2.14.6(@types/node@24.19.1)(typescript@6.0.3))(storybook@10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.14)(prettier@3.8.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)):
     dependencies:
-      is-node-process: 1.2.0
       msw: 2.14.6(@types/node@24.19.1)(typescript@6.0.3)
+      storybook: 10.4.6(@testing-library/dom@10.4.1)(@types/react@19.2.14)(prettier@3.8.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
 
   msw@2.14.6(@types/node@24.19.1)(typescript@6.0.3):
     dependencies:

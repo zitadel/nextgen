@@ -1,7 +1,6 @@
 import type { StoryObj } from "@storybook/web-components-vite";
+import { PASSWORD_FIELD } from "@zitadel/api-mock";
 import { html } from "lit";
-
-import { mswLoader } from "msw-storybook-addon";
 
 import {
   fill,
@@ -24,7 +23,6 @@ import {
 export default {
   title: "Orchestrator/Login",
   tags: ["no-test"],
-  loaders: [mswLoader],
   parameters: {
     layout: "fullscreen",
     msw: { handlers: mock.handlers },
@@ -83,7 +81,77 @@ export const PasswordStep: Story = {
     await waitFor(() =>
       canvasElement
         .querySelector("zitadel-login")
-        ?.shadowRoot?.querySelector('zl-field[name="password"]'),
+        ?.shadowRoot?.querySelector(`zl-field[name="${PASSWORD_FIELD}"]`),
     );
+  },
+};
+
+/**
+ * Sign-up, second step: set a password — the sibling of `PasswordStep` on the
+ * register path. Reached by completing the sign-up details, the way a visitor
+ * does, rather than faking the step.
+ */
+export const RegisterPasswordStep: Story = {
+  args: { purpose: "register" },
+  play: async ({ canvasElement }) => {
+    await fill(canvasElement, "email", "ada@example.com");
+    await fill(canvasElement, "given_name", "Ada");
+    await fill(canvasElement, "family_name", "Lovelace");
+    await submit(canvasElement);
+    // register-password collapses the sign-up fields to a single password
+    // field (whose name is the schema pointer, not "password").
+    await waitFor(
+      () =>
+        canvasElement.querySelector("zitadel-login")?.shadowRoot?.querySelectorAll("zl-field")
+          .length === 1,
+    );
+  },
+};
+
+/**
+ * Recover (forgot-password) step, reached from the identifier's "Forgot
+ * password?" link. The step has no fields of its own, so the play waits for the
+ * email field to disappear once the recover screen renders.
+ */
+export const RecoverStep: Story = {
+  play: async ({ canvasElement }) => {
+    const login = canvasElement.querySelector("zitadel-login");
+    // The recover affordance is a `navigate` action rendered as an anchor with a
+    // stable `data-action`; match on that, not its localized label (the
+    // orchestrator translates action text from `navigator.language`, so a
+    // text match would time out in a non-English browser).
+    const link = await waitFor(() => login?.shadowRoot?.querySelector('[data-action="recover"]'));
+    (link as HTMLElement).click();
+    await waitFor(
+      () =>
+        login?.shadowRoot != null &&
+        login.shadowRoot.querySelector('zl-field[name="email"]') == null &&
+        login.shadowRoot.querySelector("form") != null,
+    );
+  },
+};
+
+/**
+ * The terminal "you're signed in" step (`complete: "show"`), reached by walking
+ * a full sign-in. A hosted surface with a `post-sign-in-url` would redirect
+ * instead; without one the completion screen stays put.
+ */
+export const SignedIn: Story = {
+  play: async ({ canvasElement }) => {
+    await fill(canvasElement, "email", "ada@example.com");
+    await submit(canvasElement);
+    await waitFor(() =>
+      canvasElement
+        .querySelector("zitadel-login")
+        ?.shadowRoot?.querySelector(`zl-field[name="${PASSWORD_FIELD}"]`),
+    );
+    await fill(canvasElement, PASSWORD_FIELD, "hunter2password");
+    await submit(canvasElement);
+    await waitFor(() => {
+      const sr = canvasElement.querySelector("zitadel-login")?.shadowRoot;
+      return (
+        sr != null && sr.querySelector("zl-field") == null && sr.querySelector("zl-button") != null
+      );
+    });
   },
 };
