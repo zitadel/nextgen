@@ -9,6 +9,7 @@ import { DocumentViewer } from "@/components/document-viewer";
 import { DETAIL_PANEL_PAGE } from "@/components/layout";
 import { SchemaFieldsPanel } from "@/components/schema-fields-panel";
 import { Badge } from "@/components/ui/badge";
+import { InlineCode } from "@/components/ui/inline-code";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate } from "@/lib/date";
@@ -101,9 +102,18 @@ function SchemaDetail() {
                       <span className="text-sm leading-5 font-medium text-foreground">
                         {method.label}
                       </span>
-                      <Badge variant="secondary" className="h-5">
-                        {method.enabled ? "Enabled" : "Disabled"}
-                      </Badge>
+                      <div className="flex flex-wrap items-center justify-end gap-1.5">
+                        {/* Raw slugs: resolving them to connection names needs
+                            `idp.read`, which this screen does not assume. A
+                            slug with no connection reads the same — the
+                            Authentication screen is where that is flagged. */}
+                        {method.providers.map((slug) => (
+                          <InlineCode key={slug}>{slug}</InlineCode>
+                        ))}
+                        <Badge variant="secondary" className="h-5">
+                          {method.enabled ? "Enabled" : "Disabled"}
+                        </Badge>
+                      </div>
                     </div>
                   </Fragment>
                 ))

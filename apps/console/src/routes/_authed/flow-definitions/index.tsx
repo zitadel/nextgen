@@ -35,8 +35,8 @@ import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { schemaDisplayName } from "@/lib/schema";
 
 export const Route = createFileRoute("/_authed/flow-definitions/")({
-  // Order 4: Users sits at 3.
-  staticData: { scope: "project", nav: { label: "Login flows", order: 4, icon: Workflow } },
+  // Order 5: Users sits at 3, Authentication at 4.
+  staticData: { scope: "project", nav: { label: "Login flows", order: 5, icon: Workflow } },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
     // Without the embed the row has only the schema's id, not its name.

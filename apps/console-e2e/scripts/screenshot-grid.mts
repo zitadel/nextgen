@@ -69,6 +69,21 @@ const SCREENS: Screen[] = [
     firstRow: "/users/",
     tab: "Authentication",
   },
+  { name: "Authentication", path: "/authentication" },
+  {
+    name: "Authentication — schema sign-in",
+    path: "/authentication",
+    firstRow: "/authentication?",
+  },
+  {
+    name: "Authentication — Identity providers",
+    path: "/authentication?tab=identity-providers",
+  },
+  {
+    name: "Identity provider detail",
+    path: "/authentication?tab=identity-providers",
+    firstRow: "/authentication/idps/",
+  },
   { name: "Login flows", path: "/flow-definitions" },
   { name: "Login flow detail", path: "/flow-definitions", firstRow: "/flow-definitions/" },
   { name: "Branding", path: "/branding" },
@@ -119,7 +134,7 @@ async function settle(page: Page): Promise<void> {
 async function resolveUrls(page: Page, project: string): Promise<Map<Screen, string>> {
   const urls = new Map<Screen, string>();
   for (const screen of SCREENS) {
-    const list = `${origin}${screen.path}?project=${encodeURIComponent(project)}`;
+    const list = `${origin}${screen.path}${screen.path.includes("?") ? "&" : "?"}project=${encodeURIComponent(project)}`;
     if (!screen.firstRow) {
       urls.set(screen, list);
       continue;

@@ -229,6 +229,94 @@ if (!claimMode && devUser && !(await grantDevUserAdmin(devUser.id))) {
   );
 }
 
+/**
+ * An identity provider connection and the schemas around it, so the
+ * Authentication screen renders against real data: a `google` connection, a
+ * `Customer users` schema that lists it, and an `Employees` schema that lists
+ * no provider — the Sign-in tab then shows the same connection Enabled for one
+ * schema and Disabled for the other, and the connection's "Used by" names one.
+ *
+ * Both schemas are the bootstrapped one with their own type, title and methods,
+ * so they carry the properties the seeded users already validate against. The
+ * client id and secret are `${{ VAR }}` references: no variable backs them, so
+ * the connection renders but cannot complete a sign-in — which nothing here
+ * asks of it. Best-effort, like the grant: a failure costs the screen its
+ * data, not the instance.
+ */
+async function seedAuthentication(): Promise<boolean> {
+  const headers = {
+    authorization: `Bearer ${projectSecret}`,
+    "content-type": "application/json",
+  };
+  const scoped = (path: string, extra: Record<string, string> = {}) =>
+    `${baseUrl}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
+  const post = (path: string, body: unknown) =>
+    fetch(scoped(path), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(5_000),
+    });
+  try {
+    const idp = await post("/idps", {
+      idp: {
+        slug: "google",
+        protocol: "oidc",
+        template: "google",
+        display_name: "Google",
+        claim_mapping: { email: "email", givenName: "given_name", familyName: "family_name" },
+        verified_claims: { email: "email_verified" },
+        oidc: {
+          issuer: "https://accounts.google.com",
+          client_id: "${{ GOOGLE_CLIENT_ID }}",
+          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+          scopes: ["openid", "profile", "email"],
+        },
+      },
+    });
+    if (!idp.ok) return false;
+
+    const list = await fetch(scoped("/schemas", { kind: "user-schema", revisions: "latest" }), {
+      headers,
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!list.ok) return false;
+    const { schemas } = (await list.json()) as {
+      schemas: Array<{ schema: Record<string, unknown> }>;
+    };
+    const base = schemas[0]?.schema;
+    if (!base) return false;
+    // A fresh `$id` and `objectType` each: `objectType` is what makes a
+    // document a schema rather than a revision of the bootstrapped one.
+    const { $id: _id, ...document } = base;
+    const methods = (document["x-auth-methods"] ?? {}) as Record<string, unknown>;
+
+    const customers = await post("/schemas", {
+      ...document,
+      kind: "user-schema",
+      objectType: "customer-user",
+      title: "Customer users",
+      "x-auth-methods": { ...methods, sso: { enabled: true, providers: ["google"] } },
+    });
+    const employees = await post("/schemas", {
+      ...document,
+      kind: "user-schema",
+      objectType: "employee",
+      title: "Employees",
+      "x-auth-methods": { ...methods, sso: { enabled: false } },
+    });
+    return customers.ok && employees.ok;
+  } catch {
+    return false;
+  }
+}
+
+if (!claimMode && !(await seedAuthentication())) {
+  console.warn(
+    "[console-dev-real] could not seed the identity provider and its schemas; the Authentication screen will have no connection to show.",
+  );
+}
+
 // Claim mode signs in against the platform project, because that is the only
 // session `claim/complete` accepts; bootstrapping it makes it the project
 // `runtime.json` names. The seeded users stay in the project being claimed —
