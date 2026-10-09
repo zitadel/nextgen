@@ -2,8 +2,8 @@
 /**
  * Post-deploy smoke test for the preview cloud.
  *
- *   pnpm run smoke -- https://preview.example.com
- *   VERCEL_AUTOMATION_BYPASS_SECRET=… pnpm run smoke -- https://<deployment>.vercel.app
+ *   corepack pnpm exec tsx apps/cloud/scripts/smoke.mts https://preview.example.com
+ *   VERCEL_AUTOMATION_BYPASS_SECRET=… corepack pnpm exec tsx apps/cloud/scripts/smoke.mts https://<deployment>.vercel.app
  *
  * Exercises readiness, anonymous project creation, the operator plane with
  * the project secret (user create and query), the session middleware, the
@@ -18,7 +18,7 @@
 const args = process.argv.slice(2).filter((a) => a !== "--");
 const base = (args[0] ?? process.env.PUBLIC_BASE ?? "").replace(/\/$/, "");
 if (!base) {
-  console.error("usage: smoke.ts <public base url>");
+  console.error("usage: smoke.mts <public base url>");
   process.exit(2);
 }
 
@@ -116,14 +116,15 @@ try {
   // 1.0.0-alpha.24, so the probe uses the long-standing /sessions/me.)
   await call("sessionWithoutCookie", "/sessions/me", { expect: 401 });
 
-  // The docs service shares the deployment: its pages and the static files
-  // the top-level rewrites hand to it must answer on the same origin.
-  // /docs redirects to the overview page; fetch follows it.
+  // The docs service shares the deployment: its pages and the root-level
+  // files the top-level rewrites hand to it (/llms.txt, /assets, …) must
+  // answer on the same origin.
   const docs = await call("docsIndex", "/docs", { expect: 200 });
   if (!/text\/html/.test(docs.headers.get("content-type") ?? "")) {
     throw new Error(`docsIndex: expected an HTML page, got ${docs.headers.get("content-type")}`);
   }
-  await call("docsLlmsTxt", "/docs/llms.txt", { expect: 200 });
+  await call("docsReference", "/reference/api", { expect: 200 });
+  await call("docsLlmsTxt", "/llms.txt", { expect: 200 });
 
   // The console and the login UI are their own static services, built from
   // the same commit as the server; the console still reads its runtime
@@ -162,5 +163,6 @@ try {
   process.exit(1);
 }
 
-// Top-level await needs a module scope; the script has no other exports.
+// The .mts extension makes this an ES module (top-level await) without a
+// package.json of its own; the script has no exports.
 export {};

@@ -1,187 +1,22 @@
-# Preview Cloud on Cloudflare Containers + PlanetScale Postgres
+# Preview Cloud on Vercel + PlanetScale Postgres
 
-> **Status:** Draft plan (2026-10-07). **Superseded in part on 2026-10-07:** the
-> deployment target is now Vercel container images (`apps/cloud/`,
-> runbook `docs/runbooks/preview-cloud.md`). The Cloudflare Containers design
-> below stays as the recorded alternative; the database findings still apply.
+> **Status:** Live (2026-10-08). Code: [`apps/cloud/`](../../../apps/cloud/),
+> runbook: [preview-cloud.md](../../runbooks/preview-cloud.md).
+> This note is the dated record of the research and the decisions, oldest
+> first; where a later section disagrees with an earlier one, the later one
+> holds. The first draft (2026-10-07) targeted Cloudflare Containers: a
+> Worker router in front of one Durable Object per container replica, a
+> manual replica count, a cold-start p95 around 24 s. It was dropped after
+> the database tests, see "Decision" below; the database findings are what
+> survived of it.
 > **See also:** [Overview](overview.md) · [Claim Flow](claim-flow.md) ·
 > [ADR 053](../../adrs/053-cross-project-principals.md) ·
 > [ADR 065](../../adrs/065-background-jobs.md) ·
 > [Operations example config](../../operations/nextgen.example.yaml)
 >
 > **Scope:** a hosted *preview* cloud for nextgen. Production stays on GCP
-> (Spanner). Multi-region placement is explicitly deferred to Phase 4 and
+> (Spanner). Multi-region placement is explicitly deferred (see "Regions") and
 > gated on a buyer for residency.
-
-## Assumptions
-
-- Compute: Cloudflare Containers (GA since 2026-04), `default` scheduling
-  policy, one Worker in front, one Durable Object per container replica.
-- Database: PlanetScale **Postgres** (GA), not Neki. Neki is in platform
-  preview with no SLA, one region per database, and a ~$36/mo floor per
-  shard. It stays a later in-region option; nextgen's `(project_id, id)`
-  keying already fits it.
-- One region to start. The platform project, customer projects, and the
-  database live together, exactly like self-hosted. The region split is a
-  separate build (Phase 4) and is not needed for a preview offering.
-- nextgen runs unchanged: single Go binary, `linux/amd64`, port 8080,
-  Postgres dialect, in-process job loop ([ADR 065](../../adrs/065-background-jobs.md)).
-
-## Target shape
-
-```text
-browser / CLI
-   │  https://preview.<domain>   (Cloudflare DNS + TLS)
-   ▼
-Worker (router)
-   │  hostname → DO id `replica-N` (N in 0..REPLICAS-1), round-robin
-   ▼
-Durable Object ─── ctx.container ─── nextgen (basic: 1/4 vCPU, 1 GiB, 4 GB disk)
-                                        │ TCP 5432 + TLS verify-full
-                                        ▼
-                               PlanetScale Postgres (single region)
-```
-
-- Replicas are stateless. Master keys are injected; `generate_master_key`
-  is `false` so an ephemeral disk never mints a key.
-- Every replica runs the job loop; the SQL lease is the lock. One replica is
-  kept awake by a Worker cron so periodic jobs run while idle.
-- Migrations run as a one-shot step before the rollout, never as the serving
-  container's `CMD`.
-
-## Phases
-
-### Phase 0 — Decisions (half a day)
-
-| Decision | Recommendation | Why |
-|---|---|---|
-| Region | Cloudflare `WEUR` placement + PlanetScale `eu-west-1` (AWS) or `europe-west4` (GCP) | Pick by measured container→DB p50 in Phase 1; GCP keeps a PSC path open later |
-| DB size | PS-5 single node ($5/mo) for the spike, PS-10 HA ($30/mo) once people depend on it | Single node has maintenance downtime |
-| Instance type | `basic` (1 GiB) | argon2id at 64 MiB × 4 threads plus the embedded UIs will not fit `lite` |
-| Replicas | 2 | Survives one host restart; no autoscaling exists |
-| Domain | one hostname, e.g. `preview.zitadel.cloud` | `public_base` must match it |
-| Claim allowed? | yes, free | matches [overview](overview.md); production *mode* stays off |
-
-### Phase 1 — Prove the two unknowns (1–2 days)
-
-Nothing else matters if either fails.
-
-1. **Postgres compatibility.** Create the PlanetScale database and run the
-   storage suite against it from a laptop:
-
-   ```sh
-   ZITADEL_TEST_POSTGRES_URL='postgres://…:5432/nextgen?sslmode=verify-full' \
-     go test ./internal/storage/... -count=1
-   ```
-
-   Exit: green. PlanetScale Postgres is plain Postgres behind PgBouncer, so a
-   failure here is a pooler/transaction-mode issue, not a dialect issue.
-
-2. **Raw TCP egress from a container.** Deploy the release image as-is with
-   `NEXTGEN_DATABASE_POSTGRES` pointing at PlanetScale. Exit: `--migrate`
-   completes and `/readyz` answers 200. Record container→DB p50/p99 and
-   cold-start time for the ~60 MB image. Cloudflare documents HTTP egress
-   controls only; raw 5432 is implied, not stated.
-
-   Fallback if TCP is blocked: Hyperdrive is Workers-only, so the fallback is
-   a different host (Fly.io, Cloud Run), not a different driver.
-
-### Phase 2 — Image, config, secrets (2–3 days)
-
-- **Config delivery.** Nested master keys cannot be bound from env (viper
-  `AutomaticEnv` only resolves keys it already knows). Add a thin image layer
-  whose entrypoint writes `/etc/nextgen/nextgen.yaml` from one env var
-  (`NEXTGEN_CONFIG_YAML`) and then `exec`s `nextgen`. The server already
-  searches `/etc/nextgen`.
-- **Secrets.** Master key PEM, database URL, and any SMTP/IdP secrets live as
-  Worker secrets and are passed to the container via `envVars` at start.
-  `server.generate_master_key: false`.
-- **Image source.** Releases publish to GHCR; Cloudflare's registry pulls
-  from Docker Hub, ECR, and Google Artifact Registry only. CI pulls the GHCR
-  tag and runs `wrangler containers push`. Alternative: mirror to GAR, which
-  prod already has.
-- **Health.** Wire `pingEndpoint` to `/readyz` (the spec also exposes `/healthz` and `/livez`) so a replica only
-  receives traffic once migrations and key loading are done.
-- **Migrations.** A second container class `migrator` runs the `nextgen migrate` subcommand
-  (same image, different argv) triggered by the deploy pipeline before
-  `wrangler deploy`. Rollouts go 10 % → 100 % with old and new binaries
-  serving at once, so every migration must be expand/contract safe. The goose
-  advisory lock already serialises concurrent migrators.
-
-### Phase 3 — Router, keep-alive, pipeline (3–4 days)
-
-- **Worker router.** Map the hostname to DO ids `replica-0..N-1`,
-  round-robin per request, retry once on a connect failure. Forward headers
-  unchanged; nextgen derives origin and CSRF from `public_base`.
-- **Keep-alive.** `sleepAfter` of several hours plus a Worker cron every
-  5 min that pings `replica-0`, so the job loop and `jobs.gc` keep running.
-- **Rollout.** CI on tag: build nothing, pull image, push, run migrator,
-  `wrangler deploy` with `--containers-rollout` default steps. Document the
-  manual `none`/rollback path.
-- **Observability.** Workers Logs with Logpush to the existing sink; nextgen
-  wide events stay in the database per ADR 048. No metrics scraping on
-  containers, so export the ADR 065 job metrics through logs for now.
-- **Exit criteria.** Fresh `npx @zitadel/setup` against the hostname
-  completes registration and passkey login; a claim completes; a release
-  rolls out with zero failed requests in a k6 sweep (`moon run bench:sweep`
-  pointed at the hostname).
-
-### Phase 4 — Regions (deferred, needs a buyer)
-
-Customer-chosen regions require a global layer. The cheapest version is
-nextgen's own platform project in a home region plus replication, not a
-separate product. The seams, in build order:
-
-1. Project → region directory and `{region}.<domain>` routing (resource
-   scope lookup is per database; the request must land in the right region).
-2. Console session validation without a cross-region DB read (signed,
-   short-lived token, or replicated session table).
-3. Platform membership projection replicated to every region so `CheckAuthz`
-   stays one query ([ADR 053 §2](../../adrs/053-cross-project-principals.md)
-   names this as the later step).
-4. Claim as a two-step write with repair.
-5. System catalog version parity across regions on rollout.
-6. Region chosen at create; project move = export/import, which does not
-   exist yet.
-
-Do not start any of this for the preview cloud.
-
-## Risks and how each is retired
-
-| Risk | Impact | Retire by |
-|---|---|---|
-| Raw TCP egress to Postgres not supported | plan dead on Cloudflare | Phase 1 step 2 |
-| Cold-start tail (p95 ≈ 24 s on `default` policy) | first request after a host restart is slow | 2 warm replicas + cron ping; measure in Phase 1 |
-| No autoscaling | manual replica count | acceptable for preview; alert on 5xx |
-| No static egress IP | cannot IP-allowlist the DB | TLS `verify-full` + password; PSC later if on GCP |
-| `Container` class maintained only through 2026-12-31 | API churn | use native `ctx.container` where the docs allow |
-| Rolling rollout with mixed binaries | migration breaks old replica | expand/contract rule in Phase 2 |
-| Secrets in env of a microVM | exposure via `wrangler containers ssh` | restrict who can ssh; rotate keys per ADR 029 |
-| PgBouncer transaction mode | session-state SQL fails | Phase 1 step 1 surfaces it; nextgen keeps no session state except the migration advisory lock, which runs on a direct port |
-
-## Cost (preview, EU, two replicas)
-
-| Item | Monthly |
-|---|---|
-| Workers Paid base | $5 |
-| 2 × `basic` always-on (memory + disk, CPU on use) | ~$14 |
-| PlanetScale Postgres PS-5 (PS-10 HA: $30) | $5 |
-| Egress (NA/EU $0.025/GB after 1 TB) | ~$0 |
-| **Total** | **~$25 (~$50 with HA DB)** |
-
-Numbers are from the Cloudflare and PlanetScale pricing pages as of
-2026-10-07 and are estimates, not quotes.
-
-## Open questions
-
-- Does PlanetScale's PgBouncer port (6432) or the direct port (5432) become
-  the default URL? Direct keeps savepoints and `FOR UPDATE` semantics simple;
-  pooled is what PlanetScale recommends for many short connections. Two
-  replicas with pgx pools fit direct connections easily.
-- Where do the dev-inbox and egress-policy defaults land for a shared host
-  ([ADR 050](../../adrs/050-dev-inbox.md), [ADR 061](../../adrs/061-egress-policy-user-injectable-urls.md))?
-- Whether the preview cloud ever flips a project to production mode, or
-  claim remains the ceiling.
 
 ## Neki findings (2026-10-07, PS-10 unsharded, AWS eu-central-1, Postgres 18.6 Neki)
 
@@ -229,10 +64,9 @@ database on the direct port 5432.
 - Raw probes: user-insert CTE, auth-attempt CTE with `LATERAL
   jsonb_to_recordset`, `FOR UPDATE`, savepoints, the full `CheckAuthz`
   statement with 33 bound arguments: all green.
-- Nothing in Phase 1 step 1 is left open. The database side of the plan is
-  settled.
+- The database side of the plan is settled.
 
-Latency, measured from a laptop on the US west coast, not from Cloudflare:
+Latency, measured from a laptop on the US west coast, not from the platform:
 
 | Measure | Value |
 |---|---|
@@ -243,10 +77,10 @@ Latency, measured from a laptop on the US west coast, not from Cloudflare:
 | `POST /users` | 3.7 s |
 
 A user create is roughly 20 database round trips, so request latency is
-almost entirely RTT × round trips. That is the argument for pinning the
-container next to the database: at a 5–15 ms container-to-database RTT the
-same calls land in the 100–300 ms range. Measure this from a `WEUR` container
-in Phase 1 step 2 before choosing the region pair.
+almost entirely RTT × round trips. That is the argument for running the
+server next to the database: at a 5–15 ms server-to-database RTT the same
+calls land in the 100–300 ms range, which the first Vercel deploy from
+`fra1` confirmed.
 
 Note for the API smoke: operator-plane calls carry `project_id` as a required
 query parameter even when the bearer already names the project.
@@ -272,8 +106,10 @@ no background job loop yet (ADR 065 is still proposed), so the keep-warm cron
 is only about cold starts; and `/readyz` does not check the database, it only
 proves the HTTP server is listening, which happens after the pool opened.
 
-Phase 1 step 1 (database compatibility) is done; step 2 (egress and latency
-from the platform) moves to the first Vercel deploy.
+Egress and latency from the platform were measured on the first Vercel
+deploy, next section. The container image and the CI migration step of this
+table were replaced later in the day (Go runtime, migrations in the build;
+both below).
 
 ## First Vercel deploy (2026-10-07): numbers
 
@@ -296,15 +132,15 @@ and showed up even with the 5-minute cron, so instances are evicted faster
 than the documented production idle window or the cron does not reach the same
 instance; measure before deciding whether that needs a shorter schedule.
 
-Phase 1 is complete: database compatibility, raw TCP egress on 5432 with TLS,
-and platform latency are all proven.
+Database compatibility, raw TCP egress on 5432 with TLS and platform latency
+are all proven.
 
 ## Repo shape (decided 2026-10-07, revised 2026-10-08)
 
 The cloud is the product surface a visitor experiences: website, docs and
 the server. All three ship from this repo:
 
-- `apps/cloud` (this PR): the server container. It keeps its own hostnames
+- `apps/cloud`: the server service. It keeps its own hostnames
   per the design docs (`{region}.zitadel.cloud`, dashboard subdomain)
   because the API has no path prefix and cannot be path-composed under the
   website's origin without shadowing marketing pages.
@@ -319,7 +155,7 @@ the server. All three ship from this repo:
   `zitadel/new-website` is the next step; content PRs must not trigger the
   Go gates.
 
-`apps/cloud` is **not** moved to the website or infra repos: the entrypoint
+`apps/cloud` is **not** moved to the website or infra repos: the launcher
 mirrors server config semantics and the deploy is a function of the pinned
 server version, so it changes in the same PRs as the server.
 
@@ -392,8 +228,8 @@ and typescript; `next` and `@tailwindcss/postcss` are pinned in the app like
 ## Main is production, all on Vercel (2026-10-08)
 
 Decision: the cloud runs the server of the current `main` commit, compiled
-by Vercel itself from the repository (`Dockerfile.vercel`, Go
-only), with the console and the login UI built as their own static services
+by Vercel itself from the repository (a pure Go build, first as a container
+image, since the same day on the Go runtime, see below), with the console and the login UI built as their own static services
 at `/console` and `/login` from the same commit (their Vite base paths are
 build-time configurable; the embedded defaults stay `/ui/console` and
 `/ui/login` for self-hosters). Nothing passes
@@ -409,21 +245,17 @@ for a fraction of the machinery. Splitting the UIs out of the image is what
 makes the Vercel build cheap: the container build is a pure Go compile, the
 UIs get Vercel's native static builds.
 
-Safety rules that make this acceptable:
+Safety rules that make this acceptable, in their final form (the first
+version ran the migrations in a GitHub workflow; see "Migrations in the
+build" for what replaced it):
 
-- Migrations run only in the workflow, from a binary of the commit being
-  deployed, before the deploy, with a credential that lives only in the
-  `cloud-preview` GitHub environment (restricted to `main`).
-- Serving containers refuse `--migrate` (entrypoint guard with a test).
-- The database URL and the master key exist for the Production target only.
-  A preview deployment has no database: its server fails to start, which is
-  the intended failure mode until previews get their own PlanetScale branch
-  and key. "A preview silently migrates the production database" is
-  therefore impossible by configuration, not by discipline.
-- Vercel's `--build-env` does not reach Docker `ARG`s (verified with a
-  non-existent tag: the build still pulled the Dockerfile default), so the
-  only input to the container build is the tree itself; the workflow writes
-  the commit into `apps/cloud/commit.txt` for the version stamp.
+- Migrations run only in the build of the commit being deployed, before the
+  deployment goes live, never at startup; the serving function refuses
+  `--migrate` (launcher guard with a test).
+- Production values (database URL, migrator URL, master key, admin document)
+  exist in the Production target only; previews get their own in the
+  Preview target. "A preview silently migrates the production database" is
+  impossible by configuration, not by discipline.
 - Rollback promotes a previous deployment and relies on expand/contract
   migrations.
 
@@ -435,19 +267,22 @@ under `/storybook/`. Bare prefixes (`/storybook`, `/console`,
 `/login`) redirect to the slash form, because a relocated static app at
 its bare prefix resolves relative asset links against `/`.
 
-The docs got a base path too (`DOCS_BASE_PATH=/docs`, Waku `basePath`), so
-the whole route table is one rewrite per app. Waku's Vercel adapter prefixes
-its routes for a base path but leaves the static files and the server
-function at the root of the Build Output, so `apps/docs/scripts/vercel-base-path.mjs`
-moves both under the prefix after the build. The docs pages moved from
-`content/docs` to the content root at the same time, so the overview is
-`/docs/` and every page keeps a single `docs` segment; the standalone docs
-site serves the same pages at `/`.
+The docs keep the prefix-list routing of the previous section. A base path
+(`DOCS_BASE_PATH=/docs`, Waku `basePath`) was tried the same day so that the
+route table is one rewrite per app: Waku's Vercel adapter prefixes its routes
+but leaves the static files and the RSC function at the root of the Build
+Output, so a post-build script had to relocate them, and the pages had to
+move from `content/docs` to the content root to avoid a `/docs/docs` segment.
+That moved 40 files and changed the standalone site's URLs for a routing
+convenience, so it was reverted: the docs build unchanged, and the cloud
+lists their paths (`/docs`, `/reference`, `/assets`, `/RSC`, `/api/search`,
+`/llms.txt`, `/llms-full.txt`, `/mcp`) in the rewrites. Should the docs ever
+move to Next.js, its native `basePath` makes the one-prefix layout free.
 
 Open follow-up in the server: an "external UI" mode. Today the server
 refuses to boot when an enabled UI is not embedded (`ValidateDist`) and
-mounts `/console/runtime.json` only while one is enabled, so the cloud image
-ships stub `index.html` files for both UIs. Serving the runtime endpoint
+mounts `/console/runtime.json` only while one is enabled, so the server build
+writes stub `index.html` files for both UIs. Serving the runtime endpoint
 with the embedded UIs disabled removes the stubs and makes the split honest.
 
 
@@ -460,16 +295,16 @@ configuration guide). That is what makes a working server preview per PR
 cheap without a database branch per PR: one PS-DEV branch `preview` holds a
 schema per pull request.
 
-- Per PR: `nextgen migrate` and `vercel deploy` both get
-  `NEXTGEN_DATABASE_POSTGRES=…?search_path=pr_<n>` plus a preview master key
-  under the Preview target; the schema is created by `migrate` itself, so no
-  admin role and no `CREATE DATABASE` step exist. The corpus is seeded
-  through the public API the way `console:dev-real` seeds a local instance.
-- On close: `DROP SCHEMA pr_<n> CASCADE`.
+- Per PR: the build step appends `search_path=pr_<n>` to the Preview
+  target's database URL and migrates; the function serves from the same
+  schema. The schema is created by `migrate` itself, so no admin role and no
+  `CREATE DATABASE` step exist. The Preview target carries its own master
+  key and admin document.
+- On close: `DROP SCHEMA pr_<n> CASCADE` (`cloud-preview-cleanup.yml`).
 - Extensions are per database and are pinned to `public` for every
   non-default schema, so all previews share them.
-- Still open: the PR workflow itself, the corpus fixture, and the preview
-  key in the Vercel Preview target.
+- Still open: a corpus fixture seeded through the public API the way
+  `console:dev-real` seeds a local instance.
 
 ## Go runtime instead of the container (2026-10-08)
 
@@ -495,8 +330,9 @@ its own schema of the preview cluster:
 The cold start no longer pays for an image pull; what remains is the
 server's own boot. Nothing is cached for the Go step yet (Vercel picked
 go1.26.8 for `go 1.26` and downloaded all modules) and it is still the
-cheapest part of the build. Open: confirm in the dashboard that the function
-runs on Fluid compute; the Services guide says backends do by default.
+cheapest part of the build. Fluid compute is on for the project, so idle
+functions scale to zero and the measured cold start is what a first request
+pays; the keep-warm cron of the container days is gone.
 
 ## Migrations in the build, Git deployments on (2026-10-08)
 
@@ -517,3 +353,36 @@ Given up: the smoke test in the pipeline (the script stays for manual
 runs; Vercel checks or a `deployment_status` action can bring it back) and
 the `main`-only migrator credential in a GitHub environment, replaced by the
 branch guard plus "who can create production builds".
+
+## Regions (deferred, needs a buyer)
+
+Customer-chosen regions require a global layer. The cheapest version is
+nextgen's own platform project in a home region plus replication, not a
+separate product. The seams, in build order:
+
+1. Project → region directory and `{region}.<domain>` routing (resource
+   scope lookup is per database; the request must land in the right region).
+2. Console session validation without a cross-region DB read (signed,
+   short-lived token, or replicated session table).
+3. Platform membership projection replicated to every region so `CheckAuthz`
+   stays one query ([ADR 053 §2](../../adrs/053-cross-project-principals.md)
+   names this as the later step).
+4. Claim as a two-step write with repair.
+5. System catalog version parity across regions on rollout.
+6. Region chosen at create; project move = export/import, which does not
+   exist yet.
+
+Nothing of this is needed for a single-region preview cloud.
+
+## Open
+
+- A corpus fixture for previews, seeded through the public API.
+- An external-UI mode in the server (serve `/console/runtime.json` with the
+  embedded UIs disabled) so the build stops writing stub `index.html` files.
+- A boot-time schema version check in the server, and a database-aware
+  readiness endpoint (`/readyz` is constant today).
+- The smoke test back in the pipeline, as a Vercel check or a
+  `deployment_status` action.
+- Where the dev-inbox and egress-policy defaults land for a shared host
+  ([ADR 050](../../adrs/050-dev-inbox.md), [ADR 061](../../adrs/061-egress-policy-user-injectable-urls.md)),
+  and whether the preview cloud ever flips a project to production mode.

@@ -1,9 +1,9 @@
 #!/bin/sh
 # Build and migrate for Vercel's Go runtime (vercel.json: service "server",
-# framework "go"). Mirrors the build stage of Dockerfile.vercel: stub UI
-# embeds (the UIs are their own services; the server only validates that an
-# index.html exists), build metadata from the server manifest and
-# apps/cloud/commit.txt, then a static binary written to $VERCEL_OUTPUT_FILE.
+# framework "go"): stub UI embeds (the UIs are their own services; the server
+# only validates that an index.html exists), build metadata from the server
+# manifest and the deployment's commit, then a static binary written to
+# $VERCEL_OUTPUT_FILE.
 set -eu
 cd "$(dirname "$0")/../.."
 
@@ -15,7 +15,7 @@ for ui in console login; do
 done
 
 version="$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' apps/server/package.json | head -1)"
-commit="$(cat apps/cloud/commit.txt 2>/dev/null || echo local)"
+commit="${VERCEL_GIT_COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"
 date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 out="${VERCEL_OUTPUT_FILE:-bin/nextgen-launcher}"
 mkdir -p "$(dirname "$out")"

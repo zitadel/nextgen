@@ -1,6 +1,6 @@
 ---
-title: React SDK
-description: Client-side React wrappers for the Zitadel login and logout components.
+title: Qwik SDK
+description: Client-side Qwik wrappers for the Zitadel login and logout components.
 ---
 
 import { Callout } from "fumadocs-ui/components/callout";
@@ -8,10 +8,14 @@ import { File, Files } from "fumadocs-ui/components/files";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
-The React SDK is the SPA wrapper for the shared Zitadel login and logout widgets.
+The Qwik SDK is the SPA wrapper for the shared Zitadel login and logout widgets.
+
+<Callout title="Requires Qwik 2" type="info">
+  `@zitadel/sdk-qwik` peers `@qwik.dev/core` (`^2.0.0-beta.45`), so your app must be on Qwik 2. A Qwik 1 (`@builder.io/qwik`) app is not supported — migrate it to `@qwik.dev/core` first.
+</Callout>
 
 <Callout title="SPA proxy requirement" type="warn">
-  React apps do not have server middleware by default. The CLI configures a Vite dev proxy; production deployments need an equivalent same-origin proxy for `/__nextgen/*`. See [SDK proxy](/concepts/sdk-proxy).
+  Vite-based Qwik SPAs do not have server middleware by default. The CLI configures a Vite dev proxy; production deployments need an equivalent same-origin proxy for `/__nextgen/*`. See [SDK proxy](/docs/concepts/sdk-proxy).
 </Callout>
 
 ## Install
@@ -19,17 +23,17 @@ The React SDK is the SPA wrapper for the shared Zitadel login and logout widgets
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
     ```sh
-    pnpm add @zitadel/sdk-react
+    pnpm add @zitadel/sdk-qwik
     ```
   </Tab>
   <Tab>
     ```sh
-    npm install @zitadel/sdk-react
+    npm install @zitadel/sdk-qwik
     ```
   </Tab>
   <Tab>
     ```sh
-    yarn add @zitadel/sdk-react
+    yarn add @zitadel/sdk-qwik
     ```
   </Tab>
 </Tabs>
@@ -41,7 +45,7 @@ The React SDK is the SPA wrapper for the shared Zitadel login and logout widgets
     The CLI configures the Vite proxy, writes app-level auth UI, adds environment files, and installs the SDK.
 
     <Files>
-      <File name="src/App.tsx" />
+      <File name="src/routes/login/index.tsx" />
       <File name="vite.config.ts" />
       <File name=".env.local" />
       <File name=".env.example" />
@@ -52,21 +56,24 @@ The React SDK is the SPA wrapper for the shared Zitadel login and logout widgets
     Configure Zitadel once, then render login and logout widgets:
 
     ```tsx
-    import { ZitadelLogin, ZitadelLogout, configureZitadel } from "@zitadel/sdk-react";
+    import { component$ } from "@qwik.dev/core";
+    import { ZitadelLogin, ZitadelLogout, configureZitadel } from "@zitadel/sdk-qwik";
 
     const project = configureZitadel({
       projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID,
       proxyPath: "/__nextgen",
     });
 
-    export function LoginPage() {
+    export const LoginPage = component$(() => {
       return <ZitadelLogin project={project} purpose="login" postSignInUrl="/" />;
-    }
+    });
 
-    export function ProfilePage() {
+    export const ProfilePage = component$(() => {
       return <ZitadelLogout project={project} postSignOutUrl="/login" />;
-    }
+    });
     ```
+
+    The widget's flow events surface as optional QRL callbacks: `onFlowStep$`, `onFlowInput$`, `onFlowComplete$`, and `onFlowError$`.
   </Tab>
 </Tabs>
 
@@ -75,7 +82,7 @@ The React SDK is the SPA wrapper for the shared Zitadel login and logout widgets
 <Steps>
   <Step>The widgets call the configured proxy path on the same origin.</Step>
   <Step>In local Vite development, the generated proxy forwards `/__nextgen/*` to Zitadel and attaches the project service key only on the session exchange.</Step>
-  <Step>In production, the same-origin path comes from a platform rewrite or minimal worker (see [SDK proxy](/concepts/sdk-proxy)) — or intentionally configure a backend URL for local-only experiments.</Step>
+  <Step>In production, the same-origin path comes from a platform rewrite or minimal worker (see [SDK proxy](/docs/concepts/sdk-proxy)) — or intentionally configure a backend URL for local-only experiments.</Step>
 </Steps>
 
 ## Verify
@@ -87,6 +94,6 @@ The React SDK is the SPA wrapper for the shared Zitadel login and logout widgets
 
 ## See also
 
-- [SDK proxy](/concepts/sdk-proxy) — why SPAs need a same-origin `/__nextgen/*` proxy and how to run one in production.
-- [Components](/sdks/components) — the shared web components these wrappers render.
-- [`@zitadel/sdk-react` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-react) and the [CLI React patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/react).
+- [SDK proxy](/docs/concepts/sdk-proxy) — why SPAs need a same-origin `/__nextgen/*` proxy and how to run one in production.
+- [Components](/docs/sdks/components) — the shared web components these wrappers render.
+- [`@zitadel/sdk-qwik` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-qwik) and the [CLI Qwik patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/qwik).

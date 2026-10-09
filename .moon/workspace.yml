@@ -15,7 +15,6 @@ projects:
     demo-nuxt-e2e: "apps/demo-nuxt-e2e"
     login-ui: "apps/login-ui"
     mock-zitadel: "apps/mock-zitadel"
-    cloud: "apps/cloud"
     website: "apps/website"
     api: "packages/api"
     api-mock: "packages/api-mock"

@@ -1,8 +1,8 @@
 // Command launcher starts the nextgen server on Vercel's Go runtime.
 //
-// It is entrypoint.sh in Go: the Go framework preset runs a bare binary with
-// no script in front of it, so the binary itself has to turn the environment
-// a Vercel function receives into what the server accepts. server.master_keys
+// The Go framework preset runs a bare binary with no script in front of it,
+// so the binary itself has to turn the environment a Vercel function
+// receives into what the server accepts. server.master_keys
 // can only be loaded from a YAML file (the server ignores the
 // NEXTGEN_SERVER_MASTER_KEYS_* env form), so MASTER_KEY_PEM_B64 and
 // MASTER_KEY_ID become <data_dir>/nextgen.yaml, the optional bootstrap admin

@@ -1,14 +1,15 @@
 # Runbook: preview cloud (Vercel + PlanetScale Postgres)
 
-> **Status:** Draft (2026-10-07)
+> **Status:** Live (2026-10-08)
 > **Code:** [`apps/cloud/`](../../apps/cloud/)
-> **Design:** [preview-cloud-cloudflare-planetscale.md](../design/platform/preview-cloud-cloudflare-planetscale.md)
+> **Design:** [preview-cloud-vercel-planetscale.md](../design/platform/preview-cloud-vercel-planetscale.md)
 
 The preview cloud is the server of the current `main` commit, compiled by
-Vercel from the repository and run as a container in Frankfurt (`fra1`)
-against one PlanetScale Postgres database in AWS `eu-central-1`. **Main is
-production** for this cloud: every merge deploys, and everything builds on
-Vercel. Version tags (`1.0.0-alpha.N`), their images and npm packages are the
+Vercel from the repository and run as a function on Vercel's Go runtime in
+Frankfurt (`fra1`) against one PlanetScale Postgres database in AWS
+`eu-central-1`. **Main is production** for this cloud: every push to `main`
+deploys, every pull request gets a preview, and everything builds on Vercel.
+Version tags (`1.0.0-alpha.N`), their images and npm packages are the
 self-hoster artifact, produced separately by `release-publish.yml`, and are
 not what the cloud runs. Production stays on GCP; this is a single-region
 preview offering with the same topology as self-hosted.
@@ -22,19 +23,18 @@ The Vercel project is one deployment with six
 | `server` | `.` | the Go server, compiled by `apps/cloud/vercel-build.sh` on Vercel's Go runtime and started by `apps/cloud/launcher` (no embedded UIs) | everything not listed below, incl. `/console/runtime.json` |
 | `console` | `apps/console` | the console SPA, built with `CONSOLE_BASE_PATH=/console`, relocated to `out/console` | `/console/*` |
 | `login` | `apps/login-ui` | the login UI, built with `LOGIN_BASE_PATH=/login`, relocated to `out/login` | `/login/*` |
-| `docs` | `apps/docs` | the docs site (Waku), built with `DOCS_BASE_PATH=/docs`, output relocated by `scripts/vercel-base-path.mjs` | `/docs/*` |
+| `docs` | `apps/docs` | the docs site (Waku), built unchanged at base `/` | `/docs*`, `/reference/*`, `/assets/*`, `/RSC/*`, `/api/search`, `/llms.txt`, `/llms-full.txt`, `/mcp*` |
 | `storybook` | `apps/storybook` | the `@zitadel/components` workbench, static build relocated to `out/storybook` | `/storybook/*` |
 | `website` | `apps/website` | the website scaffold (Next.js), one start page | `/`, `/_next/*` |
 
-Every app owns exactly one prefix, so the route table is one rewrite per
-service, one exception (`/console/runtime.json` stays with the server) and
-the server catch-all. The server's own namespaces (`/projects`, `/users`,
-`/sessions`, …) never overlap with those prefixes. Bare prefixes redirect
-to the slash form (308), as the server's own UI handler does, because the
-static apps reference their assets relative to that directory. The docs
-pages live at the content root (`apps/docs/content`), so `/docs/` is the
-overview and `/docs/concepts/…`, `/docs/reference/api/…` follow; the
-standalone docs deployment serves the same pages at `/`.
+The route table is one rewrite per prefix (the docs have several, because
+the site serves its pages at `/docs` and `/reference` and its runtime files
+at the root), one exception (`/console/runtime.json` stays with the server)
+and the server catch-all. The server's own namespaces (`/projects`,
+`/users`, `/sessions`, …) never overlap with those prefixes; a new
+top-level docs route needs a rewrite entry. Bare UI prefixes redirect to
+the slash form (308), as the server's own UI handler does, because the
+static apps reference their assets relative to that directory.
 
 The server is told the UI prefixes too (`NEXTGEN_SERVER_CONSOLE_PATH`,
 `NEXTGEN_SERVER_LOGIN_PATH`), so the console base URL it derives for the
@@ -46,63 +46,63 @@ same file) so the website can own every path.
 
 ### 1. PlanetScale
 
-1. Create a **Postgres** database (not Neki) in `eu-central-1`, PS-10 HA once
-   anyone depends on it, PS-5 for a first try.
-2. Create two roles, each bound to the `main` branch:
-   - `preview-migrator`: `postgres` grant. Used only by the deploy workflow.
+1. Production: a **Postgres** database (not Neki) in `eu-central-1`, PS-10 HA
+   once anyone depends on it, PS-5 for a first try. Two roles on its `main`
+   branch:
+   - `preview-migrator`: `postgres` grant. Used only by the build step's
+     `launcher migrate` (`CLOUD_MIGRATOR_DATABASE_URL`).
    - `preview-server`: `pg_read_all_data` + `pg_write_all_data`. Used by the
      running server.
+2. Previews: a second database (`zitadel-preview`, PS-DEV is enough) with one
+   role `preview-pr` that inherits `postgres`: it creates the schema of each
+   pull request and installs the extensions into `public`. Every preview is
+   a schema of this database, never a branch.
 3. Use the direct port `5432` with `sslmode=verify-full&sslrootcert=system`.
    The pooled port is not needed: the server keeps a small pgx pool.
 
-### 2. Master key
+### 2. Master keys
 
 ```sh
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out master-key.pem
 base64 < master-key.pem | tr -d '\n' > master-key.b64
 ```
 
-Keep `master-key.pem` in the team password manager. Losing it makes every
+One key for production, a different one for previews. Keep the production
+`master-key.pem` in the team password manager. Losing it makes every
 project's key-encryption key unwrappable ([ADR 029](../adrs/029-cryptography-secrets-and-key-lifecycle.md)).
 
 ### 3. Vercel project
 
 1. Create a project in the team with **no Root Directory**: the repository
    root is the deployment root, `vercel.json` there defines the services and
-   their roots. Both the workflow and the CLI deploy from the repo root
-   (`vercel deploy --cwd ../..` from `apps/cloud`). Connecting the GitHub
-   repo is fine; the `git.deploymentEnabled: false` in `vercel.json` keeps
-   Git pushes from deploying so the workflow stays the only deployer.
-2. Environment variables (Production; the build-time ones also for Preview):
+   their roots. Connect the GitHub repository (section 4).
+2. Environment variables, by target. Add them with the Vercel CLI
+   (`npm i -g vercel`, or `npx vercel`) from the repo root:
+   `vercel env add NAME production --sensitive --yes` with the value on
+   stdin for secrets, `--no-sensitive` for plain config.
 
-   | Name | Value | Sensitive |
+   | Name | Target | Value |
    |---|---|---|
-   | `NEXTGEN_DATABASE_POSTGRES` | `postgresql://preview-server…:5432/postgres?sslmode=verify-full&sslrootcert=system` | yes, **Production only** |
-   | `CLOUD_MIGRATOR_DATABASE_URL` | the `preview-migrator` role, used only by the build step's `launcher migrate` | yes, **Production only** |
-   | `NEXTGEN_DATABASE_POSTGRES` (Preview target) | the `preview-pr` role of the `zitadel-preview` database; each preview appends `search_path=pr_<n>` itself | yes, **Preview only** |
-   | `MASTER_KEY_PEM_B64` | contents of `master-key.b64` | yes, **Production only** |
-   | `MASTER_KEY_ID` | `preview-2026-10` (stable; rotation adds a new id) | no |
-   | `PORT` | `8080` | no |
-   | `NEXTGEN_SERVER_PUBLIC_BASE` | the public origin, e.g. `https://preview.zitadel.cloud` | no |
-   | `NEXTGEN_INSTRUMENTATION_LOG_FORMAT` | `json` | no |
-   | `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT` | `true` | no |
-   | `BOOTSTRAP_ADMIN_USER_JSON_B64` | output of `pnpm run admin-user` (see below) | yes |
-   | `ENABLE_EXPERIMENTAL_COREPACK` | `1` (build time; the UI services install with `corepack pnpm`, which pins the workspace's pnpm) | no |
-   | `DOCS_SITE_URL` | the public origin, same as `NEXTGEN_SERVER_PUBLIC_BASE` (build time; canonical and sitemap URLs of the docs) | no |
-   | `DOCS_BASE_PATH`, `CONSOLE_BASE_PATH`, `LOGIN_BASE_PATH` | `/docs`, `/console`, `/login` (build time; the prefix each UI build is served under) | no |
-   | `NEXTGEN_SERVER_CONSOLE_PATH`, `NEXTGEN_SERVER_LOGIN_PATH` | `/console`, `/login` (the server derives the console base URL from it) | no |
+   | `NEXTGEN_DATABASE_POSTGRES` | Production, secret | `postgresql://preview-server…:5432/postgres?sslmode=verify-full&sslrootcert=system` |
+   | `CLOUD_MIGRATOR_DATABASE_URL` | Production, secret | the `preview-migrator` role; only `launcher migrate` reads it |
+   | `MASTER_KEY_PEM_B64` | Production, secret | contents of the production `master-key.b64` |
+   | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Production, secret | the platform admin's bootstrap document (section 5) |
+   | `NEXTGEN_SERVER_PUBLIC_BASE` | Production | the public origin, e.g. `https://preview.zitadel.cloud` |
+   | `DOCS_SITE_URL` | Production | the public origin (canonical and sitemap URLs of the docs) |
+   | `NEXTGEN_DATABASE_POSTGRES` | Preview, secret | the `preview-pr` role of `zitadel-preview`; each preview appends `search_path=pr_<n>` itself |
+   | `MASTER_KEY_PEM_B64` | Preview, secret | contents of the preview `master-key.b64` |
+   | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Preview, secret | a preview admin document (section 5) |
+   | `MASTER_KEY_ID` | both | `preview-2026-10` (stable; rotation adds a new id) |
+   | `NEXTGEN_INSTRUMENTATION_LOG_FORMAT` | both | `json` |
+   | `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT` | both | `true` |
+   | `ENABLE_EXPERIMENTAL_COREPACK` | both | `1` (build time; the UI services install with `corepack pnpm`, which pins the workspace's pnpm) |
+   | `CONSOLE_BASE_PATH`, `LOGIN_BASE_PATH` | both | `/console`, `/login` (build time; the prefix each UI build is served under) |
+   | `NEXTGEN_SERVER_CONSOLE_PATH`, `NEXTGEN_SERVER_LOGIN_PATH` | both | `/console`, `/login` (the server derives the console base URL from it) |
 
-   `PORT` is required: Vercel's container router defaults to 80 and the image
-   runs as uid 65532, which cannot bind it.
-
-   The database URL, the master key and the bootstrap document exist for the
-   Production target only. A preview deployment therefore has no database
-   and no key: its server service fails to start, by design, while docs,
-   storybook and website previews work. Previews with a working server need
-   their own database, or their own schema in a shared preview branch
-   (`?search_path=pr_<n>` on the DSN, see the configuration guide), and a
-   preview master key under the Preview target; they must never share the
-   production database.
+   Production values exist in the Production target only, preview values in
+   the Preview target only, so a preview cannot reach the production
+   database or key by configuration. The launcher follows Vercel's `PORT`
+   on its own.
 
    `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=true` is what makes this a cloud: the
    server provisions the reserved platform project, the Console signs into
@@ -110,6 +110,7 @@ project's key-encryption key unwrappable ([ADR 029](../adrs/029-cryptography-sec
    in standalone mode and manages whichever customer project was created
    first, which on a shared host is whatever the smoke test created.
 3. Function settings: memory 2 GB (default), max duration 60 s is plenty.
+   Fluid compute is on.
 4. Domain: assign the custom domain and set `NEXTGEN_SERVER_PUBLIC_BASE` to
    match it exactly. CSRF and WebAuthn derive the origin from Vercel's
    `X-Forwarded-Host` / `X-Forwarded-Proto`, which already carry the custom
@@ -137,20 +138,29 @@ that there is nothing to drop and the schema stays until someone drops it.
 ### 5. Platform admin
 
 The platform project has no users until someone registers or a bootstrap
-document seeds one. Mint the seeded admin once:
+document seeds one. The document is the one `zitadel start` writes for its
+local admin ([`admin-credential.ts`](../../apps/cli/src/lib/local-server/admin-credential.ts)):
+a header naming `proj_platform`, the user and team ids, the attributes, and
+a PBKDF2 hash of the password, never the password. Mint one with the CLI in
+a scratch directory and rename it:
 
 ```sh
-cd apps/cloud
-corepack pnpm run admin-user -- --email ops@example.com --out ../../.zitadel/preview-admin \
-  | corepack pnpm exec vercel env add BOOTSTRAP_ADMIN_USER_JSON_B64 production --sensitive --yes
+mkdir cloud-admin && cd cloud-admin
+npx @zitadel/cli@alpha start && npx @zitadel/cli@alpha stop
+# .zitadel/local/admin.json holds the generated password: move it to the
+# password manager. In .zitadel/local/admin-user.json set header.id,
+# header.team_id, attributes.username and attributes.email to the cloud
+# admin's values (for example user_platformadmin, team_platformadmin,
+# ops@example.com).
+base64 < .zitadel/local/admin-user.json | tr -d '\n' \
+  | vercel env add BOOTSTRAP_ADMIN_USER_JSON_B64 production --sensitive --yes
 ```
 
-`admin.json` in the output directory holds the generated password; move it to
-the password manager and delete the directory. The entrypoint renders the
-document to `/tmp` and passes `--user-file`; the server imports the user into
-`proj_platform` on the next deploy and skips it afterwards, so the variable
-can stay set. To rotate the password, mint a new document with the same
-`--user-id`, delete the old user, redeploy.
+The launcher renders the document to the data dir and passes `--user-file`;
+the server imports the user into `proj_platform` on the next deploy and
+skips it afterwards, so the variable can stay set. To rotate the password,
+mint a new document with the same ids, delete the old user, redeploy. The
+Preview target gets its own document the same way.
 
 ## Deploying
 
@@ -175,24 +185,32 @@ can stay set. To rotate the password, mint a new document with the same
 pending and exits. Only commits that add migrations apply something, and
 every migration must be expand/contract: the previous deployment keeps
 serving until the new one is live, and a rollback promotes an older
-deployment on the newer schema. The build script stamps version, commit and
-date into the binary (`VERCEL_GIT_COMMIT_SHA` is not used; `apps/cloud/commit.txt`
-is only written by manual deploys).
+deployment on the newer schema. The build script stamps the version, the
+deployment's commit (`VERCEL_GIT_COMMIT_SHA`) and the date into the binary.
 
 All services are rebuilt on every deploy. The Go step downloads the
 toolchain and the modules each time and still takes well under a minute
 plus the migration run; the whole deployment is bounded by the UI builds
-(about 2.5 minutes on 2026-10-08, against 6 to 7 minutes with the earlier
-container build).
+(about 2.5 minutes on 2026-10-08).
 
 ### Manual and staged deploys
 
-A `vercel deploy` from a workstation builds exactly the checked-out tree
-and migrates like any other build: a preview deploy migrates the schema of
-the local branch (`br_<name>`, or `pr_<n>` when the branch has a pull
-request), a `--prod` deploy migrates production only when the local branch
-is `main`. Write `git rev-parse HEAD > apps/cloud/commit.txt` first so the
-binary reports the commit.
+A `vercel deploy` from the repo root builds exactly the checked-out tree
+(`.vercelignore` trims the upload) and migrates like any other build: a
+preview deploy migrates the schema of the local branch (`br_<name>`, or
+`pr_<n>` when the branch has a pull request), a `--prod` deploy migrates
+production only when the local branch is `main`. To point a manual preview
+at an existing schema, pass the URL with its `search_path` to both the build
+and the function: `--build-env NEXTGEN_DATABASE_POSTGRES=… -e NEXTGEN_DATABASE_POSTGRES=…`.
+A CLI upload carries no Git metadata, so the binary of a manual deploy
+reports the commit as `unknown` unless `--build-env VERCEL_GIT_COMMIT_SHA=…`
+is passed as well.
+
+A **staged production deploy** is `vercel deploy --prod --skip-domain` from
+`main`: it builds and migrates with production settings without moving the
+production domain. Smoke it with the project's protection-bypass header
+(`VERCEL_AUTOMATION_BYPASS_SECRET=… corepack pnpm exec tsx apps/cloud/scripts/smoke.mts <url>`),
+then `vercel promote <url>`.
 
 The serving function refuses `--migrate` (see `apps/cloud/launcher`), so
 no deploy of any kind can change the schema by starting; only the build
@@ -204,31 +222,26 @@ Promote the previous deployment in the Vercel dashboard (Deployments → … →
 Promote to Production) or `vercel promote <url>`; Vercel keeps every
 deployment's functions. All services roll back together: they are one
 deployment. A schema that the older binary cannot read is **not** rolled
-back; that is what the expand/contract rule protects. To redeploy an older
-commit with a build, run the workflow from that commit (`workflow_dispatch`
-on a branch pointing at it).
+back; that is what the expand/contract rule protects. A fresh build of an
+older state is a revert on `main`.
 
-## Lessons from the first deploy (2026-10-07)
+## Lessons (2026-10-07/08)
 
 - Service objects need an explicit `framework`. With `"framework": null`
   the build finishes in one second, builds nothing, and every path is a 404
-  from the edge. The server ran as a `Dockerfile.vercel` container until
-  2026-10-08 and now uses `"framework": "go"` with a `buildCommand`.
+  from the edge; with several frameworks detectable at the repo root (Vite,
+  Storybook) every service must name its own.
 - The Vercel MCP connector could create the project but was refused (403)
   on environment variables; use `vercel env add NAME production,preview
   --sensitive --yes` with the value on stdin. A `--value` flag with an open
   stdin hangs the CLI after a successful add.
 - This team stores new variables as **Secret** by default, so plain config
   added without a flag ends up unreadable in the dashboard. Pass
-  `--no-sensitive` for config (`PORT`, `DOCS_SITE_URL`, …) and `--sensitive`
-  only for real secrets (database URL, master key, bootstrap document).
+  `--no-sensitive` for config and `--sensitive` only for real secrets
+  (database URLs, master keys, bootstrap documents).
 - The team default Vercel Authentication (`all_except_custom_domains`) did
   not block the production alias `nextgen-preview-cloud.vercel.app`; it does
   protect preview and deployment URLs. Verify after any protection change.
-- The published `1.0.0-alpha.24` does not have `/sessions/me/csrf`; the smoke
-  test probes `/sessions/me` instead.
-- Measured on the first deploy: build 13 s, cold start 3.7–5.3 s, warm
-  `/readyz` 0.19 s, `POST /users` 0.23 s.
 - `.vercelignore` uses gitignore syntax: an unanchored `docs` also drops
   `apps/docs`, and the build then fails with "Service docs has root apps/docs
   but that directory does not exist". Anchor repo-root entries with `/`.
@@ -241,19 +254,14 @@ on a branch pointing at it).
   Bare prefixes redirect to the slash form instead.
 - The server validates at boot that every enabled embedded UI has an
   `index.html` (`ValidateDist`) and mounts `/console/runtime.json` only while
-  a UI is enabled. With the UIs served as Vercel services, the container
-  image carries a stub `index.html` per UI so the server boots and keeps the
+  a UI is enabled. With the UIs served as Vercel services, the build script
+  writes a stub `index.html` per UI so the server boots and keeps the
   runtime endpoint; the stubs are shadowed by the route table. The clean
   fix is a server change: serve the runtime endpoint with both embedded UIs
   disabled (`console_enabled`/`login_enabled` false), then drop the stubs.
-- Vercel's `--build-env` does not reach Docker `ARG`s (verified with a
-  non-existent tag: the build still used the Dockerfile default). Anything
-  the container build must know goes in as a file in the build context.
-- A service object rejects `"framework": null`; with several frameworks
-  detectable at the repo root (Vite, Storybook) every service must name its
-  framework. Storybook builds with moon, so the upload must contain every
-  moon project source (`tools/` stays out of `.vercelignore`); moon itself
-  runs fine without a `.git` directory.
+- Storybook builds with moon, so a CLI upload must contain every moon
+  project source (`tools/` stays out of `.vercelignore`); moon itself runs
+  fine without a `.git` directory.
 - The build log warns that the repo-root `api/` directory "will not be built
   because services are configured". That is Vercel's serverless-functions
   convention noticing a directory that is OpenAPI sources and Go code; the
@@ -263,30 +271,36 @@ on a branch pointing at it).
   whose keys were wrapped with a discarded master key, so
   `/console/runtime.json` answered 500 (`enc_key.not_found`). The flag pins
   the Console to `proj_platform`. That stale `pg-smoke` row
-  (`proj_01M4C6YJGKREDXW8XAC1PJVDZQ`) is still in the database and harmless;
-  drop it when convenient.
+  (`proj_01M4C6YJGKREDXW8XAC1PJVDZQ`) is still in the production database
+  and harmless; drop it when convenient.
+- A Waku `basePath` for the docs (one `/docs/(.*)` rewrite instead of the
+  prefix list) needs a post-build relocation of Waku's Vercel output and
+  moves the pages out of `content/docs` to avoid a `/docs/docs` segment. Not
+  worth it; the prefix list stays.
 
 ## Operating
 
-- **Logs:** Vercel runtime logs; container stdout is broadcast to all in-flight
-  requests of the instance. Add a log drain for retention.
-- **Cold starts:** instances scale to zero after 5 minutes without traffic.
-  The cron in `vercel.json` hits `/readyz` every 5 minutes on the production
-  deployment to keep one instance warm. Measure the cold start of the image
-  after the first deploy; if it is unacceptable, shorten the cron.
-- **Egress:** no static IP for container functions. The database is protected
-  by TLS and the role password only.
+- **Logs:** Vercel runtime logs of the `server` function. Add a log drain
+  for retention.
+- **Cold starts:** Fluid compute scales idle functions to zero. The Go
+  function's cold `/readyz` measured 0.3–0.45 s (2026-10-08), warm 0.2 s;
+  no keep-warm cron.
+- **Egress:** no static IP for functions. The database is protected by TLS
+  and the role password only.
 - **Smoke test by hand:**
 
   ```sh
-  corepack pnpm --filter @zitadel/cloud run smoke -- https://preview.zitadel.cloud
+  corepack pnpm exec tsx apps/cloud/scripts/smoke.mts https://preview.zitadel.cloud
   ```
 
-- **Staged production deploy:** `vercel deploy --cwd ../.. --prod --skip-domain`
-  from `apps/cloud` builds with production settings without moving the
-  production domain; smoke it with the project's protection-bypass header
-  (`VERCEL_AUTOMATION_BYPASS_SECRET=… pnpm run smoke -- <url>`), then
-  `vercel promote <url>`. Mind the migration rule above.
+  It creates one throwaway project and exercises readiness, project and
+  user creation, a query, the session middleware, and one page of every
+  UI service.
+
+- **Preview schemas:** `pr_<n>` is dropped by the cleanup workflow when the
+  pull request closes. Schemas of manual deploys (`br_<name>`) and of
+  closed pull requests from before the workflow had its secret are dropped
+  by hand: `DROP SCHEMA <name> CASCADE` on `zitadel-preview`.
 
 - **Master key rotation:** add a second key under a new `MASTER_KEY_ID`
   following ADR 029; this wrapper supports exactly one key per deployment
@@ -294,14 +308,12 @@ on a branch pointing at it).
 
 ## Known limits
 
-- Vercel container images and the Fluid runtime: request and response bodies
-  are capped at 4.5 MB, 1,024 file descriptors per instance, max duration
-  per plan (300 s default).
+- Vercel functions: request and response bodies are capped at 4.5 MB, max
+  duration per plan (300 s default).
 - Scale-to-zero means in-process state (the request wide-event buffer of
   [ADR 048](../adrs/048-wide-events-internal-audit-primitive.md)) can be lost
-  on scale-down; the server flushes on `SIGTERM` within Vercel's 30 s grace.
+  on scale-down; the server flushes on `SIGTERM`.
 - No background job loop exists in this tree yet ([ADR 065](../adrs/065-background-jobs.md)
-  is proposed). When it lands, scale-to-zero stalls periodic jobs while idle;
-  the keep-warm cron covers that for a preview.
+  is proposed). When it lands, scale-to-zero stalls periodic jobs while idle.
 - Regions: one. Customer-chosen regions need the global layer described in
-  the design note's Phase 4.
+  the design note's "Regions" section.

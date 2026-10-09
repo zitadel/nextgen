@@ -67,11 +67,6 @@
       "source": "/login",
       "destination": "/login/",
       "permanent": true
-    },
-    {
-      "source": "/docs",
-      "destination": "/docs/",
-      "permanent": true
     }
   ],
   "rewrites": [
@@ -112,7 +107,73 @@
       }
     },
     {
+      "source": "/docs",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
       "source": "/docs/(.*)",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/docs.md",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/reference",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/reference/(.*)",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/assets/(.*)",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/RSC/(.*)",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/api/search",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/llms.txt",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/llms-full.txt",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/mcp",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/mcp/(.*)",
       "destination": {
         "service": "docs"
       }
@@ -126,12 +187,6 @@
   ],
   "regions": [
     "fra1"
-  ],
-  "crons": [
-    {
-      "path": "/readyz",
-      "schedule": "*/5 * * * *"
-    }
   ],
   "git": {
     "deploymentEnabled": true
