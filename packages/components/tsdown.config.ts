@@ -82,13 +82,9 @@ export default defineConfig([
       // `./legacy-designs/*` for Storybook, which shows them for review.
       { from: "src/orchestrator/__fixtures__/legacy-designs", to: "dist" },
     ],
-    // Typecheck emits nothing, so tsdown is the only writer here. `clean:
-    // false` is still needed because `clean: true` would wipe the sibling
-    // standalone.mjs while the two build entries in this config race each
-    // other. tsdown still overwrites its
-    // own outputs on each rebuild — stale files just accumulate harmlessly
-    // until a full `git clean`.
-    clean: false,
+    // The first entry cleans dist; the standalone entry below keeps
+    // `clean: false` so it appends standalone.mjs instead of wiping this one.
+    clean: true,
     target: "es2022",
     deps: {
       neverBundle: [...THIRD_PARTY, "@zitadel/api-mock"],
