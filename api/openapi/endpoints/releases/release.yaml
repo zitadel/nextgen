@@ -8,7 +8,7 @@ description: |
   `revision_id` through the per-kind read endpoints (`GET /schemas/{id}`,
   `GET /flow_definitions/{id}`, …).
 
-  A release exists on its own and is not tied to a target. Deploying it is a
+  A release exists on its own and is not tied to an origin. Deploying it is a
   separate call.
 
   Two identifiers: `id` is the one paths and `release_id` fields take;

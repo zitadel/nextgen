@@ -21,6 +21,10 @@ description: |
   resource and at most 50, the most a release pins; the server refuses
   anything outside that with `rel.invalid`. Unknown keys are refused. More
   kinds join as they become release kinds.
+
+  Each resource is validated as its kind's create endpoint validates it,
+  and every failing resource is reported in one `rel.invalid`. Sending a
+  resource needs that kind's write scope, as creating it directly does.
 additionalProperties: false
 properties:
   schemas:

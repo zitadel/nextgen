@@ -9662,6 +9662,9 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 // resource and at most 50, the most a release pins; the server refuses
 // anything outside that with `rel.invalid`. Unknown keys are refused. More
 // kinds join as they become release kinds.
+// Each resource is validated as its kind's create endpoint validates it,
+// and every failing resource is reported in one `rel.invalid`. Sending a
+// resource needs that kind's write scope, as creating it directly does.
 // Ref: #
 type ConfigurationBundle struct {
 	// User schemas, one per `.zitadel/schemas/*.json`.
@@ -56417,7 +56420,7 @@ func (s *RelRevisionUnpinnableDetails) init() RelRevisionUnpinnableDetails {
 // revisions belong together. Callers that need the resource bytes resolve each
 // `revision_id` through the per-kind read endpoints (`GET /schemas/{id}`,
 // `GET /flow_definitions/{id}`, …).
-// A release exists on its own and is not tied to a target. Deploying it is a
+// A release exists on its own and is not tied to an origin. Deploying it is a
 // separate call.
 // Two identifiers: `id` is the one paths and `release_id` fields take;
 // `content_hash` is the digest of the content the release pins, printed by
