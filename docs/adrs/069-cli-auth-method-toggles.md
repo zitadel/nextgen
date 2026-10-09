@@ -33,15 +33,19 @@ enables.
 ### 1. One topic, one command per method
 
 ```
-zitadel auth-method password enable|disable [--schema <name>]
-zitadel auth-method passkey  enable|disable [--schema <name>]
-zitadel auth-method sso      enable  --provider <slug> [--client-id <id>] [--schema <name>]
-zitadel auth-method sso      disable --provider <slug> [--schema <name>]
+zitadel auth-method password enable  [--schema <name>]
+zitadel auth-method password disable [--schema <name>] [--force]
+zitadel auth-method passkey  enable  [--schema <name>]
+zitadel auth-method passkey  disable [--schema <name>] [--force]
+zitadel auth-method sso      enable  --provider <name> [--client-id <id>] [--schema <name>]
+zitadel auth-method sso      disable --provider <name> [--schema <name>] [--force]
 ```
 
 - **The method is the noun.** Following ADR 064's resource-first grammar, each
   method is its own command with its own flags. `password` and `passkey` take
   none of their own. `sso` takes `--provider` and the provider's credentials.
+  On `sso enable`, `--provider` is one of the providers the CLI can set up;
+  on `sso disable`, it is any provider the schema lists.
   A single command with a `--mode` switch was rejected, because flags such as
   `--client-id` would then mean something for one mode and nothing for the
   others, and help could not show which flags go together.
@@ -57,8 +61,11 @@ zitadel auth-method sso      disable --provider <slug> [--schema <name>]
 
 ### 2. What each command edits
 
-Nothing is sent to the server. Changes are published by the commands that ship
-configuration edits, and the result lists them as `next_commands`. Today those
+The commands change local files. The one exception is `sso enable`, which
+also stores the provider's client id and secret on the project as variables,
+so they never sit in a file. Schema and flow changes are published by the
+commands that ship configuration edits, and the result lists them as
+`next_commands`. Today those
 are `plan` and `apply` (ADR 007). [ADR 035 §CLI](035-configuration-environments.md)
 removes `plan` and replaces `apply` with `deploy`. When that lands,
 `next_commands` changes with it, and these commands do not change.
@@ -85,17 +92,20 @@ written.
 
 ### 3. Refusals
 
-Every refusal happens before anything is written, including under `--dry-run`.
+Every refusal happens before anything is written or published, including under
+`--dry-run`, so a dry run fails exactly where the real run would.
 
 - **A flow would break.** Before any change, the command validates each login
   flow that runs against the schema, using the schema and flows as they would
   be after the change. It uses the validator `plan` uses. If the change adds an
   error, such as a step that still collects `x-auth-methods#password` or still
   offers a `passkey` action, the command refuses and names each flow and step.
-  Errors the flow already had do not count. The command matches flows to a
-  schema by the published id, the id it replaced, the schema's `$id`, or the
-  file name. Before the first `apply` that is broader than `plan`'s matching,
-  so the command can be stricter than `plan`, but never looser.
+  Errors the flow already had do not count. A flow belongs to the schema when
+  its `user_schema` is the id `.zitadel/state.json` records for the schema or
+  the id that one replaced; otherwise when it is the schema's `$id`; and, for a
+  schema with no `$id`, when it ends in the schema's file name. Before the
+  first `apply` this can match more flows than `plan` does, so a command may
+  refuse a change `plan` would accept, but never the reverse.
 - **A flow cannot be checked.** A flow file that does not match the flow
   schema, or that has a structural error such as a purpose pointing at a
   missing step, is not checked for sign-in methods by the validator. The
@@ -111,26 +121,38 @@ Every refusal happens before anything is written, including under `--dry-run`.
   [ADR 064 §10](064-cli-resource-commands.md) guards destructive verbs. In a
   terminal the command asks for confirmation, and declining ends as `skipped`.
   Non-interactively, and under `--dry-run`, it refuses unless `--force` is
-  passed, and the refusal carries the exact command to re-run with `--force`.
+  passed, and the refusal carries the exact command to re-run with `--force`,
+  plus commands that enable another method instead.
   `--force` overrides this guard only. The other refusals protect against a
   `plan` or `apply` that would fail, so no flag overrides them, and they are
   checked before the prompt.
 
   The guard reads the schema alone. Whether anyone can actually sign in also
   depends on the active flows: a method is only reachable when the schema
-  enables it and an active flow's login journey offers it. The commands cannot
-  remove a method that an active flow offers, because the flow refusal above
-  stops them first, so losing every reachable method takes a flow edit. To make
-  that visible, every run warns when, after the change, no active flow offers
-  any method the schema enables.
+  enables it and an active flow's login journey offers it. `password` and
+  `passkey` cannot remove a method that an active flow offers, because the flow
+  refusal above stops them first. `sso disable` removes the provider from the
+  flows as well as the schema, so for it the guard is what stops the last
+  provider going unnoticed. Either way, a schema can still end up with methods
+  that no flow offers, for example after a flow edit. To make that visible,
+  every run warns when, after the change, the schema enables a method but no
+  active flow offers any of them.
 
+- **Suggested commands stay safe to run.** The schema name comes from a file
+  name and `--cwd` from the user. When either would need shell quoting,
+  `next_commands` is left empty, because quoting differs between POSIX shells,
+  PowerShell and cmd.exe. The same commands are always given as argument lists:
+  `data.next_args` on success, and `details.retry_args` and
+  `details.suggested_args` on a refusal. A follow-up carries `--cwd` when the
+  run did, and a dry run's suggestions keep `--dry-run`.
 - **Password needs an identifier.** Enabling password on a schema without
   `x-identifier` is refused, because the server rejects that combination and
   `plan` does not catch it.
 - **Values that are not the right shape are refused, not overwritten.** This
-  covers an `x-auth-methods` that is not an object, an entry without a boolean
-  `enabled`, and a schema that points at an external URL instead of holding
-  its own methods.
+  covers an `x-auth-methods` that is not an object, an entry (`sso`
+  included) without a boolean `enabled`, an `sso.providers` that is not a
+  list, and a schema that points at an external URL instead of holding its
+  own methods.
 
 ### 4. Enabling does not make a method appear
 
@@ -161,8 +183,8 @@ command. CLI output, `setup`'s suggestions and the agent contract
 - A change that would break `plan` or `apply` is caught before the file is
   written.
 - Disabling a method that a flow uses is still two steps: edit the flow, then
-  run the command. A later decision can let the commands rewrite the shipped
-  default flow, but not hand-edited ones.
+  run the command. A later decision may let the commands rewrite the shipped
+  default flow; hand-edited flows would stay the developer's to change.
 - `zitadel auth` is left unused.
 - Adding `otp`, `magic_link` or a new SSO provider adds commands or provider
   settings without changing the existing commands.

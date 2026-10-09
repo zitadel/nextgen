@@ -218,8 +218,9 @@ export default class SsoEnable extends BaseCommand {
       consola.info(`Callback URI   ${callbackUri}`);
       consola.info(`Create it at   ${entry.consoleUrl}`);
 
-      // Before the credentials: on a development build the provider may be a
-      // local stand-in, and the client is registered with whatever answers.
+      // Before the credentials: on a development run (ZITADEL_CLI_DEV) the
+      // provider may be a local stand-in, and the client is registered with
+      // whatever answers.
       const endpoints = await askConnectionEndpoints({
         provider,
         developmentBuild: isDevelopmentBuild() && !nonInteractive,
