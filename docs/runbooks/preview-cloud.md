@@ -64,7 +64,7 @@ same file) so the website can own every path.
    `sslmode=verify-full&sslrootcert=system`. Vercel starts one container
    per simultaneous request when none is warm, each with its own pgx
    pool, so without the pooler a burst exhausts a small cluster's
-   `max_connections` (PS-5: 25) within seconds. Raise it to 50 in the cluster's Parameters tab, as PlanetScale's own "High connections on primary" warning suggests, or the direct port stays tight for ten minutes after every burst while PgBouncer holds its idle server connections.
+   `max_connections` (PS-5 default: 25) within seconds, and PgBouncer's own server pool (up to 20 per role, held idle for ten minutes) fills the direct port the migrate step needs. The preview cluster runs with `max_connections` 50 since 2026-10-08 (Parameters tab, needs a restart); do the same for production.
 
 ### 2. Master keys
 
@@ -317,10 +317,10 @@ older state is a revert on `main`.
   24 seeded project creations, 72 of 72 answered 201); on the direct port
   the same bursts exhausted the PS-5 cluster's 25 connections within
   seconds and the instances that could not reach the database failed
-  their boot, which Vercel reports as `FUNCTION_INVOCATION_FAILED`. The
-  migrate step still uses the direct port, so a production build during a
-  heavy burst on a small cluster can fail on a refused connection; retry
-  the deployment. See the design note for the measurements.
+  their boot, which Vercel reports as `FUNCTION_INVOCATION_FAILED`. With
+  `max_connections` at 50 the direct port kept about 24 free slots during
+  the bursts, which is what the migrate step needs. See the design note
+  for the measurements.
 - **Egress:** no static IP for functions. The database is protected by TLS
   and the role password only.
 - **Smoke test by hand:**

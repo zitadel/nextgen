@@ -393,11 +393,13 @@ failed requests with 500. That is what the Go runtime's failures were too.
 | container, direct port, warm instances | 0 | 9–13 | 11–15 |
 | container, PgBouncer, one warm instance | 10 | 24 | 0 |
 | container, PgBouncer, warm instances (twice) | 0 | 24 | 0 |
+| container, PgBouncer, `max_connections` 50, cold | 24 | 23 | 1 |
+| container, PgBouncer, `max_connections` 50, warm (twice) | 0 | 24 | 0 |
 
 Through PgBouncer the server-side connections of the preview role stayed
 at 13 during the bursts; the direct port was saturated by PgBouncer's own
 server pool plus PlanetScale's processes, which is a PS-5 sizing fact
-rather than an application one. PlanetScale's dashboard shows it directly: PgBouncer 2/400 clients with 19 server connections, direct 22/25, and a "High connections on primary" warning. PgBouncer keeps idle server connections for ten minutes (`server_idle_timeout`), so the direct port stays tight for that long after a burst.
+rather than an application one. After raising `max_connections` to 50 (a restart) the direct port kept about 24 free slots through the bursts while PgBouncer held 22 server connections; the one remaining failure is a cold start that did not bind its port inside Vercel's provisioning window when 24 containers booted at once, which the production keep-warm cron avoids. PlanetScale's dashboard shows it directly: PgBouncer 2/400 clients with 19 server connections, direct 22/25, and a "High connections on primary" warning. PgBouncer keeps idle server connections for ten minutes (`server_idle_timeout`), so the direct port stays tight for that long after a burst.
 
 **What changed:**
 
