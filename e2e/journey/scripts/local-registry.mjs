@@ -109,14 +109,14 @@ export async function packPackages(
 }
 
 export async function verifyTarballs(repoRoot, tarballsDir, run, env) {
-  await run("node", ["apps/cli-journey-e2e/scripts/verify-tarballs.mjs", tarballsDir], {
+  await run("node", ["e2e/journey/scripts/verify-tarballs.mjs", tarballsDir], {
     cwd: repoRoot,
     env,
   });
 }
 
 export async function publishTarballs(repoRoot, tarballsDir, registryUrl, npmrcPath, run, env) {
-  await run("node", ["apps/cli-journey-e2e/scripts/publish-tarballs.mjs", tarballsDir], {
+  await run("node", ["e2e/journey/scripts/publish-tarballs.mjs", tarballsDir], {
     cwd: repoRoot,
     env: {
       ...env,

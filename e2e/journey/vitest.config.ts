@@ -9,10 +9,13 @@ import { baseTest } from "../../vitest.shared.mjs";
  * separate runner (`e2e*` tasks) and are not selected here.
  */
 export default defineConfig({
+  // The task runs from the package root (e2e); pin the root to this
+  // subfolder so the globs below resolve against journey/, not e2e/.
+  root: import.meta.dirname,
   cacheDir: ".vitest",
   test: {
     ...baseTest,
-    name: "@zitadel/cli-journey-e2e",
+    name: "@zitadel/e2e",
     environment: "node",
     include: ["scripts/**/*.test.mjs"],
     coverage: { ...baseTest.coverage, include: ["scripts/**/*.mjs"] },

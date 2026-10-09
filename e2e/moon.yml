@@ -1,0 +1,170 @@
+id: "e2e"
+language: "typescript"
+layer: "automation"
+stack: "frontend"
+# The project that holds every end-to-end test. It consolidates what used to be
+# four sibling packages — console-e2e, demo-next-e2e, demo-nuxt-e2e,
+# cli-journey-e2e — into one automation-layer node that may depend on everything
+# it drives. Each former package is now a subfolder (console/, demo-next/,
+# demo-nuxt/, journey/).
+#
+# Outside this file the project is just another package with a `test` task:
+# `moon ci :test` runs it like every other package. The individual lanes below
+# are an internal detail — `test` depends on them, so there is no need to name a
+# lane anywhere else. They are `runInCI: true` because `test` (which runs in CI)
+# depends on them; the `:test` target selects `test`, and the lanes run as its
+# dependencies.
+dependsOn:
+  - "api-mock"
+  - "cli"
+  - "console"
+  - "demo-next"
+  - "demo-nuxt"
+  - "testing"
+
+workspace:
+  inheritedTasks:
+    # Nothing to build. `test` is inherited (it runs the journey harness unit
+    # tests via `pnpm run test:all`), so it is not excluded.
+    exclude:
+      - "build"
+
+tasks:
+  typecheck:
+    deps:
+      # The real-instance configs and src-real specs import
+      # @zitadel/testing/playwright.
+      - "testing:build"
+
+  # The one task the rest of the repo sees. Its own command runs the journey
+  # harness unit tests; its deps run every browser lane. So `moon run e2e:test`
+  # (and `moon ci :test`) execute the whole suite — unit and spec alike — with
+  # moon ordering the shared build deps (server:build, cli:build, …) once.
+  test:
+    command: "corepack pnpm run test"
+    deps:
+      - "e2e:console-smoke"
+      - "e2e:console-real"
+      - "e2e:console-embedded"
+      - "e2e:console-platform"
+      - "e2e:demo-next-mock"
+      - "e2e:demo-next-real"
+      - "e2e:demo-nuxt-mock"
+      - "e2e:journey-local"
+    options:
+      runInCI: true
+
+  # ── console lanes (former @zitadel/console-e2e) ──────────────────────────────
+
+  # Embedded shell smoke: Vite preview of the built console under its production
+  # embed base. No live API.
+  console-smoke:
+    command: "corepack pnpm exec playwright test --config console/playwright.config.mts"
+    deps:
+      - "console:build"
+    options:
+      runInCI: true
+
+  # Live console resource coverage through the Vite server-side API proxy.
+  console-real:
+    command: "corepack pnpm exec playwright test --config console/playwright.real.config.mts"
+    deps:
+      - "testing:build"
+      - "cli:build"
+      - "server:build"
+    env:
+      REAL_ZITADEL_PORT: "8093"
+      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+      NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false"
+      NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
+    options:
+      cache: false
+      runInCI: true
+
+  # The embedded surfaces, served by the binary itself — no Vite, no proxy. The
+  # only lane proving the console's API base and the Go mux routing table agree.
+  console-embedded:
+    command: "corepack pnpm exec playwright test --config console/playwright.embedded.config.mts"
+    deps:
+      - "testing:build"
+      - "cli:build"
+      - "server:build"
+    env:
+      EMBEDDED_ZITADEL_PORT: "8095"
+      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+      NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false"
+    options:
+      cache: false
+      runInCI: true
+
+  # The embedded console against a deployment with the platform project
+  # bootstrapped (the server default).
+  console-platform:
+    command: "corepack pnpm exec playwright test --config console/playwright.platform.config.mts"
+    deps:
+      - "testing:build"
+      - "cli:build"
+      - "server:build"
+    env:
+      PLATFORM_ZITADEL_PORT: "8097"
+      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+    options:
+      cache: false
+      runInCI: true
+
+  # ── demo-next lanes (former @zitadel/demo-next-e2e) ──────────────────────────
+
+  # Mock lane: the demo against the standalone @zitadel/api-mock TCP server.
+  demo-next-mock:
+    command: "corepack pnpm exec playwright test --config demo-next/playwright.config.mts"
+    deps:
+      - "api-mock:build"
+      - "sdk-next:build"
+    options:
+      runInCI: true
+
+  # Real lane: the same sign-in journey against a real ephemeral instance seeded
+  # via @zitadel/testing instead of api-mock.
+  demo-next-real:
+    command: "corepack pnpm exec playwright test --config demo-next/playwright.real.config.mts"
+    deps:
+      - "testing:build"
+      - "cli:build"
+      - "server:build"
+    env:
+      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+      NEXTGEN_SERVER_LOGIN_ENABLED: "false"
+      NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
+      NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false"
+    options:
+      cache: false
+      runInCI: true
+
+  # ── demo-nuxt lane (former @zitadel/demo-nuxt-e2e) ───────────────────────────
+
+  # Mock lane: the Vue / Nitro demo against @zitadel/api-mock.
+  demo-nuxt-mock:
+    command: "corepack pnpm exec playwright test --config demo-nuxt/playwright.config.mts"
+    deps:
+      - "api-mock:build"
+      - "sdk-nuxt:build"
+    options:
+      runInCI: true
+
+  # ── journey lane (former @zitadel/cli-journey-e2e) ───────────────────────────
+
+  # The CLI customer setup journey. `--ci` runs the fixed variant set in one
+  # process (fresh-app framework matrix, passkey preset, pre-existing app,
+  # testkit); `--runtime binary` drives the built server binary; the runner
+  # builds its own release tarballs (via release:pack), so it is self-contained
+  # — no snapshot handoff from the workflow.
+  journey-local:
+    command: "corepack pnpm run e2e-local -- --ci --matrix full --runtime binary"
+    env:
+      ZITADEL_TELEMETRY: "0"
+    deps:
+      - "cli:build"
+      - "testing:build"
+    options:
+      cache: false
+      runInCI: true

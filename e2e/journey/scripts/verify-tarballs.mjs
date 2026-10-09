@@ -7,7 +7,7 @@ import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
 
 const [tarballsDir, ...flags] = process.argv.slice(2);
 if (!tarballsDir || tarballsDir.startsWith("--")) {
-  throw new Error("usage: node apps/cli-journey-e2e/scripts/verify-tarballs.mjs <tarballs-dir>");
+  throw new Error("usage: node e2e/journey/scripts/verify-tarballs.mjs <tarballs-dir>");
 }
 if (flags.length > 0) {
   throw new Error(`unknown flags: ${flags.join(", ")}`);

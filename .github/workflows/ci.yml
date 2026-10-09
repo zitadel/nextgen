@@ -84,20 +84,19 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
         run: moon run server:check-generate-pruned
 
-      # Chromium for the standalone e2e suites and journeys, gated by ci-mode.
-      # The components/api-mock/storybook browser `:test` lanes provision their
-      # own Chromium through a moon `install-browsers` dep, so they need no step
-      # here — moon installs it exactly when one of those tasks is affected.
+      # Chromium for the e2e lanes (now part of `:test` via the e2e project's
+      # `test` task). moon's component/storybook browser lanes install their own
+      # through an `install-browsers` dep; this covers the Playwright e2e specs.
       - name: Cache Playwright browsers
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.browsers == 'true' }}
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Playwright Chromium
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.browsers == 'true' }}
-        run: corepack pnpm --filter @zitadel/components exec playwright install chromium
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: corepack pnpm --filter @zitadel/e2e exec playwright install chromium
 
       - name: Keep Docker's interface churn away from Chromium
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
@@ -109,6 +108,11 @@ jobs:
         # interfaces only; loopback and the runner's NIC keep it. (#1490)
         run: sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
 
+      # The e2e suites run here too: the `e2e` project's `test` task fans out to
+      # every lane (console real/embedded/platform, demo mock/real, the CLI
+      # journey matrix) and depends on server:build / cli:build, so `:test`
+      # orders and runs them through the DAG — no hand-written per-lane steps,
+      # no release-snapshot handoff (the journey runner builds its own tarballs).
       - name: Run Moon build and test graph
         id: moon-ci
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
@@ -121,10 +125,8 @@ jobs:
         if: ${{ failure() && steps.moon-ci.conclusion == 'failure' }}
         run: node scripts/report-moon-failures.mjs
 
-      - name: Run Go tests
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
-        run: moon run server:test
-
+      # Go integration lanes stay hand-orchestrated (not folded into this change):
+      # they are not `test` tasks, so `:test` above does not select them.
       - name: Run Go integration tests (postgres)
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
         run: moon run server:test-postgres
@@ -135,78 +137,6 @@ jobs:
       - name: Run Go integration tests (sqlite)
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
         run: moon run server:test-sqlite
-
-      # The snapshot exists here to feed the journeys, so it runs iff any
-      # journey does (the tarball handoff is a filesystem contract moon
-      # cannot see).
-      - name: Build release snapshot without container
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container
-
-      # The journey runner parallelizes the four CI variants (fresh-app matrix,
-      # passkey preset, pre-existing app, testkit) internally through its own
-      # concurrency pool, so a single process shares one port pool and one work
-      # dir instead of four orchestrated CI steps racing for ports.
-      # journey_matrix=single collapses the fresh-app framework matrix to Next
-      # when no SDK, CLI, or journey surface moved — the flow widget is
-      # framework-independent, so a server-only change proves as much on one
-      # framework as on the full matrix (apps/cli-journey-e2e/scripts/frameworks.mjs).
-      # Verdaccio proxies every public framework package the journey scaffolds
-      # pull from npmjs; persisting its storage turns a dozen cold npm installs
-      # into warm ones. The key is per-run so each save adds newly seen
-      # packages and restore-keys pulls the most recent prior store. The journey
-      # always republishes the @zitadel packages fresh (local-registry.mjs), so
-      # a stale store is still valid.
-      - name: Cache journey registry packages
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
-        uses: actions/cache@v4
-        with:
-          path: ${{ runner.temp }}/journey-verdaccio-storage
-          key: journey-verdaccio-${{ runner.os }}-${{ github.run_id }}
-          restore-keys: |
-            journey-verdaccio-${{ runner.os }}-
-
-      - name: Run journey e2e lanes
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
-        env:
-          JOURNEY_REGISTRY_STORAGE: ${{ runner.temp }}/journey-verdaccio-storage
-        run: |
-          version="$(node -p "require('./apps/server/package.json').version")"
-          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- \
-            --ci \
-            --matrix "${{ steps.ci-mode.outputs.journey_matrix }}" \
-            --runtime binary \
-            --work-dir "${RUNNER_TEMP}/ci-journey" \
-            --tarballs-dir "dist/release/${version}/npm"
-
-      # Gates the test-kit's central promise: boot a real seeded instance,
-      # then drive the real browser login with per-test users. Reuses the Go
-      # build cache and Playwright Chromium installed above.
-      - name: Run @zitadel/testing real-instance suites
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_testing_demo == 'true' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run testing:test-integration demo-next-e2e:e2e-real
-
-      # Dogfoods @zitadel/testing through a second consumer. Keep this separate
-      # from the demo suite so two local-server instances do not contend.
-      - name: Run console real-instance suite
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_console == 'true' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run console-e2e:e2e-real
-
-      # The embedded-surface suite: the binary serves console, hosted login,
-      # and the API from one origin — the only lane exercising the production
-      # request path (no Vite proxy rewriting /api). Its own step so the two
-      # console instances run sequentially, same rationale as above.
-      - name: Run console embedded-surface suite
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_console == 'true' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run console-e2e:e2e-embedded
-
-      # The same binary with the platform project bootstrapped (#1300): a
-      # platform operator signs up through the console and manages a granted
-      # customer project on the session cookie alone. Its own step, same
-      # rationale as above.
-      - name: Run console platform-project suite
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_console == 'true' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run console-e2e:e2e-platform
 
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
@@ -220,7 +150,7 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
         run: |
           version="$(node -p "require('./apps/server/package.json').version")"
-          node apps/cli-journey-e2e/scripts/verify-tarballs.mjs "dist/release/${version}/npm"
+          node e2e/journey/scripts/verify-tarballs.mjs "dist/release/${version}/npm"
 
       - name: Upload release snapshot
         if: ${{ always() }}
@@ -247,7 +177,7 @@ jobs:
         with:
           name: console-e2e-diagnostics
           path: |
-            apps/console-e2e/test-results
-            apps/console-e2e/playwright-report
+            e2e/console/test-results
+            e2e/console/playwright-report
           if-no-files-found: ignore
           retention-days: 7

@@ -186,9 +186,9 @@ interaction is in
 [CONTRIBUTING.md](CONTRIBUTING.md#running-integration-and-end-to-end-tests)):
 
 ```sh
-corepack pnpm --filter @zitadel/demo-next-e2e exec playwright install
-moon run demo-next-e2e:e2e
-moon run demo-nuxt-e2e:e2e
+corepack pnpm --filter @zitadel/e2e exec playwright install
+moon run e2e:demo-next-mock
+moon run e2e:demo-nuxt-mock
 ```
 
 The local reproduction command for the fresh-app consumer journey gate is:
@@ -252,7 +252,7 @@ upward**. When deciding where a new test belongs:
    the proxy and route-protection layers are framework-specific.
 
 The consumer journey suite is the exception to the checked-in demo ownership
-rule: it belongs in `apps/cli-journey-e2e/` and must exercise a freshly
+rule: it belongs in `e2e/journey/` and must exercise a freshly
 generated app because it protects the customer local setup path.
 
 A new test belongs at e2e level only when the boundary it covers is

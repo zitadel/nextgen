@@ -1,12 +1,12 @@
 ---
-applyTo: "apps/cli-journey-e2e/**,.github/workflows/ci.yml"
+applyTo: "e2e/journey/**,.github/workflows/ci.yml"
 ---
 
 # Consumer Journey Review Instructions
 
 Review consumer journey changes as the required customer local setup quality
 gate, not as a demo-app e2e suite. The canonical contract is
-[`apps/cli-journey-e2e/AGENTS.md`](../../apps/cli-journey-e2e/AGENTS.md) —
+[`e2e/journey/AGENTS.md`](../../e2e/journey/AGENTS.md) —
 tarball packing (`moon run release:pack`), the `PUBLIC_RELEASE_PACKAGES`
 manifest + `verify-tarballs.mjs` enforcement, the 8-framework matrix, the
 single `--ci` runner invocation that runs all journey variants (fresh-app,

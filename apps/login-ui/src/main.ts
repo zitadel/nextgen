@@ -142,7 +142,7 @@ function loginWidget(projectId: string, publishableKey?: string): HTMLElement {
  * into either way — previewing widget chrome without one is what
  * `?project_id=` is for. Hence no `*_RUNTIME_FALLBACK` opt-in on this side:
  * no automated lane serves the shell without the document
- * (`console-e2e:e2e-embedded` runs the real binary with both surfaces on).
+ * (`e2e:console-embedded` runs the real binary with both surfaces on).
  */
 async function fetchRuntime(): Promise<RuntimeResult> {
   let response: Response;

@@ -170,9 +170,9 @@ for local tests; raw IP origins like `127.0.0.1` are invalid. The default
 step; boot `preset: "passkey-first"` for one-tap discoverable-credential
 login flows.
 
-The two in-repo consumers are `apps/demo-next-e2e/playwright.real.config.mts`
-and `apps/console-e2e/playwright.real.config.mts` — run them with
-`moon run demo-next-e2e:e2e-real` / `moon run console-e2e:e2e-real`.
+The two in-repo consumers are `e2e/demo-next/playwright.real.config.mts`
+and `e2e/console/playwright.real.config.mts` — run them with
+`moon run e2e:demo-next-real` / `moon run e2e:console-real`.
 
 ### Composable pieces
 
@@ -286,7 +286,7 @@ or export.
 **One instance per suite, one fresh user per test.** Emails are unique per
 project, so per-test `seed.user()` calls are isolation enough for login-flow
 tests, and tests run fully parallel against the shared instance
-(demonstrated by `demo-next-e2e:e2e-real`, 2 workers).
+(demonstrated by `e2e:demo-next-real`, 2 workers).
 
 Typical timings with the SQLite local default (dated estimates from a July 2026 dev build — orders of magnitude, not a benchmark; remeasure locally before relying on them):
 
@@ -321,7 +321,7 @@ own suites run `moon run server:build` and point the kit at the result via
 `serverBinaryHint` exists for this). Most in-repo moon tasks set
 `NEXTGEN_SERVER_LOGIN_ENABLED=false` / `NEXTGEN_SERVER_CONSOLE_ENABLED=false`
 because they drive the app-embedded login, not the server-hosted `/ui/*`; the
-exception is `console-e2e:e2e-embedded`, which keeps both surfaces on and
+exception is `e2e:console-embedded`, which keeps both surfaces on and
 omits `app` — the binary-served `/ui/*` pages are its subject. Customer
 installs need none of this.
 

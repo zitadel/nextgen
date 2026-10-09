@@ -1,14 +1,18 @@
 {
-  "name": "@zitadel/demo-next-e2e",
+  "name": "@zitadel/e2e",
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --config journey/vitest.config.ts",
+    "test:all": "pnpm run test",
+    "e2e-local": "node journey/scripts/run-local.mjs"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
     "@types/node": "catalog:",
     "@zitadel/api-mock": "workspace:*",
+    "@zitadel/sdk-nuxt": "workspace:*",
     "@zitadel/testing": "workspace:*",
     "typescript": "catalog:"
   }

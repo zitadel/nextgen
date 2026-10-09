@@ -9,8 +9,8 @@ import { computeMode, forceFullReason, queryAffectedTargets, resolveGates } from
 // exercising one trigger path rather than full captures.
 
 const GO_CLASS = [
-  "console-e2e:e2e-real",
-  "demo-next-e2e:e2e-real",
+  "e2e:console-real",
+  "e2e:demo-next-real",
   "release:snapshot",
   "server:build",
   "server:check-generate",
@@ -26,16 +26,16 @@ const GO_CLASS = [
 ];
 const DOCS_CLASS = ["workspace:check-adrs"];
 const JOURNEY_CLASS = [
-  "cli-journey-e2e:e2e",
-  "cli-journey-e2e:e2e-local",
-  "cli-journey-e2e:e2e-testkit",
-  "cli-journey-e2e:lint",
-  "cli-journey-e2e:test",
+  "e2e:journey-e2e",
+  "e2e:journey-e2e-local",
+  "e2e:journey-e2e-testkit",
+  "e2e:journey-lint",
+  "e2e:journey-test",
 ];
 const CONSOLE_CLASS = [
-  "console-e2e:e2e",
-  "console-e2e:e2e-embedded",
-  "console-e2e:e2e-real",
+  "e2e:console-smoke",
+  "e2e:console-embedded",
+  "e2e:console-real",
   "console:build",
   "console:build-release",
   "console:dev",
@@ -44,7 +44,7 @@ const CONSOLE_CLASS = [
   "console:preview",
   "console:test",
   "console:typecheck",
-  "demo-next-e2e:e2e-real",
+  "e2e:demo-next-real",
   "release:pack",
   "release:publish",
   "release:snapshot",
@@ -63,8 +63,8 @@ const SDK_VUE_CLASS = [
   "sdk-vue:typecheck",
 ];
 const LOGIN_UI_CLASS = [
-  "console-e2e:e2e-real",
-  "demo-next-e2e:e2e-real",
+  "e2e:console-real",
+  "e2e:demo-next-real",
   "login-ui:build",
   "login-ui:build-release",
   "login-ui:dev",
@@ -78,11 +78,11 @@ const LOGIN_UI_CLASS = [
   "testing:test-integration",
 ];
 const TESTING_KIT_CLASS = [
-  "cli-journey-e2e:e2e",
-  "cli-journey-e2e:e2e-local",
-  "cli-journey-e2e:e2e-testkit",
-  "console-e2e:e2e-real",
-  "demo-next-e2e:e2e-real",
+  "e2e:journey-e2e",
+  "e2e:journey-e2e-local",
+  "e2e:journey-e2e-testkit",
+  "e2e:console-real",
+  "e2e:demo-next-real",
   "release:build-public-packages",
   "release:pack",
   "release:publish",
@@ -97,9 +97,9 @@ const TESTING_KIT_CLASS = [
 // Full capture, 2026-08-04: components feeds every SDK, both UIs, the CLI,
 // and the journey project — 91 tasks, correctly close to "everything".
 const COMPONENTS_CLASS = [
-  "cli-journey-e2e:e2e",
-  "cli-journey-e2e:e2e-local",
-  "cli-journey-e2e:e2e-testkit",
+  "e2e:journey-e2e",
+  "e2e:journey-e2e-local",
+  "e2e:journey-e2e-testkit",
   "cli:build",
   "cli:build-release",
   "cli:lint",
@@ -111,16 +111,16 @@ const COMPONENTS_CLASS = [
   "components:lint",
   "components:test",
   "components:typecheck",
-  "console-e2e:e2e",
-  "console-e2e:e2e-real",
+  "e2e:console-smoke",
+  "e2e:console-real",
   "console:build",
   "console:build-release",
   "console:lint",
   "console:preview",
   "console:test",
   "console:typecheck",
-  "demo-next-e2e:e2e",
-  "demo-next-e2e:e2e-real",
+  "e2e:demo-next-mock",
+  "e2e:demo-next-real",
   "demo-next:build",
   "demo-next:dev",
   "demo-next:lint",
@@ -306,7 +306,7 @@ test("testing-kit change runs all journeys with the full matrix", () => {
 test("journey-project change runs all journeys, full matrix, and the snapshot that feeds them", () => {
   const { gates, matrix } = resolveGates({
     mode: "full",
-    files: ["apps/cli-journey-e2e/src/user-journey.spec.ts"],
+    files: ["e2e/journey/src/user-journey.spec.ts"],
     targets: JOURNEY_CLASS,
   });
   assert.deepEqual(journeys(gates), [true, true, true, true]);
@@ -336,8 +336,8 @@ test("embedded-lane affectedness alone trips the console gate", () => {
   // to either console lane, not just e2e-real.
   const { gates } = resolveGates({
     mode: "full",
-    files: ["apps/console-e2e/src-embedded/embedded-console.spec.ts"],
-    targets: ["console-e2e:e2e-embedded"],
+    files: ["e2e/console/src-embedded/embedded-console.spec.ts"],
+    targets: ["e2e:console-embedded"],
   });
   assert.equal(gates.suites_console, true);
   assert.equal(gates.browsers, true);

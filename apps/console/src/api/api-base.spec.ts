@@ -6,7 +6,7 @@ import { _resetConfigForTesting } from "@zitadel/api/config";
  * Pins both branches of the API base (Console ADR 0002 §4, revised): the
  * embedded production build must target the origin root — `/api` exists only
  * under the dev server, whose proxy strips it, and the Go mux has never
- * served it. The embedded e2e lane (`console-e2e:e2e-embedded`) proves the
+ * served it. The embedded e2e lane (`e2e:console-embedded`) proves the
  * full request path but is opt-in local; this spec is the CI-visible guard
  * on the client half, the counterpart of `cmd/server/mux_test.go` pinning
  * the server half. The original bug — an unconditional `/api` default —

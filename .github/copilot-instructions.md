@@ -40,8 +40,8 @@ touched path** — read those first; the scoped files under
   dependency shared by several packages that is not a `catalog:` entry
   ([`AGENTS.md` — Node.js version](../AGENTS.md#nodejs-version)).
 - Licensing split: [`LICENSING.md`](../LICENSING.md).
-- Journey-gate changes (`apps/cli-journey-e2e/**`, `ci.yml` journey steps):
-  [`apps/cli-journey-e2e/AGENTS.md`](../apps/cli-journey-e2e/AGENTS.md) is
+- Journey-gate changes (`e2e/journey/**`, `ci.yml` journey steps):
+  [`e2e/journey/AGENTS.md`](../e2e/journey/AGENTS.md) is
   canonical (the project id is `cli-journey-e2e`).
 - Local runtime command changes: verify `.zitadel/local/` state handling,
   `--server local` resolution, and the zero-config smoke paths per

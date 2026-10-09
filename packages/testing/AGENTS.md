@@ -157,8 +157,8 @@ a `testing:build` task dep.
 - `moon run testing:test testing:lint testing:typecheck` — unit gate.
 - `moon run testing:test-integration` — boots real instances
   (binary + SQLite local default).
-- Dogfood: `moon run demo-next-e2e:e2e-real`, `moon run console-e2e:e2e-real`,
-  `env -u CI moon run cli-journey-e2e:e2e-testkit` (customer install path).
+- Dogfood: `moon run e2e:demo-next-real`, `moon run e2e:console-real`,
+  `moon run e2e:journey-local` (runs the testkit variant among others).
 
 The real-instance lanes carry `runInCI: false`, but that only keeps them
 out of moon's automatic CI selection — `full-pr` runs all of them through

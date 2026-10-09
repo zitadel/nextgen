@@ -271,12 +271,12 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
   `moon run server:test-sqlite`.
 - `moon run release:snapshot -- --skip-container` — a non-publishing release
   snapshot.
-- All consumer journey variants in one process (`cli-journey-e2e:e2e-local
+- All consumer journey variants in one process (`e2e:journey-local
   --ci`): the fresh-app framework matrix, the passkey-first preset, the
   pre-existing-app posture, and the test-kit consumer suite — run concurrently
   with the npm binary runtime against the snapshot's packed tarballs.
 - The real-instance suites: `testing:test-integration` with
-  `demo-next-e2e:e2e-real`, then `console-e2e:e2e-real`.
+  `e2e:demo-next-real`, then `e2e:console-real`.
 
 Within full mode, the steps after the `moon ci` graph are additionally gated
 by moon's affected task selection (`moon query tasks --affected --downstream
@@ -405,9 +405,9 @@ These tests start real servers and require a browser install, so they are opt-in
 locally. The demo suites exercise the checked-in framework demos:
 
 ```sh
-corepack pnpm --filter @zitadel/demo-next-e2e exec playwright install
-moon run demo-next-e2e:e2e
-moon run demo-nuxt-e2e:e2e
+corepack pnpm --filter @zitadel/e2e exec playwright install
+moon run e2e:demo-next-mock
+moon run e2e:demo-nuxt-mock
 ```
 
 ### Fresh-app journey

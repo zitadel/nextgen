@@ -151,7 +151,7 @@ export function isNonShippingFile(file) {
   }
 
   // End-to-end suites live beside the app they exercise and ship with none of it.
-  if (/^apps\/[^/]*-e2e\//.test(path) || /^apps\/demo-[^/]+\//.test(path)) {
+  if (/^apps\/(?:e2e|[^/]*-e2e)\//.test(path) || /^apps\/demo-[^/]+\//.test(path)) {
     return true;
   }
 
@@ -192,7 +192,7 @@ export function suggestType(files) {
       (path) =>
         isTestFile(path) ||
         path.includes("/testdata/") ||
-        /^apps\/[^/]*-e2e\//.test(path) ||
+        /^apps\/(?:e2e|[^/]*-e2e)\//.test(path) ||
         /^apps\/demo-[^/]+\//.test(path) ||
         path.startsWith("apps/mock-zitadel/") ||
         path.startsWith("packages/api-mock/"),

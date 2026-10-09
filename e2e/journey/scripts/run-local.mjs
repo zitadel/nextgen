@@ -303,7 +303,7 @@ async function runFrameworkJourney(context) {
   try {
     await mkdir(context.diagnosticsDir, { recursive: true });
     log(`[${prefix}] preparing fresh ${framework.displayName} app`);
-    await run("node", ["apps/cli-journey-e2e/scripts/prepare-app.mjs"], {
+    await run("node", ["e2e/journey/scripts/prepare-app.mjs"], {
       env: {
         ...process.env,
         // Pin every JOURNEY_* variable prepare-app reads: a preceding CI
@@ -352,12 +352,12 @@ async function runFrameworkJourney(context) {
       [
         "pnpm",
         "--filter",
-        "@zitadel/cli-journey-e2e",
+        "@zitadel/e2e",
         "exec",
         "playwright",
         "test",
         "--config",
-        "playwright.config.mts",
+        "journey/playwright.config.mts",
       ],
       {
         env: {
@@ -399,7 +399,7 @@ async function runTestkitJourney(context) {
   try {
     await mkdir(context.diagnosticsDir, { recursive: true });
     log(`[${prefix}] preparing fresh ${framework.displayName} app`);
-    await run("node", ["apps/cli-journey-e2e/scripts/prepare-app.mjs"], {
+    await run("node", ["e2e/journey/scripts/prepare-app.mjs"], {
       env: {
         ...scrubRepoOverrides(process.env),
         JOURNEY_APP_DIR: context.appDir,
@@ -543,7 +543,7 @@ async function ensurePlaywrightBrowsers() {
   await run("corepack", [
     "pnpm",
     "--filter",
-    "@zitadel/cli-journey-e2e",
+    "@zitadel/e2e",
     "exec",
     "playwright",
     "install",

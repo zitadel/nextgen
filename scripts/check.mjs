@@ -109,14 +109,14 @@ async function phaseNodeE2e() {
   await run("corepack", [
     "pnpm",
     "--filter",
-    "@zitadel/demo-next-e2e",
+    "@zitadel/e2e",
     "exec",
     "playwright",
     "install",
     "chromium",
   ]);
-  await run("moon", ["run", "demo-next-e2e:e2e"]);
-  await run("moon", ["run", "demo-nuxt-e2e:e2e"]);
+  await run("moon", ["run", "e2e:demo-next-mock"]);
+  await run("moon", ["run", "e2e:demo-nuxt-mock"]);
 }
 
 async function phasePack() {

@@ -18,7 +18,7 @@ import { isDirectRun } from "./dev-process.mjs";
 //    single representative framework when no SDK, CLI, or journey surface
 //    moved: the scaffolded flow widget is framework-independent, so a
 //    server-only change proves as much on one framework as on the full
-//    matrix (apps/cli-journey-e2e/scripts/frameworks.mjs owns the list).
+//    matrix (e2e/journey/scripts/frameworks.mjs owns the list).
 //
 // The gates fail open: known repo-wide files no task claims (workflow
 // definitions, scripts/, moon config, root manifests and compiler/release
@@ -95,7 +95,7 @@ const SHARED_JOURNEY_TRIGGERS = [
   "sdk-next:build",
 ];
 const SDK_BUILD_RE = /^sdk-[a-z-]+:build$/;
-const JOURNEY_PROJECT_PREFIX = "cli-journey-e2e:";
+const JOURNEY_PROJECT_PREFIX = "e2e:journey";
 
 // Full framework matrix only when a surface that differs per framework
 // moved: an SDK build, the CLI (owns the scaffold templates), or the journey
@@ -108,12 +108,12 @@ const GO_TEST_TARGETS = [
   "server:test-postgres",
   "server:test-sqlite",
 ];
-const TESTING_DEMO_TARGETS = ["testing:test-integration", "demo-next-e2e:e2e-real"];
+const TESTING_DEMO_TARGETS = ["testing:test-integration", "e2e:demo-next-real"];
 // Both real-instance console lanes: the dev-proxy suite and the embedded
 // suite (binary-served /ui/* + API at one origin). Either being affected
 // runs the console gate — the workflow steps them sequentially so two local
 // instances do not contend.
-const CONSOLE_E2E_TARGETS = ["console-e2e:e2e-real", "console-e2e:e2e-embedded"];
+const CONSOLE_E2E_TARGETS = ["e2e:console-real", "e2e:console-embedded"];
 
 const ALL_GATES = [
   "go_tests",
