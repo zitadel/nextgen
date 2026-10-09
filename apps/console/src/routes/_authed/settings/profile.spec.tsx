@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
@@ -13,11 +13,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
-
 const ME_URL = "http://localhost/api/users/me";
-
-afterAll(() => vi.unstubAllEnvs());
 
 function me(overrides: Record<string, unknown> = {}) {
   return {
