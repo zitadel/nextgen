@@ -4875,16 +4875,16 @@ func unlinkedParked(claims map[string]any, verified map[string]bool) *domain.Flo
 // x-unique ones verified.
 func completeClaims() (map[string]any, map[string]bool) {
 	return map[string]any{
-		"email":       "alice@example.com",
-		"username":    "alice",
-		"given_name":  "Alice",
-		"family_name": "Liddell",
-		"badge":       "b-7",
-	}, map[string]bool{
-		"email":    true,
-		"username": true,
-		"badge":    true,
-	}
+			"email":       "alice@example.com",
+			"username":    "alice",
+			"given_name":  "Alice",
+			"family_name": "Liddell",
+			"badge":       "b-7",
+		}, map[string]bool{
+			"email":    true,
+			"username": true,
+			"badge":    true,
+		}
 }
 
 // withSSOOutcomeSteps routes the two creation outcomes to their own steps.
