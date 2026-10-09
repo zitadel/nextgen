@@ -5,48 +5,16 @@
     {% assign recover = actions | where: "name", "recover" | first %}
     {% assign password_field = fields | where: "type", "password" | first %}
     <div class="zl-field-group">
+    {% comment %}
+      Fields bind by name only: <zitadel-login> fills label, type, placeholder,
+      help, error, test hook and the forgot-password link from the step. An
+      attribute written here wins over the filled one.
+    {% endcomment %}
     {% for f in fields %}
-      {% assign field_placeholder = f.text_key | fieldPlaceholder %}
-      {% assign field_help = f.text_key | fieldHelp %}
-      {% assign field_err = f.name | fieldError: errors %}
       {% case f.type %}
-      {% when 'checkbox' %}
-        <zl-checkbox
-          name="{{ f.name }}"
-          data-testid="zitadel-field-{{ f.name | testid }}"
-          label="{{ f.text_key | t }}"
-          value="true"
-          {% if f.value %}checked{% endif %}
-          {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
-        ></zl-checkbox>
-      {% when 'select' %}
-        <zl-select
-          name="{{ f.name }}"
-          data-testid="zitadel-field-{{ f.name | testid }}"
-          label="{{ f.text_key | t }}"
-          value="{{ f.value }}"
-          options='{{ f.validation.enum | selectOptions | json }}'
-          {% if f.required %}required{% endif %}
-          {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
-        {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
-        ></zl-select>
-      {% else %}
-        <zl-field
-          name="{{ f.name }}"
-          data-testid="zitadel-field-{{ f.name | testid }}"
-          label="{{ f.text_key | t }}"
-          type="{{ f.type }}"
-          value="{{ f.value }}"
-          {% if f.autocomplete %}autocomplete="{{ f.autocomplete }}"{% endif %}
-          {% if f.required %}required{% endif %}
-          {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
-          {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
-          {% if recover and f.type == 'password' %}forgot-password-href="#" forgot-password-action="{{ recover.name }}" forgot-password-label="{{ recover.text_key | t }}"{% endif %}
-        >
-          {% if field_help != "" %}
-            <span slot="help">{{ field_help }}</span>
-          {% endif %}
-        </zl-field>
+      {% when 'checkbox' %}<zl-checkbox name="{{ f.name }}"></zl-checkbox>
+      {% when 'select' %}<zl-select name="{{ f.name }}"></zl-select>
+      {% else %}<zl-field name="{{ f.name }}"></zl-field>
       {% endcase %}
     {% endfor %}
 

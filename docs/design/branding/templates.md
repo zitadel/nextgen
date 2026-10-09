@@ -62,17 +62,10 @@ The bundled default is the reference: `packages/components/src/orchestrator/temp
     <h1 slot="header" class="zl-card-title">{{ step.texts.title_key | t: identity.display_name }}</h1>
 
     {% for f in fields %}
-      {% assign field_err = f.name | fieldError: errors %}
       {% case f.type %}
-      {% when 'checkbox' %}
-        <zl-checkbox name="{{ f.name }}" label="{{ f.text_key | t }}" value="true"></zl-checkbox>
-      {% when 'select' %}
-        <zl-select name="{{ f.name }}" label="{{ f.text_key | t }}"
-          options='{{ f.validation.enum | selectOptions | json }}'></zl-select>
-      {% else %}
-        <zl-field name="{{ f.name }}" label="{{ f.text_key | t }}" type="{{ f.type }}"
-          value="{{ f.value }}" {% if f.required %}required{% endif %}
-          {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}></zl-field>
+      {% when 'checkbox' %}<zl-checkbox name="{{ f.name }}"></zl-checkbox>
+      {% when 'select' %}<zl-select name="{{ f.name }}"></zl-select>
+      {% else %}<zl-field name="{{ f.name }}"></zl-field>
       {% endcase %}
     {% endfor %}
 
@@ -103,7 +96,8 @@ Notes:
 
 - The `typography.font_url` stylesheet is injected by the orchestrator when the element runs as `variant="page"`; the template does not emit the `<link>` tag itself.
 - `actions` is an ordered array of entries carrying `name` and a `primary: true` flag on the primary entry ([ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md)); look an action up with `{% assign submit = actions | where: "name", "submit" | first %}`. There is no `actions.primary` alias.
-- `register` and `sign_in` render as links carrying `data-action`. `recover` is passed to the password `<zl-field>` as `forgot-password-action`, and renders as a `data-action` link only on a step with no password field. Other secondary actions render as `<zl-button hierarchy="secondary">`.
+- Field atoms bind by `name` only. After each render `<zitadel-login>` fills the rest from the matching `fields` entry (`packages/components/src/orchestrator/field-fill.ts`): `label`, `type`, `value`, `autocomplete`, `required`, `placeholder`, help text, the inline `error`, the `data-testid` hook, select `options`, and the forgot-password link. An attribute the template writes itself wins, so a design can still set its own `label` or `placeholder`, and a template that binds every attribute (as ejected designs did before) renders unchanged. The `fieldError`, `fieldPlaceholder`, `fieldHelp`, `selectOptions` and `testid` filters remain for such templates.
+- `register` and `sign_in` render as links carrying `data-action`. `recover` becomes the password field's forgot-password link through the fill, and renders as a `data-action` link only on a step with no password field. Other secondary actions render as `<zl-button hierarchy="secondary">`.
 - `{% mandatory_gates %}` appends any required field and the primary action the template left out. The authoring validator requires the tag ([`validator.md`](validator.md)).
 
 ## Built-in set and the design catalog
@@ -168,7 +162,7 @@ zitadel apply                           # publishes an immutable branding revisi
 Every template should render:
 
 - One field atom per entry in the `fields` array, with `name` matching the entry's `name`: `<zl-checkbox>` for `checkbox`, `<zl-select>` for `select`, `<zl-field>` for every other type.
-- The entry's `autocomplete` on that atom's `autocomplete` attribute, verbatim, so password managers and browser autofill recognise the identifier and password inputs. Never derive the token from the field's or the step's name: the identifier is whatever property the schema designates, and whether a password is filled or generated depends on the flow's purpose, neither of which a name reveals.
+- The entry's `autocomplete` on that atom's `autocomplete` attribute, verbatim — the field fill sets it when the template does not — so password managers and browser autofill recognise the identifier and password inputs. Never derive the token from the field's or the step's name: the identifier is whatever property the schema designates, and whether a password is filled or generated depends on the flow's purpose, neither of which a name reveals.
 - One primary `<zl-button>` wired to the action with `primary: true`.
 - An affordance for each secondary action: a `<zl-button hierarchy="secondary">` or a link carrying `data-action`.
 - `<zl-passkey>` when the step carries a passkey `challenge`.

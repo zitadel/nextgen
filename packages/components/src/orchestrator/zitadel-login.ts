@@ -39,6 +39,7 @@ import { createSanitiser } from "./sanitiser.js";
 import { ZitadelSurface } from "./surface.js";
 import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
+import { fillFields, type FieldFillContext } from "./field-fill.js";
 
 import layoutChromeCss from "./templates/layout-chrome.css?inline";
 
@@ -309,6 +310,12 @@ export class ZitadelLogin extends ZitadelSurface {
   private engine: Liquid | null = null;
 
   /**
+   * What the last rendered step needs to fill its field atoms, captured by
+   * `renderStep` and applied in `updated` once the atoms exist. Non-reactive.
+   */
+  private fieldFill: FieldFillContext | null = null;
+
+  /**
    * The theme the last commit rendered with. The template output carries the
    * resolved side's mark, so a theme change rewrites the string and
    * `unsafeHTML` rebuilds the form — which drops what the visitor had typed
@@ -506,6 +513,7 @@ export class ZitadelLogin extends ZitadelSurface {
       for (const card of this.shadowRoot.querySelectorAll("zl-card")) {
         card.toggleAttribute("data-suppress-header", this.suppressHeader === true);
       }
+      if (this.fieldFill) fillFields(this.shadowRoot, this.fieldFill);
     }
     const previousTheme = this.lastRenderedTheme;
     this.lastRenderedTheme = this.themeController.theme;
@@ -1036,6 +1044,7 @@ export class ZitadelLogin extends ZitadelSurface {
 
     const fields = step.fields ?? [];
     const actions = step.actions ?? [];
+    this.fieldFill = { fields, actions, errors, locale: this.resolveLocale() };
     const context: LiquidContext = {
       step: {
         name: step.name,

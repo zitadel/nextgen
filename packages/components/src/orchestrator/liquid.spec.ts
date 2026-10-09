@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { Liquid } from "liquidjs";
+
+import { fillFields, type FieldFillContext } from "./field-fill.js";
 import { createLiquidEngine, localiseFlowErrorKeys, parseSsoError } from "./liquid.js";
 import { en as fullLocale } from "./locales/en.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
@@ -10,6 +13,27 @@ import { TEMPLATE_NAMES } from "./template-names.js";
  * `[{ name, ... }, ...]` array. Keeps each test's context authoring concise
  * while matching the runtime contract.
  */
+/**
+ * The bundled template plus the field fill `<zitadel-login>` runs after each
+ * commit: the template binds fields by name only, so the attributes a visitor
+ * gets exist only once the fill has run.
+ */
+function renderDefault(
+  engine: Liquid,
+  context: Record<string, unknown>,
+  dictionary: Record<string, string>,
+): string {
+  const template = document.createElement("template");
+  template.innerHTML = engine.renderFileSync(TEMPLATE_NAMES.default, context) as string;
+  fillFields(template.content, {
+    fields: (context.fields ?? []) as FieldFillContext["fields"],
+    actions: (context.actions ?? []) as FieldFillContext["actions"],
+    errors: (context.errors ?? []) as FieldFillContext["errors"],
+    locale: dictionary,
+  });
+  return template.innerHTML;
+}
+
 function toArray<T extends object>(entries: Record<string, T>): ({ name: string } & T)[] {
   return Object.entries(entries).map(([name, body]) => ({ name, ...body }));
 }
@@ -192,7 +216,7 @@ describe("LiquidJS engine", () => {
       messages: [],
       identity: null,
     };
-    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    const result = renderDefault(engine, context, locale);
     expect(result).toContain("<zl-page-shell");
     expect(result).toContain("<zl-card");
     expect(result).toContain("<zl-field");
@@ -227,7 +251,7 @@ describe("LiquidJS engine", () => {
       messages: [],
       identity: null,
     };
-    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    const result = renderDefault(engine, context, locale);
     expect(result).toContain('data-testid="zitadel-field-password"');
     expect(result).not.toContain('data-testid="zitadel-field-x-auth-methods#password"');
     expect(result).toContain('name="x-auth-methods#password"');
@@ -248,7 +272,7 @@ describe("LiquidJS engine", () => {
       messages: [],
       identity: { display_name: "Alice" },
     };
-    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    const result = renderDefault(engine, context, locale);
     expect(result).toContain("Sign in");
   });
 
@@ -270,7 +294,7 @@ describe("LiquidJS engine", () => {
       messages: [],
       identity: null,
     };
-    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    const result = renderDefault(engine, context, fullLocale);
     expect(result).toContain("Sign in faster next time");
     expect(result).toContain('action="setup"');
     expect(result).toContain('action="skip"');
@@ -297,7 +321,7 @@ describe("LiquidJS engine", () => {
       messages: [],
       identity: null,
     };
-    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    const result = renderDefault(engine, context, fullLocale);
     expect(result).toContain("<zl-alert data-zl-step-error");
     expect(result).toContain("The passkey prompt was closed before completing.");
     expect(result).toContain('action="setup"');
@@ -323,7 +347,7 @@ describe("LiquidJS engine", () => {
       messages: [],
       identity: null,
     };
-    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    const result = renderDefault(engine, context, fullLocale);
     expect(result).toContain("<zl-alert data-zl-step-error");
     expect(result).toContain("This passkey could not be verified");
     expect(result).not.toContain("error.passkey_invalid");
@@ -349,7 +373,7 @@ describe("LiquidJS engine", () => {
       messages: [],
       identity: null,
     };
-    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    const result = renderDefault(engine, context, fullLocale);
     expect(result).toContain("<zl-alert data-zl-step-error");
     expect(result).toContain("The new passkey could not be verified");
     expect(result).not.toContain("error.passkey_registration_invalid");
@@ -380,7 +404,7 @@ describe("LiquidJS engine", () => {
       },
     };
 
-    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    const result = renderDefault(engine, context, fullLocale);
     expect(result).toContain("<zl-passkey");
     expect(result).toContain('ceremony="register"');
     expect(result).toContain('method="passkey_register"');
@@ -409,7 +433,7 @@ describe("LiquidJS engine", () => {
       },
     };
 
-    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    const result = renderDefault(engine, context, fullLocale);
     expect(result).toContain('ceremony="register"');
     expect(result).toContain('method="passkey_register"');
   });
@@ -428,7 +452,7 @@ describe("LiquidJS engine", () => {
       messages: [],
       identity: { display_name: "Alice", email_address: "alice@acme.com" },
     };
-    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    const result = renderDefault(engine, context, locale);
     expect(result).toContain("zl-card-title");
   });
 
@@ -470,7 +494,7 @@ describe("LiquidJS engine", () => {
       messages: [],
       identity: null,
     };
-    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    const result = renderDefault(engine, context, fullLocale);
     expect(result).toContain('autocomplete="username"');
     expect(result).toContain('autocomplete="current-password"');
     expect(result).toContain('forgot-password-action="recover"');
@@ -502,7 +526,7 @@ describe("LiquidJS engine", () => {
       messages: [],
       identity: null,
     };
-    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    const result = renderDefault(engine, context, fullLocale);
     const passkeyButtons =
       result.match(/<zl-button[^>]*data-testid="zitadel-action-passkey"[^>]*>/g) ?? [];
     expect(passkeyButtons).toHaveLength(1);
@@ -542,7 +566,7 @@ describe("LiquidJS engine", () => {
       messages: [],
       identity: null,
     };
-    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    const result = renderDefault(engine, context, fullLocale);
     expect(result).toContain("Wrong email or password.");
     expect(result).toContain('name="password"');
     expect(result).toContain("invalid");
@@ -581,8 +605,10 @@ describe("LiquidJS engine", () => {
       messages: [],
       identity: null,
     };
-    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
-    expect(result).toContain('heading="We couldn&#39;t complete your sign in."');
+    const result = renderDefault(engine, context, fullLocale);
+    // Read back through the DOM (the fill needs it), so the apostrophe comes
+    // out of the serialiser unescaped — it was a parsed attribute all along.
+    expect(result).toContain(`heading="We couldn't complete your sign in."`);
     expect(result).toContain("Please try again in a few minutes");
     expect(result).toContain('autocomplete="username"');
     expect(result).toContain('autocomplete="current-password"');
@@ -621,7 +647,7 @@ describe("LiquidJS engine", () => {
       messages: [],
       identity: null,
     };
-    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    const result = renderDefault(engine, context, fullLocale);
     expect(result).toContain('autocomplete="username"');
     expect(result).toContain('autocomplete="new-password"');
     // Password complexity copy and the YYYY-MM-DD date hint were removed: only
@@ -654,7 +680,7 @@ describe("LiquidJS engine", () => {
       messages: [],
       identity: { email_address: "qwertz@acme.com" },
     };
-    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    const result = renderDefault(engine, context, locale);
     expect(result).toContain("zl-card-title");
   });
 });
@@ -686,7 +712,9 @@ describe("provider names are server data", () => {
       identity: null,
     };
 
-    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    // Raw template output: this asserts the Liquid escaping itself, which a
+    // DOM round trip would re-serialise away.
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context) as string;
 
     const attribute = /providers='([^']*)'/.exec(result);
     expect(attribute, "the providers attribute closed early").not.toBeNull();

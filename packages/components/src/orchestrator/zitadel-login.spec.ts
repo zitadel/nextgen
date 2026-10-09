@@ -492,12 +492,13 @@ describe("<zitadel-login> against the typed Flow API", () => {
     );
     expect(marker.textContent).toBe("tenant-owned");
     // patchMandatoryGates re-injects the step's mandatory fields into tenant
-    // templates that omit them, so a bare zl-field is expected — but the
-    // bundled default (recognisable by its data-testid markers) must not be
-    // the template that rendered.
+    // templates that omit them, and the field fill gives that field its test
+    // hook — but the bundled default (recognisable by its field group) must
+    // not be the template that rendered.
+    expect(element.shadowRoot!.querySelector(".zl-field-group")).toBeNull();
     expect(
       element.shadowRoot!.querySelector('zl-field[data-testid="zitadel-field-email"]'),
-    ).toBeNull();
+    ).toBeTruthy();
   });
 
   it("renders a primary passkey action as exactly one button", async () => {

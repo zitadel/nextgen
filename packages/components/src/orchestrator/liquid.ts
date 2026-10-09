@@ -92,10 +92,7 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
     "t",
     function tFilter(this: { context: unknown }, key: unknown, ...args: unknown[]) {
       const lookupKey = stringify(key);
-      let template =
-        options.locale[lookupKey] ??
-        injectedKeyFallback(options.locale, lookupKey) ??
-        fieldLabelFallback(lookupKey);
+      let template = lookupText(options.locale, lookupKey);
       if (template === undefined) {
         template = lookupKey;
         if (lookupKey !== "" && !warnedMissingKeys.has(lookupKey)) {
@@ -204,6 +201,15 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
 const INJECTED_KEY_FALLBACKS: ReadonlyArray<{ suffix: string; fallback: string }> = [
   { suffix: ".action.back", fallback: "action.back" },
 ];
+
+/**
+ * The `| t` lookup without the raw-key fallback: the dictionary entry, then
+ * the generic entry for an engine-injected key, then a humanised field label.
+ * Shared with the field fill so a label reads the same either way.
+ */
+export function lookupText(locale: Locale, key: string): string | undefined {
+  return locale[key] ?? injectedKeyFallback(locale, key) ?? fieldLabelFallback(key);
+}
 
 function injectedKeyFallback(locale: Locale, key: string): string | undefined {
   for (const { suffix, fallback } of INJECTED_KEY_FALLBACKS) {
