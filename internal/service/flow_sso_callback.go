@@ -106,6 +106,8 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 
 	var conn *idp.Connection
 	if in.Issuer != "" {
+		// access_denied is the person saying no and gets its own key. Every
+		// other code is the provider failing.
 		pinned, err := c.pinnedConnection(ctx, projectID, pending)
 		if err != nil {
 			return c.fail(ctx, projectID, check, err, refusedEventType(in))
@@ -115,12 +117,13 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 		}
 		conn = &pinned
 	}
-
 	if in.Error != "" {
 		key := domain.FlowStepErrorSSOFailed
 		if in.Error == oauthErrorAccessDenied {
 			key = domain.FlowStepErrorSSOCancelled
 		}
+		// The description and URI are logged for the operator and never
+		// stored: the user sees only the localized key.
 		getLoggingContext(ctx, "flow").Warn("sso provider returned an error",
 			slog.String("project_id", projectID),
 			slog.String("slug", pending.ProviderSlug),
