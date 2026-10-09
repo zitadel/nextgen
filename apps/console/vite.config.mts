@@ -72,6 +72,16 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     name: "@zitadel/console",
     environment: "jsdom",
     setupFiles: ["./src/test-setup.ts"],
+    // The env every spec starts from. Vite also loads `.env.local`, so without
+    // the blank fallback a developer's local VITE_CONSOLE_RUNTIME_FALLBACK would
+    // turn runtime-discovery failures into the standalone fallback (Console ADR
+    // 0004 §3). A spec that needs another value stubs it with `vi.stubEnv`, and
+    // `unstubEnvs` restores these before the next test.
+    env: {
+      VITE_CONSOLE_API_BASE: "http://localhost/api",
+      VITE_CONSOLE_RUNTIME_FALLBACK: "",
+    },
+    unstubEnvs: true,
     // Above the RTL asyncUtilTimeout (5s, set in test-setup.ts) with room for a
     // test that makes several queries, so a slow query reports its own Testing
     // Library diagnostic rather than being cut short by this budget.
