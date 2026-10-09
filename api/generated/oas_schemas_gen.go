@@ -63317,23 +63317,20 @@ func (*UpdateVariablesErrorResponseStatusCode) updateVariablesRes() {}
 // The variables to enter, keyed by name. Each is either a bare scalar (a
 // non-secret value), an object stating the `secret` flag, or `null` to remove
 // the name.
-// This is a patch: a name present here is written at the owner the request
-// addresses, replacing whatever that owner held under it, and a name absent
-// here is left alone. A name whose value is `null` is removed from that owner
-// (RFC 7386), so one request can enter, replace and remove names together —
+// This is a patch: a name present here is written, replacing whatever the
+// project held under it, and a name absent here is left alone. A name whose
+// value is `null` is removed (RFC 7386), so one request can enter, replace and remove names together
+// —
 // which is also the way to remove several at once. `DELETE
 // /variables/{variable_name}` remains the way to remove exactly one name and
 // be told whether it was there.
-// Removing a name the owner does not hold is not an error: a patch states what
-// the owner holds afterwards, and that name is already absent. That makes a
+// Removing a name the project does not hold is not an error: a patch states
+// what the project holds afterwards, and that name is already absent. That makes a
 // retry safe, and it is the one place this body differs from `DELETE`, which
 // answers `var.not_found`.
 // The body is applied whole or not at all. Every value is validated, and every
 // secret encrypted, before anything is written, and the writes and removals
 // share one transaction.
-// Names are written at exactly the owner the request addresses, and reach no
-// further. Writing at the project level does not change what any environment
-// resolves, and writing on one environment does not touch another.
 // Ref: #
 type UpdateVariablesRequest map[string]VariableInput
 
@@ -66990,11 +66987,10 @@ func (*Variable) getVariableRes() {}
 // `{"value": …, "secret": false}` for each of them is noise. Making a value
 // secret is therefore always deliberate: it cannot happen by writing a plain
 // scalar.
-// `null` is the RFC 7386 merge-patch convention: the name is removed at the
-// owner this request addresses, and at no other, which is what lets one request
-// enter, replace and remove names together. Removing a name the owner does not
-// hold is not an error, because a patch states what the owner holds afterwards
-// and that name is already absent. `DELETE /variables/{variable_name}`
+// `null` is the RFC 7386 merge-patch convention: the name is removed, which is
+// what lets one request enter, replace and remove names together. Removing a
+// name the project does not hold is not an error, because a patch states what
+// the project holds afterwards and that name is already absent. `DELETE /variables/{variable_name}`
 // addresses one name deliberately and still answers `var.not_found` there.
 // A null is a removal wherever it appears, so a body built from client state in
 // which an unset field serializes to `null` removes that variable instead of
@@ -67193,12 +67189,9 @@ func NewBoolVariableScalar(v bool) VariableScalar {
 	return s
 }
 
-// The variables entered at the owner the request addresses, keyed by name.
-// Only that owner's own variables: the project level does not see into its
-// environments, and an environment does not inherit the project's. One name at
-// that owner is one value, so nothing here had to be chosen between.
+// The project's variables, keyed by name. One name is one value.
 // An empty object is an ordinary answer, not an error — it means nothing has
-// been entered at this owner.
+// been entered.
 // Ref: #
 type Variables map[string]Variable
 
