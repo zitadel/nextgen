@@ -540,6 +540,36 @@ transaction begin and commit errors through the dialect's mapper and log
 the parent of a bootstrap failure, retry a transient boot failure a few
 times, and make the platform bootstrap check before it inserts.
 
+## Ready for production (2026-10-09, afternoon)
+
+What changed for the first Git-driven production deployment, and what is
+left to a human:
+
+- The keep-warm cron (`/readyz` every five minutes) is gone. On the
+  container it was mostly a cold boot itself (94 of 120 hits landed on a
+  cold instance), and on Fluid an instance kept warm around the clock is
+  billed for its memory the whole time (2 GB × 730 h ≈ $22 a month), to
+  shave a sub-second boot off the first visit after a quiet spell. A
+  preview cloud does not need that; if a product deployment ever does, the
+  lever is a cron entry in `vercel.json`, not the runtime.
+- The `PORT` variable left over from the container (uid 65532 could not
+  bind port 80) is removed from both targets: the Go runtime hands the
+  binary its port and the launcher follows it. Verified on a preview
+  deployment without the variable.
+- The runbook, the cleanup workflow and `.vercelignore` no longer describe
+  a container.
+
+Still a human's: connect the repository (`vercel git connect`), which
+turns on preview builds for every pull request of the repository as well
+as production from `main`; the Production target's database variables for
+the new Frankfurt database (pooled URL with `pool_max_conns=4` and
+`default_query_exec_mode=cache_describe` for the server, direct URL with
+the migrator role for the build step, `max_connections` 50 on the
+cluster); the repository secret of the cleanup workflow. The project
+settings still carry `framework: container` and a no-op install command
+from the first deploy; a services deployment ignores both, so that is
+cosmetic.
+
 ## Regions (deferred, needs a buyer)
 
 Customer-chosen regions require a global layer. The cheapest version is

@@ -75,10 +75,11 @@ Development and test surfaces (`apps/`):
 - `apps/cloud/` — deployment wrapper for the hosted preview cloud: Vercel
   compiles the server with its Go preset (`apps/cloud/build.sh`) and runs it
   as a function against PlanetScale Postgres; the migrations run in the build
-  of an internal `migrate` service (`apps/cloud/vercel-build.sh`). The repo-root `vercel.json`
-  deploys it together with `apps/console`, `apps/login-ui`, `apps/docs`,
-  `apps/storybook` and `apps/website` as six services of one Vercel project;
-  main is production there (runbook: `docs/runbooks/preview-cloud.md`).
+  of an internal `migrate` service (`apps/cloud/vercel-build.sh`). The
+  repo-root `vercel.json` deploys both together with `apps/console`,
+  `apps/login-ui`, `apps/docs`, `apps/storybook` and `apps/website` as the
+  seven services of one Vercel project; main is production there (runbook:
+  `docs/runbooks/preview-cloud.md`).
 - `apps/website/` — scaffold of the public website (Next.js, Tailwind), the
   `website` service of that deployment; owns `/` on the cloud host.
 

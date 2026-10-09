@@ -1,12 +1,13 @@
 name: cloud-preview-cleanup
 
 # The preview cloud deploys itself: Vercel builds every push (vercel.json,
-# git.deploymentEnabled), and the server service's build step runs the
-# migrations before the deployment goes live (apps/cloud/vercel-build.sh,
-# `launcher migrate`). Production migrates only from main, a pull request
-# preview migrates its own schema pr_<number> of the preview database. The
-# only thing Vercel cannot do on its own is forget a schema when its pull
-# request closes; that is this workflow.
+# git.deploymentEnabled), and the build step of the internal `migrate`
+# service runs the migrations before the deployment goes live
+# (apps/cloud/vercel-build.sh, `launcher migrate`). Production migrates
+# only from main, a pull request preview migrates its own schema
+# pr_<number> of the preview database. The only thing Vercel cannot do on
+# its own is forget a schema when its pull request closes; that is this
+# workflow.
 
 on:
   pull_request:

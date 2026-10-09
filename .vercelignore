@@ -1,6 +1,6 @@
 # Upload filter for CLI deployments of the cloud project (repo root is the
-# deployment root, see vercel.json). The server service compiles the Go
-# binary from this tree on Vercel's Go runtime (apps/cloud/vercel-build.sh
+# deployment root, see vercel.json). The server and migrate services compile
+# the Go binary from this tree with Vercel's Go preset (apps/cloud/build.sh
 # writes the stub UI embeds itself), the UI services build with moon, so Go
 # sources and every moon project source (tools/) stay in. Only repo meta and
 # build artifacts are dropped.

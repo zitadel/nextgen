@@ -193,12 +193,6 @@
   "regions": [
     "fra1"
   ],
-  "crons": [
-    {
-      "path": "/readyz",
-      "schedule": "*/5 * * * *"
-    }
-  ],
   "git": {
     "deploymentEnabled": true
   }

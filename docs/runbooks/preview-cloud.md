@@ -61,9 +61,9 @@ same file) so the website can own every path.
    PgBouncer on `6432` (transaction pooling, 20 server connections per role
    shared by every instance), the migrations through the direct port
    `5432`, because goose holds a session advisory lock. Both with
-   `sslmode=verify-full&sslrootcert=system`. Vercel starts one container
-   per simultaneous request when none is warm, each with its own pgx
-   pool, so without the pooler a burst exhausts a small cluster's
+   `sslmode=verify-full&sslrootcert=system`. Vercel starts one function
+   instance per simultaneous request when none is warm, each a full server
+   with its own pgx pool, so without the pooler a burst exhausts a small cluster's
    `max_connections` (PS-5 default: 25) within seconds, and PgBouncer's own server pool (up to 20 per role, held idle for ten minutes) fills the direct port the migrate step needs. The preview cluster runs with `max_connections` 50 since 2026-10-08 (Parameters tab, needs a restart); do the same for production.
 
 ### 2. Master keys
@@ -116,9 +116,10 @@ project's key-encryption key unwrappable ([ADR 029](../adrs/029-cryptography-sec
    it, and claiming and self-registration work. Without it the Console runs
    in standalone mode and manages whichever customer project was created
    first, which on a shared host is whatever the smoke test created.
-3. Function settings: memory 2 GB (default), max duration 60 s is plenty.
-   `PORT=8080` must stay set: the container runs as uid 65532, which cannot
-   bind Vercel's default port 80.
+3. Function settings: the project defaults (Fluid compute, standard
+   memory, region `fra1`) are what the Go preset runs with; nothing to set.
+   The launcher listens on the `PORT` Vercel's Go runtime hands it, so the
+   project needs no `PORT` variable.
 4. Domain: assign the custom domain and set `NEXTGEN_SERVER_PUBLIC_BASE` to
    match it exactly. CSRF and WebAuthn derive the origin from Vercel's
    `X-Forwarded-Host` / `X-Forwarded-Proto`, which already carry the custom
@@ -185,7 +186,7 @@ Preview target gets its own document the same way.
   feature branch fails its build instead of changing the production schema.
 - **Previews:** every push to a pull request branch. The same build step
   migrates the preview database in the schema `pr_<number>` (branch name
-  without a pull request: `br_<name>`), the container serves from that
+  without a pull request: `br_<name>`), the function serves from that
   schema, and nothing is shared between previews except the database's
   extensions in `public`. The schema travels as the `schema` parameter of
   the connection string, which the server consumes itself: PgBouncer
@@ -201,10 +202,10 @@ serving until the new one is live, and a rollback promotes an older
 deployment on the newer schema. The build script stamps the version, the
 deployment's commit (`VERCEL_GIT_COMMIT_SHA`) and the date into the binary.
 
-All services are rebuilt on every deploy. The container build (toolchain
-image pull, module download, compile, image push, no layer cache) is the
-long pole at six to seven minutes; the migrate service's Go build takes
-under a minute plus the migration run.
+All services are rebuilt on every deploy; a deployment takes two to three
+minutes end to end on the project's elastic build machine. The two Go
+builds (`server`, `migrate`) take under a minute each plus the migration
+run; the UI services build with moon beside them.
 
 ### Manual and staged deploys
 
@@ -308,12 +309,14 @@ older state is a revert on `main`.
 
 - **Logs:** Vercel runtime logs of the `server` function. Add a log drain
   for retention.
-- **Cold starts:** container instances scale to zero after 5 minutes idle
-  in production and 30 seconds in previews; a cold start is about 2.4 s
-  (image start plus server boot), warm requests 0.2 s. The cron in
-  `vercel.json` hits `/readyz` every 5 minutes on production to keep one
-  instance warm; previews pay the cold start per visit.
-- **Bursts and database connections:** Vercel starts one container per
+- **Cold starts:** a Go instance boots in 0.1 to 1.4 s (binary start, pool,
+  platform bootstrap); warm requests answer in about 0.2 s. Vercel keeps an
+  idle instance around for a while (one was still warm after 50 s idle)
+  and starts more for a burst. There is no keep-warm cron: on the container
+  94 of 120 five-minute hits landed on a cold instance anyway, and an
+  instance kept warm around the clock is billed for its memory the whole
+  time, which a preview cloud with sporadic traffic does not need.
+- **Bursts and database connections:** Vercel starts one instance per
   simultaneous request when none is warm and adds instances under load;
   each instance is a full server with its own pgx pool. Through PgBouncer
   the server-side connection count stays flat (measured: three bursts of
