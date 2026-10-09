@@ -115,13 +115,15 @@ export default class SsoEnable extends BaseCommand {
         hint: "Run `zitadel setup` first, or add environments.development.issuer to zitadel.json.",
       });
     }
-    const callbackUri = callbackUriFor(issuer);
 
     const schema = selectSchema(await readSchemaFiles(cwd), flags.schema);
     const connections = await readConnectionFiles(cwd);
     // `nonBlankString` has already refused a blank one and trimmed the rest.
     const clientIdFlag = flags["client-id"];
     const plan = planConnection({ provider, files: connections, clientId: clientIdFlag });
+    // The connection's own route, so the slug decides it: a reused connection
+    // keeps the slug it was created with.
+    const callbackUri = callbackUriFor(issuer, plan.slug);
 
     const reusing = plan.action === "reuse";
     // A reused connection may name its own variables — it is an editable file
@@ -179,6 +181,10 @@ export default class SsoEnable extends BaseCommand {
 
     if (reusing) {
       consola.success(`Reusing ${plan.file.path}`);
+      // Shown on reuse too: the URI moved to one per connection after the
+      // first release, and rerunning this command is how a developer finds
+      // the one to register now.
+      consola.info(`Callback URI   ${callbackUri}`);
       // The connection references its credentials rather than holding them, so
       // reuse is not evidence they were ever published: a run interrupted
       // between writing the file and publishing leaves the document pointing

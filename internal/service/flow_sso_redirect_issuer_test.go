@@ -62,7 +62,7 @@ var ssoIssueInput = domain.FlowIssueSSORedirectInput{
 	AttemptID:    "attempt-1",
 	ProviderSlug: "google",
 	FlowSSOReturn: domain.FlowSSOReturn{
-		RedirectURI:  "https://auth.example.com/__nextgen/idp/callback",
+		RedirectURI:  "https://auth.example.com/__nextgen/idp/google/callback",
 		ReturnTarget: "https://auth.example.com/login?flow=flow-1",
 	},
 }

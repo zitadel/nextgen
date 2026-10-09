@@ -30,7 +30,7 @@ type ssoCallbackProcessor interface {
 	Process(ctx context.Context, in service.FlowSSOCallbackInput) (service.FlowSSOCallbackOutput, error)
 }
 
-// IDPCallbackHandler answers the provider's redirect on [IDPCallbackPath]. It
+// IDPCallbackHandler answers the provider's redirect on [IDPCallbackPattern]. It
 // is a plain net/http handler, not an API operation: the request shape is
 // RFC 6749's, the browser arriving here carries no API credential, and the
 // response is a redirect or an error page, never JSON.
@@ -53,11 +53,13 @@ func (h *IDPCallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	query := r.URL.Query()
 	in := service.FlowSSOCallbackInput{
+		ConnectionSlug:   r.PathValue(idpCallbackSlugWildcard),
 		State:            query.Get("state"),
 		Code:             query.Get("code"),
 		Error:            query.Get("error"),
 		ErrorDescription: query.Get("error_description"),
 		ErrorURI:         query.Get("error_uri"),
+		Issuer:           query.Get("iss"),
 	}
 	// The cookie name depends on the scheme of this request, the same way the
 	// submit chose it (see ssoBindingCookieName); a missing cookie stays "",
@@ -90,4 +92,17 @@ func writeIDPCallbackErrorPage(w http.ResponseWriter, status int) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
 	_, _ = io.WriteString(w, idpCallbackErrorPage)
+}
+
+// serveRetiredIDPCallback answers the retired shared callback route: the
+// provider was registered with it before the routes became per connection.
+// The answer is the uniform page, and the warning tells the operator which
+// registration to update; the request log redacts the code and state as on
+// the live route.
+func serveRetiredIDPCallback(w http.ResponseWriter, r *http.Request) {
+	ctx := middleware.WithOperationIDContext(r.Context(), "idpCallback")
+	zlog.GetLoggingContext(ctx).Warn("sso callback on the retired shared route: register the connection's own callback URI, /__nextgen/idp/{slug}/callback, with the provider",
+		slog.String("path", r.URL.Path))
+	w.Header().Set("Cache-Control", "private, no-store")
+	writeIDPCallbackErrorPage(w, http.StatusBadRequest)
 }

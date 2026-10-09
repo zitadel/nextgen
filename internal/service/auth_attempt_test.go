@@ -419,7 +419,7 @@ func TestAuthAttemptService_IssueSSOState(t *testing.T) {
 		AttemptID:            "att-1",
 		ProviderSlug:         "google",
 		ConnectionRevisionID: "idpr_1",
-		RedirectURI:          "https://app.example.test/__nextgen/idp/callback",
+		RedirectURI:          "https://app.example.test/__nextgen/idp/google/callback",
 		ReturnTarget:         "https://app.example.test/login",
 	}
 
@@ -448,7 +448,7 @@ func TestAuthAttemptService_IssueSSOState(t *testing.T) {
 		assert.Equal(t, &domain.SSOStatePayload{
 			ProviderSlug:          "google",
 			ConnectionRevisionID:  "idpr_1",
-			RedirectURI:           "https://app.example.test/__nextgen/idp/callback",
+			RedirectURI:           "https://app.example.test/__nextgen/idp/google/callback",
 			BindingNonceHash:      domain.HashSecret(state.BindingNonce),
 			EncryptedPKCEVerifier: "enc:" + state.PKCEVerifier,
 			OIDCNonce:             state.OIDCNonce,

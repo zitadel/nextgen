@@ -539,7 +539,7 @@ Set-Cookie: __Host-_zsso=<binding nonce>; Path=/; Max-Age=900; HttpOnly; Secure;
   "step": {
     "name": "sso-redirect",
     "texts": { "title_key": "sso.redirect.title" },
-    "redirect_url": "https://accounts.google.com/o/oauth2/auth?client_id=...&redirect_uri=https%3A%2F%2Flogin.example.com%2F__nextgen%2Fidp%2Fcallback&state=<state>&nonce=<nonce>&code_challenge=...&code_challenge_method=S256"
+    "redirect_url": "https://accounts.google.com/o/oauth2/auth?client_id=...&redirect_uri=https%3A%2F%2Flogin.example.com%2F__nextgen%2Fidp%2Fgoogle%2Fcallback&state=<state>&nonce=<nonce>&code_challenge=...&code_challenge_method=S256"
   }
 }
 ```

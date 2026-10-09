@@ -33,7 +33,7 @@ func (ssoTestCrypter) Decrypt(encrypted string) (string, error) {
 // issueSSOState mints a state and persists it on the attempt.
 func issueSSOState(t *testing.T, stmts service.AllStatements, projectID, attemptID string) *domain.SSOState {
 	t.Helper()
-	sso, err := domain.NewSSOState(projectID, "google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", ssoTestCrypter{})
+	sso, err := domain.NewSSOState(projectID, "google", "idprev_1", "https://auth.example.com/__nextgen/idp/google/callback", "/after-login", ssoTestCrypter{})
 	require.NoError(t, err)
 	require.NoError(t, stmts.IssueSSOState(t.Context(), projectID, attemptID, sso.Check))
 	return sso

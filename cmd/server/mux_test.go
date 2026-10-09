@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/staticui/login"
 	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
@@ -111,19 +113,75 @@ func TestBuildHTTPMuxDoesNotMountTheAPIUnderAPIPrefix(t *testing.T) {
 	}
 }
 
-// The IdP callback is an exact mount ahead of the API catch-all: the provider
-// redirects the browser to it, so it must exist whatever UI surfaces are on.
-// Both spellings are served — the prefixed path when the instance is the
-// browser origin, the stripped one as a scaffolded app's SDK proxy forwards it.
+// The IdP callback is mounted per connection ahead of the API catch-all: the
+// provider redirects the browser to it, so it must exist whatever UI surfaces
+// are on. Both spellings are served: the prefixed path when the instance is
+// the browser origin, the stripped one as a scaffolded app's SDK proxy
+// forwards it.
 func TestBuildHTTPMuxMountsTheIDPCallback(t *testing.T) {
 	mux := newTestMux(t, uiConfig(false, false))
 
-	for _, path := range []string{api.IDPCallbackPath, api.IDPCallbackUpstreamPath} {
+	for _, path := range []string{api.IDPCallbackPath("google"), api.IDPCallbackUpstreamPath("google")} {
 		rec := get(t, mux, path+"?state=s&code=c")
 		assert.Equal(t, "idp-callback", rec.Header().Get("X-Test-Handler"), path)
 		// A longer path is not the callback and stays with the API namespace.
 		assert.Equal(t, "api", get(t, mux, path+"/x").Header().Get("X-Test-Handler"), path)
 	}
+}
+
+// The shared callback that preceded the per-connection routes is retired.
+// alpha.25 served it, so a provider registered then still sends the browser
+// there: it is mounted, through the same chain, to answer the uniform page
+// rather than reach the API, whose request log does not redact code and state.
+func TestBuildHTTPMuxAnswersTheRetiredSharedIDPCallback(t *testing.T) {
+	mux := newTestMux(t, uiConfig(false, false))
+
+	for _, path := range []string{"/__nextgen/idp/callback", "/idp/callback"} {
+		rec := get(t, mux, path+"?state=s&code=c")
+		assert.Empty(t, rec.Header().Get("X-Test-Handler"), "%s must not reach the API or the live callback", path)
+		assert.Equal(t, http.StatusBadRequest, rec.Code, path)
+		assert.Equal(t, "private, no-store", rec.Header().Get("Cache-Control"), path)
+	}
+}
+
+// slugRecorder is the callback's service half, recording what the handler
+// read from the request.
+type slugRecorder struct{ in service.FlowSSOCallbackInput }
+
+func (s *slugRecorder) Process(_ context.Context, in service.FlowSSOCallbackInput) (service.FlowSSOCallbackOutput, error) {
+	s.in = in
+	return service.FlowSSOCallbackOutput{ReturnTarget: "https://app.example.com/login"}, nil
+}
+
+// The real handler behind the production chain: a middleware that rebuilt the
+// request would drop the path wildcard, and every callback would then fail the
+// connection check.
+func TestBuildHTTPMuxHandsTheCallbackItsConnectionSlug(t *testing.T) {
+	for _, path := range []string{api.IDPCallbackPath("google"), api.IDPCallbackUpstreamPath("google")} {
+		recorder := &slugRecorder{}
+		mux, err := buildHTTPMux(uiConfig(false, false), idgen.NewULID(), apiEcho(), api.NewIDPCallbackHandler(recorder),
+			staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
+			nil)
+		require.NoError(t, err)
+
+		rec := get(t, mux, path+"?state=s&code=c")
+		require.Equal(t, http.StatusSeeOther, rec.Code, path)
+		assert.Equal(t, "google", recorder.in.ConnectionSlug, path)
+	}
+}
+
+// A UI path configured under /idp/ overlaps the callback route. That is a
+// startup error, not ServeMux's panic.
+func TestBuildHTTPMuxRefusesAUIPathOverlappingTheIDPCallback(t *testing.T) {
+	requireEmbeddedUI(t)
+	cfg := uiConfig(false, true)
+	cfg.LoginPath = "/idp/login"
+
+	_, err := buildHTTPMux(cfg, idgen.NewULID(), apiEcho(), idpCallbackEcho(),
+		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
+		nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "/idp/login/")
 }
 
 // The runtime document is not console-only: the hosted login shell resolves

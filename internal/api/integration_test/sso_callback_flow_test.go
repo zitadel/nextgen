@@ -175,8 +175,18 @@ func (f *ssoCallbackFixture) submitSSO(t *testing.T, flow ssoFlow) (authorize *u
 	f.provider.nonce = query.Get("nonce")
 	f.provider.challenge = query.Get("code_challenge")
 	f.provider.redirectURI = query.Get("redirect_uri")
-	require.Equal(t, "https://login.example.test"+iapi.IDPCallbackPath, f.provider.redirectURI)
+	require.Equal(t, "https://login.example.test"+iapi.IDPCallbackPath("google"), f.provider.redirectURI)
 	return &redirect, binding
+}
+
+// returnPath is the path of the redirect_uri the submit sent the provider:
+// where an honest provider returns the browser.
+func (f *ssoCallbackFixture) returnPath(t *testing.T) string {
+	t.Helper()
+	redirect, err := url.Parse(f.provider.redirectURI)
+	require.NoError(t, err)
+	require.NotEmpty(t, redirect.Path, "submitSSO pins the redirect_uri first")
+	return redirect.Path
 }
 
 // callback performs the provider's redirect against the harness server: a GET
@@ -204,7 +214,7 @@ func TestSSOCallbackSignsInTheLinkedUser(t *testing.T) {
 	authorize, binding := f.submitSSO(t, flow)
 	state := authorize.Query().Get("state")
 
-	resp := f.callback(t, iapi.IDPCallbackPath, "state="+url.QueryEscape(state)+"&code=the-code", binding)
+	resp := f.callback(t, f.returnPath(t), "state="+url.QueryEscape(state)+"&code=the-code", binding)
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusSeeOther, resp.StatusCode, string(body))
@@ -221,7 +231,7 @@ func TestSSOCallbackSignsInTheLinkedUser(t *testing.T) {
 
 	// The state is single-use: replaying the same URL answers the uniform
 	// error page, and the provider is not asked again.
-	replay := f.callback(t, iapi.IDPCallbackPath, "state="+url.QueryEscape(state)+"&code=the-code", binding)
+	replay := f.callback(t, f.returnPath(t), "state="+url.QueryEscape(state)+"&code=the-code", binding)
 	assert.Equal(t, http.StatusBadRequest, replay.StatusCode)
 	assert.Equal(t, 1, f.provider.tokenCalls)
 }
@@ -235,9 +245,90 @@ func TestSSOCallbackOnTheProxyStrippedPath(t *testing.T) {
 	flow := f.startFlow(t, "")
 	authorize, binding := f.submitSSO(t, flow)
 
-	resp := f.callback(t, iapi.IDPCallbackUpstreamPath, "state="+url.QueryEscape(authorize.Query().Get("state"))+"&code=the-code", binding)
+	resp := f.callback(t, strings.TrimPrefix(f.returnPath(t), "/__nextgen"), "state="+url.QueryEscape(authorize.Query().Get("state"))+"&code=the-code", binding)
 	require.Equal(t, http.StatusSeeOther, resp.StatusCode)
 	assert.Equal(t, "https://login.example.test/login?flow="+flow.id, resp.Header.Get("Location"))
+}
+
+// The mix-up attack (RFC 9700 §4.4): a malicious provider sends the browser on
+// to an honest one, which returns to its own connection's callback with the
+// state the malicious connection pinned. The path and the state disagree, so
+// the code goes to no token endpoint, and the step the sign-in started from
+// shows the generic failure.
+func TestSSOCallbackOnAnotherConnectionsPathIsRefused(t *testing.T) {
+	f := newSSOCallbackFixture(t)
+	userID := f.createUser(t, defaultSchemaURL())
+	f.link(t, f.connection.ID, "sub-1", userID)
+	flow := f.startFlow(t, "")
+	authorize, binding := f.submitSSO(t, flow)
+
+	resp := f.callback(t, iapi.IDPCallbackPath("other"), "state="+url.QueryEscape(authorize.Query().Get("state"))+"&code=the-code", binding)
+	require.Equal(t, http.StatusSeeOther, resp.StatusCode)
+	assert.Equal(t, "https://login.example.test/login?flow="+flow.id, resp.Header.Get("Location"))
+	assert.Equal(t, 0, f.provider.tokenCalls, "the code must not reach the pinned connection's token endpoint")
+
+	stepResp := f.getStep(t, flow)
+	require.IsType(t, &api.FlowResponseHeaders{}, stepResp, helpers.MustMarshal(t, stepResp))
+	step := stepResp.(*api.FlowResponseHeaders).Response.Step
+	require.True(t, step.Error.IsSet(), helpers.MustMarshal(t, stepResp))
+	assert.Equal(t, domain.FlowStepErrorSSOFailed, step.Error.Value)
+	assert.Equal(t, "identifier", step.Name, "the flow stays on the step the sign-in started from")
+}
+
+// RFC 9207: a provider registered with a wildcard redirect URI can answer on
+// the pinned connection's own path, so the path check passes. Its iss names
+// another issuer and is refused before the exchange. The connection's own
+// issuer as iss signs in as usual.
+func TestSSOCallbackChecksTheIssuerParameter(t *testing.T) {
+	f := newSSOCallbackFixture(t)
+	userID := f.createUser(t, defaultSchemaURL())
+	f.link(t, f.connection.ID, "sub-1", userID)
+	flow := f.startFlow(t, "")
+
+	authorize, binding := f.submitSSO(t, flow)
+	resp := f.callback(t, f.returnPath(t), "state="+url.QueryEscape(authorize.Query().Get("state"))+"&code=the-code&iss="+url.QueryEscape("https://evil.example.test"), binding)
+	require.Equal(t, http.StatusSeeOther, resp.StatusCode)
+	assert.Equal(t, 0, f.provider.tokenCalls, "a foreign iss must not reach the token endpoint")
+	stepResp := f.getStep(t, flow)
+	require.IsType(t, &api.FlowResponseHeaders{}, stepResp, helpers.MustMarshal(t, stepResp))
+	step := stepResp.(*api.FlowResponseHeaders).Response.Step
+	require.True(t, step.Error.IsSet(), helpers.MustMarshal(t, stepResp))
+	assert.Equal(t, domain.FlowStepErrorSSOFailed, step.Error.Value)
+
+	retry, retryCookie := f.submitSSO(t, flow)
+	resp = f.callback(t, f.returnPath(t), "state="+url.QueryEscape(retry.Query().Get("state"))+"&code=the-code&iss="+url.QueryEscape(f.provider.srv.URL), retryCookie)
+	require.Equal(t, http.StatusSeeOther, resp.StatusCode)
+	requireAuthenticated(t, f.getStep(t, flow))
+}
+
+// The shared callback that preceded the per-connection routes is retired. A
+// provider registered with it before the change still sends the browser
+// there: the request gets the uniform page, its code and state stay out of the
+// log, and the state stays usable on the connection's own route.
+func TestSSOCallbackOnTheRetiredSharedPathIsNotProcessed(t *testing.T) {
+	f := newSSOCallbackFixture(t)
+	userID := f.createUser(t, defaultSchemaURL())
+	f.link(t, f.connection.ID, "sub-1", userID)
+	flow := f.startFlow(t, "")
+	authorize, binding := f.submitSSO(t, flow)
+	state := authorize.Query().Get("state")
+	query := "state=" + url.QueryEscape(state) + "&code=the-code"
+
+	for _, path := range []string{"/__nextgen/idp/callback", "/idp/callback"} {
+		resp := f.callback(t, path, query, binding)
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode, path)
+		assert.Contains(t, string(body), "could not be completed", path)
+	}
+	assert.Equal(t, 0, f.provider.tokenCalls)
+	logged := harness.ServerLog()
+	assert.Contains(t, logged, "retired shared route")
+	assert.NotContains(t, logged, state, "the single-use state must never be logged")
+
+	resp := f.callback(t, f.returnPath(t), query, binding)
+	require.Equal(t, http.StatusSeeOther, resp.StatusCode)
+	requireAuthenticated(t, f.getStep(t, flow))
 }
 
 // A declined consent comes back as error=access_denied with no code. The
@@ -251,7 +342,7 @@ func TestSSOCallbackProviderDeclineRendersCancelledAndAllowsARetry(t *testing.T)
 	flow := f.startFlow(t, "")
 	authorize, binding := f.submitSSO(t, flow)
 
-	resp := f.callback(t, iapi.IDPCallbackPath,
+	resp := f.callback(t, f.returnPath(t),
 		"state="+url.QueryEscape(authorize.Query().Get("state"))+"&error=access_denied&error_description=user+declined", binding)
 	require.Equal(t, http.StatusSeeOther, resp.StatusCode)
 	assert.Equal(t, "https://login.example.test/login?flow="+flow.id, resp.Header.Get("Location"))
@@ -265,7 +356,7 @@ func TestSSOCallbackProviderDeclineRendersCancelledAndAllowsARetry(t *testing.T)
 	assert.Equal(t, "identifier", step.Name, "the flow stays on the step the sign-in started from")
 
 	retry, retryCookie := f.submitSSO(t, flow)
-	resp = f.callback(t, iapi.IDPCallbackPath,
+	resp = f.callback(t, f.returnPath(t),
 		"state="+url.QueryEscape(retry.Query().Get("state"))+"&code=the-code", retryCookie)
 	require.Equal(t, http.StatusSeeOther, resp.StatusCode)
 	requireAuthenticated(t, f.getStep(t, flow))
@@ -281,11 +372,11 @@ func TestSSOCallbackWithoutTheBindingCookieLeavesTheStateUsable(t *testing.T) {
 	authorize, binding := f.submitSSO(t, flow)
 	state := authorize.Query().Get("state")
 
-	bare := f.callback(t, iapi.IDPCallbackPath, "state="+url.QueryEscape(state)+"&code=the-code")
+	bare := f.callback(t, f.returnPath(t), "state="+url.QueryEscape(state)+"&code=the-code")
 	assert.Equal(t, http.StatusBadRequest, bare.StatusCode)
 	assert.Equal(t, 0, f.provider.tokenCalls)
 
-	withCookie := f.callback(t, iapi.IDPCallbackPath, "state="+url.QueryEscape(state)+"&code=the-code", binding)
+	withCookie := f.callback(t, f.returnPath(t), "state="+url.QueryEscape(state)+"&code=the-code", binding)
 	assert.Equal(t, http.StatusSeeOther, withCookie.StatusCode)
 }
 
@@ -299,12 +390,12 @@ func TestSSOCallbackForAReplacedStateFailsLikeAReusedOne(t *testing.T) {
 	first, firstCookie := f.submitSSO(t, flow)
 	second, secondCookie := f.submitSSO(t, flow)
 
-	stale := f.callback(t, iapi.IDPCallbackPath,
+	stale := f.callback(t, f.returnPath(t),
 		"state="+url.QueryEscape(first.Query().Get("state"))+"&code=the-code", firstCookie)
 	assert.Equal(t, http.StatusBadRequest, stale.StatusCode)
 	assert.Equal(t, 0, f.provider.tokenCalls)
 
-	resp := f.callback(t, iapi.IDPCallbackPath,
+	resp := f.callback(t, f.returnPath(t),
 		"state="+url.QueryEscape(second.Query().Get("state"))+"&code=the-code", secondCookie)
 	assert.Equal(t, http.StatusSeeOther, resp.StatusCode)
 	requireAuthenticated(t, f.getStep(t, flow))
@@ -318,7 +409,7 @@ func TestSSOCallbackAnswersInvalidStatesUniformly(t *testing.T) {
 	flow := f.startFlow(t, "")
 	authorize, binding := f.submitSSO(t, flow)
 	state := authorize.Query().Get("state")
-	consumed := f.callback(t, iapi.IDPCallbackPath,
+	consumed := f.callback(t, f.returnPath(t),
 		"state="+url.QueryEscape(state)+"&error=access_denied", binding)
 	require.Equal(t, http.StatusSeeOther, consumed.StatusCode)
 
@@ -329,7 +420,7 @@ func TestSSOCallbackAnswersInvalidStatesUniformly(t *testing.T) {
 		"consumed state":    "state=" + url.QueryEscape(state) + "&code=the-code",
 		"foreign project":   "state=" + url.QueryEscape("proj_other."+strings.SplitN(state, ".", 2)[1]) + "&code=the-code",
 	} {
-		resp := f.callback(t, iapi.IDPCallbackPath, query, binding)
+		resp := f.callback(t, f.returnPath(t), query, binding)
 		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode, name)
@@ -350,7 +441,7 @@ func TestSSOCallbackLeaksNoSecretIntoResponsesOrLog(t *testing.T) {
 	authorize, binding := f.submitSSO(t, flow)
 	state := authorize.Query().Get("state")
 
-	resp := f.callback(t, iapi.IDPCallbackPath, "state="+url.QueryEscape(state)+"&code=the-code", binding)
+	resp := f.callback(t, f.returnPath(t), "state="+url.QueryEscape(state)+"&code=the-code", binding)
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusSeeOther, resp.StatusCode)

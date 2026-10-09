@@ -212,7 +212,7 @@ Based on the research, here are the directions we're considering. The exact shap
 
 - **A new resource type** for provider configuration: `external_factor_provider` (separate from IdP providers). It holds credentials, connection details, and factor properties (ACR contribution, hardware/phishing-resistant flags).
 
-- **A separate callback endpoint** for external factor redirects (`/external-factor-providers/{id}/callback`), distinct from `/idp/callback`. The external factor callback only verifies the MFA result and records a factor — no user provisioning, no claim mapping.
+- **A separate callback endpoint** for external factor redirects (`/external-factor-providers/{id}/callback`), distinct from `/idp/{slug}/callback`. The external factor callback only verifies the MFA result and records a factor — no user provisioning, no claim mapping.
 
 - **Factor properties** on the provider resource determine how the factor participates in ACR evaluation, regardless of protocol:
   ```json

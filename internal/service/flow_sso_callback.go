@@ -12,6 +12,21 @@ import (
 	"github.com/zitadel/nextgen/internal/idp"
 )
 
+// errSSOCallbackMixUp marks a callback that names another connection than
+// the one its state pins, by its path or by its `iss`.
+var errSSOCallbackMixUp = errors.New("sso callback answered by another connection")
+
+// refusedEventType is the event a callback refused before its exchange is
+// recorded with, chosen like for any other callback: a failure after a code
+// arrived is an exchange failure, a callback without one an authorization
+// failure.
+func refusedEventType(in FlowSSOCallbackInput) domain.EventType {
+	if in.Code == "" {
+		return domain.EventTypeAuthSSOAuthorizationFailed
+	}
+	return domain.EventTypeAuthSSOExchangeFailed
+}
+
 // oauthErrorAccessDenied is the one authorization error code that means the
 // person declined (RFC 6749 §4.1.2.1).
 const oauthErrorAccessDenied = "access_denied"
@@ -36,6 +51,13 @@ func NewFlowSSOCallback(connections IDPConnectionService, attempts AuthAttemptSe
 // FlowSSOCallbackInput is the provider's redirect, picked apart by the
 // handler.
 type FlowSSOCallbackInput struct {
+	// Issuer is the authorization response's `iss` (RFC 9207), empty when
+	// the provider sent none.
+	Issuer string
+	// ConnectionSlug is the connection the callback path names: each
+	// connection has its own redirect URI, so it says which provider sent the
+	// browser back.
+	ConnectionSlug string
 	// State is the state query value, verbatim.
 	State string
 	// Code is the authorization code; empty when the provider failed.
@@ -80,6 +102,16 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 	audit.BindPublicRequest(ctx, projectID, "", "")
 	pending := check.Pending
 
+	// Before anything reaches a provider: a callback on another connection's
+	// path carries that provider's answer, and exchanging its code at the
+	// pinned connection would hand the code to the wrong token endpoint (the
+	// mix-up attack, RFC 9700 §4.4). The check needs the consumed record,
+	// which alone names the pinned connection, so the state is spent like on
+	// every other failure after the consume.
+	if in.ConnectionSlug != pending.ProviderSlug {
+		return c.fail(ctx, projectID, check, fmt.Errorf("%w: the callback path names connection %q, the state pins %q", errSSOCallbackMixUp, in.ConnectionSlug, pending.ProviderSlug), refusedEventType(in))
+	}
+
 	if in.Error != "" {
 		// access_denied is the person saying no and gets its own key. Every
 		// other code is the provider failing.
@@ -102,7 +134,7 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 		return c.fail(ctx, projectID, check, errors.New("the callback carried neither a code nor an error"), domain.EventTypeAuthSSOAuthorizationFailed)
 	}
 
-	identity, err := c.exchange(ctx, projectID, in.Code, pending)
+	identity, err := c.exchange(ctx, projectID, in, pending)
 	if err != nil {
 		return c.fail(ctx, projectID, check, err, domain.EventTypeAuthSSOExchangeFailed)
 	}
@@ -125,7 +157,7 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 
 // exchange rebuilds the engine client from the revision and redirect URI the
 // record pinned at submit and runs the token exchange.
-func (c *FlowSSOCallback) exchange(ctx context.Context, projectID, code string, pending *domain.SSOStatePayload) (idp.ExternalIdentity, error) {
+func (c *FlowSSOCallback) exchange(ctx context.Context, projectID string, in FlowSSOCallbackInput, pending *domain.SSOStatePayload) (idp.ExternalIdentity, error) {
 	connection, err := c.connections.GetRevision(ctx, projectID, pending.ConnectionRevisionID)
 	if err != nil {
 		return idp.ExternalIdentity{}, err
@@ -133,6 +165,15 @@ func (c *FlowSSOCallback) exchange(ctx context.Context, projectID, code string, 
 	conn, err := idp.ParseConnection(connection.RevisionID, connection.Document)
 	if err != nil {
 		return idp.ExternalIdentity{}, err
+	}
+	// RFC 9207: an `iss` the provider sent names who issued the code. The
+	// per-connection path rests on every provider matching redirect_uri
+	// exactly; a provider registered with a wildcard could still answer on
+	// another connection's path, and its own issuer gives it away. Most
+	// providers send no `iss`, so only a present value is checked, as a simple
+	// string comparison.
+	if in.Issuer != "" && in.Issuer != conn.OIDC.Issuer {
+		return idp.ExternalIdentity{}, fmt.Errorf("%w: the callback's iss %q is not the issuer %q of connection %q", errSSOCallbackMixUp, in.Issuer, conn.OIDC.Issuer, pending.ProviderSlug)
 	}
 	if err := resolveSSOClientID(ctx, c.variables, projectID, &conn); err != nil {
 		return idp.ExternalIdentity{}, err
@@ -150,7 +191,7 @@ func (c *FlowSSOCallback) exchange(ctx context.Context, projectID, code string, 
 		return idp.ExternalIdentity{}, err
 	}
 	return client.Callback(ctx, idp.CallbackRequest{
-		Code:         code,
+		Code:         in.Code,
 		Nonce:        pending.OIDCNonce,
 		PKCEVerifier: verifier,
 		RedirectURI:  pending.RedirectURI,

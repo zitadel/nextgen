@@ -139,7 +139,7 @@ describe("sso enable", () => {
       slug: "google",
       file: ".zitadel/idps/google.json",
     });
-    expect(payload.data.callback_uri).toBe("http://localhost:3000/__nextgen/idp/callback");
+    expect(payload.data.callback_uri).toBe("http://localhost:3000/__nextgen/idp/google/callback");
 
     const written = JSON.parse(await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8"));
     // Neither credential is a literal: each environment registers its own
@@ -161,6 +161,23 @@ describe("sso enable", () => {
     const payload = parseJson(result.stdout) as { data: { connection: { action: string } } };
     expect(payload.data.connection.action).toBe("reuse");
     expect(await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).toBe(before);
+  });
+
+  it("prints the callback URI on reuse in text mode", async () => {
+    // The URI moved to one per connection after the first release; rerunning
+    // the command on the existing connection is how a developer finds the one
+    // to register now, without reaching for --json.
+    const cwd = await makeProject();
+    await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
+
+    const result = await withStdin("piped-secret", () =>
+      runCliForTest(["sso", "enable", "--cwd", cwd, "--provider", "google", "--non-interactive"]),
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout + result.stderr).toContain(
+      "http://localhost:3000/__nextgen/idp/google/callback",
+    );
   });
 
   it("publishes a changed client id on reuse rather than ignoring it", async () => {

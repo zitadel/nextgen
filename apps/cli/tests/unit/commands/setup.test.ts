@@ -218,7 +218,14 @@ describe("setup command", () => {
 
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as {
-      data: { sso: Array<{ provider: string; client_id: string; connection: string }> };
+      data: {
+        sso: Array<{
+          provider: string;
+          client_id: string;
+          connection: string;
+          callback_uri: string;
+        }>;
+      };
     };
     expect(Array.isArray(json.data.sso)).toBe(true);
     expect(json.data.sso).toHaveLength(1);
@@ -227,6 +234,11 @@ describe("setup command", () => {
       client_id: "1234-abc.apps.googleusercontent.com",
       connection: ".zitadel/idps/google.json",
     });
+    // The connection's own route: an agent registering the OAuth application
+    // reads it from here, since a JSON run shows no prompt.
+    expect(json.data.sso[0]?.callback_uri).toMatch(
+      /^http:\/\/localhost:\d+\/__nextgen\/idp\/google\/callback$/,
+    );
   });
 
   // No provider is an empty list, not a missing key or null: a consumer can

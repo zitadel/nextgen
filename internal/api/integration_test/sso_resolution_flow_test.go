@@ -130,7 +130,7 @@ func (f *ssoResolutionFixture) attempt(t *testing.T, flow ssoFlow) *domain.AuthA
 func parkSSOResult(t *testing.T, projectID, attemptID, revisionID, subject string, claims map[string]any, verified map[string]bool) {
 	t.Helper()
 	stmts := harness.EnsureServiceDB(t).Statements()
-	sso, err := domain.NewSSOState(projectID, "google", revisionID, "https://auth.example.com/__nextgen/idp/callback", "/after-login", nil)
+	sso, err := domain.NewSSOState(projectID, "google", revisionID, "https://auth.example.com/__nextgen/idp/google/callback", "/after-login", nil)
 	require.NoError(t, err)
 	require.NoError(t, stmts.IssueSSOState(t.Context(), projectID, attemptID, sso.Check))
 	_, err = stmts.ConsumeSSOState(t.Context(), projectID, sso.Check.StateHash, sso.BindingNonce)

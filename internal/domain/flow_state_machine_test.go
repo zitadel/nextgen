@@ -774,7 +774,7 @@ func startSSOStepFlow(t *testing.T, w *flowTestWorld, def *domain.FlowDefinition
 }
 
 var ssoSubmitReturn = &domain.FlowSSOReturn{
-	RedirectURI:  "https://auth.example.com/__nextgen/idp/callback",
+	RedirectURI:  "https://auth.example.com/__nextgen/idp/google/callback",
 	ReturnTarget: "https://auth.example.com/login?flow=flow-1",
 }
 
