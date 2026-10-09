@@ -60,7 +60,7 @@ tags:
       whether the files you have are already released.
 
       A release's content never changes. If it must never be served again,
-      revoke it. A release can't be revoked while an environment still runs
+      revoke it. A release can't be revoked while any origin still serves
       it.
   - name: Environments
     description: |

@@ -1009,11 +1009,11 @@ func (UnimplementedHandler) RevokeMySession(ctx context.Context) (r RevokeMySess
 // From then on the release cannot be deployed and is refused on every path
 // that would serve it, including to a build that pins its digest, with
 // `rel.revoked`.
-// A release that is still the current deployment of any environment cannot
-// be revoked: the call answers `409` with `rel.in_use`, naming each such
-// environment and its current deployment. Deploy another release there or
-// roll the deployment back first, then revoke. Revocation therefore never
-// takes a running environment down. Deployments that named the release
+// A release that any origin still serves cannot be revoked. An origin
+// serves the release of the newest deployment to it, so the call answers
+// `409` with `rel.in_use`, naming each such origin and that deployment.
+// Deploy another release there or roll back first, then revoke. Revoking
+// therefore never takes an origin down. Deployments that named the release
 // earlier stay in the history.
 // Idempotent: revoking a release that is already revoked answers `200`
 // with the release unchanged, `revoked_at` still naming the first

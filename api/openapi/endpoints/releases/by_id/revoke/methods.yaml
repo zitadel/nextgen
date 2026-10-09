@@ -7,11 +7,11 @@ post:
     that would serve it, including to a build that pins its digest, with
     `rel.revoked`.
 
-    A release that is still the current deployment of any environment cannot
-    be revoked: the call answers `409` with `rel.in_use`, naming each such
-    environment and its current deployment. Deploy another release there or
-    roll the deployment back first, then revoke. Revocation therefore never
-    takes a running environment down. Deployments that named the release
+    A release that any origin still serves cannot be revoked. An origin
+    serves the release of the newest deployment to it, so the call answers
+    `409` with `rel.in_use`, naming each such origin and that deployment.
+    Deploy another release there or roll back first, then revoke. Revoking
+    therefore never takes an origin down. Deployments that named the release
     earlier stay in the history.
 
     Idempotent: revoking a release that is already revoked answers `200`
@@ -66,8 +66,8 @@ post:
                     revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
     '409':
       description: |
-        The release is the current deployment of at least one environment.
-        The details name each such environment and its current deployment.
+        At least one origin still serves the release. The details name each
+        such origin and the newest deployment to it.
       content:
         application/json:
           schema:
