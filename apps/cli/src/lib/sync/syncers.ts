@@ -9,6 +9,7 @@ import type {
 import { consola } from "consola";
 
 import type { ZitadelClient } from "@zitadel/api/client";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
 import { isVariableReference } from "@zitadel/config/idp";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
@@ -57,12 +58,15 @@ export function makeSyncers(opts: {
    */
   cwd: string;
 }): readonly [SchemaSyncer, IdpConnectionSyncer, FlowDefinitionSyncer, BrandingSyncer] {
+  // The flow syncer resolves a handle `user_schema` to a schema id on publish,
+  // so it is handed the schema syncer that owns that lookup.
+  const schema = new SchemaSyncer(opts.client, opts.projectId, opts.env);
   return [
-    new SchemaSyncer(opts.client, opts.projectId, opts.env),
+    schema,
     // Before flows: a flow step naming a connection slug is only valid once
     // that connection exists on the platform.
     new IdpConnectionSyncer(opts.client, opts.projectId),
-    new FlowDefinitionSyncer(opts.client, opts.projectId, opts.env),
+    new FlowDefinitionSyncer(opts.client, opts.projectId, opts.env, schema),
     new BrandingSyncer(opts.client, opts.projectId, opts.env, opts.cwd),
   ];
 }
@@ -328,6 +332,70 @@ class SchemaSyncer implements ResourceSyncer {
     const body = await this.client.getSchemaById(id);
     return body.schema;
   }
+
+  handleOf(body: object): string | undefined {
+    const objectType = (body as { objectType?: unknown }).objectType;
+    return typeof objectType === "string" ? objectType : undefined;
+  }
+
+  /** The newest revision of the object type, for `pull`. `revisions: latest` + limit 1 is the one current row. */
+  async newestRevision(handle: string): Promise<string | null> {
+    const page = await this.client.listSchemas({
+      project_id: this.projectId,
+      object_type: handle,
+      revisions: "latest",
+      limit: 1,
+    });
+    return page.schemas[0]?.id ?? null;
+  }
+
+  async localiseReference(reference: string): Promise<{ value: string; warning?: string }> {
+    // A schema id is shape-less — a minted `sch_…` value, or the document's
+    // `$id`, which may be a URL, a URN or a relative URI (ADR 063). Rather
+    // than guess from its shape, resolve it by reading the schema; a 404 means
+    // the referenced revision is gone, so the id is kept and the caller warned.
+    try {
+      const body = (await this.fetch(reference)) as { objectType?: string };
+      // A schema may omit objectType, and the server treats such a revision as
+      // unpinnable (ADR 063 / release validation). Keep the id and warn rather
+      // than silently writing an id that no release can resolve.
+      if (typeof body.objectType !== "string" || body.objectType === "") {
+        return {
+          value: reference,
+          warning: `schema ${reference} has no object type to reference it by; kept the id in user_schema.`,
+        };
+      }
+      return { value: body.objectType };
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        return {
+          value: reference,
+          warning: `schema ${reference} no longer exists; kept the id in user_schema.`,
+        };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * The id to send to the server for a stored `user_schema` reference, the
+   * inverse of {@link localiseReference}. A handle-shaped reference is looked
+   * up and resolved to the object type's newest revision id, so a pulled flow
+   * can be published through `apply` today without waiting for release-based
+   * deploys. The lookup falls back to the reference unchanged when no object
+   * type matches — which also covers a minted id (an `objectType` may itself
+   * start with `sch_`, so the prefix is not a safe id signal). A value that is
+   * not handle-shaped — a `$id` URL or URN, a `${VAR}` — is passed through
+   * without a lookup.
+   */
+  async resolveToId(reference: string): Promise<string> {
+    if (!SchemaSyncer.HANDLE.test(reference)) {
+      return reference;
+    }
+    return (await this.newestRevision(reference)) ?? reference;
+  }
+
+  private static readonly HANDLE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 }
 
 /**
@@ -348,11 +416,13 @@ class FlowDefinitionSyncer implements ResourceSyncer {
   private readonly client: ZitadelClient;
   private readonly projectId: string;
   private readonly env: EnvLookup;
+  private readonly schema: SchemaSyncer;
 
-  constructor(client: ZitadelClient, projectId: string, env: EnvLookup) {
+  constructor(client: ZitadelClient, projectId: string, env: EnvLookup, schema: SchemaSyncer) {
     this.client = client;
     this.projectId = projectId;
     this.env = env;
+    this.schema = schema;
   }
 
   /**
@@ -376,14 +446,40 @@ class FlowDefinitionSyncer implements ResourceSyncer {
    * before sending. The file on disk stays bare so it is human-editable;
    * only the wire request carries `project_id` and the surrounding
    * envelope.
+   *
+   * A pulled flow references its schema by handle; the server wants a concrete
+   * id, so the handle is resolved to the schema's newest revision here (the
+   * file keeps the handle). This lets a pulled flow round-trip through `apply`
+   * now, rather than only through a future release-based deploy.
    */
   async create(data: object): Promise<{ id: string; canonical?: object }> {
+    const original = (data as { user_schema?: unknown }).user_schema;
     const result = (await this.client.createFlowDefinition({
       project_id: this.projectId,
       schema_uri: DEFAULT_FLOW_SCHEMA_URI,
-      flow_definition: data as CreateFlowDefinitionBodyFlowDefinition,
+      flow_definition: (await this.withResolvedSchema(
+        data,
+      )) as CreateFlowDefinitionBodyFlowDefinition,
     })) as CreateFlowDefinition201;
-    return { id: result.id, canonical: result.flow_definition as object };
+    // The resolved id was only for the wire. The server echoes it back in
+    // `user_schema`, and the loop writes the canonical body to disk — so put
+    // the original local reference (the handle) back, keeping the file portable
+    // while retaining every other field the server canonicalized.
+    const canonical = result.flow_definition as Record<string, unknown>;
+    return {
+      id: result.id,
+      canonical: typeof original === "string" ? { ...canonical, user_schema: original } : canonical,
+    };
+  }
+
+  /** The body with `user_schema` resolved to a schema id for the wire (a handle → its newest revision). */
+  private async withResolvedSchema(data: object): Promise<object> {
+    const reference = (data as { user_schema?: unknown }).user_schema;
+    if (typeof reference !== "string") {
+      return data;
+    }
+    const resolved = await this.schema.resolveToId(reference);
+    return resolved === reference ? data : { ...data, user_schema: resolved };
   }
 
   async update(_id: string, _data: object): Promise<{ canonical?: object }> {
@@ -410,6 +506,41 @@ class FlowDefinitionSyncer implements ResourceSyncer {
     const envelope = await this.client.getFlowDefinition(id);
 
     return envelope.flow_definition as object;
+  }
+
+  handleOf(body: object): string | undefined {
+    const name = (body as { name?: unknown }).name;
+    return typeof name === "string" ? name : undefined;
+  }
+
+  /** The newest revision of the flow name, for `pull`. The list returns a name's revisions newest first. */
+  async newestRevision(handle: string): Promise<string | null> {
+    const page = await this.client.listFlowDefinitions({
+      project_id: this.projectId,
+      name: handle,
+      limit: 1,
+    });
+    return page.flow_definitions[0]?.id ?? null;
+  }
+
+  /**
+   * A flow's one cross-resource reference is `user_schema`, a schema revision.
+   * Hand it to the schema syncer to turn the id into the schema's handle.
+   */
+  async localise(
+    serverBody: object,
+    syncers: ReadonlyArray<ResourceSyncer>,
+  ): Promise<{ body: object; warnings: string[] }> {
+    const schema = syncers.find((syncer) => syncer.kind === "schema");
+    const reference = (serverBody as { user_schema?: unknown }).user_schema;
+    if (schema?.localiseReference === undefined || typeof reference !== "string") {
+      return { body: serverBody, warnings: [] };
+    }
+    const { value, warning } = await schema.localiseReference(reference);
+    return {
+      body: { ...serverBody, user_schema: value },
+      warnings: warning === undefined ? [] : [warning],
+    };
   }
 }
 

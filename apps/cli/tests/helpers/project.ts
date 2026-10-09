@@ -350,6 +350,12 @@ export class ScaffoldedApp {
     return only(await this.publishedSchemas(), "schema");
   }
 
+  /** The object type of the published schema — the handle a schema is pulled by. */
+  async publishedSchemaObjectType(): Promise<string> {
+    const { schema } = await this.publishedSchema();
+    return (schema as unknown as { objectType: string }).objectType;
+  }
+
   publishedFlows(): Promise<PublishedFlow[]> {
     return this.listed<PublishedFlow>("flow-definitions");
   }
@@ -455,6 +461,19 @@ export class ScaffoldedApp {
   /** Edits the committed login flow, as the developer owning it would. */
   editLoginFlow(edit: (flow: FlowDocument) => void): Promise<void> {
     return this.editDocument(FLOW_FILE, edit);
+  }
+
+  /**
+   * Pins the login flow's `user_schema` to the project's published schema
+   * revision and applies it, the server-side shape a dashboard edit leaves:
+   * a flow whose reference is a concrete `sch_…` id rather than a handle.
+   */
+  async pinLoginFlowToPublishedSchema(): Promise<void> {
+    const { id } = await this.publishedSchema();
+    await this.editLoginFlow((flow) => {
+      (flow as unknown as { user_schema: string }).user_schema = id;
+    });
+    expect(await this.apply(), "pinning the login flow should apply").toSucceed();
   }
 
   editPackageJson(edit: (pkg: PackageJson) => void): Promise<void> {

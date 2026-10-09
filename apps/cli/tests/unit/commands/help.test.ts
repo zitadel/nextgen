@@ -35,6 +35,7 @@ Local server commands
 Configuration commands
   plan:                  Validate config without mutation and preview the sync diff
   apply:                 Validate and upload repo config to the platform
+  pull:                  Fetch the newest server-side revision of a resource into .zitadel/
   branding eject:        Take ownership of the login template
   branding get:          Get one branding revision by id
   branding list:         List branding

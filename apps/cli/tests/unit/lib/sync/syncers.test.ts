@@ -9,7 +9,7 @@ import { FLOWS_DIR } from "../../../../src/lib/flows";
 import { IDPS_DIR } from "../../../../src/lib/idp";
 import { SCHEMAS_DIR } from "../../../../src/lib/user-schema";
 import { makeSyncers } from "../../../../src/lib/sync/syncers";
-import { FatalFetchError } from "../../../../src/lib/sync/types";
+import { FatalFetchError, type ResourceSyncer } from "../../../../src/lib/sync/types";
 import { ZitadelError } from "../../../../src/lib/errors";
 
 /**
@@ -939,5 +939,221 @@ describe("IdpConnectionSyncer", () => {
     // No msw handler is registered: a request would fail the test, which is
     // the point — nothing reaches the platform.
     await expect(idp.delete("idp_1")).rejects.toThrow(/not supported yet/);
+  });
+});
+
+/**
+ * `pull` is thin: each syncer owns how to find its newest revision and how to
+ * turn a server body into the local file. That per-kind logic is asserted here.
+ */
+describe("newestRevision", () => {
+  it("lists the newest schema revision for an object type", async () => {
+    server.use(
+      http.get(`${BASE}/schemas`, ({ request }) => {
+        const url = new URL(request.url);
+        expect(url.searchParams.get("object_type")).toBe("human-user");
+        expect(url.searchParams.get("revisions")).toBe("latest");
+        expect(url.searchParams.get("limit")).toBe("1");
+        return HttpResponse.json({
+          schemas: [{ id: "sch_new", schema: { objectType: "human-user" }, metadata: {} }],
+        });
+      }),
+    );
+    const [schema] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
+
+    expect(await schema.newestRevision?.("human-user")).toBe("sch_new");
+  });
+
+  it("returns null when a schema handle names nothing", async () => {
+    server.use(http.get(`${BASE}/schemas`, () => HttpResponse.json({ schemas: [] })));
+    const [schema] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
+
+    expect(await schema.newestRevision?.("absent")).toBeNull();
+  });
+
+  it("lists the newest flow revision for a name", async () => {
+    server.use(
+      http.get(`${BASE}/flow_definitions`, ({ request }) => {
+        const url = new URL(request.url);
+        expect(url.searchParams.get("name")).toBe("login");
+        expect(url.searchParams.get("limit")).toBe("1");
+        return HttpResponse.json({
+          flow_definitions: [{ id: "flowdef_new", flow_definition: { name: "login" } }],
+        });
+      }),
+    );
+    const [, , flow] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
+
+    expect(await flow.newestRevision?.("login")).toBe("flowdef_new");
+  });
+
+  it("leaves idp and branding unpullable", () => {
+    const [, idp, , branding]: ReadonlyArray<ResourceSyncer> = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
+
+    expect(idp.newestRevision).toBeUndefined();
+    expect(branding.newestRevision).toBeUndefined();
+  });
+});
+
+describe("localise", () => {
+  /** Localise a flow body against a fresh registry, failing if the flow syncer cannot. */
+  const localiseFlow = (body: object): Promise<{ body: object; warnings: string[] }> => {
+    const syncers = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
+    const flow = syncers.find((syncer) => syncer.kind === "flow");
+    if (flow?.localise === undefined) {
+      throw new Error("the flow syncer should localise");
+    }
+    return flow.localise(body, syncers);
+  };
+
+  it("rewrites a flow's user_schema id to the schema's object type", async () => {
+    server.use(
+      http.get(`${BASE}/schemas/:id`, ({ params }) => {
+        expect(params.id).toBe("sch_abc");
+        return HttpResponse.json({
+          id: "sch_abc",
+          schema: { objectType: "human-user" },
+          metadata: {},
+        });
+      }),
+    );
+
+    const { body, warnings } = await localiseFlow({ name: "login", user_schema: "sch_abc" });
+
+    expect(body).toMatchObject({ name: "login", user_schema: "human-user" });
+    expect(warnings).toEqual([]);
+  });
+
+  it.each([
+    ["a URL $id", "https://example.test/human-user.yaml"],
+    ["a URN $id", "urn:example:human-user"],
+    ["a relative-URI $id", "duplicate-id"],
+  ])("resolves %s to the object type (ids are shape-less)", async (_label, reference) => {
+    server.use(
+      http.get(`${BASE}/schemas/:id`, () =>
+        HttpResponse.json({ id: reference, schema: { objectType: "human-user" }, metadata: {} }),
+      ),
+    );
+
+    const { body, warnings } = await localiseFlow({ name: "login", user_schema: reference });
+
+    expect(body).toMatchObject({ user_schema: "human-user" });
+    expect(warnings).toEqual([]);
+  });
+
+  it("keeps the id and warns when the referenced schema revision is gone", async () => {
+    server.use(
+      http.get(`${BASE}/schemas/:id`, () =>
+        HttpResponse.json({ code: "not_found", message: "gone" }, { status: 404 }),
+      ),
+    );
+
+    const { body, warnings } = await localiseFlow({ name: "login", user_schema: "sch_gone" });
+
+    expect(body).toMatchObject({ user_schema: "sch_gone" });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("sch_gone");
+  });
+
+  it("keeps the id and warns when the schema has no object type to reference it by", async () => {
+    server.use(
+      http.get(`${BASE}/schemas/:id`, () =>
+        HttpResponse.json({ id: "sch_noobj", schema: { properties: {} }, metadata: {} }),
+      ),
+    );
+
+    const { body, warnings } = await localiseFlow({ name: "login", user_schema: "sch_noobj" });
+
+    expect(body).toMatchObject({ user_schema: "sch_noobj" });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("no object type");
+  });
+
+  it("writes a schema body verbatim — a schema references nothing", () => {
+    const [schema]: ReadonlyArray<ResourceSyncer> = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
+
+    expect(schema.localise).toBeUndefined();
+  });
+});
+
+/**
+ * On publish the flow syncer turns a handle `user_schema` into the schema's
+ * current revision id, so a pulled flow (which references by handle) can go out
+ * through `apply` without waiting for release-based deploys. Non-handle values
+ * (ids, URLs, `${VAR}`) are sent unchanged, with no schema lookup.
+ */
+describe("FlowDefinitionSyncer.create resolves user_schema", () => {
+  const sync = () =>
+    makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
+
+  it("sends the resolved id on the wire but keeps the handle in the written body", async () => {
+    let posted: { user_schema?: string } = {};
+    server.use(
+      http.get(`${BASE}/schemas`, ({ request }) => {
+        expect(new URL(request.url).searchParams.get("object_type")).toBe("human-user");
+        return HttpResponse.json({
+          schemas: [{ id: "sch_live", schema: { objectType: "human-user" }, metadata: {} }],
+        });
+      }),
+      http.post(`${BASE}/flow_definitions`, async ({ request }) => {
+        const body = (await request.json()) as { flow_definition: { user_schema?: string } };
+        posted = body.flow_definition;
+        return HttpResponse.json({ id: "flowdef_1", flow_definition: body.flow_definition });
+      }),
+    );
+    const [, , flow] = sync();
+
+    const result = await flow.create({ name: "login", user_schema: "human-user" });
+
+    // Wire carries the resolved id; the body written back keeps the handle.
+    expect(posted.user_schema).toBe("sch_live");
+    expect((result.canonical as { user_schema: string }).user_schema).toBe("human-user");
+  });
+
+  it("sends a non-handle user_schema unchanged, without a schema lookup", async () => {
+    // No `*/schemas` handler: the suite's onUnhandledRequest is `error`, so a
+    // stray lookup would fail this test.
+    server.use(
+      http.post(`${BASE}/flow_definitions`, async ({ request }) => {
+        const body = (await request.json()) as { flow_definition: unknown };
+        return HttpResponse.json({ id: "flowdef_1", flow_definition: body.flow_definition });
+      }),
+    );
+    const [, , flow] = sync();
+    const url = "https://example.test/human-user.yaml";
+
+    const result = await flow.create({ name: "login", user_schema: url });
+
+    expect((result.canonical as { user_schema: string }).user_schema).toBe(url);
   });
 });
