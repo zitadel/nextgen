@@ -364,7 +364,7 @@ Three measurements led there, all on 2026-10-08 against the preview
 database (`zitadel-preview`, PS-5, `max_connections` 25 of which PlanetScale's own
 processes hold about 13).
 
-**The Go runtime is not on Fluid compute** (the Fluid page lists Node.js,
+**The Go runtime is not on Fluid compute** *(superseded on 2026-10-09, see "The Go runtime after all": the failures below were the database refusing connections, and the runtime does serve concurrent requests)* (the Fluid page lists Node.js,
 Python, Edge, Bun and Rust) and serves one request per instance. Under 24
 concurrent `GET /console/runtime.json` it answered `FUNCTION_INVOCATION_FAILED`
 for 10, then 4, then 1 of 16 requests. The earlier "Fluid compute is on"
@@ -486,6 +486,59 @@ requests at $2.60 per million or the $300 Flat Rate tier, invocations at
 $0.60 per million): roughly $430 to $840 a month in `fra1` depending on
 how far Vercel fans out, against about $75 for three always-on 2 GB
 instances on Render. A preview-cloud price, not a product price.
+
+## The Go runtime after all (2026-10-09)
+
+Decision: the `server` service is back on Vercel's Go preset
+(`"framework": "go"`, `buildCommand: OUT="$VERCEL_OUTPUT_FILE" sh apps/cloud/build.sh`),
+and `Dockerfile.vercel` is gone. Everything else from the container day
+stays: the runtime connects through PgBouncer with `pool_max_conns=4`, the
+schema is the `schema` DSN parameter, and the migrations run in the build
+of the internal `migrate` service.
+
+The container decision rested on a misdiagnosis. The burst that "proved"
+one request per instance on the Go runtime was failing on the preview
+cluster's 25 connection slots, and the server reported it as `failed to
+commit transaction` with the cause dropped (a raw error from the
+transaction begin falls into the catch-all in `internal/service/project.go`).
+The production cluster's own log for the morning of 2026-10-09 shows the
+same thing in the clear, `FATAL: remaining connection slots are reserved
+for roles with the SUPERUSER attribute`, while production instances were
+exiting at boot. The Fluid docs page does not list Go, but Vercel's
+function detail for a Go function shows a Fluid section with a peak
+concurrency above one, and the measurements agree. Same tests on the same
+commit, both runtimes through PgBouncer with `max_connections` 50:
+
+| | container | Go preset |
+|---|---|---|
+| warm instance, 8 / 16 / 24 concurrent `/console/runtime.json` | 48 × 200, 2 extra boots at 2.3 s each | 48 × 200, 9 extra boots at 0.1–1.2 s each |
+| 48 concurrent `/readyz` from idle | 48 × 200, p50 3.2 s, max 5.1 s | 48 × 200, 23 boots, p50 0.73 s, max 1.36 s |
+| 48 again after 50 s idle | p50 2.1 s, booted again | p50 0.23 s, no boot, still warm |
+| 48 warm | p50 0.23 s | p50 0.25 s |
+| deployment build | 3 m 37 s build + 4 m 26 s post-build, 72 CPU-minutes | 2 m 5 s |
+| boot failures | 0 | 0 |
+
+So the Go preset wins on the two things that were being debated: the
+build, which was the line on the bill that scales with the team, drops
+to about a quarter of the CPU-minutes, and a cold instance costs a
+fraction of a second instead of two and a half. Fan-out is the same
+platform behavior on both; the Go router even spawns a little more
+eagerly, and each extra instance is cheap enough not to matter. The
+server's own boot is about 140 ms either way; the rest was the
+container's provisioning. What the container keeps is OS packages, which
+nothing here needs.
+
+Two corrections to the record above: the "Go runtime is not on Fluid"
+paragraph in the PgBouncer section, and the "one cold start that did not
+bind its port" explanation of the single failure on the pooled preview,
+which was the same connection shortage before `max_connections` was
+raised. Still true from that section: the pooler, the `schema` parameter,
+and the fan-out itself.
+
+Follow-ups this leaves in the server, none of them blocking: wrap the
+transaction begin and commit errors through the dialect's mapper and log
+the parent of a bootstrap failure, retry a transient boot failure a few
+times, and make the platform bootstrap check before it inserts.
 
 ## Regions (deferred, needs a buyer)
 

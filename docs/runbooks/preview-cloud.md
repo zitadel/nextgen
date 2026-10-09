@@ -5,7 +5,7 @@
 > **Design:** [preview-cloud-vercel-planetscale.md](../design/platform/preview-cloud-vercel-planetscale.md)
 
 The preview cloud is the server of the current `main` commit, compiled by
-Vercel from the repository and run as a container image in Frankfurt
+Vercel from the repository and run on Vercel's Go runtime in Frankfurt
 (`fra1`) against one PlanetScale Postgres database in AWS `eu-central-1`. **Main is production** for this cloud: every push to `main`
 deploys, every pull request gets a preview, and everything builds on Vercel.
 Version tags (`1.0.0-alpha.N`), their images and npm packages are the
@@ -19,7 +19,7 @@ The Vercel project is one deployment with seven
 
 | Service | Root | What it is | Public paths |
 |---|---|---|---|
-| `server` | `.` | the Go server as a container image (`Dockerfile.vercel`: one static binary, `apps/cloud/launcher`, no embedded UIs) | everything not listed below, incl. `/console/runtime.json` |
+| `server` | `.` | the Go server on Vercel's Go preset (`apps/cloud/build.sh` compiles one static binary, `apps/cloud/launcher`, no embedded UIs) | everything not listed below, incl. `/console/runtime.json` |
 | `migrate` | `.` | internal, never routed: a Go-runtime service whose build step runs the migrations (`apps/cloud/vercel-build.sh`) | none |
 | `console` | `apps/console` | the console SPA, built with `CONSOLE_BASE_PATH=/console`, relocated to `out/console` | `/console/*` |
 | `login` | `apps/login-ui` | the login UI, built with `LOGIN_BASE_PATH=/login`, relocated to `out/login` | `/login/*` |
@@ -177,8 +177,8 @@ Preview target gets its own document the same way.
   the launcher and then runs `launcher migrate`, which applies the
   migrations against the production database with the migrator role
   (`CLOUD_MIGRATOR_DATABASE_URL`) **before** the deployment goes live, while
-  the `server` container builds beside it (a Docker build has neither the
-  environment nor the network to migrate, hence the separate service). A
+  the `server` service compiles beside it (a service of its own, so a failed
+  migration fails the deployment and never the serving function). A
   failed migration fails the whole deployment and the previous one keeps
   serving. The launcher refuses to migrate production unless
   `VERCEL_GIT_COMMIT_REF` is `main`, so a `vercel deploy --prod` from a
@@ -291,11 +291,14 @@ older state is a revert on `main`.
   prefix list) needs a post-build relocation of Waku's Vercel output and
   moves the pages out of `content/docs` to avoid a `/docs/docs` segment. Not
   worth it; the prefix list stays.
-- Vercel's Go runtime (Beta) is not on Fluid compute: one request per
-  instance, and under 24 concurrent requests it failed 10 outright. The
-  container image serves concurrent requests per instance (Vercel reports
-  the peak concurrency in the function detail). Both fan out to one
-  instance per simultaneous request from cold.
+- Vercel's Go runtime (Beta) serves concurrent requests per instance, the
+  same as a container image, even though the Fluid page does not list it:
+  the function detail shows a Fluid section with a peak concurrency above
+  one, and a warm instance answered 24 concurrent requests with four extra
+  boots. The 2026-10-08 verdict that it runs one request per instance was
+  wrong: those failures were the database refusing connections. Both
+  runtimes fan out to new instances from cold; a Go instance boots in 0.1
+  to 1.4 s, a container in 2.2 to 2.6 s.
 - PlanetScale's PgBouncer rejects `search_path` as a startup parameter
   (`unsupported startup parameter`, 08P01); that is why the schema is a
   `schema` parameter the server consumes. `pool_max_conns` and
@@ -344,7 +347,7 @@ older state is a revert on `main`.
 
 ## Known limits
 
-- Vercel container images (Beta) and functions: request and response bodies
+- Vercel functions (the Go runtime is Beta): request and response bodies
   are capped at 4.5 MB, max duration per plan (300 s default), SIGTERM with
   a 30 s grace period on scale-in.
 - Scale-to-zero means in-process state (the request wide-event buffer of

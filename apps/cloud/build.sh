@@ -1,7 +1,8 @@
 #!/bin/sh
 # Compile the launcher, the server plus its cloud entrypoint, the way both
-# Vercel builds do: Dockerfile.vercel (the serving container) and
-# vercel-build.sh (the build step of the migrate service). Stub UI embeds
+# Go-preset services do: the `server` service's buildCommand
+# (OUT=$VERCEL_OUTPUT_FILE sh apps/cloud/build.sh) and vercel-build.sh (the
+# build step of the migrate service). Stub UI embeds
 # first: the UIs are their own services and the server only validates that
 # an index.html exists per UI. Build metadata comes from the server manifest
 # and the deployment's commit. Output: $OUT, default bin/nextgen-launcher.
