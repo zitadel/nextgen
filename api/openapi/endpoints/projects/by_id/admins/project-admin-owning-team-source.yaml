@@ -1,0 +1,16 @@
+title: ProjectAdminOwningTeamSource
+description: Admin access as an active member of the team that owns the project.
+type: object
+required:
+  - type
+  - team
+properties:
+  type:
+    type: string
+    enum:
+      - owning_team
+  team:
+    description: |
+      The owning team. Its `name` is present only when the caller is a member
+      of it.
+    $ref: ../../../../components/schemas/team-ref.yaml

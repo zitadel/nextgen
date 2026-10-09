@@ -171,10 +171,10 @@ function queryRecord(request: Request): Record<string, string> {
 }
 
 /**
- * Server-side record for a project. Strict superset of the spec response
- * types (`CreateProject201`, `GetProject200`): includes the server-only
- * secrets and `updatedAt`. Handlers project from this record to the right
- * wire shape at the boundary.
+ * Server-side record for a project: the server-only secrets and `updatedAt`
+ * on top of the spec's project fields. It does not hold `owning_team_id`,
+ * which `GetProject200` requires: the handlers derive that from the claims at
+ * the boundary, where they project this record to the right wire shape.
  */
 type ProjectRecord = {
   id: string;
@@ -789,6 +789,9 @@ export function setupPlatformHandlers() {
         name: project.name,
         created_at: project.createdAt,
         updated_at: project.updatedAt,
+        // The claim's team owns the project, as the server's owning-team
+        // assignment does; null until the project is claimed.
+        owning_team_id: store.claims.get(project.id)?.teamId ?? null,
       };
       const out = parse(GetProjectResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {

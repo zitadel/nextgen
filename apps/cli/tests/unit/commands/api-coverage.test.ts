@@ -111,6 +111,7 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   setUserPassword: "not yet exposed — follow-up, needs a credential-safe input route (ADR 064 §12)",
   listUserTeams: "not yet exposed — follow-up, a user sub-resource listing",
   listUserPasskeys: "not yet exposed — follow-up, a user sub-resource listing",
+  listProjectAdmins: "not yet exposed; a project sub-resource listing, no command reads it yet",
 };
 
 const capitalize = (word: string): string => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`;

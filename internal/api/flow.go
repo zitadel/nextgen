@@ -156,7 +156,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		if err == nil {
 			if rp := passkeyRPFromOrigin(*originURL); rp != nil {
 				requestOrigin = originURL.Scheme + "://" + originURL.Host
-				project, err := h.projectService.Get(ctx, state.ProjectID)
+				project, err := h.projectService.Get(ctx, state.ProjectID, service.ProjectQueryOptions{})
 				if err != nil {
 					// A project lookup failing mid-submit is a server-side
 					// fault, not client input: keep it a 500 rather than

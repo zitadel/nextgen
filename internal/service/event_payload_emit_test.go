@@ -115,6 +115,8 @@ func TestProjectUpdate_EventPayloadNameDelta(t *testing.T) {
 		},
 	)
 	statements.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).Return(nil)
+	statements.EXPECT().GetProject(gomock.Any(), "proj_1", service.ProjectQueryOptions{OwningTeam: true}).
+		Return(&domain.Project{ID: "proj_1"}, nil)
 
 	const baseURL = "https://example.com/api/schemas"
 	schemaValidator, err := domain.NewSchemaValidator(baseURL)
@@ -153,7 +155,7 @@ func TestProjectUpdated_PayloadCarriesPasswordHashAlgorithm(t *testing.T) {
 		).AnyTimes()
 		statementer.EXPECT().Statements().Return(statements).AnyTimes()
 		statements.EXPECT().SetProjectPasswordHashPolicy(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-		statements.EXPECT().GetProjectByID(gomock.Any(), "proj_1").
+		statements.EXPECT().GetProject(gomock.Any(), "proj_1", service.ProjectQueryOptions{OwningTeam: true}).
 			Return(&domain.Project{ID: "proj_1", Name: "kept"}, nil)
 		statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(_ context.Context, ev *domain.Event) error {

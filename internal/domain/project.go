@@ -72,6 +72,9 @@ type Project struct {
 	// written with. Nil means the deployment default, which is what a project
 	// runs on until an admin chooses otherwise. See [PasswordHashPolicy].
 	PasswordHashPolicy *PasswordHashPolicy
+	// OwningTeamID is the team that owns the project (ADR 054 §2), empty
+	// while none does. Read only when a project read asks for it.
+	OwningTeamID string
 }
 
 func NewProject(name string, previewOrigins []string) (*Project, error) {

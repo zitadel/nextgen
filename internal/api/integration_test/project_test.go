@@ -274,7 +274,7 @@ func TestGetProject(t *testing.T) {
 	}{
 		{
 			name: "ok",
-			want: &api.ProjectResponse{Name: project.Name, PreviewOrigins: previewOrigins},
+			want: &api.ProjectDetailResponse{Name: project.Name, PreviewOrigins: previewOrigins},
 		},
 		{
 			name:      "not found",
@@ -323,13 +323,13 @@ func TestProjectSessionCaller(t *testing.T) {
 	t.Run("granted person opens the project", func(t *testing.T) {
 		resp, err := grantee.GetProject(t.Context(), params)
 		require.NoError(t, err)
-		assertProjectResponse(t, &api.ProjectResponse{Name: project.Name, PreviewOrigins: []string{}}, resp)
+		assertProjectResponse(t, &api.ProjectDetailResponse{Name: project.Name, PreviewOrigins: []string{}}, resp)
 	})
 
 	t.Run("granted person renames the project", func(t *testing.T) {
 		resp, err := grantee.PatchProject(t.Context(), &api.PatchProjectRequest{Name: api.NewOptNilString(project.Name + " renamed")}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.ProjectResponse{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.ProjectDetailResponse{}, resp, helpers.MustMarshal(t, resp))
 	})
 
 	t.Run("viewer opens but cannot rename", func(t *testing.T) {
@@ -344,7 +344,7 @@ func TestProjectSessionCaller(t *testing.T) {
 
 		resp, err := viewer.GetProject(t.Context(), params)
 		require.NoError(t, err)
-		require.IsType(t, &api.ProjectResponse{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.ProjectDetailResponse{}, resp, helpers.MustMarshal(t, resp))
 
 		patchResp, err := viewer.PatchProject(t.Context(), &api.PatchProjectRequest{Name: api.NewOptNilString("viewer rename")}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
@@ -396,13 +396,13 @@ func TestPatchProject(t *testing.T) {
 		{
 			name: "rename",
 			req:  &api.PatchProjectRequest{Name: api.NewOptNilString(renamed)},
-			want: &api.ProjectResponse{Name: renamed, PreviewOrigins: []string{}},
+			want: &api.ProjectDetailResponse{Name: renamed, PreviewOrigins: []string{}},
 		},
 		{
 			name:           "preview origins are left untouched",
 			previewOrigins: keptOrigins,
 			req:            &api.PatchProjectRequest{Name: api.NewOptNilString(renamedKeep)},
-			want:           &api.ProjectResponse{Name: renamedKeep, PreviewOrigins: keptOrigins},
+			want:           &api.ProjectDetailResponse{Name: renamedKeep, PreviewOrigins: keptOrigins},
 		},
 		{
 			name: "absent name",
@@ -480,7 +480,7 @@ func TestPatchProjectPasswordHash(t *testing.T) {
 	t.Run("a new project reads back no method of its own", func(t *testing.T) {
 		got, err := client.GetProject(t.Context(), api.GetProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
-		response, ok := got.(*api.ProjectResponse)
+		response, ok := got.(*api.ProjectDetailResponse)
 		require.True(t, ok, helpers.MustMarshal(t, got))
 		assert.True(t, response.PasswordHash.IsNull(), "no method chosen reads back as null")
 	})
@@ -490,7 +490,7 @@ func TestPatchProjectPasswordHash(t *testing.T) {
 			PasswordHash: api.NewOptNilPasswordHashPolicy(argon2id),
 		}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
-		patched, ok := got.(*api.ProjectResponse)
+		patched, ok := got.(*api.ProjectDetailResponse)
 		require.True(t, ok, helpers.MustMarshal(t, got))
 
 		policy, ok := patched.PasswordHash.Get()
@@ -500,7 +500,7 @@ func TestPatchProjectPasswordHash(t *testing.T) {
 
 		read, err := client.GetProject(t.Context(), api.GetProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
-		reread, ok := read.(*api.ProjectResponse)
+		reread, ok := read.(*api.ProjectDetailResponse)
 		require.True(t, ok, helpers.MustMarshal(t, read))
 		assert.Equal(t, patched.PasswordHash, reread.PasswordHash, "a GET reads back what the PATCH set")
 	})
@@ -510,7 +510,7 @@ func TestPatchProjectPasswordHash(t *testing.T) {
 			Name: api.NewOptNilString(helpers.ProjectName()),
 		}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
-		renamed, ok := got.(*api.ProjectResponse)
+		renamed, ok := got.(*api.ProjectDetailResponse)
 		require.True(t, ok, helpers.MustMarshal(t, got))
 		assert.False(t, renamed.PasswordHash.IsNull(), "a body that says nothing about hashing changes nothing")
 	})
@@ -520,7 +520,7 @@ func TestPatchProjectPasswordHash(t *testing.T) {
 			PasswordHash: api.OptNilPasswordHashPolicy{Set: true, Null: true},
 		}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
-		cleared, ok := got.(*api.ProjectResponse)
+		cleared, ok := got.(*api.ProjectDetailResponse)
 		require.True(t, ok, helpers.MustMarshal(t, got))
 		assert.True(t, cleared.PasswordHash.IsNull())
 	})
@@ -735,8 +735,9 @@ func TestQueryProjects(t *testing.T) {
 	}
 }
 
-// assertProjectResponse covers every operation answering with the shared
-// project body: getProject, patchProject, and each item of queryProjects.
+// assertProjectResponse covers every operation answering with a project body:
+// getProject and patchProject (the detail body), and each item of
+// queryProjects.
 func assertProjectResponse(t *testing.T, want, got any) {
 	t.Helper()
 	if !assert.IsType(t, want, got, helpers.MustMarshal(t, got)) {
@@ -747,6 +748,15 @@ func assertProjectResponse(t *testing.T, want, got any) {
 	case *api.ProjectResponse:
 		require.IsType(t, &api.ProjectResponse{}, got, helpers.MustMarshal(t, got))
 		actual := got.(*api.ProjectResponse)
+
+		assert.NotEmpty(t, actual.ID)
+		assert.Equal(t, expected.Name, actual.Name)
+		assert.Equal(t, expected.PreviewOrigins, actual.PreviewOrigins)
+		assert.NotEmpty(t, actual.CreatedAt)
+		assert.False(t, actual.UpdatedAt.Before(actual.CreatedAt))
+	case *api.ProjectDetailResponse:
+		require.IsType(t, &api.ProjectDetailResponse{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.ProjectDetailResponse)
 
 		assert.NotEmpty(t, actual.ID)
 		assert.Equal(t, expected.Name, actual.Name)
