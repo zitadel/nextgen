@@ -108,7 +108,10 @@ jobs:
       - name: Run Moon build and test graph
         id: moon-ci
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: moon ci :lint :typecheck :build :test :check-adrs
+        # moon ci only selects tasks whose own inputs changed. --downstream deep
+        # with --include-relations also runs the tasks of every project that
+        # depends on a changed one, so an api change re-tests its consumers.
+        run: moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph --downstream deep --include-relations
 
       - name: Report Moon CI failures
         if: ${{ failure() && steps.moon-ci.conclusion == 'failure' }}
@@ -144,8 +147,25 @@ jobs:
       # when no SDK, CLI, or journey surface moved — the flow widget is
       # framework-independent, so a server-only change proves as much on one
       # framework as on the full matrix (apps/cli-journey-e2e/scripts/frameworks.mjs).
+      # Verdaccio proxies every public framework package the journey scaffolds
+      # pull from npmjs; persisting its storage turns a dozen cold npm installs
+      # into warm ones. The key is per-run so each save adds newly seen
+      # packages and restore-keys pulls the most recent prior store. The journey
+      # always republishes the @zitadel packages fresh (local-registry.mjs), so
+      # a stale store is still valid.
+      - name: Cache journey registry packages
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/journey-verdaccio-storage
+          key: journey-verdaccio-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            journey-verdaccio-${{ runner.os }}-
+
       - name: Run journey e2e lanes
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
+        env:
+          JOURNEY_REGISTRY_STORAGE: ${{ runner.temp }}/journey-verdaccio-storage
         run: |
           version="$(node -p "require('./apps/server/package.json').version")"
           env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- \

@@ -163,9 +163,8 @@ function Sidebar({
       <div
         data-slot="sidebar"
         className={cn(
-          // Zitadel: the Figma "Sidebar 08." surface resolves to `background`
-          // (#050505), not the grey `--zl-sidebar` token. Same near-black as the
-          // page, separated only by a `border` edge.
+          // Zitadel: the sidebar surface is `background`, not `--zl-sidebar`; a
+          // `border` edge separates it from the page.
           "flex h-full w-(--sidebar-width) flex-col bg-background text-sidebar-foreground",
           className,
         )}
@@ -177,9 +176,8 @@ function Sidebar({
   }
 
   if (isMobile) {
-    // Zitadel: the Figma mobile frame ("Sidebar 07.") keeps a persistent 48px
-    // icon rail on small screens rather than shadcn's default fully-hidden
-    // off-canvas sheet. We render the rail in-flow (so the inset sits beside it)
+    // Zitadel: small screens keep a persistent 48px icon rail instead of
+    // shadcn's hidden off-canvas sheet. We render the rail in-flow (so the inset sits beside it)
     // and keep the Sheet as the expanded overlay opened by the trigger.
     return (
       <>
@@ -255,7 +253,7 @@ function Sidebar({
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
-          className="flex h-full w-full flex-col bg-background group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm"
+          className="flex h-full w-full flex-col bg-background group-data-[variant=floating]:rounded-md group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm"
         >
           {children}
         </div>
@@ -323,7 +321,7 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
         // screen instead of scrolling the thing that is too wide. Every page
         // renders in here, so the fix belongs here rather than in each screen.
         "relative flex w-full min-w-0 flex-1 flex-col bg-background",
-        "md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
+        "md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-md md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
         className,
       )}
       {...props}
@@ -484,7 +482,7 @@ const sidebarMenuButtonVariants = cva(
       variant: {
         default: "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         outline:
-          "bg-background shadow-[0_0_0_1px_var(--sidebar-border)] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_var(--sidebar-accent)]",
+          "bg-background shadow-[0_0_0_1px_var(--color-sidebar-border)] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_var(--color-sidebar-accent)]",
       },
       size: {
         default: "h-8 text-sm",

@@ -16,6 +16,15 @@
 
 ## Decisions
 
+### D19 · List page actions sit beside the title — 2026-10-07 · [standing]
+The primary action of a list screen (Add) stays on the title row at every breakpoint, never stretched to full width or dropped under the title. Search is out of the page headers until there is a console-wide solution.
+
+### D18 · Console corners are 8px — 2026-10-07 · [standing]
+Every console surface (cards, tables, panels, dialogs, drawers, alerts, tab strips) uses the 8px radius token. The softer shadcn defaults (10px, 14px, 18px) are not used.
+
+### D17 · Every directory is a resource table — 2026-10-07 · [standing]
+User schemas and Login flows draw the same data table as Users, Teams and Projects: a name column with the resource icon, the resource's own columns, a date, and the row menu. The stacked card rows broke on narrow widths. Supersedes D7 and the schema half of D0a. The schema id leaves the list row for the detail header card, which matches Login flows (refines D10).
+
 ### D16 · Profile shows the account email only, read-only — 2026-09-30 · [standing]
 Claiming asks for nothing but an email address, and the email cannot be changed, so Settings → Profile is one disabled field with no Save. Name fields are not pulled in from the schema.
 

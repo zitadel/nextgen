@@ -134,7 +134,7 @@ export type IconName =
  */
 export type BrandIconName = "brand-google";
 
-/** Auth-surface glyph list — keep playgrounds and parity tests in sync. */
+/** Auth-surface glyph list; every name maps to a glyph (zl-icon.spec.ts). */
 export const SHIPPED_ICON_NAMES = [
   "plus",
   "arrow-right",

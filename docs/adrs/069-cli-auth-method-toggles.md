@@ -1,4 +1,4 @@
-# ADR 068: CLI Commands to Enable and Disable Password and Passkey Sign-In
+# ADR 069: CLI Commands to Enable and Disable Password and Passkey Sign-In
 
 > **Status:** Proposed
 > **Date:** 2026-10-07
