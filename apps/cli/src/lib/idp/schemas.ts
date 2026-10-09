@@ -19,7 +19,12 @@ export type SchemaFile = {
   readonly body: Record<string, unknown>;
 };
 
-function methodsOf(body: Record<string, unknown>): string[] {
+/**
+ * The authentication methods a schema document enables, sorted: every entry
+ * under `x-auth-methods` whose `enabled` is `true`. What the login engine can
+ * actually serve is narrower, and is the caller's to decide.
+ */
+export function methodsOf(body: Record<string, unknown>): string[] {
   const methods = body["x-auth-methods"];
   if (!isObject(methods)) {
     return [];

@@ -209,8 +209,8 @@ describe("branding design catalog", () => {
     });
 
     it("renders nothing for a step with no providers", () => {
-      // The shipped presets carry none until `sso enable` adds one, so this
-      // is the common case and must cost the markup nothing.
+      // The shipped presets carry none until `auth-method sso enable` adds one,
+      // so this is the common case and must cost the markup nothing.
       expect(render(context)).not.toContain("zl-sso-providers");
       expect(render({ ...context, sso_providers: [] })).not.toContain("zl-sso-providers");
     });

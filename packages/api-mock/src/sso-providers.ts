@@ -1,12 +1,12 @@
 /**
  * Module-level identity-provider overlay applied by the mock handlers.
  *
- * The shipped login flow (`packages/config/defaults/default-login.json`) has
- * no providers — they arrive only when a project runs `zitadel sso enable` —
- * and the fixtures here mirror that flow, so none is offered by default.
- * Tests and the dev playground opt in with `applySsoProviders([...])`, which
- * adds the entries to every step that can start a sign-in, exactly as the
- * engine renders them once a connection exists.
+ * The shipped login flow (`packages/config/defaults/default-login.json`) has no
+ * providers — they arrive only when a project runs
+ * `zitadel auth-method sso enable` — and the fixtures here mirror that flow, so
+ * none is offered by default. Tests and the dev playground opt in with
+ * `applySsoProviders([...])`, which adds the entries to every step that can
+ * start a sign-in, exactly as the engine renders them once a connection exists.
  *
  * Follows `branding.ts`: an overlay rather than a fixture edit, so the
  * default mock keeps mirroring the shipped flow byte for byte.

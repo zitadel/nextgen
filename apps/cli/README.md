@@ -127,6 +127,12 @@ which ships in this package.
 
 <!-- commands -->
 * [`zitadel apply`](#zitadel-apply)
+* [`zitadel auth-method passkey disable`](#zitadel-auth-method-passkey-disable)
+* [`zitadel auth-method passkey enable`](#zitadel-auth-method-passkey-enable)
+* [`zitadel auth-method password disable`](#zitadel-auth-method-password-disable)
+* [`zitadel auth-method password enable`](#zitadel-auth-method-password-enable)
+* [`zitadel auth-method sso disable`](#zitadel-auth-method-sso-disable)
+* [`zitadel auth-method sso enable`](#zitadel-auth-method-sso-enable)
 * [`zitadel autocomplete [SHELL]`](#zitadel-autocomplete-shell)
 * [`zitadel branding eject`](#zitadel-branding-eject)
 * [`zitadel branding get ID`](#zitadel-branding-get-id)
@@ -215,6 +221,237 @@ GLOBAL FLAGS
 
 DESCRIPTION
   Validate and upload repo config to the platform.
+```
+
+## `zitadel auth-method passkey disable`
+
+Disable passkey sign-in for a user schema.
+
+```
+USAGE
+  $ zitadel auth-method passkey disable [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>] [-f]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -f, --force            Disable the schema's last way to sign in. Its users can
+                         then only be managed through the API.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+  -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --schema=<value>   User schema to change. Required when the Project has
+                         more than one.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Disable passkey sign-in for a user schema.
+
+EXAMPLES
+  $ zitadel auth-method passkey disable
+
+  $ zitadel auth-method passkey disable --schema customers
+```
+
+## `zitadel auth-method passkey enable`
+
+Enable passkey sign-in for a user schema.
+
+```
+USAGE
+  $ zitadel auth-method passkey enable [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+  -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --schema=<value>   User schema to change. Required when the Project has
+                         more than one.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Enable passkey sign-in for a user schema.
+
+EXAMPLES
+  $ zitadel auth-method passkey enable
+
+  $ zitadel auth-method passkey enable --schema customers
+```
+
+## `zitadel auth-method password disable`
+
+Disable password sign-in for a user schema.
+
+```
+USAGE
+  $ zitadel auth-method password disable [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>] [-f]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -f, --force            Disable the schema's last way to sign in. Its users can
+                         then only be managed through the API.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+  -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --schema=<value>   User schema to change. Required when the Project has
+                         more than one.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Disable password sign-in for a user schema.
+
+EXAMPLES
+  $ zitadel auth-method password disable
+
+  $ zitadel auth-method password disable --schema customers
+```
+
+## `zitadel auth-method password enable`
+
+Enable password sign-in for a user schema.
+
+```
+USAGE
+  $ zitadel auth-method password enable [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+  -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --schema=<value>   User schema to change. Required when the Project has
+                         more than one.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Enable password sign-in for a user schema.
+
+EXAMPLES
+  $ zitadel auth-method password enable
+
+  $ zitadel auth-method password enable --schema customers
+```
+
+## `zitadel auth-method sso disable`
+
+Remove an identity provider from a user schema.
+
+```
+USAGE
+  $ zitadel auth-method sso disable [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
+    [--provider <value>] [-f]
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -f, --force             Disable the schema's last way to sign in. Its users
+                          can then only be managed through the API.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --provider=<value>  Identity provider to remove.
+      --schema=<value>    User schema to change. Required when the Project has
+                          more than one.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Remove an identity provider from a user schema.
+
+EXAMPLES
+  $ zitadel auth-method sso disable --provider google
+
+  $ zitadel auth-method sso disable --provider google --schema customers
+```
+
+## `zitadel auth-method sso enable`
+
+Add an identity provider to a user schema.
+
+```
+USAGE
+  $ zitadel auth-method sso enable [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
+    [--provider google] [--client-id <value>]
+
+FLAGS
+  -c, --cwd=<value>        Project directory to operate on.
+  -n, --non-interactive    Disable prompts. Required when scripting or running
+                           as an agent.
+  -s, --server=<value>     Override the resolved server URL.
+  -v, --verbose            Verbose logging.
+      --client-id=<value>  Client id of the application registered with the
+                           provider.
+      --[no-]color         Colorize human output. Disable with --no-color;
+                           NO_COLOR and FORCE_COLOR are honored too.
+      --debug              Debug logging.
+      --dry-run            Preview without mutating files or the platform.
+      --provider=<option>  Identity provider to enable.
+                           <options: google>
+      --schema=<value>     User schema to change. Required when the Project has
+                           more than one.
+      --[no-]telemetry     Send anonymous usage analytics. Disable with
+                           --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Add an identity provider to a user schema.
+
+EXAMPLES
+  $ zitadel auth-method sso enable --provider google
+
+  $ zitadel auth-method sso enable --provider google --schema customers
+
+  $ zitadel auth-method sso enable --provider google --client-id 1234-abc.apps.googleusercontent.com --non-interactive < secret.txt
 ```
 
 ## `zitadel autocomplete [SHELL]`
@@ -1906,13 +2143,13 @@ EXAMPLES
 
 ## `zitadel sso enable`
 
-Enable an identity provider for a user schema.
+Deprecated alias of auth-method sso enable.
 
 ```
 USAGE
   $ zitadel sso enable [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--provider google]
-    [--schema <value>] [--client-id <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
+    [--provider google] [--client-id <value>]
 
 FLAGS
   -c, --cwd=<value>        Project directory to operate on.
@@ -1937,14 +2174,10 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Enable an identity provider for a user schema.
+  Deprecated alias of auth-method sso enable.
 
 EXAMPLES
-  $ zitadel sso enable --provider google
-
-  $ zitadel sso enable --provider google --schema customers
-
-  $ zitadel sso enable --provider google --client-id 1234-abc.apps.googleusercontent.com --non-interactive < secret.txt
+  $ zitadel auth-method sso enable --provider google
 ```
 
 ## `zitadel start`

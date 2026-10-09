@@ -11,17 +11,21 @@
  * `CreateFlowDefinitionBody` from
  * `@zitadel/api/generated/endpoints/zitadelNextGen.zod`. This
  * module owns only the CLI-specific concerns: the password-flow
- * builder, env-var reference scanning, and the file-level
+ * builder, env-var reference scanning, the file-level
  * `validateFlows` helper that surfaces `E_VALIDATION` errors against
- * the generated Zod.
+ * the generated Zod, and the sign-in analysis the `auth-method`
+ * commands run over a flow (what a schema change breaks, and which
+ * methods a flow lets a user sign in with).
  *
  * **Dependency rule.** No upward imports (`commands/`, `sync/`, etc.)
  * and no filesystem I/O. It depends sideways only on shared utilities
- * under `apps/cli/src/lib/` — today `lib/errors` (`ZitadelError`).
+ * under `apps/cli/src/lib/` — today `lib/errors` (`ZitadelError`) and
+ * `lib/json` (`isObject`).
  */
 export { buildFlow } from "./build";
 export { validateFlows } from "./validate";
 export { flowEnvRefs } from "./env-refs";
+export { checkFlow, offeredSignInMethods } from "./sign-in";
 
 /**
  * Relative directory (from the project root) where local flow files

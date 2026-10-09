@@ -31,6 +31,7 @@ export interface Envelope<T = Record<string, unknown>> {
   readonly message?: string;
   readonly hint?: string;
   readonly next_commands?: string[];
+  readonly warnings?: string[];
   readonly cli_version?: string;
   readonly command?: string;
   readonly source?: string;
@@ -232,10 +233,14 @@ export class ScaffoldedApp {
     );
   }
 
-  /** `sso enable` without `--json`, for a spec asserting what the developer reads. */
+  /**
+   * `auth-method sso enable` without `--json`, for a spec asserting what the
+   * developer reads.
+   */
   enableSsoRendered(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingStdin(credentials.secret, () =>
       this.cli([
+        "auth-method",
         "sso",
         "enable",
         "--non-interactive",
@@ -250,6 +255,7 @@ export class ScaffoldedApp {
   enableSso(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingSecret(credentials.secret, () =>
       this.cli([
+        "auth-method",
         "sso",
         "enable",
         "--non-interactive",
@@ -260,6 +266,94 @@ export class ScaffoldedApp {
         credentials.clientId,
       ]),
     );
+  }
+
+  /** The deprecated `sso enable` alias, for the spec that covers it. */
+  enableSsoDeprecated(provider: string, credentials: Credentials): Promise<CliResult> {
+    return this.pipingSecret(credentials.secret, () =>
+      this.cli([
+        "sso",
+        "enable",
+        "--non-interactive",
+        "--json",
+        "--provider",
+        provider,
+        "--client-id",
+        credentials.clientId,
+      ]),
+    );
+  }
+
+  /**
+   * The deprecated `sso enable` alias without `--json`, for what the developer
+   * reads.
+   */
+  enableSsoDeprecatedRendered(provider: string, credentials: Credentials): Promise<CliResult> {
+    return this.pipingStdin(credentials.secret, () =>
+      this.cli([
+        "sso",
+        "enable",
+        "--non-interactive",
+        "--provider",
+        provider,
+        "--client-id",
+        credentials.clientId,
+      ]),
+    );
+  }
+
+  /** `auth-method password|passkey enable`. */
+  enableMethod(method: "password" | "passkey", extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["auth-method", method, "enable", "--non-interactive", "--json", ...extraArgs]);
+  }
+
+  /** `auth-method password|passkey disable`. */
+  disableMethod(method: "password" | "passkey", extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli([
+      "auth-method",
+      method,
+      "disable",
+      "--non-interactive",
+      "--json",
+      ...extraArgs,
+    ]);
+  }
+
+  /**
+   * `auth-method password|passkey enable` without `--json`, for what the
+   * developer reads.
+   */
+  enableMethodRendered(method: "password" | "passkey"): Promise<CliResult> {
+    return this.cli(["auth-method", method, "enable", "--non-interactive"]);
+  }
+
+  /**
+   * `auth-method password|passkey disable` without `--json`, for what the
+   * developer reads.
+   */
+  disableMethodRendered(method: "password" | "passkey"): Promise<CliResult> {
+    return this.cli(["auth-method", method, "disable", "--non-interactive"]);
+  }
+
+  /**
+   * `auth-method sso disable` without `--json`, for what the developer reads.
+   */
+  disableSsoRendered(provider: string): Promise<CliResult> {
+    return this.cli(["auth-method", "sso", "disable", "--non-interactive", "--provider", provider]);
+  }
+
+  /** `auth-method sso disable`. */
+  disableSso(provider: string, extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli([
+      "auth-method",
+      "sso",
+      "disable",
+      "--non-interactive",
+      "--json",
+      "--provider",
+      provider,
+      ...extraArgs,
+    ]);
   }
 
   /** Runs `doctor` against a fake docker on PATH and a port from this worker. */
