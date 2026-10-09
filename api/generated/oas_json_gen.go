@@ -79915,6 +79915,22 @@ func (s QueryIdpsErrorResponse) Encode(e *jx.Encoder) {
 
 func (s QueryIdpsErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
+	case AuthCsrfInvalidQueryIdpsErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AuthUnauthorizedQueryIdpsErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
@@ -80037,6 +80053,9 @@ func (s *QueryIdpsErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidQueryIdpsErrorResponse
+					found = true
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedQueryIdpsErrorResponse
 					found = true
@@ -80069,6 +80088,10 @@ func (s *QueryIdpsErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
+	case AuthCsrfInvalidQueryIdpsErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
 	case AuthUnauthorizedQueryIdpsErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err

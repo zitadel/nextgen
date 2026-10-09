@@ -86,6 +86,21 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.IsType(t, &api.BrandingRevisionResponse{}, got, helpers.MustMarshal(t, got))
 	})
 
+	t.Run("identity providers", func(t *testing.T) {
+		t.Parallel()
+		// Connections are created with the secret only (#998). The platform
+		// project is shared, so the slug is this test's own.
+		secret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, secret, console)
+		created := idpFixture{project: console, client: secret}.create(t, helpers.OIDCConnection(strings.ToLower(claimerID)))
+
+		read := idpFixture{project: console, client: session}
+		require.Contains(t, idpIDs(read.queryOK(t, &api.QueryIdpsRequest{}).Idps), created.ID)
+		got := read.get(t, created.ID)
+		require.IsType(t, &api.IdpResponse{}, got, helpers.MustMarshal(t, got))
+	})
+
 	t.Run("teams", func(t *testing.T) {
 		t.Parallel()
 		created, err := session.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: helpers.TeamName()},
@@ -211,6 +226,20 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.UpdateTeamNotFound{}, resp, helpers.MustMarshal(t, resp))
 		assert.Equal(t, api.ErrorCode("team.team_not_found"), resp.(*api.UpdateTeamNotFound).Code)
+	})
+
+	t.Run("cannot query or read another project's identity providers", func(t *testing.T) {
+		owner := idpFixture{project: other, client: otherSecret}
+		connection := owner.create(t, helpers.OIDCConnection("google"))
+
+		notFound := api.ErrorCode(domain.ErrIDPConnectionNotFound().Code)
+		stranger := idpFixture{project: other, client: session}
+		listed := stranger.query(t, &api.QueryIdpsRequest{})
+		require.IsType(t, &api.QueryIdpsNotFound{}, listed, helpers.MustMarshal(t, listed))
+		assert.Equal(t, notFound, listed.(*api.QueryIdpsNotFound).Code)
+		got := stranger.get(t, connection.ID)
+		require.IsType(t, &api.GetIdpByIdNotFound{}, got, helpers.MustMarshal(t, got))
+		assert.Equal(t, notFound, got.(*api.GetIdpByIdNotFound).Code)
 	})
 
 	t.Run("cannot read another project's schema", func(t *testing.T) {
@@ -429,6 +458,18 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 		resp, err := session.GetBrandingById(t.Context(), api.GetBrandingByIdParams{ID: revision.ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.BrandingRevisionResponse{}, resp, helpers.MustMarshal(t, resp))
+	})
+
+	// The Authentication screen lists the connections and opens one by id;
+	// both name the project, so the grant on it is what admits the session.
+	t.Run("identity provider", func(t *testing.T) {
+		t.Parallel()
+		created := idpFixture{project: customer, client: customerSecret}.create(t, helpers.OIDCConnection("google"))
+
+		read := idpFixture{project: customer, client: session}
+		require.Contains(t, idpIDs(read.queryOK(t, &api.QueryIdpsRequest{}).Idps), created.ID)
+		got := read.get(t, created.ID)
+		require.IsType(t, &api.IdpResponse{}, got, helpers.MustMarshal(t, got))
 	})
 
 	t.Run("without a grant the resource is not found", func(t *testing.T) {
