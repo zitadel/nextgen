@@ -10,17 +10,16 @@ import {
 import { bailOnCancel } from "../prompt-cancel";
 
 /**
- * Ask where a provider lives, on a development build only.
+ * Ask where a provider lives, on a development run only.
  *
  * Someone working on the CLI runs it against a local stand-in constantly, and
  * before this the connection document had to be hand-edited afterwards and
  * re-applied. Someone who installed the CLI is configuring the real vendor and
- * must never meet the question — which is why the gate is the build stamp
- * rather than a flag. A flag would have to be typed by exactly the people who
- * should not need to know it exists, and would sit in `--help` output and
- * shell history belonging to everyone else.
+ * must never meet the question — so it is gated on `developmentBuild`
+ * (`isDevelopmentBuild()`, the explicit `ZITADEL_CLI_DEV` opt-in). A published
+ * CLI never sets it, so the question stays out of its `--help` and prompts.
  *
- * Returns `undefined` for a released build and for a scripted run, and the
+ * Returns `undefined` for a normal run and for a scripted run, and the
  * catalog's own issuer is dropped when written, so an ordinary run produces
  * the document it would if none of this existed.
  */
