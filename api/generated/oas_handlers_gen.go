@@ -2230,11 +2230,11 @@ func (s *Server) handleCreateProjectRequest(args [0]string, argsEscaped bool, w 
 // `flow_definition default-login: user_schema human-user not found`,
 // because a release pins many and the code alone does not say which one
 // failed.
-// Idempotent on the pinned set: the content digest is computed over the
-// sorted pointers with metadata excluded, so re-submitting the same content
-// with a different `message` answers `200` with the release that already
-// pins it, every revision `created: false`, rather than creating a second
-// one. A release the project did not hold before answers `201`.
+// Idempotent on the pinned set: metadata is excluded from the comparison,
+// so re-submitting the same content with a different `message` answers
+// `200` with the release that already pins it, every revision
+// `created: false`, rather than creating a second one. A release the
+// project did not hold before answers `201`.
 // Creating a release does not deploy it. A release is not tied to a target,
 // and the same release can later be deployed to any number of targets
 // unchanged.
@@ -7940,10 +7940,8 @@ func (s *Server) handleGetReadyRequest(args [0]string, argsEscaped bool, w http.
 
 // handleGetReleaseByIdRequest handles getReleaseById operation.
 //
-// Reads one release: its digest, its metadata and the
-// `(kind, handle, revision_id)` tuples it pins.
-// The path takes the `rel_` id only. To find a release from its digest,
-// list with the `content_hash` filter and read the matched entry's `id`.
+// Reads one release: its metadata and the `(kind, handle, revision_id)`
+// tuples it pins.
 // Does not embed resource content. Resolve each `revision_id` through the
 // per-kind read endpoints when the bytes are needed.
 // The lookup is scoped to the project in `project_id`: a release id belonging
@@ -11264,14 +11262,8 @@ func (s *Server) handleListMyProjectsRequest(args [0]string, argsEscaped bool, w
 // handleListReleasesRequest handles listReleases operation.
 //
 // Lists the project's releases, newest first.
-// Entries carry the digest and the metadata — the pinned set is omitted. Read one release with
-// `GET /releases/{release_id}` to get its
-// pointers.
-// `content_hash` looks a release up by its content, as the CLI does when a
-// person types the digest a transcript printed. The project holds at most
-// one release per digest, so the filtered list has one entry or none, and
-// an unknown digest is an empty list rather than an error. Paths take the
-// `rel_` id only; the matched entry's `id` is what to use there.
+// Entries carry metadata only — the pinned set is omitted. Read one release
+// with `GET /releases/{release_id}` to get its pointers.
 //
 // GET /releases
 func (s *Server) handleListReleasesRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -11416,10 +11408,6 @@ func (s *Server) handleListReleasesRequest(args [0]string, argsEscaped bool, w h
 					Name: "project_id",
 					In:   "query",
 				}: params.ProjectID,
-				{
-					Name: "content_hash",
-					In:   "query",
-				}: params.ContentHash,
 				{
 					Name: "limit",
 					In:   "query",

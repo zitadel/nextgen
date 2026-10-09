@@ -38,7 +38,6 @@ var regexMap = map[string]ogenregex.Regexp{
 	"^dep_[a-zA-Z0-9_-]+$":               ogenregex.MustCompile("^dep_[a-zA-Z0-9_-]+$"),
 	"^rel_[a-zA-Z0-9_-]+$":               ogenregex.MustCompile("^rel_[a-zA-Z0-9_-]+$"),
 	"^sess_[a-zA-Z0-9_-]+$":              ogenregex.MustCompile("^sess_[a-zA-Z0-9_-]+$"),
-	"^sha256:[0-9a-f]{64}$":              ogenregex.MustCompile("^sha256:[0-9a-f]{64}$"),
 	"^user_[a-zA-Z0-9_-]+$":              ogenregex.MustCompile("^user_[a-zA-Z0-9_-]+$"),
 }
 var (
