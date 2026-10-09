@@ -182,14 +182,39 @@ Ask about:
 
 - **Sign-in methods** — password (the usual default), passkeys, and single
   sign-on. If they want SSO, which providers?
-- **Profile fields** — the user schema starts with first name, last name, and
-  the login identifier plus a password. Which additional fields do they want
-  (for example phone, username, or a display name)?
+- **Profile fields** — which attributes sign-up collects. The starting field
+  set depends on the use-case you pick (see *Presets and use-cases* below) —
+  the default (`minimal`) is the login identifier only, **not** names. Confirm
+  which fields they want (first/last name, phone, username, display name) and
+  choose the use-case or edit the schema accordingly.
 
 Offer only what the installed CLI actually supports: read the real sign-in
 presets, profile fields, and SSO options from the CLI first (`setup --help`,
 `resources --json`) and present those, not a list you remember — the options
 move with the CLI version.
+
+## Presets and use-cases — map the answers, don't trust the names
+
+`setup` has two independent axes, and their names do **not** mean what they look
+like. Read the current sets from `setup --help`, but know the traps:
+
+- **Use-case = which profile fields the schema collects.** `minimal` is the
+  login identifier **only** — it does *not* include names. First + last name is
+  `--use-case consumer` (adds `givenName` + `familyName`); add a company with
+  `--use-case business`. Choosing `minimal` because the developer said "keep it
+  minimal" leaves an identifier-only schema that ignores the names they asked
+  for.
+- **Preset = how they sign in (the login flow + auth methods).**
+  `password-first` makes password the primary step **but still leaves passkeys
+  enabled**; `passkey-first` leads with a passkey. Neither one gives you
+  password-only. If the developer does not want passkeys, turn them off
+  yourself: set `x-auth-methods.passkey.enabled` to `false` in
+  `.zitadel/schemas/*.json`, then `apply`.
+
+Translate the developer's answers into the right axis values, then **verify
+against what actually deployed**: read the live schema back
+(`schemas get <objectType> --json`) and confirm the fields and auth methods
+match what they asked for — don't assume a preset name did it.
 
 Skip the questions and proceed with the defaults above — stating the assumptions
 you made so the user can correct them — in exactly two cases: the user already

@@ -4,7 +4,7 @@
 // run metadata (when, where, which commit). Everything is inlined so the file
 // can be opened from disk or shared as-is.
 import { execSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import { marked } from "marked";
 import sanitizeHtml from "sanitize-html";
 
-import { gradeConfig } from "./lib.mjs";
+import { gradeConfig, listCells } from "./lib.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
@@ -148,17 +148,74 @@ function convo(prompt, transcript) {
   return parts.join("\n");
 }
 
-// --- Grade each config once --------------------------------------------------
-const graded = {};
-for (const c of cfg.configs) {
-  const dir = join(OUT, c);
-  graded[c] = existsSync(dir) ? gradeConfig(dir, stages) : null;
+// The live-instance outcome checks for a stage: what the harness asked the
+// running server after the agent's turn, and whether reality matched.
+function assertsBlock(asserts) {
+  if (!asserts || !asserts.length) return "";
+  const items = asserts
+    .map(
+      (a) =>
+        `<li class="asrt ${a.passed ? "ok" : "no"}"><span class="am">${a.passed ? "✓" : "✗"}</span><span class="an">${esc(a.name)}</span><span class="ae">${mdToHtml(a.evidence || "")}</span></li>`,
+    )
+    .join("");
+  return `<div class="asserts"><div class="asserts-h">Live-instance checks</div><ul class="asrt-list">${items}</ul></div>`;
 }
 
-const score = (c) => {
-  const rows = graded[c] || [];
-  return { pass: rows.filter((r) => r.status === "pass").length, total: rows.length };
+// --- Grade the whole model×repeat matrix -------------------------------------
+const cells = listCells(OUT, cfg.configs).map((c) => ({ ...c, rows: gradeConfig(c.dir, stages) }));
+
+// Group cells by (config, model); each group holds its repeats.
+const groups = [];
+const byKey = new Map();
+for (const c of cells) {
+  const key = `${c.config}__${c.model}`;
+  let g = byKey.get(key);
+  if (!g) {
+    g = { key, config: c.config, model: c.model, cells: [] };
+    byKey.set(key, g);
+    groups.push(g);
+  }
+  g.cells.push(c);
+}
+for (const g of groups) g.cells.sort((a, b) => a.rep.localeCompare(b.rep));
+const modelsUsed = [...new Set(groups.map((g) => g.model))].join(", ") || meta.model;
+
+const pct = (n, d) => (d ? `${Math.round((100 * n) / d)}%` : "—");
+const median = (xs) => {
+  if (!xs.length) return 0;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
+
+// Elina's per-scenario fields, computed over a group's repeats.
+function metricsFor(g) {
+  const per = g.cells.map((c) => {
+    const allPass = c.rows.every((r) => r.status === "pass");
+    const tokens = c.rows.reduce((a, r) => a + (r.tokens || 0), 0);
+    const ms = c.rows.reduce((a, r) => a + (r.ms || 0), 0);
+    // False completion: the agent finished a stage without erroring, yet the
+    // live-instance checks failed — success on paper, not in reality.
+    const falseComplete = c.rows.some(
+      (r) => r.status === "fail" && !(r.parsed.result?.is_error ?? true),
+    );
+    return { allPass, tokens, ms, falseComplete };
+  });
+  const runs = per.length;
+  const verified = per.filter((r) => r.allPass).length;
+  const perStage = stages.map((s) => ({
+    id: s.id,
+    pass: g.cells.filter((c) => c.rows.find((r) => r.stage === s.id)?.status === "pass").length,
+  }));
+  return {
+    runs,
+    verified,
+    tokensAll: per.reduce((a, r) => a + r.tokens, 0),
+    medMs: median(per.filter((r) => r.allPass).map((r) => r.ms)),
+    falseRuns: per.filter((r) => r.falseComplete).length,
+    perStage,
+  };
+}
 
 // --- HTML --------------------------------------------------------------------
 const metaDl = (extra = "") => `<dl class="meta">
@@ -166,16 +223,32 @@ const metaDl = (extra = "") => `<dl class="meta">
   <div><dt>Commit</dt><dd><code>${esc(meta.commit || "—")}</code>${meta.dirty ? ' <span class="warn">(working tree modified)</span>' : ""}</dd></div>
   <div><dt>Branch</dt><dd><code>${esc(meta.branch || "—")}</code></dd></div>
   <div><dt>Host</dt><dd>${esc(meta.host)}</dd></div>
-  <div><dt>Agent model</dt><dd>${esc(meta.model)}</dd></div>
+  <div><dt>Agent model(s)</dt><dd>${esc(modelsUsed)}</dd></div>
   ${extra}
 </dl>`;
 
-const scoreboard = cfg.configs
-  .map((c) => {
-    const { pass, total } = score(c);
-    return `<span class="score"><b>${esc(CONFIG_LABELS[c] || c)}</b> ${pass}/${total} passed</span>`;
+const scoreboard = groups
+  .map((g) => {
+    const m = metricsFor(g);
+    return `<span class="score"><b>${esc(CONFIG_LABELS[g.config] || g.config)} · ${esc(g.model)}</b> ${m.verified}/${m.runs} verified</span>`;
   })
   .join("");
+
+// Metrics table — one row per (config, model), Elina's fields across repeats.
+const metricsTable = `<table class="metrics">
+  <thead><tr><th>Scenario</th><th>Runs</th><th>Verified success</th><th>False completion</th><th>Median time*</th><th>Tokens / success</th>${stages.map((s) => `<th>S${s.id}</th>`).join("")}</tr></thead>
+  <tbody>${groups
+    .map((g) => {
+      const m = metricsFor(g);
+      const tps = m.verified ? Math.round(m.tokensAll / m.verified).toLocaleString() : "—";
+      const stageCells = m.perStage
+        .map((p) => `<td class="sr ${p.pass === m.runs ? "ok" : p.pass ? "mid" : "no"}">${p.pass}/${m.runs}</td>`)
+        .join("");
+      return `<tr><th scope="row">${esc(CONFIG_LABELS[g.config] || g.config)} · ${esc(g.model)}</th><td>${m.runs}</td><td><b>${pct(m.verified, m.runs)}</b> <span class="muted">(${m.verified}/${m.runs})</span></td><td>${pct(m.falseRuns, m.runs)} <span class="muted">(${m.falseRuns}/${m.runs})</span></td><td>${m.medMs ? dur(m.medMs) : "—"}</td><td>${tps}</td>${stageCells}</tr>`;
+    })
+    .join("")}</tbody>
+</table>
+<p class="metrics-note">A run is one full 5-stage journey; <b>verified success</b> = every live-instance check passed. <b>False completion</b> = the agent finished cleanly but a check failed. *Median time excludes time waiting on the developer's answers. S1–S5 show how many repeats passed each stage.</p>`;
 
 const tabs = stages
   .map(
@@ -184,15 +257,17 @@ const tabs = stages
   )
   .join("");
 
+// Detailed per-stage view shows one representative repeat (r1) per group.
 const panels = stages
   .map((s, i) => {
-    const cfgHtml = cfg.configs
-      .map((c) => {
-        const rows = graded[c];
-        if (!rows) return "";
-        const r = rows.find((x) => x.stage === s.id);
+    const cfgHtml = groups
+      .map((g) => {
+        const rep = g.cells[0];
+        const r = rep?.rows.find((x) => x.stage === s.id);
+        if (!r) return "";
         const t = r.ms ? ` · ${dur(r.ms)}` : "";
-        return `<details class="cfg"${c === "with-skill" ? " open" : ""}><summary>${badge(r.status)}<span class="cfg-name">${esc(CONFIG_LABELS[c] || c)}</span><span class="why">${esc(r.why)}</span><span class="stat">${r.turns} turns · ${r.tokens.toLocaleString()} tokens${t}</span></summary><div class="body">${convo(s.prompt, r.parsed.transcript)}</div></details>`;
+        const open = g.config === "with-skill" ? " open" : "";
+        return `<details class="cfg"${open}><summary>${badge(r.status)}<span class="cfg-name">${esc(CONFIG_LABELS[g.config] || g.config)} · ${esc(g.model)}</span><span class="why">${esc(r.why)}</span><span class="stat">${r.turns} turns · ${r.tokens.toLocaleString()} tokens${t}</span></summary><div class="body">${assertsBlock(r.asserts)}${convo(s.prompt, r.parsed.transcript)}</div></details>`;
       })
       .join("");
     return `<section class="stage-panel" role="tabpanel" id="stage-${s.id}" aria-labelledby="tab-${s.id}" tabindex="0"${i === 0 ? "" : " hidden"}><h2 class="stage-head">Stage ${s.id}: ${esc(s.title)}</h2>${cfgHtml}</section>`;
@@ -252,6 +327,24 @@ main{max-width:1000px;margin:0 auto;padding:24px clamp(16px,4vw,32px)}
 .why{color:var(--muted);font-size:12.5px}
 .stat{color:var(--muted);font-size:12px;margin-left:auto;white-space:nowrap}
 .dur{font-variant-numeric:tabular-nums}
+.metrics-wrap{padding:20px clamp(16px,4vw,32px) 0}
+.metrics{border-collapse:collapse;width:100%;font-size:13px;background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.metrics th,.metrics td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+.metrics thead th{background:var(--th-bg);font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+.metrics tbody th{font-weight:700}
+.metrics td.sr{text-align:center;font-variant-numeric:tabular-nums;font-weight:700}
+.metrics td.sr.ok{color:#16a34a}.metrics td.sr.mid{color:#d97706}.metrics td.sr.no{color:#dc2626}
+.metrics .muted{color:var(--muted);font-weight:400}
+.metrics-note{font-size:11.5px;color:var(--muted);margin:8px 2px 0;white-space:normal}
+.asserts{margin:0 0 20px;border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--panel)}
+.asserts-h{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px}
+.asrt-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.asrt{display:grid;grid-template-columns:18px 1fr;gap:4px 8px;align-items:baseline;font-size:13px}
+.asrt .am{font-weight:800;text-align:center}
+.asrt.ok .am{color:#16a34a}.asrt.no .am{color:#dc2626}
+.asrt.no .an{font-weight:600}
+.asrt .ae{grid-column:2;color:var(--muted);font-size:11.5px}
+.asrt .ae code{font-size:11px}
 .cmd{margin:0 0 18px;border-radius:10px;overflow:hidden;border:1px solid var(--cmd-bg)}
 .cmd .c{background:var(--cmd-bg);color:#e5e7eb;padding:10px 14px;font:12px/1.5 ui-monospace,Menlo,monospace;display:flex;gap:12px;align-items:flex-start}
 .cmd .c code{background:none;color:inherit;font:inherit;white-space:pre-wrap;word-break:break-word;flex:1 1 auto;min-width:0}
@@ -398,6 +491,7 @@ const doc = `<!doctype html>
   <div class="scoreboard">${scoreboard}</div>
   ${metaDl()}
 </header>
+<section class="metrics-wrap" aria-label="Metrics">${metricsTable}</section>
 <nav class="tabs" role="tablist" aria-label="Journey stages">${tabs}</nav>
 <main>${panels}</main>
 <footer class="site-foot">
