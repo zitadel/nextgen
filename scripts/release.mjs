@@ -218,7 +218,7 @@ export async function assertNoUnrecordedPendingChangesets(root = repoRoot) {
 }
 
 export function releasePublishEnv(overrides = {}) {
-  return { ...process.env, ...overrides, ZITADEL_TELEMETRY_BUILD_CHANNEL: "production" };
+  return { ...process.env, ...overrides };
 }
 
 export function shouldFailManualPublishSkip(options = {}, env = process.env) {

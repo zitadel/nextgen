@@ -431,6 +431,31 @@ The repo requires the Node.js version from `.nvmrc`; sandbox images often
 ship an older default. Ensure the `.nvmrc` version is first on `$PATH` (for
 example via nvm) before running any `corepack` or `pnpm` command.
 
+`.nvmrc` names only the Node.js major (`24`), and every runtime in the repo
+uses that major. Minor and patch versions do not matter, so never pin one:
+
+- `.devcontainer/devcontainer.json` (the `node` feature `version`)
+- `apps/cli-skill-e2e/scripts/run.mjs` (the `node:<major>` image)
+- the Vercel-deployed apps (`console`, `docs`, `mock-zitadel`, `storybook`)
+  set `engines.node` to `<major>.x`
+- CI workflows read `.nvmrc` through `node-version-file`; never hard-code a
+  `node-version`
+
+`@types/node` in the pnpm catalog tracks the `.nvmrc` major, so code cannot
+type-check against APIs the runtime lacks. When the major changes, bump all
+of these together.
+
+The same rule holds for dependencies:
+
+- Use caret ranges (`^1.2.3`), not exact versions. An exact pin needs a
+  comment next to it saying why (see `@redocly/openapi-core` in
+  `pnpm-workspace.yaml`).
+- A dependency used by more than one package lives in the pnpm catalog and
+  is referenced as `catalog:`, so the whole workspace resolves one version
+  of it.
+- Peer dependency ranges of the published SDKs stay wide (`>=18`); they
+  describe what consumers may install, not what the repo uses.
+
 ### Playwright browser install gotcha
 
 The standard `playwright install --with-deps chromium` may hang during zip
