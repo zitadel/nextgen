@@ -131,18 +131,9 @@ Connect the repository to the Vercel project (Project → Settings → Git, or
 `vercel git connect` from the repo root). `vercel.json` has Git deployments
 enabled: every push to `main` is a production deployment, every push to a
 pull request branch a preview deployment, and the Vercel bot posts the
-preview URL on the pull request. No GitHub Actions secrets are needed for
-deploying or migrating.
-
-One repository secret for the cleanup workflow
-(`.github/workflows/cloud-preview-cleanup.yml`):
-
-| Kind | Name |
-|---|---|
-| secret | `PREVIEW_CLOUD_PREVIEW_DATABASE_URL` (the `preview-pr` role) |
-
-It drops `pr_<number>` when a pull request closes. Without it the job logs
-that there is nothing to drop and the schema stays until someone drops it.
+preview URL on the pull request. Nothing of this cloud runs on GitHub
+Actions: no secrets, no workflow. The schema of a closed pull request is
+dropped by hand (see "Preview schemas" under Operating).
 
 ### 5. Platform admin
 
@@ -339,10 +330,14 @@ older state is a revert on `main`.
   user creation, a query, the session middleware, and one page of every
   UI service.
 
-- **Preview schemas:** `pr_<n>` is dropped by the cleanup workflow when the
-  pull request closes. Schemas of manual deploys (`br_<name>`) and of
-  closed pull requests from before the workflow had its secret are dropped
-  by hand: `DROP SCHEMA <name> CASCADE` on `zitadel-preview`.
+- **Preview schemas:** nothing drops them automatically. Now and then, on
+  `zitadel-preview` with the `preview-pr` role, list what is there and drop
+  the schemas of closed pull requests and of manual deploys (`br_<name>`):
+
+  ```sql
+  SELECT nspname FROM pg_namespace WHERE nspname LIKE 'pr\_%' OR nspname LIKE 'br\_%' ORDER BY 1;
+  DROP SCHEMA pr_1234 CASCADE;
+  ```
 
 - **Master key rotation:** add a second key under a new `MASTER_KEY_ID`
   following ADR 029; this wrapper supports exactly one key per deployment

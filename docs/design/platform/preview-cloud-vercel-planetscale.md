@@ -300,7 +300,8 @@ schema per pull request.
   schema. The schema is created by `migrate` itself, so no admin role and no
   `CREATE DATABASE` step exist. The Preview target carries its own master
   key and admin document.
-- On close: `DROP SCHEMA pr_<n> CASCADE` (`cloud-preview-cleanup.yml`).
+- On close: `DROP SCHEMA pr_<n> CASCADE`, by hand (the GitHub workflow that
+  did it was removed on 2026-10-09; nothing of this cloud runs on Actions).
 - Extensions are per database and are pinned to `public` for every
   non-default schema, so all previews share them.
 - Still open: a corpus fixture seeded through the public API the way
@@ -556,8 +557,10 @@ left to a human:
   bind port 80) is removed from both targets: the Go runtime hands the
   binary its port and the launcher follows it. Verified on a preview
   deployment without the variable.
-- The runbook, the cleanup workflow and `.vercelignore` no longer describe
-  a container.
+- The runbook and `.vercelignore` no longer describe a container, and the
+  GitHub workflow that dropped a closed pull request's schema is gone:
+  nothing of this cloud runs on GitHub Actions, preview schemas are
+  dropped by hand.
 
 Still a human's: connect the repository (`vercel git connect`), which
 turns on preview builds for every pull request of the repository as well
@@ -565,10 +568,9 @@ as production from `main`; the Production target's database variables for
 the new Frankfurt database (pooled URL with `pool_max_conns=4` and
 `default_query_exec_mode=cache_describe` for the server, direct URL with
 the migrator role for the build step, `max_connections` 50 on the
-cluster); the repository secret of the cleanup workflow. The project
-settings still carry `framework: container` and a no-op install command
-from the first deploy; a services deployment ignores both, so that is
-cosmetic.
+cluster). The project settings' `framework: container` and no-op install
+command from the first deploy are reset; a services deployment ignored
+both anyway.
 
 ## Regions (deferred, needs a buyer)
 
