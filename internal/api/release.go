@@ -96,6 +96,7 @@ func (h *Handler) ListReleases(ctx context.Context, params api.ListReleasesParam
 			ProjectID:   api.ProjectID(entity.ProjectID),
 			ContentHash: toAPIReleaseContentHash(entity.ContentHash),
 			Metadata:    toAPIReleaseMetadata(entity),
+			RevokedAt:   api.NilDateTime{Null: true},
 		}
 	}
 	if result.NextPageToken != "" {
@@ -147,6 +148,7 @@ func toAPIRelease(entity *domain.Release) api.Release {
 		ProjectID:   api.ProjectID(entity.ProjectID),
 		ContentHash: toAPIReleaseContentHash(entity.ContentHash),
 		Metadata:    toAPIReleaseMetadata(entity),
+		RevokedAt:   api.NilDateTime{Null: true},
 		Pointers:    pointers,
 	}
 }

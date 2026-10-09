@@ -166,6 +166,7 @@ post:
                     created_at: '2026-07-14T09:11:00Z'
                     created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
                     created_by_type: human
+                  revoked_at: null
                   pointers:
                     - kind: schema
                       handle: human-user
@@ -217,6 +218,7 @@ post:
                     created_at: '2026-07-14T09:11:00Z'
                     created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
                     created_by_type: human
+                  revoked_at: null
                   pointers:
                     - kind: schema
                       handle: human-user
@@ -261,6 +263,7 @@ post:
                     created_at: '2026-07-15T11:02:00Z'
                     created_by: null
                     created_by_type: service
+                  revoked_at: null
                   pointers:
                     - kind: schema
                       handle: human-user
@@ -307,7 +310,8 @@ get:
   description: |
     Lists the project's releases, newest first.
 
-    Entries carry the digest and the metadata — the pinned set is omitted. Read one release with `GET /releases/{release_id}` to get its
+    Entries carry the digest, the metadata and `revoked_at` — the pinned set
+    is omitted. Read one release with `GET /releases/{release_id}` to get its
     pointers.
 
     `content_hash` looks a release up by its content, as the CLI does when a
@@ -347,6 +351,7 @@ get:
                       created_at: '2026-07-14T09:11:00Z'
                       created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
                       created_by_type: human
+                    revoked_at: null
                   - id: rel_01KX2ZJ4B8C7F0N9WD3P2E4YM5
                     project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
                     content_hash: sha256:0f1e2d3c4b5a69788796a5b4c3d2e1f0091827364554637281909a8b7c6d5e4f
@@ -357,6 +362,7 @@ get:
                       created_at: '2026-07-13T08:00:00Z'
                       created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
                       created_by_type: human
+                    revoked_at: '2026-07-14T10:30:00Z'
                 next_page_token: v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw
             lastPage:
               summary: The final page
@@ -375,6 +381,7 @@ get:
                       created_at: '2026-07-13T08:00:00Z'
                       created_by: null
                       created_by_type: null
+                    revoked_at: null
             byContentHash:
               summary: Looked up by digest
               description: |
@@ -393,6 +400,7 @@ get:
                       created_at: '2026-07-14T09:11:00Z'
                       created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
                       created_by_type: human
+                    revoked_at: null
             unknownDigest:
               summary: A digest no release carries
               value:

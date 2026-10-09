@@ -7940,8 +7940,8 @@ func (s *Server) handleGetReadyRequest(args [0]string, argsEscaped bool, w http.
 
 // handleGetReleaseByIdRequest handles getReleaseById operation.
 //
-// Reads one release: its digest, its metadata and the
-// `(kind, handle, revision_id)` tuples it pins.
+// Reads one release: its digest, its metadata, whether it was revoked, and
+// the `(kind, handle, revision_id)` tuples it pins.
 // The path takes the `rel_` id only. To find a release from its digest,
 // list with the `content_hash` filter and read the matched entry's `id`.
 // Does not embed resource content. Resolve each `revision_id` through the
@@ -11264,8 +11264,8 @@ func (s *Server) handleListMyProjectsRequest(args [0]string, argsEscaped bool, w
 // handleListReleasesRequest handles listReleases operation.
 //
 // Lists the project's releases, newest first.
-// Entries carry the digest and the metadata — the pinned set is omitted. Read one release with
-// `GET /releases/{release_id}` to get its
+// Entries carry the digest, the metadata and `revoked_at` — the pinned set
+// is omitted. Read one release with `GET /releases/{release_id}` to get its
 // pointers.
 // `content_hash` looks a release up by its content, as the CLI does when a
 // person types the digest a transcript printed. The project holds at most
@@ -14162,6 +14162,210 @@ func (s *Server) handleRevokeMySessionRequest(args [0]string, argsEscaped bool, 
 	}
 
 	if err := encodeRevokeMySessionResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
+// handleRevokeReleaseRequest handles revokeRelease operation.
+//
+// Marks the release revoked, the operator's hard stop on content that must
+// not be served anywhere. From then on the release cannot be deployed and
+// is refused on every path that would serve it, including to a build that
+// pins its digest, with `rel.revoked`.
+// Nothing is undone: deployments naming the release stay in the history,
+// and the targets they serve answer `rel.revoked` until something else is
+// deployed there. Rolling a deployment back is the soft alternative — it
+// moves what the targets serve and leaves pinned builds where they are.
+// Idempotent: revoking a release that is already revoked answers `200`
+// with the release unchanged, `revoked_at` still naming the first
+// revocation. There is no un-revoke; build a new release instead.
+// Takes no body. The lookup is scoped to the project in `project_id`, so a
+// release id of another project answers not found exactly as an unknown id
+// does.
+//
+// POST /releases/{release_id}/revoke
+func (s *Server) handleRevokeReleaseRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("revokeRelease"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.HTTPRouteKey.String("/releases/{release_id}/revoke"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), RevokeReleaseOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(codeAttr)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: RevokeReleaseOperation,
+			ID:   "revokeRelease",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, RevokeReleaseOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeRevokeReleaseParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response RevokeReleaseRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    RevokeReleaseOperation,
+			OperationSummary: "Revoke a release",
+			OperationID:      "revokeRelease",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+				{
+					Name: "release_id",
+					In:   "path",
+				}: params.ReleaseID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = RevokeReleaseParams
+			Response = RevokeReleaseRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackRevokeReleaseParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.RevokeRelease(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.RevokeRelease(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeRevokeReleaseResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)

@@ -20,6 +20,7 @@ required:
   - project_id
   - content_hash
   - metadata
+  - revoked_at
   - pointers
 properties:
   id:
@@ -39,6 +40,19 @@ properties:
   metadata:
     readOnly: true
     $ref: release-metadata.yaml
+  revoked_at:
+    readOnly: true
+    description: |
+      When the release was revoked, or null while it is not. A revoked
+      release cannot be deployed and is refused on every path that would
+      serve it, including to a build that pins its digest; deployments that
+      already name it stay in the history, and the targets they serve answer
+      `rel.revoked` until something else is deployed there.
+    oneOf:
+      - type: string
+        format: date-time
+      - type: 'null'
+    example: null
   pointers:
     readOnly: true
     type: array
