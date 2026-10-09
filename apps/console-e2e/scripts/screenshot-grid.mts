@@ -71,6 +71,11 @@ const SCREENS: Screen[] = [
   },
   { name: "Authentication", path: "/authentication" },
   {
+    name: "Authentication — schema sign-in",
+    path: "/authentication",
+    firstRow: "/authentication?",
+  },
+  {
     name: "Authentication — Identity providers",
     path: "/authentication?tab=identity-providers",
   },
