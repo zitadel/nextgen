@@ -151,7 +151,7 @@ func encodeCreateProjectRequest(
 }
 
 func encodeCreateReleaseRequest(
-	req *CreateReleaseRequest,
+	req CreateReleaseRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
