@@ -27,6 +27,44 @@ by re-applying an earlier template.
   field and the primary action your template left out, so the step stays
   submittable.
 
+## Fields
+
+Render a field by its name only; the component fills in the rest from the
+step after every render:
+
+```liquid
+{% for f in fields %}
+  {% case f.type %}
+  {% when 'checkbox' %}<zl-checkbox name="{{ f.name }}"></zl-checkbox>
+  {% when 'select' %}<zl-select name="{{ f.name }}"></zl-select>
+  {% else %}<zl-field name="{{ f.name }}"></zl-field>
+  {% endcase %}
+{% endfor %}
+```
+
+| Filled in | From | On |
+|---|---|---|
+| `label` | the field's `text_key`, translated | all |
+| `data-testid` | `zitadel-field-<name>` | all |
+| `error`, `invalid` | the step's error for this field, translated | all |
+| `value` | the server's prefilled value (`checked` on a checkbox) | all |
+| `type`, `autocomplete`, `required` | the step's field | `zl-field` |
+| `placeholder` | `<text_key>.placeholder` | `zl-field`, `zl-select` |
+| help text | `<text_key>.help`, as a `<span slot="help">` | `zl-field` |
+| `options`, `required` | the field's allowed values | `zl-select` |
+| `forgot-password-href`, `-action`, `-label` | the step's `recover` action | password `zl-field` |
+
+What you write wins. An attribute in your template is never overwritten, so
+`<zl-field name="{{ f.name }}" label="Work email">` keeps your label while
+everything else is still filled in. To leave something out, write it empty:
+`placeholder=""` shows no placeholder, `forgot-password-href=""` hides the
+forgot-password link, and your own `<span slot="help">` replaces the filled
+help. Wording changes that apply to every design belong in the `locales`
+prop, not the template.
+
+Templates that bind every attribute themselves (ejected before fields were
+filled in) keep working unchanged.
+
 ## Make it yours
 
 - Brand asset URLs go in `branding.json` and must use `https://`. Each template

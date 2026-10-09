@@ -56,6 +56,8 @@ npx @zitadel/cli@alpha apply
 
 The scaffolded `README.md` in `.zitadel/branding/` documents the template rules (compose `zl-*` components, no scripts or inline styles, copy through translation keys).
 
+Fields render by name only — `<zl-field name="{{ f.name }}"></zl-field>` — and the login fills in the label, type, placeholder, help, errors, autocomplete and the forgot-password link from the step. Anything you write on the element yourself wins: `label="Work email"` keeps your label, and an empty value such as `placeholder=""` leaves that part out. The README's "Fields" section lists every attribute that is filled in.
+
 ## Ownership trade-off
 
 An ejected template is yours: it stops receiving improvements to the built-in designs. Eject when you want to change the login's structure and look; to change only wording, the `locales` prop covers copy without touching templates (see Customize copy). Staying on the built-in template costs nothing — `branding eject` is always one command away.

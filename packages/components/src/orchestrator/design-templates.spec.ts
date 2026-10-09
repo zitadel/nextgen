@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import heroTemplate from "./__fixtures__/legacy-designs/hero.liquid";
 import splitRightTemplate from "./__fixtures__/legacy-designs/split-right.liquid";
 import splitTemplate from "./__fixtures__/legacy-designs/split.liquid";
+import { fillFields } from "./field-fill.js";
 import { createLiquidEngine } from "./liquid.js";
 import { mandatoryGatesMarkerComment, patchMandatoryGates } from "./mandatory-gates.js";
 import { createSanitiser } from "./sanitiser.js";
@@ -92,7 +93,17 @@ function renderDesign(design: string): string {
   const engine = createLiquidEngine({ locale });
   const rendered = engine.parseAndRenderSync(templateFor(design), context);
   const sanitised = createSanitiser()(rendered);
-  return patchMandatoryGates(sanitised, step, locale);
+  // The last stage is the field fill `<zitadel-login>` runs on the committed
+  // DOM; designs bind fields by name only and rely on it.
+  const template = document.createElement("template");
+  template.innerHTML = patchMandatoryGates(sanitised, step, locale);
+  fillFields(template.content, {
+    fields: step.fields ?? [],
+    actions: step.actions ?? [],
+    errors: [],
+    locale,
+  });
+  return template.innerHTML;
 }
 
 describe("branding design catalog", () => {
