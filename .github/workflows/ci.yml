@@ -27,6 +27,19 @@ jobs:
       # pass/fail list; the replay section is empty when nothing failed.
       MOON_SUMMARY: detailed
     steps:
+      # SPIKE (network-capture-cache): observe-only egress capture. Must be the
+      # first step so the eBPF agent is loaded before any other step touches the
+      # network. audit mode blocks nothing — it records every outbound DNS/TLS
+      # call, correlated to the step that made it, and prints a per-step domain
+      # list in the job log plus a run-scoped insights link. Supported on Depot
+      # runners since v2.20.0, so it works on both runner types this job targets.
+      # Reading the results tells us whether a one-leaf incremental run stays
+      # isolated (only the cache/registry endpoints) or re-downloads toolchains.
+      - name: Capture outbound network (audit)
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0

@@ -1,3 +1,5 @@
+// SPIKE (network-capture-cache): trivial touch to make this leaf the only
+// affected project, so the CI network audit reflects a minimal incremental run.
 export { ZitadelLoginComponent } from "./lib/zitadel-login.component";
 export { ZitadelLogoutComponent } from "./lib/zitadel-logout.component";
 export { ZitadelSessionComponent } from "./lib/zitadel-session.component";
