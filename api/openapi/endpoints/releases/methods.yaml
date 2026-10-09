@@ -18,6 +18,45 @@ post:
     transaction — a failure anywhere leaves no revision and no release. The
     caller records nothing. An empty bundle is refused.
 
+    Every resource in a bundle is validated as its kind's create endpoint
+    validates it, and every failure is reported at once rather than only the
+    first: the request answers `400` with `rel.invalid`, and
+    `details.resources` lists each resource that failed. An entry carries the
+    resource's `kind`, its `index` in that kind's array, its `handle` when it
+    declares one, and the `code` and `message` its own create endpoint would
+    have answered:
+
+    ```json
+    {
+      "code": "rel.invalid",
+      "message": "release: invalid",
+      "details": {
+        "resources": [
+          {
+            "kind": "schema",
+            "index": 0,
+            "handle": "human-user",
+            "code": "sch.invalid_request",
+            "message": "properties.email: x-unique must be project"
+          },
+          {
+            "kind": "flow_definition",
+            "index": 1,
+            "handle": "b2b-login",
+            "code": "flowdef.invalid",
+            "message": "steps[2]: unknown step type"
+          }
+        ]
+      }
+    }
+    ```
+
+    `pointers` needs `release.write`. A bundle also writes revisions, so it
+    needs, in addition, the write scope of every kind it carries a resource
+    of — `schema.write`, `flow_definition.write` and `branding.write`, as the
+    per-kind create endpoints do. A missing scope answers `403` with
+    `rel.permission_denied`, naming the kind. An empty kind needs no scope.
+
     Both shapes are closed the same way: every handle a pinned resource
     references — a flow definition's `user_schema` naming a schema by
     `objectType` — must be pinned by the same release. A bundle may leave a
@@ -36,9 +75,9 @@ post:
     `200` with the release that already pins it rather than creating a
     second one. A release the project did not hold before answers `201`.
 
-    Creating a release does not deploy it. A release is not tied to a target,
-    and the same release can later be deployed to any number of targets
-    unchanged.
+    Creating a release does not deploy it. A release is not tied to an
+    origin, and the same release can later be deployed to any number of
+    origins unchanged.
   tags:
     - Releases
   parameters:
