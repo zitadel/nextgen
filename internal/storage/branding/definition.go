@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // Definition is the structure stored inside the definition JSON/JSONB column.

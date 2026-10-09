@@ -6,7 +6,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/zitadel/nextgen/internal/storage/dialect/spanner/migration"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/spanner/migration"
 )
 
 // Migrate implements [database.Pool].

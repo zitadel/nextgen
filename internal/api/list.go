@@ -1,8 +1,8 @@
 package api
 
 import (
-	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/service"
+	api "github.com/zitadel/zitadel/v5/api/generated"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 // list-request translation shared by the query endpoints.

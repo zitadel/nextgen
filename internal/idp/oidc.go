@@ -13,7 +13,7 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/client/rp"
 	"golang.org/x/oauth2"
 
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // SigningAlgorithms is the fixed allowlist for id_token signatures:

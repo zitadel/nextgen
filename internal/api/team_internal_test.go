@@ -3,8 +3,8 @@ package api
 import (
 	"testing"
 
-	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/domain"
+	api "github.com/zitadel/zitadel/v5/api/generated"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // The contract only knows active and deactivated, so every other domain status

@@ -10,7 +10,7 @@ import { isDirectRun, run, runCapture } from "./dev-process.mjs";
 // how the previous `-X main.version=...` stamping went unnoticed while every
 // shipped binary reported an empty version. assertServerBuildPackage turns a
 // package move back into a loud failure at build time.
-export const SERVER_BUILD_PACKAGE = "github.com/zitadel/nextgen/internal/build";
+export const SERVER_BUILD_PACKAGE = "github.com/zitadel/zitadel/v5/internal/build";
 
 const defaultRepoRoot = fileURLToPath(new URL("..", import.meta.url));
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/zitadel/nextgen/internal/crypto"
+	"github.com/zitadel/zitadel/v5/internal/crypto"
 )
 
 const PrefixVariable ResourcePrefix = "var"
@@ -176,7 +176,7 @@ type VariableOwner struct {
 // everywhere is entered at the project and read from the project; an
 // environment that wants it has to enter it.
 //
-// This is the predicate [github.com/zitadel/nextgen/internal/storage/variable.VisibleTo]
+// This is the predicate [github.com/zitadel/zitadel/v5/internal/storage/variable.VisibleTo]
 // compiles into SQL, and the two are proven equal there.
 func (owner *VariableOwner) HasAccessTo(variable *Variable) bool {
 	return variable.Owner == *owner

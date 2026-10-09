@@ -15,13 +15,13 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/mock/gomock"
 
-	"github.com/zitadel/nextgen/internal/cache"
-	nextgencrypto "github.com/zitadel/nextgen/internal/crypto"
-	"github.com/zitadel/nextgen/internal/domain"
-	zmetrics "github.com/zitadel/nextgen/internal/instrumentation/metrics"
-	"github.com/zitadel/nextgen/internal/service"
-	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/cache"
+	nextgencrypto "github.com/zitadel/zitadel/v5/internal/crypto"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	zmetrics "github.com/zitadel/zitadel/v5/internal/instrumentation/metrics"
+	"github.com/zitadel/zitadel/v5/internal/service"
+	servicemocks "github.com/zitadel/zitadel/v5/internal/service/mocks"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 func newMockedKeyService(t testing.TB) (

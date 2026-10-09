@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-faster/errors"
 	"github.com/go-faster/jx"
-	"github.com/zitadel/nextgen/internal/api/ogenx"
+	"github.com/zitadel/zitadel/v5/internal/api/ogenx"
 )
 
 // Merged schema.

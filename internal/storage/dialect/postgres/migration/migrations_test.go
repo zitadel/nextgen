@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver used for migrations
-	migrationpkg "github.com/zitadel/nextgen/internal/storage/dialect/postgres/migration"
-	"github.com/zitadel/nextgen/internal/storage/testdb"
+	migrationpkg "github.com/zitadel/zitadel/v5/internal/storage/dialect/postgres/migration"
+	"github.com/zitadel/zitadel/v5/internal/storage/testdb"
 )
 
 func TestMigrateSupportsSingleConnectionPool(t *testing.T) {

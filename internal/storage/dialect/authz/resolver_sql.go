@@ -1,7 +1,7 @@
 package authz
 
 import (
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // ArgWriter is satisfied by each dialect's statementCompiler.

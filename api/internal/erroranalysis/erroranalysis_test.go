@@ -114,7 +114,7 @@ func TestInspectedErrorsAreNotReported(t *testing.T) {
 // fixturePkg is the import path of the testdata module the shape tests analyze.
 // It stands apart from the real tree so a shape can be pinned without waiting
 // for the production code to grow one.
-const fixturePkg = "github.com/zitadel/nextgen/api/internal/erroranalysis/testdata/fixture/"
+const fixturePkg = "github.com/zitadel/zitadel/v5/api/internal/erroranalysis/testdata/fixture/"
 
 var analyzeFixtureOnce = sync.OnceValues(func() (map[string]Method, error) {
 	_, file, _, ok := runtime.Caller(0)

@@ -1,8 +1,8 @@
 package sqlite
 
 import (
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/idgen"
 )
 
 var managedIDs idgen.Generator = idgen.NewULID()

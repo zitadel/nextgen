@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // Document is the on-disk shape for a single bootstrap user (one file per user).

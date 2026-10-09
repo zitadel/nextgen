@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 func (h *Harness) EnsureTeamService(t *testing.T) *service.TeamService {

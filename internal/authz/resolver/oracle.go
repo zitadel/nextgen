@@ -3,8 +3,8 @@ package resolver
 import (
 	"time"
 
-	"github.com/zitadel/nextgen/internal/authz/compiler"
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/authz/compiler"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // Graph is an in-memory authz fact set for the L4 oracle.

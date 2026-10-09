@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/dialect/schematest"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/schematest"
 )
 
 // SchemaColumnNullability lists the DDL nullability expected for every column

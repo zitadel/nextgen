@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zitadel/nextgen/internal/crypto"
+	"github.com/zitadel/zitadel/v5/internal/crypto"
 )
 
 // decodeDoc keeps the fixtures readable and, more usefully, makes them the same

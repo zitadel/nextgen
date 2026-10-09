@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	api "github.com/zitadel/nextgen/api/generated"
+	api "github.com/zitadel/zitadel/v5/api/generated"
 )
 
 func (h *Handler) GetHealth(ctx context.Context) (api.GetHealthRes, error) {

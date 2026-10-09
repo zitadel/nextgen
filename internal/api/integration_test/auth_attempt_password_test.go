@@ -7,11 +7,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	api "github.com/zitadel/nextgen/api/generated"
-	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
-	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
+	api "github.com/zitadel/zitadel/v5/api/generated"
+	apischemas "github.com/zitadel/zitadel/v5/api/openapi/endpoints/schemas"
+	"github.com/zitadel/zitadel/v5/internal/api/integration_test/helpers"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 // The auth-attempt REST surface is how a client that renders no login step

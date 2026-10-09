@@ -1,9 +1,9 @@
 package user
 
 import (
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/pagination"
 )
 
 // EnsureListOptions returns opts with the default CreatedAt+ID ASC order when

@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/zitadel/v5/internal/instrumentation/zlog"
 )
 
 func getLoggingContext(ctx context.Context, svcname string) *slog.Logger {

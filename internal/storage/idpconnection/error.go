@@ -3,7 +3,7 @@ package idpconnection
 import (
 	"errors"
 
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 // ReviseNotFound turns the foreign key violation an unknown connection raises

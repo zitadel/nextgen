@@ -89,7 +89,7 @@ moon run workspace:server-debug -- server --migrate --user-file examples/bootstr
 
 The task prints the `go build` invocation and the PID of the running process. The
 three `-X` values are stamped from the current HEAD, and `<pkg>` below stands for
-`github.com/zitadel/nextgen/internal/build`:
+`github.com/zitadel/zitadel/v5/internal/build`:
 
 ```
 [server-debug] build: go build -gcflags 'all=-N -l' -ldflags '-X <pkg>.version=debug+<short-sha> -X <pkg>.commit=<sha> -X <pkg>.date=<commit-date>' -o dist/server/nextgen-debug .

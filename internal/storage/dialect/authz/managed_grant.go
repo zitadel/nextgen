@@ -3,8 +3,8 @@ package authz
 import (
 	"fmt"
 
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 // ManagedGrantListConjunct is ANDed into the managed-grants list SELECT so

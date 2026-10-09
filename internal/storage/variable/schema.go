@@ -28,7 +28,7 @@ package variable
 import (
 	"time"
 
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 // VariableStorage is the row shape. It mirrors [domain.Variable] with the

@@ -5,7 +5,7 @@
     <go_parameters value="-tags postgres_integration" />
     <useCustomBuildTags value="true" />
     <kind value="DIRECTORY" />
-    <package value="github.com/zitadel/nextgen/internal/api/integration_test" />
+    <package value="github.com/zitadel/zitadel/v5/internal/api/integration_test" />
     <directory value="$PROJECT_DIR$" />
     <filePath value="$PROJECT_DIR$/../nextgen|$PROJECT_DIR$/internal/api/integration_test/helpers/pg_test_main.go" />
     <framework value="gotest" />

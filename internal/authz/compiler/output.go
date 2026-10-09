@@ -1,7 +1,7 @@
 package compiler
 
 import (
-	"github.com/zitadel/nextgen/internal/authz"
+	"github.com/zitadel/zitadel/v5/internal/authz"
 )
 
 // Relation identifies one relation on one object type.

@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/api/integration_test/helpers"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 // contendingWriters is deliberately larger than the emulator's one-transaction-at-a-time

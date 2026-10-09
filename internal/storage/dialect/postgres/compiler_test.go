@@ -7,11 +7,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
-	"github.com/zitadel/nextgen/internal/storage/flowdefinition"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/authz"
+	"github.com/zitadel/zitadel/v5/internal/storage/flowdefinition"
 )
 
 const testProjectQuery = "SELECT id, created_at, updated_at, preview_origins FROM zitadel_nextgen.projects"

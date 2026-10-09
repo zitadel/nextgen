@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // IDPCallbackPath is the route the provider sends the browser back to, under

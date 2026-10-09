@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zitadel/nextgen/internal/authz/compiler"
-	"github.com/zitadel/nextgen/internal/authz/openfga"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/authz/compiler"
+	"github.com/zitadel/zitadel/v5/internal/authz/openfga"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 // authorizedProjectsOrderAsc is the only ordering the discovery query serves.

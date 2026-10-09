@@ -17,10 +17,10 @@ import (
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/ianlancetaylor/jsonschema"
-	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
-	"github.com/zitadel/nextgen/internal/httputil"
-	"github.com/zitadel/nextgen/internal/maputil"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	apischemas "github.com/zitadel/zitadel/v5/api/openapi/endpoints/schemas"
+	"github.com/zitadel/zitadel/v5/internal/httputil"
+	"github.com/zitadel/zitadel/v5/internal/maputil"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 const (

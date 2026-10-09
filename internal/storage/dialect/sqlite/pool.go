@@ -4,9 +4,9 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/dialect/sqlite/migration"
+	"github.com/zitadel/zitadel/v5/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/sqlite/migration"
 )
 
 // Pool wraps a *sql.DB and implements [database.Pool] and [service.Pool].

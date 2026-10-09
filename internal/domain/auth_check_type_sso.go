@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/crypto"
+	"github.com/zitadel/zitadel/v5/internal/crypto"
 )
 
 // ssoStateSeparator splits the project id from the random part of a state.

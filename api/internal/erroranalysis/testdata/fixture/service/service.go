@@ -9,7 +9,7 @@ package service
 import (
 	"errors"
 
-	"github.com/zitadel/nextgen/api/internal/erroranalysis/testdata/fixture/domain"
+	"github.com/zitadel/zitadel/v5/api/internal/erroranalysis/testdata/fixture/domain"
 )
 
 type FixtureService interface {

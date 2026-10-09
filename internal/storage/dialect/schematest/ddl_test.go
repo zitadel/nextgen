@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/dialect/schematest"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/schematest"
 )
 
 var schema = database.NewSchema(map[domain.SessionField]database.FieldBinding[domain.Session]{

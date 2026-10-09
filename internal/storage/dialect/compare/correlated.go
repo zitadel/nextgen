@@ -1,7 +1,7 @@
 package compare
 
 import (
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 // CompileCorrelated compiles a [database.CorrelatedFilter] by writing the

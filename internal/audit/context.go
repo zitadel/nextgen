@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/zitadel/nextgen/internal/api/middleware"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/events"
+	"github.com/zitadel/zitadel/v5/internal/api/middleware"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/storage/events"
 )
 
 type contextKey struct{}

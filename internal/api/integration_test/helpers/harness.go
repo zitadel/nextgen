@@ -7,13 +7,13 @@ import (
 	"sync"
 
 	"github.com/go-jose/go-jose/v4"
-	generated "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/api"
-	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
-	"github.com/zitadel/nextgen/internal/crypto"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/secrets"
-	"github.com/zitadel/nextgen/internal/service"
+	generated "github.com/zitadel/zitadel/v5/api/generated"
+	"github.com/zitadel/zitadel/v5/internal/api"
+	"github.com/zitadel/zitadel/v5/internal/api/integration_test/test_data"
+	"github.com/zitadel/zitadel/v5/internal/crypto"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/secrets"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 type Harness struct {

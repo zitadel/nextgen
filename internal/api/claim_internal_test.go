@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/service/mocks"
+	api "github.com/zitadel/zitadel/v5/api/generated"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/service/mocks"
 	"go.uber.org/mock/gomock"
 )
 

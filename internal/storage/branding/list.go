@@ -1,8 +1,8 @@
 package branding
 
 import (
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 // NewestFirst is created_at DESC, id DESC. id (ULID) breaks created_at ties

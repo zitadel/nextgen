@@ -6,10 +6,10 @@ import (
 
 	"cloud.google.com/go/spanner"
 
-	"github.com/zitadel/nextgen/internal/authz/compiler"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
+	"github.com/zitadel/zitadel/v5/internal/authz/compiler"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/authz"
 )
 
 const (

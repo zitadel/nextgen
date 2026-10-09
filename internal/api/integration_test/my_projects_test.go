@@ -10,10 +10,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
+	api "github.com/zitadel/zitadel/v5/api/generated"
+	"github.com/zitadel/zitadel/v5/internal/api/integration_test/helpers"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 // sessionClientForUser signs userID into the platform project and returns a

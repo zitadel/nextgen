@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	slogctx "github.com/veqryn/slog-context"
-	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/dbtest"
+	"github.com/zitadel/zitadel/v5/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/storage/dbtest"
 )
 
 func TestMain(m *testing.M) {

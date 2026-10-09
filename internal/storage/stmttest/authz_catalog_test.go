@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zitadel/nextgen/internal/authz/compiler"
-	"github.com/zitadel/nextgen/internal/authz/openfga"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
+	"github.com/zitadel/zitadel/v5/internal/authz/compiler"
+	"github.com/zitadel/zitadel/v5/internal/authz/openfga"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/authz"
 )
 
 const sampleCatalogOpenFGAModel = `model

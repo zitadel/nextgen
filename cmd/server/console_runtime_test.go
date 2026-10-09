@@ -13,11 +13,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
-	"github.com/zitadel/nextgen/internal/service"
-	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
+	cryptomock "github.com/zitadel/zitadel/v5/internal/crypto/mock"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/instrumentation/zlog"
+	"github.com/zitadel/zitadel/v5/internal/service"
+	servicemocks "github.com/zitadel/zitadel/v5/internal/service/mocks"
 	"go.uber.org/mock/gomock"
 )
 

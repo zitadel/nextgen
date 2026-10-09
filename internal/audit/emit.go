@@ -3,7 +3,7 @@ package audit
 import (
 	"context"
 
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // EmitSpec is one Path B wide-event emission (ADR 048).

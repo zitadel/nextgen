@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zitadel/nextgen/internal/api"
-	"github.com/zitadel/nextgen/internal/staticui/console"
-	"github.com/zitadel/nextgen/internal/staticui/login"
-	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
+	"github.com/zitadel/zitadel/v5/internal/api"
+	"github.com/zitadel/zitadel/v5/internal/staticui/console"
+	"github.com/zitadel/zitadel/v5/internal/staticui/login"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/idgen"
 )
 
 // The mux's routing table is a cross-surface contract: the embedded SPAs are

@@ -56,7 +56,7 @@ const (
 	// Directive is the comment prefix that exempts one construction site.
 	Directive = "//egress:allow"
 
-	defaultSanctioned = "github.com/zitadel/nextgen/internal/httputil"
+	defaultSanctioned = "github.com/zitadel/zitadel/v5/internal/httputil"
 )
 
 // defaultThirdPartyClients lists module paths of libraries that dial on their

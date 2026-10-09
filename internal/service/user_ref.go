@@ -4,8 +4,8 @@ import (
 	"context"
 	"slices"
 
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 // UserRefResolver is the batch resolution port of ADR 058 §4: it hydrates

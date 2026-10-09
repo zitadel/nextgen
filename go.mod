@@ -1,4 +1,4 @@
-module github.com/zitadel/nextgen
+module github.com/zitadel/zitadel/v5
 
 go 1.26
 

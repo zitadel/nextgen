@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/ogen-go/ogen/middleware"
-	oasapi "github.com/zitadel/nextgen/api/generated"
+	oasapi "github.com/zitadel/zitadel/v5/api/generated"
 )
 
 type operationIDContextKey struct {

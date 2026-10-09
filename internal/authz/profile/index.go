@@ -1,7 +1,7 @@
 package profile
 
 import (
-	"github.com/zitadel/nextgen/internal/authz"
+	"github.com/zitadel/zitadel/v5/internal/authz"
 )
 
 // node addresses one relation on one object type.

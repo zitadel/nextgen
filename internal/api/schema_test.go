@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	gen "github.com/zitadel/nextgen/api/generated"
+	gen "github.com/zitadel/zitadel/v5/api/generated"
 )
 
 // CreateSchema re-marshals the decoded body before validating it, so the

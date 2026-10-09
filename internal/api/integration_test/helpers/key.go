@@ -5,10 +5,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/zitadel/nextgen/internal/cache"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/oidc/v3/pkg/op"
+	"github.com/zitadel/zitadel/v5/internal/cache"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 // keyCacheSize is generous: the harness holds one key service for the whole

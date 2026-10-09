@@ -2,7 +2,7 @@ package cache
 
 import (
 	lru "github.com/hashicorp/golang-lru/v2"
-	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
+	"github.com/zitadel/zitadel/v5/internal/instrumentation/metrics"
 )
 
 type MeteredLRU[Key comparable, Value any] struct {

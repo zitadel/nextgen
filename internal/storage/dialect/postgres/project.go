@@ -6,11 +6,11 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
-	storageproject "github.com/zitadel/nextgen/internal/storage/project"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/pagination"
+	storageproject "github.com/zitadel/zitadel/v5/internal/storage/project"
 )
 
 const createProjectStmt = `INSERT INTO zitadel_nextgen.projects (id, name, preview_origins, password_hash_policy) VALUES ($1, $2, $3, $4) RETURNING id, created_at, updated_at`

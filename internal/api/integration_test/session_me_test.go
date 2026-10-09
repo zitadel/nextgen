@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/api/integration_test/helpers"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // TestGetMySession_Identity drives the HTTP path a signed-in app takes after

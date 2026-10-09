@@ -7,10 +7,10 @@ import (
 
 	"go.uber.org/mock/gomock"
 
-	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
-	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
+	api "github.com/zitadel/zitadel/v5/api/generated"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service"
+	servicemocks "github.com/zitadel/zitadel/v5/internal/service/mocks"
 )
 
 // The membership gate on POST /users/query keys off this, so a field that reads

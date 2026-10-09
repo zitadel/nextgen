@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/zitadel/nextgen/internal/errreport"
+	"github.com/zitadel/zitadel/v5/internal/errreport"
 )
 
 // ErrNoChanges is returned when an Update is called with no updates.

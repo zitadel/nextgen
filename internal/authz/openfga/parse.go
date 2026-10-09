@@ -14,7 +14,7 @@ import (
 	openfgav1 "github.com/openfga/api/proto/openfga/v1"
 	"github.com/openfga/language/pkg/go/transformer"
 
-	"github.com/zitadel/nextgen/internal/authz"
+	"github.com/zitadel/zitadel/v5/internal/authz"
 )
 
 // ParseDSL parses an OpenFGA DSL model and normalizes it into Zitadel's

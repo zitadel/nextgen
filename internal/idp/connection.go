@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // The connection schema's URL patterns: https, or http only for the local

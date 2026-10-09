@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/audit"
-	"github.com/zitadel/nextgen/internal/crypto"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/httputil"
-	"github.com/zitadel/nextgen/internal/instrumentation"
-	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/audit"
+	"github.com/zitadel/zitadel/v5/internal/crypto"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/httputil"
+	"github.com/zitadel/zitadel/v5/internal/instrumentation"
+	"github.com/zitadel/zitadel/v5/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 const Name = "zitadel/backend/v3/instrumentation/tracing"

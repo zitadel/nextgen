@@ -6,8 +6,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/storage/dbtest"
-	"github.com/zitadel/nextgen/internal/storage/dialect/postgres"
+	"github.com/zitadel/zitadel/v5/internal/storage/dbtest"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/postgres"
 )
 
 func init() {

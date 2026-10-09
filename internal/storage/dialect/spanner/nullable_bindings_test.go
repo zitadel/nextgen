@@ -3,7 +3,7 @@ package spanner
 import (
 	"testing"
 
-	"github.com/zitadel/nextgen/internal/storage/dialect/schematest"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/schematest"
 )
 
 func TestTokenSchemaNullableBindings(t *testing.T) {

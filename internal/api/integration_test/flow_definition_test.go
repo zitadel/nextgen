@@ -10,10 +10,10 @@ import (
 	"github.com/go-faster/jx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	api "github.com/zitadel/nextgen/api/generated"
-	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
-	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
-	"github.com/zitadel/nextgen/internal/domain"
+	api "github.com/zitadel/zitadel/v5/api/generated"
+	apischemas "github.com/zitadel/zitadel/v5/api/openapi/endpoints/schemas"
+	"github.com/zitadel/zitadel/v5/internal/api/integration_test/helpers"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {

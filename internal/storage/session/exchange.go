@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // UserAgentFingerprintKey is the user_agents.info JSON key for the browser

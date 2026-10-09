@@ -6,8 +6,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/storage/dbtest"
-	"github.com/zitadel/nextgen/internal/storage/dialect/spanner"
+	"github.com/zitadel/zitadel/v5/internal/storage/dbtest"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/spanner"
 )
 
 func init() {

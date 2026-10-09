@@ -6,9 +6,9 @@ package authz
 import (
 	"fmt"
 
-	authzmodel "github.com/zitadel/nextgen/internal/authz"
-	"github.com/zitadel/nextgen/internal/authz/compiler"
-	"github.com/zitadel/nextgen/internal/domain"
+	authzmodel "github.com/zitadel/zitadel/v5/internal/authz"
+	"github.com/zitadel/zitadel/v5/internal/authz/compiler"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // EmptyToNil returns nil for empty strings (SQL NULL for optional columns).

@@ -3,8 +3,8 @@ package compiler
 import (
 	"slices"
 
-	"github.com/zitadel/nextgen/internal/authz"
-	"github.com/zitadel/nextgen/internal/authz/profile"
+	"github.com/zitadel/zitadel/v5/internal/authz"
+	"github.com/zitadel/zitadel/v5/internal/authz/profile"
 )
 
 // Compiler validates and compiles authorization models. Validator controls the

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zitadel/nextgen/internal/crypto"
+	"github.com/zitadel/zitadel/v5/internal/crypto"
 )
 
 // limitedHasher refuses what it cannot take in full, the way bcrypt does past

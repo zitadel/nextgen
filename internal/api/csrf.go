@@ -10,9 +10,9 @@ import (
 	"net/http"
 	"net/url"
 
-	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/httputil"
+	api "github.com/zitadel/zitadel/v5/api/generated"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/httputil"
 )
 
 // CSRFHeader carries the session-bound CSRF token on cookie-authenticated

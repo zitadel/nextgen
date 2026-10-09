@@ -16,7 +16,7 @@ import (
 	"sync"
 
 	"github.com/ogen-go/ogen/ogenerrors"
-	api "github.com/zitadel/nextgen/api/generated"
+	api "github.com/zitadel/zitadel/v5/api/generated"
 )
 
 // Target is a provisioned server and the one project and user the scenarios

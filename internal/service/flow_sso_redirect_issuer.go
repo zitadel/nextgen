@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/zitadel/nextgen/internal/crypto"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/idp"
+	"github.com/zitadel/zitadel/v5/internal/crypto"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/idp"
 )
 
 // FlowSSORedirectIssuer implements [domain.FlowSSORedirectIssuer] over the

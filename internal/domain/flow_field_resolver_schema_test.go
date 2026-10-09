@@ -10,7 +10,7 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 const testProjectID = "proj-1"

@@ -12,7 +12,7 @@ import (
 
 	_ "modernc.org/sqlite" // register "sqlite" driver
 
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 func init() {

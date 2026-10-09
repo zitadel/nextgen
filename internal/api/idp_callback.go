@@ -7,10 +7,10 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/zitadel/nextgen/internal/api/middleware"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
-	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/api/middleware"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/instrumentation/zlog"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 // idpCallbackErrorPage is the one answer for every failed callback: the

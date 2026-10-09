@@ -7,9 +7,9 @@ import (
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/stretchr/testify/require"
-	api "github.com/zitadel/nextgen/api/generated"
-	internalapi "github.com/zitadel/nextgen/internal/api"
-	"github.com/zitadel/nextgen/internal/domain"
+	api "github.com/zitadel/zitadel/v5/api/generated"
+	internalapi "github.com/zitadel/zitadel/v5/internal/api"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 type FakeSecuritySource struct {

@@ -8,10 +8,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/zitadel/nextgen/internal/authz"
-	"github.com/zitadel/nextgen/internal/authz/authztest"
-	"github.com/zitadel/nextgen/internal/authz/compiler"
-	"github.com/zitadel/nextgen/internal/authz/profile"
+	"github.com/zitadel/zitadel/v5/internal/authz"
+	"github.com/zitadel/zitadel/v5/internal/authz/authztest"
+	"github.com/zitadel/zitadel/v5/internal/authz/compiler"
+	"github.com/zitadel/zitadel/v5/internal/authz/profile"
 )
 
 // checkCompileInvariants asserts L2 compiler/profile properties for one model.

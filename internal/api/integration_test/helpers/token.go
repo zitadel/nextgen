@@ -3,7 +3,7 @@ package helpers
 import (
 	"testing"
 
-	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 func (h *Harness) EnsureTokenService(t *testing.T) service.TokenService {

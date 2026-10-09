@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zitadel/nextgen/internal/crypto"
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/crypto"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // Validate checks a parsed document and password hash encoding.

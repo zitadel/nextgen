@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"net/url"
 
-	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
-	"github.com/zitadel/nextgen/internal/service"
+	api "github.com/zitadel/zitadel/v5/api/generated"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/instrumentation/zlog"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 func (h *Handler) CreateBranding(ctx context.Context, req *api.Branding, params api.CreateBrandingParams) (api.CreateBrandingRes, error) {

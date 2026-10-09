@@ -10,11 +10,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	api "github.com/zitadel/nextgen/api/generated"
-	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
-	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
-	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/oidc/v3/pkg/oidc"
+	api "github.com/zitadel/zitadel/v5/api/generated"
+	apischemas "github.com/zitadel/zitadel/v5/api/openapi/endpoints/schemas"
+	"github.com/zitadel/zitadel/v5/internal/api/integration_test/helpers"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // TestFlowSSOSubmitRedirectsToProvider covers the sso submission: the

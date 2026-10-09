@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	v2sqlite "github.com/zitadel/nextgen/internal/storage/dialect/sqlite"
+	v2sqlite "github.com/zitadel/zitadel/v5/internal/storage/dialect/sqlite"
 )
 
 // SQLite returns a connected v2 pool for the SQLite integration tests.

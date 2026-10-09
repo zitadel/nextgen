@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/zitadel/nextgen/cmd/server"
+	"github.com/zitadel/zitadel/v5/cmd/server"
 )
 
 func main() {

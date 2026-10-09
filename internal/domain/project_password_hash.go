@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/zitadel/nextgen/internal/crypto"
+	"github.com/zitadel/zitadel/v5/internal/crypto"
 )
 
 func ErrProjectPasswordHashInvalid() Error {

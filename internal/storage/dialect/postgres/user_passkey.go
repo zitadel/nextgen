@@ -7,11 +7,11 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
-	"github.com/zitadel/nextgen/internal/storage/userpasskey"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/pagination"
+	"github.com/zitadel/zitadel/v5/internal/storage/userpasskey"
 )
 
 const createUserPasskeyStmt = `INSERT INTO zitadel_nextgen.user_passkeys (

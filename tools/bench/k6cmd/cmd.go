@@ -20,8 +20,8 @@ import (
 	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/subcommand"
 
-	"github.com/zitadel/nextgen/tools/bench/harness"
-	"github.com/zitadel/nextgen/tools/bench/scripts"
+	"github.com/zitadel/zitadel/v5/tools/bench/harness"
+	"github.com/zitadel/zitadel/v5/tools/bench/scripts"
 )
 
 func init() {

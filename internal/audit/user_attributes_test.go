@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/zitadel/v5/internal/audit"
 )
 
 func TestUserAttributeAuditFields(t *testing.T) {

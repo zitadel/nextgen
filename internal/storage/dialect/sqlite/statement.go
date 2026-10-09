@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 // queryExecutor abstracts *sql.DB and *sql.Tx so entity statements work

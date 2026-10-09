@@ -3,7 +3,7 @@ package openfga_test
 import (
 	"testing"
 
-	"github.com/zitadel/nextgen/internal/authz/openfga"
+	"github.com/zitadel/zitadel/v5/internal/authz/openfga"
 )
 
 func FuzzParseDSL(f *testing.F) {

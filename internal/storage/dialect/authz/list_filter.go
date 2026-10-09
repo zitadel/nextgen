@@ -3,7 +3,7 @@ package authz
 import (
 	"context"
 
-	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 // ErrListFilterRequired is returned when a management list runs without an

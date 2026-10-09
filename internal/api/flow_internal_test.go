@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	apigen "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/domain"
+	apigen "github.com/zitadel/zitadel/v5/api/generated"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 func TestToFlowField_OmitsValidationWhenAbsent(t *testing.T) {

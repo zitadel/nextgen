@@ -127,7 +127,7 @@ anything else.
 
 k6 is AGPL-3.0-only. Keeping it out of the root `go.mod` keeps it out of the
 server's dependency graph; a nested module whose path begins with
-`github.com/zitadel/nextgen/` can still import the root module's `internal/`
+`github.com/zitadel/zitadel/v5/` can still import the root module's `internal/`
 packages. The module is AGPL-3.0-only like the server, and because it links
 k6 it is additionally excluded from any commercial licensing of the product
 ([LICENSING.md](../../LICENSING.md)). The k6 version is pinned in its

@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/text/cases"
 
-	"github.com/zitadel/nextgen/internal/maputil"
+	"github.com/zitadel/zitadel/v5/internal/maputil"
 )
 
 type AttributeKey string

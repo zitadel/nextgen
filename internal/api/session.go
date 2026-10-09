@@ -10,11 +10,11 @@ import (
 
 	"github.com/go-faster/jx"
 	"github.com/muhlemmer/gu"
-	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/api/ogenx"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/oidc/v3/pkg/op"
+	api "github.com/zitadel/zitadel/v5/api/generated"
+	"github.com/zitadel/zitadel/v5/internal/api/ogenx"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service"
 )
 
 const (

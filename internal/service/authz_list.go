@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/domain"
 )
 
 // AuthzListFilter is the portable authz conjunct injected into resource list

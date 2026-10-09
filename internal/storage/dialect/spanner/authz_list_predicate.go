@@ -3,8 +3,8 @@ package spanner
 import (
 	"context"
 
-	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
+	"github.com/zitadel/zitadel/v5/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/storage/dialect/authz"
 )
 
 // maybeWriteAuthzListPredicate appends the shared EXISTS list conjunct when a

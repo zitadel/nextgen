@@ -6,7 +6,7 @@ import (
 	"io/fs"
 	"net/http"
 
-	"github.com/zitadel/nextgen/internal/staticui"
+	"github.com/zitadel/zitadel/v5/internal/staticui"
 )
 
 //go:embed all:dist

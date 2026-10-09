@@ -3,8 +3,8 @@ package flowdefinition
 import (
 	"strconv"
 
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 // ParsePurposeKey parses a purposes map key from a cursor token.

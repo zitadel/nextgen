@@ -16,7 +16,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/zitadel/nextgen/internal/authz"
+	"github.com/zitadel/zitadel/v5/internal/authz"
 )
 
 // SupportedSchemaVersion is the only OpenFGA schema version the profile

@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zitadel/nextgen/internal/authz/resolver"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/zitadel/v5/internal/authz/resolver"
+	"github.com/zitadel/zitadel/v5/internal/domain"
+	"github.com/zitadel/zitadel/v5/internal/service"
+	"github.com/zitadel/zitadel/v5/internal/storage/database"
 )
 
 // stubAuthzStmts is a minimal AuthzResolverStatements for gate unit tests.
