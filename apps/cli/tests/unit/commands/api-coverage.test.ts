@@ -76,6 +76,7 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   createBranding:
     "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
   createRelease: "a release is constructed by `zitadel deploy` (ADR 035)",
+  revokeRelease: "an operator's hard stop; `zitadel release revoke` owns it (#539)",
   createDeployment: "a release goes live through `zitadel deploy` orchestration (ADR 035, #529)",
   getDeploymentById: "deployment history reads arrive with the `zitadel deploy` surface (#529)",
   listDeployments: "deployment history reads arrive with the `zitadel deploy` surface (#529)",

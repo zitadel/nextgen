@@ -26,7 +26,7 @@ flows:
       idp.read: Permission to read identity provider connections
       idp.write: Permission to create and revise identity provider connections
       release.read: Permission to read project configuration releases
-      release.write: Permission to create project configuration releases
+      release.write: Permission to create and revoke project configuration releases
       environment.read: Permission to read project environments
       deployment.read: Permission to read deployments
       deployment.write: Permission to create deployments (deploy, promote, roll back)
@@ -75,7 +75,7 @@ flows:
       idp.read: Permission to read identity provider connections
       idp.write: Permission to create and revise identity provider connections
       release.read: Permission to read project configuration releases
-      release.write: Permission to create project configuration releases
+      release.write: Permission to create and revoke project configuration releases
       environment.read: Permission to read project environments
       deployment.read: Permission to read deployments
       deployment.write: Permission to create deployments (deploy, promote, roll back)

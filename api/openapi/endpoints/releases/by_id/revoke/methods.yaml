@@ -1,0 +1,66 @@
+post:
+  operationId: revokeRelease
+  summary: Revoke a release
+  description: |
+    Marks the release revoked, the operator's hard stop on content that must
+    not be served anywhere. From then on the release cannot be deployed and
+    is refused on every path that would serve it, including to a build that
+    pins its digest, with `rel.revoked`.
+
+    Nothing is undone: deployments naming the release stay in the history,
+    and the targets they serve answer `rel.revoked` until something else is
+    deployed there. Rolling a deployment back is the soft alternative — it
+    moves what the targets serve and leaves pinned builds where they are.
+
+    Idempotent: revoking a release that is already revoked answers `200`
+    with the release unchanged, `revoked_at` still naming the first
+    revocation. There is no un-revoke; build a new release instead.
+
+    Takes no body. The lookup is scoped to the project in `project_id`, so a
+    release id of another project answers not found exactly as an unknown id
+    does.
+  tags:
+    - Releases
+  security:
+    - oauth2:
+        - release.write
+  parameters:
+    - $ref: ../../../../components/parameters/project-id.yaml
+    - $ref: ../../../../components/parameters/release-id.yaml
+  responses:
+    '200':
+      description: The release is revoked.
+      content:
+        application/json:
+          schema:
+            $ref: ../../release.yaml
+          examples:
+            revoked:
+              summary: A release after revocation
+              description: |
+                Only `revoked_at` changed; the pinned set and the metadata are
+                immutable and stay as they were.
+              value:
+                id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                content_hash: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
+                metadata:
+                  message: add phone_number to human-user
+                  git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+                  git_dirty: false
+                  created_at: '2026-07-14T09:11:00Z'
+                  created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                  created_by_type: human
+                revoked_at: '2026-07-16T16:20:00Z'
+                pointers:
+                  - kind: schema
+                    handle: human-user
+                    revision_id: sch_01KWHF18816ZQE7F0N9WD3P2E4
+                  - kind: flow_definition
+                    handle: default-login
+                    revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
+                  - kind: branding
+                    handle: default
+                    revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
+    default:
+      $ref: revokeRelease-error-response.yaml

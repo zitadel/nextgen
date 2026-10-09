@@ -1,0 +1,9 @@
+title: ReleaseRevokedPayload
+type: object
+description: |
+  Allowlisted fields for `release.revoked`. The release id is already the
+  event's `entity_id`; the digest is repeated so the audit stream names the
+  release the way the CLI prints it and builds pin it.
+properties:
+  content_hash:
+    type: string

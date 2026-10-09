@@ -188,18 +188,36 @@ type Invoker interface {
 	CreateProject(ctx context.Context, request *CreateProjectRequest) (CreateProjectRes, error)
 	// CreateRelease invokes createRelease operation.
 	//
-	// Bundles a release from revisions that already exist, supplied as
+	// Assembles a release from exactly one of two body shapes.
+	// `pointers` pins revisions that already exist, supplied as
 	// `(kind, revision_id)` pairs. No new revisions are allocated — use the
-	// per-kind create endpoints for that, then pin the ids here.
-	// Every referenced `revision_id` must exist in the project. Each one's handle
-	// is read from the revision itself and recorded on the release, so a resource
+	// per-kind create endpoints for that, then pin the ids here. Every
+	// referenced `revision_id` must exist in the project; each one's handle is
+	// read from the revision itself and recorded on the release, so a resource
 	// is always pinned under the identity it declares.
-	// Creating a release does not deploy it. A release is environment-agnostic
-	// and the same release can later be deployed to any number of environments
+	// `bundle` takes the resources of `.zitadel/` as authored on disk, grouped
+	// by kind. For every resource the server compares the content against the
+	// project's newest revision of the same handle: unchanged content reuses
+	// that revision, changed content allocates a new one. Construction is one
+	// transaction — a failure anywhere leaves no revision and no release. The
+	// caller records nothing, so the same directory builds the same release on
+	// any project. An empty bundle is refused.
+	// Both shapes are closed the same way: every handle a pinned resource
+	// references — a flow definition's `user_schema` naming a schema by
+	// `objectType` — must be pinned by the same release, or the request is
+	// refused with `rel.unresolved_reference`. The message names the pointer
+	// and the handle that did not resolve, for example
+	// `flow_definition default-login: user_schema human-user not found`,
+	// because a release pins many and the code alone does not say which one
+	// failed.
+	// Idempotent on the pinned set: the content digest is computed over the
+	// sorted pointers with metadata excluded, so re-submitting the same content
+	// with a different `message` answers `200` with the release that already
+	// pins it, every revision `created: false`, rather than creating a second
+	// one. A release the project did not hold before answers `201`.
+	// Creating a release does not deploy it. A release is not tied to a target,
+	// and the same release can later be deployed to any number of targets
 	// unchanged.
-	// Idempotent on the pinned set: metadata is excluded from the comparison, so
-	// re-submitting the same revisions with a different `message` returns the
-	// release that already pins them rather than creating a second one.
 	//
 	// POST /releases
 	CreateRelease(ctx context.Context, request *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error)
@@ -492,8 +510,10 @@ type Invoker interface {
 	GetReady(ctx context.Context) (GetReadyRes, error)
 	// GetReleaseById invokes getReleaseById operation.
 	//
-	// Reads one release: its metadata and the `(kind, handle, revision_id)`
-	// tuples it pins.
+	// Reads one release: its digest, its metadata, whether it was revoked, and
+	// the `(kind, handle, revision_id)` tuples it pins.
+	// The path takes the `rel_` id only. To find a release from its digest,
+	// list with the `content_hash` filter and read the matched entry's `id`.
 	// Does not embed resource content. Resolve each `revision_id` through the
 	// per-kind read endpoints when the bytes are needed.
 	// The lookup is scoped to the project in `project_id`: a release id belonging
@@ -657,8 +677,14 @@ type Invoker interface {
 	// ListReleases invokes listReleases operation.
 	//
 	// Lists the project's releases, newest first.
-	// Entries carry metadata only — the pinned set is omitted. Read one release
-	// with `GET /releases/{release_id}` to get its pointers.
+	// Entries carry the digest, the metadata and `revoked_at` — the pinned set
+	// is omitted. Read one release with `GET /releases/{release_id}` to get its
+	// pointers.
+	// `content_hash` looks a release up by its content, as the CLI does when a
+	// person types the digest a transcript printed. The project holds at most
+	// one release per digest, so the filtered list has one entry or none, and
+	// an unknown digest is an empty list rather than an error. Paths take the
+	// `rel_` id only; the matched entry's `id` is what to use there.
 	//
 	// GET /releases
 	ListReleases(ctx context.Context, params ListReleasesParams) (ListReleasesRes, error)
@@ -777,6 +803,25 @@ type Invoker interface {
 	//
 	// DELETE /sessions/me
 	RevokeMySession(ctx context.Context) (RevokeMySessionRes, error)
+	// RevokeRelease invokes revokeRelease operation.
+	//
+	// Marks the release revoked, the operator's hard stop on content that must
+	// not be served anywhere. From then on the release cannot be deployed and
+	// is refused on every path that would serve it, including to a build that
+	// pins its digest, with `rel.revoked`.
+	// Nothing is undone: deployments naming the release stay in the history,
+	// and the targets they serve answer `rel.revoked` until something else is
+	// deployed there. Rolling a deployment back is the soft alternative — it
+	// moves what the targets serve and leaves pinned builds where they are.
+	// Idempotent: revoking a release that is already revoked answers `200`
+	// with the release unchanged, `revoked_at` still naming the first
+	// revocation. There is no un-revoke; build a new release instead.
+	// Takes no body. The lookup is scoped to the project in `project_id`, so a
+	// release id of another project answers not found exactly as an unknown id
+	// does.
+	//
+	// POST /releases/{release_id}/revoke
+	RevokeRelease(ctx context.Context, params RevokeReleaseParams) (RevokeReleaseRes, error)
 	// RevokeSession invokes revokeSession operation.
 	//
 	// Permanently deletes the session, terminating it immediately.
@@ -2414,18 +2459,36 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 
 // CreateRelease invokes createRelease operation.
 //
-// Bundles a release from revisions that already exist, supplied as
+// Assembles a release from exactly one of two body shapes.
+// `pointers` pins revisions that already exist, supplied as
 // `(kind, revision_id)` pairs. No new revisions are allocated — use the
-// per-kind create endpoints for that, then pin the ids here.
-// Every referenced `revision_id` must exist in the project. Each one's handle
-// is read from the revision itself and recorded on the release, so a resource
+// per-kind create endpoints for that, then pin the ids here. Every
+// referenced `revision_id` must exist in the project; each one's handle is
+// read from the revision itself and recorded on the release, so a resource
 // is always pinned under the identity it declares.
-// Creating a release does not deploy it. A release is environment-agnostic
-// and the same release can later be deployed to any number of environments
+// `bundle` takes the resources of `.zitadel/` as authored on disk, grouped
+// by kind. For every resource the server compares the content against the
+// project's newest revision of the same handle: unchanged content reuses
+// that revision, changed content allocates a new one. Construction is one
+// transaction — a failure anywhere leaves no revision and no release. The
+// caller records nothing, so the same directory builds the same release on
+// any project. An empty bundle is refused.
+// Both shapes are closed the same way: every handle a pinned resource
+// references — a flow definition's `user_schema` naming a schema by
+// `objectType` — must be pinned by the same release, or the request is
+// refused with `rel.unresolved_reference`. The message names the pointer
+// and the handle that did not resolve, for example
+// `flow_definition default-login: user_schema human-user not found`,
+// because a release pins many and the code alone does not say which one
+// failed.
+// Idempotent on the pinned set: the content digest is computed over the
+// sorted pointers with metadata excluded, so re-submitting the same content
+// with a different `message` answers `200` with the release that already
+// pins it, every revision `created: false`, rather than creating a second
+// one. A release the project did not hold before answers `201`.
+// Creating a release does not deploy it. A release is not tied to a target,
+// and the same release can later be deployed to any number of targets
 // unchanged.
-// Idempotent on the pinned set: metadata is excluded from the comparison, so
-// re-submitting the same revisions with a different `message` returns the
-// release that already pins them rather than creating a second one.
 //
 // POST /releases
 func (c *Client) CreateRelease(ctx context.Context, request *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error) {
@@ -6554,8 +6617,10 @@ func (c *Client) sendGetReady(ctx context.Context) (res GetReadyRes, err error) 
 
 // GetReleaseById invokes getReleaseById operation.
 //
-// Reads one release: its metadata and the `(kind, handle, revision_id)`
-// tuples it pins.
+// Reads one release: its digest, its metadata, whether it was revoked, and
+// the `(kind, handle, revision_id)` tuples it pins.
+// The path takes the `rel_` id only. To find a release from its digest,
+// list with the `content_hash` filter and read the matched entry's `id`.
 // Does not embed resource content. Resolve each `revision_id` through the
 // per-kind read endpoints when the bytes are needed.
 // The lookup is scoped to the project in `project_id`: a release id belonging
@@ -9513,8 +9578,14 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 // ListReleases invokes listReleases operation.
 //
 // Lists the project's releases, newest first.
-// Entries carry metadata only — the pinned set is omitted. Read one release
-// with `GET /releases/{release_id}` to get its pointers.
+// Entries carry the digest, the metadata and `revoked_at` — the pinned set
+// is omitted. Read one release with `GET /releases/{release_id}` to get its
+// pointers.
+// `content_hash` looks a release up by its content, as the CLI does when a
+// person types the digest a transcript printed. The project holds at most
+// one release per digest, so the filtered list has one entry or none, and
+// an unknown digest is an empty list rather than an error. Paths take the
+// `rel_` id only; the matched entry's `id` is what to use there.
 //
 // GET /releases
 func (c *Client) ListReleases(ctx context.Context, params ListReleasesParams) (ListReleasesRes, error) {
@@ -9576,6 +9647,26 @@ func (c *Client) sendListReleases(ctx context.Context, params ListReleasesParams
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if unwrapped := string(params.ProjectID); true {
 				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "content_hash" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "content_hash",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ContentHash.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
 			}
 			return nil
 		}); err != nil {
@@ -11675,6 +11766,169 @@ func (c *Client) sendRevokeMySession(ctx context.Context) (res RevokeMySessionRe
 
 	stage = "DecodeResponse"
 	result, err := decodeRevokeMySessionResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// RevokeRelease invokes revokeRelease operation.
+//
+// Marks the release revoked, the operator's hard stop on content that must
+// not be served anywhere. From then on the release cannot be deployed and
+// is refused on every path that would serve it, including to a build that
+// pins its digest, with `rel.revoked`.
+// Nothing is undone: deployments naming the release stay in the history,
+// and the targets they serve answer `rel.revoked` until something else is
+// deployed there. Rolling a deployment back is the soft alternative — it
+// moves what the targets serve and leaves pinned builds where they are.
+// Idempotent: revoking a release that is already revoked answers `200`
+// with the release unchanged, `revoked_at` still naming the first
+// revocation. There is no un-revoke; build a new release instead.
+// Takes no body. The lookup is scoped to the project in `project_id`, so a
+// release id of another project answers not found exactly as an unknown id
+// does.
+//
+// POST /releases/{release_id}/revoke
+func (c *Client) RevokeRelease(ctx context.Context, params RevokeReleaseParams) (RevokeReleaseRes, error) {
+	res, err := c.sendRevokeRelease(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendRevokeRelease(ctx context.Context, params RevokeReleaseParams) (res RevokeReleaseRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("revokeRelease"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/releases/{release_id}/revoke"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, RevokeReleaseOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/releases/"
+	{
+		// Encode "release_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "release_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.ReleaseID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/revoke"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, RevokeReleaseOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeRevokeReleaseResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

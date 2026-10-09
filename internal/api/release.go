@@ -49,12 +49,12 @@ func (h *Handler) CreateRelease(ctx context.Context, req *api.CreateReleaseReque
 	// answers 200 with the release that already pins it, so a re-deploy of
 	// unchanged content is a no-op rather than an error the caller has to
 	// special-case.
-	release := toAPIRelease(result.Release)
+	response := toAPICreateReleaseResponse(result.Release)
 	if result.Created {
-		created := api.CreateReleaseCreated(release)
+		created := api.CreateReleaseCreated(response)
 		return &created, nil
 	}
-	reused := api.CreateReleaseOK(release)
+	reused := api.CreateReleaseOK(response)
 	return &reused, nil
 }
 
@@ -92,9 +92,11 @@ func (h *Handler) ListReleases(ctx context.Context, params api.ListReleasesParam
 	resp := api.ListReleasesResponse{Releases: make([]api.ReleaseSummary, len(result.Items))}
 	for i, entity := range result.Items {
 		resp.Releases[i] = api.ReleaseSummary{
-			ID:        api.ReleaseID(entity.ID),
-			ProjectID: api.ProjectID(entity.ProjectID),
-			Metadata:  toAPIReleaseMetadata(entity),
+			ID:          api.ReleaseID(entity.ID),
+			ProjectID:   api.ProjectID(entity.ProjectID),
+			ContentHash: toAPIReleaseContentHash(entity.ContentHash),
+			Metadata:    toAPIReleaseMetadata(entity),
+			RevokedAt:   api.NilDateTime{Null: true},
 		}
 	}
 	if result.NextPageToken != "" {
@@ -104,6 +106,33 @@ func (h *Handler) ListReleases(ctx context.Context, params api.ListReleasesParam
 }
 
 /* ---------------- CONVERTERS ---------------- */
+
+// releaseContentHashWirePrefix names the digest algorithm on the wire. The
+// store keeps the bare hex; the prefix is added here and stripped here.
+const releaseContentHashWirePrefix = "sha256:"
+
+func toAPIReleaseContentHash(hash string) api.ReleaseContentHash {
+	return api.ReleaseContentHash(releaseContentHashWirePrefix + hash)
+}
+
+// toAPICreateReleaseResponse pairs the release with one entry per pointer.
+// The pointer form never allocates a revision, so every entry reads
+// created: false.
+func toAPICreateReleaseResponse(entity *domain.Release) api.CreateReleaseResponse {
+	revisions := make([]api.PinnedRevision, len(entity.Pointers))
+	for i, pointer := range entity.Pointers {
+		revisions[i] = api.PinnedRevision{
+			Kind:       api.ReleasePointerKind(pointer.Kind.String()),
+			Handle:     pointer.Handle,
+			RevisionID: pointer.RevisionID,
+			Created:    false,
+		}
+	}
+	return api.CreateReleaseResponse{
+		Release:   toAPIRelease(entity),
+		Revisions: revisions,
+	}
+}
 
 func toAPIRelease(entity *domain.Release) api.Release {
 	pointers := make([]api.ReleasePointer, len(entity.Pointers))
@@ -115,10 +144,12 @@ func toAPIRelease(entity *domain.Release) api.Release {
 		}
 	}
 	return api.Release{
-		ID:        api.ReleaseID(entity.ID),
-		ProjectID: api.ProjectID(entity.ProjectID),
-		Metadata:  toAPIReleaseMetadata(entity),
-		Pointers:  pointers,
+		ID:          api.ReleaseID(entity.ID),
+		ProjectID:   api.ProjectID(entity.ProjectID),
+		ContentHash: toAPIReleaseContentHash(entity.ContentHash),
+		Metadata:    toAPIReleaseMetadata(entity),
+		RevokedAt:   api.NilDateTime{Null: true},
+		Pointers:    pointers,
 	}
 }
 
