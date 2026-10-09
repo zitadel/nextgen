@@ -118,17 +118,6 @@ var brandingAccess = resourceAccess{
 	denied:    domain.ErrBrandingPermissionDenied,
 }
 
-// environmentAccess gates the project's runtime slots (ADR 035, #534).
-// Reads are project-scoped: the list carries a project_id and the get
-// addresses an environment by name, so no route resolves a path id through
-// RSI and the kind is only used to narrow a partial-access list.
-var environmentAccess = resourceAccess{
-	kind:      domain.ResourceKindEnvironment,
-	readMiss:  domain.ErrEnvironmentNotFound,
-	writeMiss: domain.ErrEnvironmentProjectNotFound,
-	denied:    domain.ErrEnvironmentPermissionDenied,
-}
-
 // variableAccess gates the project's variables and secrets (ADR 062). Like
 // grants and events, a variable has no minted id and no resource_scope_index
 // row — it is addressed by name under the project_id the request carries — so
@@ -488,11 +477,6 @@ func requireTeamRead(ctx context.Context) error {
 func requireReleaseRead(ctx context.Context) error {
 	return requireExpandScope(ctx, "release.read", domain.ErrDeploymentPermissionDenied,
 		"expanding a deployment's release requires release.read")
-}
-
-func requireEnvironmentRead(ctx context.Context) error {
-	return requireExpandScope(ctx, "environment.read", domain.ErrDeploymentPermissionDenied,
-		"filtering deployments by environment name requires environment.read")
 }
 
 func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) error {

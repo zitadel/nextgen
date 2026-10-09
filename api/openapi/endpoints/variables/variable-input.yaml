@@ -8,11 +8,10 @@ description: |
   secret is therefore always deliberate: it cannot happen by writing a plain
   scalar.
 
-  `null` is the RFC 7386 merge-patch convention: the name is removed at the
-  owner this request addresses, and at no other, which is what lets one request
-  enter, replace and remove names together. Removing a name the owner does not
-  hold is not an error, because a patch states what the owner holds afterwards
-  and that name is already absent. `DELETE /variables/{variable_name}`
+  `null` is the RFC 7386 merge-patch convention: the name is removed, which is
+  what lets one request enter, replace and remove names together. Removing a
+  name the project does not hold is not an error, because a patch states what
+  the project holds afterwards and that name is already absent. `DELETE /variables/{variable_name}`
   addresses one name deliberately and still answers `var.not_found` there.
 
   A null is a removal wherever it appears, so a body built from client state in

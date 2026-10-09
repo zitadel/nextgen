@@ -109,10 +109,6 @@ type GetDeploymentByIdRes interface {
 	getDeploymentByIdRes()
 }
 
-type GetEnvironmentByNameRes interface {
-	getEnvironmentByNameRes()
-}
-
 type GetEventRes interface {
 	getEventRes()
 }
@@ -207,10 +203,6 @@ type ListBrandingRes interface {
 
 type ListDeploymentsRes interface {
 	listDeploymentsRes()
-}
-
-type ListEnvironmentsRes interface {
-	listEnvironmentsRes()
 }
 
 type ListEventsRes interface {

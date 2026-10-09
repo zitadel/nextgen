@@ -29,7 +29,6 @@ type AllStatements interface {
 	FlowDefinitionStatements
 	CryptoKeyStatements
 	JSONSchemaStatements
-	EnvironmentStatements
 	ReleaseStatements
 	IDPConnectionStatements
 	IDPIdentityLinkStatements
@@ -129,19 +128,6 @@ type JSONSchemaStatements interface {
 	GetJSONSchemaByID(ctx context.Context, projectID, schemaID string) (*domain.JSONSchema, error)
 	ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField], opts JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error)
 	DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error
-}
-
-// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
-// type EnvironmentPool interface {
-// 	Statementer[EnvironmentStatements]
-// 	Transactioner[EnvironmentStatements]
-// }
-
-type EnvironmentStatements interface {
-	Statements
-	CreateEnvironment(ctx context.Context, entity *domain.Environment) error
-	GetEnvironmentByName(ctx context.Context, projectID, name string) (*domain.Environment, error)
-	ListEnvironments(ctx context.Context, filter *database.ListOptions[domain.EnvironmentField]) (*database.ListResult[*domain.Environment], error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -543,13 +529,12 @@ type VariableStatements interface {
 	GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
 	// SetVariable writes variable under its own name and owner, replacing the
 	// value and IsSecret flag of an existing variable with the same name and
-	// owner. The environment is optional -- unset addresses the project level --
-	// but the project is not, and one that is missing or names no existing
-	// project is rejected by the table.
+	// owner. A project that is missing or names no existing project is
+	// rejected by the table.
 	SetVariable(ctx context.Context, variable *domain.Variable) error
 	// DeleteVariable removes the variable owner entered under name. Removing one
 	// that is not there returns NoRowFoundError; it never deletes a variable
-	// with a different owner, since every owner column must match exactly, so
+	// with a different owner, since the owner column must match exactly, so
 	// one owner cannot remove what another entered.
 	DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error
 }

@@ -7,20 +7,19 @@ import (
 
 // VisibleTo restricts the variables table to the rows owner entered, optionally
 // narrowed to names. It is [domain.VariableOwner.HasAccessTo] pushed into SQL:
-// every owner column has to match exactly.
+// the owner column has to match exactly.
 //
 // Equality, not the "unset means inherited" form: an owner is an address, not a
 // position in a ladder, so a name at an owner is one row rather than a set to
 // rank (ADR 062 §4).
 //
-// Filtering here rather than after the scan is what keeps another environment's
+// Filtering here rather than after the scan is what keeps another project's
 // variable out of a read. The domain predicate is not applied a second time, so
 // unlike the settings ladder this replaced, an unfiltered caller is not safe --
 // every read goes through here.
 func VisibleTo(owner domain.VariableOwner, names ...string) *database.ListOptions[VariableStorageField] {
 	filters := []database.Filter[VariableStorageField]{
 		database.Equal(database.Col(VariableStorageFieldProjectID), owner.ProjectID),
-		database.Equal(database.Col(VariableStorageFieldEnvironmentID), owner.EnvironmentID),
 	}
 	if len(names) > 0 {
 		filters = append(filters, anyName(names))
@@ -66,11 +65,8 @@ func ToDomain(rows []*VariableStorage) []*domain.Variable {
 // RowToDomain converts one row into the domain variable.
 func RowToDomain(row *VariableStorage) *domain.Variable {
 	return &domain.Variable{
-		Name: row.Name,
-		Owner: domain.VariableOwner{
-			ProjectID:     row.ProjectID,
-			EnvironmentID: row.EnvironmentID,
-		},
+		Name:     row.Name,
+		Owner:    domain.VariableOwner{ProjectID: row.ProjectID},
 		Value:    row.Value,
 		IsSecret: row.IsSecret,
 	}

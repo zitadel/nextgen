@@ -18,12 +18,10 @@ type VariableToSet struct {
 
 // VariableService reads and writes the variables one owner entered (ADR 062).
 //
-// The owner is an address, not a position in a ladder: nothing is inherited
-// from the project by its environments, or seen by the project in them. Storage
-// matches every owner column exactly, so a value entered at another owner can
-// never reach a caller here -- and, since the primary key is the name plus that
-// owner, a read yields at most one variable per name and there is nothing to
-// choose between.
+// The owner is the project. Storage matches the owner column exactly, so a
+// value another project entered can never reach a caller here -- and, since
+// the primary key is the name plus that owner, a read yields at most one
+// variable per name and there is nothing to choose between.
 type VariableService interface {
 	GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
 	GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
@@ -167,22 +165,12 @@ func (s *variableService) SetVariables(ctx context.Context, owner domain.Variabl
 	return nil
 }
 
-// setVariableError names the one write failure a caller can act on. The
-// variables table references (project_id, id) on environments, so a write
-// naming an environment that does not exist is refused by the database rather
-// than stored where nothing would ever read it -- which, with no inheritance to
-// fall back on, would read as empty rather than as the project's value.
-//
-// The edge resolves the environment name to that id before the write, so the
-// constraint is reached only when the environment is deleted between the two.
-// The project reference fails the same way and is likewise resolved from the
-// request before a variable is built.
+// setVariableError keeps a domain error as it is. The project reference is
+// resolved from the request before a variable is built, so a write that trips
+// it is a server fault rather than something the caller can act on.
 func setVariableError(err error) error {
 	if de, ok := errors.AsType[domain.Error](err); ok {
 		return de
-	}
-	if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
-		return domain.ErrEnvironmentNotFound().WithParent(err)
 	}
 	return domain.ErrInternal(err).WithMessage("failed to write variable to database")
 }

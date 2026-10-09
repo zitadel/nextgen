@@ -51,16 +51,14 @@ holds and never writes them here:
 | Resource            | Verbs     | Backing endpoints                                    |
 | ------------------- | --------- | ---------------------------------------------------- |
 | `schemas`           | list, get | `GET /schemas`, `GET /schemas/{id}`                  |
-| `environments`      | list, get | `GET /environments`, `GET /environments/{name}`      |
 | `releases`          | list, get | `GET /releases`, `GET /releases/{id}`                |
 | `flow-definitions`  | list, get | `GET /flow_definitions`, `GET /flow_definitions/{id}` |
 | `branding`          | list, get | `GET /branding`, `GET /branding/{id}`                |
 
-Three of these behave differently underneath, and the registry says so rather
+Two of these behave differently underneath, and the registry says so rather
 than the caller having to learn it. `schemas list` and `flow-definitions list` send
 `revisions=latest`, so they show the current schemas and flows rather than
-every revision ever written; `--filter revisions=all` gives the history. `environments get` takes a name,
-because that is what the endpoint addresses. `branding list` has no paging
+every revision ever written; `--filter revisions=all` gives the history. `branding list` has no paging
 flags at all, because its endpoint has no cursor and answers with a bare array.
 
 `schemas` and `flow-definitions` are also addressable by the value that groups

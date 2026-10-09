@@ -14,7 +14,7 @@ func (h *Handler) GetVariables(ctx context.Context, params api.GetVariablesParam
 		return nil, err
 	}
 
-	owner, err := h.variableOwner(ctx, params.ProjectID, params.EnvironmentName)
+	owner, err := variableOwner(params.ProjectID, params.EnvironmentName)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func (h *Handler) GetVariable(ctx context.Context, params api.GetVariableParams)
 	}
 
 	name := string(params.VariableName)
-	owner, err := h.variableOwner(ctx, params.ProjectID, params.EnvironmentName)
+	owner, err := variableOwner(params.ProjectID, params.EnvironmentName)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func (h *Handler) UpdateVariables(ctx context.Context, req api.UpdateVariablesRe
 			WithMessage("the request body must name at least one variable")
 	}
 
-	owner, err := h.variableOwner(ctx, params.ProjectID, params.EnvironmentName)
+	owner, err := variableOwner(params.ProjectID, params.EnvironmentName)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (h *Handler) DeleteVariable(ctx context.Context, params api.DeleteVariableP
 		return nil, err
 	}
 
-	owner, err := h.variableOwner(ctx, params.ProjectID, params.EnvironmentName)
+	owner, err := variableOwner(params.ProjectID, params.EnvironmentName)
 	if err != nil {
 		return nil, err
 	}
@@ -127,26 +127,13 @@ func (h *Handler) DeleteVariable(ctx context.Context, params api.DeleteVariableP
 /* ---------------- CONVERTERS ---------------- */
 
 // variableOwner turns the addressed scope into the owner storage matches on.
-// The wire names an environment; the table keys on its id, so the name is
-// resolved here -- once per request, at the edge, which is the only place the
-// name is still the environment's address.
-//
-// An unset environment is the project level, an address of its own, and needs
-// no lookup. A name nothing answers to is env.not_found rather than an empty
-// read: with no inheritance to fall back on, a typo would otherwise report the
-// project's variables as absent instead of saying the environment is not there.
-func (h *Handler) variableOwner(ctx context.Context, projectID api.ProjectID, environment api.OptEnvironmentName) (domain.VariableOwner, error) {
-	owner := domain.VariableOwner{ProjectID: string(projectID)}
-	if !environment.Set || environment.Value == "" {
-		return owner, nil
+// No environment exists, so a named one is env.not_found rather than an empty
+// read of the project's variables.
+func variableOwner(projectID api.ProjectID, environment api.OptEnvironmentName) (domain.VariableOwner, error) {
+	if environment.Set && environment.Value != "" {
+		return domain.VariableOwner{}, domain.ErrEnvironmentNotFound()
 	}
-
-	env, err := h.environmentService.GetByName(ctx, owner.ProjectID, string(environment.Value))
-	if err != nil {
-		return domain.VariableOwner{}, err
-	}
-	owner.EnvironmentID = env.ID
-	return owner, nil
+	return domain.VariableOwner{ProjectID: string(projectID)}, nil
 }
 
 // toAPIVariables keys a read by name. The names are already unique -- one read,
@@ -259,6 +246,18 @@ func variableErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	default:
 		// var.decryption_failed included: a value this server encrypted and
 		// cannot read back is a server fault, not a bad request.
+		return internalErrorResponse(err)
+	}
+}
+
+// environmentErrorResponse maps the environment error codes onto statuses:
+// a variables request naming an environment, and the deployment access check
+// answering env.project_not_found for a foreign project.
+func environmentErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
+	switch err.Code {
+	case domain.ErrEnvironmentNotFound().Code, domain.ErrEnvironmentProjectNotFound().Code:
+		return errorResponseWithStatusCode(http.StatusNotFound, err)
+	default:
 		return internalErrorResponse(err)
 	}
 }
