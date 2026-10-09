@@ -1,5 +1,5 @@
 /**
- * The providers `zitadel setup` and `sso enable` can scaffold a connection for.
+ * The providers `zitadel setup` and `auth-method sso enable` can scaffold a connection for.
  *
  * Adding one means adding a class and listing it here. That is a code change
  * rather than a data change, which is the point: a provider is not only a table

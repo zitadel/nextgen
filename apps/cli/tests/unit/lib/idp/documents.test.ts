@@ -738,9 +738,24 @@ describe("refusing a document the editors would overwrite", () => {
     expect(ssoEditRefusal({ "x-auth-methods": { sso: true } }, "schema")).toBe(
       "x-auth-methods.sso is not an object",
     );
-    expect(ssoEditRefusal({ "x-auth-methods": { sso: { providers: "google" } } }, "schema")).toBe(
-      "x-auth-methods.sso.providers is not a list",
+    expect(
+      ssoEditRefusal(
+        { "x-auth-methods": { sso: { enabled: true, providers: "google" } } },
+        "schema",
+      ),
+    ).toBe("x-auth-methods.sso.providers is not a list");
+  });
+
+  it("refuses an sso entry without a boolean enabled", () => {
+    expect(ssoEditRefusal({ "x-auth-methods": { sso: { providers: ["google"] } } }, "schema")).toBe(
+      "x-auth-methods.sso.enabled is not a boolean",
     );
+    expect(
+      ssoEditRefusal(
+        { "x-auth-methods": { sso: { enabled: "true", providers: ["google"] } } },
+        "schema",
+      ),
+    ).toBe("x-auth-methods.sso.enabled is not a boolean");
   });
 });
 
@@ -754,6 +769,7 @@ describe("removeSsoFromSchema", () => {
     ...getDefaultHumanUserSchema(),
     "x-auth-methods": {
       password: { enabled: true },
+      passkey: { enabled: false },
       sso: { enabled: true, providers },
     },
   });
@@ -781,6 +797,16 @@ describe("removeSsoFromSchema", () => {
     const { document } = removeSsoFromSchema(withProviders(["google"]), "google");
 
     expect(methodsOf(document).password).toEqual({ enabled: true });
+    expect(methodsOf(document).passkey).toEqual({ enabled: false });
+  });
+
+  it("does not change the schema it was given", () => {
+    const schema = withProviders(["google"]);
+    const copy = structuredClone(schema);
+
+    removeSsoFromSchema(schema, "google");
+
+    expect(schema).toEqual(copy);
   });
 
   it("changes nothing for a provider the schema does not offer", () => {
@@ -804,9 +830,19 @@ describe("removeSsoFromFlow", () => {
     return flow as Record<string, unknown>;
   }
 
-  it("takes the provider off every step that offered it", () => {
-    const { document } = removeSsoFromFlow(enabled("google"), "google");
+  it("does not change the flow it was given", () => {
+    const flow = enabled("google");
+    const copy = structuredClone(flow);
 
+    removeSsoFromFlow(flow, "google");
+
+    expect(flow).toEqual(copy);
+  });
+
+  it("takes the provider off every step that offered it", () => {
+    const { document, changed } = removeSsoFromFlow(enabled("google"), "google");
+
+    expect(changed).toBe(true);
     const offering = (document as { steps: Array<{ sso_providers?: string[] }> }).steps.filter(
       (step) => step.sso_providers !== undefined,
     );

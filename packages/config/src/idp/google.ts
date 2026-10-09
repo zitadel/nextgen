@@ -2,7 +2,7 @@ import { OidcProvider } from "./oidc-provider.js";
 import type { CallbackGuidance } from "./provider.js";
 
 /**
- * Google, as `zitadel setup` and `sso enable` scaffold it.
+ * Google, as `zitadel setup` and `auth-method sso enable` scaffold it.
  *
  * Everything here is Google's own documented behaviour, cross-checked against
  * its discovery document and the provider packages in zitadel/zitadel. It names

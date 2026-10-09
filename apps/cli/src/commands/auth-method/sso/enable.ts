@@ -10,7 +10,7 @@ import { credentialVariables, idpProvider, IDP_PROVIDERS } from "@zitadel/config
 import { createZitadelClient } from "../../../lib/api-client";
 import { isDevelopmentBuild } from "../../../lib/build-channel";
 import { ZitadelError } from "../../../lib/errors";
-import { publicCliCommand } from "../../../lib/public-cli";
+import { portableCommands } from "../../../lib/public-cli";
 import { bailOnCancel } from "../../../lib/prompt-cancel";
 import { stableStringify } from "../../../lib/json";
 import {
@@ -33,6 +33,7 @@ import {
   republishCommands,
   ssoEditRefusal,
   type SsoEditTarget,
+  type SsoResult,
   type SsoSkipped,
   reportSecretOutcome,
   selectSchema,
@@ -41,7 +42,7 @@ import {
   type SecretOutcome,
   type SecretPublisher,
 } from "../../../lib/idp";
-import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../../lib/oclif";
+import { CommandGroups, type JsonEnvelope, nonBlankString } from "../../../lib/oclif";
 import {
   readDevelopmentIssuer,
   readZitadelConfig,
@@ -51,6 +52,13 @@ import {
 import { flowsForSchema } from "../../../lib/schema-flows";
 import { readStdin } from "../../../lib/variables";
 import { reportWarning } from "../../../lib/warnings";
+import {
+  activeBodies,
+  AuthMethodCommand,
+  optionArgs,
+  refuseBrokenFlows,
+  refuseExternalSchema,
+} from "../shared";
 
 /**
  * The `auth-method sso enable` command (ADR 069) — add a provider to a
@@ -65,7 +73,7 @@ import { reportWarning } from "../../../lib/warnings";
  * prompted for, or read from stdin when scripting, so it cannot land in shell
  * history, a process listing, or CI logs.
  */
-export default class SsoEnable extends BaseCommand {
+export default class SsoEnable extends AuthMethodCommand {
   static override description = "Add an identity provider to a user schema.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -118,6 +126,7 @@ export default class SsoEnable extends BaseCommand {
     const callbackUri = callbackUriFor(issuer);
 
     const schema = selectSchema(await readSchemaFiles(cwd), flags.schema);
+    refuseExternalSchema(schema);
     const connections = await readConnectionFiles(cwd);
     // `nonBlankString` has already refused a blank one and trimmed the rest.
     const clientIdFlag = flags["client-id"];
@@ -146,6 +155,30 @@ export default class SsoEnable extends BaseCommand {
     // another schema must fail identically either way, or the preview says
     // "would create" for a run that cannot succeed.
     const flows = await this.targetFlows(cwd, schema);
+    // The schema and flow edits are worked out now, before the dry-run return
+    // and before the connection is written or a credential published, so a
+    // refusal (an edit the editors cannot make, or a flow `plan` would then
+    // reject) stops the run with nothing changed (ADR 069 §3).
+    const edits = planEdits(schema, plan.slug, flows);
+    refuseBrokenFlows(
+      schema,
+      edits.schema.document as Record<string, unknown>,
+      edits.flows.map(({ flow, result }) => ({
+        file: flow,
+        after: result.document as Record<string, unknown>,
+      })),
+    );
+    // A follow-up run from where the user stands must reach the same Project.
+    const cwdArgs = flags.cwd === undefined ? [] : optionArgs("--cwd", cwd);
+    const outcome = {
+      schema,
+      before: schema.body,
+      after: edits.schema.document as Record<string, unknown>,
+      flowsAfter: activeBodies(
+        edits.flows.map(({ result }) => result.document as Record<string, unknown>),
+      ),
+      notOffered: [],
+    };
 
     consola.info(`Project   ${secretFile.project_id}`);
     consola.info(
@@ -153,6 +186,7 @@ export default class SsoEnable extends BaseCommand {
     );
 
     if (dryRun) {
+      this.reportOutcome(outcome);
       return this.emit({
         status: "skipped",
         reason: "dry-run",
@@ -262,9 +296,9 @@ export default class SsoEnable extends BaseCommand {
       consola.success(`Wrote ${plan.path}`);
     }
 
-    const edits = await this.enableInConfiguration(cwd, schema, plan.slug, flows);
+    const written = await this.enableInConfiguration(cwd, schema, edits);
 
-    for (const file of edits.written) {
+    for (const file of written) {
       consola.success(`Updated ${file}`);
     }
     for (const skipped of edits.skipped) {
@@ -272,7 +306,7 @@ export default class SsoEnable extends BaseCommand {
         `Left ${skipped.region} alone: it has been edited by hand. Update it yourself.`,
       );
     }
-    if (edits.written.length === 0 && edits.skipped.length === 0) {
+    if (written.length === 0 && edits.skipped.length === 0) {
       consola.info(`${schema.name} and its login flow already offer ${entry.displayName}`);
     }
     if (clientIdState !== undefined && idVariable !== undefined) {
@@ -283,6 +317,11 @@ export default class SsoEnable extends BaseCommand {
       // has one, because the command refuses without it.
       reportSecretOutcome(secret, this.meta.cliVersion, reusing);
     }
+    this.reportOutcome(outcome);
+    const followUps = [
+      ["plan", ...cwdArgs],
+      ["apply", ...cwdArgs],
+    ];
 
     return this.emit({
       status: "ok",
@@ -296,7 +335,7 @@ export default class SsoEnable extends BaseCommand {
           secret,
           clientId: clientIdState,
           idVariable,
-          changed: edits.written,
+          changed: written,
           skipped: edits.skipped,
         }),
         // `variables set` only when the secret did not reach the project:
@@ -313,9 +352,11 @@ export default class SsoEnable extends BaseCommand {
             ],
             this.meta.cliVersion,
           ),
-          publicCliCommand("plan", this.meta.cliVersion),
-          publicCliCommand("apply", this.meta.cliVersion),
+          ...portableCommands(followUps, this.meta.cliVersion),
         ],
+        // The plan and apply follow-ups as argument lists, as on the other
+        // auth-method commands: present even when a --cwd path needs quoting.
+        next_args: followUps,
       },
       pretty: `Enabled ${entry.displayName} for ${schema.name}`,
     });
@@ -377,35 +418,24 @@ export default class SsoEnable extends BaseCommand {
     return flows;
   }
 
+  /** Write the edits `planEdits` worked out, and say which files changed. */
   private async enableInConfiguration(
     cwd: string,
     schema: SchemaFile,
-    slug: string,
-    flows: FlowFile[],
-  ): Promise<{ written: string[]; skipped: SsoSkipped[] }> {
-    const methods = enabledMethods(schema);
-    const schemaResult = applySsoToSchema(schema.body, slug);
-    const flowResults = flows.map((flow) => ({
-      flow,
-      result: applySsoToFlow(flow.body, slug, methods),
-    }));
-
+    edits: PlannedEdits,
+  ): Promise<string[]> {
     const written: string[] = [];
-    const skipped: SsoSkipped[] = [];
-    if (schemaResult.changed) {
-      await writeFile(join(cwd, schema.path), `${stableStringify(schemaResult.document)}\n`);
+    if (edits.schema.changed) {
+      await writeFile(join(cwd, schema.path), `${stableStringify(edits.schema.document)}\n`);
       written.push(schema.path);
     }
-    for (const { flow, result } of flowResults) {
-      skipped.push(
-        ...result.skipped.map((entry) => ({ ...entry, region: `${flow.path} ${entry.region}` })),
-      );
+    for (const { flow, result } of edits.flows) {
       if (result.changed) {
         await writeFile(join(cwd, flow.path), `${stableStringify(result.document)}\n`);
         written.push(flow.path);
       }
     }
-    return { written, skipped };
+    return written;
   }
 
   /** The machine-readable payload. Never the secret, only whether it is held. */
@@ -527,4 +557,31 @@ function refuseUneditable(path: string, body: object, target: SsoEditTarget): vo
       "Fix it against the dialect in .zitadel/meta/, then run the command again.",
     details: { file: path, region: refusal },
   });
+}
+
+/** The schema and flow edits a run will make, worked out before anything is written. */
+type PlannedEdits = {
+  readonly schema: SsoResult<object>;
+  readonly flows: ReadonlyArray<{ flow: FlowFile; result: SsoResult<object> }>;
+  /** Hand-edited regions the flow editors leave alone, named by file. */
+  readonly skipped: SsoSkipped[];
+};
+
+/**
+ * Enable the provider in the schema and every login flow that runs against
+ * it, without writing anything. A flow belonging to another schema is left
+ * alone: enabling Google for customers must not touch the employee journey.
+ * The editors are pure and throw their refusals, so calling this before any
+ * write or publish is what makes those refusals leave nothing behind.
+ */
+function planEdits(schema: SchemaFile, slug: string, flows: readonly FlowFile[]): PlannedEdits {
+  const methods = enabledMethods(schema);
+  const results = flows.map((flow) => ({ flow, result: applySsoToFlow(flow.body, slug, methods) }));
+  return {
+    schema: applySsoToSchema(schema.body, slug),
+    flows: results,
+    skipped: results.flatMap(({ flow, result }) =>
+      result.skipped.map((entry) => ({ ...entry, region: `${flow.path} ${entry.region}` })),
+    ),
+  };
 }

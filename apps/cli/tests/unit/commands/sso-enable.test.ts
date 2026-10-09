@@ -55,13 +55,15 @@ function loginFlow(schemaName: string) {
         name: "identifier",
         fields: ["email"],
         actions: [{ name: "submit", kind: "submit", primary: true }],
-        transitions: { submit: { target: "done" } },
+        // A flow serving both purposes routes each to the other, or the
+        // validator (and so this command) rejects it.
+        transitions: { submit: { target: "done" }, user_not_found: { target: "register" } },
       },
       {
         name: "register",
         fields: ["email"],
         actions: [{ name: "submit", kind: "submit", primary: true }],
-        transitions: { submit: { target: "done" } },
+        transitions: { submit: { target: "done" }, user_already_exists: { target: "identifier" } },
       },
       { name: "done", complete: "show" },
     ],
@@ -145,5 +147,28 @@ describe("sso enable (deprecated alias)", () => {
 
     const envelope = parseJson(result.stdout) as { status: string; warnings: string[] };
     expect(envelope).toMatchObject({ status: "skipped", warnings: [DEPRECATION] });
+  });
+
+  it("names the command to use instead when the run fails", async () => {
+    const cwd = await makeProject();
+
+    const result = await runCliForTest([
+      "sso",
+      "enable",
+      "--cwd",
+      cwd,
+      "--json",
+      "--non-interactive",
+    ]);
+
+    const envelope = parseJson(result.stdout) as { status: string; warnings: string[] };
+    expect(envelope).toMatchObject({ status: "error", warnings: [DEPRECATION] });
+  });
+
+  it("lists the global flags in its help, like every command", async () => {
+    const result = await runCliForTest(["sso", "enable", "--help"]);
+
+    expect(result.stdout).toContain("--cwd");
+    expect(result.stdout).toContain("--json");
   });
 });

@@ -23,7 +23,7 @@
  * - `applyBranding(branding)` injects a tenant branding overlay merged into
  *   every response. Pass `null` (or call `clearBranding()`) to remove it.
  * - `applySsoProviders(providers)` offers identity providers on the steps a
- *   sign-in can start from, the way a project that ran `zitadel sso enable`
+ *   sign-in can start from, the way a project that ran `zitadel auth-method sso enable`
  *   does. Off by default, because the shipped flow has none.
  */
 import type { SetupWorker } from "msw/browser";

@@ -4,16 +4,13 @@ import { join } from "node:path";
 
 import { Readable } from "node:stream";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
-
-const tempDirs: string[] = [];
 
 /** A Project as `zitadel setup` leaves it, minus what this command ignores. */
 async function makeProject(schemas: Record<string, unknown> = {}): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-sso-enable-"));
-  tempDirs.push(cwd);
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
   await writeFile(
     join(cwd, "zitadel.json"),
@@ -58,13 +55,15 @@ function loginFlow(schemaName: string) {
         name: "identifier",
         fields: ["email"],
         actions: [{ name: "submit", kind: "submit", primary: true }],
-        transitions: { submit: { target: "done" } },
+        // A flow serving both purposes routes each to the other, or the
+        // validator (and so this command) rejects it.
+        transitions: { submit: { target: "done" }, user_not_found: { target: "register" } },
       },
       {
         name: "register",
         fields: ["email"],
         actions: [{ name: "submit", kind: "submit", primary: true }],
-        transitions: { submit: { target: "done" } },
+        transitions: { submit: { target: "done" }, user_already_exists: { target: "identifier" } },
       },
       { name: "done", complete: "show" },
     ],
@@ -119,14 +118,8 @@ function enable(cwd: string, ...extra: string[]) {
   );
 }
 
-afterEach(async () => {
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) {
-      await rm(dir, { recursive: true, force: true });
-    }
-  }
-});
+// Temp dirs are left for the OS to reclaim, as the integration helper does
+// (#1498): a recursive delete on teardown flakes under CI load.
 
 describe("auth-method sso enable", () => {
   it("writes the connection and reports what changed", async () => {

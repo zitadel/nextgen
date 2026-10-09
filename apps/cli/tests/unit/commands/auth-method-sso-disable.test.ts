@@ -12,17 +12,19 @@ import { parseJson, runCliForTest } from "../../helpers/run-cli";
 type Envelope = {
   status: string;
   code?: string;
+  message?: string;
   hint?: string;
   data?: Record<string, unknown>;
   warnings?: string[];
   next_commands?: string[];
   details?: { retry_args?: string[]; region?: string };
+  reason?: string;
 };
 
 type Methods = Record<string, { enabled: boolean; providers?: string[] }>;
 
-const schemaWith = (methods: Methods) => ({
-  $id: "https://schemas.test.invalid/default-human-user.json",
+const schemaWith = (methods: Methods, name = "default-human-user") => ({
+  $id: `https://schemas.test.invalid/${name}.json`,
   type: "object",
   "x-identifier": "email",
   required: ["email"],
@@ -31,11 +33,11 @@ const schemaWith = (methods: Methods) => ({
 });
 
 /** A login flow whose entry step offers these providers beside a password step. */
-function flowOffering(providers: string[]) {
+function flowOffering(providers: string[], name = "default-human-user") {
   return {
-    name: "default-human-user-login",
+    name: `${name}-login`,
     status: "active",
-    user_schema: "https://schemas.test.invalid/default-human-user.json",
+    user_schema: `https://schemas.test.invalid/${name}.json`,
     purposes: { login: "identifier" },
     steps: [
       {
@@ -70,6 +72,11 @@ async function makeProject(methods: Methods, flowProviders: string[]): Promise<s
     `${JSON.stringify(flowOffering(flowProviders))}\n`,
   );
   return cwd;
+}
+
+/** Write one more file into a Project, for a test whose input is that file. */
+async function writeJson(cwd: string, path: string, body: unknown): Promise<void> {
+  await writeFile(join(cwd, path), `${JSON.stringify(body)}\n`);
 }
 
 const passwordAndGoogle: Methods = {
@@ -167,16 +174,91 @@ describe("auth-method sso disable", () => {
 
     expect(envelope).toMatchObject({ status: "skipped", reason: "dry-run" });
     expect(await ssoOf(cwd)).toEqual({ enabled: true, providers: ["google"] });
+    expect(await entryProviders(cwd)).toEqual(["google"]);
+  });
+
+  it("lists plan and apply, with --cwd, as the next commands after a change", async () => {
+    const cwd = await makeProject(passwordAndGoogle, ["google"]);
+
+    const { envelope } = await run(cwd, "--provider", "google");
+
+    expect(envelope.data?.next_args).toEqual([
+      ["plan", "--cwd", expect.any(String)],
+      ["apply", "--cwd", expect.any(String)],
+    ]);
+  });
+
+  it("changes only the flow when the schema no longer lists the provider", async () => {
+    const cwd = await makeProject({ password: { enabled: true } }, ["google"]);
+
+    const { envelope } = await run(cwd, "--provider", "google");
+
+    expect(envelope.data).toMatchObject({
+      changed: true,
+      files: [".zitadel/flows/default-human-user-login.json"],
+    });
+    expect(await entryProviders(cwd)).toBeUndefined();
+  });
+
+  it("changes only the named schema and its flows", async () => {
+    const cwd = await makeProject(passwordAndGoogle, ["google"]);
+    await writeJson(cwd, ".zitadel/schemas/staff.json", schemaWith(passwordAndGoogle, "staff"));
+    await writeJson(cwd, ".zitadel/flows/staff-login.json", flowOffering(["google"], "staff"));
+
+    await run(cwd, "--provider", "google", "--schema", "staff");
+
+    expect(await ssoOf(cwd)).toEqual({ enabled: true, providers: ["google"] });
+    expect(await entryProviders(cwd)).toEqual(["google"]);
+    const staff = await readJson(cwd, ".zitadel/schemas/staff.json");
+    expect((staff["x-auth-methods"] as Methods).sso).toEqual({ enabled: false });
+  });
+
+  it("warns when the schema is left with methods no active flow offers", async () => {
+    // Password is enabled, but the only flow signs in with Google alone.
+    const flow = flowOffering(["google"]);
+    const ssoOnly = {
+      ...flow,
+      steps: [
+        {
+          name: "identifier",
+          sso_providers: ["google"],
+          transitions: { sso_authenticated: { target: "done" } },
+        },
+        { name: "done", complete: "show" },
+      ],
+    };
+    const cwd = await makeProject(passwordAndGoogle, []);
+    await writeJson(cwd, ".zitadel/flows/default-human-user-login.json", ssoOnly);
+
+    const { envelope } = await run(cwd, "--provider", "google");
+
+    expect(envelope.warnings).toEqual([
+      "No active login flow for default-human-user offers a method it enables, so nobody can sign in until one does.",
+    ]);
   });
 
   describe("refusals", () => {
     it("asks for a provider and names the ones offered", async () => {
-      const cwd = await makeProject(passwordAndGoogle, ["google"]);
+      const cwd = await makeProject(
+        { password: { enabled: true }, sso: { enabled: true, providers: ["github"] } },
+        ["github"],
+      );
 
       const { envelope } = await run(cwd);
 
-      expect(envelope.code).toBe("E_VALIDATION");
-      expect(envelope.hint).toContain("google");
+      expect(envelope).toMatchObject({
+        code: "E_VALIDATION",
+        message: "Name the provider to remove",
+      });
+      expect(envelope.hint).toContain("default-human-user offers: github.");
+    });
+
+    it("says when the schema offers no provider at all", async () => {
+      const cwd = await makeProject({ password: { enabled: true } }, []);
+
+      const { envelope } = await run(cwd);
+
+      expect(envelope.hint).toContain("default-human-user offers: none.");
     });
 
     it("refuses to remove the last way to sign in and gives the --force re-run", async () => {
@@ -215,6 +297,108 @@ describe("auth-method sso disable", () => {
       expect(envelope.warnings).toContain(
         "default-human-user has no way to sign in left. Its users can only be managed through the API.",
       );
+    });
+
+    it("refuses a dry run that would remove the last way to sign in, keeping --dry-run", async () => {
+      const cwd = await makeProject(
+        { password: { enabled: false }, sso: { enabled: true, providers: ["google"] } },
+        ["google"],
+      );
+
+      const { envelope } = await run(cwd, "--provider", "google", "--dry-run");
+
+      expect(envelope.details?.retry_args).toEqual(
+        expect.arrayContaining(["--dry-run", "--force"]),
+      );
+    });
+
+    it("suggests enabling password or passkey instead of removing the last provider", async () => {
+      const cwd = await makeProject(
+        { password: { enabled: false }, sso: { enabled: true, providers: ["google"] } },
+        ["google"],
+      );
+
+      const { envelope } = await run(cwd, "--provider", "google");
+
+      expect(envelope.next_commands?.map((c) => c.replace(/^.*? auth-method /, ""))).toEqual([
+        expect.stringMatching(
+          /^sso disable --provider google --schema default-human-user --cwd \S+ --force$/,
+        ),
+        expect.stringMatching(/^password enable --schema default-human-user --cwd \S+$/),
+        expect.stringMatching(/^passkey enable --schema default-human-user --cwd \S+$/),
+      ]);
+    });
+
+    it("refuses while a flow has errors that prevent checking it", async () => {
+      const cwd = await makeProject(passwordAndGoogle, ["google"]);
+      const broken = { ...flowOffering(["google"]), purposes: { login: "missing" } };
+      await writeJson(cwd, ".zitadel/flows/default-human-user-login.json", broken);
+
+      const { envelope } = await run(cwd, "--provider", "google");
+
+      expect(envelope.message).toContain("cannot be checked against the changed schema");
+      expect(await ssoOf(cwd)).toEqual({ enabled: true, providers: ["google"] });
+    });
+
+    it("does not let --force past a flow it cannot check", async () => {
+      const cwd = await makeProject(passwordAndGoogle, ["google"]);
+      const broken = { ...flowOffering(["google"]), purposes: { login: "missing" } };
+      await writeJson(cwd, ".zitadel/flows/default-human-user-login.json", broken);
+
+      const { envelope } = await run(cwd, "--provider", "google", "--force");
+
+      expect(envelope.message).toContain("cannot be checked against the changed schema");
+    });
+
+    it("refuses a schema that points at an external url", async () => {
+      const cwd = await makeProject(passwordAndGoogle, ["google"]);
+      await writeJson(cwd, ".zitadel/schemas/default-human-user.json", {
+        kind: "schema-url",
+        url: "https://schemas.test.invalid/customers.json",
+      });
+
+      const { envelope } = await run(cwd, "--provider", "google");
+
+      expect(envelope.message).toBe(
+        ".zitadel/schemas/default-human-user.json points at an external schema",
+      );
+    });
+
+    it.each([
+      ["x-auth-methods is not an object", { "x-auth-methods": [] }],
+      ["x-auth-methods.sso is not an object", { "x-auth-methods": { sso: true } }],
+      [
+        "x-auth-methods.sso.enabled is not a boolean",
+        { "x-auth-methods": { sso: { enabled: "true", providers: ["google"] } } },
+      ],
+    ])("refuses a schema where %s", async (region, methods) => {
+      const cwd = await makeProject(passwordAndGoogle, ["google"]);
+      await writeJson(cwd, ".zitadel/schemas/default-human-user.json", {
+        ...schemaWith(passwordAndGoogle),
+        ...methods,
+      });
+
+      const { envelope } = await run(cwd, "--provider", "google");
+
+      expect(envelope).toMatchObject({ code: "E_VALIDATION", details: { region } });
+    });
+
+    it("refuses a flow whose provider list is not a list", async () => {
+      const cwd = await makeProject(passwordAndGoogle, ["google"]);
+      const flow = flowOffering(["google"]);
+      await writeJson(cwd, ".zitadel/flows/default-human-user-login.json", {
+        ...flow,
+        steps: flow.steps.map((step) =>
+          step.name === "identifier" ? { ...step, sso_providers: "google" } : step,
+        ),
+      });
+
+      const { envelope } = await run(cwd, "--provider", "google");
+
+      expect(envelope).toMatchObject({
+        code: "E_VALIDATION",
+        details: { region: "steps.identifier.sso_providers is not a list" },
+      });
     });
 
     it("refuses an sso entry whose providers are not a list", async () => {

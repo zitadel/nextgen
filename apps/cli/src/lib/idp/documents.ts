@@ -194,6 +194,11 @@ function schemaRefusal(schema: Json): string | undefined {
   if (!isObject(methods.sso)) {
     return "x-auth-methods.sso is not an object";
   }
+  // The meta-schema requires a boolean. A missing one or a string "true" is
+  // neither on nor off, so it is refused rather than overwritten.
+  if (typeof methods.sso.enabled !== "boolean") {
+    return "x-auth-methods.sso.enabled is not a boolean";
+  }
   const providers = methods.sso.providers;
   if (providers !== undefined && !Array.isArray(providers)) {
     return "x-auth-methods.sso.providers is not a list";

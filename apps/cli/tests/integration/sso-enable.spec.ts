@@ -13,7 +13,8 @@ const CREDENTIALS = {
 
 // `sso enable` is the deprecated alias of `auth-method sso enable` (ADR 069
 // §6). The command itself is covered by auth-method-sso-enable.spec.ts; this
-// spec covers only what the alias adds.
+// spec covers only what the alias adds. The exact deprecation wording is the
+// unit test's (tests/unit/commands/sso-enable.test.ts).
 describe("sso enable", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
@@ -21,7 +22,11 @@ describe("sso enable", () => {
         const app = await aSetUpApp();
         platform.isNotZitadel();
 
-        expect(await app.enableSsoDeprecated(GOOGLE, CREDENTIALS)).toSucceed();
+        await app.enableSsoDeprecated(GOOGLE, CREDENTIALS);
+
+        expect((await app.committed.idpConnection(GOOGLE)).oidc.client_id).toBe(
+          "${{ GOOGLE_CLIENT_ID }}",
+        );
       });
     });
 
@@ -30,31 +35,55 @@ describe("sso enable", () => {
         const app = await aSetUpApp();
         platform.isUnavailable();
 
-        expect(await app.enableSsoDeprecated(GOOGLE, CREDENTIALS)).toSucceed();
+        await app.enableSsoDeprecated(GOOGLE, CREDENTIALS);
+
+        expect((await app.committed.idpConnection(GOOGLE)).oidc.client_id).toBe(
+          "${{ GOOGLE_CLIENT_ID }}",
+        );
       });
     });
   });
 
   describe("against a valid server", () => {
     describe("--json", () => {
-      it("enables the provider the same way auth-method sso enable does", async () => {
-        const app = await aSetUpApp();
-        expect(await app.enableSsoDeprecated(GOOGLE, CREDENTIALS)).toSucceed();
-        expect(await app.apply()).toSucceed();
-
-        const { schema } = await app.publishedSchema();
-
-        expect(schema["x-auth-methods"]?.sso).toEqual({ enabled: true, providers: [GOOGLE] });
-      });
-
       it("names the command to use instead", async () => {
         const app = await aSetUpApp();
 
         const result = await app.enableSsoDeprecated(GOOGLE, CREDENTIALS);
 
-        expect(app.envelopeOf(result).warnings).toContain(
-          "`sso enable` is deprecated. Use `auth-method sso enable`, which takes the same flags.",
-        );
+        expect(app.envelopeOf(result).warnings).toEqual([
+          expect.stringContaining("auth-method sso enable"),
+        ]);
+      });
+
+      describe("once applied", () => {
+        it("offers the provider in the published schema", async () => {
+          const app = await aSetUpApp();
+          expect(await app.enableSsoDeprecated(GOOGLE, CREDENTIALS)).toSucceed();
+          expect(await app.apply()).toSucceed();
+
+          const { schema } = await app.publishedSchema();
+
+          expect(schema["x-auth-methods"]?.sso).toEqual({ enabled: true, providers: [GOOGLE] });
+        });
+      });
+    });
+
+    describe("rendered for a terminal", () => {
+      it("names the command to use instead", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.enableSsoDeprecatedRendered(GOOGLE, CREDENTIALS);
+
+        expect(result).toSay("Use `auth-method sso enable`");
+      });
+
+      it("renders text rather than a json envelope", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.enableSsoDeprecatedRendered(GOOGLE, CREDENTIALS);
+
+        expect(result).toPrintNoJson();
       });
     });
   });

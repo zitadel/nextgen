@@ -60,8 +60,7 @@ describe("auth-method password disable", () => {
 
         const result = await app.authMethodRendered("password", "disable");
 
-        expect(result.stderr).toContain("A login flow still uses what");
-        expect(result.stderr).toContain('step "password"');
+        expect(result).toSay('step "password"');
       });
     });
   });

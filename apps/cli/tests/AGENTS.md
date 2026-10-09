@@ -28,7 +28,7 @@ A spec drives the built CLI through `runCliForTest` against
 observe afterwards.
 
 **One spec file per command, named after the command.** `setup.spec.ts`,
-`plan.spec.ts`, `sso-enable.spec.ts`, `variables-set.spec.ts`. A command's spec is
+`plan.spec.ts`, `auth-method-sso-enable.spec.ts`, `variables-set.spec.ts`. A command's spec is
 the only spec that drives that command as its subject. There are no
 cross-command spec files, no "contract" files and no "round-trip" files.
 
@@ -57,7 +57,7 @@ describe("<command>", () => {
     const app = await aNextApp();
     await app.setup();                 // arrange with flags, non-interactively
 
-    const result = await app.ssoEnable({ provider: "google", ...CREDENTIALS });
+    const result = await app.enableSso("google", CREDENTIALS);
 
     expect(result.exitCode).toBe(0);
     expect(snapshotPlatformStore().idpSlugs).toEqual(["google"]);

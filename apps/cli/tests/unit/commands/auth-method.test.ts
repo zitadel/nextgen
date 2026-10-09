@@ -4,11 +4,14 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { COMMANDS } from "../../../src/index";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
 type Envelope = {
   status: string;
   code?: string;
+  message?: string;
+  hint?: string;
   data?: Record<string, unknown>;
   warnings?: string[];
   next_commands?: string[];
@@ -110,7 +113,7 @@ async function readSchema(cwd: string, name = "default-human-user") {
 
 describe("auth-method password and passkey", () => {
   describe("the envelope", () => {
-    it("reports what changed, what was already set, and what is left", async () => {
+    it("reports the schema, the method, whether it changed and what is left", async () => {
       const cwd = await makeProject();
 
       const { envelope } = await run(cwd, "passkey", "disable");
@@ -121,6 +124,7 @@ describe("auth-method password and passkey", () => {
         method: "passkey",
         changed: true,
         usable: ["password"],
+        not_offered: [],
       });
     });
 
@@ -312,6 +316,7 @@ describe("auth-method password and passkey", () => {
       const { envelope } = await run(cwd, "passkey", "disable");
 
       expect(envelope).toMatchObject({ status: "error", code: "E_VALIDATION" });
+      expect(envelope.hint).toContain("Name the one to change with --schema");
     });
   });
 
@@ -562,7 +567,9 @@ describe("auth-method password and passkey", () => {
 
       const { envelope } = await run(cwd, "passkey", "disable");
 
-      expect(envelope.code).toBe("E_VALIDATION");
+      expect(envelope.message).toBe(
+        ".zitadel/schemas/default-human-user.json would have no way to sign in left",
+      );
     });
 
     it("refuses password on a schema with no x-identifier", async () => {
@@ -590,6 +597,7 @@ describe("auth-method password and passkey", () => {
       expect(envelope.details).toMatchObject({
         retry_args: expect.arrayContaining(["--dry-run", "--force"]),
       });
+      expect(envelope.next_commands).toHaveLength(2);
       for (const command of envelope.next_commands ?? []) {
         expect(command).toContain("--dry-run");
       }
@@ -600,7 +608,9 @@ describe("auth-method password and passkey", () => {
 
       const { envelope } = await run(cwd, "password", "disable", "--dry-run");
 
-      expect(envelope.code).toBe("E_VALIDATION");
+      expect(envelope.details?.issues).toEqual([
+        expect.objectContaining({ rule: "schema/fields-resolve", step: "password" }),
+      ]);
     });
 
     it("writes nothing when it refuses", async () => {
@@ -640,22 +650,28 @@ describe("auth-method password and passkey", () => {
       ]);
     });
 
-    it("does not claim the change when the schema cannot be written", async () => {
-      const cwd = await makeProject(passkeyOnly(), {});
-      await chmod(join(cwd, ".zitadel/schemas/default-human-user.json"), 0o444);
+    // Root ignores file modes, so a read-only file is still written there.
+    it.skipIf(process.getuid?.() === 0)(
+      "does not claim the change when the schema cannot be written",
+      async () => {
+        const cwd = await makeProject(passkeyOnly(), {});
+        await chmod(join(cwd, ".zitadel/schemas/default-human-user.json"), 0o444);
 
-      const { envelope } = await run(cwd, "passkey", "disable", "--force");
+        const { envelope } = await run(cwd, "passkey", "disable", "--force");
 
-      expect(envelope.status).toBe("error");
-      expect(envelope).not.toHaveProperty("warnings");
-    });
+        expect(envelope.status).toBe("error");
+        expect(envelope).not.toHaveProperty("warnings");
+      },
+    );
 
     it("does not override a flow that still uses the factor", async () => {
       const cwd = await makeProject();
 
       const { envelope } = await run(cwd, "password", "disable", "--force");
 
-      expect(envelope.code).toBe("E_VALIDATION");
+      expect(envelope.details?.issues).toEqual([
+        expect.objectContaining({ rule: "schema/fields-resolve", step: "password" }),
+      ]);
     });
   });
 
@@ -679,5 +695,26 @@ describe("auth-method password and passkey", () => {
       expect(envelope.data?.changed).toBe(true);
       expect((await readSchema(cwd))["x-auth-methods"].passkey).toEqual({ enabled: true });
     });
+  });
+
+  // Every suggestion is meant to be run as written, so each must name a real
+  // command: a renamed command would otherwise leave dead suggestions behind.
+  it("only suggests commands that exist", async () => {
+    const cwd = await makeProject(passkeyOnlySchema(), {});
+    const refused = await run(cwd, "passkey", "disable");
+    const changed = await run(await makeProject(), "passkey", "disable");
+
+    const suggested = [
+      ...(refused.envelope.next_commands ?? []),
+      ...((changed.envelope.data?.next_commands as string[]) ?? []),
+    ];
+
+    expect(suggested.length).toBeGreaterThan(0);
+    for (const command of suggested) {
+      const words = command.replace(/^npx \S+ /, "").split(" ");
+      const firstFlag = words.findIndex((word) => word.startsWith("-"));
+      const id = words.slice(0, firstFlag === -1 ? words.length : firstFlag).join(":");
+      expect(Object.keys(COMMANDS), command).toContain(id);
+    }
   });
 });

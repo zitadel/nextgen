@@ -5,7 +5,7 @@ import { consola } from "consola";
 
 import { usableSignInMethods } from "../../../lib/auth-methods";
 import { ZitadelError } from "../../../lib/errors";
-import { removeSsoFromFlow, removeSsoFromSchema } from "../../../lib/idp";
+import { removeSsoFromFlow, removeSsoFromSchema, ssoEditRefusal } from "../../../lib/idp";
 import { isObject, stableStringify } from "../../../lib/json";
 import { CommandGroups, type JsonEnvelope, nonBlankString } from "../../../lib/oclif";
 import {
@@ -53,9 +53,22 @@ export default class SsoDisable extends AuthMethodCommand {
         hint: `Pass --provider, e.g. --provider google. ${schema.name} offers: ${offered(schema.body).join(", ") || "none"}.`,
       });
     }
-    const malformed = malformedSso(schema.body);
+    // The same shapes `sso enable` refuses: a region that is not what these
+    // editors write is someone's, and is not overwritten.
+    const malformed = ssoEditRefusal(schema.body, "schema");
     if (malformed !== undefined) {
       throw malformedRefusal(schema, malformed);
+    }
+    for (const file of flows) {
+      const refusal = ssoEditRefusal(file.body, "flow");
+      if (refusal !== undefined) {
+        throw new ZitadelError("E_VALIDATION", `${file.path}: ${refusal}`, {
+          hint:
+            "This command edits that region, and it is not the shape it edits. " +
+            "Fix it against the dialect in .zitadel/meta/, then run the command again.",
+          details: { file: file.path, region: refusal },
+        });
+      }
     }
 
     const schemaChange = removeSsoFromSchema(schema.body, provider);
@@ -90,6 +103,9 @@ export default class SsoDisable extends AuthMethodCommand {
       }
     }
 
+    // When only a flow still offered the provider, say so: the schema itself
+    // did not change.
+    const where = schemaChange.changed ? schema.name : `the login flows of ${schema.name}`;
     const files = [
       ...(schemaChange.changed ? [schema.path] : []),
       ...changedFlows.map(({ file }) => file.path),
@@ -118,7 +134,7 @@ export default class SsoDisable extends AuthMethodCommand {
         reason: "dry-run",
         data,
         pretty: changed
-          ? `Would remove ${provider} from ${schema.name}`
+          ? `Would remove ${provider} from ${where}`
           : `${schema.name} does not offer ${provider}`,
       });
     }
@@ -139,7 +155,7 @@ export default class SsoDisable extends AuthMethodCommand {
       status: "ok",
       data: { ...data, ...this.followUps(changed, cwdArgs) },
       pretty: changed
-        ? `Removed ${provider} from ${schema.name}`
+        ? `Removed ${provider} from ${where}`
         : `${schema.name} does not offer ${provider}`,
     });
   }
@@ -152,29 +168,4 @@ function offered(schema: Record<string, unknown>): string[] {
   return isObject(sso) && Array.isArray(sso.providers)
     ? sso.providers.filter((p): p is string => typeof p === "string")
     : [];
-}
-
-/**
- * Why `x-auth-methods.sso` cannot be edited safely. Only an absent value is
- * empty; one of the wrong shape was written by someone and is not discarded.
- */
-function malformedSso(schema: Record<string, unknown>): string | undefined {
-  const methods = schema["x-auth-methods"];
-  if (methods === undefined) {
-    return undefined;
-  }
-  if (!isObject(methods)) {
-    return "x-auth-methods is not an object";
-  }
-  const sso = methods.sso;
-  if (sso === undefined) {
-    return undefined;
-  }
-  if (!isObject(sso)) {
-    return "x-auth-methods.sso is not an object";
-  }
-  if (sso.providers !== undefined && !Array.isArray(sso.providers)) {
-    return "x-auth-methods.sso.providers is not a list";
-  }
-  return undefined;
 }

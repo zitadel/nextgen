@@ -64,20 +64,22 @@ type Target = {
  * publish them like any configuration change.
  */
 export abstract class AuthMethodCommand extends BaseCommand {
+  /**
+   * The global flags, restated rather than only inherited. oclif collects a
+   * command's static properties by walking up its classes, and stops at the
+   * first one with none of its own; without this, a command two levels below
+   * (the `sso enable` alias) would lose `--json`, `--cwd` and the rest from its
+   * help and manifest, though not from parsing.
+   */
+  static override baseFlags = BaseCommand.baseFlags;
+
   /** Read the schema and the flows that run against it, refusing what cannot be edited. */
   protected async target(flags: { schema?: string; cwd?: string }): Promise<Target> {
     // A stopped local runtime must not block staging a change for a later apply.
     await this.toMeta(flags, { resolveServer: false });
     const { cwd } = this.meta;
     const schema = selectSchema(await readSchemaFiles(cwd), flags.schema);
-    if (schema.body.kind === "schema-url") {
-      throw new ZitadelError("E_VALIDATION", `${schema.path} points at an external schema`, {
-        hint:
-          "Its sign-in methods live in the schema at its url, which the server fetches. " +
-          "Edit x-auth-methods there instead.",
-        details: { file: schema.path, url: schema.body.url },
-      });
-    }
+    refuseExternalSchema(schema);
     return {
       cwd,
       // A follow-up run from where the user stands must reach the same Project.
@@ -152,7 +154,12 @@ export abstract class AuthMethodCommand extends BaseCommand {
       );
       return;
     }
-    if (reachableSignInMethods(input.after, input.flowsAfter).length === 0) {
+    // A schema that enables nothing has nothing for a flow to offer; that is
+    // the API-only case the last-method guard already let through.
+    if (
+      usableSignInMethods(input.after).length > 0 &&
+      reachableSignInMethods(input.after, input.flowsAfter).length === 0
+    ) {
       // The schema still enables something, but no active flow offers it.
       // Flows are not these commands' to rewrite (ADR 069 §2), so it is said.
       reportWarning(
@@ -268,6 +275,23 @@ export abstract class AuthMethodCommand extends BaseCommand {
         : `Nothing to ${verb} for ${schema.name}`,
     });
   }
+}
+
+/**
+ * A schema that points at an external URL holds no sign-in methods of its own:
+ * they live in the schema the server fetches, so editing the pointer would
+ * change nothing.
+ */
+export function refuseExternalSchema(schema: SchemaFile): void {
+  if (schema.body.kind !== "schema-url") {
+    return;
+  }
+  throw new ZitadelError("E_VALIDATION", `${schema.path} points at an external schema`, {
+    hint:
+      "Its sign-in methods live in the schema at its url, which the server fetches. " +
+      "Edit x-auth-methods there instead.",
+    details: { file: schema.path, url: schema.body.url },
+  });
 }
 
 /** Only an active flow is served, so only active flows decide what is offered. */

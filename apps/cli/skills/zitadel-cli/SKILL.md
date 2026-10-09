@@ -259,10 +259,13 @@ than one:
   removes it.
 
 `sso enable` is a deprecated alias of `auth-method sso enable`; use the new
-command. The commands edit only local files, and write nothing when they
-refuse. They refuse to disable a method a login flow still asks for, to change
-any method while a flow has errors, to enable password on a schema without
-`x-identifier`, and to edit a schema that points at an external url. Disabling
+command. The commands change only local files, apart from `auth-method sso
+enable`, which also stores the provider's credentials on the project. When they
+refuse, they write and publish nothing, on a dry run too. They refuse to
+disable a method a login flow still asks for, to change any method while a flow
+has errors, to enable password on a schema without `x-identifier`, to edit a
+value that is not the shape they edit, and to edit a schema that points at an
+external url. Disabling
 the schema's last way to sign in needs `--force` when non-interactive; only pass
 it for a schema whose users are managed through the API, and ask the user
 first. A method that is enabled but not offered by any active flow is reported

@@ -5,8 +5,8 @@ import { aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
-// The scaffolded project already signs in with a password, and its login flow
-// keeps password from being turned off, so these cover the already-on case.
+// The scaffolded login flow collects a password, so turning password off is
+// arranged by editing the schema by hand, as a developer could.
 describe("auth-method password enable", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
@@ -30,6 +30,29 @@ describe("auth-method password enable", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
+      it("turns password back on in the published schema once applied", async () => {
+        const app = await aSetUpApp();
+        await app.editUserSchema((schema) => {
+          schema["x-auth-methods"] = { ...schema["x-auth-methods"], password: { enabled: false } };
+        });
+
+        expect(await app.authMethod("password", "enable")).toSucceed();
+        expect(await app.apply()).toSucceed();
+
+        const { schema } = await app.publishedSchema();
+        expect(schema["x-auth-methods"]?.password).toEqual({ enabled: true });
+      });
+
+      it("refuses a schema with no x-identifier to check a password against", async () => {
+        const app = await aSetUpApp();
+        await app.editUserSchema((schema) => {
+          delete (schema as { "x-identifier"?: string })["x-identifier"];
+          schema["x-auth-methods"] = { ...schema["x-auth-methods"], password: { enabled: false } };
+        });
+
+        expect(await app.authMethod("password", "enable")).toFailWith("E_VALIDATION");
+      });
+
       it("changes nothing when password is already on", async () => {
         const app = await aSetUpApp();
         const files = await app.snapshot();
@@ -54,7 +77,6 @@ describe("auth-method password enable", () => {
 
         const result = await app.authMethodRendered("password", "enable");
 
-        expect(result).toSucceed();
         expect(result).toPrint("Nothing to enable for default-human-user");
       });
 

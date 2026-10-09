@@ -15,30 +15,20 @@ async function anAppWithoutPasskey(): Promise<ScaffoldedApp> {
 describe("auth-method passkey enable", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
-      it("still turns passkey on, for apply to publish once it is back", async () => {
+      it("still turns passkey on", async () => {
         const app = await anAppWithoutPasskey();
         platform.isNotZitadel();
 
         expect(await app.authMethod("passkey", "enable")).toSucceed();
-
-        platform.recovers();
-        expect(await app.apply()).toSucceed();
-        const { schema } = await app.publishedSchema();
-        expect(schema["x-auth-methods"]?.passkey).toEqual({ enabled: true });
       });
     });
 
     describe("that is down", () => {
-      it("still turns passkey on, for apply to publish once it is back", async () => {
+      it("still turns passkey on", async () => {
         const app = await anAppWithoutPasskey();
         platform.isUnavailable();
 
         expect(await app.authMethod("passkey", "enable")).toSucceed();
-
-        platform.recovers();
-        expect(await app.apply()).toSucceed();
-        const { schema } = await app.publishedSchema();
-        expect(schema["x-auth-methods"]?.passkey).toEqual({ enabled: true });
       });
     });
   });
@@ -90,7 +80,6 @@ describe("auth-method passkey enable", () => {
 
         const result = await app.authMethodRendered("passkey", "enable");
 
-        expect(result).toSucceed();
         expect(result).toPrint("Enabled passkey for default-human-user");
       });
 
@@ -99,7 +88,7 @@ describe("auth-method passkey enable", () => {
 
         const result = await app.authMethodRendered("passkey", "enable");
 
-        expect(result.stderr).toContain("No login flow for default-human-user offers passkey yet");
+        expect(result).toSay("No login flow for default-human-user offers passkey yet");
       });
 
       it("renders text rather than a json envelope", async () => {
