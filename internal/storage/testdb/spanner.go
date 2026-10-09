@@ -47,14 +47,26 @@ func SpannerDSN(ctx context.Context) (string, func(), error) {
 		return url, func() {}, nil
 	}
 
+	// SPIKE: default to the range-locking emulator image (concurrent read-write
+	// transactions) published from the personal fork, so CI exercises the
+	// modified emulator without any other change. The package is public, so no
+	// pull token is required. Override with ZITADEL_TEST_SPANNER_IMAGE.
+	image := "ghcr.io/mridang/cloud-spanner-emulator:rangelock"
+	if v := os.Getenv("ZITADEL_TEST_SPANNER_IMAGE"); v != "" {
+		image = v
+	}
+	platform := "linux/amd64"
+	if v := os.Getenv("ZITADEL_TEST_SPANNER_PLATFORM"); v != "" {
+		platform = v
+	}
 	req := testcontainers.ContainerRequest{
-		Image: "gcr.io/cloud-spanner-emulator/emulator:latest",
+		Image: image,
 		// Pin the platform: the arm64 emulator build returns commit timestamps at a
 		// different resolution than the amd64 one, which makes seven created_at
 		// assertions in stmttest and the spanner dialect fail on Apple Silicon while
 		// passing in CI. No-op on amd64 hosts (CI), Rosetta elsewhere, and worth the
 		// few seconds it costs to have one suite that behaves the same everywhere.
-		ImagePlatform: "linux/amd64",
+		ImagePlatform: platform,
 		ExposedPorts:  []string{"9010/tcp", "9020/tcp"},
 		// 120s to match postgres.go: the default 60s is not enough for a cold
 		// start under emulation, where the first run also pulls the image.
