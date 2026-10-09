@@ -1,13 +1,13 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 
 // Safe as a static import where `@/auth/session` is not: the fixture's only
 // dependency on it is a type, which the transform erases.
 import { makeTestSession } from "@/test/session.fixture";
+import { server } from "@/test/msw";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -36,14 +36,8 @@ const GRANTS_QUERY_URL = `${GRANTS_URL}/query`;
 const USERS_QUERY_URL = "http://localhost/api/users/query";
 /** The signed-in address, read from the fixture rather than restated here. */
 const SELF = makeTestSession().user?.identifier ?? "";
-const server = setupServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => {
-  server.close();
-  vi.unstubAllEnvs();
-});
+afterAll(() => vi.unstubAllEnvs());
 
 async function renderProject(projectId = PROJECT_ID) {
   const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([

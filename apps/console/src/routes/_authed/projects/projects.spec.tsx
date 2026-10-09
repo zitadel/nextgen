@@ -1,8 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
+import { server } from "@/test/msw";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -18,14 +18,8 @@ vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 // with the session cookie (#1237). Not `POST /projects/query`, which the server
 // pins to the calling credential's one home project.
 const PROJECTS_URL = "http://localhost/api/users/me/projects";
-const server = setupServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => {
-  server.close();
-  vi.unstubAllEnvs();
-});
+afterAll(() => vi.unstubAllEnvs());
 
 /** The same locale-derived string the screen renders, rather than one locale's output. */
 function expectedDate(value: string): string {

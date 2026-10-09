@@ -1,9 +1,9 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
+import { server } from "@/test/msw";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -18,14 +18,8 @@ vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 const USERS_URL = "http://localhost/api/users";
 const USERS_QUERY_URL = `${USERS_URL}/query`;
 const SCHEMAS_URL = "http://localhost/api/schemas";
-const server = setupServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => {
-  server.close();
-  vi.unstubAllEnvs();
-});
+afterAll(() => vi.unstubAllEnvs());
 
 async function renderUsers(path = scopedPath("/users")) {
   const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
@@ -138,6 +132,19 @@ describe("users screen", () => {
               },
             },
           ],
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json({
+          id: "sch_business",
+          schema: {
+            title: "Business",
+            properties: {
+              givenName: { type: "string" },
+              familyName: { type: "string" },
+              email: { type: "string", format: "email" },
+            },
+          },
         }),
       ),
     );
