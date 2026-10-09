@@ -14,3 +14,10 @@ implicitInputs:
   - "/.nvmrc"
   - "/devbox.json"
   - "/devbox.lock"
+
+# --- SPIKE: go-cache benchmark cache-buster (remove before merge) ---
+# Bumping the token below changes this file's content hash. Every task
+# inherits it via implicitInputs above, so the change forces a full moon DAG
+# rebuild (no remote-cache hits) and makes the Go toolchain cache the thing
+# under test. Bump the token for each benchmark run.
+# cache-bust: cloudx-1
