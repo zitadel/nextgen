@@ -6,9 +6,9 @@ import {
   normalizePublicCliProse,
   npmDistTagForCliVersion,
   npmSelectorForCliVersion,
-  publicCliCommand,
-  isPortableShellWord,
+  optionArgs,
   portableCommands,
+  publicCliCommand,
 } from "../../../src/lib/public-cli";
 
 describe("public CLI command formatting", () => {
@@ -116,10 +116,21 @@ describe("normalizePublicCliJson", () => {
   });
 });
 
-describe("isPortableShellWord", () => {
+describe("portableCommands", () => {
+  it("prefixes every command when every argument is portable", () => {
+    expect(portableCommands([["plan"], ["apply", "--cwd", "/home/dev/app"]], "1.0.0")).toEqual([
+      expect.stringMatching(/ plan$/),
+      expect.stringMatching(/ apply --cwd \/home\/dev\/app$/),
+    ]);
+  });
+
   it("accepts a plain value and a POSIX-style path", () => {
-    expect(isPortableShellWord("default-human-user")).toBe(true);
-    expect(isPortableShellWord("/home/dev/my-app")).toBe(true);
+    expect(
+      portableCommands(
+        [["plan", "--schema", "default-human-user", "--cwd", "/home/dev/my-app"]],
+        "1.0.0",
+      ),
+    ).toHaveLength(1);
   });
 
   it("rejects anything a POSIX shell, PowerShell or cmd.exe could read differently", () => {
@@ -134,22 +145,23 @@ describe("isPortableShellWord", () => {
       "a`b",
       "C:\\dev",
     ]) {
-      expect(isPortableShellWord(value), value).toBe(false);
+      expect(portableCommands([["plan", "--cwd", value]], "1.0.0"), value).toEqual([]);
     }
-  });
-});
-
-describe("portableCommands", () => {
-  it("prefixes every command when every argument is portable", () => {
-    expect(portableCommands([["plan"], ["apply", "--cwd", "/home/dev/app"]], "1.0.0")).toEqual([
-      expect.stringMatching(/ plan$/),
-      expect.stringMatching(/ apply --cwd \/home\/dev\/app$/),
-    ]);
   });
 
   it("returns none when any argument in any command needs quoting", () => {
     expect(portableCommands([["plan"], ["apply", "--cwd", "/home/dev/my app"]], "1.0.0")).toEqual(
       [],
     );
+  });
+});
+
+describe("optionArgs", () => {
+  it("passes the option and its value as two arguments", () => {
+    expect(optionArgs("--schema", "customers")).toEqual(["--schema", "customers"]);
+  });
+
+  it("joins a value that starts with a dash to its option", () => {
+    expect(optionArgs("--schema", "--force")).toEqual(["--schema=--force"]);
   });
 });

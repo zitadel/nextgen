@@ -168,9 +168,9 @@ function flowRefusal(flow: Json): string | undefined {
 
 /**
  * Why a flow's steps cannot be read for their provider lists, or `undefined`
- * when they can. This is all removing a provider needs (`auth-method sso
- * disable`): unlike enabling, it writes no route, so it does not care where a
- * completed sign-in ends.
+ * when they can. This is all removing a provider needs
+ * (`auth-method sso disable`): unlike enabling, it writes no route, so it does
+ * not care where a completed sign-in ends.
  */
 export function ssoProvidersRefusal(document: object): string | undefined {
   const flow = document as Json;
@@ -425,13 +425,13 @@ const LEGACY_OUTCOMES: ReadonlyArray<readonly [string, string]> = [
 
 /**
  * Rename the previous outcome keys on every step, in place. The validator
- * rejects the old keys, so leaving them would make `auth-method sso enable` write an
- * invalid flow. Where a step already has the new key, that one wins. A key
- * that is also one of the step's action names is the action's transition and
- * stays. A new key that is an action name is refused: the old route would be
- * dropped for the action's. A legacy key with `purpose` or `action` is
- * refused: the new keys may declare neither, and dropping them would change
- * the author's routing.
+ * rejects the old keys, so leaving them would make `auth-method sso enable`
+ * write an invalid flow. Where a step already has the new key, that one wins. A
+ * key that is also one of the step's action names is the action's transition
+ * and stays. A new key that is an action name is refused: the old route would
+ * be dropped for the action's. A legacy key with `purpose` or `action` is
+ * refused: the new keys may declare neither, and dropping them would change the
+ * author's routing.
  */
 function migrateLegacyOutcomes(document: Json): boolean {
   let changed = false;
@@ -650,9 +650,9 @@ export function removeSsoFromSchema(schema: object, slug: string): SsoResult<obj
  * Remove a provider from every step of a login flow that offers it.
  *
  * Only the `sso_providers` lists change; a list left empty is dropped. The
- * routes and steps `auth-method sso enable` added stay: without a provider they are never
- * reached, they validate as they are, and enabling a provider again uses them
- * as they stand rather than rebuilding them.
+ * routes and steps `auth-method sso enable` added stay: without a provider they
+ * are never reached, they validate as they are, and enabling a provider again
+ * uses them as they stand rather than rebuilding them.
  */
 export function removeSsoFromFlow(flow: object, slug: string): SsoResult<object> {
   const document = clone(flow) as Json;

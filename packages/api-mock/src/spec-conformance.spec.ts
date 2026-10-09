@@ -1047,9 +1047,9 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 });
 
 /**
- * The identity provider connection and variable endpoints the CLI's SSO
- * journey needs. The Go service does not exist yet (#1003), so this mock is
- * the only place `auth-method sso enable` / `plan` / `apply` can be driven end to end.
+ * The identity provider connection and variable endpoints the CLI's SSO journey
+ * needs. The Go service does not exist yet (#1003), so this mock is the only
+ * place `auth-method sso enable` / `plan` / `apply` can be driven end to end.
  */
 describe("api-mock idp connections and variables", () => {
   const connection = (over: Record<string, unknown> = {}) => ({

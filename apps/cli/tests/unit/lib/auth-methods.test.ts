@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  checkFlow,
-  flowOffers,
   hasIdentifier,
+  listedProviders,
+  malformedAuthMethods,
   reachableSignInMethods,
-  setAuthFactors,
+  setMethodEnabled,
   usableSignInMethods,
 } from "../../../src/lib/auth-methods";
 
-const schema = (methods: Record<string, unknown>): Record<string, unknown> => ({
+const schema = (methods: unknown): Record<string, unknown> => ({
   type: "object",
   "x-identifier": "email",
   required: ["email"],
@@ -17,50 +17,27 @@ const schema = (methods: Record<string, unknown>): Record<string, unknown> => ({
   "x-auth-methods": methods,
 });
 
-/** The shipped password flow, cut to the steps the validator needs. */
+/** A flow whose login journey collects a password. */
 const passwordFlow = {
-  name: "default-login",
   status: "active",
-  user_schema: "https://schemas.test.invalid/default-human-user.json",
+  purposes: { login: "password" },
+  steps: [{ name: "password", fields: ["x-auth-methods#password"] }],
+};
+
+/** A flow whose login journey offers these providers. */
+const ssoFlow = (providers: string[]) => ({
+  status: "active",
   purposes: { login: "identifier" },
-  steps: [
-    {
-      name: "identifier",
-      fields: ["email"],
-      actions: [{ name: "submit", kind: "submit", primary: true }],
-      transitions: { submit: { target: "password" } },
-    },
-    {
-      name: "password",
-      fields: ["x-auth-methods#password"],
-      actions: [{ name: "submit", kind: "submit", primary: true }],
-      transitions: { submit: { target: "done" } },
-    },
-    { name: "done", complete: "show" },
-  ],
-};
+  steps: [{ name: "identifier", sso_providers: providers }],
+});
 
-const passkeyFlow = {
-  ...passwordFlow,
-  purposes: { login: "passkey-first" },
-  steps: [
-    {
-      name: "passkey-first",
-      fields: [],
-      actions: [{ name: "passkey", kind: "passkey", primary: true }],
-      transitions: { passkey: { target: "done" } },
-    },
-    { name: "done", complete: "show" },
-  ],
-};
-
-describe("setAuthFactors", () => {
-  it("switches only the named factor", () => {
+describe("setMethodEnabled", () => {
+  it("switches only the named method", () => {
     const before = schema({ password: { enabled: true }, passkey: { enabled: true } });
 
-    const result = setAuthFactors(before, ["passkey"], false);
+    const result = setMethodEnabled(before, "passkey", false);
 
-    expect(result.changed).toEqual(["passkey"]);
+    expect(result.changed).toBe(true);
     expect(result.document["x-auth-methods"]).toEqual({
       password: { enabled: true },
       passkey: { enabled: false },
@@ -73,7 +50,7 @@ describe("setAuthFactors", () => {
       sso: { enabled: true, providers: ["google"] },
     });
 
-    const result = setAuthFactors(before, ["passkey"], true);
+    const result = setMethodEnabled(before, "passkey", true);
 
     expect(result.document["x-auth-methods"]).toEqual({
       passkey: { enabled: true },
@@ -81,25 +58,25 @@ describe("setAuthFactors", () => {
     });
   });
 
-  it("adds a factor the schema does not mention", () => {
-    const result = setAuthFactors(schema({ password: { enabled: true } }), ["passkey"], true);
+  it("adds a method the schema does not mention", () => {
+    const result = setMethodEnabled(schema({ password: { enabled: true } }), "passkey", true);
 
     expect(result.document["x-auth-methods"]).toMatchObject({ passkey: { enabled: true } });
   });
 
-  it("reports a factor already in the requested state as unchanged and returns the input", () => {
+  it("reports a method already in the requested state as unchanged and returns the input", () => {
     const before = schema({ password: { enabled: true } });
 
-    const result = setAuthFactors(before, ["password"], true);
+    const result = setMethodEnabled(before, "password", true);
 
-    expect(result).toEqual({ document: before, changed: [], unchanged: ["password"] });
+    expect(result).toEqual({ document: before, changed: false });
   });
 
   it("does not mutate the schema it was given", () => {
     const before = schema({ password: { enabled: true } });
     const copy = structuredClone(before);
 
-    setAuthFactors(before, ["password"], false);
+    setMethodEnabled(before, "password", false);
 
     expect(before).toEqual(copy);
   });
@@ -124,7 +101,7 @@ describe("usableSignInMethods", () => {
     expect(usableSignInMethods(schema({ sso: { enabled: true, providers: [] } }))).toEqual([]);
   });
 
-  it("does not count factors the login engine cannot serve", () => {
+  it("does not count methods the login engine cannot serve", () => {
     expect(
       usableSignInMethods(schema({ otp: { enabled: true }, magic_link: { enabled: true } })),
     ).toEqual([]);
@@ -132,6 +109,18 @@ describe("usableSignInMethods", () => {
 
   it("is empty for a schema without x-auth-methods", () => {
     expect(usableSignInMethods({ type: "object" })).toEqual([]);
+  });
+});
+
+describe("listedProviders", () => {
+  it("lists every provider as written, well-formed or not", () => {
+    expect(
+      listedProviders(schema({ sso: { enabled: true, providers: ["google", "Not A Slug", 7] } })),
+    ).toEqual(["google", "Not A Slug"]);
+  });
+
+  it("is empty when the schema lists none", () => {
+    expect(listedProviders(schema({ password: { enabled: true } }))).toEqual([]);
   });
 });
 
@@ -146,92 +135,32 @@ describe("hasIdentifier", () => {
   });
 });
 
-describe("checkFlow", () => {
-  it("names the step that still collects a disabled password", () => {
-    const before = schema({ password: { enabled: true } });
-    const after = schema({ password: { enabled: false } });
-
-    const check = checkFlow(passwordFlow, before, after);
-
-    expect(check.kind === "checked" && check.introduced.map((issue) => issue.step)).toEqual([
-      "password",
-    ]);
+describe("malformedAuthMethods", () => {
+  it("accepts an absent container or entry", () => {
+    expect(malformedAuthMethods({ type: "object" }, "passkey")).toBeUndefined();
+    expect(
+      malformedAuthMethods(schema({ password: { enabled: true } }), "passkey"),
+    ).toBeUndefined();
   });
 
-  it("names the step that still offers a disabled passkey", () => {
-    const before = schema({ passkey: { enabled: true } });
-    const after = schema({ passkey: { enabled: false } });
-
-    const check = checkFlow(passkeyFlow, before, after);
-
-    expect(check).toEqual({
-      kind: "checked",
-      introduced: [
-        expect.objectContaining({ rule: "schema/passkey-actions", step: "passkey-first" }),
-      ],
-    });
+  it("ignores a malformed entry of another method", () => {
+    expect(malformedAuthMethods(schema({ password: true }), "passkey")).toBeUndefined();
   });
 
-  it("finds nothing when the flow never used the factor", () => {
-    const before = schema({ password: { enabled: true }, passkey: { enabled: true } });
-    const after = schema({ password: { enabled: true }, passkey: { enabled: false } });
-
-    expect(checkFlow(passwordFlow, before, after)).toEqual({ kind: "checked", introduced: [] });
-  });
-
-  it("ignores schema errors the flow already had", () => {
-    // Password is already off, so the password step is already an error.
-    const before = schema({ password: { enabled: false }, passkey: { enabled: true } });
-    const after = schema({ password: { enabled: false }, passkey: { enabled: false } });
-
-    expect(checkFlow(passwordFlow, before, after)).toEqual({ kind: "checked", introduced: [] });
-  });
-
-  it("reports a malformed flow file as unchecked", () => {
-    // A string where `fields` should be a list reads as no fields to the
-    // semantic validator, which would hide the password step.
-    const malformed = {
-      ...passwordFlow,
-      steps: [
-        passwordFlow.steps[0],
-        { ...passwordFlow.steps[1], fields: "x-auth-methods#password" },
-        passwordFlow.steps[2],
-      ],
-    };
-    const before = schema({ password: { enabled: true } });
-    const after = schema({ password: { enabled: false } });
-
-    expect(checkFlow(malformed, before, after).kind).toBe("unchecked");
-  });
-
-  it("reports a structurally broken flow as unchecked rather than unaffected", () => {
-    // A structural error stops the validator before the schema rules, so the
-    // password step would otherwise go unnoticed.
-    const broken = { ...passwordFlow, purposes: { login: "identifier", register: "missing" } };
-    const before = schema({ password: { enabled: true } });
-    const after = schema({ password: { enabled: false } });
-
-    const check = checkFlow(broken, before, after);
-
-    expect(check.kind).toBe("unchecked");
-  });
-});
-
-describe("flowOffers", () => {
-  it("sees password on a step that collects it", () => {
-    expect(flowOffers(passwordFlow, "password")).toBe(true);
-    expect(flowOffers(passwordFlow, "passkey")).toBe(false);
-  });
-
-  it("sees passkey on a step that offers the action", () => {
-    expect(flowOffers(passkeyFlow, "passkey")).toBe(true);
-    expect(flowOffers(passkeyFlow, "password")).toBe(false);
+  it.each([
+    ["x-auth-methods is not an object", []],
+    ["x-auth-methods.passkey is not an object", { passkey: true }],
+    ["x-auth-methods.passkey.enabled is not a boolean", { passkey: {} }],
+    ["x-auth-methods.passkey.enabled is not a boolean", { passkey: { enabled: "true" } }],
+  ])("names the region when %s", (region, methods) => {
+    expect(malformedAuthMethods(schema(methods), "passkey")).toBe(region);
   });
 });
 
 describe("reachableSignInMethods", () => {
   it("counts only methods an active flow offers", () => {
-    // The shipped default: passkey is enabled, but the flow offers password only.
+    // The shipped default: passkey is enabled, but the flow offers password
+    // only.
     const both = schema({ password: { enabled: true }, passkey: { enabled: true } });
 
     expect(reachableSignInMethods(both, [passwordFlow])).toEqual(["password"]);
@@ -243,113 +172,21 @@ describe("reachableSignInMethods", () => {
     expect(reachableSignInMethods(passkeyOnly, [passwordFlow])).toEqual([]);
   });
 
-  it("does not count a register-only flow that collects a password", () => {
-    const registerOnly = {
-      purposes: { register: "register" },
-      steps: [{ name: "register", fields: ["email", "x-auth-methods#password"] }],
-    };
+  it("does not count a flow that is not active", () => {
+    const password = schema({ password: { enabled: true } });
 
-    expect(reachableSignInMethods(schema({ password: { enabled: true } }), [registerOnly])).toEqual(
-      [],
-    );
-  });
-
-  it("does not count register steps of a flow that also signs in", () => {
-    // The login journey offers passkey only; password is collected on the
-    // register side, which the login steps hand over to with a purpose flip.
-    const combined = {
-      purposes: { login: "start", register: "register" },
-      steps: [
-        {
-          name: "start",
-          actions: [{ name: "passkey", kind: "passkey" }],
-          transitions: { register: { target: "register", purpose: "register" } },
-        },
-        { name: "register", fields: ["x-auth-methods#password"] },
-      ],
-    };
-    const both = schema({ password: { enabled: true }, passkey: { enabled: true } });
-
-    expect(reachableSignInMethods(both, [combined])).toEqual(["passkey"]);
-  });
-
-  it("follows a local transition with null action and purpose", () => {
-    const flow = {
-      purposes: { login: "identifier" },
-      steps: [
-        {
-          name: "identifier",
-          transitions: { submit: { target: "password", action: null, purpose: null } },
-        },
-        { name: "password", fields: ["x-auth-methods#password"] },
-      ],
-    };
-
-    expect(reachableSignInMethods(schema({ password: { enabled: true } }), [flow])).toEqual([
-      "password",
-    ]);
-  });
-
-  it("does not follow a transition into another flow", () => {
-    // `switch` targets a step of another flow that shares a name with a local one.
-    const flow = {
-      purposes: { login: "identifier" },
-      steps: [
-        {
-          name: "identifier",
-          transitions: { other: { target: "password", action: "switch" } },
-        },
-        { name: "password", fields: ["x-auth-methods#password"] },
-      ],
-    };
-
-    expect(reachableSignInMethods(schema({ password: { enabled: true } }), [flow])).toEqual([]);
-  });
-
-  it("stops at an outcome that switches to registration on its own", () => {
-    // The shipped shape: user_not_found routes to register with no purpose.
-    const flow = {
-      purposes: { login: "identifier", register: "register" },
-      steps: [
-        {
-          name: "identifier",
-          actions: [{ name: "passkey", kind: "passkey" }],
-          transitions: { user_not_found: { target: "register" } },
-        },
-        { name: "register", fields: ["x-auth-methods#password"] },
-      ],
-    };
-    const both = schema({ password: { enabled: true }, passkey: { enabled: true } });
-
-    expect(reachableSignInMethods(both, [flow])).toEqual(["passkey"]);
-  });
-
-  it("does not count a flow that only registers passkeys", () => {
-    const passkeyOnly = schema({ password: { enabled: false }, passkey: { enabled: true } });
-    const registerOnly = {
-      steps: [{ name: "register", actions: [{ name: "enrol", kind: "passkey_register" }] }],
-    };
-
-    expect(reachableSignInMethods(passkeyOnly, [registerOnly])).toEqual([]);
+    expect(reachableSignInMethods(password, [{ ...passwordFlow, status: "draft" }])).toEqual([]);
   });
 
   it("does not count SSO for a provider the schema does not enable", () => {
     const sso = schema({ sso: { enabled: true, providers: ["google"] } });
-    const githubFlow = {
-      purposes: { login: "identifier" },
-      steps: [{ name: "identifier", sso_providers: ["github"] }],
-    };
 
-    expect(reachableSignInMethods(sso, [githubFlow])).toEqual([]);
+    expect(reachableSignInMethods(sso, [ssoFlow(["github"])])).toEqual([]);
   });
 
-  it("counts SSO on a step that names a provider", () => {
+  it("counts SSO on a step that names a provider the schema enables", () => {
     const sso = schema({ sso: { enabled: true, providers: ["google"] } });
-    const ssoFlow = {
-      purposes: { login: "identifier" },
-      steps: [{ name: "identifier", sso_providers: ["google"] }],
-    };
 
-    expect(reachableSignInMethods(sso, [ssoFlow])).toEqual(["sso"]);
+    expect(reachableSignInMethods(sso, [ssoFlow(["google"])])).toEqual(["sso"]);
   });
 });

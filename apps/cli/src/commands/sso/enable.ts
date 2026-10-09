@@ -1,4 +1,4 @@
-import type { GlobalOptions } from "../../lib/oclif/types";
+import type { GlobalOptions } from "../../lib/oclif";
 import { reportWarning } from "../../lib/warnings";
 import AuthMethodSsoEnable from "../auth-method/sso/enable";
 

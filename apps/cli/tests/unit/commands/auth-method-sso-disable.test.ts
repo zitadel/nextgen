@@ -1,13 +1,7 @@
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
 
+import { makeProject as writeProject, readJson, writeJson } from "../../helpers/local-project";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
-
-// Temp dirs are left for the OS to reclaim, as the integration helper does
-// (#1498): a recursive delete on teardown flakes under CI load.
 
 type Envelope = {
   status: string;
@@ -17,7 +11,7 @@ type Envelope = {
   data?: Record<string, unknown>;
   warnings?: string[];
   next_commands?: string[];
-  details?: { retry_args?: string[]; region?: string };
+  details?: { suggested_args?: string[][]; region?: string };
   reason?: string;
 };
 
@@ -32,7 +26,9 @@ const schemaWith = (methods: Methods, name = "default-human-user") => ({
   "x-auth-methods": methods,
 });
 
-/** A login flow whose entry step offers these providers beside a password step. */
+/**
+ * A login flow whose entry step offers these providers beside a password step.
+ */
 function flowOffering(providers: string[], name = "default-human-user") {
   return {
     name: `${name}-login`,
@@ -58,25 +54,14 @@ function flowOffering(providers: string[], name = "default-human-user") {
   };
 }
 
-async function makeProject(methods: Methods, flowProviders: string[]): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-auth-method-sso-disable-"));
-  await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
-  await mkdir(join(cwd, ".zitadel/flows"), { recursive: true });
-  await writeFile(join(cwd, "zitadel.json"), `${JSON.stringify({ version: "0.0.1" })}\n`);
-  await writeFile(
-    join(cwd, ".zitadel/schemas/default-human-user.json"),
-    `${JSON.stringify(schemaWith(methods))}\n`,
-  );
-  await writeFile(
-    join(cwd, ".zitadel/flows/default-human-user-login.json"),
-    `${JSON.stringify(flowOffering(flowProviders))}\n`,
-  );
-  return cwd;
-}
-
-/** Write one more file into a Project, for a test whose input is that file. */
-async function writeJson(cwd: string, path: string, body: unknown): Promise<void> {
-  await writeFile(join(cwd, path), `${JSON.stringify(body)}\n`);
+/**
+ * A Project with one schema and its login flow, which offers these providers.
+ */
+function makeProject(methods: Methods, flowProviders: string[]): Promise<string> {
+  return writeProject({
+    schemas: { "default-human-user": schemaWith(methods) },
+    flows: { "default-human-user-login": flowOffering(flowProviders) },
+  });
 }
 
 const passwordAndGoogle: Methods = {
@@ -96,10 +81,6 @@ async function run(cwd: string, ...args: string[]) {
     ...args,
   ]);
   return { exitCode: result.exitCode, envelope: parseJson(result.stdout) as Envelope };
-}
-
-async function readJson(cwd: string, path: string) {
-  return JSON.parse(await readFile(join(cwd, path), "utf8")) as Record<string, unknown>;
 }
 
 async function ssoOf(cwd: string) {
@@ -150,8 +131,7 @@ describe("auth-method sso disable", () => {
     expect(envelope.data).toMatchObject({
       method: "sso",
       provider: "google",
-      changed: true,
-      files: [
+      changed: [
         ".zitadel/schemas/default-human-user.json",
         ".zitadel/flows/default-human-user-login.json",
       ],
@@ -164,7 +144,7 @@ describe("auth-method sso disable", () => {
 
     const { envelope } = await run(cwd, "--provider", "github");
 
-    expect(envelope.data).toMatchObject({ changed: false, files: [], next_commands: [] });
+    expect(envelope.data).toMatchObject({ changed: [], next_commands: [] });
   });
 
   it("previews without writing under --dry-run", async () => {
@@ -175,6 +155,17 @@ describe("auth-method sso disable", () => {
     expect(envelope).toMatchObject({ status: "skipped", reason: "dry-run" });
     expect(await ssoOf(cwd)).toEqual({ enabled: true, providers: ["google"] });
     expect(await entryProviders(cwd)).toEqual(["google"]);
+  });
+
+  it("lists the files a dry run would change", async () => {
+    const cwd = await makeProject(passwordAndGoogle, ["google"]);
+
+    const { envelope } = await run(cwd, "--provider", "google", "--dry-run");
+
+    expect(envelope.data?.changed).toEqual([
+      ".zitadel/schemas/default-human-user.json",
+      ".zitadel/flows/default-human-user-login.json",
+    ]);
   });
 
   it("lists plan and apply, with --cwd, as the next commands after a change", async () => {
@@ -194,8 +185,7 @@ describe("auth-method sso disable", () => {
     const { envelope } = await run(cwd, "--provider", "google");
 
     expect(envelope.data).toMatchObject({
-      changed: true,
-      files: [".zitadel/flows/default-human-user-login.json"],
+      changed: [".zitadel/flows/default-human-user-login.json"],
     });
     expect(await entryProviders(cwd)).toBeUndefined();
   });
@@ -287,7 +277,7 @@ describe("auth-method sso disable", () => {
       const { envelope } = await run(cwd, "--provider", "google");
 
       expect(envelope.code).toBe("E_VALIDATION");
-      expect(envelope.details?.retry_args).toEqual([
+      expect(envelope.details?.suggested_args?.[0]).toEqual([
         "auth-method",
         "sso",
         "disable",
@@ -316,7 +306,7 @@ describe("auth-method sso disable", () => {
       );
     });
 
-    it("refuses a dry run that would remove the last way to sign in, keeping --dry-run", async () => {
+    it("previews removing the last way to sign in on a dry run, and warns", async () => {
       const cwd = await makeProject(
         { password: { enabled: false }, sso: { enabled: true, providers: ["google"] } },
         ["google"],
@@ -324,13 +314,13 @@ describe("auth-method sso disable", () => {
 
       const { envelope } = await run(cwd, "--provider", "google", "--dry-run");
 
-      expect(envelope.details?.retry_args).toEqual(
-        expect.arrayContaining(["--dry-run", "--force"]),
-      );
-      expect(envelope.next_commands?.length).toBeGreaterThan(0);
-      for (const command of envelope.next_commands ?? []) {
-        expect(command).toContain("--dry-run");
-      }
+      expect(envelope).toMatchObject({
+        status: "skipped",
+        reason: "dry-run",
+        warnings: [
+          "default-human-user would have no way to sign in left. Its users can only be managed through the API.",
+        ],
+      });
     });
 
     it("suggests enabling password or passkey instead of removing the last provider", async () => {

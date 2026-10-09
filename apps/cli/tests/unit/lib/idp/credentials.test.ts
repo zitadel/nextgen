@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { republishCommand, republishCommands } from "../../../../src/lib/idp";
+import { republishArgs, republishCommand, republishCommands } from "../../../../src/lib/idp";
 
 const VERSION = "1.0.0-alpha.23";
 
@@ -73,5 +73,42 @@ describe("the recovery commands a result carries", () => {
         VERSION,
       ),
     ).toEqual([]);
+  });
+});
+
+describe("the recovery commands as argument lists", () => {
+  it("appends the extra arguments, such as the run's --cwd, to every command", () => {
+    expect(
+      republishArgs(
+        [
+          { name: "GOOGLE_CLIENT_ID", secret: false, published: "failed" },
+          { name: "GOOGLE_CLIENT_SECRET", secret: true, published: "deferred" },
+        ],
+        ["--cwd", "/home/dev/app"],
+      ),
+    ).toEqual([
+      ["variables", "set", "GOOGLE_CLIENT_ID", "--project-level", "--cwd", "/home/dev/app"],
+      [
+        "variables",
+        "set",
+        "GOOGLE_CLIENT_SECRET",
+        "--project-level",
+        "--secret",
+        "--cwd",
+        "/home/dev/app",
+      ],
+    ]);
+  });
+
+  it("lists the same commands as the strings", () => {
+    const credentials = [
+      { name: "GOOGLE_CLIENT_SECRET", secret: true, published: "failed" },
+    ] as const;
+
+    expect(republishCommands(credentials, VERSION)).toEqual(
+      republishArgs(credentials).map((args) =>
+        expect.stringMatching(new RegExp(` ${args.join(" ")}$`)),
+      ),
+    );
   });
 });

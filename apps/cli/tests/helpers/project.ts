@@ -233,7 +233,10 @@ export class ScaffoldedApp {
     );
   }
 
-  /** `auth-method sso enable` without `--json`, for a spec asserting what the developer reads. */
+  /**
+   * `auth-method sso enable` without `--json`, for a spec asserting what the
+   * developer reads.
+   */
   enableSsoRendered(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingStdin(credentials.secret, () =>
       this.cli([
@@ -281,7 +284,10 @@ export class ScaffoldedApp {
     );
   }
 
-  /** The deprecated `sso enable` alias without `--json`, for what the developer reads. */
+  /**
+   * The deprecated `sso enable` alias without `--json`, for what the developer
+   * reads.
+   */
   enableSsoDeprecatedRendered(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingStdin(credentials.secret, () =>
       this.cli([
@@ -296,24 +302,42 @@ export class ScaffoldedApp {
     );
   }
 
-  /** `auth-method password|passkey <verb>`. */
-  authMethod(
-    method: "password" | "passkey",
-    verb: "enable" | "disable",
-    extraArgs: string[] = [],
-  ): Promise<CliResult> {
-    return this.cli(["auth-method", method, verb, "--non-interactive", "--json", ...extraArgs]);
+  /** `auth-method password|passkey enable`. */
+  enableMethod(method: "password" | "passkey", extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["auth-method", method, "enable", "--non-interactive", "--json", ...extraArgs]);
   }
 
-  /** `auth-method password|passkey <verb>` without `--json`, for what the developer reads. */
-  authMethodRendered(
-    method: "password" | "passkey",
-    verb: "enable" | "disable",
-  ): Promise<CliResult> {
-    return this.cli(["auth-method", method, verb, "--non-interactive"]);
+  /** `auth-method password|passkey disable`. */
+  disableMethod(method: "password" | "passkey", extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli([
+      "auth-method",
+      method,
+      "disable",
+      "--non-interactive",
+      "--json",
+      ...extraArgs,
+    ]);
   }
 
-  /** `auth-method sso disable` without `--json`, for what the developer reads. */
+  /**
+   * `auth-method password|passkey enable` without `--json`, for what the
+   * developer reads.
+   */
+  enableMethodRendered(method: "password" | "passkey"): Promise<CliResult> {
+    return this.cli(["auth-method", method, "enable", "--non-interactive"]);
+  }
+
+  /**
+   * `auth-method password|passkey disable` without `--json`, for what the
+   * developer reads.
+   */
+  disableMethodRendered(method: "password" | "passkey"): Promise<CliResult> {
+    return this.cli(["auth-method", method, "disable", "--non-interactive"]);
+  }
+
+  /**
+   * `auth-method sso disable` without `--json`, for what the developer reads.
+   */
   disableSsoRendered(provider: string): Promise<CliResult> {
     return this.cli(["auth-method", "sso", "disable", "--non-interactive", "--provider", provider]);
   }

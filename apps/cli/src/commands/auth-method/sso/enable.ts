@@ -8,9 +8,9 @@ import { consola } from "consola";
 import { credentialVariables, idpProvider, IDP_PROVIDERS } from "@zitadel/config/idp";
 
 import { createZitadelClient } from "../../../lib/api-client";
+import { refuseBrokenFlows, refuseUneditable } from "../../../lib/auth-methods";
 import { isDevelopmentBuild } from "../../../lib/build-channel";
 import { ZitadelError } from "../../../lib/errors";
-import { portableCommands } from "../../../lib/public-cli";
 import { bailOnCancel } from "../../../lib/prompt-cancel";
 import { stableStringify } from "../../../lib/json";
 import {
@@ -27,38 +27,32 @@ import {
   publishClientId,
   type PublishState,
   readConnectionFiles,
-  readSchemaFiles,
   reportClientIdOutcome,
+  republishArgs,
   type StoredVariables,
   ssoEditRefusal,
-  type SsoEditTarget,
   type SsoResult,
   type SsoSkipped,
   reportSecretOutcome,
-  selectSchema,
   storeClientSecret,
   type SchemaFile,
   type SecretOutcome,
   type SecretPublisher,
 } from "../../../lib/idp";
-import { CommandGroups, type JsonEnvelope, nonBlankString } from "../../../lib/oclif";
+import {
+  AuthMethodCommand,
+  CommandGroups,
+  type JsonEnvelope,
+  nonBlankString,
+} from "../../../lib/oclif";
 import {
   readDevelopmentIssuer,
   readZitadelConfig,
   readZitadelSecret,
   type ZitadelSecret,
 } from "../../../lib/project";
-import { flowsForSchema } from "../../../lib/schema-flows";
 import { readStdin } from "../../../lib/variables";
 import { reportWarning } from "../../../lib/warnings";
-import {
-  activeBodies,
-  AuthMethodCommand,
-  optionArgs,
-  refuseBrokenFlows,
-  refuseExternalSchema,
-  SCHEMA_FLAG,
-} from "../shared";
 
 /**
  * The `auth-method sso enable` command (ADR 069) — add a provider to a
@@ -73,7 +67,7 @@ import {
  * prompted for, or read from stdin when scripting, so it cannot land in shell
  * history, a process listing, or CI logs.
  */
-export default class SsoEnable extends AuthMethodCommand {
+export default class AuthMethodSsoEnable extends AuthMethodCommand {
   static override description = "Add an identity provider to a user schema.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -89,67 +83,52 @@ export default class SsoEnable extends AuthMethodCommand {
       options: [...IDP_PROVIDERS],
       description: "Identity provider to enable.",
     }),
-    ...SCHEMA_FLAG,
     "client-id": nonBlankString({
       description: "Client id of the application registered with the provider.",
     }),
   };
 
   async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(SsoEnable);
-    await this.toMeta(flags);
-    const { cwd, nonInteractive, dryRun } = this.meta;
+    const { flags } = await this.parse(AuthMethodSsoEnable);
+    const {
+      cwd,
+      cwdArgs,
+      schema,
+      flows: candidates,
+      preflight: { provider, entry, secretFile, callbackUri },
+    } = await this.target(flags, {
+      // The credentials are published to the project, so the server is
+      // resolved, unlike for the other auth-method commands.
+      resolveServer: true,
+      preflight: (cwd) => readProject(cwd, flags.provider),
+    });
+    const { nonInteractive, dryRun } = this.meta;
 
-    const provider = flags.provider;
-    if (provider === undefined) {
-      // Named rather than prompted for: the catalog holds one provider today,
-      // and a question offering a single answer is a keystroke, not a choice
-      // (the same reasoning `OwnerCommand` gives for requiring an owner).
-      throw new ZitadelError("E_VALIDATION", "Name the provider to enable", {
-        hint: `Pass --provider, e.g. --provider ${IDP_PROVIDERS[0]}.`,
-      });
-    }
-    const entry = idpProvider(provider);
-
-    // The Project is read before anything is asked for: being turned away
-    // after typing a secret would mean typing it again.
-    const config = await readZitadelConfig(cwd);
-    const secretFile = await readZitadelSecret(cwd);
-    const issuer = readDevelopmentIssuer(config);
-    if (issuer === undefined) {
-      throw new ZitadelError("E_VALIDATION", "This Project has no development issuer", {
-        hint: "Run `zitadel setup` first, or add environments.development.issuer to zitadel.json.",
-      });
-    }
-    const callbackUri = callbackUriFor(issuer);
-
-    const schema = selectSchema(await readSchemaFiles(cwd), flags.schema);
-    refuseExternalSchema(schema);
     const connections = await readConnectionFiles(cwd);
     // `nonBlankString` has already refused a blank one and trimmed the rest.
     const clientIdFlag = flags["client-id"];
     const plan = planConnection({ provider, files: connections, clientId: clientIdFlag });
 
     const reusing = plan.action === "reuse";
+    // What a newly written connection will reference: this command writes both
+    // as `${{ NAME }}`, so on the create path the names are certain.
+    const scaffolded = credentialVariables(plan.slug);
     // A reused connection may name its own variables — it is an editable file
     // — so the credentials go where it actually looks rather than where this
     // command would have put them. A name is `undefined` when the file holds
     // that credential as a literal: there is no variable to publish to, and
     // publishing to a derived name would report success for a value the
     // connection never reads.
-    // What a newly written connection will reference: this command writes both
-    // as `${{ NAME }}`, so on the create path the names are certain.
-    const scaffolded = credentialVariables(plan.slug);
     const names: StoredVariables = reusing
       ? credentialVariablesOf(plan.file, plan.slug)
       : scaffolded;
     const variable = names.clientSecret;
     const idVariable = names.clientId;
 
-    // Read-only, and before the dry-run return: a Project whose flows all name
-    // another schema must fail identically either way, or the preview says
-    // "would create" for a run that cannot succeed.
-    const flows = await this.targetFlows(cwd, schema);
+    // Before the dry-run return: a Project whose flows all name another
+    // schema must fail identically either way, or the preview says "would
+    // create" for a run that cannot succeed.
+    const flows = targetFlows(schema, candidates);
     // The schema and flow edits are worked out now, before the dry-run return
     // and before the connection is written or a credential published, so a
     // refusal (an edit the editors cannot make, or a flow `plan` would then
@@ -163,16 +142,11 @@ export default class SsoEnable extends AuthMethodCommand {
         after: result.document as Record<string, unknown>,
       })),
     );
-    // A follow-up run from where the user stands must reach the same Project.
-    const cwdArgs = flags.cwd === undefined ? [] : optionArgs("--cwd", cwd);
     const outcome = {
       schema,
       before: schema.body,
       after: edits.schema.document as Record<string, unknown>,
-      flowsAfter: activeBodies(
-        edits.flows.map(({ result }) => result.document as Record<string, unknown>),
-      ),
-      notOffered: [],
+      flowsAfter: edits.flows.map(({ result }) => result.document as Record<string, unknown>),
     };
 
     consola.info(`Project   ${secretFile.project_id}`);
@@ -194,6 +168,7 @@ export default class SsoEnable extends AuthMethodCommand {
           secret: undefined,
           clientId: undefined,
           idVariable,
+          changed: editedFiles(schema, edits),
         }),
         pretty: `Would ${plan.action} ${plan.action === "reuse" ? plan.file.path : plan.path}`,
       });
@@ -313,38 +288,18 @@ export default class SsoEnable extends AuthMethodCommand {
       reportSecretOutcome(secret, this.meta.cliVersion, reusing);
     }
     this.reportOutcome(outcome);
-    // `variables set` only for a credential that did not reach the project:
+    // `variables set` first, for a credential that did not reach the project:
     // the connection references it as `${{ NAME }}` and the engine resolves
     // that from the project's variables, so a button whose credential never
     // arrived fails at token exchange. Then plan and apply, when a file
     // changed. All carry --cwd when the run did.
-    const recovery = [
-      { name: idVariable, secret: false, published: clientIdState },
-      { name: variable, secret: true, published: secret?.published },
-    ].flatMap(({ name, secret: isSecret, published }) =>
-      name !== undefined && published !== undefined && published !== "stored"
-        ? [
-            [
-              "variables",
-              "set",
-              name,
-              "--project-level",
-              ...(isSecret ? ["--secret"] : []),
-              ...cwdArgs,
-            ],
-          ]
-        : [],
+    const recovery = republishArgs(
+      [
+        { name: idVariable, secret: false, published: clientIdState },
+        { name: variable, secret: true, published: secret?.published },
+      ],
+      cwdArgs,
     );
-    const filesChanged = !reusing || written.length > 0;
-    const followUps = [
-      ...recovery,
-      ...(filesChanged
-        ? [
-            ["plan", ...cwdArgs],
-            ["apply", ...cwdArgs],
-          ]
-        : []),
-    ];
 
     return this.emit({
       status: "ok",
@@ -362,21 +317,19 @@ export default class SsoEnable extends AuthMethodCommand {
           skipped: edits.skipped,
         }),
         // An ok result carries its follow-ups in data.next_commands (errors
-        // use the top-level nextCommands instead), as strings only when every
-        // argument is safe to run as written, and always as argument lists.
-        next_commands: portableCommands(followUps, this.meta.cliVersion),
-        next_args: followUps,
+        // use the top-level nextCommands instead).
+        ...this.followUps(!reusing || written.length > 0, cwdArgs, recovery),
       },
       pretty: `Enabled ${entry.displayName} for ${schema.name}`,
     });
   }
 
   /**
-   * How the connection's credentials reach the project, or `undefined` when there is
-   * no project behind this run: `--source mock` answers from fixtures and has
-   * no variables to write. The connection is built here rather than taken from
-   * `OwnerCommand.connect` because this command addresses the local Project it
-   * was pointed at, not an owner the developer named.
+   * How the connection's credentials reach the project, or `undefined` when
+   * there is no project behind this run: `--source mock` answers from fixtures
+   * and has no variables to write. The connection is built here rather than
+   * taken from `OwnerCommand.connect` because this command addresses the local
+   * Project it was pointed at, not an owner the developer named.
    */
   private publisher(secret: ZitadelSecret): SecretPublisher | undefined {
     const { source } = this.meta;
@@ -392,57 +345,26 @@ export default class SsoEnable extends AuthMethodCommand {
     };
   }
 
-  /**
-   * The flows this provider must be added to, or a refusal.
-   *
-   * Called before the connection is written and before either credential is
-   * published, because no flow means no button however well everything else
-   * went: `plan` and `apply` both succeed and the sign-in screen simply never
-   * offers the provider. Failing afterwards would leave a connection file and
-   * two published variables behind for a provider that cannot be shown.
-   */
-  private async targetFlows(cwd: string, schema: SchemaFile): Promise<FlowFile[]> {
-    const flows = await flowsForSchema(cwd, schema);
-    if (flows.length === 0) {
-      throw new ZitadelError("E_NOT_FOUND", `No login flow runs against ${schema.name}`, {
-        hint:
-          "The provider is offered by a flow, and none of the files under .zitadel/flows/ " +
-          "names this schema. Check the flow's user_schema, or run `zitadel apply` first so the " +
-          "schema's published id is recorded in .zitadel/state.json.",
-        details: { schema: schema.path },
-      });
-    }
-    // The editors read a region they cannot recognise as absent and write the
-    // generated one over it. Refuse here, before anything is written or
-    // published, rather than discard whatever a developer put there.
-    refuseUneditable(schema.path, schema.body, "schema");
-    for (const flow of flows) {
-      refuseUneditable(flow.path, flow.body, "flow");
-    }
-    return flows;
-  }
-
   /** Write the edits `planEdits` worked out, and say which files changed. */
   private async enableInConfiguration(
     cwd: string,
     schema: SchemaFile,
     edits: PlannedEdits,
   ): Promise<string[]> {
-    const written: string[] = [];
     if (edits.schema.changed) {
       await writeFile(join(cwd, schema.path), `${stableStringify(edits.schema.document)}\n`);
-      written.push(schema.path);
     }
     for (const { flow, result } of edits.flows) {
       if (result.changed) {
         await writeFile(join(cwd, flow.path), `${stableStringify(result.document)}\n`);
-        written.push(flow.path);
       }
     }
-    return written;
+    return editedFiles(schema, edits);
   }
 
-  /** The machine-readable payload. Never the secret, only whether it is held. */
+  /**
+   * The machine-readable payload. Never the secret, only whether it is held.
+   */
   private payload(input: {
     /**
      * The Project the run addresses. `--json` suppresses the console line that
@@ -549,21 +471,77 @@ export default class SsoEnable extends AuthMethodCommand {
   }
 }
 
-/** Stop on a document whose region the SSO editors would overwrite. */
-function refuseUneditable(path: string, body: object, target: SsoEditTarget): void {
-  const refusal = ssoEditRefusal(body, target);
-  if (refusal === undefined) {
-    return;
+/** What the run needs from the Project before the schema is read. */
+type ProjectContext = {
+  readonly provider: string;
+  readonly entry: ReturnType<typeof idpProvider>;
+  readonly secretFile: ZitadelSecret;
+  readonly callbackUri: string;
+};
+
+/**
+ * The provider to enable and the Project it is enabled for, or a refusal.
+ *
+ * The Project is read before anything is asked for: being turned away after
+ * typing a secret would mean typing it again.
+ *
+ * @param cwd - The Project directory.
+ * @param provider - `--provider`, which is named rather than prompted for.
+ */
+async function readProject(cwd: string, provider: string | undefined): Promise<ProjectContext> {
+  if (provider === undefined) {
+    // Named rather than prompted for: the catalog holds one provider today,
+    // and a question offering a single answer is a keystroke, not a choice
+    // (the same reasoning `OwnerCommand` gives for requiring an owner).
+    throw new ZitadelError("E_VALIDATION", "Name the provider to enable", {
+      hint: `Pass --provider, e.g. --provider ${IDP_PROVIDERS[0]}.`,
+    });
   }
-  throw new ZitadelError("E_VALIDATION", `${path}: ${refusal}`, {
-    hint:
-      "Enabling a provider edits this file, and that region is not the shape it edits. " +
-      "Fix it against the dialect in .zitadel/meta/, then run the command again.",
-    details: { file: path, region: refusal },
-  });
+  const entry = idpProvider(provider);
+  const config = await readZitadelConfig(cwd);
+  const secretFile = await readZitadelSecret(cwd);
+  const issuer = readDevelopmentIssuer(config);
+  if (issuer === undefined) {
+    throw new ZitadelError("E_VALIDATION", "This Project has no development issuer", {
+      hint: "Run `zitadel setup` first, or add environments.development.issuer to zitadel.json.",
+    });
+  }
+  return { provider, entry, secretFile, callbackUri: callbackUriFor(issuer) };
 }
 
-/** The schema and flow edits a run will make, worked out before anything is written. */
+/**
+ * The flows this provider must be added to, or a refusal.
+ *
+ * Called before the connection is written and before either credential is
+ * published, because no flow means no button however well everything else
+ * went: `plan` and `apply` both succeed and the sign-in screen simply never
+ * offers the provider. Failing afterwards would leave a connection file and
+ * two published variables behind for a provider that cannot be shown.
+ *
+ * @param schema - The schema the provider is enabled for.
+ * @param flows - The flows that run against it.
+ */
+function targetFlows(schema: SchemaFile, flows: FlowFile[]): FlowFile[] {
+  if (flows.length === 0) {
+    throw new ZitadelError("E_NOT_FOUND", `No login flow runs against ${schema.name}`, {
+      hint:
+        "The provider is offered by a flow, and none of the files under .zitadel/flows/ " +
+        "names this schema. Check the flow's user_schema, or run `zitadel apply` first so the " +
+        "schema's published id is recorded in .zitadel/state.json.",
+      details: { schema: schema.path },
+    });
+  }
+  // The editors read a region they cannot recognise as absent and write the
+  // generated one over it. Refuse here, before anything is written or
+  // published, rather than discard whatever a developer put there.
+  refuseUneditable(schema.path, ssoEditRefusal(schema.body, "schema"));
+  for (const flow of flows) {
+    refuseUneditable(flow.path, ssoEditRefusal(flow.body, "flow"));
+  }
+  return flows;
+}
+
+/** The schema and flow edits a run will make, before anything is written. */
 type PlannedEdits = {
   readonly schema: SsoResult<object>;
   readonly flows: ReadonlyArray<{ flow: FlowFile; result: SsoResult<object> }>;
@@ -588,4 +566,12 @@ function planEdits(schema: SchemaFile, slug: string, flows: readonly FlowFile[])
       result.skipped.map((entry) => ({ ...entry, region: `${flow.path} ${entry.region}` })),
     ),
   };
+}
+
+/** The project-relative files the planned edits change. */
+function editedFiles(schema: SchemaFile, edits: PlannedEdits): string[] {
+  return [
+    ...(edits.schema.changed ? [schema.path] : []),
+    ...edits.flows.filter(({ result }) => result.changed).map(({ flow }) => flow.path),
+  ];
 }

@@ -12,7 +12,7 @@ describe("auth-method password enable", () => {
         const app = await aSetUpApp();
         platform.isNotZitadel();
 
-        expect(await app.authMethod("password", "enable")).toSucceed();
+        expect(await app.enableMethod("password")).toSucceed();
       });
     });
 
@@ -21,7 +21,7 @@ describe("auth-method password enable", () => {
         const app = await aSetUpApp();
         platform.isUnavailable();
 
-        expect(await app.authMethod("password", "enable")).toSucceed();
+        expect(await app.enableMethod("password")).toSucceed();
       });
     });
   });
@@ -35,14 +35,14 @@ describe("auth-method password enable", () => {
           schema["x-auth-methods"] = { ...schema["x-auth-methods"], password: { enabled: false } };
         });
 
-        expect(await app.authMethod("password", "enable")).toFailWith("E_VALIDATION");
+        expect(await app.enableMethod("password")).toFailWith("E_VALIDATION");
       });
 
       it("changes nothing when password is already on", async () => {
         const app = await aSetUpApp();
         const files = await app.snapshot();
 
-        expect(await app.authMethod("password", "enable")).toSucceed();
+        expect(await app.enableMethod("password")).toSucceed();
 
         expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
       });
@@ -50,7 +50,7 @@ describe("auth-method password enable", () => {
       it("leaves nothing to publish when password is already on", async () => {
         const app = await aSetUpApp();
 
-        expect(await app.authMethod("password", "enable")).toSucceed();
+        expect(await app.enableMethod("password")).toSucceed();
 
         expect(await app.plan()).toReportNothingToDo();
       });
@@ -64,7 +64,7 @@ describe("auth-method password enable", () => {
               password: { enabled: false },
             };
           });
-          expect(await app.authMethod("password", "enable")).toSucceed();
+          expect(await app.enableMethod("password")).toSucceed();
           expect(await app.apply()).toSucceed();
 
           const { schema } = await app.publishedSchema();
@@ -78,7 +78,7 @@ describe("auth-method password enable", () => {
       it("says there was nothing to enable", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.authMethodRendered("password", "enable");
+        const result = await app.enableMethodRendered("password");
 
         expect(result).toPrint("Nothing to enable for default-human-user");
       });
@@ -86,7 +86,7 @@ describe("auth-method password enable", () => {
       it("renders text rather than a json envelope", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.authMethodRendered("password", "enable");
+        const result = await app.enableMethodRendered("password");
 
         expect(result).toPrintNoJson();
       });

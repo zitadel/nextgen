@@ -22,8 +22,8 @@ import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";
  *   rendered fields change without a separate component.
  * - `branding` swaps the tenant payload the mock overlays on every response.
  * - `sso` offers identity providers on the steps that can start a sign-in,
- *   which is what the flow looks like after `zitadel auth-method sso enable`. The shipped
- *   flow has none, so it is off by default.
+ *   which is what the flow looks like after `zitadel auth-method sso enable`.
+ *   The shipped flow has none, so it is off by default.
  *
  * Interactive fixture emails (typed live in the rendered form):
  * - `wrong@example.com` -> inline "Wrong email or password." on the password
@@ -47,9 +47,9 @@ export interface OrchestratorArgs {
 export const mock = setupMockHandlers();
 
 /**
- * What `zitadel auth-method sso enable --provider google` leaves in the flow, plus a tenant's own OIDC
- * connection — the second one has no brand mark, which is what every provider
- * looks like before its artwork lands.
+ * What `zitadel auth-method sso enable --provider google` leaves in the flow,
+ * plus a tenant's own OIDC connection — the second one has no brand mark, which
+ * is what every provider looks like before its artwork lands.
  */
 export const SSO_PROVIDERS = [
   { id: "google", name: "Google", template: "google" },

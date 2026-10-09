@@ -19,11 +19,11 @@ import type { PromptContext, SetupAnswers, SetupPrompt, SsoAnswer } from "./type
  * questions and takes "not now" as a first-class answer (#1081).
  *
  * Registering the OAuth application is the developer's to do and cannot be
- * automated, so the question announces what to register and where before
- * asking for anything back. Declining costs nothing: `auth-method sso enable` performs
+ * automated, so the question announces what to register and where before asking
+ * for anything back. Declining costs nothing: `auth-method sso enable` performs
  * exactly this journey on an existing Project, which is why this prompt
- * collects answers rather than doing any work — the scaffolding step writes
- * the connection, the schema and the flow in one place for both paths.
+ * collects answers rather than doing any work — the scaffolding step writes the
+ * connection, the schema and the flow in one place for both paths.
  *
  * `--sso` skips only the parts it answers. A flagged run that could not
  * supply the secret — it is never a flag, and only a scripted run pipes it in
@@ -82,8 +82,9 @@ export class SocialSignInPrompt implements SetupPrompt {
   private async chooseProviders(): Promise<readonly string[]> {
     const chosen = await multiselect({
       message: "Add social sign-in providers?",
-      // Nothing preselected, and declining costs nothing: `auth-method sso enable`
-      // performs this journey on an existing Project later.
+      // Nothing preselected, and declining costs nothing:
+      // `auth-method sso enable` performs this journey on an existing Project
+      // later.
       required: false,
       options: IDP_PROVIDERS.map((provider) => ({
         value: provider,

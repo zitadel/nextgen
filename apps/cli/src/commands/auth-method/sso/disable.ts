@@ -1,9 +1,16 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { Flags } from "@oclif/core";
+import { IDP_PROVIDERS } from "@zitadel/config/idp";
 import { consola } from "consola";
 
-import { usableSignInMethods } from "../../../lib/auth-methods";
+import {
+  listedProviders,
+  refuseBrokenFlows,
+  refuseUneditable,
+  usableSignInMethods,
+} from "../../../lib/auth-methods";
 import { ZitadelError } from "../../../lib/errors";
 import {
   removeSsoFromFlow,
@@ -11,27 +18,25 @@ import {
   ssoEditRefusal,
   ssoProvidersRefusal,
 } from "../../../lib/idp";
-import { isObject, stableStringify } from "../../../lib/json";
-import { CommandGroups, type JsonEnvelope, nonBlankString } from "../../../lib/oclif";
+import { stableStringify } from "../../../lib/json";
 import {
-  activeBodies,
   AuthMethodCommand,
-  FORCE_FLAG,
-  malformedRefusal,
-  optionArgs,
-  refuseBrokenFlows,
-  SCHEMA_FLAG,
-} from "../shared";
+  CommandGroups,
+  type JsonEnvelope,
+  nonBlankString,
+} from "../../../lib/oclif";
+import { optionArgs } from "../../../lib/public-cli";
 
 /**
  * `auth-method sso disable` (ADR 069 §2): remove one provider from a schema
  * and from the login flows that run against it.
  *
  * The connection file and its published credentials are kept, so enabling the
- * provider again does not ask for them. The routes and steps `auth-method sso enable`
- * added stay in the flows; without a provider they are never reached.
+ * provider again does not ask for them. The routes and steps
+ * `auth-method sso enable` added stay in the flows; without a provider they
+ * are never reached.
  */
-export default class SsoDisable extends AuthMethodCommand {
+export default class AuthMethodSsoDisable extends AuthMethodCommand {
   static override description = "Remove an identity provider from a user schema.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -39,53 +44,58 @@ export default class SsoDisable extends AuthMethodCommand {
     "<%= config.bin %> auth-method sso disable --provider google --schema customers",
   ];
   static override flags = {
-    // Not `required`, as on `auth-method sso enable`: the refusal below names the next
-    // move, and oclif's own would not. A provider is always named, because
-    // removing every provider at once would be a different, larger change.
+    // Not `required`, as on `auth-method sso enable`: the refusal below names
+    // the next move, and oclif's own would not. A provider is always named,
+    // because removing every provider at once would be a different, larger
+    // change.
     provider: nonBlankString({ description: "Identity provider to remove." }),
-    ...SCHEMA_FLAG,
-    ...FORCE_FLAG,
+    // `--force` is per command, not global (ADR 064 §10): here it permits
+    // removing the last way to sign in, which the server allows for a schema
+    // whose users are only managed through the API.
+    force: Flags.boolean({
+      char: "f",
+      description:
+        "Disable the schema's last way to sign in. Its users can then only be managed through the API.",
+    }),
   };
 
   async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(SsoDisable);
+    const { flags } = await this.parse(AuthMethodSsoDisable);
     const { cwd, cwdArgs, schema, flows } = await this.target(flags);
     const { dryRun } = this.meta;
 
     const provider = flags.provider;
     if (provider === undefined) {
+      // Every provider the schema lists, well-formed or not: any of them is
+      // one the developer may want to remove.
       throw new ZitadelError("E_VALIDATION", "Name the provider to remove", {
-        hint: `Pass --provider, e.g. --provider google. ${schema.name} offers: ${offered(schema.body).join(", ") || "none"}.`,
+        hint: `Pass --provider, e.g. --provider ${IDP_PROVIDERS[0]}. ${schema.name} offers: ${listedProviders(schema.body).join(", ") || "none"}.`,
       });
     }
-    // The same shapes `auth-method sso enable` refuses: a region that is not what these
-    // editors write is someone's, and is not overwritten.
-    const malformed = ssoEditRefusal(schema.body, "schema");
-    if (malformed !== undefined) {
-      throw malformedRefusal(schema, malformed);
-    }
+    // The same shapes `auth-method sso enable` refuses: a region that is not
+    // what these editors write is someone's, and is not overwritten.
+    refuseUneditable(schema.path, ssoEditRefusal(schema.body, "schema"));
     for (const file of flows) {
-      const refusal = ssoProvidersRefusal(file.body);
-      if (refusal !== undefined) {
-        throw new ZitadelError("E_VALIDATION", `${file.path}: ${refusal}`, {
-          hint:
-            "This command edits that region, and it is not the shape it edits. " +
-            "Fix it against the dialect in .zitadel/meta/, then run the command again.",
-          details: { file: file.path, region: refusal },
-        });
-      }
+      refuseUneditable(file.path, ssoProvidersRefusal(file.body));
     }
 
     const schemaChange = removeSsoFromSchema(schema.body, provider);
-    const flowChanges = flows.map((file) => ({
-      file,
-      after: removeSsoFromFlow(file.body, provider).document as Record<string, unknown>,
-    }));
     const after = schemaChange.document as Record<string, unknown>;
-    const changedFlows = flowChanges.filter(({ file, after: body }) => body !== file.body);
-    const changed = schemaChange.changed || changedFlows.length > 0;
+    const flowChanges = flows.map((file) => {
+      const change = removeSsoFromFlow(file.body, provider);
+      return {
+        file,
+        after: change.document as Record<string, unknown>,
+        changed: change.changed,
+      };
+    });
+    const changedFlows = flowChanges.filter((change) => change.changed);
+    const changed = [
+      ...(schemaChange.changed ? [schema.path] : []),
+      ...changedFlows.map(({ file }) => file.path),
+    ];
 
-    if (changed) {
+    if (changed.length > 0) {
       // Before the last-method guard: these refusals have no override, so
       // nobody should be asked to confirm a change that fails anyway.
       refuseBrokenFlows(schema, after, flowChanges);
@@ -100,7 +110,6 @@ export default class SsoDisable extends AuthMethodCommand {
           ...optionArgs("--provider", provider),
           ...optionArgs("--schema", schema.name),
         ],
-        turningOff: [],
         cwdArgs,
       });
       if (!proceed) {
@@ -111,25 +120,19 @@ export default class SsoDisable extends AuthMethodCommand {
     // When only a flow still offered the provider, say so: the schema itself
     // did not change.
     const where = schemaChange.changed ? schema.name : `the login flows of ${schema.name}`;
-    const files = [
-      ...(schemaChange.changed ? [schema.path] : []),
-      ...changedFlows.map(({ file }) => file.path),
-    ];
     const data = {
       schema: schema.name,
       file: schema.path,
       method: "sso",
       provider,
       changed,
-      files,
       usable: usableSignInMethods(after),
     };
     const outcome = {
       schema,
       before: schema.body,
       after,
-      flowsAfter: activeBodies(flowChanges.map(({ after: body }) => body)),
-      notOffered: [],
+      flowsAfter: flowChanges.map(({ after: body }) => body),
     };
 
     if (dryRun) {
@@ -138,9 +141,10 @@ export default class SsoDisable extends AuthMethodCommand {
         status: "skipped",
         reason: "dry-run",
         data,
-        pretty: changed
-          ? `Would remove ${provider} from ${where}`
-          : `${schema.name} does not offer ${provider}`,
+        pretty:
+          changed.length > 0
+            ? `Would remove ${provider} from ${where}`
+            : `${schema.name} does not offer ${provider}`,
       });
     }
     if (schemaChange.changed) {
@@ -149,28 +153,20 @@ export default class SsoDisable extends AuthMethodCommand {
     for (const { file, after: body } of changedFlows) {
       await writeFile(join(cwd, file.path), `${stableStringify(body)}\n`);
     }
-    for (const path of files) {
+    for (const path of changed) {
       consola.success(`Updated ${path}`);
     }
-    if (!changed) {
+    if (changed.length === 0) {
       consola.info(`${schema.name} does not offer ${provider}`);
     }
     this.reportOutcome(outcome);
     return this.emit({
       status: "ok",
-      data: { ...data, ...this.followUps(changed, cwdArgs) },
-      pretty: changed
-        ? `Removed ${provider} from ${where}`
-        : `${schema.name} does not offer ${provider}`,
+      data: { ...data, ...this.followUps(changed.length > 0, cwdArgs) },
+      pretty:
+        changed.length > 0
+          ? `Removed ${provider} from ${where}`
+          : `${schema.name} does not offer ${provider}`,
     });
   }
-}
-
-/** The providers a schema lists, for the hint when none is named. */
-function offered(schema: Record<string, unknown>): string[] {
-  const methods = schema["x-auth-methods"];
-  const sso = isObject(methods) ? methods.sso : undefined;
-  return isObject(sso) && Array.isArray(sso.providers)
-    ? sso.providers.filter((p): p is string => typeof p === "string")
-    : [];
 }

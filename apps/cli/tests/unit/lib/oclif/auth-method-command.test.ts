@@ -1,21 +1,17 @@
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 import { confirm, isCancel } from "@clack/prompts";
 import { Config } from "@oclif/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import PasskeyDisable from "../../../src/commands/auth-method/passkey/disable";
-import SsoDisable from "../../../src/commands/auth-method/sso/disable";
-import { cliPackageRoot } from "../../helpers/oclif-build";
+import AuthMethodPasskeyDisable from "../../../../src/commands/auth-method/passkey/disable";
+import AuthMethodSsoDisable from "../../../../src/commands/auth-method/sso/disable";
+import { makeProject, readJson, writeJson } from "../../../helpers/local-project";
+import { cliPackageRoot } from "../../../helpers/oclif-build";
 
-// The terminal paths of the shared auth-method base (src/commands/auth-method/
-// shared.ts): the confirmation that guards the last way to sign in, and the
-// runs that never prompt. The other auth-method tests run --non-interactive
-// against the built CLI, where a prompt cannot be answered; this file runs the
-// command classes in-process, so it can mock the prompt (a module-level
-// vi.mock, which is why it is a file of its own).
+// The terminal paths of the auth-method base class: the confirmation that
+// guards the last way to sign in, and the runs that never prompt. The command
+// tests run --non-interactive against the built CLI, where a prompt cannot be
+// answered; this file runs the command classes in-process, so it can mock the
+// prompt (a module-level vi.mock, which is why it is a file of its own).
 vi.mock("@clack/prompts", async (importOriginal) => {
   const original = await importOriginal<typeof import("@clack/prompts")>();
   return {
@@ -27,7 +23,8 @@ vi.mock("@clack/prompts", async (importOriginal) => {
   };
 });
 
-// Restored exactly as found, so a stream that had no own `isTTY` gets none back.
+// Restored exactly as found, so a stream that had no own `isTTY` gets none
+// back.
 const tty = {
   stdout: Object.getOwnPropertyDescriptor(process.stdout, "isTTY"),
   stdin: Object.getOwnPropertyDescriptor(process.stdin, "isTTY"),
@@ -60,7 +57,8 @@ afterEach(async () => {
 
 /**
  * Run a command class in-process with its output kept out of the test log:
- * oclif prints through console.log and console.error, consola through the streams.
+ * oclif prints through console.log and console.error, consola through the
+ * streams.
  */
 async function quietly<T>(run: () => Promise<T>): Promise<T> {
   vi.spyOn(process.stdout, "write").mockImplementation(() => true);
@@ -70,33 +68,39 @@ async function quietly<T>(run: () => Promise<T>): Promise<T> {
   return run();
 }
 
-/** A Project whose only enabled factor is passkey, with no flows to stop the change. */
-async function passkeyOnlyProject(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-auth-method-confirm-"));
-  await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
-  await writeFile(join(cwd, "zitadel.json"), `${JSON.stringify({ version: "0.0.1" })}\n`);
-  await writeFile(
-    join(cwd, ".zitadel/schemas/default-human-user.json"),
-    `${JSON.stringify({
-      type: "object",
-      "x-identifier": "email",
-      properties: { email: { type: "string" } },
-      "x-auth-methods": { password: { enabled: false }, passkey: { enabled: true } },
-    })}\n`,
-  );
-  return cwd;
+const schemaWith = (methods: Record<string, unknown>) => ({
+  type: "object",
+  "x-identifier": "email",
+  properties: { email: { type: "string" } },
+  "x-auth-methods": methods,
+});
+
+/**
+ * A Project whose only enabled method is passkey, with no flows to stop the
+ * change.
+ */
+function passkeyOnlyProject(): Promise<string> {
+  return makeProject({
+    schemas: {
+      "default-human-user": schemaWith({
+        password: { enabled: false },
+        passkey: { enabled: true },
+      }),
+    },
+  });
 }
 
-async function passkey(cwd: string): Promise<unknown> {
-  const schema = JSON.parse(
-    await readFile(join(cwd, ".zitadel/schemas/default-human-user.json"), "utf8"),
-  ) as { "x-auth-methods": Record<string, unknown> };
-  return schema["x-auth-methods"].passkey;
+/** The `x-auth-methods` entry of one method, as the run left it. */
+async function methodOf(cwd: string, method: string): Promise<unknown> {
+  const schema = await readJson(cwd, ".zitadel/schemas/default-human-user.json");
+  return (schema["x-auth-methods"] as Record<string, unknown>)[method];
 }
 
 async function disablePasskey(cwd: string, ...extra: string[]) {
   const config = await Config.load({ root: cliPackageRoot });
-  return quietly(() => PasskeyDisable.run(["--cwd", cwd, "--no-telemetry", ...extra], config));
+  return quietly(() =>
+    AuthMethodPasskeyDisable.run(["--cwd", cwd, "--no-telemetry", ...extra], config),
+  );
 }
 
 describe("auth-method passkey disable confirmation", () => {
@@ -116,10 +120,10 @@ describe("auth-method passkey disable confirmation", () => {
     const envelope = await disablePasskey(cwd);
 
     expect(envelope).toMatchObject({ status: "skipped", reason: "disable-cancelled" });
-    expect(await passkey(cwd)).toEqual({ enabled: true });
+    expect(await methodOf(cwd, "passkey")).toEqual({ enabled: true });
   });
 
-  it("disables the factor and warns when confirmed", async () => {
+  it("disables the method and warns when confirmed", async () => {
     const cwd = await passkeyOnlyProject();
     vi.mocked(confirm).mockResolvedValue(true);
 
@@ -131,7 +135,7 @@ describe("auth-method passkey disable confirmation", () => {
         "default-human-user has no way to sign in left. Its users can only be managed through the API.",
       ],
     });
-    expect(await passkey(cwd)).toEqual({ enabled: false });
+    expect(await methodOf(cwd, "passkey")).toEqual({ enabled: false });
   });
 });
 
@@ -144,41 +148,26 @@ describe("auth-method passkey disable cancelled with Ctrl-C", () => {
     const envelope = await disablePasskey(cwd);
 
     expect(envelope).toMatchObject({ status: "skipped", reason: "disable-cancelled" });
-    expect(await passkey(cwd)).toEqual({ enabled: true });
+    expect(await methodOf(cwd, "passkey")).toEqual({ enabled: true });
   });
 });
 
-/** A Project whose only way to sign in is Google, offered by its one flow. */
-async function googleOnlyProject(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-auth-method-confirm-sso-"));
-  await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
-  await writeFile(join(cwd, "zitadel.json"), `${JSON.stringify({ version: "0.0.1" })}\n`);
-  await writeFile(
-    join(cwd, ".zitadel/schemas/default-human-user.json"),
-    `${JSON.stringify({
-      type: "object",
-      "x-identifier": "email",
-      properties: { email: { type: "string" } },
-      "x-auth-methods": {
+/** A Project whose only way to sign in is Google. */
+function googleOnlyProject(): Promise<string> {
+  return makeProject({
+    schemas: {
+      "default-human-user": schemaWith({
         password: { enabled: false },
         sso: { enabled: true, providers: ["google"] },
-      },
-    })}\n`,
-  );
-  return cwd;
-}
-
-async function sso(cwd: string): Promise<unknown> {
-  const schema = JSON.parse(
-    await readFile(join(cwd, ".zitadel/schemas/default-human-user.json"), "utf8"),
-  ) as { "x-auth-methods": Record<string, unknown> };
-  return schema["x-auth-methods"].sso;
+      }),
+    },
+  });
 }
 
 async function disableGoogle(cwd: string) {
   const config = await Config.load({ root: cliPackageRoot });
   return quietly(() =>
-    SsoDisable.run(["--provider", "google", "--cwd", cwd, "--no-telemetry"], config),
+    AuthMethodSsoDisable.run(["--provider", "google", "--cwd", cwd, "--no-telemetry"], config),
   );
 }
 
@@ -203,7 +192,7 @@ describe("auth-method sso disable confirmation", () => {
     const envelope = await disableGoogle(cwd);
 
     expect(envelope).toMatchObject({ status: "skipped", reason: "disable-cancelled" });
-    expect(await sso(cwd)).toEqual({ enabled: true, providers: ["google"] });
+    expect(await methodOf(cwd, "sso")).toEqual({ enabled: true, providers: ["google"] });
   });
 
   it("removes the provider and warns when confirmed", async () => {
@@ -218,17 +207,32 @@ describe("auth-method sso disable confirmation", () => {
         "default-human-user has no way to sign in left. Its users can only be managed through the API.",
       ],
     });
-    expect(await sso(cwd)).toEqual({ enabled: false });
+    expect(await methodOf(cwd, "sso")).toEqual({ enabled: false });
   });
 });
 
 describe("auth-method passkey disable in a terminal without a prompt", () => {
-  it("refuses a dry run instead of asking", async () => {
+  it("does not ask on a dry run", async () => {
     const cwd = await passkeyOnlyProject();
 
-    await expect(disablePasskey(cwd, "--dry-run")).rejects.toThrow();
+    await disablePasskey(cwd, "--dry-run");
 
     expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it("previews a dry run, and warns, rather than refusing", async () => {
+    const cwd = await passkeyOnlyProject();
+
+    const envelope = await disablePasskey(cwd, "--dry-run");
+
+    expect(envelope).toMatchObject({
+      status: "skipped",
+      reason: "dry-run",
+      warnings: [
+        "default-human-user would have no way to sign in left. Its users can only be managed through the API.",
+      ],
+    });
+    expect(await methodOf(cwd, "passkey")).toEqual({ enabled: true });
   });
 
   it("does not ask when --force is passed", async () => {
@@ -244,20 +248,16 @@ describe("auth-method passkey disable in a terminal without a prompt", () => {
 describe("auth-method passkey disable run from inside the Project", () => {
   it("suggests plan and apply without --cwd", async () => {
     const cwd = await passkeyOnlyProject();
-    await writeFile(
-      join(cwd, ".zitadel/schemas/default-human-user.json"),
-      `${JSON.stringify({
-        type: "object",
-        "x-identifier": "email",
-        properties: { email: { type: "string" } },
-        "x-auth-methods": { password: { enabled: true }, passkey: { enabled: true } },
-      })}\n`,
+    await writeJson(
+      cwd,
+      ".zitadel/schemas/default-human-user.json",
+      schemaWith({ password: { enabled: true }, passkey: { enabled: true } }),
     );
     vi.spyOn(process, "cwd").mockReturnValue(cwd);
     const config = await Config.load({ root: cliPackageRoot });
 
     const envelope = await quietly(() =>
-      PasskeyDisable.run(["--no-telemetry", "--non-interactive"], config),
+      AuthMethodPasskeyDisable.run(["--no-telemetry", "--non-interactive"], config),
     );
 
     expect(envelope).toMatchObject({ data: { next_args: [["plan"], ["apply"]] } });

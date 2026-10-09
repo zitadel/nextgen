@@ -12,7 +12,7 @@ describe("auth-method password disable", () => {
         const app = await aSetUpApp();
         platform.isNotZitadel();
 
-        expect(await app.authMethod("password", "disable")).toFailWith("E_VALIDATION");
+        expect(await app.disableMethod("password")).toFailWith("E_VALIDATION");
       });
     });
 
@@ -21,7 +21,7 @@ describe("auth-method password disable", () => {
         const app = await aSetUpApp();
         platform.isUnavailable();
 
-        expect(await app.authMethod("password", "disable")).toFailWith("E_VALIDATION");
+        expect(await app.disableMethod("password")).toFailWith("E_VALIDATION");
       });
     });
   });
@@ -31,14 +31,14 @@ describe("auth-method password disable", () => {
       it("refuses while a login flow still asks for a password", async () => {
         const app = await aSetUpApp();
 
-        expect(await app.authMethod("password", "disable")).toFailWith("E_VALIDATION");
+        expect(await app.disableMethod("password")).toFailWith("E_VALIDATION");
       });
 
       it("leaves the project as it was when it refuses", async () => {
         const app = await aSetUpApp();
         const files = await app.snapshot();
 
-        await app.authMethod("password", "disable");
+        await app.disableMethod("password");
 
         expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
       });
@@ -46,7 +46,7 @@ describe("auth-method password disable", () => {
       it("leaves nothing to publish when it refuses", async () => {
         const app = await aSetUpApp();
 
-        await app.authMethod("password", "disable");
+        await app.disableMethod("password");
 
         expect(await app.plan()).toReportNothingToDo();
       });
@@ -56,7 +56,7 @@ describe("auth-method password disable", () => {
       it("says which flow step still asks for a password", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.authMethodRendered("password", "disable");
+        const result = await app.disableMethodRendered("password");
 
         expect(result).toSay('step "password"');
       });

@@ -378,8 +378,8 @@ Remove an identity provider from a user schema.
 ```
 USAGE
   $ zitadel auth-method sso disable [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--provider <value>]
-    [--schema <value>] [-f]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
+    [--provider <value>] [-f]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -418,8 +418,8 @@ Add an identity provider to a user schema.
 ```
 USAGE
   $ zitadel auth-method sso enable [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--provider google]
-    [--schema <value>] [--client-id <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
+    [--provider google] [--client-id <value>]
 
 FLAGS
   -c, --cwd=<value>        Project directory to operate on.
@@ -2148,8 +2148,8 @@ Deprecated alias of auth-method sso enable.
 ```
 USAGE
   $ zitadel sso enable [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--provider google]
-    [--schema <value>] [--client-id <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
+    [--provider google] [--client-id <value>]
 
 FLAGS
   -c, --cwd=<value>        Project directory to operate on.

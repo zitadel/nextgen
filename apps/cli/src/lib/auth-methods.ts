@@ -1,10 +1,8 @@
-import { flowConfigSchema } from "@zitadel/config/schemas";
-import {
-  PURPOSE_FLIP_TARGETS,
-  validateFlowDefinition,
-  type FlowValidationIssue,
-} from "@zitadel/config/validate";
+import type { FlowValidationIssue } from "@zitadel/config/validate";
 
+import { ZitadelError } from "./errors";
+import { checkFlow, offeredSignInMethods } from "./flows";
+import { type FlowFile, methodsOf, type SchemaFile } from "./idp";
 import { isObject } from "./json";
 
 /**
@@ -14,49 +12,35 @@ import { isObject } from "./json";
  * SSO is not one of them: a provider needs credentials, a connection file and
  * flow edits, so `auth-method sso` handles it with its own commands.
  */
-export const AUTH_FACTORS = ["password", "passkey"] as const;
-export type AuthFactor = (typeof AUTH_FACTORS)[number];
-
-/** What switching some factors did to a schema document. */
-export type AuthFactorChange = {
-  /** The schema with the change applied; the input itself when nothing changed. */
-  readonly document: Record<string, unknown>;
-  /** Factors whose state this run changed. */
-  readonly changed: AuthFactor[];
-  /** Factors that were already in the requested state. */
-  readonly unchanged: AuthFactor[];
-};
+export const TOGGLEABLE_METHODS = ["password", "passkey"] as const;
+export type ToggleableMethod = (typeof TOGGLEABLE_METHODS)[number];
 
 /**
- * Set `x-auth-methods.<factor>.enabled` for each factor.
+ * Set `x-auth-methods.<method>.enabled` on a schema document.
  *
  * Only `enabled` is written. Anything else under the method, and every other
- * method, belongs to whoever put it there. A factor already in the requested
- * state is reported as unchanged, so running the command twice writes nothing
- * the second time.
+ * method, belongs to whoever put it there. A method already in the requested
+ * state is reported as unchanged and the input returned as it is, so running
+ * the command twice writes nothing the second time.
+ *
+ * @param schema - The schema document, which is not mutated.
+ * @param method - The method to switch.
+ * @param enabled - The state to put it in.
  */
-export function setAuthFactors(
+export function setMethodEnabled(
   schema: Record<string, unknown>,
-  factors: readonly AuthFactor[],
+  method: ToggleableMethod,
   enabled: boolean,
-): AuthFactorChange {
+): { readonly document: Record<string, unknown>; readonly changed: boolean } {
   const existing = isObject(schema["x-auth-methods"]) ? schema["x-auth-methods"] : {};
-  const methods: Record<string, unknown> = { ...existing };
-  const changed: AuthFactor[] = [];
-  const unchanged: AuthFactor[] = [];
-  for (const factor of factors) {
-    const entry = isObject(methods[factor]) ? methods[factor] : {};
-    if ((entry.enabled === true) === enabled) {
-      unchanged.push(factor);
-      continue;
-    }
-    methods[factor] = { ...entry, enabled };
-    changed.push(factor);
+  const entry = isObject(existing[method]) ? existing[method] : {};
+  if ((entry.enabled === true) === enabled) {
+    return { document: schema, changed: false };
   }
-  if (changed.length === 0) {
-    return { document: schema, changed, unchanged };
-  }
-  return { document: { ...schema, "x-auth-methods": methods }, changed, unchanged };
+  return {
+    document: { ...schema, "x-auth-methods": { ...existing, [method]: { ...entry, enabled } } },
+    changed: true,
+  };
 }
 
 /**
@@ -68,33 +52,36 @@ export function setAuthFactors(
  * way in.
  */
 export function usableSignInMethods(schema: Record<string, unknown>): string[] {
+  return methodsOf(schema).filter((method) =>
+    method === "sso"
+      ? enabledProviders(schema).length > 0
+      : (TOGGLEABLE_METHODS as readonly string[]).includes(method),
+  );
+}
+
+/**
+ * Every string a schema lists under `x-auth-methods.sso.providers`, as
+ * written. Some may be no way to sign in at all (see
+ * {@link usableSignInMethods}); this is what the schema says, for a hint that
+ * names what the developer can remove.
+ */
+export function listedProviders(schema: Record<string, unknown>): string[] {
   const methods = schema["x-auth-methods"];
-  if (!isObject(methods)) {
-    return [];
-  }
-  const on = (name: string) => isObject(methods[name]) && methods[name].enabled === true;
-  const usable: string[] = AUTH_FACTORS.filter(on);
-  if (on("sso") && enabledProviders(schema).length > 0) {
-    usable.push("sso");
-  }
-  return usable.sort();
+  const sso = isObject(methods) ? methods.sso : undefined;
+  return isObject(sso) && Array.isArray(sso.providers)
+    ? sso.providers.filter((p): p is string => typeof p === "string")
+    : [];
 }
 
 /** The provider slug format the SSO auth-method meta-schema allows. */
 const PROVIDER_SLUG = /^[a-z0-9][a-z0-9_-]*$/;
 
 /**
- * The SSO providers the schema enables, keeping only well-formed slugs: an
- * entry like `7` names no connection, so it is no way to sign in.
+ * The listed providers that are well-formed slugs: an entry like `Not A Slug`
+ * names no connection, so it is no way to sign in.
  */
 function enabledProviders(schema: Record<string, unknown>): string[] {
-  const methods = schema["x-auth-methods"];
-  const sso = isObject(methods) ? methods.sso : undefined;
-  return isObject(sso) && Array.isArray(sso.providers)
-    ? sso.providers.filter(
-        (p): p is string => typeof p === "string" && p.length <= 64 && PROVIDER_SLUG.test(p),
-      )
-    : [];
+  return listedProviders(schema).filter((p) => p.length <= 64 && PROVIDER_SLUG.test(p));
 }
 
 /**
@@ -107,197 +94,32 @@ export function hasIdentifier(schema: Record<string, unknown>): boolean {
   return typeof identifier === "string" && identifier.trim() !== "";
 }
 
-/** What validating a flow against a schema change found. */
-export type FlowCheck =
-  /**
-   * The flow has a structural error, so the validator never reached the rules
-   * that depend on the schema and cannot say whether the change breaks it.
-   */
-  | { readonly kind: "unchecked"; readonly issues: FlowValidationIssue[] }
-  /** The errors the change introduces; empty when the flow is unaffected. */
-  | { readonly kind: "checked"; readonly introduced: FlowValidationIssue[] };
-
-/**
- * Check what a schema change from `before` to `after` does to a flow.
- *
- * Only new errors count. A schema-rule error the flow already had is `plan`'s
- * to report, and refusing an unrelated change because of it would block the
- * developer from an edit that might be part of the fix.
- */
-export function checkFlow(
-  flow: object,
-  before: Record<string, unknown>,
-  after: Record<string, unknown>,
-  // The flow as the change leaves it. Password and passkey never edit a flow,
-  // so it defaults to the flow itself; `sso disable` removes the provider.
-  flowAfter: object = flow,
-): FlowCheck {
-  // The semantic validator reads a malformed shape leniently (a string where
-  // `fields` should be a list reads as no fields), so the raw file is checked
-  // against the canonical flow schema first, as `plan` does.
-  const shape = flowConfigSchema.safeParse(flowAfter);
-  if (!shape.success) {
-    return {
-      kind: "unchecked",
-      issues: shape.error.issues.map((issue) => ({
-        severity: "error",
-        rule: "definition",
-        message: `${issue.path.join(".") || "(root)"}: ${issue.message}`,
-      })),
-    };
-  }
-  // The validator runs the schema rules only over a structurally sound flow,
-  // so without this the change would always look harmless on a broken one.
-  const structural = validateFlowDefinition(flowAfter);
-  if (structural.length > 0) {
-    return { kind: "unchecked", issues: structural };
-  }
-  const key = (issue: FlowValidationIssue) => `${issue.rule}\u0000${issue.message}`;
-  const existing = new Set(
-    validateFlowDefinition(flow, before)
-      .filter((issue) => issue.severity === "error")
-      .map(key),
-  );
-  return {
-    kind: "checked",
-    introduced: validateFlowDefinition(flowAfter, after).filter(
-      (issue) => issue.severity === "error" && !existing.has(key(issue)),
-    ),
-  };
-}
-
-/**
- * Whether a flow offers a factor to the person signing in. Password is
- * field-shaped (a step collects `x-auth-methods#password`) and passkey is
- * action-shaped (a `passkey` or `passkey_register` action), mirroring how the
- * validator tells the two apart.
- */
-export function flowOffers(flow: Record<string, unknown>, factor: AuthFactor): boolean {
-  const steps = Array.isArray(flow.steps) ? flow.steps.filter(isObject) : [];
-  if (factor === "password") {
-    return steps.some(
-      (step) => Array.isArray(step.fields) && step.fields.includes("x-auth-methods#password"),
-    );
-  }
-  return steps.some(
-    (step) =>
-      Array.isArray(step.actions) &&
-      step.actions.some(
-        (action) =>
-          isObject(action) && (action.kind === "passkey" || action.kind === "passkey_register"),
-      ),
-  );
-}
-
 /**
  * The methods a schema enables that some active flow lets an existing user
- * sign in with. Passkey counts only through a `passkey` action:
- * `passkey_register` enrols a new credential and signs nobody in. SSO counts
- * only through a step offering a provider the schema itself enables.
+ * sign in with. SSO counts only through a step offering a provider the schema
+ * itself enables.
+ *
+ * @param schema - The schema document.
+ * @param flows - The flows that run against it, whatever their status: only
+ *   the active ones count.
  */
 export function reachableSignInMethods(
   schema: Record<string, unknown>,
-  activeFlows: readonly Record<string, unknown>[],
+  flows: readonly Record<string, unknown>[],
 ): string[] {
-  // Only the login journey signs anyone in: a register-only flow, or the
-  // register steps of a combined one, can collect a password or offer a
-  // passkey without letting an existing user back in.
-  const loginFlows = activeFlows.map(loginJourney);
-  return usableSignInMethods(schema).filter((method) =>
-    loginFlows.some((flow) =>
-      method === "sso"
-        ? offersSso(flow, enabledProviders(schema))
-        : method === "passkey"
-          ? signsInWithPasskey(flow)
-          : flowOffers(flow, method as AuthFactor),
-    ),
-  );
+  const offered = offeredSignInMethods(flows, enabledProviders(schema));
+  return usableSignInMethods(schema).filter((method) => offered.includes(method));
 }
 
 /**
- * Outcomes the engine answers by switching from login to register without a
- * `purpose` on the transition: the validator's flip table, plus
- * `sso_user_not_found`, which it leaves out of that table on purpose but
- * which routes to registration the same way.
- */
-const LOGIN_LEAVING_OUTCOMES = new Set([
-  ...Object.keys(PURPOSE_FLIP_TARGETS.login ?? {}),
-  "sso_user_not_found",
-]);
-
-/**
- * The flow cut down to the steps reachable from its `login` entry, following
- * transitions that stay in the login purpose. No `login` purpose means no
- * steps: such a flow signs nobody in.
- */
-function loginJourney(flow: Record<string, unknown>): Record<string, unknown> {
-  const purposes = isObject(flow.purposes) ? flow.purposes : {};
-  const entry = purposes.login;
-  const byName = new Map(steps(flow).map((step) => [step.name, step]));
-  const reached = new Set<string>();
-  const queue = typeof entry === "string" ? [entry] : [];
-  while (queue.length > 0) {
-    const name = queue.shift() as string;
-    const step = byName.get(name);
-    if (reached.has(name) || step === undefined) {
-      continue;
-    }
-    reached.add(name);
-    const transitions = isObject(step.transitions) ? Object.entries(step.transitions) : [];
-    for (const [outcome, transition] of transitions) {
-      // Some outcomes switch the journey to registration on their own, with
-      // no `purpose` on the transition: the steps after them register a new
-      // user rather than sign one in.
-      if (LOGIN_LEAVING_OUTCOMES.has(outcome)) {
-        continue;
-      }
-      // Mirrors the validator's local adjacency: a transition with an
-      // `action` goes to another flow, whose step names are not this flow's,
-      // and one into another purpose (register, say) leaves the login
-      // journey. A null `action` or `purpose` is the same as an absent one.
-      if (
-        isObject(transition) &&
-        typeof transition.target === "string" &&
-        (transition.action === undefined || transition.action === null) &&
-        (transition.purpose === undefined ||
-          transition.purpose === null ||
-          transition.purpose === "login")
-      ) {
-        queue.push(transition.target);
-      }
-    }
-  }
-  return { ...flow, steps: steps(flow).filter((step) => reached.has(step.name as string)) };
-}
-
-function steps(flow: Record<string, unknown>): Record<string, unknown>[] {
-  return Array.isArray(flow.steps) ? flow.steps.filter(isObject) : [];
-}
-
-function signsInWithPasskey(flow: Record<string, unknown>): boolean {
-  return steps(flow).some(
-    (step) =>
-      Array.isArray(step.actions) &&
-      step.actions.some((action) => isObject(action) && action.kind === "passkey"),
-  );
-}
-
-function offersSso(flow: Record<string, unknown>, providers: readonly string[]): boolean {
-  return steps(flow).some(
-    (step) =>
-      Array.isArray(step.sso_providers) &&
-      step.sso_providers.some((p) => typeof p === "string" && providers.includes(p)),
-  );
-}
-
-/**
- * Why the schema's `x-auth-methods` cannot be edited safely, or `undefined`
- * when it can. Only an absent container or entry counts as empty: a value of
- * the wrong shape was written by someone, and rewriting it would discard it.
+ * Why the schema's `x-auth-methods` cannot be edited safely for one method, or
+ * `undefined` when it can. Only an absent container or entry counts as empty:
+ * a value of the wrong shape was written by someone, and rewriting it would
+ * discard it.
  */
 export function malformedAuthMethods(
   schema: Record<string, unknown>,
-  factors: readonly AuthFactor[],
+  method: ToggleableMethod,
 ): string | undefined {
   const methods = schema["x-auth-methods"];
   if (methods === undefined) {
@@ -306,20 +128,111 @@ export function malformedAuthMethods(
   if (!isObject(methods)) {
     return "x-auth-methods is not an object";
   }
-  for (const factor of factors) {
-    const entry = methods[factor];
-    if (entry === undefined) {
-      continue;
-    }
-    if (!isObject(entry)) {
-      return `x-auth-methods.${factor} is not an object`;
-    }
-    // The meta-schema requires a boolean. A missing one or a string "true" is
-    // neither on nor off, so it is refused rather than overwritten or read as
-    // disabled. Only an absent entry counts as empty.
-    if (typeof entry.enabled !== "boolean") {
-      return `x-auth-methods.${factor}.enabled is not a boolean`;
-    }
+  const entry = methods[method];
+  if (entry === undefined) {
+    return undefined;
+  }
+  if (!isObject(entry)) {
+    return `x-auth-methods.${method} is not an object`;
+  }
+  // The meta-schema requires a boolean. A missing one or a string "true" is
+  // neither on nor off, so it is refused rather than overwritten or read as
+  // disabled.
+  if (typeof entry.enabled !== "boolean") {
+    return `x-auth-methods.${method}.enabled is not a boolean`;
   }
   return undefined;
+}
+
+/**
+ * Refuse to edit a file whose region is not the shape the command edits.
+ * Rewriting it would discard whatever a developer put there, so the run stops
+ * before anything is written or published.
+ *
+ * @param path - The project-relative file the region is in.
+ * @param region - What is wrong with it, or `undefined` when nothing is, in
+ *   which case this returns.
+ */
+export function refuseUneditable(path: string, region: string | undefined): void {
+  if (region === undefined) {
+    return;
+  }
+  throw new ZitadelError("E_VALIDATION", `${path}: ${region}`, {
+    hint:
+      "This command edits that region, and it is not the shape it edits. " +
+      "Fix it against the dialect in .zitadel/meta/, then run the command again.",
+    details: { file: path, region },
+  });
+}
+
+/**
+ * Refuse when a flow running against the schema would stop validating once
+ * the schema and the flows are changed, or cannot be checked at all. `plan`
+ * would reject either, so the change is refused before it is written.
+ *
+ * @param schema - The schema being changed.
+ * @param after - The schema as the change leaves it.
+ * @param flows - Each flow that runs against the schema, with its body as the
+ *   change leaves it.
+ * @param introduced - What to say about errors the change introduces. Neutral
+ *   by default; a command that leaves flows alone says which method is still
+ *   used instead.
+ */
+export function refuseBrokenFlows(
+  schema: SchemaFile,
+  after: Record<string, unknown>,
+  flows: ReadonlyArray<{ readonly file: FlowFile; readonly after: Record<string, unknown> }>,
+  introduced: { heading: string; hint: string } = {
+    heading: "A login flow would stop validating after this change:",
+    hint: "Fix the steps named above, then run the command again.",
+  },
+): void {
+  const unchecked: FlowIssue[] = [];
+  const added: FlowIssue[] = [];
+  for (const { file, after: flowAfter } of flows) {
+    const check = checkFlow(file.body, schema.body, after, flowAfter);
+    if (check.kind === "unchecked") {
+      unchecked.push(...check.issues.map((issue) => ({ path: file.path, issue })));
+    } else {
+      added.push(...check.introduced.map((issue) => ({ path: file.path, issue })));
+    }
+  }
+  if (unchecked.length > 0) {
+    throw brokenFlowsError(
+      schema.path,
+      unchecked,
+      "A login flow has errors, so it cannot be checked against the changed schema:",
+      "Fix those errors first (`zitadel plan` reports them too), then run the command again.",
+    );
+  }
+  if (added.length > 0) {
+    throw brokenFlowsError(schema.path, added, introduced.heading, introduced.hint);
+  }
+}
+
+/** A validation issue and the flow file it was found in. */
+type FlowIssue = { readonly path: string; readonly issue: FlowValidationIssue };
+
+function brokenFlowsError(
+  file: string,
+  issues: readonly FlowIssue[],
+  heading: string,
+  hint: string,
+): ZitadelError {
+  return new ZitadelError(
+    "E_VALIDATION",
+    `${heading}\n${issues.map(({ path, issue }) => `  - ${path}: ${issue.message}`).join("\n")}`,
+    {
+      hint,
+      details: {
+        file,
+        issues: issues.map(({ path, issue }) => ({
+          path,
+          rule: issue.rule,
+          message: issue.message,
+          ...(issue.step === undefined ? {} : { step: issue.step }),
+        })),
+      },
+    },
+  );
 }

@@ -1,10 +1,11 @@
-import { chmod, mkdir, mkdtemp, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, rename } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import { COMMANDS } from "../../../src/index";
+import { makeProject as writeProject, readJson } from "../../helpers/local-project";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
 type Envelope = {
@@ -15,7 +16,11 @@ type Envelope = {
   data?: Record<string, unknown>;
   warnings?: string[];
   next_commands?: string[];
-  details?: { issues?: Array<{ rule: string; step?: string }>; usable?: string[] };
+  details?: {
+    issues?: Array<{ rule: string; step?: string }>;
+    usable?: string[];
+    suggested_args?: string[][];
+  };
 };
 
 const passwordSchema = (name = "default-human-user") => ({
@@ -51,21 +56,11 @@ const passwordFlow = (schemaName = "default-human-user") => ({
 });
 
 /** A Project with the given schemas, each with its own login flow. */
-async function makeProject(
+function makeProject(
   schemas: Record<string, Record<string, unknown>> = { "default-human-user": passwordSchema() },
   flows: Record<string, unknown> = { "default-human-user-login": passwordFlow() },
 ): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-auth-method-"));
-  await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
-  await mkdir(join(cwd, ".zitadel/flows"), { recursive: true });
-  await writeFile(join(cwd, "zitadel.json"), `${JSON.stringify({ version: "0.0.1" })}\n`);
-  for (const [name, body] of Object.entries(schemas)) {
-    await writeFile(join(cwd, `.zitadel/schemas/${name}.json`), `${JSON.stringify(body)}\n`);
-  }
-  for (const [name, body] of Object.entries(flows)) {
-    await writeFile(join(cwd, `.zitadel/flows/${name}.json`), `${JSON.stringify(body)}\n`);
-  }
-  return cwd;
+  return writeProject({ schemas, flows });
 }
 
 async function run(
@@ -92,7 +87,7 @@ function suggested(command: string): string {
   return command.replace(/^.*? auth-method /, "").replace(/--cwd \S+/, "--cwd <cwd>");
 }
 
-/** A schema whose only enabled factor is passkey. */
+/** A schema whose only enabled method is passkey. */
 function passkeyOnlySchema() {
   return {
     "default-human-user": {
@@ -103,13 +98,10 @@ function passkeyOnlySchema() {
 }
 
 async function readSchema(cwd: string, name = "default-human-user") {
-  return JSON.parse(await readFile(join(cwd, `.zitadel/schemas/${name}.json`), "utf8")) as {
+  return (await readJson(cwd, `.zitadel/schemas/${name}.json`)) as {
     "x-auth-methods": Record<string, { enabled: boolean }>;
   };
 }
-
-// Temp dirs are left for the OS to reclaim, as the integration helper does
-// (#1498): a recursive delete on teardown flakes under CI load.
 
 describe("auth-method password and passkey", () => {
   describe("the envelope", () => {
@@ -122,7 +114,7 @@ describe("auth-method password and passkey", () => {
         schema: "default-human-user",
         file: ".zitadel/schemas/default-human-user.json",
         method: "passkey",
-        changed: true,
+        changed: [".zitadel/schemas/default-human-user.json"],
         usable: ["password"],
         not_offered: [],
       });
@@ -167,7 +159,7 @@ describe("auth-method password and passkey", () => {
 
       const { envelope } = await run(cwd, "password", "enable");
 
-      expect(envelope.data).toMatchObject({ changed: false, next_commands: [], next_args: [] });
+      expect(envelope.data).toMatchObject({ changed: [], next_commands: [], next_args: [] });
     });
 
     it("does not count a register step that only enrols a passkey", async () => {
@@ -208,7 +200,7 @@ describe("auth-method password and passkey", () => {
       expect(envelope.data?.not_offered).toEqual(["passkey"]);
     });
 
-    it("does not count a draft flow as offering the factor", async () => {
+    it("does not count a draft flow as offering the method", async () => {
       const draft = {
         ...passwordFlow(),
         name: "draft-login",
@@ -235,8 +227,8 @@ describe("auth-method password and passkey", () => {
     });
 
     it("warns when no active flow offers any method the schema enables", async () => {
-      // Copilot's lockout case: password steps removed from the flow, passkey
-      // enabled but never offered, then password disabled.
+      // Password steps removed from the flow, passkey enabled but never
+      // offered, then password disabled: nobody is left a way in.
       const noPassword = {
         ...passwordFlow(),
         steps: [
@@ -258,7 +250,7 @@ describe("auth-method password and passkey", () => {
       ]);
     });
 
-    it("warns about a factor no flow offers", async () => {
+    it("warns about a method no flow offers", async () => {
       const cwd = await makeProject({
         "default-human-user": {
           ...passwordSchema(),
@@ -267,8 +259,6 @@ describe("auth-method password and passkey", () => {
       });
 
       const { envelope } = await run(cwd, "passkey", "enable");
-
-      expect(envelope.data?.changed).toBe(true);
 
       expect(envelope.data?.not_offered).toEqual(["passkey"]);
       expect(envelope.warnings).toEqual([
@@ -328,7 +318,7 @@ describe("auth-method password and passkey", () => {
       });
     });
 
-    it("names the rule and step a disabled factor would break", async () => {
+    it("names the rule and step a disabled method would break", async () => {
       const cwd = await makeProject();
 
       const { envelope } = await run(cwd, "password", "disable");
@@ -422,18 +412,17 @@ describe("auth-method password and passkey", () => {
 
       expect(envelope.next_commands ?? []).toEqual([]);
       expect(envelope.details).toMatchObject({
-        retry_args: [
-          "auth-method",
-          "passkey",
-          "disable",
-          "--schema",
-          "my users&calc",
-          "--cwd",
-          expect.any(String),
-          "--force",
-        ],
         suggested_args: [
-          expect.arrayContaining(["disable", "--force"]),
+          [
+            "auth-method",
+            "passkey",
+            "disable",
+            "--schema",
+            "my users&calc",
+            "--cwd",
+            expect.any(String),
+            "--force",
+          ],
           [
             "auth-method",
             "password",
@@ -447,7 +436,7 @@ describe("auth-method password and passkey", () => {
       });
     });
 
-    it("refuses a factor entry with no enabled value", async () => {
+    it("refuses a method entry with no enabled value", async () => {
       const cwd = await makeProject(
         {
           "default-human-user": {
@@ -501,12 +490,26 @@ describe("auth-method password and passkey", () => {
       const { envelope } = await run(cwd, "passkey", "disable");
 
       expect(envelope.next_commands ?? []).toEqual([]);
-      expect(envelope.details).toMatchObject({
-        retry_args: expect.arrayContaining(["--schema=--force", "--force"]),
-      });
-      expect(envelope.details).toMatchObject({
-        retry_args: expect.not.arrayContaining(["--schema"]),
-      });
+      expect(envelope.details?.suggested_args?.[0]).toEqual(
+        expect.arrayContaining(["--schema=--force", "--force"]),
+      );
+      expect(envelope.details?.suggested_args?.[0]).toEqual(
+        expect.not.arrayContaining(["--schema"]),
+      );
+    });
+
+    it("says how to fix a region that is not the shape it edits", async () => {
+      const cwd = await makeProject(
+        { "default-human-user": { ...passwordSchema(), "x-auth-methods": [] } },
+        {},
+      );
+
+      const { envelope } = await run(cwd, "passkey", "enable");
+
+      expect(envelope.hint).toBe(
+        "This command edits that region, and it is not the shape it edits. " +
+          "Fix it against the dialect in .zitadel/meta/, then run the command again.",
+      );
     });
 
     it("refuses an enabled value that is not a boolean", async () => {
@@ -542,7 +545,7 @@ describe("auth-method password and passkey", () => {
       });
     });
 
-    it("refuses a factor entry that is not an object rather than overwrite it", async () => {
+    it("refuses a method entry that is not an object rather than overwrite it", async () => {
       const cwd = await makeProject(
         {
           "default-human-user": {
@@ -593,21 +596,15 @@ describe("auth-method password and passkey", () => {
 
       const { envelope } = await run(cwd, "password", "enable");
 
-      expect(envelope).toMatchObject({ code: "E_VALIDATION", details: { factor: "password" } });
+      expect(envelope).toMatchObject({ code: "E_VALIDATION", details: { method: "password" } });
     });
 
-    it("keeps --dry-run in the suggestions of a refused dry run", async () => {
+    it("points at the arguments of the --force re-run", async () => {
       const cwd = await makeProject(passkeyOnlySchema(), {});
 
-      const { envelope } = await run(cwd, "passkey", "disable", "--dry-run");
+      const { envelope } = await run(cwd, "passkey", "disable");
 
-      expect(envelope.details).toMatchObject({
-        retry_args: expect.arrayContaining(["--dry-run", "--force"]),
-      });
-      expect(envelope.next_commands).toHaveLength(2);
-      for (const command of envelope.next_commands ?? []) {
-        expect(command).toContain("--dry-run");
-      }
+      expect(envelope.hint).toContain("details.suggested_args");
     });
 
     it("refuses under --dry-run too", async () => {
@@ -638,7 +635,7 @@ describe("auth-method password and passkey", () => {
       },
     });
 
-    it("disables the last factor, which the server allows", async () => {
+    it("disables the last method, which the server allows", async () => {
       const cwd = await makeProject(passkeyOnly(), {});
 
       const { exitCode } = await run(cwd, "passkey", "disable", "--force");
@@ -671,7 +668,7 @@ describe("auth-method password and passkey", () => {
       },
     );
 
-    it("does not override a flow that still uses the factor", async () => {
+    it("does not override a flow that still uses the method", async () => {
       const cwd = await makeProject();
 
       const { envelope } = await run(cwd, "password", "disable", "--force");
@@ -693,7 +690,6 @@ describe("auth-method password and passkey", () => {
 
       const { envelope } = await run(cwd, "passkey", "enable", "--dry-run");
 
-      expect(envelope.data?.changed).toBe(true);
       expect(envelope.warnings).toEqual([
         "No login flow for default-human-user offers passkey yet. Add it to a flow to show it.",
       ]);
@@ -705,8 +701,29 @@ describe("auth-method password and passkey", () => {
       const { envelope } = await run(cwd, "passkey", "disable", "--dry-run");
 
       expect(envelope).toMatchObject({ status: "skipped", reason: "dry-run" });
-      expect(envelope.data?.changed).toBe(true);
       expect((await readSchema(cwd))["x-auth-methods"].passkey).toEqual({ enabled: true });
+    });
+
+    it("lists the file it would change", async () => {
+      const cwd = await makeProject();
+
+      const { envelope } = await run(cwd, "passkey", "disable", "--dry-run");
+
+      expect(envelope.data?.changed).toEqual([".zitadel/schemas/default-human-user.json"]);
+    });
+
+    it("previews removing the last way to sign in rather than refusing, and warns", async () => {
+      const cwd = await makeProject(passkeyOnlySchema(), {});
+
+      const { envelope } = await run(cwd, "passkey", "disable", "--dry-run");
+
+      expect(envelope).toMatchObject({
+        status: "skipped",
+        reason: "dry-run",
+        warnings: [
+          "default-human-user would have no way to sign in left. Its users can only be managed through the API.",
+        ],
+      });
     });
   });
 

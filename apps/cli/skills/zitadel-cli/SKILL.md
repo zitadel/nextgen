@@ -259,24 +259,26 @@ than one:
   removes it.
 
 `sso enable` is a deprecated alias of `auth-method sso enable`; use the new
-command. The commands change only local files, apart from `auth-method sso
-enable`, which also stores the provider's credentials on the project. When they
-refuse, they write and publish nothing, on a dry run too. They refuse to disable
-a method a login flow still asks for, to change a method while a login flow has
-errors that prevent checking it, to enable password on a schema without
-`x-identifier`, to edit a value that is not the shape they edit, and to edit a
-schema that points at an external URL. Disabling the schema's last way to sign
-in needs `--force` when non-interactive; only pass it for a schema whose users
-are managed through the API, and ask the user first. A method that is enabled
-but not offered by any active flow is reported in `warnings` (and in
-`data.not_offered` for password and passkey). `data.changed` is `true` or
-`false` on password, passkey and `sso disable` (which also lists `data.files`),
-and the list of changed files on `sso enable`. Follow `data.next_commands`
-(`plan`, `apply`, and `variables set` when a credential did not reach the
-project) to publish the change. When a path or schema name would need shell
-quoting, `next_commands` is empty and `data.next_args` (or
-`details.suggested_args` on a refusal, re-run first) holds the same commands as
-argument lists.
+command. The commands change only local files, apart from
+`auth-method sso enable`, which also stores the provider's credentials on the
+project. When they refuse, they write and publish nothing, on a dry run too.
+They refuse to disable a method a login flow still asks for, to change a method
+while a login flow has errors that prevent checking it, to enable password on a
+schema without `x-identifier`, to edit a value that is not the shape they edit,
+and to edit a schema that points at an external URL. Disabling the schema's last
+way to sign in needs `--force` when non-interactive; only pass it for a schema
+whose users are managed through the API, and ask the user first. That refusal's
+`details.suggested_args` lists the `--force` re-run first, then the methods that
+could be enabled instead. A dry run of the change is not refused: it previews it
+and warns that no way to sign in would be left. A method that is enabled but not
+offered by any active flow is reported in `warnings` (and in `data.not_offered`
+for password and passkey). Every command reports `data.changed`, the
+project-relative files it wrote (on a dry run, the files it would write), empty
+when nothing changed. Follow `data.next_commands` (`plan`, `apply`, and
+`variables set` when a credential did not reach the project) to publish the
+change. When a path or schema name would need shell quoting, `next_commands` is
+empty and `data.next_args` (or `details.suggested_args` on a refusal) holds the
+same commands as argument lists.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `plan` and `apply`. See the reference below for driving the login UI

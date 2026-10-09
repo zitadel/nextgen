@@ -20,7 +20,7 @@ export function npmSelectorForCliVersion(cliVersion: string): string {
  * between them, so a value that needs quoting is not put in a suggested
  * command at all; callers hand it over as an argument list instead.
  */
-export function isPortableShellWord(value: string): boolean {
+function isPortableShellWord(value: string): boolean {
   // `/` is included so a POSIX-style --cwd path can be suggested as written.
   return /^[A-Za-z0-9_./-]+$/.test(value);
 }
@@ -35,6 +35,19 @@ export function portableCommands(argLists: readonly string[][], cliVersion: stri
     return [];
   }
   return argLists.map((args) => publicCliCommand(args.join(" "), cliVersion));
+}
+
+/**
+ * An option and its value as arguments for a suggested command. A value that
+ * starts with `-` would be read as the next flag, so it is joined with `=`
+ * instead. That token is not a portable shell word, so it also keeps the
+ * string form out of {@link portableCommands}.
+ *
+ * @param option - The option, with its dashes, e.g. `--schema`.
+ * @param value - The value it takes, as the user or a file name gave it.
+ */
+export function optionArgs(option: string, value: string): string[] {
+  return value.startsWith("-") ? [`${option}=${value}`] : [option, value];
 }
 
 export function publicCliCommand(args: string, cliVersion: string): string {
