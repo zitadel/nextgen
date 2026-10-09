@@ -78,10 +78,16 @@ func (UnimplementedHandler) CreateBranding(ctx context.Context, req *Branding, p
 // unknown release id or digest answers `404` with `rel.not_found`, and a
 // revoked release answers `409` with `rel.revoked`.
 // `targets` lists `primary`, which expands to every primary origin of the
-// project, and exact origins. An origin that is not a primary origin of
-// the project answers `403` with `proj.origin_not_allowed`, and `primary`
-// on a project with no primary origin answers `400` with `dep.invalid`.
-// The deployment records the resolved origins, sorted, never the keyword.
+// project, and exact origins. An origin that is neither a primary origin
+// of the project nor matches one of its preview patterns answers `403`
+// with `proj.origin_not_allowed`, and `primary` on a project with no
+// primary origin answers `400` with `dep.invalid`. The deployment records
+// the resolved origins, sorted, never the keyword.
+// A deployment to preview URLs creates the preview for each of them, or
+// renews it when it exists, in the same transaction, with the expiry set
+// from `ttl`; each target in the response carries that expiry. Primary
+// origins and preview URLs cannot be mixed in one deployment: that
+// answers `400` with `dep.invalid`.
 // Idempotent on what is served: when every resolved target already serves
 // the release, nothing changes and the call answers `200` with the newest
 // deployment to those targets, so a re-run of `zitadel deploy` on
@@ -745,9 +751,10 @@ func (UnimplementedHandler) ListBranding(ctx context.Context, params ListBrandin
 // history of that origin alone, and its first row is the deployment the
 // origin serves.
 // With `live=true`, the list is what is served now: the newest deployment
-// to each target, each carrying only the targets it still serves. A
-// deployment every target of which has since been replaced does not
-// appear. Combined with `origin`, the live view is the one deployment that
+// to each target, each carrying only the targets it still serves, with
+// the expiry of each preview URL. A deployment every target of which has
+// since been replaced, or whose previews have all expired or been
+// removed, does not appear. Combined with `origin`, the live view is the one deployment that
 // origin serves, or empty.
 // `expand: ["release"]` embeds the release each deployment made live, so a
 // history renders with each entry's content without resolving `release_id`
@@ -818,6 +825,17 @@ func (UnimplementedHandler) ListIdpRevisions(ctx context.Context, params ListIdp
 //
 // GET /users/me/projects
 func (UnimplementedHandler) ListMyProjects(ctx context.Context, params ListMyProjectsParams) (r ListMyProjectsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListPreviews implements listPreviews operation.
+//
+// Lists the project's live previews, newest first by `created_at`. An
+// expired or removed preview is not listed; what was deployed to it stays
+// in `GET /deployments`.
+//
+// GET /previews
+func (UnimplementedHandler) ListPreviews(ctx context.Context, params ListPreviewsParams) (r ListPreviewsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -970,6 +988,21 @@ func (UnimplementedHandler) QueryTeams(ctx context.Context, req *QueryTeamsReque
 //
 // POST /users/query
 func (UnimplementedHandler) QueryUsers(ctx context.Context, req *QueryUsersRequest, params QueryUsersParams) (r QueryUsersRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// RemovePreview implements removePreview operation.
+//
+// Ends a preview before it expires: the URL stops being served at once.
+// The deployments to it stay in the history.
+// Idempotent: a URL with no live preview, including one that has already
+// expired or was removed before, answers `204` too, so a cleanup that
+// races the expiry still succeeds.
+// The URL travels in the body rather than the path because an origin
+// contains `/`.
+//
+// POST /previews/remove
+func (UnimplementedHandler) RemovePreview(ctx context.Context, req *RemovePreviewRequest, params RemovePreviewParams) (r RemovePreviewRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

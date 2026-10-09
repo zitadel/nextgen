@@ -75,4 +75,30 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 		require.NoError(t, err)
 		expectNotImplemented(t, resp)
 	})
+
+	t.Run("create to preview URLs", func(t *testing.T) {
+		resp, err := fixture.client.CreateDeployment(t.Context(),
+			&api.CreateDeploymentRequest{
+				ReleaseID: api.NewOptReleaseID(releaseID),
+				Targets:   api.DeploymentTargetsRequest{"https://acme-git-sso-acmeinc.vercel.app"},
+				TTL:       api.NewOptPreviewTTL("168h"),
+			},
+			api.CreateDeploymentParams{ProjectID: project})
+		require.NoError(t, err)
+		expectNotImplemented(t, resp)
+	})
+
+	t.Run("list previews", func(t *testing.T) {
+		resp, err := fixture.client.ListPreviews(t.Context(), api.ListPreviewsParams{ProjectID: project})
+		require.NoError(t, err)
+		expectNotImplemented(t, resp)
+	})
+
+	t.Run("remove a preview", func(t *testing.T) {
+		resp, err := fixture.client.RemovePreview(t.Context(),
+			&api.RemovePreviewRequest{Origin: "https://acme-git-sso-acmeinc.vercel.app"},
+			api.RemovePreviewParams{ProjectID: project})
+		require.NoError(t, err)
+		expectNotImplemented(t, resp)
+	})
 }

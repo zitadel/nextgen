@@ -6,3 +6,13 @@ required:
 properties:
   origin:
     $ref: ../../components/schemas/origin.yaml
+  expires_at:
+    description: |
+      Present only on a target that is a preview URL: when its preview
+      expires. Null once the preview has expired or was removed. Absent on a
+      primary origin, which does not expire.
+    oneOf:
+      - type: string
+        format: date-time
+      - type: 'null'
+    example: '2026-10-09T14:10:00Z'

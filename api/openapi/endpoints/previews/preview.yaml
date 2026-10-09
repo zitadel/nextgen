@@ -1,0 +1,34 @@
+title: Preview
+type: object
+description: |
+  A preview URL that is live: an origin matching one of the project's
+  preview patterns, with something deployed to it, until it expires.
+
+  There is no create operation. A deployment whose targets are preview URLs
+  creates the preview for each of them, or renews it when it exists, in the
+  same transaction, so a preview with nothing deployed to it cannot exist.
+  A preview ends when it expires or is removed with `POST /previews/remove`;
+  the deployments to it stay in the history either way.
+required:
+  - origin
+  - expires_at
+  - created_at
+properties:
+  origin:
+    readOnly: true
+    description: The preview URL, as scheme and host.
+    $ref: ../../components/schemas/origin.yaml
+  expires_at:
+    readOnly: true
+    type: string
+    format: date-time
+    description: |
+      When the preview stops being served. Every deployment to it sets this
+      again from its `ttl`.
+    example: '2026-10-09T14:10:00Z'
+  created_at:
+    readOnly: true
+    type: string
+    format: date-time
+    description: When the first deployment to the URL created the preview.
+    example: '2026-10-02T14:10:00Z'

@@ -59,6 +59,11 @@ tags:
       Endpoints for a project's runtime slots (ADR 035). Identity only:
       the release an environment runs and its deployment history arrive with
       the deployments endpoints, and environment lifecycle with its own ADR.
+  - name: Previews
+    description: |
+      Preview URLs that are live. A deployment to a URL matching one of the
+      project's preview patterns creates or renews its preview; list them
+      here and remove one before it expires.
   - name: Grants
     description: |
       Collaboration grants that bind a user or team to project.viewer,
@@ -208,6 +213,10 @@ paths:
     $ref: endpoints/deployments/methods.yaml
   /deployments/{deployment_id}:
     $ref: endpoints/deployments/by_id/methods.yaml
+  /previews:
+    $ref: endpoints/previews/methods.yaml
+  /previews/remove:
+    $ref: endpoints/previews/remove/methods.yaml
 
 components:
   securitySchemes:

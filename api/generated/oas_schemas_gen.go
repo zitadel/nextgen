@@ -10183,6 +10183,13 @@ type CreateDeploymentRequest struct {
 	// `404` with `rel.not_found`; deploying never assembles a release.
 	ContentHash OptString                `json:"content_hash"`
 	Targets     DeploymentTargetsRequest `json:"targets"`
+	// How long each preview URL in `targets` stays live, counted from this
+	// deployment. Every preview it writes gets the same expiry, renewing a
+	// preview that already exists. Omitted, the project's default applies; a
+	// value above the project's maximum answers `400` with `dep.invalid`.
+	// Only valid when the targets are preview URLs: with primary origins it
+	// answers `400` with `dep.invalid`.
+	TTL OptPreviewTTL `json:"ttl"`
 	// Why this deployment happens. Omitted, the server records `deploy`.
 	Reason OptDeploymentReason `json:"reason"`
 	// A short free-form summary of why this deployment happened, analogous to
@@ -10214,6 +10221,11 @@ func (s *CreateDeploymentRequest) GetTargets() DeploymentTargetsRequest {
 	return s.Targets
 }
 
+// GetTTL returns the value of TTL.
+func (s *CreateDeploymentRequest) GetTTL() OptPreviewTTL {
+	return s.TTL
+}
+
 // GetReason returns the value of Reason.
 func (s *CreateDeploymentRequest) GetReason() OptDeploymentReason {
 	return s.Reason
@@ -10242,6 +10254,11 @@ func (s *CreateDeploymentRequest) SetContentHash(val OptString) {
 // SetTargets sets the value of Targets.
 func (s *CreateDeploymentRequest) SetTargets(val DeploymentTargetsRequest) {
 	s.Targets = val
+}
+
+// SetTTL sets the value of TTL.
+func (s *CreateDeploymentRequest) SetTTL(val OptPreviewTTL) {
+	s.TTL = val
 }
 
 // SetReason sets the value of Reason.
@@ -16294,6 +16311,10 @@ func (s *DeploymentReason) UnmarshalText(data []byte) error {
 // Ref: #
 type DeploymentTarget struct {
 	Origin Origin `json:"origin"`
+	// Present only on a target that is a preview URL: when its preview
+	// expires. Null once the preview has expired or was removed. Absent on a
+	// primary origin, which does not expire.
+	ExpiresAt OptNilDateTime `json:"expires_at"`
 }
 
 // GetOrigin returns the value of Origin.
@@ -16301,9 +16322,19 @@ func (s *DeploymentTarget) GetOrigin() Origin {
 	return s.Origin
 }
 
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *DeploymentTarget) GetExpiresAt() OptNilDateTime {
+	return s.ExpiresAt
+}
+
 // SetOrigin sets the value of Origin.
 func (s *DeploymentTarget) SetOrigin(val Origin) {
 	s.Origin = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *DeploymentTarget) SetExpiresAt(val OptNilDateTime) {
+	s.ExpiresAt = val
 }
 
 type DeploymentTargetsRequest []string
@@ -34239,6 +34270,245 @@ func (s *ListMyProjectsResponseHeaders) SetResponse(val ListMyProjectsResponse) 
 
 func (*ListMyProjectsResponseHeaders) listMyProjectsRes() {}
 
+// ListPreviewsErrorResponse represents sum type.
+type ListPreviewsErrorResponse struct {
+	Type                ListPreviewsErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	DepNotFound         DepNotFound
+	DepPermissionDenied DepPermissionDenied
+	Internal            Internal
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+}
+
+// ListPreviewsErrorResponseType is oneOf type of ListPreviewsErrorResponse.
+type ListPreviewsErrorResponseType string
+
+// Possible values for ListPreviewsErrorResponseType.
+const (
+	AuthUnauthorizedListPreviewsErrorResponse    ListPreviewsErrorResponseType = "auth.unauthorized"
+	DepNotFoundListPreviewsErrorResponse         ListPreviewsErrorResponseType = "dep.not_found"
+	DepPermissionDeniedListPreviewsErrorResponse ListPreviewsErrorResponseType = "dep.permission_denied"
+	InternalListPreviewsErrorResponse            ListPreviewsErrorResponseType = "internal"
+	NotImplementedListPreviewsErrorResponse      ListPreviewsErrorResponseType = "not_implemented"
+	ReqInvalidListPreviewsErrorResponse          ListPreviewsErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether ListPreviewsErrorResponse is AuthUnauthorized.
+func (s ListPreviewsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListPreviewsErrorResponse
+}
+
+// IsDepNotFound reports whether ListPreviewsErrorResponse is DepNotFound.
+func (s ListPreviewsErrorResponse) IsDepNotFound() bool {
+	return s.Type == DepNotFoundListPreviewsErrorResponse
+}
+
+// IsDepPermissionDenied reports whether ListPreviewsErrorResponse is DepPermissionDenied.
+func (s ListPreviewsErrorResponse) IsDepPermissionDenied() bool {
+	return s.Type == DepPermissionDeniedListPreviewsErrorResponse
+}
+
+// IsInternal reports whether ListPreviewsErrorResponse is Internal.
+func (s ListPreviewsErrorResponse) IsInternal() bool {
+	return s.Type == InternalListPreviewsErrorResponse
+}
+
+// IsNotImplemented reports whether ListPreviewsErrorResponse is NotImplemented.
+func (s ListPreviewsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListPreviewsErrorResponse
+}
+
+// IsReqInvalid reports whether ListPreviewsErrorResponse is ReqInvalid.
+func (s ListPreviewsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListPreviewsErrorResponse
+}
+
+// SetAuthUnauthorized sets ListPreviewsErrorResponse to AuthUnauthorized.
+func (s *ListPreviewsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListPreviewsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListPreviewsErrorResponse is AuthUnauthorized.
+func (s ListPreviewsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListPreviewsErrorResponse returns new ListPreviewsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListPreviewsErrorResponse(v AuthUnauthorized) ListPreviewsErrorResponse {
+	var s ListPreviewsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetDepNotFound sets ListPreviewsErrorResponse to DepNotFound.
+func (s *ListPreviewsErrorResponse) SetDepNotFound(v DepNotFound) {
+	s.Type = DepNotFoundListPreviewsErrorResponse
+	s.DepNotFound = v
+}
+
+// GetDepNotFound returns DepNotFound and true boolean if ListPreviewsErrorResponse is DepNotFound.
+func (s ListPreviewsErrorResponse) GetDepNotFound() (v DepNotFound, ok bool) {
+	if !s.IsDepNotFound() {
+		return v, false
+	}
+	return s.DepNotFound, true
+}
+
+// NewDepNotFoundListPreviewsErrorResponse returns new ListPreviewsErrorResponse from DepNotFound.
+func NewDepNotFoundListPreviewsErrorResponse(v DepNotFound) ListPreviewsErrorResponse {
+	var s ListPreviewsErrorResponse
+	s.SetDepNotFound(v)
+	return s
+}
+
+// SetDepPermissionDenied sets ListPreviewsErrorResponse to DepPermissionDenied.
+func (s *ListPreviewsErrorResponse) SetDepPermissionDenied(v DepPermissionDenied) {
+	s.Type = DepPermissionDeniedListPreviewsErrorResponse
+	s.DepPermissionDenied = v
+}
+
+// GetDepPermissionDenied returns DepPermissionDenied and true boolean if ListPreviewsErrorResponse is DepPermissionDenied.
+func (s ListPreviewsErrorResponse) GetDepPermissionDenied() (v DepPermissionDenied, ok bool) {
+	if !s.IsDepPermissionDenied() {
+		return v, false
+	}
+	return s.DepPermissionDenied, true
+}
+
+// NewDepPermissionDeniedListPreviewsErrorResponse returns new ListPreviewsErrorResponse from DepPermissionDenied.
+func NewDepPermissionDeniedListPreviewsErrorResponse(v DepPermissionDenied) ListPreviewsErrorResponse {
+	var s ListPreviewsErrorResponse
+	s.SetDepPermissionDenied(v)
+	return s
+}
+
+// SetInternal sets ListPreviewsErrorResponse to Internal.
+func (s *ListPreviewsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListPreviewsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListPreviewsErrorResponse is Internal.
+func (s ListPreviewsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListPreviewsErrorResponse returns new ListPreviewsErrorResponse from Internal.
+func NewInternalListPreviewsErrorResponse(v Internal) ListPreviewsErrorResponse {
+	var s ListPreviewsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets ListPreviewsErrorResponse to NotImplemented.
+func (s *ListPreviewsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListPreviewsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListPreviewsErrorResponse is NotImplemented.
+func (s ListPreviewsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListPreviewsErrorResponse returns new ListPreviewsErrorResponse from NotImplemented.
+func NewNotImplementedListPreviewsErrorResponse(v NotImplemented) ListPreviewsErrorResponse {
+	var s ListPreviewsErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets ListPreviewsErrorResponse to ReqInvalid.
+func (s *ListPreviewsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListPreviewsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListPreviewsErrorResponse is ReqInvalid.
+func (s ListPreviewsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListPreviewsErrorResponse returns new ListPreviewsErrorResponse from ReqInvalid.
+func NewReqInvalidListPreviewsErrorResponse(v ReqInvalid) ListPreviewsErrorResponse {
+	var s ListPreviewsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// ListPreviewsErrorResponseStatusCode wraps ListPreviewsErrorResponse with StatusCode.
+type ListPreviewsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListPreviewsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListPreviewsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListPreviewsErrorResponseStatusCode) GetResponse() ListPreviewsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListPreviewsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListPreviewsErrorResponseStatusCode) SetResponse(val ListPreviewsErrorResponse) {
+	s.Response = val
+}
+
+func (*ListPreviewsErrorResponseStatusCode) listPreviewsRes() {}
+
+// The project's live previews, newest first.
+// Ref: #
+type ListPreviewsResponse struct {
+	Previews []Preview `json:"previews"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetPreviews returns the value of Previews.
+func (s *ListPreviewsResponse) GetPreviews() []Preview {
+	return s.Previews
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListPreviewsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetPreviews sets the value of Previews.
+func (s *ListPreviewsResponse) SetPreviews(val []Preview) {
+	s.Previews = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListPreviewsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListPreviewsResponse) listPreviewsRes() {}
+
 // ListReleasesErrorResponse represents sum type.
 type ListReleasesErrorResponse struct {
 	Type                ListReleasesErrorResponseType // switch on this field
@@ -45853,6 +46123,52 @@ func (o OptPatchUserRequestAttributes) Or(d PatchUserRequestAttributes) PatchUse
 	return d
 }
 
+// NewOptPreviewTTL returns new OptPreviewTTL with value set to v.
+func NewOptPreviewTTL(v PreviewTTL) OptPreviewTTL {
+	return OptPreviewTTL{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPreviewTTL is optional PreviewTTL.
+type OptPreviewTTL struct {
+	Value PreviewTTL
+	Set   bool
+}
+
+// IsSet returns true if OptPreviewTTL was set.
+func (o OptPreviewTTL) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPreviewTTL) Reset() {
+	var v PreviewTTL
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPreviewTTL) SetTo(v PreviewTTL) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPreviewTTL) Get() (v PreviewTTL, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPreviewTTL) Or(d PreviewTTL) PreviewTTL {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptProjClaimExpiredDetails returns new OptProjClaimExpiredDetails with value set to v.
 func NewOptProjClaimExpiredDetails(v ProjClaimExpiredDetails) OptProjClaimExpiredDetails {
 	return OptProjClaimExpiredDetails{
@@ -51736,6 +52052,56 @@ func (s *PatchUserRequestAttributes) init() PatchUserRequestAttributes {
 	return m
 }
 
+// A preview URL that is live: an origin matching one of the project's
+// preview patterns, with something deployed to it, until it expires.
+// There is no create operation. A deployment whose targets are preview URLs
+// creates the preview for each of them, or renews it when it exists, in the
+// same transaction, so a preview with nothing deployed to it cannot exist.
+// A preview ends when it expires or is removed with `POST /previews/remove`;
+// the deployments to it stay in the history either way.
+// Ref: #
+type Preview struct {
+	// The preview URL, as scheme and host.
+	Origin Origin `json:"origin"`
+	// When the preview stops being served. Every deployment to it sets this
+	// again from its `ttl`.
+	ExpiresAt time.Time `json:"expires_at"`
+	// When the first deployment to the URL created the preview.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetOrigin returns the value of Origin.
+func (s *Preview) GetOrigin() Origin {
+	return s.Origin
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *Preview) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *Preview) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetOrigin sets the value of Origin.
+func (s *Preview) SetOrigin(val Origin) {
+	s.Origin = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *Preview) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *Preview) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+type PreviewTTL string
+
 // Merged schema.
 // Ref: #
 type ProjClaimExpired struct {
@@ -57031,6 +57397,264 @@ func (s *ReleaseSummary) SetProjectID(val ProjectID) {
 // SetMetadata sets the value of Metadata.
 func (s *ReleaseSummary) SetMetadata(val ReleaseMetadata) {
 	s.Metadata = val
+}
+
+// RemovePreviewErrorResponse represents sum type.
+type RemovePreviewErrorResponse struct {
+	Type                RemovePreviewErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	DepNotFound         DepNotFound
+	DepPermissionDenied DepPermissionDenied
+	EnvProjectNotFound  EnvProjectNotFound
+	Internal            Internal
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+}
+
+// RemovePreviewErrorResponseType is oneOf type of RemovePreviewErrorResponse.
+type RemovePreviewErrorResponseType string
+
+// Possible values for RemovePreviewErrorResponseType.
+const (
+	AuthUnauthorizedRemovePreviewErrorResponse    RemovePreviewErrorResponseType = "auth.unauthorized"
+	DepNotFoundRemovePreviewErrorResponse         RemovePreviewErrorResponseType = "dep.not_found"
+	DepPermissionDeniedRemovePreviewErrorResponse RemovePreviewErrorResponseType = "dep.permission_denied"
+	EnvProjectNotFoundRemovePreviewErrorResponse  RemovePreviewErrorResponseType = "env.project_not_found"
+	InternalRemovePreviewErrorResponse            RemovePreviewErrorResponseType = "internal"
+	NotImplementedRemovePreviewErrorResponse      RemovePreviewErrorResponseType = "not_implemented"
+	ReqInvalidRemovePreviewErrorResponse          RemovePreviewErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether RemovePreviewErrorResponse is AuthUnauthorized.
+func (s RemovePreviewErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedRemovePreviewErrorResponse
+}
+
+// IsDepNotFound reports whether RemovePreviewErrorResponse is DepNotFound.
+func (s RemovePreviewErrorResponse) IsDepNotFound() bool {
+	return s.Type == DepNotFoundRemovePreviewErrorResponse
+}
+
+// IsDepPermissionDenied reports whether RemovePreviewErrorResponse is DepPermissionDenied.
+func (s RemovePreviewErrorResponse) IsDepPermissionDenied() bool {
+	return s.Type == DepPermissionDeniedRemovePreviewErrorResponse
+}
+
+// IsEnvProjectNotFound reports whether RemovePreviewErrorResponse is EnvProjectNotFound.
+func (s RemovePreviewErrorResponse) IsEnvProjectNotFound() bool {
+	return s.Type == EnvProjectNotFoundRemovePreviewErrorResponse
+}
+
+// IsInternal reports whether RemovePreviewErrorResponse is Internal.
+func (s RemovePreviewErrorResponse) IsInternal() bool {
+	return s.Type == InternalRemovePreviewErrorResponse
+}
+
+// IsNotImplemented reports whether RemovePreviewErrorResponse is NotImplemented.
+func (s RemovePreviewErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedRemovePreviewErrorResponse
+}
+
+// IsReqInvalid reports whether RemovePreviewErrorResponse is ReqInvalid.
+func (s RemovePreviewErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidRemovePreviewErrorResponse
+}
+
+// SetAuthUnauthorized sets RemovePreviewErrorResponse to AuthUnauthorized.
+func (s *RemovePreviewErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedRemovePreviewErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if RemovePreviewErrorResponse is AuthUnauthorized.
+func (s RemovePreviewErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedRemovePreviewErrorResponse(v AuthUnauthorized) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetDepNotFound sets RemovePreviewErrorResponse to DepNotFound.
+func (s *RemovePreviewErrorResponse) SetDepNotFound(v DepNotFound) {
+	s.Type = DepNotFoundRemovePreviewErrorResponse
+	s.DepNotFound = v
+}
+
+// GetDepNotFound returns DepNotFound and true boolean if RemovePreviewErrorResponse is DepNotFound.
+func (s RemovePreviewErrorResponse) GetDepNotFound() (v DepNotFound, ok bool) {
+	if !s.IsDepNotFound() {
+		return v, false
+	}
+	return s.DepNotFound, true
+}
+
+// NewDepNotFoundRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from DepNotFound.
+func NewDepNotFoundRemovePreviewErrorResponse(v DepNotFound) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetDepNotFound(v)
+	return s
+}
+
+// SetDepPermissionDenied sets RemovePreviewErrorResponse to DepPermissionDenied.
+func (s *RemovePreviewErrorResponse) SetDepPermissionDenied(v DepPermissionDenied) {
+	s.Type = DepPermissionDeniedRemovePreviewErrorResponse
+	s.DepPermissionDenied = v
+}
+
+// GetDepPermissionDenied returns DepPermissionDenied and true boolean if RemovePreviewErrorResponse is DepPermissionDenied.
+func (s RemovePreviewErrorResponse) GetDepPermissionDenied() (v DepPermissionDenied, ok bool) {
+	if !s.IsDepPermissionDenied() {
+		return v, false
+	}
+	return s.DepPermissionDenied, true
+}
+
+// NewDepPermissionDeniedRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from DepPermissionDenied.
+func NewDepPermissionDeniedRemovePreviewErrorResponse(v DepPermissionDenied) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetDepPermissionDenied(v)
+	return s
+}
+
+// SetEnvProjectNotFound sets RemovePreviewErrorResponse to EnvProjectNotFound.
+func (s *RemovePreviewErrorResponse) SetEnvProjectNotFound(v EnvProjectNotFound) {
+	s.Type = EnvProjectNotFoundRemovePreviewErrorResponse
+	s.EnvProjectNotFound = v
+}
+
+// GetEnvProjectNotFound returns EnvProjectNotFound and true boolean if RemovePreviewErrorResponse is EnvProjectNotFound.
+func (s RemovePreviewErrorResponse) GetEnvProjectNotFound() (v EnvProjectNotFound, ok bool) {
+	if !s.IsEnvProjectNotFound() {
+		return v, false
+	}
+	return s.EnvProjectNotFound, true
+}
+
+// NewEnvProjectNotFoundRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from EnvProjectNotFound.
+func NewEnvProjectNotFoundRemovePreviewErrorResponse(v EnvProjectNotFound) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetEnvProjectNotFound(v)
+	return s
+}
+
+// SetInternal sets RemovePreviewErrorResponse to Internal.
+func (s *RemovePreviewErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalRemovePreviewErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if RemovePreviewErrorResponse is Internal.
+func (s RemovePreviewErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from Internal.
+func NewInternalRemovePreviewErrorResponse(v Internal) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets RemovePreviewErrorResponse to NotImplemented.
+func (s *RemovePreviewErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedRemovePreviewErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if RemovePreviewErrorResponse is NotImplemented.
+func (s RemovePreviewErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from NotImplemented.
+func NewNotImplementedRemovePreviewErrorResponse(v NotImplemented) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets RemovePreviewErrorResponse to ReqInvalid.
+func (s *RemovePreviewErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidRemovePreviewErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if RemovePreviewErrorResponse is ReqInvalid.
+func (s RemovePreviewErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from ReqInvalid.
+func NewReqInvalidRemovePreviewErrorResponse(v ReqInvalid) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// RemovePreviewErrorResponseStatusCode wraps RemovePreviewErrorResponse with StatusCode.
+type RemovePreviewErrorResponseStatusCode struct {
+	StatusCode int
+	Response   RemovePreviewErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *RemovePreviewErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *RemovePreviewErrorResponseStatusCode) GetResponse() RemovePreviewErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *RemovePreviewErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *RemovePreviewErrorResponseStatusCode) SetResponse(val RemovePreviewErrorResponse) {
+	s.Response = val
+}
+
+func (*RemovePreviewErrorResponseStatusCode) removePreviewRes() {}
+
+// RemovePreviewNoContent is response for RemovePreview operation.
+type RemovePreviewNoContent struct{}
+
+func (*RemovePreviewNoContent) removePreviewRes() {}
+
+// The preview to remove.
+// Ref: #
+type RemovePreviewRequest struct {
+	// The preview URL, exactly as `GET /previews` lists it.
+	Origin Origin `json:"origin"`
+}
+
+// GetOrigin returns the value of Origin.
+func (s *RemovePreviewRequest) GetOrigin() Origin {
+	return s.Origin
+}
+
+// SetOrigin sets the value of Origin.
+func (s *RemovePreviewRequest) SetOrigin(val Origin) {
+	s.Origin = val
 }
 
 // Merged schema.
