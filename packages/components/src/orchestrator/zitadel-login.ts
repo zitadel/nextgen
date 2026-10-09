@@ -31,7 +31,7 @@ import { resolveLogoUrl } from "./branding.js";
 import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
-import { createLiquidEngine, localiseFlowErrorKeys, parseSsoError } from "./liquid.js";
+import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { en, builtinLocales, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { resolveApi } from "./resolve-api.js";
@@ -1017,8 +1017,7 @@ export class ZitadelLogin extends ZitadelSurface {
     // localise via the catalog with generic per-rule fallbacks; anything
     // else (outcome names, diagnostics) stays verbatim.
     const rawErrors: FlowError[] = step.error
-      ? (parseSsoError(step.error) ??
-        localiseFlowErrorKeys(step.error, {
+      ? (localiseFlowErrorKeys(step.error, {
           locale: this.resolveLocale(),
           stepName: step.name ?? "",
           // Inline-routed keys downgrade to a banner message when the
