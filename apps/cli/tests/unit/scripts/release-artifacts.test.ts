@@ -242,7 +242,7 @@ describe("release artifact helpers", () => {
     ).rejects.toThrow(/requires .+\/dist before packing/);
   });
 
-  it("stamps CLI release packs with the production telemetry channel", async () => {
+  it("packs the CLI release tarball", async () => {
     const { packPublicPackages } = await loadModule();
     const manifest = (await import(
       new URL("../../../../../scripts/release-manifest.mjs", import.meta.url).href
@@ -263,27 +263,19 @@ describe("release artifact helpers", () => {
       );
     }
 
-    const originalChannel = process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL;
-    process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL = "development";
     const calls: Array<{ args: string[]; env: NodeJS.ProcessEnv }> = [];
-    try {
-      await packPublicPackages({
-        repoRoot,
-        outDir,
-        version: "0.1.0-alpha.6",
-        run: async (_command, args, options) => {
-          calls.push({ args, env: options.env });
-        },
-      });
-    } finally {
-      if (originalChannel === undefined) {
-        delete process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL;
-      } else {
-        process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL = originalChannel;
-      }
-    }
+    await packPublicPackages({
+      repoRoot,
+      outDir,
+      version: "0.1.0-alpha.6",
+      run: async (_command, args, options) => {
+        calls.push({ args, env: options.env });
+      },
+    });
 
+    // The CLI ships as a single generic build, so its pack is invoked like
+    // every other public package — no special telemetry-channel env.
     const cliPack = calls.find((call) => call.args.includes("apps/cli"));
-    expect(cliPack?.env.ZITADEL_TELEMETRY_BUILD_CHANNEL).toBe("production");
+    expect(cliPack).toBeDefined();
   });
 });
