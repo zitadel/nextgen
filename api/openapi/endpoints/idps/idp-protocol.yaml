@@ -1,0 +1,5 @@
+type: string
+enum:
+  - oidc
+  - oauth2
+description: The protocol used by the identity provider.

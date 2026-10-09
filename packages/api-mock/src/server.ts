@@ -10,37 +10,48 @@
  *   POST   /sessions/exchange     — exchange handoff_token for session cookie
  *   GET    /sessions/me           — get current session from opaque cookie
  *   DELETE /sessions/me           — revoke the current session (logout)
+ *   POST   /projects/:id/claim/complete — spend a claim challenge (session cookie)
  *   GET    /auth/end-session      — OIDC-style end-session, clears cookies
  *   GET    /.well-known/jwks.json — JWKS for JWT verification (dev convenience)
- *   GET    /auth/keys             — JWKS, spec-defined endpoint (operation `getKeys`)
+ *   GET    /auth/keys             — JWKS at the URL sdk-core's JWT verifier
+ *                                   derives (`${issuerUrl}/auth/keys`). Mock-only:
+ *                                   the OIDC surface is not in api/openapi.
  *
  * Platform routes (mounted via setupPlatformHandlers):
  *   POST   /projects                  — create project
  *   GET    /projects/:id              — fetch project
+ *   POST   /projects/:id/claim/init   — mint a claim challenge
+ *   GET    /projects/:id/claim/status — poll a claim challenge
  *   POST   /schemas                   — create user schema
+ *   GET    /schemas                   — list user schemas
  *   GET    /schemas/:id               — fetch user schema
  *   DELETE /schemas/:id               — delete user schema
  *   POST   /flow_definitions          — create flow definition
  *   GET    /flow_definitions          — list flow definitions
  *   GET    /flow_definitions/:id      — get flow definition
- *   PATCH  /flow_definitions/:id      — update flow definition
- *   DELETE /flow_definitions/:id      — delete flow definition
  */
-import { randomBytes, randomUUID } from "node:crypto";
-import { type Server } from "node:http";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
+import type { Server } from "node:http";
 
-import type { ExchangeHandoff200, GetMySession200 } from "@zitadel/api/generated/model";
-import express from "express";
-import cookieParser from "cookie-parser";
 import { createMiddleware } from "@mswjs/http-middleware";
+import { CompleteClaimBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import type { ExchangeHandoff200, GetMySession200 } from "@zitadel/api/generated/model";
+import cookieParser from "cookie-parser";
+import express from "express";
 
 import { applyBranding } from "./branding.js";
 import { HandoffError, JWK, verifyHandoffToken } from "./crypto.js";
 import { defaultDevBranding } from "./default-dev-branding.js";
 import { setupMockHandlers } from "./handlers.js";
-import { errorBody, setupPlatformHandlers } from "./platform-handlers.js";
+import { buildOpenIdConfiguration } from "./openid-configuration.js";
+import { completeClaimChallenge, errorBody, setupPlatformHandlers } from "./platform-handlers.js";
 
 const SESSION_TTL_SECONDS = 3600;
+
+// The claiming human's account lives in Zitadel's own platform project (ADR
+// 046 §2), so only a session belonging to it may complete a claim. Exported so
+// conformance and downstream tests can mint an eligible session.
+export const PLATFORM_PROJECT_ID = "platform";
 
 /**
  * Tracks handoff tokens (by `jti`) we've already consumed so a replay
@@ -56,10 +67,54 @@ const consumedHandoffJtis = new Set<string>();
 /**
  * In-memory session store. Maps opaque session tokens to session data.
  * Mimics the Go server's encrypted opaque tokens without actual encryption.
- * We extend the API type with an `email` field for client lookups.
  */
-type StoredSession = GetMySession200 & { email?: string | null };
+type StoredSession = GetMySession200;
+
+/**
+ * Demo identities with a resolved display name — the shape a schema
+ * designating `x-display` produces. Any email not listed here signs in with
+ * an identifier-only ref (the shipped default schema designates no display
+ * properties), so both branches of the rendering chain stay exercisable.
+ */
+const DEMO_DISPLAY_NAMES = new Map<string, string>([
+  ["ada@example.com", "Ada Lovelace"],
+  ["grace@example.com", "Grace Hopper"],
+]);
 const sessionStore = new Map<string, StoredSession>();
+
+/** What the request's `__nextgen_session` cookie names, if anything. */
+type SessionLookup =
+  | { status: "missing" }
+  | { status: "unknown"; token: string }
+  | { status: "expired"; token: string }
+  | { status: "active"; token: string; session: StoredSession };
+
+/**
+ * Looks up the request's session by its cookie. An expired session is dropped
+ * from the store, as the server's would no longer resolve. Each route answers
+ * the failures in its own words; this only says which one it was.
+ */
+function lookupSession(req: express.Request): SessionLookup {
+  const token = (req.cookies as Record<string, string>).__nextgen_session;
+  if (!token) return { status: "missing" };
+  const session = sessionStore.get(token);
+  if (!session) return { status: "unknown", token };
+  if (new Date(session.expires_at) < new Date()) {
+    sessionStore.delete(token);
+    return { status: "expired", token };
+  }
+  return { status: "active", token, session };
+}
+/**
+ * A session's CSRF token (ADR 053 §5), served by GET /sessions/me/csrf and
+ * checked on claim/complete. Derived from the session cookie exactly as the Go
+ * server's CSRFToken does (HMAC-SHA256 keyed by the cookie over a fixed label,
+ * unpadded base64url), so there is no per-session state to keep in step with
+ * the session store.
+ */
+export function csrfTokenFor(sessionToken: string): string {
+  return createHmac("sha256", sessionToken).update("zitadel-csrf-v1").digest("base64url");
+}
 
 /**
  * Generates an opaque session token (random hex, not a JWT).
@@ -83,12 +138,45 @@ type IdempotencyCacheEntry = {
 const IDEMPOTENCY_TTL_MS = 60_000;
 const idempotencyCache = new Map<string, IdempotencyCacheEntry>();
 
-export function startMockServer(port: number): Server {
+/**
+ * Build the configured Express app without binding it to a port.
+ *
+ * Returning the bare app (rather than a listening {@link Server}) lets a
+ * serverless host — e.g. a Vercel function — use it directly as a
+ * request handler, while {@link startMockServer} wraps it for the
+ * standalone dev server.
+ *
+ * The issuer is fixed at construction on purpose: the handoff tokens the
+ * mock signs (inside the MSW handlers) and the `expectedIss` it later
+ * enforces in `/sessions/exchange` must agree, so both read the same
+ * value regardless of which host a given request happens to arrive on.
+ *
+ * **State is not per-app.** The session store, consumed-handoff set, and
+ * idempotency cache are module-scoped (see the top of this file), and the
+ * branding overlay is likewise module-scoped — `applyBranding` mutates it
+ * during construction. So two apps built in the same process **share** all
+ * of that state; there is no per-instance isolation. This is intentional
+ * for the single-app dev/serverless use cases; tests that need isolation
+ * should run in separate workers (as Vitest does) rather than creating
+ * multiple apps in one.
+ *
+ * @param options.issuer - Absolute base URL this mock advertises as its
+ *   OIDC issuer (`http://localhost:8080` locally, the preview domain on
+ *   Vercel). Embedded in the discovery document and used as the expected
+ *   issuer when verifying handoff tokens (the JWKS responses carry only
+ *   the key, not the issuer).
+ */
+export function createMockApp(options: { issuer: string }): express.Express {
   applyBranding(defaultDevBranding);
-  const iss = `http://localhost:${port}`;
+  const iss = options.issuer;
   const app = express();
   app.use(cookieParser());
 
+  // CORS reflects any origin, with credentials, on purpose. Besides local
+  // development, apps/mock-zitadel deploys this app publicly for every pull
+  // request so a demo app, an SDK or a manual test on another origin can be
+  // pointed at a branch, and those callers need the session cookie. It serves
+  // only fake data. The real server's rules (ADR 053 §5) are not modelled here.
   app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     const origin = req.headers.origin;
     res.setHeader("Vary", "Origin");
@@ -98,7 +186,10 @@ export function startMockServer(port: number): Server {
     }
     if (req.method === "OPTIONS") {
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key");
+      res.setHeader(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Idempotency-Key, X-Zitadel-CSRF",
+      );
       res.status(204).end();
       return;
     }
@@ -111,24 +202,9 @@ export function startMockServer(port: number): Server {
   app.get("/auth/keys", (_req: express.Request, res: express.Response) => {
     res.json({ keys: [JWK] });
   });
-  // Minimal OIDC discovery document — every real Zitadel server publishes
-  // one. The CLI's setup prompt uses this to auto-discover localhost OIDC
-  // servers (see lib/prober).
-  app.get(
-    "/.well-known/openid-configuration",
-    (_req: express.Request, res: express.Response) => {
-      res.json({
-        issuer: iss,
-        jwks_uri: `${iss}/.well-known/jwks.json`,
-        authorization_endpoint: `${iss}/auth`,
-        token_endpoint: `${iss}/auth/token`,
-        end_session_endpoint: `${iss}/auth/end-session`,
-        response_types_supported: ["code"],
-        subject_types_supported: ["public"],
-        id_token_signing_alg_values_supported: ["RS256"],
-      });
-    },
-  );
+  app.get("/.well-known/openid-configuration", (_req: express.Request, res: express.Response) => {
+    res.json(buildOpenIdConfiguration(iss));
+  });
 
   const jsonBodyParser: express.RequestHandler = (req, res, next) => {
     express.json()(req, res, (err) => {
@@ -208,18 +284,36 @@ export function startMockServer(port: number): Server {
       const userId = `user_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
 
       // Store the session data for GET /sessions/me lookups.
-      // The `email` field is kept alongside the spec-typed fields for
-      // client display purposes (same as the Go server's response).
+      // The `user` ref mirrors the Go server's identity hydration: the mock
+      // signs in by email, so the ref's identifier is the email claim.
+      // `display` comes from the demo-identity fixture — present for the
+      // known demo identities (a schema designating x-display), absent for
+      // every other email (the shipped default schema designates none) — so
+      // clients can exercise both branches of the display → identifier →
+      // user_id rendering chain.
+      // A handoff is issued only after a login completes, so the exchanged
+      // session carries a verified factor. The contract now defines `active`
+      // as "has at least one verified authentication factor", so an empty
+      // factor list would contradict the state we report.
+      const verifiedFactors = [
+        { method: "password" as const, verified_at: createdAt.toISOString() },
+      ];
+      const display = claims.sub ? DEMO_DISPLAY_NAMES.get(claims.sub) : undefined;
       const sessionData: StoredSession = {
         session_id: sessionId,
         project_id: projectId,
         state: "active",
         user_id: userId,
-        factors: [],
+        factors: verifiedFactors,
         assurance_levels: [],
         created_at: createdAt.toISOString(),
         expires_at: expiresAt.toISOString(),
-        email: claims.sub,
+        user: {
+          user_id: userId,
+          // identifier_property travels exactly with identifier (ADR 058 §3).
+          ...(claims.sub ? { identifier: claims.sub, identifier_property: "email" } : {}),
+          ...(display ? { display } : {}),
+        },
       };
       sessionStore.set(opaqueToken, sessionData);
 
@@ -234,7 +328,7 @@ export function startMockServer(port: number): Server {
           project_id: projectId,
           state: "active",
           user_id: userId,
-          factors: [],
+          factors: verifiedFactors,
           assurance_levels: [],
           created_at: createdAt.toISOString(),
           expires_at: expiresAt.toISOString(),
@@ -251,47 +345,67 @@ export function startMockServer(port: number): Server {
     },
   );
 
+  // GET /console/runtime.json — the console's pre-session runtime document
+  // (Console ADR 0004 §3), served by the Go server's root mux. Without it the
+  // console stops on its connectivity screen, or, with
+  // VITE_CONSOLE_RUNTIME_FALLBACK, has no project to sign in to. It names the
+  // platform project, as a deployment that bootstraps one does: the console's
+  // session then belongs to it, which is the only session `claim/complete`
+  // below accepts. No `publishable_key`: the mock's session exchange asks for
+  // no bearer.
+  app.get("/console/runtime.json", (_req: express.Request, res: express.Response) => {
+    res.json({ mode: "standalone", console_project_id: PLATFORM_PROJECT_ID });
+  });
+
   // GET /sessions/me — validate opaque session cookie and return session data.
   // Mirrors the Go server's GetMySession handler.
   app.get("/sessions/me", (req: express.Request, res: express.Response) => {
-    const token = (req.cookies as Record<string, string>).__nextgen_session;
-    if (!token) {
-      res.status(401).json(errorBody("unauthenticated", "no session cookie"));
+    const found = lookupSession(req);
+    switch (found.status) {
+      case "missing":
+        res.status(401).json(errorBody("unauthenticated", "no session cookie"));
+        return;
+      case "unknown":
+        res.status(401).json(errorBody("unauthenticated", "invalid or expired session"));
+        return;
+      case "expired":
+        res.status(401).json(errorBody("unauthenticated", "session expired"));
+        return;
+      case "active":
+        res.json(found.session);
+    }
+  });
+
+  // GET /sessions/me/csrf — the session's CSRF token (ADR 053 §5). Mirrors
+  // the Go server's GetMySessionCsrfToken handler.
+  app.get("/sessions/me/csrf", (req: express.Request, res: express.Response) => {
+    // Both the token and the 401 are session state: neither may be stored.
+    res.setHeader("Cache-Control", "private, no-store");
+    const found = lookupSession(req);
+    if (found.status !== "active") {
+      res.status(401).json(errorBody("auth.unauthorized", "Missing or invalid session token."));
       return;
     }
-    const session = sessionStore.get(token);
-    if (!session) {
-      res.status(401).json(errorBody("unauthenticated", "invalid or expired session"));
-      return;
-    }
-    // Check expiry
-    if (new Date(session.expires_at) < new Date()) {
-      sessionStore.delete(token);
-      res.status(401).json(errorBody("unauthenticated", "session expired"));
-      return;
-    }
-    res.json(session);
+    res.json({ csrf_token: csrfTokenFor(found.token) });
   });
 
   // DELETE /sessions/me — revoke the current session (logout). Mirrors the
   // Go server's revokeMySession handler and the SDK proxy's logout call.
   app.delete("/sessions/me", (req: express.Request, res: express.Response) => {
-    const token = (req.cookies as Record<string, string>).__nextgen_session;
-    if (!token) {
-      res.status(401).json(errorBody("unauthenticated", "no session cookie"));
-      return;
+    const found = lookupSession(req);
+    switch (found.status) {
+      case "missing":
+        res.status(401).json(errorBody("unauthenticated", "no session cookie"));
+        return;
+      case "unknown":
+        res.status(404).json(errorBody("session_not_found", "session not found"));
+        return;
+      case "expired":
+        res.status(409).json(errorBody("session_revoked", "session already revoked or expired"));
+        return;
+      case "active":
+        sessionStore.delete(found.token);
     }
-    const session = sessionStore.get(token);
-    if (!session) {
-      res.status(404).json(errorBody("session_not_found", "session not found"));
-      return;
-    }
-    if (new Date(session.expires_at) < new Date()) {
-      sessionStore.delete(token);
-      res.status(409).json(errorBody("session_revoked", "session already revoked or expired"));
-      return;
-    }
-    sessionStore.delete(token);
     res.setHeader("Set-Cookie", [
       `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,
@@ -299,6 +413,61 @@ export function startMockServer(port: number): Server {
     ]);
     res.status(204).end();
   });
+
+  // POST /projects/:project_id/claim/complete — the browser leg of the claim
+  // dance. A custom Express route (not an MSW handler) because it authenticates
+  // with the module-scoped __nextgen_session cookie, exactly like GET
+  // /sessions/me. The challenge_id from the body is its browser-safe authorization.
+  app.post(
+    "/projects/:project_id/claim/complete",
+    jsonBodyParser,
+    (req: express.Request, res: express.Response) => {
+      const found = lookupSession(req);
+      if (found.status !== "active") {
+        res.status(401).json(errorBody("auth.unauthorized", "missing or invalid session token"));
+        return;
+      }
+      const { token, session } = found;
+      // ADR 053 §5: a cookie-authenticated write carries the session's CSRF
+      // token. Checked after the credential and before eligibility, in the
+      // same order as the Go server's security handler.
+      if (req.get("x-zitadel-csrf") !== csrfTokenFor(token)) {
+        res
+          .status(403)
+          .json(
+            errorBody(
+              "auth.csrf_invalid",
+              "The request failed cross-site request forgery validation.",
+            ),
+          );
+        return;
+      }
+      // ADR 046 §2: only a platform-project session that is active and carries a
+      // verified factor may claim. A customer-project session, an inactive one,
+      // or an anonymous pre-login session must never complete a claim.
+      const eligible =
+        session.project_id === PLATFORM_PROJECT_ID &&
+        session.state === "active" &&
+        (session.factors?.length ?? 0) > 0;
+      if (!eligible) {
+        res
+          .status(401)
+          .json(errorBody("auth.unauthorized", "session is not eligible to claim a project"));
+        return;
+      }
+      const parsed = CompleteClaimBody.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json(
+          errorBody("invalid_request", "request does not conform to spec", {
+            issues: parsed.error.issues,
+          }),
+        );
+        return;
+      }
+      const result = completeClaimChallenge(parsed.data.challenge_id, req.params.project_id ?? "");
+      res.status(result.status).json(result.body);
+    },
+  );
 
   app.get("/auth/end-session", (req: express.Request, res: express.Response) => {
     // Clean up session from store when logging out
@@ -316,6 +485,15 @@ export function startMockServer(port: number): Server {
 
   app.use(createMiddleware(...setupMockHandlers({ iss }).handlers, ...setupPlatformHandlers()));
 
+  return app;
+}
+
+/**
+ * Start the standalone dev server: build the app via {@link createMockApp}
+ * with a localhost issuer derived from `port`, then bind it.
+ */
+export function startMockServer(port: number): Server {
+  const app = createMockApp({ issuer: `http://localhost:${port}` });
   return app.listen(port, () => {
     console.log(`\napi-mock server listening on http://localhost:${port}`);
     console.log(`  JWKS: http://localhost:${port}/.well-known/jwks.json`);

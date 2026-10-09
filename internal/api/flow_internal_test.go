@@ -84,3 +84,186 @@ func TestToFlowField_EnumSurfaces(t *testing.T) {
 	require.True(t, got.Validation.Set, "validation block emitted when only enum is set")
 	require.Equal(t, []string{"Single", "Married", "Divorced", "Widowed"}, got.Validation.Value.Enum)
 }
+
+func TestToFlowField_CarriesAutocompleteWhenSet(t *testing.T) {
+	t.Parallel()
+
+	got := toFlowField(domain.FlowField{
+		Name:         "x-auth-methods#password",
+		Type:         domain.FlowFieldTypePassword,
+		TextKey:      "password.field.password",
+		Autocomplete: domain.AutocompleteCurrentPassword,
+	})
+
+	require.True(t, got.Autocomplete.Set)
+	require.Equal(t, domain.AutocompleteCurrentPassword, got.Autocomplete.Value)
+}
+
+func TestToFlowField_OmitsAutocompleteWhenAbsent(t *testing.T) {
+	t.Parallel()
+
+	got := toFlowField(domain.FlowField{
+		Name:    "given_name",
+		Type:    domain.FlowFieldTypeText,
+		TextKey: "register.field.given_name",
+	})
+
+	require.False(t, got.Autocomplete.Set)
+}
+
+func TestToFlowStep_EmitsSSOProvidersInOrder(t *testing.T) {
+	t.Parallel()
+
+	got := toFlowStep(&domain.FlowStep{
+		Name: "identifier",
+		SSOProviders: []domain.FlowSSOProvider{
+			{ID: "google", Name: "Google", Template: "google"},
+			{ID: "github", Name: "GitHub", Template: "github"},
+		},
+	})
+
+	require.Equal(t, []apigen.SSOProvider{
+		{ID: "google", Name: "Google", Template: "google"},
+		{ID: "github", Name: "GitHub", Template: "github"},
+	}, got.SSOProviders)
+}
+
+func TestToFlowStep_NoSSOProvidersLeavesListEmpty(t *testing.T) {
+	t.Parallel()
+
+	got := toFlowStep(&domain.FlowStep{Name: "identifier"})
+
+	require.Empty(t, got.SSOProviders)
+}
+
+func TestToFlowStep_CarriesThePairedIdentifier(t *testing.T) {
+	t.Parallel()
+
+	got := toFlowStep(&domain.FlowStep{
+		Name: "password",
+		Identifier: &domain.FlowStepIdentifier{
+			Value:        "alice@example.com",
+			Autocomplete: domain.AutocompleteUsername,
+		},
+	})
+
+	require.True(t, got.Identifier.Set)
+	require.Equal(t, "alice@example.com", got.Identifier.Value.Value)
+	require.Equal(t, domain.AutocompleteUsername, got.Identifier.Value.Autocomplete)
+}
+
+func TestToFlowStep_OmitsThePairedIdentifierWhenAbsent(t *testing.T) {
+	t.Parallel()
+
+	got := toFlowStep(&domain.FlowStep{Name: "identifier"})
+
+	require.False(t, got.Identifier.Set)
+}
+
+func TestValidateOriginAgainstProject(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		origin      string
+		allowed     []string
+		wantErr     bool
+		wantInError []string
+	}{
+		{
+			name:    "empty allowlist allows any origin",
+			origin:  "http://127.0.0.1:3000",
+			allowed: nil,
+		},
+		{
+			name:    "exact match allows",
+			origin:  "http://localhost:3000",
+			allowed: []string{"http://localhost:3000"},
+		},
+		{
+			name:    "loopback spellings are not aliased",
+			origin:  "http://127.0.0.1:3000",
+			allowed: []string{"http://localhost:3000", "https://app.example.com"},
+			wantErr: true,
+			wantInError: []string{
+				`"http://127.0.0.1:3000"`,
+				"http://localhost:3000, https://app.example.com",
+			},
+		},
+		{
+			name:    "ipv6 loopback is not aliased",
+			origin:  "http://[::1]:3000",
+			allowed: []string{"http://localhost:3000"},
+			wantErr: true,
+			wantInError: []string{
+				`"http://[::1]:3000"`,
+				"http://localhost:3000",
+			},
+		},
+		{
+			name:    "ipv6 exact match allows",
+			origin:  "http://[::1]:3000",
+			allowed: []string{"http://[::1]:3000"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validateOriginAgainstProject(tc.origin, &domain.Project{PreviewOrigins: tc.allowed})
+
+			if !tc.wantErr {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			for _, want := range tc.wantInError {
+				require.Contains(t, err.Error(), want, "message must name the offending origin and the allowlist")
+			}
+		})
+	}
+}
+
+// Explicit JSON `null` for a transition's action/purpose must map to "not
+// set" — IsSet() alone is also true for ogen's explicit-null state, and
+// reading .Value would silently yield the zero enum (switch / login).
+func TestMapFlowDefinitionRequest_NullTransitionActionAndPurpose(t *testing.T) {
+	t.Parallel()
+
+	definition := apigen.FlowDefinition{
+		Name:       "combined",
+		UserSchema: "sch_test",
+		Purposes:   apigen.FlowDefinitionPurposes{"login": "identifier"},
+		Steps: []apigen.FlowDefinitionStep{
+			{
+				Name: "identifier",
+				Transitions: apigen.NewOptFlowDefinitionStepTransitions(apigen.FlowDefinitionStepTransitions{
+					"next": {
+						Target:  "identifier",
+						Action:  apigen.OptNilFlowDefinitionStepTransitionsItemAction{Set: true, Null: true},
+						Purpose: apigen.OptNilFlowDefinitionStepTransitionsItemPurpose{Set: true, Null: true},
+					},
+					"purposed": {
+						Target: "identifier",
+						Purpose: apigen.NewOptNilFlowDefinitionStepTransitionsItemPurpose(
+							apigen.FlowDefinitionStepTransitionsItemPurposeRegister,
+						),
+					},
+				}),
+			},
+		},
+	}
+
+	svcReq, err := mapCreateRequestToService(&apigen.CreateFlowDefinitionRequest{ProjectID: "proj-1", FlowDefinition: definition})
+	require.NoError(t, err)
+	require.Len(t, svcReq.Steps, 1)
+
+	nullBoth := svcReq.Steps[0].Transitions["next"]
+	require.Nil(t, nullBoth.Action, "explicit null action must not map to the zero enum")
+	require.Nil(t, nullBoth.Purpose, "explicit null purpose must not map to login")
+
+	purposed := svcReq.Steps[0].Transitions["purposed"]
+	require.NotNil(t, purposed.Purpose)
+	require.Equal(t, domain.FlowDefinitionPurposeRegister, *purposed.Purpose)
+}

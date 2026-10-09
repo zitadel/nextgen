@@ -16,3 +16,9 @@ The default proxy path is:
 ```
 
 The login and logout components call the same-origin proxy path by default when configured through the SDK.
+
+## SPAs in production
+
+Single-page apps (React, Vue, Angular, Solid, Svelte, Qwik) have no server of their own. In local development the CLI scaffolds a dev-server proxy for `/__nextgen/*`; in production the same-origin path comes from the hosting platform instead: a `vercel.json` rewrite, a `netlify.toml` redirect, or a minimal Cloudflare worker (Cloudflare redirects cannot proxy external origins).
+
+[ADR 036](https://github.com/zitadel/nextgen/blob/main/docs/adrs/036-api-credential-planes.md) removes the project-secret requirement from this browser-facing path — a browser-safe, origin-checked credential replaces it, with the project's origin allowlist as the enforcement boundary — so these platform entries are plain config with no secrets in platform env stores. The credential rollout and CLI scaffolding for the platform configs are tracked in [zitadel/nextgen#560](https://github.com/zitadel/nextgen/issues/560); until that lands, the dev proxy covers local development only.

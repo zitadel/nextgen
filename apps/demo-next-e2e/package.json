@@ -2,10 +2,14 @@
   "name": "@zitadel/demo-next-e2e",
   "version": "0.0.1",
   "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
   "devDependencies": {
     "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
     "@zitadel/api-mock": "workspace:*",
-    "@zitadel/sdk-next": "workspace:*",
-    "eslint-plugin-playwright": "catalog:"
+    "@zitadel/testing": "workspace:*",
+    "typescript": "catalog:"
   }
 }

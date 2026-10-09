@@ -38,6 +38,7 @@ Trade-offs:
 
 It is currently unclear how configuration options should be presented to clients when alternatives are backend-specific, for example:
 
+- `database.sqlite`
 - `database.spanner`
 - `database.postgres`
 

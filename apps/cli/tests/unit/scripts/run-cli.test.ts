@@ -1,16 +1,21 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 type RunCliModule = {
+  assertFreshInstall: (
+    root?: string,
+    statFn?: (path: string) => Promise<{ mtimeMs: number }>,
+  ) => Promise<void>;
   cliCwdFor: (env?: Record<string, string | undefined>, fallback?: string) => string;
   commandName: (args: string[]) => string | undefined;
   main: (options: {
     args?: string[];
     cwd?: string;
     env?: Record<string, string | undefined>;
+    assertFreshInstall?: () => Promise<void>;
     buildCli?: (options: { env: Record<string, string | undefined> }) => Promise<void>;
     buildLocalServerBinary?: (options: {
       env: Record<string, string | undefined>;
-    }) => Promise<string>;
+    }) => Promise<{ path: string; version: string }>;
     buildLocalRuntimeImage?: (options: {
       env: Record<string, string | undefined>;
     }) => Promise<unknown>;
@@ -48,6 +53,13 @@ let runCli: RunCliModule;
 let runtimeImage: BuildLocalRuntimeImageModule;
 
 const noop = async (): Promise<void> => undefined;
+
+/** Signature of the injected process runner, so `run.mock.calls` is typed. */
+type RunSpawn = (
+  execPath: string,
+  args: string[],
+  options: { cwd: string; env: NodeJS.ProcessEnv },
+) => Promise<void>;
 
 beforeAll(async () => {
   runCli = (await import(
@@ -135,6 +147,52 @@ describe("run-cli wrapper", () => {
     ).toBe(false);
   });
 
+  it("flags a stale or missing install and stays quiet on a fresh one", async () => {
+    const statFor = (mtimes: Record<string, number>) => async (path: string) => {
+      const mtimeMs = mtimes[path];
+      if (mtimeMs === undefined) {
+        throw Object.assign(new Error(`ENOENT: ${path}`), { code: "ENOENT" });
+      }
+      return { mtimeMs };
+    };
+    const lockfile = "/repo/pnpm-lock.yaml";
+    const installed = "/repo/node_modules/.pnpm/lock.yaml";
+    const remedy = "corepack pnpm install --frozen-lockfile";
+
+    await expect(
+      runCli.assertFreshInstall("/repo", statFor({ [lockfile]: 2000, [installed]: 1000 })),
+    ).rejects.toThrow(remedy);
+    await expect(runCli.assertFreshInstall("/repo", statFor({ [lockfile]: 2000 }))).rejects.toThrow(
+      remedy,
+    );
+    await expect(
+      runCli.assertFreshInstall("/repo", statFor({ [lockfile]: 2000, [installed]: 2000 })),
+    ).resolves.toBeUndefined();
+    await expect(runCli.assertFreshInstall("/repo", statFor({}))).resolves.toBeUndefined();
+    await expect(
+      runCli.assertFreshInstall("/repo", async () => {
+        throw Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" });
+      }),
+    ).rejects.toThrow("EACCES");
+  });
+
+  it("fails before building anything when the install is stale", async () => {
+    const buildCli = vi.fn(noop);
+
+    await expect(
+      runCli.main({
+        args: ["doctor"],
+        env: { PATH: "/bin" },
+        assertFreshInstall: async () => {
+          throw new Error("Run: corepack pnpm install --frozen-lockfile");
+        },
+        buildCli,
+        run: vi.fn(noop),
+      }),
+    ).rejects.toThrow("corepack pnpm install --frozen-lockfile");
+    expect(buildCli).not.toHaveBeenCalled();
+  });
+
   it("builds and injects a local server binary for the default binary start runtime", async () => {
     const calls: string[] = [];
     const env = { PATH: "/bin" };
@@ -143,6 +201,7 @@ describe("run-cli wrapper", () => {
     await runCli.main({
       args: ["start"],
       env,
+      assertFreshInstall: noop,
       buildCli: async (options) => {
         calls.push("build-cli");
         expect(options.env).toBe(env);
@@ -150,7 +209,7 @@ describe("run-cli wrapper", () => {
       buildLocalServerBinary: async (options) => {
         calls.push("build-server");
         expect(options.env).toBe(env);
-        return "/repo/dist/server/nextgen";
+        return { path: "/repo/dist/server/nextgen", version: "dev+abcdef123456" };
       },
       buildLocalRuntimeImage: async (options) => {
         calls.push("build-image");
@@ -170,6 +229,7 @@ describe("run-cli wrapper", () => {
     expect(runEnv).toMatchObject({
       PATH: "/bin",
       ZITADEL_SERVER_BINARY: "/repo/dist/server/nextgen",
+      ZITADEL_SERVER_BINARY_VERSION: "dev+abcdef123456",
     });
     expect(runEnv).not.toHaveProperty("ZITADEL_LOCAL_IMAGE");
     expect(env).not.toHaveProperty("ZITADEL_SERVER_BINARY");
@@ -184,13 +244,14 @@ describe("run-cli wrapper", () => {
     await runCli.main({
       args: ["start", "--runtime", "docker"],
       env,
+      assertFreshInstall: noop,
       buildCli: async (options) => {
         calls.push("build-cli");
         expect(options.env).toBe(env);
       },
       buildLocalServerBinary: async () => {
         calls.push("build-server");
-        return "/repo/dist/server/nextgen";
+        return { path: "/repo/dist/server/nextgen", version: "dev+abcdef123456" };
       },
       buildLocalRuntimeImage: async (options) => {
         calls.push("build-image");
@@ -216,12 +277,16 @@ describe("run-cli wrapper", () => {
 
   it("skips the builder when start receives --image", async () => {
     const buildLocalRuntimeImage = vi.fn(noop);
-    const buildLocalServerBinary = vi.fn(async () => "/repo/dist/server/nextgen");
-    const run = vi.fn(noop);
+    const buildLocalServerBinary = vi.fn(async () => ({
+      path: "/repo/dist/server/nextgen",
+      version: "dev+abcdef123456",
+    }));
+    const run = vi.fn<RunSpawn>(noop);
 
     await runCli.main({
       args: ["start", "--image", "custom:tag"],
       env: { PATH: "/bin" },
+      assertFreshInstall: noop,
       buildCli: vi.fn(noop),
       buildLocalServerBinary,
       buildLocalRuntimeImage,
@@ -231,17 +296,21 @@ describe("run-cli wrapper", () => {
     expect(buildLocalServerBinary).not.toHaveBeenCalled();
     expect(buildLocalRuntimeImage).not.toHaveBeenCalled();
     expect(run).toHaveBeenCalledOnce();
-    expect(run.mock.calls[0]?.[2].env).not.toHaveProperty("ZITADEL_LOCAL_IMAGE");
+    expect(run!.mock.calls[0]?.[2].env).not.toHaveProperty("ZITADEL_LOCAL_IMAGE");
   });
 
   it("skips the builder when ZITADEL_LOCAL_IMAGE is set", async () => {
     const buildLocalRuntimeImage = vi.fn(noop);
-    const buildLocalServerBinary = vi.fn(async () => "/repo/dist/server/nextgen");
-    const run = vi.fn(noop);
+    const buildLocalServerBinary = vi.fn(async () => ({
+      path: "/repo/dist/server/nextgen",
+      version: "dev+abcdef123456",
+    }));
+    const run = vi.fn<RunSpawn>(noop);
 
     await runCli.main({
       args: ["start"],
       env: { PATH: "/bin", ZITADEL_LOCAL_IMAGE: "custom:tag" },
+      assertFreshInstall: noop,
       buildCli: vi.fn(noop),
       buildLocalServerBinary,
       buildLocalRuntimeImage,
@@ -251,16 +320,20 @@ describe("run-cli wrapper", () => {
     expect(buildLocalServerBinary).not.toHaveBeenCalled();
     expect(buildLocalRuntimeImage).not.toHaveBeenCalled();
     expect(run).toHaveBeenCalledOnce();
-    expect(run.mock.calls[0]?.[2].env.ZITADEL_LOCAL_IMAGE).toBe("custom:tag");
+    expect(run!.mock.calls[0]?.[2].env.ZITADEL_LOCAL_IMAGE).toBe("custom:tag");
   });
 
   it("preserves an explicit local server binary override for binary start", async () => {
-    const buildLocalServerBinary = vi.fn(async () => "/repo/dist/server/nextgen");
-    const run = vi.fn(noop);
+    const buildLocalServerBinary = vi.fn(async () => ({
+      path: "/repo/dist/server/nextgen",
+      version: "dev+abcdef123456",
+    }));
+    const run = vi.fn<RunSpawn>(noop);
 
     await runCli.main({
       args: ["start", "--runtime", "binary"],
       env: { PATH: "/bin", ZITADEL_SERVER_BINARY: "/tmp/custom-nextgen" },
+      assertFreshInstall: noop,
       buildCli: vi.fn(noop),
       buildLocalServerBinary,
       buildLocalRuntimeImage: vi.fn(noop),
@@ -269,15 +342,19 @@ describe("run-cli wrapper", () => {
 
     expect(buildLocalServerBinary).not.toHaveBeenCalled();
     expect(run).toHaveBeenCalledOnce();
-    expect(run.mock.calls[0]?.[2].env.ZITADEL_SERVER_BINARY).toBe("/tmp/custom-nextgen");
+    expect(run!.mock.calls[0]?.[2].env.ZITADEL_SERVER_BINARY).toBe("/tmp/custom-nextgen");
   });
 
   it("skips the local server binary build for dry-run start", async () => {
-    const buildLocalServerBinary = vi.fn(async () => "/repo/dist/server/nextgen");
+    const buildLocalServerBinary = vi.fn(async () => ({
+      path: "/repo/dist/server/nextgen",
+      version: "dev+abcdef123456",
+    }));
 
     await runCli.main({
       args: ["start", "--dry-run"],
       env: { PATH: "/bin" },
+      assertFreshInstall: noop,
       buildCli: vi.fn(noop),
       buildLocalServerBinary,
       buildLocalRuntimeImage: vi.fn(noop),
@@ -289,11 +366,15 @@ describe("run-cli wrapper", () => {
 
   it("skips the builder for non-start commands", async () => {
     const buildLocalRuntimeImage = vi.fn(noop);
-    const buildLocalServerBinary = vi.fn(async () => "/repo/dist/server/nextgen");
+    const buildLocalServerBinary = vi.fn(async () => ({
+      path: "/repo/dist/server/nextgen",
+      version: "dev+abcdef123456",
+    }));
 
     await runCli.main({
       args: ["doctor"],
       env: { PATH: "/bin" },
+      assertFreshInstall: noop,
       buildCli: vi.fn(noop),
       buildLocalServerBinary,
       buildLocalRuntimeImage,
@@ -305,25 +386,26 @@ describe("run-cli wrapper", () => {
   });
 
   it("runs the CLI from the original invocation directory", async () => {
-    const run = vi.fn(noop);
+    const run = vi.fn<RunSpawn>(noop);
 
     await runCli.main({
       args: ["setup", "--server", "local", "--skip-install"],
       env: { INIT_CWD: "/tmp/myapp", PATH: "/bin" },
+      assertFreshInstall: noop,
       buildCli: vi.fn(noop),
       buildLocalRuntimeImage: vi.fn(noop),
       run,
     });
 
     expect(run).toHaveBeenCalledOnce();
-    expect(run.mock.calls[0]?.[1][0]).toMatch(/apps\/cli\/bin\/run\.js$/);
-    expect(run.mock.calls[0]?.[1].slice(1)).toEqual([
+    expect(run!.mock.calls[0]?.[1][0]).toMatch(/apps\/cli\/bin\/run\.js$/);
+    expect(run!.mock.calls[0]?.[1].slice(1)).toEqual([
       "setup",
       "--server",
       "local",
       "--skip-install",
     ]);
-    expect(run.mock.calls[0]?.[2].cwd).toBe("/tmp/myapp");
+    expect(run!.mock.calls[0]?.[2].cwd).toBe("/tmp/myapp");
   });
 
   it("prepares a local package registry for setup and forwards npm env to the CLI", async () => {
@@ -341,11 +423,12 @@ describe("run-cli wrapper", () => {
         },
       };
     });
-    const run = vi.fn(noop);
+    const run = vi.fn<RunSpawn>(noop);
 
     await runCli.main({
       args: ["setup", "--server", "local"],
       env: { INIT_CWD: "/tmp/myapp", PATH: "/bin" },
+      assertFreshInstall: noop,
       buildCli: vi.fn(noop),
       buildLocalRuntimeImage: vi.fn(noop),
       prepareLocalRegistry,
@@ -354,8 +437,8 @@ describe("run-cli wrapper", () => {
 
     expect(prepareLocalRegistry).toHaveBeenCalledOnce();
     expect(run).toHaveBeenCalledOnce();
-    expect(run.mock.calls[0]?.[2].cwd).toBe("/tmp/myapp");
-    expect(run.mock.calls[0]?.[2].env).toMatchObject({
+    expect(run!.mock.calls[0]?.[2].cwd).toBe("/tmp/myapp");
+    expect(run!.mock.calls[0]?.[2].env).toMatchObject({
       INIT_CWD: "/tmp/myapp",
       NPM_CONFIG_USERCONFIG: "/tmp/local-registry/verdaccio.npmrc",
       PATH: "/bin",
@@ -383,6 +466,7 @@ describe("run-cli wrapper", () => {
     await runCli.main({
       args: ["setup", "--server", "local", "--json"],
       env: { INIT_CWD: "/tmp/myapp", PATH: "/bin" },
+      assertFreshInstall: noop,
       buildCli: vi.fn(noop),
       buildLocalRuntimeImage: vi.fn(noop),
       prepareLocalRegistry,

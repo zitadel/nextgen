@@ -1,0 +1,8 @@
+title: AuthTokenIssuedPayload
+type: object
+description: Payload for `auth.token.issued` events.
+properties:
+  scopes:
+    type: array
+    items:
+      type: string

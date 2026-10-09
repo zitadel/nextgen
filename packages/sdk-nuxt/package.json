@@ -1,7 +1,7 @@
 {
   "name": "@zitadel/sdk-nuxt",
-  "version": "0.1.0-alpha.12",
-  "description": "Nuxt proxy middleware and helpers for Nextgen Auth",
+  "version": "1.0.0-alpha.25",
+  "description": "Nuxt proxy middleware and helpers for the pre-release Zitadel preview.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-nuxt#readme",
   "bugs": {
     "url": "https://github.com/zitadel/nextgen/issues"
@@ -19,6 +19,7 @@
       "import": "./dist/index.js"
     },
     "./module": {
+      "types": "./dist/module.d.ts",
       "import": "./dist/module.js"
     },
     "./server": {
@@ -33,11 +34,11 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/server.ts src/runtime/types.ts src/runtime/server/middleware.ts src/runtime/server/handler.ts --format esm --dts --clean --external '#imports' && tsup src/runtime/plugin.ts src/runtime/composables/useAuth.ts src/runtime/components/ZitadelLogin.ts src/runtime/components/ZitadelLogout.ts src/module.ts --format esm --no-clean --external @nuxt/kit --external '#imports' --external vue",
+    "build": "tsup --tsconfig tsconfig.lib.json src/index.ts src/server.ts src/runtime/types.ts src/runtime/server/middleware.ts src/runtime/server/handler.ts --format esm --dts --clean --external '#imports' && tsup --tsconfig tsconfig.lib.json src/runtime/plugin.ts src/runtime/composables/useAuth.ts src/module.ts --format esm --no-clean --external @nuxt/kit --external '#imports' && tsup --tsconfig tsconfig.lib.json src/module.ts --format esm --dts-only --no-clean --external @nuxt/kit",
     "dev": "tsup src/index.ts src/server.ts --format esm --dts --watch",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
-    "lint": "eslint ."
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
+    "test": "vitest run",
+    "test:all": "pnpm run test"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
@@ -46,26 +47,17 @@
   },
   "peerDependencies": {
     "h3": ">=1",
-    "nuxt": ">=4",
-    "vue": ">=3"
+    "nuxt": ">=4"
   },
   "devDependencies": {
-    "@eslint/js": "catalog:",
-    "@eslint/json": "catalog:",
-    "@eslint/markdown": "catalog:",
-    "vue": "^3.5.0",
-    "@nuxt/eslint-plugin": "^0.7.0",
-    "eslint": "catalog:",
-    "eslint-config-prettier": "catalog:",
-    "eslint-import-resolver-typescript": "catalog:",
-    "eslint-plugin-import": "catalog:",
-    "eslint-plugin-perfectionist": "catalog:",
-    "eslint-plugin-prettier": "catalog:",
+    "@nuxt/kit": "catalog:",
+    "@nuxt/schema": "catalog:",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "h3": "^1.15.3",
-    "prettier": "catalog:",
+    "nuxt": "catalog:",
     "tsup": "catalog:",
-    "typescript": "^5.7.3",
-    "typescript-eslint": "catalog:",
-    "vitest": "^3.0.0"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

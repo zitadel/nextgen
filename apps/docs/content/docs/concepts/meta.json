@@ -4,6 +4,7 @@
     "index",
     "project-team-user",
     "local-runtime",
+    "databases",
     "repo-config",
     "flows-and-schemas",
     "sdk-proxy",

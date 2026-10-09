@@ -3,29 +3,39 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { forwardedArgs, formatCommand, run } from "./dev-process.mjs";
+import { assertServerBuildPackage, gitInfo, serverLdflags } from "./server-build.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
-const args = forwardedArgs();
+const args = withServerMigrateArgs(forwardedArgs());
 const out = "dist/server/nextgen-debug";
 
 // -gcflags "all=-N -l": disable compiler optimisations (-N) and inlining (-l) so the
 // debugger can step through code accurately and inspect local variables.
-// -ldflags "-X main.version=debug": stamp the binary as a debug build (no -trimpath, no -s/-w stripping).
-const buildArgs = ["build", "-gcflags", "all=-N -l", "-ldflags", "-X main.version=debug", "-o", out, "."];
-
 try {
+  await assertServerBuildPackage({ repoRoot });
+  const info = await gitInfo({ repoRoot });
+  const ldflags = serverLdflags({
+    version: `debug+${info.shortCommit}`,
+    commit: info.commit,
+    date: info.date,
+  });
+  const buildArgs = ["build", "-gcflags", "all=-N -l", "-ldflags", ldflags, "-o", out, "."];
   if (isHelp(args)) {
-    await run("go", ["run", ".", ...helpArgs(args)], { cwd: repoRoot });
+    await run("go", ["run", "-ldflags", ldflags, ".", ...helpArgs(args)], { cwd: repoRoot });
   } else {
     process.stderr.write(`\n[server-debug] build: ${formatCommand("go", buildArgs)}\n`);
     process.stderr.write(`[server-debug] run:   ${formatCommand(`./${out}`, args)}\n\n`);
-    await run("moon", ["run", "console:build", "login-ui:build"], { cwd: repoRoot });
+    if (args[0] !== "migrate" && args[0] !== "completion") {
+      await run("moon", ["run", "console:build", "login-ui:build"], { cwd: repoRoot });
+    }
     await run("go", buildArgs, { cwd: repoRoot });
     await runBinary(`./${out}`, args, repoRoot);
   }
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
-  process.exit(typeof error === "object" && error !== null && typeof error.code === "number" ? error.code : 1);
+  process.exit(
+    typeof error === "object" && error !== null && typeof error.code === "number" ? error.code : 1,
+  );
 }
 
 async function runBinary(command, binaryArgs, cwd) {
@@ -78,6 +88,16 @@ async function runBinary(command, binaryArgs, cwd) {
 
 function isHelp(a) {
   return a.includes("--help") || a.includes("-h") || a[0] === "help";
+}
+
+function withServerMigrateArgs(args) {
+  if (isHelp(args) || args.includes("--migrate")) {
+    return args;
+  }
+  if (args[0] === "migrate" || args[0] === "completion") {
+    return args;
+  }
+  return [...args, "--migrate"];
 }
 
 function helpArgs(a) {

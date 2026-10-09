@@ -1,17 +1,112 @@
+import { spawn } from "node:child_process";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { stopBinaryRuntime } from "../../../../src/lib/local-server/binary";
+import {
+  resolveServerCommand,
+  startBinaryRuntime,
+  stopBinaryRuntime,
+} from "../../../../src/lib/local-server/binary";
+
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
+  return { ...actual, spawn: vi.fn(() => ({ pid: 4242, unref: () => undefined })) };
+});
 
 describe("local server binary helpers", () => {
   afterEach(() => {
     vi.useRealTimers();
+    // `clearAllMocks` resets the `spawn` mock's call history between tests. Under
+    // Vitest 4 `restoreAllMocks` only restores `spyOn` spies and no longer clears
+    // a `vi.fn()` module mock's `.mock.calls`, so without this a later test reads
+    // an earlier test's `spawn.mock.calls[0]`.
+    vi.clearAllMocks();
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it("spawns the server with the address, data dir, and public base env", async () => {
+    vi.stubEnv("ZITADEL_SERVER_BINARY", "/tmp/fake-nextgen-server");
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-binary-test-"));
+
+    const runtime = await startBinaryRuntime({
+      cliVersion: "0.0.0-test",
+      dataDir: join(dir, "data"),
+      logPath: join(dir, "logs", "server.log"),
+      port: 8091,
+      serverUrl: "http://localhost:8091",
+    });
+
+    const [command, args, options] = vi.mocked(spawn).mock.calls[0] as unknown as [
+      string,
+      string[],
+      { env: NodeJS.ProcessEnv },
+    ];
+    expect(command).toBe("/tmp/fake-nextgen-server");
+    expect(args).toEqual(["--migrate"]);
+    expect(runtime.command).toBe("/tmp/fake-nextgen-server --migrate");
+    expect(options.env.NEXTGEN_SERVER_ADDRESS).toBe(":8091");
+    expect(options.env.NEXTGEN_SERVER_PUBLIC_BASE).toBe("http://localhost:8091");
+    expect(runtime.env).toEqual({ injected: [] });
+  });
+
+  it("passes resolved project variables through the child environment, never argv", async () => {
+    vi.stubEnv("ZITADEL_SERVER_BINARY", "/tmp/fake-nextgen-server");
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-binary-test-"));
+
+    const runtime = await startBinaryRuntime({
+      cliVersion: "0.0.0-test",
+      dataDir: join(dir, "data"),
+      logPath: join(dir, "logs", "server.log"),
+      port: 8091,
+      serverUrl: "http://localhost:8091",
+      env: {
+        values: { GOOGLE_CLIENT_SECRET: "canary-secret" },
+        injected: ["GOOGLE_CLIENT_SECRET"],
+      },
+    });
+
+    const [command, args, options] = vi.mocked(spawn).mock.calls[0] as unknown as [
+      string,
+      string[],
+      { env: NodeJS.ProcessEnv },
+    ];
+    expect(options.env.GOOGLE_CLIENT_SECRET).toBe("canary-secret");
+    expect([command, ...args].join(" ")).not.toContain("canary-secret");
+    expect(runtime.command).not.toContain("canary-secret");
+    expect(runtime.env).toEqual({
+      injected: ["GOOGLE_CLIENT_SECRET"],
+    });
+    expect(JSON.stringify(runtime)).not.toContain("canary-secret");
+  });
+
+  it("records an explicit source build version with a binary override", () => {
+    expect(
+      resolveServerCommand({
+        ZITADEL_SERVER_BINARY: "/repo/dist/server/nextgen",
+        ZITADEL_SERVER_BINARY_VERSION: "dev+abcdef123456",
+      }),
+    ).toEqual({
+      command: "/repo/dist/server/nextgen",
+      args: [],
+      serverPackage: "@zitadel/server",
+      serverVersion: "dev+abcdef123456",
+    });
+  });
+
+  it("keeps the generic label for an unversioned user override", () => {
+    expect(
+      resolveServerCommand({ ZITADEL_SERVER_BINARY: "/tmp/custom-nextgen" }).serverVersion,
+    ).toBe("override");
   });
 
   it("falls back from process-group SIGTERM to pid SIGTERM and reports a stale process", async () => {
     const kill = vi
       .spyOn(process, "kill")
-      .mockImplementation((_pid: number, signal?: NodeJS.Signals | number) => {
+      .mockImplementation((_pid: number, signal?: string | number) => {
         if (_pid === -12345 && signal === "SIGTERM") {
           throw errno("ESRCH");
         }
@@ -36,7 +131,7 @@ describe("local server binary helpers", () => {
     vi.useFakeTimers();
     const kill = vi
       .spyOn(process, "kill")
-      .mockImplementation((_pid: number, _signal?: NodeJS.Signals | number) => {
+      .mockImplementation((_pid: number, _signal?: string | number) => {
         return true;
       });
 

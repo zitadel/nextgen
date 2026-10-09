@@ -6,25 +6,30 @@ dependsOn:
   - "components"
   - "design-tokens"
   - "sdk-nuxt"
-  - "shared-component-styles"
+
+workspace:
+  inheritedTasks:
+    # A demo app with no unit tests; demo-nuxt-e2e covers it.
+    exclude:
+      - "test"
 
 tasks:
-  lint:
-    command: "corepack pnpm exec oxlint ."
-    deps:
-      - "sdk-nuxt:build"
-
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
       - "sdk-nuxt:build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
       - "sdk-nuxt:build"
     outputs:
       - ".output/**/*"
+    options:
+      # Replaces the inherited dist/**/* rather than adding to it.
+      mergeOutputs: "replace"
+      # Reads sdk-nuxt/dist while bundling; shares the mutex with the
+      # sdk-nuxt builders so a concurrent build-release cannot clean that
+      # directory mid-bundle.
+      mutex: "sdk-nuxt-dist"
 
   dev:
     command: "corepack pnpm run dev"

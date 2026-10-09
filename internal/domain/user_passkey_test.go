@@ -194,3 +194,39 @@ func TestVerifyPasskeyChallenge(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func TestPasskeyCredentialName(t *testing.T) {
+	tests := []struct {
+		name           string
+		transports     []string
+		backupEligible bool
+		want           string
+	}{
+		{
+			name:           "roaming transport is a security key",
+			transports:     []string{"usb", "nfc"},
+			backupEligible: true,
+			want:           domain.PasskeyNameSecurityKey,
+		},
+		{
+			name:           "backup-eligible credential syncs",
+			transports:     []string{"internal", "hybrid"},
+			backupEligible: true,
+			want:           domain.PasskeyNameSynced,
+		},
+		{
+			name:       "platform credential without backup is device-bound",
+			transports: []string{"internal"},
+			want:       domain.PasskeyNameDeviceBound,
+		},
+		{
+			name: "no transports reported still yields a name",
+			want: domain.PasskeyNameDeviceBound,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, domain.GeneratePasskeyCredentialName(tt.transports, tt.backupEligible))
+		})
+	}
+}

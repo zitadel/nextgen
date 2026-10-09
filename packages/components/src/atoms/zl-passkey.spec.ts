@@ -31,6 +31,19 @@ function fakeAssertion(): PublicKeyCredential {
   } as unknown as PublicKeyCredential;
 }
 
+function fakeAttestation(): PublicKeyCredential {
+  return {
+    id: "cred-id",
+    rawId: bytes("rawid"),
+    type: "public-key",
+    authenticatorAttachment: "platform",
+    response: {
+      clientDataJSON: bytes("{}"),
+      attestationObject: bytes("attestation"),
+    },
+  } as unknown as PublicKeyCredential;
+}
+
 describe("<zl-passkey>", () => {
   let host: HTMLDivElement;
   let credentials: CredentialsStub;
@@ -81,7 +94,9 @@ describe("<zl-passkey>", () => {
 
   function nextEvent<T>(el: ZlPasskey, name: string): Promise<T> {
     return new Promise<T>((resolve) => {
-      el.addEventListener(name, (event) => resolve((event as CustomEvent).detail as T), { once: true });
+      el.addEventListener(name, (event) => resolve((event as CustomEvent).detail as T), {
+        once: true,
+      });
     });
   }
 
@@ -172,6 +187,41 @@ describe("<zl-passkey>", () => {
     expect(descriptor?.type).toBe("public-key");
   });
 
+  it("auto-starts registration once and passes user labels to create()", async () => {
+    credentials.create.mockResolvedValue(fakeAttestation());
+    const el = create({
+      ceremony: "register",
+      method: "passkey_register",
+      options: {
+        challenge: "AAAA",
+        rp: { id: "example.com", name: "example.com" },
+        user: { id: "dXNlci0x", name: "alice@example.com", displayName: "Alice" },
+        pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+      },
+    });
+    const detail = nextEvent<{
+      method: string;
+      proof: { response: { attestationObject?: string } };
+    }>(el, "zl-passkey-result");
+    host.appendChild(el);
+    const result = await detail;
+
+    expect(credentials.create).toHaveBeenCalledTimes(1);
+    expect(credentials.get).not.toHaveBeenCalled();
+    const arg = credentials.create.mock.calls[0]?.[0] as {
+      publicKey: {
+        user: { id: unknown; name: string; displayName: string };
+        pubKeyCredParams: Array<{ type: string; alg: number }>;
+      };
+    };
+    expect(arg.publicKey.user.id).toBeInstanceOf(ArrayBuffer);
+    expect(arg.publicKey.user.name).toBe("alice@example.com");
+    expect(arg.publicKey.user.displayName).toBe("Alice");
+    expect(arg.publicKey.pubKeyCredParams).toEqual([{ type: "public-key", alg: -7 }]);
+    expect(result.method).toBe("passkey_register");
+    expect(result.proof.response.attestationObject).toBeTypeOf("string");
+  });
+
   it("aborts the in-flight ceremony when disconnected", async () => {
     credentials.get.mockImplementation(
       (arg: { signal?: AbortSignal }) =>
@@ -188,5 +238,154 @@ describe("<zl-passkey>", () => {
     el.remove();
     const result = await errored;
     expect(result.aborted).toBe(true);
+  });
+
+  it("emits zl-passkey-started when the ceremony actually begins", async () => {
+    const el = create({ ceremony: "authenticate", options: { challenge: "AAAA" } });
+    const order: string[] = [];
+    el.addEventListener("zl-passkey-started", () => order.push("started"));
+    el.addEventListener("zl-passkey-result", () => order.push("result"));
+    const started = nextEvent<{ challenge_id: string; method: string }>(el, "zl-passkey-started");
+    const done = nextEvent(el, "zl-passkey-result");
+    host.appendChild(el);
+    const detail = await started;
+    await done;
+    expect(detail).toEqual({ challenge_id: "chal-1", method: "passkey" });
+    expect(order).toEqual(["started", "result"]);
+  });
+
+  it("does not emit zl-passkey-started when a guard rejects the start", async () => {
+    const startedListener = vi.fn();
+    const el = create({ manual: true });
+    el.addEventListener("zl-passkey-started", startedListener);
+    host.appendChild(el);
+    const errored = nextEvent(el, "zl-passkey-error");
+    void el.startCeremony();
+    await errored;
+    expect(startedListener).not.toHaveBeenCalled();
+  });
+
+  it("renders pending status + cancel while in flight and clears them after", async () => {
+    let resolveGet!: (value: PublicKeyCredential) => void;
+    credentials.get.mockImplementation(
+      () => new Promise<PublicKeyCredential>((resolve) => (resolveGet = resolve)),
+    );
+    const el = create({
+      ceremony: "authenticate",
+      options: { challenge: "AAAA" },
+      pendingLabel: "Waiting for your passkey…",
+      cancelLabel: "Cancel",
+    });
+    const done = nextEvent(el, "zl-passkey-result");
+    host.appendChild(el);
+    await el.updateComplete;
+
+    const pendingUi = el.querySelector('[data-testid="zitadel-passkey-pending"]');
+    expect(pendingUi).not.toBeNull();
+    expect(pendingUi?.textContent).toContain("Waiting for your passkey…");
+    expect(el.querySelector('[data-testid="zitadel-passkey-cancel"]')).not.toBeNull();
+
+    resolveGet(fakeAssertion());
+    await done;
+    await el.updateComplete;
+    expect(el.querySelector('[data-testid="zitadel-passkey-pending"]')).toBeNull();
+  });
+
+  it("renders no pending UI when silent", async () => {
+    // A ceremony that never settles — only the pending state matters here.
+    credentials.get.mockImplementation(() => new Promise(() => undefined));
+    const el = create({ ceremony: "authenticate", options: { challenge: "AAAA" }, silent: true });
+    host.appendChild(el);
+    await el.updateComplete;
+    expect(el.querySelector('[data-testid="zitadel-passkey-pending"]')).toBeNull();
+  });
+
+  it("cancel click aborts the ceremony without leaking zl-submit to ancestors", async () => {
+    credentials.get.mockImplementation(
+      (arg: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          arg.signal?.addEventListener("abort", () =>
+            reject(new DOMException("aborted", "AbortError")),
+          );
+        }),
+    );
+    const hostSubmitListener = vi.fn();
+    host.addEventListener("zl-submit", hostSubmitListener);
+    const el = create({ ceremony: "authenticate", options: { challenge: "AAAA" } });
+    const errored = nextEvent<{ aborted: boolean; timed_out: boolean }>(el, "zl-passkey-error");
+    host.appendChild(el);
+    await el.updateComplete;
+
+    const cancel = el.querySelector<HTMLElement>('[data-testid="zitadel-passkey-cancel"]');
+    expect(cancel).not.toBeNull();
+    cancel?.click();
+
+    const result = await errored;
+    expect(result.aborted).toBe(true);
+    expect(result.timed_out).toBe(false);
+    expect(hostSubmitListener).not.toHaveBeenCalled();
+    await el.updateComplete;
+    expect(el.querySelector('[data-testid="zitadel-passkey-pending"]')).toBeNull();
+  });
+
+  it("classifies NotAllowedError at the server timeout as timed_out", async () => {
+    vi.useFakeTimers();
+    try {
+      let rejectGet!: (reason: unknown) => void;
+      credentials.get.mockImplementation(
+        () => new Promise((_resolve, reject) => (rejectGet = reject)),
+      );
+      const el = create({
+        ceremony: "authenticate",
+        options: { challenge: "AAAA", timeout: 60_000 },
+      });
+      const errored = nextEvent<{ aborted: boolean; timed_out: boolean }>(el, "zl-passkey-error");
+      host.appendChild(el);
+
+      vi.advanceTimersByTime(60_000);
+      rejectGet(new DOMException("timed out", "NotAllowedError"));
+      const result = await errored;
+      expect(result.aborted).toBe(true);
+      expect(result.timed_out).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("treats a prompt NotAllowedError as a cancellation, not a timeout", async () => {
+    let rejectGet!: (reason: unknown) => void;
+    credentials.get.mockImplementation(
+      () => new Promise((_resolve, reject) => (rejectGet = reject)),
+    );
+    const el = create({
+      ceremony: "authenticate",
+      options: { challenge: "AAAA", timeout: 60_000 },
+    });
+    const errored = nextEvent<{ aborted: boolean; timed_out: boolean }>(el, "zl-passkey-error");
+    host.appendChild(el);
+    await Promise.resolve();
+    rejectGet(new DOMException("dismissed", "NotAllowedError"));
+    const result = await errored;
+    expect(result.aborted).toBe(true);
+    expect(result.timed_out).toBe(false);
+  });
+
+  it("never claims a timeout when the server sent no timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      let rejectGet!: (reason: unknown) => void;
+      credentials.get.mockImplementation(
+        () => new Promise((_resolve, reject) => (rejectGet = reject)),
+      );
+      const el = create({ ceremony: "authenticate", options: { challenge: "AAAA" } });
+      const errored = nextEvent<{ timed_out: boolean }>(el, "zl-passkey-error");
+      host.appendChild(el);
+      vi.advanceTimersByTime(600_000);
+      rejectGet(new DOMException("dismissed", "NotAllowedError"));
+      const result = await errored;
+      expect(result.timed_out).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

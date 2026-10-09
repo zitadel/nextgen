@@ -1,14 +1,19 @@
 import { randomUUID } from "node:crypto";
 
 import { Command, Flags } from "@oclif/core";
+
+import { nonBlankString } from "./flags";
 import consola from "consola";
 
 import { toZitadelError, type ZitadelError } from "../errors";
+import { listenForInterrupt, stopListeningForInterrupt } from "../interrupt";
 import { isObject } from "../json";
 import { resolveCwd } from "../paths";
 import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
 import { resolveServer } from "../server";
 import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
+import { buildUserAgent, installUserAgent, processUserAgentFacts } from "../user-agent";
+import { takeReportedWarnings } from "../warnings";
 import {
   CLI_COMMAND_COMPLETED,
   CLI_COMMAND_FAILED,
@@ -17,12 +22,14 @@ import {
   deviceProfileProperties,
   FIRST_RUN_NOTICE,
 } from "./command-telemetry";
+import type { CommandGroup } from "./groups";
 import type {
   CommandResult,
   ErrorEnvelope,
   EnvelopeMeta,
   GlobalOptions,
   JsonEnvelope,
+  SkippedEnvelope,
 } from "./types";
 
 /**
@@ -40,18 +47,45 @@ export abstract class BaseCommand extends Command {
   /** Opt into oclif's native `--json` flag and JSON serialisation of the result. */
   static override enableJsonFlag = true;
 
-  /** Flags shared by every command, inherited via oclif `baseFlags`. */
+  /**
+   * The group the root help lists this command under (see `lib/oclif/groups`).
+   * Every product command must set it; the root-help test fails otherwise.
+   */
+  static group?: CommandGroup;
+
+  /** Position within {@link group} on the root help, lowest first. */
+  static groupOrder?: number;
+
+  /**
+   * Flags shared by every command, inherited via oclif `baseFlags`. `--force` is
+   * deliberately absent: what it permits differs per command (overwrite a
+   * managed file, delete a resource), so each command that honours it declares
+   * its own with wording that says what it does. {@link toMeta} still reads
+   * `flags.force` into {@link GlobalOptions.force} for those commands.
+   */
   static override baseFlags = {
-    cwd: Flags.string({ char: "c", description: "Project directory to operate on." }),
-    server: Flags.string({ char: "s", description: "Override the resolved server URL." }),
+    cwd: nonBlankString({ char: "c", description: "Project directory to operate on." }),
+    server: nonBlankString({ char: "s", description: "Override the resolved server URL." }),
     "non-interactive": Flags.boolean({
       char: "n",
       description: "Disable prompts. Required when scripting or running as an agent.",
     }),
-    force: Flags.boolean({ char: "f", description: "Overwrite protected files on conflict." }),
     "dry-run": Flags.boolean({ description: "Preview without mutating files or the platform." }),
-    verbose: Flags.boolean({ description: "Verbose logging." }),
+    // `-v` is the short form curl, ssh and wget bind to verbosity, so an agent
+    // reaches for it by reflex; the root `--version` here carries no short form,
+    // so there is nothing to collide with.
+    verbose: Flags.boolean({ char: "v", description: "Verbose logging." }),
     debug: Flags.boolean({ description: "Debug logging." }),
+    // Declared so oclif accepts `--color`/`--no-color` rather than refusing them
+    // as unknown; the colour decision itself is applied in `bin/run.js` (which
+    // sets NO_COLOR/FORCE_COLOR before the libraries load) and honoured here.
+    // picocolors reads `--no-color` from argv on its own; consola reads the env.
+    color: Flags.boolean({
+      default: true,
+      allowNo: true,
+      description:
+        "Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.",
+    }),
     telemetry: Flags.boolean({
       default: true,
       allowNo: true,
@@ -90,6 +124,25 @@ export abstract class BaseCommand extends Command {
   private readonly telemetryStartedAt = Date.now();
 
   /**
+   * oclif runs this before `run`. The user agent goes in here, ahead of flag
+   * parsing and server resolution, so every request the command makes carries
+   * it — including the local-server health probes {@link toMeta} can trigger.
+   * Flags are not parsed yet, so `--no-telemetry` is looked for in this
+   * command's argv — a plain match that errs towards opting out. (oclif's own
+   * `config.userAgent` only feeds its `http-call` client, which the CLI does
+   * not use.)
+   */
+  protected override async init(): Promise<void> {
+    // A fresh invocation starts with no warnings, even when an earlier one in
+    // the same process (a test run, say) failed before emitting its own.
+    takeReportedWarnings();
+    await super.init();
+    listenForInterrupt();
+    const telemetryFlag = this.argv.includes("--no-telemetry") ? false : undefined;
+    installUserAgent(buildUserAgent(processUserAgentFacts(this.config.version, telemetryFlag)));
+  }
+
+  /**
    * Merge command-specific dimensions into {@link telemetryProps} immutably: a
    * new frozen bag replaces the previous one, so no shared object is ever
    * mutated. `step` advances by re-recording it at each milestone.
@@ -109,11 +162,10 @@ export abstract class BaseCommand extends Command {
   ): Promise<GlobalOptions> {
     const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
     const serverFlag = typeof flags.server === "string" ? flags.server : undefined;
-    const environment = typeof flags.environment === "string" ? flags.environment : "development";
     const source =
       options.resolveServer === false
         ? { value: options.source ?? "", origin: "default" as const }
-        : await resolveServer({ cwd, env: process.env, serverFlag, environment });
+        : await resolveServer({ cwd, env: process.env, serverFlag });
     const json = this.jsonEnabled();
     const isTTY = Boolean(process.stdout.isTTY && process.stdin.isTTY);
     const verbose = Boolean(flags.verbose);
@@ -124,6 +176,11 @@ export abstract class BaseCommand extends Command {
     // `--verbose` is reserved for richer per-step detail and currently maps
     // to the same level as default.
     consola.level = json ? -999 : debug ? 4 : 3;
+    // `--no-color` (or the `NO_COLOR` env) turns colour off; both reach this
+    // process as `NO_COLOR` via `bin/run.js`, and `--no-color` also unsets the
+    // parsed `color` flag. The flag's value is the source of truth here so that
+    // a programmatic `run()` (tests) honours it without the entry-point shim.
+    const useColor = flags.color !== false && !process.env.NO_COLOR;
     // Drop the right-aligned timestamp the FancyReporter adds by default.
     // Timestamps add no value in a one-off CLI run, wrap awkwardly on long
     // lines (e.g. created-schema URL), and clutter the visual rhythm of the
@@ -131,7 +188,7 @@ export abstract class BaseCommand extends Command {
     consola.options.formatOptions = {
       ...consola.options.formatOptions,
       date: false,
-      colors: true,
+      colors: useColor,
       compact: true,
     };
     this.meta = {
@@ -208,11 +265,7 @@ export abstract class BaseCommand extends Command {
       return false;
     }
     const argv = process.argv;
-    if (
-      argv.includes("--json") ||
-      argv.includes("--non-interactive") ||
-      argv.includes("-n")
-    ) {
+    if (argv.includes("--json") || argv.includes("--non-interactive") || argv.includes("-n")) {
       return false;
     }
     return Boolean(process.stdout.isTTY && process.stdin.isTTY);
@@ -235,8 +288,17 @@ export abstract class BaseCommand extends Command {
         }),
       );
     }
-    this.log(renderPretty(normalized, this.meta));
-    return toEnvelope(normalized, this.meta);
+    // An empty rendering is written as nothing, not as a blank line: a piped
+    // list of no records must leave stdout empty, so `wc -l` reports 0.
+    const rendered = renderPretty(normalized, this.meta);
+    if (rendered !== "") {
+      this.log(rendered);
+    }
+    // Reported warnings were printed when they happened, so they join the
+    // envelope only: printing them again here would show them twice.
+    const reported = takeReportedWarnings();
+    const envelope = toEnvelope(withReportedWarnings(normalized, reported), this.meta);
+    return envelope.status === "skipped" ? withWarnings(envelope, reported) : envelope;
   }
 
   /**
@@ -266,7 +328,7 @@ export abstract class BaseCommand extends Command {
       );
     }
     if (this.jsonEnabled()) {
-      this.logJson(toErrorEnvelope(zitadelError, meta));
+      this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), takeReportedWarnings()));
     } else {
       this.logToStderr(renderError(zitadelError, meta));
     }
@@ -288,6 +350,7 @@ export abstract class BaseCommand extends Command {
    * the grace, it force-exits with the resolved code.
    */
   protected override async finally(error: Error | undefined): Promise<void> {
+    stopListeningForInterrupt();
     await this.telemetry?.shutdown(1000);
     if (this.telemetry?.enabled) {
       setTimeout(() => process.exit(process.exitCode ?? 0), 250).unref();
@@ -343,6 +406,25 @@ function normalizeDataNextCommands(data: unknown, meta: GlobalOptions): unknown 
   };
 }
 
+/** Add the warnings reported while the command ran to an ok result. */
+function withReportedWarnings(result: CommandResult, reported: readonly string[]): CommandResult {
+  if (result.status !== "ok" || reported.length === 0) {
+    return result;
+  }
+  return { ...result, warnings: [...reported, ...(result.warnings ?? [])] };
+}
+
+/**
+ * Add reported warnings to a skipped or error envelope. Those envelopes carry
+ * `warnings` only when there are some, so their shape is otherwise unchanged.
+ */
+function withWarnings<T extends SkippedEnvelope | ErrorEnvelope>(
+  envelope: T,
+  warnings: readonly string[],
+): T {
+  return warnings.length === 0 ? envelope : { ...envelope, warnings: [...warnings] };
+}
+
 /** Wraps a {@link CommandResult} with the invocation metadata into the final envelope. */
 function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
   const base: EnvelopeMeta = {
@@ -390,7 +472,12 @@ function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelop
  */
 function renderPretty(result: CommandResult, meta: GlobalOptions): string {
   if (result.pretty !== undefined) {
-    return result.pretty;
+    // A command's own rendering replaces the generic one, but not its
+    // warnings: those are printed after it, so setting `pretty` cannot hide them.
+    const warnings = result.status === "ok" ? (result.warnings ?? []) : [];
+    return [result.pretty, ...warnings.map((warning) => `Warning: ${warning}`)]
+      .filter((line) => line !== "")
+      .join("\n");
   }
   if (result.status === "ok") {
     return formatData(result.data, result.warnings ? [...result.warnings] : [], meta);

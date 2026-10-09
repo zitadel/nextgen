@@ -7,31 +7,43 @@ tasks:
   generate:
     command: "corepack pnpm run generate"
     inputs:
+      - "**/*"
       - "/api/openapi/**/*.yaml"
-      - "orval.config.ts"
-      - "src/runtime/**/*.ts"
     outputs:
       - "src/generated/**/*"
-
-  lint:
-    command: "corepack pnpm exec oxlint ."
-    deps:
-      - "generate"
+    options:
+      # The spec references *-error-response.yaml files that server:generate
+      # and its checks rewrite or prune; see the mutex note on server:generate.
+      mutex: "generated-sources"
 
   typecheck:
-    command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
     deps:
       - "generate"
 
   build:
-    command: "corepack pnpm run build"
+    deps:
+      - "generate"
+
+  build-release:
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
     deps:
       - "generate"
     outputs:
       - "dist/**/*"
+    options:
+      cache: false
+      # The release preclean and rebuild run in one mutex-held task. Do not
+      # rely on parent runDepsInParallel ordering; only task deps and mutexes
+      # keep dist cleanup from racing builds that read or rewrite it.
+      runInCI: false
+      # cli:test drives the built oclif CLI, whose commands import this
+      # package's dist at runtime. The shared mutex keeps this release build
+      # (whose clean step rewrites dist/) from running while those tests are
+      # importing it; a task dep on cli:test would cycle the project graph.
+      mutex: "public-dist"
 
   test:
-    command: "corepack pnpm exec vitest run --passWithNoTests"
     deps:
       - "generate"
-

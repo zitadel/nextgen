@@ -1,0 +1,430 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import Ajv2020 from "ajv/dist/2020";
+import { describe, expect, it } from "vitest";
+
+import {
+  BRANDING_DESIGNS,
+  getDefaultBrandingConfig,
+  getDefaultLoginFlow,
+  SETUP_PRESETS,
+} from "./defaults.js";
+import {
+  BRANDING_FILE_SCHEMA_REF,
+  FLOW_FILE_SCHEMA_REF,
+  META_SCHEMA_DIR,
+  metaSchemaFiles,
+} from "./meta-schemas.js";
+
+const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+/** Every `$ref` string value anywhere in a schema document. */
+function collectRefs(node: unknown, refs: string[] = []): string[] {
+  if (Array.isArray(node)) {
+    for (const item of node) collectRefs(item, refs);
+  } else if (typeof node === "object" && node !== null) {
+    for (const [key, value] of Object.entries(node)) {
+      if (key === "$ref" && typeof value === "string") refs.push(value);
+      else collectRefs(value, refs);
+    }
+  }
+  return refs;
+}
+
+describe("meta-schemas", () => {
+  it("exposes the dialect files", () => {
+    expect(metaSchemaFiles().map((f) => f.name)).toEqual([
+      "flow-definition.json",
+      "user-schema.json",
+      "user-property.json",
+      "property-name.json",
+      "auth-methods.json",
+      "auth-method.json",
+      "sso-auth-method.json",
+      "idp-connection.json",
+      "branding.json",
+    ]);
+  });
+
+  // Offline contract: every relative $ref inside a materialized file must
+  // point at another materialized file, or editors/agents can't resolve the
+  // dialect without network access.
+  it("relative $refs resolve within the materialized set", () => {
+    const names = new Set(metaSchemaFiles().map((f) => f.name));
+    for (const file of metaSchemaFiles()) {
+      for (const ref of collectRefs(file.body)) {
+        if (ref.startsWith("#") || /^https?:\/\//.test(ref)) continue;
+        expect(names, `${file.name} references ${ref}, which is not materialized`).toContain(
+          ref.split("#")[0],
+        );
+      }
+    }
+  });
+
+  it("the flow $schema ref resolves from .zitadel/flows/ into the meta dir", () => {
+    expect(META_SCHEMA_DIR).toBe(".zitadel/meta");
+    expect(join(".zitadel/flows", FLOW_FILE_SCHEMA_REF)).toBe(
+      join(META_SCHEMA_DIR, "flow-definition.json"),
+    );
+  });
+
+  // The whole point of shipping the meta-schema: it must accept the exact
+  // files that carry the `$schema` pointer at it. A dialect drift here means
+  // editors flag every scaffolded flow as invalid.
+  it("validates every scaffolded preset flow", () => {
+    const ajv = new Ajv2020({ strict: false });
+    const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
+    const check = ajv.compile(flowSchema?.body as object);
+    for (const preset of SETUP_PRESETS) {
+      const flow = getDefaultLoginFlow({ preset, userSchemaUrl: "sch_TEST" });
+      expect(check(flow), `${preset}: ${JSON.stringify(check.errors)}`).toBe(true);
+    }
+  });
+
+  // The branding dialect shares one definition between the light and dark
+  // sides and one between the twelve colours, so a broken `$ref` would not
+  // fail loudly — it would quietly stop constraining anything.
+  it("validates a branding descriptor through its shared definitions", () => {
+    const ajv = new Ajv2020({ strict: false });
+    const brandingSchema = metaSchemaFiles().find((f) => f.name === "branding.json");
+    const check = ajv.compile(brandingSchema?.body as object);
+
+    const descriptor = {
+      layout: "centered",
+      logo_url: "https://cdn.example.com/logo.svg",
+      theme: {
+        mode: "auto",
+        light: {
+          logo_url: "https://cdn.example.com/on-light.svg",
+          palette: { primary: "#4F46E5", link: "rebeccapurple" },
+        },
+        dark: {
+          logo_url: "https://cdn.example.com/on-dark.svg",
+          palette: { primary: "color-mix(in oklab, #A5B4FC 40%, white)" },
+        },
+      },
+      typography: { font_family: "Inter, ui-sans-serif, sans-serif", scale: 1 },
+      shape: { radius: 10, density: "regular", logo_scale: 1.5 },
+    };
+    expect(check(descriptor), JSON.stringify(check.errors)).toBe(true);
+
+    // Both sides have to be constrained, not just whichever one the schema
+    // happened to spell out before the definitions were shared.
+    for (const side of ["light", "dark"] as const) {
+      const hostile = {
+        theme: { [side]: { palette: { primary: "red; } :host { display: none" } } },
+      };
+      expect(check(hostile), `${side} accepted an injection`).toBe(false);
+    }
+  });
+
+  it("accepts an explicit `action: null` transition, as the OpenAPI contract does", () => {
+    const ajv = new Ajv2020({ strict: false });
+    const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
+    const check = ajv.compile(flowSchema?.body as object);
+    const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }) as unknown as {
+      steps: Array<{
+        transitions?: Record<string, { target: string; action?: string | null }>;
+      }>;
+    };
+    const step = flow.steps.find((s) => s.transitions && Object.keys(s.transitions).length > 0);
+    const transition = Object.values(step?.transitions ?? {})[0];
+    if (!transition) throw new Error("fixture flow has no transitions");
+    // `action: null` means "current flow" — the wire contract marks the enum
+    // nullable, so the editor-facing dialect must not flag it.
+    transition.action = null;
+    expect(check(flow), JSON.stringify(check.errors)).toBe(true);
+    // The enum still constrains real values.
+    (transition as { action: unknown }).action = "warp";
+    expect(check(flow)).toBe(false);
+  });
+
+  // Step and transition shapes the engine can never run are rejected by the
+  // dialect too, so an editor flags them before plan does.
+  it("rejects step and transition shapes the engine cannot run", () => {
+    const ajv = new Ajv2020({ strict: false });
+    const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
+    const check = ajv.compile(flowSchema?.body as object);
+    const withStep = (step: Record<string, unknown>): object => {
+      const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }) as unknown as {
+        steps: object[];
+      };
+      flow.steps.push({ name: "extra", ...step });
+      return flow;
+    };
+    const provider = "google";
+    const providers = (n: number): string[] => Array.from({ length: n }, (_, i) => `idp-${i}`);
+    const cases: Array<[string, Record<string, unknown>, boolean]> = [
+      ["sso_providers without transitions", { sso_providers: [provider] }, false],
+      [
+        "sso_providers without an sso_authenticated transition",
+        { sso_providers: [provider], transitions: { submit: { target: "extra" } } },
+        false,
+      ],
+      [
+        "sso_providers with an sso_authenticated transition",
+        { sso_providers: [provider], transitions: { sso_authenticated: { target: "extra" } } },
+        true,
+      ],
+      [
+        "twenty sso_providers",
+        { sso_providers: providers(20), transitions: { sso_authenticated: { target: "extra" } } },
+        true,
+      ],
+      [
+        "twenty-one sso_providers",
+        { sso_providers: providers(21), transitions: { sso_authenticated: { target: "extra" } } },
+        false,
+      ],
+      [
+        "terminal step with actions",
+        { complete: "show", actions: [{ name: "submit", kind: "submit" }] },
+        false,
+      ],
+      [
+        "terminal step with transitions",
+        { complete: "show", transitions: { submit: { target: "extra" } } },
+        false,
+      ],
+      ["terminal step with empty lists", { complete: "show", fields: [], actions: [] }, true],
+      ["non-terminal step with nothing", {}, false],
+      ["non-terminal step with only empty lists", { fields: [], actions: [] }, false],
+      [
+        "non-terminal step with only an sso_authenticated transition",
+        { transitions: { sso_authenticated: { target: "extra" } } },
+        true,
+      ],
+      ["non-terminal step with fields", { fields: ["email"] }, true],
+      [
+        "transition with both purpose and action",
+        {
+          fields: ["email"],
+          transitions: { submit: { target: "extra", purpose: "login", action: "switch" } },
+        },
+        false,
+      ],
+      [
+        "transition with purpose and a null action",
+        {
+          fields: ["email"],
+          transitions: { submit: { target: "extra", purpose: "login", action: null } },
+        },
+        true,
+      ],
+      [
+        "sso_authenticated with a purpose",
+        {
+          fields: ["email"],
+          transitions: { sso_authenticated: { target: "extra", purpose: "register" } },
+        },
+        false,
+      ],
+      [
+        "sso_user_not_found with an action",
+        {
+          fields: ["email"],
+          transitions: { sso_user_not_found: { target: "extra", action: "switch" } },
+        },
+        false,
+      ],
+      [
+        "sso outcomes with a null purpose and action",
+        {
+          fields: ["email"],
+          transitions: {
+            sso_authenticated: { target: "extra", purpose: null, action: null },
+            sso_user_not_found: { target: "extra", purpose: null, action: null },
+          },
+        },
+        true,
+      ],
+      [
+        "user_already_exists with a purpose",
+        {
+          fields: ["email"],
+          transitions: { user_already_exists: { target: "extra", purpose: "login" } },
+        },
+        true,
+      ],
+    ];
+    for (const [name, step, valid] of cases) {
+      expect(check(withStep(step)), `${name}: ${JSON.stringify(check.errors)}`).toBe(valid);
+    }
+  });
+
+  // The dialect is what an editor validates against, so the property-name
+  // rule has to hold in a plain JSON Schema validator, not just in the
+  // server's Go one.
+  it("constrains user schema property names at every level", () => {
+    const ajv = new Ajv2020({ strict: false, validateFormats: false });
+    for (const file of metaSchemaFiles()) {
+      if (file.name !== "user-schema.json") ajv.addSchema(file.body as object, file.name);
+    }
+    const check = ajv.compile(
+      metaSchemaFiles().find((f) => f.name === "user-schema.json")?.body as object,
+    );
+    const userSchema = (properties: unknown) => ({
+      metaSchema: "https://example.test/user-schema.json",
+      kind: "user-schema",
+      "x-auth-methods": { password: { enabled: true } },
+      properties,
+    });
+
+    expect(check(userSchema({ email: { type: "string", "x-unique": "project" } }))).toBe(true);
+    expect(check(userSchema({ "address.street": { type: "string" } }))).toBe(false);
+    expect(
+      check(
+        userSchema({
+          address: { type: "object", properties: { "zip.code": { type: "string" } } },
+        }),
+      ),
+    ).toBe(false);
+    // Recursion also carries the annotation rules down, so a nested typo is
+    // caught rather than silently ignored at runtime.
+    expect(
+      check(
+        userSchema({
+          address: { type: "object", properties: { zip: { type: "string", "x-unique": "nope" } } },
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("validates every scaffolded branding design descriptor", () => {
+    // validateFormats off: the branding dialect uses `format: uri`, which
+    // plain Ajv (no ajv-formats) would reject at compile time.
+    const ajv = new Ajv2020({ strict: false, validateFormats: false });
+    const brandingSchema = metaSchemaFiles().find((f) => f.name === "branding.json");
+    const check = ajv.compile(brandingSchema?.body as object);
+    for (const design of BRANDING_DESIGNS) {
+      const { branding } = getDefaultBrandingConfig(design);
+      const file = { $schema: BRANDING_FILE_SCHEMA_REF, ...branding };
+      expect(check(file), `${design}: ${JSON.stringify(check.errors)}`).toBe(true);
+    }
+    // The template is inline or a `$file` reference; the old key is unknown.
+    expect(check({ liquid_template: "<p></p>" })).toBe(true);
+    expect(check({ liquid_template: { $file: "./login.liquid" } })).toBe(true);
+    expect(check({ liquid_template: { $file: "" } })).toBe(false);
+    expect(check({ liquid_template: { $file: "./login.liquid", extra: 1 } })).toBe(false);
+    expect(check({ liquid_template_file: "./login.liquid" })).toBe(false);
+    // Unknown keys are dialect errors, like the flow dialect.
+    expect(check({ not_a_branding_key: true })).toBe(false);
+    // Asset URLs are https by default at the dialect level too — editors flag
+    // what the server's save gate would reject. Scheme matching is
+    // case-insensitive, like the zod and Go validators.
+    expect(check({ logo_url: "http://cdn.example.com/logo.svg" })).toBe(false);
+    expect(check({ hero_url: "https://cdn.example.com/hero.png" })).toBe(true);
+    expect(check({ hero_url: "HTTPS://cdn.example.com/hero.png" })).toBe(true);
+    expect(check({ logo_url: "https://cdn.example.com:8443/logo.svg" })).toBe(true);
+    expect(
+      check({ theme: { light: { logo_url: "https://cdn.example.com:8443/on-light.svg" } } }),
+    ).toBe(true);
+    expect(
+      check({
+        typography: { font_family: "Inter", font_url: "https://fonts.example.com:8443/css" },
+      }),
+    ).toBe(true);
+    // Loopback HTTP is the dev-posture carve-out, mirrored across the zod
+    // and Go gates: editors must not flag what plan/apply accept.
+    expect(check({ logo_url: "http://localhost:3000/logo.svg" })).toBe(true);
+    expect(check({ logo_url: "HTTP://LOCALHOST:3000/logo.svg" })).toBe(true);
+    expect(check({ hero_url: "http://127.0.0.1:8080/hero.png" })).toBe(true);
+    expect(check({ hero_url: "http://127.255.255.255/hero.png" })).toBe(true);
+    expect(check({ logo_url: "http://[::1]:3000/logo.svg" })).toBe(true);
+    expect(check({ logo_url: "http://localhost.evil.example/logo.svg" })).toBe(false);
+    expect(check({ logo_url: "http://localhost:3000@evil.example/logo.svg" })).toBe(false);
+    expect(check({ hero_url: "http://192.168.1.10/hero.png" })).toBe(false);
+    expect(check({ hero_url: "http://127.1/hero.png" })).toBe(false);
+    expect(check({ hero_url: "http://2130706433/hero.png" })).toBe(false);
+    expect(check({ hero_url: "http://0x7f000001/hero.png" })).toBe(false);
+    expect(check({ hero_url: "http://127.00.0.1/hero.png" })).toBe(false);
+    expect(check({ hero_url: "http://[0:0:0:0:0:0:0:1]/hero.png" })).toBe(false);
+    expect(check({ hero_url: "http://[::ffff:127.0.0.1]/hero.png" })).toBe(false);
+    expect(check({ hero_url: "http://localhost:65536/hero.png" })).toBe(false);
+    // Userinfo in an asset URL is a credential every visitor's browser sends,
+    // so the dialect rejects it like the zod and Go gates; an `@` in the path
+    // is not userinfo.
+    expect(check({ logo_url: "https://bob:secret@cdn.example.com/logo.svg" })).toBe(false);
+    expect(
+      check({ theme: { dark: { logo_url: "https://bob@cdn.example.com/on-dark.svg" } } }),
+    ).toBe(false);
+    expect(
+      check({
+        typography: { font_family: "Inter", font_url: "https://u:p@fonts.example.com/css" },
+      }),
+    ).toBe(false);
+    expect(check({ logo_url: "https://cdn.example.com/logo@2x.png" })).toBe(true);
+    // A stylesheet alone names no face to render in.
+    expect(check({ typography: { font_url: "https://fonts.example.com/css" } })).toBe(false);
+    expect(
+      check({ typography: { font_family: "Inter", font_url: "https://fonts.example.com/css" } }),
+    ).toBe(true);
+  });
+
+  it("the branding $schema ref resolves from .zitadel/branding/ into the meta dir", () => {
+    expect(join(".zitadel/branding", BRANDING_FILE_SCHEMA_REF)).toBe(
+      join(META_SCHEMA_DIR, "branding.json"),
+    );
+  });
+
+  it("rejects the pre-array actions dialect and unknown keys", () => {
+    const ajv = new Ajv2020({ strict: false });
+    const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
+    const check = ajv.compile(flowSchema?.body as object);
+    const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }) as unknown as {
+      steps: Array<{ actions?: unknown }>;
+    };
+    // Old dialect: actions keyed by name instead of an ordered array.
+    const [entry] = flow.steps;
+    if (entry) {
+      entry.actions = { submit: { primary: true } };
+    }
+    expect(check(flow)).toBe(false);
+
+    const withUnknown = {
+      ...getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }),
+      not_a_flow_key: true,
+    };
+    expect(check(withUnknown)).toBe(false);
+  });
+
+  // The dialect must also accept the raw files this package ships from disk
+  // (placeholders included): editors validate scaffolded flow and schema
+  // files against these specs, so a divergence between the dialect and the
+  // real config shape lights up every valid file as an error. $ref-registered
+  // compilation exercises the cross-file references (user-schema →
+  // auth-methods → auth-method) that standalone compiles skip.
+  describe("dialect accepts the shipped defaults and presets", () => {
+    const defaultsDir = join(packageRoot, "defaults");
+    const presetDirs = readdirSync(join(defaultsDir, "presets"));
+    const flowFiles = [
+      "default-login.json",
+      ...presetDirs.map((p) => join("presets", p, "login.json")),
+    ];
+    const userSchemaFiles = [
+      "default-human-user.json",
+      ...presetDirs.map((p) => join("presets", p, "human-user.json")),
+    ];
+
+    const ajv = new Ajv2020({ strict: false, allErrors: true });
+    for (const file of metaSchemaFiles()) ajv.addSchema(file.body, file.name);
+    const validateFlow = ajv.compile({ $ref: "flow-definition.json" });
+    const validateUserSchema = ajv.compile({ $ref: "user-schema.json" });
+
+    it.each(flowFiles)("flow file %s validates", (file) => {
+      const body = JSON.parse(readFileSync(join(defaultsDir, file), "utf8")) as object;
+      const valid = validateFlow(body);
+      expect(validateFlow.errors ?? [], `${file} violates flow-definition.json`).toEqual([]);
+      expect(valid).toBe(true);
+    });
+
+    it.each(userSchemaFiles)("user schema %s validates", (file) => {
+      const body = JSON.parse(readFileSync(join(defaultsDir, file), "utf8")) as object;
+      const valid = validateUserSchema(body);
+      expect(validateUserSchema.errors ?? [], `${file} violates user-schema.json`).toEqual([]);
+      expect(valid).toBe(true);
+    });
+  });
+});

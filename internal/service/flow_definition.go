@@ -5,19 +5,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 
 	"github.com/ianlancetaylor/jsonschema"
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 type FlowDefinitionService interface {
 	Create(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error)
-	Update(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error)
 	Get(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error)
-	List(ctx context.Context, req ListFlowDefinitionsRequest) ([]*domain.FlowDefinition, error)
-	Delete(ctx context.Context, projectID string, id string) error
+	List(ctx context.Context, req ListFlowDefinitionsRequest) (*ListFlowDefinitionsResponse, error)
 }
 
 type SchemaGetter interface {
@@ -32,121 +30,57 @@ type BuiltinSchemaProvider interface {
 type flowDefinitionValidatorFunc func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error)
 
 type FlowDefinitionRequest struct {
-	FlowDefinitionID string
-	ProjectID        string
-	Name             string
-	Status           string
-	SchemaVersion    string // todo (grvijayan): currently empty as the request does not contain schema version
-	FlowSchemaURI    string // todo (grvijayan): schema_version (semver) stored in the db vs schema_uri needed for validation
-	UserSchema       string
-	Purposes         map[string]string
-	Audience         domain.FlowDefinitionAudience
-	Steps            []domain.FlowDefinitionStep
+	ProjectID     string
+	Name          string
+	Status        string
+	SchemaVersion string // todo (grvijayan): currently empty as the request does not contain schema version
+	FlowSchemaURI string // todo (grvijayan): schema_version (semver) stored in the db vs schema_uri needed for validation
+	UserSchema    string
+	Purposes      map[string]string
+	Audience      domain.FlowDefinitionAudience
+	Steps         []domain.FlowDefinitionStep
 }
 
 type flowDefinitionService struct {
-	db                     database.Pool
+	v2Pool                 *DB
 	schemaGetter           SchemaGetter
 	builtinSchemaProvider  BuiltinSchemaProvider
 	validateFlowDefinition flowDefinitionValidatorFunc
-	flowDefinitionRepo     domain.FlowDefinitionRepository
 }
 
 func NewFlowDefinitionService(
-	db database.Pool,
+	v2Pool *DB,
 	schemaGetter SchemaGetter,
 	schemaProvider BuiltinSchemaProvider,
 	flowDefinitionValidatorFn flowDefinitionValidatorFunc,
-	flowDefinitionRepo domain.FlowDefinitionRepository,
 ) FlowDefinitionService {
 	if flowDefinitionValidatorFn == nil {
 		flowDefinitionValidatorFn = domain.ValidateFlowDefinition
 	}
 	return &flowDefinitionService{
-		db:                     db,
+		v2Pool:                 v2Pool,
 		schemaGetter:           schemaGetter,
 		builtinSchemaProvider:  schemaProvider,
 		validateFlowDefinition: flowDefinitionValidatorFn,
-		flowDefinitionRepo:     flowDefinitionRepo,
 	}
 }
 
 func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error) {
-	// check if a flow definition (name + schema version) already exists in the project
-	opts := []domain.FlowDefinitionListOption{
-		domain.WithFlowDefinitionName(req.Name),
-		domain.WithSchemaVersion(req.SchemaVersion),
-	}
-	defs, err := fd.flowDefinitionRepo.ListFlowDefinitions(ctx, fd.db, req.ProjectID, opts...)
-	if err != nil {
-		if !errors.Is(err, &database.NoRowFoundError{}) {
-			return nil, err
-		}
-	}
-	if len(defs) > 0 {
-		return nil, domain.ErrFlowDefinitionAlreadyExists()
-	}
-
 	purposes, err := mapPurposesToDomain(req.Purposes)
 	if err != nil {
 		return nil, err
 	}
-
+	status, err := domain.FlowDefinitionStatusString(req.Status)
+	if err != nil {
+		return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("invalid status: %q", req.Status), err)
+	}
 	flowDefinition, err := domain.NewFlowDefinition(
-		"", // the flow definition ID is auto-generated
+		"",
 		req.ProjectID,
 		req.Name,
 		req.SchemaVersion,
 		req.UserSchema,
 		purposes,
-		req.Audience,
-		req.Steps,
-		domain.FlowDefinitionStatusActive,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	err = fd.Validate(ctx, flowDefinition)
-	if err != nil {
-		return nil, err
-	}
-	err = fd.flowDefinitionRepo.CreateFlowDefinition(ctx, fd.db, flowDefinition)
-	if err != nil {
-		return nil, err
-	}
-	return flowDefinition, nil
-}
-
-func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error) {
-	retrievedFlowDef, err := fd.Get(ctx, req.ProjectID, req.FlowDefinitionID)
-	if err != nil {
-		return nil, err
-	}
-
-	// if the status is not set, use the existing status
-	if req.Status == "" {
-		req.Status = retrievedFlowDef.Status.String()
-	}
-	status, err := domain.FlowDefinitionStatusString(req.Status)
-	if err != nil {
-		return nil, domain.ErrFlowDefinitionInvalid("invalid status", err)
-	}
-	reqPurposes, err := mapPurposesToDomain(req.Purposes)
-	if err != nil {
-		return nil, err
-	}
-	err = fd.isUpdateAllowed(ctx, req.ProjectID, retrievedFlowDef.ID, retrievedFlowDef.Status, status, retrievedFlowDef.Purposes, reqPurposes)
-	if err != nil {
-		return nil, err
-	}
-	flowDefinition, err := domain.NewFlowDefinition(
-		req.FlowDefinitionID,
-		req.ProjectID,
-		req.Name,
-		req.SchemaVersion,
-		req.UserSchema,
-		reqPurposes,
 		req.Audience,
 		req.Steps,
 		status,
@@ -159,67 +93,33 @@ func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionR
 	if err != nil {
 		return nil, err
 	}
-	err = fd.flowDefinitionRepo.UpdateFlowDefinition(ctx, fd.db, flowDefinition)
+	err = fd.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().CreateFlowDefinition(ctx, flowDefinition); err != nil {
+			return err
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeFlowdefCreated,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  flowDefinition.ProjectID,
+			EntityType: "flow_definition",
+			EntityID:   flowDefinition.ID,
+			Payload:    domain.FlowdefPayloadSnapshot(flowDefinition),
+		})
+	})
 	if err != nil {
+		// The id is server-minted, so the only unique constraint a create can
+		// lose is (project_id, name, created_at): another revision of the same
+		// flow landed on the same instant. Other integrity violations (foreign
+		// key, check) are not that race and keep their own semantics.
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			return nil, domain.ErrFlowDefinitionRevisionConflict().WithParent(err)
+		}
 		return nil, err
 	}
 	return flowDefinition, nil
 }
 
-func (fd *flowDefinitionService) isUpdateAllowed(
-	ctx context.Context,
-	projectID,
-	flowDefID string,
-	currentStatus, reqStatus domain.FlowDefinitionStatus,
-	currentPurposes, reqPurposes map[domain.FlowDefinitionPurpose]string) error {
-	// no status change and no purpose change -> the update is allowed implicitly
-	if currentStatus == reqStatus && maps.Equal(currentPurposes, reqPurposes) {
-		return nil
-	}
-
-	purposesToCheck := make(map[domain.FlowDefinitionPurpose]struct{})
-
-	if reqStatus != domain.FlowDefinitionStatusActive {
-		// deactivation: to check if there are other active flow definitions with the current purpose
-		for p := range currentPurposes {
-			purposesToCheck[p] = struct{}{}
-		}
-	} else {
-		// purpose change: to check if there are other active flow definitions to support the purpose being removed
-		for p := range currentPurposes {
-			if _, ok := reqPurposes[p]; !ok {
-				purposesToCheck[p] = struct{}{}
-			}
-		}
-	}
-
-	if len(purposesToCheck) == 0 {
-		return nil
-	}
-
-	// todo (@grvijayan): refactor once the repository layer supports querying by multiple purposes at once
-	//  (excluding the current flow definition ID) to avoid multiple calls to the database
-	for purpose := range purposesToCheck {
-		fds, err := fd.flowDefinitionRepo.ListFlowDefinitions(
-			ctx,
-			fd.db,
-			projectID,
-			domain.WithFlowDefinitionStatus(domain.FlowDefinitionStatusActive),
-			domain.WithFlowDefinitionPurpose(purpose),
-		)
-		if err != nil {
-			return domain.ErrInternal(err).WithMessage(fmt.Sprintf("failed to list flow definitions for old purpose %q", purpose))
-		}
-		if !(len(fds) > 1) {
-			return domain.ErrFlowDefinitionUpdateConflict(fmt.Sprintf("cannot update: no other active flow definition found with purpose %q", purpose))
-		}
-	}
-	return nil
-}
-
-// Validate validates the flow definition steps and transitions
 func (fd *flowDefinitionService) Validate(ctx context.Context, flowDefinition *domain.FlowDefinition) error {
-	// resolve the user schema from the user schema URI
 	sch, err := fd.schemaGetter.GetSchema(ctx, flowDefinition.ProjectID, "", flowDefinition.UserSchema)
 	if err != nil {
 		if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
@@ -234,31 +134,30 @@ func (fd *flowDefinitionService) Validate(ctx context.Context, flowDefinition *d
 		return domain.ErrSchemaFetchFailed("failed to unmarshal user schema", err)
 	}
 
-	// validate the flow steps, fields against the user schema, transitions, reachability, trapped cycles, etc.
 	pivotingTargets, err := fd.validateFlowDefinition(userSchema, *flowDefinition)
 	if err != nil {
 		return err
 	}
 
-	// validate that the pivoting targets returned by the flow definition validator are valid flow definitions in the same project
 	return fd.validatePivotingTargets(ctx, pivotingTargets, flowDefinition.ProjectID)
-
 }
 
-// validatePivotingTargets validates that the pivoting targets are a valid flow definition in the same project.
 func (fd *flowDefinitionService) validatePivotingTargets(ctx context.Context, pivotingTargets []domain.PivotingTarget, projectID string) error {
 	if len(pivotingTargets) == 0 {
 		return nil
 	}
 	for _, target := range pivotingTargets {
-		defs, err := fd.flowDefinitionRepo.ListFlowDefinitions(ctx, fd.db, projectID,
-			domain.WithFlowDefinitionName(target.Name),
-			domain.WithFlowDefinitionStatus(domain.FlowDefinitionStatusActive),
-		)
+		defs, err := fd.v2Pool.Statements().ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
+			Filter: database.And(
+				database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
+				database.Equal(database.Col(domain.FlowDefinitionFieldName), target.Name),
+				database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
+			),
+		}, FlowDefinitionQueryOptions{})
 		if err != nil {
 			return err
 		}
-		if len(defs) == 0 {
+		if len(defs.Items) == 0 {
 			return domain.ErrFlowDefinitionInvalid(fmt.Sprintf(
 				"step %q: transition %q targets unknown or inactive flow %q", target.Step, target.Transition, target.Name), nil)
 		}
@@ -286,9 +185,9 @@ func (fd *flowDefinitionService) Get(ctx context.Context, projectID, id string) 
 	if id == "" {
 		return nil, domain.ErrMissingFlowDefinitionID()
 	}
-	definition, err := fd.flowDefinitionRepo.GetFlowDefinition(ctx, fd.db, projectID, id)
+	definition, err := fd.v2Pool.Statements().GetFlowDefinitionByID(ctx, projectID, id)
 	if err != nil {
-		if errors.Is(err, &database.NoRowFoundError{}) {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrFlowDefinitionNotFound()
 		}
 		return nil, err
@@ -299,45 +198,54 @@ func (fd *flowDefinitionService) Get(ctx context.Context, projectID, id string) 
 type ListFlowDefinitionsRequest struct {
 	ProjectID string
 	Purpose   string
-	Limit     int
-	PageToken string
+	Name      string
+	// LatestRevisionPerName keeps only the newest revision of each flow name.
+	LatestRevisionPerName bool
+	Limit                 int
+	PageToken             string
 }
 
-func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitionsRequest) ([]*domain.FlowDefinition, error) {
+type ListFlowDefinitionsResponse struct {
+	Items         []*domain.FlowDefinition
+	NextPageToken string
+}
+
+func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitionsRequest) (*ListFlowDefinitionsResponse, error) {
 	// todo (grvijayan): get the project ID from the context when the functionality is implemented
 	if req.ProjectID == "" {
 		return nil, domain.ErrMissingProjectID()
 	}
-	var filterOpts []domain.FlowDefinitionListOption
+	filters := []database.Filter[domain.FlowDefinitionField]{
+		database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
+	}
 	if req.Purpose != "" {
 		purpose, err := domain.FlowDefinitionPurposeString(req.Purpose)
 		if err != nil {
 			return nil, domain.ErrFlowDefinitionInvalid("invalid purpose", nil)
 		}
-		filterOpts = append(filterOpts, domain.WithFlowDefinitionPurpose(purpose))
+		filters = append(filters, database.ArrayContains(database.Col(domain.FlowDefinitionFieldPurposes), purpose.String()))
 	}
-	// todo: the repository layer supports offset at the moment, but not page token
-	if req.Limit > 0 {
-		filterOpts = append(filterOpts, domain.WithFlowDefinitionLimit(uint32(req.Limit)))
+	if req.Name != "" {
+		filters = append(filters, database.Equal(database.Col(domain.FlowDefinitionFieldName), req.Name))
 	}
-	defs, err := fd.flowDefinitionRepo.ListFlowDefinitions(
-		ctx,
-		fd.db,
-		req.ProjectID,
-		filterOpts...,
-	)
+	cursor, err := revisionsCursor(req.PageToken, req.LatestRevisionPerName)
 	if err != nil {
 		return nil, err
 	}
-	return defs, nil
-}
-
-func (fd *flowDefinitionService) Delete(ctx context.Context, projectID, id string) error {
-	if projectID == "" {
-		return domain.ErrMissingProjectID()
+	opts := &database.ListOptions[domain.FlowDefinitionField]{
+		Filter: database.And(filters...),
+		Pagination: database.Page[domain.FlowDefinitionField]{
+			Limit:  uint32(normalizeLimit(req.Limit)),
+			Cursor: cursor,
+		},
 	}
-	if id == "" {
-		return domain.ErrMissingFlowDefinitionID()
+	result, err := fd.v2Pool.Statements().ListFlowDefinitions(ctx, opts,
+		FlowDefinitionQueryOptions{LatestRevisionPerName: req.LatestRevisionPerName})
+	if err != nil {
+		return nil, mapListError(err, "failed to list flow definitions")
 	}
-	return fd.flowDefinitionRepo.DeleteFlowDefinition(ctx, fd.db, projectID, id)
+	return &ListFlowDefinitionsResponse{
+		Items:         result.Items,
+		NextPageToken: stampRevisionsMode(result.NextCursor, req.LatestRevisionPerName),
+	}, nil
 }

@@ -12,12 +12,53 @@ for the typed `@zitadel/api` Flow API. Consumers:
   through `msw-storybook-addon`.
 - `packages/components/src/orchestrator/zitadel-login.spec.ts` — feeds
   the handlers into `msw/node`'s `setupServer`.
+- The widget SDKs (`packages/sdk-{angular,qwik,react,solid,svelte,vue}`) —
+  their `test-setup.ts` calls `serveMockFlowApi()` from the test-only
+  `./vitest` (`msw/node`) or `./vitest-browser` (`msw/browser`) entry point.
 - `apps/demo-next/` and `apps/demo-nuxt/` — hit the standalone TCP server
   started by `pnpm --filter @zitadel/api-mock start` (not an
   in-browser worker).
 
-It is **not** published. There is no built artifact; consumers import
-the source directly via the workspace export map.
+It is **not** published. It still builds to `dist/` like every other
+workspace package, so consumers resolve it through its export map (the
+`@zitadel/source` condition points in-repo tooling at the source) and depend
+on `api-mock:build` in moon like any other package.
+
+## The flow shape must mirror the real default flow
+
+This mock is the substrate for the orchestrator's own test suite, the Storybook
+stories, and the demo e2e suites. When its flow shape diverges from the server's,
+every one of those consumers silently proves the wrong thing.
+
+The authority is
+[`packages/config/defaults/default-login.json`](../config/defaults/default-login.json),
+embedded into the server via `configdefaults.DefaultLoginFlowDefinition()`. Two
+properties it fixes, both of which this mock got wrong until they were corrected:
+
+- **Sign-in is split**: `identifier` (email) → `password` → `done`. It is not a
+  combined email+password card. The mock served a combined card for a long time,
+  so the orchestrator's tests, the Storybook story, and both demo e2e suites were
+  all walking a screen the server never emits.
+- **Credential fields are keyed by the schema pointer** `x-auth-methods#password`
+  (exported as `PASSWORD_FIELD`), on both `password` and `register-password`. The
+  server answers `req.invalid` to a submit keyed on plain `password`, so the short
+  name let the orchestrator send a key the real backend refuses — invisible to
+  every mock-backed test.
+
+Two knowing, documented exceptions: the `identifier` step keeps a `recover`
+navigate action (the default flow defines no recovery step yet) so that screen
+stays reachable, and the `passkey-upsell`/`passkey-setup` pair is retained for
+direct actor injection though the default flow no longer routes through it.
+(`register` on identifier and `sign_in` on register used to be listed here;
+they are real now — the default declares them as navigate actions with
+purposed transitions.)
+
+**Before changing a step fixture, diff it against that JSON.** The per-step
+action surface is enforced automatically by
+`src/fixtures/default-conformance.spec.ts` — a fixture can neither miss a
+declared action nor grow an extra beyond its documented allowlist. If a design
+or test needs a shape the server does not emit, the flow definition changes
+first.
 
 ## Architecture
 
@@ -83,11 +124,16 @@ this package depend on the components type surface. The orchestrator's
 branding-validator strips anything the OpenAPI doesn't model. Tests
 should clear the overlay between cases via `clearBranding()`.
 
-The standalone TCP server (`startMockServer` in `src/server.ts`) calls
-`applyBranding(defaultDevBranding)` on boot so demo apps receive a
-baseline `font_url` (Google Fonts Arimo) without extra setup. The payload
-lives in `src/default-dev-branding.ts` and mirrors
-`docs/design/branding/branding.example.json`. MSW-only consumers
+`src/server.ts` exposes two functions. `createMockApp({ issuer })` builds
+the configured Express app and returns it without binding a port; it
+calls `applyBranding(defaultDevBranding)` on boot so demo apps receive a
+baseline `font_url` (Google Fonts Arimo) without extra setup.
+`startMockServer(port)` wraps it for the standalone TCP server (deriving a
+localhost issuer from `port`). The bare app is published via the
+`./server` export so a serverless host can use it directly as a request
+handler — see `apps/mock-zitadel`, which serves it as per-PR Vercel
+previews. The branding payload lives in `src/default-dev-branding.ts` and
+mirrors `docs/design/branding/branding.example.json`. MSW-only consumers
 (`setupMockHandlers` / `setupMock`) do **not** get this overlay unless
 they call `applyBranding` themselves — same as before.
 
@@ -97,24 +143,27 @@ Two Vitest projects, mirroring `packages/components`:
 
 - `unit` — node mode against `msw/node`'s `setupServer`. Picks up
   `*.spec.ts`. The end-to-end walk in `src/index.spec.ts` is the
-  canonical contract test for the handlers and is what CI runs as
-  `pnpm test`.
+  canonical contract test for the handlers, run locally by `pnpm test`.
 - `browser` — real Chromium via Playwright against `msw/browser`'s
   `setupWorker`. Picks up `*.browser.spec.ts`. `index.browser.spec.ts`
-  smoke-tests the `setupMock(worker)` browser entry point. Runs locally
-  via `pnpm test:browser` and requires a
-  Playwright browser install (`pnpm exec playwright install`); skipped
-  in CI to keep the runner image lean.
+  smoke-tests the `setupMock(worker)` browser entry point. Run alone
+  via `pnpm test:browser`; it needs a Playwright browser install
+  (`pnpm exec playwright install`).
 
-`pnpm test:all` runs both projects. When fixing a regression in step
-routing, add a case to the unit spec first — that is what CI gates on.
+`pnpm test:all` runs both projects, and is what CI runs (the `api-mock:test`
+moon task invokes it with an `install-browsers` dep). When fixing a regression in step
+routing, add a case to the unit spec first — it is the canonical contract for the
+handlers.
 
 ## Don't
 
 - Don't introduce shadow types for step / field / branding shapes. Use
   orval's `CreateFlow201*` aliases directly.
 - Don't depend on `msw/browser` from anything other than the
-  `setupMock(worker)` entry point — the same handlers must work in
-  node.
+  `setupMock(worker)` entry point and the test-only `./vitest-browser`
+  harness — the same handlers must work in node.
 - Don't ship a build artifact. Consumers import source via the workspace
   export map; the Moon build task is intentionally a no-op.
+- Don't invent a step shape to make a test or a design convenient. The flow
+  definition is the authority — see the section above.
+- Don't hard-code `"password"` as a field name. Import `PASSWORD_FIELD`.

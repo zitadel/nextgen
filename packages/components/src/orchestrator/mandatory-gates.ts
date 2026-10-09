@@ -1,13 +1,11 @@
 /**
  * `{% mandatory_gates %}` runtime patcher.
  *
- * Per `docs/design/branding/validator.md` §Runtime safety net:
- *
- *   "After the template finishes rendering, the tag inspects the produced DOM
- *    and appends:
- *      - Any required `fields[*]` without a matching `<zl-field>`.
- *      - Any required `gates[*]` without a matching consumer.
- *      - A primary `<zl-button type="submit">` if none was reached."
+ * Per `docs/design/branding/validator.md` §Runtime safety net, after the
+ * template finishes rendering this appends:
+ *   - any required `fields[*]` with no field atom of that name, and
+ *   - the step's primary action as a `<zl-button>`, if none was rendered.
+ * It does not append gate consumers.
  *
  * Implementation: the LiquidJS `{% mandatory_gates %}` tag emits a unique
  * marker comment. After Liquid renders, this patcher parses the produced
@@ -24,13 +22,12 @@ import type { Locale } from "./locales/en.js";
 
 export const MANDATORY_GATES_MARKER = "ZL_MANDATORY_GATES";
 
+/** Every atom tag that participates as a named form field. */
+const FIELD_ATOM_TAGS = "zl-field, zl-select, zl-checkbox";
+
 export const mandatoryGatesMarkerComment = `<!--${MANDATORY_GATES_MARKER}-->`;
 
-export function patchMandatoryGates(
-  html: string,
-  step: CreateFlow201Step,
-  locale: Locale,
-): string {
+export function patchMandatoryGates(html: string, step: CreateFlow201Step, locale: Locale): string {
   const template = document.createElement("template");
   template.innerHTML = html;
   const fragment = template.content;
@@ -84,10 +81,17 @@ function hasPrimaryButton(fragment: DocumentFragment): boolean {
 }
 
 function hasFieldFor(fragment: DocumentFragment, name: string): boolean {
-  // We avoid a CSS attribute selector here so we don't have to worry about
-  // escaping arbitrary characters in `name` (which comes from the step JSON).
-  // Walking the small set of <zl-field> nodes is fine.
-  for (const field of fragment.querySelectorAll("zl-field")) {
+  // A field renders as one of several form-participating atoms depending on
+  // its type: <zl-field> (text/email/password), <zl-select> (enum), or
+  // <zl-checkbox> (boolean). Match on the shared `name` attribute across all
+  // of them — checking only <zl-field> made required <zl-select>/<zl-checkbox>
+  // fields look "missing", so the safety net appended a duplicate generic text
+  // field at the bottom of the form.
+  //
+  // We avoid a CSS attribute selector for `name` so we don't have to worry
+  // about escaping arbitrary characters in it (it comes from the step JSON);
+  // walking the small set of field-atom nodes is fine.
+  for (const field of fragment.querySelectorAll(FIELD_ATOM_TAGS)) {
     if (field.getAttribute("name") === name) return true;
   }
   return false;

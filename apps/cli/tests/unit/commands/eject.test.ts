@@ -1,4 +1,4 @@
-import { access, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -163,6 +163,44 @@ describe("eject command", () => {
     expect(await exists(join(cwd, "zitadel.json"))).toBe(true);
     expect(await exists(join(cwd, ".zitadel"))).toBe(true);
     expect(await exists(join(cwd, ".env.local"))).toBe(true);
+  });
+
+  it("strips guidance sections and deletes scaffold-created husks", async () => {
+    const cwd = await makeManagedProject();
+    const begin = "<!-- zitadel:guidance:begin -->";
+    const end = "<!-- zitadel:guidance:end -->";
+    // Scaffold-created AGENTS.md: nothing but the header around the managed
+    // section, so eject removes the whole file.
+    await writeFile(
+      join(cwd, "AGENTS.md"),
+      `# AGENTS.md\n\nGuidance for AI agents working in this repository.\n\n${begin}\n## Authentication (Zitadel)\nstale golden path\n${end}\n`,
+    );
+    // README.md carries real user content around the managed section, so only
+    // the section goes.
+    await writeFile(
+      join(cwd, "README.md"),
+      `# demo\n\nMy notes.\n\n${begin}\n## Authentication (Zitadel)\nstale golden path\n${end}\n`,
+    );
+
+    // Dry-run previews the removals without touching either file.
+    const preview = await eject(cwd, ["--force", "--dry-run"]);
+    expect(preview.exitCode).toBe(0);
+    const previewJson = parseJson(preview.stdout) as { data: { files_removed: string[] } };
+    expect(previewJson.data.files_removed).toContain("AGENTS.md");
+    expect(previewJson.data.files_removed).toContain("README.md (managed section)");
+    expect(await readFile(join(cwd, "AGENTS.md"), "utf8")).toContain("stale golden path");
+
+    const res = await eject(cwd, ["--force"]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { data: { files_removed: string[] } };
+    expect(json.data.files_removed).toContain("AGENTS.md");
+    expect(json.data.files_removed).toContain("README.md (managed section)");
+    expect(await exists(join(cwd, "AGENTS.md"))).toBe(false);
+    const readme = await readFile(join(cwd, "README.md"), "utf8");
+    expect(readme).toContain("My notes.");
+    expect(readme).not.toContain("zitadel:guidance");
+    expect(readme).not.toContain("Authentication (Zitadel)");
   });
 
   it("surfaces in-place config edits as manual steps for edit-based frameworks", async () => {

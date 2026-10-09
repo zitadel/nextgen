@@ -6,9 +6,10 @@
  * the `Branding` JSON into a CSSStyleSheet of `:host { --zl-* }` declarations
  * and applies it via `shadowRoot.adoptedStyleSheets`.
  *
- * Dark-mode overrides are emitted as `:host([data-theme="dark"]) { ... }`
- * (matching `docs/design/branding/tokens.md`). Resolution between
- * `light | dark | auto` happens in `<zitadel-login>`.
+ * Light and dark are independent surfaces: each side's palette is emitted under
+ * its own `data-theme` selector only, so a key the revision left unset on one
+ * side takes the maintained default for that side rather than the other side's
+ * colour. Resolution between `light | dark | auto` happens in `<zitadel-login>`.
  *
  * Base layer: the design-tokens package ships the full `--zl-*` set as both a
  * `.css` file (for host pages) and a `tokensCss` string (for shadow roots and
@@ -16,87 +17,140 @@
  * paint correctly even when the host page didn't `@import` tokens.css — the
  * orchestrator is meant to drop into any page.
  */
-import { tokensCss } from "@zitadel/design-tokens";
+import { THEME_SELECTORS, tokens, tokensCss } from "@zitadel/design-tokens";
 
-import type { ResolvedTheme } from "./theme-controller.js";
+import { publishedSides } from "./branding.js";
 import type { Branding, BrandingPalette, BrandingShape, BrandingTypography } from "./branding.js";
+import type { ResolvedTheme } from "./theme-controller.js";
 
-// Radius tokens (Figma corner-radius scale). Branding lets a tenant pick
-// one of five shapes; we override all three corner sizes in proportion.
-const RADIUS_MAP: Record<NonNullable<BrandingShape["radius"]>, string> = {
-  none: "0",
-  sm: "0.25rem",
-  md: "0.5rem",
-  lg: "0.75rem",
-  full: "9999px",
-};
+// The corner ramp a brand's single radius value scales. Ratios come from the
+// design system's own steps rather than being spelled out, so a change to the
+// ramp in Figma moves the branded corners with it.
+const RADIUS_STEPS = ["xs", "sm", "md", "lg", "xl"] as const;
+
+const RADIUS_RATIOS: Record<(typeof RADIUS_STEPS)[number], number> = (() => {
+  const base = remToNumber(tokens.radius.md);
+  const ratios = {} as Record<(typeof RADIUS_STEPS)[number], number>;
+  for (const step of RADIUS_STEPS) {
+    ratios[step] = remToNumber(tokens.radius[step]) / base;
+  }
+  return ratios;
+})();
+
+// Preset names, as rem values for the control step (`md`). The pill is its own
+// case: every step goes fully round, so it has no control value to scale from.
+const RADIUS_PRESETS = {
+  none: 0,
+  sm: 0.25,
+  md: 0.5,
+  lg: 0.75,
+} as const;
+
+// The text steps the login surface draws with. `typography.scale` multiplies
+// both the size and its leading, so a brand that asks for larger text gets the
+// line box that goes with it rather than crowded lines.
+const TEXT_STEPS = ["xs", "sm", "base", "lg", "xl"] as const;
 
 // Branding lets tenants tune perceived density. Padding bands are the
 // most visible knob; height tweaks come from the Figma button/field heights.
 const DENSITY_MAP: Record<NonNullable<BrandingShape["density"]>, Record<string, string>> = {
   compact: {
-    "--zl-spacing-03": "0.75rem",
-    "--zl-spacing-05": "1.5rem",
+    "--zl-spacing-4": "0.75rem",
+    "--zl-spacing-8": "1.5rem",
   },
   regular: {},
   comfortable: {
-    "--zl-spacing-03": "1.25rem",
-    "--zl-spacing-05": "2.25rem",
+    "--zl-spacing-4": "1.25rem",
+    "--zl-spacing-8": "2.25rem",
   },
 };
 
-// Mapping from the Branding palette keys (stable, public API for tenants)
-// to the design-tokens variable names that atoms actually consume. The keys
-// are intentionally semantic — tenants do NOT see internal token names like
-// `--zl-color-surface-default-black`; they say "background", "surface",
-// "primary", "text", etc. The orchestrator translates here.
+// Mapping from the Branding palette keys (stable, public API for tenants) to
+// the design-tokens variable names that atoms actually consume. The keys are
+// intentionally semantic — tenants do NOT see internal token names; they say
+// "background", "surface", "primary", "text". The orchestrator translates here,
+// which is what lets the internal vocabulary move without touching a single
+// tenant's `branding.json`.
+//
+// A key maps to more than one variable where the design system splits a role
+// the tenant-facing API deliberately does not: a brand picks one "border"
+// colour, and both the card edge and the control edge take it.
 const PALETTE_MAP: Record<keyof BrandingPalette, string[]> = {
-  primary: ["--zl-color-surface-default-white"],
-  on_primary: ["--zl-color-text-button-default"],
-  background: ["--zl-color-surface-default-black"],
-  surface: ["--zl-color-surface-default-primary-gray"],
-  muted: ["--zl-color-surface-default-secondary-gray"],
-  border: ["--zl-color-border-default-gray-200", "--zl-color-border-default-gray-100"],
-  text: ["--zl-color-text-primary-white"],
-  text_muted: ["--zl-color-text-secondary-gray"],
-  link: ["--zl-color-text-subtitle-pink"],
-  success: ["--zl-color-text-success", "--zl-color-border-success", "--zl-color-icon-success"],
-  warning: ["--zl-color-text-subtitle-orange"],
-  error: ["--zl-color-text-error", "--zl-color-border-error", "--zl-color-icon-error"],
-};
-
-export type BrandingToTokensOptions = {
-  resolvedTheme?: ResolvedTheme;
+  primary: ["--zl-primary"],
+  on_primary: ["--zl-primary-foreground"],
+  background: ["--zl-background"],
+  surface: ["--zl-card", "--zl-popover"],
+  muted: ["--zl-muted", "--zl-secondary", "--zl-accent"],
+  border: ["--zl-border", "--zl-input"],
+  // Every neutral surface's text, not just the page's. A brand that sets a
+  // light `muted` on a dark-resolving widget would otherwise keep the default
+  // near-white label on it — the secondary button rendered at 1.05:1.
+  text: [
+    "--zl-foreground",
+    "--zl-card-foreground",
+    "--zl-popover-foreground",
+    "--zl-secondary-foreground",
+    "--zl-accent-foreground",
+  ],
+  text_muted: ["--zl-muted-foreground"],
+  // The frames draw links in the surrounding text colour and distinguish them
+  // by an underline, so `--zl-link` defaults to `currentColor`. Setting it here
+  // (or from a host page) tints exactly the links — the card-nav switcher and
+  // the forgot-password affordance — and nothing else.
+  link: ["--zl-link"],
+  success: ["--zl-success"],
+  warning: ["--zl-warning"],
+  error: ["--zl-destructive"],
 };
 
 /**
- * Build a CSS string of `:host { --zl-* }` declarations from a Branding
- * payload. Light values land on `:host`; dark overrides land on
- * `:host([data-theme="dark"])`.
+ * Selector for the tenant's declarations.
+ *
+ * It names the theme attributes rather than relying on `:host` alone, so it
+ * reaches the same specificity as the base token layer. `applyBaseTokens`
+ * rewrites the design-system defaults onto `:host, :host([data-theme="dark"])`,
+ * so on a host carrying `data-theme` — which `applySurfaceTheme` always stamps
+ * — the *default* matches at `(0,2,0)`. A plain `:host` block is `(0,1,0)` and
+ * loses on specificity however much later it is adopted, which left every
+ * tenant's palette, fonts and shape painting nothing.
+ *
+ * Matching the attribute makes both `(0,2,0)`, so adoption order decides and
+ * branding — adopted after the base — wins. `:host` stays in the list to cover
+ * the moment before a theme resolves.
  */
-export function buildBrandingStylesheet(
-  branding: Branding | undefined,
-  options: BrandingToTokensOptions = {},
-): string {
-  const lightDecls = collectDeclarations(branding);
-  const darkPalette = branding?.theme?.dark?.palette;
-  const darkDecls = darkPalette ? mapPalette(darkPalette) : {};
+const BRANDING_SELECTOR = ':host, :host([data-theme="light"]), :host([data-theme="dark"])';
+
+/** Per-side palettes. Emitted after {@link BRANDING_SELECTOR}, so they win on order. */
+const LIGHT_SELECTOR = ':host([data-theme="light"])';
+const DARK_SELECTOR = ':host([data-theme="dark"])';
+
+/**
+ * Build a CSS string of `:host { --zl-* }` declarations from a Branding
+ * payload. Shape and typography are shared across the sides and land on the
+ * shared selector; each side's palette lands only under its own `data-theme`
+ * selector, and nowhere else.
+ *
+ * No copy of the resolved side goes on the shared selector. That copy would
+ * reach `[data-theme="light"]` as well, so a key set on the dark side and not
+ * the light one would paint on both, with nothing in the light block to
+ * override it. Callers stamp `data-theme` on the host — `applySurfaceTheme`
+ * does it in the same update that adopts this sheet — so the per-side block is
+ * already matching by the time anything paints.
+ */
+export function buildBrandingStylesheet(branding: Branding | undefined): string {
+  const shared = collectDeclarations(branding);
+  const light = mapPalette(branding?.theme?.light?.palette);
+  const dark = mapPalette(branding?.theme?.dark?.palette);
 
   const blocks: string[] = [];
-  if (Object.keys(lightDecls).length > 0) {
-    blocks.push(formatBlock(":host", lightDecls));
+  if (Object.keys(shared).length > 0) {
+    blocks.push(formatBlock(BRANDING_SELECTOR, shared));
   }
-  if (Object.keys(darkDecls).length > 0) {
-    blocks.push(formatBlock(':host([data-theme="dark"])', darkDecls));
+  if (Object.keys(light).length > 0) {
+    blocks.push(formatBlock(LIGHT_SELECTOR, light));
   }
-
-  // When the orchestrator forces dark mode (mode: "dark" or auto + prefers-dark),
-  // treat the dark overrides as primary so :host alone reflects dark even
-  // before a `data-theme` attribute is set. Cheap and avoids a flash.
-  if (options.resolvedTheme === "dark" && darkPalette) {
-    const merged = { ...lightDecls, ...darkDecls };
-    blocks.length = 0;
-    blocks.push(formatBlock(":host", merged));
+  if (Object.keys(dark).length > 0) {
+    blocks.push(formatBlock(DARK_SELECTOR, dark));
   }
 
   return blocks.join("\n");
@@ -107,7 +161,6 @@ function collectDeclarations(branding: Branding | undefined): Record<string, str
     return {};
   }
   const decls: Record<string, string> = {};
-  Object.assign(decls, mapPalette(branding.palette));
   Object.assign(decls, mapTypography(branding.typography));
   Object.assign(decls, mapShape(branding.shape));
   return decls;
@@ -116,7 +169,10 @@ function collectDeclarations(branding: Branding | undefined): Record<string, str
 function mapPalette(palette: BrandingPalette | undefined): Record<string, string> {
   if (!palette) return {};
   const out: Record<string, string> = {};
-  for (const [key, varNames] of Object.entries(PALETTE_MAP) as [keyof BrandingPalette, string[]][]) {
+  for (const [key, varNames] of Object.entries(PALETTE_MAP) as [
+    keyof BrandingPalette,
+    string[],
+  ][]) {
     const value = palette[key];
     if (typeof value === "string" && value.length > 0) {
       for (const varName of varNames) {
@@ -130,22 +186,19 @@ function mapPalette(palette: BrandingPalette | undefined): Record<string, string
 function mapTypography(typography: BrandingTypography | undefined): Record<string, string> {
   if (!typography) return {};
   const out: Record<string, string> = {};
-  // Tenants can override sans (primary body), heading, and mono families.
-  // We keep them as separate overrides so a tenant can ship a display face
-  // without losing the design-system fallback chain for body copy.
+  // One face covers body and headings. A separate display face is not part of
+  // a branding revision: a host page that has licensed one declares the
+  // `@font-face` and points `--zl-font-family-heading` at it.
   if (typography.font_family) {
     out["--zl-font-family-sans"] = typography.font_family;
     out["--zl-font-family-heading"] = typography.font_family;
   }
-  if (typography.font_family_mono) {
-    out["--zl-font-family-mono"] = typography.font_family_mono;
-  }
-  // Typography scale tunes the *base* font sizes embedded in atoms.
-  // The Figma scale isn't published as variables, so we map to the
-  // implicit sizes the atoms use directly.
   const scale = clamp(typography.scale ?? 1, 0.75, 1.25);
   if (scale !== 1) {
-    out["--zl-font-scale"] = `${scale}`;
+    for (const step of TEXT_STEPS) {
+      out[`--zl-text-${step}-size`] = scaleRem(tokens.text[step].size, scale);
+      out[`--zl-text-${step}-leading`] = scaleRem(tokens.text[step].leading, scale);
+    }
   }
   return out;
 }
@@ -153,18 +206,62 @@ function mapTypography(typography: BrandingTypography | undefined): Record<strin
 function mapShape(shape: BrandingShape | undefined): Record<string, string> {
   if (!shape) return {};
   const out: Record<string, string> = {};
-  if (shape.radius && RADIUS_MAP[shape.radius]) {
-    const radius = RADIUS_MAP[shape.radius];
-    // Map the chosen radius onto the corner-radius/s slot atoms use by
-    // default, plus the larger size for cards. xs stays as a small accent.
-    out["--zl-radius-s"] = radius;
-    out["--zl-radius-m"] = radius === "0" ? "0" : `calc(${radius} * 1.5)`;
-    out["--zl-radius-l"] = radius === "0" ? "0" : `calc(${radius} * 2)`;
-  }
+  Object.assign(out, mapRadius(shape.radius));
   if (shape.density) {
     Object.assign(out, DENSITY_MAP[shape.density]);
   }
+  // The caps themselves stay in the CSS that draws the mark; branding supplies
+  // the multiplier so a host override of a cap keeps working underneath it.
+  const logoScale = shape.logo_scale;
+  if (typeof logoScale === "number" && Number.isFinite(logoScale)) {
+    out["--zl-logo-scale"] = `${clamp(logoScale, 0.5, 2)}`;
+  }
   return out;
+}
+
+/**
+ * A brand picks one corner value and the whole ramp follows it in proportion,
+ * which is what keeps the card rounder than the controls inside it. Both forms
+ * the revision accepts land here: a preset name, or an integer number of pixels
+ * for the brand that has a specific value.
+ */
+function mapRadius(radius: BrandingShape["radius"]): Record<string, string> {
+  if (radius == null) return {};
+  const out: Record<string, string> = {};
+  if (radius === "full") {
+    // A pill has no ramp: every corner is fully round, and scaling 9999px would
+    // only produce a larger number that draws the same shape.
+    for (const step of RADIUS_STEPS) {
+      out[`--zl-radius-${step}`] = tokens.radius.full;
+    }
+    return out;
+  }
+  const [base, unit] =
+    typeof radius === "number"
+      ? [radius, "px"]
+      : radius in RADIUS_PRESETS
+        ? [RADIUS_PRESETS[radius as keyof typeof RADIUS_PRESETS], "rem"]
+        : [Number.NaN, ""];
+  if (Number.isNaN(base)) return {};
+  for (const step of RADIUS_STEPS) {
+    const value = base * RADIUS_RATIOS[step];
+    out[`--zl-radius-${step}`] = value === 0 ? "0" : `${round(value)}${unit}`;
+  }
+  return out;
+}
+
+function scaleRem(value: string, scale: number): string {
+  return `${round(remToNumber(value) * scale)}rem`;
+}
+
+function remToNumber(value: string): number {
+  return Number.parseFloat(value);
+}
+
+// Four decimals keeps a scaled step exact enough to be indistinguishable at any
+// realistic text size while staying a readable value in devtools.
+function round(value: number): number {
+  return Math.round(value * 10000) / 10000;
 }
 
 function formatBlock(selector: string, decls: Record<string, string>): string {
@@ -178,20 +275,21 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 // Lazily-built base sheet, shared by every `<zitadel-login>` instance.
-// `tokensCss` ships the design-system defaults under `:root` and
-// `[data-theme="dark"]`; rewriting them to `:host` / `:host([data-theme="dark"])`
-// projects the same variables onto the orchestrator's shadow root so
-// `var(--zl-*)` lookups inside atoms resolve before branding overrides land.
+// `tokensCss` ships the design-system defaults against document selectors;
+// rewriting them to `:host` projects the same variables onto the orchestrator's
+// shadow root so `var(--zl-*)` lookups inside atoms resolve before branding
+// overrides land. The selectors come from the package rather than being spelled
+// out here: a mismatch would not fail, it would silently stop rewriting and
+// leave the widget with no base tokens at all.
 let baseTokenSheet: CSSStyleSheet | undefined;
 function getBaseTokenSheet(): CSSStyleSheet | undefined {
   if (typeof CSSStyleSheet === "undefined") return undefined;
   if (!baseTokenSheet) {
+    const rewritten = tokensCss
+      .replaceAll(THEME_SELECTORS.dark, ':host,\n:host([data-theme="dark"])')
+      .replaceAll(THEME_SELECTORS.light, ':host([data-theme="light"])');
     baseTokenSheet = new CSSStyleSheet();
-    baseTokenSheet.replaceSync(
-      tokensCss
-        .replaceAll(":root,\n[data-theme=\"dark\"]", ":host,\n:host([data-theme=\"dark\"])")
-        .replaceAll("[data-theme=\"light\"]", ":host([data-theme=\"light\"])"),
-    );
+    baseTokenSheet.replaceSync(rewritten);
   }
   return baseTokenSheet;
 }
@@ -224,12 +322,8 @@ export function applyBaseTokens(shadowRoot: ShadowRoot): void {
  * Callers should run `applyBaseTokens(shadowRoot)` first (once per shadow
  * root) so the base values exist before branding patches them.
  */
-export function applyBrandingTokens(
-  shadowRoot: ShadowRoot,
-  branding: Branding | undefined,
-  resolvedTheme: ResolvedTheme,
-): void {
-  const css = buildBrandingStylesheet(branding, { resolvedTheme });
+export function applyBrandingTokens(shadowRoot: ShadowRoot, branding: Branding | undefined): void {
+  const css = buildBrandingStylesheet(branding);
   if (typeof CSSStyleSheet === "undefined") {
     return;
   }
@@ -243,12 +337,21 @@ export function applyBrandingTokens(
   (shadowRoot as ShadowRoot & { __zlTokenSheet?: CSSStyleSheet }).__zlTokenSheet = sheet;
 }
 
+/**
+ * Standalone branding→theme resolution for callers outside the orchestrator
+ * (SSR, tests, embedders composing atoms by hand). `<zitadel-login>` itself
+ * uses {@link ThemeController}, which layers the element's `theme` property
+ * and a variant-derived fallback on top of the same branding input.
+ *
+ * Defaults to dark: the design system's primary surface, and the mode a
+ * hosted login page renders when a revision states no preference.
+ */
 export function resolveTheme(branding: Branding | undefined): ResolvedTheme {
-  // Default is dark — the design system only publishes a dark variable mode
-  // today. `light` and `auto` are accepted as branding inputs so existing
-  // payloads round-trip, but until a light mode lands they fall back to the
-  // dark surface. Light support is gated by a future Figma sync that fills
-  // the `[data-theme="light"]` block in tokens.css.
+  const [only, second] = publishedSides(branding);
+  // One published side is the whole surface: `auto` has nothing to choose
+  // between, and an operating-system preference for the other side cannot
+  // conjure colours the revision never published.
+  if (only && !second) return only;
   const mode = branding?.theme?.mode ?? "dark";
   if (mode === "light") return "light";
   if (mode === "dark") return "dark";

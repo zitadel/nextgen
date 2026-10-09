@@ -1,5 +1,5 @@
 /**
- * Storybook resolves `@zitadel/components` (and `@zitadel/ui-react`) to their
+ * Storybook resolves `@zitadel/components` to its
  * TS source via the `@zitadel/source` condition so the dev server runs from
  * source with HMR. That pulls the atoms' source into this typecheck program,
  * which then sees their non-JS imports: shadow CSS via `?inline` and the

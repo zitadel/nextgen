@@ -6,34 +6,25 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { forwardedArgs, isDirectRun, runCapture } from "./dev-process.mjs";
+import { PUBLIC_RELEASE_PACKAGES } from "./release-manifest.mjs";
 
-// Public product packages, mirroring the fixed alpha group in
-// `.changeset/config.json` (the source of truth) plus each package's root path.
-// `validateFixedGroup()` fails the release check if the two drift, so update both
-// when adding a public package.
-export const publicPackages = [
-  { name: "@zitadel/cli", root: "apps/cli/" },
-  { name: "@zitadel/server", root: "apps/server/" },
-  { name: "@zitadel/server-linux-x64", root: "apps/server-linux-x64/" },
-  { name: "@zitadel/server-linux-arm64", root: "apps/server-linux-arm64/" },
-  { name: "@zitadel/server-darwin-x64", root: "apps/server-darwin-x64/" },
-  { name: "@zitadel/server-darwin-arm64", root: "apps/server-darwin-arm64/" },
-  { name: "@zitadel/server-win32-x64", root: "apps/server-win32-x64/" },
-  { name: "@zitadel/api", root: "packages/api/" },
-  { name: "@zitadel/components", root: "packages/components/" },
-  { name: "@zitadel/sdk-core", root: "packages/sdk-core/" },
-  { name: "@zitadel/sdk-next", root: "packages/sdk-next/" },
-  { name: "@zitadel/sdk-nuxt", root: "packages/sdk-nuxt/" },
-  { name: "@zitadel/sdk-react", root: "packages/sdk-react/" },
-  { name: "@zitadel/sdk-vue", root: "packages/sdk-vue/" },
-  { name: "@zitadel/sdk-angular", root: "packages/sdk-angular/" },
-  { name: "@zitadel/sdk-solid", root: "packages/sdk-solid/" },
-  { name: "@zitadel/sdk-svelte", root: "packages/sdk-svelte/" },
-  { name: "@zitadel/sdk-qwik", root: "packages/sdk-qwik/" },
-  { name: "@zitadel/sdk-sveltekit", root: "packages/sdk-sveltekit/" },
-  { name: "@zitadel/sdk-tanstack-start", root: "packages/sdk-tanstack-start/" },
-  { name: "@zitadel/sdk-solid-start", root: "packages/sdk-solid-start/" },
-  { name: "@zitadel/sdk-qwik-city", root: "packages/sdk-qwik-city/" },
+// Public product packages, mirrored by the fixed alpha group in
+// `.changeset/config.json`. `validateFixedGroup()` fails the release check if
+// the manifest and Changesets config drift.
+export const publicPackages = PUBLIC_RELEASE_PACKAGES.map((pkg) => ({
+  name: pkg.name,
+  root: `${pkg.dir}/`,
+}));
+
+// The console and login UI publish no npm package of their own — they are built
+// into the server container, so a user-visible change there ships inside
+// `@zitadel/server` and belongs in the release notes. They are deliberately not
+// in PUBLIC_RELEASE_PACKAGES or the changesets fixed group: they are never
+// packed or published, they only make a changeset mandatory. See
+// `.changeset/README.md#when-a-change-needs-a-changeset`.
+export const embeddedServerSurfaces = [
+  { name: "@zitadel/server", root: "apps/console/" },
+  { name: "@zitadel/server", root: "apps/login-ui/" },
 ];
 
 const publicPackageNames = publicPackages.map((pkg) => pkg.name);
@@ -162,7 +153,19 @@ export function packageForFile(file) {
   if (file.endsWith("/AGENTS.md") || isTestFile(file)) {
     return undefined;
   }
-  return publicPackages.find((pkg) => file.startsWith(pkg.root));
+
+  const publicPackage = publicPackages.find((pkg) => file.startsWith(pkg.root));
+  if (publicPackage) {
+    return publicPackage;
+  }
+
+  // Markdown under an embedded surface is repo documentation — the container
+  // ships built output, not these files. An npm package's own README does ship
+  // in its tarball, which is why this exemption is scoped to the surfaces below.
+  if (file.endsWith(".md")) {
+    return undefined;
+  }
+  return embeddedServerSurfaces.find((surface) => file.startsWith(surface.root));
 }
 
 export function parseChangesetPackages(source) {
@@ -177,7 +180,9 @@ export function parseChangesetPackages(source) {
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith("#"))
     .flatMap((line) => {
-      const packageMatch = line.match(/^["']?([^"':]+)["']?\s*:\s*["']?(major|minor|patch|none)["']?\s*$/);
+      const packageMatch = line.match(
+        /^["']?([^"':]+)["']?\s*:\s*["']?(major|minor|patch|none)["']?\s*$/,
+      );
       return packageMatch ? [packageMatch[1]] : [];
     });
 }
@@ -214,7 +219,9 @@ export async function checkChangesetsStatus(options) {
   const pending = options.pending ?? false;
   const versionPr = options.versionPr ?? false;
   const root = options.repoRoot ?? repoRoot;
-  const entries = options.entries ?? (pending ? await pendingChangesetEntries(root) : await gitChangedEntries(root, base));
+  const entries =
+    options.entries ??
+    (pending ? await pendingChangesetEntries(root) : await gitChangedEntries(root, base));
   const config = options.config ?? (await readChangesetsConfig(root));
   const analysis = analyzeChangedEntries(entries, { versionPr });
   const errors = validateFixedGroup(config).map((message) => ({
@@ -226,7 +233,8 @@ export async function checkChangesetsStatus(options) {
 
   if (analysis.currentChangesetFiles.length > 0) {
     const changesetSources =
-      options.changesetSources ?? (await readChangesetSources(root, analysis.currentChangesetFiles));
+      options.changesetSources ??
+      (await readChangesetSources(root, analysis.currentChangesetFiles));
 
     for (const file of analysis.currentChangesetFiles) {
       const packages = parseChangesetPackages(changesetSources[file] ?? "");
@@ -329,14 +337,14 @@ export function renderStepSummary(report) {
   } else {
     lines.push("| Package | Files |", "| --- | --- |");
     for (const changedPackage of report.analysis.changedPackages) {
-      const shownFiles = changedPackage.files.slice(0, 12).map((file) => `\`${escapeMarkdown(file)}\``);
+      const shownFiles = changedPackage.files
+        .slice(0, 12)
+        .map((file) => `\`${escapeMarkdown(file)}\``);
       const hiddenCount = changedPackage.files.length - shownFiles.length;
       if (hiddenCount > 0) {
         shownFiles.push(`and ${hiddenCount} more`);
       }
-      lines.push(
-        `| \`${changedPackage.name}\` | ${shownFiles.join("<br>")} |`,
-      );
+      lines.push(`| \`${changedPackage.name}\` | ${shownFiles.join("<br>")} |`);
     }
     lines.push("");
   }
@@ -416,10 +424,14 @@ export async function main(args = forwardedArgs(), options = {}) {
   return 1;
 }
 
-async function gitChangedEntries(root, base) {
-  const committed = await runCapture("git", ["diff", "--name-status", `${base}...HEAD`], { cwd: root });
+export async function gitChangedEntries(root, base) {
+  const committed = await runCapture("git", ["diff", "--name-status", `${base}...HEAD`], {
+    cwd: root,
+  });
   const worktree = await runCapture("git", ["diff", "--name-status", "HEAD"], { cwd: root });
-  const untracked = await runCapture("git", ["ls-files", "--others", "--exclude-standard"], { cwd: root });
+  const untracked = await runCapture("git", ["ls-files", "--others", "--exclude-standard"], {
+    cwd: root,
+  });
   const entries = new Map();
 
   for (const entry of parseNameStatus(committed.stdout)) {

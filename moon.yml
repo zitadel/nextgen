@@ -37,8 +37,134 @@ tasks:
       cache: false
       runInCI: false
 
+  # The local runtime image (ghcr.io/zitadel/nextgen:local-dev): the server
+  # cross-compiled for linux, with both UI dists embedded, in the release
+  # Dockerfile. Needs Docker, so it stays out of CI.
+  build-local-image:
+    command: "node scripts/build-local-runtime-image.mjs"
+    deps:
+      - "console:build"
+      - "login-ui:build"
+    options:
+      cache: false
+      runInCI: false
+
+  # Starts the image build-local-image produced the way an operator would — no
+  # flags, no volumes, no --user override — and asserts it serves. Covers the
+  # container contract that unit tests cannot: the Dockerfile's data dir
+  # default against the non-root USER it declares. Needs a local Docker daemon,
+  # so it stays out of CI.
+  smoke-container:
+    command: "node scripts/smoke-container.mjs"
+    deps:
+      - "build-local-image"
+    options:
+      cache: false
+      runInCI: false
+
   check:
     command: "node scripts/check.mjs"
     options:
       cache: false
       runInCI: false
+
+  # Matched by the `:test` target in the ci workflow's `moon ci` call, so the
+  # affected-gate and release-body logic never become test files nothing
+  # executes.
+  test:
+    command: "corepack pnpm run test:all"
+    inputs:
+      - "scripts/ci-mode.mjs"
+      - "scripts/ci-mode.test.mjs"
+      - "scripts/dev-process.mjs"
+      - "scripts/generate-meta-schemas.ts"
+      - "scripts/generate-meta-schemas.test.ts"
+      - "scripts/release-artifacts.mjs"
+      - "scripts/release-github.mjs"
+      - "scripts/release-github.test.mjs"
+      - "scripts/release-manifest.mjs"
+      # The task delegates to the package `test` script and its file-existence
+      # guard, so both are behavioral inputs.
+      - "package.json"
+      - "scripts/assert-file.mjs"
+      # Shared Vitest config these tests run under (root project is not covered
+      # by the TypeScript implicitInputs).
+      - "vitest.config.ts"
+      - "vitest.shared.mjs"
+      - "vitest.shared.d.mts"
+    options:
+      cache: true
+      runInCI: true
+
+  check-typecheck:
+    # assert-file guards against a silent pass: Vitest treats a positional filter
+    # that matches nothing as success (passWithNoTests), so a renamed/moved test
+    # file would stop running unnoticed. node:test used to error on a missing
+    # file; this restores that fail-loud behavior, cross-platform (POSIX `test`
+    # is unavailable on Windows shells).
+    script: "node scripts/assert-file.mjs scripts/check-typecheck-programs.test.mjs && corepack pnpm exec vitest run scripts/check-typecheck-programs.test.mjs && node scripts/check-typecheck-programs.mjs"
+    inputs:
+      - "scripts/check-typecheck-programs.mjs"
+      - "scripts/check-typecheck-programs.test.mjs"
+      - "scripts/assert-file.mjs"
+      - "apps/*/moon.yml"
+      - "packages/*/moon.yml"
+      - "apps/*/package.json"
+      - "packages/*/package.json"
+      - "apps/*/tsconfig*.json"
+      - "packages/*/tsconfig*.json"
+      - "vitest.config.ts"
+      - "vitest.shared.mjs"
+      - "vitest.shared.d.mts"
+    options:
+      cache: true
+      runInCI: true
+
+  # The wire-casing rules are config, so a wrong subject type or regex breaks
+  # nothing loudly — the spec just stops being checked. These fixtures fail
+  # instead.
+  check-openapi-rules:
+    # assert-file guards against a silent pass: Vitest treats a positional filter
+    # that matches nothing as success (passWithNoTests), so a renamed/moved test
+    # file would stop running unnoticed. node:test used to error on a missing
+    # file; this restores that fail-loud behavior, cross-platform (POSIX `test`
+    # is unavailable on Windows shells).
+    script: "node scripts/assert-file.mjs scripts/openapi-casing-rules.test.mjs && corepack pnpm exec vitest run scripts/openapi-casing-rules.test.mjs"
+    inputs:
+      - "scripts/openapi-casing-rules.test.mjs"
+      - "scripts/assert-file.mjs"
+      - "scripts/testdata/openapi-casing/**"
+      - "/redocly.yaml"
+      - "/.redocly.lint-ignore.yaml"
+      - "vitest.config.ts"
+      - "vitest.shared.mjs"
+      - "vitest.shared.d.mts"
+    options:
+      cache: true
+      runInCI: true
+
+  # The moon graph rules in .moon/AGENTS.md: no transitive duplicate deps, and
+  # cross-project deps match each package.json.
+  check-moon-graph:
+    command: "node scripts/check-moon-graph.mjs"
+    inputs:
+      - "scripts/check-moon-graph.mjs"
+      - "moon.yml"
+      - "apps/*/moon.yml"
+      - "packages/*/moon.yml"
+      - "tools/*/moon.yml"
+      - "apps/*/package.json"
+      - "packages/*/package.json"
+    options:
+      cache: true
+      runInCI: true
+
+  check-adrs:
+    command: "node scripts/check-adrs-index.mjs"
+    inputs:
+      - "docs/adrs/**/*.md"
+      - "scripts/check-adrs-index.mjs"
+      - "scripts/dev-process.mjs"
+    options:
+      cache: true
+      runInCI: true

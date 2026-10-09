@@ -1,5 +1,0 @@
-/* Lit-only: <zl-icon> defers box metrics to inner .zr-icon. */
-:host {
-  display: contents;
-  color: inherit;
-}

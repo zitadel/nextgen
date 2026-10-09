@@ -1,0 +1,8 @@
+title: TeamPayload
+type: object
+description: |
+  Shared allowlisted fields for `team.created` (snapshot) and
+  `team.updated` (delta: only changed fields present).
+properties:
+  name:
+    type: string

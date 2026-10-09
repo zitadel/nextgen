@@ -37,6 +37,7 @@ import "@zitadel/components";
     [projectId]="projectId"
     [proxyPath]="proxyPath"
     [attr.post-sign-out-url]="postSignOutUrl"
+    [attr.theme]="theme ?? null"
     (zitadel-signout)="onSignout($event)"
   ></zitadel-logout>`,
 })
@@ -45,6 +46,7 @@ export class ZitadelLogoutComponent {
   @Input() projectId?: string;
   @Input() proxyPath?: string;
   @Input() postSignOutUrl?: string;
+  @Input() theme?: "light" | "dark" | "auto";
   @Output() signout = new EventEmitter<ZitadelSignoutDetail>();
 
   @ViewChild("el") private elementRef?: ElementRef<ZitadelLogoutElement>;

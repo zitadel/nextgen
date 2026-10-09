@@ -4,15 +4,122 @@ layer: "automation"
 stack: "frontend"
 dependsOn:
   - "console"
+  - "testing"
+
+workspace:
+  inheritedTasks:
+    # An e2e suite: nothing to build, and its specs run through the `e2e*` tasks.
+    exclude:
+      - "build"
+      - "test"
 
 tasks:
-  lint:
-    command: "corepack pnpm exec oxlint ."
+  # The e2e tasks themselves are opt-in (`runInCI: false`), which would leave
+  # the specs entirely outside CI's type surface — API contract drift in a
+  # spec would only surface when someone next ran the suite. Typechecking is
+  # cheap, so it runs in CI even though the suite does not.
+  typecheck:
+    deps:
+      - "testing:build"
 
   e2e:
     command: "corepack pnpm exec playwright test"
     deps:
       - "console:build"
     options:
+      runInCI: false
+
+  # Live console resource coverage through the Vite server-side API proxy.
+  # Boots one ephemeral real Zitadel instance shared by Playwright workers.
+  e2e-real:
+    command: "corepack pnpm exec playwright test --config playwright.real.config.mts"
+    deps:
+      - "testing:build"
+      - "cli:build"
+      - "server:build"
+    env:
+      # A fixed pin, deliberately outside the deferred-bind blocks
+      # (22000-23999 journey runner / 24000-31999 embedded-pg — doctrine in
+      # apps/cli-journey-e2e/scripts/ports.mjs): withZitadel() needs the port
+      # while the Playwright config evaluates (readiness URL; workers
+      # re-evaluate the config), and those blocks are dynamically scanned
+      # reservation domains where a static tenant can be reserved out from
+      # under this lane between config evaluation and server bind. 8093 is
+      # below the default ephemeral ranges on our supported runners, so the
+      # outbound source-port steals the blocks guard against cannot hit it;
+      # the only collider is an explicit listener — typically this lane's
+      # own orphan from an aborted run, which fails loud by design (sweep:
+      # `moon run workspace:cli -- stop --all`).
+      # Neighbors: 8092 demo-next-e2e e2e-real, 8094 console dev-real.
+      REAL_ZITADEL_PORT: "8093"
+      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+      # A bare single-project instance, the shape this suite asserts: its
+      # operator and colleague are users of the bootstrapped project, and a
+      # platform project would make them ineligible as grant principals
+      # (`grant.principal_not_found`, see create-grant-request.yaml). `zitadel
+      # start` creates one by default for the local-admin journey; this lane
+      # opts out, so it keeps exercising an ordinary project's Admins screen.
+      NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false"
+      # Vite serves the console and proxies its API requests, so the binary's
+      # embedded console stays off: this suite must exercise the Vite-served
+      # one. The hosted-login surface stays on (the default) because
+      # `/console/runtime.json` is mounted only alongside a UI surface
+      # (`buildHTTPMux`), and that document carries the publishable key the
+      # login widget needs for the handoff exchange. With no project secret in
+      # the proxy (#1300), nothing else would authenticate that exchange.
+      NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
+    options:
+      cache: false
+      runInCI: false
+
+  # The embedded surfaces, served by the binary itself — no Vite, no proxy.
+  # The other two lanes each hide the production path: `e2e` serves a preview
+  # build with no backend, `e2e-real` goes through the dev proxy that rewrites
+  # /api -> /. This is the only lane where the console's API base and the Go
+  # mux's routing table have to agree (Console ADR 0002 §4).
+  e2e-embedded:
+    command: "corepack pnpm exec playwright test --config playwright.embedded.config.mts"
+    deps:
+      - "testing:build"
+      - "cli:build"
+      # Embeds the current console and login-ui dists (server:build deps), so
+      # the suite always drives the working tree's UI.
+      - "server:build"
+    env:
+      # Fixed pin, same reasoning as REAL_ZITADEL_PORT above (withZitadel needs
+      # the port at config-evaluation time). Neighbors: 8092 demo-next-e2e
+      # e2e-real, 8093 console-e2e e2e-real, 8094 console dev-real.
+      EMBEDDED_ZITADEL_PORT: "8095"
+      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+      # Same opt-out as the real lane: this suite signs in users seeded in the
+      # harness's own project, and a platform project would take over the
+      # console and hosted-login default, so those sign-ins would run against
+      # a project the seeded user does not exist in.
+      NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false"
+      # Both surfaces stay on (the server defaults): they are what this lane
+      # tests. Contrast e2e-real above, which switches them off.
+    options:
+      cache: false
+      runInCI: false
+
+  # The embedded console against a deployment with the platform project
+  # bootstrapped (the server default): an operator signs up through the
+  # console, is granted a customer project, and walks the screens on the
+  # session cookie alone. The embedded lane cannot cover this, because it
+  # switches the platform project off to sign its seeded users into the
+  # harness's own project.
+  e2e-platform:
+    command: "corepack pnpm exec playwright test --config playwright.platform.config.mts"
+    deps:
+      - "testing:build"
+      - "cli:build"
+      - "server:build"
+    env:
+      # Fixed pin, same reasoning as the other lanes. Neighbors: 8095
+      # console-e2e e2e-embedded.
+      PLATFORM_ZITADEL_PORT: "8097"
+      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+    options:
+      cache: false
       runInCI: false
 

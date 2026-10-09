@@ -38,6 +38,7 @@ var tenantUserSchemaNoAuthMethod = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tenant.com/schemas/no-auth-methods.json",
   "type": "object",
+  "x-identifier": "email",
   "required": ["email"],
   "properties": {
     "email": { "type": "string", "format": "email", "x-unique": "team" }
@@ -48,6 +49,7 @@ var tenantUserSchemaEmptyAuthMethod = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tenant.com/schemas/empty-auth-methods.json",
   "type": "object",
+  "x-identifier": "email",
   "required": ["email"],
   "x-auth-methods": {},
   "properties": {
@@ -59,9 +61,10 @@ var tenantUserSchemaDisabledAuthMethod = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tenant.com/schemas/disabled-auth-user.json",
   "type": "object",
+  "x-identifier": "email",
   "required": ["email"],
   "x-auth-methods": {
-    "password": { "enabled": false, "position": 0 }
+    "password": { "enabled": false }
   },
   "properties": {
     "email":    { "type": "string", "format": "email", "x-unique": "team" }
@@ -72,12 +75,59 @@ var userSchemaIDAndPassword = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tenant.com/schemas/idpw-user.json",
   "type": "object",
+  "x-identifier": "email",
   "required": ["email"],
   "x-auth-methods": {
-    "password": { "enabled": true, "position": 0 }
+    "password": { "enabled": true }
   },
   "properties": {
     "email":    { "type": "string", "format": "email", "x-unique": "team" }
+  }
+}`)
+
+var userSchemaPasskeyEnabled = []byte(`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant.com/schemas/passkey-user.json",
+  "type": "object",
+  "x-identifier": "email",
+  "required": ["email"],
+  "x-auth-methods": {
+    "password": { "enabled": true },
+    "passkey":  { "enabled": true }
+  },
+  "properties": {
+    "email":    { "type": "string", "format": "email", "x-unique": "team" }
+  }
+}`)
+
+var userSchemaPasskeyDisabled = []byte(`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant.com/schemas/passkey-disabled-user.json",
+  "type": "object",
+  "x-identifier": "email",
+  "required": ["email"],
+  "x-auth-methods": {
+    "password": { "enabled": true },
+    "passkey":  { "enabled": false }
+  },
+  "properties": {
+    "email":    { "type": "string", "format": "email", "x-unique": "team" }
+  }
+}`)
+
+var userSchemaRequiredProps = []byte(`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant.com/schemas/idpw-user.json",
+  "type": "object",
+  "required": ["email", "first_name", "last_name"],
+  "x-auth-methods": {
+    "password": { "enabled": true }
+  },
+  "properties": {
+    "email":    { "type": "string", "format": "email", "x-unique": "team" },
+	"first_name": { "type": "string" },
+	"last_name": { "type": "string" },
+	"age": { "type": "integer" }
   }
 }`)
 
@@ -92,8 +142,7 @@ var tenantUserSchema = []byte(`{
   ],
   "x-auth-methods": {
     "password": {
-      "enabled": true,
-      "position": 0
+      "enabled": true
     }
   },
   "properties": {
@@ -101,7 +150,6 @@ var tenantUserSchema = []byte(`{
       "title": "Email Address",
       "type": "string",
       "format": "email",
-      "x-identifier": true,
       "x-unique": "project"
     }
   }
@@ -118,8 +166,7 @@ var tenantUserSchemaNoProps = []byte(`{
   ],
   "x-auth-methods": {
     "password": {
-      "enabled": true,
-      "position": 0
+      "enabled": true
     }
   }
 }`)
@@ -297,10 +344,10 @@ func TestValidateFlowDefinition(t *testing.T) {
 						{
 							Name: "middle",
 							Actions: []domain.FlowStepAction{
-								{Name: "back", Kind: domain.FlowActionKindNavigate},
+								{Name: "restart", Kind: domain.FlowActionKindNavigate},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
-								"back": {Target: "start"}, // cycle back to identify
+								"restart": {Target: "start"}, // cycle back to identify
 							},
 						},
 					},
@@ -331,15 +378,12 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name: "identify",
-							SSOProviders: []domain.FlowSSOProvider{
-								{
-									ID:       "google",
-									Name:     "Google",
-									Template: "google",
-								},
+							Fields: []domain.Field{
+								"email",
 							},
+							SSOProviders: []string{"google"},
 							Transitions: map[string]domain.FlowStepTransition{
-								"callback": {Target: "done"},
+								"sso_authenticated": {Target: "done"},
 							},
 						},
 						{
@@ -366,14 +410,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 					},
 					Steps: []domain.FlowDefinitionStep{
 						{
-							Name: "identify",
-							SSOProviders: []domain.FlowSSOProvider{
-								{
-									ID:       "google",
-									Name:     "Google",
-									Template: "google",
-								},
-							},
+							Name:         "identify",
+							SSOProviders: []string{"google"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"cancel": {Target: "done"},
 							},
@@ -385,7 +423,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					},
 				},
 			},
-			wantErr: domain.ErrFlowDefinitionInvalid(`step "identify": has sso_providers but is missing transitions.callback`, nil),
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "identify": has sso_providers but is missing transitions.sso_authenticated`, nil),
 		},
 		{
 			name: "invalid with inescapable cycle",
@@ -404,6 +442,9 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name: "enter",
+							Fields: []domain.Field{
+								"email",
+							},
 							Actions: []domain.FlowStepAction{
 								{Name: "next", Kind: domain.FlowActionKindSubmit},
 							},
@@ -538,7 +579,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					},
 				},
 			},
-			wantErr: domain.ErrFlowDefinitionInvalid(`step "doing_nothing" is non-terminal but has no fields, actions, sso_providers, gates, or transitions.callback`, nil),
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "doing_nothing" is non-terminal but has no fields, actions, sso_providers, gates, or transitions.sso_authenticated`, nil),
 		},
 		{
 			name: "invalid flow with missing entry point in steps",
@@ -896,7 +937,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []domain.Field{"username", "firstName"},
+							Fields: []domain.Field{"email", "username", "firstName"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -1015,7 +1056,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					},
 				},
 			},
-			wantErr: domain.ErrFlowDefinitionInvalid(`step "start": transition key "magic_link" is not an action name or reserved outcome (user_not_found, user_already_exists, callback)`, nil),
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "start": transition key "magic_link" is not an action name or reserved outcome (user_not_found, user_already_exists, sso_user_not_found, sso_authenticated)`, nil),
 		},
 		{
 			name: "invalid flow - duplicate step names",
@@ -1242,6 +1283,69 @@ func TestValidator_FlipTable_SoloLoginNoFlipRequired(t *testing.T) {
 	}
 	_, err := domain.ValidateFlowDefinition(schema, def)
 	require.NoError(t, err)
+}
+
+// The SSO collision shares user_already_exists with the typed one, so there is
+// no separate sso_ key to route.
+func TestValidator_SSOCollisionHasNoOwnOutcome(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	def := domain.FlowDefinition{
+		ProjectID:     "p",
+		Name:          "solo-login",
+		SchemaVersion: "1.0.0",
+		UserSchema:    "https://tenant.com/schemas/idpw-user.json",
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "credentials",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "credentials",
+				Fields: []domain.Field{"email", "x-auth-methods#password"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit":                  {Target: "done"},
+					"sso_user_already_exists": {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+		},
+	}
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err), `transition key "sso_user_already_exists" is not an action name or reserved outcome`)
+}
+
+// The engine raises sso_authenticated right after it bound the user, and
+// sso_user_not_found with the provider's claims still parked: a re-purpose
+// would drop that user or those claims, and a cross-flow action cannot carry
+// them. The shared user_already_exists keeps both.
+func TestValidator_SSOOutcomeRejectsPurposeAndAction(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	for _, outcome := range []string{domain.FlowImplicitOutcomeSSOAuthenticated, domain.FlowImplicitOutcomeSSOUserNotFound} {
+		for name, tr := range map[string]domain.FlowStepTransition{
+			"purpose": {Target: "register", Purpose: gu.Ptr(domain.FlowDefinitionPurposeRegister)},
+			"action":  {Target: "other-flow", Action: gu.Ptr(domain.Switch)},
+		} {
+			t.Run(outcome+" with "+name, func(t *testing.T) {
+				def := purposedNavDef(nil)
+				def.Steps[0].Transitions[outcome] = tr
+				_, err := domain.ValidateFlowDefinition(schema, def)
+				require.Error(t, err)
+				assert.Contains(t, errorDetails(t, err), fmt.Sprintf(
+					`step "identifier": transition %q is an sso outcome and cannot declare purpose or action`, outcome))
+			})
+		}
+	}
+	t.Run("user_already_exists with purpose", func(t *testing.T) {
+		def := purposedNavDef(nil)
+		def.Steps[1].Transitions[domain.FlowImplicitOutcomeUserAlreadyExists] = domain.FlowStepTransition{
+			Target: "identifier", Purpose: gu.Ptr(domain.FlowDefinitionPurposeLogin),
+		}
+		_, err := domain.ValidateFlowDefinition(schema, def)
+		require.NoError(t, err)
+	})
 }
 
 // ---- on_success manifest cross-check ----
@@ -1487,4 +1591,377 @@ func TestValidator_DeclaredBackKindRejected(t *testing.T) {
 	_, err := domain.ValidateFlowDefinition(schema, def)
 	require.Error(t, err)
 	assert.Contains(t, errorDetails(t, err), `action "back" has kind=back, which is engine-injected and cannot be declared`)
+}
+
+// TestValidator_ReservedActionNamesRejected guards the action names the
+// engine claims for itself, whatever kind the author gives them. "back"
+// would collide at render time with the engine-injected back action: the
+// client would see two "back" buttons and route to the customer's kind.
+// "sso" is dispatched to the sso path on submission, so an authored action
+// of that name would validate and then fail every submission with
+// flow.invalid_action.
+func TestValidator_ReservedActionNamesRejected(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	for name, reason := range map[string]string{
+		"back": "engine-injected back navigation",
+		"sso":  "sso submissions",
+	} {
+		t.Run(name, func(t *testing.T) {
+			def := domain.FlowDefinition{
+				ProjectID: "p", Name: "f", SchemaVersion: "1",
+				UserSchema: "https://tenant.com/schemas/idpw-user.json",
+				Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
+				Steps: []domain.FlowDefinitionStep{
+					{
+						Name: "step", Fields: []domain.Field{"email"},
+						Actions:     []domain.FlowStepAction{{Name: name, Kind: domain.FlowActionKindNavigate}},
+						Transitions: map[string]domain.FlowStepTransition{name: {Target: "done"}},
+					},
+					{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+				},
+			}
+			_, err := domain.ValidateFlowDefinition(schema, def)
+			require.Error(t, err)
+			assert.Contains(t, errorDetails(t, err), fmt.Sprintf("action name %q is reserved for %s", name, reason))
+		})
+	}
+}
+
+func TestValidator_MissingRequiredUserSchemaFields(t *testing.T) {
+	schema := mustSchema(t, userSchemaRequiredProps)
+	def := domain.FlowDefinition{
+		ProjectID: "p", Name: "f", SchemaVersion: "1",
+		UserSchema: "https://tenant.com/schemas/idpw-user.json",
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identifier"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "identifier", Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "profile"}},
+			},
+			{
+				Name: "profile", Fields: []domain.Field{"given_name", "family_name", "date_of_birth"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+			},
+			{Name: "done", Complete: new(domain.FlowStepCompleteShow)},
+		},
+	}
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, domain.ErrFlowDefinitionInvalid(`required fields [first_name last_name] in user schema are missing in the flow definition steps`, nil))
+}
+
+// userSchemaRequiredNested makes `address` required and gives it a
+// required leaf of its own, so coverage has to be checked one level
+// down. `billing` is required but declares no `required`, so any leaf
+// beneath it covers the object. `shipping` is optional with a required
+// leaf, and `address.geo` is the same shape one level down inside a
+// required object — neither is demanded until a step collects into it.
+var userSchemaRequiredNested = []byte(`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant.com/schemas/nested-user.json",
+  "type": "object",
+  "required": ["email", "address", "billing"],
+  "x-auth-methods": {
+    "password": { "enabled": true, "position": 0 }
+  },
+  "properties": {
+    "email": { "type": "string", "format": "email", "x-unique": "team" },
+    "address": {
+      "type": "object",
+      "required": ["street"],
+      "properties": {
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "geo": {
+          "type": "object",
+          "required": ["lat"],
+          "properties": {
+            "lat": { "type": "string" },
+            "lng": { "type": "string" }
+          }
+        }
+      }
+    },
+    "billing": {
+      "type": "object",
+      "properties": { "vat_id": { "type": "string" } }
+    },
+    "shipping": {
+      "type": "object",
+      "required": ["street"],
+      "properties": {
+        "street": { "type": "string" },
+        "city": { "type": "string" }
+      }
+    }
+  }
+}`)
+
+// nestedRequiredFlow builds a login flow whose profile step collects the
+// given fields, so cases vary only by what the step declares.
+func nestedRequiredFlow(fields []domain.Field) domain.FlowDefinition {
+	return domain.FlowDefinition{
+		ProjectID: "p", Name: "f", SchemaVersion: "1",
+		UserSchema: "https://tenant.com/schemas/nested-user.json",
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identifier"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "identifier", Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "profile"}},
+			},
+			{
+				Name: "profile", Fields: fields,
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+			},
+			{Name: "done", Complete: new(domain.FlowStepCompleteShow)},
+		},
+	}
+}
+
+func TestValidator_RequiredNestedUserSchemaFields(t *testing.T) {
+	schema := mustSchema(t, userSchemaRequiredNested)
+
+	t.Run("nested required leaf satisfies coverage", func(t *testing.T) {
+		_, err := domain.ValidateFlowDefinition(schema, nestedRequiredFlow(
+			[]domain.Field{"address.street", "billing.vat_id"},
+		))
+		require.NoError(t, err)
+	})
+
+	t.Run("missing nested required leaf is reported by its path", func(t *testing.T) {
+		_, err := domain.ValidateFlowDefinition(schema, nestedRequiredFlow(
+			[]domain.Field{"address.city", "billing.vat_id"},
+		))
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrFlowDefinitionInvalid(
+			`required fields [address.street] in user schema are missing in the flow definition steps`, nil))
+	})
+
+	t.Run("required object without its own required is covered by any leaf", func(t *testing.T) {
+		_, err := domain.ValidateFlowDefinition(schema, nestedRequiredFlow(
+			[]domain.Field{"address.street"},
+		))
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrFlowDefinitionInvalid(
+			`required fields [billing] in user schema are missing in the flow definition steps`, nil))
+	})
+
+	// The resolver's own fixture, driven through the save path: the
+	// resolver cases prove a dotted field resolves, this proves the
+	// definition carrying it is accepted.
+	t.Run("the resolver's nested fixture saves", func(t *testing.T) {
+		_, err := domain.ValidateFlowDefinition(
+			mustSchema(t, []byte(nestedSchemaContent)),
+			nestedRequiredFlow([]domain.Field{"address.street"}),
+		)
+		require.NoError(t, err)
+	})
+
+	// An optional object exists in the collected document only because a
+	// step collected something beneath it, and from that point the
+	// document validator enforces its `required` list. Without this the
+	// definition saved and then failed at create_user on every submission.
+	t.Run("collecting into an optional object demands its own required leaf", func(t *testing.T) {
+		_, err := domain.ValidateFlowDefinition(schema, nestedRequiredFlow(
+			[]domain.Field{"address.street", "billing.vat_id", "shipping.city"},
+		))
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrFlowDefinitionInvalid(
+			`required fields [shipping.street] in user schema are missing in the flow definition steps`, nil))
+	})
+
+	t.Run("collecting an optional object's required leaf satisfies it", func(t *testing.T) {
+		_, err := domain.ValidateFlowDefinition(schema, nestedRequiredFlow(
+			[]domain.Field{"address.street", "billing.vat_id", "shipping.street", "shipping.city"},
+		))
+		require.NoError(t, err)
+	})
+
+	t.Run("an optional object no step collects into demands nothing", func(t *testing.T) {
+		_, err := domain.ValidateFlowDefinition(schema, nestedRequiredFlow(
+			[]domain.Field{"address.street", "billing.vat_id"},
+		))
+		require.NoError(t, err)
+	})
+
+	// The same rule one level down: `geo` is optional inside `address`,
+	// which is itself required, so the descent has to keep alternating
+	// between required names and materialized ones.
+	t.Run("collecting into an optional object nested in a required one demands its leaf", func(t *testing.T) {
+		_, err := domain.ValidateFlowDefinition(schema, nestedRequiredFlow(
+			[]domain.Field{"address.street", "billing.vat_id", "address.geo.lng"},
+		))
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrFlowDefinitionInvalid(
+			`required fields [address.geo.lat] in user schema are missing in the flow definition steps`, nil))
+	})
+
+	// Naming the object itself used to resolve as a text input and only
+	// fail once the user submitted it, at create_user.
+	t.Run("naming the object itself is rejected at definition time", func(t *testing.T) {
+		_, err := domain.ValidateFlowDefinition(schema, nestedRequiredFlow(
+			[]domain.Field{"address", "address.street", "billing.vat_id"},
+		))
+		require.Error(t, err)
+		assert.Contains(t, errorDetails(t, err), domain.ErrFlowFieldNotScalar.Error())
+	})
+}
+
+// ---- Passkey action enablement ----
+
+// passkeyActionFlow builds a minimal login flow whose entry step offers
+// a WebAuthn action of the given kind next to a plain submit.
+func passkeyActionFlow(actionName string, kind domain.FlowActionKind) domain.FlowDefinition {
+	return domain.FlowDefinition{
+		ProjectID: "p", Name: "f", SchemaVersion: "1",
+		UserSchema: "https://tenant.com/schemas/passkey-user.json",
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "step", Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: actionName, Kind: kind},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit":   {Target: "done"},
+					actionName: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+		},
+	}
+}
+
+func TestValidator_PasskeyActionRejectedWhenSchemaDisablesPasskey(t *testing.T) {
+	schema := mustSchema(t, userSchemaPasskeyDisabled)
+	_, err := domain.ValidateFlowDefinition(schema, passkeyActionFlow("passkey", domain.FlowActionKindPasskey))
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err),
+		`step "step": action "passkey" offers passkey but "passkey" is not an enabled authentication method`)
+}
+
+// An absent passkey entry counts as disabled, matching the field-shaped
+// precedent for x-auth-methods#password.
+func TestValidator_PasskeyActionRejectedWhenSchemaOmitsPasskey(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	_, err := domain.ValidateFlowDefinition(schema, passkeyActionFlow("passkey", domain.FlowActionKindPasskey))
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err),
+		`step "step": action "passkey" offers passkey but "passkey" is not an enabled authentication method`)
+}
+
+func TestValidator_PasskeyRegisterActionRejectedWhenSchemaDisablesPasskey(t *testing.T) {
+	schema := mustSchema(t, userSchemaPasskeyDisabled)
+	_, err := domain.ValidateFlowDefinition(schema, passkeyActionFlow("enroll", domain.FlowActionKindPasskeyRegister))
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err),
+		`step "step": action "enroll" offers passkey but "passkey" is not an enabled authentication method`)
+}
+
+func TestValidator_PasskeyActionsAcceptedWhenSchemaEnablesPasskey(t *testing.T) {
+	schema := mustSchema(t, userSchemaPasskeyEnabled)
+	_, err := domain.ValidateFlowDefinition(schema, passkeyActionFlow("passkey", domain.FlowActionKindPasskey))
+	assert.NoError(t, err)
+	_, err = domain.ValidateFlowDefinition(schema, passkeyActionFlow("enroll", domain.FlowActionKindPasskeyRegister))
+	assert.NoError(t, err)
+}
+
+// purposedNavDef builds a two-purpose definition whose identifier step
+// carries a navigate action with a purposed transition; mutate overrides
+// the transition before validation.
+func purposedNavDef(mutate func(t *domain.FlowStepTransition)) domain.FlowDefinition {
+	tr := domain.FlowStepTransition{
+		Target:  "register",
+		Purpose: gu.Ptr(domain.FlowDefinitionPurposeRegister),
+	}
+	if mutate != nil {
+		mutate(&tr)
+	}
+	return domain.FlowDefinition{
+		ProjectID: "p", Name: "f", SchemaVersion: "1",
+		UserSchema: "https://tenant.com/schemas/idpw-user.json",
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin:    "identifier",
+			domain.FlowDefinitionPurposeRegister: "register",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "identifier", Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: "register", Kind: domain.FlowActionKindNavigate},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit":                               {Target: "done"},
+					"register":                             tr,
+					domain.FlowImplicitOutcomeUserNotFound: {Target: "register"},
+				},
+			},
+			{
+				Name: "register", Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit": {Target: "done"},
+					domain.FlowImplicitOutcomeUserAlreadyExists: {Target: "identifier"},
+				},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+		},
+	}
+}
+
+// A well-formed purposed navigation — to a served purpose, targeting its
+// entry step, without a cross-flow action — validates.
+func TestValidator_TransitionPurposeAccepted(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	_, err := domain.ValidateFlowDefinition(schema, purposedNavDef(nil))
+	require.NoError(t, err)
+}
+
+// A transition cannot both re-purpose locally and target another flow.
+func TestValidator_TransitionPurposeWithActionRejected(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	def := purposedNavDef(func(tr *domain.FlowStepTransition) {
+		tr.Action = gu.Ptr(domain.Switch)
+	})
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err), "declares both purpose and action")
+}
+
+// The declared purpose must be one this definition serves.
+func TestValidator_TransitionPurposeNotServedRejected(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	def := purposedNavDef(func(tr *domain.FlowStepTransition) {
+		tr.Purpose = gu.Ptr(domain.FlowDefinitionPurposeRecovery)
+	})
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err), `re-purposes to "recovery", which this definition does not serve`)
+}
+
+// The purposed transition must land on the declared purpose's entry step.
+func TestValidator_TransitionPurposeWrongTargetRejected(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	def := purposedNavDef(func(tr *domain.FlowStepTransition) {
+		tr.Target = "done"
+	})
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err), `must target that purpose's entry step "register"`)
 }

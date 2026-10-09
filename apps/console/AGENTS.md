@@ -1,0 +1,155 @@
+# Agent Instructions — `apps/console`
+
+Scoped instructions for the console SPA. These add to, and where they conflict
+take precedence over, the root [`AGENTS.md`](../../AGENTS.md) for files under
+`apps/console`.
+
+## Decision source: read the console ADRs first
+
+Before changing console routing, navigation, the app shell, or how the console
+talks to the API, read the console-scoped ADRs in
+[`docs/adrs/`](docs/adrs/README.md) (statuses in that index; 0001/0002 are
+Accepted, 0003/0004 Proposed and largely implemented). They are the agreed
+direction for the console build-out (issue
+[#440](https://github.com/zitadel/nextgen/issues/440)):
+
+- [ADR 0001: Routing](docs/adrs/0001-console-routing.md) — file-based routing,
+  one router factory, `basepath` derived from the Vite `base`, route loaders +
+  pending/error/not-found boundaries, `staticData`-driven sidebar.
+- [ADR 0002: API access and auth interceptors](docs/adrs/0002-console-api-access.md)
+  — the console holds no script-readable credential and calls the API
+  same-origin; the embedded browser carries its HttpOnly first-party session
+  cookie. Reuse `configureZitadel()` / `getApi()` rather than a bespoke client.
+  The base is `/api` **only** under the dev server (whose proxy forwards
+  without adding a credential); the embedded build talks to the origin root,
+  where the Go binary serves the API. The `/api` shim §1 once deferred to the
+  server was withdrawn in the 2026-08-12 revision — do not reintroduce it.
+- [ADR 0003: Console authentication](docs/adrs/0003-console-authentication.md)
+  — `/login` embeds the login widget (`@zitadel/sdk-react`); the pathless
+  `_authed` layout owns the session guard (`GET /sessions/me`) and the app
+  shell; the first-party session cookie is the embedded Console's human
+  operator credential, and it authorizes the management calls too (#1300):
+  what a person can see and change is what their grants on the selected
+  project allow. No project secret is involved in dev or in production.
+- [ADR 0004: Deployment modes](docs/adrs/0004-console-deployment-modes.md)
+  — one build and one authorization model serve cloud and self-host. **Target:**
+  every deployment uses a reserved platform project for Console identities; an
+  explicit testkit or future server-file seed fully provisions it, its initial
+  user, membership, separate owner assignment, and optional customer project.
+  **Today:** the Console signs into the pinned or first-created project — an
+  ordinary customer project — under §2's cutover rule, unless
+  `platform.bootstrap_project` is set, which provisions the reserved platform
+  project itself (keys, default schema, default login flow — but not the
+  initial user/membership/owner assignment the target seed transport adds)
+  and is what makes claiming and self-registration work. `zitadel start` is
+  the exception to "today": it sets that flag and hands the server an initial
+  operator through `--user-file`, so on a CLI-started server with the default
+  bootstrap the Console signs into `proj_platform` (setting the flag to
+  `false` or pinning another project keeps the fallback). Do not remove that
+  fallback (or the `platform.project_id` pin) until the seed transport ships;
+  doing so strands self-hosters. Standalone optimizes for one project but does
+  not forbid more. The runtime document carries only public sign-in metadata;
+  portal surfaces render from target-scoped **effective permissions**, never
+  membership, build-time flags, or a parallel console-facing feature array.
+  A runtime document the Console cannot read is an **error, not a mode** (§3):
+  keep "unreachable/erroring" and "no project yet" separate states, and do not
+  reintroduce a silent fallback to `standalone` — backend-less dev and preview
+  runs opt in with `VITE_CONSOLE_RUNTIME_FALLBACK` instead.
+
+If an implementation needs to diverge from an ADR, update the ADR in the same
+change rather than letting code and decision drift.
+
+## Styling: classify before building
+
+Before building any console UI, read
+[`docs/styling.md`](docs/styling.md) — where a component lives decides how it
+is styled (unprefixed shadcn utilities for console UI; login atoms are Lit with
+their own CSS), and the retired `*-zl-*` console utility names must not come
+back. The surface decision and token authority live there; the atom recipe lives
+in [`apps/storybook/AGENTS.md`](../storybook/AGENTS.md).
+
+## Screen conventions
+
+List/detail screens follow the shipped patterns under `src/routes/_authed/`
+(users, schemas, flow-definitions): loader-fetched data, status columns where
+the resource has lifecycle state, `$param` detail routes. A list screen composes
+`src/components/resource-list.tsx` and a detail screen
+`src/components/detail-page.tsx` rather than measuring its own frame — see
+"Resource list layout" and "Resource detail layout" in `docs/styling.md`. There
+is no sessions screen.
+
+A screen that acts on one project declares `staticData.scope: "project"` and
+reads the **selected** project — `?project=`, retained by the `_authed` layout —
+through `src/lib/project-scope.ts` (`projectScopeDeps` + `requireProjectScope`
+in loaders, `useRequiredProjectScope` in components). Never scope a management
+call with `getConsoleProjectId()`: that is the project the console signs into
+(ADR 0004 §1), not the one being managed. The flag also hides the screen from
+the sidebar until a project is selected.
+
+The sidebar is the Projects overview, then the selected project's contents.
+Projects is the one unscoped entry, first, and the only one while nothing is
+selected; the project switcher's `All projects` footer links to it too, and a
+row there opens the project (selects it). The project's own page is the scoped `/project` (`Project
+settings`); `/projects/$projectId` only redirects there with that project
+selected. Screens outside every project (account, billing, deployment-wide
+operators) belong in the switcher or the Settings view, not in this list.
+
+## Generated files
+
+`src/routeTree.gen.ts` is generated by the TanStack Router Vite plugin. Do not
+hand-edit it — add or change files under `src/routes/` and let the plugin
+regenerate the tree (consistent with the root `AGENTS.md` "Generated Files"
+rule).
+
+## Local tasks
+
+```sh
+moon run console:dev-real   # seeded real backend + dev server (default loop)
+moon run console:dev-claim  # same, but for the claim page (see below)
+moon run console:dev        # dev server only on http://localhost:5174
+moon run console:typecheck
+moon run console:test
+moon run console:build
+```
+
+## The claim page needs `dev-claim`, not `dev-real`
+
+`dev-real` boots one ordinary project and signs the console into it. The claim
+page is the console acting as the *platform's* claim surface, and
+`claim/complete` only accepts a session belonging to the platform project — so
+on `dev-real` the page renders but the claim always fails with "This account
+can't claim the project". That is the harness, not a defect.
+
+`moon run console:dev-claim` boots the platform project, pins the console to it,
+and prints a ready claim link. The trade-off is why it is opt-in: pinning the
+console to `proj_platform` changes the standalone semantics the demo and
+embedded suites rely on, and the seeded users live in the project being claimed
+rather than the platform one, so list screens read empty and you register on the
+claim page instead of signing in with the seeded credentials.
+
+Three things that break either loop before it starts, none of which say so
+clearly:
+
+- **Build the CLI first** (`moon run cli:build`). Both loops shell out to it to
+  start the server; without a built bundle the server starts unmigrated and dies
+  with `no such table: projects`.
+- **Reinstall after a rebase** (`pnpm install`). A stale `node_modules` fails the
+  built CLI on a missing transitive dependency, not on anything you changed.
+- **A raw binary needs `--migrate`.** Migrations are opt-in since #1152; the CLI
+  passes the flag for you, so this only bites when launching `dist/server/nextgen`
+  by hand.
+
+`CONSOLE_DEV_ORIGIN` sets the console's port for both loops, so a second worktree
+can run beside the first.
+
+## Develop against real data, not the mock
+
+The console manages an instance, so **use `console:dev-real`** — it boots a real
+ephemeral instance and seeds users, so list screens show real API responses.
+`@zitadel/api-mock` has no user store; a users list read from it is a fiction.
+
+Why the mock cannot substitute (it has no user store, and nothing about
+authorization can be proven against it) is documented canonically in the Local
+development section of [`README.md`](README.md) — read it for all three backends
+and when each applies. The mock's flow-shape authority rule lives in
+[`packages/api-mock/AGENTS.md`](../../packages/api-mock/AGENTS.md).

@@ -1,0 +1,17 @@
+type: object
+description: The registered passkey.
+required:
+  - id
+  - name
+  - created_at
+properties:
+  id:
+    type: string
+    description: The unique identifier of the passkey.
+  name:
+    type: string
+    description: The name of the passkey.
+  created_at:
+    type: string
+    format: date-time
+    description: The timestamp when the passkey was created.

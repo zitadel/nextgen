@@ -4,7 +4,7 @@
 
 ## How to read this page
 
-All paths are shown without a version segment — versioning is header-selected via `Zitadel-Version` (see [`conventions.md`](conventions.md#versioning)).
+All paths are shown without a version segment. Header-selected versioning (`Zitadel-Version`) is target design — the shipped API is unversioned (see [`conventions.md`](conventions.md#direction-not-shipped)).
 
 Standard REST semantics apply: `POST` on the collection creates, `GET` on the collection lists (scope required — see [`url-architecture.md`](url-architecture.md#scope-resolution-as-a-first-class-invariant)), and `GET`/`PATCH` on the item reads/updates. `DELETE` on managed resources runs the resource's lifecycle semantics first (usually deactivate/tombstone); it is not a blind SQL hard-delete. Action verbs use slash form (`POST /users/{id}/verify_email`).
 
@@ -12,12 +12,11 @@ Standard REST semantics apply: `POST` on the collection creates, `GET` on the co
 
 ## Projects
 
-A project is a tenant / deployment. One project is reserved as the **platform project** — discoverable via `/capabilities`.
+A project is a tenant / deployment. One project is reserved as the **platform project** (server-side discovery of its ID is target design — see [`conventions.md`](conventions.md#direction-not-shipped)).
 
 ```http
 /projects
 /projects/{id}
-/projects/{id}/branding
 /projects/{id}/domains
 /projects/{id}/features
 /projects/{id}/allowed_origins
@@ -25,6 +24,32 @@ A project is a tenant / deployment. One project is reserved as the **platform pr
 /projects/{id}/api_keys
 /projects/{id}/webhooks
 ```
+
+Branding is project-scoped but flat by revision id — see [Branding](#branding).
+
+---
+
+## Branding
+
+Immutable per-project login-appearance revisions (ADR 040). Create publishes a
+new revision; there is no update or delete. Flow responses resolve the latest
+revision for the project.
+
+```http
+/branding
+/branding/{id}
+```
+
+Create/list are project-scoped (project id on the request, matching OpenAPI):
+
+```http
+POST /branding                  # publish a new revision
+GET  /branding                  # list revisions for the project, newest first
+GET  /branding/{id}
+```
+
+Permission names in
+[`system-permission-catalog.md`](system-permission-catalog.md#project-scoped-configuration).
 
 ---
 
@@ -44,7 +69,8 @@ Create/list with explicit scope:
 
 ```http
 POST /teams                     # body: { project_id, name, ... }
-GET  /teams?project_id=…
+POST /teams/query               # structured filters + cursor pagination (ADR 031)
+GET  /users/{user_id}/teams     # the teams a user belongs to
 ```
 
 `DELETE /teams/{id}` deactivates/tombstones the team, revokes team-scoped API
@@ -64,12 +90,15 @@ Users live inside projects. A user in the platform project is a developer/admin;
 /me/memberships                 # every team_membership the caller holds
 ```
 
-Create/list with explicit scope:
+Create takes an explicit scope; the list derives it from the credential:
 
 ```http
-POST /users                     # body: { project_id, email, ... }
-GET  /users?project_id=…&q=…&limit=…
+POST /users?project_id=…        # body: { schema, attributes: { email, ... } }
+POST /users/query               # structured filters + cursor pagination (ADR 031)
 ```
+
+There is no `GET /users`, matching projects and teams. `POST /users/query`
+takes an optional `project_id`, defaulting to the credential's project (#1300).
 
 `DELETE /users/{id}` deactivates/tombstones the user, revokes sessions, tokens,
 and credentials, and deactivates memberships. Teams and resources the user
@@ -86,6 +115,8 @@ as an authorization fact, but membership is not proof that the team owns the
 user's identity lifecycle.
 
 ```http
+# Target design — no membership endpoints are shipped yet.
+# The shipped read surface is GET /users/{user_id}/teams.
 /team_memberships/{id}
 POST /team_memberships          # body: { team_id, user_id, roles: [...] }
 DELETE /team_memberships/{id}
@@ -97,9 +128,37 @@ relationship and policy requires deprovisioning.
 
 ---
 
+## User schemas
+
+User profile / directory schema definitions — the field structure that user
+records follow. Only user schemas exist today; the collection is project-scoped.
+
+```http
+/schemas
+/schemas/{id}
+```
+
+Create/list with explicit scope:
+
+```http
+POST /schemas                   # create a user schema
+GET  /schemas?project_id=…&object_type=…
+GET  /schemas/{id}
+```
+
+`PATCH`/`DELETE /schemas/{id}` are **not yet exposed** — create, list, and get
+only. Permission names in
+[`system-permission-catalog.md`](system-permission-catalog.md#schemas-user-schemas).
+
+---
+
 ## Credentials (globally addressable)
 
-API keys are first-class resources with their own URL. Listing happens under the scope that owns them (`/projects/{id}/api_keys`, `/teams/{id}/api_keys`).
+> **Parked as a management resource** — see
+> [`system-permission-catalog.md` open questions](system-permission-catalog.md#open-questions)
+> and [`credentials.md`](credentials.md#api-keys-as-first-class-resources--parked).
+> Opaque `sk_*` service tokens remain; first-class `/api_keys` CRUD is not catalog
+> contract yet. URL inventory below is design sketch only.
 
 ```http
 /api_keys/{id}
@@ -107,7 +166,8 @@ API keys are first-class resources with their own URL. Listing happens under the
 /api_keys/{id}/revoke
 ```
 
-Detail in [`credentials.md`](credentials.md).
+Listing under the owning scope (`/projects/{id}/api_keys`, `/teams/{id}/api_keys`)
+was part of the same sketch. Detail in [`credentials.md`](credentials.md).
 
 ---
 
@@ -144,9 +204,11 @@ POST /sessions/exchange
 
 ```http
 POST   /sessions                         # optional anonymous pre-auth shell
-GET    /sessions                         # list (admin / management)
-GET    /sessions/{id}
-DELETE /sessions/{id}                    # logout
+POST   /sessions/query                   # operator list — structured filters + cursor pagination
+GET    /sessions/{id}                    # operator get
+DELETE /sessions/{id}                    # operator revoke (not logout; idempotent 204)
+GET    /sessions/me                      # end-user get (`nextgenSession` cookie)
+DELETE /sessions/me                      # end-user logout (`nextgenSession` cookie)
 ```
 
 Sessions carry factors + `assurance_levels[]`. Clients read and revoke
@@ -160,35 +222,63 @@ sessions; factor changes flow through `auth_attempts`. Detail in
 The UI-orchestration layer that runs on top of auth_attempts. Detail in [`../flowengine/flow-engine.md`](../flowengine/flow-engine.md).
 
 ```http
-POST /flows
-GET  /flows/{session_id}
-POST /flows/{session_id}/submit
-POST /flows/{session_id}/event
+POST /flow                      # start a flow run
+GET  /flow/{id}                 # read the current step
+POST /flow/{id}/submit          # submit the current step
 ```
 
-Flow definition management (uploaded via `npx zitadel push`):
+Flow definition management:
 
 ```http
-POST   /flow-definitions
-GET    /flow-definitions/{id}
-PATCH  /flow-definitions/{id}
-DELETE /flow-definitions/{id}
-POST   /flow-definitions/{id}/activate
-POST   /flow-definitions/{id}/archive
-POST   /flow-definitions/{id}/validate
-POST   /flow-definitions/{id}/simulate
+POST /flow_definitions          # publish a new revision
+GET  /flow_definitions?project_id=…&name=…
+GET  /flow_definitions/{id}
+# planned: POST /flow_definitions/{id}/validate
+# planned: POST /flow_definitions/{id}/simulate
 ```
+
+A flow definition is an immutable revision ([ADR 035](../../adrs/035-configuration-environments.md)):
+every `POST` assigns a new id, a repeated `name` is a new revision of that
+flow, and the `name` filter lists one flow's revisions newest first. There
+is no update or delete; retirement waits for releases
+([#536](https://github.com/zitadel/nextgen/issues/536)).
 
 ---
 
 ## Events and audit
 
+Unified wide-event audit stream. See [ADR 048](../../adrs/048-wide-events-internal-audit-primitive.md)
+(internal model) and [ADR 049](../../adrs/049-events-api-retention-export.md) (API,
+retention, export).
+
 ```http
-/events/{id}                             # identity events (sign-in, password change)
-/events?project_id=…
-/audit_events/{id}                       # admin/configuration changes
-/audit_events?team_id=…
+GET /events/{id}?project_id=… # project-scoped get (events not in resource_scope_index)
+GET /events?project_id=…
+         &category=…          # request | auth | session | admin | entity | signal
+         &event_type=…
+         &actor_id=…
+         &client_id=…
+         &session_id=…
+         &flow_id=…
+         &request_id=…
+         &fingerprint=…
+         &entity_type=…
+         &entity_id=…
+         &team_id=…           # emit-time team scope filter
+         &created_after=…
+         &created_before=…
+         &page_token=…
 ```
+
+`GET /events/{id}` is **project-scoped**: resolve `project_id` from the
+credential (or require it explicitly), authorize, then load
+`(project_id, id)`. Events are **not** registered in `resource_scope_index`
+(TTL audit volume). List/get authorization uses emit-time `team_id` stored on
+the event, not recomputed membership. See [ADR 049](../../adrs/049-events-api-retention-export.md).
+
+`category=admin` covers admin and configuration changes (formerly sketched as
+`/audit_events`). `category=auth` and `category=session` cover sign-in, token,
+and session lifecycle events.
 
 ---
 
@@ -207,9 +297,10 @@ No generic `/batch`. Resource-specific bulk endpoints only when demand is real.
 ## Caller convenience
 
 ```http
+# Target design — none of these are shipped yet.
 GET /me
 GET /me/memberships
-GET /capabilities                        # split public/authenticated — see conventions.md
+GET /capabilities                        # split public/authenticated — direction, see conventions.md
 ```
 
 ---
@@ -255,7 +346,7 @@ Quick lookup for which project a given use case targets.
 
 | Use case | Project context | Notes |
 |---|---|---|
-| A developer signs in to the console | Platform project | Resolves via `/capabilities` `defaults.project_id`. |
+| A developer signs in to the console | Platform project | Would resolve via the planned `/capabilities` `defaults.project_id` (direction); today the console reads `GET /console/runtime.json`. |
 | A paying team adds a developer | Platform project | `POST /team_memberships` with `team_id` pointing at the paying team. |
 | A customer creates a project | Customer project (the new one) | `POST /projects` mints the resource; claim later attaches it to a platform-project team. |
 | A customer adds a B2B tenant | Customer project | `POST /teams` with `project_id` = the customer project. |
@@ -279,10 +370,15 @@ Draft request/response sketches for this design PR:
 
 - [`../platform/api/claim-api.yaml`](../platform/api/claim-api.yaml) — projects, claim, team domain-match.
 - [`../platform/api/config-api.yaml`](../platform/api/config-api.yaml) — `npx zitadel push` upload, capability manifest, drift.
-- [`../flowengine/api/flow-api.yaml`](../flowengine/api/flow-api.yaml) — flow engine runtime.
-- [`../flowengine/api/session-api.yaml`](../flowengine/api/session-api.yaml) — sessions.
 
-auth_attempts, api_keys (flat), events, audit_events, imports, capabilities: **TODO — not yet specified.**
+The former flow-engine and session sketches (`flow-api.yaml`, `session-api.yaml`)
+were deleted once the shipped spec under `api/openapi/endpoints/{flow,sessions}/`
+took over as the contract of record.
+
+auth_attempts, api_keys (flat), imports, capabilities: **TODO — not yet specified.**
+
+events: partially specified via [ADR 049](../../adrs/049-events-api-retention-export.md);
+OpenAPI sketch pending.
 
 Implementation OpenAPI source remains under `api/openapi/**`; generated Go code
 continues to come from that source, not from these design sketches.
@@ -295,3 +391,4 @@ continues to come from that source, not from these design sketches.
 - [`url-architecture.md`](url-architecture.md) — flat vs nested rule, no version segment
 - [`authn-and-auth-flows.md`](authn-and-auth-flows.md) — auth_attempts detail
 - [`credentials.md`](credentials.md) — api_keys, `sk_*` tokens
+- [`system-permission-catalog.md`](system-permission-catalog.md) — required permission names

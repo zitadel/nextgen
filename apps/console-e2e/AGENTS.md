@@ -1,0 +1,61 @@
+# Agent Instructions — `apps/console-e2e`
+
+Playwright project for the console's four runtime boundaries. Defer to root
+[`AGENTS.md`](../../AGENTS.md) for repo-wide rules; lane descriptions and the
+secret-handling caveat live in [`README.md`](README.md).
+
+## The four lanes
+
+- `moon run console-e2e:e2e` — **embedded shell smoke**: Vite-preview of the
+  built console under its production embed base `/ui/console/`. No live API.
+- `moon run console-e2e:e2e-real` — **real-instance resource coverage**: one
+  ephemeral real instance via `@zitadel/testing`
+  ([`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md)), console
+  served by the Vite dev server through its (credential-free) API proxy; each
+  test's user is granted access through the API and signs in with its
+  session cookie (`src-real/support.ts`). Playwright workers share the
+  instance and seed a fresh user per test.
+- `moon run console-e2e:e2e-embedded` — **embedded production-path coverage**:
+  the built Go binary serves the console, hosted login, and API from one
+  origin, with no Vite proxy. This is the only lane that proves the API base
+  and Go mux agree on the request path customers receive.
+- `moon run console-e2e:e2e-platform` — **platform-project coverage**: the
+  same binary with the platform project bootstrapped (the server default). An
+  operator signs up through the console, is granted the harness project by
+  email, and uses the screens on the session cookie alone. The console selects
+  that project on its own (the operator's only grant, as `?project=`), so the
+  screens run in a project other than the one the console signs into.
+
+Console screens act on the selected project (`?project=`, see
+[`apps/console/AGENTS.md`](../console/AGENTS.md)). The guard only ever selects
+a project the signed-in person holds a grant on: their only project, else
+none. `e2e-real` grants each signed-in user the harness project (`signIn` in
+`src-real/support.ts`), so it is selected there; a user with no grant lands on
+Projects with nothing selected. The project the console signs into comes from
+the instance's `/console/runtime.json` in every lane; no lane pins it. A spec
+that navigates by URL either lets the guard fill it in or names it, and asserts
+it survives navigation where that is the point.
+
+All four tasks carry `runInCI: false` — that only keeps them out of moon's
+automatic selection. The `full-pr` job explicitly runs `e2e-real`,
+`e2e-embedded` and `e2e-platform` in separate, sequential workflow steps; the
+shell smoke stays local-only. The `@zitadel/testing` interaction is documented in
+[`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md).
+
+## Hard rules
+
+- **Port pinning**: `REAL_ZITADEL_PORT: 8093`, `EMBEDDED_ZITADEL_PORT: 8095`
+  and `PLATFORM_ZITADEL_PORT: 8097` are fixed pins deliberately outside the
+  deferred-bind blocks — the full doctrine (why config-time ports cannot live
+  in the dynamically scanned reservation domains, and the neighbor map) is in
+  [`moon.yml`](moon.yml) and `apps/cli-journey-e2e/scripts/ports.mjs`. Do not
+  move any of these lanes onto a scanned block, and sweep orphans with
+  `moon run workspace:cli -- stop --all`.
+- **Secrets**: the `.zitadel-testing/` handshake contains the project secret —
+  gitignored, never uploaded as a CI artifact. Failure artifacts are limited
+  to Playwright results and the HTML report.
+- **Test placement**: this project covers only console runtime boundaries
+  (embed base, dev proxy, live resource data, binary-served production path).
+  Screen behavior belongs in `apps/console` Vitest specs
+  (`src/routes/**/*.spec.tsx`); component behavior in the component packages —
+  same layering rule as root `AGENTS.md` Testing Layers.

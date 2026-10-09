@@ -13,7 +13,7 @@ func TestFlattenMapToCreateAttributes(t *testing.T) {
 			name     string
 			mapValue map[string]any
 			schema   map[string]any
-			expected []*CreateAttribute
+			expected CreateAttributes
 		}{
 			{
 				name: "single layer",
@@ -34,7 +34,7 @@ func TestFlattenMapToCreateAttributes(t *testing.T) {
 						},
 					},
 				},
-				expected: []*CreateAttribute{
+				expected: CreateAttributes{
 					mustNewCreateAttribute(t, "name", "dummy", AttributeUniquenessUnspecified),
 					mustNewCreateAttribute(t, "email", "test@example.com", AttributeUniquenessTeam),
 				},
@@ -86,7 +86,7 @@ func TestFlattenMapToCreateAttributes(t *testing.T) {
 						},
 					},
 				},
-				expected: []*CreateAttribute{
+				expected: CreateAttributes{
 					mustNewCreateAttribute(t, "name", "dummy", AttributeUniquenessUnspecified),
 					mustNewCreateAttribute(t, "email", "test@example.com", AttributeUniquenessTeam),
 					mustNewCreateAttribute(t, "address.street", "main street", AttributeUniquenessUnspecified),
@@ -110,7 +110,7 @@ func TestFlattenMapToCreateAttributes(t *testing.T) {
 						},
 					},
 				},
-				expected: []*CreateAttribute{
+				expected: CreateAttributes{
 					mustNewCreateAttribute(t, "email", "test@example.com", AttributeUniquenessTeam),
 				},
 			},
@@ -140,7 +140,7 @@ func TestFlattenMapToCreateAttributes(t *testing.T) {
 						},
 					},
 				},
-				expected: []*CreateAttribute{
+				expected: CreateAttributes{
 					mustNewCreateAttribute(t, "email", "unique@example.com", AttributeUniquenessTeam),
 					mustNewCreateAttribute(t, "address.secondary_email", "also@example.com", AttributeUniquenessProject),
 				},
@@ -176,13 +176,13 @@ func TestFlattenMapToCreateAttributes(t *testing.T) {
 						},
 					},
 				},
-				expected: []*CreateAttribute{},
+				expected: CreateAttributes{},
 			},
 		}
 
 		for _, tc := range tcs {
 			t.Run(tc.name, func(t *testing.T) {
-				as, err := FlattenMapToCreateAttributes(tc.mapValue, tc.schema, "")
+				as, err := CreateAttributesFromMap(tc.mapValue, tc.schema)
 				assert.NoError(t, err)
 				assert.Equal(t, len(tc.expected), len(as))
 				for _, a := range as {
@@ -193,16 +193,20 @@ func TestFlattenMapToCreateAttributes(t *testing.T) {
 	})
 }
 
-func TestBuildAttributeTree(t *testing.T) {
+func TestAttributes_ToMap(t *testing.T) {
+	t.Parallel()
+
 	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+
 		tcs := []struct {
 			name       string
-			attributes []Attribute
+			attributes Attributes
 			expected   map[string]any
 		}{
 			{
 				name: "single layer",
-				attributes: []Attribute{
+				attributes: Attributes{
 					{Key: "name", Value: "dummy"},
 					{Key: "email", Value: "test@example.com"},
 				},
@@ -213,7 +217,7 @@ func TestBuildAttributeTree(t *testing.T) {
 			},
 			{
 				name: "multi layer",
-				attributes: []Attribute{
+				attributes: Attributes{
 					{"name", "dummy"},
 					{"email", "test@example.com"},
 					{"address.street", "main street"},
@@ -234,21 +238,94 @@ func TestBuildAttributeTree(t *testing.T) {
 					},
 				},
 			},
+			{
+				name: "nested beyond one level",
+				attributes: Attributes{
+					{"email", "test@example.com"},
+					{"address.street", "main street"},
+					{"address.geo.latitude", 45.0},
+					{"address.geo.datum.reference.epsg", "EPSG:4326"},
+				},
+				expected: map[string]any{
+					"email": "test@example.com",
+					"address": map[string]any{
+						"street": "main street",
+						"geo": map[string]any{
+							"latitude": 45.0,
+							"datum": map[string]any{
+								"reference": map[string]any{
+									"epsg": "EPSG:4326",
+								},
+							},
+						},
+					},
+				},
+			},
 		}
 
 		for _, tc := range tcs {
 			t.Run(tc.name, func(t *testing.T) {
-				m, err := BuildAttributeTree(tc.attributes)
+				t.Parallel()
+
+				m, err := tc.attributes.ToMap()
 				assert.NoError(t, err)
 				assert.EqualValues(t, tc.expected, m)
 			})
 		}
 	})
+
+	t.Run("error", func(t *testing.T) {
+		t.Parallel()
+
+		// A scalar and a path descending through the same node cannot both
+		// be written: the second write would have to traverse into a string.
+		attrs := Attributes{
+			{"address", "main street"},
+			{"address.city", "examplus"},
+		}
+
+		_, err := attrs.ToMap()
+		assert.ErrorContains(t, err, "address")
+	})
 }
 
-func mustNewCreateAttribute(t *testing.T, key string, value any, unique AttributeUniqueness) *CreateAttribute {
+func mustNewCreateAttribute(t *testing.T, key AttributeKey, value any, unique AttributeUniqueness) CreateAttribute {
 	t.Helper()
 	a, err := NewCreateAttribute(key, value, unique)
 	require.NoError(t, err)
-	return a
+	return *a
+}
+
+func TestUniqueValueHash(t *testing.T) {
+	upper, err := UniqueValueHash("Alice@Example.COM")
+	require.NoError(t, err)
+	lower, err := UniqueValueHash("alice@example.com")
+	require.NoError(t, err)
+	assert.Equal(t, upper, lower, "casings of one string are one unique value")
+
+	eszett, err := UniqueValueHash("straße")
+	require.NoError(t, err)
+	folded, err := UniqueValueHash("STRASSE")
+	require.NoError(t, err)
+	assert.Equal(t, eszett, folded, "case folding is Unicode, not ASCII")
+
+	other, err := UniqueValueHash("bob@example.com")
+	require.NoError(t, err)
+	assert.NotEqual(t, lower, other)
+
+	num, err := UniqueValueHash(42)
+	require.NoError(t, err)
+	str, err := UniqueValueHash("42")
+	require.NoError(t, err)
+	assert.NotEqual(t, num, str, "non-strings hash as encoded, distinct from strings")
+}
+
+func TestNewCreateAttribute_UniqueHashIsNormalized(t *testing.T) {
+	a, err := NewCreateAttribute("email", "Alice@Example.com", AttributeUniquenessProject)
+	require.NoError(t, err)
+	b, err := NewCreateAttribute("email", "alice@example.com", AttributeUniquenessProject)
+	require.NoError(t, err)
+
+	assert.Equal(t, a.ValueHash, b.ValueHash, "the registry sees one value")
+	assert.Equal(t, "Alice@Example.com", a.Value, "the stored value keeps its casing")
 }

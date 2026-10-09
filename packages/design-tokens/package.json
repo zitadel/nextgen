@@ -1,8 +1,8 @@
 {
   "name": "@zitadel/design-tokens",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0-alpha.1",
   "private": true,
-  "description": "Figma-driven design tokens for ZITADEL NextGen — CSS variables, typed TypeScript constants, and a Tailwind v4 @theme block built from the published Zitadel Design System library.",
+  "description": "Figma-driven design tokens for the pre-release Zitadel preview — CSS variables, typed TypeScript constants, and a Tailwind v4 @theme block built from the published Zitadel Design System library.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -23,17 +23,24 @@
       "import": "./dist/tokens.mjs"
     },
     "./css/tokens.css": "./src/generated/tokens.css",
-    "./css/tailwind.css": "./src/generated/tailwind.css"
+    "./css/tailwind.css": "./src/generated/tailwind.css",
+    "./css/shadcn.css": "./src/generated/shadcn.css"
   },
   "scripts": {
     "sync": "tsx scripts/sync-from-figma.ts",
+    "sync:export": "tsx scripts/sync-from-export.ts",
     "generate": "tsx scripts/build.ts",
     "build": "tsdown",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:all": "pnpm run test",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
-    "tsx": "catalog:"
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

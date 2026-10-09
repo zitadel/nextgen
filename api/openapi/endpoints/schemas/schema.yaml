@@ -1,0 +1,29 @@
+title: Schema
+description: |
+  A schema resource: the server-owned envelope around a customer-authored
+  JSON Schema document.
+
+  `schema` is the customer-authored document, served verbatim: its keys and
+  contents are defined entirely by its author. The rest of the object — `id`,
+  `metadata` — is the server-owned envelope. Keeping the two apart means the
+  document may declare any property (including `id` or `metadata`) without
+  colliding with the envelope, and the resource `id` stays distinguishable
+  from the document's own `$id`.
+type: object
+required:
+  - id
+  - schema
+  - metadata
+properties:
+  id:
+    readOnly: true
+    type: string
+    description: |
+      The resource id: the server-minted `sch_*` identifier, or the
+      customer-supplied `$id` URI when the document declared one at creation.
+    example: sch_01H455VB4213EF62K49QF6M73F
+  schema:
+    $ref: schema-document.yaml
+  metadata:
+    readOnly: true
+    $ref: schema-metadata.yaml

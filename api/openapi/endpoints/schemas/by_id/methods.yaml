@@ -1,47 +1,37 @@
 get:
   operationId: getSchemaById
   summary: Get schema by ID
-  description: Get a schema by its ID. This will return the default revision of the schema.
+  description: |
+    Get a schema by its ID. A schema ID identifies one immutable revision, so
+    this returns exactly that revision. To find the current revision of an
+    object type, list with `revisions=latest`.
+
+    Schema IDs are unique within a project, not across projects (the seeded
+    default schema carries the same `$id` in every project). A Console
+    session that manages more than one project names the project with
+    `project_id`; without it, the ID is resolved in the credential's own
+    project when it is ambiguous. A project secret always resolves in its
+    own project and ignores `project_id`.
   tags:
     - Schemas
   security:
     - oauth2:
         - schema.read
+    - nextgenSession: []
   parameters:
     - name: id
       in: path
       required: true
       schema:
         type: string
-    - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/team-id.yaml
+    - $ref: ../../../components/parameters/project-id-query.yaml
   responses:
     '200':
       description: The schema was retrieved successfully
       content:
         application/json:
           schema:
-            oneOf:
-              - $ref: ../user-schema.yaml
-            discriminator:
-              propertyName: kind
-              mapping:
-                user-schema: ../user-schema.yaml
-    '400':
-      description: The provided input was not valid
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
-    '404':
-      description: No schema was found with the given id
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../schema.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      $ref: getSchemaById-error-response.yaml

@@ -1,0 +1,114 @@
+{
+  "name": "@zitadel/config",
+  "version": "1.0.0-alpha.25",
+  "description": "Versioned Zitadel local config schemas and defaults",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/config#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "packages/config"
+  },
+  "files": [
+    "dist",
+    "defaults/*.json",
+    "defaults/*.md",
+    "defaults/presets/*/*.json",
+    "defaults/branding/*/*.liquid",
+    "meta-schemas/*.json",
+    "LICENSE"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "@zitadel/source": "./src/index.ts",
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./defaults": {
+      "@zitadel/source": "./src/defaults.ts",
+      "types": "./dist/defaults.d.mts",
+      "import": "./dist/defaults.mjs"
+    },
+    "./idp": {
+      "@zitadel/source": "./src/idp/index.ts",
+      "types": "./dist/idp/index.d.mts",
+      "import": "./dist/idp/index.mjs"
+    },
+    "./schemas": {
+      "@zitadel/source": "./src/schemas.ts",
+      "types": "./dist/schemas.d.mts",
+      "import": "./dist/schemas.mjs"
+    },
+    "./branding-url": {
+      "@zitadel/source": "./src/branding-url.ts",
+      "types": "./dist/branding-url.d.mts",
+      "import": "./dist/branding-url.mjs"
+    },
+    "./branding-contrast": {
+      "@zitadel/source": "./src/branding-contrast.ts",
+      "types": "./dist/branding-contrast.d.mts",
+      "import": "./dist/branding-contrast.mjs"
+    },
+    "./css-color": {
+      "@zitadel/source": "./src/css-color.ts",
+      "types": "./dist/css-color.d.mts",
+      "import": "./dist/css-color.mjs"
+    },
+    "./normalize": {
+      "@zitadel/source": "./src/normalize.ts",
+      "types": "./dist/normalize.d.mts",
+      "import": "./dist/normalize.mjs"
+    },
+    "./validate": {
+      "@zitadel/source": "./src/validate.ts",
+      "types": "./dist/validate.d.mts",
+      "import": "./dist/validate.mjs"
+    },
+    "./meta-schemas": {
+      "@zitadel/source": "./src/meta-schemas.ts",
+      "types": "./dist/meta-schemas.d.mts",
+      "import": "./dist/meta-schemas.mjs"
+    },
+    "./template": {
+      "@zitadel/source": "./src/template.ts",
+      "types": "./dist/template.d.mts",
+      "import": "./dist/template.mjs"
+    },
+    "./defaults/default-human-user.json": "./defaults/default-human-user.json",
+    "./defaults/default-login.json": "./defaults/default-login.json",
+    "./defaults/branding/*": "./defaults/branding/*",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "sync-schemas": "node scripts/sync-meta-schemas.mjs",
+    "prebuild": "pnpm run sync-schemas",
+    "build": "tsdown",
+    "pretypecheck": "pnpm run sync-schemas",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
+    "pretest": "pnpm run sync-schemas",
+    "test": "vitest run",
+    "test:all": "pnpm run test"
+  },
+  "dependencies": {
+    "@zitadel/api": "workspace:*",
+    "culori": "catalog:",
+    "liquidjs": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/culori": "catalog:",
+    "@types/node": "catalog:",
+    "ajv": "catalog:",
+    "tsdown": "catalog:",
+    "tslib": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

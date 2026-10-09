@@ -1,0 +1,68 @@
+{
+  "name": "@zitadel/testing",
+  "version": "1.0.0-alpha.25",
+  "description": "Test-kit for seeded ephemeral local Zitadel instances",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/testing#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "packages/testing"
+  },
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "@zitadel/source": "./src/index.ts",
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.mjs"
+    },
+    "./playwright": {
+      "@zitadel/source": "./src/playwright.ts",
+      "types": "./dist/playwright.d.mts",
+      "import": "./dist/playwright.mjs",
+      "require": "./dist/playwright.cjs",
+      "default": "./dist/playwright.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
+    "test": "vitest run",
+    "test:all": "pnpm run test",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@zitadel/api": "workspace:*",
+    "@zitadel/cli": "workspace:*",
+    "@zitadel/config": "workspace:*"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.60"
+  },
+  "peerDependenciesMeta": {
+    "@playwright/test": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
+    "msw": "catalog:",
+    "tsdown": "catalog:",
+    "tslib": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

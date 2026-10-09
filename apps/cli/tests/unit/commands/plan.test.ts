@@ -18,17 +18,24 @@ const SECRET = {
 const VALID_USER_SCHEMA = {
   kind: "user-schema",
   metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
-  "x-auth-methods": { password: { enabled: true, position: 0 } },
+  "x-auth-methods": { password: { enabled: true } },
   properties: { email: { type: "string" } },
 };
 
 const VALID_FLOW = {
   name: "default",
+  status: "active",
   user_schema:
     "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
   purposes: { login: "identifier" },
   steps: [
-    { name: "identifier", fields: [], actions: [], gates: {} },
+    {
+      name: "identifier",
+      fields: [],
+      actions: [{ name: "submit", kind: "submit", primary: true }],
+      transitions: { submit: { target: "done" } },
+    },
+    { name: "done", complete: "show" },
   ],
 };
 
@@ -79,11 +86,30 @@ describe("plan command", () => {
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as {
       status: string;
-      data: { creates: number; updates: number; deletes: number; total: number };
+      data: {
+        creates: number;
+        updates: number;
+        revisions: number;
+        deletes: number;
+        total: number;
+      };
     };
     expect(json.status).toBe("ok");
-    // The user schema and the default flow are both new → two creates.
-    expect(json.data).toEqual({ creates: 2, updates: 0, deletes: 0, total: 2 });
+    // The user schema and the default flow are both new → two creates,
+    // enumerated per resource in `changes` so agents can verify what a
+    // plan will touch without applying.
+    expect(json.data).toEqual({
+      creates: 2,
+      updates: 0,
+      revisions: 0,
+      deletes: 0,
+      total: 2,
+      changes: [
+        { kind: "schema", action: "create", file: ".zitadel/schemas/user.json" },
+        { kind: "flow", action: "create", file: ".zitadel/flows/default.json" },
+      ],
+      warnings: [],
+    });
   });
 
   it("errors with E_VALIDATION when a local resource is invalid", async () => {
@@ -105,5 +131,25 @@ describe("plan command", () => {
     const json = parseJson(res.stdout) as { status: string; code: string };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_VALIDATION");
+  });
+
+  it.each(["-e", "--environment"])("refuses %s, which addresses no environment", async (flag) => {
+    const cwd = await makeProject();
+
+    const res = await runCliForTest([
+      "plan",
+      flag,
+      "prod",
+      "--cwd",
+      cwd,
+      "--json",
+      "--server",
+      "https://api.zitadel.cloud",
+    ]);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { code: string; message: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("Nonexistent flag");
   });
 });

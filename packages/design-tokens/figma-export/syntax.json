@@ -1,0 +1,77 @@
+{
+  "$metadata": {
+    "collection": "Syntax",
+    "modes": [
+      "Dark",
+      "Light"
+    ]
+  },
+  "Dark": {
+    "syntax": {
+      "key": {
+        "$value": "{brand.purple.500}",
+        "$type": "color",
+        "$description": "sky-400 / sky-600"
+      },
+      "string": {
+        "$value": "{brand.orange.400}",
+        "$type": "color",
+        "$description": "emerald-400 / emerald-600"
+      },
+      "number": {
+        "$value": "{brand.pink.400}",
+        "$type": "color",
+        "$description": "amber-400 / amber-600"
+      },
+      "boolean": {
+        "$value": "{brand.purple.700}",
+        "$type": "color",
+        "$description": "violet-400 / violet-600"
+      },
+      "punctuation": {
+        "$value": "{brand.gray.500}",
+        "$type": "color",
+        "$description": "slate-400 / slate-500"
+      },
+      "comment": {
+        "$value": "{brand.gray.400}",
+        "$type": "color",
+        "$description": "slate-500 / slate-400"
+      }
+    }
+  },
+  "Light": {
+    "syntax": {
+      "key": {
+        "$value": "{brand.purple.100}",
+        "$type": "color",
+        "$description": "sky-400 / sky-600"
+      },
+      "string": {
+        "$value": "{brand.orange.200}",
+        "$type": "color",
+        "$description": "emerald-400 / emerald-600"
+      },
+      "number": {
+        "$value": "{brand.pink.200}",
+        "$type": "color",
+        "$description": "amber-400 / amber-600"
+      },
+      "boolean": {
+        "$value": "{brand.purple.300}",
+        "$type": "color",
+        "$description": "violet-400 / violet-600"
+      },
+      "punctuation": {
+        "$value": "{brand.gray.400}",
+        "$type": "color",
+        "$description": "slate-400 / slate-500"
+      },
+      "comment": {
+        "$value": "{brand.gray.500}",
+        "$type": "color",
+        "$description": "slate-500 / slate-400"
+      }
+    }
+  }
+}

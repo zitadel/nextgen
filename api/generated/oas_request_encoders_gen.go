@@ -5,17 +5,69 @@ package api
 import (
 	"bytes"
 	"net/http"
-	"strings"
 
-	"github.com/go-faster/errors"
 	"github.com/go-faster/jx"
-	"github.com/ogen-go/ogen/conv"
 	ht "github.com/ogen-go/ogen/http"
-	"github.com/ogen-go/ogen/uri"
 )
+
+func encodeBeginUserPasskeyRegistrationRequest(
+	req *BeginUserPasskeyRegistrationRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeCompleteClaimRequest(
+	req *CompleteClaimRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
 
 func encodeCreateAuthAttemptRequest(
 	req *CreateAuthAttemptRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeCreateBrandingRequest(
+	req *Branding,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeCreateDeploymentRequest(
+	req *CreateDeploymentRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -56,8 +108,50 @@ func encodeCreateFlowDefinitionRequest(
 	return nil
 }
 
+func encodeCreateGrantRequest(
+	req *CreateGrantRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeCreateIdpRequest(
+	req *CreateIdpRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeCreateProjectRequest(
 	req *CreateProjectRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeCreateReleaseRequest(
+	req *CreateReleaseRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -105,9 +199,7 @@ func encodeCreateTeamRequest(
 	const contentType = "application/json"
 	e := new(jx.Encoder)
 	{
-		if req != nil {
-			req.Encode(e)
-		}
+		req.Encode(e)
 	}
 	encoded := e.Bytes()
 	ht.SetBody(r, bytes.NewReader(encoded), contentType)
@@ -115,7 +207,7 @@ func encodeCreateTeamRequest(
 }
 
 func encodeCreateUserRequest(
-	req *User,
+	req *CreateUserRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -142,186 +234,17 @@ func encodeExchangeHandoffRequest(
 	return nil
 }
 
-func encodeGetTokenRequest(
-	req *PostTokenRequest,
+func encodeFinishUserPasskeyRegistrationRequest(
+	req *FinishUserPasskeyRegistrationRequest,
 	r *http.Request,
 ) error {
-	const contentType = "application/x-www-form-urlencoded"
-	request := req
-
-	q := uri.NewFormEncoder(map[string]string{})
+	const contentType = "application/json"
+	e := new(jx.Encoder)
 	{
-		// Encode "code" form field.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "code",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := request.Code.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
-			}
-			return nil
-		}); err != nil {
-			return errors.Wrap(err, "encode query")
-		}
+		req.Encode(e)
 	}
-	{
-		// Encode "client_assertion" form field.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "client_assertion",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := request.ClientAssertion.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
-			}
-			return nil
-		}); err != nil {
-			return errors.Wrap(err, "encode query")
-		}
-	}
-	{
-		// Encode "client_assertion_type" form field.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "client_assertion_type",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := request.ClientAssertionType.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
-			}
-			return nil
-		}); err != nil {
-			return errors.Wrap(err, "encode query")
-		}
-	}
-	{
-		// Encode "client_id" form field.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "client_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := request.ClientID.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
-			}
-			return nil
-		}); err != nil {
-			return errors.Wrap(err, "encode query")
-		}
-	}
-	{
-		// Encode "client_secret" form field.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "client_secret",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := request.ClientSecret.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
-			}
-			return nil
-		}); err != nil {
-			return errors.Wrap(err, "encode query")
-		}
-	}
-	{
-		// Encode "code_verifier" form field.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "code_verifier",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := request.CodeVerifier.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
-			}
-			return nil
-		}); err != nil {
-			return errors.Wrap(err, "encode query")
-		}
-	}
-	{
-		// Encode "grant_type" form field.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "grant_type",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := request.GrantType.Get(); ok {
-				return e.EncodeValue(conv.StringToString(string(val)))
-			}
-			return nil
-		}); err != nil {
-			return errors.Wrap(err, "encode query")
-		}
-	}
-	{
-		// Encode "redirect_uri" form field.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "redirect_uri",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := request.RedirectURI.Get(); ok {
-				return e.EncodeValue(conv.URLToString(val))
-			}
-			return nil
-		}); err != nil {
-			return errors.Wrap(err, "encode query")
-		}
-	}
-	encoded := q.Values().Encode()
-	ht.SetBody(r, strings.NewReader(encoded), contentType)
-	return nil
-}
-
-func encodeIntrospectRequest(
-	req *IntrospectRequest,
-	r *http.Request,
-) error {
-	const contentType = "application/x-www-form-urlencoded"
-	request := req
-
-	q := uri.NewFormEncoder(map[string]string{})
-	{
-		// Encode "token" form field.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "token",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			return e.EncodeValue(conv.StringToString(request.Token))
-		}); err != nil {
-			return errors.Wrap(err, "encode query")
-		}
-	}
-	{
-		// Encode "token_type_hint" form field.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "token_type_hint",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := request.TokenTypeHint.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
-			}
-			return nil
-		}); err != nil {
-			return errors.Wrap(err, "encode query")
-		}
-	}
-	encoded := q.Values().Encode()
-	ht.SetBody(r, strings.NewReader(encoded), contentType)
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
 	return nil
 }
 
@@ -339,53 +262,8 @@ func encodeIssueChallengeRequest(
 	return nil
 }
 
-func encodeRevokeTokenRequest(
-	req *RevokeRequest,
-	r *http.Request,
-) error {
-	const contentType = "application/x-www-form-urlencoded"
-	request := req
-
-	q := uri.NewFormEncoder(map[string]string{})
-	{
-		// Encode "token" form field.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "token",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := request.Token.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
-			}
-			return nil
-		}); err != nil {
-			return errors.Wrap(err, "encode query")
-		}
-	}
-	{
-		// Encode "token_type_hint" form field.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "token_type_hint",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := request.TokenTypeHint.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
-			}
-			return nil
-		}); err != nil {
-			return errors.Wrap(err, "encode query")
-		}
-	}
-	encoded := q.Values().Encode()
-	ht.SetBody(r, strings.NewReader(encoded), contentType)
-	return nil
-}
-
-func encodeSetUserPasswordRequest(
-	req *SetUserPasswordRequest,
+func encodePatchMyUserRequest(
+	req *PatchMyUserRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -398,8 +276,120 @@ func encodeSetUserPasswordRequest(
 	return nil
 }
 
-func encodeSubmitFlowEventRequest(
-	req *FlowEventRequest,
+func encodePatchProjectRequest(
+	req *PatchProjectRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodePatchUserByIDRequest(
+	req *PatchUserRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeQueryGrantsRequest(
+	req *QueryGrantsRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeQueryIdpsRequest(
+	req *QueryIdpsRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeQueryProjectsRequest(
+	req *QueryProjectsRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeQuerySessionsRequest(
+	req *QuerySessionsRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeQueryTeamsRequest(
+	req *QueryTeamsRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeQueryUsersRequest(
+	req *QueryUsersRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeSetUserPasswordRequest(
+	req *SetUserPasswordRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -426,8 +416,22 @@ func encodeSubmitFlowStepRequest(
 	return nil
 }
 
-func encodeUpdateFlowDefinitionRequest(
-	req *FlowDefinitionUpdateRequest,
+func encodeUpdateTeamRequest(
+	req *UpdateTeamRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeUpdateVariablesRequest(
+	req UpdateVariablesRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

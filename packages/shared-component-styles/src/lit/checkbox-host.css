@@ -1,7 +1,0 @@
-/* Lit-only: <zl-checkbox> host box model. Surface rules live in checkbox.css. */
-:host {
-  display: inline-flex;
-}
-:host([disabled]) {
-  cursor: not-allowed;
-}

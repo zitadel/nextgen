@@ -1,0 +1,59 @@
+id: "config"
+language: "typescript"
+layer: "library"
+stack: "frontend"
+dependsOn:
+  - "api"
+
+tasks:
+  # `meta-schemas/` is gitignored build input, copied from the directory the
+  # server embeds. The package scripts run the copy themselves, so this task
+  # exists for cache invalidation: it names the upstream files as inputs, and
+  # every task that reads the copy depends on it.
+  sync-schemas:
+    command: "corepack pnpm run sync-schemas"
+    inputs:
+      - "**/*"
+      - "/api/openapi/endpoints/schemas/*.json"
+    outputs:
+      - "meta-schemas/*.json"
+    options:
+      # Reads files server:generate and its checks rewrite or prune; see the
+      # mutex note on server:generate.
+      mutex: "generated-sources"
+
+  typecheck:
+    deps:
+      - "api:build"
+      - "sync-schemas"
+
+  build:
+    deps:
+      - "api:build"
+      - "sync-schemas"
+
+  build-release:
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
+    deps:
+      - "api:build-release"
+    outputs:
+      - "dist/**/*"
+    options:
+      cache: false
+      # Release builds remove stale package output and rebuild dist inside one
+      # mutex-held task. They stay out of `moon ci`; release:snapshot invokes
+      # them in the later release step instead of the normal build/test graph.
+      runInCI: false
+      # cli:test drives the built oclif CLI, whose commands import
+      # @zitadel/config/defaults from this package's dist at runtime. The
+      # shared mutex keeps this release build and its preclean from running
+      # while those tests are importing it.
+      # A task dep on cli:test is not possible: cli dependsOn config, so
+      # the reverse edge would cycle the project graph.
+      mutex: "public-dist"
+
+  test:
+    deps:
+      - "build"

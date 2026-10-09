@@ -1,5 +1,556 @@
 # @zitadel/components
 
+## 1.0.0-alpha.25
+
+### Minor Changes
+
+- [#1287](https://github.com/zitadel/nextgen/pull/1287) [`0ca8019`](https://github.com/zitadel/nextgen/commit/0ca80197fedb2755964617d9fe5f17e08b1cb95b) Thanks [@mridang](https://github.com/mridang)! - Render the identity providers a login step offers. A new `<zl-sso-providers>` atom draws one button per entry in the step's `sso_providers`, choosing one submits the reserved `sso` action with that connection's id, and the orchestrator follows the `redirect_url` the engine answers with — a new `zitadel-flow-redirect` event, kept separate from `zitadel-flow-complete` because nobody is signed in yet and the flow resumes when the provider returns. Every SDK forwards it, as `onFlowRedirect` in React, Solid and Svelte, `flowRedirect` in Vue and Angular, and `onFlowRedirect$` in Qwik. The atom is driven entirely by the step's data: a mark is looked up by the connection's `template` (Google ships one), and a template without one still gets a working button rather than a wrong logo, which is what a tenant's own OIDC connection will always look like. Copy for the provider buttons and for the `register-sso` and `sso-conflict` steps is added to every builtin locale, and `applySsoProviders()` in the mock API package lets a test or playground offer providers the way a project that ran `zitadel sso enable` does. The shipped `centered` and `minimal` designs carry the provider block; the retired split and hero designs ([#1039](https://github.com/zitadel/nextgen/issues/1039)) do not, so a tenant still on a revision published from one of those sees no provider buttons until it moves to `centered` or `minimal`.
+
+- [#1352](https://github.com/zitadel/nextgen/pull/1352) [`d821e91`](https://github.com/zitadel/nextgen/commit/d821e91a4f778b29a524c8a67129951795a16f8d) Thanks [@bastionstack](https://github.com/bastionstack)! - The console's branding preview runs in the selected project and shows the login in a chosen state.
+
+  The preview now starts the flow of the project selected in the switcher rather than the console's own, so on a platform deployment it renders a customer project's flow beside that project's branding. A state selector beside the screen tabs shows the step as a visitor first sees it, with validation errors, with a submission error, loading, or on the success screen.
+
+  `<zitadel-login>` gains `preview-state` for this. Set, the element starts the flow as usual, shows the served step in that state, and submits nothing. `preview-success-step` names the terminal step the success state paints, for a flow that does not end on the default `done`. The React `ZitadelLogin` takes both as `previewState` and `previewSuccessStep`. The terminal screen's heading is centred in its card.
+
+- [#1392](https://github.com/zitadel/nextgen/pull/1392) [`77369ca`](https://github.com/zitadel/nextgen/commit/77369ca215600478d8f56740406ce9f52cf09d00) Thanks [@vitorbari](https://github.com/vitorbari)! - Password managers and browser autofill now work across the sign-in and
+  registration screens, including the two-step layouts where the password is
+  asked for on its own.
+  - The login reads the `autocomplete` token the server sends for each field
+    instead of guessing from the field or step name, so a renamed identifier
+    property or a renamed step gets the right token.
+  - A step that asks for the password alone now carries the identifier collected
+    earlier, hidden in the same form, so a manager saves the two as one
+    credential and offers to fill them together next time.
+
+  Ejected templates pick this up by replacing their `autocomplete` guesswork with
+  the field's own `autocomplete` value; the hidden identifier needs no template
+  change.
+
+- [#1406](https://github.com/zitadel/nextgen/pull/1406) [`46a366f`](https://github.com/zitadel/nextgen/commit/46a366fabf688964b3a62158e6922902f0f0045b) Thanks [@mridang](https://github.com/mridang)! - Add a per-framework Agent Skill for each SDK and `@zitadel/components`, alongside a top-level `zitadel` router skill that routes to the right one. The skills are distributed through the repo (not published to npm); a single `npx skills add zitadel/nextgen --full-depth` installs the whole set, giving a coding agent framework-specific guidance for integrating Zitadel auth into a React, Next.js, Angular, Nuxt, Vue, Solid, Svelte, or Qwik app — including existing apps the CLI can't scaffold — and for embedding the `<zitadel-login>` web component directly. Each skill is discover-first: it teaches the integration pattern and points at the installed package's own README and types for exact APIs, so it does not drift with the package version.
+
+- [#1371](https://github.com/zitadel/nextgen/pull/1371) [`0269f56`](https://github.com/zitadel/nextgen/commit/0269f56e8299584b20e5815cf9b8d3c84ae65010) Thanks [@IAM-marco](https://github.com/IAM-marco)! - `<zitadel-login>` shows a message in English, German and Italian when a sign-in provider returns an account that has no user and the connection does not allow creating one.
+
+  When the server answers `flow.restart_required` (for example, the provider's connection was deleted while the user was signing in), `<zitadel-login>` starts a fresh flow and tells the user to start again, instead of showing only an error. It restarts at most once in a row, so a server that keeps refusing cannot loop it.
+
+### Patch Changes
+
+- [#1424](https://github.com/zitadel/nextgen/pull/1424) [`4af9f8e`](https://github.com/zitadel/nextgen/commit/4af9f8ec460b3f83f11bece0d4134f0fa1d2e52e) Thanks [@mridang](https://github.com/mridang)! - Stop the `<zitadel-login>` card header flickering on every render when `suppressHeader` is left unset. An unset optional boolean reaches the element as `undefined`, which made `toggleAttribute` flip the header each commit instead of setting it; both call sites now coerce it with `=== true`.
+
+- [#1386](https://github.com/zitadel/nextgen/pull/1386) [`6821cc6`](https://github.com/zitadel/nextgen/commit/6821cc62356ef75cce936907d203470f35cd1a9a) Thanks [@grvijayan](https://github.com/grvijayan)! - An sso submission starts the external sign-in. `{action: "sso",
+sso_provider_id, return_target}` on a step that offers `sso_providers`
+  pins the connection at its newest revision, issues the single-use state
+  record on the auth attempt and returns the `sso-redirect` step, whose
+  `redirect_url` is the provider's authorize URL with `state`, `nonce` and,
+  when the connection enables PKCE, an S256 code challenge. A `${{ NAME }}`
+  `client_id` is filled from the project's variables. The response re-seals
+  `_zflow` and adds the browser-binding cookie the callback checks. On every
+  host except http loopback it is `__Host-_zsso` with `Secure`. When the
+  request host is http loopback (local development, where Safari rejects
+  `Secure`), it is `_zsso` with no `Secure`; the `__Host-` prefix is dropped
+  because it requires `Secure`. In both cases the cookie is `HttpOnly`,
+  `Path=/` and `SameSite=Lax`.
+
+  The flow responses' `Set-Cookie` header is now declared as a list, one
+  header line per cookie, `_zflow` first. Browsers never expose the header to
+  script; the shape concerns server-side and generated non-browser clients.
+
+  The submit request gains `return_target`, the page hosting the
+  orchestrator where the flow resumes after the callback. It is required with
+  action `sso`, and its origin must equal the request origin. A provider the
+  engine cannot start a sign-in with re-renders the step with
+  `error.sso_unavailable`, which the orchestrator localizes. The orchestrator
+  sends its page URL, with the flow id set in the `flow` query parameter, as
+  `return_target` on an sso submission.
+
+  When the orchestrator resumes a flow handle, from the `flow` query
+  parameter or from `resume-flow-id`, and the flow no longer resolves, it
+  starts a new flow instead of showing a startup error, with a console
+  warning naming the handle. This covers the return from an external sign-in
+  after the flow cookie's window: the browser no longer sends the required
+  cookie and the server refuses the request with 400.
+
+- [#1342](https://github.com/zitadel/nextgen/pull/1342) [`c03400d`](https://github.com/zitadel/nextgen/commit/c03400d0a6263534a1fe862eacf198d62979230d) Thanks [@bastionstack](https://github.com/bastionstack)! - The design tokens bundled with the login components gain `--zl-gradient-red`, the design system's red gradient composed from its published stops. Nothing in the login surface reads it.
+
+- [#1287](https://github.com/zitadel/nextgen/pull/1287) [`0ca8019`](https://github.com/zitadel/nextgen/commit/0ca80197fedb2755964617d9fe5f17e08b1cb95b) Thanks [@mridang](https://github.com/mridang)! - Resume the flow an identity-provider callback returns with. The callback finishes by navigating the browser back to the page the sign-in started on with `?flow=<id>` appended. That is a fresh page load, so nothing of the previous document survives to carry the handle, and a page that ignores the parameter starts a new flow — leaving the user on a blank sign-in screen having just signed in. `<zitadel-login>` now falls back to that parameter when `resume-flow-id` is not set, so a host page needs no code of its own for external sign-in to finish; doing it per framework would mean the same few lines in each scaffolded template, and one that forgot them would fail silently. A handle taken from the URL is not a capability: `GET /flow/{id}` only answers when the sealed flow cookie names that same id, so an id someone else put there resolves to nothing.
+
+- [#1530](https://github.com/zitadel/nextgen/pull/1530) [`59c6e9a`](https://github.com/zitadel/nextgen/commit/59c6e9ab1f6a77c327be53bd7ffe89073f2192f2) Thanks [@mridang](https://github.com/mridang)! - Stop printing Lit's "Lit is in dev mode" notice when the components run under a test runner or browser automation.
+
+- [#1478](https://github.com/zitadel/nextgen/pull/1478) [`9b7b4b2`](https://github.com/zitadel/nextgen/commit/9b7b4b2268b968b03752393850c28d047eca13cc) Thanks [@grvijayan](https://github.com/grvijayan)! - The `error.sso_failed` message no longer blames the provider. The same key covers configuration and server-side failures, so it now reads "The sign-in could not be completed. Please try again."
+
+- Updated dependencies [[`79527ed`](https://github.com/zitadel/nextgen/commit/79527edba346d39fd43502eb4357d3d19a77ad2d), [`0ca8019`](https://github.com/zitadel/nextgen/commit/0ca80197fedb2755964617d9fe5f17e08b1cb95b), [`79527ed`](https://github.com/zitadel/nextgen/commit/79527edba346d39fd43502eb4357d3d19a77ad2d), [`6aca9bb`](https://github.com/zitadel/nextgen/commit/6aca9bb9afcb6e2b33f9e5e5cf5af6c1319d4fe1), [`77369ca`](https://github.com/zitadel/nextgen/commit/77369ca215600478d8f56740406ce9f52cf09d00), [`c363d18`](https://github.com/zitadel/nextgen/commit/c363d1809bf2b8032178ea04e031d50cc365f71b), [`0269f56`](https://github.com/zitadel/nextgen/commit/0269f56e8299584b20e5815cf9b8d3c84ae65010), [`b44b907`](https://github.com/zitadel/nextgen/commit/b44b907bd50fd244440999b8386a79d132b58f1c)]:
+  - @zitadel/config@1.0.0-alpha.25
+
+## 1.0.0-alpha.24
+
+### Patch Changes
+
+- [#1331](https://github.com/zitadel/nextgen/pull/1331) [`8853408`](https://github.com/zitadel/nextgen/commit/88534088991a21027f7e7dd6bea1ff76fe43edf0) Thanks [@bastionstack](https://github.com/bastionstack)! - The design tokens bundled with the login components gain `--zl-container-settings`, the width of the console's settings column. Nothing in the login surface reads it.
+
+- Updated dependencies [[`6524178`](https://github.com/zitadel/nextgen/commit/6524178cc74251da3d454451fdef45063fabce86), [`7165d73`](https://github.com/zitadel/nextgen/commit/7165d73f8d13f8f4aac94858ee5e918b5700c773)]:
+  - @zitadel/config@1.0.0-alpha.24
+
+## 1.0.0-alpha.23
+
+### Major Changes
+
+- [#1206](https://github.com/zitadel/nextgen/pull/1206) [`fc1bb82`](https://github.com/zitadel/nextgen/commit/fc1bb8299cd1dddde0b5490d74385576b83e4ad4) Thanks [@bastionstack](https://github.com/bastionstack)! - The login widget paints the appearance a branding revision publishes.
+
+  An element `theme` now selects among the sides a revision publishes, and cannot reach one it did not: with a single published side the property has no effect. An embedder pinning `theme="light"` against a dark-only revision gets the dark side.
+
+  Each theme side keeps its own colours: a light key no longer leaks into the dark surface, and the mark comes from the resolved side, so a wordmark drawn for a light card is never placed on a dark one. A revision that publishes one side renders that side only — `auto`, the visitor's operating system, and the element's `theme` property can all ask for the other one, and it is not there to give.
+
+  `shape.radius` accepts the pixel value the contract allows, and scales the whole corner ramp in proportion rather than only the three middle steps, so `none` now squares off checkboxes and fields too. `shape.logo_scale` multiplies the logo height caps. `typography.scale` reaches the text sizes and their leading, so the multiplier changes what the surface renders at.
+
+  `Branding` and its member types are now the wire shapes rather than a parallel client declaration. `BrandingAssets` is removed from the package's exported types, along with the `assets` block it described: `logo_dark`, `favicon` and `background_image` were only ever validated, never rendered. A per-side `theme.light.logo_url` / `theme.dark.logo_url` replaces the first, and the other two have no successor. The client-only `typography.font_family_heading` and `font_family_mono` go the same way — a revision carries one face, and a page with a licensed display face points `--zl-font-family-heading` at it directly.
+
+### Patch Changes
+
+- [#1179](https://github.com/zitadel/nextgen/pull/1179) [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71) Thanks [@vitorbari](https://github.com/vitorbari)! - An embedded widget no longer injects the tenant font stylesheet into the
+  embedding application's document. The widget applies `typography.font_family`
+  and leaves loading the face to the page around it; a Zitadel-served page still
+  injects, because it owns its own document.
+
+  `typography.scale` and `shape.logo_scale` no longer declare a schema `default`,
+  so an omitted key stays omitted through decoding rather than being persisted as
+  an explicit `1`.
+
+  `zitadel plan` now applies the server's URL rules to `typography.font_url` and
+  rejects credentials in any branding URL, so a value that would fail on publish
+  fails locally first.
+
+- [#1179](https://github.com/zitadel/nextgen/pull/1179) [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71) Thanks [@vitorbari](https://github.com/vitorbari)! - Branding revisions carry login appearance.
+
+  `theme` publishes complete `light` and `dark` sides, each with its own logo and
+  semantic palette; neither side inherits from the other, and a side that is not
+  published is never resolved. `typography` names one face for body and headings
+  plus the stylesheet that loads it. `shape` carries a corner radius — a preset
+  name or a pixel value — along with density and a logo scale.
+
+  `font_url` becomes writable and moves onto `typography`, beside the family it
+  loads. It is stored, not injected: an embedded widget applies the family and
+  relies on the embedding page having loaded the face.
+
+  Appearance values are held to an allowlist, because the widget writes them into
+  a CSS declaration. A colour must be hex, a colour name, or a colour function; a
+  font stack must be identifiers or quoted names. `url()` and `var()` are
+  rejected, asset URLs may not carry credentials, and colours, font stacks and
+  URLs all have length caps. The contract states the same shapes as a JSON Schema
+  `pattern`, so generated clients reject them too.
+
+  Revisions published before these fields existed keep working and use the
+  maintained defaults.
+
+- [#1277](https://github.com/zitadel/nextgen/pull/1277) [`85db700`](https://github.com/zitadel/nextgen/commit/85db70036625cdf6dc4560487c4f7cf6f6694a1d) Thanks [@peintnermax](https://github.com/peintnermax)! - The login widget's text fields no longer stop on the "Clear" cross when tabbing between inputs. The cross remains a pointer-only affordance; Tab now moves from one input straight to the next.
+
+- [#1278](https://github.com/zitadel/nextgen/pull/1278) [`58c25fd`](https://github.com/zitadel/nextgen/commit/58c25fd9dd9776ab3d92a86515c879d6f4888de4) Thanks [@peintnermax](https://github.com/peintnermax)! - The console claim page reads the session once per document and no longer completes the claim on a navigation the router sees while the sign-in widget is up, so a claim link is spent exactly once and the developer sees "Project claimed" rather than "Already claimed" for their own claim.
+
+  `<zitadel-login>` no longer calls `history.back()` to retire its back-gesture sentinel on a terminal step that navigates to `post-sign-in-url`. The traversal fired `popstate` in the host page, and a host router that reloads its route on `popstate` could see the session the handoff exchange had just created and act on it in the document about to be replaced — the console claim page spent its single-use challenge twice that way, once before the navigation and once after, and told the developer their project was already claimed. The sentinel is now retired in place with `history.replaceState`, so the host sees no navigation until the real one.
+
+- Updated dependencies [[`40025fe`](https://github.com/zitadel/nextgen/commit/40025feb3d9a7154db7d1348043248dbd42f5d6c), [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9), [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71), [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71), [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9), [`f118796`](https://github.com/zitadel/nextgen/commit/f118796f01af9e90be00f3313f1f9fc5ab407b4b), [`6c3f4a3`](https://github.com/zitadel/nextgen/commit/6c3f4a35e6466e9335ebb00b9943902faef8f2f8), [`84d1c4b`](https://github.com/zitadel/nextgen/commit/84d1c4b7dc636dc4439c0ee7a21eee8ecad44f36), [`205cef5`](https://github.com/zitadel/nextgen/commit/205cef525ee26250b652ee40f0b35622dc05caea), [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9)]:
+  - @zitadel/config@1.0.0-alpha.23
+
+## 1.0.0-alpha.22
+
+### Patch Changes
+
+- Updated dependencies [[`c7c737a`](https://github.com/zitadel/nextgen/commit/c7c737a32dd62368161db2ab90d93af800c07198)]:
+  - @zitadel/config@1.0.0-alpha.22
+
+## 1.0.0-alpha.21
+
+### Minor Changes
+
+- [#1085](https://github.com/zitadel/nextgen/pull/1085) [`a59b288`](https://github.com/zitadel/nextgen/commit/a59b288e4e52a3274c1ab4b5e4c241f1083aac6b) Thanks [@livio-a](https://github.com/livio-a)! - Session responses identify their user through a resolved **user ref** derived
+  from the user schema's own `x-identifier`/`x-display` designations (ADR 058),
+  replacing the convention-resolved flat `name`/`email` fields this supersedes
+  (see the earlier `GET /sessions/me` identity changeset). Rendering follows one
+  chain everywhere: `display`, falling back to `identifier`, then `user_id`.
+  - `@zitadel/server`: `GET /sessions/me`, session get, and query sessions embed
+    `user` (`{user_id, identifier, identifier_property, display}`), the list
+    path hydrated with one batch resolution per page — listed sessions now carry
+    user identity at all. The conventional attribute-name resolver
+    (`name`/`givenName`+`familyName`/`email`) is removed.
+  - `@zitadel/api`: the regenerated client types the new `user` ref component.
+  - `@zitadel/components`: `<zitadel-session>`/`<zitadel-logout>` render from
+    the ref; the `zitadel-signout` detail is now `{display, identifier}`;
+    logout templates substitute `{{display}}`/`{{identifier}}` (the old
+    `{{name}}`/`{{email}}` tokens keep filling as aliases).
+  - `@zitadel/sdk-core` (and every SPA SDK via the shared contract):
+    `NextgenSession`/`ClientSession` become `{userId, identifier,
+identifierProperty, display}`; JWT-claim identities map `name` → `display`
+    and `email` → `identifier`.
+  - `@zitadel/sdk-next` / `@zitadel/sdk-nuxt`: server and client session reads
+    return the new shape.
+  - `@zitadel/cli`: scaffolded Nuxt auth plugins emit the new fields.
+
+  **Breaking:** the flat `name`/`email` session fields and the old SDK session
+  shape are gone. An unknown property is dropped rather than rejected, so a
+  client left on the old fields reads silently empty values instead of failing
+  loudly — update server, SDKs, and app chrome together.
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/config@1.0.0-alpha.21
+
+## 1.0.0-alpha.20
+
+### Minor Changes
+
+- [#913](https://github.com/zitadel/nextgen/pull/913) [`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b) Thanks [@bastionstack](https://github.com/bastionstack)! - The login surface is Lit-only, and the console composes shadcn/ui (ADR 055). `@zitadel/ui-react` and `@zitadel/shared-component-styles` are removed: each atom's CSS now lives beside it as `packages/components/src/atoms/zl-<atom>.css`, with the shadow-host rules merged into the same file, and `@zitadel/components` gains `IconSize`, `IconTone`, `ZITADEL_ATTRIBUTION_LOGOTYPE_SVG` and `zitadelTrustmarkInnerHtml` on its public surface. The `--zl-*` variables from `@zitadel/design-tokens` remain the only contract the two surfaces share, so nothing about theming, tenant branding, or the `part`/`exportparts` styling hooks changes. Consumers importing `@zitadel/ui-react` should compose shadcn/ui, or embed `<zitadel-login>` or the atom itself as a custom element.
+
+- [#913](https://github.com/zitadel/nextgen/pull/913) [`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b) Thanks [@bastionstack](https://github.com/bastionstack)! - feat: the sign-in and sign-up surface is rebuilt on the shadcn design language. The card, fields, buttons, alert and trustmark are re-cut to the shadcn geometry and re-keyed onto the shadcn token roles, so every colour now comes from a semantic `--zl-*` role and light mode falls out of the token layer. Form-level alerts move below the fields, forgot-password moves onto the password field's label row, and headings and labels are set in the display face. Tenant branding, the `part`/`exportparts` hooks and `suppress-header` are unchanged.
+
+### Patch Changes
+
+- [#913](https://github.com/zitadel/nextgen/pull/913) [`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b) Thanks [@bastionstack](https://github.com/bastionstack)! - fix: the `split`, `split-right` and `hero` designs keep "Secured with Zitadel" 24px below the card, as the centred design does. It hung off the page-shell footer, which spans both panes, so the brand pane's height decided the distance — over 100px on a tall pane. Those templates now carry a `data-zl-attribution-anchor` in their form column; a template without one still uses the footer slot. The split brand pane is also smaller: `--zl-spacing-8` block padding, and an 18rem placeholder with `--zl-split-hero-max-height` tracking it at 22.5rem.
+
+- Updated dependencies [[`0a9a5af`](https://github.com/zitadel/nextgen/commit/0a9a5afd0336382ca8ebef9c646f09acde2d7ada), [`4a8d546`](https://github.com/zitadel/nextgen/commit/4a8d546d8abd6902f2e19c50e8b980f91451bbfd), [`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b)]:
+  - @zitadel/config@1.0.0-alpha.20
+
+## 0.1.0-alpha.19
+
+### Minor Changes
+
+- [#830](https://github.com/zitadel/nextgen/pull/830) [`35d25c3`](https://github.com/zitadel/nextgen/commit/35d25c3add44611197363ff088fc940ee3858c78) Thanks [@fforootd](https://github.com/fforootd)! - Theming and header controls for the login surface:
+  - The primary button now consumes the semantic `--zl-primary` /
+    `--zl-primary-foreground` pair (Figma-owned values; the previous legacy
+    role tokens remain as fallback). Expect a slight visual shift on stock
+    buttons; setting the pair on the host element — or
+    `branding.palette.primary` / `branding.palette.on_primary`, which now
+    feed both vocabularies — restyles the CTA. Hover intentionally stays on
+    the legacy hover role until Figma publishes a primary-scoped hover value.
+  - `branding.palette.link` finally reaches the links: card navigation,
+    forgot-password, and field links consume a new `--zl-color-text-link`
+    contract variable (defined by default as an alias of the existing purple
+    accent, which resolves per theme). Previously the palette key recolored
+    pills instead of links.
+  - New `suppress-header` boolean on `<zitadel-login>` and
+    `<zitadel-session>` (and a `suppressHeader` prop on every framework
+    wrapper): visually hides the widget's own heading block while keeping it
+    in the accessibility tree — for embeds whose page already carries the
+    heading. Works with user-ejected branding templates too.
+
+### Patch Changes
+
+- [#875](https://github.com/zitadel/nextgen/pull/875) [`d1e967d`](https://github.com/zitadel/nextgen/commit/d1e967d74ee339f9695f73185dd3097b19f527a2) Thanks [@fforootd](https://github.com/fforootd)! - The login widget now uses clearer identifier-step copy and avoids misleading initial focus:
+  - The identifier step's primary button now says "Continue" ("Weiter" /
+    "Continua") instead of "Sign in". The step branches to registration when
+    the email is unknown, so "Sign in" promised an outcome the step cannot
+    guarantee.
+  - The widget no longer paints a focus ring on the primary action when a
+    page-mode flow loads on a field-less step (e.g. the passkey-first
+    preset's entry step). Script-moved focus with no prior interaction
+    matches `:focus-visible`, which made the ring read as a pre-selected
+    state. Initial focus now lands only on input fields; step swaps keep
+    moving focus to the first control, where the browser derives the ring
+    from the user's actual input modality.
+
+- [#874](https://github.com/zitadel/nextgen/pull/874) [`c2888bd`](https://github.com/zitadel/nextgen/commit/c2888bdfd3c2a21fefd76a9b7fa80507d97cd88b) Thanks [@fforootd](https://github.com/fforootd)! - Branding asset URLs (`logo_url`, `hero_url`) may now use plain `http://` with canonical loopback hosts (`localhost`, dotted-decimal `127.0.0.0/8`, `[::1]`) so local development can serve login assets straight from the app's own dev server. The login component preserves those URLs only when it also runs on a loopback HTTP page; public pages and every other URL field remain HTTPS-only. The CLI plan, server save, editor, and component gates now enforce the same syntax and explain the carve-out when rejecting a URL.
+
+- [#886](https://github.com/zitadel/nextgen/pull/886) [`61a0eee`](https://github.com/zitadel/nextgen/commit/61a0eee0abb310a834d94b72a74f351035021be8) Thanks [@fforootd](https://github.com/fforootd)! - A branding asset URL that is well-formed but unreachable no longer fails
+  silently. `logo_url` / `hero_url` cleared every gate — the CLI's shape check
+  and the server's save gate — published a revision, and then rendered as a 0×0
+  `<img>`: no plan output, no apply output, no console error.
+
+  Three changes close that hole:
+  - `plan` and `apply` probe each asset URL (HEAD, 2.5s budget, in parallel) and
+    emit a non-blocking warning when it is unreachable, returns a non-2xx
+    status, or answers with something that is not an image. Advisory by design —
+    the machine planning is not necessarily the machine rendering the login
+    page — so it never fails a run. Set `ZITADEL_SKIP_ASSET_PROBE` to turn it
+    off (offline, air-gapped CI, a CDN that only resolves from production) and
+    `ZITADEL_ASSET_PROBE_TIMEOUT_MS` to retune the per-URL budget. Only public
+    HTTPS destinations are contacted and redirects are re-validated;
+    loopback/private/internal targets remain inconclusive rather than becoming
+    network requests from the machine running the plan.
+  - The login UI hides an asset that fails to load and restores either the split
+    designs' decorative placeholder or the shipped design's authored no-logo
+    content, so a broken asset degrades to the same result as no asset instead
+    of a blank pane or missing compact brand. Templates could not do this
+    themselves: they are DOMPurify-sanitised and inline `onerror` is stripped.
+  - Branding revisions can now carry plan warnings at all; previously only
+    create/update actions could, and branding is revisioned.
+
+  Two readability fixes ride along. A branding `plan` no longer dumps the whole
+  inlined Liquid template as one escaped line: an unchanged multi-line field
+  renders as `(<n> lines, sha256:…)` and a changed one as a real line diff. And
+  the branding dialect file scaffolded into `.zitadel/meta/` now spells its
+  command mentions the way the generated app can run them
+  (`npx @zitadel/cli@<version> apply`), matching the READMEs — the bare
+  `zitadel apply` in the editor tooltip named a command that does not exist
+  there.
+
+- [#856](https://github.com/zitadel/nextgen/pull/856) [`b17b2c9`](https://github.com/zitadel/nextgen/commit/b17b2c9fb3fae00f99a1864d37f3b51142ea4344) Thanks [@fforootd](https://github.com/fforootd)! - The package documentation now matches what the packages actually do. The Next and Nuxt guides drop the removed `api-base` attribute in favor of `configureZitadel()` and the `project` property; the Nuxt guide documents the Nuxt module (what `zitadel setup` wires) with its real options and the `useAuth()` / `useZitadelProject()` composables, alongside the hand-rolled middleware path with its full option set. `@zitadel/sdk-core` and `@zitadel/api` gain real documentation of their entry points, `@zitadel/config` gains a package README, and the SPA guides document the `ZitadelSession` card and point local no-proxy experiments at the local runtime's actual default port (8080). The flow-editing guide copied into `.zitadel/flows/` no longer suggests cross-flow `switch`/`pivot` transitions, which the runtime does not execute yet, and API examples use the real prefixed ID format (`proj_…`, `team_…`) instead of a retired naming scheme.
+
+- [#870](https://github.com/zitadel/nextgen/pull/870) [`b7235f7`](https://github.com/zitadel/nextgen/commit/b7235f7a0ede460e504376974b370d3d95e0d3c6) Thanks [@fforootd](https://github.com/fforootd)! - Update DOMPurify to address sanitizer bypass vulnerabilities in `@zitadel/components`.
+
+- [#885](https://github.com/zitadel/nextgen/pull/885) [`f1049fd`](https://github.com/zitadel/nextgen/commit/f1049fd1b07086ffd070ecdd0b2d80958efd72f2) Thanks [@fforootd](https://github.com/fforootd)! - `zitadel setup` now pins the dev-server port in the scaffolded `dev` script for Next and Nuxt, so the app serves the port setup registered as the project's allowed origin. Previously a bare `next dev` / `nuxt dev` ignored that port and defaulted to 3000 — and Next silently moved to 3001 when 3000 was busy — so login rendered but the first submit failed with `origin "http://localhost:3000" is not allowed for this project`. The other frameworks already pinned the port in their own dev-server config (Vite's `server.port` + `strictPort`, Angular's `serve.options.port`) and are unchanged. An explicit port also turns a busy port into a loud `EADDRINUSE` instead of a silent move to a rejected origin.
+
+  `doctor` verifies that dev script against the port recorded as the development issuer, so a script moved to another port is reported as an unapplied config edit and `doctor --fix` restores the registered port. `eject` now lists `package.json` among the edits it cannot auto-revert.
+
+  A login that cannot start — a rejected origin being the most common cause — now reports the failure inside the login card instead of leaving a bare line of text on an otherwise empty page.
+
+- [#873](https://github.com/zitadel/nextgen/pull/873) [`37e9cb9`](https://github.com/zitadel/nextgen/commit/37e9cb903943d34eebadfb44457872892f296823) Thanks [@fforootd](https://github.com/fforootd)! - Split-family login designs now look intentional out of the box. The brand pane renders a token-gradient placeholder panel until `branding.json` names a `logo_url`/`hero_url`, so a fresh `split`/`split-right` eject reads as a split layout instead of a lonely off-centre card. The "Secured with Zitadel" attribution now aligns under the form column in split-family designs (it previously centred across both panes) and recentres when the layout collapses to a single column on narrow containers.
+
+- [#888](https://github.com/zitadel/nextgen/pull/888) [`11e6ab5`](https://github.com/zitadel/nextgen/commit/11e6ab57d611f4dc0f9732b958bff1302d4ea689) Thanks [@fforootd](https://github.com/fforootd)! - A `hero_url` no longer decides how tall the sign-in page is. In the `split` and
+  `split-right` designs the brand pane took its height from the image, so an asset
+  that is tall, square, or an SVG with no width/height of its own — the kind every
+  framework scaffold ships in `public/` — stretched the pane past the viewport and
+  pushed the "Secured with Zitadel" attribution below the fold. The hero now spans
+  the brand pane's width with a capped height: a conventional wide banner renders
+  exactly as before, and a taller asset is cropped to fit instead of growing the
+  page. Set `--zl-split-hero-max-height` on the template root to raise or lower the
+  cap for a design that wants a taller pane.
+
+- [#888](https://github.com/zitadel/nextgen/pull/888) [`11e6ab5`](https://github.com/zitadel/nextgen/commit/11e6ab57d611f4dc0f9732b958bff1302d4ea689) Thanks [@fforootd](https://github.com/fforootd)! - A tall `logo_url` no longer stretches the `split` / `split-right` brand pane. The
+  logo was capped in width but not in height, so a portrait lockup — a mark stacked
+  above a wordmark, say — kept the height its own proportions asked for and grew the
+  pane past the viewport. It is now capped in both directions and scales down whole,
+  never cropped: a logo that already fit is untouched, and a small one is still shown
+  at its own size rather than blown up to fill the pane. When a logo and a hero share
+  the pane the logo takes the smaller header-mark cap, so the two together still leave
+  the "Secured with Zitadel" badge on screen. Set `--zl-split-logo-max-height` on the
+  template root if your lockup wants more room.
+- Updated dependencies [[`c2888bd`](https://github.com/zitadel/nextgen/commit/c2888bdfd3c2a21fefd76a9b7fa80507d97cd88b), [`61a0eee`](https://github.com/zitadel/nextgen/commit/61a0eee0abb310a834d94b72a74f351035021be8), [`79f5ce1`](https://github.com/zitadel/nextgen/commit/79f5ce1db6b36baab85944a667072f1936880704), [`b17b2c9`](https://github.com/zitadel/nextgen/commit/b17b2c9fb3fae00f99a1864d37f3b51142ea4344), [`41f6a0a`](https://github.com/zitadel/nextgen/commit/41f6a0a7c60e28a9adecfa9d72b964a305f7ba3d), [`fc3d154`](https://github.com/zitadel/nextgen/commit/fc3d154f2fabb722c6f94633fd6c10bc60d0a657), [`4e04e5f`](https://github.com/zitadel/nextgen/commit/4e04e5fb2a9585669b75d2b188b0966bfb23f4e7), [`9ef7096`](https://github.com/zitadel/nextgen/commit/9ef709667f1a6f7bd5126491bf4039a34a43a792), [`37e9cb9`](https://github.com/zitadel/nextgen/commit/37e9cb903943d34eebadfb44457872892f296823), [`433f81c`](https://github.com/zitadel/nextgen/commit/433f81cffc3e3e8499c555aa45b2a45aa557916f)]:
+  - @zitadel/config@0.1.0-alpha.19
+
+## 0.1.0-alpha.18
+
+### Minor Changes
+
+- [#686](https://github.com/zitadel/nextgen/pull/686) [`e375e18`](https://github.com/zitadel/nextgen/commit/e375e1811b9d03ceae8b517cf2230f52957e8a5c) Thanks [@fforootd](https://github.com/fforootd)! - New types-only `@zitadel/components/jsx` entry with React JSX declarations for `<zitadel-login>`, `<zitadel-session>`, and `<zitadel-logout>`, covering each element's full attribute/property surface plus React's standard `ref`/`key` (a `ref` resolves to the concrete element type). Reference it once (`/// <reference types="@zitadel/components/jsx" />`) to type the custom elements in TSX.
+
+- [#686](https://github.com/zitadel/nextgen/pull/686) [`e375e18`](https://github.com/zitadel/nextgen/commit/e375e1811b9d03ceae8b517cf2230f52957e8a5c) Thanks [@fforootd](https://github.com/fforootd)! - The built-in locale dictionaries ship neutral email copy — "Email" / "you@example.com" (de: "du@beispiel.de", it: "E-mail" / "tu@esempio.com") — instead of the business-flavored "Work email" / "you@company.com". Products that want the previous work-email framing spread the new `businessLocales` overlay over the built-in dictionary via the `locales` property. The `it` dictionary is now also exported from the package root.
+
+- [#686](https://github.com/zitadel/nextgen/pull/686) [`e375e18`](https://github.com/zitadel/nextgen/commit/e375e1811b9d03ceae8b517cf2230f52957e8a5c) Thanks [@fforootd](https://github.com/fforootd)! - `<zitadel-session>` is now embeddable and themable like `<zitadel-login>`: it shares the same surface contract with `variant` (default `widget` — content-sized, transparent, no font injection; `page` claims the viewport and paints the surface via its internal page shell) and `theme` (`light` / `dark` / `auto`, resolved against the variant fallback instead of hardcoding dark). `<zitadel-logout>` also resolves `theme` now instead of pinning `data-theme="dark"`. Breaking within the alpha: `<zitadel-session>` no longer renders page-like by default — dedicated signed-in routes must set `variant="page"`.
+
+### Patch Changes
+
+- [#259](https://github.com/zitadel/nextgen/pull/259) [`ff66683`](https://github.com/zitadel/nextgen/commit/ff66683eeb0daa3a12e7d11fed01076ac8c2ba58) Thanks [@peintnermax](https://github.com/peintnermax)! - `<zitadel-login>` maps the browser's back gesture to a step's `kind: "back"` action via a single re-armed History API sentinel entry (no URL changes). Back-navigation is gesture-only: the default template and all shipped branding designs render no visible control for the action, and the kind-based exclusion keeps it out of the generic secondary-button loop. Tenant templates can still render an explicit control from the wire action.
+
+- [#603](https://github.com/zitadel/nextgen/pull/603) [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c) Thanks [@fforootd](https://github.com/fforootd)! - Emit `zitadel-flow-step` for the first step, not just for steps reached by submitting. A host app driving its own chrome from the flow step — progress indicators, headings, analytics — previously saw nothing until after the visitor's first submit; `startFlow()` now announces the applied step exactly as `submit()` does.
+
+  Scope the compact brand header's height cap to images. `.zl-split__compact` is shared by the split designs' `<img>` logo and the hero design's `<p>` text fallback, so the 2.5rem cap meant for a logo clipped tenant-edited brand copy the moment it wrapped. Both image caps (2.5rem logo, 6rem hero banner) are now `img`-qualified so they resolve by source order, and the text fallback gets full width plus safe wrapping.
+
+  Documents and pins the host-page styling contract: a plain `zitadel-login { --zl-*: … }` rule in the embedding app's own stylesheet reaches the atoms' internal shadow roots and outranks both the design-system defaults and the tenant's server-side branding, per the CSS cascade's encapsulation-context step. No behaviour change — it already worked — but it is now a covered contract rather than an accident, which also fixes it in place as a constraint on how the orchestrator may express token defaults.
+
+- [#603](https://github.com/zitadel/nextgen/pull/603) [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c) Thanks [@fforootd](https://github.com/fforootd)! - Expose `--zl-page-min-height` so host pages can size the embedded login widget to content (`auto`) instead of the default full-viewport page shape; releases both the orchestrator mount and the `zl-page-shell` atom.
+
+- [#603](https://github.com/zitadel/nextgen/pull/603) [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c) Thanks [@fforootd](https://github.com/fforootd)! - Add the `hero` landing design, a mobile compact brand header for split-family designs, split layout knobs (`--zl-split-columns`, `--zl-split-align`, `--zl-split-brand-mobile`), and a warn-once console signal for missing text keys.
+
+- [#818](https://github.com/zitadel/nextgen/pull/818) [`310014f`](https://github.com/zitadel/nextgen/commit/310014f1ec8df441b161d12bb01658d27aa1f478) Thanks [@bastionstack](https://github.com/bastionstack)! - `theme="light"` now paints every part of the login surface, not just its resting colours. Hover, pressed and focus states on buttons, fields and selects re-theme with the mode, the card keeps a visible edge, and the attribution pill follows the light palette. Dark mode is unchanged.
+
+  Three semantic tokens carry the interactive states: `--zl-color-surface-hover-strong`, `--zl-color-surface-hover-subtle` and `--zl-color-border-hover`. Surfaces should reach for these rather than the raw `--zl-color-gray-*` ramp, which is mode-independent by design and keeps its dark shade on a light page.
+
+- [#603](https://github.com/zitadel/nextgen/pull/603) [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c) Thanks [@fforootd](https://github.com/fforootd)! - Ship a real light theme. The legacy `--zl-color-*` tokens the auth atoms consume are now authored as `{ dark, light }` pairs and emitted into the `[data-theme="light"]` block, so switching modes actually repaints surfaces, text, borders, icons, and the focus ring — previously that block only carried the shadcn namespace, and light mode resolved correctly while every surface stayed dark. `<zitadel-login>` gains a `theme` property (`light | dark | auto`); resolution runs element property → `branding.theme.mode` → variant default, where a `page` stays dark (the design system's primary surface) and an embedded `widget` follows `prefers-color-scheme` instead of forcing a dark card onto a light host page.
+
+- [#404](https://github.com/zitadel/nextgen/pull/404) [`ca91e8f`](https://github.com/zitadel/nextgen/commit/ca91e8f0368a59f9b96df2f380ec708b3b678f6c) Thanks [@vitorbari](https://github.com/vitorbari)! - Login flow: enforce required fields client-side and show inline errors on every control.
+  - Submit-type `<zl-button>` now delegates to the form, so the primary action
+    can't bypass validation; non-submit buttons keep emitting `zl-submit` for
+    ungated navigation (back, skip, passkey, sign-in/register switch).
+  - On submit the orchestrator checks the step's `required` fields via each atom's
+    live `formValue` (so autofill that skipped `input` events is still seen) and
+    surfaces an empty one through the server's own `error.<field>_required`
+    dialect — styled and localised exactly like a backend rejection, with no
+    native validation bubble. Checkboxes are excluded: a rendered checkbox always
+    submits a real boolean (`false` when unticked), so a must-accept boolean is a
+    schema concern (`const: true`), keeping browser and API clients aligned.
+  - Field errors render inline under every control type, not just email/password:
+    `<zl-select>` and `<zl-checkbox>` gained an `error` / `invalid` contract (with
+    React `Select` / `Checkbox` parity, including a generated fallback id so the
+    error stays wired to the control via `aria-describedby`). Selected values and
+    checkbox states survive an error re-render.
+
+- [#404](https://github.com/zitadel/nextgen/pull/404) [`ca91e8f`](https://github.com/zitadel/nextgen/commit/ca91e8f0368a59f9b96df2f380ec708b3b678f6c) Thanks [@vitorbari](https://github.com/vitorbari)! - Login flow: render and submit `select` and `checkbox` user-schema fields.
+  - The default template renders `select` / `checkbox` field types as
+    `<zl-select>` / `<zl-checkbox>`.
+  - `<zl-select>` / `<Select>` are agent-first: a real native `<select>` is the
+    operable, accessible, automatable control, with the Figma-styled trigger kept
+    as a pointer-only visual layer. Screen readers, keyboard users, password
+    managers and automation drivers can now pick an option (e.g. enum schema
+    fields during CLI-driven registration).
+  - The orchestrator captures every input atom through a uniform `formValue`
+    contract, so `<zl-select>` and `<zl-checkbox>` submit the right shape: a
+    checkbox as a real JSON boolean, a select as its chosen enum member, with
+    empty enum values omitted so an untouched optional select isn't rejected by
+    the server's enum check.
+  - The leading placeholder row drops any empty-valued member the schema enum
+    itself lists, so no duplicate empty option is rendered.
+  - The styled popup closes on `Escape` for pointer users (keyboard users already
+    get this from the native `<select>`).
+  - The `{% mandatory_gates %}` safety net recognises `<zl-select>` /
+    `<zl-checkbox>`, so a required select or checkbox no longer gets a duplicate
+    generic text field appended.
+
+- [#603](https://github.com/zitadel/nextgen/pull/603) [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c) Thanks [@fforootd](https://github.com/fforootd)! - Forward atom CSS Shadow Parts through `<zitadel-login>`: host pages can now restyle atom internals with `zitadel-login::part(<atom>-<part>)` (e.g. `field-input`, `button-root`); the mapping is derived from the atom manifests and stamped on every render, covering gate-patched atoms too.
+
+- [#593](https://github.com/zitadel/nextgen/pull/593) [`6394228`](https://github.com/zitadel/nextgen/commit/6394228f61426eed4bd28d0df781a98b42a9ac95) Thanks [@fforootd](https://github.com/fforootd)! - Security: update DOMPurify in `@zitadel/components` and gRPC in `@zitadel/server`, and refresh vulnerable workspace dependencies tracked by Dependabot.
+
+- [#660](https://github.com/zitadel/nextgen/pull/660) [`1395911`](https://github.com/zitadel/nextgen/commit/1395911519a40ceb4e06e8b68729376553d2768d) Thanks [@fforootd](https://github.com/fforootd)! - Update `liquidjs` to 10.27.2. 10.27.1 charges the `pop` filter against
+  `memoryLimit` (CVE-2026-55575); 10.27.2 extends that accounting to the
+  `join`, `json`, and `inspect` filters.
+
+- [#563](https://github.com/zitadel/nextgen/pull/563) [`41a2de2`](https://github.com/zitadel/nextgen/commit/41a2de240cb446cd12b438a442a55e7b90287e80) Thanks [@fforootd](https://github.com/fforootd)! - Tenant-customizable login templates land end to end (ADR 040): eject a
+  design, edit real Liquid, `plan`/`apply` publishes it, and the login
+  renders it.
+  - `@zitadel/server`: new Branding API (`POST /branding`,
+    `GET /branding`, `GET /branding/{id}`) storing immutable per-project
+    branding revisions with a lexical template gate (size, encoding,
+    `<script>`/`<style>`, inline handlers, `javascript:` URLs, `| raw`).
+    Flow responses now resolve the latest revision per project instead of
+    the hardcoded default.
+  - `@zitadel/api`: generated client and zod schemas for the Branding API.
+  - `@zitadel/config`: the authoritative LiquidJS template validator
+    (`@zitadel/config/template`), the `branding.json` config dialect
+    meta-schema, and the ejectable design catalog (`centered`, `split`,
+    `split-right`, `minimal`) with `getDefaultBrandingConfig`.
+  - `@zitadel/components`: split/minimal layout chrome for the design
+    catalog; the `{% mandatory_gates %}` tag name is now single-sourced
+    from `@zitadel/config/template`.
+  - `@zitadel/cli`: `.zitadel/branding/` becomes a synced resource — a
+    `branding.json` descriptor plus a sibling `login.liquid` the CLI
+    inlines on upload. `zitadel branding eject [--design <name>]`
+    scaffolds it, `zitadel setup --design <name>` does so at setup and
+    publishes revision 1, and `plan`/`apply` validate templates with the
+    authoritative validator and publish edits as new revisions.
+
+- [#603](https://github.com/zitadel/nextgen/pull/603) [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c) Thanks [@fforootd](https://github.com/fforootd)! - Flip `<zitadel-login>` to widget-first: the default `variant="widget"` is content-sized, transparent through every layer, injects no default font into the host document, and never steals focus on load — the embedding app owns the page. Dedicated login routes (hosted shell, scaffolded pages) opt into the previous full-page behavior with `variant="page"`. Split-family responsive chrome now keys off the widget's own width via container queries (baseline 2023 browsers), the hero design ships neutral placeholder copy instead of fabricated claims, and split tenants with only a `hero_url` keep a compact banner fallback on narrow widths.
+
+- [#716](https://github.com/zitadel/nextgen/pull/716) [`65da8b1`](https://github.com/zitadel/nextgen/commit/65da8b18b8a1af4e484d7cf494f8142f0539fb41) Thanks [@fforootd](https://github.com/fforootd)! - fix: `variant="widget"` no longer pads around the card. The internal page shell kept its full-page padding chrome (52px vertical at desktop widths) in widget mode, so `<zitadel-login>`/`<zitadel-session>` embedded in an app's own container rendered with dead space above and below the card — a 682px host around a 514px card. Widget mode now sheds the shell padding along with the background and viewport sizing it already dropped, making the host box hug the card as the content-sized embedding contract promises. The shipped `minimal` branding design sheds its pane padding the same way (it has no card, so that padding was page chrome too); the split designs' pane padding is part of their composition and intentionally stays. `variant="page"` is unchanged everywhere.
+
+- Updated dependencies [[`ff66683`](https://github.com/zitadel/nextgen/commit/ff66683eeb0daa3a12e7d11fed01076ac8c2ba58), [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c), [`d2bca36`](https://github.com/zitadel/nextgen/commit/d2bca36bdaa09168363e8e581cc4f0ef5db7eeb8), [`418457f`](https://github.com/zitadel/nextgen/commit/418457f7407c712f3ff02b30df014fbf12e03d23), [`1395911`](https://github.com/zitadel/nextgen/commit/1395911519a40ceb4e06e8b68729376553d2768d), [`41a2de2`](https://github.com/zitadel/nextgen/commit/41a2de240cb446cd12b438a442a55e7b90287e80), [`2cf426e`](https://github.com/zitadel/nextgen/commit/2cf426e0bbe9d27059d748f16272bd1674408dc0), [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c)]:
+  - @zitadel/config@0.1.0-alpha.18
+
+## 0.1.0-alpha.17
+
+### Patch Changes
+
+- [#544](https://github.com/zitadel/nextgen/pull/544) [`79d4179`](https://github.com/zitadel/nextgen/commit/79d417924518c9ea272136db1f46aaf237497999) Thanks [@fforootd](https://github.com/fforootd)! - Fixes from alpha.16 community feedback:
+  - Custom schema fields now render a readable label. A property with no
+    catalog entry (e.g. `department`, `dateOfBirth`) falls back to a
+    humanised name ("Department", "Date of birth") on the form instead of
+    leaking the raw `<step>.field.<name>` text key. A catalogued key still
+    wins, so localised labels are unaffected.
+  - The scaffolded `.zitadel/flows/README.md` no longer contains the
+    "Presets" section twice.
+  - The `warn/default-flow-swap` plan warning now leads with the impact in
+    plain language: the new flow becomes the default for its purposes, and
+    every page that does not explicitly set `flow-name` on
+    `<zitadel-login>` will start rendering it — scope it via `audience`
+    or pin `flow-name` to opt out.
+  - The flip-table validation error (login/register entry step missing its
+    `user_not_found`/`user_already_exists` transition) now explains who
+    gets stuck where: someone without an account would be stuck at
+    sign-in instead of being routed to registration, and vice versa. Plan,
+    apply, and the server report the same wording.
+
+- [#525](https://github.com/zitadel/nextgen/pull/525) [`363482e`](https://github.com/zitadel/nextgen/commit/363482e27c88ac96c9a2b48c880e5caa5a4dcf65) Thanks [@fforootd](https://github.com/fforootd)! - Every engine-emitted step error is now a localizable `error.*` catalog
+  key — no `auth_attempt.*` literals leak into the login UI anymore.
+  Rejected passkey proofs emit `error.passkey_invalid` (assertion) and
+  `error.passkey_registration_invalid` (attestation), translated in every
+  builtin locale; rejected password submissions emit the existing
+  `error.invalid_credentials`, which the login component routes inline to
+  the password field. The `step.error` contract docs now describe the
+  `error.*` catalog plus verbatim outcome tokens (e.g. `user_not_found`)
+  instead of citing `auth_attempt.*` diagnostics.
+
+- [#543](https://github.com/zitadel/nextgen/pull/543) [`a0b39a1`](https://github.com/zitadel/nextgen/commit/a0b39a119408a6fa02e8e1e45ebd5dd14b96c01b) Thanks [@fforootd](https://github.com/fforootd)! - Automation hooks for auth-method credential fields are now method-named,
+  matching what the docs have always promised: a flow field named
+  `x-auth-methods#password` renders `data-testid="zitadel-field-password"`
+  and `zitadel-input-password` instead of leaking the raw field name into
+  the hooks. The `name` attribute (the wire/form key) is unchanged.
+  Scripts that targeted the raw `zitadel-field-x-auth-methods#password`
+  form must switch to the documented method-named hooks.
+
+## 0.1.0-alpha.16
+
+### Patch Changes
+
+- [#495](https://github.com/zitadel/nextgen/pull/495) [`e4d55d2`](https://github.com/zitadel/nextgen/commit/e4d55d22c64d28a19597718417af6447a66a5852) Thanks [@fforootd](https://github.com/fforootd)! - Fix the duplicate "Continue with passkey" button: flow responses no longer embed a stale copy of the default login template. The login widget renders the up-to-date template bundled with `@zitadel/components`, which also brings checkbox/select field rendering and the empty-subtitle guard to real flows. A tenant-provided `branding.liquid_template` still takes precedence.
+
+- [#524](https://github.com/zitadel/nextgen/pull/524) [`e73d55f`](https://github.com/zitadel/nextgen/commit/e73d55f57e86db53464ac112f8a362a3da327a19) Thanks [@fforootd](https://github.com/fforootd)! - Flow field validation errors now travel as localisation keys instead of
+  developer strings: `step.error` carries `error.<field>_<rule>` per violation
+  ("; "-joined, format spelled `_invalid` to match the catalog), and the login
+  components localise them — catalog-known keys render inline on their field,
+  unknown fields resolve through new generic `error.field_<rule>` fallbacks
+  interpolated with the step's field label (en/de/it). A key routed inline whose
+  field is not on the step downgrades to a visible banner message instead of
+  disappearing. Users see "Please enter a valid email" instead of
+  "flow field email: format".
+
+- [#514](https://github.com/zitadel/nextgen/pull/514) [`1eec59e`](https://github.com/zitadel/nextgen/commit/1eec59ee924cc2b12df11f5541d6a2eef8caa6c2) Thanks [@fforootd](https://github.com/fforootd)! - Select a flow definition by name. `<zitadel-login>` gains a `flow-name`
+  attribute (`flowName` prop on every framework wrapper) that sends
+  `flow_definition_name` on flow start, so a project with several synced
+  flows can run a specific one instead of the audience-resolved default.
+  An unknown name or a purpose mismatch surfaces as a clear startup error
+  naming the attribute. Audience selection itself is now honored and
+  deterministic: hinted app beats hinted team beats the newest unscoped
+  flow, and a flow scoped to an app/team no longer captures the project
+  default. The flows README and plan/apply docs explain how to add and
+  select a second flow.
+
+  Because newest-unscoped-wins means a new flow can silently take over the
+  default login, `plan` warns on any create of an active, unscoped flow in
+  a project that already has flows (`warn/default-flow-swap`, a
+  non-blocking `# warning:` line and a `--json` warnings entry) — scope
+  the flow via `audience` or pin `flow-name` in the widget to opt out.
+  The offline dialect gains the committed `auth-methods`/`auth-method`
+  meta-schema copies that `user-schema.json` references, so editors
+  resolve the full dialect without network access.
+
+- [#496](https://github.com/zitadel/nextgen/pull/496) [`754c7f6`](https://github.com/zitadel/nextgen/commit/754c7f6d8b970438a5ffa2c5c57ef72a2b5ed657) Thanks [@fforootd](https://github.com/fforootd)! - Custom flow steps no longer render a raw `<step>.action.back` key on the back
+  button: the `| t` filter now falls back to a generic `action.back` entry
+  (shipped in en/de/it) when a step-specific key is missing. Step-specific keys
+  still win when defined.
+
+- [#497](https://github.com/zitadel/nextgen/pull/497) [`e9593cd`](https://github.com/zitadel/nextgen/commit/e9593cd4f74f5ebc010150a2ed8a3ae03b7d5d87) Thanks [@fforootd](https://github.com/fforootd)! - The passkey origin-allowlist rejection now names the allowed origins (e.g. `origin "http://127.0.0.1:3000" is not allowed for this project (allowed: http://localhost:3000)`), and `<zitadel-login>` surfaces the server's error message instead of a generic "returned 400". `@zitadel/api` exports the new `apiErrorMessage` helper for extracting the server error envelope from an `ApiError`.
+
+- [#524](https://github.com/zitadel/nextgen/pull/524) [`e73d55f`](https://github.com/zitadel/nextgen/commit/e73d55f57e86db53464ac112f8a362a3da327a19) Thanks [@fforootd](https://github.com/fforootd)! - The login form now shows a "Waiting for your passkey…" status with a Cancel
+  button while a WebAuthn ceremony is in flight; cancelling aborts the ceremony
+  and returns to the step with the fallback actions usable. Ceremony timeouts get
+  their own copy (`error.passkey_timeout`) instead of reading as cancellations,
+  and the cancelled copy no longer says "setup" for login ceremonies.
+  `<zl-passkey>` emits a new `zl-passkey-started` event and accepts
+  `pending-label`, `cancel-label`, and `silent` attributes. Step error banners
+  are dismissible and clear as soon as the user edits a field (the edited
+  field's inline error clears too); errors reappear only if the server
+  re-reports them.
+
+- [#500](https://github.com/zitadel/nextgen/pull/500) [`69b6b6a`](https://github.com/zitadel/nextgen/commit/69b6b6a0fa934cbbd81deba46192b3b1346612a8) Thanks [@fforootd](https://github.com/fforootd)! - `zitadel setup` now asks "How should users sign in?" and scaffolds the
+  matching schema+flow preset: `password-first` (today's default) or
+  `passkey-first` (a one-tap passkey on the login entry step with an
+  email → password fallback path, passkey-primary registration, and email
+  kept required so the fallback always works). Non-interactive and scripted
+  runs use `--preset`; the choice is recorded in `zitadel.json`. Presets are
+  named bundles under `@zitadel/config` (the mechanism behind app-type
+  selection, [#448](https://github.com/zitadel/nextgen/issues/448)) and are hygiene-tested: every bundle must pass the flow
+  validator and resolve every text key in every builtin locale.
+
+## 0.1.0-alpha.15
+
+### Patch Changes
+
+- [#486](https://github.com/zitadel/nextgen/pull/486) [`f45d47c`](https://github.com/zitadel/nextgen/commit/f45d47c5850edc83a55b5ad7364a59ffac4fd37c) Thanks [@fforootd](https://github.com/fforootd)! - Fix the default login template rendering two passkey buttons when the flow marks the passkey action as primary.
+
+## 0.1.0-alpha.14
+
+### Minor Changes
+
+- [#443](https://github.com/zitadel/nextgen/pull/443) [`ea193dc`](https://github.com/zitadel/nextgen/commit/ea193dc0fabdf3c49fa9c3e3bae4cf242001d630) Thanks [@bastionstack](https://github.com/bastionstack)! - Add a post-sign-in `<zitadel-session>` "signed in as" card: a dedicated element exposed through every SPA SDK and re-exported from sdk-next. CLI scaffolds now render it as the post-sign-in `/profile` page (with a Logout action) across all frameworks. Identity is read from `GET /sessions/me`, preferring `name` then `email` then `user_id`.
+
+  `<zitadel-logout>` now sources its identity from the same `getMySession` operation instead of the `__nextgen_display` cookie, so both signed-in surfaces work against the real backend. Both components route their `getMySession`/`revokeMySession` calls through the shared `api-client` wrappers that enforce `credentials: "include"`.
+
+### Patch Changes
+
+- [#453](https://github.com/zitadel/nextgen/pull/453) [`54dcc87`](https://github.com/zitadel/nextgen/commit/54dcc87084dd2d2b8314d08221354683bae64c6b) Thanks [@vitorbari](https://github.com/vitorbari)! - Add back navigation to interactive flows. The engine injects a `back` action on rendered step responses when there's a step to return to, and clears the back stack past irreversible mutations (user creation, passkey registration) and at flow termination.
+
+## 0.1.0-alpha.13
+
+### Patch Changes
+
+- [#417](https://github.com/zitadel/nextgen/pull/417) [`b574f3a`](https://github.com/zitadel/nextgen/commit/b574f3a6e6122439fadd6f971b73a61b8554f293) Thanks [@fforootd](https://github.com/fforootd)! - Label passkey registrations with collected identifiers and request discoverable credentials while keeping WebAuthn user handles opaque.
+
 ## 0.1.0-alpha.12
 
 ### Minor Changes

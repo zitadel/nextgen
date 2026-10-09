@@ -1,0 +1,6 @@
+title: ClaimCompletedPayload
+type: object
+description: Payload for `claim.completed` events.
+properties:
+  team_id:
+    type: string

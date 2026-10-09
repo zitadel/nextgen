@@ -313,10 +313,10 @@ components:
       name: projectId
       in: path
       required: true
-      description: Project identifier (e.g. `river-8421`).
+      description: Project identifier (e.g. `proj_01hexample`).
       schema:
         type: string
-        example: river-8421
+        example: proj_01hexample
 
   securitySchemes:
     secretAuth:
@@ -375,7 +375,7 @@ components:
             Stable for the lifetime of the project. Appears in dashboard /
             claim / scratch-dashboard paths — never as a user-facing origin
             in the default model.
-          example: "river-8421"
+          example: "proj_01hexample"
         project_secret:
           type: string
           description: |
@@ -410,7 +410,7 @@ components:
             Anonymous scratch dashboard for inspecting unclaimed project
             state. Path on `zitadel.dev`, keyed by slug. Session-based,
             browser-local.
-          example: "https://zitadel.dev/scratch/river-8421"
+          example: "https://zitadel.dev/scratch/proj_01hexample"
 
     ProjectResponse:
       type: object
@@ -480,7 +480,7 @@ components:
           description: |
             URL to open in the browser. Renders the claim page with
             GitHub / Google / email options.
-          example: "https://zitadel.cloud/claim/river-8421/abc123def456"
+          example: "https://zitadel.cloud/claim/proj_01hexample/abc123def456"
         challenge_id:
           type: string
           description: Short-lived challenge identifier. Default TTL 10 minutes.

@@ -1,0 +1,17 @@
+type: apiKey
+in: cookie
+name: __nextgen_session
+description: |
+  The __nextgen_session cookie issued at session creation or superseding handoff exchange.
+
+  A missing or invalid cookie yields `401` with code `auth.unauthorized` and the message
+  `Missing or invalid session token.`
+
+  Cross-site request forgery (ADR 053 §5): a state-changing request that this
+  cookie authenticates must come from the same origin — a cross-site browser
+  request is refused with `403` and code `auth.csrf_invalid`. Every such
+  request must also send the session's token from `GET /sessions/me/csrf` in the
+  `X-Zitadel-CSRF` header, or it answers the same `403`. The only exceptions are
+  sign-out (`revokeMySession`) and the `POST …/query` reads, which need no
+  token. Safe methods (`GET`) are not checked. A request a project secret
+  authenticates is not affected.

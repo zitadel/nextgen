@@ -5,57 +5,52 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
-func (h *Harness) EnsureCreateUserHandler(t *testing.T) *domain.FlowCreateUserHandler {
+func (h *Harness) EnsureCreateUserHandler(t *testing.T) *service.FlowCreateUserWithPasswordHandler {
 	t.Helper()
-	return domain.NewFlowCreateUserHandler(
-		idgen.NewULID(),
-		h.EnsureUserRepo(t),
-		h.EnsureUserPasswordRepo(t),
-		h.EnsureHasher(t),
+	return service.NewFlowCreateUserHandler(
+		h.EnsureProjectHashers(t),
+		h.EnsureUserService(t),
+		h.EnsureSchemaStore(t),
+		h.EnsureServiceDB(t),
 	)
 }
 
 func (h *Harness) EnsureFlowService(t *testing.T) service.FlowService {
 	t.Helper()
-	if h.FlowService == nil {
-		h.FlowService = service.NewFlowService(
-			h.EnsureDBPool(t),
-			h.EnsureFlowDefinitionRepo(t),
+	h.flowService.mutex.Lock()
+	defer h.flowService.mutex.Unlock()
+
+	if h.flowService.value == nil {
+		h.flowService.value = service.NewFlowService(
+			h.EnsureServiceDB(t),
 			h.EnsureFlowStateMachine(t),
-			idgen.NewULID(),
 		)
 	}
-	return h.FlowService
+	return h.flowService.value
 }
 
 func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineRuntime {
 	t.Helper()
-	if h.FlowStateMachine == nil {
-		fields := domain.NewSchemaFieldResolver()
-		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t))
-		passkeyRegSvc := service.NewPasskeyRegistrationService(
-			h.EnsureDBPool(t),
-			repository.NewPasskeyRegistrationRepository(),
-			h.EnsureUserPasskeyRepo(t),
-			idgen.NewULID(),
-		)
-		passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
-		h.FlowStateMachine = domain.NewFlowStateMachine(h.EnsureSchemaResolver(t), fields, h.EnsureCreateUserHandler(t), authAdapter, passkeyRegAdapter, time.Now)
-	}
-	return h.FlowStateMachine
-}
+	h.flowStateMachine.mutex.Lock()
+	defer h.flowStateMachine.mutex.Unlock()
 
-func (h *Harness) EnsureFlowDefinitionRepo(t *testing.T) domain.FlowDefinitionRepository {
-	t.Helper()
-	if h.FlowDefinitionRepo == nil {
-		h.FlowDefinitionRepo = repository.NewFlowDefinitionRepository(
-			h.EnsureDBPool(t),
+	if h.flowStateMachine.value == nil {
+		fields := domain.NewSchemaFieldResolver()
+		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t), h.EnsureSchemaStore(t))
+		h.flowStateMachine.value = domain.NewFlowStateMachine(
+			h.EnsureSchemaResolver(t),
+			h.EnsureSchemaStore(t),
+			fields,
+			h.EnsureCreateUserHandler(t),
+			authAdapter,
+			service.NewFlowSSOProviderResolver(h.EnsureIDPConnectionService(t)),
+			service.NewFlowSSOIdentityResolver(h.EnsureServiceDB(t), h.EnsureIDPConnectionService(t), h.EnsureUserService(t), h.EnsureSchemaStore(t)),
+			service.NewFlowSSORedirectIssuer(h.EnsureIDPConnectionService(t), h.EnsureAuthAttemptService(t), h.EnsureKeyService(t), h.EnsureVariableService(t), h.EnsureHttpClient(t)),
+			time.Now,
 		)
 	}
-	return h.FlowDefinitionRepo
+	return h.flowStateMachine.value
 }

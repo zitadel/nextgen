@@ -5,13 +5,41 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 type ReleaseArtifactsModule = {
+  buildServerBinaries: (options: {
+    repoRoot: string;
+    outDir: string;
+    version: string;
+    gitInfo: { commit: string; shortCommit: string; date: string };
+    platforms: Array<{ goos: string; goarch: string }>;
+    runCapture?: (
+      command: string,
+      args: string[],
+      options: { cwd: string },
+    ) => Promise<{ stdout: string }>;
+    run: (
+      command: string,
+      args: string[],
+      options: { cwd: string; env: NodeJS.ProcessEnv },
+    ) => Promise<void>;
+  }) => Promise<unknown>;
   containerTags: (input: { image?: string; version: string; prerelease: boolean }) => string[];
+  TAG_PRERELEASE_AS_LATEST: boolean;
   readServerRelease: (repoRoot: string) => Promise<{
     name: string;
     version: string;
     tag: string;
     prerelease: boolean;
   }>;
+  packPublicPackages: (options: {
+    repoRoot: string;
+    outDir: string;
+    version: string;
+    run?: (
+      command: string,
+      args: string[],
+      options: { cwd: string; env: NodeJS.ProcessEnv },
+    ) => Promise<void>;
+  }) => Promise<string>;
   stageServerNpmBinaries: (options: {
     repoRoot: string;
     outDir: string;
@@ -49,6 +77,44 @@ afterEach(async () => {
 });
 
 describe("release artifact helpers", () => {
+  it("stamps the runtime metadata package in release binaries", async () => {
+    const { buildServerBinaries } = await loadModule();
+    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-build-"));
+    tempDirs.push(repoRoot);
+    const calls: Array<{ command: string; args: string[] }> = [];
+
+    await buildServerBinaries({
+      repoRoot,
+      outDir: join(repoRoot, "dist/release/0.1.0-alpha.6"),
+      version: "0.1.0-alpha.6",
+      gitInfo: {
+        commit: "abcdef1234567890",
+        shortCommit: "abcdef123456",
+        date: "2026-06-16T00:00:00Z",
+      },
+      platforms: [{ goos: "linux", goarch: "amd64" }],
+      // The ldflags target package is verified via `go list` before any build.
+      runCapture: async () => ({ stdout: "github.com/zitadel/nextgen/internal/build\n" }),
+      run: async (command, args) => {
+        calls.push({ command, args });
+      },
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      command: "go",
+      args: [
+        "build",
+        "-trimpath",
+        "-ldflags",
+        "-s -w -X github.com/zitadel/nextgen/internal/build.version=0.1.0-alpha.6 -X github.com/zitadel/nextgen/internal/build.commit=abcdef1234567890 -X github.com/zitadel/nextgen/internal/build.date=2026-06-16T00:00:00Z",
+        "-o",
+        expect.stringMatching(/dist\/release\/0\.1\.0-alpha\.6\/build\/linux\/amd64\/nextgen$/),
+        ".",
+      ],
+    });
+  });
+
   it("reads the server npm package as the product version source", async () => {
     const { readServerRelease } = await loadModule();
     const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-server-package-"));
@@ -70,14 +136,25 @@ describe("release artifact helpers", () => {
     });
   });
 
-  it("only adds latest for stable container releases", async () => {
+  it("adds latest for stable container releases", async () => {
     const { containerTags } = await loadModule();
 
-    expect(containerTags({ version: "1.2.3-alpha.1", prerelease: true })).toEqual([
-      "ghcr.io/zitadel/nextgen:1.2.3-alpha.1",
-    ]);
     expect(containerTags({ version: "1.2.3", prerelease: false })).toEqual([
       "ghcr.io/zitadel/nextgen:1.2.3",
+      "ghcr.io/zitadel/nextgen:latest",
+    ]);
+  });
+
+  // Temporary, paired with TAG_PRERELEASE_AS_LATEST in release-artifacts.mjs:
+  // pre-GA there is no stable release to own `:latest`, so the alpha train
+  // carries it. Delete this and restore the prerelease case above when the flag
+  // goes back to false on `changeset pre exit`.
+  it("also adds latest for prereleases while the alpha train owns it", async () => {
+    const { containerTags, TAG_PRERELEASE_AS_LATEST } = await loadModule();
+
+    expect(TAG_PRERELEASE_AS_LATEST).toBe(true);
+    expect(containerTags({ version: "1.2.3-alpha.1", prerelease: true })).toEqual([
+      "ghcr.io/zitadel/nextgen:1.2.3-alpha.1",
       "ghcr.io/zitadel/nextgen:latest",
     ]);
   });
@@ -137,5 +214,68 @@ describe("release artifact helpers", () => {
         },
       }),
     ).rejects.toThrow("missing release artifacts");
+  });
+
+  it("rejects packing public packages before release build output exists", async () => {
+    const { packPublicPackages } = await loadModule();
+    const manifest = (await import(
+      new URL("../../../../../scripts/release-manifest.mjs", import.meta.url).href
+    )) as { PUBLIC_RELEASE_PACKAGES: Array<{ name: string; dir: string }> };
+    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-packages-"));
+    tempDirs.push(repoRoot);
+    const outDir = join(repoRoot, "dist/release/0.1.0-alpha.6");
+    for (const pkg of manifest.PUBLIC_RELEASE_PACKAGES) {
+      await mkdir(join(repoRoot, pkg.dir), { recursive: true });
+      await writeFile(
+        join(repoRoot, pkg.dir, "package.json"),
+        `${JSON.stringify({ license: "MIT", name: pkg.name, version: "0.1.0-alpha.6" }, null, 2)}\n`,
+      );
+    }
+
+    await expect(
+      packPublicPackages({
+        repoRoot,
+        outDir,
+        version: "0.1.0-alpha.6",
+        run: async () => undefined,
+      }),
+    ).rejects.toThrow(/requires .+\/dist before packing/);
+  });
+
+  it("packs the CLI release tarball", async () => {
+    const { packPublicPackages } = await loadModule();
+    const manifest = (await import(
+      new URL("../../../../../scripts/release-manifest.mjs", import.meta.url).href
+    )) as {
+      PUBLIC_RELEASE_PACKAGES: Array<{ name: string; dir: string; buildTarget?: string }>;
+    };
+    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-packages-"));
+    tempDirs.push(repoRoot);
+    const outDir = join(repoRoot, "dist/release/0.1.0-alpha.6");
+    for (const pkg of manifest.PUBLIC_RELEASE_PACKAGES) {
+      await mkdir(join(repoRoot, pkg.dir), { recursive: true });
+      if (pkg.buildTarget) {
+        await mkdir(join(repoRoot, pkg.dir, "dist"), { recursive: true });
+      }
+      await writeFile(
+        join(repoRoot, pkg.dir, "package.json"),
+        `${JSON.stringify({ license: "MIT", name: pkg.name, version: "0.1.0-alpha.6" }, null, 2)}\n`,
+      );
+    }
+
+    const calls: Array<{ args: string[]; env: NodeJS.ProcessEnv }> = [];
+    await packPublicPackages({
+      repoRoot,
+      outDir,
+      version: "0.1.0-alpha.6",
+      run: async (_command, args, options) => {
+        calls.push({ args, env: options.env });
+      },
+    });
+
+    // The CLI ships as a single generic build, so its pack is invoked like
+    // every other public package — no special telemetry-channel env.
+    const cliPack = calls.find((call) => call.args.includes("apps/cli"));
+    expect(cliPack).toBeDefined();
   });
 });

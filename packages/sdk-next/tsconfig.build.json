@@ -1,27 +1,12 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "./tsconfig.lib.json",
   "compilerOptions": {
-    "composite": false,
-    "rootDir": "src",
     "outDir": "dist",
-    "emitDeclarationOnly": false,
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "experimentalDecorators": true,
-    "jsx": "react-jsx",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"]
-  },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["src/**/*.spec.ts", "src/**/__tests__/**"],
-  "references": [
-    {
-      "path": "../sdk-core/tsconfig.lib.json"
-    },
-    {
-      "path": "../components/tsconfig.lib.json"
-    },
-    {
-      "path": "../api/tsconfig.lib.json"
-    }
-  ]
+    // The dist build resolves workspace dependencies through their built
+    // dist types (like a real consumer), not the "@zitadel/source" condition:
+    // source resolution would pull dependency .ts files into this program and
+    // violate rootDir. Requires dependency dist/ to exist — Moon's build task
+    // graph guarantees that.
+    "customConditions": []
+  }
 }

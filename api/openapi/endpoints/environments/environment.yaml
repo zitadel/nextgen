@@ -1,0 +1,43 @@
+title: Environment
+description: |
+  A runtime slot on a project (ADR 035).
+
+  Identity plus what runs there: `current_deployment` names the release the
+  environment currently runs. The deployment history lives at
+  `GET /deployments`; environment lifecycle (create, rename, retire) arrives
+  with its own ADR. Until then every project is seeded with a fixed set of
+  environments at creation and the set cannot be changed.
+type: object
+required:
+  - id
+  - project_id
+  - name
+  - created_at
+  - current_deployment
+properties:
+  id:
+    readOnly: true
+    type: string
+    description: The opaque, immutable resource id.
+    example: env_01KX3RG8A7F0N9WD3P2E4YM5C1
+  project_id:
+    readOnly: true
+    description: The project this environment is a runtime slot of.
+    $ref: ../../components/schemas/project-id.yaml
+  name:
+    readOnly: true
+    $ref: ../../components/schemas/environment-name.yaml
+  created_at:
+    readOnly: true
+    type: string
+    format: date-time
+    description: When the environment was created.
+    example: '2026-07-01T00:00:00Z'
+  current_deployment:
+    readOnly: true
+    description: |
+      The deployment this environment currently runs, or `null` while nothing
+      has been deployed to it yet.
+    oneOf:
+      - $ref: current-deployment.yaml
+      - type: 'null'

@@ -12,8 +12,19 @@
  */
 import type { CreateFlow201, CreateFlow201Step } from "@zitadel/api/generated/model";
 
-import { signHandoffToken } from "../crypto.js";
+import { signHandoffToken, toBase64url } from "../crypto.js";
 import type { StoredCredential } from "../lib/authn/index.js";
+
+/**
+ * The field name every credential step uses: the schema pointer into the user
+ * schema's `x-auth-methods`, exactly as the real server emits it
+ * (`packages/config/defaults/default-login.json`).
+ *
+ * Load-bearing, not cosmetic — the server answers `req.invalid` to a submit
+ * keyed on plain `password`, so a mock using the short name would let the
+ * orchestrator send a key the real backend refuses with no test noticing.
+ */
+export const PASSWORD_FIELD = "x-auth-methods#password";
 
 export type StepFixtureInput = {
   flowId: string;
@@ -52,14 +63,18 @@ export type StepFixtureInput = {
  * browser's keychain from conflating credentials belonging to different users.
  */
 function emailToUserHandle(email: string): string {
-  return Buffer.from(email).toString("base64url");
+  return toBase64url(new TextEncoder().encode(email));
 }
 
 /**
  * Wrap a step shape in the standard {@link CreateFlow201} envelope.
  * All fixtures delegate to this helper so the session fields stay consistent.
  */
-function wrap(input: StepFixtureInput, step: CreateFlow201Step, extras?: Partial<CreateFlow201>): CreateFlow201 {
+function wrap(
+  input: StepFixtureInput,
+  step: CreateFlow201Step,
+  extras?: Partial<CreateFlow201>,
+): CreateFlow201 {
   return {
     id: input.flowId,
     session_id: "sess_mock",
@@ -70,33 +85,49 @@ function wrap(input: StepFixtureInput, step: CreateFlow201Step, extras?: Partial
 }
 
 /**
- * Combined sign-in card — Figma 2xl `6593:141983`, card `6593:141985`,
- * stack `6593:141989` (email + password + forgot + CTAs on one step).
+ * `step.identifier` for a step that collects the password on its own: the
+ * address captured earlier, or nothing when the step was reached without one
+ * (an SSO flow that skipped the identifier step). Which steps carry it is the
+ * caller's business — only {@link passwordStep} and
+ * {@link registerPasswordStep} ask.
+ */
+function collectedIdentifier(input: StepFixtureInput): CreateFlow201Step["identifier"] | undefined {
+  if (!input.capturedEmail) return undefined;
+  return { value: input.capturedEmail, autocomplete: "username" };
+}
+
+/**
+ * Identifier step — collects the email only, then hands off to
+ * {@link passwordStep}.
  *
- * Matches the Flow API shape in `docs/design/flowengine/flow-engine.md`
- * (single `login` step with `fields: [email, password]`).
+ * Mirrors the real default login flow
+ * (`packages/config/defaults/default-login.json`, embedded into the server via
+ * `configdefaults.DefaultLoginFlowDefinition()`): the credential is **not**
+ * collected here. This step used to serve a combined email+password card, which
+ * meant every consumer of this mock was exercising a screen the server never
+ * emits; see this package's AGENTS.md.
+ *
+ * `register` is real: the default flow declares it as a navigate action whose
+ * transition re-purposes to register (alongside the engine's `user_not_found`
+ * fallback). `recover` remains the one mock-only affordance on this step — the
+ * default defines no recovery step yet, and the screen is kept reachable for
+ * Storybook and tests. `default-conformance.spec.ts` enforces that split.
  */
 export function identifierStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "identifier",
-    texts: { title_key: "identifier.title" },
+    texts: { title_key: "identifier.title", description_key: "identifier.description" },
     fields: [
       {
         name: "email",
         type: "email",
         text_key: "identifier.field.email",
-        required: true,
-      },
-      {
-        name: "password",
-        type: "password",
-        text_key: "identifier.field.password",
+        autocomplete: "username",
         required: true,
       },
     ],
     actions: [
-      { name: "submit", kind: "submit", text_key: "submit.signin", primary: true },
-      { name: "passkey", kind: "passkey", text_key: "identifier.action.passkey" },
+      { name: "submit", kind: "submit", text_key: "identifier.action.continue", primary: true },
       { name: "register", kind: "navigate", text_key: "identifier.action.register.link" },
       { name: "recover", kind: "navigate", text_key: "action.forgot_password" },
     ],
@@ -108,12 +139,13 @@ export function identifierStep(input: StepFixtureInput): CreateFlow201 {
 export function registerStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "register",
-    texts: { title_key: "register.title" },
+    texts: { title_key: "register.title", description_key: "register.description" },
     fields: [
       {
         name: "email",
         type: "email",
         text_key: "register.field.email",
+        autocomplete: "username",
         required: true,
       },
       {
@@ -150,7 +182,6 @@ export function registerStep(input: StepFixtureInput): CreateFlow201 {
     ],
     actions: [
       { name: "submit", kind: "submit", text_key: "register.action.password", primary: true },
-      { name: "passkey_register", kind: "passkey_register", text_key: "register.action.passkey" },
       { name: "sign_in", kind: "navigate", text_key: "register.action.sign_in.link" },
     ],
     gates: {},
@@ -160,6 +191,10 @@ export function registerStep(input: StepFixtureInput): CreateFlow201 {
 /**
  * Register-password step — second step in the two-step registration flow.
  * Collects the password after the user has entered their profile fields.
+ *
+ * Keyed by {@link PASSWORD_FIELD} for the same reason as {@link passwordStep}:
+ * the real flow definition declares `x-auth-methods#password` here too, and the
+ * server rejects the short name.
  */
 export function registerPasswordStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
@@ -170,41 +205,58 @@ export function registerPasswordStep(input: StepFixtureInput): CreateFlow201 {
     },
     fields: [
       {
-        name: "password",
+        name: PASSWORD_FIELD,
         type: "password",
         text_key: "register-password.field.password",
+        autocomplete: "new-password",
         required: true,
         validation: { min_length: 8 },
       },
     ],
+    identifier: collectedIdentifier(input),
     actions: [
-      { name: "submit", kind: "submit", text_key: "register-password.action.submit", primary: true },
+      {
+        name: "submit",
+        kind: "submit",
+        text_key: "register-password.action.submit",
+        primary: true,
+      },
+      { name: "back", kind: "back", text_key: "action.back" },
     ],
     gates: {},
   });
 }
 
 /**
- * Password-only step — legacy split-credential screen kept for tests that
- * target it directly. Not reachable from any `START` transition in the normal
- * flow; the happy path goes `identifier → passkey-upsell` directly.
+ * Password step — the second half of the split sign-in, reached from
+ * {@link identifierStep} and where invalid credentials surface.
+ *
+ * The field name is the schema pointer `x-auth-methods#password`, exactly as the
+ * real server emits it (`packages/config/defaults/default-login.json`). This is
+ * load-bearing, not cosmetic: the server rejects a submit keyed on plain
+ * `password` with `req.invalid`, so a mock that used the short name let the
+ * orchestrator submit a key the real backend refuses without any test noticing.
+ *
+ * The real engine also injects a `back` action here (ADR 022), which the flow
+ * definition itself does not list.
  */
 export function passwordStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "password",
-    texts: { title_key: "password.title" },
+    texts: { title_key: "password.title", description_key: "password.description" },
     fields: [
       {
-        name: "password",
+        name: PASSWORD_FIELD,
         type: "password",
         text_key: "password.field.password",
+        autocomplete: "current-password",
         required: true,
       },
     ],
+    identifier: collectedIdentifier(input),
     actions: [
-      { name: "submit", kind: "submit", text_key: "submit.signin", primary: true },
-      { name: "passkey", kind: "passkey", text_key: "password.action.passkey" },
-      { name: "register", kind: "navigate", text_key: "password.action.register.link" },
+      { name: "submit", kind: "submit", text_key: "password.action.signin", primary: true },
+      { name: "back", kind: "back", text_key: "action.back" },
     ],
     gates: {},
   });
@@ -223,9 +275,7 @@ export function recoverStep(input: StepFixtureInput): CreateFlow201 {
       description_key: "recover.description",
     },
     fields: [],
-    actions: [
-      { name: "submit", kind: "navigate", text_key: "recover.action.back", primary: true },
-    ],
+    actions: [{ name: "submit", kind: "navigate", text_key: "recover.action.back", primary: true }],
     gates: {},
   });
 }
@@ -240,7 +290,12 @@ export function passkeyUpsellStep(input: StepFixtureInput): CreateFlow201 {
     texts: { title_key: "passkey-upsell.title" },
     fields: [],
     actions: [
-      { name: "setup", kind: "passkey_register", text_key: "passkey-upsell.action.setup", primary: true },
+      {
+        name: "setup",
+        kind: "passkey_register",
+        text_key: "passkey-upsell.action.setup",
+        primary: true,
+      },
       { name: "skip", kind: "navigate", text_key: "passkey-upsell.action.skip" },
     ],
     gates: {},
@@ -259,9 +314,7 @@ export function passkeySetupStep(input: StepFixtureInput): CreateFlow201 {
     name: "passkey-setup",
     texts: { title_key: "passkey-upsell.title" },
     fields: [],
-    actions: [
-      { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
-    ],
+    actions: [{ name: "submit", kind: "submit", text_key: "submit.continue", primary: true }],
     gates: {},
     challenge: {
       method: "passkey",
@@ -344,9 +397,7 @@ export function passkeyLoginStep(input: StepFixtureInput): CreateFlow201 {
  * TODO: thread `ssoProviderId` from the machine context through to a computed
  * redirect URL so each provider gets a distinct mock destination.
  */
-export function ssoRedirectStep(
-  input: StepFixtureInput & { redirectUrl?: string },
-): CreateFlow201 {
+export function ssoRedirectStep(input: StepFixtureInput & { redirectUrl?: string }): CreateFlow201 {
   return wrap(input, {
     name: "sso-redirect",
     texts: { title_key: "sso.redirect.title" },
@@ -354,6 +405,60 @@ export function ssoRedirectStep(
     actions: [],
     gates: {},
     redirect_url: input.redirectUrl ?? "https://idp.mock.invalid/authorize",
+  });
+}
+
+/**
+ * A new external identity, collecting what the provider did not supply.
+ *
+ * The provider returns an email, so the field this asks for is the name the
+ * schema wants and Google's claim does not always carry. Its submit is the
+ * flow's `create_user_with_sso`; `sign_in` goes back rather than registering.
+ */
+export function registerSsoStep(input: StepFixtureInput): CreateFlow201 {
+  return wrap(input, {
+    name: "register-sso",
+    texts: { title_key: "register-sso.title", description_key: "register-sso.description" },
+    fields: [
+      { name: "given_name", type: "text", text_key: "register.field.givenName", required: true },
+      { name: "family_name", type: "text", text_key: "register.field.familyName", required: true },
+    ],
+    actions: [
+      { name: "submit", kind: "submit", text_key: "register-sso.action.submit", primary: true },
+      { name: "sign_in", kind: "navigate", text_key: "register.action.sign_in.link" },
+    ],
+    gates: {},
+  });
+}
+
+/**
+ * The provider's email already has an account here.
+ *
+ * It offers the methods that prove the user owns that account rather than
+ * minting a second one for the same email. The password field and the passkey
+ * action are both present in the mock: the real step offers only what the
+ * schema enables, which is the tenant's schema to decide and not something the
+ * fixture can know.
+ */
+export function ssoConflictStep(input: StepFixtureInput): CreateFlow201 {
+  return wrap(input, {
+    name: "sso-conflict",
+    texts: { title_key: "sso-conflict.title", description_key: "sso-conflict.description" },
+    fields: [
+      {
+        name: "password",
+        type: "password",
+        text_key: "password.field.password",
+        autocomplete: "current-password",
+        required: true,
+      },
+    ],
+    actions: [
+      { name: "submit", kind: "submit", text_key: "sso-conflict.action.submit", primary: true },
+      { name: "passkey", kind: "passkey", text_key: "sso-conflict.action.passkey" },
+      { name: "sign_in", kind: "navigate", text_key: "sso-conflict.action.sign_in" },
+    ],
+    gates: {},
   });
 }
 

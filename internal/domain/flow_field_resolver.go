@@ -7,12 +7,10 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 )
 
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_field_resolver.mock.go . FlowFieldResolver
-
 // FlowFieldResolver maps property names referenced by a flow step to
 // fully-resolved [FlowField] payloads, surfaces the implicit transition
-// outcomes the schema implies (a property with `x-unique` set implies a
-// `user_not_found` outcome), and validates submitted values against the
+// outcomes the schema implies (the designated `x-identifier` property
+// implies a `user_not_found` outcome), and validates submitted values against the
 // schema-derived rules.
 //
 // The contract is shaped to the user meta-schema at
@@ -28,6 +26,12 @@ type FlowFieldResolver interface {
 	// Validate checks submitted values against the rules carried by a
 	// previously resolved field set.
 	Validate(fields FlowResolvedFields, values map[string]any) error
+
+	// MissingRequired reports the required fields absent from values.
+	// Applied only on field-collecting actions (the submit action and the
+	// passkey-register issue leg); other actions legitimately submit a
+	// subset of fields or none.
+	MissingRequired(fields FlowResolvedFields, values map[string]any) FlowFieldValidationErrors
 }
 
 // FlowResolvedFields is the output of [FlowFieldResolver.Resolve].
@@ -40,24 +44,34 @@ type FlowResolvedFields struct {
 	// field contributes, keyed by field name. The state machine uses it
 	// to validate flow definitions and route schema-derived transitions.
 	ImplicitOutcomes map[string][]string
+
+	// IdentifierName is the property the schema designates as the
+	// identifier (`x-identifier`), whether or not this step collects it.
+	// Empty when the schema designates nothing.
+	IdentifierName string
 }
 
 // FlowField is the resolved per-field metadata.
 type FlowField struct {
-	// Name is the user-schema property name this field collects.
+	// Name is the user-schema property this field collects, as a dotted
+	// path for a nested property (`address.street`).
 	Name string
 
 	// Type is the UI input kind the client should render. It is
 	// derived from the property's JSON `type` and `format` in the user
-	// meta-schema. The property's `x-password: true` annotation forces
-	// a password input regardless of `format`.
+	// meta-schema. The reserved `x-auth-methods#<method>` field name
+	// forces the input kind matching that credential method
+	// (e.g. `x-auth-methods#password` → password).
 	Type FlowFieldType
 
 	// TextKey is a localization key for the field label (e.g.
 	// `field.email`). Resolved client-side via the `| t` filter.
 	TextKey string
 
-	// Required reflects membership in the schema's top-level `required` array.
+	// Required reflects membership in the schema's `required` array at
+	// every level of the field's path: a nested leaf is required only
+	// when each of its ancestors is required too, matching what schema
+	// validation accepts for the document as a whole.
 	Required bool
 
 	// Value is an optional pre-fill (e.g. an identifier carried over
@@ -74,33 +88,38 @@ type FlowField struct {
 	// per-attribute uniqueness scope on storage.
 	Unique AttributeUniqueness
 
+	// Autocomplete is the HTML autofill token for this field's input, or
+	// empty when none applies. See [AutocompleteForField].
+	Autocomplete string
+
 	// Challenge names the auth-attempt challenge the field maps to, or
 	// [FlowFieldChallengeNone] when the field carries neither an
-	// identifier nor a credential proof. Derivation paths: a non-empty
-	// `x-unique` annotation on the property surfaces as
-	// [FlowFieldChallengeIdentifier] (any uniquely-keyed property can
-	// identify a user); `x-password: true` combined with schema-level
-	// `x-auth-methods.password.enabled = true` surfaces as
-	// [FlowFieldChallengePassword]. Other credential kinds (passkey,
-	// magic_link, sso, otp) do not have user-property-shaped proofs and
-	// are produced by the state machine as challenge steps, not by the
-	// resolver. The state machine consults Challenge on submit to route
-	// the value — identifier fields drive identifier resolution (and
-	// the `user_not_found` implicit outcome), password fields drive the
-	// password challenge.
+	// identifier nor a credential proof. Derivation paths: the field
+	// naming the schema's designated identifier (the schema-root
+	// `x-identifier` path, ADR 058) surfaces as
+	// [FlowFieldChallengeIdentifier]; the reserved `x-auth-methods#password` field
+	// name combined with `x-auth-methods.password.enabled = true` at
+	// the schema root surfaces as [FlowFieldChallengePassword]. Other
+	// credential kinds (passkey, magic_link, sso, otp) do not have
+	// field-shaped proofs and are produced by the state machine as
+	// challenge steps, not by the resolver. The state machine consults
+	// Challenge on submit to route the value — identifier fields drive
+	// identifier resolution (and the `user_not_found` implicit outcome),
+	// password fields drive the password challenge.
 	Challenge FlowFieldChallenge
 }
 
 // FlowFieldChallenge names the auth-attempt challenge a field maps
 // to. Values mirror the keys of `x-auth-methods` in the user
 // meta-schema (api/openapi/endpoints/schemas/user-schema.yaml).
-// `identifier` is sourced from a non-empty `x-unique` scope on the
-// property; `password` is sourced from `x-password` on the property
-// combined with `x-auth-methods.password.enabled` at the schema root.
-// The remaining credential values (passkey, magic_link, sso, otp) have
-// no user-property-shaped proof and are produced by the state machine
-// as challenge steps rather than by the resolver. Empty means the
-// field maps to no challenge.
+// `identifier` is sourced from the schema-root `x-identifier`
+// designation; `password` is sourced from the reserved
+// `x-auth-methods#password` field name combined with
+// `x-auth-methods.password.enabled` at the schema root. The remaining
+// credential values (passkey, magic_link, sso, otp) have no
+// field-shaped proof and are produced by the state machine as
+// challenge steps rather than by the resolver. Empty means the field
+// maps to no challenge.
 type FlowFieldChallenge string
 
 const (
@@ -113,6 +132,47 @@ const (
 	FlowFieldChallengeOTP        FlowFieldChallenge = "otp"
 )
 
+// HTML autofill tokens the engine puts on [FlowField.Autocomplete].
+const (
+	AutocompleteUsername        = "username"
+	AutocompleteCurrentPassword = "current-password"
+	AutocompleteNewPassword     = "new-password"
+)
+
+// passwordAutocomplete is the token a password field carries under each
+// purpose: signing in asks for the password the user already has, registering
+// and recovering ask them to choose one. It describes what the form asks for,
+// not what the engine does with the value — dispatch decides that on its own
+// terms, so neither tracks the other.
+//
+// Mapped one purpose at a time, deliberately. An unlisted purpose yields no
+// token rather than inheriting a default, so reauth cannot tell a password
+// manager to generate a replacement for the password it is asking the user
+// to confirm. A journey that collects a password adds its entry here.
+var passwordAutocomplete = map[FlowDefinitionPurpose]string{
+	FlowDefinitionPurposeLogin:    AutocompleteCurrentPassword,
+	FlowDefinitionPurposeRegister: AutocompleteNewPassword,
+	FlowDefinitionPurposeRecovery: AutocompleteNewPassword,
+}
+
+// AutocompleteForField returns the autofill token for a resolved field under
+// the given purpose, or "" when none applies.
+//
+// The identifier always takes [AutocompleteUsername], whatever its type. That
+// is the token a password manager pairs with a password; `email` means contact
+// information, so an email-typed identifier tagged with it would describe the
+// same value two different ways across an identifier step and a password step
+// and weaken the pairing the tokens exist to establish.
+func AutocompleteForField(f FlowField, purpose FlowDefinitionPurpose) string {
+	switch f.Challenge {
+	case FlowFieldChallengeIdentifier:
+		return AutocompleteUsername
+	case FlowFieldChallengePassword:
+		return passwordAutocomplete[purpose]
+	}
+	return ""
+}
+
 // FlowFieldValidation carries the validation rules the resolver
 // surfaces to the client and enforces on submit. Each field maps to a
 // user meta-schema keyword on [user-property.yaml]:
@@ -121,6 +181,7 @@ const (
 //   - MinLength ↔ `minLength`
 //   - MaxLength ↔ `maxLength`
 //   - Enum      ↔ `enum` (closed set of allowed string values)
+//   - Const     ↔ `const` (property pinned to a fixed value)
 //
 // Zero values mean "no rule". JSON Schema's `pattern` keyword is not
 // part of the user meta-schema and is intentionally not surfaced.
@@ -129,6 +190,12 @@ type FlowFieldValidation struct {
 	MinLength int
 	MaxLength int
 	Enum      []string
+
+	// Const, when non-nil, pins the property to a fixed value (JSON
+	// Schema `const`) of any type — e.g. a must-accept checkbox uses
+	// `const: true`. A differing submission is reported as
+	// [FlowFieldValidationRuleFormat].
+	Const any
 }
 
 // FlowFieldType names the input kind the client should render. Mirrors
@@ -151,7 +218,11 @@ const (
 )
 
 // FlowFieldValidationRule names a schema-derived validation rule the
-// resolver enforces.
+// resolver enforces. Each rule doubles as the key suffix of the wire
+// dialect (see [FlowFieldValidationError.TextKey]), so a new rule also
+// needs a generic `error.field_<rule>` catalog entry and a suffix
+// mapping in the client's `localiseFlowErrorKeys`
+// (packages/components/src/orchestrator/liquid.ts).
 type FlowFieldValidationRule string
 
 const (
@@ -173,6 +244,23 @@ func (e FlowFieldValidationError) Error() string {
 	return "flow field " + e.Field + ": " + string(e.Rule)
 }
 
+// TextKey returns the client-facing localisation key for the violation:
+// `error.<field>_<rule>`, with the format rule aliased to `_invalid` —
+// the text catalog's existing spelling (`error.email_invalid`). Field
+// names are used verbatim, credential shape included
+// (`error.x-auth-methods#password_required`): tenant schemas keep field
+// naming open, so clients resolve unknown keys through generic
+// `error.field_<rule>` fallbacks instead of a closed catalog — see
+// `localiseFlowErrorKeys` in
+// packages/components/src/orchestrator/liquid.ts.
+func (e FlowFieldValidationError) TextKey() string {
+	suffix := string(e.Rule)
+	if e.Rule == FlowFieldValidationRuleFormat {
+		suffix = "invalid"
+	}
+	return "error." + e.Field + "_" + suffix
+}
+
 // FlowFieldValidationErrors collects rule violations. Returned as
 // `error` by [FlowFieldResolver.Validate].
 type FlowFieldValidationErrors []FlowFieldValidationError
@@ -185,11 +273,34 @@ func (e FlowFieldValidationErrors) Error() string {
 	return strings.Join(parts, "; ")
 }
 
+// StepError renders the violations for the wire `step.error` field: one
+// [FlowFieldValidationError.TextKey] per violation, joined with "; ".
+// Clients split on the joiner and localise each key. Error() stays the
+// Go-side diagnostic ("flow field email: required") for logs and
+// wrapped errors.
+func (e FlowFieldValidationErrors) StepError() string {
+	parts := make([]string, len(e))
+	for i, err := range e {
+		parts[i] = err.TextKey()
+	}
+	return strings.Join(parts, "; ")
+}
+
 // FlowImplicitOutcomeUserNotFound drives the login → register flip.
 const FlowImplicitOutcomeUserNotFound = "user_not_found"
 
 // FlowImplicitOutcomeUserAlreadyExists drives the register → login flip.
 const FlowImplicitOutcomeUserAlreadyExists = "user_already_exists"
+
+// FlowImplicitOutcomeSSOUserNotFound drives the login → register flip when
+// SSO resolution finds no user for the provider's subject. Raised only by
+// SSO resolution, never by a typed identifier, so a shared entry step can
+// route the two apart.
+const FlowImplicitOutcomeSSOUserNotFound = "sso_user_not_found"
+
+// FlowImplicitOutcomeSSOAuthenticated is raised when SSO resolution binds the
+// attempt to a user. A step offering sso_providers must route it.
+const FlowImplicitOutcomeSSOAuthenticated = "sso_authenticated"
 
 // implicitOutcomesByChallenge lists the transition outcomes a field
 // contributes by virtue of its [FlowFieldChallenge]. New mappings
@@ -219,3 +330,9 @@ var ErrFlowFieldUnknown = errors.New("flow field: not a property in the user sch
 // reduced to X and does not trigger this error; any other multi-entry
 // union does.
 var ErrFlowFieldUnsupportedType = errors.New("flow field: unsupported JSON type")
+
+// ErrFlowFieldNotScalar is returned by [FlowFieldResolver.Resolve] when a
+// field names an object- or array-typed property. An object is collected
+// one leaf at a time through its dotted path (`address.street`); an array
+// has no field-shaped input.
+var ErrFlowFieldNotScalar = errors.New("flow field: not a scalar property, name a nested leaf instead")

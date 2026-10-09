@@ -3,6 +3,7 @@
   "schema_uri": "https://nextgen.com/flow-definition.json",
   "flow_definition": {
     "name": "passkey-register",
+    "status": "active",
     "user_schema": "${USER_SCHEMA_URL}",
     "purposes": {
       "register": "signup"

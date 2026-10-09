@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
@@ -80,7 +81,7 @@ describe("setup command pre-flight", () => {
     expect(json.hint).toContain("--framework");
   });
 
-  it("still requires --framework in non-interactive local setup after runtime start", async () => {
+  it("reports a non-empty dir and points at --force when runtime start left .zitadel behind", async () => {
     const cwd = await makeTempDir();
     const serverUrl = await startHealthServer();
     await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
@@ -99,7 +100,9 @@ describe("setup command pre-flight", () => {
     const json = parseJson(res.stdout) as { status: string; code: string; hint?: string };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_FRAMEWORK_NOT_DETECTED");
-    expect(json.hint).toContain("--framework");
+    // `.zitadel/local` from `start` makes the directory non-empty, so the empty
+    // check stops here and points at --force rather than at --framework.
+    expect(json.hint).toContain("--force");
   });
 
   it("keeps the framework in local-runtime-missing setup guidance", async () => {
@@ -130,8 +133,141 @@ describe("setup command pre-flight", () => {
     expect(json.hint).toContain("Start local Zitadel first");
     expect(json.next_commands).toEqual([
       expectedPublicCliCommand("start"),
-      expectedPublicCliCommand("setup --framework next --server local"),
+      expectedPublicCliCommand("setup --framework next --non-interactive --server local"),
     ]);
+  });
+
+  it("offers an sso retry that can actually be run", async () => {
+    // The retry goes into next_commands, which an agent runs verbatim. With
+    // --sso and --non-interactive the CLI reads the secret from stdin, and a
+    // command handed over as text has none -- so advertising that combination
+    // is advertising a command that fails on sight.
+    const cwd = await makeTempDir();
+    await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "^15" } }));
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--framework",
+      "next",
+      "--server",
+      "local",
+      "--sso",
+      "google",
+      "--sso-client-id",
+      "1234-abc.apps.googleusercontent.com",
+      "--non-interactive",
+      "--json",
+    ]);
+
+    const json = parseJson(res.stdout) as { code: string; hint?: string; next_commands?: string[] };
+    expect(json.code).toBe("E_LOCAL_SERVER_NOT_RUNNING");
+    const retry = (json.next_commands ?? []).find((c) => c.includes("setup "));
+    expect(retry).toContain("--sso google");
+    expect(retry).not.toContain("--non-interactive");
+    // And it says why, so the scripted path is still reachable -- naming both
+    // credentials, since the retry carries neither.
+    expect(json.hint).toContain("asks for the client id and secret");
+    expect(json.hint).toContain("--sso-client-id");
+  });
+
+  // Recovery commands configure the project setup was pointed at, not the
+  // shell's own directory, and they carry no `--cwd` -- a path can hold spaces
+  // and metacharacters, and nothing escapes a suggested command for a shell.
+  // So the guidance names the directory instead.
+  it("names the project directory when it is not the shell's own", async () => {
+    const cwd = await makeTempDir();
+    await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "^15" } }));
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--framework",
+      "next",
+      "--server",
+      "local",
+      "--json",
+    ]);
+
+    const json = parseJson(res.stdout) as { hint?: string; next_commands?: string[] };
+    expect(json.hint).toContain(cwd);
+    // Named in prose, never as an argument a shell would split.
+    for (const command of json.next_commands ?? []) {
+      expect(command).not.toContain("--cwd");
+    }
+  });
+
+  // The suggested retry carries `--sso` without `--sso-client-id`, since the id
+  // is never put in command text. Following that retry and hitting the same
+  // failure again must not drop the provider from the next suggestion -- the
+  // developer would be told to set up without the provider they asked for.
+  it("keeps the provider in the retry when only --sso was given", async () => {
+    const cwd = await makeTempDir();
+    await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "^15" } }));
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--framework",
+      "next",
+      "--server",
+      "local",
+      "--sso",
+      "google",
+      "--json",
+    ]);
+
+    const json = parseJson(res.stdout) as { next_commands?: string[]; hint?: string };
+    const retry = (json.next_commands ?? []).find((c) => c.includes("setup "));
+    expect(retry).toContain("--sso google");
+    // And the scripted route names both flags, because a rerun with --sso and
+    // --non-interactive alone fails on the missing client id before stdin is
+    // ever read.
+    expect(json.hint).toContain("--sso-client-id");
+  });
+
+  // Suggested commands are run verbatim, especially by agents, and nothing
+  // escapes them for a shell. The wizard accepts any non-empty client id, so a
+  // value carrying a space or a metacharacter would split the command or
+  // change what it does. No id is interpolated into command text at all --
+  // the rerun asks for it, as it already does for the secret.
+  it("keeps the client id out of every suggested command", async () => {
+    const cwd = await makeTempDir();
+    await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "^15" } }));
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--framework",
+      "next",
+      "--server",
+      "local",
+      "--sso",
+      "google",
+      "--sso-client-id",
+      "id with spaces; echo pwned",
+      "--non-interactive",
+      "--json",
+    ]);
+
+    const json = parseJson(res.stdout) as { next_commands?: string[]; hint?: string };
+    for (const command of json.next_commands ?? []) {
+      expect(command).not.toContain("id with spaces");
+      expect(command).not.toContain("echo pwned");
+    }
+    expect(json.hint ?? "").not.toContain("echo pwned");
+    // The provider still reaches the retry; only the id is withheld.
+    const retry = (json.next_commands ?? []).find((c) => c.includes("setup "));
+    expect(retry).toContain("--sso google");
+    expect(retry).not.toContain("--sso-client-id");
   });
 
   it("explains non-empty dirs whose framework can't be inferred or scaffolded", async () => {
@@ -160,8 +296,9 @@ describe("setup command pre-flight", () => {
     };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_FRAMEWORK_NOT_DETECTED");
-    expect(json.message).toContain("not a fresh scaffold target");
-    expect(json.hint).toContain("Directory contains README.md");
+    expect(json.message).toContain("is not empty");
+    expect(json.hint).toContain("README.md");
+    expect(json.hint).toContain("--force");
     expect(json.details.entries).toContain("README.md");
   });
 
@@ -185,7 +322,53 @@ describe("setup command pre-flight", () => {
       "--skip-install",
     ]);
 
-    expect(res.exitCode).toBe(3);
+    expect(res.exitCode).toBe(4);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      code: string;
+      hint?: string;
+      message: string;
+      next_commands?: string[];
+    };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_NOT_FOUND");
+    expect(json.message).toContain("has no such endpoint");
+    // The retry pins the resolved dev port: the issuer registered with the
+    // project derives from it, so the rerun must reproduce it verbatim.
+    expect(json.hint).toContain(
+      "--framework next --dev-port 3000 --non-interactive --server local",
+    );
+    expect(json.next_commands).toEqual([
+      expectedPublicCliCommand("start"),
+      expectedPublicCliCommand(
+        "setup --framework next --dev-port 3000 --non-interactive --server local",
+      ),
+    ]);
+  });
+
+  it("keeps the sign-in preset in cloud-failure retry guidance", async () => {
+    const cwd = await makeTempDir();
+    await mkdir(join(cwd, "app"), { recursive: true });
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
+    );
+    const serverUrl = await startNotFoundServer();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--preset",
+      "passkey-first",
+      "--server",
+      serverUrl,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
+
+    expect(res.exitCode).toBe(4);
     const json = parseJson(res.stdout) as {
       status: string;
       code: string;
@@ -193,12 +376,230 @@ describe("setup command pre-flight", () => {
       next_commands?: string[];
     };
     expect(json.status).toBe("error");
-    expect(json.code).toBe("E_VALIDATION");
-    expect(json.hint).toContain("--framework next --server local");
+    // Following the printed retry verbatim must reproduce the requested
+    // sign-in preset, not silently fall back to the default.
+    expect(json.hint).toContain("--preset passkey-first");
     expect(json.next_commands).toEqual([
       expectedPublicCliCommand("start"),
-      expectedPublicCliCommand("setup --framework next --server local"),
+      expectedPublicCliCommand(
+        "setup --framework next --preset passkey-first --dev-port 3000 --non-interactive --server local",
+      ),
     ]);
+  });
+
+  it("sends a project name in create-project payload", async () => {
+    const cwd = await makeTempDir();
+    await mkdir(join(cwd, "app"), { recursive: true });
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
+    );
+    const capture = await startCreateProjectCaptureServer();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--server",
+      capture.url,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(capture.body).toBeTruthy();
+    expect(capture.body).toMatchObject({
+      name: expect.any(String),
+      preview_origins: expect.arrayContaining([expect.any(String)]),
+      seed_defaults: false,
+    });
+    const projectName = capture.body?.name;
+    expect(typeof projectName).toBe("string");
+    if (typeof projectName !== "string") {
+      throw new Error("expected create-project payload name to be a string");
+    }
+    expect(projectName.trim().length).toBeGreaterThan(0);
+  });
+
+  it("writes no login template and publishes no branding revision (#1039)", async () => {
+    const cwd = await makeTempDir();
+    await mkdir(join(cwd, "app"), { recursive: true });
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
+    );
+    const capture = await startCreateProjectCaptureServer();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--server",
+      capture.url,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      warnings: string[];
+      data: Record<string, unknown> & { files_written: string[]; next_actions: string[] };
+    };
+    expect(json.status).toBe("ok");
+    expect(json.warnings).toEqual([]);
+    // Setup only gets authentication working: the login renders the
+    // maintained component, so nothing under .zitadel/branding/ is written
+    // and no branding revision is created on the platform.
+    expect(existsSync(join(cwd, ".zitadel/branding"))).toBe(false);
+    expect(json.data.files_written.some((file) => file.includes(".zitadel/branding/"))).toBe(false);
+    expect(capture.requests).not.toContain("POST /branding");
+    // The envelope no longer carries a design, and the look guidance must not
+    // claim a revision is live.
+    expect(json.data).not.toHaveProperty("design");
+    const guidance = json.data.next_actions.join("\n");
+    expect(guidance).not.toMatch(/revision 1/i);
+    expect(guidance).toContain("branding eject");
+  });
+});
+
+describe("setup --design removal (#1039)", () => {
+  it("--help no longer offers a login design", async () => {
+    const res = await runCliForTest(["setup", "--help"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).not.toContain("--design");
+  });
+
+  it("rejects --design with a targeted hint, before any project is created", async () => {
+    const cwd = await makeTempDir();
+    const capture = await startCreateProjectCaptureServer();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--design",
+      "split",
+      "--server",
+      capture.url,
+      "--non-interactive",
+      "--json",
+    ]);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as {
+      code: string;
+      message: string;
+      hint: string;
+      next_commands: string[];
+    };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("no longer applies a login template");
+    expect(json.hint).toContain("--zl-*");
+    expect(json.next_commands.join("\n")).toContain("branding eject");
+    expect(capture.requests).toEqual([]);
+    expect(existsSync(join(cwd, ".zitadel"))).toBe(false);
+  });
+});
+
+describe("setup --sso flags", () => {
+  it("refuses a provider with no client id before touching the directory", async () => {
+    const cwd = await makeTempDir();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--sso",
+      "google",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { status: string; code: string; message?: string };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("--sso-client-id");
+  });
+
+  it("refuses a client id with no provider", async () => {
+    const cwd = await makeTempDir();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--sso-client-id",
+      "1234-abc.apps.googleusercontent.com",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { status: string; code: string };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+  });
+
+  it("rejects a provider the catalog does not know", async () => {
+    const cwd = await makeTempDir();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--sso",
+      "myspace",
+      "--sso-client-id",
+      "abc",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+  });
+});
+
+describe("setup --renderer surface", () => {
+  it("--help advertises only implemented renderers", async () => {
+    const res = await runCliForTest(["setup", "--help"]);
+
+    expect(res.exitCode).toBe(0);
+    // oclif renders the flag's `options` as `<options: a|b>`; a renderer that
+    // getRenderer would reject with E_NOT_IMPLEMENTED must not be offered as
+    // a selectable value, only mentioned as not yet available (ADR 006).
+    // Whitespace is collapsed because oclif wraps help text mid-sentence.
+    const help = res.stdout.replace(/\s+/g, " ");
+    expect(res.stdout).toContain("<options: react>");
+    expect(help).not.toContain("react|web-component");
+    expect(help).toContain("Not yet available: web-component.");
+  });
+
+  it("rejects a declared-but-unpublished renderer at parse time", async () => {
+    const cwd = await makeTempDir();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--renderer",
+      "web-component",
+      "--non-interactive",
+      "--json",
+    ]);
+
+    // Fails during flag parsing — before any remote project is created. The
+    // registry's E_NOT_IMPLEMENTED path still guards renderer ids read from
+    // persisted config (see the renderer registry unit tests).
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { status: string; code: string; message: string };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("web-component");
   });
 });
 
@@ -221,9 +622,9 @@ async function startHealthServer(): Promise<string> {
 
 async function startNotFoundServer(): Promise<string> {
   const server = createServer((_req, res) => {
-    res.writeHead(404, { "content-type": "application/json" }).end(
-      JSON.stringify({ message: "not found" }),
-    );
+    res
+      .writeHead(404, { "content-type": "application/json" })
+      .end(JSON.stringify({ message: "not found" }));
   });
   servers.push(server);
   await new Promise<void>((resolve) => server.listen(0, "localhost", () => resolve()));
@@ -232,6 +633,69 @@ async function startNotFoundServer(): Promise<string> {
     throw new Error("not-found server did not expose a TCP address");
   }
   return `http://localhost:${String(address.port)}`;
+}
+
+async function startCreateProjectCaptureServer(): Promise<{
+  url: string;
+  body: Record<string, unknown> | null;
+  requests: string[];
+}> {
+  let body: Record<string, unknown> | null = null;
+  const requests: string[] = [];
+  const server = createServer(async (req, res) => {
+    const path = new URL(req.url ?? "/", "http://localhost").pathname;
+    requests.push(`${req.method ?? "GET"} ${path}`);
+    if (req.method === "POST" && path === "/projects") {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+      }
+      body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "proj_test",
+          name: "demo",
+          project_secret: "sk_proj_test_full",
+          preview_secret: "sk_proj_test_preview",
+          preview_origins: [],
+          created_at: "2026-06-01T00:00:00.000Z",
+        }),
+      );
+      return;
+    }
+    if (req.method === "POST" && path === "/schemas") {
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "sch_test",
+          created_at: "2026-06-01T00:00:00.000Z",
+        }),
+      );
+      return;
+    }
+    if (req.method === "POST" && path === "/flow_definitions") {
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "flow_test",
+          created_at: "2026-06-01T00:00:00.000Z",
+        }),
+      );
+      return;
+    }
+    res.writeHead(404).end();
+  });
+  servers.push(server);
+  await new Promise<void>((resolve) => server.listen(0, "localhost", () => resolve()));
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("capture server did not expose a TCP address");
+  }
+  return {
+    url: `http://localhost:${String(address.port)}`,
+    get body() {
+      return body;
+    },
+    requests,
+  };
 }
 
 function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {

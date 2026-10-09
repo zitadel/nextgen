@@ -3,16 +3,22 @@ titleOnly: true
 
 # Allowed types — the PR title type must be one of these.
 # This list is the single source of truth referenced by AGENTS.md and CONTRIBUTING.md.
+#
+# The gloss on each type says WHO the change reaches, because that — not how much
+# work the PR was — is what picks the type. `feat` and `fix` land in release notes
+# read by people using our SDKs and products, so a change that ships nothing to
+# them is never `feat` or `fix`; `scripts/check-pr-title.mjs` enforces that in CI.
+# How to choose, with worked examples: CONTRIBUTING.md#title-format.
 types:
-  - feat # new feature
-  - fix # bug fix
-  - docs # documentation only (no code change)
-  - refactor # code restructuring without behaviour change
-  - perf # performance improvement
-  - test # adding or fixing tests
-  - build # build system or tooling
+  - feat # new capability a user of the SDKs, CLI, API, console, or login UI can reach
+  - fix # corrects shipped behavior a user could have hit
+  - docs # documentation in this repo — not content that ships inside a package
+  - refactor # restructures shipped code without changing what a user gets
+  - perf # shipped code gets faster or lighter, same behavior
+  - test # tests and test harnesses; nothing a user installs
+  - build # build system, packaging, or release wiring
   - ci # CI/CD pipeline
-  - chore # maintenance (deps, config, etc.)
+  - chore # repo maintenance that changes nothing a user receives
   - revert # reverts a previous commit
 
 # Allowed scopes — if a scope is provided it must match one of these.

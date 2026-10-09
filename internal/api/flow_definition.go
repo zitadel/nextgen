@@ -5,14 +5,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"slices"
+	"strings"
 
-	"github.com/muhlemmer/gu"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
 func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDefinitionRequest) (api.CreateFlowDefinitionRes, error) {
+	if err := h.requireProjectAccess(ctx, string(req.GetProjectID()), flowDefinitionAccess, opWrite); err != nil {
+		return nil, err
+	}
 	svcReq, err := mapCreateRequestToService(req)
 	if err != nil {
 		return nil, err
@@ -23,52 +27,106 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 		return nil, err
 	}
 
-	return flowDefinitionDetailResponse(flowDefinition), nil
+	return flowDefinitionResponse(flowDefinition), nil
 }
 
 func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefinitionParams) (api.GetFlowDefinitionRes, error) {
-	definition, err := h.flowDefinitionService.Get(ctx, string(params.ProjectID), params.ID)
+	projectID, err := h.requireResourceAccess(ctx, params.ID, flowDefinitionAccess, opRead)
 	if err != nil {
 		return nil, err
 	}
-	return flowDefinitionDetailResponse(definition), nil
+	definition, err := h.flowDefinitionService.Get(ctx, projectID, params.ID)
+	if err != nil {
+		return nil, err
+	}
+	return flowDefinitionResponse(definition), nil
 }
 
 func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDefinitionsParams) (api.ListFlowDefinitionsRes, error) {
+	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), flowDefinitionAccess, domain.ResourceKindFlowDefinition)
+	if err != nil {
+		return nil, err
+	}
 	svcReq := mapListRequestToService(params)
 
-	definitions, err := h.flowDefinitionService.List(ctx, svcReq)
+	listed, err := h.flowDefinitionService.List(ctx, svcReq)
 	if err != nil {
 		return nil, err
 	}
-	respDefinitions := make([]api.FlowDefinitionResponse, 0, len(definitions))
-	for _, def := range definitions {
-		respDefinitions = append(respDefinitions, flowDefinitionResponse(def))
+	respDefinitions := make([]api.FlowDefinitionResponse, 0, len(listed.Items))
+	for _, def := range listed.Items {
+		respDefinitions = append(respDefinitions, *flowDefinitionResponse(def))
 	}
-	return &api.FlowDefinitionListResponse{FlowDefinitions: respDefinitions}, nil
-}
-
-func (h Handler) UpdateFlowDefinition(ctx context.Context, req *api.FlowDefinitionUpdateRequest, params api.UpdateFlowDefinitionParams) (api.UpdateFlowDefinitionRes, error) {
-	svcReq, err := mapUpdateRequestToService(params, req)
-	if err != nil {
-		return nil, err
+	if slices.Contains(params.Expand, api.FlowDefinitionExpandUserSchema) {
+		if err := h.expandUserSchemas(ctx, string(params.ProjectID), respDefinitions); err != nil {
+			return nil, err
+		}
 	}
-
-	flowDefinition, err := h.flowDefinitionService.Update(ctx, svcReq)
-	if err != nil {
-		return nil, err
+	resp := &api.FlowDefinitionListResponse{FlowDefinitions: respDefinitions}
+	if listed.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(listed.NextPageToken))
 	}
-
-	resp := flowDefinitionDetailResponse(flowDefinition)
 	return resp, nil
 }
 
-func (h Handler) DeleteFlowDefinition(ctx context.Context, params api.DeleteFlowDefinitionParams) (api.DeleteFlowDefinitionRes, error) {
-	err := h.flowDefinitionService.Delete(ctx, string(params.ProjectID), params.ID)
+// expandUserSchemas embeds each listed flow definition's user schema
+// (ADR 059: hydrate, never join — one batched query keyed on the page's
+// distinct schema ids, after the flow query ran, so ordering and page
+// tokens stay untouched).
+//
+// The schema kind gets its own authz stamp first: the flow-definition list
+// consumed the one-shot Allow skip, and reading schemas embedded must gate
+// exactly like reading them at GET /schemas (a caller without schema read
+// access gets an error, not a silently missing property).
+func (h Handler) expandUserSchemas(ctx context.Context, projectID string, definitions []api.FlowDefinitionResponse) error {
+	ctx, _, err := h.requireProjectListAccess(ctx, projectID, schemaAccess, domain.ResourceKindSchema)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return &api.DeleteFlowDefinitionNoContent{}, nil
+
+	seen := make(map[string]struct{}, len(definitions))
+	ids := make([]string, 0, len(definitions))
+	for _, def := range definitions {
+		id := def.FlowDefinition.UserSchema
+		if _, dup := seen[id]; dup || id == "" {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+
+	byID := make(map[string]*api.Schema, len(ids))
+	if len(ids) > 0 {
+		// One batched query suffices: the generated validation caps the flow
+		// page at the shared list maximum (limit defaults to 20, tops out at
+		// 100), so a page can never reference more distinct schemas than one
+		// schema query of the same maximum returns. If either cap ever moves
+		// independently, chunk this loop instead.
+		schemas, err := h.schemaService.ListSchemas(ctx, service.ListSchemasInput{
+			ProjectID: projectID,
+			IDs:       ids,
+			Limit:     len(ids),
+		})
+		if err != nil {
+			return err
+		}
+		for _, schema := range schemas.Items {
+			apiSchema, err := domainSchemaToApiSchema(schema)
+			if err != nil {
+				return err
+			}
+			byID[schema.URL] = apiSchema
+		}
+	}
+
+	for i := range definitions {
+		if schema, ok := byID[definitions[i].FlowDefinition.UserSchema]; ok {
+			definitions[i].UserSchema.SetTo(*schema)
+		} else {
+			definitions[i].UserSchema.SetToNull()
+		}
+	}
+	return nil
 }
 
 /* ---------------- CONVERTERS ---------------- */
@@ -76,33 +134,11 @@ func (h Handler) DeleteFlowDefinition(ctx context.Context, params api.DeleteFlow
 /* API request to service/domain converters */
 func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.FlowDefinitionRequest, error) {
 	definition := req.GetFlowDefinition()
-
-	// set the default status to active if not provided
-	status := api.FlowDefinitionStatusActive
-	if s, ok := definition.GetStatus().Get(); ok && s != "" {
-		status = s
-	}
-	return mapFlowDefinitionRequestToService(string(req.GetProjectID()), req.GetSchemaURI(), req.GetFlowDefinition(), string(status))
-}
-
-func mapUpdateRequestToService(params api.UpdateFlowDefinitionParams, req *api.FlowDefinitionUpdateRequest) (service.FlowDefinitionRequest, error) {
-	definition := req.GetFlowDefinition()
-	status := string(definition.GetStatus().Value)
-	svcReq, err := mapFlowDefinitionRequestToService(string(params.ProjectID), req.GetSchemaURI(), definition, status)
-	if err != nil {
-		return svcReq, err
-	}
-	svcReq.FlowDefinitionID = params.ID
-	return svcReq, nil
-}
-
-func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchemaURI, definition api.FlowDefinition, status string) (service.FlowDefinitionRequest, error) {
-	userSchemaURI := definition.GetUserSchema()
 	svcReq := service.FlowDefinitionRequest{
-		ProjectID:     projectID,
+		ProjectID:     string(req.GetProjectID()),
 		Name:          definition.GetName(),
-		UserSchema:    userSchemaURI.String(),
-		Status:        status,
+		UserSchema:    definition.GetUserSchema(),
+		Status:        strings.ToLower(string(definition.GetStatus())),
 		SchemaVersion: "1.0.0", // todo (grvijayan): find a way to set this based on the schema URI or the request (currently not set in the request)
 	}
 
@@ -112,7 +148,7 @@ func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchema
 	}
 	svcReq.Purposes = purposes
 
-	reqFlowSchemaURI, ok := schemaURI.Get()
+	reqFlowSchemaURI, ok := req.GetSchemaURI().Get()
 	if ok {
 		u := (url.URL)(reqFlowSchemaURI)
 		svcReq.FlowSchemaURI = u.String()
@@ -132,25 +168,21 @@ func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchema
 			Name:   step.GetName(),
 			Fields: domain.FieldsFromStrings(step.GetFields()),
 		}
-		// actions — preserve the nil-vs-empty distinction so an explicit `[]`
-		// (deliberately no actions, e.g. terminal-step shape) survives the
-		// round-trip distinct from an omitted field (engine-default behavior).
-		if apiActions := step.GetActions(); apiActions != nil {
-			actions := make([]domain.FlowStepAction, 0, len(apiActions))
-			for _, apiAction := range apiActions {
-				kind, err := domain.FlowActionKindString(string(apiAction.GetKind()))
-				if err != nil {
-					return svcReq, fmt.Errorf("step %q: action %q has invalid kind %q: %w", step.GetName(), apiAction.GetName(), apiAction.GetKind(), err)
-				}
-				actions = append(actions, domain.FlowStepAction{
-					Name:    apiAction.GetName(),
-					Kind:    kind,
-					Primary: apiAction.GetPrimary().Value,
-					TextKey: apiAction.GetTextKey().Value,
-				})
+		// actions
+		actions := make([]domain.FlowStepAction, 0, len(step.GetActions()))
+		for _, apiAction := range step.GetActions() {
+			kind, err := domain.FlowActionKindString(string(apiAction.GetKind()))
+			if err != nil {
+				return svcReq, fmt.Errorf("step %q: action %q has invalid kind %q: %w", step.GetName(), apiAction.GetName(), apiAction.GetKind(), err)
 			}
-			s.Actions = actions
+			actions = append(actions, domain.FlowStepAction{
+				Name:    apiAction.GetName(),
+				Kind:    kind,
+				Primary: apiAction.GetPrimary().Value,
+				TextKey: apiAction.GetTextKey().Value,
+			})
 		}
+		s.Actions = actions
 
 		// gates
 		if step.GetGates().IsSet() {
@@ -174,31 +206,32 @@ func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchema
 			s.Gates = gates
 		}
 
-		// sso providers
-		ssoProviders := make([]domain.FlowSSOProvider, 0, len(step.GetSSOProviders()))
-		for _, ssoProvider := range step.GetSSOProviders() {
-			s := domain.FlowSSOProvider{
-				ID:       ssoProvider.GetID(),
-				Name:     ssoProvider.GetName(),
-				Template: ssoProvider.GetTemplate(),
-			}
-			ssoProviders = append(ssoProviders, s)
-		}
-		s.SSOProviders = ssoProviders
+		// sso providers: connection slugs, stored as given
+		s.SSOProviders = slices.Clone(step.GetSSOProviders())
 
 		// transitions
 		if step.GetTransitions().IsSet() {
 			transitions := make(map[string]domain.FlowStepTransition, len(step.GetTransitions().Value))
 			for name, apiTransition := range step.GetTransitions().Value {
+				// Get() is false for both absent and explicit-null values;
+				// IsSet() alone would map an explicit `null` to the zero
+				// enum. Non-null strings are enum-validated by the
+				// generated request decoder.
 				var transitionAction *domain.FlowDefinitionTransitionAction
-				if apiTransition.Action.IsSet() {
-					a, _ := domain.FlowDefinitionTransitionActionString(string(apiTransition.GetAction().Value)) // validated in the domain
+				if value, ok := apiTransition.Action.Get(); ok {
+					a, _ := domain.FlowDefinitionTransitionActionString(string(value))
 					transitionAction = &a
+				}
+				var transitionPurpose *domain.FlowDefinitionPurpose
+				if value, ok := apiTransition.Purpose.Get(); ok {
+					p, _ := domain.FlowDefinitionPurposeString(string(value))
+					transitionPurpose = &p
 				}
 
 				t := domain.FlowStepTransition{
-					Action: transitionAction,
-					Target: apiTransition.GetTarget(),
+					Action:  transitionAction,
+					Purpose: transitionPurpose,
+					Target:  apiTransition.GetTarget(),
 				}
 				transitions[name] = t
 			}
@@ -230,15 +263,19 @@ func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchema
 
 func mapListRequestToService(params api.ListFlowDefinitionsParams) service.ListFlowDefinitionsRequest {
 	req := service.ListFlowDefinitionsRequest{
-		ProjectID: string(params.ProjectID),
+		ProjectID:             string(params.ProjectID),
+		LatestRevisionPerName: params.Revisions.Value == api.ListFlowDefinitionsRevisionsLatest,
 	}
 	purpose, ok := params.Purpose.Get()
 	if ok {
 		req.Purpose = string(purpose)
 	}
+	if name, ok := params.Name.Get(); ok {
+		req.Name = name
+	}
 	limit, ok := params.Limit.Get()
 	if ok {
-		req.Limit = limit
+		req.Limit = int(limit)
 	}
 	pageToken, ok := params.PageToken.Get()
 	if ok {
@@ -249,40 +286,27 @@ func mapListRequestToService(params api.ListFlowDefinitionsParams) service.ListF
 
 /* domain to API response converters */
 
-func flowDefinitionResponse(flowDefinition *domain.FlowDefinition) api.FlowDefinitionResponse {
-	return api.FlowDefinitionResponse{
-		ID:        flowDefinition.ID,
-		Name:      flowDefinition.Name,
-		ProjectID: flowDefinition.ProjectID,
-		CreatedAt: flowDefinition.CreatedAt,
-		UpdatedAt: flowDefinition.UpdatedAt,
-		Status:    api.FlowDefinitionStatus(flowDefinition.Status.String()),
-	}
-}
-
-func flowDefinitionDetailResponse(flowDefinition *domain.FlowDefinition) *api.FlowDefinitionDetailResponse {
+func flowDefinitionResponse(flowDefinition *domain.FlowDefinition) *api.FlowDefinitionResponse {
 	purposes := mapDomainPurposesToAPI(flowDefinition.Purposes)
 	audience := api.OptFlowAudience{
 		Value: api.FlowAudience{
-			TeamIds: flowDefinition.Audience.TeamIDs,
-			AppIds:  flowDefinition.Audience.AppIDs,
+			TeamIds: nilIfEmpty(flowDefinition.Audience.TeamIDs),
+			AppIds:  nilIfEmpty(flowDefinition.Audience.AppIDs),
 		},
 		Set: true,
 	}
 	steps := mapDomainStepsToAPI(flowDefinition.Steps)
 
-	userSchemaURI, _ := url.Parse(flowDefinition.UserSchema)
-
-	return &api.FlowDefinitionDetailResponse{
+	return &api.FlowDefinitionResponse{
 		ID:        flowDefinition.ID,
 		ProjectID: flowDefinition.ProjectID,
-		Status:    api.FlowDefinitionStatus(flowDefinition.Status.String()),
 		FlowDefinition: api.FlowDefinition{
 			Name:       flowDefinition.Name,
+			Status:     api.FlowDefinitionStatus(flowDefinition.Status.String()),
 			Steps:      steps,
 			Purposes:   purposes,
 			Audience:   audience,
-			UserSchema: gu.Value(userSchemaURI),
+			UserSchema: flowDefinition.UserSchema,
 		},
 		CreatedAt: flowDefinition.CreatedAt,
 		UpdatedAt: flowDefinition.UpdatedAt,
@@ -304,8 +328,6 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 		actions := mapActionsToAPI(step.Actions)
 		// gates
 		gates := mapGatesToAPI(step.Gates)
-		// sso providers
-		ssoProviders := mapSSOProvidersToAPI(step.SSOProviders)
 		// transitions
 		transitions := mapTransitionsToAPI(step.Transitions)
 
@@ -315,13 +337,13 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 		}
 		apiStep := api.FlowDefinitionStep{
 			Name:    step.Name,
-			Fields:  domain.FieldsToStrings(step.Fields),
+			Fields:  nilIfEmpty(domain.FieldsToStrings(step.Fields)),
 			Actions: actions,
 			Gates: api.OptFlowDefinitionStepGates{
 				Value: gates,
 				Set:   gates != nil,
 			},
-			SSOProviders: ssoProviders,
+			SSOProviders: nilIfEmpty(step.SSOProviders),
 			Transitions: api.OptFlowDefinitionStepTransitions{
 				Value: transitions,
 				Set:   transitions != nil,
@@ -340,11 +362,21 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 	return steps
 }
 
+// Storage drops empty collections on write, so responses built from the
+// request entity must drop them too or create/update would answer a
+// different document than get/list.
+func nilIfEmpty[T any](s []T) []T {
+	if len(s) == 0 {
+		return nil
+	}
+	return s
+}
+
 // mapActionsToAPI preserves the nil-vs-empty distinction so a stored flow
 // definition's explicit `[]` round-trips back to the client as `[]` (not
 // omitted), keeping sync/diff tooling honest.
 func mapActionsToAPI(domainActions []domain.FlowStepAction) []api.StepAction {
-	if domainActions == nil {
+	if len(domainActions) == 0 {
 		return nil
 	}
 	actions := make([]api.StepAction, 0, len(domainActions))
@@ -375,6 +407,10 @@ func mapTransitionsToAPI(domainTransitions map[string]domain.FlowStepTransition)
 		if transition.Action != nil {
 			action = transition.Action.String()
 		}
+		var purpose string
+		if transition.Purpose != nil {
+			purpose = transition.Purpose.String()
+		}
 		transitions[n] = api.FlowDefinitionStepTransitionsItem{
 			Target: transition.Target,
 			Action: api.OptNilFlowDefinitionStepTransitionsItemAction{
@@ -382,24 +418,14 @@ func mapTransitionsToAPI(domainTransitions map[string]domain.FlowStepTransition)
 				Set:   transition.Action != nil,
 				Null:  transition.Action == nil,
 			},
+			Purpose: api.OptNilFlowDefinitionStepTransitionsItemPurpose{
+				Value: api.FlowDefinitionStepTransitionsItemPurpose(purpose),
+				Set:   transition.Purpose != nil,
+				Null:  transition.Purpose == nil,
+			},
 		}
 	}
 	return transitions
-}
-
-func mapSSOProvidersToAPI(domainSSOProviders []domain.FlowSSOProvider) []api.SSOProvider {
-	if len(domainSSOProviders) == 0 {
-		return nil
-	}
-	ssoProviders := make([]api.SSOProvider, 0, len(domainSSOProviders))
-	for _, ssoProvider := range domainSSOProviders {
-		ssoProviders = append(ssoProviders, api.SSOProvider{
-			ID:       ssoProvider.ID,
-			Name:     ssoProvider.Name,
-			Template: ssoProvider.Template,
-		})
-	}
-	return ssoProviders
 }
 
 func mapGatesToAPI(domainGates map[string]domain.FlowStepGate) map[string]api.Gate {

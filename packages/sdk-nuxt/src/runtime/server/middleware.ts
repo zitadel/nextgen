@@ -185,12 +185,11 @@ async function proxyRequest(
 
   const upstreamHeaders = buildUpstreamHeaders(event);
 
-  // Attach the project service-key secret as the bearer on every proxied
-  // request. The module's setup() puts the secret into Nuxt's server-only
-  // runtimeConfig (read from `process.env.ZITADEL_PROJECT_SECRET`; falls back
-  // to a `.env.local` parse when Nuxt's dev runtime didn't auto-load it).
-  // runtimeConfig is server-side only — never exposed to the client bundle.
-  if (!upstreamHeaders.has("authorization")) {
+  // ADR 036: the current browser flow needs the confidential project secret
+  // only for the handoff exchange. Never make the public proxy an
+  // operator-capable relay, and preserve an explicit caller credential for
+  // the future publishable-key exchange path.
+  if (requiresProjectSecret(method, suffix) && !upstreamHeaders.has("authorization")) {
     const config = useRuntimeConfig();
     const projectSecret = (config.nextgen as { projectSecret?: string } | undefined)?.projectSecret;
     if (projectSecret) {
@@ -208,7 +207,9 @@ async function proxyRequest(
 
   // Build a web-standard Response with filtered headers. This is the
   // canonical representation — we write it to event.node.res at the end.
-  const responseHeaders = filterResponseHeaders(upstream.headers);
+  // The app's own request URL: the origin a proxied redirect may name, and
+  // the base a relative one resolves against.
+  const responseHeaders = filterResponseHeaders(upstream.headers, getRequestURL(event).toString());
 
   const setCookieHeaders = upstream.headers.getSetCookie?.() ?? [];
   for (const cookie of setCookieHeaders) {
@@ -233,6 +234,10 @@ async function proxyRequest(
   }
 
   return response.body;
+}
+
+function requiresProjectSecret(method: string, pathname: string): boolean {
+  return method.toUpperCase() === "POST" && pathname === "/sessions/exchange";
 }
 
 const DECODER = new TextDecoder();
@@ -275,7 +280,12 @@ async function validateOpaqueSessionToken(
   token: string,
   issuerUrl: string,
   timeoutMs: number,
-): Promise<{ userId?: string } | null> {
+): Promise<{
+  userId?: string;
+  identifier: string | null;
+  identifierProperty: string | null;
+  display: string | null;
+} | null> {
   try {
     const res = await fetch(`${issuerUrl}/sessions/me`, {
       method: "GET",
@@ -283,8 +293,16 @@ async function validateOpaqueSessionToken(
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) return null;
-    const body = (await res.json()) as { user_id?: string };
-    return { userId: body.user_id };
+    const body = (await res.json()) as {
+      user_id?: string;
+      user?: { identifier?: string; identifier_property?: string; display?: string };
+    };
+    return {
+      userId: body.user_id,
+      identifier: body.user?.identifier ?? null,
+      identifierProperty: body.user?.identifier_property ?? null,
+      display: body.user?.display ?? null,
+    };
   } catch {
     return null;
   }
@@ -380,8 +398,9 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
       isAuthenticated: true,
       session: {
         userId: payload.sub,
-        email: payload.email ?? null,
-        name: payload.name ?? null,
+        identifier: payload.email ?? null,
+        identifierProperty: null,
+        display: payload.name ?? null,
         token,
       },
     };
@@ -393,27 +412,38 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
   // not a JWT (non-JSON segments). A token with a valid JWT structure that
   // failed verification (bad sig, wrong typ/alg) must be rejected — never
   // accepted by a backend call that doesn't re-check the JWT claims.
+  let liveAnonymousSession = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
     const opaqueResult = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    if (opaqueResult) {
+    // A session without a user id is an anonymous session — the flow has not
+    // verified a user factor yet. Treat it as unauthenticated rather than
+    // inventing a placeholder identity that no route handler can resolve.
+    if (opaqueResult?.userId) {
       event.context.nextgenAuth = {
         isAuthenticated: true,
         session: {
-          userId: opaqueResult.userId ?? "unknown",
-          email: null,
-          name: null,
+          userId: opaqueResult.userId,
+          identifier: opaqueResult.identifier,
+          identifierProperty: opaqueResult.identifierProperty,
+          display: opaqueResult.display,
           token: cookieToken,
         },
       };
       return;
     }
+    liveAnonymousSession = opaqueResult !== null;
   }
 
   event.context.nextgenAuth = { isAuthenticated: false, session: null };
 
-  for (const name of Object.keys(parseCookies(event))) {
-    if (name.startsWith("__nextgen")) {
-      deleteCookie(event, name);
+  // Clearing cookies stops the browser from replaying dead credentials. A
+  // live anonymous session is not dead — the backend confirmed it above, and
+  // an in-progress login flow may still complete it — so its cookie stays.
+  if (!liveAnonymousSession) {
+    for (const name of Object.keys(parseCookies(event))) {
+      if (name.startsWith("__nextgen")) {
+        deleteCookie(event, name);
+      }
     }
   }
 

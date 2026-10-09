@@ -37,11 +37,10 @@ const USER_SCHEMA_URI =
  * @param fields - User-schema property names to collect on the register
  *   step, in display order (e.g. `["email", "given_name"]`).
  */
-export function buildFlow(
-  fields: ReadonlyArray<string>,
-): CreateFlowDefinitionBodyFlowDefinition {
+export function buildFlow(fields: ReadonlyArray<string>): CreateFlowDefinitionBodyFlowDefinition {
   return {
     name: "default",
+    status: "active",
     user_schema: USER_SCHEMA_URI,
     purposes: {
       login: "identifier",

@@ -1,8 +1,10 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {
   localContainerName,
@@ -12,12 +14,22 @@ import {
 } from "../../../src/lib/local-server/runtime";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 
+// The platform is unreachable unless a test says otherwise — a network error,
+// not an HTTP status — so the user-presence probe reads as "unknown" and
+// status keeps its lifecycle-only output.
+const server = setupServer(http.post("*/users/query", () => HttpResponse.error()));
+
+beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
+afterAll(() => server.close());
+
 const SECRET = {
   project_id: "proj-001",
   project_secret: "sk_proj_test",
   preview_secret: "sk_proj_preview",
   preview_origins: [],
-  created_at: "2026-01-01T00:00:00.000Z",
+  // Recent, so the claim window reads as open; the closed-window test writes
+  // its own stale timestamp.
+  created_at: new Date(Date.now() - 60_000).toISOString(),
 };
 
 const tempDirs: string[] = [];
@@ -34,6 +46,7 @@ function status(cwd: string) {
 }
 
 afterEach(async () => {
+  server.resetHandlers();
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
     if (dir) {
@@ -42,18 +55,23 @@ afterEach(async () => {
   }
 });
 
+async function configuredProject(): Promise<string> {
+  const cwd = await makeProject();
+  await writeFile(
+    join(cwd, "zitadel.json"),
+    JSON.stringify({
+      project: "proj-001",
+      server: "https://api.zitadel.cloud",
+      environments: { development: { issuer: "http://localhost:3000" } },
+    }),
+  );
+  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
+  return cwd;
+}
+
 describe("status command", () => {
   it("returns an ok envelope for a healthy project with config and secret", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, "zitadel.json"),
-      JSON.stringify({
-        project: "proj-001",
-        server: "https://api.zitadel.cloud",
-        environments: { development: { issuer: "http://localhost:3000" } },
-      }),
-    );
-    await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
+    const cwd = await configuredProject();
 
     const res = await status(cwd);
 
@@ -72,6 +90,100 @@ describe("status command", () => {
     expect(json.data.project.project_id).toBe("proj-001");
     expect(json.data.project.issuer).toBe("http://localhost:3000");
     expect(json.data.next_commands).toContain(expectedPublicCliCommand("doctor"));
+  });
+
+  it("reports a project with no owning team as temporary and points at claim", async () => {
+    const cwd = await configuredProject();
+
+    const res = await status(cwd);
+
+    const json = parseJson(res.stdout) as {
+      data: {
+        project: { claim?: { kind: string } };
+        next_actions: string[];
+        next_commands: string[];
+      };
+    };
+    expect(json.data.project.claim).toMatchObject({ kind: "detached", claimable: true });
+    expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
+  });
+
+  // Once the locally recorded creation time says the 14-day window has
+  // passed, the nudge flips to reconciliation wording. The claim command
+  // stays suggested: the local record can be stale (claimed from another
+  // machine reads detached) and the server resolves the grant before the
+  // window, so running claim is the safe authoritative check.
+  it("switches to reconciliation guidance once the claim window has closed", async () => {
+    const cwd = await configuredProject();
+    await writeFile(
+      join(cwd, ".zitadel/secret"),
+      JSON.stringify({ ...SECRET, created_at: "2026-01-01T00:00:00.000Z" }),
+    );
+
+    const res = await status(cwd);
+
+    const json = parseJson(res.stdout) as {
+      data: {
+        project: { claim?: { kind: string; claimable?: boolean } };
+        next_actions: string[];
+        next_commands: string[];
+      };
+    };
+    expect(json.data.project.claim).toMatchObject({ kind: "detached", claimable: false });
+    const actions = json.data.next_actions.join("\n");
+    expect(actions).toContain("claim window has closed");
+    expect(actions).toContain("no longer be claimed");
+    expect(actions).not.toContain("its data may be lost");
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
+  });
+
+  it("reports the owning team once claimed, and stops nudging", async () => {
+    const cwd = await configuredProject();
+    await writeFile(
+      join(cwd, ".zitadel/secret"),
+      JSON.stringify({ ...SECRET, claimed_at: "2026-01-02T00:00:00.000Z", team_id: "team-001" }),
+    );
+
+    const res = await status(cwd);
+
+    const json = parseJson(res.stdout) as {
+      data: {
+        project: { claim?: { kind: string; team_id?: string; claimed_at?: string } };
+        next_actions: string[];
+        next_commands: string[];
+      };
+    };
+    expect(json.data.project.claim).toEqual({
+      kind: "attached",
+      team_id: "team-001",
+      claimed_at: "2026-01-02T00:00:00.000Z",
+    });
+    expect(json.data.next_actions.join("\n")).not.toContain("its data may be lost");
+    expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("claim"));
+  });
+
+  // The project lives wherever `zitadel.json` says, not wherever this
+  // invocation is pointed: `--server local` retargets the health probe only.
+  it("omits claim state for a local project, whatever --server says", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "zitadel.json"),
+      JSON.stringify({
+        project: "proj-001",
+        server: "http://localhost:8080",
+        environments: { development: { issuer: "http://localhost:3000" } },
+      }),
+    );
+    await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
+
+    const res = await status(cwd);
+
+    const json = parseJson(res.stdout) as {
+      data: { project: { claim?: unknown }; next_commands: string[] };
+    };
+    expect(json.data.project.claim).toBeUndefined();
+    expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("claim"));
   });
 
   it("reports orphaned-config when zitadel.json exists but secret is missing", async () => {
@@ -124,7 +236,25 @@ describe("status command", () => {
     const cwd = await makeProject();
     await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
 
-    const res = await status(relative(process.cwd(), cwd));
+    // The docker-backend fixture makes status spawn `docker inspect`; a fake
+    // on PATH keeps the test hermetic — with a wedged Docker daemon the real
+    // CLI blocks on the socket forever instead of failing fast.
+    const binDir = await mkdtemp(join(tmpdir(), "zitadel-status-fake-docker-"));
+    tempDirs.push(binDir);
+    await writeFile(join(binDir, "docker"), "#!/usr/bin/env node\nprocess.exit(1);\n");
+    await chmod(join(binDir, "docker"), 0o755);
+
+    const res = await runCliForTest(
+      [
+        "status",
+        "--cwd",
+        relative(process.cwd(), cwd),
+        "--json",
+        "--server",
+        "https://api.zitadel.cloud",
+      ],
+      { PATH: `${binDir}:${process.env.PATH ?? ""}` },
+    );
 
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as {
@@ -155,6 +285,67 @@ describe("status command", () => {
     expect(json.data.project.lifecycle).toBe("configured");
     expect(json.data.project.project_id).toBe("proj-001");
     expect(json.data.project.issuer).toBeUndefined();
+  });
+
+  it("stages verify-login guidance while the project has no users", async () => {
+    const cwd = await configuredProject();
+    server.use(http.post("*/users/query", () => HttpResponse.json({ users: [] })));
+
+    const res = await status(cwd);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      data: { next_actions: string[]; next_commands: string[] };
+    };
+    const actions = json.data.next_actions.join("\n");
+    expect(actions).toContain("open http://localhost:3000");
+    expect(actions).toContain("register a user");
+    expect(actions).not.toContain(".zitadel/schemas/");
+    // next_commands is staged in lockstep: preview is fine, publishing
+    // waits for the first proven login.
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("plan"));
+    expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("apply"));
+  });
+
+  it("switches to customize/publish guidance once users exist", async () => {
+    const cwd = await configuredProject();
+    server.use(http.post("*/users/query", () => HttpResponse.json({ users: [{ id: "usr_1" }] })));
+
+    const res = await status(cwd);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      data: { next_actions: string[]; next_commands: string[] };
+    };
+    const actions = json.data.next_actions.join("\n");
+    expect(actions).toContain("Customize what you ask for and how people sign in");
+    expect(actions).toContain(".zitadel/schemas/");
+    expect(actions).toContain(
+      `See your changes before they go live: ${expectedPublicCliCommand("plan")} to preview, ` +
+        `then ${expectedPublicCliCommand("apply")} to publish.`,
+    );
+    expect(actions).not.toContain("register a user");
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("apply"));
+  });
+
+  it("keeps lifecycle-only output when the platform is unreachable", async () => {
+    const cwd = await configuredProject();
+
+    const res = await status(cwd);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      data: { next_actions: string[]; next_commands: string[] };
+    };
+    // The journey guidance is staged on the user-presence probe, so an
+    // unreachable platform withholds it. The claim nudge is not: it reads
+    // `.zitadel/secret`, so it survives being offline — which is the point of
+    // reading it locally rather than asking the platform.
+    const actions = json.data.next_actions.join("\n");
+    expect(actions).not.toContain("register a user");
+    expect(actions).not.toContain("Customize what you ask for");
+    expect(actions).toContain("temporary and its data may be lost");
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("apply"));
   });
 });
 

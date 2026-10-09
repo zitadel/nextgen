@@ -19,8 +19,6 @@ servers:
   #   description: Production API
 
 tags:
-  - name: Authorization
-    description: OIDC and OAuth discovery, authorization, token, keys, revoke, introspection, and user info endpoints.
   - name: System
     description: Health, liveness, and readiness endpoints.
   - name: Flows
@@ -32,33 +30,62 @@ tags:
   - name: Sessions
     description: Session creation, lookup, exchange, and teardown endpoints.
   - name: Projects
-    description: Project creation and lookup endpoints.
+    description: Project management endpoints.
   - name: Teams
-    description: Team creation and lookup endpoints.
+    description: Team management endpoints.
   - name: Users
     description: User creation, lookup, current-user, and password endpoints.
   - name: Schemas
     description: User schema creation and lookup endpoints.
+  - name: Branding
+    description: Branding revision publication and lookup endpoints for the login UI (layout, asset URLs, Liquid template).
+  - name: Identity Providers
+    description: |
+      External login providers a project offers, each published as a
+      revisioned connection document and referenced by its slug from user
+      schemas and flow definitions. Create-or-revise, query, read by id, and
+      revision reads. A slug resolves through the query.
+  - name: Releases
+    description: |
+      Immutable, project-scoped configuration snapshots. A release pins one
+      revision of each resource it includes and records who assembled it, when,
+      and from which commit. It carries those pointers and that metadata only —
+      never resource content, which stays with the per-kind endpoints.
+
+      Assembling a release does not deploy it: the same release can later be
+      run on any number of environments unchanged.
+  - name: Environments
+    description: |
+      Endpoints for a project's runtime slots (ADR 035). Identity only:
+      the release an environment runs and its deployment history arrive with
+      the deployments endpoints, and environment lifecycle with its own ADR.
+  - name: Grants
+    description: |
+      Collaboration grants that bind a user or team to project.viewer,
+      project.editor, or project.admin. Create, get, query, and revoke;
+      role-change PATCH is a follow-up.
+  - name: Events
+    description: |
+      Project-scoped audit event list and get (ADR 049). Unified surface for
+      identity, session, admin, and entity events; filter by `category` /
+      `event_type`. Response items are a discriminated Event union on
+      `event_type` with typed payloads per docs/design/api/events-catalog.md.
+  - name: Variables
+    description: |
+      Named values a project enters and references from configuration documents
+      as `${{ NAME }}` (ADR 062). A variable belongs to the project or to one of
+      its environments, which is how a value that must differ per environment
+      reaches a release that is promoted between them unchanged.
+
+      Those owners are separate rather than a hierarchy: a variable is read,
+      written and deleted at exactly the owner a request addresses, and nothing
+      is inherited in either direction.
+
+      Secrets are the same resource with the value stored encrypted: same
+      names, same references, same endpoints. They are write-only — a read says
+      that a secret is held, never what it is.
 
 paths:
-  /.well-known/openid-configuration:
-    $ref: endpoints/.well-known/openid-configuration/methods.yaml
-  /auth/authorize:
-    $ref: endpoints/oauth/authorize/methods.yaml
-  /auth/device-authorization:
-    $ref: endpoints/oauth/device-authorization/methods.yaml
-  /auth/end-session:
-    $ref: endpoints/oauth/end-session/methods.yaml
-  /auth/introspect:
-    $ref: endpoints/oauth/introspect/methods.yaml
-  /auth/keys:
-    $ref: endpoints/oauth/keys/methods.yaml
-  /auth/revoke:
-    $ref: endpoints/oauth/revoke/methods.yaml
-  /auth/token:
-    $ref: endpoints/oauth/token/methods.yaml
-  /auth/userinfo:
-    $ref: endpoints/oauth/userinfo/methods.yaml
   /healthz:
     $ref: endpoints/healthz/methods.yaml
   /livez:
@@ -67,20 +94,30 @@ paths:
     $ref: endpoints/readyz/methods.yaml
   /users:
     $ref: endpoints/users/methods.yaml
+  /users/query:
+    $ref: endpoints/users/query/methods.yaml
   /users/{user_id}:
     $ref: endpoints/users/by_id/methods.yaml
+  /users/{user_id}/passkeys:
+    $ref: endpoints/users/by_id/passkeys/methods.yaml
+  /users/{user_id}/passkeys/registrations:
+    $ref: endpoints/users/by_id/passkeys/registrations/methods.yaml
+  /users/{user_id}/passkeys/registrations/{registration_id}:
+    $ref: endpoints/users/by_id/passkeys/registrations/by_id/methods.yaml
   /users/{user_id}/password:
     $ref: endpoints/users/by_id/password/methods.yaml
+  /users/{user_id}/teams:
+    $ref: endpoints/users/by_id/teams/methods.yaml
   /users/me:
     $ref: endpoints/users/me/methods.yaml
+  /users/me/projects:
+    $ref: endpoints/users/me/projects/methods.yaml
   /flow:
     $ref: endpoints/flow/methods.yaml
   /flow/{id}:
     $ref: endpoints/flow/session/methods.yaml
   /flow/{id}/submit:
     $ref: endpoints/flow/submit/methods.yaml
-  /flow/{id}/event:
-    $ref: endpoints/flow/event/methods.yaml
   /auth_attempts:
     $ref: endpoints/auth_attempts/methods.yaml
   /auth_attempts/{attempt_id}:
@@ -93,16 +130,30 @@ paths:
     $ref: endpoints/auth_attempts/by_id/handoff/methods.yaml
   /projects:
     $ref: endpoints/projects/methods.yaml
+  /projects/query:
+    $ref: endpoints/projects/query/methods.yaml
   /projects/{project_id}:
     $ref: endpoints/projects/by_id/methods.yaml
+  /projects/{project_id}/claim/init:
+    $ref: endpoints/projects/by_id/claim/init/methods.yaml
+  /projects/{project_id}/claim/status:
+    $ref: endpoints/projects/by_id/claim/status/methods.yaml
+  /projects/{project_id}/claim/complete:
+    $ref: endpoints/projects/by_id/claim/complete/methods.yaml
+  /projects/{project_id}/claim/window:
+    $ref: endpoints/projects/by_id/claim/window/methods.yaml
   /sessions:
     $ref: endpoints/sessions/methods.yaml
+  /sessions/query:
+    $ref: endpoints/sessions/query/methods.yaml
   /sessions/exchange:
     $ref: endpoints/sessions/exchange/methods.yaml
   /sessions/{session_id}:
     $ref: endpoints/sessions/by_id/methods.yaml
   /sessions/me:
     $ref: endpoints/sessions/me/methods.yaml
+  /sessions/me/csrf:
+    $ref: endpoints/sessions/me/csrf/methods.yaml
   /schemas:
     $ref: endpoints/schemas/methods.yaml
   /schemas/{id}:
@@ -111,18 +162,56 @@ paths:
     $ref: endpoints/flow_definitions/methods.yaml
   /flow_definitions/{id}:
     $ref: endpoints/flow_definitions/by_id/methods.yaml
-  /flow_definitions/{id}/activate:
-    $ref: endpoints/flow_definitions/lifecycle/activate/method.yaml
-  /flow_definitions/{id}/deactivate:
-    $ref: endpoints/flow_definitions/lifecycle/deactivate/method.yaml
   /teams:
     $ref: endpoints/teams/methods.yaml
+  /teams/query:
+    $ref: endpoints/teams/query/methods.yaml
   /teams/{team_id}:
     $ref: endpoints/teams/by_id/methods.yaml
+  /environments:
+    $ref: endpoints/environments/methods.yaml
+  /environments/{name}:
+    $ref: endpoints/environments/by_name/methods.yaml
+  /branding:
+    $ref: endpoints/branding/methods.yaml
+  /branding/{id}:
+    $ref: endpoints/branding/by_id/methods.yaml
+  /idps:
+    $ref: endpoints/idps/methods.yaml
+  /idps/query:
+    $ref: endpoints/idps/query/methods.yaml
+  /idps/{id}:
+    $ref: endpoints/idps/by_id/methods.yaml
+  /idps/{id}/revisions:
+    $ref: endpoints/idps/by_id/revisions/methods.yaml
+  /idps/revisions/{revision_id}:
+    $ref: endpoints/idps/revisions/by_id/methods.yaml
+  /releases:
+    $ref: endpoints/releases/methods.yaml
+  /releases/{release_id}:
+    $ref: endpoints/releases/by_id/methods.yaml
+  /grants:
+    $ref: endpoints/grants/methods.yaml
+  /grants/query:
+    $ref: endpoints/grants/query/methods.yaml
+  /grants/{id}:
+    $ref: endpoints/grants/by_id/methods.yaml
+  /events:
+    $ref: endpoints/events/methods.yaml
+  /events/{id}:
+    $ref: endpoints/events/by_id/methods.yaml
+  /variables:
+    $ref: endpoints/variables/methods.yaml
+  /variables/{variable_name}:
+    $ref: endpoints/variables/by_name/methods.yaml
+  /deployments:
+    $ref: endpoints/deployments/methods.yaml
+  /deployments/{deployment_id}:
+    $ref: endpoints/deployments/by_id/methods.yaml
 
 components:
   securitySchemes:
     oauth2:
       $ref: security/oauth2.yaml
-    usernamePassword:
-      $ref: security/username-password.yaml
+    nextgenSession:
+      $ref: security/session-cookie.yaml

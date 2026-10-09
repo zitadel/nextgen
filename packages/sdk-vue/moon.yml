@@ -4,35 +4,40 @@ layer: "library"
 stack: "frontend"
 dependsOn:
   - "api"
+  - "api-mock"
   - "components"
   - "sdk-core"
 
 tasks:
-  lint:
-    command: "corepack pnpm run lint"
-    deps:
-      - "api:build"
-      - "components:build"
-      - "sdk-core:build"
-
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
-      - "api:build"
+      - "api-mock:build"
       - "components:build"
       - "sdk-core:build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
-      - "api:build"
       - "components:build"
       - "sdk-core:build"
+
+  build-release:
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
+    deps:
+      - "components:build-release"
+      - "sdk-core:build-release"
     outputs:
       - "dist/**/*"
+    options:
+      cache: false
+      # Release builds remove stale package output and rebuild dist in one
+      # task. They stay out of `moon ci`; release:snapshot invokes them in
+      # the later release step instead of the normal build/test graph.
+      runInCI: false
 
   test:
-    command: "corepack pnpm run test"
     deps:
+      # api-mock serves the Flow API to the specs (test-setup.ts).
+      - "api-mock:build"
       - "build"
-

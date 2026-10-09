@@ -21,20 +21,23 @@ Keep Shadow DOM for styling, fix form behaviour with web platform features. Spec
 
 | Concern | Mechanism | Owner |
 | --- | --- | --- |
-| Form value participation | [Form-associated custom elements](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_custom_elements#form-associated_custom_elements) (`static formAssociated = true` + `attachInternals().setFormValue()`) | each `<zl-*>` input atom |
+| Form value participation | [Form-associated custom elements](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_custom_elements#form-associated_custom_elements) (`static formAssociated = true` + `attachInternals().setFormValue()`) | `zl-field`, `zl-select`, `zl-checkbox`, `zl-button` |
 | Real `<form>` element | Rendered inside `<zitadel-login>`'s shadow root, wraps the Liquid output | `<zitadel-login>` |
 | Submit interception | Native `submit` event listener on the shadow root; `preventDefault()` then call the flow API | `<zitadel-login>` |
+| Credential pairing on a password-only step | A plain `<input>` rendered into the same `<form>`, carrying `step.identifier`'s value and `autocomplete="username"`, with no `name` so it is never submitted | `<zitadel-login>` |
 | Enter-to-submit | Each field forwards `keydown[Enter]` to `internals.form.requestSubmit()` | `<zl-field>` |
 | Validity state | `internals.setValidity()` mirrors `required` / step-level errors | each input atom |
-| Reset / restore | `formResetCallback`, `formStateRestoreCallback` clear / restore `value` | each input atom |
-| Focus delegation | `static shadowRootOptions = { delegatesFocus: true }` | every atom + orchestrator |
-| Step-change focus | Orchestrator focuses the first field when `step` changes | `<zitadel-login>` |
+| Reset / restore | `formResetCallback`, `formStateRestoreCallback` write the default or the submitted state through `formValue` | `FormAtom`, shared by every input atom |
+| `<fieldset disabled>` | `formDisabledCallback` disables the native control and takes the atom out of submission | `FormAtom` |
+| Focus delegation | `static shadowRootOptions = { delegatesFocus: true }` | the form atoms (`zl-field`, `zl-select`, `zl-checkbox`, `zl-button`) + orchestrator |
+| Step-change focus | Orchestrator focuses the first field when `step` changes. On the first render it does so only in `variant="page"`, so an embedded widget does not take focus from its page on load | `<zitadel-login>` |
 | Aria refs | `aria-describedby` only references ids that have content (no dangling refs) | `<zl-field>` |
 
 Why these specifically:
 
 - **Form-associated custom elements** are W3C standard and shipped in every evergreen browser since 2023 (Safari 16.4 was the last to land). Modern password managers (1Password 8+, Bitwarden, browser built-ins) walk the form by talking to the platform, not by piercing shadow roots, so once each atom calls `setFormValue` they're visible.
 - **Real `<form>`** is what password managers and the browser's autofill / save-password heuristics actually look for. We don't navigate on submit (we own the cycle via fetch), but the form being present is what triggers detection.
+- **The paired identifier is a plain `<input>`, not an atom.** A manager saves an identifier and a password as one credential and reads both from the same form, so a step collecting only the password has to carry the identifier beside it. The orchestrator renders it rather than the template: the sanitiser drops a raw `<input>` out of template output, and an ejected template then keeps the behaviour for free. It needs no form association because it is not in a nested shadow root — it sits directly in the form. Omitting `name` is what keeps it out of the submission, so no engine-side tolerance for an extra field is required.
 - **`delegatesFocus: true`** makes the shadow boundary transparent for keyboard tab order. It also lets `:focus-visible` styling on the host work as users expect.
 - **Step-change focus move** keeps screen-reader and keyboard users oriented across step swaps.
 
@@ -48,9 +51,8 @@ Why these specifically:
 
 The mechanism is web-standards, so frameworks don't have to do anything special:
 
-- **Next.js / React.** Drop `<zitadel-login>` in. With `@lit/react` you get typed props; without it, all attributes work.
-- **Astro.** Use the element directly in `.astro` templates. SSR rendering uses Lit's [Declarative Shadow DOM](https://web.dev/articles/declarative-shadow-dom) — the server emits `<template shadowrootmode="open">` and the browser hydrates on parse. No client-side flicker.
-- **Remix / SvelteKit / Nuxt.** Same as Astro: native HTML, optional DSD.
+- **Next.js / React.** Drop `<zitadel-login>` in. `@zitadel/sdk-react` wraps it with `@lit/react` for typed props; without it, all attributes work.
+- **Astro / Remix / SvelteKit / Nuxt.** Use the element directly. It renders on the client; the package ships no server rendering or Declarative Shadow DOM output.
 - **Vue.** Native usage works; `defineCustomElement` available if you want a Vue-flavoured wrapper.
 - **Plain HTML.** Just a `<script type="module">` import and the tag.
 
@@ -59,7 +61,7 @@ Form participation works the same way in every host: as long as `<zitadel-login>
 ## Testing notes
 
 - Unit specs live next to the implementation (`zl-field.spec.ts`, `zitadel-login.spec.ts`).
-- Lit tests run in `jsdom`; jsdom implements `ElementInternals` and form-associated custom elements as of jsdom 24.
+- Markup, props and ARIA run in `jsdom`. Form association, focus delegation and Enter-to-submit run in real Chromium, in the `*.browser.spec.ts` files (see Testing Layers in the root `AGENTS.md`).
 - Browser smoke checks should cover: Tab order, Enter-to-submit from each field, password manager visibility (manual), focus landing on the first field after a step change, screen-reader announcement of `aria-busy` and step-level errors.
 
 ## Where the rules live in code

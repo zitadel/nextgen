@@ -40,6 +40,11 @@ type FlowOnSuccess uint8
 
 const (
 	FlowOnSuccessCreateUser FlowOnSuccess = iota
+	// FlowOnSuccessCreateUserWithSso creates the user from the identity an
+	// external provider returned. The value is accepted so an SSO flow can
+	// be authored and stored; no handler is wired, so a step that reaches
+	// it fails with a flow integrity error (see runOnSuccess).
+	FlowOnSuccessCreateUserWithSso
 )
 
 // FlowStepComplete classifies a terminal step. The frontend uses this
@@ -86,9 +91,12 @@ const (
 type FlowActionKind uint8
 
 const (
+	// FlowActionKindUnset is the zero value. stepActionKind returns it
+	// when the submitted name isn't declared on the step.
+	FlowActionKindUnset FlowActionKind = iota
 	// FlowActionKindSubmit advances by collecting the step's fields and
 	// running the standard validate/dispatch/on_success pipeline.
-	FlowActionKindSubmit FlowActionKind = iota + 1
+	FlowActionKindSubmit
 	// FlowActionKindPasskey issues a WebAuthn assertion challenge and
 	// resolves the matching transition once the assertion verifies.
 	FlowActionKindPasskey
@@ -137,13 +145,6 @@ func NewFlowDefinition(
 	steps []FlowDefinitionStep,
 	status FlowDefinitionStatus,
 ) (_ *FlowDefinition, err error) {
-
-	if flowDefID == "" {
-		flowDefID, err = newID(FlowDefinitionPrefix)
-		if err != nil {
-			return nil, ErrInternal(err).WithMessage("failed to generate flow-definition id")
-		}
-	}
 	return &FlowDefinition{
 		ProjectID:     projectID,
 		ID:            flowDefID,
@@ -185,8 +186,8 @@ type FlowDefinitionAudience struct {
 
 // authMethodPrefix marks a step.fields entry as referring to an entry
 // under the user schema's `x-auth-methods` keyword (e.g.
-// "x-auth-methods#password") rather than to a top-level user property.
-const authMethodPrefix = "x-auth-methods#"
+// "x-auth-methods#password") rather than to a user property.
+const authMethodPrefix = SchemaAnnotationAuthMethods + "#"
 
 // Field carries the raw field name from a flow-definition step.
 type Field string
@@ -196,7 +197,7 @@ func (f Field) String() string {
 	return string(f)
 }
 
-// IsUserProperty reports whether the field names a top-level user-schema property.
+// IsUserProperty reports whether the field names a user-schema property.
 func (f Field) IsUserProperty() bool {
 	return !f.IsAuthMethod()
 }
@@ -251,8 +252,11 @@ type FlowDefinitionStep struct {
 	// Gates are security challenges that must be satisfied before the
 	// step's submission is accepted, keyed by gate name.
 	Gates map[string]FlowStepGate
-	// SSOProviders lists the identity providers available on this step.
-	SSOProviders []FlowSSOProvider
+	// SSOProviders lists the slugs of the identity provider connections
+	// this step offers, in display order. The connection owns the display
+	// name and template; rendering resolves each slug into a
+	// [FlowSSOProvider] for the client.
+	SSOProviders []string
 	// OnSuccess names the server-side mutation to run after field
 	// validation passes, before the transition fires. Nil means advance
 	// directly with no side effect.
@@ -286,7 +290,10 @@ type FlowStepGate struct {
 	Config map[string]any
 }
 
-// FlowSSOProvider is an identity provider option offered on a step.
+// FlowSSOProvider is an identity provider option as rendered to the
+// client: a connection slug resolved to its display name and template.
+// Flow definitions reference connections by slug only
+// ([FlowDefinitionStep.SSOProviders]).
 type FlowSSOProvider struct {
 	ID       string
 	Name     string
@@ -300,8 +307,33 @@ type FlowStepTransition struct {
 	// When Action == nil, Target refers to a step in the current flow
 	// When Action != nil, Target refers to another flow.
 	Target string
+	// Purpose, when non-nil, re-purposes the flow locally: taking this
+	// transition sets [FlowState.CurrentPurpose] to this purpose while the
+	// pinned [FlowState.Purpose] stays untouched. The purpose must be one
+	// the definition serves and Target must be that purpose's entry step
+	// (validated). Mutually exclusive with Action — a transition either
+	// pivots to another flow or re-purposes within this one, never both.
+	Purpose *FlowDefinitionPurpose
 }
 
 func (fst FlowStepTransition) IsCurrentFlow() bool {
 	return fst.Action == nil
 }
+
+// FlowDefinitionField enumerates the fields of FlowDefinition which can be used for ordering in list operations.
+type FlowDefinitionField uint8
+
+const (
+	FlowDefinitionFieldUnspecified FlowDefinitionField = iota
+	FlowDefinitionFieldProjectID
+	FlowDefinitionFieldID
+	FlowDefinitionFieldName
+	FlowDefinitionFieldSchemaVersion
+	FlowDefinitionFieldStatus
+	FlowDefinitionFieldCreatedAt
+	FlowDefinitionFieldUpdatedAt
+	FlowDefinitionFieldUserSchema
+	FlowDefinitionFieldPurposes
+	FlowDefinitionFieldAudience
+	FlowDefinitionFieldSteps
+)

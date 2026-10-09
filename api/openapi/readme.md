@@ -49,9 +49,7 @@ This API uses **cursor-based pagination** (`page_token` / `next_page_token`), no
 - Omit `page_token` to start from the beginning.
 - Treat `page_token` as opaque — do not attempt to decode or construct it.
 
-> **Note:** Some endpoints (e.g. `GET /users`) currently still use `offset`/`limit`.
-> These are marked with a `TODO` comment and will be migrated to `page_token` / `next_page_token`.
-> New list endpoints must use cursor-based pagination — see `GET /sessions` as the reference implementation.
+New list endpoints must use cursor-based pagination — see `POST /sessions/query` as the reference implementation.
 
 ### Nullable types
 
@@ -63,8 +61,9 @@ session_id:
   type: ["string", "null"]
 ```
 
-However, ogen v1.20.3 parses the `type` field as a plain string and cannot unmarshal
-a YAML sequence, causing generation to fail with `cannot unmarshal !!seq into string`.
+However, ogen (the pinned Go tool dependency in `go.mod`) parses the `type` field
+as a plain string and cannot unmarshal a YAML sequence, causing generation to fail
+with `cannot unmarshal !!seq into string`.
 This is tracked upstream at [ogen-go/ogen#1617](https://github.com/ogen-go/ogen/issues/1617).
 
 **Workaround:** Use `oneOf` with an explicit `null` type instead, which is still
@@ -81,31 +80,13 @@ session_id:
 Once ogen#1617 is resolved, all `oneOf` nullable patterns in this spec can be
 migrated to the more concise `type: ["string", "null"]` form.
 
-### Spec merging: Redocly
+### Linting and bundling: Redocly
 
-- Github: [](https://github.com/Redocly/redocly-cli)
-- Docs: [](https://redocly.com/docs/cli)
-
-#### Install Redocly
-
-```shell
-npm install -g @redocly/cli
-```
-
-or docker
+The repo pins `@redocly/openapi-core` (the library behind the
+[Redocly CLI](https://redocly.com/docs/cli)) and applies `redocly.yaml` and
+`.redocly.lint-ignore.yaml` from the repo root. Nothing needs installing:
 
 ```shell
-docker pull redocly/cli
-```
-
-#### Merge spec
-
-```shell
-redocly bundle open-api-spec.yaml -o bundled.yaml 
-```
-
-or docker
-
-```shell
-docker run --rm -v $PWD:/spec redocly/cli bundle open-api-spec.yaml -o bundled.yaml 
+moon run server:openapi          # lint openapi-spec.yaml
+moon run docs:generate-openapi   # bundle it into apps/docs/.generated/openapi.mjs
 ```

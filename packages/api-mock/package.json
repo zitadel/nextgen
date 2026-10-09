@@ -6,16 +6,39 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "import": "./src/index.ts"
+      "@zitadel/source": "./src/index.ts",
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./openid-configuration": {
+      "@zitadel/source": "./src/openid-configuration.ts",
+      "types": "./dist/openid-configuration.d.mts",
+      "import": "./dist/openid-configuration.mjs"
     },
     "./platform": {
-      "types": "./src/platform-handlers.ts",
-      "import": "./src/platform-handlers.ts"
+      "@zitadel/source": "./src/platform-handlers.ts",
+      "types": "./dist/platform-handlers.d.mts",
+      "import": "./dist/platform-handlers.mjs"
     },
     "./public-dir": {
-      "types": "./src/public-dir.ts",
-      "import": "./src/public-dir.ts"
+      "@zitadel/source": "./src/public-dir.ts",
+      "types": "./dist/public-dir.d.mts",
+      "import": "./dist/public-dir.mjs"
+    },
+    "./server": {
+      "@zitadel/source": "./src/server.ts",
+      "types": "./dist/server.d.mts",
+      "import": "./dist/server.mjs"
+    },
+    "./vitest": {
+      "@zitadel/source": "./src/vitest.ts",
+      "types": "./dist/vitest.d.mts",
+      "import": "./dist/vitest.mjs"
+    },
+    "./vitest-browser": {
+      "@zitadel/source": "./src/vitest-browser.ts",
+      "types": "./dist/vitest-browser.d.mts",
+      "import": "./dist/vitest-browser.mjs"
     }
   },
   "bin": {
@@ -26,11 +49,14 @@
     "dev": "tsx watch bin/start.ts",
     "test": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
-    "test:all": "vitest run"
+    "test:all": "vitest run",
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json"
   },
   "dependencies": {
     "@mswjs/http-middleware": "catalog:",
     "@zitadel/api": "workspace:*",
+    "@zitadel/config": "workspace:*",
     "cookie-parser": "catalog:",
     "express": "catalog:",
     "tslib": "catalog:",
@@ -43,10 +69,14 @@
     "@types/cookie-parser": "catalog:",
     "@types/express": "catalog:",
     "@types/node": "catalog:",
+    "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "msw": "catalog:",
     "playwright": "catalog:",
+    "tsdown": "catalog:",
     "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
     "zod": "catalog:"
   },
   "msw": {

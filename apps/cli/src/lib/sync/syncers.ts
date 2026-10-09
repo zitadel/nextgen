@@ -1,17 +1,40 @@
 import type {
+  CreateBranding201,
+  CreateBrandingBody,
+  CreateFlowDefinition201,
   CreateFlowDefinitionBodyFlowDefinition,
-  UpdateFlowDefinitionBodyFlowDefinition,
+  CreateIdpBodyIdp,
   CreateSchemaBody,
-  GetSchemaById200,
-  GetFlowDefinition200,
 } from "@zitadel/api/generated/model";
-import type { ZitadelClient } from "@zitadel/api/client";
-import { CreateSchemaBody as createSchemaBodySchema } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { consola } from "consola";
 
-import { FLOWS_DIR, flowEnvRefs, validateFlows } from "../flows";
+import type { ZitadelClient } from "@zitadel/api/client";
+import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
+import { isVariableReference } from "@zitadel/config/idp";
+import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
+import {
+  brandingConfigSchema,
+  flowConfigSchema,
+  idpConnectionConfigSchema,
+  schemaConfigSchema,
+} from "@zitadel/config/schemas";
+import { validateLoginTemplate } from "@zitadel/config/template";
+
+import {
+  BRANDING_DIR,
+  assertNoLegacyTemplateKey,
+  readDescriptorTemplate,
+  toBrandingWireBody,
+  toLocalBrandingBody,
+} from "../branding";
+import { FLOWS_DIR, flowEnvRefs } from "../flows";
+import { IDPS_DIR, refuseResolvedSecret } from "../idp";
 import { SCHEMAS_DIR } from "../user-schema";
 import { ZitadelError } from "../errors";
+import { FatalFetchError } from "./types.js";
 import type { ResourceSyncer } from "./types.js";
+
+export type { ResourceSyncer } from "./types.js";
 
 /** Runtime environment lookup used to resolve `${VAR}` / `*_env` references. */
 type EnvLookup = Record<string, string | undefined>;
@@ -19,19 +42,28 @@ type EnvLookup = Record<string, string | undefined>;
 /**
  * Build the syncer list with the context every syncer needs: the
  * `project_id` flow creates carry, and the runtime `env` against which
- * each file's `${VAR}` / `*_env` references are checked. Callers
- * (apply / plan / setup) read `project_id` from `.zitadel/secret` and
- * pass the process environment. The returned array is treated as
- * read-only by the sync loop.
+ * each file's `${VAR}` / `*_env` references are checked. Callers (apply /
+ * plan / setup) read `project_id` from `.zitadel/secret` and pass the
+ * process environment. The returned array is treated as read-only by the
+ * sync loop.
  */
 export function makeSyncers(opts: {
   client: ZitadelClient;
   projectId: string;
   env: EnvLookup;
-}): ReadonlyArray<ResourceSyncer> {
+  /**
+   * Project root. The branding syncer resolves `$file` references against it
+   * when inlining templates for hashing and upload.
+   */
+  cwd: string;
+}): readonly [SchemaSyncer, IdpConnectionSyncer, FlowDefinitionSyncer, BrandingSyncer] {
   return [
     new SchemaSyncer(opts.client, opts.projectId, opts.env),
+    // Before flows: a flow step naming a connection slug is only valid once
+    // that connection exists on the platform.
+    new IdpConnectionSyncer(opts.client, opts.projectId),
     new FlowDefinitionSyncer(opts.client, opts.projectId, opts.env),
+    new BrandingSyncer(opts.client, opts.projectId, opts.env, opts.cwd),
   ];
 }
 
@@ -41,6 +73,33 @@ export function makeSyncers(opts: {
  * the missing names. Shared by every syncer so the check is identical for
  * schemas and flows, and runs in the sync engine before any platform call.
  */
+/**
+ * A mutation response, checked before it is treated as the canonical body.
+ *
+ * Both write paths return the stored document and the sync loop writes it back
+ * to the file on disk, so this is the last point before a resolved secret would
+ * be committed.
+ */
+function canonicalDefinition(definition: object | undefined, id: unknown): object | undefined {
+  if (definition === undefined) {
+    return undefined;
+  }
+  refuseResolvedSecret(definition, typeof id === "string" ? id : "the connection");
+  return definition;
+}
+
+/** The value a Zod issue path points at, or `undefined` when it is absent. */
+function valueAt(data: object, path: ReadonlyArray<PropertyKey>): unknown {
+  let current: unknown = data;
+  for (const key of path) {
+    if (typeof current !== "object" || current === null) {
+      return undefined;
+    }
+    current = (current as Record<PropertyKey, unknown>)[key];
+  }
+  return current;
+}
+
 function assertEnvRefs(data: object, env: EnvLookup): void {
   const missing = flowEnvRefs(data).filter((name) => !env[name]);
   if (missing.length > 0) {
@@ -48,16 +107,161 @@ function assertEnvRefs(data: object, env: EnvLookup): void {
   }
 }
 
+/**
+ * Syncs `.zitadel/idps/*.json`, one identity provider connection per file.
+ *
+ * `mutable` with `revisioned: false`: the connection keeps one id for life and
+ * the server files each edit as a revision beneath it, so an edit is an update
+ * here rather than a new resource, and nothing that references the slug has to
+ * be re-pinned.
+ *
+ * Deletion is not supported yet (#1013): what should happen to users already
+ * linked to a connection is undesigned, so a removed file is reported and no
+ * deletion is sent.
+ *
+ * `fetch` reads the stored connection so an update plans with a field-level
+ * diff, as every other resource does. It refuses a body whose `client_secret`
+ * is a value rather than a `${{ NAME }}` reference: previews must never print
+ * a credential (area 4), and the CLI's own `validate` makes a literal secret
+ * unuploadable, so one coming back from a read means the server resolved it
+ * and the plan must stop rather than render it.
+ */
+class IdpConnectionSyncer implements ResourceSyncer {
+  readonly kind = "idp";
+  readonly directory = IDPS_DIR;
+  readonly mutable = true;
+  readonly revisioned = false;
+
+  private readonly client: ZitadelClient;
+  private readonly projectId: string;
+
+  constructor(client: ZitadelClient, projectId: string) {
+    this.client = client;
+    this.projectId = projectId;
+  }
+
+  /**
+   * Parse against the generated `CreateIdpBody.idp` Zod, the orval-emitted
+   * equivalent of `idp-connection.json`. A literal `client_secret` fails that
+   * pattern, so it is caught here and named plainly: it is the one mistake
+   * that would publish a credential.
+   */
+  validate(data: object): void {
+    const result = idpConnectionConfigSchema.safeParse(data);
+    if (result.success) {
+      return;
+    }
+    // Only a stored value that is not a reference is the mistake this names.
+    // A missing or wrongly-typed `client_secret` fails at the same path, and
+    // telling someone to replace a value with a reference when the field is
+    // not there sends them looking for something that does not exist.
+    const literalSecret = result.error.issues.some((issue) => {
+      if (issue.path.length <= 1 || issue.path[issue.path.length - 1] !== "client_secret") {
+        return false;
+      }
+      const stored = valueAt(data, issue.path);
+      return typeof stored === "string" && !isVariableReference(stored);
+    });
+    throw new ZitadelError(
+      "E_VALIDATION",
+      literalSecret
+        ? "Connection file's client_secret must reference a variable, not hold a value"
+        : "Connection file is not a valid identity provider connection",
+      {
+        hint: literalSecret
+          ? 'Use "client_secret": "${{ NAME }}" and publish the value with `variables set NAME --secret`.'
+          : undefined,
+        details: { issues: result.error.issues },
+      },
+    );
+  }
+
+  /**
+   * `POST /idps` creates the connection when its slug is new to the project.
+   * The response carries the stored document, so no follow-up fetch is needed.
+   */
+  async create(data: object): Promise<{ id: string; canonical?: object }> {
+    const result = await this.client.createIdp(
+      { idp: data as CreateIdpBodyIdp },
+      { project_id: this.projectId },
+    );
+    // Guarded before it becomes canonical: `writeBackResource` commits the
+    // canonical body to `.zitadel/idps/`, so a resolved secret here would be
+    // written to a file the developer commits.
+    return { id: result.id, canonical: canonicalDefinition(result.definition, result.id) };
+  }
+
+  /**
+   * The same call: a document whose slug already exists revises that
+   * connection, keeping its id. The id is passed for the sync loop's benefit
+   * and deliberately unused — the slug inside the document addresses the row.
+   */
+  async update(_id: string, data: object): Promise<{ id?: string; canonical?: object }> {
+    const result = await this.client.createIdp(
+      { idp: data as CreateIdpBodyIdp },
+      { project_id: this.projectId },
+    );
+    // The id comes back because the slug decides which connection the write
+    // landed on: editing it names a different connection, and the server
+    // creates one. Returning the id keeps state pointing at that connection
+    // rather than the one the slug used to name.
+    return {
+      id: typeof result.id === "string" ? result.id : undefined,
+      canonical: canonicalDefinition(result.definition, result.id),
+    };
+  }
+
+  /**
+   * The stored connection, for the plan's before/after.
+   *
+   * Comparison-only: the result is rendered, never written back or uploaded,
+   * so it is returned as the server states it apart from the secret guard.
+   */
+  async fetch(id: string): Promise<object> {
+    const body = await this.client.getIdpById(id, { project_id: this.projectId });
+    const definition = (body.definition ?? {}) as object;
+    try {
+      refuseResolvedSecret(definition, id);
+    } catch (err) {
+      // Fatal rather than a fetch that failed: the planner swallows an ordinary
+      // failure and plans without a diff, which would turn a server resolving
+      // secrets into a silently missing before/after.
+      throw new FatalFetchError(err as Error);
+    }
+    return definition;
+  }
+
+  async delete(_id: string): Promise<void> {
+    throw new ZitadelError(
+      "E_NOT_IMPLEMENTED",
+      "Deleting an identity provider connection is not supported yet",
+      {
+        hint: "Restore the file, or remove the connection on the platform once deletion is designed (#1013).",
+      },
+    );
+  }
+}
+
 class SchemaSyncer implements ResourceSyncer {
   readonly kind = "schema";
   readonly directory = SCHEMAS_DIR;
   readonly mutable = false;
+  readonly revisioned = true;
+  readonly normalize = normalizeSchemaBody;
+  // Deliberately no `normalizeWrite`: the server stores schema bytes
+  // verbatim, so stripping spelled-out x-* defaults from the local file
+  // would drop them from the next published revision. Canonical schema
+  // bodies are written back as-is; `normalize` is comparison-only.
 
-  constructor(
-    private readonly client: ZitadelClient,
-    private readonly projectId: string,
-    private readonly env: EnvLookup,
-  ) {}
+  private readonly client: ZitadelClient;
+  private readonly projectId: string;
+  private readonly env: EnvLookup;
+
+  constructor(client: ZitadelClient, projectId: string, env: EnvLookup) {
+    this.client = client;
+    this.projectId = projectId;
+    this.env = env;
+  }
 
   /**
    * Parse against the generated `CreateSchemaBody` Zod (the orval-emitted
@@ -66,7 +270,7 @@ class SchemaSyncer implements ResourceSyncer {
    * discriminated on `kind`; both are valid on-disk bodies.
    */
   validate(data: object): void {
-    const result = createSchemaBodySchema.safeParse(data);
+    const result = schemaConfigSchema.safeParse(data);
     if (!result.success) {
       throw new ZitadelError("E_VALIDATION", "Schema file is not a valid Zitadel schema body", {
         details: { issues: result.error.issues },
@@ -75,16 +279,36 @@ class SchemaSyncer implements ResourceSyncer {
     assertEnvRefs(data, this.env);
   }
 
-  async create(data: object): Promise<string> {
+  /**
+   * `POST /schemas` mints a new immutable row. The server allocates the
+   * opaque id; the CLI records it in state and re-pins flows against it.
+   * The create response carries only the id, so the canonical stored body
+   * comes from a follow-up fetch; a fetch failure degrades to no
+   * write-back rather than failing the create.
+   */
+  async create(data: object): Promise<{ id: string; canonical?: object }> {
     const result = await this.client.createSchema(data as CreateSchemaBody, {
       project_id: this.projectId,
     });
-    return result.id;
+    try {
+      return { id: result.id, canonical: await this.fetch(result.id) };
+    } catch (err) {
+      consola.debug(`fetch created schema ${result.id} failed:`, err);
+      return { id: result.id };
+    }
   }
 
-  /** Never called — schemas are immutable on the platform, so `mutable = false`. */
-  async update(_id: string, _data: object): Promise<void> {
-    return;
+  /**
+   * Not called by the sync loop: schemas are `revisioned`, so a hash change
+   * publishes a new immutable revision through {@link create} rather than
+   * mutating an existing row. Kept as a required interface member; throws
+   * loudly if a caller reaches it.
+   */
+  async update(_id: string, _data: object): Promise<{ canonical?: object }> {
+    throw new ZitadelError(
+      "E_NOT_IMPLEMENTED",
+      "schemas are revisioned — edit publishes a new revision, not an update",
+    );
   }
 
   async delete(id: string): Promise<void> {
@@ -98,84 +322,198 @@ class SchemaSyncer implements ResourceSyncer {
   }
 
   async fetch(id: string): Promise<object> {
-    const body = await this.client.getSchemaById(id, { project_id: this.projectId });
-    return body as unknown as GetSchemaById200;
+    // Flat-by-id: authz resolves the project from RSI; no project_id query.
+    // The response is the `{id, schema, metadata}` envelope; only the
+    // customer-authored document is written back to `.zitadel/schemas/`.
+    const body = await this.client.getSchemaById(id);
+    return body.schema;
   }
 }
 
+/**
+ * Flow definitions are revisioned like schemas: every edit publishes a new
+ * immutable revision via `POST /flow_definitions`, no update or delete. The
+ * revisions of one flow share its `name`; the runtime serves the newest.
+ */
 class FlowDefinitionSyncer implements ResourceSyncer {
   readonly kind = "flow";
   readonly directory = FLOWS_DIR;
-  readonly mutable = true;
+  readonly mutable = false;
+  readonly revisioned = true;
+  readonly normalize = normalizeFlowBody;
+  // For flows the comparison form doubles as the file form: everything it
+  // strips (envelope keys, the empty `audience` echo) is transport noise.
+  readonly normalizeWrite = normalizeFlowBody;
 
-  constructor(
-    private readonly client: ZitadelClient,
-    private readonly projectId: string,
-    private readonly env: EnvLookup,
-  ) {}
+  private readonly client: ZitadelClient;
+  private readonly projectId: string;
+  private readonly env: EnvLookup;
+
+  constructor(client: ZitadelClient, projectId: string, env: EnvLookup) {
+    this.client = client;
+    this.projectId = projectId;
+    this.env = env;
+  }
 
   /**
-   * Validates one flow file. `validateFlows` takes a batch and throws
-   * `E_VALIDATION` on the first invalid entry; passing a single-element array
-   * lets us reuse the batch validator for one file.
+   * Validates one flow file against the canonical `flowConfigSchema` (the
+   * same Zod `validateFlows` and doctor use), then checks env references.
    */
   validate(data: object): void {
-    validateFlows([data]);
+    const result = flowConfigSchema.safeParse(data);
+    if (!result.success) {
+      throw new ZitadelError("E_VALIDATION", "Flow file is not a valid Zitadel flow body", {
+        details: { issues: result.error.issues },
+      });
+    }
     assertEnvRefs(data, this.env);
   }
 
   /**
-   * Wraps the bare on-disk flow body in the spec's create-envelope
+   * `POST /flow_definitions` publishes a new immutable revision and returns
+   * its id. Wraps the bare on-disk flow body in the spec's create-envelope
    * (`api/openapi/components/flows/flow-definition-create-request.yaml`)
    * before sending. The file on disk stays bare so it is human-editable;
    * only the wire request carries `project_id` and the surrounding
    * envelope.
    */
-  async create(data: object): Promise<string> {
-    const result = await this.client.createFlowDefinition({
+  async create(data: object): Promise<{ id: string; canonical?: object }> {
+    const result = (await this.client.createFlowDefinition({
       project_id: this.projectId,
+      schema_uri: DEFAULT_FLOW_SCHEMA_URI,
       flow_definition: data as CreateFlowDefinitionBodyFlowDefinition,
-    });
-    return result.id;
+    })) as CreateFlowDefinition201;
+    return { id: result.id, canonical: result.flow_definition as object };
   }
 
-  /**
-   * PUT completely replaces the flow definition. The wire request wraps the
-   * bare on-disk flow in the `{ flow_definition }` update envelope
-   * (`api/openapi/components/flows/flow-definition-update-request.yaml`) and
-   * carries `project_id` as a query parameter; the file on disk stays bare so
-   * it is human-editable.
-   */
-  async update(id: string, data: object): Promise<void> {
-    await this.client.updateFlowDefinition(
-      id,
-      { flow_definition: data as UpdateFlowDefinitionBodyFlowDefinition },
-      { project_id: this.projectId },
+  async update(_id: string, _data: object): Promise<{ canonical?: object }> {
+    throw new ZitadelError(
+      "E_NOT_IMPLEMENTED",
+      "flows are revisioned — edit publishes a new revision, not an update",
     );
   }
 
   async delete(id: string): Promise<void> {
-    await this.client.deleteFlowDefinition(id);
+    // Flow revisions are immutable on the platform; removing the local file
+    // does not retire them. The newest revision of the name keeps being
+    // served — publish a new revision to change what users see.
+    throw new ZitadelError("E_NOT_IMPLEMENTED", `flow delete is not supported (${id})`);
   }
 
   /**
-   * `GET /flow_definitions/:id` wraps the bare flow body in a detail envelope
-   * (`id`, `project_id`, `schema_uri`, `status`, `created_at`, `updated_at`).
-   * Strip those envelope fields here so the diff renderer compares
-   * apples-to-apples against the on-disk file, which stores only the bare
-   * body.
+   * `GET /flow_definitions/:id` returns a response envelope with metadata
+   * (`id`, `project_id`, `created_at`, `updated_at`) plus `flow_definition`.
+   * Return only `flow_definition` so diffs compare with the on-disk bare body.
+   * Flat-by-id: no `project_id` query — authz resolves the project from RSI.
    */
   async fetch(id: string): Promise<object> {
-    const envelope = (await this.client.getFlowDefinition(id)) as GetFlowDefinition200;
-    const {
-      id: _id,
-      project_id: _projectId,
-      schema_uri: _schemaUri,
-      status: _status,
-      created_at: _createdAt,
-      updated_at: _updatedAt,
-      ...body
-    } = envelope;
-    return body;
+    const envelope = await this.client.getFlowDefinition(id);
+
+    return envelope.flow_definition as object;
+  }
+}
+
+/**
+ * Branding revisions (ADR 040): schema-style immutable semantics — every
+ * edit publishes a new revision via `POST /branding`, no update or delete.
+ * Unlike schemas, nothing references branding revisions, so a revise never
+ * triggers re-pinning. The descriptor keeps the template in a sibling
+ * `.liquid` file behind a `$file` reference; this syncer inlines it for
+ * hashing and upload and splits it back out on write-back.
+ */
+class BrandingSyncer implements ResourceSyncer {
+  readonly kind = "branding";
+  readonly directory = BRANDING_DIR;
+  readonly mutable = false;
+  readonly revisioned = true;
+  /** One project, one branding descriptor — extra .json files fail the scan. */
+  readonly singletonFile = "branding.json";
+
+  private readonly client: ZitadelClient;
+  private readonly projectId: string;
+  private readonly env: EnvLookup;
+  private readonly cwd: string;
+
+  constructor(client: ZitadelClient, projectId: string, env: EnvLookup, cwd: string) {
+    this.client = client;
+    this.projectId = projectId;
+    this.env = env;
+    this.cwd = cwd;
+  }
+
+  /**
+   * The comparison form is the wire body with the template inlined, so an
+   * edit to the referenced `.liquid` file changes the state hash and plans
+   * a `revise` even though the descriptor JSON is untouched.
+   */
+  readonly normalize = (data: object): object => toBrandingWireBody(this.cwd, data);
+
+  /**
+   * Zod shape + env refs, then the authoritative template validation from
+   * `@zitadel/config/template` — the LiquidJS-dialect check the Go server
+   * cannot run (its save gate is lexical; see ADR 040).
+   */
+  validate(data: object): void {
+    assertNoLegacyTemplateKey(data);
+    const result = brandingConfigSchema.safeParse(data);
+    if (!result.success) {
+      throw new ZitadelError("E_VALIDATION", "Branding file is not a valid branding descriptor", {
+        details: { issues: result.error.issues },
+      });
+    }
+    assertEnvRefs(data, this.env);
+    const template = readDescriptorTemplate(this.cwd, data);
+    if (template === undefined) {
+      return;
+    }
+    const issues = validateLoginTemplate(template).filter((issue) => issue.severity === "error");
+    if (issues.length > 0) {
+      throw new ZitadelError("E_VALIDATION", "Login template failed validation", {
+        details: { issues },
+        hint: "Fix the template issues; the rules live in docs/design/flowengine/template-security.md.",
+      });
+    }
+  }
+
+  /**
+   * `POST /branding` publishes a new immutable revision. The canonical body
+   * is converted back to descriptor form: the stored template is written to
+   * the referenced `.liquid` file (when it differs) and the JSON keeps the
+   * file reference, so `writeBackResource` stays pure-JSON.
+   */
+  async create(data: object): Promise<{ id: string; canonical?: object }> {
+    const wire = toBrandingWireBody(this.cwd, data) as CreateBrandingBody;
+    const result = (await this.client.createBranding(wire, {
+      project_id: this.projectId,
+    })) as CreateBranding201;
+    return { id: result.id, canonical: this.canonicalToLocal(result.branding as object, data) };
+  }
+
+  async update(_id: string, _data: object): Promise<{ canonical?: object }> {
+    throw new ZitadelError(
+      "E_NOT_IMPLEMENTED",
+      "branding is revisioned — edit publishes a new revision, not an update",
+    );
+  }
+
+  async delete(id: string): Promise<void> {
+    // Branding revisions are immutable on the platform; removing the local
+    // descriptor does not retire them. The newest revision keeps being
+    // served — publish a new revision to change what users see.
+    throw new ZitadelError("E_NOT_IMPLEMENTED", `branding delete is not supported (${id})`);
+  }
+
+  /** Wire form (template inlined); diffs compare in the normalized form. Flat-by-id: no project_id query. */
+  async fetch(id: string): Promise<object> {
+    const envelope = await this.client.getBrandingById(id);
+    return envelope.branding as object;
+  }
+
+  private canonicalToLocal(canonicalWire: object, localData: object): object {
+    const { document, written } = toLocalBrandingBody(this.cwd, canonicalWire, localData);
+    for (const ref of written) {
+      consola.info(`Updated ${ref} from the server's canonical response`);
+    }
+    return document;
   }
 }

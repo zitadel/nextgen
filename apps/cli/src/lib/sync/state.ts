@@ -1,7 +1,9 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { ResourceEntry, ZitadelState } from "./types.js";
+import type { ResourceEntry, ScaffoldManifest, ZitadelState } from "./types.js";
+
+export type { ZitadelState } from "./types.js";
 
 /**
  * Read and parse `.zitadel/state.json`. Throws if the file is
@@ -19,11 +21,7 @@ export async function readState(cwd: string): Promise<ZitadelState> {
  * with sorted keys disabled (state is engine-managed, not human-
  * authored, so deterministic ordering isn't required here).
  */
-export async function updateState(
-  cwd: string,
-  key: string,
-  entry: ResourceEntry,
-): Promise<void> {
+export async function updateState(cwd: string, key: string, entry: ResourceEntry): Promise<void> {
   const current = await readState(cwd);
   const updated: ZitadelState = {
     ...current,
@@ -32,6 +30,18 @@ export async function updateState(
       [key]: { ...current.resources[key], ...entry },
     },
   };
+  await writeFile(join(cwd, ".zitadel/state.json"), JSON.stringify(updated, null, 2));
+}
+
+/**
+ * Replace the scaffold manifest section wholesale, preserving the sync
+ * `resources`. Setup owns the full manifest (it knows exactly what it wrote);
+ * `doctor --fix` re-writes it after restoring files. Kept here so state.json
+ * retains a single writer module.
+ */
+export async function updateScaffold(cwd: string, scaffold: ScaffoldManifest): Promise<void> {
+  const current = await readState(cwd);
+  const updated: ZitadelState = { ...current, scaffold };
   await writeFile(join(cwd, ".zitadel/state.json"), JSON.stringify(updated, null, 2));
 }
 

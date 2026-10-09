@@ -5,40 +5,57 @@ stack: "frontend"
 dependsOn:
   - "api"
   - "api-mock"
+  - "config"
   - "sdk-next"
 
 tasks:
-  lint:
-    command: "corepack pnpm exec oxlint ."
-    deps:
-      - "api:build"
-      - "sdk-next:build"
-
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
-      - "api:build"
+      - "api-mock:build"
       - "sdk-next:build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
-      - "api:build"
       - "sdk-next:build"
-    inputs:
-      # Default project files plus the telemetry build-channel env var, so a
-      # production-stamped (release) build is never served from — or reused as —
-      # a dev-stamped cache. See apps/cli/tsdown.config.ts.
-      - "**/*"
-      - "$ZITADEL_TELEMETRY_BUILD_CHANNEL"
+
+  build-release:
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
+    deps:
+      - "test"
+      - "sdk-next:build-release"
     outputs:
       - "dist/**/*"
+    options:
+      cache: false
+      # cli:test exercises the normal dev build and its workspace package
+      # readers. Finish it before release deps start cleaning/rebuilding the
+      # public package dist directories.
+      runDepsInParallel: false
+      # Release builds remove stale package output and rebuild dist after
+      # cli:test has finished using the dev build. They stay out of `moon ci`;
+      # release:snapshot invokes them in the later release step instead.
+      runInCI: false
 
   test:
-    command: "corepack pnpm run test"
     deps:
       - "build"
       - "api-mock:build"
+    inputs:
+      - "**/*"
+      # The @zitadel/server wrapper its server-wrapper test loads. An input,
+      # not a task dep on server: server depends on console, and console's dev
+      # tasks depend on cli (#1487), so that edge would close a project cycle.
+      - "/apps/server/bin/**/*"
+    options:
+      # The built oclif commands import @zitadel/{api,config,sdk-next} from
+      # those packages' dist/ at runtime. Their build-release tasks rewrite
+      # the same directories and cannot take a task dep on this target
+      # (cli dependsOn them — the reverse edge would cycle the project
+      # graph), so a shared mutex keeps them from cleaning a dist while
+      # these tests import from it.
+      mutex: "public-dist"
 
   readme:
     command: "corepack pnpm run readme"

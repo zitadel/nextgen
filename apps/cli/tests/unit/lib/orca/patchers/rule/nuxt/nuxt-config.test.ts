@@ -15,7 +15,6 @@ describe("nuxtConfigEdit", () => {
     expect(out).toContain("process.env.ZITADEL_URL");
     expect(out).toContain("process.env.NUXT_PUBLIC_ZITADEL_PROJECT_ID");
     expect(out).toContain("@zitadel/components");
-    expect(out).toContain("@zitadel/shared-component-styles");
     expect(out).toContain("@zitadel/design-tokens");
     expect(out).toContain("isCustomElement");
     expect(out).toContain('tag.startsWith("zitadel-")');

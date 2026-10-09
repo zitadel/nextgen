@@ -11,6 +11,9 @@ import (
 )
 
 func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, params api.CreateSchemaParams) (api.CreateSchemaRes, error) {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), schemaAccess, opWrite); err != nil {
+		return nil, err
+	}
 	var schema *domain.JSONSchema
 
 	switch req.Type {
@@ -46,20 +49,77 @@ func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, par
 }
 
 func (h *Handler) GetSchemaById(ctx context.Context, params api.GetSchemaByIdParams) (api.GetSchemaByIdRes, error) {
-	schema, err := h.schemaService.GetSchema(ctx, string(params.ProjectID), string(params.TeamID.Value), params.ID)
+	projectID, err := h.requireResourceAccessInProject(ctx, string(params.ProjectID.Value), params.ID, schemaAccess, opRead)
+	if err != nil {
+		return nil, err
+	}
+	schema, err := h.schemaService.GetSchema(ctx, projectID, string(params.TeamID.Value), params.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	apiSchema := api.UserSchema{}
-	err = apiSchema.UnmarshalJSON(schema.Schema)
+	apiSchema, err := domainSchemaToApiSchema(schema)
+	if err != nil {
+		return nil, err
+	}
+	return apiSchema, nil
+}
+
+func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams) (api.ListSchemasRes, error) {
+	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), schemaAccess, domain.ResourceKindSchema)
+	if err != nil {
+		return nil, err
+	}
+	// The wire enum and the domain enum carry the same values, but the mapping
+	// is explicit so an added kind cannot silently pass through unrecognised.
+	var kind *domain.JSONSchemaKind
+	if params.Kind.Set {
+		parsed, err := domain.JSONSchemaKindString(string(params.Kind.Value))
+		if err != nil {
+			return nil, err
+		}
+		kind = &parsed
+	}
+
+	schemas, err := h.schemaService.ListSchemas(ctx, service.ListSchemasInput{
+		ProjectID:                   string(params.ProjectID),
+		ObjectType:                  params.ObjectType.Value,
+		Kind:                        kind,
+		LatestRevisionPerObjectType: params.Revisions.Value == api.ListSchemasRevisionsLatest,
+		PageToken:                   string(params.PageToken.Value),
+		Limit:                       int(params.Limit.Value),
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	return &api.GetSchemaByIdOK{
-		Type:       api.UserSchemaGetSchemaByIdOK,
-		UserSchema: apiSchema,
+	resp := api.ListSchemasResponse{Schemas: make([]api.Schema, len(schemas.Items))}
+	for i, schema := range schemas.Items {
+		apiSchema, err := domainSchemaToApiSchema(schema)
+		if err != nil {
+			return nil, err
+		}
+		resp.Schemas[i] = *apiSchema
+	}
+	if schemas.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(schemas.NextPageToken))
+	}
+
+	return &resp, nil
+}
+
+// domainSchemaToApiSchema wraps the stored customer-authored document in the
+// server-owned envelope; every schema read goes through it.
+func domainSchemaToApiSchema(schema *domain.JSONSchema) (*api.Schema, error) {
+	document := api.UserSchema{}
+	if err := document.UnmarshalJSON(schema.Schema); err != nil {
+		return nil, err
+	}
+
+	return &api.Schema{
+		ID:       schema.URL,
+		Schema:   api.NewUserSchemaSchemaDocument(document),
+		Metadata: api.SchemaMetadata{CreatedAt: schema.CreatedAt},
 	}, nil
 }
 
@@ -69,10 +129,18 @@ func schemaErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case domain.ErrJSONSchemaNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case domain.ErrJSONSchemaAlreadyExists().Code:
+	case domain.ErrJSONSchemaAlreadyExists().Code,
+		domain.ErrJSONSchemaRevisionConflict().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
-	case domain.ErrJSONSchemaInvalid().Code:
+	case domain.ErrJSONSchemaInvalid().Code,
+		domain.ErrJSONSchemaFetchDenied().Code,
+		domain.ErrJSONSchemaFetchTooLarge().Code,
+		domain.ErrJSONSchemaFetchTooManyRedirects().Code,
+		domain.ErrJSONSchemaFetchDowngrade().Code,
+		domain.ErrJSONSchemaFetchTimeout().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	case domain.ErrJSONSchemaPermissionDenied().Code:
+		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	default:
 		return internalErrorResponse(err)
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 )
 
 type StatusError struct {
@@ -41,6 +42,12 @@ func Get(ctx context.Context, url string, client *http.Client, acceptContentType
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		// Redirects may have moved the request: carry the URL this response
+		// actually came from, the way client.Do itself reports failures, so
+		// callers can attribute a mid-body failure to the right hop.
+		if resp.Request != nil && resp.Request.URL != nil {
+			return nil, &neturl.Error{Op: "Read", URL: resp.Request.URL.String(), Err: err}
+		}
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {

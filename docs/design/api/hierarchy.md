@@ -12,7 +12,7 @@
 
 ## Platform is a reserved project
 
-There is no separate "platform" resource kind. Zitadel's own control plane is just a **reserved project** inside the same model — the platform project. Its `project_id` is discoverable via the authenticated [`/capabilities`](conventions.md#capabilities) response under `defaults.project_id`. The SDK does not hardcode the value; it reads it on initialisation.
+There is no separate "platform" resource kind. Zitadel's own control plane is just a **reserved project** inside the same model — the platform project. Discovering its `project_id` from the server (rather than hardcoding it) is target design: the planned [`/capabilities`](conventions.md#direction-not-shipped) endpoint would expose it under `defaults.project_id`, but no such endpoint is shipped today.
 
 This means:
 
@@ -25,9 +25,13 @@ Same resources, different project context. The SDK talks to `/users`, `/teams`, 
 
 ## Self-hosted exposes the same API shape as cloud
 
-**LOCKED.** Self-hosted returns a singleton platform project and a singleton default team with the identical JSON schema the cloud version returns. The SDK does not branch on deployment mode — it blindly works against both.
+**LOCKED.** A bootstrapped self-hosted deployment returns a singleton platform project and a singleton default team with the identical JSON schema the cloud version returns. The SDK does not branch on deployment mode — it blindly works against both. Before bootstrap completes there is no platform project to return; that is a deployment-lifecycle state, not a second API shape ([Console ADR 0004 §2](../../../apps/console/docs/adrs/0004-console-deployment-modes.md#2-bootstrap-is-explicit-desired-state)).
 
-The self-hosted project ID is **discoverable via `/capabilities`**, never hardcoded. When self-hosted grows to multiple projects, restores from backup with a different `project_id`, or runs clustered, the SDK keeps working because it discovered its defaults from the server.
+"Singleton" describes the platform project and the default team, not the deployment's project count. Customer projects are unbounded in both modes.
+
+Not shipped yet: the *discoverable, auto-provisioned* singleton this section describes. On a server started by hand, a self-hoster opts into a platform project by setting `platform.bootstrap_project` (`NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT`), which provisions the project itself (keys, default schema, default login flow) at startup, so there the flag is still a manual opt-in. The CLI is the exception: `zitadel start` sets the flag itself and seeds a local admin, `admin@zitadel.localhost`, through the server's `--user-file` input, so a CLI-started server with the default bootstrap has both the platform project and an initial user (the opt-out env var or a non-platform project pin disables both). What is missing is the server-discovered provisioning this section targets, not the initial user: ADR 0004 §2's seed transport still owns membership and owner assignment. With the flag off, every project created is a customer project, and the Console signs in against §2's transitional fallback (the first-created project, or the `platform.project_id` pin). Read this section as the contract bootstrap implements, not as current behavior.
+
+The self-hosted project ID should be **discoverable from the server** ([direction](conventions.md#direction-not-shipped)), never hardcoded. When self-hosted grows to multiple projects, restores from backup with a different `project_id`, or runs clustered, the SDK keeps working because it discovered its defaults from the server.
 
 ## Concrete shapes
 

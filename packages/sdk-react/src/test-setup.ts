@@ -1,5 +1,11 @@
 import { cleanup } from "@testing-library/react";
+import { serveMockFlowApi } from "@zitadel/api-mock/vitest";
 import { afterEach } from "vitest";
+
+// Serves the mock Flow API (`@zitadel/api-mock`) to every spec, so a mounted
+// widget talks to the same handlers the components suite and Storybook use
+// instead of a network that is not there.
+serveMockFlowApi();
 
 // Unmounts rendered components and clears the DOM after every spec
 // (testing-library's recommended setup-file pattern), mirroring the

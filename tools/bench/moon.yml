@@ -1,0 +1,100 @@
+id: "bench"
+language: "go"
+layer: "tool"
+stack: "infrastructure"
+
+# The k6 benchmark harness (ADR 067): a nested Go module that compiles the
+# k6/x/nextgen scenarios and the `k6 x nextgen` command tree into a k6 binary.
+# Tasks run from this directory, so `go` sees tools/bench/go.mod.
+
+fileGroups:
+  benchInputs:
+    - "**/*.go"
+    - "**/*.js"
+    - "go.mod"
+    - "go.sum"
+    - "moon.yml"
+    # The root module is a dependency through the replace directive.
+    - "/**/*.go"
+    - "/go.mod"
+    - "/go.sum"
+    # Files the root packages bench imports compile in through //go:embed:
+    # the JSON meta-schemas and the config defaults.
+    - "/api/openapi/endpoints/schemas/*.json"
+    - "/packages/config/defaults/**/*"
+
+tasks:
+  # Tracked Go files only, as the server project checks them.
+  format:
+    script: |
+      unformatted="$(git ls-files -z -- '*.go' | xargs -0 gofmt -l)"
+      if [ -n "$unformatted" ]; then
+        echo "error: gofmt would rewrite the following files:" >&2
+        printf '%s\n' "$unformatted" >&2
+        echo "hint: run gofmt -w on those paths, then re-check with moon run bench:format" >&2
+        exit 1
+      fi
+    inputs:
+      - "**/*.go"
+
+  vet:
+    command: "go vet ./..."
+    inputs:
+      - "@group(benchInputs)"
+
+  # This is a Go project, so it inherits no Biome lint task, but it owns a
+  # JavaScript k6 script (scripts/*.js). Lint it here so a change to it cannot
+  # bypass Biome; the JS files are inputs, so `moon ci :lint` selects this task
+  # when a script changes. Mirrors the server launcher (apps/server/moon.yml).
+  lint:
+    command: "corepack pnpm exec biome check scripts --no-errors-on-unmatched"
+    inputs:
+      - "scripts/**/*.js"
+      - "/biome.json"
+
+  # The CI build #1096 asks for: the module and the binary compile. No load
+  # is generated here. dist/ is what every project builds into and is
+  # gitignored at the root.
+  build:
+    command: "go build -o dist/k6 ./cmd/k6"
+    deps:
+      - "vet"
+    inputs:
+      - "@group(benchInputs)"
+    outputs:
+      - "dist/k6"
+
+  test:
+    command: "go test -timeout 5m ./..."
+    deps:
+      - "format"
+      - "vet"
+    inputs:
+      - "@group(benchInputs)"
+
+  # Local sweep against a server that is already running: provision
+  # fixtures/local.json, run every scenario at 1, 5 and 20 VUs, summarise.
+  # The harness never starts a server; locally that is `moon run
+  # workspace:server` in another terminal (default port 8080). Pass flags
+  # through, later flags win:
+  #   moon run bench:sweep -- --vus 5 --duration 10s --scenarios getUser
+  #   moon run bench:sweep -- --base http://localhost:9090 --lane postgres
+  sweep:
+    command: "dist/k6 x nextgen sweep --base http://localhost:8080 --fixtures fixtures/local.json"
+    deps:
+      - "build"
+    options:
+      cache: false
+      runInCI: false
+      shell: false
+
+  # Rewrite the summary of an existing sweep directory:
+  #   moon run bench:summarize -- dist/sweep-<stamp>
+  summarize:
+    command: "dist/k6 x nextgen summarize"
+    deps:
+      - "build"
+    options:
+      cache: false
+      runInCI: false
+      shell: false

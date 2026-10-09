@@ -1,13 +1,11 @@
 import { readFileSync } from "node:fs";
 import { format } from "node:util";
-import { fileURLToPath } from "node:url";
 
 import { run } from "@oclif/core";
 
 import { publicCliCommand } from "../../src/lib/public-cli";
+import { cliPackageRoot } from "./oclif-build";
 
-/** Repo root of the CLI package (where the oclif config + built dist live). */
-const root = fileURLToPath(new URL("../../", import.meta.url));
 const cliVersion = JSON.parse(
   readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
 ) as { version: string };
@@ -17,9 +15,14 @@ const cliVersion = JSON.parse(
  * code, with `env` overlaid onto `process.env` for the duration. Mirrors a real
  * `zitadel <args>` invocation; the JSON envelope is emitted by the domain
  * `run*` functions to stdout exactly as in production. Requires the CLI to have
- * been built (vitest global setup builds `dist/commands`).
+ * been built (vitest global setup builds `dist/index.mjs`). `root` is the
+ * package oclif loads; pass a staged copy to exercise a published layout.
  */
-export async function runCliForTest(argv: string[], env: NodeJS.ProcessEnv = {}) {
+export async function runCliForTest(
+  argv: string[],
+  env: NodeJS.ProcessEnv = {},
+  root: string = cliPackageRoot,
+) {
   let stdout = "";
   let stderr = "";
   const originalOut = process.stdout.write.bind(process.stdout);
@@ -85,6 +88,23 @@ export function parseJson(stdout: string): unknown {
   return JSON.parse(stdout);
 }
 
+// Spelled as an escape so the pattern carries no literal control character.
+const ESC = "\\u001B";
+const ANSI_SEQUENCE = new RegExp(`${ESC}\\[[0-9;]*m`, "g");
+
+/** Drops SGR colour codes so assertions can target the text itself. */
+export function stripAnsi(text: string): string {
+  return text.replaceAll(ANSI_SEQUENCE, "");
+}
+
 export function expectedPublicCliCommand(args: string): string {
   return publicCliCommand(args, cliVersion.version);
+}
+
+/**
+ * Presses Ctrl-C in the running command. Emitting the signal rather than
+ * sending it keeps the keypress inside this process, where the command runs.
+ */
+export function pressCtrlC(): void {
+  process.emit("SIGINT", "SIGINT");
 }

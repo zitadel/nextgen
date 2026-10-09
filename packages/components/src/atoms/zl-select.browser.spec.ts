@@ -1,13 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import "./zl-select.js";
-import type { ZlSelect, ZlSelectChangeDetail, ZlSelectOption } from "./zl-select.js";
+import type { ZlSelect, ZlSelectOption } from "./zl-select.js";
 
 /**
- * Real-browser checks for the form-participation and keyboard contract. These
- * rely on the full Form-Associated Custom Element API (setFormValue /
- * setValidity / formResetCallback / delegatesFocus) and real key events, which
- * jsdom 29 only partially implements. Run via `pnpm test:browser`.
+ * Real-browser checks for the form-participation contract. These rely on the
+ * full Form-Associated Custom Element API (setFormValue / setValidity /
+ * formResetCallback / delegatesFocus), which jsdom 29 only partially
+ * implements. Run via `pnpm test:browser`.
+ *
+ * Keyboard and assistive-tech selection flow through the real native `<select>`
+ * (`.zr-select__native`): its native popup ultimately fires a `change` event,
+ * which is exactly what automation drivers (Playwright `selectOption`, the
+ * chrome-devtools a11y snapshot) trigger too. We exercise that `change` path
+ * directly rather than driving the OS-level native popup.
  */
 const OPTIONS: ZlSelectOption[] = [
   { value: "us", label: "United States" },
@@ -40,12 +46,20 @@ describe("<zl-select> form participation (chromium)", () => {
     return { form: host.querySelector("form") as HTMLFormElement, select };
   }
 
-  function trigger(select: ZlSelect): HTMLButtonElement {
-    return select.shadowRoot?.querySelector(".zr-select__trigger") as HTMLButtonElement;
+  function native(select: ZlSelect): HTMLSelectElement {
+    return select.shadowRoot?.querySelector(".zr-select__native") as HTMLSelectElement;
   }
 
-  function press(select: ZlSelect, key: string): void {
-    trigger(select).dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, composed: true }));
+  function options(select: ZlSelect): HTMLLIElement[] {
+    return [...(select.shadowRoot?.querySelectorAll<HTMLLIElement>(".zr-select__option") ?? [])];
+  }
+
+  /** Simulate a selection through the native control (native popup / automation). */
+  async function selectNative(select: ZlSelect, value: string): Promise<void> {
+    const el = native(select);
+    el.value = value;
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    await select.updateComplete;
   }
 
   it("contributes the selected value to FormData", async () => {
@@ -66,56 +80,40 @@ describe("<zl-select> form participation (chromium)", () => {
     expect(form.checkValidity()).toBe(true);
   });
 
-  it("opens with arrow keys and selects the active option on Enter", async () => {
+  it("contributes a native-control change to FormData and re-dispatches one change", async () => {
     const { form, select } = await mount();
-    let detail: ZlSelectChangeDetail | undefined;
     let nativeChanges = 0;
-    select.addEventListener("zl-change", (event) => {
-      detail = (event as CustomEvent<ZlSelectChangeDetail>).detail;
-    });
     select.addEventListener("change", () => {
       nativeChanges += 1;
     });
-
-    trigger(select).focus();
-    press(select, "ArrowDown");
-    await select.updateComplete;
-    expect(select.open).toBe(true);
-
-    press(select, "ArrowDown"); // us -> de
-    await select.updateComplete;
-    press(select, "Enter");
-    await select.updateComplete;
-
-    expect(select.value).toBe("de");
-    expect(select.open).toBe(false);
-    expect(new FormData(form).get("country")).toBe("de");
-    expect(detail).toEqual({ name: "country", value: "de" });
+    await selectNative(select, "us");
+    expect(new FormData(form).get("country")).toBe("us");
     expect(nativeChanges).toBe(1);
   });
 
-  it("skips disabled options during keyboard navigation", async () => {
-    const { select } = await mount("", "de");
-    trigger(select).focus();
-    press(select, "ArrowDown"); // open, active = de (selected)
-    await select.updateComplete;
-    press(select, "ArrowDown"); // de -> skip ch (disabled) -> at
-    await select.updateComplete;
-    press(select, "Enter");
-    await select.updateComplete;
-    expect(select.value).toBe("at");
+  it("contributes nothing to FormData once cleared back to the empty option", async () => {
+    const { form, select } = await mount("", "us");
+    await selectNative(select, "");
+    expect(new FormData(form).get("country")).toBeNull();
   });
 
-  it("closes on Escape without changing the value", async () => {
+  it("contributes a pointer choice from the styled popup to FormData", async () => {
+    const { form, select } = await mount();
+    select.open = true;
+    await select.updateComplete;
+    // Leading empty row + us, de, ch(disabled), at → "at" is index 4.
+    options(select)[4]?.click();
+    await select.updateComplete;
+    expect(new FormData(form).get("country")).toBe("at");
+  });
+
+  it("ignores pointer clicks on a disabled popup row", async () => {
     const { select } = await mount("", "us");
-    trigger(select).focus();
-    press(select, "ArrowDown");
+    select.open = true;
     await select.updateComplete;
-    press(select, "ArrowDown");
+    // ch (disabled) is index 3.
+    options(select)[3]?.click();
     await select.updateComplete;
-    press(select, "Escape");
-    await select.updateComplete;
-    expect(select.open).toBe(false);
     expect(select.value).toBe("us");
   });
 
@@ -128,9 +126,24 @@ describe("<zl-select> form participation (chromium)", () => {
     expect(select.value).toBe("us");
   });
 
-  it("delegates focus from the host to the trigger", async () => {
+  it("is disabled by an enclosing fieldset", async () => {
+    host.innerHTML = `<form><fieldset disabled><zl-select name="country" value="us"></zl-select></fieldset></form>`;
+    const form = host.querySelector("form") as HTMLFormElement;
+    const select = host.querySelector("zl-select") as ZlSelect;
+    select.options = OPTIONS;
+    await select.updateComplete;
+    expect(native(select).disabled).toBe(true);
+    expect(new FormData(form).get("country")).toBeNull();
+
+    (form.querySelector("fieldset") as HTMLFieldSetElement).disabled = false;
+    await select.updateComplete;
+    expect(native(select).disabled).toBe(false);
+    expect(new FormData(form).get("country")).toBe("us");
+  });
+
+  it("delegates focus from the host to the native control", async () => {
     const { select } = await mount();
     select.focus();
-    expect(select.shadowRoot?.activeElement).toBe(trigger(select));
+    expect(select.shadowRoot?.activeElement).toBe(native(select));
   });
 });

@@ -4,34 +4,60 @@ layer: "library"
 stack: "frontend"
 dependsOn:
   - "api"
+  - "api-mock"
   - "components"
   - "sdk-core"
 
 tasks:
-  lint:
-    command: "corepack pnpm run lint"
-    deps:
-      - "api:build"
-      - "components:build"
-      - "sdk-core:build"
-
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
-      - "api:build"
+      - "api-mock:build"
       - "components:build"
       - "sdk-core:build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
-      - "api:build"
       - "components:build"
       - "sdk-core:build"
+
+  build-release:
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
+    deps:
+      - "components:build-release"
+      - "sdk-core:build-release"
     outputs:
       - "dist/**/*"
+    options:
+      cache: false
+      # Release builds remove stale package output and rebuild dist in one
+      # task. They stay out of `moon ci`; release:snapshot invokes them in
+      # the later release step instead of the normal build/test graph.
+      runInCI: false
 
+  # Chromium for the browser-mode test suite. Self-contained (like components):
+  # the `test` task depends on it so `moon ci :test` provisions it in CI.
+  install-browsers:
+    command: "corepack pnpm exec playwright install chromium"
+    options:
+      cache: false
+
+  # Runs the Vitest suite in real Chromium (see vitest.config.ts): Qwik 2's
+  # client render and the wrapped Lit web components need a real DOM. The
+  # browser project pays a Chromium cold start, which this lane covers in CI.
   test:
-    command: "corepack pnpm run test"
     deps:
+      # api-mock serves the Flow API to the specs (test-setup.ts).
+      - "api-mock:build"
+      - "install-browsers"
       - "build"
+    options:
+      # Shared mutex with the other browser-mode suites so only one real-Chromium
+      # Vite server runs at a time; concurrent servers starve under moon's CI
+      # graph and drop module fetches. (#1490)
+      mutex: "browser-tests"
+      # Retry a failed browser suite in CI. The flake is a cold-start race:
+      # the first attempt warms the Vite dep cache, so a retry runs warm and
+      # clears the "Failed to fetch dynamically imported module" failure. (#1490)
+      retryCount: 3

@@ -1,5 +1,667 @@
 # @zitadel/cli
 
+## 1.0.0-alpha.25
+
+### Minor Changes
+
+- [#1406](https://github.com/zitadel/nextgen/pull/1406) [`46a366f`](https://github.com/zitadel/nextgen/commit/46a366fabf688964b3a62158e6922902f0f0045b) Thanks [@mridang](https://github.com/mridang)! - Distribute the CLI's agent guidance as an installable Agent Skill. Any skills-compatible coding agent — Claude Code, Cursor, Copilot, Codex, and more — can now add it with `npx skills add zitadel/nextgen --full-depth`, giving the agent guided, always-current instructions for scaffolding and managing Zitadel auth with the `zitadel` CLI. The skill also ships inside the `@zitadel/cli` package.
+
+- [#1366](https://github.com/zitadel/nextgen/pull/1366) [`025acc6`](https://github.com/zitadel/nextgen/commit/025acc68028216d982d88771e372ef99aacf1d54) Thanks [@mridang](https://github.com/mridang)! - `zitadel setup` no longer limits onboarding to one social provider. The onboarding question is a multi-select rather than one choice, and declining is an empty selection rather than a "not now" option beside the providers. Each chosen provider is asked for its own client id and secret, gets its own connection file, and has its slug added to the schema and the login flow — which already carried `sso_providers` as a list. The summary and the `--json` payload report one entry per provider, so a publish that did not land names the provider it belongs to. `--sso` still takes a single provider: a scripted run pipes one secret on stdin, and `sso enable` adds the rest. The catalog ships one provider today, so this changes what the CLI supports rather than what a developer can pick right now — a second catalog entry is what makes the multi-select visible.
+
+- [#1281](https://github.com/zitadel/nextgen/pull/1281) [`79527ed`](https://github.com/zitadel/nextgen/commit/79527edba346d39fd43502eb4357d3d19a77ad2d) Thanks [@mridang](https://github.com/mridang)! - Add social sign-in to the CLI. `zitadel sso enable --provider google` configures an identity provider on an existing Project: it says what to register with the vendor and at which redirect URI, takes the client id and secret, writes `.zitadel/idps/<slug>.json`, enables `sso` on the user schema, and adds the provider button plus the steps and routes a provider round trip needs to every login flow that runs against that schema. The client secret is never a flag — it is prompted for, or piped in on stdin for a scripted run — and never written to disk: only its `${{ NAME }}` reference reaches the connection file, and the value is published to the Project as an encrypted variable, which is where the engine resolves it from. `zitadel setup` asks the same question during onboarding, so a Project can start with Google rather than adding it afterwards, with `--sso` and `--sso-client-id` for scripted runs. Everything so far is local: publishing the connection needs identity provider support on the server, which is not in this release, so `apply` cannot upload a connection file yet and deleting one is not supported either. Enable the provider once that support ships.
+
+- [#1358](https://github.com/zitadel/nextgen/pull/1358) [`67461ef`](https://github.com/zitadel/nextgen/commit/67461efbc0db36d4771af85f09cdc5219e49a5a5) Thanks [@mridang](https://github.com/mridang)! - `@zitadel/sdk-qwik` now targets Qwik 2: it declares a peer dependency on `@qwik.dev/core` (`^2.0.0-beta.45`) in place of `@builder.io/qwik`, so your app must be on Qwik 2 to use it. Qwik 2 runs on Vite 8. The widgets stay reactive to their props, mirroring the other framework SDKs.
+
+  The CLI's Qwik support follows suit. `zitadel setup` now scaffolds and detects Qwik 2 apps: a new app is created on `@qwik.dev/core` and Vite 8 (no Vite 7 pin), and a Qwik 1 project is no longer auto-detected, since it cannot use the Qwik 2 SDK.
+
+- [#1406](https://github.com/zitadel/nextgen/pull/1406) [`46a366f`](https://github.com/zitadel/nextgen/commit/46a366fabf688964b3a62158e6922902f0f0045b) Thanks [@mridang](https://github.com/mridang)! - `setup` now decides where to scaffold with a plain rule instead of a maintained allowlist. A directory with a detected framework is integrated in place; an empty directory gets a fresh app; a non-empty directory with no framework stops and asks for `--force`. `setup --force` scaffolds a fresh app into a non-empty directory, moving the existing files aside and restoring everything the scaffold does not create. This removes the treadmill of allowlisting each tool's metadata (`.gitignore`, `.zitadel`, `.claude`, …) and lets you install the agent skill into a project directory and then scaffold there with an explicit `--force`.
+
+- [#1371](https://github.com/zitadel/nextgen/pull/1371) [`0269f56`](https://github.com/zitadel/nextgen/commit/0269f56e8299584b20e5815cf9b8d3c84ae65010) Thanks [@IAM-marco](https://github.com/IAM-marco)! - `zitadel setup` and `zitadel sso enable` write the renamed SSO outcomes into the login flow: `sso_authenticated` and `sso_user_not_found`. `user_already_exists` keeps its name and is shared with the typed collision. On a flow an earlier version wrote, `zitadel sso enable` renames `callback` and `identity_unknown` to the new keys, so enabling another provider keeps the flow valid. If one of those old keys declares `purpose` or `action`, which the new keys refuse, the command stops with a validation error naming the step and the key, so you can remove them first. If a step the command edits already has an action named like an outcome it writes there (`sso_authenticated`, `sso_user_not_found` or `user_already_exists`), whether or not the flow still uses the old keys, the command stops with a validation error naming the step and the action, so you can rename that action first.
+
+### Patch Changes
+
+- [#1383](https://github.com/zitadel/nextgen/pull/1383) [`4c07937`](https://github.com/zitadel/nextgen/commit/4c0793767753c765a1c84ffb2f93a7504f7522ef) Thanks [@mridang](https://github.com/mridang)! - Human output can now be turned colourless with `--no-color`, and the `NO_COLOR` and `FORCE_COLOR` environment variables are honoured. This covers both the step logging and the highlighted commands, paths and ids, so piped and CI runs read cleanly; `--color` forces colour on.
+
+- [#1456](https://github.com/zitadel/nextgen/pull/1456) [`3937a77`](https://github.com/zitadel/nextgen/commit/3937a7724380c0e59ff039e946053945a8e6475d) Thanks [@mridang](https://github.com/mridang)! - A platform request that gets no response is now reported reliably and can be cancelled.
+  - `@zitadel/api`: the client throws a typed `NetworkError` (reason `unreachable` or `timeout`) when
+    a request gets no response, alongside `ApiError` for a failing status. `createZitadelClient`
+    takes an optional `signal` and `timeoutMs`; an aborted request rejects with the signal's reason.
+  - `@zitadel/cli`: a refused, unresolvable or silent server reports `E_NETWORK` (exit 4) on every
+    command, the same as a server answering 5xx; before, a failure worded differently by the fetch
+    runtime fell through to `E_VALIDATION` (exit 3). Each request has a 30-second deadline, and
+    Ctrl-C while one is waiting cancels it with the new `E_CANCELLED` (exit 130) instead of leaving
+    the command hung behind a spinner.
+
+- [#1383](https://github.com/zitadel/nextgen/pull/1383) [`4c07937`](https://github.com/zitadel/nextgen/commit/4c0793767753c765a1c84ffb2f93a7504f7522ef) Thanks [@mridang](https://github.com/mridang)! - Every product command now accepts `-v` as the short form of `--verbose`, matching the convention agents already expect from curl, ssh, and wget. The long `--verbose` is unchanged, and the root `--version` keeps no short form, so nothing collides.
+
+- [#1495](https://github.com/zitadel/nextgen/pull/1495) [`8c08f48`](https://github.com/zitadel/nextgen/commit/8c08f4873fe468b0dabfb1b668f85a31c3f142f7) Thanks [@mridang](https://github.com/mridang)! - Show CLI warnings in both terminal and JSON output. `--json` results from `claim`, `start`, `sso enable`, `setup`, `plan` and `apply` now include warnings that were only printed to the terminal before.
+
+- [#1429](https://github.com/zitadel/nextgen/pull/1429) [`7f95a7b`](https://github.com/zitadel/nextgen/commit/7f95a7b8edb55d7f15c1192f4567a74ee0be7195) Thanks [@bastionstack](https://github.com/bastionstack)! - Make the local journey work when the app lives inside the directory `zitadel start` ran in, and say how to continue after setup.
+
+  `zitadel setup` and `zitadel console` now find the local admin in the working directory or the nearest parent that has one. When a local server has no local admin on that path, setup warns that the project is not attached to a team and that the local console will not list it, and says which directory to run from. The closing box from setup says to open a second terminal for further commands, and lists `zitadel console` once the project is owned by the local admin. The scaffolded README says the same about the second terminal.
+
+  In the console, the project's Admins section tells an owner that they have admin access as a member of the project's owning team, and an empty list reads "No additional admins have been added."
+
+- [#1309](https://github.com/zitadel/nextgen/pull/1309) [`790ce8e`](https://github.com/zitadel/nextgen/commit/790ce8eb90ba043574f5822216e88de89b5767c9) Thanks [@livio-a](https://github.com/livio-a)! - State-changing requests authenticated by the Console session cookie are now protected against cross-site request forgery. A cross-site browser request is refused with `403 auth.csrf_invalid`, and every such write except sign-out and the `POST …/query` reads must also send the session's token (from the new `GET /sessions/me/csrf`) in the `X-Zitadel-CSRF` header; the code is listed in each affected operation's default error responses. Requests made with a project secret are unaffected. The generated client adds the header automatically once `setApiCsrfToken` is set, and only to requests for the origin the token was issued for (the page's own by default). On a refusal it asks `setApiCsrfRejectionHandler` for a fresh token and retries once with it, so a write survives the session being renewed in another tab; an app returns no token when someone else is signed in now, and the write is then not retried. `zitadel setup` sends it when it claims a project for the local admin.
+
+- Updated dependencies [[`3937a77`](https://github.com/zitadel/nextgen/commit/3937a7724380c0e59ff039e946053945a8e6475d), [`79527ed`](https://github.com/zitadel/nextgen/commit/79527edba346d39fd43502eb4357d3d19a77ad2d), [`0ca8019`](https://github.com/zitadel/nextgen/commit/0ca80197fedb2755964617d9fe5f17e08b1cb95b), [`d821e91`](https://github.com/zitadel/nextgen/commit/d821e91a4f778b29a524c8a67129951795a16f8d), [`e37bdec`](https://github.com/zitadel/nextgen/commit/e37bdec037ef579a3069b566bf9aae96dd55351d), [`8a90d87`](https://github.com/zitadel/nextgen/commit/8a90d879890dc83b136d528e60465c969a22ff74), [`79527ed`](https://github.com/zitadel/nextgen/commit/79527edba346d39fd43502eb4357d3d19a77ad2d), [`6aca9bb`](https://github.com/zitadel/nextgen/commit/6aca9bb9afcb6e2b33f9e5e5cf5af6c1319d4fe1), [`6821cc6`](https://github.com/zitadel/nextgen/commit/6821cc62356ef75cce936907d203470f35cd1a9a), [`214d8b2`](https://github.com/zitadel/nextgen/commit/214d8b299480e4eaa311ae241e39827740eb8104), [`69dee53`](https://github.com/zitadel/nextgen/commit/69dee53995312c9c09714967e71a3cd37632750b), [`7f95a7b`](https://github.com/zitadel/nextgen/commit/7f95a7b8edb55d7f15c1192f4567a74ee0be7195), [`77369ca`](https://github.com/zitadel/nextgen/commit/77369ca215600478d8f56740406ce9f52cf09d00), [`7897a77`](https://github.com/zitadel/nextgen/commit/7897a77cd7963591827bf1427574f0bb0b2df827), [`dc201e9`](https://github.com/zitadel/nextgen/commit/dc201e9e43fc7f4a969c592fc849a05692795675), [`faccf02`](https://github.com/zitadel/nextgen/commit/faccf02136ff713718e103b18d4128e5a665d02e), [`c8f5f70`](https://github.com/zitadel/nextgen/commit/c8f5f7041e4e231d016f60dc0cce9823765903d3), [`c363d18`](https://github.com/zitadel/nextgen/commit/c363d1809bf2b8032178ea04e031d50cc365f71b), [`790ce8e`](https://github.com/zitadel/nextgen/commit/790ce8eb90ba043574f5822216e88de89b5767c9), [`82ea394`](https://github.com/zitadel/nextgen/commit/82ea394d969cedff0cfe5f9902f24f1b34042910), [`fba561b`](https://github.com/zitadel/nextgen/commit/fba561b67cfb771c0f72c4e293793e4ab86db284), [`b208b0c`](https://github.com/zitadel/nextgen/commit/b208b0c7635b7c146c0fa7294ead08c92eba6cd2), [`9b7b4b2`](https://github.com/zitadel/nextgen/commit/9b7b4b2268b968b03752393850c28d047eca13cc), [`0269f56`](https://github.com/zitadel/nextgen/commit/0269f56e8299584b20e5815cf9b8d3c84ae65010), [`0269f56`](https://github.com/zitadel/nextgen/commit/0269f56e8299584b20e5815cf9b8d3c84ae65010), [`faccf02`](https://github.com/zitadel/nextgen/commit/faccf02136ff713718e103b18d4128e5a665d02e), [`b44b907`](https://github.com/zitadel/nextgen/commit/b44b907bd50fd244440999b8386a79d132b58f1c), [`392ee8a`](https://github.com/zitadel/nextgen/commit/392ee8affea25752ab4cd8b7335b4f7ba83c76ce)]:
+  - @zitadel/api@1.0.0-alpha.25
+  - @zitadel/config@1.0.0-alpha.25
+  - @zitadel/server@1.0.0-alpha.25
+
+## 1.0.0-alpha.24
+
+### Minor Changes
+
+- [#1286](https://github.com/zitadel/nextgen/pull/1286) [`b633a22`](https://github.com/zitadel/nextgen/commit/b633a22c5d2ee8957255dff6b836caab36c676ce) Thanks [@mridang](https://github.com/mridang)! - **Breaking:** remove `--environment` (`-e`) from `plan`, `apply` and the resource commands (`users`, `teams`, `sessions`, `events`, `grants`, `idps`, `projects`, `schemas`, `environments`, `releases`, `flow-definitions`, `branding`). It accepted only `development`, `preview` or `production` — none of them a name the platform uses — and never reached the platform: its one effect was to read a server URL from `environments.<name>.server` in `zitadel.json`, a key nothing writes. Passing it now fails as an unknown flag; drop it from scripts. `--server`, `ZITADEL_API_BASE` and the top-level `server` in `zitadel.json` still choose the server, and `environments list` / `environments get` still read the platform's environments.
+
+  The CLI therefore has no per-environment flag at all until the platform's environments settle, which is also why the new `variables` commands address the project level only. Their own `--environment` / `--env` never shipped.
+
+- [#1297](https://github.com/zitadel/nextgen/pull/1297) [`7165d73`](https://github.com/zitadel/nextgen/commit/7165d73f8d13f8f4aac94858ee5e918b5700c773) Thanks [@peintnermax](https://github.com/peintnermax)! - Setup no longer applies a login template, and the template catalog keeps
+  only widget structure.
+  - `zitadel setup` drops the "How should the login look?" question and the
+    `--design` flag; passing `--design` now fails with `E_VALIDATION` and a
+    hint pointing at app-side theming and `branding eject`. It embeds the
+    maintained login component (a starting page for a new app, a drop-in for an
+    existing one), writes nothing under `.zitadel/branding/`, and publishes no
+    branding revision. The JSON envelope
+    drops `data.design`, the summary drops the "Login design" row, and the next
+    actions point at theming the component from your app, with
+    `branding eject` as the opt-in for owning its template.
+  - `zitadel branding eject --design` now offers `centered` (the default card)
+    and `minimal` (the same form without card chrome). `split`, `split-right`
+    and `hero` are removed: they were page layout around the same card, which
+    belongs in your application, and asking for one fails with `E_VALIDATION`
+    and a hint saying so. `BRANDING_DESIGNS` in `@zitadel/config`
+    shrinks accordingly.
+  - Revisions already published from `split`, `split-right` or `hero` keep
+    rendering; the login still ships their chrome. The API reference for
+    `Branding.layout` no longer lists the retired designs.
+
+### Patch Changes
+
+- [#1296](https://github.com/zitadel/nextgen/pull/1296) [`1a05521`](https://github.com/zitadel/nextgen/commit/1a0552186fe99b0af17a5dc4ffed02ddf2b4c222) Thanks [@IAM-marco](https://github.com/IAM-marco)! - The CLI documentation now explains the local admin `admin@zitadel.localhost`
+  that `zitadel start` creates by default, the one-time console sign-in link it
+  prints, the `zitadel console` command that prints a fresh link, and that on the
+  default local runtime `zitadel setup` attaches the project to that admin's
+  team, so `zitadel claim` reports it as already owned.
+
+- [#1288](https://github.com/zitadel/nextgen/pull/1288) [`4bea70a`](https://github.com/zitadel/nextgen/commit/4bea70a7244b44e62476e6dd2dc6b8e4a7bd1a45) Thanks [@mridang](https://github.com/mridang)! - Encode path parameters in the generated API client, so any id the API accepts can be fetched. Schema ids are the case that hit today: a schema's id is its `$id`, usually a URL such as `https://nextgen.com/api/schemas/default-human-user.json`. Sent raw, the `//` collapsed on a redirect and the request 404'd, so `zitadel schemas get <id>` failed for every URL id and the console's user list silently dropped its schema columns. `zitadel schemas get` also stops guessing what an id looks like: it used to read anything without `sch_` or `://` as an object type, which sent ids like `urn:example:human` down the wrong path. It now asks the server, and falls back to the object-type lookup only on a 404. Setup reconciliation and `apply`/`plan` schema fetches used to encode the id themselves to work around the same bug; that is gone, so the client encodes exactly once rather than sending `%25` for every delimiter.
+
+- [#1292](https://github.com/zitadel/nextgen/pull/1292) [`0a82bb1`](https://github.com/zitadel/nextgen/commit/0a82bb1e66f5d66b7d256389fb503939563b8eaa) Thanks [@mridang](https://github.com/mridang)! - Correct the `grants` command reference. The README still documented `--principal-type` and `--principal-id` on `grants create`, and `principal_type` / `principal_id` as filter fields on `grants list`, which the user and team locators replaced: `grants create` takes `--relation` as its only required field flag and names the principal through `--data` / `--file`, and `grants list` filters on `user_id` and `team_id`.
+
+  `grants create --help` also no longer suggests `grants create --relation viewer`. A grant needs exactly one of `user` or `team`, which are nested objects no flag can carry, so that run was never a complete body. Any write command whose body needs a nested object or an array now offers only its `--data` and `--file` examples.
+
+- Updated dependencies [[`5bac207`](https://github.com/zitadel/nextgen/commit/5bac20773092ea9a9d807c13bd423c70ecea56e6), [`6524178`](https://github.com/zitadel/nextgen/commit/6524178cc74251da3d454451fdef45063fabce86), [`565427b`](https://github.com/zitadel/nextgen/commit/565427b39ba7ab8d1006778944d1e20aef99e93c), [`2056c37`](https://github.com/zitadel/nextgen/commit/2056c37515fbad31b5100e0f84d7b94cfc68f191), [`d05fa4c`](https://github.com/zitadel/nextgen/commit/d05fa4cc2ae9063b84e1967c3e4e91e0145c6400), [`5bac207`](https://github.com/zitadel/nextgen/commit/5bac20773092ea9a9d807c13bd423c70ecea56e6), [`91b1eb6`](https://github.com/zitadel/nextgen/commit/91b1eb653fc00633cf64e9d93c9edf73e3687933), [`331b826`](https://github.com/zitadel/nextgen/commit/331b826ebe1f3354817edc2685a63ecbd63d4a56), [`4bea70a`](https://github.com/zitadel/nextgen/commit/4bea70a7244b44e62476e6dd2dc6b8e4a7bd1a45), [`5226076`](https://github.com/zitadel/nextgen/commit/5226076ce7bbb117d84c9ab15028eb1aa3dedbd6), [`db15426`](https://github.com/zitadel/nextgen/commit/db154268d9610833e15860b7358a626c8b2315d0), [`e61c854`](https://github.com/zitadel/nextgen/commit/e61c8545f06ce9ebe25e7f2e0d344cb6f8efb0d0), [`a0e642d`](https://github.com/zitadel/nextgen/commit/a0e642d6675f13724e9ee33aacc068ae61d2ff9b), [`f2e81dd`](https://github.com/zitadel/nextgen/commit/f2e81dd84af7e47c06c084365dea983ee59a305b), [`ed64c1d`](https://github.com/zitadel/nextgen/commit/ed64c1d4d66b53501516a1456e364fc99022f07f), [`7165d73`](https://github.com/zitadel/nextgen/commit/7165d73f8d13f8f4aac94858ee5e918b5700c773), [`d89916b`](https://github.com/zitadel/nextgen/commit/d89916b05a9e020963d105de614be440c44f99d1), [`2aafc3a`](https://github.com/zitadel/nextgen/commit/2aafc3ab9cb0e0498d4993689f52308b3448fbcf), [`2a625ba`](https://github.com/zitadel/nextgen/commit/2a625ba79b1dab543892c4a5f3a48aa9d3b2d219)]:
+  - @zitadel/server@1.0.0-alpha.24
+  - @zitadel/config@1.0.0-alpha.24
+  - @zitadel/api@1.0.0-alpha.24
+
+## 1.0.0-alpha.23
+
+### Minor Changes
+
+- [#1210](https://github.com/zitadel/nextgen/pull/1210) [`48351c4`](https://github.com/zitadel/nextgen/commit/48351c4fa3cc16429a3cfcee1bcd2ea290399ed6) Thanks [@mridang](https://github.com/mridang)! - Add resource commands to the CLI. `users`, `teams`, `sessions`, `events`, `grants`, and `projects` each gain the operations their API supports — users the full set, teams the same with `deactivate` in place of `delete`, sessions list, get and revoke, grants list, get, create and delete, projects list, get and update, and events list and get. `idps` gains `list`, `get` and `create`, and `schemas`, `environments`, `releases`, `flow-definitions` and `branding` gain `list` and `get` only: they are authored as files and shipped through a release, so the CLI reads them and never writes them. Every list shares one `--filter field=operation:value` grammar regardless of whether the endpoint takes a query body or query parameters, with each field declaring the operations it accepts so an unsupported one is refused locally rather than as a server error. Cursor pagination, `--fields` to choose columns, per-field flags on writes, local schema validation, `--dry-run`, and a `--force` guard on destructive verbs are the same everywhere. `schemas list` and `flow-definitions list` show the current revision of each rather than the full history, with `--filter revisions=all` for the history, and `schemas get` and `flow-definitions get` accept the object type or flow name as well as a revision id. `zitadel resources` reports the whole surface in one call.
+
+  **Breaking:** `schemas list` is now generated from the same registry as every other list. Its `--json` envelope changes from `{ object_type, revisions, count }` to the standard `{ items, count, next_page_token }`; `--object-type` becomes an optional `--filter object_type=<value>` rather than a required flag; and the interactive revision picker is gone, since `schemas get <id>` reads one revision. A bare `schemas list` still returns the complete revision history.
+
+- [#1224](https://github.com/zitadel/nextgen/pull/1224) [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9) Thanks [@mridang](https://github.com/mridang)! - A branding descriptor now points at its login template with `"liquid_template": { "$file": "./login.liquid" }` instead of a separate `liquid_template_file` key. The CLI replaces any `$file` reference with the file's content before publishing and writes the published value back into the file afterwards. `branding eject` and `setup --design` scaffold the new form, and a descriptor that still carries `liquid_template_file` fails `zitadel plan` with a hint showing the replacement.
+
+- [#1187](https://github.com/zitadel/nextgen/pull/1187) [`a41c594`](https://github.com/zitadel/nextgen/commit/a41c5949c38baf6e501d9809ddd00f6be0838093) Thanks [@mridang](https://github.com/mridang)! - The project's env files now configure the local server.
+
+  `zitadel start` reads `.env.local`, then `.env`, and hands every `NEXTGEN_*` variable to the server it launches: through the process environment on the binary backend and as bare `--env NAME` on Docker. No value ever reaches the command line, `.zitadel/local/runtime.json`, logs, or `--json` output; only the names are recorded, as `env.injected`, and `zitadel status` reports them. The address, data directory and public base the CLI sets itself always win. A running runtime is not updated in place, so after changing a value run `zitadel stop` and `zitadel start`.
+
+  `setup` now writes a comment at the top of the scaffolded `.env.example` and `.env.local` saying so.
+
+- [#1249](https://github.com/zitadel/nextgen/pull/1249) [`116e037`](https://github.com/zitadel/nextgen/commit/116e037eda29800c43ac18a00b20525c48878173) Thanks [@mridang](https://github.com/mridang)! - Group the root help by purpose. `zitadel`, `zitadel --help`, and `zitadel help` now list commands under "Project commands", "Local server commands", and "Configuration commands" in journey order, with oclif's own utilities under "Additional commands", followed by flags, examples, and where to learn more, in the layout of `gh --help`. Nested commands such as `schemas list` and `branding eject` are listed inline; the `uninstall` alias and `help` are not. Per-command help and `--json` output are unchanged.
+
+- [#1274](https://github.com/zitadel/nextgen/pull/1274) [`1feea7d`](https://github.com/zitadel/nextgen/commit/1feea7d9fceb633a2011ddf706fc904e3a595b71) Thanks [@mridang](https://github.com/mridang)! - Identify the CLI in the `User-Agent` of its HTTP requests — Zitadel API calls, local-server health checks and branding asset probes — so server logs and session records can tell CLI traffic and CLI versions apart. Requests used to carry Node's bare `node`; they now send `zitadel-cli/<version> node/<version> <os>/<release> arch/<arch>`, followed by `ci/<provider>` when running in CI and `host/<name>` when running under a detected host such as Claude Code, Cursor or VS Code, e.g. `zitadel-cli/1.0.0 node/v24.12.0 darwin/24.6.0 arch/arm64 host/claude_code`. The `ci/` and `host/` tokens are left out when telemetry is opted out with `--no-telemetry`, `DO_NOT_TRACK` or `ZITADEL_TELEMETRY=0`.
+
+- [#1259](https://github.com/zitadel/nextgen/pull/1259) [`a5a9046`](https://github.com/zitadel/nextgen/commit/a5a9046058e0cb92fc3d95e87de3458b5f77af96) Thanks [@mridang](https://github.com/mridang)! - Manage per-environment variables and secrets from the CLI with `zitadel variables list|get|set|delete`. Each command names its owner with `--environment` (alias `--env`) or `--project-level`, and a non-interactive run that names neither is refused rather than defaulted.
+
+- [#1224](https://github.com/zitadel/nextgen/pull/1224) [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9) Thanks [@mridang](https://github.com/mridang)! - The branding and flow definition editor schemas now flag what the server rejects: asset URLs that carry `user:password@`, `typography.font_url` without `typography.font_family`, a terminal step that also collects or acts, a step that does nothing, `sso_providers` without a `callback` transition, and a transition that sets both `purpose` and `action`. The API client's Zod schemas reject credentials in branding asset URLs, and `zitadel plan` measures asset URL length in bytes, as the server does.
+
+- [#1116](https://github.com/zitadel/nextgen/pull/1116) [`f118796`](https://github.com/zitadel/nextgen/commit/f118796f01af9e90be00f3313f1f9fc5ab407b4b) Thanks [@grvijayan](https://github.com/grvijayan)! - Flow definitions sync as revisions. An edited flow file plans as a `revise` and `apply` publishes a new immutable revision instead of updating in place. A schema revise re-publishes the flows pinned to it with the new `user_schema` in the same run. Removing a flow file no longer deletes the flow on the platform; `apply` fails with `E_NOT_IMPLEMENTED` instead.
+
+- [#1156](https://github.com/zitadel/nextgen/pull/1156) [`84d1c4b`](https://github.com/zitadel/nextgen/commit/84d1c4b7dc636dc4439c0ee7a21eee8ecad44f36) Thanks [@grvijayan](https://github.com/grvijayan)! - Social login gets its configuration contracts. `zitadel setup` now copies two more dialect files into `.zitadel/meta/`: `idp-connection.json`, the schema for a provider connection file, and `sso-auth-method.json`, the shape of the `sso` slot in a user schema. A user schema with `sso.enabled: true` must now list the connection slugs its users may sign in with under `sso.providers`, and a disabled slot must not carry the list. In a flow definition, `identity_unknown` is a reserved transition outcome that switches a login flow to register when a provider returns an unknown user.
+
+- [#1225](https://github.com/zitadel/nextgen/pull/1225) [`b0e0f02`](https://github.com/zitadel/nextgen/commit/b0e0f02ee5c3ad022695a04c8da36ef891289c0b) Thanks [@mridang](https://github.com/mridang)! - `zitadel start` now boots the local server with the platform project and a local admin, so you exist on your own server without signing up, and prints a one-time link that signs you in to the console. The new `zitadel console` command mints a fresh link whenever you need one; the console honours such a link only when it is served from loopback. A local `zitadel setup` attaches the new project to the admin's team, so `zitadel claim` reports it as already owned. Booting the platform project also makes it the server's default project, so the console and the hosted login now point at `proj_platform` rather than at the first project you create; users seeded into another project cannot sign in to them. A harness that wants a bare single-project server sets `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false` and gets neither the platform project nor the admin — including one built on `@zitadel/testing`, whose `withZitadel` boots the server by running `zitadel start` and so inherits the new default. Users imported with `--user-file` now register unique attributes from their user schema's `x-unique` annotations, so a user whose schema identifies users by email can sign in.
+
+### Patch Changes
+
+- [#1273](https://github.com/zitadel/nextgen/pull/1273) [`24cecf1`](https://github.com/zitadel/nextgen/commit/24cecf15ac26ff35a566622185a494dbec50440a) Thanks [@mridang](https://github.com/mridang)! - Escape terminal control characters in everything the server returns. A value anyone can write — a user's name, a branding field, a variable — could carry ESC or OSC sequences that cleared the screen, set the window title, wrote the clipboard or disguised a link when another person ran `list` or `get`. Every response body and server error message now has its C0 and C1 control characters, DEL, and format and bidi controls shown as `\xNN` or `\uNNNN`; newlines and tabs are kept. `--json` output carries the same escaped text.
+
+- [#1194](https://github.com/zitadel/nextgen/pull/1194) [`c63a477`](https://github.com/zitadel/nextgen/commit/c63a4774039438c43385a2fb410ea914518d3f14) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Polish the claiming journey copy: the claim nudges in `setup`, `status`, and
+  `doctor` now name the claim deadline and the data-loss stake, the `claim`
+  command's help text, pre-browser message, and success output speak in
+  claim/permanence terms, and the team id moved out of the human success output
+  (it stays in the JSON envelope and `.zitadel/secret`). The setup
+  summary's INSTALLED section now reports the SDK package the scaffold actually
+  added and recognizes every supported framework's artifacts instead of always
+  claiming `@zitadel/sdk-next` with Next.js file paths.
+- Updated dependencies [[`df8870e`](https://github.com/zitadel/nextgen/commit/df8870e2b62b464ac917ad5ef277eeacb8399293), [`3a10eb6`](https://github.com/zitadel/nextgen/commit/3a10eb61dd7e597ccd5b62d8a39453fb7645673e), [`4b8f447`](https://github.com/zitadel/nextgen/commit/4b8f447e5feefbdecd30abcd910b5dabbd14c442), [`7878e5b`](https://github.com/zitadel/nextgen/commit/7878e5bd3e118c6ac2bc128ea4c99e990fdc3398), [`411363c`](https://github.com/zitadel/nextgen/commit/411363c918475bf64fe4064cc6e6118088d5f50c), [`f8c5a24`](https://github.com/zitadel/nextgen/commit/f8c5a24aa87015e722f2f6ecfb276b839d46f4de), [`40025fe`](https://github.com/zitadel/nextgen/commit/40025feb3d9a7154db7d1348043248dbd42f5d6c), [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9), [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71), [`93cac33`](https://github.com/zitadel/nextgen/commit/93cac336402cae09a3e6dfb8622556d13794ab71), [`fc1bb82`](https://github.com/zitadel/nextgen/commit/fc1bb8299cd1dddde0b5490d74385576b83e4ad4), [`453f311`](https://github.com/zitadel/nextgen/commit/453f311254d997231dbf94bd344adf3b09d8ef64), [`5659de3`](https://github.com/zitadel/nextgen/commit/5659de30836c39f4a5a15fc93af62d882905bc75), [`e719e85`](https://github.com/zitadel/nextgen/commit/e719e856e16f573ca74771195c3cf9da509e448a), [`05b09cd`](https://github.com/zitadel/nextgen/commit/05b09cde4d1be0b029ae9a4f0c337835525bc2c8), [`45b3cc0`](https://github.com/zitadel/nextgen/commit/45b3cc0d242d8ce8480d6e7f22271cb841e7838f), [`5e871b0`](https://github.com/zitadel/nextgen/commit/5e871b0194ac8882e61d2708cc32fcf3f773a7fb), [`099d660`](https://github.com/zitadel/nextgen/commit/099d66095c7ec8d0d4e21b7b96c4120b31ac5a80), [`426515d`](https://github.com/zitadel/nextgen/commit/426515d07fe78b889834c0c87b80e2d25acd312c), [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9), [`85db700`](https://github.com/zitadel/nextgen/commit/85db70036625cdf6dc4560487c4f7cf6f6694a1d), [`583a8ed`](https://github.com/zitadel/nextgen/commit/583a8ed0c6142539539eb6e082de8dbfe11a3246), [`f118796`](https://github.com/zitadel/nextgen/commit/f118796f01af9e90be00f3313f1f9fc5ab407b4b), [`b2db632`](https://github.com/zitadel/nextgen/commit/b2db63253e44cdc71c481ee3f5993c23e7224fef), [`6c3f4a3`](https://github.com/zitadel/nextgen/commit/6c3f4a35e6466e9335ebb00b9943902faef8f2f8), [`816abec`](https://github.com/zitadel/nextgen/commit/816abec2d26e7db3a1a1c50ea7d8085b6b3e7af9), [`a9dabbc`](https://github.com/zitadel/nextgen/commit/a9dabbc269b6c9fc899f11dca944e8040be939be), [`4e61fd2`](https://github.com/zitadel/nextgen/commit/4e61fd2b0c4227276588f5c47c783e4ffb91b2fb), [`b97a8d1`](https://github.com/zitadel/nextgen/commit/b97a8d1240876e05aba8d34e87af6fd04695cc45), [`84d1c4b`](https://github.com/zitadel/nextgen/commit/84d1c4b7dc636dc4439c0ee7a21eee8ecad44f36), [`205cef5`](https://github.com/zitadel/nextgen/commit/205cef525ee26250b652ee40f0b35622dc05caea), [`5659de3`](https://github.com/zitadel/nextgen/commit/5659de30836c39f4a5a15fc93af62d882905bc75), [`85fb5ab`](https://github.com/zitadel/nextgen/commit/85fb5abc1edd8699b86898e57d31c4938a6228a5), [`b0e0f02`](https://github.com/zitadel/nextgen/commit/b0e0f02ee5c3ad022695a04c8da36ef891289c0b), [`58c25fd`](https://github.com/zitadel/nextgen/commit/58c25fd9dd9776ab3d92a86515c879d6f4888de4), [`ae8035f`](https://github.com/zitadel/nextgen/commit/ae8035f23c3eddb056122bb3262131c4ba9f7433), [`ffa4ace`](https://github.com/zitadel/nextgen/commit/ffa4ace5fcd3ba4613f536ad8e169fc8dd45dd46), [`8fc4472`](https://github.com/zitadel/nextgen/commit/8fc44720d0b93f6d5450bff85cb8ed984712156a), [`5659de3`](https://github.com/zitadel/nextgen/commit/5659de30836c39f4a5a15fc93af62d882905bc75), [`b70e520`](https://github.com/zitadel/nextgen/commit/b70e52035b433e7c3293c54be43352bb59e78dc2), [`ce3c67c`](https://github.com/zitadel/nextgen/commit/ce3c67c10b7ef7f20a30335fedb07325b6146cad), [`390c184`](https://github.com/zitadel/nextgen/commit/390c184755e78806fa96574347c7ca718abeb2d0), [`dc16c48`](https://github.com/zitadel/nextgen/commit/dc16c4889bd2349fe00cbd9393c83b87e1de4843), [`1162dc9`](https://github.com/zitadel/nextgen/commit/1162dc91c274fcd96bf3dada5b474356242cc1b9)]:
+  - @zitadel/server@1.0.0-alpha.23
+  - @zitadel/api@1.0.0-alpha.23
+  - @zitadel/config@1.0.0-alpha.23
+
+## 1.0.0-alpha.22
+
+### Minor Changes
+
+- [#1147](https://github.com/zitadel/nextgen/pull/1147) [`893364c`](https://github.com/zitadel/nextgen/commit/893364c538f8468114510bfbdaac5cc2966d6395) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Clearer claim journey output: commands now sit on their own styled line in the setup box, separated from the prose so they can be copied without surrounding words, the end-of-setup notice states the concrete deadline (date, time, and zone) until which the temporary project can be claimed, terminal boxes wrap to the window width instead of breaking their frame below 80 columns, and `zitadel claim` explains a closed 14-day claim window instead of suggesting a futile retry. `zitadel setup` now also nudges against a local server when that server hosts the platform plane (probed via its runtime document), where the claim can actually complete; the offline surfaces (`status`, `doctor`) keep their cloud-only nudges.
+
+### Patch Changes
+
+- Updated dependencies [[`c7c737a`](https://github.com/zitadel/nextgen/commit/c7c737a32dd62368161db2ab90d93af800c07198), [`c0bef04`](https://github.com/zitadel/nextgen/commit/c0bef048c305cd4fdac5d44bd1219a3fc08e550a), [`fce5a75`](https://github.com/zitadel/nextgen/commit/fce5a755fee3dab0d1e013b4ab198755d2dda4c5), [`1f5e7b9`](https://github.com/zitadel/nextgen/commit/1f5e7b9d8ccd1282a81f8541f359376ddd0947bc), [`4a637a3`](https://github.com/zitadel/nextgen/commit/4a637a3fed02f969cae61a427d293ca226bd6a4a), [`82186ce`](https://github.com/zitadel/nextgen/commit/82186ce7da8dd96cd0f178a3a7c9994d7ee00cea), [`c3fbdee`](https://github.com/zitadel/nextgen/commit/c3fbdee479ed94ab6cf511ec8441db68bd9821b5), [`af21963`](https://github.com/zitadel/nextgen/commit/af21963a99d6f827699249fa524fbc64f2e6baab), [`472a182`](https://github.com/zitadel/nextgen/commit/472a18216b472cdcd76620b1f11f37ce997fcdcb), [`e04e3ce`](https://github.com/zitadel/nextgen/commit/e04e3ceba65ac35329c2cde99f9fea1b1530ef32)]:
+  - @zitadel/server@1.0.0-alpha.22
+  - @zitadel/config@1.0.0-alpha.22
+  - @zitadel/api@1.0.0-alpha.22
+
+## 1.0.0-alpha.21
+
+### Patch Changes
+
+- [#1127](https://github.com/zitadel/nextgen/pull/1127) [`a24ec4d`](https://github.com/zitadel/nextgen/commit/a24ec4daac1c265a1263697ffbd3744873069d9a) Thanks [@IAM-marco](https://github.com/IAM-marco)! - `zitadel claim` against a CLI-launched local server (`--server local`) now opens the claim page on the local server itself instead of a remote default: the CLI passes the server's public base when it starts the binary or docker runtime. When a manually started loopback server still advertises a remote claim page, `claim` warns and names the `NEXTGEN_SERVER_PUBLIC_BASE` setting to fix it.
+
+- [#1085](https://github.com/zitadel/nextgen/pull/1085) [`a59b288`](https://github.com/zitadel/nextgen/commit/a59b288e4e52a3274c1ab4b5e4c241f1083aac6b) Thanks [@livio-a](https://github.com/livio-a)! - Session responses identify their user through a resolved **user ref** derived
+  from the user schema's own `x-identifier`/`x-display` designations (ADR 058),
+  replacing the convention-resolved flat `name`/`email` fields this supersedes
+  (see the earlier `GET /sessions/me` identity changeset). Rendering follows one
+  chain everywhere: `display`, falling back to `identifier`, then `user_id`.
+  - `@zitadel/server`: `GET /sessions/me`, session get, and query sessions embed
+    `user` (`{user_id, identifier, identifier_property, display}`), the list
+    path hydrated with one batch resolution per page — listed sessions now carry
+    user identity at all. The conventional attribute-name resolver
+    (`name`/`givenName`+`familyName`/`email`) is removed.
+  - `@zitadel/api`: the regenerated client types the new `user` ref component.
+  - `@zitadel/components`: `<zitadel-session>`/`<zitadel-logout>` render from
+    the ref; the `zitadel-signout` detail is now `{display, identifier}`;
+    logout templates substitute `{{display}}`/`{{identifier}}` (the old
+    `{{name}}`/`{{email}}` tokens keep filling as aliases).
+  - `@zitadel/sdk-core` (and every SPA SDK via the shared contract):
+    `NextgenSession`/`ClientSession` become `{userId, identifier,
+identifierProperty, display}`; JWT-claim identities map `name` → `display`
+    and `email` → `identifier`.
+  - `@zitadel/sdk-next` / `@zitadel/sdk-nuxt`: server and client session reads
+    return the new shape.
+  - `@zitadel/cli`: scaffolded Nuxt auth plugins emit the new fields.
+
+  **Breaking:** the flat `name`/`email` session fields and the old SDK session
+  shape are gone. An unknown property is dropped rather than rejected, so a
+  client left on the old fields reads silently empty values instead of failing
+  loudly — update server, SDKs, and app chrome together.
+
+- Updated dependencies [[`6b59d5a`](https://github.com/zitadel/nextgen/commit/6b59d5a37d731abad0ef05b2699da2a0d860ed89), [`21beee0`](https://github.com/zitadel/nextgen/commit/21beee0fe6d6b7df07a05f2bf9b8570bc72d4127), [`a59b288`](https://github.com/zitadel/nextgen/commit/a59b288e4e52a3274c1ab4b5e4c241f1083aac6b), [`7a06425`](https://github.com/zitadel/nextgen/commit/7a06425a1b30a448bf05da8d870bd4570d304060), [`941645e`](https://github.com/zitadel/nextgen/commit/941645e194c9d2b0d1f0aa484f0c0d518bddafc8)]:
+  - @zitadel/server@1.0.0-alpha.21
+  - @zitadel/api@1.0.0-alpha.21
+  - @zitadel/config@1.0.0-alpha.21
+
+## 1.0.0-alpha.20
+
+### Patch Changes
+
+- [#913](https://github.com/zitadel/nextgen/pull/913) [`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b) Thanks [@bastionstack](https://github.com/bastionstack)! - Scaffolded Nuxt projects no longer list `@zitadel/ui-react` in `build.transpile`. The package is gone, so writing it into a user's `nuxt.config.ts` left them with a config entry pointing at a dependency they do not have.
+
+- [#930](https://github.com/zitadel/nextgen/pull/930) [`1ef3c32`](https://github.com/zitadel/nextgen/commit/1ef3c32fd6fa7091f2300fa9e210f43040dbd143) Thanks [@IAM-marco](https://github.com/IAM-marco)! - `GET /schemas` and `GET /schemas/{id}` now return each schema as an `{id, schema, metadata}` envelope carrying the full customer-authored document, and `GET /schemas` wraps its rows in a `{schemas: [...]}` object. The two read endpoints share one representation; the resource `id` and `metadata.created_at` are server-owned and can no longer collide with keys in the document. Clients that read the bare document from `GET /schemas/{id}` or the bare `{id, created_at}` array from `GET /schemas` must unwrap the envelope.
+
+- [#947](https://github.com/zitadel/nextgen/pull/947) [`19fc783`](https://github.com/zitadel/nextgen/commit/19fc7835e23d04da9c458bda2fda39c4aa9dbc00) Thanks [@IAM-marco](https://github.com/IAM-marco)! - The console's schema directory now pages through `GET /schemas` with a `Load more` button, and `zitadel schemas list` walks every page so the printed revision history stays complete.
+
+- Updated dependencies [[`c8dfb1f`](https://github.com/zitadel/nextgen/commit/c8dfb1f3d64d10c9535184994a6221a5a159d103), [`67b3c5a`](https://github.com/zitadel/nextgen/commit/67b3c5a354c49fa066c96d1ce93421e6efadd9df), [`2f1b2f4`](https://github.com/zitadel/nextgen/commit/2f1b2f4dce2ca5c1c9582e9737ca143d1bc97177), [`67b3c5a`](https://github.com/zitadel/nextgen/commit/67b3c5a354c49fa066c96d1ce93421e6efadd9df), [`cb6894d`](https://github.com/zitadel/nextgen/commit/cb6894dc8763758a785c775d5fa7c6fa80d1181d), [`bb8b010`](https://github.com/zitadel/nextgen/commit/bb8b0102145ee9ed75fc3e334185478a656ed4f1), [`d997952`](https://github.com/zitadel/nextgen/commit/d997952eb28ebb1ea81b3291ef8b632a828f0eb4), [`c8288b5`](https://github.com/zitadel/nextgen/commit/c8288b58d8370fb1e60ad366e394e6c575d9ed49), [`309ae57`](https://github.com/zitadel/nextgen/commit/309ae57e20145b6417d77726624e7ceb6c1a288b), [`b1a4899`](https://github.com/zitadel/nextgen/commit/b1a489967af31962f4eba834f64f9825f4e525e3), [`b2a74e4`](https://github.com/zitadel/nextgen/commit/b2a74e49eb44448c4c2203ce5642698c45ef8863), [`25c1802`](https://github.com/zitadel/nextgen/commit/25c1802a9df257d7eca1a2469cb4caf389118a25), [`3f3dd43`](https://github.com/zitadel/nextgen/commit/3f3dd4312b52b90e3cb96d01826b488f55a1dcab), [`7910305`](https://github.com/zitadel/nextgen/commit/79103051d4fa05897fa63f4e4a87dcdfd0b0b37f), [`b1bcc37`](https://github.com/zitadel/nextgen/commit/b1bcc3740fe780297761baaf69f9df403927efcc), [`7d27c9c`](https://github.com/zitadel/nextgen/commit/7d27c9cdf26230f02e34b10169df98f958c4dae1), [`0a9a5af`](https://github.com/zitadel/nextgen/commit/0a9a5afd0336382ca8ebef9c646f09acde2d7ada), [`b94e797`](https://github.com/zitadel/nextgen/commit/b94e79767e84e1898f6ffe0f97e9c629a3788f86), [`3474d05`](https://github.com/zitadel/nextgen/commit/3474d05856a796cd1bb8b9b20ac1d49312b5c149), [`ad19e29`](https://github.com/zitadel/nextgen/commit/ad19e29957bd8d4caf146ae87d6e3775e582cd87), [`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b), [`0fa2e45`](https://github.com/zitadel/nextgen/commit/0fa2e45fe265e0f90c68c664c3c460cbc85781ea), [`3017d95`](https://github.com/zitadel/nextgen/commit/3017d95238f8d7bf05b4f0426c57c83b33872e7a), [`79ea448`](https://github.com/zitadel/nextgen/commit/79ea4487b59f293f6306528c9199a6c57837f5cc), [`c1ee831`](https://github.com/zitadel/nextgen/commit/c1ee83117f22e50885bf551740ba5719832c0bc9), [`d7aefb3`](https://github.com/zitadel/nextgen/commit/d7aefb3020cf7fb32cfc89229fb379c320ad5898), [`4a8d546`](https://github.com/zitadel/nextgen/commit/4a8d546d8abd6902f2e19c50e8b980f91451bbfd), [`2bd640d`](https://github.com/zitadel/nextgen/commit/2bd640d920f4c30eb711a101640da9563e6cef6f), [`1ef3c32`](https://github.com/zitadel/nextgen/commit/1ef3c32fd6fa7091f2300fa9e210f43040dbd143), [`78915e0`](https://github.com/zitadel/nextgen/commit/78915e0595901fd134ec92f7074ca37cb6a7ddbe), [`14cc4df`](https://github.com/zitadel/nextgen/commit/14cc4dff9424e0ec8024f1821786b0967930505b), [`19fc783`](https://github.com/zitadel/nextgen/commit/19fc7835e23d04da9c458bda2fda39c4aa9dbc00), [`b8b5b97`](https://github.com/zitadel/nextgen/commit/b8b5b970c6cf99d2e60b55737fce860876b16577), [`2a0623b`](https://github.com/zitadel/nextgen/commit/2a0623bfc5f045905de8930fe45aeadf3de10f78), [`de7534a`](https://github.com/zitadel/nextgen/commit/de7534aa6a140e9ea32173a59694c71e61214e7b), [`6098080`](https://github.com/zitadel/nextgen/commit/609808008e5be1159f7eadf3d904de52c9ea3b70)]:
+  - @zitadel/server@1.0.0-alpha.20
+  - @zitadel/config@1.0.0-alpha.20
+  - @zitadel/api@1.0.0-alpha.20
+
+## 0.1.0-alpha.19
+
+### Patch Changes
+
+- [#886](https://github.com/zitadel/nextgen/pull/886) [`61a0eee`](https://github.com/zitadel/nextgen/commit/61a0eee0abb310a834d94b72a74f351035021be8) Thanks [@fforootd](https://github.com/fforootd)! - A branding asset URL that is well-formed but unreachable no longer fails
+  silently. `logo_url` / `hero_url` cleared every gate — the CLI's shape check
+  and the server's save gate — published a revision, and then rendered as a 0×0
+  `<img>`: no plan output, no apply output, no console error.
+
+  Three changes close that hole:
+  - `plan` and `apply` probe each asset URL (HEAD, 2.5s budget, in parallel) and
+    emit a non-blocking warning when it is unreachable, returns a non-2xx
+    status, or answers with something that is not an image. Advisory by design —
+    the machine planning is not necessarily the machine rendering the login
+    page — so it never fails a run. Set `ZITADEL_SKIP_ASSET_PROBE` to turn it
+    off (offline, air-gapped CI, a CDN that only resolves from production) and
+    `ZITADEL_ASSET_PROBE_TIMEOUT_MS` to retune the per-URL budget. Only public
+    HTTPS destinations are contacted and redirects are re-validated;
+    loopback/private/internal targets remain inconclusive rather than becoming
+    network requests from the machine running the plan.
+  - The login UI hides an asset that fails to load and restores either the split
+    designs' decorative placeholder or the shipped design's authored no-logo
+    content, so a broken asset degrades to the same result as no asset instead
+    of a blank pane or missing compact brand. Templates could not do this
+    themselves: they are DOMPurify-sanitised and inline `onerror` is stripped.
+  - Branding revisions can now carry plan warnings at all; previously only
+    create/update actions could, and branding is revisioned.
+
+  Two readability fixes ride along. A branding `plan` no longer dumps the whole
+  inlined Liquid template as one escaped line: an unchanged multi-line field
+  renders as `(<n> lines, sha256:…)` and a changed one as a real line diff. And
+  the branding dialect file scaffolded into `.zitadel/meta/` now spells its
+  command mentions the way the generated app can run them
+  (`npx @zitadel/cli@<version> apply`), matching the READMEs — the bare
+  `zitadel apply` in the editor tooltip named a command that does not exist
+  there.
+
+- [#872](https://github.com/zitadel/nextgen/pull/872) [`79f5ce1`](https://github.com/zitadel/nextgen/commit/79f5ce1db6b36baab85944a667072f1936880704) Thanks [@fforootd](https://github.com/fforootd)! - Scaffolded `.zitadel/**` READMEs now show runnable `npx @zitadel/cli@<version> …` commands instead of the bare `zitadel` command, which does not exist inside a generated app. The branding dialect now explains that `layout` is the degrade preset (`centered`/`split`), not the design name — switch designs with `branding eject --design`. The branding README shows exactly where `logo_url`/`hero_url` go (and that custom fonts aren't configurable there yet), and the setup summary surfaces the `.zitadel/` customization entry points (user schema, login flow, login template) and pairs the chosen design's wizard label with its slug (e.g. "Split (reversed)" → `split-right`) so you can confirm the selection applied.
+
+- [#889](https://github.com/zitadel/nextgen/pull/889) [`18ed11e`](https://github.com/zitadel/nextgen/commit/18ed11e03f33ef76c4bcf0f4814f9a5c7de6d640) Thanks [@fforootd](https://github.com/fforootd)! - Released Zitadel server binaries now report the published package version instead of a build timestamp, and no longer log a missing-metadata warning at startup. Source builds report the revision they were built from, and locally built Docker images identify themselves as source builds rather than claiming the published version.
+
+- [#856](https://github.com/zitadel/nextgen/pull/856) [`b17b2c9`](https://github.com/zitadel/nextgen/commit/b17b2c9fb3fae00f99a1864d37f3b51142ea4344) Thanks [@fforootd](https://github.com/fforootd)! - The package documentation now matches what the packages actually do. The Next and Nuxt guides drop the removed `api-base` attribute in favor of `configureZitadel()` and the `project` property; the Nuxt guide documents the Nuxt module (what `zitadel setup` wires) with its real options and the `useAuth()` / `useZitadelProject()` composables, alongside the hand-rolled middleware path with its full option set. `@zitadel/sdk-core` and `@zitadel/api` gain real documentation of their entry points, `@zitadel/config` gains a package README, and the SPA guides document the `ZitadelSession` card and point local no-proxy experiments at the local runtime's actual default port (8080). The flow-editing guide copied into `.zitadel/flows/` no longer suggests cross-flow `switch`/`pivot` transitions, which the runtime does not execute yet, and API examples use the real prefixed ID format (`proj_…`, `team_…`) instead of a retired naming scheme.
+
+- [#822](https://github.com/zitadel/nextgen/pull/822) [`41f6a0a`](https://github.com/zitadel/nextgen/commit/41f6a0a7c60e28a9adecfa9d72b964a305f7ba3d) Thanks [@vitorbari](https://github.com/vitorbari)! - Drop `position` from `x-auth-methods` entries; `enabled` is now the only key. The
+  user schema declares which authentication methods a user type supports.
+  Presentation concerns such as the order methods are offered in belong to the flow
+  engine, which takes them from the order of a step's actions in the flow
+  definition.
+
+  An auth-method entry now sets `additionalProperties: false`, matching the
+  enclosing `x-auth-methods` object, which already rejects unknown method keys. A
+  schema that still carries `position` fails validation instead of being accepted
+  with the field ignored.
+
+- [#825](https://github.com/zitadel/nextgen/pull/825) [`ff6ab36`](https://github.com/zitadel/nextgen/commit/ff6ab36b69af5331dc3d10591789ba081757c68b) Thanks [@fforootd](https://github.com/fforootd)! - The `dependency-version` doctor warning now repairs with the project's own package manager and an exact-save flag (`npm install --save-exact` / `pnpm add --save-exact` / `yarn add --exact` / `bun add --exact`) instead of always suggesting a bare `npm install`, which would have switched managers on pnpm/yarn/bun projects and rewritten the exact pin as a caret range the check deliberately ignores. The repair command is also emitted as a structured `next_commands` entry, matching the agent contract's prefer-structured guidance. Widget-posture scaffolds now describe `theme="auto"` accurately: it follows the OS `prefers-color-scheme`, not the host app's own theme, and the generated comments and guidance say how to pin `theme="light"`/`"dark"` for apps that fix their scheme.
+
+- [#908](https://github.com/zitadel/nextgen/pull/908) [`3818717`](https://github.com/zitadel/nextgen/commit/3818717d9fd079828b742adf6624955e80966308) Thanks [@fforootd](https://github.com/fforootd)! - The Zitadel server container now starts as the non-root user it ships with. It previously created a data directory next to its own entrypoint before reading configuration, which is not writable by that user, so the container exited before serving — and setting a data directory via environment or config file did not avoid it. This also fixes `zitadel start --runtime docker`, which failed the same way.
+
+- [#863](https://github.com/zitadel/nextgen/pull/863) [`fb05da1`](https://github.com/zitadel/nextgen/commit/fb05da12e35ed586ccd65aa767b8bb06f1f16ad8) Thanks [@fforootd](https://github.com/fforootd)! - Clarify embedded login design guidance. The generated AGENTS.md gains a
+  "theming the widgets from your app" section (the `--zl-*` token bridge
+  through the shadow DOM, the `suppress-header` knob, and how starter designs
+  collapse by container width), and the Next session-state paragraph explains
+  extending the request-boundary `matcher` for server-rendered header chrome.
+  The `--design` flag help and the wizard hints now state what split-family
+  designs show at card width (compact brand mark: `logo_url`, else `hero_url`;
+  `hero` falls back to editable text), setup emits a warning when a
+  widget-posture app picks `split`/`split-right`, and the scaffolded
+  widget-posture pages mention `suppress-header` next to the variant/theme
+  comment.
+
+- [#885](https://github.com/zitadel/nextgen/pull/885) [`f1049fd`](https://github.com/zitadel/nextgen/commit/f1049fd1b07086ffd070ecdd0b2d80958efd72f2) Thanks [@fforootd](https://github.com/fforootd)! - `zitadel setup` now pins the dev-server port in the scaffolded `dev` script for Next and Nuxt, so the app serves the port setup registered as the project's allowed origin. Previously a bare `next dev` / `nuxt dev` ignored that port and defaulted to 3000 — and Next silently moved to 3001 when 3000 was busy — so login rendered but the first submit failed with `origin "http://localhost:3000" is not allowed for this project`. The other frameworks already pinned the port in their own dev-server config (Vite's `server.port` + `strictPort`, Angular's `serve.options.port`) and are unchanged. An explicit port also turns a busy port into a loud `EADDRINUSE` instead of a silent move to a rejected origin.
+
+  `doctor` verifies that dev script against the port recorded as the development issuer, so a script moved to another port is reported as an unapplied config edit and `doctor --fix` restores the registered port. `eject` now lists `package.json` among the edits it cannot auto-revert.
+
+  A login that cannot start — a rejected origin being the most common cause — now reports the failure inside the login card instead of leaving a bare line of text on an otherwise empty page.
+
+- [#887](https://github.com/zitadel/nextgen/pull/887) [`46e3bd7`](https://github.com/zitadel/nextgen/commit/46e3bd74a2f4000d620997500e119f2b7b1941de) Thanks [@fforootd](https://github.com/fforootd)! - `zitadel setup` no longer claims a split design's brand pane is collapsed in
+  your app. The pane follows the login's own container width, so the warning now
+  describes when it actually collapses — a card-width embed, or any phone-width
+  viewport — and why setting `logo_url` or `hero_url` in
+  `.zitadel/branding/branding.json` matters there. Full-page setups get the
+  warning too: without one of those assets, a `split` or `split-right` login
+  loses its branding entirely at narrow widths.
+- Updated dependencies [[`d1e967d`](https://github.com/zitadel/nextgen/commit/d1e967d74ee339f9695f73185dd3097b19f527a2), [`c0b5a68`](https://github.com/zitadel/nextgen/commit/c0b5a6867d457d3cea495293b43584ce47af7f7b), [`e146a1e`](https://github.com/zitadel/nextgen/commit/e146a1ee1da307d57285ec6c7ddafeda155e339f), [`7f44430`](https://github.com/zitadel/nextgen/commit/7f44430c35ffbb01a14666dd43c38f0a88647482), [`46ccc08`](https://github.com/zitadel/nextgen/commit/46ccc080befcd6f1401248f1a891e37c0d1d8626), [`982e885`](https://github.com/zitadel/nextgen/commit/982e8853b94a748c420ddf2614206225ae76eb94), [`051ed71`](https://github.com/zitadel/nextgen/commit/051ed7162e58a0ff9fc3c488f9c747925b376b6d), [`20ad1fe`](https://github.com/zitadel/nextgen/commit/20ad1fe1fd369688676d939d9eda9adf94ef7330), [`6904475`](https://github.com/zitadel/nextgen/commit/690447504a4a1a524074103c7d28c4332711c4bd), [`a0c8f7a`](https://github.com/zitadel/nextgen/commit/a0c8f7ab8b7646e10a2d1ecc73e2594eb64957cc), [`a869184`](https://github.com/zitadel/nextgen/commit/a86918457a25755974c24066307724f50dd77077), [`15fe470`](https://github.com/zitadel/nextgen/commit/15fe4707660fe2a8f62c64e5ee59e957bc3703c6), [`c2888bd`](https://github.com/zitadel/nextgen/commit/c2888bdfd3c2a21fefd76a9b7fa80507d97cd88b), [`61a0eee`](https://github.com/zitadel/nextgen/commit/61a0eee0abb310a834d94b72a74f351035021be8), [`79f5ce1`](https://github.com/zitadel/nextgen/commit/79f5ce1db6b36baab85944a667072f1936880704), [`18ed11e`](https://github.com/zitadel/nextgen/commit/18ed11e03f33ef76c4bcf0f4814f9a5c7de6d640), [`215ca5c`](https://github.com/zitadel/nextgen/commit/215ca5c7cb6d179424469308f5aac33d809af3c8), [`c4d9c76`](https://github.com/zitadel/nextgen/commit/c4d9c76e5ca0f15b41ffabb6383f4f77187abacd), [`aa86726`](https://github.com/zitadel/nextgen/commit/aa86726343946ea2adf10757bf47a0a9c2d71237), [`d5ba4d2`](https://github.com/zitadel/nextgen/commit/d5ba4d268a84c57ced65ef8cbb99735c108617de), [`659ad19`](https://github.com/zitadel/nextgen/commit/659ad192b4defde50ea326e46e63663b01ff29d1), [`b17b2c9`](https://github.com/zitadel/nextgen/commit/b17b2c9fb3fae00f99a1864d37f3b51142ea4344), [`41f6a0a`](https://github.com/zitadel/nextgen/commit/41f6a0a7c60e28a9adecfa9d72b964a305f7ba3d), [`72cfb92`](https://github.com/zitadel/nextgen/commit/72cfb928e78a96b7d47bac217f13ec8cb603851a), [`009fd77`](https://github.com/zitadel/nextgen/commit/009fd774f7f59bf3cf319b9753ac81b17ac7c873), [`91738b9`](https://github.com/zitadel/nextgen/commit/91738b93e445fc3dd3731a04f76fb3de24436cdb), [`a0c9fbe`](https://github.com/zitadel/nextgen/commit/a0c9fbe9b6ba36e973b219236b64741441262235), [`fc3d154`](https://github.com/zitadel/nextgen/commit/fc3d154f2fabb722c6f94633fd6c10bc60d0a657), [`af41826`](https://github.com/zitadel/nextgen/commit/af4182696e569afd78be406045108dd7f9c6675e), [`e26f376`](https://github.com/zitadel/nextgen/commit/e26f37617f5d3a3f92f00c07aad89a98ee9d754f), [`4e04e5f`](https://github.com/zitadel/nextgen/commit/4e04e5fb2a9585669b75d2b188b0966bfb23f4e7), [`9ef7096`](https://github.com/zitadel/nextgen/commit/9ef709667f1a6f7bd5126491bf4039a34a43a792), [`3818717`](https://github.com/zitadel/nextgen/commit/3818717d9fd079828b742adf6624955e80966308), [`be64eaa`](https://github.com/zitadel/nextgen/commit/be64eaaf3a7348d40e95874bb13c1b341cd816ed), [`a5efd98`](https://github.com/zitadel/nextgen/commit/a5efd985176dc67884c5eae2b80963e64ad05783), [`f1049fd`](https://github.com/zitadel/nextgen/commit/f1049fd1b07086ffd070ecdd0b2d80958efd72f2), [`37e9cb9`](https://github.com/zitadel/nextgen/commit/37e9cb903943d34eebadfb44457872892f296823), [`c470f07`](https://github.com/zitadel/nextgen/commit/c470f0741df9a767fda0930b8cb63a3ad607674b), [`0e8ac0c`](https://github.com/zitadel/nextgen/commit/0e8ac0c41c6e958fe3fc52eee8750381a8a16919), [`433f81c`](https://github.com/zitadel/nextgen/commit/433f81cffc3e3e8499c555aa45b2a45aa557916f), [`72cfb92`](https://github.com/zitadel/nextgen/commit/72cfb928e78a96b7d47bac217f13ec8cb603851a)]:
+  - @zitadel/server@0.1.0-alpha.19
+  - @zitadel/config@0.1.0-alpha.19
+  - @zitadel/api@0.1.0-alpha.19
+
+## 0.1.0-alpha.18
+
+### Minor Changes
+
+- [#711](https://github.com/zitadel/nextgen/pull/711) [`5208d86`](https://github.com/zitadel/nextgen/commit/5208d863015f78c9618317398ceda1e959c13296) Thanks [@fforootd](https://github.com/fforootd)! - The framework SDK packages (react, vue, angular, svelte, solid, qwik, nuxt) now re-export the `businessLocales` copy overlay from `@zitadel/components`, so an app that only declares its framework SDK as a direct dependency can wire the work-email wording without reaching into `@zitadel/components` (which strict package managers would not resolve). `zitadel setup --use-case business` uses this to wire the overlay into every framework's generated auth pages — previously only Next scaffolds got the business copy; the SPA scaffolds pass a plain `locales` prop to the wrapper components, and `doctor --fix` regenerates the same markup from the recorded use case.
+
+- [#754](https://github.com/zitadel/nextgen/pull/754) [`a1d01cd`](https://github.com/zitadel/nextgen/commit/a1d01cd1f384515929216ae019658b30dae91504) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Add `zitadel claim`, which attaches a project to a team so it becomes permanent. The command mints a short-lived link with the project secret, opens it in a browser, and blocks until the developer finishes signing in there, then records `claimed_at` and `team_id` in `.zitadel/secret`.
+
+  Nothing about the project changes: the issuer, users, passkeys, and applications keep working, and the project secret is not rotated. Running it again once the project belongs to a team is a clean `status: "skipped"` with `reason: "already-claimed"`, whether that is known locally or learned from the platform, so agents can retry safely. Links last 10 minutes; once one lapses the command exits `E_VALIDATION` and points at a fresh run.
+
+  `--dry-run` stops before anything is minted and reports `status: "skipped"`, `reason: "dry-run"`. There is nothing to preview, because a claim is decided in a browser rather than by anything the CLI computes.
+
+  The link is always printed before any browser opens, so headless machines, SSH sessions, and `--no-open` need no special handling. Where a browser can be launched, `BROWSER`, macOS, Windows, WSL, and the usual Linux openers (`xdg-open`, `gio open`, `x-www-browser`, `sensible-browser`, `gnome-open`, `kde-open`) are all handled. `--timeout <seconds>` stops waiting sooner than the link's own expiry.
+
+- [#776](https://github.com/zitadel/nextgen/pull/776) [`48effc9`](https://github.com/zitadel/nextgen/commit/48effc9e728dbe11ce45efe6572fe5da48ee0465) Thanks [@IAM-marco](https://github.com/IAM-marco)! - Report whether a project is attached to a team in `setup`, `status`, and `doctor`, so the temporary nature of a fresh project is visible without having to know `zitadel claim` exists.
+
+  `setup` closes with an ownership line and points at `claim`, `status` carries `data.project.claim` (`detached`, or `attached` with the owning `team_id` and `claimed_at`), and `doctor` grows a `claim` check. All three read `claimed_at`/`team_id` from `.zitadel/secret`, which `zitadel claim` already writes, so nothing here costs a platform call and everything keeps working offline.
+
+  A project with no team is a **warning**, never a failure: it works exactly like one with a team, so `doctor` still exits 0, and `--fix` deliberately does nothing because claiming needs a human in a browser. The messaging frames unattached projects as temporary without promising deletion, since nothing deletes them today.
+
+  Nudges appear only for projects whose `server` in `zitadel.json` is the Zitadel cloud. Local and self-hosted projects have no team to attach to, so `zitadel setup --server local` stays quiet about it.
+
+- [#685](https://github.com/zitadel/nextgen/pull/685) [`e80bfb3`](https://github.com/zitadel/nextgen/commit/e80bfb34d3e9d2332eb2424dc8537f42b48c3ad8) Thanks [@fforootd](https://github.com/fforootd)! - `doctor` now verifies the scaffolded app files. Setup records a scaffold manifest (per-file content hash and ownership class) in `.zitadel/state.json`; the new `managed-files` check fails when an infrastructure file (request boundary, `custom-elements.d.ts`) is missing, warns on a missing generated page, and classifies edited or user-adopted files without failing them. `doctor --fix` restores missing managed files and — across all checks, including the dependency repair — never replaces an existing scaffolded app file, edited or not; additive repairs (gitignore entries, env keys, the SDK dependency) stay idempotent. The check also verifies the managed config wirings (the Vite/Nuxt dev-proxy merges, Angular's `angular.json` proxy and auth routes) through the patchers' own idempotent transforms — a detached or missing wiring config fails, an unverifiable one warns, and `--fix` re-applies it. Boundary migrations converge safely: a pristine leftover `middleware.ts` from a Next 15→16 upgrade is swapped for `proxy.ts` by `--fix`, while an edited one becomes an explicit conflict instead of creating both. Apps scaffolded by older CLI versions are checked against template-derived expectations until `doctor --fix` materializes their manifest (`setup` skips initialized projects).
+
+- [#713](https://github.com/zitadel/nextgen/pull/713) [`9eaa610`](https://github.com/zitadel/nextgen/commit/9eaa61022101b4af1fa8bac77864fee22486c2f7) Thanks [@fforootd](https://github.com/fforootd)! - The CLI now enforces its supported framework floors — Next.js 15 and newer, React 18 and newer. `setup` refuses a below-floor app before making any change, and `doctor` reports one the same way: both emit an explicit `E_UNSUPPORTED_PROJECT_SHAPE` error naming the floor together with an upgrade hint. Only version ranges that provably cannot resolve to a supported release are rejected — protocol specs (`file:`, `workspace:`), dist-tags (`latest`), and ranges that admit a supported version all pass. `@zitadel/sdk-next` now declares the matching peer range `next >=15`.
+
+- [#686](https://github.com/zitadel/nextgen/pull/686) [`e375e18`](https://github.com/zitadel/nextgen/commit/e375e1811b9d03ceae8b517cf2230f52957e8a5c) Thanks [@fforootd](https://github.com/fforootd)! - The framework SDK wrappers now expose the widgets' surface contract: `ZitadelLogin` and `ZitadelSession` accept `variant` (`widget` | `page`) and `theme` (`light` | `dark` | `auto`), and `ZitadelLogout` accepts `theme`, across the React, Vue, Angular, Svelte, Qwik, and Solid wrappers. The `locales` prop additionally accepts partial dictionaries, so presets like `businessLocales` are directly assignable. Apps scaffolded by `zitadel setup` pin `variant="page"` on the generated `/profile` page's `<zitadel-session>` (keeping it full-page under the new widget-first default) and reference the SDK-shipped React JSX declarations instead of carrying a hand-maintained copy.
+
+- [#717](https://github.com/zitadel/nextgen/pull/717) [`cb42772`](https://github.com/zitadel/nextgen/commit/cb427725b28a650739c5c86e72187f3df1529570) Thanks [@fforootd](https://github.com/fforootd)! - Give the embedding app a supported way to read session state for its own chrome (header navigation, account menus) — previously the widgets read `GET /sessions/me` internally but the host page had no documented path to the same answer and kept rendering signed-out CTAs beside a live session.
+  - `@zitadel/sdk-next` ships a new `@zitadel/sdk-next/session` entry with `getSession()`: a client-side read of the same-origin `{proxyPath}/sessions/me` (the exact read `<zitadel-session>` performs). Works on any page — unlike server-side `auth()` it does not require the route to be covered by the middleware `matcher` — and returns the client-safe `ClientAuthResult` (`userId`/`email`/`name`, no token). 401, the backend's JSON 404, and anonymous sessions map to signed-out; other failures — including a framework's HTML 404 from a misrouted proxy — throw instead of silently rendering signed-out.
+  - The client-safe auth shapes (`ClientSession`, `ClientAuthState`, `ClientAuthResult`) move to `@zitadel/sdk-core` as the single source; `@zitadel/sdk-nuxt` re-exports them unchanged, so its `useAuth()` and sdk-next's `getSession()` now return the identical shape.
+  - CLI scaffold guidance (`AGENTS.md` managed section) and the generated profile pages now name each framework's session read: `getSession()` on Next, the auto-imported `useAuth()` composable on Nuxt, and the raw `/__nextgen/sessions/me` read for the SPA frameworks.
+
+- [#750](https://github.com/zitadel/nextgen/pull/750) [`560ebf0`](https://github.com/zitadel/nextgen/commit/560ebf0b8a50bf378a4e011343f43ff3688a3efe) Thanks [@fforootd](https://github.com/fforootd)! - The setup wizard now asks how the login should look: keep the preselected
+  built-in template (writes nothing), or pick one of the five starter designs
+  (centered, split, split-right, hero, minimal) to eject it into
+  `.zitadel/branding/` and publish it as branding revision 1 during setup.
+  `--design` answers the question non-interactively, as before. The chosen
+  design is reported in the summary box, the JSON envelope (`data.design`,
+  `null` for built-in), and the setup retry hint, and setup's next actions
+  now point at the branding workflow — edit/plan/apply when a design was
+  ejected, `branding eject` when not.
+
+- [#563](https://github.com/zitadel/nextgen/pull/563) [`41a2de2`](https://github.com/zitadel/nextgen/commit/41a2de240cb446cd12b438a442a55e7b90287e80) Thanks [@fforootd](https://github.com/fforootd)! - Tenant-customizable login templates land end to end (ADR 040): eject a
+  design, edit real Liquid, `plan`/`apply` publishes it, and the login
+  renders it.
+  - `@zitadel/server`: new Branding API (`POST /branding`,
+    `GET /branding`, `GET /branding/{id}`) storing immutable per-project
+    branding revisions with a lexical template gate (size, encoding,
+    `<script>`/`<style>`, inline handlers, `javascript:` URLs, `| raw`).
+    Flow responses now resolve the latest revision per project instead of
+    the hardcoded default.
+  - `@zitadel/api`: generated client and zod schemas for the Branding API.
+  - `@zitadel/config`: the authoritative LiquidJS template validator
+    (`@zitadel/config/template`), the `branding.json` config dialect
+    meta-schema, and the ejectable design catalog (`centered`, `split`,
+    `split-right`, `minimal`) with `getDefaultBrandingConfig`.
+  - `@zitadel/components`: split/minimal layout chrome for the design
+    catalog; the `{% mandatory_gates %}` tag name is now single-sourced
+    from `@zitadel/config/template`.
+  - `@zitadel/cli`: `.zitadel/branding/` becomes a synced resource — a
+    `branding.json` descriptor plus a sibling `login.liquid` the CLI
+    inlines on upload. `zitadel branding eject [--design <name>]`
+    scaffolds it, `zitadel setup --design <name>` does so at setup and
+    publishes revision 1, and `plan`/`apply` validate templates with the
+    authoritative validator and publish edits as new revisions.
+
+- [#707](https://github.com/zitadel/nextgen/pull/707) [`53d46fe`](https://github.com/zitadel/nextgen/commit/53d46fe3df8f93184e05582f934ecfc26d282564) Thanks [@fforootd](https://github.com/fforootd)! - `zitadel setup --use-case business` now wires the SDK's `businessLocales` overlay into the generated Next login/register pages, restoring work-email wording on top of the widgets' neutral built-in copy (assigned via a ref so it holds on React 18, and `doctor --fix` regenerates the same markup from the recorded use case). The generated profile pages leave page chrome to the session card's `variant="page"` surface instead of hardcoding viewport height and background, every scaffolded page names the `variant="widget"` embedding alternative in a comment, and the scaffolded AGENTS.md guidance points at the widgets' variant/theme knobs and the SDK-shipped JSX types.
+
+### Patch Changes
+
+- [#719](https://github.com/zitadel/nextgen/pull/719) [`b37f23b`](https://github.com/zitadel/nextgen/commit/b37f23bc68cce7ba2ed0f0c2aac081de73f1c70d) Thanks [@fforootd](https://github.com/fforootd)! - Session-state reads now bypass caches and only canonical Zitadel 401/404 error
+  responses are treated as signed out, including expired or superseded session
+  cookies. The browser-only `getSession` helper and its options type now live on
+  the dedicated `@zitadel/sdk-next/session` entry instead of the package root.
+  Framework proxies attach the project secret only to the exact
+  `POST /sessions/exchange` handoff operation, so browser-reachable public and
+  management paths no longer receive an infrastructure-supplied operator
+  credential. After upgrading the CLI, run `zitadel doctor --fix` to migrate the
+  legacy managed Vite and Angular proxy hooks. Doctor warns when an unrecognized
+  proxy may still over-forward the project secret; custom proxy implementations
+  remain user-owned and must be reviewed manually.
+
+- [#603](https://github.com/zitadel/nextgen/pull/603) [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c) Thanks [@fforootd](https://github.com/fforootd)! - Add the `hero` landing design, a mobile compact brand header for split-family designs, split layout knobs (`--zl-split-columns`, `--zl-split-align`, `--zl-split-brand-mobile`), and a warn-once console signal for missing text keys.
+
+- [#547](https://github.com/zitadel/nextgen/pull/547) [`121e227`](https://github.com/zitadel/nextgen/commit/121e22776713f8972d2967f7b23c404c93f659c0) Thanks [@fforootd](https://github.com/fforootd)! - `stop` now reaps the local server's embedded Postgres, and `start` self-heals a
+  Postgres orphaned by an earlier unclean exit. The server binary starts Postgres
+  through `pg_ctl`, which daemonizes the postmaster into its own session — so the
+  process-group signal `stop` sends never reached it, and a crash or SIGKILL could
+  leave it running and holding the data-directory lock. The next `start` then
+  failed with `E_NETWORK` ("exited before becoming healthy") and a `pg_ctl:
+another server might be running` log. The CLI now terminates that postmaster by
+  its `postmaster.pid` (SIGINT fast-shutdown, escalating to SIGKILL) on every stop
+  and before every start, so `start → stop → start` is reliable again.
+
+- [#681](https://github.com/zitadel/nextgen/pull/681) [`1348cca`](https://github.com/zitadel/nextgen/commit/1348ccacaf1ecee056c9a6c7b9b9543ad1e2fdc1) Thanks [@fforootd](https://github.com/fforootd)! - `zitadel setup --renderer` now only advertises implemented renderers: `--help` lists `react` and calls out the planned `web-component` renderer as not yet available instead of offering it as an equal option. Passing `--renderer web-component` explicitly now fails at flag parsing — before any remote project is created — rather than mid-setup.
+
+- [#824](https://github.com/zitadel/nextgen/pull/824) [`77220eb`](https://github.com/zitadel/nextgen/commit/77220ebca4c81e78a1b43e103d3405f2acb5a10a) Thanks [@fforootd](https://github.com/fforootd)! - Scaffolded auth pages now derive their embedding posture from how setup met the app (ADR 044). Fresh scaffolds keep the widgets' full-page chrome; a pre-existing Next or Nuxt app gets `variant="widget"` cards with `theme="auto"` in a layout-neutral wrapper, so the login no longer paints token-colored chrome underneath the host app's own header and theme. Nuxt setup also stops writing `app.vue`/`pages/index.vue` into pre-existing apps — the shell and homepage stay user-owned, mirroring Next. The chosen posture is recorded in the scaffold manifest and `doctor --fix` restores it; manifests without a record restore full-page. A new `dependency-version` doctor check warns (with the exact install command) when an exactly-pinned `@zitadel/*` dependency trails the CLI's own train, so a newer CLI's guidance can't silently reference SDK entry points the app's pinned SDK does not ship yet.
+
+- [#688](https://github.com/zitadel/nextgen/pull/688) [`612c2e7`](https://github.com/zitadel/nextgen/commit/612c2e7e8343f6c12e6d7354374b3446c1b5c182) Thanks [@fforootd](https://github.com/fforootd)! - `setup` no longer reorders your `package.json`: the dependency splice preserves the file's key order, indentation, line endings, and trailing newline (only the touched dependency map is name-sorted, as package managers write it); the Angular `dev`-script merge behaves the same. Setup's file reporting is also cleaned up — `files_written` now lists deduplicated file paths only (directories and double-counted env merges are gone), and a new `data.files` carries one typed row per artifact (`{path, kind, action}`) so scripts can tell what setup created versus merged into.
+
+- [#551](https://github.com/zitadel/nextgen/pull/551) [`2cf426e`](https://github.com/zitadel/nextgen/commit/2cf426e0bbe9d27059d748f16272bd1674408dc0) Thanks [@vitorbari](https://github.com/vitorbari)! - `zitadel setup` now asks "Who will sign in to your app?" and scaffolds the
+  matching schema fields: `minimal` (email only), `consumer` (email, given and
+  family name), or `business` (adds a `companyName` attribute). `minimal` is the
+  default, so the no-flag scaffold now collects **email only** — a deliberate
+  slim-down from today's output: given/family name move to `consumer`/`business`,
+  and `dateOfBirth` is no longer scaffolded by any use case. The default schema
+  and login-flow templates (embedded as the server-side fallback for projects
+  created without the CLI) are slimmed to the same email-only baseline, so the
+  no-CLI default and the `minimal` use case now agree; the per-field bodies for
+  `givenName`/`familyName`/`companyName` move into the config field catalog the
+  CLI composes from. This is a second axis alongside the sign-in
+  preset ([#448](https://github.com/zitadel/nextgen/issues/448)): the use case owns
+  the schema field set, the sign-in preset owns the flow, and the login flow's
+  register step is derived from the chosen fields instead of a hard-coded list —
+  so the two compose instead of multiplying into a bundle per pair. The
+  question is asked before the sign-in preset; non-interactive and scripted
+  runs use `--use-case` (defaults to `minimal`, never blocks); the choice is
+  recorded in `zitadel.json` for guidance/status only, never behavior. `business`
+  is a field set only for now — `companyName` is a plain user attribute with no
+  org/team model behind it yet. Every (use case × sign-in preset) pair is
+  hygiene-tested against the flow validator.
+  The unused, divergent `buildUserSchema`/`fieldPreset` helpers are removed in
+  favor of a single source of field defaults.
+
+- [#603](https://github.com/zitadel/nextgen/pull/603) [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c) Thanks [@fforootd](https://github.com/fforootd)! - Flip `<zitadel-login>` to widget-first: the default `variant="widget"` is content-sized, transparent through every layer, injects no default font into the host document, and never steals focus on load — the embedding app owns the page. Dedicated login routes (hosted shell, scaffolded pages) opt into the previous full-page behavior with `variant="page"`. Split-family responsive chrome now keys off the widget's own width via container queries (baseline 2023 browsers), the hero design ships neutral placeholder copy instead of fabricated claims, and split tenants with only a `hero_url` keep a compact banner fallback on narrow widths.
+
+- Updated dependencies [[`a964309`](https://github.com/zitadel/nextgen/commit/a9643097df1fbbf1ca339ed8b7271e4271616b0d), [`35d287f`](https://github.com/zitadel/nextgen/commit/35d287ff5bb092bcdee4861fd2ec268efbec6b2d), [`8dadbd8`](https://github.com/zitadel/nextgen/commit/8dadbd8cdeabc7c289c7bef8ccce3d779a43e7c4), [`7120ce3`](https://github.com/zitadel/nextgen/commit/7120ce328eb9c63bbc6ff0bad0465c7f1f49e602), [`04e77a7`](https://github.com/zitadel/nextgen/commit/04e77a712edac7f9b486a6014134ddfc7cb71190), [`ff66683`](https://github.com/zitadel/nextgen/commit/ff66683eeb0daa3a12e7d11fed01076ac8c2ba58), [`0142d94`](https://github.com/zitadel/nextgen/commit/0142d9406d0a641858d2731fcabe2561a57edf27), [`c704fea`](https://github.com/zitadel/nextgen/commit/c704fea9f7d5f9ac037190b9979f4a897d3cd770), [`2fdb22e`](https://github.com/zitadel/nextgen/commit/2fdb22e76f3ca512864321a729860668d2370b70), [`4fdaf16`](https://github.com/zitadel/nextgen/commit/4fdaf16c6d0ea354477665049b428f34b055ef8e), [`f7b2049`](https://github.com/zitadel/nextgen/commit/f7b2049eee601843e58dc96606690e6d49863fc4), [`b403dc4`](https://github.com/zitadel/nextgen/commit/b403dc48830d54c96f650a0e8584a13cd4abf6f3), [`7ea32f8`](https://github.com/zitadel/nextgen/commit/7ea32f82b582e37944535b537940f035bdda8cde), [`de02bfc`](https://github.com/zitadel/nextgen/commit/de02bfcce196d07aedd44388895c6e8bd98a87a5), [`2c63b47`](https://github.com/zitadel/nextgen/commit/2c63b47c025e1255683b0b8cd2c48a3e25f79b3a), [`2019602`](https://github.com/zitadel/nextgen/commit/20196023ec4ccd9cfe55c205537f85ddb487fe8f), [`6652e57`](https://github.com/zitadel/nextgen/commit/6652e57b6ede15d921de029fff6aea2a7315875d), [`1f66979`](https://github.com/zitadel/nextgen/commit/1f6697956ee81a5a28812905283ddb94f649250f), [`ca91e8f`](https://github.com/zitadel/nextgen/commit/ca91e8f0368a59f9b96df2f380ec708b3b678f6c), [`63490d7`](https://github.com/zitadel/nextgen/commit/63490d715f92a1a1726b8a6c12c6afe7de52c19c), [`f720dbb`](https://github.com/zitadel/nextgen/commit/f720dbb5b2a8ea974bad87263bd3e1e0fd377eca), [`b37f23b`](https://github.com/zitadel/nextgen/commit/b37f23bc68cce7ba2ed0f0c2aac081de73f1c70d), [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c), [`14aacb5`](https://github.com/zitadel/nextgen/commit/14aacb59c16a6a4c30ebf905e98c2d21acaa5ef2), [`def4e92`](https://github.com/zitadel/nextgen/commit/def4e92e92e54fbe8bb149c5eb9e72c0c2da1e9c), [`d2bca36`](https://github.com/zitadel/nextgen/commit/d2bca36bdaa09168363e8e581cc4f0ef5db7eeb8), [`e0b8d3d`](https://github.com/zitadel/nextgen/commit/e0b8d3d66356f80d658198edccca3d6d77077c29), [`97470b2`](https://github.com/zitadel/nextgen/commit/97470b2d51fdf815463336ffe7999f864e510f13), [`e58a4c1`](https://github.com/zitadel/nextgen/commit/e58a4c1161d11d519d04cb944ab2875270ddc8c2), [`c0336d4`](https://github.com/zitadel/nextgen/commit/c0336d4dfe539f62a9bbbad35095236d2ba5c2f1), [`1d32433`](https://github.com/zitadel/nextgen/commit/1d324331491e672473352f71c4e4cec59450a4cf), [`77ceae3`](https://github.com/zitadel/nextgen/commit/77ceae3368cd5c0bb3ad691d31544b0453782b17), [`39e5a20`](https://github.com/zitadel/nextgen/commit/39e5a20bce36555f0269febd04acf4e5c0acf9e3), [`d419841`](https://github.com/zitadel/nextgen/commit/d4198416f65fc5ac7182a5ccf9cb247bf07b4922), [`de68ead`](https://github.com/zitadel/nextgen/commit/de68ead4bf02de17069185c46a71d1d7a98b1345), [`8197eea`](https://github.com/zitadel/nextgen/commit/8197eea30f65ac668554cb2caced367f3627bc36), [`a87a614`](https://github.com/zitadel/nextgen/commit/a87a614433c19ead251de28d5ebd3435aff9dcba), [`4b984af`](https://github.com/zitadel/nextgen/commit/4b984afbbde622b6f86d90ff327f4b21f9526785), [`417a378`](https://github.com/zitadel/nextgen/commit/417a3786aaa1d77c041fe679ca1fcdafc8ef6ce8), [`734ed68`](https://github.com/zitadel/nextgen/commit/734ed68ef444c9b932f561fbda4feb371336d06d), [`40c8537`](https://github.com/zitadel/nextgen/commit/40c8537efc12203fce05855b9536500a4a78621a), [`0f94093`](https://github.com/zitadel/nextgen/commit/0f94093d6f1909ce314c9c45d95703cefff6efd4), [`418457f`](https://github.com/zitadel/nextgen/commit/418457f7407c712f3ff02b30df014fbf12e03d23), [`658ce78`](https://github.com/zitadel/nextgen/commit/658ce78926b96240bcae583fee2e042283991b30), [`4b984af`](https://github.com/zitadel/nextgen/commit/4b984afbbde622b6f86d90ff327f4b21f9526785), [`6394228`](https://github.com/zitadel/nextgen/commit/6394228f61426eed4bd28d0df781a98b42a9ac95), [`1395911`](https://github.com/zitadel/nextgen/commit/1395911519a40ceb4e06e8b68729376553d2768d), [`ff6fc16`](https://github.com/zitadel/nextgen/commit/ff6fc16df33a597ef68a6174f4ecd74a9cfcecca), [`fa907c2`](https://github.com/zitadel/nextgen/commit/fa907c2272b2b4d54974b0510240f6225b7fece6), [`b5b9b6e`](https://github.com/zitadel/nextgen/commit/b5b9b6eeaf3d09ccffc41812db4c339a1c1faf7b), [`034b966`](https://github.com/zitadel/nextgen/commit/034b9662fe3572a525fc0c2974512ec0cd906187), [`c39d501`](https://github.com/zitadel/nextgen/commit/c39d501ebb4ba36c8a6589985e9107a56fe6dce9), [`4f4a97e`](https://github.com/zitadel/nextgen/commit/4f4a97e568268ed3c9ba30dca97b3d31a2d2edb1), [`929d158`](https://github.com/zitadel/nextgen/commit/929d158371f9750410d255c631327ec042dfa9c0), [`ff0a47d`](https://github.com/zitadel/nextgen/commit/ff0a47d4cc676be93d563251468e43fad03e21b0), [`f61eeb0`](https://github.com/zitadel/nextgen/commit/f61eeb0705d9dc3f0bfc83c1fe365e34ac945a50), [`9cf915b`](https://github.com/zitadel/nextgen/commit/9cf915bb67579cdfbac4211df7634c59d38be738), [`d594f00`](https://github.com/zitadel/nextgen/commit/d594f00cd1b5acf8c002e9f034b3a7faca1d6555), [`1b80119`](https://github.com/zitadel/nextgen/commit/1b801198ab2a5355b6f6265a38799bb126764c39), [`929d158`](https://github.com/zitadel/nextgen/commit/929d158371f9750410d255c631327ec042dfa9c0), [`47bcb8f`](https://github.com/zitadel/nextgen/commit/47bcb8fa24473ad81bf56c9c890c7e0fd7f6b1f3), [`ef617c8`](https://github.com/zitadel/nextgen/commit/ef617c87f0cfbb9497afb385d3d573d2fa3d4fa2), [`ef617c8`](https://github.com/zitadel/nextgen/commit/ef617c87f0cfbb9497afb385d3d573d2fa3d4fa2), [`01361c3`](https://github.com/zitadel/nextgen/commit/01361c31d5cda5ab0e4d881c300da7567d22eb36), [`a40c7d1`](https://github.com/zitadel/nextgen/commit/a40c7d10f2a250ab044eb2de0967ec086c002e11), [`a40c7d1`](https://github.com/zitadel/nextgen/commit/a40c7d10f2a250ab044eb2de0967ec086c002e11), [`70ccb39`](https://github.com/zitadel/nextgen/commit/70ccb3921adcf2b7c58eccef894ddb0611fa59b8), [`0377731`](https://github.com/zitadel/nextgen/commit/0377731a788c42f99404fa73b5c2e5b710870da7), [`45ef2cc`](https://github.com/zitadel/nextgen/commit/45ef2ccd692cd592b01e8dad2bbbf95a67d9c8a0), [`85d9e67`](https://github.com/zitadel/nextgen/commit/85d9e6730bd749a685548e45fc3b1afe5a545dee), [`4c3a3ce`](https://github.com/zitadel/nextgen/commit/4c3a3ceccfbad8bebfb3c97fcf86de5dfa7d71e4), [`e313d92`](https://github.com/zitadel/nextgen/commit/e313d92ab8b289c1947273dbe1befc3551c6f8b3), [`3f86dcd`](https://github.com/zitadel/nextgen/commit/3f86dcdee48c5ed1a50529ccca93f97809549265), [`3f86dcd`](https://github.com/zitadel/nextgen/commit/3f86dcdee48c5ed1a50529ccca93f97809549265), [`09c753e`](https://github.com/zitadel/nextgen/commit/09c753eb59e0fa0cd70446a77202dc8207b1a1c1), [`fd31b20`](https://github.com/zitadel/nextgen/commit/fd31b20c79de2c1d14c42aa48fab6e856e848775), [`58696a0`](https://github.com/zitadel/nextgen/commit/58696a06cadcf118aaac866151bffed093016423), [`f2cec14`](https://github.com/zitadel/nextgen/commit/f2cec1417437c4f7d33dc4bd2281b802cfebe406), [`41a2de2`](https://github.com/zitadel/nextgen/commit/41a2de240cb446cd12b438a442a55e7b90287e80), [`286cf4a`](https://github.com/zitadel/nextgen/commit/286cf4a37746c6ac7ae70864e1106f18d5895991), [`2cf426e`](https://github.com/zitadel/nextgen/commit/2cf426e0bbe9d27059d748f16272bd1674408dc0), [`2975c4d`](https://github.com/zitadel/nextgen/commit/2975c4dabec68ac1a8569d6a34960de50dced1b8), [`5decdd7`](https://github.com/zitadel/nextgen/commit/5decdd7cfb05beca7994ed7202548dc4915e2a59), [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c)]:
+  - @zitadel/server@0.1.0-alpha.18
+  - @zitadel/api@0.1.0-alpha.18
+  - @zitadel/config@0.1.0-alpha.18
+
+## 0.1.0-alpha.17
+
+### Patch Changes
+
+- [#544](https://github.com/zitadel/nextgen/pull/544) [`79d4179`](https://github.com/zitadel/nextgen/commit/79d417924518c9ea272136db1f46aaf237497999) Thanks [@fforootd](https://github.com/fforootd)! - Fixes from alpha.16 community feedback:
+  - Custom schema fields now render a readable label. A property with no
+    catalog entry (e.g. `department`, `dateOfBirth`) falls back to a
+    humanised name ("Department", "Date of birth") on the form instead of
+    leaking the raw `<step>.field.<name>` text key. A catalogued key still
+    wins, so localised labels are unaffected.
+  - The scaffolded `.zitadel/flows/README.md` no longer contains the
+    "Presets" section twice.
+  - The `warn/default-flow-swap` plan warning now leads with the impact in
+    plain language: the new flow becomes the default for its purposes, and
+    every page that does not explicitly set `flow-name` on
+    `<zitadel-login>` will start rendering it — scope it via `audience`
+    or pin `flow-name` to opt out.
+  - The flip-table validation error (login/register entry step missing its
+    `user_not_found`/`user_already_exists` transition) now explains who
+    gets stuck where: someone without an account would be stuck at
+    sign-in instead of being routed to registration, and vice versa. Plan,
+    apply, and the server report the same wording.
+
+- [#543](https://github.com/zitadel/nextgen/pull/543) [`a0b39a1`](https://github.com/zitadel/nextgen/commit/a0b39a119408a6fa02e8e1e45ebd5dd14b96c01b) Thanks [@fforootd](https://github.com/fforootd)! - `plan --json` and `apply --json` now enumerate what they touch: a
+  `data.changes` array with one `{kind, action, file, id?, previous_id?}`
+  row per resource (action ∈ create/update/revision/delete). Plan rows
+  preview the pending sync; apply rows report what happened, carrying the
+  resulting platform ids (created ids, newly published revision ids), so
+  agents can verify an edit did what they intended without re-applying.
+  `apply` also gains `next_actions`/`next_commands` ("changes are live" +
+  a versioned `plan` follow-up), and `schemas list` emits `created_at` in
+  snake_case like every other envelope field. Counters and
+  `files_updated` (local write-backs only) are unchanged.
+
+- [#546](https://github.com/zitadel/nextgen/pull/546) [`c7fffef`](https://github.com/zitadel/nextgen/commit/c7fffefe1ee966ba7d8e34a18bfffbdd1cef5b8a) Thanks [@fforootd](https://github.com/fforootd)! - The interactive `setup` wizard now detects a running local Zitadel server the
+  same way `start` and `doctor` do — via the runtime metadata written by
+  `zitadel start` plus a `/healthz` probe on the default port — and preselects
+  it in the server choice. Previously it scanned localhost ports for an OIDC
+  discovery document the server does not serve, so it always reported "No local
+  OIDC servers found" even with a healthy server running.
+- Updated dependencies [[`79d4179`](https://github.com/zitadel/nextgen/commit/79d417924518c9ea272136db1f46aaf237497999), [`363482e`](https://github.com/zitadel/nextgen/commit/363482e27c88ac96c9a2b48c880e5caa5a4dcf65)]:
+  - @zitadel/config@0.1.0-alpha.17
+  - @zitadel/server@0.1.0-alpha.17
+  - @zitadel/api@0.1.0-alpha.17
+
+## 0.1.0-alpha.16
+
+### Patch Changes
+
+- [#514](https://github.com/zitadel/nextgen/pull/514) [`1eec59e`](https://github.com/zitadel/nextgen/commit/1eec59ee924cc2b12df11f5541d6a2eef8caa6c2) Thanks [@fforootd](https://github.com/fforootd)! - Select a flow definition by name. `<zitadel-login>` gains a `flow-name`
+  attribute (`flowName` prop on every framework wrapper) that sends
+  `flow_definition_name` on flow start, so a project with several synced
+  flows can run a specific one instead of the audience-resolved default.
+  An unknown name or a purpose mismatch surfaces as a clear startup error
+  naming the attribute. Audience selection itself is now honored and
+  deterministic: hinted app beats hinted team beats the newest unscoped
+  flow, and a flow scoped to an app/team no longer captures the project
+  default. The flows README and plan/apply docs explain how to add and
+  select a second flow.
+
+  Because newest-unscoped-wins means a new flow can silently take over the
+  default login, `plan` warns on any create of an active, unscoped flow in
+  a project that already has flows (`warn/default-flow-swap`, a
+  non-blocking `# warning:` line and a `--json` warnings entry) — scope
+  the flow via `audience` or pin `flow-name` in the widget to opt out.
+  The offline dialect gains the committed `auth-methods`/`auth-method`
+  meta-schema copies that `user-schema.json` references, so editors
+  resolve the full dialect without network access.
+
+- [#515](https://github.com/zitadel/nextgen/pull/515) [`aeea830`](https://github.com/zitadel/nextgen/commit/aeea83071227816e2bf2d4ee6fb4597c70908459) Thanks [@fforootd](https://github.com/fforootd)! - Disabling passkey in the user schema (`x-auth-methods.passkey.enabled: false`)
+  is now enforced for flows. A flow step declaring a `passkey` or
+  `passkey_register` action against a schema that does not enable passkey fails
+  validation at plan time (and on the server at apply time) with
+  `step "…": action "…" offers passkey but "passkey" is not an enabled
+authentication method` — the same treatment the `x-auth-methods#password`
+  field already gets. Previously the schema toggle applied successfully but
+  /login and /register kept offering and accepting passkeys.
+
+  Definition time is the only enforcement point, matching every other flow
+  rule: a flow pins its schema revision, and repinning re-validates, so a
+  validated flow's verdict cannot change at runtime. Flows applied before this
+  rule keep working as applied and surface the violation on their next
+  plan/apply.
+
+- [#497](https://github.com/zitadel/nextgen/pull/497) [`e9593cd`](https://github.com/zitadel/nextgen/commit/e9593cd4f74f5ebc010150a2ed8a3ae03b7d5d87) Thanks [@fforootd](https://github.com/fforootd)! - The passkey origin-allowlist rejection now names the allowed origins (e.g. `origin "http://127.0.0.1:3000" is not allowed for this project (allowed: http://localhost:3000)`), and `<zitadel-login>` surfaces the server's error message instead of a generic "returned 400". `@zitadel/api` exports the new `apiErrorMessage` helper for extracting the server error envelope from an `ApiError`.
+
+- [#499](https://github.com/zitadel/nextgen/pull/499) [`1f2dcf6`](https://github.com/zitadel/nextgen/commit/1f2dcf647cc4d3b96275b4dbc17d0f5e2a060b9b) Thanks [@fforootd](https://github.com/fforootd)! - `plan` and `apply` now validate flow definitions against the same rules the
+  server enforces — before any mutation. A flow missing an invariant (e.g. a
+  login entry step without `user_not_found -> register` while `register` is a
+  wired purpose) fails at plan time with the server's exact wording instead of
+  half-applied after the schema already revised. Errors aggregate across flows
+  (`--json` carries structured `details.issues`); product guidance surfaces as
+  non-blocking `# warning:` lines in the plan. The validator ships as
+  `@zitadel/config/validate`. Escape hatch: set `ZITADEL_SKIP_FLOW_VALIDATION`
+  to skip the pre-flight if it ever disagrees with your server version.
+
+- [#517](https://github.com/zitadel/nextgen/pull/517) [`8df6e7a`](https://github.com/zitadel/nextgen/commit/8df6e7a78bdb64c6d183728903904771038d8048) Thanks [@bastionstack](https://github.com/bastionstack)! - Remove the scaffold landing chooser ("Sign in, create an account, or open your profile") from every framework template. Fresh apps now redirect `/` to `/login`, setup next steps tell users to open `/login`, and Next.js auth pages no longer duplicate login/register links the widget already provides in-flow.
+
+- [#502](https://github.com/zitadel/nextgen/pull/502) [`bdf2906`](https://github.com/zitadel/nextgen/commit/bdf29064ab783f1d14ea554f3512bf243e86d3b5) Thanks [@fforootd](https://github.com/fforootd)! - Scaffolded projects now explain their own next step. `zitadel setup` writes
+  an `AGENTS.md` guidance section for AI agents and an "Authentication
+  (Zitadel)" section into the app README (marker-fenced — existing content is
+  never clobbered), copies the flow/schema dialect meta-schemas into
+  `.zitadel/meta/`, and scaffolds flow files with
+  `"$schema": "../meta/flow-definition.json"` so editors validate and
+  autocomplete flow edits offline. The `$schema` pointer is local-only: sync
+  ignores it and write-back preserves it. `ZitadelLogin` wrappers gain typed
+  `locales`/`lang` props for labelling custom flow steps (see the new
+  "Customize copy" docs page).
+
+  `zitadel eject` removes what setup wrote: the marker-fenced guidance section
+  is stripped from `README.md`/`AGENTS.md` (content outside the markers is
+  untouched), and a file is deleted only when nothing but the scaffold-created
+  header would remain — no stale golden path survives pointing at deleted
+  `.zitadel/` files.
+
+  Every SDK wrapper now forwards `locales`/`lang` to the widget (previously
+  only React did; Solid/Qwik/Svelte accepted and discarded them, Vue/Angular
+  did not expose them). The flow dialect meta-schema (`@zitadel/server`
+  embeds it; `@zitadel/config` ships the committed copy) marks a transition's
+  `action` as nullable, matching the OpenAPI contract — editors no longer
+  flag `"action": null`.
+
+- [#500](https://github.com/zitadel/nextgen/pull/500) [`69b6b6a`](https://github.com/zitadel/nextgen/commit/69b6b6a0fa934cbbd81deba46192b3b1346612a8) Thanks [@fforootd](https://github.com/fforootd)! - `zitadel setup` now asks "How should users sign in?" and scaffolds the
+  matching schema+flow preset: `password-first` (today's default) or
+  `passkey-first` (a one-tap passkey on the login entry step with an
+  email → password fallback path, passkey-primary registration, and email
+  kept required so the fallback always works). Non-interactive and scripted
+  runs use `--preset`; the choice is recorded in `zitadel.json`. Presets are
+  named bundles under `@zitadel/config` (the mechanism behind app-type
+  selection, [#448](https://github.com/zitadel/nextgen/issues/448)) and are hygiene-tested: every bundle must pass the flow
+  validator and resolve every text key in every builtin locale.
+
+- [#524](https://github.com/zitadel/nextgen/pull/524) [`e73d55f`](https://github.com/zitadel/nextgen/commit/e73d55f57e86db53464ac112f8a362a3da327a19) Thanks [@fforootd](https://github.com/fforootd)! - Setup failure guidance now reconstructs the full invocation: retry hints and
+  `next_commands` carry `--preset`, `--renderer`, `--dev-port`, and
+  `--non-interactive` alongside `--framework`, so following the printed command
+  verbatim reproduces the requested scaffold instead of silently falling back to
+  defaults. HTTP 404s map to the new `E_NOT_FOUND` error code with exit code 4
+  (previously `E_VALIDATION`/exit 3 — update scripts that branch on it); a 404
+  without the platform's error envelope also names the URL and asks whether the
+  target is a Zitadel platform API. Passkey-first scaffolds add a note to
+  AGENTS.md telling agents to verify the login loop via the email/password
+  fallback or a CDP WebAuthn virtual authenticator, since automated browsers
+  cannot complete passkey ceremonies.
+
+- [#516](https://github.com/zitadel/nextgen/pull/516) [`85f5044`](https://github.com/zitadel/nextgen/commit/85f504491a10f0b41b99c123e91df1f41c2d5763) Thanks [@fforootd](https://github.com/fforootd)! - Setup and status guidance now tracks where you are in the journey. The
+  `zitadel setup` terminal box ends on the verify mission (install, start,
+  register → sign out → sign in) plus a single breadcrumb to `zitadel status`
+  and the README's Zitadel section, instead of listing customize/publish steps
+  before the first login. The `--json` envelope keeps the complete
+  `next_actions`/`next_commands` for agents. `zitadel status` asks the platform
+  whether the project has users yet: none → verify-login guidance, some → the
+  customize (.zitadel/schemas/, .zitadel/flows/) and plan/apply publish steps;
+  when the server is unreachable it keeps the lifecycle-only output.
+  `next_commands` is staged in lockstep: before the first proven login it
+  offers `plan` and withholds `apply`.
+
+  The server implements `GET /users` (previously generated-but-unimplemented,
+  returning 500): bearer-scoped to the token's project — the exact call shape
+  of the status probe — returning attribute-hydrated users with a stable
+  creation-ordered `offset`/`limit` window (spec defaults limit 20, max 100).
+  The staged status therefore works against a real runtime, not only the
+  api-mock.
+
+- Updated dependencies [[`99395d1`](https://github.com/zitadel/nextgen/commit/99395d1ae038643bc664033281f4c9999e675975), [`9de949d`](https://github.com/zitadel/nextgen/commit/9de949d8e9376a63da5dccc23044cdf40264123f), [`e4d55d2`](https://github.com/zitadel/nextgen/commit/e4d55d22c64d28a19597718417af6447a66a5852), [`62a7982`](https://github.com/zitadel/nextgen/commit/62a79824e9574eaad1f478ef3b6d51badb4d1355), [`e4809a3`](https://github.com/zitadel/nextgen/commit/e4809a30d21ae9ca400e58d2ccbb7078c2d3efff), [`e73d55f`](https://github.com/zitadel/nextgen/commit/e73d55f57e86db53464ac112f8a362a3da327a19), [`1eec59e`](https://github.com/zitadel/nextgen/commit/1eec59ee924cc2b12df11f5541d6a2eef8caa6c2), [`aeea830`](https://github.com/zitadel/nextgen/commit/aeea83071227816e2bf2d4ee6fb4597c70908459), [`e9593cd`](https://github.com/zitadel/nextgen/commit/e9593cd4f74f5ebc010150a2ed8a3ae03b7d5d87), [`1f2dcf6`](https://github.com/zitadel/nextgen/commit/1f2dcf647cc4d3b96275b4dbc17d0f5e2a060b9b), [`bdf2906`](https://github.com/zitadel/nextgen/commit/bdf29064ab783f1d14ea554f3512bf243e86d3b5), [`75b61e1`](https://github.com/zitadel/nextgen/commit/75b61e1f431bdd91f6e97dce4a87d51cd9d8a152), [`e73d55f`](https://github.com/zitadel/nextgen/commit/e73d55f57e86db53464ac112f8a362a3da327a19), [`69b6b6a`](https://github.com/zitadel/nextgen/commit/69b6b6a0fa934cbbd81deba46192b3b1346612a8), [`85f5044`](https://github.com/zitadel/nextgen/commit/85f504491a10f0b41b99c123e91df1f41c2d5763)]:
+  - @zitadel/server@0.1.0-alpha.16
+  - @zitadel/config@0.1.0-alpha.16
+  - @zitadel/api@0.1.0-alpha.16
+
+## 0.1.0-alpha.15
+
+### Patch Changes
+
+- [#485](https://github.com/zitadel/nextgen/pull/485) [`9e9ccb3`](https://github.com/zitadel/nextgen/commit/9e9ccb39997eda62a8eeb673fff4a46e9f2ddc0e) Thanks [@fforootd](https://github.com/fforootd)! - `apply` now re-pins flows to a freshly published schema revision in the same
+  run: the CLI rewrites `user_schema` in every local flow file pinned to the
+  superseded revision (lockfile-style, announced by `plan` and reported in the
+  output) and the flow update carries the new id — editing a schema and using
+  the new field in a flow no longer fails validation or needs a second apply.
+  Interrupted runs recover via a `previousId` marker in `.zitadel/state.json`.
+
+- [#485](https://github.com/zitadel/nextgen/pull/485) [`9e9ccb3`](https://github.com/zitadel/nextgen/commit/9e9ccb39997eda62a8eeb673fff4a46e9f2ddc0e) Thanks [@fforootd](https://github.com/fforootd)! - Make `plan` diffs trustworthy and keep local config in lockstep with live
+  state. `@zitadel/config/normalize` is the shared canonical-form normalizer
+  (drops the server's empty `audience` echo and spelled-out `x-*` meta-schema
+  property defaults); the sync engine hashes and diffs in normalized form
+  (with a legacy-hash fallback so existing state files don't read as edits),
+  and setup/apply write the server's canonical body back to the local file —
+  reported in human and `--json` output — so a one-field edit renders as a
+  one-field diff and applying can no longer silently strip live settings.
+  The api-mock now mirrors the server's unconditional `audience` echo.
+
+- [#485](https://github.com/zitadel/nextgen/pull/485) [`9e9ccb3`](https://github.com/zitadel/nextgen/commit/9e9ccb39997eda62a8eeb673fff4a46e9f2ddc0e) Thanks [@fforootd](https://github.com/fforootd)! - Surface the customize loop after setup: the "Zitadel is ready" next steps now
+  point at the editable `.zitadel/schemas/` and `.zitadel/flows/` files and the
+  `plan`/`apply` commands, and the scaffolded READMEs are restructured
+  workflow-first (mental model → example → making changes → common changes).
+- Updated dependencies [[`9e9ccb3`](https://github.com/zitadel/nextgen/commit/9e9ccb39997eda62a8eeb673fff4a46e9f2ddc0e), [`f52841d`](https://github.com/zitadel/nextgen/commit/f52841df9c1d5da857c2ff48d50a894c66fbcb5b), [`9e9ccb3`](https://github.com/zitadel/nextgen/commit/9e9ccb39997eda62a8eeb673fff4a46e9f2ddc0e), [`6e4a11a`](https://github.com/zitadel/nextgen/commit/6e4a11a7cd07587a51362d751fcc0320b00a4301), [`9e9ccb3`](https://github.com/zitadel/nextgen/commit/9e9ccb39997eda62a8eeb673fff4a46e9f2ddc0e)]:
+  - @zitadel/config@0.1.0-alpha.15
+  - @zitadel/server@0.1.0-alpha.15
+  - @zitadel/api@0.1.0-alpha.15
+
+## 0.1.0-alpha.14
+
+### Minor Changes
+
+- [#341](https://github.com/zitadel/nextgen/pull/341) [`605abe1`](https://github.com/zitadel/nextgen/commit/605abe1f04a011c05bd4be2179556052eae6c007) Thanks [@fforootd](https://github.com/fforootd)! - Scaffold editable schema and flow config from shared local defaults, add project default seeding control, and seed sync state so plan is idempotent immediately after setup.
+
+- [#443](https://github.com/zitadel/nextgen/pull/443) [`ea193dc`](https://github.com/zitadel/nextgen/commit/ea193dc0fabdf3c49fa9c3e3bae4cf242001d630) Thanks [@bastionstack](https://github.com/bastionstack)! - Add a post-sign-in `<zitadel-session>` "signed in as" card: a dedicated element exposed through every SPA SDK and re-exported from sdk-next. CLI scaffolds now render it as the post-sign-in `/profile` page (with a Logout action) across all frameworks. Identity is read from `GET /sessions/me`, preferring `name` then `email` then `user_id`.
+
+  `<zitadel-logout>` now sources its identity from the same `getMySession` operation instead of the `__nextgen_display` cookie, so both signed-in surfaces work against the real backend. Both components route their `getMySession`/`revokeMySession` calls through the shared `api-client` wrappers that enforce `credentials: "include"`.
+
+### Patch Changes
+
+- [#469](https://github.com/zitadel/nextgen/pull/469) [`f55a293`](https://github.com/zitadel/nextgen/commit/f55a2932610ba92315d7174704ca24b940d8d7a6) Thanks [@fforootd](https://github.com/fforootd)! - Route published CLI telemetry to the production Mixpanel project during npm publish.
+
+- [#436](https://github.com/zitadel/nextgen/pull/436) [`13ef6b6`](https://github.com/zitadel/nextgen/commit/13ef6b6b59dde33358c72a93d81be4d0af9458ee) Thanks [@fforootd](https://github.com/fforootd)! - Map CLI telemetry events to Mixpanel's event country property so country appears correctly in analytics.
+
+- [#474](https://github.com/zitadel/nextgen/pull/474) [`ec0a33c`](https://github.com/zitadel/nextgen/commit/ec0a33cfb1ace9e845d5aea6f60c46529fa06f7b) Thanks [@fforootd](https://github.com/fforootd)! - Verify public npm provenance after repository publication.
+
+- Updated dependencies [[`eedc8fe`](https://github.com/zitadel/nextgen/commit/eedc8fe94a850fb2c7173c0b782bcae9d30817a1), [`ddc0c13`](https://github.com/zitadel/nextgen/commit/ddc0c1323ac7eac7332344931fe7c077857f70dc), [`54dcc87`](https://github.com/zitadel/nextgen/commit/54dcc87084dd2d2b8314d08221354683bae64c6b), [`605abe1`](https://github.com/zitadel/nextgen/commit/605abe1f04a011c05bd4be2179556052eae6c007)]:
+  - @zitadel/server@0.1.0-alpha.14
+  - @zitadel/api@0.1.0-alpha.14
+  - @zitadel/config@0.1.0-alpha.14
+
+## 0.1.0-alpha.13
+
+### Patch Changes
+
+- [#411](https://github.com/zitadel/nextgen/pull/411) [`720e526`](https://github.com/zitadel/nextgen/commit/720e526f0f29181b1ae5824dee18cf57b10bea3f) Thanks [@vitorbari](https://github.com/vitorbari)! - Drop the `x-password` user-property annotation. The flow engine sources the password challenge from the reserved `x-auth-methods#password` field name combined with `x-auth-methods.password.enabled` at the schema root (introduced in [#400](https://github.com/zitadel/nextgen/issues/400)); `x-password` is no longer read by any code path. Removed from the `user-property.json` meta-schema and the CLI's generated `password` preset; comments and docs updated to match.
+
+- Updated dependencies [[`720e526`](https://github.com/zitadel/nextgen/commit/720e526f0f29181b1ae5824dee18cf57b10bea3f), [`b574f3a`](https://github.com/zitadel/nextgen/commit/b574f3a6e6122439fadd6f971b73a61b8554f293)]:
+  - @zitadel/server@0.1.0-alpha.13
+  - @zitadel/api@0.1.0-alpha.13
+
 ## 0.1.0-alpha.12
 
 ### Minor Changes

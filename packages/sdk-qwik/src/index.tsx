@@ -1,17 +1,19 @@
 import type {
   ZitadelLogin as ZitadelLoginElement,
   ZitadelLogout as ZitadelLogoutElement,
+  ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 import type {
   ZitadelLoginConfig,
   ZitadelLoginHandlers,
   ZitadelLogoutConfig,
   ZitadelLogoutHandlers,
+  ZitadelSessionConfig,
+  ZitadelSessionHandlers,
 } from "@zitadel/sdk-core/types";
 
 import "@zitadel/components";
-import { component$, useSignal, useVisibleTask$, type QRL, type Signal } from "@builder.io/qwik";
-import { isBrowser } from "@builder.io/qwik/build";
+import { component$, useSignal, useVisibleTask$, type QRL, type Signal } from "@qwik.dev/core";
 import {
   configureZitadel,
   getApi,
@@ -24,37 +26,68 @@ export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
 export * from "./types";
 
+// Re-exported so scaffolded apps can wire the business copy overlay without a
+// direct @zitadel/components dependency (strict package managers reject those).
+export { businessLocales } from "@zitadel/components";
+
 /**
- * Derives the widget's declarative `project-id` / `proxy-path` / `url`
- * *attributes* from the SDK handle (or the discrete props), spread because
- * `@zitadel/components`' Qwik JSX types omit these members.
+ * Assigns a widget config value as a DOM *property*, skipping `undefined` so the
+ * element keeps its own accessor default (e.g. the session card's "Signed in
+ * as" heading).
  *
- * Attributes — not the `project` object property — are what make the widget
- * survive Qwik's resumability. Qwik serialises attributes into the SSR'd HTML,
- * so they are present the instant the custom element upgrades on the client and
- * Lit reflects each one onto its `projectId` / `proxyPath` / `url` property. An
- * object bound only as the `project` property, by contrast, is dropped on
- * resume — Qwik does not re-apply object DOM properties to a plain custom
- * element after hydration — which left the element unconfigured and the flow
- * erroring with "requires a configured project". A `ZitadelProject` is just
- * `{ projectId, proxyPath, url? }`, so the three attributes express it fully.
- *
- * The SDK handle is *additionally* bound as the `project` property (see the
- * `ref` below); when present it wins by `resolveApi()` precedence, so the
- * in-memory handle (and its shared API-client cache) is still used once the ref
- * runs. The attributes are the resume-safe fallback that closes the timing gap.
- * Undefined values are omitted so the widget keeps its own `proxy-path` default.
+ * Qwik 2 binds custom-element JSX props as *attributes* only — its client
+ * renderer has no property-setting path for elements — and the widgets expose
+ * their config as property-only members (`project`/`locales` are
+ * `@property({ attribute: false })`) or as camelCase properties backed by
+ * kebab-case attributes (`projectId` ↔ `project-id`). Neither survives Qwik's
+ * lower-cased attribute binding, so all configuration is applied imperatively on
+ * the element — see the `bind*Config` binders.
  */
-function projectAttrs(
-  project: ZitadelProject | undefined,
-  projectId: string | undefined,
-  proxyPath: string | undefined,
-): Record<string, string | undefined> {
-  return {
-    "project-id": project?.projectId ?? projectId,
-    "proxy-path": project?.proxyPath ?? proxyPath,
-    url: project?.url,
-  };
+function setProp<E extends Element, K extends keyof E>(
+  el: E,
+  key: K,
+  value: E[K] | undefined,
+): void {
+  if (value !== undefined) {
+    el[key] = value;
+  }
+}
+
+/** Applies the `<zitadel-login>` surface config to the element as DOM properties. */
+function bindLoginConfig(el: ZitadelLoginElement, props: ZitadelLoginProps): void {
+  setProp(el, "project", props.project);
+  setProp(el, "projectId", props.projectId);
+  setProp(el, "proxyPath", props.proxyPath);
+  setProp(el, "purpose", props.purpose ?? "login");
+  setProp(el, "flowName", props.flowName);
+  setProp(el, "postSignInUrl", props.postSignInUrl);
+  setProp(el, "variant", props.variant);
+  setProp(el, "theme", props.theme);
+  setProp(el, "suppressHeader", props.suppressHeader);
+  setProp(el, "locales", props.locales);
+  setProp(el, "lang", props.lang);
+}
+
+/** Applies the `<zitadel-logout>` surface config to the element as DOM properties. */
+function bindLogoutConfig(el: ZitadelLogoutElement, props: ZitadelLogoutProps): void {
+  setProp(el, "project", props.project);
+  setProp(el, "projectId", props.projectId);
+  setProp(el, "proxyPath", props.proxyPath);
+  setProp(el, "postSignOutUrl", props.postSignOutUrl);
+  setProp(el, "theme", props.theme);
+}
+
+/** Applies the `<zitadel-session>` surface config to the element as DOM properties. */
+function bindSessionConfig(el: ZitadelSessionElement, props: ZitadelSessionProps): void {
+  setProp(el, "project", props.project);
+  setProp(el, "projectId", props.projectId);
+  setProp(el, "proxyPath", props.proxyPath);
+  setProp(el, "postSignOutUrl", props.postSignOutUrl);
+  setProp(el, "heading", props.heading);
+  setProp(el, "logoutLabel", props.logoutLabel);
+  setProp(el, "variant", props.variant);
+  setProp(el, "theme", props.theme);
+  setProp(el, "suppressHeader", props.suppressHeader);
 }
 
 function eventDetail<T>(event: Event): T {
@@ -92,33 +125,41 @@ export type ZitadelLoginProps = ZitadelLoginConfig &
 
 /**
  * Qwik component wrapping the `<zitadel-login>` web component. Binds the
- * {@link ZitadelProject} handle as a DOM property (or the discrete project id /
- * proxy path) and forwards the widget's `zitadel-*` events as optional
- * callbacks. `useVisibleTask$` (eager `document-ready`, so listeners attach on
- * load rather than on first visibility) wires the native listeners; Qwik's
- * declarative `useOn` does not catch these programmatic custom events.
+ * {@link ZitadelProject} handle (or the discrete project id / proxy path) and
+ * the surface config as DOM properties — Qwik's JSX cannot set these on a custom
+ * element (see {@link setProp}). The `ref` callback applies them synchronously at
+ * mount, before the widget's first render; the `useVisibleTask$` tracks the props
+ * and re-applies them when any changes (so the widget stays reactive), and wires
+ * the native listeners that forward the widget's `zitadel-*` events, which Qwik's
+ * declarative `useOn` does not catch.
  */
 export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
   const host = useSignal<ZitadelLoginElement>();
-  // eslint-disable-next-line qwik/no-use-visible-task
+  // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
   useVisibleTask$(
     ({ track, cleanup }) => {
       const el = track(() => host.value);
       if (!el) {
         return;
       }
+      // Re-run whenever any prop changes, then re-apply the config reactively.
+      track(() => ({ ...props }));
+      bindLoginConfig(el, props);
       const onStep = (event: Event): void => void props.onFlowStep$?.(eventDetail(event));
       const onInput = (event: Event): void => void props.onFlowInput$?.(eventDetail(event));
       const onComplete = (event: Event): void => void props.onFlowComplete$?.(eventDetail(event));
+      const onRedirect = (event: Event): void => void props.onFlowRedirect$?.(eventDetail(event));
       const onError = (event: Event): void => void props.onFlowError$?.(eventDetail(event));
       el.addEventListener("zitadel-flow-step", onStep);
       el.addEventListener("zitadel-flow-input", onInput);
       el.addEventListener("zitadel-flow-complete", onComplete);
+      el.addEventListener("zitadel-flow-redirect", onRedirect);
       el.addEventListener("zitadel-flow-error", onError);
       cleanup(() => {
         el.removeEventListener("zitadel-flow-step", onStep);
         el.removeEventListener("zitadel-flow-input", onInput);
         el.removeEventListener("zitadel-flow-complete", onComplete);
+        el.removeEventListener("zitadel-flow-redirect", onRedirect);
         el.removeEventListener("zitadel-flow-error", onError);
       });
     },
@@ -128,21 +169,11 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
     <zitadel-login
       ref={(el) => {
         host.value = el;
-        // Bind the SDK handle as the `project` property too: when the ref runs
-        // before the deferred `startFlow()`, the in-memory handle wins by
-        // precedence; the `project-id` attribute below is the resume-safe path.
-        // Guard to the browser — Qwik also runs `ref` during SSR, where `el` is
-        // a non-extensible virtual node and assigning to it throws.
-        if (isBrowser && props.project) {
-          el.project = props.project;
-        }
         if (props.ref) {
           props.ref.value = el;
         }
+        bindLoginConfig(el, props);
       }}
-      {...projectAttrs(props.project, props.projectId, props.proxyPath)}
-      purpose={props.purpose ?? "login"}
-      post-sign-in-url={props.postSignInUrl}
     />
   );
 });
@@ -166,19 +197,22 @@ export type ZitadelLogoutProps = ZitadelLogoutConfig &
 
 /**
  * Qwik component wrapping the `<zitadel-logout>` web component. Binds the
- * {@link ZitadelProject} handle as a DOM property (or the discrete project id /
- * proxy path) and forwards the widget's `zitadel-signout` event as an optional
- * callback.
+ * {@link ZitadelProject} handle (or the discrete project id / proxy path) and
+ * surface config as DOM properties (see {@link setProp}) — applied at mount in
+ * the `ref` callback and re-applied reactively by the `useVisibleTask$` — and
+ * forwards the widget's `zitadel-signout` event as an optional callback.
  */
 export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   const host = useSignal<ZitadelLogoutElement>();
-  // eslint-disable-next-line qwik/no-use-visible-task
+  // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
   useVisibleTask$(
     ({ track, cleanup }) => {
       const el = track(() => host.value);
       if (!el) {
         return;
       }
+      track(() => ({ ...props }));
+      bindLogoutConfig(el, props);
       const onSignout = (event: Event): void => void props.onSignout$?.(eventDetail(event));
       el.addEventListener("zitadel-signout", onSignout);
       cleanup(() => {
@@ -191,18 +225,67 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
     <zitadel-logout
       ref={(el) => {
         host.value = el;
-        // See ZitadelLogin: bind the handle as `project` for precedence, while
-        // the `project-id` attribute below survives Qwik's resume. Browser-only
-        // — `ref` also runs during SSR, where `el` is non-extensible.
-        if (isBrowser && props.project) {
-          el.project = props.project;
-        }
         if (props.ref) {
           props.ref.value = el;
         }
+        bindLogoutConfig(el, props);
       }}
-      {...projectAttrs(props.project, props.projectId, props.proxyPath)}
-      post-sign-out-url={props.postSignOutUrl}
+    />
+  );
+});
+
+/**
+ * Props for {@link ZitadelSession}. Supply the SDK handle via {@link project},
+ * or the discrete `projectId` / `proxyPath` the widget reads as properties. The
+ * `on…$` QRL callbacks are derived from the shared {@link ZitadelSessionHandlers}
+ * contract. Pass an optional {@link ref} signal to obtain the underlying
+ * `<zitadel-session>` element imperatively.
+ */
+export type ZitadelSessionProps = ZitadelSessionConfig &
+  Qrlify<ZitadelSessionHandlers> & {
+    /**
+     * Optional signal populated with the underlying `<zitadel-session>` element
+     * once it mounts, mirroring React's `forwardRef`.
+     */
+    readonly ref?: Signal<ZitadelSessionElement | undefined>;
+  };
+
+/**
+ * Qwik component wrapping the `<zitadel-session>` web component — the
+ * post-sign-in "signed in as" card. Binds the {@link ZitadelProject} handle (or
+ * the discrete project id / proxy path) and surface config as DOM properties
+ * (see {@link setProp}) — applied at mount in the `ref` callback and re-applied
+ * reactively by the `useVisibleTask$` — and forwards the widget's
+ * `zitadel-signout` event as an optional callback.
+ */
+export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
+  const host = useSignal<ZitadelSessionElement>();
+  // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
+  useVisibleTask$(
+    ({ track, cleanup }) => {
+      const el = track(() => host.value);
+      if (!el) {
+        return;
+      }
+      track(() => ({ ...props }));
+      bindSessionConfig(el, props);
+      const onSignout = (event: Event): void => void props.onSignout$?.(eventDetail(event));
+      el.addEventListener("zitadel-signout", onSignout);
+      cleanup(() => {
+        el.removeEventListener("zitadel-signout", onSignout);
+      });
+    },
+    { strategy: "document-ready" },
+  );
+  return (
+    <zitadel-session
+      ref={(el) => {
+        host.value = el;
+        if (props.ref) {
+          props.ref.value = el;
+        }
+        bindSessionConfig(el, props);
+      }}
     />
   );
 });

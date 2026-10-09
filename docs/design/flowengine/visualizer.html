@@ -718,7 +718,6 @@ const USER_SCHEMAS = {
         "type": "string",
         "format": "email",
         "title": "Email address",
-        "x-identifier": true,
         "x-unique": "project",
         "x-editable": true
       },
@@ -765,7 +764,6 @@ const USER_SCHEMAS = {
         "type": "string",
         "format": "email",
         "title": "Email address",
-        "x-identifier": true,
         "x-unique": "project",
         "x-editable": true
       },
@@ -867,7 +865,7 @@ const FLOWS = {
       },
       {
         name: "sso_redirect",
-        transitions: { callback: { target: "done" } }
+        transitions: { sso_authenticated: { target: "done" } }
       },
       { name: "done", complete: "redirect" }
     ]
@@ -926,7 +924,7 @@ const FLOWS = {
       },
       {
         name: "sso_redirect",
-        transitions: { callback: { target: "consent" } }
+        transitions: { sso_authenticated: { target: "consent" } }
       },
       {
         name: "signin",
@@ -1018,7 +1016,7 @@ const FLOWS = {
       },
       {
         name: "sso_link",
-        transitions: { callback: { target: "terms" } }
+        transitions: { sso_authenticated: { target: "terms" } }
       },
       {
         name: "terms",
@@ -1186,7 +1184,7 @@ function highlightJSON(text) {
   ).replace(
     /:\s*("(?:[^"\\]|\\.)*")/g, ': <span class="str">$1</span>'
   ).replace(
-    /(?<=[\[,\n]\s*)("(?:[^"\\]|\\.)*")(?=\s*[,\]\n])/g, '<span class="str">$1</span>'
+    /(?<=[[,\n]\s*)("(?:[^"\\]|\\.)*")(?=\s*[,\]\n])/g, '<span class="str">$1</span>'
   ).replace(
     /\b(\d+(?:\.\d+)?)\b/g, '<span class="num">$1</span>'
   ).replace(
@@ -1424,7 +1422,7 @@ async function renderDiagram() {
       const schemaName = currentFlow?.user_schema;
       const fieldLabels = fieldNames.map(f => {
         const annots = getAnnotations(schemaName, f);
-        if (annots['x-identifier']) return f + ' (id)';
+        if (annots['x-unique']) return f + ' (id)';
         if (annots['x-credential']) return f + ' (cred)';
         return f;
       });
@@ -1432,8 +1430,8 @@ async function renderDiagram() {
     }
 
     if (step.on_success) label += `<br/>on_success: ${step.on_success}`;
-    // Detect callback-only steps (SSO redirect, etc.)
-    const isCallbackStep = step.transitions && 'callback' in step.transitions &&
+    // Detect SSO-return-only steps (SSO redirect, etc.)
+    const isCallbackStep = step.transitions && 'sso_authenticated' in step.transitions &&
       (!step.fields || (Array.isArray(step.fields) ? step.fields.length === 0 : Object.keys(step.fields).length === 0)) &&
       (!step.actions || Object.keys(step.actions).length === 0);
 
@@ -1476,7 +1474,7 @@ async function renderDiagram() {
 
   for (const step of steps) {
     const id = 'n_' + step.name;
-    const isCallback = step.transitions && 'callback' in step.transitions &&
+    const isCallback = step.transitions && 'sso_authenticated' in step.transitions &&
       (!step.fields || (Array.isArray(step.fields) ? step.fields.length === 0 : Object.keys(step.fields).length === 0)) &&
       (!step.actions || Object.keys(step.actions).length === 0);
     if (step.complete) {
@@ -1839,8 +1837,8 @@ async function renderSim() {
     return;
   }
 
-  // Detect redirect/callback steps: no fields, no actions, has a callback transition
-  const hasCallback = step.transitions && 'callback' in step.transitions;
+  // Detect redirect steps: no fields, no actions, has an SSO return transition
+  const hasCallback = step.transitions && 'sso_authenticated' in step.transitions;
   const hasNoFields = !step.fields || (Array.isArray(step.fields) ? step.fields.length === 0 : Object.keys(step.fields).length === 0);
   const hasNoActions = !step.actions || Object.keys(step.actions).length === 0;
   if (hasCallback && hasNoFields && hasNoActions) {
@@ -1850,7 +1848,7 @@ async function renderSim() {
       <div class="sim-body">
         <p style="color: var(--muted); text-align: center; padding: 40px 0;">Redirecting to external provider\u2026</p>
         <div class="sim-actions">
-          <button class="sim-btn primary" onclick="simAction('callback')">Simulate callback</button>
+          <button class="sim-btn primary" onclick="simAction('sso_authenticated')">Simulate SSO return</button>
         </div>
       </div>
       <div class="sim-footer">
@@ -1979,9 +1977,11 @@ function renderResolvedPayload() {
   // Build implied outcomes from annotations
   const impliedOutcomes = [];
   for (const [name, annots] of Object.entries(annotations)) {
-    if (annots['x-identifier']) impliedOutcomes.push({ field: name, outcome: 'user_not_found', reason: 'x-identifier: true' });
+    if (annots['x-unique']) {
+      impliedOutcomes.push({ field: name, outcome: 'user_not_found', reason: `x-unique: "${annots['x-unique']}"` });
+      impliedOutcomes.push({ field: name, outcome: 'already_exists', reason: `x-unique: "${annots['x-unique']}"` });
+    }
     if (annots['x-credential']) impliedOutcomes.push({ field: name, outcome: 'invalid_credential', reason: `x-credential: "${annots['x-credential']}"` });
-    if (annots['x-unique']) impliedOutcomes.push({ field: name, outcome: 'already_exists', reason: `x-unique: "${annots['x-unique']}"` });
   }
 
   const definitionJson = highlightInline(JSON.stringify(fieldNames, null, 2));
@@ -2042,7 +2042,7 @@ function highlightInline(json) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/("(?:[^"\\]|\\.)*")\s*:/g, '<span class="key">$1</span>:')
     .replace(/:\s*("(?:[^"\\]|\\.)*")/g, ': <span class="str">$1</span>')
-    .replace(/(?<=[\[,\n]\s*)("(?:[^"\\]|\\.)*")(?=\s*[,\]\n])/g, '<span class="str">$1</span>')
+    .replace(/(?<=[[,\n]\s*)("(?:[^"\\]|\\.)*")(?=\s*[,\]\n])/g, '<span class="str">$1</span>')
     .replace(/\b(true|false)\b/g, '<span class="bool">$1</span>');
 }
 </script>

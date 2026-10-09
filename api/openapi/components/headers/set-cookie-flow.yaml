@@ -1,8 +1,27 @@
 description: |
-  Encrypted flow state cookie. Holds a map of flow states keyed by
-  flow ID, supporting multiple concurrent flows in the same browser.
-  HttpOnly, Secure, SameSite=Strict, scoped to `/flow`. Rotated on
-  every response, including validation failures.
+  The cookies this response sets, one `Set-Cookie` line per element; the
+  generated server emits the lines separately, since the comma-joined form
+  OpenAPI prescribes for array headers is invalid for `Set-Cookie`
+  (RFC 6265). Browsers never expose the header to script, so this shape
+  concerns server-side and generated non-browser clients only.
+
+  The first element is always `_zflow`, the encrypted flow state: HttpOnly,
+  Secure, SameSite=Strict, Path=/. Starting a flow and every submit
+  response rotate it, including validation failures; `GET /flow/{id}`
+  sets it only when the render resolved a parked SSO identity. The
+  `sso-redirect` response appends the browser-binding cookie the callback
+  checks.
 schema:
-  type: string
-  example: _zflow=<encrypted-payload>; HttpOnly; Secure; SameSite=Strict; Path=/flow
+  type: array
+  items:
+    type: string
+examples:
+  step:
+    summary: Any step response
+    value:
+      - _zflow=<encrypted-payload>; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=600
+  sso-redirect:
+    summary: The sso-redirect step adds the binding cookie
+    value:
+      - _zflow=<encrypted-payload>; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=600
+      - __Host-_zsso=<nonce>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=900

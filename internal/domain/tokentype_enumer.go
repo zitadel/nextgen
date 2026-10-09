@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _TokenTypeName = "unspecifiedsession_tokenoidc_access_tokensaml_assertionpersonal_access_tokenflowjwt_profile"
+const _TokenTypeName = "unspecifiedsession_tokenoidc_access_tokensaml_assertionpersonal_access_tokenflowjwt_profileproject_tokenproject_preview"
 
-var _TokenTypeIndex = [...]uint8{0, 11, 24, 41, 55, 76, 80, 91}
+var _TokenTypeIndex = [...]uint8{0, 11, 24, 41, 55, 76, 80, 91, 104, 119}
 
-const _TokenTypeLowerName = "unspecifiedsession_tokenoidc_access_tokensaml_assertionpersonal_access_tokenflowjwt_profile"
+const _TokenTypeLowerName = "unspecifiedsession_tokenoidc_access_tokensaml_assertionpersonal_access_tokenflowjwt_profileproject_tokenproject_preview"
 
 func (i TokenType) String() string {
 	if i >= TokenType(len(_TokenTypeIndex)-1) {
@@ -32,25 +32,31 @@ func _TokenTypeNoOp() {
 	_ = x[TokenTypePersonalAccessToken-(4)]
 	_ = x[TokenTypeFlow-(5)]
 	_ = x[TokenTypeJWTProfile-(6)]
+	_ = x[TokenTypeProjectToken-(7)]
+	_ = x[TokenTypeProjectPreview-(8)]
 }
 
-var _TokenTypeValues = []TokenType{TokenTypeUnspecified, TokenTypeSessionToken, TokenTypeOIDCAccessToken, TokenTypeSAMLAssertion, TokenTypePersonalAccessToken, TokenTypeFlow, TokenTypeJWTProfile}
+var _TokenTypeValues = []TokenType{TokenTypeUnspecified, TokenTypeSessionToken, TokenTypeOIDCAccessToken, TokenTypeSAMLAssertion, TokenTypePersonalAccessToken, TokenTypeFlow, TokenTypeJWTProfile, TokenTypeProjectToken, TokenTypeProjectPreview}
 
 var _TokenTypeNameToValueMap = map[string]TokenType{
-	_TokenTypeName[0:11]:       TokenTypeUnspecified,
-	_TokenTypeLowerName[0:11]:  TokenTypeUnspecified,
-	_TokenTypeName[11:24]:      TokenTypeSessionToken,
-	_TokenTypeLowerName[11:24]: TokenTypeSessionToken,
-	_TokenTypeName[24:41]:      TokenTypeOIDCAccessToken,
-	_TokenTypeLowerName[24:41]: TokenTypeOIDCAccessToken,
-	_TokenTypeName[41:55]:      TokenTypeSAMLAssertion,
-	_TokenTypeLowerName[41:55]: TokenTypeSAMLAssertion,
-	_TokenTypeName[55:76]:      TokenTypePersonalAccessToken,
-	_TokenTypeLowerName[55:76]: TokenTypePersonalAccessToken,
-	_TokenTypeName[76:80]:      TokenTypeFlow,
-	_TokenTypeLowerName[76:80]: TokenTypeFlow,
-	_TokenTypeName[80:91]:      TokenTypeJWTProfile,
-	_TokenTypeLowerName[80:91]: TokenTypeJWTProfile,
+	_TokenTypeName[0:11]:         TokenTypeUnspecified,
+	_TokenTypeLowerName[0:11]:    TokenTypeUnspecified,
+	_TokenTypeName[11:24]:        TokenTypeSessionToken,
+	_TokenTypeLowerName[11:24]:   TokenTypeSessionToken,
+	_TokenTypeName[24:41]:        TokenTypeOIDCAccessToken,
+	_TokenTypeLowerName[24:41]:   TokenTypeOIDCAccessToken,
+	_TokenTypeName[41:55]:        TokenTypeSAMLAssertion,
+	_TokenTypeLowerName[41:55]:   TokenTypeSAMLAssertion,
+	_TokenTypeName[55:76]:        TokenTypePersonalAccessToken,
+	_TokenTypeLowerName[55:76]:   TokenTypePersonalAccessToken,
+	_TokenTypeName[76:80]:        TokenTypeFlow,
+	_TokenTypeLowerName[76:80]:   TokenTypeFlow,
+	_TokenTypeName[80:91]:        TokenTypeJWTProfile,
+	_TokenTypeLowerName[80:91]:   TokenTypeJWTProfile,
+	_TokenTypeName[91:104]:       TokenTypeProjectToken,
+	_TokenTypeLowerName[91:104]:  TokenTypeProjectToken,
+	_TokenTypeName[104:119]:      TokenTypeProjectPreview,
+	_TokenTypeLowerName[104:119]: TokenTypeProjectPreview,
 }
 
 var _TokenTypeNames = []string{
@@ -61,6 +67,8 @@ var _TokenTypeNames = []string{
 	_TokenTypeName[55:76],
 	_TokenTypeName[76:80],
 	_TokenTypeName[80:91],
+	_TokenTypeName[91:104],
+	_TokenTypeName[104:119],
 }
 
 // TokenTypeString retrieves an enum value from the enum constants string name.

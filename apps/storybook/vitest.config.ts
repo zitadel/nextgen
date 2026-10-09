@@ -5,6 +5,7 @@ import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
+import { baseTest } from "../../vitest.shared.mjs";
 import { optimizeDepsExclude, optimizeDepsInclude } from "./.storybook/optimize-deps.js";
 
 const dir = dirname(fileURLToPath(import.meta.url));
@@ -21,9 +22,23 @@ const dir = dirname(fileURLToPath(import.meta.url));
  */
 export default defineConfig({
   test: {
+    ...baseTest,
+    name: "@zitadel/storybook",
+    // Run story files one at a time. main's `optimizeDeps.noDiscovery` (below)
+    // fixes the re-optimization cause of the CI "Failed to fetch dynamically
+    // imported module" flake, but parallel Chromium contexts still overwhelm
+    // the Vitest Vite server under the full `moon ci` load (vitest-dev/vitest#9509).
+    // Serializing the files keeps the server serving one importer at a time;
+    // per-file isolation stays on (this is not `isolate: false`).
+    fileParallelism: false,
     projects: [
       {
         extends: true,
+        // NOTE: unlike the other packages we do NOT pin cacheDir to `.vitest`
+        // here — the Storybook Vitest addon (`storybookTest`) manages its own
+        // Vite instance and keeps its cache under `node_modules/.vite`
+        // regardless of this setting, so `storybook:test` has no `.vitest`
+        // output in moon.yml.
         plugins: [
           storybookTest({
             configDir: join(dir, ".storybook"),
@@ -34,6 +49,15 @@ export default defineConfig({
         optimizeDeps: {
           exclude: optimizeDepsExclude,
           include: optimizeDepsInclude,
+          // Forbid on-the-fly discovery: optimize ONLY the `include` list up
+          // front and never re-optimize mid-run. The browser suite's recurring
+          // cold-CI failure ("Failed to fetch dynamically imported module …
+          // setup-file-with-project-annotations.js") is Vite re-optimizing when
+          // it discovers a dep after the browser has started, which invalidates
+          // the in-flight module URLs. With discovery off that race cannot
+          // happen: a missing dep fails deterministically (and reproducibly on
+          // a cold local cache) instead of flaking under CI timing.
+          noDiscovery: true,
         },
         test: {
           name: "storybook",

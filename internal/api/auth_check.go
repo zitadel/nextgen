@@ -36,18 +36,20 @@ func factorPayloadToAPI(factor domain.AuthFactor) api.OptCompletedFactorPayload 
 		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
 			Type: api.IdentifierFactorPayloadCompletedFactorPayload,
 			IdentifierFactorPayload: api.IdentifierFactorPayload{
+				Method: api.IdentifierFactorPayloadMethodIdentifier,
 				UserID: api.UserID(f.UserID),
 			},
 		})
 	case *domain.AuthFactorPassword:
 		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
 			Type:                  api.PasswordFactorPayloadCompletedFactorPayload,
-			PasswordFactorPayload: api.PasswordFactorPayload{},
+			PasswordFactorPayload: api.PasswordFactorPayload{Method: api.PasswordFactorPayloadMethodPassword},
 		})
 	case *domain.AuthFactorPasskey:
 		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
 			Type: api.PasskeyFactorPayloadCompletedFactorPayload,
 			PasskeyFactorPayload: api.PasskeyFactorPayload{
+				Method:                  api.PasskeyFactorPayloadMethodPasskey,
 				CredentialID:            base64.RawURLEncoding.EncodeToString(f.CredentialID),
 				UserVerified:            f.UserVerified,
 				BackupEligible:          api.NewOptBool(f.BackupEligible),
@@ -55,6 +57,23 @@ func factorPayloadToAPI(factor domain.AuthFactor) api.OptCompletedFactorPayload 
 				AuthenticatorAttachment: api.OptPasskeyFactorPayloadAuthenticatorAttachment{},
 			},
 		})
+	case *domain.AuthFactorPasskeyRegistration:
+		// A completed enrollment renders as a passkey factor: creating the
+		// credential proved possession just like an assertion would.
+		return api.NewOptCompletedFactorPayload(api.CompletedFactorPayload{
+			Type: api.PasskeyFactorPayloadCompletedFactorPayload,
+			PasskeyFactorPayload: api.PasskeyFactorPayload{
+				Method:                  api.PasskeyFactorPayloadMethodPasskey,
+				CredentialID:            f.CredentialID,
+				UserVerified:            f.UserVerified,
+				BackupEligible:          api.NewOptBool(f.BackupEligible),
+				BackupState:             api.NewOptBool(f.BackupState),
+				AuthenticatorAttachment: api.OptPasskeyFactorPayloadAuthenticatorAttachment{},
+			},
+		})
+	case *domain.AuthFactorSSO:
+		// No payload: the connection and link ids stay server-side.
+		return api.OptCompletedFactorPayload{}
 	}
 	return api.OptCompletedFactorPayload{}
 }
@@ -67,14 +86,33 @@ func requiredFactorsToAPI(checks []domain.AuthCheckType) []api.FactorMethod {
 	return factors
 }
 
+// checkTypeToAPI maps a check type's class to its wire method: enrollment is
+// passkey-class on the wire, the distinct check type is internal bookkeeping.
 func checkTypeToAPI(check domain.AuthCheckType) api.FactorMethod {
-	switch check {
+	switch check.Class() {
 	case domain.AuthCheckTypeUser:
 		return api.FactorMethodIdentifier
 	case domain.AuthCheckTypePassword:
 		return api.FactorMethodPassword
 	case domain.AuthCheckTypePasskey:
 		return api.FactorMethodPasskey
+	case domain.AuthCheckTypeSSO:
+		return api.FactorMethodSSO
+	default:
+		return ""
+	}
+}
+
+// checkTypeToChallengeMethod is [checkTypeToAPI] for challenges. An sso check
+// is never an [domain.AuthChallenge], so the challenge enum leaves it out.
+func checkTypeToChallengeMethod(check domain.AuthCheckType) api.ChallengeMethod {
+	switch check.Class() {
+	case domain.AuthCheckTypeUser:
+		return api.ChallengeMethodIdentifier
+	case domain.AuthCheckTypePassword:
+		return api.ChallengeMethodPassword
+	case domain.AuthCheckTypePasskey:
+		return api.ChallengeMethodPasskey
 	default:
 		return ""
 	}

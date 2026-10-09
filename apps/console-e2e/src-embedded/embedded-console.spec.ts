@@ -1,0 +1,178 @@
+import { expect, test } from "@zitadel/testing/playwright";
+
+import { grantProjectAdmin } from "../src-real/support";
+
+/**
+ * The console as the Go binary serves it (Console ADR 0002 §4).
+ *
+ * Everything here is ordinary console behaviour that the other two suites
+ * already appear to cover. The difference is the server: this one is the
+ * built binary, serving the SPA out of `internal/staticui/console` and the
+ * ogen API at the origin root, with no proxy in between. That makes the
+ * console's API base a real claim about a real routing table instead of a
+ * string nobody checks — the claim that shipped wrong, as `/api/*` against a
+ * mux that serves `/ui/login`, `/ui/console`, `/console/runtime.json`, `/`.
+ *
+ * Keep the assertions here about *reaching the API*. Console features belong
+ * in `src-real/`, which runs the same screens through the Vite dev proxy.
+ */
+
+test("signs in end to end against the embedded API", async ({ page, seed }) => {
+  const user = await seed.user();
+
+  await page.goto("/ui/console/");
+
+  // The guard's `GET /sessions/me` has to reach the API to answer 401; a
+  // request to a path the mux does not serve produces the same redirect (
+  // `fetchSession` swallows every failure), so the redirect alone proves
+  // nothing. The widget below is what needs a live API.
+  await expect(page).toHaveURL(/\/ui\/console\/login$/);
+
+  // `POST /flow` — the first call whose result is visible on screen. With the
+  // wrong base the widget renders "POST /api/flow returned 404" here.
+  await expect(page.getByLabel("Email")).toBeVisible();
+  await page.getByLabel("Email").fill(user.email);
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+
+  await expect(page.getByLabel("Password")).toBeVisible();
+  await page.getByLabel("Password").fill(user.password);
+  // Registered before the terminal click, because the call fires as soon as
+  // the console boots on the other side of the navigation.
+  const myProjects = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/users/me/projects",
+  );
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+
+  // Terminal step → `POST /sessions/exchange` with the runtime-discovered
+  // publishable key → `__nextgen_session` cookie → full-document navigation
+  // back into the console, where the guard's `GET /sessions/me` now answers
+  // 200. Four more calls that only resolve if the base is right.
+  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
+  // `/` has no screen of its own and lands on Teams, which acts on a selected
+  // project. The seeded user holds no grant, so `GET /users/me/projects` lists
+  // nothing and there is no project to select for them
+  // (`resolveDefaultProjectScope`): the guard sends them to Projects instead,
+  // never to the project the console signed into, which they could not manage.
+  // That read is authenticated by the session cookie alone (#1237), so it
+  // answering 200 is what proves the base and the cookie are right.
+  expect((await myProjects).status()).toBe(200);
+  await expect(page).toHaveURL(/\/ui\/console\/projects(\?|$)/);
+  expect(new URL(page.url()).searchParams.get("project")).toBeNull();
+
+  // The shell, not the screen: it is what shows the signed-in console was
+  // reached.
+  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+  await expect(page.getByText("No projects yet.")).toBeVisible();
+  // `toContainText`: the pill carries its label twice, once per breakpoint.
+  await expect(page.getByRole("button", { name: "Switch project" })).toContainText("No projects");
+});
+
+test("manages the project with the session cookie alone", async ({ page, seed, zitadel }) => {
+  // #1300: nothing on this lane holds the project secret — the binary serves
+  // the console and the API at one origin and no proxy adds a credential — so
+  // a granted operator's session cookie is what authorizes a management read
+  // and a management write. The grant is written from the test process.
+  const operator = await seed.user();
+  await grantProjectAdmin(zitadel.handle, operator.id);
+  const colleague = await seed.user();
+
+  await page.goto("/ui/console/");
+  await page.getByLabel("Email").fill(operator.email);
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByLabel("Password").fill(operator.password);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
+  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+
+  await page.goto("/ui/console/users");
+  await expect(page.getByRole("link", { name: colleague.email, exact: true })).toBeVisible();
+
+  const name = `Embedded ${Date.now().toString(36)}`;
+  await page.goto("/ui/console/teams?status=active");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  const drawer = page.getByRole("dialog", { name: "Add team" });
+  await drawer.getByLabel("Team name").fill(name);
+  const created = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/teams" && response.request().method() === "POST",
+  );
+  await drawer.getByRole("button", { name: "Add team", exact: true }).click();
+  expect((await created).status()).toBe(201);
+  await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
+});
+
+test("shows each user's team on the Users screen with the session cookie", async ({
+  page,
+  zitadel,
+  seed,
+}) => {
+  // #1300 §4: `expand: ["teams"]` needs team_membership.read, which a session
+  // never carries; QueryUsers lets a session through once it may list the
+  // project. Proven through the console, not only the API: without it the
+  // Users screen falls back to the unexpanded read and drops its Team column,
+  // while every Go test stays green.
+  const { baseUrl, projectId, projectSecret, schemaId } = zitadel.handle;
+  const post = async (path: string, body: unknown) => {
+    const response = await fetch(`${baseUrl}${path}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const text = await response.text();
+    expect(response.ok, text).toBe(true);
+    return JSON.parse(text) as { id: string };
+  };
+
+  const operator = await seed.user();
+  await grantProjectAdmin(zitadel.handle, operator.id);
+  const team = await post(`/teams?project_id=${projectId}`, {
+    name: `Support ${Date.now().toString(36)}`,
+  });
+  const member = `member-${Date.now().toString(36)}@example.com`;
+  await post(`/users?project_id=${projectId}&team_id=${team.id}`, {
+    schema: schemaId,
+    attributes: { email: member },
+  });
+
+  await page.goto("/ui/console/");
+  await page.getByLabel("Email").fill(operator.email);
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByLabel("Password").fill(operator.password);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
+
+  await page.goto("/ui/console/users");
+  await expect(page.getByRole("columnheader", { name: "Team" })).toBeVisible();
+  const row = page.getByRole("row").filter({ hasText: member });
+  await expect(row.getByText(/^Support /)).toBeVisible();
+});
+
+test("targets the origin root, never an /api prefix", async ({ page }) => {
+  const apiPrefixed: string[] = [];
+  page.on("request", (request) => {
+    const { pathname } = new URL(request.url());
+    if (pathname === "/api" || pathname.startsWith("/api/")) {
+      apiPrefixed.push(`${request.method()} ${pathname}`);
+    }
+  });
+
+  await page.goto("/ui/console/");
+  await expect(page.getByLabel("Email")).toBeVisible();
+
+  // The dev proxy's path, and the only base the binary has never served.
+  // Asserted on the request side so the failure names what was called rather
+  // than leaving a rendered 404 to be interpreted.
+  expect(apiPrefixed).toEqual([]);
+});
+
+test("serves the runtime document the console bootstraps from", async ({ page, zitadel }) => {
+  const response = await page.request.get("/console/runtime.json");
+  expect(response.status()).toBe(200);
+
+  // Mounted at a root path, independent of where the SPA lives, and naming
+  // the deployment's own project — the one the widget above signed into.
+  await expect(response.json()).resolves.toMatchObject({
+    mode: "standalone",
+    console_project_id: zitadel.handle.projectId,
+  });
+});

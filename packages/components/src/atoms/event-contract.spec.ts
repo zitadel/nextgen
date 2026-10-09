@@ -14,12 +14,13 @@ describe("atom event contract", () => {
     "zl-button": ["zl-submit"],
     "zl-card": [],
     "zl-checkbox": ["zl-change"],
-    "zl-field": ["zl-input"],
+    "zl-field": ["zl-input", "zl-submit"],
     "zl-icon": [],
     "zl-page-shell": [],
-    "zl-passkey": ["zl-passkey-result", "zl-passkey-error"],
+    "zl-passkey": ["zl-passkey-result", "zl-passkey-error", "zl-passkey-started"],
     "zl-pill": [],
     "zl-select": ["zl-change"],
+    "zl-sso-providers": ["zl-sso-select"],
   };
 
   for (const manifest of manifestRegistry) {

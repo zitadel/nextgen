@@ -3,37 +3,75 @@ language: "typescript"
 layer: "application"
 stack: "frontend"
 dependsOn:
+  - "api"
   - "design-tokens"
-  - "ui-react"
+  - "sdk-react"
 
 tasks:
-  lint:
-    command: "corepack pnpm exec oxlint ."
-    deps:
-      - "design-tokens:build"
-      - "ui-react:build"
-
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
-      - "design-tokens:build"
-      - "ui-react:build"
+      - "sdk-react:build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
-      - "design-tokens:build"
-      - "ui-react:build"
+      - "sdk-react:build"
     outputs:
       - "/internal/staticui/console/dist/**/*"
+    options:
+      # Replaces the inherited dist/**/* rather than adding to it.
+      mergeOutputs: "replace"
+
+  build-release:
+    command: "corepack pnpm run build"
+    deps:
+      - "api:build-release"
+      - "sdk-react:build"
+    outputs:
+      - "/internal/staticui/console/dist/**/*"
+    options:
+      cache: false
+      # Release UI builds consume package release output and run from the later
+      # release step instead of the normal `moon ci` build/test graph.
+      runInCI: false
 
   test:
-    command: "corepack pnpm run test"
     deps:
       - "build"
 
+  # The same deps as build: sdk-react has no `@zitadel/source` entry, so the
+  # dev server loads its dist.
   dev:
     command: "corepack pnpm run dev"
+    deps:
+      - "sdk-react:build"
+    options:
+      persistent: true
+      runInCI: false
+
+  # Real-data dev loop: boots a seeded ephemeral instance, then the dev server
+  # against it. The console manages an instance, so its list screens are only
+  # meaningful against a real backend (see scripts/dev-real.mts). The script
+  # runs `moon run server:build` itself; a task dep on it here would cycle the
+  # project graph, because server:build depends on console:build.
+  dev-real:
+    command: "corepack pnpm run dev:real"
+    # dev's deps, plus the built `zitadel` CLI the instance boots through.
+    deps:
+      - "sdk-react:build"
+      - "cli:build"
+    options:
+      persistent: true
+      runInCI: false
+
+  # The claim page is the console acting as the *platform's* claim surface, not
+  # as a project's admin console, so it needs the platform project that
+  # `dev-real` deliberately does not boot. Opt-in for that one screen; every
+  # other screen is better served by `dev-real`.
+  dev-claim:
+    command: "corepack pnpm run dev:claim"
+    deps:
+      - "sdk-react:build"
+      - "cli:build"
     options:
       persistent: true
       runInCI: false

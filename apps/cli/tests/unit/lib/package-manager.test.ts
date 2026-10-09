@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  addExactCommandFor,
   detectPackageManager,
   devCommandFor,
   installCommandFor,
@@ -67,4 +68,18 @@ describe("package manager commands", () => {
       expect(devCommandFor(packageManager).display).toBe(dev);
     },
   );
+
+  // The exact-save flag is the point: every manager's default save prefix is
+  // a caret range, which would float a deliberately exact pin.
+  it.each([
+    ["npm", "npm install --save-exact @zitadel/sdk-next@0.1.0 @zitadel/testing@0.1.0"],
+    ["pnpm", "pnpm add --save-exact @zitadel/sdk-next@0.1.0 @zitadel/testing@0.1.0"],
+    ["yarn", "yarn add --exact @zitadel/sdk-next@0.1.0 @zitadel/testing@0.1.0"],
+    ["bun", "bun add --exact @zitadel/sdk-next@0.1.0 @zitadel/testing@0.1.0"],
+  ] satisfies Array<[PackageManager, string]>)("maps %s exact adds", (packageManager, display) => {
+    expect(
+      addExactCommandFor(packageManager, ["@zitadel/sdk-next@0.1.0", "@zitadel/testing@0.1.0"])
+        .display,
+    ).toBe(display);
+  });
 });

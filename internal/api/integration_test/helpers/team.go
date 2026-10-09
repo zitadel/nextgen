@@ -1,31 +1,37 @@
 package helpers
 
 import (
+	"context"
 	"testing"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
-
-func (h *Harness) EnsureTeamRepo(t *testing.T) domain.TeamRepository {
-	t.Helper()
-	if h.TeamRepo == nil {
-		h.TeamRepo = repository.NewTeamRepository(
-			h.EnsureDBPool(t),
-		)
-	}
-
-	return h.TeamRepo
-}
 
 func (h *Harness) EnsureTeamService(t *testing.T) *service.TeamService {
 	t.Helper()
-	if h.TeamService == nil {
-		h.TeamService = service.NewTeamService(
-			h.EnsureDBPool(t),
-			h.EnsureTeamRepo(t),
+	h.teamService.mutex.Lock()
+	defer h.teamService.mutex.Unlock()
+
+	if h.teamService.value == nil {
+		h.teamService.value = service.NewTeamService(
+			h.EnsureServiceDB(t),
 		)
 	}
-	return h.TeamService
+	return h.teamService.value
+}
+
+type TeamMembershipFixture struct {
+	Pool *service.DB
+}
+
+func (h *Harness) EnsureTeamMembershipFixture(t *testing.T) TeamMembershipFixture {
+	t.Helper()
+	return TeamMembershipFixture{Pool: h.EnsureServiceDB(t)}
+}
+
+func (f TeamMembershipFixture) Create(ctx context.Context, membership *domain.TeamMembership) error {
+	return f.Pool.Transaction(ctx, func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+		return tx.Statements().CreateTeamMembership(ctx, membership)
+	})
 }

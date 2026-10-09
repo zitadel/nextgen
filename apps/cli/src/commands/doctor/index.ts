@@ -1,6 +1,7 @@
 import { Flags } from "@oclif/core";
 import consola from "consola";
 
+import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
 import { ZitadelError } from "../../lib/errors";
 import { assertServerPackageAvailable } from "../../lib/local-server/binary";
 import { dockerAvailable, imageAvailable } from "../../lib/local-server/docker";
@@ -22,7 +23,7 @@ import {
   type RuntimeBackend,
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
-import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { createOrca } from "../../lib/orca";
 import { hasZitadelConfig } from "../../lib/project";
 import { listenersForPort } from "../../lib/prober/ports";
@@ -43,8 +44,9 @@ const LOCAL_RUNTIME_CHECK_NAMES = new Set([
  *
  * Runs every registered {@link SANITY_CHECKS} entry and emits the aggregate
  * result; if any check fails it throws `E_VALIDATION` carrying the full check
- * details. With `--fix`, each failing check first attempts its own repair (a
- * no-op for checks with no safe automatic remedy), then the battery re-runs.
+ * details. With `--fix`, each check that did not pass — failed or warned —
+ * first attempts its own repair (a no-op for checks with no safe automatic
+ * remedy), then the battery re-runs.
  *
  * The `--fix` loop is best-effort: a repair that throws (e.g. a missing
  * prerequisite file the check itself would also flag) is logged at debug
@@ -53,9 +55,11 @@ const LOCAL_RUNTIME_CHECK_NAMES = new Set([
  */
 export default class Doctor extends BaseCommand {
   static override description = "Verify local runtime and project state.";
+  static override group = CommandGroups.project;
+  static override groupOrder = 3;
   static override flags = {
-    fix: Flags.boolean({ description: "Re-apply missing managed files." }),
-    image: Flags.string({ description: "Container image to check." }),
+    fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
+    image: nonBlankString({ description: "Container image to check." }),
     port: Flags.integer({ description: "Local HTTP port.", default: DEFAULT_LOCAL_SERVER_PORT }),
     runtime: Flags.string({
       description: "Local runtime backend.",
@@ -86,7 +90,9 @@ export default class Doctor extends BaseCommand {
     if (hasConfig && flags.fix) {
       const before = await Promise.all(SANITY_CHECKS.map((check) => check.run(ctx)));
       for (const [index, check] of SANITY_CHECKS.entries()) {
-        if (before[index]?.status !== "fail") {
+        // Repair warn-level drift too (e.g. a deleted presentation page):
+        // fixes are restore-missing-only, so running one on a warning is safe.
+        if (before[index]?.status === "pass") {
           continue;
         }
         try {
@@ -136,7 +142,13 @@ export default class Doctor extends BaseCommand {
 
     if (failed.length > 0) {
       const advice = failureAdvice(failed, image, port, this.meta.cliVersion);
-      const code = failed.some((check) => check.name === "port") ? "E_PORT_IN_USE" : "E_VALIDATION";
+      // A check that failed with a typed CLI error advertises its own
+      // category (e.g. the framework floor's E_UNSUPPORTED_PROJECT_SHAPE) —
+      // surface that instead of the generic validation class so agents can
+      // branch on it. The port check keeps its dedicated code first.
+      const code = failed.some((check) => check.name === "port")
+        ? "E_PORT_IN_USE"
+        : (failed.find((check) => check.code !== undefined)?.code ?? "E_VALIDATION");
       throw new ZitadelError(code, "Zitadel doctor found issues", {
         hint: advice.hint,
         nextCommands: advice.nextCommands,
@@ -216,6 +228,14 @@ function failureAdvice(
     };
   }
 
+  // A failure that surfaced as a typed CLI error carries its own remedy —
+  // e.g. the framework floor's upgrade hint. That beats the generic --fix
+  // advice below, which cannot repair an unsupported version.
+  const typed = failed.find((check) => check.code !== undefined && check.hint !== undefined);
+  if (typed?.hint !== undefined) {
+    return { hint: typed.hint, nextCommands: [publicCliCommand("doctor", cliVersion)] };
+  }
+
   const hasProjectFailure = failed.some((check) => !LOCAL_RUNTIME_CHECK_NAMES.has(check.name));
   if (hasProjectFailure) {
     return {
@@ -242,12 +262,40 @@ function advisoryForWarnings(
     nextCommands.push(...advice.nextCommands);
   }
 
-  const managedRuntimeWarning = warnings.find((check) => check.name === "managed-runtime-processes");
+  const claimWarning = warnings.find((check) => check.name === "claim");
+  if (claimWarning) {
+    // The check classified the window (details.claimable). Once it looks
+    // closed the advisory switches to reconciliation wording, but the claim
+    // command stays suggested either way: the local record can be stale
+    // (claimed from another machine reads detached), and the server checks
+    // the grant before the window, so running claim is safe and answers
+    // authoritatively.
+    nextActions.push(
+      claimWindowClosed(claimWarning)
+        ? claimWindowClosedAction(cliVersion)
+        : claimAction(cliVersion),
+    );
+    nextCommands.push(claimCommand(cliVersion));
+  }
+
+  const managedRuntimeWarning = warnings.find(
+    (check) => check.name === "managed-runtime-processes",
+  );
   if (hasManagedRuntimeProcesses(managedRuntimeWarning)) {
     nextActions.push(
       "Review other host-wide CLI-managed local Zitadel runtimes before starting a new one.",
     );
     nextCommands.push(publicCliCommand("stop --all", cliVersion));
+  }
+
+  const dependencyRemedy = remedyCommandOf(
+    warnings.find((check) => check.name === "dependency-version"),
+  );
+  if (dependencyRemedy !== undefined) {
+    nextActions.push(
+      "Align the exactly-pinned @zitadel/* dependencies with the CLI version; scaffolded files and guidance target the CLI's train.",
+    );
+    nextCommands.push(dependencyRemedy);
   }
 
   if (nextActions.length === 0 && nextCommands.length === 0) {
@@ -281,10 +329,8 @@ async function runLocalRuntimeChecks(
         },
         "warn",
       ),
-      await check(
-        "port",
-        `Port ${String(port)} is available`,
-        () => checkPortAvailability(runtime, port),
+      await check("port", `Port ${String(port)} is available`, () =>
+        checkPortAvailability(runtime, port),
       ),
       await checkRuntime(runtime, runtimeBackend),
       managedRuntimeCheck,
@@ -346,10 +392,8 @@ async function runLocalRuntimeChecks(
       },
       "warn",
     ),
-    await check(
-      "port",
-      `Port ${String(port)} is available`,
-      () => checkPortAvailability(runtime, port),
+    await check("port", `Port ${String(port)} is available`, () =>
+      checkPortAvailability(runtime, port),
     ),
     await checkRuntime(runtime, runtimeBackend),
     managedRuntimeCheck,
@@ -371,12 +415,19 @@ async function checkPortAvailability(
 }
 
 class PortInUseCheckError extends Error {
+  readonly port: number;
+  readonly serverUrl: string;
+  readonly listeners: Awaited<ReturnType<typeof listenersForPort>>;
+
   constructor(
-    readonly port: number,
-    readonly serverUrl: string,
-    readonly listeners: Awaited<ReturnType<typeof listenersForPort>>,
+    port: number,
+    serverUrl: string,
+    listeners: Awaited<ReturnType<typeof listenersForPort>>,
   ) {
     super(`Port ${String(port)} is already in use by ${formatListeners(listeners)}`);
+    this.port = port;
+    this.serverUrl = serverUrl;
+    this.listeners = listeners;
   }
 }
 
@@ -416,7 +467,9 @@ function additionalManagedRuntimeProcesses(
   if (runtime?.backend !== "binary") {
     return processes;
   }
-  return processes.filter((processInfo) => processInfo.pid !== runtime.pid && processInfo.ppid !== runtime.pid);
+  return processes.filter(
+    (processInfo) => processInfo.pid !== runtime.pid && processInfo.ppid !== runtime.pid,
+  );
 }
 
 async function checkRuntime(
@@ -447,6 +500,40 @@ function formatListeners(listeners: Awaited<ReturnType<typeof listenersForPort>>
         .join(" "),
     )
     .join(", ");
+}
+
+/**
+ * A warning may carry its own repair as `details.remedy_command` (today: the
+ * dependency-version check's package-manager-aware exact-pin install).
+ * Surfacing that string keeps the structured advisory identical to the
+ * command quoted in the warning's prose.
+ */
+function remedyCommandOf(check: CheckOutcome | undefined): string | undefined {
+  if (check?.status !== "warn") {
+    return undefined;
+  }
+  const details = check.details;
+  if (typeof details !== "object" || details === null) {
+    return undefined;
+  }
+  const remedy = (details as { remedy_command?: unknown }).remedy_command;
+  return typeof remedy === "string" && remedy.length > 0 ? remedy : undefined;
+}
+
+/**
+ * Reads the claim check's window classification out of its details. Absent
+ * or malformed details mean "not closed". The classification only selects
+ * the advisory wording (deadline nudge vs reconciliation); the claim
+ * command stays suggested either way, because the local record may be stale
+ * and running claim lets the server answer authoritatively.
+ */
+function claimWindowClosed(check: CheckOutcome): boolean {
+  const details = check.details;
+  return (
+    typeof details === "object" &&
+    details !== null &&
+    (details as { claimable?: unknown }).claimable === false
+  );
 }
 
 function hasManagedRuntimeProcesses(check: CheckOutcome | undefined): boolean {

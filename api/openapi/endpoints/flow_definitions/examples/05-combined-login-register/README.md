@@ -28,7 +28,7 @@ user enters via the wrong purpose; explicit navigation CTAs (`register` /
 - **Profile field collection.** `register-identifier` collects
   `email + name + phoneNumber`; the `create_user` writer persists every
   non-password attribute from `state.CollectedData` onto the new user
-  (`flow_on_success_create_user.go:54`), so `name` and `phoneNumber` land on
+  (the `create_user` on-success handling in `internal/domain/flow_on_success.go`), so `name` and `phoneNumber` land on
   the user record even though they're collected one step before the writer
   fires.
 - **Ancestor-chain `create_user` manifest.** `register-password` declares
@@ -104,7 +104,7 @@ flowchart TD
 ## Notes
 
 - **Action override edge case.** Identifier dispatch runs *before* the action's
-  transition resolves (`flow_state_machine.go:343-354`). If a user types an
+  transition resolves (action-kind routing in `internal/domain/flow_state_machine.go`). If a user types an
   email *and* clicks `register`, dispatch runs first; in login mode, finding
   the user resolves it and the `register` action still fires (no flip), so
   the flow routes to `register-identifier` with `_user_id` already pinned —

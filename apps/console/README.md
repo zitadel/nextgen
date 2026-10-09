@@ -1,27 +1,218 @@
 # console
 
 Pre-release Vite + React shell for the internal Zitadel console — where users
-will manage their account and settings. Built with `@zitadel/ui-react` atoms
-and design tokens, and embedded into the Go server under `/ui/console/`.
+will manage their account and settings. Built with **shadcn/ui** and
+`@zitadel/design-tokens` (`css/shadcn.css`), and embedded into the Go server
+under `/ui/console/`.
 
-Component development and review (atoms, paired React, and the
-`<zitadel-login>` orchestrator) live in
+Architecture decisions for this app are recorded in the console ADRs under
+[`docs/adrs/`](docs/adrs/README.md); repo-wide decisions are in the root
+[`docs/adrs/`](../../docs/adrs/README.md) index.
+
+Login / shared atom development lives in
 [`apps/storybook`](../storybook/README.md), not in this app.
 
-## Run locally
+## Styling
 
-From the repo root (after `corepack pnpm install`):
+The console is a **shadcn/ui** app. Components are installed into
+`src/components/ui/` via `components.json`. Colours, type, and radius come from
+`@zitadel/design-tokens/css/shadcn.css`, which maps standard shadcn utility names
+(`bg-background`, `text-muted-foreground`, …) onto `--zl-*` variables. Full
+rules and the Figma → code flow: [`docs/styling.md`](docs/styling.md).
 
-```bash
-moon run console:dev
+## Theming
+
+The console follows the OS colour scheme by default and offers a Light / Dark /
+System toggle in the context bar (persisted in `localStorage`). Theming is
+driven by `data-theme` on `<html>`: the design tokens ship a dark `:root` and a
+light `[data-theme="light"]` override, so components only reference semantic
+tokens and re-theme automatically. See [`src/theme.ts`](src/theme.ts) and the
+pre-paint script in [`index.html`](index.html).
+
+## Screens
+
+Every screen is a file route under `src/routes/`, and the sidebar is built from
+each route's `staticData.nav` ([`src/nav.ts`](src/nav.ts)).
+
+**In the sidebar:**
+
+- **Projects** (`/projects`): the one entry outside a project, and the only one
+  until a project is selected.
+- **Teams** (`/teams`, `/teams/$teamId`).
+- **Users** (`/users`, `/users/$userId`), with **User schemas** (`/schemas`,
+  `/schemas/$schemaId`) nested under it.
+- **Login flows** (`/flow-definitions`, `/flow-definitions/$definitionId`), with
+  **Branding** (`/branding`) nested under it.
+- **Project settings** (`/project`).
+- **Profile** (`/settings/profile`), in the Settings view.
+
+**Not in the sidebar:**
+
+- `/` redirects to Teams, `/settings` to Profile, and `/projects/$projectId` to
+  `/project` with that project selected.
+- `/system` shows server health.
+- `/login` and `/claim` render outside the app shell.
+
+The sidebar lists only built screens (`DESIGN_ONLY_NAV` in `src/nav.ts` is
+empty). Attaching `staticData.nav` to a new route lists it.
+
+## Shell
+
+`AppShell` is shadcn's `Sidebar` block (`collapsible="icon"`):
+
+- Desktop expanded = 256px sidebar
+- Desktop collapsed / mobile = icon rail (48px), with a Sheet
+  overlay available for the expanded label view
+- Context bar: project `Popover` switcher + theme toggle
+
+## API access and auth
+
+The console holds **no long-lived credential in the browser bundle**. It calls a
+same-origin API base (`/api` under the dev server, the origin root when
+embedded). Management requests carry no bearer: the `__nextgen_session` cookie
+authorizes them. Sign-in requests send the runtime publishable key (below).
+The dev proxy injects no credential. See the Vite proxy config and environment
+variables below.
+
+### Console sign-in (Console ADR 0003)
+
+Console users sign in through the embedded `<zitadel-login>` widget on
+`/login` (via `@zitadel/sdk-react`). Completing the flow exchanges the
+widget's handoff token for the `__nextgen_session` HttpOnly cookie; the
+pathless `_authed` layout guards every screen by confirming that cookie
+against `GET /sessions/me` and redirects unauthenticated visitors to
+`/login?next=…`. Sign-out lives in the sidebar user menu
+(`DELETE /sessions/me`).
+
+The cookie authenticates the console UI, the session endpoints, and the
+management API: a signed-in person sees and changes what their grants on the
+project allow (#1300). No project secret is involved — see
+[ADR 0003](docs/adrs/0003-console-authentication.md) for the model and its
+caveats.
+
+### Runtime discovery and the default project (Console ADR 0004)
+
+At boot the console fetches `GET /console/runtime.json` (public, served by
+the Go server; proxied in dev) to learn the deployment `mode` and which
+project to sign into.
+
+The target model (ADR 0004 §1) gives every deployment a reserved *platform*
+project that the console signs into, with customer projects selected after
+sign-in; nothing enforces a one-project ceiling. **What ships today is the
+transitional fallback from §2's cutover rule:** the server never creates the
+sign-in project, and the first project created — by the customer's
+`zitadel setup` (`POST /projects`) — becomes the one the console signs into
+and manages. `platform.project_id` / `NEXTGEN_PLATFORM_PROJECT_ID` pins a
+specific existing project instead. The fallback stays until a human-usable
+seed transport ships the reserved platform project end to end.
+
+A deployment can opt out of the fallback today by setting
+`platform.bootstrap_project` (`NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT`), which
+provisions the reserved platform project itself at startup (keys, default
+schema, default login flow) and is what makes `zitadel claim` and
+self-registration work. It still lacks §2's server-discovered seed transport
+for membership and owner assignment, but it is no longer only a manual
+opt-in: `zitadel start` sets the flag and hands the server an initial
+operator, `admin@zitadel.localhost`, through `--user-file`. So on a
+CLI-started server that keeps the default bootstrap the console signs into
+`proj_platform`, and `zitadel console` prints a one-time link that signs that
+operator in. Setting `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false` or pinning
+another project turns both the platform project and the local admin off.
+
+The "run `zitadel setup`" hint on the login screen therefore only shows where
+the platform project is off and no project exists yet; refresh after setup and
+the console picks the new project up. Only `standalone` mode exists today;
+`platform` (cloud portal) mode is future work.
+
+**A server the console cannot reach is an error, not a mode** (ADR 0004 §3).
+An unreachable endpoint, a non-2xx answer, or a body that is not a runtime
+document renders a retryable "Server unavailable" screen instead of the app —
+deliberately distinct from the setup hint, because "no project yet" would send
+an operator to `zitadel setup` for a problem setup cannot fix. Running the
+console against something that serves no runtime document (a backend-less
+`vite preview`) is the one legitimate case for the
+old behavior, and it says so explicitly: set `VITE_CONSOLE_RUNTIME_FALLBACK=1`
+*for the build or dev server*, and discovery failures resolve to `standalone`
+again with a warning in the browser console. Never set it for the embedded
+production build.
+
+The runtime document also carries the default project's **publishable key**
+(root ADR 036): a browser-safe, origin-scoped bearer the login widget sends
+on flow calls and the handoff exchange. Sign-in therefore needs no server-side
+credential either. The server serves the document only while one of its UI
+surfaces (console or hosted login) is enabled.
+
+## Local development
+
+The console manages an instance, so its screens are only honest against a real
+backend: `@zitadel/api-mock` has no user store, so a users list read from it is
+a fiction. **Default to the real-data loop.**
+
+### Real data (default)
+
+```sh
+moon run console:dev-real
 ```
 
-Open [http://localhost:5174](http://localhost:5174).
+One command: boots an ephemeral real instance (binary runtime + SQLite by
+default, no Docker) via `@zitadel/testing`, bootstraps a project with the
+default schema and login flow, seeds users, then starts the dev server with the
+proxy bound to that instance. It prints the sign-in credentials
+(`dev@zitadel.local` / `Console-dev-1` by default). HMR is the normal Vite loop.
 
-## Other tasks
+Each run is a fresh database, so the seeded list is identical every time — a
+screenshot diff reflects code changes, not reshuffled fixtures — at the cost of
+signing in again after a restart. `--seed-only` boots and seeds without starting
+Vite, for pointing a separately-running console at a fresh instance. Overrides:
+`CONSOLE_DEV_EMAIL`, `CONSOLE_DEV_PASSWORD`, `CONSOLE_DEV_ZITADEL_PORT`,
+`CONSOLE_DEV_ORIGIN`. See [`scripts/dev-real.mts`](scripts/dev-real.mts).
 
-```bash
-moon run console:typecheck
+The proxy adds no credential: every screen reads with the dev user's session
+cookie, which is why the script grants that user admin on the seeded project.
+A project you were granted access to, or one added with
+[`scripts/dev-real-add-project.mts`](scripts/dev-real-add-project.mts), works
+the same way — through the grant, not a secret.
+
+### Mock backend
+
+```sh
+PORT=8080 moon run api-mock:start          # terminal 1
+moon run console:dev                       # terminal 2
+```
+
+Fast and offline, and the full sign-in loop works (the mock serves
+`/sessions/exchange` and `/sessions/me`), with the same split
+`identifier` → `password` flow the real server emits. Use it only for chrome that
+needs no real data: it has **no user store**, so list screens cannot be
+meaningful and nothing about authorization can be proven there. It serves its
+own `/console/runtime.json`, naming the mock's platform project as the one the
+console signs into (so the claim page can complete, as in `console:dev-claim`),
+and the loop needs no variables: the dev proxy's default backend is the mock's
+port.
+
+### Embedded build
+
+```sh
+moon run workspace:server
+```
+
+Serves the built bundle under `/ui/console/` — no HMR. Use it only to verify the
+embed base path.
+
+## Environment variables
+
+| Variable | Where | Purpose |
+| --- | --- | --- |
+| `CONSOLE_BACKEND_URL` | Node (dev proxy) | Upstream API origin (defaults in `vite.config.mts`) |
+| `CONSOLE_DEV_PROXY_LOG` | Node (dev proxy) | Set to `1` to print each proxied request — for a screen that answers 401/403/404 when it is not obvious what the server was asked |
+| `VITE_CONSOLE_API_BASE` | Client | Same-origin API base the SDK calls (default `/api` under the dev server, the origin root in a build) |
+| `VITE_CONSOLE_RUNTIME_FALLBACK` | Client (build/dev time) | Opt-in for runs with no `/console/runtime.json` (`vite preview`): failed discovery resolves to `standalone` instead of the connectivity error. Never set it for the embedded build |
+
+## Commands
+
+```sh
+moon run console:dev-real   # dev server + seeded real backend (preferred)
+moon run console:dev        # dev server only (bring your own backend)
 moon run console:test
-moon run console:build
+moon run console:typecheck
 ```

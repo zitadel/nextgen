@@ -32,6 +32,11 @@ func (h Handler) GetAuthAttempt(ctx context.Context, params api.GetAuthAttemptPa
 	if err != nil {
 		return nil, err
 	}
+	if attempt.Internal {
+		// A server-orchestrated ceremony's attempt is a state carrier, not an
+		// attempt-surface resource: it stays invisible here.
+		return nil, domain.ErrAuthAttemptNotFound()
+	}
 	return authAttemptToAPI(attempt), nil
 }
 
@@ -99,7 +104,7 @@ func (h Handler) CreateHandoff(ctx context.Context, params api.CreateHandoffPara
 
 // challengeRequestToChallenge maps the API oneOf challenge to the service Challenge discriminated union.
 func challengeRequestToChallenge(req *api.IssueChallengeRequest) (service.Challenge, error) {
-	checkType, err := factorMethodToCheckType(req.GetMethod())
+	checkType, err := challengeMethodToCheckType(req.GetMethod())
 	if err != nil {
 		return nil, err
 	}
@@ -129,6 +134,9 @@ func verifyRequestToProof(req *api.VerifyChallengeRequest) (service.Proof, error
 	switch req.GetOneOf().Type {
 	case api.IdentifierProofVerifyChallengeRequestSum:
 		p := req.GetOneOf().IdentifierProof
+		// No attribute name: the direct API resolves the login name against the
+		// project's designated identifiers rather than a property the caller
+		// picks (ADR 058 §5).
 		return service.UserProof{
 			LoginName: p.GetLoginName(),
 		}, nil
@@ -152,13 +160,13 @@ func verifyRequestToProof(req *api.VerifyChallengeRequest) (service.Proof, error
 	}
 }
 
-var methodChecks = map[api.FactorMethod]domain.AuthCheckType{
-	api.FactorMethodIdentifier: domain.AuthCheckTypeUser,
-	api.FactorMethodPassword:   domain.AuthCheckTypePassword,
-	api.FactorMethodPasskey:    domain.AuthCheckTypePasskey,
+var methodChecks = map[api.ChallengeMethod]domain.AuthCheckType{
+	api.ChallengeMethodIdentifier: domain.AuthCheckTypeUser,
+	api.ChallengeMethodPassword:   domain.AuthCheckTypePassword,
+	api.ChallengeMethodPasskey:    domain.AuthCheckTypePasskey,
 }
 
-func factorMethodToCheckType(method api.FactorMethod) (domain.AuthCheckType, error) {
+func challengeMethodToCheckType(method api.ChallengeMethod) (domain.AuthCheckType, error) {
 	check, ok := methodChecks[method]
 	if !ok {
 		return domain.AuthCheckTypeUnspecified, domain.ErrAuthAttemptInvalidRequest()
@@ -169,7 +177,7 @@ func factorMethodToCheckType(method api.FactorMethod) (domain.AuthCheckType, err
 func challengeToAPI(challenge domain.AuthChallenge) *api.ChallengeResponse {
 	return &api.ChallengeResponse{
 		ChallengeID: api.ChallengeID(challenge.GetID()),
-		Method:      checkTypeToAPI(challenge.Type()),
+		Method:      checkTypeToChallengeMethod(challenge.Type()),
 		State:       api.ChallengeResponseStatePending,
 		CreatedAt:   challenge.GetLastChallengedAt(),
 		ExpiresAt:   api.OptNilDateTime{},
@@ -178,16 +186,35 @@ func challengeToAPI(challenge domain.AuthChallenge) *api.ChallengeResponse {
 }
 
 func challengePayloadToAPI(check domain.AuthChallenge) api.OptChallengeResponsePayload {
-	if passkey, ok := check.(*domain.AuthChallengePasskey); ok {
+	switch challenge := check.(type) {
+	case *domain.AuthChallengePasskey:
 		return api.NewOptChallengeResponsePayload(api.ChallengeResponsePayload{
 			Type: api.PasskeyChallengePayloadChallengeResponsePayload,
 			PasskeyChallengePayload: api.PasskeyChallengePayload{
 				PublicKey: api.PasskeyChallengePayloadPublicKey{
-					Challenge:          passkey.Challenge,
-					AllowedCredentials: allowedCredentialsToAPI(passkey.AllowedCredentialIDs),
-					UserVerification:   userVerificationToAPI(passkey.UserVerification),
+					Challenge:          challenge.Challenge,
+					AllowedCredentials: allowedCredentialsToAPI(challenge.AllowedCredentialIDs),
+					UserVerification:   userVerificationToAPI(challenge.UserVerification),
 					RpID: api.OptString{
-						Value: passkey.RPID,
+						Value: challenge.RPID,
+						Set:   true,
+					},
+				},
+			},
+		})
+	case *domain.AuthChallengePasskeyRegistration:
+		// A pending enrollment renders in the passkey payload shape with the
+		// fields both ceremonies share (challenge, rp id). The full creation
+		// options are not modeled here: the payload union discriminates by
+		// method and `passkey` is taken by the assertion shape — the flow
+		// step and the management begin endpoint carry the real options.
+		return api.NewOptChallengeResponsePayload(api.ChallengeResponsePayload{
+			Type: api.PasskeyChallengePayloadChallengeResponsePayload,
+			PasskeyChallengePayload: api.PasskeyChallengePayload{
+				PublicKey: api.PasskeyChallengePayloadPublicKey{
+					Challenge: challenge.Challenge,
+					RpID: api.OptString{
+						Value: challenge.RPID,
 						Set:   true,
 					},
 				},
@@ -269,6 +296,7 @@ func authAttemptErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		domain.ErrAuthAttemptAlreadyCompleted().Code,
 		domain.ErrAuthAttemptNotCompleted().Code,
 		domain.ErrAuthAttemptStaleChallenge().Code,
+		domain.ErrAuthAttemptAlreadyHandedOff().Code,
 		domain.ErrAuthAttemptProofRejected(nil).Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	default:

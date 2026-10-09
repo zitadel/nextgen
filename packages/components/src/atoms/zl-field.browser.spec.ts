@@ -31,9 +31,7 @@ describe("<zl-field> form participation (chromium)", () => {
   }
 
   it("contributes its value to the enclosing FormData", async () => {
-    const { form, field } = mount(
-      `<form><zl-field name="email" type="email"></zl-field></form>`,
-    );
+    const { form, field } = mount(`<form><zl-field name="email" type="email"></zl-field></form>`);
     await field.updateComplete;
     field.value = "alice@acme.com";
     await field.updateComplete;
@@ -41,9 +39,7 @@ describe("<zl-field> form participation (chromium)", () => {
   });
 
   it("flags valueMissing when required and empty", async () => {
-    const { form, field } = mount(
-      `<form><zl-field name="email" required></zl-field></form>`,
-    );
+    const { form, field } = mount(`<form><zl-field name="email" required></zl-field></form>`);
     await field.updateComplete;
     expect(form.checkValidity()).toBe(false);
     field.value = "alice@acme.com";
@@ -52,25 +48,50 @@ describe("<zl-field> form participation (chromium)", () => {
   });
 
   it("forwards a custom error message via setValidity", async () => {
-    const { form, field } = mount(
-      `<form><zl-field name="email" value="x"></zl-field></form>`,
-    );
+    const { form, field } = mount(`<form><zl-field name="email" value="x"></zl-field></form>`);
     await field.updateComplete;
     field.error = "That email is already registered.";
     await field.updateComplete;
     expect(form.checkValidity()).toBe(false);
   });
 
-  it("clears its value when the host form is reset", async () => {
-    const { form, field } = mount(
-      `<form><zl-field name="email" value="seed"></zl-field></form>`,
-    );
+  it("restores its initial value when the host form is reset", async () => {
+    const { form, field } = mount(`<form><zl-field name="email" value="seed"></zl-field></form>`);
     await field.updateComplete;
     field.value = "alice@acme.com";
     await field.updateComplete;
     form.reset();
     await field.updateComplete;
-    expect(field.value).toBe("");
+    expect(field.value).toBe("seed");
+  });
+
+  it("clears text written straight into the native input when the form is reset", async () => {
+    // A password manager can fill the native input without an input event, so
+    // the host's `value` never learns about it. Reset goes through the native
+    // control, so the text goes with it either way.
+    const { form, field } = mount(`<form><zl-field name="email"></zl-field></form>`);
+    await field.updateComplete;
+    const native = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    native.value = "bob@example.com";
+    form.reset();
+    await field.updateComplete;
+    expect(native.value).toBe("");
+    expect(new FormData(form).get("email")).toBe("");
+  });
+
+  it("is disabled by an enclosing fieldset", async () => {
+    const { form, field } = mount(
+      `<form><fieldset disabled><zl-field name="email" value="x"></zl-field></fieldset></form>`,
+    );
+    await field.updateComplete;
+    const native = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    expect(native.disabled).toBe(true);
+    expect(new FormData(form).get("email")).toBeNull();
+
+    (form.querySelector("fieldset") as HTMLFieldSetElement).disabled = false;
+    await field.updateComplete;
+    expect(native.disabled).toBe(false);
+    expect(new FormData(form).get("email")).toBe("x");
   });
 
   it("submits the owning form when Enter is pressed inside the input", async () => {
@@ -124,6 +145,18 @@ describe("<zl-field> form participation (chromium)", () => {
     field.focus();
     const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
     expect(field.shadowRoot?.activeElement).toBe(input);
+  });
+
+  it("keeps the clear button out of the tab order but still clickable", async () => {
+    const { field } = mount(`<form><zl-field name="email" value="a@b.c"></zl-field></form>`);
+    await field.updateComplete;
+    const button = field.shadowRoot?.querySelector(
+      'button[part="trailing-action"]',
+    ) as HTMLButtonElement;
+    expect(button).toBeTruthy();
+    expect(button.tabIndex).toBe(-1);
+    button.click();
+    expect(field.value).toBe("");
   });
 
   it("syncs native input/change events with host value and FormData", async () => {

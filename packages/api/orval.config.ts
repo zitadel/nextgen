@@ -4,6 +4,12 @@ export default defineConfig({
   zitadel: {
     input: {
       target: "../../api/openapi/openapi-spec.yaml",
+      // `api/openapi/` is split one file per endpoint (see api/openapi/AGENTS.md),
+      // so the spec is almost entirely `$ref`s into sibling files. orval 8.37
+      // stopped following external `$ref`s unless allow-listed — a fetch guard
+      // aimed at remote documents. Every target is a local file checked in beside
+      // the root, so allowing all adds no network reach.
+      parserOptions: { externalRefs: { allow: ["*"] } },
     },
     output: {
       target: "./src/generated/endpoints",
@@ -11,11 +17,16 @@ export default defineConfig({
       client: "fetch",
       mode: "split",
       mock: true,
+      // A path parameter is any string the API accepts, and schema ids are
+      // routinely `$id` URIs (`https://…/default-human-user.json`). Without
+      // this, orval interpolates them raw and `/schemas/{id}` collapses the
+      // `//` on a redirect and 404s. orval only encodes the parameters —
+      // not the `baseUrl` below — from 8.37.0 (orval-labs/orval#4179).
+      urlEncodeParameters: true,
       baseUrl: {
         runtime: "getProxyPath()",
         imports: [{ name: "getProxyPath", importPath: "../../runtime/base-url" }],
       },
-      formatter: "oxfmt",
       override: {
         fetch: {
           includeHttpResponseReturnType: false,
@@ -34,13 +45,14 @@ export default defineConfig({
   zitadelZod: {
     input: {
       target: "../../api/openapi/openapi-spec.yaml",
+      // See the note on the `zitadel` input above.
+      parserOptions: { externalRefs: { allow: ["*"] } },
     },
     output: {
       mode: "split",
       client: "zod",
       target: "./src/generated/endpoints",
       fileExtension: ".zod.ts",
-      formatter: "oxfmt",
       clean: ["!**/*", "./src/generated/endpoints/**/*.zod.ts"],
       override: {
         zod: {

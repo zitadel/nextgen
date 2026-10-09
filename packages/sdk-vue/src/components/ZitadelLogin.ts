@@ -3,6 +3,7 @@ import type { ZitadelLogin as ZitadelLoginElement } from "@zitadel/components";
 import type {
   CreateFlowBodyPurpose,
   ZitadelFlowCompleteDetail,
+  ZitadelFlowRedirectDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,
   ZitadelFlowStepDetail,
@@ -24,7 +25,8 @@ import "@zitadel/components";
  * the discrete `:project-id` / `:proxy-path` the widget reads instead — the
  * widget uses whichever is present. All three are bound as DOM properties and
  * read by the widget at startup. The widget's `zitadel-*` events are re-emitted
- * with their detail as `flowStep`, `flowInput`, `flowComplete` and
+ * with their detail as `flowStep`, `flowInput`, `flowComplete`,
+ * `flowRedirect` and
  * `flowError` (the names declared in `emits`).
  *
  * A Vue `ref` on this component resolves to the component *instance*, not the
@@ -44,8 +46,17 @@ export default defineComponent({
       default: "login",
     },
     postSignInUrl: { type: String, default: undefined },
+    locales: {
+      type: Object as PropType<Record<string, Partial<Record<string, string>>>>,
+      default: undefined,
+    },
+    lang: { type: String, default: undefined },
+    flowName: { type: String, default: undefined },
+    variant: { type: String as PropType<"widget" | "page">, default: undefined },
+    theme: { type: String as PropType<"light" | "dark" | "auto">, default: undefined },
+    suppressHeader: { type: Boolean, default: undefined },
   },
-  emits: ["flowStep", "flowInput", "flowComplete", "flowError"],
+  emits: ["flowStep", "flowInput", "flowComplete", "flowRedirect", "flowError"],
   setup(props, { emit, expose }) {
     // Template ref to the rendered Lit element. Exposed so a consumer's
     // component `ref` (which resolves to this instance) can reach the DOM node.
@@ -63,6 +74,14 @@ export default defineComponent({
         proxyPath: props.proxyPath,
         purpose: props.purpose,
         "post-sign-in-url": props.postSignInUrl,
+        // Same raw-unwrap rationale as `project`: hand the widget the plain
+        // dictionaries, not Vue's reactive proxy.
+        locales: props.locales === undefined ? undefined : toRaw(props.locales),
+        lang: props.lang,
+        "flow-name": props.flowName,
+        variant: props.variant,
+        theme: props.theme,
+        suppressHeader: props.suppressHeader,
         onZitadelFlowStep: (event: CustomEvent<ZitadelFlowStepDetail>) => {
           emit("flowStep", event.detail);
         },
@@ -71,6 +90,9 @@ export default defineComponent({
         },
         onZitadelFlowComplete: (event: CustomEvent<ZitadelFlowCompleteDetail>) => {
           emit("flowComplete", event.detail);
+        },
+        onZitadelFlowRedirect: (event: CustomEvent<ZitadelFlowRedirectDetail>) => {
+          emit("flowRedirect", event.detail);
         },
         onZitadelFlowError: (event: CustomEvent<ZitadelFlowErrorDetail>) => {
           emit("flowError", event.detail);

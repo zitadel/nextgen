@@ -1,3 +1,36 @@
+# Agent Instructions — `apps/cli`
+
+Scope pointers first — this file's own body covers **telemetry only**:
+
+- The agent-facing command contract (JSON envelope, posture, claim, doctor
+  repair) is [`SKILL.md`](skills/zitadel-cli/SKILL.md) — keep it aligned with the command
+  surface on every CLI behavior change (root `AGENTS.md` Generated Files rule).
+- Scaffold posture derivation (standalone page vs widget in a pre-existing
+  app) is [ADR 044](../../docs/adrs/044-scaffold-embedding-posture-defaults.md);
+  the implementation lives in `src/lib/orca/patchers/posture.ts` and the
+  manifest in `src/lib/scaffold-manifest.ts` (drift rules:
+  [ADR 042](../../docs/adrs/042-scaffolded-file-ownership-and-drift-detection.md)).
+- The claim lifecycle is
+  [ADR 046](../../docs/adrs/046-claim-lifecycle-v2.md) (`src/commands/claim.ts`,
+  `src/lib/claim-state.ts`, `src/commands/doctor/checks/claim.ts`).
+- The journey e2e contract is
+  [`apps/cli-journey-e2e/AGENTS.md`](../cli-journey-e2e/AGENTS.md).
+- The test contract — the unit/spec split and one spec per command — is
+  [`tests/AGENTS.md`](tests/AGENTS.md). Read it before adding or moving any
+  test.
+- Warnings go through `reportWarning` in `src/lib/warnings.ts`, or the
+  `warnings` field of a command's result. Never call `consola.warn` directly:
+  `--json` silences consola, so the warning would never reach an agent.
+  `reportWarning` shows it in the terminal at once and adds it to the JSON
+  envelope's `warnings`, and `emit` prints a result's `warnings` after its
+  `pretty` text. A unit test fails on any other `consola.warn` call.
+- The flag surface deliberately tracks the [WebCLI spec](https://webcli.com/) so
+  an agent can drive the CLI from conventions it already knows. That is the
+  rationale; the canonical flag list, output-channel rules and the two
+  intentional deviations are the invocation rules in [`SKILL.md`](skills/zitadel-cli/SKILL.md).
+  Keep that alignment in mind when adding a global flag, and record it there —
+  not in a second copy here.
+
 # Analytics Tracking — Mixpanel
 
 This package (`@zitadel/cli`) uses **Mixpanel** for anonymous product analytics.
@@ -40,14 +73,13 @@ event.
 
 The ingestion token is **write-only** (cannot read data back), so embedding it
 in the published CLI is safe and intentional — this is how dev-tool telemetry
-works. Dev and prod are separate Mixpanel projects. The channel is **stamped into
-the bundle at build time** and **defaults to `development`**: `tsdown`'s `define`
-sets `__ZITADEL_TELEMETRY_CHANNEL__` from `ZITADEL_TELEMETRY_BUILD_CHANNEL` (else
-`development`), so every contributor/CI build routes to the dev project. **Only
-the release pipeline** (`scripts/release.mjs`) sets that env to `production`, so
-the **published CLI routes real user traffic to prod**. Runtime precedence:
-explicit `ZITADEL_TELEMETRY_ENV`, then a runtime `ZITADEL_TELEMETRY_BUILD_CHANNEL`,
-then the build-time stamp. Ambient `NODE_ENV` is intentionally not consulted.
+works. Dev and prod are separate Mixpanel projects. The CLI ships as a **single
+generic build** with no channel stamp, so events **default to the production
+project** and the published CLI needs no per-user env. Development, CI, and test
+runs stay out of prod by opting out entirely (`DO_NOT_TRACK` /
+`ZITADEL_TELEMETRY=0` — CI sets `DO_NOT_TRACK=1` for every job) or by selecting
+the dev project with `ZITADEL_TELEMETRY_ENV=development`. `ZITADEL_TELEMETRY_TOKEN`
+overrides the token outright. Ambient `NODE_ENV` is intentionally not consulted.
 
 ---
 
@@ -102,9 +134,16 @@ wired into the user's app.
 `non_interactive`, `is_tty`, `is_ci`, `ci_provider`, `host_agent`,
 `invocation_channel`, `dry_run`, `force`, `server_kind` (bucketed
 `cloud`/`local`/`self_hosted` — **never the URL**), plus the reserved
-`$os`/`$country_code` (country derived from the timezone, not the IP — `ip: 0`
-keeps geolocation off). Built in `src/lib/oclif/command-telemetry.ts` (using the
-generic env/geo helpers in `src/lib/telemetry/`).
+event properties `$os`/`mp_country_code` (country derived from the timezone, not
+the IP — `ip: 0` keeps IP geolocation off). First-run user profiles use the
+People API's `$country_code` profile property for the same derived country. Built
+in `src/lib/oclif/command-telemetry.ts` (using the generic env/geo helpers in
+`src/lib/telemetry/`).
+
+`ci_provider` and `host_agent` also leave the machine outside Mixpanel, as the
+`ci/` and `host/` tokens of the HTTP `User-Agent` (`src/lib/user-agent.ts`). They
+share the telemetry opt-out: `--no-telemetry`, `DO_NOT_TRACK` and
+`ZITADEL_TELEMETRY=0` drop them.
 
 ### Event shape
 
@@ -123,7 +162,7 @@ Mixpanel injects the transport fields (`time`, `$lib_version`,
     "command": "status",
     "cli_version": "0.1.0-alpha.11",
     "$os": "Mac OS X",
-    "$country_code": "AU",
+    "mp_country_code": "AU",
     "os": "darwin",
     "arch": "arm64",
     "node_version": "24.12.0",
@@ -147,10 +186,12 @@ Commands add dimensions via `this.recordTelemetry({ … })` (merged immutably on
 each lifecycle event emitted *after* recording — typically `completed`/`failed`,
 since `started` fires before the command body runs):
 
-- **setup** — `framework`, `renderer`, `package_manager`, `scaffolded_skeleton`, `skip_install`, `dev_port_explicit`, `files_written_count`, `step` (`framework_resolved` → `project_created` → `files_patched` → `dependencies_installed`).
-- **plan / apply** — `creates`, `updates`, `deletes`, `total` (diff *counts* only).
+- **setup** — `framework`, `renderer`, `package_manager`, `scaffolded_skeleton`, `skip_install`, `dev_port_explicit`, `preset`, `use_case`, `sso` (an `IDP_PROVIDERS` slug, `none`, or `multiple` when setup enabled several), `design` (a `BRANDING_DESIGNS` value or `built-in`), `files_written_count`, `step` (`framework_resolved` → `project_created` → `files_patched` → `dependencies_installed`).
+- **plan / apply** — `creates`, `updates`, `deletes`, `revisions`, `total` (diff *counts* only).
 - **doctor** — `runtime`, `checks_total`, `checks_failed`, `checks_warn`, `failed_checks` (failing check **names**, never messages).
 - **start** — `runtime` (`binary` / `docker`).
+- **variables** — `is_secret`, `variable_count`. Deliberately *not* recorded: the variable's name or value — a name is free text, and a value is the credential itself. There is no owner dimension: the project level is the only owner the commands can address.
+- **claim** — `claim_outcome` (`completed` / `already_claimed` / `expired` / `window_expired` / `timeout` / `dry_run`), `poll_count`, `browser_opened`. Deliberately *not* recorded: `challenge_id`, `team_id`, `claim_url`, `dashboard_url` — every one of them is an id or a URL.
 
 ### Naming conventions
 

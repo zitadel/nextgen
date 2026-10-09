@@ -3,40 +3,21 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
-const tarballsDir = process.argv[2];
-if (!tarballsDir) {
-  throw new Error("usage: node scripts/verify-tarballs.mjs <tarballs-dir>");
+import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
+
+const [tarballsDir, ...flags] = process.argv.slice(2);
+if (!tarballsDir || tarballsDir.startsWith("--")) {
+  throw new Error("usage: node apps/cli-journey-e2e/scripts/verify-tarballs.mjs <tarballs-dir>");
+}
+if (flags.length > 0) {
+  throw new Error(`unknown flags: ${flags.join(", ")}`);
 }
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
-const requiredPackageDirs = [
-  "apps/cli",
-  "apps/server",
-  "apps/server-linux-x64",
-  "apps/server-linux-arm64",
-  "apps/server-darwin-x64",
-  "apps/server-darwin-arm64",
-  "apps/server-win32-x64",
-  "packages/api",
-  "packages/components",
-  "packages/sdk-core",
-  "packages/sdk-next",
-  "packages/sdk-nuxt",
-  "packages/sdk-react",
-  "packages/sdk-vue",
-  "packages/sdk-angular",
-  "packages/sdk-solid",
-  "packages/sdk-svelte",
-  "packages/sdk-qwik",
-  "packages/sdk-sveltekit",
-  "packages/sdk-tanstack-start",
-  "packages/sdk-solid-start",
-  "packages/sdk-qwik-city",
-];
-const requiredPackageNames = new Set(
-  await Promise.all(requiredPackageDirs.map(packageName)),
-);
+// Journey registries and release artifact dirs carry the same set: exactly
+// the public release packages, nothing on top.
+const requiredPackageNames = new Set(await Promise.all(PUBLIC_PACKAGE_DIRS.map(packageName)));
 const dependencyFields = [
   "dependencies",
   "devDependencies",
@@ -47,10 +28,15 @@ const unsupportedProtocol = /^(catalog|workspace):/;
 const semverVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const manifests = new Map();
 const serverPlatformPackagePattern = /^@zitadel\/server-(?:darwin|linux|win32)-/;
+// The CLI ships its agent contract as an installable Agent Skill (ADR 004).
+// Shipping the complete skill — its entry file and every reference it links —
+// is core product behavior, so the tarball must carry all of them.
+const cliSkillFiles = [
+  "skills/zitadel-cli/SKILL.md",
+  "skills/zitadel-cli/references/driving-login-ui.md",
+];
 
-const tarballs = (await readdir(tarballsDir))
-  .filter((file) => file.endsWith(".tgz"))
-  .sort();
+const tarballs = (await readdir(tarballsDir)).filter((file) => file.endsWith(".tgz")).sort();
 
 if (tarballs.length === 0) {
   throw new Error(`no .tgz files found in ${tarballsDir}`);
@@ -70,6 +56,7 @@ for (const file of tarballs) {
   }
   assertInstallableManifest(tarball, manifest);
   assertServerPlatformBinary(tarball, manifest);
+  assertCliSkillBundle(tarball, manifest);
   manifests.set(manifest.name, manifest);
 }
 
@@ -137,6 +124,23 @@ function assertServerPlatformBinary(tarball, manifest) {
   }
 }
 
+function assertCliSkillBundle(tarball, manifest) {
+  if (manifest.name !== "@zitadel/cli") {
+    return;
+  }
+  const result = spawnSync("tar", ["-tf", tarball], { encoding: "utf8" });
+  if (result.status !== 0) {
+    throw new Error(`failed to list ${tarball}: ${result.stderr}`);
+  }
+  const entries = new Set(
+    result.stdout.split(/\r?\n/).map((line) => line.replace(/^\.\//, "").replace(/\/$/, "")),
+  );
+  const missing = cliSkillFiles.filter((file) => !entries.has(`package/${file}`));
+  if (missing.length > 0) {
+    throw new Error(`${tarball} is missing CLI agent skill files: ${missing.join(", ")}`);
+  }
+}
+
 function assertValidVersions(manifests) {
   const invalid = [...manifests.values()]
     .filter((manifest) => !semverVersion.test(manifest.version))
@@ -148,9 +152,7 @@ function assertValidVersions(manifests) {
 }
 
 async function packageName(relativePath) {
-  const pkg = JSON.parse(
-    await readFile(join(repoRoot, relativePath, "package.json"), "utf8"),
-  );
+  const pkg = JSON.parse(await readFile(join(repoRoot, relativePath, "package.json"), "utf8"));
   if (typeof pkg.name !== "string" || pkg.name.length === 0) {
     throw new Error(`${relativePath}/package.json has no name`);
   }

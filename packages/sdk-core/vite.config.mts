@@ -1,10 +1,13 @@
 import { resolve } from "node:path";
+// `defineConfig` comes from `vitest/config` (not `vite`) so the `test` field
+// typechecks: Vitest 4 no longer augments Vite's own `UserConfig` with `test`.
+import { defineConfig } from "vitest/config";
 
-import { defineConfig } from "vite";
+import { baseTest } from "../../vitest.shared.mjs";
 
-export default defineConfig(() => ({
+export default defineConfig({
   root: import.meta.dirname,
-  cacheDir: "../../node_modules/.vite/packages/sdk-core",
+  cacheDir: ".vitest",
   build: {
     emptyOutDir: false,
     lib: {
@@ -12,22 +15,14 @@ export default defineConfig(() => ({
         index: resolve(import.meta.dirname, "src/index.ts"),
         types: resolve(import.meta.dirname, "src/types.ts"),
         jwt: resolve(import.meta.dirname, "src/jwt.ts"),
-        "middleware": resolve(import.meta.dirname, "src/middleware.ts"),
+        middleware: resolve(import.meta.dirname, "src/middleware.ts"),
       },
       formats: ["es" as const],
     },
   },
   test: {
+    ...baseTest,
     name: "@zitadel/sdk-core",
-    watch: false,
-    globals: true,
     environment: "node",
-    include: ["src/**/*.spec.ts"],
-    reporters: ["default"],
-    coverage: {
-      reportsDirectory: "./test-output/vitest/coverage",
-      provider: "v8",
-      include: ["src/**/*.ts"],
-    },
   },
-}));
+});

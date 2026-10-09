@@ -1,0 +1,331 @@
+/**
+ * The console's real-data dev loop: one command that boots a real Zitadel,
+ * seeds it, and starts Vite against it.
+ *
+ * The console manages an instance, so its screens are only honest against a
+ * real backend — `@zitadel/api-mock` has no user store, so a users list read
+ * from it is a fiction. This script boots the packaged server (binary runtime +
+ * SQLite by default, no Docker) via `@zitadel/testing`, bootstraps a project
+ * with the default schema and login flow, seeds users, and then starts
+ * `console:dev` with the dev proxy pointed at that instance:
+ *
+ *   CONSOLE_BACKEND_URL     -> the booted instance
+ *
+ * The console takes the project it signs into from the instance's
+ * `/console/runtime.json`, as it does in production: the seeded project here,
+ * the platform project in claim mode (`NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT`
+ * below decides which). Nothing pins it on the client.
+ *
+ * The browser authenticates with the dev user's session cookie alone, as the
+ * embedded console does (#1300); the dev user is granted admin on the seeded
+ * project below, which is what lets it see and manage that project. The
+ * project secret, captured from `POST /projects` by the testkit's boot
+ * contract (root ADR 053 §9), is used only here, server-side, to seed and to
+ * write that grant — it never reaches the proxy or the browser. `--seed-only`
+ * prints the variables for a separately-started dev server.
+ *
+ * The instance is ephemeral: each run gets a fresh database and re-seeds, so
+ * the users list looks identical every time (good for design work) at the cost
+ * of signing in again after a restart. Persisting the instance across runs is
+ * deliberately out of scope here — it needs the project secret stored between
+ * runs and existing-state detection.
+ *
+ * `--seed-only` boots, seeds, prints the handle, and exits without Vite, for
+ * pointing a separately-running console (or curl) at a fresh instance.
+ */
+import { spawn } from "node:child_process";
+import { access, mkdir, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { startLocalZitadel, type LocalZitadel, type SeededUser } from "@zitadel/testing";
+
+const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const workspaceRoot = resolve(appDir, "../..");
+
+const consoleOrigin = process.env.CONSOLE_DEV_ORIGIN ?? "http://localhost:5174";
+const port = Number(process.env.CONSOLE_DEV_ZITADEL_PORT ?? 8094);
+const configuredServerBinary = process.env.ZITADEL_SERVER_BINARY;
+const serverBinary = configuredServerBinary || join(workspaceRoot, "dist", "server", "nextgen");
+const seedOnly = process.argv.includes("--seed-only");
+/**
+ * Claim mode boots the deployment's *platform* project and points the console
+ * at it, which is what `claim/complete` authenticates against — without it the
+ * claim page can render but never finish, because the console's session belongs
+ * to the seeded project instead. Opt-in, not the default: making
+ * `proj_platform` the deployment's default project is exactly the
+ * standalone-semantics change the demo and embedded suites must not see (see
+ * `cli-journey-e2e/scripts/run-local.mjs`).
+ */
+const claimMode = process.argv.includes("--claim");
+
+/** The well-known platform project id (`domain.PlatformProjectID`). */
+const PLATFORM_PROJECT_ID = "proj_platform";
+
+// Read by the server through the CLI's `start`, which inherits this process's
+// environment (`packages/testing/src/cli.ts` merges `process.env`). Set either
+// way: `zitadel start` bootstraps the platform project by default, and that
+// pins the console's default project to `proj_platform` — which would leave
+// DEV_USER, seeded in the project this script bootstraps, unable to sign in.
+process.env.NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT = claimMode ? "true" : "false";
+
+/**
+ * The account you sign in as. Fixed rather than random so the credentials stay
+ * the same across restarts and can live in a password manager.
+ */
+const DEV_USER = {
+  email: process.env.CONSOLE_DEV_EMAIL ?? "dev@zitadel.local",
+  password: process.env.CONSOLE_DEV_PASSWORD ?? "Console-dev-1",
+} as const;
+
+/**
+ * Extra users so list screens have something to page, sort, and filter. Names
+ * are stable so a screenshot diff between runs reflects code changes, not
+ * reshuffled fixture data.
+ *
+ * `givenName`/`familyName` need the `consumer` use case below — the shipped
+ * `minimal` schema is email-only and would reject them.
+ */
+const EXTRA_USERS: ReadonlyArray<{ email: string; givenName: string; familyName: string }> = [
+  { email: "ada.lovelace@example.com", givenName: "Ada", familyName: "Lovelace" },
+  { email: "alan.turing@example.com", givenName: "Alan", familyName: "Turing" },
+  { email: "grace.hopper@example.com", givenName: "Grace", familyName: "Hopper" },
+  { email: "katherine.johnson@example.com", givenName: "Katherine", familyName: "Johnson" },
+  { email: "linus.torvalds@example.com", givenName: "Linus", familyName: "Torvalds" },
+  { email: "margaret.hamilton@example.com", givenName: "Margaret", familyName: "Hamilton" },
+  { email: "radia.perlman@example.com", givenName: "Radia", familyName: "Perlman" },
+  { email: "barbara.liskov@example.com", givenName: "Barbara", familyName: "Liskov" },
+];
+
+if (configuredServerBinary) {
+  await access(serverBinary).catch(() => {
+    console.error(`[console-dev-real] server binary not found at ${serverBinary}`);
+    process.exit(1);
+  });
+} else {
+  // Build (or cache-hit) the embedded server binary. Spawned here instead of
+  // declared as a task dep: server:build depends on console:build, so a
+  // dev-real -> server:build task dep would cycle the project graph.
+  await new Promise<void>((resolveBuild, rejectBuild) => {
+    const build = spawn("moon", ["run", "server:build"], {
+      cwd: workspaceRoot,
+      stdio: "inherit",
+    });
+    build.on("error", rejectBuild);
+    build.on("close", (code, signal) => {
+      if (code === 0) {
+        resolveBuild();
+        return;
+      }
+      const detail = signal ? `signal ${signal}` : `exit ${code}`;
+      rejectBuild(new Error(`moon run server:build failed with ${detail}`));
+    });
+  });
+}
+
+// Signal handlers close over this before the asynchronous boot assigns it.
+let zitadel: LocalZitadel | undefined;
+let stopping: Promise<void> | undefined;
+
+function shutdown(code: number): Promise<void> {
+  stopping ??= (async () => {
+    try {
+      await zitadel?.stop();
+    } catch (error) {
+      console.error(`[console-dev-real] stop failed: ${(error as Error).message}`);
+      code = 1;
+    }
+    process.exit(code);
+  })();
+  return stopping;
+}
+
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.on(signal, () => void shutdown(0));
+}
+
+console.log(`[console-dev-real] booting a real instance on port ${port} …`);
+zitadel = await startLocalZitadel({
+  port,
+  // The backend's origin check rejects forwarded requests from unregistered
+  // origins, and the Vite dev server is the origin the browser will use.
+  appOrigins: [consoleOrigin],
+  serverBinary,
+  projectName: "console-dev",
+  // `consumer` widens the user schema to email + givenName + familyName, so
+  // seeded users carry real names instead of an email-only stub.
+  useCase: "consumer",
+});
+
+const seeded: SeededUser[] = [];
+try {
+  seeded.push(await zitadel.seedUser(DEV_USER));
+  const extraUserAt = (index: number): (typeof EXTRA_USERS)[number] => {
+    const user = EXTRA_USERS[index];
+    if (!user) throw new Error(`[console-dev-real] no seed user at index ${index}`);
+    return user;
+  };
+  seeded.push(
+    ...(await zitadel.seedUsers(EXTRA_USERS.length, {
+      email: (index) => extraUserAt(index).email,
+      attributes: (index) => {
+        const { email: _email, ...attributes } = extraUserAt(index);
+        return attributes;
+      },
+    })),
+  );
+} catch (error) {
+  console.error(`[console-dev-real] seeding failed: ${(error as Error).message}`);
+  await shutdown(1);
+}
+
+/**
+ * The seeded accounts, for `scripts/dev-real-add-project.mts`: it grants one
+ * of them on another project and needs its id. Nothing else can hand that
+ * over — the dev proxy holds no credential (#1300) and the project secret
+ * stays in this process. Ids and emails only; overwritten on every run.
+ */
+const DEV_REAL_USERS_FILE = join(appDir, ".dev-real", "users.json");
+await mkdir(dirname(DEV_REAL_USERS_FILE), { recursive: true });
+await writeFile(
+  DEV_REAL_USERS_FILE,
+  JSON.stringify(
+    seeded.map(({ id, email }) => ({ id, email })),
+    null,
+    2,
+  ),
+);
+
+const { baseUrl, projectId, projectSecret } = zitadel.handle;
+
+/**
+ * Makes the dev account an admin of the seeded project.
+ *
+ * The console authenticates with the dev user's session cookie alone, so this
+ * grant is what every screen reads through: without it the dev user sees "No
+ * projects" and every list answers 404. Skipped in claim mode, where claiming
+ * is what is meant to produce the access. Best-effort: a failure is reported,
+ * not fatal.
+ */
+async function grantDevUserAdmin(userId: string): Promise<boolean> {
+  try {
+    const query = new URLSearchParams({ project_id: projectId });
+    const response = await fetch(`${baseUrl}/grants?${query.toString()}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
+      body: JSON.stringify({ user: { user_id: userId }, relation: "admin" }),
+      signal: AbortSignal.timeout(5_000),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+const devUser = seeded[0];
+if (!claimMode && devUser && !(await grantDevUserAdmin(devUser.id))) {
+  console.warn(
+    "[console-dev-real] could not grant the dev user admin on the project; the console will show no project and its lists will answer 404.",
+  );
+}
+
+// Claim mode signs in against the platform project, because that is the only
+// session `claim/complete` accepts; bootstrapping it makes it the project
+// `runtime.json` names. The seeded users stay in the project being claimed —
+// they are its app's users, not the human doing the claiming, who registers
+// through the claim page itself.
+
+/**
+ * A claim link for the seeded project, so claim mode lands on something
+ * openable instead of leaving the reader to mint one. Best-effort: a failure
+ * costs the link, not the instance.
+ */
+async function mintClaimUrl(): Promise<string | null> {
+  try {
+    const response = await fetch(`${baseUrl}/projects/${projectId}/claim/init`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
+      body: "{}",
+      // A hung endpoint must not hold the dev server hostage for a
+      // convenience link.
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) return null;
+    const { challenge_id } = (await response.json()) as { challenge_id?: string };
+    if (!challenge_id) return null;
+    // The server builds claim_url from its configured console base, which is
+    // not this dev server; rebuild it against the origin actually being served.
+    const query = new URLSearchParams({ challenge_id, project_id: projectId });
+    return `${consoleOrigin}/claim?${query.toString()}`;
+  } catch {
+    return null;
+  }
+}
+
+const claimUrl = claimMode ? await mintClaimUrl() : null;
+
+console.log(
+  [
+    "",
+    "  ┌─ console dev (real backend) ──────────────────────────────",
+    `  │  instance   ${baseUrl}`,
+    `  │  project    ${projectId}`,
+    `  │  users      ${seeded.length} seeded`,
+    "  │",
+    `  │  sign in at ${consoleOrigin}/login`,
+    `  │    email     ${DEV_USER.email}`,
+    `  │    password  ${DEV_USER.password}`,
+    ...(claimMode
+      ? [
+          "  │",
+          `  │  claim mode: console signs in to ${PLATFORM_PROJECT_ID}, so the`,
+          "  │  seeded credentials above do not exist there — register on the",
+          "  │  claim page instead. After the claim the console selects the",
+          "  │  claimed project; until then there is no project to show.",
+          ...(claimUrl
+            ? ["  │", `  │  claim       ${claimUrl}`]
+            : ["  │", "  │  claim       could not mint a link; see claim/init"]),
+        ]
+      : []),
+    "  └───────────────────────────────────────────────────────────",
+    "",
+  ].join("\n"),
+);
+
+if (seedOnly) {
+  // Hand the instance's address to the separately-started dev server. No
+  // credential and no project: the console reads the project from the
+  // instance's runtime document, and the dev user's session cookie does the
+  // rest.
+  console.log(
+    [
+      "[console-dev-real] --seed-only: instance stays up, Ctrl-C to stop.",
+      "  point a console dev server at it:",
+      "",
+      `    CONSOLE_BACKEND_URL=${baseUrl} \\`,
+      "    corepack pnpm --filter @zitadel/console dev",
+      "",
+    ].join("\n"),
+  );
+  setInterval(() => {
+    /* keep the event loop alive */
+  }, 60_000);
+} else {
+  // `--port` from the origin: everything else here honours CONSOLE_DEV_ORIGIN,
+  // and without this vite stays pinned to its config's 5174 and a second
+  // worktree collides with the first. Passed to the `dev` script rather than
+  // around it, so future flags on that script still apply here. No `--`
+  // separator: pnpm swallows the args with one and vite never sees them.
+  const consolePort = new URL(consoleOrigin).port;
+  const viteArgs = ["pnpm", "--filter", "@zitadel/console", "dev"];
+  if (consolePort) viteArgs.push("--port", consolePort);
+  const vite = spawn("corepack", viteArgs, {
+    cwd: workspaceRoot,
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      CONSOLE_BACKEND_URL: baseUrl,
+    },
+  });
+  vite.on("exit", (code) => void shutdown(code ?? 0));
+}

@@ -8,5 +8,5 @@ import { expect, test } from "@playwright/test";
 test("redirects unauthenticated requests to /admin back to /login", async ({ page }) => {
   await page.goto("/admin");
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
-  await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue", exact: true })).toBeVisible();
 });

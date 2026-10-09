@@ -1,8 +1,6 @@
-# ADR 017: Widget-owned locale resolution
+# ADR 018: Widget-owned locale resolution
 
-## Status
-
-Accepted — 2026-05-29
+> **Status:** Accepted — 2026-05-29
 
 ## Context
 

@@ -1,11 +1,8 @@
 package domain
 
 import (
-	"context"
 	"slices"
 	"time"
-
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const (
@@ -62,11 +59,16 @@ func ErrAuthAttemptStaleChallenge() Error {
 
 // AuthAttempt represents the object defined [here](https://github.com/zitadel/nextgen/blob/15bd7f438d709fcd5205a163e24374f6f667b68f/docs/design/api/resource-map.md#auth-flows)
 // It is short-lived and should therefore be stored near the client, do not store PII data in it.
+//
+// One exception: the sso_callback check's result may hold the claims a provider
+// asserted. They stay server side, since checksToAPI never renders that check,
+// and they live at most the attempt TTL, are wiped by a re-issue and go with the
+// attempt. See [AuthAttempt.SSOCallback].
 type AuthAttempt struct {
 	// ProjectID links to [Project].
 	ProjectID string
 	// ID is the unique identifier for the auth attempt within the project.
-	// The storage layer assigns this value on Create (database-generated identity).
+	// The storage layer assigns this value on Create (dialect-minted prefixed opaque string).
 	ID string
 
 	// HandoffToken is the single-use token minted explicitly with the handoff call after all required factors are verified, used by the client to exchange for a session.
@@ -89,9 +91,19 @@ type AuthAttempt struct {
 	// TTL describes how long an auth attempt is valid, it should be set to a reasonable value (e.g. 5 minutes) to prevent abuse and to ensure that old auth attempts are cleaned up.
 	// An auth attempt gets garbage collected after CreatedAt + TimeToLive, so it is important to set it to a reasonable value to prevent abuse and to ensure that old auth attempts are cleaned up.
 	TimeToLive *time.Duration
+
+	// Internal marks a server-orchestrated ceremony (e.g. management-plane
+	// passkey enrollment, ADR 056) whose attempt row is only a state carrier:
+	// it must never be handed off, exchanged, or read through the attempt API.
+	Internal bool
 }
 
 const AuthAttemptTTL = 15 * time.Minute
+
+// PasskeyRegistrationChallengeTTL bounds the registration ceremony: the
+// attestation must come back within this window even though the attempt
+// itself lives longer.
+const PasskeyRegistrationChallengeTTL = 5 * time.Minute
 
 type AuthAttemptOption func(*AuthAttempt)
 
@@ -108,14 +120,8 @@ func WithSession(sessionID *string, authFactors ...AuthFactor) AuthAttemptOption
 }
 
 func NewAuthAttempt(projectID string, requiredChecks []AuthCheckType, opts ...AuthAttemptOption) (*AuthAttempt, error) {
-	id, err := newID(PrefixAuthAttempt)
-	if err != nil {
-		return nil, err
-	}
-
 	attempt := &AuthAttempt{
 		ProjectID:      projectID,
-		ID:             id,
 		RequiredChecks: requiredChecks,
 		TimeToLive:     new(AuthAttemptTTL),
 	}
@@ -138,6 +144,21 @@ func CheckAs[T AuthFactor](attempt *AuthAttempt, typ AuthCheckType) (T, bool) {
 	return typedCheck, ok
 }
 
+// SSOCallback returns the attempt's SSO state record, if it has one.
+// [CheckAs] cannot reach it: that helper is constrained to [AuthFactor] and
+// the record is deliberately not one.
+//
+// Its Result is the PII exception documented on [AuthAttempt]; the attempt
+// delete that the session exchange runs is what cascades it away.
+func (a *AuthAttempt) SSOCallback() (*SSOCallbackCheck, bool) {
+	for _, check := range a.Checks {
+		if ssoCheck, ok := check.(*SSOCallbackCheck); ok {
+			return ssoCheck, true
+		}
+	}
+	return nil, false
+}
+
 // IsExpired returns true if the attempt's TTL has elapsed. Returns false if the attempt is not yet initialized (zero CreatedAt) or TTL is nil.
 func (a *AuthAttempt) IsExpired() bool {
 	if a.CreatedAt.IsZero() || a.TimeToLive == nil {
@@ -155,9 +176,11 @@ func (a *AuthAttempt) ExpiresAt() time.Time {
 }
 
 // IsCompleted returns true if all required checks are verified successfully.
+// Matching is by factor class, so a completed passkey enrollment satisfies a
+// required passkey check.
 func (a *AuthAttempt) IsCompleted() bool {
 	for _, requiredCheck := range a.RequiredChecks {
-		_, ok := a.FactorByType(requiredCheck)
+		_, ok := a.FactorByClass(requiredCheck)
 		if !ok {
 			return false
 		}
@@ -168,6 +191,18 @@ func (a *AuthAttempt) IsCompleted() bool {
 // IsHandedOff returns true if a handoff token has been generated.
 func (a *AuthAttempt) IsHandedOff() bool {
 	return a.HandoffToken != nil
+}
+
+// FactorByClass returns a verified factor whose type competes in typ's class
+// (see [AuthCheckType.Class]), if one exists on the attempt.
+func (a *AuthAttempt) FactorByClass(typ AuthCheckType) (AuthFactor, bool) {
+	for _, check := range a.Checks {
+		factor, ok := check.(AuthFactor)
+		if ok && factor.Type().Class() == typ.Class() {
+			return factor, true
+		}
+	}
+	return nil, false
 }
 
 // FactorByType returns the verified factor of the given type, if it exists on the attempt.
@@ -268,6 +303,48 @@ func (a *AuthAttempt) PreparePasskeyChallenge() (string, error) {
 	return userCheck.UserID, nil
 }
 
+// PreparePasskeyRegistrationChallenge validates that a passkey registration
+// challenge can be issued and resolves the user handle for the ceremony.
+// Unlike password, no prior user factor is required: registration is how a
+// user comes to exist in the first place.
+//
+// With a pinned user factor the enrollment targets that user (requestedUserID
+// must match when set) and the ceremony is not provisional. Without one the
+// ceremony is provisional: every authenticated path persists a user factor —
+// including discoverable passkey login — so an unpinned attempt has no user.
+// A non-empty requestedUserID is kept by the caller only when
+// [AuthAttempt.HasProvisionalRegistrationHandle] confirms it is the handle of
+// the attempt's own in-flight ceremony (a re-issued challenge); any other
+// handle must be replaced by a fresh mint, so a caller-chosen id never
+// becomes a user id. An empty handle signals the caller to mint a fresh one.
+func (a *AuthAttempt) PreparePasskeyRegistrationChallenge(requestedUserID string) (userID string, provisional bool, err error) {
+	if err := a.PrepareChallenge(AuthCheckTypePasskeyRegistration); err != nil {
+		return "", false, err
+	}
+	userCheck, ok := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
+	if ok {
+		if requestedUserID != "" && requestedUserID != userCheck.UserID {
+			return "", false, ErrAuthAttemptInvalidRequest().WithMessage("The registration user must match the authenticated user.")
+		}
+		return userCheck.UserID, false, nil
+	}
+	return requestedUserID, true, nil
+}
+
+// HasProvisionalRegistrationHandle reports whether the attempt's current
+// registration challenge is provisional and carries the given user handle.
+// This is the only situation in which a caller-supplied handle is known to be
+// server-minted, so a re-issued challenge may keep it; any other unknown
+// handle must be replaced by a fresh mint, never adopted.
+func (a *AuthAttempt) HasProvisionalRegistrationHandle(userID string) bool {
+	challenge, ok := a.ChallengeByType(AuthCheckTypePasskeyRegistration)
+	if !ok {
+		return false
+	}
+	registration, ok := challenge.(*AuthChallengePasskeyRegistration)
+	return ok && registration.Provisional && registration.UserID == userID
+}
+
 // SetUserChallenge registers a new user challenge on the attempt, replacing any existing challenge of the same type.
 func (a *AuthAttempt) SetUserChallenge() *AuthChallengeUser {
 	challenge := &AuthChallengeUser{}
@@ -285,6 +362,16 @@ func (a *AuthAttempt) SetPasswordChallenge() *AuthChallengePassword {
 func (a *AuthAttempt) SetPasskeyChallenge(passkeyChallenge *PasskeyChallenge) *AuthChallengePasskey {
 	challenge := &AuthChallengePasskey{
 		PasskeyChallenge: passkeyChallenge,
+	}
+	a.SetCheck(challenge)
+	return challenge
+}
+
+// SetPasskeyRegistrationChallenge registers a new passkey registration challenge on the attempt, replacing any existing challenge of the same type.
+func (a *AuthAttempt) SetPasskeyRegistrationChallenge(registrationChallenge *PasskeyRegistrationChallenge, provisional bool) *AuthChallengePasskeyRegistration {
+	challenge := &AuthChallengePasskeyRegistration{
+		PasskeyRegistrationChallenge: registrationChallenge,
+		Provisional:                  provisional,
 	}
 	a.SetCheck(challenge)
 	return challenge
@@ -362,6 +449,37 @@ func (a *AuthAttempt) PreparePasskeyVerification(challengeID string) (AuthChalle
 	return challenge, userCheck, nil
 }
 
+// PreparePasskeyRegistrationVerification validates that a registration proof
+// can be submitted. Beyond the generic checks it enforces the ceremony's own
+// window ([PasskeyRegistrationChallengeTTL]), which is tighter than the
+// attempt TTL, and that the attempt's user state still matches what the
+// challenge was issued for: an authentication that happened after the issue
+// supersedes the ceremony. Without this, a provisional attestation could
+// create a second user on an attempt that meanwhile authenticated user A —
+// overwriting the user check A→H while A's other factors survive, so the
+// handoff would mint a session for H carrying factors verified against A.
+func (a *AuthAttempt) PreparePasskeyRegistrationVerification(challengeID string) (*AuthChallengePasskeyRegistration, error) {
+	challenge, err := a.PrepareVerification(challengeID, AuthCheckTypePasskeyRegistration)
+	if err != nil {
+		return nil, err
+	}
+	registrationChallenge, ok := challenge.(*AuthChallengePasskeyRegistration)
+	if !ok {
+		return nil, ErrAuthAttemptInvalidRequest()
+	}
+	if time.Since(registrationChallenge.GetLastChallengedAt()) > PasskeyRegistrationChallengeTTL {
+		return nil, ErrAuthAttemptStaleChallenge()
+	}
+	userCheck, hasUserFactor := CheckAs[*AuthFactorUser](a, AuthCheckTypeUser)
+	if registrationChallenge.Provisional && hasUserFactor {
+		return nil, ErrAuthAttemptStaleChallenge()
+	}
+	if !registrationChallenge.Provisional && hasUserFactor && userCheck.UserID != registrationChallenge.UserID {
+		return nil, ErrAuthAttemptStaleChallenge()
+	}
+	return registrationChallenge, nil
+}
+
 // SetUserFactor registers a verified user factor on the attempt, overwriting existing factors of the same type and clearing any associated challenges.
 func (a *AuthAttempt) SetUserFactor(user *User) *AuthFactorUser {
 	factor := &AuthFactorUser{
@@ -374,6 +492,20 @@ func (a *AuthAttempt) SetUserFactor(user *User) *AuthFactorUser {
 // SetPasswordFactor registers a verified password factor on the attempt, overwriting existing factors of the same type and clearing any associated challenges.
 func (a *AuthAttempt) SetPasswordFactor() *AuthFactorPassword {
 	factor := &AuthFactorPassword{}
+	a.SetCheck(factor)
+	return factor
+}
+
+// SetPasskeyRegistrationFactor records a completed passkey enrollment as a
+// verified factor on the attempt, replacing the registration challenge.
+func (a *AuthAttempt) SetPasskeyRegistrationFactor(passkey *CreateUserPasskey) *AuthFactorPasskeyRegistration {
+	factor := &AuthFactorPasskeyRegistration{
+		UserVerified:   passkey.UserVerified,
+		UserID:         passkey.UserID,
+		CredentialID:   passkey.CredentialID,
+		BackupEligible: passkey.BackupEligible,
+		BackupState:    passkey.BackupState,
+	}
 	a.SetCheck(factor)
 	return factor
 }
@@ -394,6 +526,11 @@ func (a *AuthAttempt) SetPasskeyFactor(passkeyVerification *PasskeyVerification)
 // And will generate and store the handoff token.
 // Note: The HandoffToken is generated using a crypto/rand token and stored in a hashed way for security reasons.
 func (a *AuthAttempt) PrepareHandoff() error {
+	if a.Internal {
+		// An internal ceremony's attempt never becomes a session: reporting
+		// not-found keeps it invisible on the attempt surface.
+		return ErrAuthAttemptNotFound()
+	}
 	if a.IsExpired() {
 		return ErrAuthAttemptInvalidState()
 	}
@@ -439,37 +576,4 @@ func (a *AuthAttempt) SetCheck(check AuthCheck) {
 		}
 	}
 	a.Checks = append(a.Checks, check)
-}
-
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/auth_attempt.mock.go . AuthAttemptRepository
-
-type AuthAttemptRepository interface {
-	// GetByID retrieves a single AuthAttempt by its ID and project ID.
-	GetByID(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) (*AuthAttempt, error)
-	// GetByHandoffToken retrieves a single AuthAttempt by its handoff token and project ID.
-	GetByHandoffToken(ctx context.Context, client database.QueryExecutor, projectID string, handoffToken []byte) (*AuthAttempt, error)
-	// Create stores an auth attempt including all defined fields (except read-only fields).
-	// The repository MUST set the [AuthAttempt.CreatedAt] field to the current time.
-	// The repository MUST store [AuthAttempts.Checks] following this recipe:
-	//  - If the check does implement [AuthFactor], it MUST SET `LastVerifiedAt`.
-	//  - If the check does implement [AuthChallenge], it MUST set `LastChallengedAt`.
-	Create(ctx context.Context, client database.QueryExecutor, authAttempt *AuthAttempt) error
-	// Delete an auth attempt by its ID and project ID.
-	Delete(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) error
-
-	// Handoff stores the handoff token for an auth attempt and sets the handoff time to the current time.
-	Handoff(ctx context.Context, client database.QueryExecutor, attempt *AuthAttempt) error
-
-	// SetChallenge sets a check to challenged and sets the challenge payload.
-	// If the check is not stored yet, the method creates a new check with the given type and challenge payload, otherwise it updates the existing check with the new challenge payload and id.
-	// The repository MUST call [AuthChallenge.SetID] with the generated id, [AuthChallenge.SetLastChallengedAt] with the current time, reset the [AuthChallenge.SetLastFailedAt] to nil and reset the [AuthChallenge.SetFailureCount] to 0, and store the values accordingly.
-	SetChallenge(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, challenge AuthChallenge) error
-	// ChallengeSucceeded sets the [AuthFactor.SetLastVerifiedAt] to the current time and stores it accordingly and removes the challenge payload from the storage.
-	// The factor must be stored already as an [AuthChallenge], with the same ID.
-	// The factor's payload MUST be stored by the repository.
-	ChallengeSucceeded(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, factor AuthFactor, challengeID string) error
-	// ChallengeFailed sets a challenge to failed.
-	// The challenge must be stored already as an [AuthChallenge], with the same ID.
-	// The [AuthChallenge.SetLastFailedAt] must be called with the current time and the [AuthChallenge.SetFailureCount] increased by 1, and store the values accordingly.
-	ChallengeFailed(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, challenge AuthChallenge) error
 }

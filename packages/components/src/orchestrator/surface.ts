@@ -1,0 +1,137 @@
+import { LitElement } from "lit";
+import { property } from "lit/decorators.js";
+import type { ZitadelProject } from "@zitadel/api/config";
+
+import type { Branding } from "./branding.js";
+import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
+import { applyDefaultFont, applyFontUrl } from "./font-loader.js";
+import type { ProjectAttrs } from "./resolve-api.js";
+import { ThemeController, type ThemeMode } from "./theme-controller.js";
+
+/**
+ * Base for every orchestrator element: the project config `resolveApi` reads,
+ * as an SDK handle or as declarative attributes.
+ */
+export class ZitadelConfigured extends LitElement {
+  /**
+   * SDK project handle returned by `configureZitadel()`. Set from JS (or a
+   * framework binding). When set, takes precedence over both the
+   * `project-id`/`proxy-path`/`url` attributes and the global singleton from
+   * `getZitadelConfig()`.
+   */
+  @property({ attribute: false }) accessor project: ZitadelProject | undefined;
+
+  /**
+   * Project ID, set declaratively in HTML. Lets the component be configured on
+   * a plain page without JS or `configureZitadel()`. Ignored when the `project`
+   * property or a `configureZitadel()` global is set.
+   */
+  @property({ type: String, attribute: "project-id" }) accessor projectId = "";
+
+  /**
+   * Proxy path for API requests (e.g. `/__nextgen`), set declaratively in HTML.
+   * Defaults to `/__nextgen` when omitted, matching `configureZitadel()`.
+   */
+  @property({ type: String, attribute: "proxy-path" }) accessor proxyPath = "";
+
+  /**
+   * Full URL of the Zitadel auth backend, set declaratively in HTML. Optional —
+   * not needed in client-only setups.
+   */
+  @property({ type: String }) accessor url = "";
+
+  /** Declarative config read from this element's attributes. */
+  protected get projectAttrs(): ProjectAttrs {
+    return { projectId: this.projectId, proxyPath: this.proxyPath, url: this.url };
+  }
+}
+
+/** Stamp the resolved theme on a host so token lookups and host-page selectors flip with the mode. */
+export function stampTheme(host: HTMLElement, controller: ThemeController): void {
+  host.dataset.theme = controller.theme;
+  host.toggleAttribute("data-theme-dark", controller.theme === "dark");
+}
+
+/**
+ * Shared base for the orchestrator host elements (`<zitadel-login>`,
+ * `<zitadel-session>`) that render a themable page/widget surface.
+ *
+ * Owns the `variant` / `theme` public properties, the {@link ThemeController},
+ * and the per-update surface application (base tokens, branding overrides,
+ * font links, and the `data-theme` host stamp). Subclasses call
+ * {@link applySurfaceTheme} from their `willUpdate` so the resolved theme is
+ * committed in the same update cycle that reads it.
+ *
+ * Not a registered custom element — purely an implementation-sharing base.
+ */
+export class ZitadelSurface extends ZitadelConfigured {
+  /**
+   * Sizing/chrome mode. Components size to content; pages compose them —
+   * so the default is `widget`: content-sized, transparent host, no
+   * document-level default-font injection. Dedicated routes — the hosted
+   * shell and the scaffolded pages — opt into `page`, which claims the
+   * viewport, paints the surface background, and ships the brand font.
+   * Fine-grained height override in both modes: `--zl-page-min-height`.
+   */
+  @property({ type: String, reflect: true }) accessor variant: "widget" | "page" = "widget";
+
+  /**
+   * Colour mode: `light`, `dark`, or `auto` (follow `prefers-color-scheme`).
+   * Empty means "not stated", and resolution falls through to the tenant's
+   * `branding.theme.mode`, then to a variant-derived default — `dark` for
+   * `page` (the hosted design system surface) and `auto` for `widget`, so an
+   * embedded widget matches the visitor's preference instead of forcing a
+   * dark card onto a light page. Set it explicitly when your app's surface
+   * is fixed: `<zitadel-login theme="light">`.
+   */
+  @property({ type: String }) accessor theme: "" | ThemeMode = "";
+
+  /**
+   * Visually hide the surface's own heading block (the step title and
+   * subtitle on `<zitadel-login>`, the heading line on
+   * `<zitadel-session>`) while keeping it in the accessibility tree. For
+   * embedders whose page already carries the heading — a brand-voice
+   * "Welcome back" above the card — so the widget doesn't repeat it.
+   * Reflected so host-page CSS and DOM assertions can key off the
+   * attribute, like `variant`.
+   */
+  @property({ type: Boolean, reflect: true, attribute: "suppress-header" })
+  accessor suppressHeader = false;
+
+  protected readonly themeController = new ThemeController(this);
+
+  /**
+   * Resolve the active theme and commit it to this element's surface: adopt
+   * the base token sheet, layer the branding overrides, manage the
+   * document-level font links, and stamp `data-theme` / `data-theme-dark` on
+   * the host so token lookups (and host-page selectors) flip with the mode.
+   * `branding` is `undefined` for surfaces without a tenant payload — the
+   * theme then resolves through the element preference and variant fallback.
+   */
+  protected applySurfaceTheme(branding: Branding | undefined): void {
+    // Resolve before reading `themeController.theme` below: a page owns its
+    // surface (dark), a widget defers to the visitor's preference (auto).
+    this.themeController.setModePreference(
+      this.theme === "" ? undefined : this.theme,
+      this.variant === "page" ? "dark" : "auto",
+    );
+    const root = this.shadowRoot;
+    if (root) {
+      applyBaseTokens(root);
+      applyBrandingTokens(root, branding);
+      // Fonts load as a document-level `<link>`, because `@font-face` inside a
+      // shadow tree never registers. That makes injection a page-wide grant,
+      // so neither face goes into a document we do not own: on a dedicated
+      // page we ship the design-system face and hand over to the tenant's
+      // when there is one, and in widget mode we inject neither. An embedded
+      // widget applies `typography.font_family` and relies on the embedding
+      // app — which owns its typography, its CSP and its visitors' font-CDN
+      // connections — to have loaded the face.
+      const page = this.variant === "page";
+      const tenantFontUrl = page ? (branding?.typography?.font_url ?? null) : null;
+      applyDefaultFont(root, page && !tenantFontUrl ? undefined : null);
+      applyFontUrl(root, tenantFontUrl);
+    }
+    stampTheme(this, this.themeController);
+  }
+}

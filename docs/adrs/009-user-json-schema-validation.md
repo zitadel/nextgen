@@ -3,6 +3,10 @@
 > **Status:** Proposed
 > **Date:** 2026-04-30
 > **Context:** Dynamic users and schema-driven validation
+>
+> **Amended by:** [ADR 052](052-user-envelope-and-attributes.md) — the API
+> property is `schema`, not `$schema`, and it sits on an envelope beside the
+> validated `attributes` document.
 
 ## Context
 
@@ -15,6 +19,8 @@ JSON Schema is the validation mechanism. The server resolves schemas per instanc
 ## Decision
 
 ### 1. `$schema` on create and update
+
+> Amended by [ADR 052](052-user-envelope-and-attributes.md): the property is named `schema`, and the attributes it governs are nested under `attributes` rather than sitting at the top level beside it.
 
 When users are created or updated over the API, the request body includes a **`$schema`** property: a URL string that references a JSON Schema **already registered** for the instance (a row in `json_schemas`, same URL as the `url` column).
 
@@ -39,7 +45,7 @@ No background or automatic migration from schema v1 to v2. The intended flow:
 3. The client sends a **self-contained** update (PUT and/or PATCH) that sets **`$schema`** to the v2 URL and includes all attribute additions, updates, and removals required to satisfy v2 in **one request**.
 4. The server applies changes in a **single transaction**, materializes the new user state, **validates it against the v2 schema before commit**, and returns the new state. Validation failure aborts the transaction.
 
-SQL-oriented put/patch contracts under `internal/storage/database/dialect/postgres/migration/004_users/example/` already reflect single-transaction user updates; HTTP APIs should preserve that atomicity.
+SQL-oriented put/patch contracts under `internal/storage/dialect/postgres/migration/sql/user_examples/` already reflect single-transaction user updates; HTTP APIs should preserve that atomicity.
 
 ```mermaid
 sequenceDiagram

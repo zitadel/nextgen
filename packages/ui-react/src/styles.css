@@ -1,7 +1,0 @@
-/*
- * Paired React components — import shared surfaces (see pairs.json in shared-component-styles).
- * Requires design tokens on the host:
- *   @import "@zitadel/design-tokens/css/tokens.css";
- */
-
-@import "@zitadel/shared-component-styles/styles.css";

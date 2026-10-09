@@ -1,0 +1,12 @@
+---
+title: Databases
+description: Choose SQLite, PostgreSQL, or Spanner for the Zitadel server.
+---
+
+Zitadel persists projects, users, sessions, and related state in a SQL database. Configure exactly one dialect. When `database:` is omitted, the server uses **SQLite** at `<server.data_dir>/zitadel.db`.
+
+- **SQLite** — local development, CLI `zitadel start`, and small single-node / homelab deployments (single-writer limits apply).
+- **PostgreSQL** — production and the Docker Compose operator stack.
+- **Spanner** — production on Google Cloud Spanner.
+
+PostgreSQL and Spanner are the production peers. For the CLI binary runtime path, see [Local runtime](/docs/concepts/local-runtime). For YAML and environment examples, see the repository [configuration guide](https://github.com/zitadel/nextgen/blob/main/docs/quick-start/configuration.md).

@@ -22,15 +22,13 @@ properties:
     type: string
     description: |
       Current lifecycle state of the session:
-      - `building`: has a user factor but is still gathering authentication factors
+      - `building`: no verified authentication factors yet
       - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as factors age
       - `expired`: TTL elapsed
-      - `revoked`: explicitly revoked via DELETE
     enum:
       - building
       - active
       - expired
-      - revoked
     example: active
   user_id:
     description: |
@@ -39,6 +37,15 @@ properties:
     oneOf:
       - $ref: ../../components/schemas/user-id.yaml
       - type: 'null'
+  user:
+    $ref: ../../components/schemas/user-ref.yaml
+    description: |
+      The authenticated user's resolved reference, derived live from the
+      user schema's `x-identifier`/`x-display` designations (ADR 058).
+      Present on identity-hydrating reads (`GET /sessions/me`, session get
+      and query) whenever the session has an authenticated user; absent
+      for anonymous sessions. Clients render `display`, falling back to
+      `identifier`, then `user_id`.
   factors:
     type: array
     description: |

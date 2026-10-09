@@ -5,63 +5,20 @@ import { chmod, copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { run, runCapture } from "./dev-process.mjs";
+import { mapWithConcurrency, run } from "./dev-process.mjs";
+import {
+  PUBLIC_PACKAGE_DIRS,
+  PUBLIC_RELEASE_PACKAGES,
+  SERVER_PLATFORM_PACKAGES,
+} from "./release-manifest.mjs";
+import { assertServerBuildPackage, gitInfo, serverLdflags } from "./server-build.mjs";
+
+export { PUBLIC_PACKAGE_DIRS, SERVER_PLATFORM_PACKAGES } from "./release-manifest.mjs";
+export { gitInfo } from "./server-build.mjs";
 
 export const SERVER_IMAGE = "ghcr.io/zitadel/nextgen";
 export const SERVER_PACKAGE = "@zitadel/server";
 export const SERVER_PACKAGE_MANIFEST = "apps/server/package.json";
-export const SERVER_PLATFORM_PACKAGES = [
-  {
-    goos: "linux",
-    goarch: "amd64",
-    packageName: "@zitadel/server-linux-x64",
-    packageDir: "apps/server-linux-x64",
-  },
-  {
-    goos: "linux",
-    goarch: "arm64",
-    packageName: "@zitadel/server-linux-arm64",
-    packageDir: "apps/server-linux-arm64",
-  },
-  {
-    goos: "darwin",
-    goarch: "amd64",
-    packageName: "@zitadel/server-darwin-x64",
-    packageDir: "apps/server-darwin-x64",
-  },
-  {
-    goos: "darwin",
-    goarch: "arm64",
-    packageName: "@zitadel/server-darwin-arm64",
-    packageDir: "apps/server-darwin-arm64",
-  },
-  {
-    goos: "windows",
-    goarch: "amd64",
-    packageName: "@zitadel/server-win32-x64",
-    packageDir: "apps/server-win32-x64",
-  },
-];
-export const PUBLIC_PACKAGE_DIRS = [
-  "apps/cli",
-  "apps/server",
-  ...SERVER_PLATFORM_PACKAGES.map((platform) => platform.packageDir),
-  "packages/api",
-  "packages/components",
-  "packages/sdk-core",
-  "packages/sdk-next",
-  "packages/sdk-nuxt",
-  "packages/sdk-react",
-  "packages/sdk-vue",
-  "packages/sdk-angular",
-  "packages/sdk-solid",
-  "packages/sdk-svelte",
-  "packages/sdk-qwik",
-  "packages/sdk-sveltekit",
-  "packages/sdk-tanstack-start",
-  "packages/sdk-solid-start",
-  "packages/sdk-qwik-city",
-];
 export const SERVER_PLATFORMS = [
   { goos: "linux", goarch: "amd64" },
   { goos: "linux", goarch: "arm64" },
@@ -100,19 +57,6 @@ export function validateSemver(version) {
   }
 }
 
-export async function gitInfo(options = {}) {
-  const repoRoot = options.repoRoot ?? defaultRepoRoot;
-  const runCaptureFn = options.runCapture ?? runCapture;
-  const commit = (await runCaptureFn("git", ["rev-parse", "HEAD"], { cwd: repoRoot })).stdout.trim();
-  const shortCommit = (await runCaptureFn("git", ["rev-parse", "--short=12", "HEAD"], {
-    cwd: repoRoot,
-  })).stdout.trim();
-  const date = (await runCaptureFn("git", ["show", "-s", "--format=%cI", "HEAD"], {
-    cwd: repoRoot,
-  })).stdout.trim();
-  return { commit, shortCommit, date };
-}
-
 export function releaseDir(repoRoot, version) {
   return join(repoRoot, "dist", "release", version);
 }
@@ -138,7 +82,11 @@ export async function buildServerBinaries(options = {}) {
   const runFn = options.run ?? run;
   const baseEnv = { ...process.env, ...(options.env ?? {}) };
 
-  for (const platform of platforms) {
+  await assertServerBuildPackage({ repoRoot, runCapture: options.runCapture });
+
+  // The per-platform builds are independent and the Go build cache is safe
+  // under concurrency, so cross-compile all platforms at once.
+  await mapWithConcurrency(platforms, platforms.length, async (platform) => {
     const dir = platformDir(outDir, platform);
     const output = join(dir, binaryName(platform.goos));
     await mkdir(dir, { recursive: true });
@@ -148,12 +96,7 @@ export async function buildServerBinaries(options = {}) {
         "build",
         "-trimpath",
         "-ldflags",
-        [
-          "-s -w",
-          `-X main.version=${version}`,
-          `-X main.commit=${info.shortCommit}`,
-          `-X main.date=${info.date}`,
-        ].join(" "),
+        serverLdflags({ version, commit: info.commit, date: info.date, strip: true }),
         "-o",
         output,
         ".",
@@ -168,7 +111,7 @@ export async function buildServerBinaries(options = {}) {
         },
       },
     );
-  }
+  });
 
   return { outDir, platforms, version, gitInfo: info };
 }
@@ -226,7 +169,10 @@ export async function createArchives(options = {}) {
       const stagingDir = join(outDir, "archive-staging", name);
       await rm(stagingDir, { recursive: true, force: true });
       await mkdir(stagingDir, { recursive: true });
-      await copyFile(join(sourceDir, binaryName(platform.goos)), join(stagingDir, binaryName(platform.goos)));
+      await copyFile(
+        join(sourceDir, binaryName(platform.goos)),
+        join(stagingDir, binaryName(platform.goos)),
+      );
       await copyFile(join(repoRoot, "LICENSE"), join(stagingDir, "LICENSE"));
       await copyFile(join(repoRoot, "README.md"), join(stagingDir, "README.md"));
       const archivePath = join(archivesDir, `${name}.zip`);
@@ -272,27 +218,30 @@ export async function packPublicPackages(options = {}) {
   await rm(tarballsDir, { recursive: true, force: true });
   await mkdir(tarballsDir, { recursive: true });
 
-  for (const dir of PUBLIC_PACKAGE_DIRS) {
+  // Packs are independent (distinct package dirs, distinct tarball names in a
+  // shared destination); cap concurrency so the cli prepack rebuild and the
+  // larger packages do not stampede the runner.
+  await mapWithConcurrency(PUBLIC_PACKAGE_DIRS, 8, async (dir) => {
     const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
     await assertPublishDirectoryReady({ repoRoot, dir, manifest });
-    // `pnpm pack` runs the package's `prepack`, which for @zitadel/cli rebuilds
-    // the bundle via tsdown. Stamp the production telemetry channel here so the
-    // published tarball routes to the prod Mixpanel project — setting it only on
-    // the earlier `moon run cli:build` is not enough, since prepack rebuilds.
-    const env =
-      dir === "apps/cli"
-        ? { ...process.env, ZITADEL_TELEMETRY_BUILD_CHANNEL: "production" }
-        : process.env;
     await runFn("corepack", ["pnpm", "--dir", dir, "pack", "--pack-destination", tarballsDir], {
       cwd: repoRoot,
-      env,
+      env: process.env,
     });
-  }
+  });
 
   return tarballsDir;
 }
 
 async function assertPublishDirectoryReady({ repoRoot, dir, manifest }) {
+  const releasePackage = PUBLIC_RELEASE_PACKAGES.find((pkg) => pkg.dir === dir);
+  if (releasePackage?.buildTarget && !(await exists(join(repoRoot, dir, "dist")))) {
+    throw new Error(
+      `${manifest.name} requires ${dir}/dist before packing. ` +
+        `Run moon run ${releasePackage.buildTarget} or moon run release:build-public-packages.`,
+    );
+  }
+
   const publishDirectory = manifest.publishConfig?.directory;
   if (!publishDirectory) {
     return;
@@ -314,17 +263,29 @@ export async function buildContainerImage(options = {}) {
   const runFn = options.run ?? run;
   const platformList = options.platforms ?? CONTAINER_PLATFORMS;
   const contextPlatforms = options.contextPlatforms ?? platformList;
-  const contextDir = options.contextDir ??
+  const contextDir =
+    options.contextDir ??
     (await prepareDockerContext({
       repoRoot,
       outDir,
       version: release.version,
       platforms: contextPlatforms,
     }));
-  const platformArgs = platformList.map((platform) => `${platform.goos}/${platform.goarch}`).join(",");
+  const platformArgs = platformList
+    .map((platform) => `${platform.goos}/${platform.goarch}`)
+    .join(",");
   const image = options.image ?? SERVER_IMAGE;
-  const tags = options.tags ?? containerTags({ image, version: release.version, prerelease: release.prerelease });
-  const args = ["buildx", "build", "--platform", platformArgs, "-f", join(contextDir, "Dockerfile")];
+  const tags =
+    options.tags ??
+    containerTags({ image, version: release.version, prerelease: release.prerelease });
+  const args = [
+    "buildx",
+    "build",
+    "--platform",
+    platformArgs,
+    "-f",
+    join(contextDir, "Dockerfile"),
+  ];
 
   for (const tag of tags) {
     args.push("-t", tag);
@@ -344,9 +305,21 @@ export async function buildContainerImage(options = {}) {
   return { args, contextDir, tags };
 }
 
+// Temporary: while the repo is pre-GA every release is a prerelease, so the
+// rule below ("only stable moves `:latest`") leaves `:latest` pinned to a build
+// that predates the alpha train. Anyone following the documented Docker quick
+// start — `docs/operations/env.example` defaults `NEXTGEN_IMAGE` to `:latest` —
+// gets that stale image rather than the alpha they expect.
+//
+// Until the first stable release, point `:latest` at the alpha train too. Flip
+// this back to `false` when leaving prerelease mode (`changeset pre exit`, see
+// `.changeset/README.md`), so a later alpha can never overwrite a stable
+// `:latest`.
+export const TAG_PRERELEASE_AS_LATEST = true;
+
 export function containerTags({ image = SERVER_IMAGE, version, prerelease }) {
   const tags = [`${image}:${version}`];
-  if (!prerelease) {
+  if (!prerelease || TAG_PRERELEASE_AS_LATEST) {
     tags.push(`${image}:latest`);
   }
   return tags;
@@ -369,7 +342,11 @@ export async function writeReleaseMetadata(options = {}) {
     shortCommit: info.shortCommit,
     date: info.date,
     image: SERVER_IMAGE,
-    imageTags: containerTags({ image: SERVER_IMAGE, version: release.version, prerelease: release.prerelease }),
+    imageTags: containerTags({
+      image: SERVER_IMAGE,
+      version: release.version,
+      prerelease: release.prerelease,
+    }),
     packages,
   };
   await mkdir(outDir, { recursive: true });
@@ -402,7 +379,9 @@ export function artifactImageRows(metadata) {
 }
 
 export function artifactPackageRows(metadata) {
-  return (metadata.packages ?? []).map((pkg) => `| \`${pkg.name}\` | \`${pkg.version}\` |`).join("\n");
+  return (metadata.packages ?? [])
+    .map((pkg) => `| \`${pkg.name}\` | \`${pkg.version}\` |`)
+    .join("\n");
 }
 
 export async function verifyLocalArtifacts(options = {}) {
@@ -412,7 +391,11 @@ export async function verifyLocalArtifacts(options = {}) {
   const missing = [];
   for (const platform of SERVER_PLATFORMS) {
     const extension = platform.goos === "windows" ? "zip" : "tar.gz";
-    const archive = join(outDir, "archives", `nextgen_${release.version}_${platformName(platform)}.${extension}`);
+    const archive = join(
+      outDir,
+      "archives",
+      `nextgen_${release.version}_${platformName(platform)}.${extension}`,
+    );
     if (!(await exists(archive))) {
       missing.push(archive);
     }

@@ -1,6 +1,5 @@
-/* oxlint-disable playwright/expect-expect */
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test } from "vitest";
 
 import { appPortFromUrl, frameworkForId, frameworkIds, frameworks } from "./frameworks.mjs";
 
@@ -9,7 +8,10 @@ test("framework registry lists every CLI journey target", () => {
     frameworks.map((framework) => framework.id),
     ["next", "nuxt", "react", "vue", "angular", "solid", "svelte", "qwik"],
   );
-  assert.deepEqual(frameworkIds, frameworks.map((framework) => framework.id));
+  assert.deepEqual(
+    frameworkIds,
+    frameworks.map((framework) => framework.id),
+  );
   for (const framework of frameworks) {
     assert.match(framework.sdkPackageDir, /^packages\/sdk-/);
     assert.equal(framework.readyPath, "/login");

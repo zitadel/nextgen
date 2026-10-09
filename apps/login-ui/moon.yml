@@ -7,28 +7,41 @@ dependsOn:
   - "design-tokens"
 
 tasks:
-  lint:
-    command: "corepack pnpm exec oxlint ."
-    deps:
-      - "components:build"
-      - "design-tokens:build"
-
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
       - "components:build"
-      - "design-tokens:build"
+
+  test:
+    deps:
+      - "components:build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
       - "components:build"
-      - "design-tokens:build"
     outputs:
       - "/internal/staticui/login/dist/**/*"
+    options:
+      # Replaces the inherited dist/**/* rather than adding to it.
+      mergeOutputs: "replace"
 
+  build-release:
+    command: "corepack pnpm run build"
+    deps:
+      - "components:build-release"
+    outputs:
+      - "/internal/staticui/login/dist/**/*"
+    options:
+      cache: false
+      # Release UI builds consume package release output and run from the later
+      # release step instead of the normal `moon ci` build/test graph.
+      runInCI: false
+
+  # The same deps as build: components has no `@zitadel/source` entry, so the
+  # dev server loads its dist.
   dev:
     command: "corepack pnpm run dev"
+    deps:
+      - "components:build"
     options:
       persistent: true
       runInCI: false

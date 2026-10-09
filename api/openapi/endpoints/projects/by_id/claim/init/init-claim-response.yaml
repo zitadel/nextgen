@@ -1,0 +1,19 @@
+type: object
+description: The claim challenge minted for a project.
+required:
+  - claim_url
+  - challenge_id
+  - expires_at
+properties:
+  claim_url:
+    type: string
+    format: uri
+    description: |
+      The browser URL a developer opens to complete the claim. It embeds the
+      `challenge_id` so the browser leg does not need the project secret.
+  challenge_id:
+    $ref: ../../../../../components/schemas/challenge-id.yaml
+  expires_at:
+    type: string
+    format: date-time
+    description: The time when the claim challenge expires.

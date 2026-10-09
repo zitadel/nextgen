@@ -1,12 +1,13 @@
 import { createWriteStream } from "node:fs";
 import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
-import net from "node:net";
 
-import { frameworkForId } from "./frameworks.mjs";
+import { frameworkForId, frameworkIds } from "./frameworks.mjs";
+import { canListen, createJourneyPortAllocator } from "./ports.mjs";
 import {
   localRegistryPaths,
   npmEnvironment,
@@ -27,33 +28,60 @@ if (options.help) {
   process.exit(0);
 }
 
-const selectedFrameworks = options.frameworkIds.map(frameworkForId);
+// A "journey variant" is one unit of work: a suite/preset/pre-existing-app
+// posture and the frameworks it runs. Non-CI derives a single variant from the
+// parsed options; `--ci` runs the fixed CI set (fresh-app matrix, passkey
+// preset, pre-existing app, testkit) in this one process so they share the
+// module-level `usedPorts` and never need cross-process port juggling.
+const journeyVariants = buildJourneyVariants();
+const plannedRuns = journeyVariants.flatMap((variant) =>
+  variant.frameworkIds.map((id) => ({ variant, framework: frameworkForId(id) })),
+);
 const workDir = resolve(
   options.workDir || (await mkdtemp(join(tmpdir(), "zitadel-cli-journey-local-"))),
 );
 const diagnosticsDir = join(workDir, "diagnostics");
 const registryPaths = localRegistryPaths(workDir);
+// CI points Verdaccio's storage at a path it caches between runs, so the public
+// framework packages every scaffold pulls through the npmjs uplink are not
+// re-downloaded on every run. Unset (local dev) keeps the ephemeral per-run
+// store that is wiped with the work dir.
+const persistentRegistryStorage = process.env.JOURNEY_REGISTRY_STORAGE;
+if (persistentRegistryStorage) {
+  registryPaths.storagePath = resolve(persistentRegistryStorage);
+}
+// Reserved ports are bound long after reservation (Verdaccio within seconds,
+// the app and Zitadel ports only minutes later), so they come from the fixed
+// non-ephemeral journey block — see ports.mjs for why listen(:0) flaked.
+const usedPorts = new Set();
+const reserveJourneyPort = createJourneyPortAllocator();
 const registryPort = await resolvePort("JOURNEY_REGISTRY_PORT");
+usedPorts.add(registryPort);
 const registryUrl = `http://127.0.0.1:${registryPort}`;
 const cliPackage = await packageName(repoRoot, "apps/cli");
 const childProcesses = new Set();
-const frameworkContexts = [];
-const usedPorts = new Set([registryPort]);
+const journeyContexts = [];
+const prebuiltTarballsDir = options.tarballsDir || process.env.JOURNEY_TARBALLS_DIR || "";
 let registryProcess;
 let registryLogsCollected = false;
 let cleanupStarted = false;
 let success = false;
-let localRuntimeImage = options.runtime === "docker" ? process.env.ZITADEL_LOCAL_IMAGE || options.image : "";
+let localRuntimeImage =
+  options.runtime === "docker" ? process.env.ZITADEL_LOCAL_IMAGE || options.image : "";
 
 process.on("SIGINT", () => void handleSignal("SIGINT"));
 process.on("SIGTERM", () => void handleSignal("SIGTERM"));
 
 try {
-  assertMatrixPortsAreDynamic(selectedFrameworks);
+  assertMatrixPortsAreDynamic(plannedRuns);
   await mkdir(diagnosticsDir, { recursive: true });
 
   log(`work dir: ${workDir}`);
-  log(`frameworks: ${selectedFrameworks.map((framework) => framework.id).join(", ")}`);
+  log(
+    `journeys: ${plannedRuns
+      .map(({ variant, framework }) => `${variant.id}/${framework.id}`)
+      .join(", ")}`,
+  );
   log(`runtime: ${options.runtime}`);
   if (options.runtime === "docker") {
     await assertDockerAvailable();
@@ -69,6 +97,8 @@ try {
     registryPort,
     registryUrl,
     repoRoot,
+    resetStorage: !persistentRegistryStorage,
+    prebuiltTarballsDir: prebuiltTarballsDir ? resolve(repoRoot, prebuiltTarballsDir) : "",
     run,
     workDir,
   });
@@ -79,14 +109,23 @@ try {
     localRuntimeImage = await buildJourneyRuntimeImage();
   }
 
-  for (const framework of selectedFrameworks) {
-    frameworkContexts.push(await createFrameworkContext(framework));
+  // Resolve every (variant, framework) port sequentially so the shared
+  // `usedPorts` set settles before any journey starts: the first context that
+  // prefers 3000 takes it and the rest fall through to the allocator.
+  for (const { variant, framework } of plannedRuns) {
+    journeyContexts.push(await createJourneyContext(variant, framework));
   }
 
   await runWithConcurrency(
-    frameworkContexts,
-    Math.min(options.concurrency, frameworkContexts.length),
-    runFrameworkJourney,
+    journeyContexts,
+    Math.min(options.concurrency, journeyContexts.length),
+    (context) => {
+      const journey =
+        context.suite === "testkit" ? runTestkitJourney(context) : runFrameworkJourney(context);
+      // Release this lane's app server and runtime as soon as it finishes, so a
+      // full run never holds more than `concurrency` of them alive at once.
+      return journey.finally(() => teardownJourney(context));
+    },
   );
 
   success = true;
@@ -122,16 +161,72 @@ function printUsage() {
 
 Options:
   --framework <id>         Run one framework: next, nuxt, react, vue, or angular
+  --suite <id>             frameworks (default) or testkit: scaffold one next app,
+                           install @zitadel/testing from the journey registry, and
+                           run the checked-in consumer suite inside it
+  --ci                     Run the full CI journey set (fresh-app matrix,
+                           passkey preset, pre-existing app, testkit) in one
+                           process; incompatible with --framework/--suite/--preset/--preexisting-app
+  --matrix <single|full>   Fresh-app framework scope under --ci (default: full)
   --concurrency <n>        Number of framework journeys to run in parallel (default: 5)
   --runtime <binary|docker> Local runtime backend (default: binary)
   --image <docker-tag>     Use an existing local runtime image instead of building one
+  --preset <id>            Pass a sign-in preset to setup (e.g. passkey-first)
+  --preexisting-app        Seed a minimal pre-existing app before setup so the
+                           scaffolded pages take the widget posture (ADR 044);
+                           defaults the matrix to next and nuxt
+  --tarballs-dir <path>    Use prebuilt release npm tarballs
   --keep                   Keep the temp work directory after success
   --work-dir <path>        Use an explicit work directory
 `);
 }
 
-function assertMatrixPortsAreDynamic(frameworksToRun) {
-  if (frameworksToRun.length <= 1) return;
+function buildJourneyVariants() {
+  if (!options.ci) {
+    return [
+      {
+        id: "journey",
+        suite: options.suite,
+        preset: options.preset,
+        preexistingApp: options.preexistingApp,
+        frameworkIds: options.frameworkIds,
+      },
+    ];
+  }
+  return [
+    {
+      id: "fresh-app",
+      suite: "frameworks",
+      preset: "",
+      preexistingApp: false,
+      frameworkIds: options.matrix === "single" ? ["next"] : [...frameworkIds],
+    },
+    {
+      id: "passkey",
+      suite: "frameworks",
+      preset: "passkey-first",
+      preexistingApp: false,
+      frameworkIds: ["next"],
+    },
+    {
+      id: "preexisting",
+      suite: "frameworks",
+      preset: "",
+      preexistingApp: true,
+      frameworkIds: ["next", "nuxt"],
+    },
+    {
+      id: "testkit",
+      suite: "testkit",
+      preset: "",
+      preexistingApp: false,
+      frameworkIds: ["next"],
+    },
+  ];
+}
+
+function assertMatrixPortsAreDynamic(runsToRun) {
+  if (runsToRun.length <= 1) return;
   const fixedPorts = ["JOURNEY_APP_PORT", "JOURNEY_ZITADEL_PORT"].filter(
     (name) => process.env[name],
   );
@@ -145,23 +240,38 @@ function assertMatrixPortsAreDynamic(frameworksToRun) {
   );
 }
 
-async function createFrameworkContext(framework) {
-  const frameworkWorkDir = join(workDir, framework.id);
-  const appPort = await resolveFrameworkPort("JOURNEY_APP_PORT", 3000);
+async function createJourneyContext(variant, framework) {
+  // Namespace every per-run path by variant id so two variants that use the
+  // same framework (e.g. fresh-app/next and passkey/next) never collide on
+  // disk or in Playwright output.
+  const frameworkWorkDir = join(workDir, variant.id, framework.id);
+  const contextDiagnosticsDir = join(diagnosticsDir, variant.id, framework.id);
+  // The testkit suite hands the port to Playwright's webServer readiness
+  // check, which refuses a port that already answers — and 3000 is the most
+  // commonly squatted developer port (an IPv6-wildcard listener also slips
+  // past canListen's IPv4 probe). Prefer a fresh ephemeral port there.
+  const appPort = await resolveFrameworkPort(
+    "JOURNEY_APP_PORT",
+    variant.suite === "testkit" ? undefined : 3000,
+  );
   const zitadelPort = await resolveFrameworkPort("JOURNEY_ZITADEL_PORT");
   const appUrl = `http://localhost:${appPort}`;
   const appDir = join(frameworkWorkDir, "myapp");
-  const playwrightRoot = join(projectRoot, "test-output", "playwright", framework.id);
+  const playwrightRoot = join(projectRoot, "test-output", "playwright", variant.id, framework.id);
   return {
     appDir,
     appPort,
     appUrl,
-    diagnosticsDir: join(diagnosticsDir, framework.id),
+    diagnosticsDir: contextDiagnosticsDir,
     framework,
     frameworkWorkDir,
-    logPath: join(diagnosticsDir, framework.id, `${framework.id}-app.log`),
+    logPath: join(contextDiagnosticsDir, `${framework.id}-app.log`),
     playwrightOutputDir: join(playwrightRoot, "output"),
     playwrightReportDir: join(playwrightRoot, "report"),
+    preexistingApp: variant.preexistingApp,
+    preset: variant.preset,
+    suite: variant.suite,
+    variantId: variant.id,
     zitadelPort,
   };
 }
@@ -182,34 +292,47 @@ async function resolveFrameworkPort(envName, preferred) {
     return preferred;
   }
 
-  let port = await freePort();
-  while (usedPorts.has(port)) {
-    port = await freePort();
-  }
+  const port = await reserveJourneyPort(usedPorts);
   usedPorts.add(port);
   return port;
 }
 
 async function runFrameworkJourney(context) {
   const { framework } = context;
+  const prefix = `${context.variantId}/${framework.id}`;
   try {
     await mkdir(context.diagnosticsDir, { recursive: true });
-    log(`[${framework.id}] preparing fresh ${framework.displayName} app`);
+    log(`[${prefix}] preparing fresh ${framework.displayName} app`);
     await run("node", ["apps/cli-journey-e2e/scripts/prepare-app.mjs"], {
       env: {
         ...process.env,
+        // Pin every JOURNEY_* variable prepare-app reads: a preceding CI
+        // journey step exports its final values through GITHUB_ENV, so the
+        // inherited process.env may carry another run's (deleted) app dir
+        // or preset.
+        JOURNEY_APP_DIR: context.appDir,
         JOURNEY_APP_URL: context.appUrl,
         JOURNEY_FRAMEWORK: framework.id,
+        // Always explicit ("" = scaffold fresh) for the same GITHUB_ENV
+        // leak-proofing as JOURNEY_PRESET above.
+        JOURNEY_PREEXISTING_APP: context.preexistingApp ? "1" : "",
+        JOURNEY_PRESET: context.preset,
         JOURNEY_ZITADEL_PORT: String(context.zitadelPort),
         JOURNEY_REGISTRY_URL: registryUrl,
         JOURNEY_RUNTIME: options.runtime,
         JOURNEY_WORK_DIR: context.frameworkWorkDir,
         NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
+        // The claim spec needs a platform project (claim/complete 401s without
+        // one) and the personal teams provisioned at session exchange.
+        // `zitadel start` now opts in by itself, so this is belt and braces for
+        // the framework lane, and it keeps the intent explicit here. Reaches
+        // the server through prepare-app's `start` step env.
+        NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "true",
         ...(localRuntimeImage ? { ZITADEL_LOCAL_IMAGE: localRuntimeImage } : {}),
       },
     });
 
-    log(`[${framework.id}] starting generated app at ${context.appUrl}`);
+    log(`[${prefix}] starting generated app at ${context.appUrl}`);
     const appProcess = startChild("npm", framework.devServerArgs(context.appPort), {
       cwd: context.appDir,
       env: process.env,
@@ -220,10 +343,10 @@ async function runFrameworkJourney(context) {
       `${context.appUrl}${framework.readyPath}`,
       `generated ${framework.displayName} app`,
       appProcess,
-      (message) => log(`[${framework.id}] ${message}`),
+      (message) => log(`[${prefix}] ${message}`),
     );
 
-    log(`[${framework.id}] running Playwright journey`);
+    log(`[${prefix}] running Playwright journey`);
     await run(
       "corepack",
       [
@@ -245,14 +368,136 @@ async function runFrameworkJourney(context) {
           JOURNEY_OUTPUT_DIR: context.frameworkWorkDir,
           JOURNEY_PLAYWRIGHT_OUTPUT_DIR: context.playwrightOutputDir,
           JOURNEY_PLAYWRIGHT_REPORT_DIR: context.playwrightReportDir,
+          // The claim spec spawns the CLI through the journey registry, which
+          // needs the same npmrc the prepare-app steps used.
+          NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
+          // Always explicit ("" = default preset / fresh scaffold): see the
+          // prepare-app note.
+          JOURNEY_PREEXISTING_APP: context.preexistingApp ? "1" : "",
+          JOURNEY_PRESET: context.preset,
         },
       },
     );
-    log(`[${framework.id}] journey passed`);
+    log(`[${prefix}] journey passed`);
   } catch (error) {
     await collectDiagnostics(context);
-    throw new Error(`${framework.id}: ${errorMessage(error)}`, { cause: error });
+    throw new Error(`${prefix}: ${errorMessage(error)}`, { cause: error });
   }
+}
+
+/**
+ * The customer-configuration proof for @zitadel/testing: scaffold a fresh app
+ * exactly like the framework journey, then use the kit the way its README
+ * tells a customer to — install it from the registry, drop in a Playwright
+ * config built on withZitadel(), and run the suite. No ZITADEL_SERVER_BINARY,
+ * no NEXTGEN_* env: the CLI resolves the published binary and its embedded
+ * login UI on its own.
+ */
+async function runTestkitJourney(context) {
+  const { framework } = context;
+  const prefix = `${context.variantId}/${framework.id}`;
+  try {
+    await mkdir(context.diagnosticsDir, { recursive: true });
+    log(`[${prefix}] preparing fresh ${framework.displayName} app`);
+    await run("node", ["apps/cli-journey-e2e/scripts/prepare-app.mjs"], {
+      env: {
+        ...scrubRepoOverrides(process.env),
+        JOURNEY_APP_DIR: context.appDir,
+        JOURNEY_APP_URL: context.appUrl,
+        JOURNEY_FRAMEWORK: framework.id,
+        // The testkit suite always scaffolds fresh; pin the flag off so a
+        // preceding CI journey step's GITHUB_ENV export cannot leak in.
+        JOURNEY_PREEXISTING_APP: "",
+        JOURNEY_PRESET: context.preset,
+        JOURNEY_ZITADEL_PORT: String(context.zitadelPort),
+        JOURNEY_REGISTRY_URL: registryUrl,
+        JOURNEY_RUNTIME: options.runtime,
+        JOURNEY_WORK_DIR: context.frameworkWorkDir,
+        NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
+      },
+    });
+
+    // Setup booted an instance to scaffold against; the kit suite boots its
+    // own ephemeral one, so stop it and let the suite reuse the port.
+    log(`[${prefix}] stopping the setup instance`);
+    await runCapture("npx", cliArgs(context, ["stop"]), {
+      cwd: context.appDir,
+      env: scrubRepoOverrides(npxEnv(context)),
+    });
+
+    const playwrightVersion = workspacePlaywrightVersion();
+    log(
+      `[${prefix}] installing @zitadel/testing and @playwright/test@${playwrightVersion} from the journey registry`,
+    );
+    await run(
+      "npm",
+      [
+        "install",
+        "--save-dev",
+        "--no-audit",
+        "--no-fund",
+        "@zitadel/testing@alpha",
+        `@playwright/test@${playwrightVersion}`,
+      ],
+      { cwd: context.appDir, env: scrubRepoOverrides(npxEnv(context)) },
+    );
+
+    log(`[${prefix}] copying the checked-in consumer suite into the app`);
+    await cp(join(projectRoot, "fixtures", "testkit"), context.appDir, { recursive: true });
+
+    log(`[${prefix}] running the app's @zitadel/testing suite`);
+    await run("npx", ["playwright", "test", "--config", "playwright.testkit.config.mts"], {
+      cwd: context.appDir,
+      env: {
+        ...scrubRepoOverrides(npxEnv(context)),
+        TESTKIT_APP_PORT: String(context.appPort),
+        TESTKIT_ZITADEL_PORT: String(context.zitadelPort),
+      },
+    });
+    log(`[${prefix}] consumer suite passed`);
+  } catch (error) {
+    await collectTestkitDiagnostics(context);
+    throw new Error(`${prefix}: ${errorMessage(error)}`, { cause: error });
+  }
+}
+
+/**
+ * The testkit lane's contract is "the published binary works unconfigured":
+ * a developer's ZITADEL_SERVER_BINARY or NEXTGEN_* exports leaking into the
+ * scaffold or the inner suite would silently turn it back into an in-repo
+ * run, so strip them instead of trusting the environment.
+ */
+function scrubRepoOverrides(env) {
+  const scrubbed = { ...env };
+  delete scrubbed.ZITADEL_SERVER_BINARY;
+  for (const key of Object.keys(scrubbed)) {
+    if (key.startsWith("NEXTGEN_")) {
+      delete scrubbed[key];
+    }
+  }
+  return scrubbed;
+}
+
+/**
+ * Pin the app-local Playwright to the workspace's exact version so the inner
+ * suite reuses the Chromium that ensurePlaywrightBrowsers already installed
+ * instead of downloading a different revision mid-journey.
+ */
+function workspacePlaywrightVersion() {
+  const require = createRequire(join(projectRoot, "package.json"));
+  return require("@playwright/test/package.json").version;
+}
+
+async function collectTestkitDiagnostics(context) {
+  await collectDiagnostics(context);
+  await copyIfExists(
+    join(context.appDir, "playwright-report"),
+    join(context.diagnosticsDir, "testkit-playwright-report"),
+  );
+  await copyIfExists(
+    join(context.appDir, "test-results"),
+    join(context.diagnosticsDir, "testkit-test-results"),
+  );
 }
 
 async function runWithConcurrency(items, limit, worker) {
@@ -277,15 +522,12 @@ async function runWithConcurrency(items, limit, worker) {
   }
 }
 
-async function resolvePort(envName, fallback) {
+async function resolvePort(envName) {
   const value = process.env[envName];
   if (value) {
     return validatePortValue(value, envName);
   }
-  if (fallback) {
-    return fallback;
-  }
-  return freePort();
+  return reserveJourneyPort(usedPorts);
 }
 
 function validatePortValue(value, name) {
@@ -294,33 +536,6 @@ function validatePortValue(value, name) {
     throw new Error(`${name} must be a TCP port, got ${value}`);
   }
   return port;
-}
-
-function freePort() {
-  return new Promise((resolvePortPromise, reject) => {
-    const server = net.createServer();
-    server.unref();
-    server.on("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        reject(new Error("unable to allocate TCP port"));
-        return;
-      }
-      server.close(() => resolvePortPromise(address.port));
-    });
-  });
-}
-
-function canListen(port) {
-  return new Promise((resolveCanListen) => {
-    const server = net.createServer();
-    server.unref();
-    server.once("error", () => resolveCanListen(false));
-    server.listen(port, "127.0.0.1", () => {
-      server.close(() => resolveCanListen(true));
-    });
-  });
 }
 
 async function ensurePlaywrightBrowsers() {
@@ -458,24 +673,42 @@ async function collectDiagnostics(context) {
 
   await mkdir(context.diagnosticsDir, { recursive: true });
   await collectLocalRuntimeLogs(context);
-  await copyIfExists(context.logPath, join(context.diagnosticsDir, `${context.framework.id}-app.log`));
-  await copyIfExists(join(context.frameworkWorkDir, "doctor.json"), join(context.diagnosticsDir, "doctor.json"));
+  await copyIfExists(
+    context.logPath,
+    join(context.diagnosticsDir, `${context.framework.id}-app.log`),
+  );
+  await copyIfExists(
+    join(context.frameworkWorkDir, "doctor.json"),
+    join(context.diagnosticsDir, "doctor.json"),
+  );
   await copyIfExists(
     join(context.frameworkWorkDir, "doctor.stderr.log"),
     join(context.diagnosticsDir, "doctor.stderr.log"),
   );
-  await copyIfExists(join(context.frameworkWorkDir, "start.json"), join(context.diagnosticsDir, "start.json"));
+  await copyIfExists(
+    join(context.frameworkWorkDir, "start.json"),
+    join(context.diagnosticsDir, "start.json"),
+  );
   await copyIfExists(
     join(context.frameworkWorkDir, "start.stderr.log"),
     join(context.diagnosticsDir, "start.stderr.log"),
   );
-  await copyIfExists(join(context.frameworkWorkDir, "setup.json"), join(context.diagnosticsDir, "setup.json"));
+  await copyIfExists(
+    join(context.frameworkWorkDir, "setup.json"),
+    join(context.diagnosticsDir, "setup.json"),
+  );
   await copyIfExists(
     join(context.frameworkWorkDir, "setup.stderr.log"),
     join(context.diagnosticsDir, "setup.stderr.log"),
   );
-  await copyIfExists(join(context.frameworkWorkDir, "metadata.json"), join(context.diagnosticsDir, "metadata.json"));
-  await copyIfExists(join(context.frameworkWorkDir, "logs.json"), join(context.diagnosticsDir, "logs.json"));
+  await copyIfExists(
+    join(context.frameworkWorkDir, "metadata.json"),
+    join(context.diagnosticsDir, "metadata.json"),
+  );
+  await copyIfExists(
+    join(context.frameworkWorkDir, "logs.json"),
+    join(context.diagnosticsDir, "logs.json"),
+  );
   await copyIfExists(
     join(context.frameworkWorkDir, "logs.stderr.log"),
     join(context.diagnosticsDir, "logs.stderr.log"),
@@ -501,8 +734,14 @@ async function collectDiagnostics(context) {
     join(context.appDir, "pnpm-lock.yaml"),
     join(context.diagnosticsDir, "generated-app", "pnpm-lock.yaml"),
   );
-  await copyIfExists(context.playwrightReportDir, join(context.diagnosticsDir, "playwright-report"));
-  await copyIfExists(context.playwrightOutputDir, join(context.diagnosticsDir, "playwright-output"));
+  await copyIfExists(
+    context.playwrightReportDir,
+    join(context.diagnosticsDir, "playwright-report"),
+  );
+  await copyIfExists(
+    context.playwrightOutputDir,
+    join(context.diagnosticsDir, "playwright-output"),
+  );
 }
 
 async function collectRegistryLogs() {
@@ -547,7 +786,7 @@ async function cleanup() {
     await stopChild(child);
   }
 
-  await Promise.all(frameworkContexts.map(resetLocalRuntime));
+  await Promise.all(journeyContexts.map(teardownJourney));
 
   if (registryProcess) {
     try {
@@ -569,6 +808,19 @@ async function resetLocalRuntime(context) {
       `[journey-local] ${context.framework.id} local runtime reset failed: ${errorMessage(error)}`,
     );
   }
+}
+
+// Stop a finished lane's app server and reset its runtime. Called from each
+// worker's finally so services don't accumulate past the concurrency limit;
+// cleanup() calls it too for any lane cut short by a failure or signal. The
+// `toreDown` guard keeps it idempotent across both callers.
+async function teardownJourney(context) {
+  if (context.toreDown) return;
+  context.toreDown = true;
+  if (context.appProcess) {
+    await stopChild(context.appProcess);
+  }
+  await resetLocalRuntime(context);
 }
 
 async function stopChild(child) {
@@ -624,7 +876,7 @@ async function removeWorkDirAfterSuccess(path) {
 async function handleSignal(signal) {
   console.error(`[journey-local] received ${signal}, cleaning up`);
   await collectRegistryLogs();
-  await Promise.all(frameworkContexts.map(collectDiagnostics));
+  await Promise.all(journeyContexts.map(collectDiagnostics));
   await cleanup();
   process.exit(130);
 }
@@ -646,7 +898,8 @@ function npxEnv(context) {
   env.JOURNEY_RUNTIME = options.runtime;
   env.npm_config_cache = join(context.frameworkWorkDir, ".npm-cache");
   env.npm_config_tmp = join(context.frameworkWorkDir, ".npm-tmp");
-  const image = options.runtime === "docker" ? localRuntimeImage || process.env.ZITADEL_LOCAL_IMAGE : "";
+  const image =
+    options.runtime === "docker" ? localRuntimeImage || process.env.ZITADEL_LOCAL_IMAGE : "";
   if (image) {
     env.ZITADEL_LOCAL_IMAGE = image;
   }
@@ -662,10 +915,5 @@ function errorMessage(error) {
 }
 
 function isErrno(error, code) {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === code
-  );
+  return typeof error === "object" && error !== null && "code" in error && error.code === code;
 }

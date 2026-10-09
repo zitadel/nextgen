@@ -1,0 +1,11 @@
+title: Variable
+description: |
+  One resolved variable. A non-secret variable is its value; a secret is an
+  object saying so and withholding the value.
+
+  The two forms mirror the update body, so a value read here can be written
+  back unchanged — with the one asymmetry that a secret read back has no value
+  to write.
+oneOf:
+  - $ref: variable-scalar.yaml
+  - $ref: secret-variable.yaml

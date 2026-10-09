@@ -2,9 +2,10 @@
 
 Combined login + register with both password and passkey methods on both
 purposes, plus a post-signup passkey upsell and a terminal `redirect` for
-OIDC-style hand-back. Mirrors the shipped `default-login-flow-definition.json`
-with a redirect terminal in place of `show`, additional user-schema fields on
-the register branch, and explicit navigation CTAs between sub-flows.
+OIDC-style hand-back. Mirrors the server's embedded default flow
+(`packages/config/defaults/default-login.json`) with a redirect terminal in
+place of `show`, additional user-schema fields on the register branch, and
+explicit navigation CTAs between sub-flows.
 
 This is the most feature-rich example *today*; as new methods land (OTP,
 magic-link, SSO, …) they will live in their own examples rather than getting
@@ -31,7 +32,7 @@ folded in here.
 - **Profile field collection on the password branch.** `register` collects
   `email + name`; `register-password` collects `password + phoneNumber`. The
   `create_user` writer iterates `state.CollectedData` and persists every
-  non-password attribute (`flow_on_success_create_user.go:54`), so the new
+  non-password attribute (the `create_user` on-success handling in `internal/domain/flow_on_success.go`), so the new
   user record carries `email`, `name`, and `phoneNumber`.
 - **Passkey upsell after password signup.** Once `create_user` runs on
   `register-password`, the user is identified. The `passkey-upsell` step
@@ -108,21 +109,21 @@ flowchart TD
 - **`HandleProvisional` only persists the identifier.** The passkey-register
   path (`register: passkey_register → done`) finalizes the user via
   `HandleProvisional`, which writes *only* the identifier attribute
-  (`flow_on_success_create_user.go:110-119`). Any non-identifier fields
+  (the `create_user` on-success handling in `internal/domain/flow_on_success.go`). Any non-identifier fields
   collected on `register` — `name` here — are silently dropped on this path.
   The password path goes through `Handle`, which persists everything. If you
   need profile data on the passkey path, collect it post-handoff or extend
   `HandleProvisional`.
 - **Action override edge case.** Identifier dispatch runs *before* the
-  action's transition resolves (`flow_state_machine.go:343-354`). If a user
+  action's transition resolves (action-kind routing in `internal/domain/flow_state_machine.go`). If a user
   types an email *and* clicks `register`, dispatch in login mode resolves the
   user and the `register` action still fires (no flip), routing to `register`
   with `_user_id` pinned — a follow-up `register-password` submit then fails
   with a `user_already_exists` step error from `create_user`. In practice
   users click navigation CTAs *before* typing.
 - The default project flow embedded in the server
-  (`default-login-flow-definition.json`) is similar but with `complete: show`,
-  no profile fields, and no navigation CTAs.
+  (`packages/config/defaults/default-login.json`) is similar but with
+  `complete: show`, no profile fields, and no navigation CTAs.
 - For a redirect-terminal flow to actually navigate, the caller must supply
   `redirect_uri` on `POST /flow`. Without it, the terminal step still
   classifies as `redirect`, but the frontend has nowhere to send the user.

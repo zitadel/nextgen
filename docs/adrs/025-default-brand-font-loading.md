@@ -1,8 +1,6 @@
 # ADR 025: Default brand font loading
 
-## Status
-
-Accepted — 2026-06-15 (revised 2026-06-16: dropped APK Futural; headings use bold Arimo)
+> **Status:** Accepted — 2026-06-15 (revised 2026-06-16: dropped APK Futural; headings use bold Arimo)
 
 ## Context
 
@@ -68,6 +66,10 @@ orchestrator independently of branding. Headings use the same family rendered
    distinguished by weight (`font-weight: 700` on `.zl-card-title`), not by a
    separate family.
 
+   > **Amendment (2026-10-04):** the `--zl-font-family-heading` stack leads
+   > with `"APK Futural"`, then `"Arimo"`
+   > (`packages/design-tokens/src/overrides.ts`).
+
 ### Asset strategy: linked stylesheet, not bundled bytes
 
 The default loads via a stylesheet URL rather than a self-hosted font file
@@ -124,4 +126,6 @@ and pass its own href to `applyDefaultFont`.
 - [`packages/design-tokens/src/overrides.ts`](../../packages/design-tokens/src/overrides.ts) — font-family token stacks
 - [`docs/design/branding/tokens.md`](../design/branding/tokens.md) — token catalogue and asset injection
 - [ADR 014](./014-design-tokens-and-ui-react-pairs.md) — `--zl-*` token ownership
+  (superseded in part by [ADR 055](./055-lit-only-login-surface.md); the token
+  half still stands)
 - [ADR 006](./006-web-component-renderer-direction.md) — web component direction

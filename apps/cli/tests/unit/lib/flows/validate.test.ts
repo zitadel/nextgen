@@ -5,12 +5,12 @@ import { ZitadelError } from "../../../../src/lib/errors";
 
 describe("validateFlows", () => {
   it("returns the parsed flows on success", () => {
-    const flow = buildFlow("password", ["email"]);
+    const flow = buildFlow(["email"]);
     expect(validateFlows([flow])).toHaveLength(1);
   });
 
   it("throws E_VALIDATION when any input fails to parse", () => {
-    const flow = buildFlow("password", ["email"]);
+    const flow = buildFlow(["email"]);
     expect(() => validateFlows([flow, { name: "bad" }])).toThrow(ZitadelError);
   });
 
@@ -22,10 +22,12 @@ describe("validateFlows", () => {
       caught = error;
     }
     expect(caught).toBeInstanceOf(ZitadelError);
-    const issues = (caught as ZitadelError).details?.issues as Array<{ index: number }>;
+    const issues = ((caught as ZitadelError).details as { issues?: unknown })?.issues as Array<{
+      index: number;
+    }>;
     expect(issues).toHaveLength(2);
-    expect(issues[0].index).toBe(0);
-    expect(issues[1].index).toBe(1);
+    expect(issues[0]!.index).toBe(0);
+    expect(issues[1]!.index).toBe(1);
   });
 
   it("returns an empty array for an empty input", () => {

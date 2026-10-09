@@ -1,15 +1,12 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "composite": false,
-    "declaration": true,
-    "rootDir": "src",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "jsx": "preserve",
-    "jsxImportSource": "solid-js",
-    // tsup-preset-solid's d.ts step injects the (now-deprecated) `baseUrl`
-    // option; TS 6 errors on it unless deprecations are explicitly tolerated.
-    "ignoreDeprecations": "6.0"
-  },
-  "include": ["src"]
+  "extends": "./tsconfig.spec.json",
+  "include": [
+    "*.config.mts",
+    "*.config.ts",
+    "scripts/**/*.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx"
+  ]
 }

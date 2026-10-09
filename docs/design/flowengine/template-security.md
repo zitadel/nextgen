@@ -63,7 +63,7 @@ LiquidJS provides a `| raw` filter that disables auto-escaping:
 {{ malicious_value | raw }}
 ```
 
-**Mitigation:** The `| raw` filter must be **banned from all tenant-editable templates**. The built-in `default.liquid` must never use it. On template save, the backend must parse the Liquid AST and reject templates containing `raw` filter usage.
+**Mitigation:** The `| raw` filter is **neutered inside the engine**: the orchestrator re-registers `raw` as a passthrough that still escapes (`packages/components/src/orchestrator/liquid.ts`), so even a stored template that uses it cannot bypass escaping when rendered by the official component. On top of that, `raw` usage is **rejected at authoring time** by the authoritative validator (Layer 4a) and lexically at save time (Layer 4b).
 
 ## Defense-in-Depth Strategy
 
@@ -85,13 +85,21 @@ LiquidJS provides a `| raw` filter that disables auto-escaping:
 │  This makes ALL inline event handlers inert,        │
 │  even if they survive sanitization.                 │
 ├─────────────────────────────────────────────────────┤
-│  Layer 4: Template Validation on Save               │
-│  On ejected template save, the backend parses the   │
-│  Liquid AST and rejects:                            │
+│  Layer 4a: Authoring-Time Validation (CLI)          │
+│  `zitadel plan`/`apply` run the authoritative       │
+│  validator from @zitadel/config: a real LiquidJS    │
+│  parse (same dialect as the renderer) that rejects: │
 │    - Any use of the | raw filter                    │
-│    - <script> tags                                  │
+│    - <script> / <style> tags                        │
 │    - Inline event attributes (on*)                  │
-│    - Tags outside the <zl-*> + safe HTML whitelist  │
+│    - Missing {% mandatory_gates %}                  │
+├─────────────────────────────────────────────────────┤
+│  Layer 4b: Lexical Gate on Save (server)            │
+│  POST /branding rejects oversized or non-UTF-8      │
+│  payloads and the same banned patterns as a         │
+│  substring/regex check. Deliberately lexical: the   │
+│  server is Go and LiquidJS is the dialect — a Go    │
+│  AST parse would validate the wrong language.       │
 ├─────────────────────────────────────────────────────┤
 │  Layer 5: Shadow DOM Style Isolation                │
 │  The <zitadel-login> Shadow DOM prevents            │
@@ -107,8 +115,17 @@ LiquidJS provides a `| raw` filter that disables auto-escaping:
 |---|---|---|
 | Backend payload values | LiquidJS auto-escaping | DOMPurify |
 | `innerHTML` inline handlers | CSP `script-src 'self'` | DOMPurify strips `on*` attributes |
-| Ejected template XSS | Template AST validation on save | CSP + DOMPurify |
+| Ejected template XSS | CLI validation at plan time (Layer 4a) | Server lexical gate + CSP + DOMPurify |
 | Translation dictionary HTML | LiquidJS auto-escaping (via `{{ }}`) | DOMPurify |
-| `| raw` filter abuse | AST validation rejects on save | CSP as last resort |
+| `| raw` filter abuse | Engine neuters `raw` at render | Rejected by Layers 4a/4b |
+| `font_url` document-level CSS injection | Field is read-only in v1: `POST /branding` rejects it (the font stylesheet must load at document level, outside every layer above) | Safe delivery design tracked in ADR 040 |
+| Template publishing with a leaked browser-plane token, or into a foreign project | The Branding management API requires a project-bound operator-grade token (`project.write` \| `branding.write`); the preview secret has no management access, and foreign projects answer like nonexistent ones | ADR 036 credential planes (mintable `branding.*` scopes) |
 
 **The strongest single mitigation is CSP.** A strict `script-src 'self'` header on the Hosted Login page makes all inline script vectors completely inert regardless of whether the HTML was sanitized. Combined with LiquidJS auto-escaping and DOMPurify, this creates three independent layers that an attacker must defeat simultaneously.
+
+**Consumer caveat:** the Branding API returns raw template strings. The
+guarantees above hold for rendering through `@zitadel/components`; a
+consumer that renders templates with its own engine owns its own
+escaping, sanitisation, and CSP. See
+[ADR 040](../../adrs/040-tenant-login-templates-editable-config.md) for
+the storage/validation split.

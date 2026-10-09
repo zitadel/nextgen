@@ -1,0 +1,16 @@
+type: object
+description: Paginated list of events (ADR 027 / ADR 049).
+required:
+  - data
+properties:
+  data:
+    type: array
+    items:
+      $ref: event.yaml
+  next_page_token:
+    description: |
+      Token to pass as `page_token` in the next request to fetch the following page.
+      Absent when there are no more results.
+    oneOf:
+      - $ref: ../../components/schemas/page-token.yaml
+      - type: 'null'

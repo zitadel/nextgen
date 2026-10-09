@@ -1,0 +1,15 @@
+type: array
+description: Branding revisions, newest first.
+items:
+  type: object
+  required:
+    - id
+    - created_at
+  properties:
+    id:
+      type: string
+      description: The unique identifier of this branding revision.
+    created_at:
+      type: string
+      format: date-time
+      description: When this revision was published.

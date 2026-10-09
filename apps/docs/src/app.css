@@ -22,21 +22,21 @@
 .dark {
   color-scheme: dark;
 
-  --color-fd-background: var(--zl-color-surface-default-black);
-  --color-fd-foreground: var(--zl-color-text-primary-white);
-  --color-fd-muted: var(--zl-color-surface-default-primary-gray);
-  --color-fd-muted-foreground: var(--zl-color-text-secondary-gray);
-  --color-fd-popover: var(--zl-color-surface-default-primary-gray);
-  --color-fd-popover-foreground: var(--zl-color-text-primary-white);
-  --color-fd-card: var(--zl-color-surface-default-primary-gray);
-  --color-fd-card-foreground: var(--zl-color-text-primary-white);
-  --color-fd-border: var(--zl-color-surface-default-secondary-gray);
-  --color-fd-primary: var(--zl-color-text-subtitle-purple);
-  --color-fd-primary-foreground: var(--zl-color-surface-default-black);
-  --color-fd-secondary: var(--zl-color-surface-default-primary-gray);
-  --color-fd-secondary-foreground: var(--zl-color-text-primary-white);
-  --color-fd-accent: var(--zl-color-surface-default-secondary-gray);
-  --color-fd-accent-foreground: var(--zl-color-text-primary-white);
-  --color-fd-ring: var(--zl-color-text-subtitle-purple);
-  --color-fd-error: var(--zl-color-text-error);
+  --color-fd-background: var(--zl-background);
+  --color-fd-foreground: var(--zl-foreground);
+  --color-fd-muted: var(--zl-muted);
+  --color-fd-muted-foreground: var(--zl-muted-foreground);
+  --color-fd-popover: var(--zl-popover);
+  --color-fd-popover-foreground: var(--zl-popover-foreground);
+  --color-fd-card: var(--zl-card);
+  --color-fd-card-foreground: var(--zl-card-foreground);
+  --color-fd-border: var(--zl-border);
+  --color-fd-primary: var(--zl-gradient-lavender-start);
+  --color-fd-primary-foreground: var(--zl-background);
+  --color-fd-secondary: var(--zl-secondary);
+  --color-fd-secondary-foreground: var(--zl-secondary-foreground);
+  --color-fd-accent: var(--zl-accent);
+  --color-fd-accent-foreground: var(--zl-accent-foreground);
+  --color-fd-ring: var(--zl-ring);
+  --color-fd-error: var(--zl-destructive);
 }

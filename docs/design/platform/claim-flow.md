@@ -3,10 +3,24 @@
 > **Status:** Draft
 > **See also:** [README](README.md) · [Overview](overview.md) · [Project Secret](secret.md) · [Configuration Surface](configuration-surface.md) · [Claim API](api/claim-api.yaml) · [Glossary](../glossary.md)
 >
-> **Current implementation note:** This is a target design for the future
-> claim lifecycle. The checked-in CLI and server do not currently expose these
-> endpoints or a `zitadel claim` command; see ADR 003 for the shipped-state
-> decision.
+> **Current implementation note:** This document is the fuller *target* design.
+> The MVP claim being built is a deliberately narrower slice, specified in
+> **[ADR 046: Claim Lifecycle v2](../../adrs/046-claim-lifecycle-v2.md)**
+> (which supersedes the Withdrawn ADR 003). In the MVP, claim is
+> **association-only**: it writes a project→team **grant** in the permission
+> engine, authenticated on completion by the platform **session cookie**, and
+> attaches the project to the claiming user's **pre-existing personal team**
+> (created at platform registration, not here; its name is derived per user
+> rather than a shared "Personal Team" literal, because team names are unique
+> per project — ADR 046 §4). Identity is **email
+> registration and login only** (no SSO/OAuth). Accordingly, the sections below
+> on **what authenticates the claim (the GitHub/Google OAuth authenticators)**,
+> **secret rotation at claim**, **domain-based team matching / team
+> resolution**, and **team creation at claim** describe the future target and
+> are **not part of MVP claim**; see ADR 046 for what ships and the accepted
+> risks. The MVP is shipped: the server serves
+> `/projects/{project_id}/claim/{init,status,complete}` and the CLI provides
+> `zitadel claim`.
 
 Claim is the transaction that attaches ownership and accountability to a project. Before claim, the project exists but has no accountable owner. After claim, it belongs to a **team** with at least one accountable human. The transition is atomic — nothing partial.
 
@@ -100,7 +114,9 @@ Notably absent from this list: anything that touches `project_id`, users, factor
 - **Ownership.** The project transitions from anonymous (no team) to owned (attached to a team with at least one member).
 - **Capabilities.** Free-tier capabilities that require a human owner unlock — BYO email configuration, additional team members, the dashboard's billing surface.
 - **Billing eligibility.** Adding a card becomes possible. Pro-gated capabilities (managed email, SSO/SCIM/SAML, custom delivery) are now reachable.
-- **Audit trail.** The project begins emitting auditable events from this point. Pre-claim activity is not retroactively audited.
+- **Audit trail.** Events are emitted and stored from project creation onward
+  (including the pre-claim window). List, get, and export stay gated until claim
+  succeeds — stored history becomes visible without a backfill (ADR 048 / 049).
 - **Recovery options.** Strong — tied to the auth provider used at claim (and any later-linked providers). Pre-claim, recovery was best-effort.
 - **Project secret.** Rotated from the pre-claim `sk_proj_…` value to a new claimed credential. Everything else — origin-scoped secret, `project_id`, config, resources — untouched.
 
@@ -164,7 +180,7 @@ If the project is already claimed when `POST /projects/{projectId}/claim/init` i
   "error": "already_claimed",
   "message": "This project is already claimed by team Acme.",
   "team_id": "team_acme",
-  "dashboard_url": "https://dashboard.zitadel.cloud/team_acme/projects/river-8421"
+  "dashboard_url": "https://dashboard.zitadel.cloud/team_acme/projects/proj_01hexample"
 }
 ```
 

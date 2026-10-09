@@ -90,6 +90,48 @@ export function formatCommand(command, args = []) {
   return [command, ...args].map(shellQuote).join(" ");
 }
 
+// Maps items through an async worker with at most `limit` in flight,
+// preserving input order in the results. After a failure no new work starts,
+// but in-flight workers are awaited (their child processes cannot be
+// abandoned safely); the first error is rethrown once all lanes settle.
+export async function mapWithConcurrency(items, limit, worker) {
+  if (!Number.isInteger(limit) || limit < 1) {
+    throw new Error(`mapWithConcurrency requires a positive integer limit, got ${limit}`);
+  }
+  const entries = [...items];
+  if (entries.length === 0) {
+    return [];
+  }
+  const results = new Array(entries.length);
+  const errors = [];
+  const width = Math.min(limit, entries.length);
+  let next = 0;
+  let failed = false;
+
+  await Promise.all(
+    Array.from({ length: width }, async () => {
+      while (!failed) {
+        const index = next;
+        next += 1;
+        if (index >= entries.length) {
+          return;
+        }
+        try {
+          results[index] = await worker(entries[index], index);
+        } catch (error) {
+          errors.push(error);
+          failed = true;
+        }
+      }
+    }),
+  );
+
+  if (errors.length > 0) {
+    throw errors[0];
+  }
+  return results;
+}
+
 export function forwardedArgs(args = process.argv.slice(2)) {
   return args[0] === "--" ? args.slice(1) : args;
 }

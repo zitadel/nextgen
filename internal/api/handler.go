@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 
 	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/crypto"
-	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -15,36 +13,60 @@ type Handler struct {
 	// responses for all endpoints, so only implemented methods need to be defined.
 	api.UnimplementedHandler
 
-	crypter               crypto.Crypter
-	sessionTokenVerifier  domain.TokenVerifier
-	sessionTokenGenerator domain.TokenGenerator
 	flowService           service.FlowService
 	authAttemptService    service.AuthAttemptService
 	sessionService        service.SessionService
 	projectService        service.ProjectService
-	userService           *service.UserService
+	userService           service.UserService
 	schemaService         *service.SchemaService
 	flowDefinitionService service.FlowDefinitionService
 	teamService           *service.TeamService
+	brandingService       *service.BrandingService
+	environmentService    *service.EnvironmentService
+	releaseService        service.ReleaseService
+	idpConnectionService  service.IDPConnectionService
+	deploymentService     *service.DeploymentService
+	eventService          *service.EventService
+	tokenService          service.TokenService
+	keyService            service.KeyService
+	claimService          service.ClaimService
+	grantService          *service.GrantService
+	variableService       service.VariableService
+	pool                  *service.DB
+
+	// platformProjectID is the configured platform.project_id pin (ADR 046 §2).
+	// Empty means the platform project is unresolved, so claim/complete rejects
+	// every session.
+	platformProjectID string
+	// personalTeams is optional (see WithPersonalTeamEnsurer); nil skips the
+	// exchange-time ensure.
+	personalTeams service.PersonalTeamEnsurer
 }
 
 func NewHandler(
-	crypter crypto.Crypter,
-	sessionTokenVerifier domain.TokenVerifier,
-	sessionTokenGenerator domain.TokenGenerator,
 	flowService service.FlowService,
 	authAttemptService service.AuthAttemptService,
 	sessionService service.SessionService,
 	projectService service.ProjectService,
-	userService *service.UserService,
+	userService service.UserService,
 	schemaService *service.SchemaService,
 	flowDefinitionService service.FlowDefinitionService,
 	teamService *service.TeamService,
+	brandingService *service.BrandingService,
+	environmentService *service.EnvironmentService,
+	releaseService service.ReleaseService,
+	idpConnectionService service.IDPConnectionService,
+	deploymentService *service.DeploymentService,
+	eventService *service.EventService,
+	tokenService service.TokenService,
+	keyService service.KeyService,
+	claimService service.ClaimService,
+	grantService *service.GrantService,
+	variableService service.VariableService,
+	pool *service.DB,
+	platformProjectID string,
 ) *Handler {
 	return &Handler{
-		crypter:               crypter,
-		sessionTokenVerifier:  sessionTokenVerifier,
-		sessionTokenGenerator: sessionTokenGenerator,
 		flowService:           flowService,
 		authAttemptService:    authAttemptService,
 		sessionService:        sessionService,
@@ -53,7 +75,29 @@ func NewHandler(
 		schemaService:         schemaService,
 		flowDefinitionService: flowDefinitionService,
 		teamService:           teamService,
+		brandingService:       brandingService,
+		environmentService:    environmentService,
+		releaseService:        releaseService,
+		idpConnectionService:  idpConnectionService,
+		deploymentService:     deploymentService,
+		eventService:          eventService,
+		tokenService:          tokenService,
+		keyService:            keyService,
+		claimService:          claimService,
+		grantService:          grantService,
+		variableService:       variableService,
+		pool:                  pool,
+		platformProjectID:     platformProjectID,
 	}
+}
+
+// WithPersonalTeamEnsurer wires the session-exchange self-heal for platform
+// personal teams (#527). A chainable setter rather than a constructor
+// parameter so the existing NewHandler call sites (tests included) stay
+// untouched; without it the exchange simply skips the ensure.
+func (h *Handler) WithPersonalTeamEnsurer(e service.PersonalTeamEnsurer) *Handler {
+	h.personalTeams = e
+	return h
 }
 
 // NewError implements the api.Handler interface and is used by ogen to convert any error

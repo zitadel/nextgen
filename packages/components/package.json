@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/components",
-  "version": "0.1.0-alpha.12",
+  "version": "1.0.0-alpha.25",
   "description": "Lit-based atomic web components and the <zitadel-login> orchestrator for the Zitadel auth UI.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/components#readme",
   "bugs": {
@@ -40,6 +40,10 @@
       "types": "./dist/manifests.d.mts",
       "import": "./dist/manifests.mjs"
     },
+    "./events": {
+      "types": "./dist/events.d.mts",
+      "import": "./dist/events.mjs"
+    },
     "./tokens": {
       "types": "./dist/tokens/index.d.mts",
       "import": "./dist/tokens/index.mjs"
@@ -47,7 +51,11 @@
     "./orchestrator": {
       "types": "./dist/orchestrator/index.d.mts",
       "import": "./dist/orchestrator/index.mjs"
-    }
+    },
+    "./jsx": {
+      "types": "./dist/jsx.d.ts"
+    },
+    "./legacy-designs/*": "./dist/legacy-designs/*"
   },
   "publishConfig": {
     "access": "public"
@@ -56,9 +64,11 @@
     "build": "tsdown",
     "test": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
-    "test:all": "vitest run"
+    "test:all": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json"
   },
   "dependencies": {
+    "@zitadel/config": "workspace:*",
     "dompurify": "catalog:",
     "liquidjs": "catalog:",
     "lit": "catalog:",
@@ -66,18 +76,22 @@
   },
   "devDependencies": {
     "@tsdown/css": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
+    "@zitadel/api": "workspace:*",
     "@zitadel/api-mock": "workspace:*",
+    "@zitadel/design-tokens": "workspace:*",
     "jsdom": "catalog:",
+    "lightningcss": "catalog:",
     "msw": "catalog:",
     "playwright": "catalog:",
     "ts-lit-plugin": "catalog:",
-    "lightningcss": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
-    "@zitadel/api": "workspace:*",
-    "@zitadel/design-tokens": "workspace:*",
-    "@zitadel/shared-component-styles": "workspace:*"
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
   }
 }

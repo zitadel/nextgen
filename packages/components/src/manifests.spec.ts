@@ -16,6 +16,7 @@ describe("manifest registry", () => {
         "zl-passkey",
         "zl-pill",
         "zl-select",
+        "zl-sso-providers",
       ].sort(),
     );
   });
@@ -67,7 +68,15 @@ describe("manifest registry", () => {
       ]),
     );
     expect(field?.parts).toEqual(
-      expect.arrayContaining(["root", "label", "label-row", "forgot-link", "input", "error", "trailing-icon"]),
+      expect.arrayContaining([
+        "root",
+        "label",
+        "label-row",
+        "forgot-link",
+        "input",
+        "error",
+        "trailing-icon",
+      ]),
     );
     expect(field?.slots).toEqual(expect.arrayContaining(["prefix", "suffix", "help"]));
     expect(field?.events).toContain("zl-input");
@@ -79,7 +88,16 @@ describe("manifest registry", () => {
     // validator and editor tooling stay honest.
     const passkey = findManifest("zl-passkey");
     expect(passkey?.attrs).toEqual(
-      expect.arrayContaining(["ceremony", "method", "challenge-id", "options", "manual"]),
+      expect.arrayContaining([
+        "ceremony",
+        "method",
+        "challenge-id",
+        "options",
+        "manual",
+        "pending-label",
+        "cancel-label",
+        "silent",
+      ]),
     );
   });
 

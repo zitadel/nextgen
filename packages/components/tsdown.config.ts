@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 
-import { defineConfig, type Plugin } from "tsdown";
+import { defineConfig, type TsdownPlugin } from "tsdown";
 
 /**
  * Rolldown plugin that turns `.liquid` files into default-exported strings.
  * Mirrors what Vite does natively so `import tpl from "./file.liquid"` works
  * in both dev (Vite) and production (tsdown/rolldown) builds.
  */
-function liquidRaw(): Plugin {
+function liquidRaw(): TsdownPlugin {
   return {
     name: "liquid-raw",
     load(id) {
@@ -25,18 +25,22 @@ function liquidRaw(): Plugin {
  * `import { ... } from "@zitadel/components/atoms"` without dragging
  * in the orchestrator (and its `liquidjs` + `dompurify` dependencies).
  *
- * Internal `@zitadel/*` workspace packages (`api`, `design-tokens`,
- * `shared-component-styles`) are inlined into the dist so consumers only
- * need to install `@zitadel/components` itself — no transitive
- * registry deps. `@zitadel/api-mock` stays external because it's a
- * test-only helper consumers never import.
+ * Internal `@zitadel/*` workspace packages (`api`, `design-tokens`) are inlined
+ * into the dist so consumers only need to install `@zitadel/components` itself
+ * — no transitive registry deps. `@zitadel/api-mock` stays external because
+ * it's a test-only helper consumers never import.
  */
 /** Internal workspace deps are always inlined so the published package is self-contained. */
-const INLINE_INTERNAL = [
-  /^@zitadel\/api(\/|$)/,
-  /^@zitadel\/design-tokens(\/|$)/,
-  /^@zitadel\/shared-component-styles(\/|$)/,
-];
+const INLINE_INTERNAL = [/^@zitadel\/api(\/|$)/, /^@zitadel\/design-tokens(\/|$)/];
+
+/**
+ * Published workspace deps that stay EXTERNAL in the library build (declared
+ * runtime dependencies npm resolves — `@zitadel/config` provides the shared
+ * template contract) but MUST be inlined into the standalone file: a browser
+ * cannot resolve a bare package specifier, so leaving them external would
+ * break the unpkg/jsDelivr entry at load time.
+ */
+const INLINE_STANDALONE_ONLY = [/^@zitadel\/config(\/|$)/];
 
 /** Third-party runtime deps the components need in the browser. */
 const THIRD_PARTY = ["lit", /^lit\//, "liquidjs", "dompurify", "lucide", /^lucide\//] as const;
@@ -53,24 +57,39 @@ export default defineConfig([
       index: "src/index.ts",
       "atoms/index": "src/atoms/index.ts",
       manifests: "src/manifests.ts",
+      events: "src/events.ts",
       "tokens/index": "src/tokens/index.ts",
       "orchestrator/index": "src/orchestrator/index.ts",
+      // Not a public subpath. As its own entry it stays a separate file that
+      // the entries import ahead of the chunks that load `lit`; inlined, it
+      // would land below the hoisted `import "lit"` and run too late (see
+      // src/internal/lit-dev-mode.ts).
+      "internal/lit-dev-mode": "src/internal/lit-dev-mode.ts",
     },
     outDir: "dist",
     format: ["esm"],
+    failOnWarn: true,
     tsconfig: "tsconfig.lib.json",
     dts: true,
     sourcemap: true,
-    // `clean: true` would wipe the .d.ts files tsgo emits during the
-    // `typecheck` target, breaking project-reference consumers
-    // (sdk-next, demo-next, demo-nuxt) whose tsgo --build expects those
-    // .d.ts files to exist. tsdown still overwrites its own .mjs/.d.mts
-    // outputs on each rebuild — stale files just accumulate harmlessly
-    // until a full `git clean`.
-    clean: false,
+    // Shipped React JSX declarations (`exports["./jsx"]`). Copied verbatim
+    // into the outDir: the file is a hand-authored ambient
+    // `declare module "react"` block, which the dts bundler must not process
+    // (see src/jsx.d.ts).
+    copy: [
+      "src/jsx.d.ts",
+      // The retired split/hero designs (#1039), exported as
+      // `./legacy-designs/*` for Storybook, which shows them for review.
+      { from: "src/orchestrator/__fixtures__/legacy-designs", to: "dist" },
+    ],
+    // The first entry cleans dist; the standalone entry below keeps
+    // `clean: false` so it appends standalone.mjs instead of wiping this one.
+    clean: true,
     target: "es2022",
-    external: [...THIRD_PARTY, "@zitadel/api-mock"],
-    noExternal: INLINE_INTERNAL,
+    deps: {
+      neverBundle: [...THIRD_PARTY, "@zitadel/api-mock"],
+      alwaysBundle: INLINE_INTERNAL,
+    },
   },
 
   /**
@@ -90,6 +109,7 @@ export default defineConfig([
     entry: { standalone: "src/index.ts" },
     outDir: "dist",
     format: ["esm"],
+    failOnWarn: true,
     platform: "browser",
     // `platform: "browser"` would otherwise emit `standalone.js`; force `.mjs`
     // so the `unpkg`/`jsdelivr`/`./standalone` paths in package.json still match.
@@ -99,7 +119,9 @@ export default defineConfig([
     sourcemap: false,
     clean: false,
     target: "es2022",
-    external: ["@zitadel/api-mock"],
-    noExternal: [...INLINE_INTERNAL, ...THIRD_PARTY],
+    deps: {
+      neverBundle: ["@zitadel/api-mock"],
+      alwaysBundle: [...INLINE_INTERNAL, ...INLINE_STANDALONE_ONLY, ...THIRD_PARTY],
+    },
   },
 ]);

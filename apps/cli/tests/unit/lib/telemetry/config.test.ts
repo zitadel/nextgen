@@ -1,37 +1,36 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  resolveTelemetryHost,
-  resolveTelemetryToken,
-} from "../../../../src/lib/telemetry/config";
+import { resolveTelemetryHost, resolveTelemetryToken } from "../../../../src/lib/telemetry/config";
 
 const DEV_TOKEN = "0fb432b08a9797b87b0eebcbee11706e";
 const PROD_TOKEN = "f56fd7315ccd614fba8eecb2a8966152";
 
 describe("resolveTelemetryToken", () => {
-  it("defaults to the dev project when running from source (no build stamp)", () => {
-    expect(resolveTelemetryToken({})).toBe(DEV_TOKEN);
+  it("defaults to the prod project (single generic build, no channel stamp)", () => {
+    expect(resolveTelemetryToken({})).toBe(PROD_TOKEN);
   });
 
-  it("uses the prod project under the production build-channel stamp", () => {
-    // The CI/release override path; install-location auto-detection can't be
-    // exercised in-source (the test file is not under node_modules).
-    expect(resolveTelemetryToken({ ZITADEL_TELEMETRY_BUILD_CHANNEL: "production" })).toBe(
-      PROD_TOKEN,
-    );
-  });
-
-  it("lets an explicit development env override a production build stamp", () => {
-    expect(
-      resolveTelemetryToken({
-        ZITADEL_TELEMETRY_BUILD_CHANNEL: "production",
-        ZITADEL_TELEMETRY_ENV: "development",
-      }),
-    ).toBe(DEV_TOKEN);
+  it("selects the dev project on an explicit development env", () => {
+    expect(resolveTelemetryToken({ ZITADEL_TELEMETRY_ENV: "development" })).toBe(DEV_TOKEN);
   });
 
   it("selects prod on an explicit production env", () => {
     expect(resolveTelemetryToken({ ZITADEL_TELEMETRY_ENV: "production" })).toBe(PROD_TOKEN);
+  });
+
+  it("routes an unattended CI run to the dev project as a safeguard", () => {
+    expect(resolveTelemetryToken({ CI: "true" })).toBe(DEV_TOKEN);
+    expect(resolveTelemetryToken({ GITHUB_ACTIONS: "true" })).toBe(DEV_TOKEN);
+  });
+
+  it("ignores a falsey CI flag (CI=false is not a CI run)", () => {
+    expect(resolveTelemetryToken({ CI: "false" })).toBe(PROD_TOKEN);
+  });
+
+  it("lets an explicit production env win over the CI safeguard", () => {
+    expect(resolveTelemetryToken({ CI: "true", ZITADEL_TELEMETRY_ENV: "production" })).toBe(
+      PROD_TOKEN,
+    );
   });
 
   it("lets ZITADEL_TELEMETRY_TOKEN override the channel outright", () => {

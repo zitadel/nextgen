@@ -1,8 +1,0 @@
-name: offset
-description: Number of items to skip before returning results.
-in: query
-required: false
-schema:
-  type: integer
-  minimum: 0
-  default: 0

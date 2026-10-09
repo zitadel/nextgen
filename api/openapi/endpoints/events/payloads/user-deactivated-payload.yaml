@@ -1,0 +1,6 @@
+title: UserDeactivatedPayload
+type: object
+description: Payload for `user.deactivated` events.
+properties:
+  reason:
+    type: string

@@ -68,23 +68,78 @@ export function matchesRoutes(pathname: string, routes: readonly string[]): bool
 // ─── Response header filtering ───────────────────────────────────────────────
 
 /**
- * Filters upstream response headers for proxying: strips hop-by-hop headers,
- * `set-cookie` (handled separately via `getSetCookie()`), and `location`
- * (prevents leaking internal upstream URLs).
+ * An upstream `Location`, pointed back at this app.
+ *
+ * Only the path, query and fragment survive; whatever origin the upstream
+ * named is discarded and the result is re-based onto the request's own URL.
+ * That keeps both properties the blanket strip was protecting -- an internal
+ * hostname can never reach the browser, and the redirect can only ever land on
+ * this app -- without needing to know what this app's public origin is.
+ *
+ * Comparing origins instead would have required that knowledge, and there is
+ * no reliable source for it: `X-Forwarded-Host` is attacker-settable on a
+ * direct request, and the request's own host is wrong behind a proxy that
+ * terminates TLS or rewrites it. Discarding the origin sidesteps the question
+ * -- a redirect to another origin becomes the same path on this one rather
+ * than being dropped, so a deployment behind such a proxy works instead of
+ * landing on a blank page.
+ *
+ * Nothing legitimate on this path points off-origin anyway: an outbound
+ * redirect to a provider travels as `step.redirect_url` in a JSON body and the
+ * widget performs it, never as a proxied header.
+ *
+ * A relative reference resolves against the path it came from (RFC 3986 §5),
+ * so `next?flow=x` answered to `/__nextgen/idp/callback` means
+ * `/__nextgen/idp/next?flow=x`. An unparseable value is the one case with
+ * nothing to forward.
+ */
+function ontoThisApp(location: string, selfUrl: string | undefined): string | undefined {
+  if (selfUrl === undefined || selfUrl === "") {
+    return undefined;
+  }
+  try {
+    const base = new URL(selfUrl);
+    const target = new URL(location, base);
+    return new URL(`${target.pathname}${target.search}${target.hash}`, base).toString();
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Filters upstream response headers for proxying: strips hop-by-hop headers
+ * and `set-cookie` (handled separately via `getSetCookie()`), and reduces
+ * `location` to a redirect that can only land on this app.
+ *
+ * `location` was stripped outright until the identity-provider callback
+ * needed it: the provider returns the browser to `/__nextgen/idp/callback`,
+ * and the engine answers `303` back to the page the sign-in started on. That
+ * is a top-level navigation with no JavaScript in the loop, so a dropped
+ * `Location` leaves the browser on an empty page. Outbound redirects to a
+ * provider do not travel this way -- they arrive as `step.redirect_url` in a
+ * JSON body and the widget navigates -- so nothing legitimate points off-origin.
  *
  * @param upstream - The upstream response headers.
+ * @param selfUrl - The app's own request URL, which is both the origin a
+ *   redirect must land on and the base a relative one resolves against.
+ *   Omitting it keeps the old behaviour of dropping every redirect.
  * @returns A new `Headers` object with filtered headers.
  */
-export function filterResponseHeaders(upstream: Headers): Headers {
+export function filterResponseHeaders(upstream: Headers, selfUrl?: string): Headers {
   const filtered = new Headers();
   upstream.forEach((value, key) => {
-    if (
-      !HOP_BY_HOP.has(key.toLowerCase()) &&
-      key.toLowerCase() !== "set-cookie" &&
-      key.toLowerCase() !== "location"
-    ) {
-      filtered.set(key, value);
+    const name = key.toLowerCase();
+    if (HOP_BY_HOP.has(name) || name === "set-cookie") {
+      return;
     }
+    if (name === "location") {
+      const onThisApp = ontoThisApp(value, selfUrl);
+      if (onThisApp !== undefined) {
+        filtered.set("location", onThisApp);
+      }
+      return;
+    }
+    filtered.set(key, value);
   });
   return filtered;
 }
@@ -92,15 +147,26 @@ export function filterResponseHeaders(upstream: Headers): Headers {
 // ─── Middleware types ──────────────────────────────────────────────────────────
 
 /**
- * The authenticated session for a signed-in user.
+ * The authenticated session for a signed-in user. Identity follows the
+ * user-ref vocabulary (ADR 058): render `display`, falling back to
+ * `identifier`, then `userId`.
  */
 export type NextgenSession = {
   /** The user's unique identifier (`sub` claim). */
   userId: string;
-  /** The user's email address, or `null` if not present in the token. */
-  email: string | null;
-  /** The user's display name, or `null` if not present in the token. */
-  name: string | null;
+  /**
+   * The user schema's designated identifier value (the login identifier,
+   * e.g. an email address or username), or `null` when unresolved. On the
+   * JWT path this carries the `email` claim.
+   */
+  identifier: string | null;
+  /**
+   * The schema property `identifier` came from (e.g. `"email"`), or `null`
+   * when unknown — JWT-claim identities carry no property attribution.
+   */
+  identifierProperty: string | null;
+  /** The user's display name rendering, or `null` when the schema designates none. */
+  display: string | null;
   /** The raw verified JWT. */
   token: string;
 };
@@ -115,6 +181,34 @@ export type UnauthState = { isAuthenticated: false; session: null };
 export type AuthResult = AuthState | UnauthState;
 
 /**
+ * The client-safe session exposed to app UI (headers, account menus).
+ * Identical to {@link NextgenSession} but omits `token` — the raw session
+ * token must never reach client-side JavaScript, whether through an SSR
+ * payload or a client-side fetch result.
+ */
+export type ClientSession = {
+  /** The user's unique identifier (`sub` claim). */
+  userId: string;
+  /** The designated identifier value (login identifier), or `null`. */
+  identifier: string | null;
+  /** The schema property the identifier came from, or `null`. */
+  identifierProperty: string | null;
+  /** The display name rendering, or `null`. */
+  display: string | null;
+};
+
+/** Client-safe auth state when the user is signed in. */
+export type ClientAuthState = { isAuthenticated: true; session: ClientSession };
+
+/**
+ * Union of all possible client-safe auth states. Returned by the client
+ * session reads (`useAuth()` in sdk-nuxt, `getSession()` in sdk-next).
+ * Token is intentionally absent — use the server-side helpers when the raw
+ * token is needed.
+ */
+export type ClientAuthResult = ClientAuthState | UnauthState;
+
+/**
  * Options passed to the SDK middleware factory (`nextgenMiddleware` in
  * sdk-next, `createNextgenMiddleware` in sdk-nuxt).
  */
@@ -127,6 +221,10 @@ export type NextgenMiddlewareOptions = {
 
   /**
    * URL path prefix that is reverse-proxied to the auth backend.
+   *
+   * Sign-in with an external provider currently requires the default: the
+   * provider returns to `/__nextgen/idp/callback`, which is proxied only under
+   * the default prefix.
    * @default "/__nextgen"
    */
   proxyPath?: string;

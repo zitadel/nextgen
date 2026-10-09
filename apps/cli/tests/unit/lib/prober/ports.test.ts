@@ -10,13 +10,15 @@ vi.mock("node:child_process", () => ({
 
 const mockExecFile = vi.mocked(execFile);
 
-import { listListeningPorts, listListeningTcpListeners } from "../../../../src/lib/prober/ports";
+import { listListeningTcpListeners } from "../../../../src/lib/prober/ports";
 
 /**
  * Promisified `execFile` invokes the callback the mock provides. Each test
  * sets the callback's behaviour via `mockImplementation`.
  */
-function whenLsof(impl: (cb: (err: NodeJS.ErrnoException | null, stdout: string) => void) => void): void {
+function whenLsof(
+  impl: (cb: (err: NodeJS.ErrnoException | null, stdout: string) => void) => void,
+): void {
   mockExecFile.mockImplementation(((
     _file: string,
     _args: readonly string[],
@@ -32,13 +34,14 @@ beforeEach(() => {
   mockExecFile.mockReset();
 });
 
-describe("listListeningPorts", () => {
-  it("parses unique, numerically-sorted loopback ports from lsof -F n output", async () => {
+describe("listListeningTcpListeners", () => {
+  it("parses loopback listeners sorted by port from lsof -F pcn output", async () => {
     whenLsof((cb) =>
       cb(
         null,
-        // Multiple records, including duplicates and a non-loopback bind that
-        // must be filtered out. `n*:8080` (wildcard) counts as loopback.
+        // Multiple records, including a duplicate port on another host and a
+        // non-loopback bind that must be filtered out. `n*:8080` (wildcard)
+        // counts as loopback.
         [
           "p12345",
           "n*:8080",
@@ -55,24 +58,21 @@ describe("listListeningPorts", () => {
       ),
     );
 
-    const ports = await listListeningPorts();
+    const listeners = await listListeningTcpListeners();
 
-    expect(ports).toEqual([3000, 5050, 8080]);
+    expect(listeners.map((l) => l.port)).toEqual([3000, 3000, 5050, 8080]);
+    expect(
+      listeners.every((l) => l.host === "*" || l.host.includes("::1") || l.host === "127.0.0.1"),
+    ).toBe(true);
   });
 
   it("keeps listener process metadata for diagnostics", async () => {
     whenLsof((cb) =>
       cb(
         null,
-        [
-          "p12345",
-          "czitadel-server",
-          "n*:8080",
-          "p23456",
-          "cnode",
-          "n127.0.0.1:3000",
-          "",
-        ].join("\n"),
+        ["p12345", "czitadel-server", "n*:8080", "p23456", "cnode", "n127.0.0.1:3000", ""].join(
+          "\n",
+        ),
       ),
     );
 
@@ -88,7 +88,7 @@ describe("listListeningPorts", () => {
     });
     whenLsof((cb) => cb(enoent, ""));
 
-    expect(await listListeningPorts()).toEqual([]);
+    expect(await listListeningTcpListeners()).toEqual([]);
   });
 
   it("returns [] when lsof exits non-zero", async () => {
@@ -97,7 +97,7 @@ describe("listListeningPorts", () => {
     });
     whenLsof((cb) => cb(failure, ""));
 
-    expect(await listListeningPorts()).toEqual([]);
+    expect(await listListeningTcpListeners()).toEqual([]);
   });
 
   it("returns [] when lsof exceeds the timeout", async () => {
@@ -107,7 +107,7 @@ describe("listListeningPorts", () => {
     });
     whenLsof((cb) => cb(timedOut, ""));
 
-    expect(await listListeningPorts({ timeoutMs: 1 })).toEqual([]);
+    expect(await listListeningTcpListeners({ timeoutMs: 1 })).toEqual([]);
   });
 
   it("ignores malformed lines and out-of-range ports", async () => {
@@ -126,6 +126,7 @@ describe("listListeningPorts", () => {
       ),
     );
 
-    expect(await listListeningPorts()).toEqual([80]);
+    const listeners = await listListeningTcpListeners();
+    expect(listeners.map((l) => l.port)).toEqual([80]);
   });
 });

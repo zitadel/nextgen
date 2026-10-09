@@ -13,15 +13,7 @@ export const frameworkIds = [
   "qwik-city",
 ];
 
-const viteDevArgs = (port) => [
-  "run",
-  "dev",
-  "--",
-  "--host",
-  "localhost",
-  "--port",
-  String(port),
-];
+const viteDevArgs = (port) => ["run", "dev", "--", "--host", "localhost", "--port", String(port)];
 
 export const frameworks = [
   {
@@ -133,7 +125,9 @@ export const frameworks = [
 export function frameworkForId(id) {
   const framework = frameworks.find((candidate) => candidate.id === id);
   if (!framework) {
-    throw new Error(`unsupported journey framework "${id}". Expected one of: ${frameworkIds.join(", ")}`);
+    throw new Error(
+      `unsupported journey framework "${id}". Expected one of: ${frameworkIds.join(", ")}`,
+    );
   }
   return framework;
 }

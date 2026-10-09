@@ -1,0 +1,239 @@
+/**
+ * Console runtime discovery (Console ADR 0004 §3).
+ *
+ * The embedded console is one build artifact serving every deployment, so
+ * deployment facts are discovered at boot instead of baked in: the server
+ * publishes a small public runtime-metadata document and the console fetches
+ * it once before the router renders (`src/main.tsx`). Everything in the
+ * document is public runtime metadata in the root ADR 005 sense — an enum
+ * and project ids, never secrets or feature inventories (per-surface gating
+ * rides effective permissions, ADR 0004 §5).
+ *
+ * Discovery has three outcomes, and ADR 0004 §3 keeps them distinct because
+ * each asks a different thing of the operator:
+ *
+ * 1. **reachable and provisioned** — the document names a sign-in project;
+ *    the console boots normally.
+ * 2. **reachable and not provisioned** — a 2xx document without
+ *    `console_project_id`; the login screen shows its `zitadel setup` hint.
+ * 3. **unreachable, non-2xx, or unreadable** — {@link initRuntime} reports a
+ *    {@link ConsoleRuntimeFailure} and `main.tsx` renders a retryable
+ *    connectivity error. Guessing `standalone` here would report a server
+ *    outage as "no project yet" and send an operator to run `zitadel setup`
+ *    against a problem setup cannot fix.
+ *
+ * Builds that deliberately run without a runtime document — `vite preview`
+ * with no backend — collapse state 3 into state 2 by opting in with
+ * `VITE_CONSOLE_RUNTIME_FALLBACK`. That opt-in is the only path back to the
+ * old silent fallback, and the embedded production build never sets it.
+ */
+
+/** The payload of `GET /console/runtime.json`, served by the Go mux. */
+export interface ConsoleRuntime {
+  /** `"platform"` (cloud portal) is future work; servers send `"standalone"` today. */
+  mode: "platform" | "standalone";
+  /**
+   * The project used to sign in to the Console. Today this is the standalone
+   * default discovered through the first-created/configured fallback retained
+   * by ADR 0004 §2's cutover rule. The target in §3 is the reserved platform
+   * project. It identifies the Console's sign-in identity plane, not the set
+   * of customer projects that identity may manage. Absent while no project
+   * exists yet; the login screen then shows its setup hint.
+   */
+  console_project_id?: string;
+  /**
+   * The default project's **publishable key** (root ADR 036): browser-safe
+   * and origin-scoped by construction. The login widget sends it as the
+   * bearer on public-plane calls — most importantly the handoff exchange,
+   * the one sign-in step that requires a credential — so sign-in needs no
+   * server-side secret injection.
+   */
+  publishable_key?: string;
+}
+
+/** Why discovery produced no document — ADR 0004 §3's third state. */
+export interface ConsoleRuntimeFailure {
+  /** The HTTP status, when the endpoint answered at all. */
+  status?: number;
+  /** Operator-facing clause, rendered into the connectivity error screen. */
+  detail: string;
+}
+
+/** What {@link initRuntime} resolved to: a usable document, or why there is none. */
+export type ConsoleRuntimeResult =
+  | { ok: true; runtime: ConsoleRuntime }
+  | { ok: false; failure: ConsoleRuntimeFailure };
+
+/**
+ * Absolute same-origin path, deliberately not under the console's BASE_URL:
+ * the Go server serves it at the root mux (dev: proxied in
+ * `vite.config.mts`), independent of where the SPA is mounted.
+ */
+export const RUNTIME_URL = "/console/runtime.json";
+
+const FALLBACK: ConsoleRuntime = { mode: "standalone" };
+
+let runtime: ConsoleRuntime = FALLBACK;
+let settled: ConsoleRuntimeResult | undefined;
+let pending: Promise<ConsoleRuntimeResult> | undefined;
+
+/**
+ * Fetches the runtime document once. Idempotent; concurrent and later calls
+ * share the first result. Never throws — a failed discovery resolves to an
+ * `ok: false` result the caller renders (see {@link retryRuntime}).
+ */
+export async function initRuntime(): Promise<ConsoleRuntimeResult> {
+  if (settled) return settled;
+  pending ??= discover()
+    .then((result) => {
+      settled = result;
+      return result;
+    })
+    .finally(() => {
+      pending = undefined;
+    });
+  return pending;
+}
+
+/**
+ * Re-runs discovery after a failure — what the connectivity error screen's
+ * retry button calls. A document that already resolved is kept: it is a
+ * per-boot fact, and re-reading it mid-session would swap the sign-in project
+ * under a mounted router.
+ */
+export async function retryRuntime(): Promise<ConsoleRuntimeResult> {
+  if (settled?.ok) return settled;
+  settled = undefined;
+  return initRuntime();
+}
+
+/**
+ * The discovered runtime document. Falls back to the standalone shape before
+ * discovery resolves and after it fails — in the failure case nothing renders
+ * from it, because `main.tsx` shows the connectivity error instead of the app.
+ */
+export function getRuntime(): ConsoleRuntime {
+  return runtime;
+}
+
+/**
+ * The project the console signs into: the discovered `console_project_id`
+ * (ADR 0004 §3), in development as in production. There is no build-time
+ * override: `dev-real`, the real e2e lane and the api-mock all serve a runtime
+ * document naming the project, so the console always takes it from the server.
+ *
+ * Not the project being managed, and never selected as one: management calls
+ * use the selected project (`src/lib/project-scope.ts`), chosen from the
+ * person's own projects. This one is for sign-in and claim.
+ */
+export function getConsoleProjectId(): string {
+  return getRuntime().console_project_id || "";
+}
+
+/**
+ * The discovered publishable key, or `undefined` when the server does not
+ * serve one (older servers, no project yet). The login widget's handoff
+ * exchange requires it: without it every sign-in answers 401.
+ */
+export function getPublishableKey(): string | undefined {
+  return getRuntime().publishable_key;
+}
+
+async function discover(): Promise<ConsoleRuntimeResult> {
+  let response: Response;
+  try {
+    response = await fetch(RUNTIME_URL, { credentials: "same-origin" });
+  } catch (cause) {
+    return failed({ detail: `the request failed (${describeCause(cause)})` });
+  }
+
+  if (!response.ok) {
+    return failed({ status: response.status, detail: `the server answered ${response.status}` });
+  }
+
+  let document: unknown;
+  try {
+    document = await response.json();
+  } catch {
+    return failed({ status: response.status, detail: "the response was not valid JSON" });
+  }
+
+  const parsed = parseRuntime(document);
+  if (!parsed) {
+    // A 2xx body the console cannot read is a broken server, not an
+    // unprovisioned one — the same reason §3 refuses to guess a mode.
+    return failed({ status: response.status, detail: "the response was not a runtime document" });
+  }
+
+  runtime = parsed;
+  return { ok: true, runtime: parsed };
+}
+
+/**
+ * Turns a discovery failure into a result. Honors the backend-less opt-in
+ * (`VITE_CONSOLE_RUNTIME_FALLBACK`), which is the only way back to the
+ * pre-§3 behavior of treating an absent document as `standalone` — and warns
+ * when it fires, so a build carrying the flag by accident says so out loud.
+ */
+function failed(failure: ConsoleRuntimeFailure): ConsoleRuntimeResult {
+  if (!runtimeFallbackEnabled()) return { ok: false, failure };
+  console.warn(
+    `[console] runtime discovery failed (${failure.detail}); VITE_CONSOLE_RUNTIME_FALLBACK is set, ` +
+      `continuing with the built-in ${FALLBACK.mode} document.`,
+  );
+  runtime = FALLBACK;
+  return { ok: true, runtime: FALLBACK };
+}
+
+function runtimeFallbackEnabled(): boolean {
+  const flag = import.meta.env.VITE_CONSOLE_RUNTIME_FALLBACK;
+  return flag !== undefined && flag !== "" && flag !== "0" && flag !== "false";
+}
+
+function describeCause(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause);
+}
+
+function parseRuntime(doc: unknown): ConsoleRuntime | undefined {
+  if (typeof doc !== "object" || doc === null) return undefined;
+  const record = doc as Record<string, unknown>;
+  // Destructured first: a type predicate does not narrow a property read off
+  // a `Record<string, unknown>`, only a local.
+  const { mode, console_project_id: projectId, publishable_key: publishableKey } = record;
+
+  if (mode !== "standalone" && mode !== "platform") return undefined;
+  if (!absentOrString(projectId) || !absentOrString(publishableKey)) return undefined;
+
+  return { mode, console_project_id: projectId, publishable_key: publishableKey };
+}
+
+/**
+ * Absence is how the document says "not provisioned yet": the server omits
+ * both ids rather than emitting empty ones (`omitempty` in
+ * `cmd/server/console_runtime.go`), and ADR 0004 §2's shape shows the field
+ * omitted. A *present* field must therefore be a usable string — a number, a
+ * `null`, or `""` came from something that is not our server, and coercing it
+ * to "absent" would report that as "no project yet", which is the
+ * misdiagnosis §3 exists to end, one field lower down. JSON cannot carry
+ * `undefined`, so it can only mean the key was missing.
+ */
+function absentOrString(value: unknown): value is string | undefined {
+  return value === undefined || (typeof value === "string" && value !== "");
+}
+
+/**
+ * Test-only: settle discovery on `document`, as if the server had served it —
+ * how a spec names the project the console signs into.
+ */
+export function _setRuntimeForTesting(document: ConsoleRuntime): void {
+  runtime = document;
+  settled = { ok: true, runtime: document };
+  pending = undefined;
+}
+
+/** Test-only: drop the cached document so specs can exercise `initRuntime` again. */
+export function _resetRuntimeForTesting(): void {
+  runtime = FALLBACK;
+  settled = undefined;
+  pending = undefined;
+}

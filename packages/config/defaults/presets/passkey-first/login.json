@@ -1,0 +1,188 @@
+{
+  "$schema": "../meta/flow-definition.json",
+  "name": "default-login",
+  "status": "active",
+  "user_schema": "${USER_SCHEMA_URL}",
+  "purposes": {
+    "login": "passkey-first",
+    "register": "register"
+  },
+  "steps": [
+    {
+      "name": "passkey-first",
+      "fields": [],
+      "actions": [
+        {
+          "name": "passkey",
+          "kind": "passkey",
+          "primary": true,
+          "text_key": "passkey-first.action.passkey"
+        },
+        {
+          "name": "email_fallback",
+          "kind": "navigate",
+          "primary": false,
+          "text_key": "passkey-first.action.email_fallback"
+        },
+        {
+          "name": "register",
+          "kind": "navigate",
+          "primary": false,
+          "text_key": "identifier.action.register.link"
+        }
+      ],
+      "transitions": {
+        "passkey": {
+          "target": "done"
+        },
+        "email_fallback": {
+          "target": "identifier"
+        },
+        "user_not_found": {
+          "target": "register"
+        },
+        "register": {
+          "target": "register",
+          "purpose": "register"
+        }
+      }
+    },
+    {
+      "name": "identifier",
+      "fields": [
+        "email"
+      ],
+      "actions": [
+        {
+          "name": "submit",
+          "kind": "submit",
+          "primary": true,
+          "text_key": "identifier.action.continue"
+        },
+        {
+          "name": "passkey",
+          "kind": "passkey",
+          "primary": false,
+          "text_key": "identifier.action.passkey"
+        },
+        {
+          "name": "register",
+          "kind": "navigate",
+          "primary": false,
+          "text_key": "identifier.action.register.link"
+        }
+      ],
+      "transitions": {
+        "submit": {
+          "target": "password"
+        },
+        "passkey": {
+          "target": "done"
+        },
+        "user_not_found": {
+          "target": "register"
+        },
+        "register": {
+          "target": "register",
+          "purpose": "register"
+        }
+      }
+    },
+    {
+      "name": "password",
+      "fields": [
+        "x-auth-methods#password"
+      ],
+      "actions": [
+        {
+          "name": "submit",
+          "kind": "submit",
+          "primary": true,
+          "text_key": "password.action.signin"
+        },
+        {
+          "name": "passkey",
+          "kind": "passkey",
+          "primary": false,
+          "text_key": "password.action.passkey"
+        }
+      ],
+      "transitions": {
+        "submit": {
+          "target": "done"
+        },
+        "passkey": {
+          "target": "done"
+        }
+      }
+    },
+    {
+      "name": "register",
+      "fields": [
+        "email"
+      ],
+      "actions": [
+        {
+          "name": "passkey_register",
+          "kind": "passkey_register",
+          "primary": true,
+          "text_key": "register.action.passkey"
+        },
+        {
+          "name": "submit",
+          "kind": "submit",
+          "primary": false,
+          "text_key": "register.action.password"
+        },
+        {
+          "name": "sign_in",
+          "kind": "navigate",
+          "primary": false,
+          "text_key": "register.action.sign_in.link"
+        }
+      ],
+      "transitions": {
+        "passkey_register": {
+          "target": "done"
+        },
+        "submit": {
+          "target": "register-password"
+        },
+        "user_already_exists": {
+          "target": "password"
+        },
+        "sign_in": {
+          "target": "passkey-first",
+          "purpose": "login"
+        }
+      }
+    },
+    {
+      "name": "register-password",
+      "fields": [
+        "x-auth-methods#password"
+      ],
+      "actions": [
+        {
+          "name": "submit",
+          "kind": "submit",
+          "primary": true,
+          "text_key": "register-password.action.submit"
+        }
+      ],
+      "on_success": "create_user",
+      "transitions": {
+        "submit": {
+          "target": "done"
+        },
+        "user_already_exists": {
+          "target": "password"
+        }
+      }
+    },
+    {
+      "name": "done",
+      "complete": "show"
+    }
+  ]
+}

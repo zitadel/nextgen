@@ -1,36 +1,121 @@
-name: sync-design-tokens
+name: Sync design tokens
+# workflow_dispatch otherwise titles the run as the file path
+# (.github/workflows/sync-design-tokens.yml). Push keeps the plugin commit subject.
+run-name: >-
+  ${{
+    github.event_name == 'workflow_dispatch'
+    && format('Sync design tokens ({0})', inputs.source)
+    || github.event.head_commit.message
+  }}
 
-# Pulls the published Variables of the Zitadel Design System Figma library
-# into `packages/design-tokens/src/generated/figma.tokens.json`, regenerates
-# the CSS / TS / Tailwind outputs, and opens a PR with the diff.
+# Regenerates @zitadel/design-tokens from Figma and opens (or updates) a review PR.
 #
-# Never auto-merges. The PR is the review gate: a designer change ships
-# only when a maintainer reads the diff, runs the snapshot test, and
-# merges intentionally.
+# Triggers:
+#   - push to design-tokens/figma-sync (figma-export/**) — Community plugin push
+#   - workflow_dispatch — manual re-run or Enterprise REST sync
+#
+# Never auto-merges. Push trigger is scoped to figma-export/** only so commits
+# that only touch generated CSS/TS do not re-trigger this workflow.
+#
+# Do not use peter-evans/create-pull-request against design-tokens/figma-sync:
+# that action rebases onto main and force-pushes, which drops the plugin's
+# figma-export commits. Commit + push + gh pr create preserves them.
 
 on:
+  push:
+    branches:
+      - design-tokens/figma-sync
+    paths:
+      - packages/design-tokens/figma-export/**
   workflow_dispatch:
     inputs:
+      source:
+        description: "Sync source"
+        required: true
+        default: export
+        type: choice
+        options:
+          - export
+          - figma-rest
       figma_version:
         description: >-
-          Published library version to pin (e.g. "1.42.0" or a Figma
-          library version id). Optional — defaults to whatever
-          figma-tokens.lock already says, in which case this is a
-          re-sync of the current pinned version.
+          Published library version for figma-rest only (optional).
         required: false
         type: string
 
 permissions:
   contents: write
   pull-requests: write
+  # Dispatch ci.yml on the sync branch so full-pr runs unattended (a PR opened
+  # by GITHUB_TOKEN otherwise leaves pull_request checks approval-required).
+  actions: write
+
+concurrency:
+  group: design-tokens-sync
+  # The Figma plugin pushes one commit per token file (a burst of pushes per
+  # sync). Coalesce them: cancel a superseded run so only the latest push
+  # regenerates + opens the PR + dispatches full-pr, instead of N serial runs.
+  # Safe because each run re-checks-out and regenerates from scratch.
+  cancel-in-progress: true
 
 jobs:
   sync:
     runs-on: depot-ubuntu-24.04-4
+    # Quiet git init / advice noise from actions/checkout (otherwise logs a
+    # long "hint: Using 'master' as the name for the initial branch" block).
+    env:
+      GIT_CONFIG_COUNT: 2
+      GIT_CONFIG_KEY_0: init.defaultBranch
+      GIT_CONFIG_VALUE_0: main
+      GIT_CONFIG_KEY_1: advice.defaultBranchName
+      GIT_CONFIG_VALUE_1: "false"
     steps:
       - uses: actions/checkout@v6
+        with:
+          # export/push land on the long-lived sync branch; figma-rest always
+          # generates from main (the script asserts CURRENT_BRANCH == main
+          # before force-pushing) so a dispatch from a feature branch cannot
+          # push the wrong source into the sync branch.
+          ref: >-
+            ${{
+              (github.event_name == 'push'
+              || (github.event_name == 'workflow_dispatch' && inputs.source == 'export'))
+              && 'design-tokens/figma-sync'
+              || 'main'
+            }}
+          # Shallow tip only — refresh step replaces the remote.fetch refspec
+          # and unshallows just main + the sync branch (fetch-depth: 0 would
+          # dump every remote branch into the log).
+          fetch-depth: 1
 
-      - uses: moonrepo/setup-toolchain@v0
+      # Keep the long-lived sync branch from going stale: plugin pushes land on
+      # design-tokens/figma-sync, so merge main before generating so workflow
+      # helpers and other tooling commits are present on the checked-out tip.
+      - name: Refresh sync branch from main
+        if: >-
+          github.event_name == 'push'
+          || (github.event_name == 'workflow_dispatch' && inputs.source == 'export')
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          set -euo pipefail
+          # Narrow fetch to the two refs we need, then unshallow so merge-base
+          # sees real shared history (a plain shallow fetch of two tips looks
+          # like unrelated histories).
+          git config --unset-all remote.origin.fetch || true
+          git config --add remote.origin.fetch '+refs/heads/main:refs/remotes/origin/main'
+          git config --add remote.origin.fetch '+refs/heads/design-tokens/figma-sync:refs/remotes/origin/design-tokens/figma-sync'
+          git fetch --no-tags --prune --unshallow origin
+          git reset --hard origin/design-tokens/figma-sync
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "design-tokens/figma-sync already contains origin/main"
+            exit 0
+          fi
+          git merge --no-edit --no-ff origin/main
+          git push -q origin HEAD:design-tokens/figma-sync
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v5
@@ -44,10 +129,25 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: corepack pnpm install --frozen-lockfile
+        # Filter to design-tokens (+ deps). --loglevel error hides monorepo
+        # "Unsupported platform" / optional-bin WARNs from unrelated packages.
+        # Filtered installs still include the workspace root's devDependencies,
+        # so node_modules/.bin/moon is present for the moon steps below.
+        run: >-
+          corepack pnpm install --frozen-lockfile
+          --filter @zitadel/design-tokens...
+          --loglevel error
+
+      # Bare `moon` below is the workspace's own pinned @moonrepo/cli, so CI
+      # runs the exact version the lockfile resolves — same as local dev.
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Pin requested Figma library version
-        if: ${{ inputs.figma_version != '' }}
+        if: >-
+          github.event_name == 'workflow_dispatch'
+          && inputs.source == 'figma-rest'
+          && inputs.figma_version != ''
         run: |
           jq --arg v "${{ inputs.figma_version }}" \
              --arg t "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -56,7 +156,16 @@ jobs:
              packages/design-tokens/figma-tokens.lock > packages/design-tokens/figma-tokens.lock.tmp
           mv packages/design-tokens/figma-tokens.lock.tmp packages/design-tokens/figma-tokens.lock
 
-      - name: Pull tokens from Figma
+      - name: Sync from committed DTCG export
+        if: >-
+          github.event_name == 'push'
+          || (github.event_name == 'workflow_dispatch' && inputs.source == 'export')
+        run: moon run design-tokens:sync-export
+
+      - name: Pull tokens from Figma REST (Enterprise path)
+        if: >-
+          github.event_name == 'workflow_dispatch'
+          && inputs.source == 'figma-rest'
         env:
           FIGMA_TOKEN: ${{ secrets.FIGMA_TOKEN }}
         run: moon run design-tokens:sync
@@ -64,36 +173,24 @@ jobs:
       - name: Regenerate token artifacts
         run: moon run design-tokens:generate
 
-      - name: Run snapshot test
-        # Snapshot will fail if any public token name changed. That's the
-        # signal the PR reviewer needs — either consumers need updating
-        # before this PR can merge, or the snapshot needs an intentional
-        # bump in the same PR.
+      # Commit/push before the snapshot gate so a legitimate rename still lands
+      # a reviewable PR. The snapshot step then fails the workflow check when
+      # public token names drift. Zero-token syncs never reach here —
+      # sync-export throws (fail-loud) and the job stops above.
+      # Keep ${{ }} out of the open-PR script body — nested &&/||/format
+      # expressions inside run: fail workflow parsing ("An expression was expected").
+      - name: Commit generated artifacts and open PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Attribute the commit to the actor who triggered the sync (plugin
+          # pusher or workflow_dispatch user); committer stays the Actions bot.
+          GIT_AUTHOR_NAME: ${{ github.actor }}
+          GIT_AUTHOR_EMAIL: ${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          EVENT_NAME: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+        run: bash .github/scripts/design-tokens-open-sync-pr.sh
+
+      - name: Run snapshot test (hard gate)
         run: moon run design-tokens:test
-        continue-on-error: true
-
-      - name: Open PR
-        uses: peter-evans/create-pull-request@v7
-        with:
-          branch: design-tokens/sync-${{ github.run_id }}
-          base: main
-          title: "chore(design-tokens): sync from Figma"
-          commit-message: "chore(design-tokens): sync from Figma library"
-          body: |
-            Automated sync from the Zitadel Design System Figma library.
-
-            - Lock file pinned to `${{ inputs.figma_version || 'previous value' }}`
-            - Triggered by @${{ github.actor }} via workflow_dispatch
-
-            **Before merging:**
-            1. Review every change in `packages/design-tokens/src/generated/`.
-            2. If the snapshot test failed, update `src/tokens.snapshot.spec.ts`
-               *only* if every consumer of the renamed/removed token has been
-               updated in this PR or a follow-up. Never blanket-accept.
-            3. Verify visual parity in `apps/console` and the dev playground.
-          add-paths: |
-            packages/design-tokens/figma-tokens.lock
-            packages/design-tokens/src/generated/figma.tokens.json
-            packages/design-tokens/src/generated/tokens.css
-            packages/design-tokens/src/generated/tokens.ts
-            packages/design-tokens/src/generated/tailwind.css

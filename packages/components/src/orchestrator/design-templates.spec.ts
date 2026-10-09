@@ -1,0 +1,294 @@
+/**
+ * Contract tests for the ejectable design catalog in `@zitadel/config`
+ * (ADR 040): every shipped design must render through the real pipeline —
+ * LiquidJS engine → DOMPurify sanitiser → `patchMandatoryGates` — and keep
+ * the atoms a step needs. The authoring-side validation of the same files
+ * lives in `packages/config/src/template.test.ts`.
+ *
+ * The retired page-layout designs (`split`, `split-right`, `hero`)
+ * are no longer ejectable, but revisions already published from them keep
+ * rendering on the `layout-chrome.css` split/hero chrome. Their last shipped
+ * templates live in `__fixtures__/legacy-designs/` so that promise stays
+ * tested until the chrome is removed.
+ */
+import type { CreateFlow201Step } from "@zitadel/api/generated/model";
+import { BRANDING_DESIGNS, getDefaultBrandingConfig } from "@zitadel/config/defaults";
+import { describe, expect, it } from "vitest";
+
+import heroTemplate from "./__fixtures__/legacy-designs/hero.liquid";
+import splitRightTemplate from "./__fixtures__/legacy-designs/split-right.liquid";
+import splitTemplate from "./__fixtures__/legacy-designs/split.liquid";
+import { createLiquidEngine } from "./liquid.js";
+import { mandatoryGatesMarkerComment, patchMandatoryGates } from "./mandatory-gates.js";
+import { createSanitiser } from "./sanitiser.js";
+
+const locale: Record<string, string> = {
+  "identifier.title": "Sign in",
+  "identifier.field.email": "Work email",
+  "identifier.field.remember": "Remember me",
+  "identifier.action.register.lead": "New here? ",
+  "identifier.action.register.link": "Create an account",
+  "submit.continue": "Continue",
+  "action.recover": "Forgot password?",
+  "action.back": "Back",
+  "register.action.sign_in.lead": "Have an account already? ",
+  "register.action.sign_in.link": "Sign in",
+  "sso-conflict.action.sign_in": "Back to sign in",
+  "sso.continue_with": "Continue with {name}",
+  "sso.divider": "or",
+};
+
+const step: CreateFlow201Step = {
+  name: "identifier",
+  fields: [
+    { name: "email", type: "email", text_key: "identifier.field.email", required: true },
+    { name: "remember", type: "checkbox", text_key: "identifier.field.remember" },
+  ],
+  actions: [
+    { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
+    { name: "register", kind: "navigate", text_key: "identifier.action.register.link" },
+    { name: "recover", kind: "navigate", text_key: "action.recover" },
+  ],
+  gates: {},
+};
+
+const context = {
+  step: { name: step.name, texts: { title_key: "identifier.title" } },
+  fields: step.fields,
+  actions: step.actions,
+  gates: [],
+  messages: [],
+  errors: [],
+  identity: null,
+  branding: {
+    logo_url: "https://cdn.example.com/logo.svg",
+    hero_url: "https://cdn.example.com/hero.png",
+  },
+  loading: false,
+  challenge: null,
+};
+
+const LEGACY_TEMPLATES: Record<string, string> = {
+  split: splitTemplate,
+  "split-right": splitRightTemplate,
+  hero: heroTemplate,
+};
+const LEGACY_DESIGNS = Object.keys(LEGACY_TEMPLATES);
+
+function legacyTemplate(design: string): string {
+  const template = LEGACY_TEMPLATES[design];
+  if (template === undefined) throw new Error(`no legacy fixture for ${design}`);
+  return template;
+}
+
+/** A shipped design's template, or a retired one's last published fixture. */
+function templateFor(design: string): string {
+  return LEGACY_DESIGNS.includes(design)
+    ? legacyTemplate(design)
+    : getDefaultBrandingConfig(design).template;
+}
+
+function renderDesign(design: string): string {
+  const engine = createLiquidEngine({ locale });
+  const rendered = engine.parseAndRenderSync(templateFor(design), context);
+  const sanitised = createSanitiser()(rendered);
+  return patchMandatoryGates(sanitised, step, locale);
+}
+
+describe("branding design catalog", () => {
+  it("ships only widget-structure designs (#1039)", () => {
+    expect([...BRANDING_DESIGNS]).toEqual(["centered", "minimal"]);
+  });
+
+  for (const design of [...BRANDING_DESIGNS, ...LEGACY_DESIGNS]) {
+    describe(design, () => {
+      const html = renderDesign(design);
+
+      it("renders the declared field and primary action after the full pipeline", () => {
+        expect(html).toContain('name="email"');
+        expect(html).toContain('data-testid="zitadel-field-remember"');
+        expect(html).toContain('data-testid="zitadel-action-submit"');
+        expect(html).toContain('data-action="register"');
+        // Recovery normally rides on the password field's label row. This step
+        // declares no password field, so it falls back to a row of its own
+        // rather than dropping the affordance.
+        expect(html).not.toContain('forgot-password-action="recover"');
+        expect(html).toContain('data-action="recover"');
+      });
+
+      it("consumes its mandatory_gates marker", () => {
+        expect(html).not.toContain(mandatoryGatesMarkerComment);
+        // Every declared capability is rendered, so the patcher must not
+        // append a second field or submit button.
+        expect(html.match(/data-testid="zitadel-field-email"/g) ?? []).toHaveLength(1);
+        expect(html.match(/data-testid="zitadel-action-submit"/g) ?? []).toHaveLength(1);
+      });
+
+      it("survives sanitisation structurally", () => {
+        expect(html).toContain("<zl-page-shell");
+      });
+
+      it("renders no visible control for a kind: back action (gesture-only)", () => {
+        const engine = createLiquidEngine({ locale });
+        const rendered = engine.parseAndRenderSync(templateFor(design), {
+          ...context,
+          actions: [...step.actions, { name: "back", kind: "back", text_key: "action.back" }],
+        });
+        const html2 = createSanitiser()(rendered);
+        // Back-navigation is gesture-only (ADR 022): the template renders no
+        // control for the action, and the kind-based exclusion keeps it out
+        // of the secondary-button loop.
+        expect(html2).not.toContain("back-action");
+        expect(html2).not.toContain('data-testid="zitadel-action-back"');
+      });
+    });
+  }
+
+  describe.each([...BRANDING_DESIGNS])("%s with identity providers", (design) => {
+    /** The step as the engine renders it once a connection is enabled. */
+    const withProviders = {
+      ...context,
+      sso_providers: [
+        { id: "google", name: "Google", template: "google" },
+        { id: "acme-sso", name: "Acme SSO", template: "oidc-generic" },
+      ],
+    };
+
+    function render(ctx: Record<string, unknown>): string {
+      const engine = createLiquidEngine({ locale });
+      const { template } = getDefaultBrandingConfig(design);
+      return createSanitiser()(engine.parseAndRenderSync(template, ctx));
+    }
+
+    it("renders the provider atom with the step's providers", () => {
+      const html = render(withProviders);
+
+      expect(html).toContain("<zl-sso-providers");
+      expect(html).toContain('data-testid="zitadel-sso-providers"');
+      // The payload survives sanitisation intact — the atom parses it back.
+      expect(html).toContain("google");
+      expect(html).toContain("acme-sso");
+    });
+
+    // The design draws no rule above the providers -- they sit directly under
+    // the primary action -- so the shipped templates pass no divider. The atom
+    // keeps the option for a tenant template that wants one.
+    it("passes the localised label format through, and no divider", () => {
+      const html = render(withProviders);
+
+      expect(html).toContain('label-format="Continue with {name}"');
+      expect(html).not.toContain("divider-label");
+    });
+
+    it("keeps the register row's copy for the register step's own sign_in", () => {
+      const html = render({
+        ...context,
+        actions: [
+          ...step.actions,
+          { name: "sign_in", kind: "navigate", text_key: "register.action.sign_in.link" },
+        ],
+      });
+
+      expect(html).toContain("Have an account already? ");
+      expect(html).toContain('data-action="sign_in"');
+    });
+
+    it("uses a step's own copy when it supplies one, without the register lead", () => {
+      // The SSO conflict screen has just said "you already have an account";
+      // repeating "Already have an account?" under it reads as a mistake.
+      const html = render({
+        ...context,
+        actions: [
+          ...step.actions,
+          { name: "sign_in", kind: "navigate", text_key: "sso-conflict.action.sign_in" },
+        ],
+      });
+
+      expect(html).toContain("Back to sign in");
+      expect(html).not.toContain("Have an account already? ");
+    });
+
+    it("renders nothing for a step with no providers", () => {
+      // The shipped presets carry none until `sso enable` adds one, so this
+      // is the common case and must cost the markup nothing.
+      expect(render(context)).not.toContain("zl-sso-providers");
+      expect(render({ ...context, sso_providers: [] })).not.toContain("zl-sso-providers");
+    });
+  });
+
+  it("legacy split revisions keep the brand pane and mirror class", () => {
+    const split = renderDesign("split");
+    expect(split).toContain('class="zl-split"');
+    expect(split).toContain('class="zl-split__brand"');
+    expect(split).toContain('src="https://cdn.example.com/hero.png"');
+    expect(split).not.toContain("zl-split--right");
+
+    const right = renderDesign("split-right");
+    expect(right).toContain("zl-split--right");
+  });
+
+  it("split designs render the placeholder panel until an asset is set", () => {
+    const engine = createLiquidEngine({ locale });
+    const noAssets = { ...context, branding: {} };
+    for (const design of ["split", "split-right"]) {
+      const template = legacyTemplate(design);
+      const bare = createSanitiser()(engine.parseAndRenderSync(template, noAssets));
+      // An empty brand pane renders the whole design as a lonely off-centre
+      // card; the decorative panel must survive the sanitiser.
+      expect(bare, design).toContain("zl-split__placeholder");
+
+      const branded = createSanitiser()(engine.parseAndRenderSync(template, context));
+      expect(branded, design).not.toContain("zl-split__placeholder");
+    }
+  });
+
+  it("split-family designs render the mobile compact brand header", () => {
+    // The chrome hides .zl-split__brand on narrow widths; the compact
+    // node is the fallback that keeps the tenant's identity visible there.
+    for (const design of ["split", "split-right", "hero"]) {
+      expect(renderDesign(design), design).toContain('class="zl-split__compact"');
+    }
+  });
+
+  it("hero_url-only tenants still get a compact fallback (banner variant)", () => {
+    const engine = createLiquidEngine({ locale });
+    const heroOnly = {
+      ...context,
+      branding: { hero_url: "https://cdn.example.com/hero.png" },
+    };
+    for (const design of ["split", "split-right"]) {
+      const template = legacyTemplate(design);
+      const html = patchMandatoryGates(
+        createSanitiser()(engine.parseAndRenderSync(template, heroOnly)),
+        step,
+        locale,
+      );
+      expect(html, design).toContain("zl-split__compact--hero");
+      expect(html, design).toContain('src="https://cdn.example.com/hero.png"');
+    }
+  });
+
+  it("hero keeps the landing pane on the split shell", () => {
+    const hero = renderDesign("hero");
+    expect(hero).toContain('class="zl-split"');
+    expect(hero).toContain('class="zl-split__brand"');
+    expect(hero).toContain('class="zl-hero"');
+    expect(hero).toContain('class="zl-hero__headline"');
+    expect(hero).toContain('class="zl-hero__bullets"');
+    // Landing CTAs must be anchors — button/input/form are stripped by the
+    // sanitiser, so a surviving <button> would mean the allowlist changed.
+    expect(hero).not.toContain("<button");
+  });
+
+  it("minimal renders without card chrome", () => {
+    const minimal = renderDesign("minimal");
+    expect(minimal).toContain('class="zl-minimal"');
+    expect(minimal).not.toContain("<zl-card");
+  });
+
+  it("centered keeps the card and header logo", () => {
+    const centered = renderDesign("centered");
+    expect(centered).toContain("<zl-card");
+    expect(centered).toContain('src="https://cdn.example.com/logo.svg"');
+  });
+});

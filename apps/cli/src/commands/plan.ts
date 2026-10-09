@@ -1,11 +1,15 @@
-import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
-import { createZitadelClient } from "@zitadel/api/client";
-
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
-import { environmentSchema } from "../lib/environment";
-import { buildSyncPlan, makeSyncers, renderPlan, summarizePlan } from "../lib/sync";
+import { createZitadelClient } from "../lib/api-client";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import {
+  buildSyncPlan,
+  collectPlanWarnings,
+  enumeratePlanResources,
+  makeSyncers,
+  renderPlan,
+  summarizePlan,
+} from "../lib/sync";
 import { readZitadelSecret } from "../lib/project";
 
 /**
@@ -18,13 +22,8 @@ import { readZitadelSecret } from "../lib/project";
  */
 export default class Plan extends BaseCommand {
   static override description = "Validate config without mutation and preview the sync diff.";
-  static override flags = {
-    environment: Flags.string({
-      char: "e",
-      description: "Target environment (default: development).",
-      options: [...environmentSchema.options],
-    }),
-  };
+  static override group = CommandGroups.configuration;
+  static override groupOrder = 1;
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Plan);
@@ -34,11 +33,17 @@ export default class Plan extends BaseCommand {
     const secret = await readZitadelSecret(cwd);
     consola.info(`Project   ${secret.project_id}`);
     consola.info(`Server    ${source}`);
-    const client = createZitadelClient({
-      baseUrl: source,
-      token: secret.project_secret,
+    // Verbatim: the plan diffs what it reads against the project's files.
+    const client = createZitadelClient(
+      { baseUrl: source, token: secret.project_secret },
+      { verbatim: true },
+    );
+    const syncers = makeSyncers({
+      client,
+      projectId: secret.project_id,
+      env,
+      cwd,
     });
-    const syncers = makeSyncers({ client, projectId: secret.project_id, env });
 
     consola.start("Building plan");
     const plan = await buildSyncPlan(cwd, syncers, true);
@@ -46,18 +51,24 @@ export default class Plan extends BaseCommand {
     this.recordTelemetry({
       creates: summary.creates,
       updates: summary.updates,
+      revisions: summary.revisions,
       deletes: summary.deletes,
       total: summary.total,
     });
     consola.success(
       `Plan: ${summary.creates} create${summary.creates === 1 ? "" : "s"}, ` +
         `${summary.updates} update${summary.updates === 1 ? "" : "s"}, ` +
+        `${summary.revisions} new revision${summary.revisions === 1 ? "" : "s"}, ` +
         `${summary.deletes} delete${summary.deletes === 1 ? "" : "s"}, ` +
-        `${summary.total - summary.creates - summary.updates - summary.deletes} unchanged`,
+        `${plan.length - summary.total} unchanged`,
     );
     return this.emit({
       status: "ok",
-      data: summary,
+      data: {
+        ...summary,
+        changes: enumeratePlanResources(plan),
+        warnings: collectPlanWarnings(plan),
+      },
       pretty: renderPlan(plan, isTTY),
     });
   }

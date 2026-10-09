@@ -1,29 +1,33 @@
 type: object
 required:
   - id
-  - projectSecret
-  - previewSecret
-  - previewOrigins
-  - createdAt
+  - name
+  - project_secret
+  - preview_secret
+  - preview_origins
+  - created_at
 properties:
   id:
     type: string
     description: The unique identifier of the project.
-  projectSecret:
+  name:
+    type: string
+    description: The name of the project.
+  project_secret:
     type: string
     description: |
       Secret which can be used for authentication when modifying the project.
-  previewSecret:
+  preview_secret:
     type: string
     description: |
       Secret which can be used for previewing and testing the project.
-  previewOrigins:
+  preview_origins:
     type: array
     items:
       type: string
     description: |
       Origins which are allowed for previewing and testing the project.
-  createdAt:
+  created_at:
     type: string
     format: date-time
     description: The time when the project was created.

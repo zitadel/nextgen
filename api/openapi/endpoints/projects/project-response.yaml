@@ -1,0 +1,35 @@
+type: object
+description: The current state of a project.
+required:
+  - id
+  - name
+  - created_at
+  - updated_at
+properties:
+  id:
+    type: string
+    description: The unique identifier of the project.
+  name:
+    type: string
+    description: The name of the project.
+  preview_origins:
+    type: array
+    items:
+      type: string
+    description: |
+      Origins which are allowed for previewing and testing the project.
+  created_at:
+    type: string
+    format: date-time
+    description: The time when the project was created.
+  updated_at:
+    type: string
+    format: date-time
+    description: The time when the project was last updated.
+  password_hash:
+    description: |
+      The method this project's passwords are hashed with. Null when the project
+      uses the server default.
+    oneOf:
+      - $ref: password-hash-policy.yaml
+      - type: 'null'

@@ -1,9 +1,11 @@
-import { readFile, rename, rm, stat } from "node:fs/promises";
+import { Flags } from "@oclif/core";
+import { readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { ZitadelError } from "../lib/errors";
 import { createOrca } from "../lib/orca";
+import { AGENTS_HEADER, removeGuidanceSection } from "../lib/orca/patchers/rule/guidance";
 import type { EjectActions } from "../lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../lib/paths";
 import { readRendererId, readZitadelConfig } from "../lib/project";
@@ -22,6 +24,7 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
     envBackups: [".env.local"],
     dependencies: [],
     configEdits: [],
+    guidanceFiles: ["AGENTS.md", "README.md"],
   };
   const orca = createOrca();
   const framework = await orca.tryDetect(cwd);
@@ -85,7 +88,15 @@ async function pathExists(path: string): Promise<boolean> {
  */
 export default class Eject extends BaseCommand {
   static override description = "Remove managed files and local Zitadel state.";
+  static override group = CommandGroups.project;
+  static override groupOrder = 4;
   static override aliases = ["uninstall"];
+  static override flags = {
+    force: Flags.boolean({
+      char: "f",
+      description: "Remove the managed files without the confirmation prompt.",
+    }),
+  };
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Eject);
@@ -156,13 +167,42 @@ export default class Eject extends BaseCommand {
       removed.push(rel);
     }
 
+    // Guidance sections live inside user-owned docs (README.md / AGENTS.md):
+    // strip only the marker-fenced section so the stale golden path doesn't
+    // outlive the files it points at. The whole file goes only when nothing
+    // but the scaffold-created header (or whitespace) would remain — i.e. we
+    // created it and nobody added anything since.
+    for (const rel of actions.guidanceFiles) {
+      const abs = join(cwd, rel);
+      if (!(await pathExists(abs))) {
+        continue;
+      }
+      const contents = await readFile(abs, "utf8").catch(() => "");
+      const stripped = removeGuidanceSection(contents);
+      if (stripped === contents) {
+        continue;
+      }
+      const husk = stripped.trim() === "" || stripped.trim() === AGENTS_HEADER.trim();
+      if (!dryRun) {
+        if (husk) {
+          await rm(abs, { force: true });
+        } else {
+          await writeFile(abs, stripped);
+        }
+      }
+      removed.push(husk ? rel : `${rel} (managed section)`);
+    }
+
     // In-place config merges (vite.config.ts / angular.json / nuxt.config.ts)
-    // can't be auto-reverted, so surface them as manual cleanup steps. The
-    // Angular patcher also edits package.json (a `dev` script, not a config
-    // block), so word that one accurately.
+    // can't be auto-reverted, so surface them as manual cleanup steps.
+    // package.json is not a config block: Angular has its `dev` script added
+    // outright, while Next and Nuxt keep theirs and only get the dev-server
+    // port pinned into it — one line has to cover both, so it names the
+    // script and both ways setup touches it rather than claiming the script
+    // itself should go.
     const manualSteps = actions.configEdits.map((rel) => {
       if (rel === "package.json" || rel.endsWith("/package.json")) {
-        return `Remove the "dev" script setup added to ${rel}`;
+        return `Restore the "dev" script in ${rel} (setup added the script, or pinned its dev-server port)`;
       }
       if (rel === "angular.json" || rel.endsWith("/angular.json")) {
         return `Remove the Zitadel proxyConfig (and dev-server port) from the serve target in ${rel}`;

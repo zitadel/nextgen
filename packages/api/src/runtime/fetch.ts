@@ -1,4 +1,13 @@
-import { getApiAuthToken } from "./auth";
+import { apiCsrfRejectionHandlerFor, apiCsrfTokenFor, getApiAuthToken } from "./auth";
+
+/** The header the session-bound CSRF token travels in (ADR 053 §5). */
+export const CSRF_HEADER = "X-Zitadel-CSRF";
+
+// Mirrors the server's list (`httputil.IsSafeMethod` in `internal/httputil`).
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/** The code the server answers a refused CSRF check with. */
+const CSRF_INVALID = "auth.csrf_invalid";
 
 /**
  * Framework-neutral failure type the orval-generated client throws on
@@ -26,31 +35,112 @@ export class ApiError extends Error {
 }
 
 /**
+ * Thrown when a request got no response at all: the connection was refused or
+ * reset, the host did not resolve, or the server accepted the connection but
+ * did not answer in time. The counterpart to {@link ApiError}, which is a
+ * response that came back with a failing status.
+ *
+ * `fetch` only rejects when no response arrived, so this is decided by the
+ * fact that it rejected, never by how a runtime words the failure. The
+ * runtime's own error stays on `cause` for debugging.
+ */
+export class NetworkError extends Error {
+  readonly url: string;
+  /** `timeout` when a deadline cut the request off, `unreachable` otherwise. */
+  readonly reason: "unreachable" | "timeout";
+
+  constructor(
+    url: string,
+    reason: "unreachable" | "timeout",
+    message: string,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = "NetworkError";
+    this.url = url;
+    this.reason = reason;
+  }
+}
+
+/**
+ * What every request a client makes is bound by. Set per call by
+ * `createZitadelClient`, the same way as the base URL and token, and read at
+ * the top of {@link customFetch} before its first `await`.
+ */
+export type RequestPolicy = {
+  /** Aborts every request made while it is set; its reason is rethrown as is. */
+  signal?: AbortSignal;
+  /** Per-request deadline, covering the response body as well as the headers. */
+  timeoutMs?: number;
+};
+
+let requestPolicy: RequestPolicy = {};
+
+export function setRequestPolicy(policy: RequestPolicy): void {
+  requestPolicy = policy;
+}
+
+/**
  * The orval `mutator` for the fetch client. Every generated operation
  * routes its request through this function instead of the global
  * `fetch`. We pin three concerns here so generated call sites stay
  * focused on the shape of one HTTP call:
  *
  * - bearer auth — read from `runtime/auth.ts` and attached automatically;
+ * - the CSRF header — the session-bound token from `runtime/auth.ts`, on
+ *   unsafe methods to the origin it was issued for, when a first-party surface
+ *   has set one; an unsafe request to that origin refused with
+ *   `403 auth.csrf_invalid` asks the registered rejection handler for a fresh
+ *   token and is retried once with it, only if the handler returns one (the
+ *   session still belongs to the same person);
  * - non-2xx → throw — orval's stock client parses the body regardless
  *   of status, so callers would have to inspect every response. Throw
  *   `ApiError` on `!res.ok` so failures interrupt control flow;
  * - body parsing — return the parsed JSON typed as `T` (the operation's
  *   return type, threaded through by orval), or `undefined` for the
- *   spec's `204`/`205`/`304` no-body responses.
+ *   spec's `204`/`205`/`304` no-body responses;
+ * - no response → throw {@link NetworkError}, or the abort reason when the
+ *   caller cancelled (see {@link request}).
  */
 export async function customFetch<T>(url: string, options: RequestInit): Promise<T> {
+  // The client sets the policy per call, so it is read before the first await;
+  // the retry below runs under the same policy as the first attempt.
+  const policy = requestPolicy;
   const token = getApiAuthToken();
   const headers = new Headers(options.headers);
   if (token && !headers.has("authorization")) {
     headers.set("authorization", `Bearer ${token}`);
   }
+  const method = (options.method ?? "GET").toUpperCase();
+  const unsafe = !SAFE_METHODS.has(method) && !headers.has(CSRF_HEADER);
+  // The token and the rejection handler belong to one server: a request to
+  // any other origin gets neither.
+  const target = originOf(url);
+  const csrfToken = apiCsrfTokenFor(target);
+  if (unsafe && csrfToken) {
+    headers.set(CSRF_HEADER, csrfToken);
+  }
 
-  const res = await fetch(url, { ...options, headers });
+  let { res, rawBody: parsed } = await request(url, { ...options, headers }, policy, readBody);
 
-  const noBody = [204, 205, 304].includes(res.status);
-  const rawBody = noBody ? "" : await res.text();
-  const parsed = rawBody ? (safeJsonParse(rawBody) as unknown) : undefined;
+  // The token was stale (the session cookie changed under this page) or never
+  // loaded. The app re-checks the session and hands back a fresh token only if
+  // it still belongs to the same person; then the request is retried once. A
+  // body that can be read only once cannot be sent again, so it is not retried.
+  const onRejected = apiCsrfRejectionHandlerFor(target);
+  if (
+    unsafe &&
+    onRejected &&
+    res.status === 403 &&
+    apiErrorCode(parsed) === CSRF_INVALID &&
+    !isStream(options.body)
+  ) {
+    const fresh = await onRejected().catch(() => undefined);
+    if (fresh && fresh !== csrfToken) {
+      headers.set(CSRF_HEADER, fresh);
+      ({ res, rawBody: parsed } = await request(url, { ...options, headers }, policy, readBody));
+    }
+  }
 
   if (!res.ok) {
     const message = `${options.method ?? "GET"} ${url} returned ${res.status}`;
@@ -58,6 +148,92 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
   }
 
   return parsed as T;
+}
+
+/** The parsed body, or `undefined` for the spec's no-body responses. */
+async function readBody(res: Response): Promise<unknown> {
+  if ([204, 205, 304].includes(res.status)) return undefined;
+  const rawBody = await res.text();
+  return rawBody ? (safeJsonParse(rawBody) as unknown) : undefined;
+}
+
+/** The request's origin, resolved against the page for a relative URL. */
+function originOf(url: string): string | undefined {
+  try {
+    return new URL(url, (globalThis as { location?: { href?: string } }).location?.href).origin;
+  } catch {
+    return undefined;
+  }
+}
+
+function isStream(body: RequestInit["body"]): boolean {
+  return typeof ReadableStream !== "undefined" && body instanceof ReadableStream;
+}
+
+/**
+ * `fetch` bound by a {@link RequestPolicy}, with its failures typed.
+ *
+ * The policy's signal, its deadline and any signal on `init` are combined, and
+ * `read` runs under them too, so a server that sends headers and then stalls
+ * mid-body is cut off as well. When the request does not complete:
+ *
+ * - a deadline fired → {@link NetworkError} with reason `timeout`;
+ * - any other abort → the signal's own reason, rethrown untouched, because a
+ *   cancellation is the caller's decision and the caller knows what it means;
+ * - anything else → {@link NetworkError} with reason `unreachable`.
+ *
+ * Exported for the few callers that need the raw {@link Response} (a
+ * `Set-Cookie` header the generated client does not expose).
+ */
+export async function request<R = undefined>(
+  url: string,
+  init: RequestInit,
+  policy: RequestPolicy = {},
+  read?: (res: Response) => Promise<R>,
+): Promise<{ res: Response; rawBody: R }> {
+  const signals = [init.signal, policy.signal].filter((signal) => signal != null);
+  if (policy.timeoutMs !== undefined) {
+    signals.push(AbortSignal.timeout(policy.timeoutMs));
+  }
+  const signal = signals.length > 0 ? AbortSignal.any(signals) : undefined;
+  const method = init.method ?? "GET";
+  try {
+    const res = await fetch(url, { ...init, signal });
+    return { res, rawBody: (read ? await read(res) : undefined) as R };
+  } catch (error) {
+    if (signal?.aborted) {
+      const reason: unknown = signal.reason;
+      if (reason instanceof DOMException && reason.name === "TimeoutError") {
+        throw new NetworkError(url, "timeout", `${method} ${url} timed out`, { cause: reason });
+      }
+      throw reason;
+    }
+    const code = errnoOf(error);
+    throw new NetworkError(
+      url,
+      "unreachable",
+      `${method} ${url} got no response${code ? ` (${code})` : ""}`,
+      { cause: error },
+    );
+  }
+}
+
+/**
+ * The errno a runtime attached to a failed request, if any, for the message.
+ * Undici nests it on `cause`, inside an `AggregateError` when it tried more
+ * than one address. Only ever used to describe the failure, never to decide
+ * that it was one.
+ */
+function errnoOf(error: unknown): string | undefined {
+  let node: unknown = error;
+  for (let depth = 0; depth < 4 && typeof node === "object" && node !== null; depth += 1) {
+    const { code, errors } = node as { code?: unknown; errors?: unknown };
+    if (typeof code === "string") {
+      return code;
+    }
+    node = Array.isArray(errors) ? errors[0] : (node as { cause?: unknown }).cause;
+  }
+  return undefined;
 }
 
 /**
@@ -72,4 +248,59 @@ function safeJsonParse(text: string): unknown {
   } catch {
     return { raw: text };
   }
+}
+
+/**
+ * The `code` of the server's `{code, message, details}` error envelope: from an
+ * {@link ApiError}, or from a parsed response body. `undefined` when there is
+ * none, e.g. an HTML error page from a proxy.
+ */
+export function apiErrorCode(errorOrBody: unknown): string | undefined {
+  const body = errorOrBody instanceof ApiError ? errorOrBody.body : errorOrBody;
+  return isRecord(body) && typeof body.code === "string" ? body.code : undefined;
+}
+
+/**
+ * Extracts the server's `{code, message, details}` envelope from an
+ * {@link ApiError} into a display string. Falls back to the fetch layer's
+ * `"METHOD url returned N"` when the body isn't shaped like an envelope, so
+ * transport-level failures (HTML from a proxy, empty 5xx) still say
+ * something.
+ */
+export function apiErrorMessage(error: ApiError): string {
+  const body = error.body;
+  if (!isRecord(body)) {
+    return error.message;
+  }
+  const serverMessage = typeof body.message === "string" ? body.message : undefined;
+  const detail = pickDetailString(body.details);
+  if (!serverMessage) {
+    return error.message;
+  }
+  return detail ? `${serverMessage}: ${detail}` : serverMessage;
+}
+
+/**
+ * Reads the innermost human-readable string out of the spec's error
+ * `details` field. Handles both `details: "..."` and the nested
+ * `details: { details: "..." }` shape the platform emits for validation
+ * failures.
+ */
+function pickDetailString(details: unknown): string | undefined {
+  if (typeof details === "string") {
+    return details;
+  }
+  if (isRecord(details)) {
+    if (typeof details.details === "string") {
+      return details.details;
+    }
+    if (typeof details.message === "string") {
+      return details.message;
+    }
+  }
+  return undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

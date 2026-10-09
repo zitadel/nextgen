@@ -21,10 +21,19 @@ This default includes, without limitation:
 cmd/
 internal/
 apps/console/
+apps/login-ui/
+apps/server/
+apps/server-*/
 ```
 
 The private root workspace package (`package.json`) follows this default
 because it describes the source tree as a whole, not a published client package.
+
+`tools/bench/` — the k6 benchmark harness — is AGPL-3.0-only under this
+default and carries its own copy of the license text. It links
+[k6](https://github.com/grafana/k6), which is itself AGPL-3.0-only, so unlike
+the rest of the AGPL-3.0-only default it is **excluded from any commercial
+licensing** of the product.
 
 The Docker images published from this repository, including
 `ghcr.io/zitadel/nextgen`, are AGPL-3.0-only because they contain the server and
@@ -58,9 +67,9 @@ apps/demo-next/
 apps/demo-nuxt/
 packages/api/
 packages/components/
+packages/config/
 packages/design-tokens/
-packages/shared-component-styles/
-packages/ui-react/
+packages/testing/
 packages/sdk-core/
 packages/sdk-next/
 packages/sdk-*/

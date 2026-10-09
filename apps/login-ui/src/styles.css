@@ -1,5 +1,25 @@
 @import "@zitadel/design-tokens/css/tokens.css";
 
+/* APK Futural — the brand display typeface the design uses for card titles and
+   field labels. Licensed, so it is declared per app rather than shipped by
+   `@zitadel/design-tokens`, which publishes to npm. Regular (400) is the only
+   weight the design draws. Mirrors `apps/console/src/styles.css`. */
+@font-face {
+  font-family: "APK Futural";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src:
+    url("./fonts/apk-futural/APK-Futural-Regular.woff2") format("woff2"),
+    url("./fonts/apk-futural/APK-Futural-Regular.woff") format("woff");
+}
+
+/* No token override needed: `--zl-font-family-heading` already names this face
+   ahead of Arimo (packages/design-tokens/src/overrides.ts), so declaring the
+   `@font-face` is the whole opt-in. The declaration is document-scoped, which
+   is the only scope that registers a face — an `@font-face` inside a shadow
+   tree is ignored — and shadow content resolves against it. */
+
 html,
 body {
   margin: 0;
@@ -8,4 +28,87 @@ body {
 
 #app {
   min-height: 100vh;
+}
+
+/*
+ * The two screens the shell paints itself instead of the widget (`src/main.ts`):
+ * the setup hint, when the deployment has no project yet, and the connectivity
+ * error, when its runtime document could not be read at all. The widget paints
+ * its own page chrome, so these have to bring their own surface — dark-only.
+ */
+.shell-notice {
+  box-sizing: border-box;
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2.5rem 1rem;
+  background: var(--zl-background);
+  color: var(--zl-foreground);
+  font-family: var(--zl-font-family-sans);
+  text-align: center;
+}
+
+.shell-notice h1 {
+  margin: 0;
+  font-family: var(--zl-font-family-heading);
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.shell-notice p {
+  margin: 0;
+  max-width: 32rem;
+  color: var(--zl-muted-foreground);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.shell-notice code {
+  border-radius: 4px;
+  background: var(--zl-accent);
+  padding: 0.1rem 0.35rem;
+  color: var(--zl-foreground);
+  font-family: var(--zl-font-family-mono);
+  font-size: 0.85em;
+}
+
+/*
+ * The failure clause on the connectivity error. Present but demoted: it is the
+ * only actionable line for whoever can fix the deployment, and noise to the
+ * person who just wanted to sign in.
+ */
+.shell-notice__detail {
+  color: var(--zl-muted-foreground);
+  font-size: 0.8125rem;
+}
+
+.shell-notice__detail code {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+
+.shell-notice button {
+  margin-top: 0.5rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--zl-primary);
+  padding: 0.5rem 1.25rem;
+  color: var(--zl-primary-foreground);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.shell-notice button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--zl-primary) 90%, var(--zl-background));
+}
+
+.shell-notice button:disabled {
+  cursor: default;
+  opacity: 0.6;
 }

@@ -12,12 +12,14 @@ import {
   localContainerName,
   readRuntimeMetadata,
 } from "../lib/local-server/runtime";
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
 import { publicCliCommand } from "../lib/public-cli";
 
 export default class Stop extends BaseCommand {
   static override description = "Stop the local Zitadel server.";
+  static override group = CommandGroups.localServer;
+  static override groupOrder = 2;
   static override flags = {
     all: Flags.boolean({
       description: "Stop all discovered CLI-managed local Zitadel runtime processes.",
@@ -57,7 +59,7 @@ export default class Stop extends BaseCommand {
       });
     }
 
-    let stopResult: Awaited<ReturnType<typeof stopBinaryRuntime>> | undefined;
+    let stopResult: StopBinaryRuntimeResult | undefined;
     if (runtime?.backend === "binary") {
       stopResult = await stopBinaryRuntime(runtime.pid);
       if (stopResult.status === "failed") {
@@ -80,7 +82,11 @@ export default class Stop extends BaseCommand {
         runtime: {
           backend: runtime?.backend ?? "missing",
           ...(runtime?.backend === "binary"
-            ? { pid: runtime.pid, log_path: runtime.log_path, stop_result: stopResult }
+            ? {
+                pid: runtime.pid,
+                log_path: runtime.log_path,
+                stop_result: stopResult,
+              }
             : { container_name: containerName }),
           data_preserved: true,
           data_dir: runtime?.data_dir,

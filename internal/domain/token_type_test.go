@@ -35,6 +35,15 @@ func TestTokenType_Persistable(t *testing.T) {
 	require.True(t, domain.TokenTypePersonalAccessToken.Persistable())
 }
 
+func TestTokenType_IsProjectSecret(t *testing.T) {
+	t.Parallel()
+	require.True(t, domain.TokenTypeProjectToken.IsProjectSecret())
+	require.True(t, domain.TokenTypeProjectPreview.IsProjectSecret())
+	require.False(t, domain.TokenTypeUnspecified.IsProjectSecret())
+	require.False(t, domain.TokenTypeSessionToken.IsProjectSecret())
+	require.False(t, domain.TokenTypeJWTProfile.IsProjectSecret())
+}
+
 func TestTokenType_Value_notPersistable(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []domain.TokenType{

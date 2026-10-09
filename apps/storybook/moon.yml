@@ -6,42 +6,25 @@ dependsOn:
   - "api"
   - "api-mock"
   - "components"
+  - "config"
   - "design-tokens"
-  - "ui-react"
 
 tasks:
-  lint:
-    command: "corepack pnpm exec oxlint ."
-    deps:
-      - "components:build"
-      - "design-tokens:build"
-      - "ui-react:build"
-
   typecheck:
-    # Runs `tsc --build`: it compiles the referenced `api`/`api-mock` composite
-    # projects (their `dist/*.d.ts` are not produced by their tsdown/no-op
-    # `build` tasks) before type-checking the Storybook program. `api-mock:build`
-    # is a no-op, but the dep edge makes Moon re-run this when api-mock source
-    # changes, since `tsc --build` reads that source directly.
-    command: "corepack pnpm run typecheck"
+    # Resolves workspace packages from source via the `@zitadel/source`
+    # condition; these build deps (through api:build) keep the generated
+    # api client present.
     deps:
-      - "api:build"
       - "api-mock:build"
       - "components:build"
-      - "design-tokens:build"
-      - "ui-react:build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
-      - "api:build"
+      - "api-mock:build"
       - "components:build"
-      - "design-tokens:build"
-      - "ui-react:build"
-    outputs:
-      - "storybook-static/**/*"
-    options:
-      runInCI: false
+    # Runs in CI: the Vercel deploy builds the static site from this task, and
+    # Vercel is a CI environment, so a `runInCI: false` here would make moon
+    # report "no tasks found" for `storybook:build` and fail the deploy.
 
   # Installs the Chromium that @storybook/addon-vitest drives. Mirrors the
   # journey e2e pattern (browsers aren't preinstalled on CI runners).
@@ -54,16 +37,27 @@ tasks:
   # (render smoke + play interactions + a11y). Replaces the old console-e2e
   # visual-parity sweep and runs in CI via `moon ci :test`.
   test:
-    command: "corepack pnpm run test"
     deps:
       - "install-browsers"
-      - "api:build"
+      - "api-mock:build"
       - "components:build"
-      - "design-tokens:build"
-      - "ui-react:build"
+    options:
+      # Shared mutex with the other browser-mode suites so only one real-Chromium
+      # Vite server runs at a time; concurrent servers starve under moon's CI
+      # graph and drop module fetches. (#1490)
+      mutex: "browser-tests"
+      # Retry a failed browser suite in CI. The flake is a cold-start race:
+      # the first attempt warms the Vite dep cache, so a retry runs warm and
+      # clears the "Failed to fetch dynamically imported module" failure. (#1490)
+      retryCount: 3
 
+  # Loads the same packages as build.
   dev:
     command: "corepack pnpm run dev"
+    deps:
+      # .storybook/main.ts imports @zitadel/api-mock/public-dir under Node.
+      - "api-mock:build"
+      - "components:build"
     options:
       persistent: true
       runInCI: false

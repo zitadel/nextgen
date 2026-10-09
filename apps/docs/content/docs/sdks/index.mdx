@@ -29,6 +29,9 @@ The same shared auth widgets, rendered client-side. They need a same-origin prox
   <Card title="React" href="/docs/sdks/react" description="Client-side login/logout widgets for Vite and other SPA deployments." />
   <Card title="Vue" href="/docs/sdks/vue" description="Vue 3 wrappers around the shared login/logout components." />
   <Card title="Angular" href="/docs/sdks/angular" description="Standalone Angular components for the shared Zitadel auth UI." />
+  <Card title="Solid" href="/docs/sdks/solid" description="Solid wrappers around the shared login/logout components." />
+  <Card title="Svelte" href="/docs/sdks/svelte" description="Svelte 5 wrappers around the shared login/logout components." />
+  <Card title="Qwik" href="/docs/sdks/qwik" description="Qwik wrappers with QRL flow callbacks around the shared auth UI." />
 </Cards>
 
 ## Building blocks
@@ -51,7 +54,10 @@ All packages ship on the `@alpha` dist-tag and move together as one train.
 | React | `@zitadel/sdk-react` | SPA | Vite dev proxy / your deploy proxy | Vite proxy + auth UI |
 | Vue | `@zitadel/sdk-vue` | SPA | Vite dev proxy / your deploy proxy | Vite proxy + auth UI |
 | Angular | `@zitadel/sdk-angular` | SPA | dev-server proxy / your deploy proxy | proxy config + components |
+| Solid | `@zitadel/sdk-solid` | SPA | Vite dev proxy / your deploy proxy | Vite proxy + auth UI |
+| Svelte | `@zitadel/sdk-svelte` | SPA | Vite dev proxy / your deploy proxy | Vite proxy + auth UI |
+| Qwik | `@zitadel/sdk-qwik` | SPA | Vite dev proxy / your deploy proxy | Vite proxy + auth UI |
 | Components | `@zitadel/components` | Web components | n/a (wrapped by an SDK) | — |
 | API client | `@zitadel/api` | n/a | n/a | typed client |
 
-The same-origin proxy is the one concept shared by every SDK. See [SDK proxy](/docs/concepts/sdk-proxy) for why `/__nextgen/*` must be same-origin and how the project service key is attached.
+The same-origin proxy is the one concept shared by every SDK. See [SDK proxy](/docs/concepts/sdk-proxy) for why `/__nextgen/*` must be same-origin and how credentials are scoped to it.

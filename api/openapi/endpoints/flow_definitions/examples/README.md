@@ -1,6 +1,6 @@
 # Flow Definition Examples
 
-Working examples of flow definitions accepted by `POST /flow-definition`. Each
+Working examples of flow definitions accepted by `POST /flow_definitions`. Each
 example exercises a different slice of the engine's currently supported
 capabilities, ordered from minimal to combined.
 
@@ -23,9 +23,16 @@ For the shape and validation rules, see
 | [05](./05-combined-login-register/) | `login` + `register` | password | Flip-table coverage between sub-flows. |
 | [06](./06-combined-password-passkey/) | `login` + `register` | password, passkey | Both methods on both purposes plus post-signup passkey upsell. |
 
-The existing `default-login-flow-definition.json` at the root of this folder is
-embedded by the server as the default project flow; it mirrors example 06 but
-uses terminal `show`.
+The server's embedded default project flow is
+`packages/config/defaults/default-login.json` (via `embed.go`) — that file is
+the authority for the default flow's shape. The
+`default-login-flow-definition.json` at the root of this folder is a separate
+copy that `POST /flow_definitions` still publishes as its `defaultLoginFlow`
+OpenAPI example (`externalValue` in `../methods.yaml`); it mirrors example 06
+but uses terminal `show`, differs from the embedded default, and — unlike the
+numbered examples — is not covered by `TestExampleFlowDefinitions`, so treat
+it as illustrative only. Repointing the OpenAPI example at the authoritative
+default (or bringing this copy under the test) is a tracked follow-up.
 
 ## Reading a definition
 
@@ -33,8 +40,9 @@ A flow definition is a directed graph. The engine derives step behavior from
 the properties present on the step — there is no step `type`:
 
 - A step with `fields` collects user input validated against the
-  `user_schema`. Schema annotations (`x-unique`, `x-password`,
-  `x-auth-methods`) drive implicit dispatch behavior at runtime.
+  `user_schema`. Schema annotations (`x-unique`, `x-auth-methods`)
+  and reserved credential field names (`x-auth-methods#<method>`)
+  drive implicit dispatch behavior at runtime.
 - A step with `actions` exposes user-selectable buttons. Two action names are
   engine-handled — `passkey` (login) and `passkey_register` (signup) — and
   trigger the two-phase WebAuthn ceremony.

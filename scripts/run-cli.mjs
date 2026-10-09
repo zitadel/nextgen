@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
+import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,16 +12,19 @@ import {
 } from "../apps/cli-journey-e2e/scripts/local-registry.mjs";
 import { buildLocalRuntimeImage, LOCAL_RUNTIME_IMAGE } from "./build-local-runtime-image.mjs";
 import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
+import { readServerBuildMetadata } from "./server-build.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const cliBin = join(repoRoot, "apps/cli/bin/run.js");
 const localServerBinary = join(repoRoot, "dist/server/nextgen");
+const localServerMetadata = join(repoRoot, "dist/server/metadata.json");
 const localRegistryWorkDir = join(repoRoot, "tmp", "cli-local-registry");
 
 export async function main(options = {}) {
   const args = options.args ?? forwardedArgs();
   const env = options.env ?? process.env;
   const runFn = options.run ?? run;
+  const assertFreshInstallFn = options.assertFreshInstall ?? assertFreshInstall;
   const runCaptureFn = options.runCapture ?? runCapture;
   const buildCliFn = options.buildCli ?? buildCli;
   const buildLocalServerBinaryFn = options.buildLocalServerBinary ?? buildLocalServerBinary;
@@ -32,10 +36,13 @@ export async function main(options = {}) {
   const cliCwd = options.cwd ?? cliCwdFor(env);
   let registryProcess;
 
+  await assertFreshInstallFn();
   await buildCliFn({ env });
 
   if (shouldUseLocalServerBinary(args, env)) {
-    cliEnv.ZITADEL_SERVER_BINARY = await buildLocalServerBinaryFn({ env });
+    const localServer = await buildLocalServerBinaryFn({ env });
+    cliEnv.ZITADEL_SERVER_BINARY = localServer.path;
+    cliEnv.ZITADEL_SERVER_BINARY_VERSION = localServer.version;
   }
 
   if (shouldPrepareLocalPackages(args, env)) {
@@ -73,6 +80,36 @@ export async function main(options = {}) {
     if (registryProcess) {
       await stopLocalRegistryFn(registryProcess);
     }
+  }
+}
+
+// A stale install (lockfile changed since the last `pnpm install`) makes the
+// task chain behind every CLI command fail deep inside cli:test with
+// misleading module-resolution errors, so fail fast with the remedy instead.
+// mtime is a heuristic: a branch switch can rewrite an unchanged lockfile and
+// report stale, but the remedy is then a fast no-op install.
+export async function assertFreshInstall(root = repoRoot, statFn = stat) {
+  // Only "not there" counts as missing; EACCES and friends are real problems
+  // the guard must not silently shrug off.
+  const statIfExists = async (path) => {
+    try {
+      return await statFn(path);
+    } catch (error) {
+      if (error?.code === "ENOENT" || error?.code === "ENOTDIR") {
+        return undefined;
+      }
+      throw error;
+    }
+  };
+  const lockfile = await statIfExists(join(root, "pnpm-lock.yaml"));
+  if (!lockfile) {
+    return;
+  }
+  const installed = await statIfExists(join(root, "node_modules", ".pnpm", "lock.yaml"));
+  if (!installed || installed.mtimeMs < lockfile.mtimeMs) {
+    throw new Error(
+      "workspace dependencies are missing or older than pnpm-lock.yaml. Run: corepack pnpm install --frozen-lockfile",
+    );
   }
 }
 
@@ -207,13 +244,11 @@ export function buildCli({ env = process.env } = {}) {
 }
 
 export async function buildLocalServerBinary({ env = process.env } = {}) {
-  await runMoonToStderr(
-    ["run", "console:build", "login-ui:build"],
-    "moon run console:build login-ui:build",
-    env,
-  );
+  // server:build deps console:build and login-ui:build, so one invocation
+  // produces the fully embedded binary in graph order.
   await runMoonToStderr(["run", "server:build"], "moon run server:build", env);
-  return localServerBinary;
+  const metadata = await readServerBuildMetadata(localServerMetadata);
+  return { path: localServerBinary, version: metadata.version };
 }
 
 function runMoonToStderr(args, label, env = process.env) {

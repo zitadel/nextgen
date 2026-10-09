@@ -1,14 +1,13 @@
 package domain
 
 import (
-	"context"
 	"time"
-
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+const PrefixUserTOTP ResourcePrefix = "utotp"
+
 type UserTOTP struct {
-	ID                  int64
+	ID                  string
 	ProjectID           string
 	UserID              string
 	Secret              []byte
@@ -20,35 +19,25 @@ type UserTOTP struct {
 }
 
 type CreateUserTOTP struct {
-	ProjectID      string
-	UserID         string
-	Secret         []byte
-	VerificationID *string
+	ID        string
+	ProjectID string
+	UserID    string
+	Secret    []byte
 }
 
-type UserTOTPRepository interface {
-	Repository
+// UserTOTPField enumerates the fields of UserTOTP which can be used for
+// filtering and ordering in list operations.
+type UserTOTPField uint8
 
-	userTOTPConditions
-	userTOTPChanges
-
-	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*UserTOTP, error)
-	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*UserTOTP, error)
-	Create(ctx context.Context, client database.QueryExecutor, totp *CreateUserTOTP) error
-	Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error
-}
-
-type userTOTPConditions interface {
-	ProjectIDCondition(projectID string) database.Condition
-	UserIDCondition(userID string) database.Condition
-	PrimaryKeyCondition(id int64) database.Condition
-	UniqueCondition(projectID, userID string) database.Condition
-}
-
-type userTOTPChanges interface {
-	SetSecret([]byte) database.Change
-	SetVerifiedAt(time.Time) database.Change
-	SetLastSuccessfulCheck(time.Time) database.Change
-	IncrementFailedAttempts() database.Change
-	ResetFailedAttempts() database.Change
-}
+const (
+	UserTOTPFieldUnspecified UserTOTPField = iota
+	UserTOTPFieldID
+	UserTOTPFieldProjectID
+	UserTOTPFieldUserID
+	UserTOTPFieldSecret
+	UserTOTPFieldVerifiedAt
+	UserTOTPFieldLastSuccessfulCheck
+	UserTOTPFieldFailedAttempts
+	UserTOTPFieldCreatedAt
+	UserTOTPFieldUpdatedAt
+)

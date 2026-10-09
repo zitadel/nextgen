@@ -10,22 +10,18 @@
  *   - Step descriptions: `<step>.description`
  *   - Field labels:      `<step>.field.<field>`
  *   - Action labels:     `<step>.action.<action>`
- *
- * Copy aligned to Figma screens file `xkvBjkOJ8ENuHdTGZHXezK` (May 2026).
- * MVP only — multi-locale support is deferred.
  */
 export const en: Record<string, string> = {
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: identifier (email entry — first screen)
-  // Figma 2xl `6593:141983`, card `6593:141985`, stack `6593:141989`
   // ═══════════════════════════════════════════════════════════════════════════
   "identifier.title": "Sign in",
   "identifier.description": "Enter your email to continue",
-  "identifier.field.email": "Work email",
-  "identifier.field.email.placeholder": "you@company.com",
+  "identifier.field.email": "Email",
+  "identifier.field.email.placeholder": "you@example.com",
   "identifier.field.password": "Password",
   "identifier.action.submit": "Sign in",
-  "identifier.action.continue": "Sign in",
+  "identifier.action.continue": "Continue",
   "identifier.action.passkey": "Sign in with a passkey",
   "identifier.action.register.lead": "Don't have an account? ",
   "identifier.action.register.link": "Sign up",
@@ -51,8 +47,8 @@ export const en: Record<string, string> = {
   // ═══════════════════════════════════════════════════════════════════════════
   "collect-credentials.title": "Create your account",
   "collect-credentials.description": "Set up your email and password",
-  "collect-credentials.field.email": "Work email",
-  "collect-credentials.field.email.placeholder": "you@company.com",
+  "collect-credentials.field.email": "Email",
+  "collect-credentials.field.email.placeholder": "you@example.com",
   "collect-credentials.field.password": "Password",
   // No static password rule hint: the only enforced rule is the schema's
   // minLength, and "symbol + number" was never enforced. The client will build
@@ -67,10 +63,10 @@ export const en: Record<string, string> = {
   "register-password.description": "Choose a secure password for your account",
   "register-password.field.password": "Password",
   "register-password.action.submit": "Sign up",
+  "register-password.action.back": "Back",
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: passkey-upsell (passkey enrollment offer — after registration)
-  // Figma `6594:630`, heading `6594:89142`, body `6594:12796`
   // ═══════════════════════════════════════════════════════════════════════════
   "passkey-upsell.title": "Sign in faster next time",
   "passkey-upsell.description": "No password needed ever again.",
@@ -78,7 +74,7 @@ export const en: Record<string, string> = {
   "passkey-upsell.description.line2": "Sign in with Face ID, Touch ID, or PIN.",
   "passkey-upsell.action.passkey_register": "Set up passkey",
   "passkey-upsell.action.skip": "Skip for now",
-  // Figma `6594:630` setup-passkey annotations — kept for backward compat.
+  // Setup-passkey copy — kept for backward compat.
   "passkey-upsell.action.setup": "Set up passkey",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -86,8 +82,8 @@ export const en: Record<string, string> = {
   // ═══════════════════════════════════════════════════════════════════════════
   "collect-passkey-email.title": "Create your account",
   "collect-passkey-email.description": "Enter your email to set up a passkey",
-  "collect-passkey-email.field.email": "Work email",
-  "collect-passkey-email.field.email.placeholder": "you@company.com",
+  "collect-passkey-email.field.email": "Email",
+  "collect-passkey-email.field.email.placeholder": "you@example.com",
   "collect-passkey-email.action.submit": "Continue",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -99,9 +95,8 @@ export const en: Record<string, string> = {
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: done (terminal — signed-in confirmation)
-  // Figma `6596:132846`
   // ═══════════════════════════════════════════════════════════════════════════
-  "done.title": "You're signed in as",
+  "done.title": "You're signed in",
   "done.description": "",
 
   // --- Step-name aliases used by the default login flow ---
@@ -110,17 +105,18 @@ export const en: Record<string, string> = {
   "password.field.password": "Password",
   "password.action.signin": "Sign in",
   "password.action.passkey": "Sign in with a passkey",
+  "password.action.back": "Back",
   "password.action.register.lead": "Don't have an account? ",
   "password.action.register.link": "Sign up",
 
   "register.title": "Create your account",
-  // Empty by design — the sign-up card has no subheadline (Figma 6593:141743).
-  "register.description": "",
-  "register.field.email": "Work email",
-  "register.field.email.placeholder": "you@company.com",
+  "register.description": "Enter your details to get started",
+  "register.field.email": "Email",
+  "register.field.email.placeholder": "you@example.com",
   "register.field.password": "Password",
   "register.field.givenName": "Given name",
   "register.field.familyName": "Family name",
+  "register.field.companyName": "Company name",
   // Native <input type="date"> localizes its own display format to the user's
   // locale and submits ISO YYYY-MM-DD — no placeholder/help format hint needed.
   "register.field.dateOfBirth": "Date of birth",
@@ -130,15 +126,22 @@ export const en: Record<string, string> = {
   "register.action.password": "Continue with password",
   "register.action.passkey": "Continue with a passkey",
   "register.action.submit": "Sign up",
+  "register.action.back": "Back",
   "register.action.sign_in.lead": "Already have an account? ",
   "register.action.sign_in.link": "Sign in",
 
-  "complete.title": "You're signed in as",
+  "complete.title": "You're signed in",
   "signed-in.continue": "Continue",
-  "signed-in.logout": "Logout",
+  "signed-in.logout": "Sign out",
 
   // --- Passkey login ---
   "passkey-login.title": "Sign in with your passkey",
+
+  // --- Step: passkey-first (entry step of the passkey-first preset) ---
+  "passkey-first.title": "Sign in",
+  "passkey-first.description": "Use your passkey to continue",
+  "passkey-first.action.passkey": "Continue with passkey",
+  "passkey-first.action.email_fallback": "Use email instead",
 
   // --- Password recovery ---
   "recover.title": "Check your email",
@@ -150,31 +153,85 @@ export const en: Record<string, string> = {
   "submit.signin": "Sign in",
   "action.forgot_password": "Forgot password?",
   "action.cancel": "Cancel",
+  // Generic fallback for the engine-injected `<step>.action.back` key on
+  // custom step names (see INJECTED_KEY_FALLBACKS in liquid.ts).
+  "action.back": "Back",
 
   // --- SSO ---
   "sso.redirect.title": "Redirecting to your provider…",
+  // `{name}` is replaced with the provider's own name by <zl-sso-providers>,
+  // so one key covers every vendor the project enables.
+  "sso.continue_with": "Continue with {name}",
+  "sso.divider": "or",
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Step: register-sso (the provider returned someone new — collect the rest)
+  // ═══════════════════════════════════════════════════════════════════════════
+  "register-sso.title": "Finish creating your account",
+  "register-sso.description": "We need a little more to set you up",
+  "register-sso.field.email": "Email",
+  "register-sso.action.submit": "Create account",
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Step: sso-conflict (that email already has an account here)
+  // ═══════════════════════════════════════════════════════════════════════════
+  "sso-conflict.title": "You already have an account",
+  "sso-conflict.description": "Sign in the way you usually do to continue",
+  "sso-conflict.field.password": "Password",
+  "sso-conflict.action.submit": "Sign in",
+  "sso-conflict.action.passkey": "Use a passkey",
+  "sso-conflict.action.sign_in": "Back to sign in",
+
+  // --- Passkey ceremony ---
+  "passkey.pending.status": "Waiting for your passkey…",
 
   // --- Passkey errors ---
-  "error.passkey_cancelled": "Passkey setup was cancelled",
+  // Covers both user dismissal and any close the browser reports as
+  // NotAllowedError — it fires for login and registration ceremonies alike.
+  "error.passkey_cancelled": "The passkey prompt was closed before completing.",
+  "error.passkey_timeout": "The passkey request timed out. Please try again.",
   "error.passkey_not_registered":
     "This passkey is not registered. Please sign in with your email and password.",
   "error.passkey_setup_failed": "Passkey registration did not complete. Please try again.",
   "error.passkey_unsupported": "This device does not support passkeys",
   "error.passkey_failed": "Something went wrong. Please try again.",
+  "error.passkey_invalid": "This passkey could not be verified. Please try again.",
+  "error.sso_creation_disabled":
+    "There is no account for this sign-in, and new accounts cannot be created with this provider.",
+  "error.flow_restart_required": "Your sign-in could not be continued. Please start again.",
+  "error.passkey_registration_invalid":
+    "The new passkey could not be verified. Please try registering it again.",
+  "error.sso_unavailable":
+    "This sign-in provider is not available right now. Please try another way to sign in.",
 
-  // --- Field / form errors (Figma field annotations) ---
+  // --- Field / form errors ---
   "error.email_required": "Please enter an email address",
   "error.email_invalid": "Please enter a valid email",
   "error.password_required": "Please enter a password",
   "error.password_incorrect": "Wrong email or password.",
   "error.email_exists": "An account with this email already exists.",
-  /** Figma sign-in error `6602:180268` — inline on password field. */
+  /** Sign-in error, inline on the password field. */
   "error.invalid_credentials": "Wrong email or password.",
   "error.required": "This field is required.",
 
-  // --- Sign-in form-level alert (Figma `6594:125237`, alert `6596:132779`) ---
+  // --- Generic field-rule fallbacks ({0} = field label) ---
+  // Used by `localiseFlowErrorKeys` (liquid.ts) when no field-specific
+  // entry exists for a server-emitted `error.<field>_<rule>` key.
+  "error.field_required": "{0} is required.",
+  "error.field_format": "Please enter a valid {0}.",
+  "error.field_min_length": "{0} is too short.",
+  "error.field_max_length": "{0} is too long.",
+  "error.field_invalid": "Please check {0}.",
+
+  // --- Sign-in form-level alert ---
   "error.sign_in_server.title": "We couldn't complete your sign in.",
   "error.sign_in_server.body": "Please try again in a few minutes",
+  "error.sso_cancelled.title": "Sign-in cancelled",
+  "error.sso_cancelled.body":
+    "You cancelled signing in with the provider, or it declined the request. You can try again or use another method.",
+  "error.sso_failed.title": "Sign-in failed",
+  "error.sso_failed.body": "The sign-in could not be completed. Please try again.",
+  "error.more_info": "More information",
 };
 
 export type Locale = Record<string, string>;

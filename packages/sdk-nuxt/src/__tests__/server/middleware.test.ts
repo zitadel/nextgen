@@ -3,6 +3,7 @@ import { generateKeyPairSync, createSign } from "node:crypto";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { createNextgenMiddleware } from "../../runtime/server/middleware";
+import { setRuntimeConfig } from "../stubs/nuxt-imports";
 
 function base64url(buf: Buffer): string {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -13,7 +14,6 @@ const { privateKey, publicKey } = generateKeyPairSync("rsa", {
 });
 const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
 const publicKeyJwk = publicKey.export({
-  type: "spki",
   format: "jwk",
 }) as Record<string, unknown>;
 
@@ -53,16 +53,36 @@ function makeJwt(
   return `${signing}.${base64url(sig)}`;
 }
 
-function makeWebRequest(url: string, cookie?: string, authorization?: string): Request {
+/**
+ * Stubs the opaque-token fallback path: `/sessions/me` answers `status` with
+ * the given body, anything else (a JWKS lookup) 404s so the JWT path cannot
+ * accidentally succeed.
+ */
+function mockSessionsMe(body: Record<string, unknown>, status = 200): ReturnType<typeof vi.fn> {
+  return vi.fn().mockImplementation((url: string) => {
+    const res = String(url).endsWith("/sessions/me")
+      ? new Response(JSON.stringify(body), { status })
+      : new Response("{}", { status: 404 });
+    return Promise.resolve(res);
+  });
+}
+
+function makeWebRequest(
+  url: string,
+  cookie?: string,
+  authorization?: string,
+  method = "GET",
+): Request {
   const headers: Record<string, string> = {};
-  if (cookie) headers["cookie"] = cookie;
-  if (authorization) headers["authorization"] = authorization;
-  return new Request(url, { headers });
+  if (cookie) headers.cookie = cookie;
+  if (authorization) headers.authorization = authorization;
+  return new Request(url, { headers, method });
 }
 
 describe("createNextgenMiddleware (H3)", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    setRuntimeConfig({ nextgen: {} });
   });
 
   it("public route with no token sets nextgenAuth to unauthenticated", async () => {
@@ -75,7 +95,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown = undefined;
+    let capturedAuth: unknown;
     app.use("/", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -130,7 +150,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown = undefined;
+    let capturedAuth: unknown;
     app.use("/admin", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -145,8 +165,9 @@ describe("createNextgenMiddleware (H3)", () => {
       isAuthenticated: true,
       session: {
         userId: "user-nuxt",
-        email: "nuxt@example.com",
-        name: null,
+        identifier: "nuxt@example.com",
+        identifierProperty: null,
+        display: null,
         token,
       },
     });
@@ -176,7 +197,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown = undefined;
+    let capturedAuth: unknown;
     app.use("/admin", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -191,8 +212,9 @@ describe("createNextgenMiddleware (H3)", () => {
       isAuthenticated: true,
       session: {
         userId: "user-nuxt",
-        email: "nuxt@example.com",
-        name: null,
+        identifier: "nuxt@example.com",
+        identifierProperty: null,
+        display: null,
         token,
       },
     });
@@ -230,7 +252,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown = undefined;
+    let capturedAuth: unknown;
     app.use("/", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -270,7 +292,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown = undefined;
+    let capturedAuth: unknown;
     app.use("/admin", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -300,7 +322,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown = undefined;
+    let capturedAuth: unknown;
     app.use("/", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -391,7 +413,7 @@ describe("createNextgenMiddleware (H3)", () => {
       }),
     );
 
-    let capturedAuth: unknown = undefined;
+    let capturedAuth: unknown;
     app.use("/admin", (event) => {
       capturedAuth = event.context.nextgenAuth;
       return { ok: true };
@@ -520,6 +542,99 @@ describe("createNextgenMiddleware (H3)", () => {
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });
 
+  it("opaque session token with a user id authenticates as that user", async () => {
+    vi.stubGlobal("fetch", mockSessionsMe({ user_id: "user-opaque" }));
+
+    const app = createApp();
+    app.use(
+      createNextgenMiddleware({
+        url: "http://localhost:4000",
+        protectedRoutes: ["/admin"],
+        loginPath: "/login",
+      }),
+    );
+
+    let capturedAuth: unknown;
+    app.use("/", (event) => {
+      capturedAuth = event.context.nextgenAuth;
+      return { ok: true };
+    });
+
+    const handler = toWebHandler(app);
+    await handler(makeWebRequest("http://localhost:3000/", "__nextgen_session=opaque-token"));
+    expect(capturedAuth).toEqual({
+      isAuthenticated: true,
+      session: {
+        userId: "user-opaque",
+        identifier: null,
+        identifierProperty: null,
+        display: null,
+        token: "opaque-token",
+      },
+    });
+  });
+
+  it("opaque session token without a user id stays unauthenticated but keeps its cookie", async () => {
+    // An anonymous session: the flow has not verified a user factor yet, so
+    // `/sessions/me` answers 200 with no `user_id`. Authenticating here would
+    // hand route handlers a placeholder identity matching no real user — but
+    // the session is live, so clearing its cookie would orphan the login flow
+    // that is still completing it.
+    vi.stubGlobal("fetch", mockSessionsMe({}));
+
+    const app = createApp();
+    app.use(
+      createNextgenMiddleware({
+        url: "http://localhost:4000",
+        protectedRoutes: ["/admin"],
+        loginPath: "/login",
+      }),
+    );
+
+    let capturedAuth: unknown;
+    app.use("/", (event) => {
+      capturedAuth = event.context.nextgenAuth;
+      return { ok: true };
+    });
+
+    const handler = toWebHandler(app);
+    const res = await handler(
+      makeWebRequest("http://localhost:3000/", "__nextgen_session=opaque-token"),
+    );
+    expect(capturedAuth).toEqual({ isAuthenticated: false, session: null });
+    expect(res.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("dead opaque session token is cleared from the browser", async () => {
+    // The backend no longer knows the session (revoked or expired), so the
+    // sweep must clear the cookie to stop the browser from replaying it.
+    vi.stubGlobal("fetch", mockSessionsMe({}, 401));
+
+    const app = createApp();
+    app.use(
+      createNextgenMiddleware({
+        url: "http://localhost:4000",
+        protectedRoutes: ["/admin"],
+        loginPath: "/login",
+      }),
+    );
+
+    let capturedAuth: unknown;
+    app.use("/", (event) => {
+      capturedAuth = event.context.nextgenAuth;
+      return { ok: true };
+    });
+
+    const handler = toWebHandler(app);
+    const res = await handler(
+      makeWebRequest("http://localhost:3000/", "__nextgen_session=dead-token"),
+    );
+    expect(capturedAuth).toEqual({ isAuthenticated: false, session: null });
+    const setCookie = res.headers.get("set-cookie") ?? "";
+    expect(setCookie).toMatch(/__nextgen_session=/);
+    expect(setCookie).toMatch(/Max-Age=0|expires=.*1970/i);
+  });
+
   it("strips x-nextgen-auth-token from proxied requests", async () => {
     let capturedHeaders: Headers | undefined;
     vi.stubGlobal(
@@ -569,8 +684,107 @@ describe("createNextgenMiddleware (H3)", () => {
     });
   });
 
-  describe("proxy: Location header stripping (S-1)", () => {
-    it("strips location header from upstream response to prevent internal URL leakage", async () => {
+  describe("proxy: credential planes", () => {
+    it.each([
+      ["GET", "/__nextgen/sessions/me"],
+      ["DELETE", "/__nextgen/sessions/me"],
+      ["POST", "/__nextgen/flow"],
+      ["GET", "/__nextgen/projects"],
+      ["GET", "/__nextgen/sessions/exchange"],
+      ["POST", "/__nextgen/sessions/exchange/extra"],
+    ])("does not attach the project secret to %s %s", async (method, pathname) => {
+      setRuntimeConfig({ nextgen: { projectSecret: "project-secret" } });
+      let capturedHeaders: Headers | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+          capturedHeaders = init.headers as Headers;
+          return Promise.resolve(new Response("{}", { status: 200 }));
+        }),
+      );
+      const app = createApp();
+      app.use(createNextgenMiddleware({ url: "http://localhost:4000" }));
+
+      await toWebHandler(app)(
+        makeWebRequest(`http://localhost:3000${pathname}`, undefined, undefined, method),
+      );
+
+      expect((capturedHeaders as Headers).has("authorization")).toBe(false);
+    });
+
+    it("attaches the project secret only to POST /sessions/exchange, ignoring the query", async () => {
+      setRuntimeConfig({ nextgen: { projectSecret: "project-secret" } });
+      let capturedHeaders: Headers | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+          capturedHeaders = init.headers as Headers;
+          return Promise.resolve(new Response("{}", { status: 200 }));
+        }),
+      );
+      const app = createApp();
+      app.use(createNextgenMiddleware({ url: "http://localhost:4000" }));
+
+      await toWebHandler(app)(
+        makeWebRequest(
+          "http://localhost:3000/__nextgen/sessions/exchange?source=browser",
+          undefined,
+          undefined,
+          "POST",
+        ),
+      );
+
+      expect((capturedHeaders as Headers).get("authorization")).toBe("Bearer project-secret");
+    });
+
+    it("preserves an explicit caller credential on the exchange", async () => {
+      setRuntimeConfig({ nextgen: { projectSecret: "project-secret" } });
+      let capturedHeaders: Headers | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+          capturedHeaders = init.headers as Headers;
+          return Promise.resolve(new Response("{}", { status: 200 }));
+        }),
+      );
+      const app = createApp();
+      app.use(createNextgenMiddleware({ url: "http://localhost:4000" }));
+
+      await toWebHandler(app)(
+        makeWebRequest(
+          "http://localhost:3000/__nextgen/sessions/exchange",
+          undefined,
+          "Bearer caller-key",
+          "POST",
+        ),
+      );
+
+      expect((capturedHeaders as Headers).get("authorization")).toBe("Bearer caller-key");
+    });
+
+    it("preserves the upstream session cache policy", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(
+          new Response("{}", {
+            status: 200,
+            headers: { "cache-control": "private, no-store" },
+          }),
+        ),
+      );
+      const app = createApp();
+      app.use(createNextgenMiddleware({ url: "http://localhost:4000" }));
+
+      const response = await toWebHandler(app)(
+        makeWebRequest("http://localhost:3000/__nextgen/sessions/me"),
+      );
+
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+    });
+  });
+
+  describe("proxy: Location header rewriting (S-1)", () => {
+    it("keeps the path but never the internal host of an upstream redirect", async () => {
       const upstreamHeaders = new Headers();
       upstreamHeaders.set("content-type", "application/json");
       upstreamHeaders.set("location", "http://internal-auth.corp:4000/callback");
@@ -585,7 +799,12 @@ describe("createNextgenMiddleware (H3)", () => {
       const handler = toWebHandler(app);
       const res = await handler(new Request("http://localhost:3000/__nextgen/v1/flow"));
 
-      expect(res.headers.get("location")).toBeNull();
+      // The redirect survives, pointed back at this app: the identity-provider
+      // callback answers `302` and a top-level navigation has no JavaScript to
+      // recover a dropped one. Only the path is taken, so the upstream's own
+      // host never reaches the browser.
+      expect(res.headers.get("location")).toBe("http://localhost/callback");
+      expect(res.headers.get("location")).not.toContain("internal-auth.corp");
       expect(res.headers.get("content-type")).toBe("application/json");
     });
   });

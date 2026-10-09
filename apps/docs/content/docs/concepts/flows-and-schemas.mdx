@@ -5,8 +5,8 @@ description: The relationship between login flows, user schemas, and generated U
 
 The flow engine drives login, registration, passkey, and related auth journeys.
 
-A flow definition decides which step renders when. User schemas describe the user properties collected by the default forms.
+A user schema defines **what** the platform stores about a user and how that user type can authenticate. A flow definition defines **when and where** users are asked to provide that data — which step renders when, and which fields each step collects. A flow's `steps[].fields` must name properties of the schema it pins via `user_schema`.
 
-The current CLI creates a project against the target server and relies on server-side defaults for the initial user schema and login flow. The CLI does not scaffold or upload those defaults during setup.
+`zitadel setup` scaffolds editable copies of the default user schema and login flow into `.zitadel/schemas/` and `.zitadel/flows/`, uploads them, and seeds `.zitadel/state.json` so the local files and the platform start in sync. Each folder contains a README explaining what you can change.
 
-Future configuration work should keep flow and schema files reviewable under `.zitadel/**`, then use `plan` and `apply` for sync.
+The local files are the source of truth: edit them, then sync with [`plan` and `apply`](/docs/cli/plan-apply). Schema edits publish a new immutable revision (existing users keep validating against the previous one); flow edits update the flow in place.

@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
 import { access, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { ZitadelError } from "../errors";
 import { isObject, parseJsonObject } from "../json";
+import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary } from "./env-vars";
 
 export const LOCAL_SERVER_IMAGE_NAME = "ghcr.io/zitadel/nextgen";
 export const DEFAULT_LOCAL_SERVER_IMAGE = `${LOCAL_SERVER_IMAGE_NAME}:latest`;
@@ -19,6 +21,39 @@ export const LOCAL_CONTAINER_GROUP_FILE = ".zitadel/local/container-group";
 export const CONTAINER_DATA_DIR = "/var/lib/zitadel/nextgen-data";
 export const CONTAINER_HTTP_PORT = 8080;
 
+/**
+ * The well-known id of a deployment's platform project (`domain.PlatformProjectID`,
+ * `internal/domain/project.go`). A CLI-managed local server bootstraps it, which
+ * is what gives the developer a team to own their projects with.
+ */
+export const PLATFORM_PROJECT_ID = "proj_platform";
+
+/**
+ * The platform project's browser-safe key, read from the console runtime
+ * document, or `undefined` when the server does not host the platform project.
+ * The document sits outside the API, so the generated client does not cover
+ * it; it publishes the deployment's default project, which the platform
+ * bootstrap pins to {@link PLATFORM_PROJECT_ID}. Fail closed: an unreadable,
+ * absent or hanging document reads as not hosted.
+ */
+export async function readPlatformRuntime(
+  serverUrl: string,
+  timeoutMs = 1500,
+): Promise<{ publishable_key: string } | undefined> {
+  try {
+    const res = await fetch(new URL("/console/runtime.json", serverUrl), {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) return undefined;
+    const doc = (await res.json()) as { console_project_id?: unknown; publishable_key?: unknown };
+    return doc.console_project_id === PLATFORM_PROJECT_ID && typeof doc.publishable_key === "string"
+      ? { publishable_key: doc.publishable_key }
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export type RuntimeBackend = "binary" | "docker";
 
 type RuntimeMetadataBase = {
@@ -29,6 +64,8 @@ type RuntimeMetadataBase = {
   data_dir: string;
   created_at: string;
   cli_version: string;
+  /** Absent on runtime files written before the env summary existed. */
+  env?: EnvSummary;
 };
 
 export type BinaryRuntimeMetadata = RuntimeMetadataBase & {
@@ -134,12 +171,7 @@ export async function ensureContainerIdentity(
   );
   await writeFile(
     paths.containerGroupFile,
-    [
-      "root:x:0:",
-      "nonroot:x:65532:",
-      `zitadel-local:x:${String(gid)}:`,
-      "",
-    ].join("\n"),
+    ["root:x:0:", "nonroot:x:65532:", `zitadel-local:x:${String(gid)}:`, ""].join("\n"),
     { mode: 0o644 },
   );
   return {
@@ -148,6 +180,71 @@ export async function ensureContainerIdentity(
     passwdFile: paths.containerPasswdFile,
     groupFile: paths.containerGroupFile,
   };
+}
+
+/**
+ * The nearest directory, from `cwd` upward, that holds `file`, or `undefined`
+ * when none does. `zitadel start` keeps its state in the directory it ran in,
+ * and an app created inside that directory reads it from there. Only readers
+ * walk up: commands that write or remove local state act on `cwd` alone.
+ *
+ * The walk ends at `stopAt`, the home directory by default, and skips a file
+ * another user owns: local state names a server to talk to and a credential to
+ * sign in with, so it is only taken from somewhere the developer put it.
+ */
+export async function findUpward(
+  cwd: string,
+  file: string,
+  stopAt: string = homedir(),
+): Promise<string | undefined> {
+  for (let dir = cwd; ; dir = dirname(dir)) {
+    if (await isOwnFile(join(dir, file))) return dir;
+    if (dir === stopAt || dirname(dir) === dir) return undefined;
+  }
+}
+
+async function isOwnFile(path: string): Promise<boolean> {
+  try {
+    const { uid } = await stat(path);
+    // Windows reports no uid; existence is all there is to check.
+    return process.getuid === undefined || uid === process.getuid();
+  } catch (error) {
+    // Only a missing path means "not here". Local state that exists but
+    // cannot be read is still the nearest one, and walking past it would
+    // pick a parent's server or credential instead.
+    if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) return false;
+    throw new ZitadelError("E_VALIDATION", `${path} cannot be read`, {
+      hint: `Check that ${path} and its directory are readable by you.`,
+      details: { cause: error instanceof Error ? error.message : String(error) },
+    });
+  }
+}
+
+/**
+ * Whether two URLs name the same local server. `localhost` and the loopback
+ * addresses are one host here: `start` records `localhost`, and a developer
+ * may pass `--server http://127.0.0.1:8080` for the same process.
+ */
+export function sameLocalServer(a: string, b: string): boolean {
+  const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
+  try {
+    const [left, right] = [new URL(a), new URL(b)];
+    const sameHost =
+      left.hostname === right.hostname ||
+      (LOOPBACK.has(left.hostname) && LOOPBACK.has(right.hostname));
+    return sameHost && left.protocol === right.protocol && left.port === right.port;
+  } catch {
+    return false;
+  }
+}
+
+/** Runtime metadata of the server started in `cwd` or the nearest parent with one. */
+async function readNearestRuntimeMetadata(
+  cwd: string,
+): Promise<{ dir: string; runtime: RuntimeMetadata } | undefined> {
+  const dir = await findUpward(cwd, LOCAL_RUNTIME_FILE);
+  const runtime = dir ? await readRuntimeMetadata(dir) : undefined;
+  return dir && runtime ? { dir, runtime } : undefined;
 }
 
 export async function readRuntimeMetadata(cwd: string): Promise<RuntimeMetadata | undefined> {
@@ -180,7 +277,10 @@ export async function removeLocalData(cwd: string): Promise<void> {
   await rm(localRuntimePaths(cwd).dataDir, { recursive: true, force: true });
 }
 
-export async function checkLocalServerHealth(serverUrl: string, timeoutMs = 1500): Promise<boolean> {
+export async function checkLocalServerHealth(
+  serverUrl: string,
+  timeoutMs = 1500,
+): Promise<boolean> {
   try {
     const healthUrl = new URL("/healthz", serverUrl);
     const response = await fetch(healthUrl, { signal: AbortSignal.timeout(timeoutMs) });
@@ -190,13 +290,45 @@ export async function checkLocalServerHealth(serverUrl: string, timeoutMs = 1500
   }
 }
 
+/**
+ * Best-effort local-server detection for optional UI (the setup wizard's
+ * server choice). Same sources as {@link resolveLocalServer} — the runtime
+ * metadata written by `zitadel start` in this directory or a parent, then the
+ * default localhost URL — but
+ * never throws: a malformed `runtime.json` or an unhealthy server yields
+ * `undefined` (doctor owns diagnosing those states), and an unhealthy
+ * metadata URL still falls back to the default-port probe so a server
+ * started from a different directory is found.
+ */
+export async function detectHealthyLocalServer(cwd: string): Promise<string | undefined> {
+  let runtime: RuntimeMetadata | undefined;
+  try {
+    runtime = (await readNearestRuntimeMetadata(cwd))?.runtime;
+  } catch {
+    runtime = undefined;
+  }
+  if (runtime && (await checkLocalServerHealth(runtime.server_url))) {
+    return runtime.server_url;
+  }
+  const alreadyProbedDefault = runtime?.server_url === DEFAULT_LOCAL_SERVER_URL;
+  if (!alreadyProbedDefault && (await checkLocalServerHealth(DEFAULT_LOCAL_SERVER_URL))) {
+    return DEFAULT_LOCAL_SERVER_URL;
+  }
+  return undefined;
+}
+
 export async function resolveLocalServer(cwd: string): Promise<string> {
-  const runtime = await readRuntimeMetadata(cwd);
-  if (runtime) {
-    if (await checkLocalServerHealth(runtime.server_url)) {
-      return runtime.server_url;
+  const nearest = await readNearestRuntimeMetadata(cwd);
+  if (nearest) {
+    const { server_url } = nearest.runtime;
+    if (await checkLocalServerHealth(server_url)) {
+      return server_url;
     }
-    throw localServerNotRunning(runtime.server_url);
+    // This directory's own metadata is authoritative. A parent's can outlive
+    // its server (`stop` keeps it), so it does not rule out the default one.
+    if (nearest.dir === cwd || server_url === DEFAULT_LOCAL_SERVER_URL) {
+      throw localServerNotRunning(server_url);
+    }
   }
 
   if (await checkLocalServerHealth(DEFAULT_LOCAL_SERVER_URL)) {
@@ -254,6 +386,7 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
     data_dir: input.data_dir,
     created_at: input.created_at,
     cli_version: input.cli_version,
+    env: isEnvSummary(input.env) ? input.env : undefined,
   };
 
   if (backend === "binary") {
@@ -343,6 +476,7 @@ export function runtimeSummary(metadata: RuntimeMetadata | undefined): Record<st
     server_url: metadata.server_url,
     data_dir: metadata.data_dir,
     created_at: metadata.created_at,
+    env: metadata.env ?? EMPTY_SUMMARY,
   };
   if (metadata.backend === "binary") {
     return {

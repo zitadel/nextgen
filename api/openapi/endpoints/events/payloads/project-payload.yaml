@@ -1,0 +1,18 @@
+title: ProjectPayload
+type: object
+description: |
+  Shared allowlisted fields for `project.created` (full snapshot) and
+  `project.updated` (delta: only changed fields present).
+properties:
+  name:
+    type: string
+  preview_origins:
+    type: array
+    items:
+      type: string
+  password_hash_algorithm:
+    type: string
+    description: |
+      The password hashing algorithm the project switched to. The empty string
+      means it was handed back to the server default. Absent when the update
+      did not touch hashing.

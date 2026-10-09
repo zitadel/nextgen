@@ -1,0 +1,29 @@
+---
+title: Customize copy
+description: Label custom flow steps and override the built-in login texts.
+---
+
+The platform never sends display text — flow responses carry semantic keys (`identifier.title`, `register.action.passkey`, …) that the login widget resolves against a locale dictionary in the browser. Built-in dictionaries (English, German, Italian) cover every step the scaffolded presets ship.
+
+When you add your own step or action to a flow, its keys follow the step name — a step called `company-details` produces `company-details.title`, `company-details.description`, `company-details.field.<field>`, and `company-details.action.<name>`. Supply the strings via the `locales` prop, keyed by language:
+
+```tsx
+<ZitadelLogin
+  locales={{
+    en: {
+      "company-details.title": "About your company",
+      "company-details.field.company": "Company name",
+      "company-details.action.submit": "Continue",
+    },
+    de: {
+      "company-details.title": "Über dein Unternehmen",
+    },
+  }}
+/>
+```
+
+Entries merge over the built-in dictionary per language, so you only supply what you add or want to change — overriding a built-in key (e.g. `identifier.title`) works the same way. `lang` forces a specific language; by default the widget follows the browser language.
+
+A key that resolves nowhere renders as the raw key string — if you see `my-step.action.submit` on a button, that's the dictionary entry to add. The engine-injected back button falls back to a generic `action.back` automatically.
+
+Flow actions can also point at any key explicitly via `text_key` in the flow definition; when omitted, the `<step>.action.<name>` convention applies.

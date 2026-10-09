@@ -48,11 +48,14 @@ Removed attributes/properties on `<zitadel-login>`:
   or use the new `api-base` attribute for declarative setups. A new
   `resume-flow-id` attribute resumes an existing flow handle.
 
-Removed attribute on `<zitadel-logout>`:
+Removed attributes on `<zitadel-logout>`:
 
-- `proxy-base`. The element now calls the typed `endSession`
-  operation (`GET /auth/end-session`) and forwards `client-id` /
-  `post-sign-out-url` as query parameters.
+- `proxy-base`.
+- `client-id`. The OIDC end-session surface is not part of the
+  OpenAPI contract, so the element no longer exposes
+  `getEndSessionUrl()`. Sign-out calls the typed `revokeMySession`
+  operation (`DELETE /sessions/me`) and then navigates to
+  `post-sign-out-url`.
 
 Behaviour changes:
 

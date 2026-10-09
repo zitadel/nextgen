@@ -9,50 +9,439 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as AuthedRouteImport } from './routes/_authed'
+import { Route as ClaimIndexRouteImport } from './routes/claim/index'
+import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
+import { Route as AuthedUsersIndexRouteImport } from './routes/_authed/users/index'
+import { Route as AuthedTeamsIndexRouteImport } from './routes/_authed/teams/index'
+import { Route as AuthedSystemIndexRouteImport } from './routes/_authed/system/index'
+import { Route as AuthedSettingsIndexRouteImport } from './routes/_authed/settings/index'
+import { Route as AuthedSchemasIndexRouteImport } from './routes/_authed/schemas/index'
+import { Route as AuthedProjectsIndexRouteImport } from './routes/_authed/projects/index'
+import { Route as AuthedProjectIndexRouteImport } from './routes/_authed/project/index'
+import { Route as AuthedFlowDefinitionsIndexRouteImport } from './routes/_authed/flow-definitions/index'
+import { Route as AuthedBrandingIndexRouteImport } from './routes/_authed/branding/index'
+import { Route as AuthedUsersUserIdRouteImport } from './routes/_authed/users/$userId'
+import { Route as AuthedTeamsTeamIdRouteImport } from './routes/_authed/teams/$teamId'
+import { Route as AuthedSettingsProfileRouteImport } from './routes/_authed/settings/profile'
+import { Route as AuthedSchemasSchemaIdRouteImport } from './routes/_authed/schemas/$schemaId'
+import { Route as AuthedProjectsProjectIdRouteImport } from './routes/_authed/projects/$projectId'
+import { Route as AuthedFlowDefinitionsDefinitionIdRouteImport } from './routes/_authed/flow-definitions/$definitionId'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthedRoute = AuthedRouteImport.update({
+  id: '/_authed',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClaimIndexRoute = ClaimIndexRouteImport.update({
+  id: '/claim/',
+  path: '/claim/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthedIndexRoute = AuthedIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedUsersIndexRoute = AuthedUsersIndexRouteImport.update({
+  id: '/users/',
+  path: '/users/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedTeamsIndexRoute = AuthedTeamsIndexRouteImport.update({
+  id: '/teams/',
+  path: '/teams/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedSystemIndexRoute = AuthedSystemIndexRouteImport.update({
+  id: '/system/',
+  path: '/system/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedSettingsIndexRoute = AuthedSettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedSchemasIndexRoute = AuthedSchemasIndexRouteImport.update({
+  id: '/schemas/',
+  path: '/schemas/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedProjectsIndexRoute = AuthedProjectsIndexRouteImport.update({
+  id: '/projects/',
+  path: '/projects/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedProjectIndexRoute = AuthedProjectIndexRouteImport.update({
+  id: '/project/',
+  path: '/project/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedFlowDefinitionsIndexRoute =
+  AuthedFlowDefinitionsIndexRouteImport.update({
+    id: '/flow-definitions/',
+    path: '/flow-definitions/',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedBrandingIndexRoute = AuthedBrandingIndexRouteImport.update({
+  id: '/branding/',
+  path: '/branding/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedUsersUserIdRoute = AuthedUsersUserIdRouteImport.update({
+  id: '/users/$userId',
+  path: '/users/$userId',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedTeamsTeamIdRoute = AuthedTeamsTeamIdRouteImport.update({
+  id: '/teams/$teamId',
+  path: '/teams/$teamId',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedSettingsProfileRoute = AuthedSettingsProfileRouteImport.update({
+  id: '/settings/profile',
+  path: '/settings/profile',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedSchemasSchemaIdRoute = AuthedSchemasSchemaIdRouteImport.update({
+  id: '/schemas/$schemaId',
+  path: '/schemas/$schemaId',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedProjectsProjectIdRoute = AuthedProjectsProjectIdRouteImport.update({
+  id: '/projects/$projectId',
+  path: '/projects/$projectId',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedFlowDefinitionsDefinitionIdRoute =
+  AuthedFlowDefinitionsDefinitionIdRouteImport.update({
+    id: '/flow-definitions/$definitionId',
+    path: '/flow-definitions/$definitionId',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof AuthedIndexRoute
+  '/login': typeof LoginRoute
+  '/claim/': typeof ClaimIndexRoute
+  '/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
+  '/projects/$projectId': typeof AuthedProjectsProjectIdRoute
+  '/schemas/$schemaId': typeof AuthedSchemasSchemaIdRoute
+  '/settings/profile': typeof AuthedSettingsProfileRoute
+  '/teams/$teamId': typeof AuthedTeamsTeamIdRoute
+  '/users/$userId': typeof AuthedUsersUserIdRoute
+  '/branding/': typeof AuthedBrandingIndexRoute
+  '/flow-definitions/': typeof AuthedFlowDefinitionsIndexRoute
+  '/project/': typeof AuthedProjectIndexRoute
+  '/projects/': typeof AuthedProjectsIndexRoute
+  '/schemas/': typeof AuthedSchemasIndexRoute
+  '/settings/': typeof AuthedSettingsIndexRoute
+  '/system/': typeof AuthedSystemIndexRoute
+  '/teams/': typeof AuthedTeamsIndexRoute
+  '/users/': typeof AuthedUsersIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/': typeof AuthedIndexRoute
+  '/claim': typeof ClaimIndexRoute
+  '/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
+  '/projects/$projectId': typeof AuthedProjectsProjectIdRoute
+  '/schemas/$schemaId': typeof AuthedSchemasSchemaIdRoute
+  '/settings/profile': typeof AuthedSettingsProfileRoute
+  '/teams/$teamId': typeof AuthedTeamsTeamIdRoute
+  '/users/$userId': typeof AuthedUsersUserIdRoute
+  '/branding': typeof AuthedBrandingIndexRoute
+  '/flow-definitions': typeof AuthedFlowDefinitionsIndexRoute
+  '/project': typeof AuthedProjectIndexRoute
+  '/projects': typeof AuthedProjectsIndexRoute
+  '/schemas': typeof AuthedSchemasIndexRoute
+  '/settings': typeof AuthedSettingsIndexRoute
+  '/system': typeof AuthedSystemIndexRoute
+  '/teams': typeof AuthedTeamsIndexRoute
+  '/users': typeof AuthedUsersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_authed': typeof AuthedRouteWithChildren
+  '/login': typeof LoginRoute
+  '/_authed/': typeof AuthedIndexRoute
+  '/claim/': typeof ClaimIndexRoute
+  '/_authed/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
+  '/_authed/projects/$projectId': typeof AuthedProjectsProjectIdRoute
+  '/_authed/schemas/$schemaId': typeof AuthedSchemasSchemaIdRoute
+  '/_authed/settings/profile': typeof AuthedSettingsProfileRoute
+  '/_authed/teams/$teamId': typeof AuthedTeamsTeamIdRoute
+  '/_authed/users/$userId': typeof AuthedUsersUserIdRoute
+  '/_authed/branding/': typeof AuthedBrandingIndexRoute
+  '/_authed/flow-definitions/': typeof AuthedFlowDefinitionsIndexRoute
+  '/_authed/project/': typeof AuthedProjectIndexRoute
+  '/_authed/projects/': typeof AuthedProjectsIndexRoute
+  '/_authed/schemas/': typeof AuthedSchemasIndexRoute
+  '/_authed/settings/': typeof AuthedSettingsIndexRoute
+  '/_authed/system/': typeof AuthedSystemIndexRoute
+  '/_authed/teams/': typeof AuthedTeamsIndexRoute
+  '/_authed/users/': typeof AuthedUsersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/claim/'
+    | '/flow-definitions/$definitionId'
+    | '/projects/$projectId'
+    | '/schemas/$schemaId'
+    | '/settings/profile'
+    | '/teams/$teamId'
+    | '/users/$userId'
+    | '/branding/'
+    | '/flow-definitions/'
+    | '/project/'
+    | '/projects/'
+    | '/schemas/'
+    | '/settings/'
+    | '/system/'
+    | '/teams/'
+    | '/users/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/login'
+    | '/'
+    | '/claim'
+    | '/flow-definitions/$definitionId'
+    | '/projects/$projectId'
+    | '/schemas/$schemaId'
+    | '/settings/profile'
+    | '/teams/$teamId'
+    | '/users/$userId'
+    | '/branding'
+    | '/flow-definitions'
+    | '/project'
+    | '/projects'
+    | '/schemas'
+    | '/settings'
+    | '/system'
+    | '/teams'
+    | '/users'
+  id:
+    | '__root__'
+    | '/_authed'
+    | '/login'
+    | '/_authed/'
+    | '/claim/'
+    | '/_authed/flow-definitions/$definitionId'
+    | '/_authed/projects/$projectId'
+    | '/_authed/schemas/$schemaId'
+    | '/_authed/settings/profile'
+    | '/_authed/teams/$teamId'
+    | '/_authed/users/$userId'
+    | '/_authed/branding/'
+    | '/_authed/flow-definitions/'
+    | '/_authed/project/'
+    | '/_authed/projects/'
+    | '/_authed/schemas/'
+    | '/_authed/settings/'
+    | '/_authed/system/'
+    | '/_authed/teams/'
+    | '/_authed/users/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  AuthedRoute: typeof AuthedRouteWithChildren
+  LoginRoute: typeof LoginRoute
+  ClaimIndexRoute: typeof ClaimIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authed': {
+      id: '/_authed'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/claim/': {
+      id: '/claim/'
+      path: '/claim'
+      fullPath: '/claim/'
+      preLoaderRoute: typeof ClaimIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authed/': {
+      id: '/_authed/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/users/': {
+      id: '/_authed/users/'
+      path: '/users'
+      fullPath: '/users/'
+      preLoaderRoute: typeof AuthedUsersIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/teams/': {
+      id: '/_authed/teams/'
+      path: '/teams'
+      fullPath: '/teams/'
+      preLoaderRoute: typeof AuthedTeamsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/system/': {
+      id: '/_authed/system/'
+      path: '/system'
+      fullPath: '/system/'
+      preLoaderRoute: typeof AuthedSystemIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/settings/': {
+      id: '/_authed/settings/'
+      path: '/settings'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AuthedSettingsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/schemas/': {
+      id: '/_authed/schemas/'
+      path: '/schemas'
+      fullPath: '/schemas/'
+      preLoaderRoute: typeof AuthedSchemasIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/projects/': {
+      id: '/_authed/projects/'
+      path: '/projects'
+      fullPath: '/projects/'
+      preLoaderRoute: typeof AuthedProjectsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/project/': {
+      id: '/_authed/project/'
+      path: '/project'
+      fullPath: '/project/'
+      preLoaderRoute: typeof AuthedProjectIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/flow-definitions/': {
+      id: '/_authed/flow-definitions/'
+      path: '/flow-definitions'
+      fullPath: '/flow-definitions/'
+      preLoaderRoute: typeof AuthedFlowDefinitionsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/branding/': {
+      id: '/_authed/branding/'
+      path: '/branding'
+      fullPath: '/branding/'
+      preLoaderRoute: typeof AuthedBrandingIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/users/$userId': {
+      id: '/_authed/users/$userId'
+      path: '/users/$userId'
+      fullPath: '/users/$userId'
+      preLoaderRoute: typeof AuthedUsersUserIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/teams/$teamId': {
+      id: '/_authed/teams/$teamId'
+      path: '/teams/$teamId'
+      fullPath: '/teams/$teamId'
+      preLoaderRoute: typeof AuthedTeamsTeamIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/settings/profile': {
+      id: '/_authed/settings/profile'
+      path: '/settings/profile'
+      fullPath: '/settings/profile'
+      preLoaderRoute: typeof AuthedSettingsProfileRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/schemas/$schemaId': {
+      id: '/_authed/schemas/$schemaId'
+      path: '/schemas/$schemaId'
+      fullPath: '/schemas/$schemaId'
+      preLoaderRoute: typeof AuthedSchemasSchemaIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/projects/$projectId': {
+      id: '/_authed/projects/$projectId'
+      path: '/projects/$projectId'
+      fullPath: '/projects/$projectId'
+      preLoaderRoute: typeof AuthedProjectsProjectIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/flow-definitions/$definitionId': {
+      id: '/_authed/flow-definitions/$definitionId'
+      path: '/flow-definitions/$definitionId'
+      fullPath: '/flow-definitions/$definitionId'
+      preLoaderRoute: typeof AuthedFlowDefinitionsDefinitionIdRouteImport
+      parentRoute: typeof AuthedRoute
     }
   }
 }
 
+interface AuthedRouteChildren {
+  AuthedIndexRoute: typeof AuthedIndexRoute
+  AuthedFlowDefinitionsDefinitionIdRoute: typeof AuthedFlowDefinitionsDefinitionIdRoute
+  AuthedProjectsProjectIdRoute: typeof AuthedProjectsProjectIdRoute
+  AuthedSchemasSchemaIdRoute: typeof AuthedSchemasSchemaIdRoute
+  AuthedSettingsProfileRoute: typeof AuthedSettingsProfileRoute
+  AuthedTeamsTeamIdRoute: typeof AuthedTeamsTeamIdRoute
+  AuthedUsersUserIdRoute: typeof AuthedUsersUserIdRoute
+  AuthedBrandingIndexRoute: typeof AuthedBrandingIndexRoute
+  AuthedFlowDefinitionsIndexRoute: typeof AuthedFlowDefinitionsIndexRoute
+  AuthedProjectIndexRoute: typeof AuthedProjectIndexRoute
+  AuthedProjectsIndexRoute: typeof AuthedProjectsIndexRoute
+  AuthedSchemasIndexRoute: typeof AuthedSchemasIndexRoute
+  AuthedSettingsIndexRoute: typeof AuthedSettingsIndexRoute
+  AuthedSystemIndexRoute: typeof AuthedSystemIndexRoute
+  AuthedTeamsIndexRoute: typeof AuthedTeamsIndexRoute
+  AuthedUsersIndexRoute: typeof AuthedUsersIndexRoute
+}
+
+const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedIndexRoute: AuthedIndexRoute,
+  AuthedFlowDefinitionsDefinitionIdRoute:
+    AuthedFlowDefinitionsDefinitionIdRoute,
+  AuthedProjectsProjectIdRoute: AuthedProjectsProjectIdRoute,
+  AuthedSchemasSchemaIdRoute: AuthedSchemasSchemaIdRoute,
+  AuthedSettingsProfileRoute: AuthedSettingsProfileRoute,
+  AuthedTeamsTeamIdRoute: AuthedTeamsTeamIdRoute,
+  AuthedUsersUserIdRoute: AuthedUsersUserIdRoute,
+  AuthedBrandingIndexRoute: AuthedBrandingIndexRoute,
+  AuthedFlowDefinitionsIndexRoute: AuthedFlowDefinitionsIndexRoute,
+  AuthedProjectIndexRoute: AuthedProjectIndexRoute,
+  AuthedProjectsIndexRoute: AuthedProjectsIndexRoute,
+  AuthedSchemasIndexRoute: AuthedSchemasIndexRoute,
+  AuthedSettingsIndexRoute: AuthedSettingsIndexRoute,
+  AuthedSystemIndexRoute: AuthedSystemIndexRoute,
+  AuthedTeamsIndexRoute: AuthedTeamsIndexRoute,
+  AuthedUsersIndexRoute: AuthedUsersIndexRoute,
+}
+
+const AuthedRouteWithChildren =
+  AuthedRoute._addFileChildren(AuthedRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  AuthedRoute: AuthedRouteWithChildren,
+  LoginRoute: LoginRoute,
+  ClaimIndexRoute: ClaimIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

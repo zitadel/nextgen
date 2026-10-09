@@ -1,3 +1,4 @@
+import { ZitadelError, type ZitadelErrorCode } from "../../../lib/errors";
 import type { Orca } from "../../../lib/orca";
 
 /** Pass/fail/advisory outcome of a single {@link SanityCheck}. */
@@ -7,6 +8,14 @@ export type CheckOutcome = {
   status: "pass" | "warn" | "fail";
   message: string;
   path?: string;
+  /**
+   * Set when the failure surfaced as a typed CLI error: the error's category
+   * and remedy travel through the outcome so the doctor envelope can carry
+   * the advertised code (e.g. the framework floor's
+   * `E_UNSUPPORTED_PROJECT_SHAPE`) and hint instead of generic advice.
+   */
+  code?: ZitadelErrorCode;
+  hint?: string;
 };
 
 /** Everything a check needs to inspect or repair a project. */
@@ -60,6 +69,9 @@ export abstract class AbstractSanityCheck implements SanityCheck {
         status: "fail",
         message: error instanceof Error ? error.message : String(error),
         path: this.path,
+        ...(error instanceof ZitadelError
+          ? { code: error.code, ...(error.hint === undefined ? {} : { hint: error.hint }) }
+          : {}),
       };
     }
   }

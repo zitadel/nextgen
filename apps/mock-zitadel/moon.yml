@@ -1,0 +1,26 @@
+id: "mock-zitadel"
+language: "typescript"
+layer: "application"
+stack: "backend"
+dependsOn:
+  - "api-mock"
+
+tasks:
+  # Bundle the function into a single self-contained JS file (see
+  # tsdown.config.ts). The deployed entry imports this, not the workspace
+  # TypeScript source.
+  build:
+    deps:
+      - "api-mock:build"
+
+  # The `typecheck` script generates @zitadel/api first (its source is
+  # gitignored and produced by orval), so it is self-contained — it passes
+  # whether run via Moon or standalone (e.g. the Vercel "TypeCheck"
+  # deployment check, which runs the npm script in a sandbox without Moon).
+  typecheck:
+    deps:
+      - "api-mock:build"
+
+  test:
+    deps:
+      - "api-mock:build"

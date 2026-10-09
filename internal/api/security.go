@@ -2,28 +2,29 @@ package api
 
 import (
 	"context"
+	"net"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 type SecurityHandler struct {
-	tokenVerifier domain.TokenVerifier
+	tokenService service.TokenService
 }
 
 func NewSecurityHandler(
-	tokenVerifier domain.TokenVerifier,
+	tokenService service.TokenService,
 ) *SecurityHandler {
 	return &SecurityHandler{
-		tokenVerifier: tokenVerifier,
+		tokenService: tokenService,
 	}
-}
-
-func (s SecurityHandler) HandleUsernamePassword(ctx context.Context, operationName api.OperationName, t api.UsernamePassword) (context.Context, error) {
-	//TODO implement me
-	panic("implement me")
 }
 
 func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.OperationName, t api.OAuth2) (context.Context, error) {
@@ -31,21 +32,154 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 
-	payload, err := s.tokenVerifier.Verify(t.Token)
+	payload, err := s.tokenService.IntrospectToken(ctx, t.Token)
 	if err != nil {
+		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	}
+	if !payload.Type.IsProjectSecret() {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 
 	scope := ScopeContext{
-		ProjectID: payload.ProjectID,
+		ProjectID:     payload.ProjectID,
+		Scope:         payload.Scope,
+		PrincipalType: domain.AuthzPrincipalTypeSKProj,
+		// Project secrets are JWEs without a stable key id; the project id is
+		// the durable principal for sk_proj grants (survives rotate/claim).
+		PrincipalID: payload.ProjectID,
+	}
+	if secretHashOperations[operationName] {
+		scope.SecretHash = domain.HashSecret(t.Token)
 	}
 
 	ctx = WithScopeContext(ctx, scope)
+	ctx = withActorFromToken(ctx, payload)
+	return ctx, nil
+}
 
+// HandleNextgenSession handles the nextgenSession security scheme: the
+// __nextgen_session cookie. It verifies the cookie decrypts to a session
+// token and stashes it for handlers. User-bound sessions mint ScopeContext
+// so management ops can authorize the human, unless oauth2 already minted
+// one (dual-scheme OR). Anonymous sessions skip the grant/user-query ops
+// so a leftover building cookie cannot 401 a valid Bearer.
+func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName api.OperationName, t api.NextgenSession) (context.Context, error) {
+	// A Bearer that already satisfied a dual-scheme operation is the
+	// credential; the cookie is not consulted at all. Otherwise a stale or
+	// malformed cookie riding along would fail here and 401 a request the
+	// Bearer authorized. Session-only operations never get this far with a
+	// ScopeContext, so they still validate the cookie below.
+	if _, ok := GetScopeContext(ctx); ok {
+		return ctx, nil
+	}
+	token, err := s.tokenService.IntrospectToken(ctx, t.APIKey)
+	if err != nil {
+		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	}
+	err = domain.ValidateSessionToken(token)
+	if err != nil {
+		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	}
+	ctx = context.WithValue(ctx, sessionTokenKey{}, token)
+	if token.UserID == "" && userBoundSessionOperations[operationName] {
+		return ctx, ogenerrors.ErrSkipServerSecurity
+	}
+	// The cookie is the credential from here on, so a state-changing request
+	// must pass the CSRF checks (ADR 053 §5). A Bearer that satisfied the
+	// operation returned above and never reaches this.
+	if err := checkSessionCSRF(ctx, operationName, t.APIKey); err != nil {
+		return nil, err
+	}
+	ctx = context.WithValue(ctx, sessionCookieKey{}, t.APIKey)
+	ctx = withActorFromToken(ctx, token)
+	if token.UserID != "" {
+		// Session.Token() never mints Scope (always empty). Users skip the
+		// project.write ceiling in credentialCeiling; Check uses PrincipalType/ID.
+		ctx = WithScopeContext(ctx, ScopeContext{
+			ProjectID:     token.ProjectID,
+			Scope:         token.Scope,
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   token.UserID,
+		})
+	}
 	return ctx, nil
 }
 
 var _ api.SecurityHandler = (*SecurityHandler)(nil)
+
+// sessionCookieOperations is the session-only 401 rewrite allowlist.
+// Dual-scheme ops stay off it so a bad Bearer is not a missing-session message.
+var sessionCookieOperations = map[api.OperationName]bool{
+	api.GetMySessionOperation:          true,
+	api.GetMySessionCsrfTokenOperation: true,
+	api.RevokeMySessionOperation:       true,
+	api.GetMyUserOperation:             true,
+	api.PatchMyUserOperation:           true,
+	api.CompleteClaimOperation:         true,
+	api.ListMyProjectsOperation:        true,
+}
+
+// userBoundSessionOperations require a session with UserID. Anonymous
+// building cookies Skip so dual-scheme oauth2 can still satisfy. On a
+// session-only operation nothing else can satisfy, so the skip becomes the 401
+// the contract declares.
+var userBoundSessionOperations = map[api.OperationName]bool{
+	api.CreateGrantOperation:    true,
+	api.GetGrantOperation:       true,
+	api.DeleteGrantOperation:    true,
+	api.QueryGrantsOperation:    true,
+	api.QueryUsersOperation:     true,
+	api.QueryTeamsOperation:     true,
+	api.GetTeamOperation:        true,
+	api.ListMyProjectsOperation: true,
+	api.GetProjectOperation:     true,
+	api.PatchProjectOperation:   true,
+	// Console management screens (#1300 §1). Their writes need the CSRF token
+	// (ADR 053 §5, csrf.go).
+	api.CreateUserOperation:          true,
+	api.GetUserByIDOperation:         true,
+	api.ListUserPasskeysOperation:    true,
+	api.DeleteUserByIDOperation:      true,
+	api.CreateTeamOperation:          true,
+	api.UpdateTeamOperation:          true,
+	api.ListSchemasOperation:         true,
+	api.GetSchemaByIdOperation:       true,
+	api.ListFlowDefinitionsOperation: true,
+	api.GetFlowDefinitionOperation:   true,
+	api.ListBrandingOperation:        true,
+	api.GetBrandingByIdOperation:     true,
+}
+
+// sessionUnauthorizedMessage mirrors the 401 descriptions of the
+// cookie-secured operations in api/openapi.
+const sessionUnauthorizedMessage = "Missing or invalid session token."
+
+// secretHashOperations lists the operations whose handlers read
+// ScopeContext.SecretHash: claim init stores it, claim status compares it
+// (ADR 046 §3). An operation missing here gets an empty hash and the claim
+// service answers 403, so a new claim leg must be added to this map.
+var secretHashOperations = map[api.OperationName]bool{
+	api.InitClaimOperation:      true,
+	api.GetClaimStatusOperation: true,
+}
+
+type sessionTokenKey struct{}
+
+// sessionCookieKey carries the raw __nextgen_session value of a request the
+// cookie authenticated, so GET /sessions/me/csrf can derive its CSRF token.
+type sessionCookieKey struct{}
+
+func sessionCookieFromContext(ctx context.Context) (string, bool) {
+	v, ok := ctx.Value(sessionCookieKey{}).(string)
+	return v, ok && v != ""
+}
+
+// sessionTokenFromContext returns the session token parsed from the
+// __nextgen_session cookie by HandleNextgenSession.
+func sessionTokenFromContext(ctx context.Context) (*domain.Token, bool) {
+	v, ok := ctx.Value(sessionTokenKey{}).(*domain.Token)
+	return v, ok && v != nil
+}
 
 type contextKey struct{}
 
@@ -56,10 +190,12 @@ type requestHostKey struct{}
 
 // WithRequestHostMiddleware injects the effective request proto+host into the
 // context so handlers can derive a WebAuthn RPID even when the browser omits
-// the Origin header (same-origin fetches).
+// the Origin header (same-origin fetches). A chain of proxies may send either
+// forwarded header as a comma-separated list; its first entry is the one the
+// client's request arrived with.
 func WithRequestHostMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		proto := r.Header.Get("X-Forwarded-Proto")
+		proto := firstForwarded(r.Header.Get("X-Forwarded-Proto"))
 		if proto == "" {
 			if r.TLS != nil {
 				proto = "https"
@@ -67,7 +203,7 @@ func WithRequestHostMiddleware(next http.Handler) http.Handler {
 				proto = "http"
 			}
 		}
-		host := r.Header.Get("X-Forwarded-Host")
+		host := firstForwarded(r.Header.Get("X-Forwarded-Host"))
 		if host == "" {
 			host = r.Host
 		}
@@ -80,13 +216,79 @@ func WithRequestHostMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// firstForwarded returns the first entry of a forwarded header that proxies
+// may have appended to ("a.example, b.internal").
+func firstForwarded(value string) string {
+	first, _, _ := strings.Cut(value, ",")
+	return strings.TrimSpace(first)
+}
+
 func requestOriginFromContext(ctx context.Context) (string, bool) {
 	v, ok := ctx.Value(requestHostKey{}).(string)
 	return v, ok && v != ""
 }
 
+// cookieSecureFromContext reports whether Set-Cookie should include Secure.
+//
+// HTTPS requests (including TLS terminated upstream with X-Forwarded-Proto)
+// keep Secure. Loopback HTTP — http://localhost / 127.0.0.0/8 / ::1 used by
+// the CLI local runtime — omits it so Safari will store and send the cookie.
+// Chrome and Firefox already accept Secure cookies on localhost; Safari does
+// not (WebKit bug 232088). Non-loopback HTTP keeps Secure so a mis-set
+// X-Forwarded-Proto fails closed rather than silently weakening cookies.
+//
+// When the request host was never injected (callers that skip
+// WithRequestHostMiddleware), or the origin cannot be parsed, default to
+// Secure=true so production-shaped paths stay locked down.
+func cookieSecureFromContext(ctx context.Context) bool {
+	origin, ok := requestOriginFromContext(ctx)
+	if !ok {
+		return true
+	}
+	u, err := url.Parse(origin)
+	if err != nil || u.Hostname() == "" {
+		return true
+	}
+	if strings.EqualFold(u.Scheme, "https") {
+		return true
+	}
+	if strings.EqualFold(u.Scheme, "http") && isLoopbackHost(u.Hostname()) {
+		return false
+	}
+	return true
+}
+
+// isLoopbackHost reports whether host is localhost or a loopback IP
+// (127.0.0.0/8, ::1). Host must already be stripped of any port.
+func isLoopbackHost(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
 type ScopeContext struct {
+	// ProjectID is the credential's home project. For project secrets it equals
+	// the managed project; for a Console session it is the session user's
+	// project and may differ from the request target (ADR 053).
 	ProjectID string
+	// Scope carries the token's minted scopes verbatim (domain.Token.Scope):
+	// project secrets hold project.write + project.read, preview secrets hold
+	// project.read only. Session tokens mint an empty Scope.
+	Scope []string
+	// PrincipalType / PrincipalID identify the authz principal for resolver.Check.
+	// OAuth2 project secrets are sk_proj with PrincipalID == ProjectID.
+	// User-bound sessions are user with PrincipalID == token.UserID.
+	PrincipalType domain.AuthzPrincipalType
+	PrincipalID   string
+	// TeamID is the token team for sk_team_ principals (resolver ConstraintTeamID).
+	TeamID string
+	// SecretHash is domain.HashSecret of the presented bearer string: the
+	// proof-of-possession seam for the claim flow (ADR 046 §3). The claim
+	// service stores it on init and compares it on status; it is set only on
+	// those two operations.
+	SecretHash string
 }
 
 func WithScopeContext(ctx context.Context, scopeCtx ScopeContext) context.Context {
@@ -96,4 +298,46 @@ func WithScopeContext(ctx context.Context, scopeCtx ScopeContext) context.Contex
 func GetScopeContext(ctx context.Context) (ScopeContext, bool) {
 	v, ok := ctx.Value(contextKey{}).(ScopeContext)
 	return v, ok
+}
+
+func withActorFromToken(ctx context.Context, token *domain.Token) context.Context {
+	if token == nil {
+		return ctx
+	}
+	ac := audit.ActorContext{
+		ProjectID:      token.ProjectID,
+		TokenID:        token.TokenID,
+		DelegationType: "direct",
+		Authenticated:  true,
+		SessionID:      token.SessionID,
+	}
+	if token.UserID != "" {
+		uid := token.UserID
+		ac.ActorID = &uid
+		actorType := domain.EventActorTypeHuman
+		if token.Type == domain.TokenTypePersonalAccessToken {
+			actorType = domain.EventActorTypeService
+		}
+		ac.ActorType = &actorType
+	} else {
+		actorType := domain.EventActorTypeService
+		ac.ActorType = &actorType
+	}
+	if reqID, ok := middleware.GetRequestIDContext(ctx); ok {
+		ac.RequestID = &reqID
+	}
+	if rc, ok := middleware.GetRequestContext(ctx); ok {
+		if rc.Fingerprint != "" {
+			ac.Fingerprint = rc.Fingerprint
+		}
+		if rc.FlowID != "" {
+			flowID := rc.FlowID
+			ac.FlowID = &flowID
+		}
+		if rc.SessionID != "" && ac.SessionID == nil {
+			sid := rc.SessionID
+			ac.SessionID = &sid
+		}
+	}
+	return audit.WithActorContext(ctx, ac)
 }

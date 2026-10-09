@@ -9,8 +9,13 @@
     "
   >
     <ClientOnly>
+      <!-- This page fixes its surface to light (the <main> background), so
+           declare it on the widget: the element-level `theme` outranks tenant
+           branding (the dev mock pins dark), which is the documented contract
+           for embedding into a page whose colour is not negotiable. -->
       <zitadel-login
         :project="project"
+        theme="light"
         post-sign-in-url="/admin"
       />
     </ClientOnly>

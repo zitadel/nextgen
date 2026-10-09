@@ -1,7 +1,7 @@
 {
   "name": "@zitadel/demo-next",
   "version": "0.0.0",
-  "description": "Next.js demo app for Nextgen Auth",
+  "description": "Next.js demo app for the pre-release Zitadel preview.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/demo-next#readme",
   "bugs": {
     "url": "https://github.com/zitadel/nextgen/issues"
@@ -17,22 +17,21 @@
     "dev": "next dev --port 3002",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
     "@zitadel/design-tokens": "workspace:*",
-    "@zitadel/shared-component-styles": "workspace:*",
     "@zitadel/sdk-next": "workspace:*",
-    "next": "^16.2.4",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "next": "^16.2.11",
+    "react": "catalog:",
+    "react-dom": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "typescript": "^5.7.3"
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:"
   }
 }

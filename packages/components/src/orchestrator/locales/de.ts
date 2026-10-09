@@ -8,8 +8,6 @@
  *   - Step descriptions: `<step>.description`
  *   - Field labels:      `<step>.field.<field>`
  *   - Action labels:     `<step>.action.<action>`
- *
- * Copy aligned to Figma screens file `xkvBjkOJ8ENuHdTGZHXezK` (May 2026).
  */
 import type { Locale } from "./en.js";
 
@@ -20,10 +18,10 @@ export const de: Locale = {
   "identifier.title": "Anmelden",
   "identifier.description": "Gib deine E-Mail-Adresse ein, um fortzufahren",
   "identifier.field.email": "E-Mail",
-  "identifier.field.email.placeholder": "du@unternehmen.com",
+  "identifier.field.email.placeholder": "du@beispiel.de",
   "identifier.field.password": "Passwort",
   "identifier.action.submit": "Anmelden",
-  "identifier.action.continue": "Anmelden",
+  "identifier.action.continue": "Weiter",
   "identifier.action.passkey": "Mit Passkey anmelden",
   "identifier.action.register.lead": "Noch kein Konto? ",
   "identifier.action.register.link": "Registrieren",
@@ -50,7 +48,7 @@ export const de: Locale = {
   "collect-credentials.title": "Konto erstellen",
   "collect-credentials.description": "Richte E-Mail und Passwort ein",
   "collect-credentials.field.email": "E-Mail",
-  "collect-credentials.field.email.placeholder": "du@unternehmen.com",
+  "collect-credentials.field.email.placeholder": "du@beispiel.de",
   "collect-credentials.field.password": "Passwort",
   "collect-credentials.action.submit": "Registrieren",
 
@@ -62,6 +60,7 @@ export const de: Locale = {
   "register-password.description": "Wähle ein sicheres Passwort für dein Konto",
   "register-password.field.password": "Passwort",
   "register-password.action.submit": "Registrieren",
+  "register-password.action.back": "Zurück",
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: passkey-upsell (Passkey-Angebot — nach Registrierung)
@@ -81,7 +80,7 @@ export const de: Locale = {
   "collect-passkey-email.description":
     "Gib deine E-Mail-Adresse ein, um einen Passkey einzurichten",
   "collect-passkey-email.field.email": "E-Mail",
-  "collect-passkey-email.field.email.placeholder": "du@unternehmen.com",
+  "collect-passkey-email.field.email.placeholder": "du@beispiel.de",
   "collect-passkey-email.action.submit": "Weiter",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -95,7 +94,7 @@ export const de: Locale = {
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: done (Terminal — Anmeldebestätigung)
   // ═══════════════════════════════════════════════════════════════════════════
-  "done.title": "Du bist angemeldet als",
+  "done.title": "Du bist angemeldet",
   "done.description": "",
 
   // --- Step-Name-Aliase für den Standard-Login-Flow ---
@@ -104,17 +103,19 @@ export const de: Locale = {
   "password.field.password": "Passwort",
   "password.action.signin": "Anmelden",
   "password.action.passkey": "Mit Passkey anmelden",
+  "password.action.back": "Zurück",
   "password.action.register.lead": "Noch kein Konto? ",
   "password.action.register.link": "Registrieren",
 
   "register.title": "Konto erstellen",
-  // Leer per Design — die Registrierungskarte hat keine Unterzeile (Figma 6593:141743).
-  "register.description": "",
+  // Leer per Design — die Registrierungskarte hat keine Unterzeile.
+  "register.description": "Gib deine Daten ein, um loszulegen",
   "register.field.email": "E-Mail",
-  "register.field.email.placeholder": "du@unternehmen.com",
+  "register.field.email.placeholder": "du@beispiel.de",
   "register.field.password": "Passwort",
   "register.field.givenName": "Vorname",
   "register.field.familyName": "Nachname",
+  "register.field.companyName": "Firmenname",
   // Natives <input type="date"> lokalisiert sein Anzeigeformat anhand der Sprache
   // des Nutzers und übermittelt ISO YYYY-MM-DD – kein Platzhalter-/Format-Hinweis nötig.
   "register.field.dateOfBirth": "Geburtsdatum",
@@ -124,15 +125,22 @@ export const de: Locale = {
   "register.action.password": "Mit Passwort fortfahren",
   "register.action.passkey": "Weiter mit Passkey",
   "register.action.submit": "Registrieren",
+  "register.action.back": "Zurück",
   "register.action.sign_in.lead": "Bereits ein Konto? ",
   "register.action.sign_in.link": "Anmelden",
 
-  "complete.title": "Du bist angemeldet als",
+  "complete.title": "Du bist angemeldet",
   "signed-in.continue": "Weiter",
   "signed-in.logout": "Abmelden",
 
   // --- Passkey-Anmeldung ---
   "passkey-login.title": "Mit Passkey anmelden",
+
+  // --- Step: passkey-first (Einstiegsschritt des Passkey-first-Presets) ---
+  "passkey-first.title": "Anmelden",
+  "passkey-first.description": "Verwende deinen Passkey, um fortzufahren",
+  "passkey-first.action.passkey": "Weiter mit Passkey",
+  "passkey-first.action.email_fallback": "Stattdessen E-Mail verwenden",
 
   // --- Passwort-Wiederherstellung ---
   "recover.title": "E-Mail prüfen",
@@ -145,18 +153,47 @@ export const de: Locale = {
   "submit.signin": "Anmelden",
   "action.forgot_password": "Passwort vergessen?",
   "action.cancel": "Abbrechen",
+  // Generische Rückfalloption für den von der Engine injizierten
+  // `<step>.action.back`-Schlüssel (siehe INJECTED_KEY_FALLBACKS in liquid.ts).
+  "action.back": "Zurück",
 
   // --- SSO ---
+  "sso.continue_with": "Weiter mit {name}",
+  "sso.divider": "oder",
+  "register-sso.title": "Konto fertig einrichten",
+  "register-sso.description": "Wir brauchen noch ein paar Angaben",
+  "register-sso.field.email": "E-Mail",
+  "register-sso.action.submit": "Konto erstellen",
+  "sso-conflict.title": "Sie haben bereits ein Konto",
+  "sso-conflict.description": "Melden Sie sich wie gewohnt an, um fortzufahren",
+  "sso-conflict.field.password": "Passwort",
+  "sso-conflict.action.submit": "Anmelden",
+  "sso-conflict.action.passkey": "Passkey verwenden",
+  "sso-conflict.action.sign_in": "Zurück zur Anmeldung",
   "sso.redirect.title": "Weiterleitung zum Anbieter…",
 
+  // --- Passkey-Vorgang ---
+  "passkey.pending.status": "Warten auf deinen Passkey…",
+
   // --- Passkey-Fehler ---
-  "error.passkey_cancelled": "Passkey-Einrichtung wurde abgebrochen",
+  "error.passkey_cancelled": "Die Passkey-Abfrage wurde vorzeitig geschlossen.",
+  "error.passkey_timeout": "Die Passkey-Anfrage hat zu lange gedauert. Bitte versuche es erneut.",
   "error.passkey_not_registered":
     "Dieser Passkey ist nicht registriert. Bitte melde dich mit E-Mail und Passwort an.",
   "error.passkey_setup_failed":
     "Passkey-Registrierung wurde nicht abgeschlossen. Bitte versuche es erneut.",
   "error.passkey_unsupported": "Dieses Gerät unterstützt keine Passkeys",
   "error.passkey_failed": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+  "error.passkey_invalid":
+    "Dieser Passkey konnte nicht bestätigt werden. Bitte versuche es erneut.",
+  "error.sso_creation_disabled":
+    "Für diese Anmeldung gibt es kein Konto, und mit diesem Anbieter können keine neuen Konten erstellt werden.",
+  "error.flow_restart_required":
+    "Ihre Anmeldung konnte nicht fortgesetzt werden. Bitte beginnen Sie erneut.",
+  "error.passkey_registration_invalid":
+    "Der neue Passkey konnte nicht bestätigt werden. Bitte registriere ihn erneut.",
+  "error.sso_unavailable":
+    "Dieser Anmeldeanbieter ist gerade nicht verfügbar. Bitte wähle eine andere Anmeldemethode.",
 
   // --- Feld- / Formularfehler ---
   "error.email_required": "Bitte gib eine E-Mail-Adresse ein",
@@ -167,7 +204,21 @@ export const de: Locale = {
   "error.invalid_credentials": "Falsche E-Mail oder falsches Passwort.",
   "error.required": "Dieses Feld ist erforderlich.",
 
+  // --- Generische Feldregel-Fallbacks ({0} = Feldbezeichnung) ---
+  "error.field_required": "{0} ist erforderlich.",
+  "error.field_format": "Bitte gib einen gültigen Wert für {0} ein.",
+  "error.field_min_length": "{0} ist zu kurz.",
+  "error.field_max_length": "{0} ist zu lang.",
+  "error.field_invalid": "Bitte überprüfe {0}.",
+
   // --- Formular-Alerts ---
   "error.sign_in_server.title": "Anmeldung konnte nicht abgeschlossen werden.",
   "error.sign_in_server.body": "Bitte versuche es in einigen Minuten erneut",
+  "error.sso_cancelled.title": "Anmeldung abgebrochen",
+  "error.sso_cancelled.body":
+    "Du hast die Anmeldung beim Anbieter abgebrochen, oder er hat die Anfrage abgelehnt. Versuche es erneut oder nutze eine andere Methode.",
+  "error.sso_failed.title": "Anmeldung fehlgeschlagen",
+  "error.sso_failed.body":
+    "Die Anmeldung konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
+  "error.more_info": "Weitere Informationen",
 };

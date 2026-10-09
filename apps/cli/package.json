@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/cli",
-  "version": "0.1.0-alpha.12",
+  "version": "1.0.0-alpha.25",
   "description": "Agent-friendly Zitadel CLI",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
   "bugs": {
@@ -22,7 +22,7 @@
     "bin",
     "dist",
     "oclif.manifest.json",
-    "SKILLS.md"
+    "skills"
   ],
   "publishConfig": {
     "access": "public"
@@ -30,7 +30,13 @@
   "oclif": {
     "bin": "zitadel",
     "dirname": "zitadel",
-    "commands": "./dist/commands",
+    "description": "Manage your Zitadel project and local identity server from the command line.",
+    "commands": {
+      "strategy": "explicit",
+      "target": "./dist/index.mjs",
+      "identifier": "COMMANDS"
+    },
+    "helpClass": "./dist/lib/oclif/help",
     "topicSeparator": " ",
     "plugins": [
       "@oclif/plugin-help",
@@ -40,13 +46,44 @@
       "@oclif/plugin-autocomplete",
       "@oclif/plugin-search",
       "@oclif/plugin-version"
-    ]
+    ],
+    "topics": {
+      "users": {
+        "description": "Manage the users of the project."
+      },
+      "teams": {
+        "description": "Manage the teams of the project."
+      },
+      "sessions": {
+        "description": "Inspect and revoke the sessions of the project."
+      },
+      "events": {
+        "description": "Read the audit event stream of the project."
+      },
+      "grants": {
+        "description": "Manage collaboration grants on the project."
+      },
+      "projects": {
+        "description": "Inspect and update the projects visible to this credential."
+      },
+      "schemas": {
+        "description": "Inspect user-schema revisions."
+      },
+      "branding": {
+        "description": "Work with login branding revisions."
+      },
+      "sso": {
+        "description": "Manage the identity providers users can sign in with."
+      }
+    }
   },
   "type": "module",
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
+    "pretest": "pnpm run build",
     "test": "vitest run",
+    "test:all": "pnpm run test",
     "readme": "oclif readme",
     "prepack": "tsdown && oclif manifest",
     "postpack": "rm -f oclif.manifest.json"
@@ -62,22 +99,30 @@
     "@oclif/plugin-version": "catalog:",
     "@oclif/plugin-which": "catalog:",
     "@zitadel/api": "workspace:*",
+    "@zitadel/config": "workspace:*",
     "@zitadel/server": "workspace:*",
     "ajv": "catalog:",
     "consola": "^3.4.2",
     "magicast": "^0.5.3",
     "mixpanel": "^0.18.1",
     "safe-stable-stringify": "catalog:",
+    "semver": "catalog:",
+    "undici": "^7.24.7",
+    "wrap-ansi": "^7.0.0",
     "zod": "catalog:",
     "picocolors": "^1.1.1"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/semver": "catalog:",
+    "@types/wrap-ansi": "^3.0.0",
+    "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/sdk-next": "workspace:*",
     "msw": "catalog:",
     "oclif": "catalog:",
-    "tsdown": "^0.21.10",
-    "vitest": "^3.0.0"
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

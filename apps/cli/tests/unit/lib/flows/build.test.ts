@@ -40,6 +40,11 @@ describe("buildFlow", () => {
     expect(complete?.complete).toBe("redirect");
   });
 
+  it("sets status to active by default", () => {
+    const flow = buildFlow(["email"]);
+    expect(flow.status).toBe("active");
+  });
+
   it("returns a freshly allocated object on every call", () => {
     const a = buildFlow(["email"]);
     const b = buildFlow(["email"]);

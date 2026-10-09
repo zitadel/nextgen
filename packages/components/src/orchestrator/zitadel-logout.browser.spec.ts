@@ -8,27 +8,21 @@ import type { ZitadelLogout } from "./zitadel-logout.js";
 /**
  * Real-browser checks for `<zitadel-logout>`. Outside-click + Escape close
  * behaviour and focus restoration depend on a real platform; the unit spec
- * covers cookie parsing, template-slot mode, and aria attributes.
+ * covers identity fetching, template-slot mode, and aria attributes.
  *
  * Network calls go through the typed `revokeMySession` operation in
  * `@zitadel/api` (`DELETE /sessions/me`). We swap `globalThis.fetch` for a
  * lightweight stub (rather than running `msw/browser`) because vitest's
- * browser provider does not register a service worker out of the box.
+ * browser provider does not register a service worker out of the box. The
+ * one-shot `GET /sessions/me` identity fetch runs against the unreachable
+ * `API_BASE` and fails silently, which is fine — these tests don't assert
+ * identity.
  */
 const API_BASE = "https://logout.test.invalid";
 
 beforeAll(() => {
   configureZitadel({ proxyPath: API_BASE, projectId: "test" });
 });
-
-function setDisplayCookie(name: string, email: string): void {
-  const value = btoa(JSON.stringify({ name, email }));
-  document.cookie = `__nextgen_display=${value}; path=/`;
-}
-
-function clearDisplayCookie(): void {
-  document.cookie = "__nextgen_display=; path=/; max-age=0";
-}
 
 function shadowQuery<T extends Element>(host: Element, selector: string): T {
   const root = host.shadowRoot;
@@ -59,13 +53,11 @@ describe("<zitadel-logout> open/close (chromium)", () => {
   beforeEach(() => {
     host = document.createElement("div");
     document.body.appendChild(host);
-    setDisplayCookie("Alice Liddell", "alice@acme.com");
     originalFetch = globalThis.fetch;
   });
 
   afterEach(() => {
     host.remove();
-    clearDisplayCookie();
     globalThis.fetch = originalFetch;
   });
 

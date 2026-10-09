@@ -8,6 +8,7 @@ import {
   installDependenciesForSetup,
   type SetupInstallInput,
 } from "../../../../src/commands/setup/install";
+import type { runPackageCommand } from "../../../../src/lib/package-manager";
 
 const dirs: string[] = [];
 
@@ -24,6 +25,7 @@ async function tempProject(packageJson: Record<string, unknown> = {}): Promise<s
 
 function input(overrides: Partial<SetupInstallInput> = {}): SetupInstallInput {
   return {
+    cliVersion: "1.2.3",
     cwd: "",
     depsAdded: ["@zitadel/sdk-next"],
     dryRun: false,
@@ -36,15 +38,17 @@ function input(overrides: Partial<SetupInstallInput> = {}): SetupInstallInput {
   };
 }
 
+const planCommand = "npx @zitadel/cli@latest plan";
+
 describe("setup dependency installation", () => {
   it("installs when setup added a dependency", async () => {
     const cwd = await tempProject();
-    const run = vi.fn(async () => undefined);
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
 
     const result = await installDependenciesForSetup(input({ cwd, run }));
 
     expect(run).toHaveBeenCalledOnce();
-    expect(run.mock.calls[0]?.[0].display).toBe("npm install");
+    expect(run!.mock.calls[0]?.[0].display).toBe("npm install");
     expect(run.mock.calls[0]?.[1]).toMatchObject({
       cwd,
       redirectStdoutToStderr: true,
@@ -55,62 +59,109 @@ describe("setup dependency installation", () => {
       command: "npm install",
     });
     expect(result.nextActions.join("\n")).toContain(
+      "Start your project: npm run dev (then open http://localhost:3000/login)",
+    );
+    expect(result.nextActions.join("\n")).not.toContain(
       "Start your project: npm run dev (then open http://localhost:3000)",
     );
-    expect(result.nextActions.join("\n")).not.toContain("http://localhost:3000/login");
     expect(result.nextActions.join("\n")).toContain("register a user");
     expect(result.nextActions.join("\n")).toContain("log in again");
-    expect(result.nextCommands).toEqual(["npm run dev"]);
+    expect(result.nextActions.join("\n")).toContain(".zitadel/schemas/");
+    expect(result.nextActions.join("\n")).toContain(".zitadel/flows/");
+    expect(result.nextActions.join("\n")).toContain(
+      `See your changes before they go live: ${planCommand} to preview, then npx @zitadel/cli@latest apply to publish.`,
+    );
+    expect(result.nextCommands).toEqual(["npm run dev", planCommand]);
+  });
+
+  it("stages the human box to the verify mission while the JSON envelope stays complete", async () => {
+    const cwd = await tempProject();
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
+
+    const result = await installDependenciesForSetup(input({ cwd, run }));
+
+    // The box ends on one breadcrumb instead of the customize/publish pair —
+    // those steps only make sense after the first successful login.
+    expect(result.boxActions.at(-1)).toEqual({
+      text:
+        "Once login works, this shows your next steps (customizing is covered in " +
+        "your README's Zitadel section):",
+      command: "npx @zitadel/cli@latest status",
+    });
+    const boxText = result.boxActions
+      .map((action) => [action.text, action.command].filter(Boolean).join(" "))
+      .join("\n");
+    expect(boxText).toContain("register a user");
+    expect(boxText).toContain("Open a second terminal in this directory");
+    expect(boxText).not.toContain(".zitadel/schemas/");
+    expect(boxText).not.toContain(planCommand);
+    // The box carries the same journey as the envelope, structured for
+    // rendering: every boxed command appears in the envelope prose, and the
+    // verify mission is quoted verbatim in both. The envelope additionally
+    // carries the customize/publish pair for agents.
+    expect(result.nextActions.join("\n")).toContain("npm run dev");
+    expect(result.nextActions).toContain(result.boxActions.find((action) => !action.command)?.text);
+    expect(result.nextActions.join("\n")).toContain(".zitadel/schemas/");
+  });
+
+  it("keeps the install step first in the box when installation was skipped", async () => {
+    const cwd = await tempProject();
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
+
+    const result = await installDependenciesForSetup(input({ cwd, run, skipInstall: true }));
+
+    expect(result.boxActions[0]).toEqual({ text: "Install dependencies:", command: "npm install" });
+    expect(result.nextActions[0]).toBe("Install dependencies: npm install");
   });
 
   it("installs after fresh scaffolding even when no Zitadel dependency changed", async () => {
     const cwd = await tempProject({ packageManager: "pnpm@10.33.2" });
-    const run = vi.fn(async () => undefined);
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
 
     const result = await installDependenciesForSetup(
       input({ cwd, depsAdded: [], scaffoldedFramework: true, run }),
     );
 
-    expect(run.mock.calls[0]?.[0].display).toBe("pnpm install");
-    expect(result.nextCommands).toEqual(["pnpm dev"]);
+    expect(run!.mock.calls[0]?.[0].display).toBe("pnpm install");
+    expect(result.nextCommands).toEqual(["pnpm dev", planCommand]);
   });
 
   it("skips and recommends install when --skip-install is set", async () => {
     const cwd = await tempProject();
-    const run = vi.fn(async () => undefined);
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
 
     const result = await installDependenciesForSetup(input({ cwd, run, skipInstall: true }));
 
     expect(run).not.toHaveBeenCalled();
     expect(result.install).toMatchObject({ status: "skipped", reason: "skip-install" });
-    expect(result.nextCommands).toEqual(["npm install", "npm run dev"]);
+    expect(result.nextCommands).toEqual(["npm install", "npm run dev", planCommand]);
   });
 
   it("skips and recommends install during dry-run", async () => {
     const cwd = await tempProject();
-    const run = vi.fn(async () => undefined);
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
 
     const result = await installDependenciesForSetup(input({ cwd, dryRun: true, run }));
 
     expect(run).not.toHaveBeenCalled();
     expect(result.install).toMatchObject({ status: "skipped", reason: "dry-run" });
-    expect(result.nextCommands).toEqual(["npm install", "npm run dev"]);
+    expect(result.nextCommands).toEqual(["npm install", "npm run dev", planCommand]);
   });
 
   it("does not install when no dependency changed", async () => {
     const cwd = await tempProject();
-    const run = vi.fn(async () => undefined);
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
 
     const result = await installDependenciesForSetup(input({ cwd, depsAdded: [], run }));
 
     expect(run).not.toHaveBeenCalled();
     expect(result.install).toMatchObject({ status: "not-needed" });
-    expect(result.nextCommands).toEqual(["npm run dev"]);
+    expect(result.nextCommands).toEqual(["npm run dev", planCommand]);
   });
 
   it("surfaces install failures with remediation", async () => {
     const cwd = await tempProject();
-    const run = vi.fn(async () => {
+    const run = vi.fn<typeof runPackageCommand>(async () => {
       throw Object.assign(new Error("boom"), { code: 1 });
     });
 

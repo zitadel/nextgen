@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-next",
-  "version": "0.1.0-alpha.12",
+  "version": "1.0.0-alpha.25",
   "description": "Next.js helpers and mock auth UI for Zitadel",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-next#readme",
   "bugs": {
@@ -16,6 +16,11 @@
     "dist"
   ],
   "type": "module",
+  "sideEffects": [
+    "./dist/client.js",
+    "./dist/auth.js",
+    "./dist/provider.js"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -36,52 +41,46 @@
     "./middleware": {
       "types": "./dist/middleware.d.ts",
       "import": "./dist/middleware.js"
+    },
+    "./jsx": {
+      "types": "./dist/jsx.d.ts"
+    },
+    "./session": {
+      "types": "./dist/session.d.ts",
+      "import": "./dist/session.js"
     }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/middleware.ts src/auth.ts src/context.tsx src/useAuth.ts src/types.ts src/index.ts src/server.ts src/client.ts src/react.tsx --format esm --dts --clean --tsconfig tsconfig.build.json",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
-    "lint": "eslint ."
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json && node -e \"require('node:fs').copyFileSync('src/jsx.d.ts', 'dist/jsx.d.ts')\"",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
+    "test": "vitest run",
+    "test:all": "pnpm run test"
   },
   "dependencies": {
-    "@lit/react": "^1.0.8",
     "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
     "@zitadel/sdk-core": "workspace:*",
     "server-only": "^0.0.1"
   },
   "peerDependencies": {
-    "next": ">=14",
+    "next": ">=15",
     "react": ">=18",
     "react-dom": ">=18"
   },
   "devDependencies": {
-    "@eslint/js": "catalog:",
-    "@eslint/json": "catalog:",
-    "@eslint/markdown": "catalog:",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",
+    "@types/node": "catalog:",
     "@types/react": "catalog:",
-    "eslint": "catalog:",
-    "eslint-config-prettier": "catalog:",
-    "eslint-import-resolver-typescript": "catalog:",
-    "eslint-plugin-import": "catalog:",
-    "eslint-plugin-jsx-a11y": "^6.10.0",
-    "eslint-plugin-perfectionist": "catalog:",
-    "eslint-plugin-prettier": "catalog:",
-    "eslint-plugin-react": "^7.37.0",
-    "eslint-plugin-react-hooks": "^5.0.0",
-    "eslint-plugin-testing-library": "^7.0.0",
+    "@vitest/coverage-v8": "catalog:",
     "jsdom": "catalog:",
-    "next": "^16.2.4",
-    "prettier": "catalog:",
-    "tsup": "catalog:",
-    "typescript": "^5.7.3",
-    "typescript-eslint": "catalog:",
-    "vitest": "^3.0.0"
+    "next": "^16.2.11",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

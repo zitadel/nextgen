@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { MANAGED_MARKER } from "../../../src/lib/paths";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 
 type Check = { name: string; status: "pass" | "warn" | "fail"; message: string; path?: string };
 
@@ -16,7 +16,7 @@ const servers: Server[] = [];
 const VALID_USER_SCHEMA = {
   kind: "user-schema",
   metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
-  "x-auth-methods": { password: { enabled: true, position: 0 } },
+  "x-auth-methods": { password: { enabled: true } },
   properties: { email: { type: "string" } },
 };
 
@@ -46,7 +46,9 @@ async function doctor(cwd: string, extra: string[] = []) {
  * Builds a well-formed managed project that should pass every doctor check
  * runnable without the platform: config/secret parse + match, 0600 secret,
  * gitignore + env.example coverage, a Next.js framework signature, a valid
- * user schema, and a Zitadel SDK dependency.
+ * user schema, a Zitadel SDK dependency, and an owning team recorded by
+ * `zitadel claim` (without it the claim check warns, which is its own test
+ * below).
  */
 async function makeHealthyProject(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-doctor-"));
@@ -54,6 +56,7 @@ async function makeHealthyProject(): Promise<string> {
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
   await mkdir(join(cwd, "app/login"), { recursive: true });
   await mkdir(join(cwd, "app/register"), { recursive: true });
+  await mkdir(join(cwd, "app/profile"), { recursive: true });
 
   await writeFile(
     join(cwd, "package.json"),
@@ -79,6 +82,8 @@ async function makeHealthyProject(): Promise<string> {
       preview_secret: "sk_proj_preview",
       preview_origins: [],
       created_at: "2026-01-01T00:00:00.000Z",
+      claimed_at: "2026-01-02T00:00:00.000Z",
+      team_id: "team-001",
     }),
   );
   await chmod(join(cwd, ".zitadel/secret"), 0o600);
@@ -100,10 +105,37 @@ async function makeHealthyProject(): Promise<string> {
     `${MANAGED_MARKER}\nexport default function R() {}\n`,
   );
   await writeFile(
+    join(cwd, "app/profile/page.tsx"),
+    `${MANAGED_MARKER}\nexport default function P() {}\n`,
+  );
+  await writeFile(
     join(cwd, "middleware.ts"),
     `${MANAGED_MARKER}\nexport function middleware() {}\n`,
   );
+  await writeFile(join(cwd, "custom-elements.d.ts"), `${MANAGED_MARKER}\nexport {};\n`);
   return cwd;
+}
+
+/**
+ * Rewrites the secret without `claimed_at`/`team_id`, i.e. a project that has
+ * been set up but never claimed — the state every project starts in. The
+ * creation time defaults to recent so the claim window reads as open.
+ */
+async function writeDetachedSecret(
+  cwd: string,
+  createdAt = new Date(Date.now() - 60_000).toISOString(),
+): Promise<void> {
+  await writeFile(
+    join(cwd, ".zitadel/secret"),
+    JSON.stringify({
+      project_id: "proj-001",
+      project_secret: "sk_proj_test",
+      preview_secret: "sk_proj_preview",
+      preview_origins: [],
+      created_at: createdAt,
+    }),
+  );
+  await chmod(join(cwd, ".zitadel/secret"), 0o600);
 }
 
 afterEach(async () => {
@@ -137,9 +169,143 @@ describe("doctor command", () => {
     expect(names).toContain("secret");
     expect(names).toContain("dependency");
     expect(names).toContain("project-match");
+    expect(names).toContain("claim");
     expect(names).not.toContain("managed-login");
     expect(names).not.toContain("managed-register");
     expect(names).not.toContain("managed-middleware");
+  });
+
+  // The nudge has to stay advisory: doctor throws E_VALIDATION on any `fail`,
+  // so failing here would break every scripted `zitadel doctor` run against a
+  // project nobody has attached to a team yet.
+  it("warns (but passes) when the project is not attached to a team, and points at claim", async () => {
+    const cwd = await makeHealthyProject();
+    await writeDetachedSecret(cwd);
+
+    const res = await doctor(cwd);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      data: { ok: boolean; checks: Check[]; next_commands?: string[] };
+    };
+    expect(json.status).toBe("ok");
+    expect(json.data.ok).toBe(true);
+    const claim = json.data.checks.find((check) => check.name === "claim");
+    expect(claim?.status).toBe("warn");
+    expect(claim?.message).toContain("temporary and its data may be lost");
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
+  });
+
+  // Same advisory posture, reconciliation wording: past the 14-day window
+  // the warning explains both outcomes, and the claim command stays
+  // suggested because the local record can be stale (claimed from another
+  // machine reads detached) and running claim answers authoritatively.
+  it("switches to reconciliation wording once the window has closed", async () => {
+    const cwd = await makeHealthyProject();
+    await writeDetachedSecret(cwd, "2026-01-01T00:00:00.000Z");
+
+    const res = await doctor(cwd);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      data: { ok: boolean; checks: Check[]; next_actions?: string[]; next_commands?: string[] };
+    };
+    expect(json.data.ok).toBe(true);
+    const claim = json.data.checks.find((check) => check.name === "claim");
+    expect(claim?.status).toBe("warn");
+    expect(claim?.message).toContain("claim window has closed");
+    expect((json.data.next_actions ?? []).join("\n")).toContain("claim window has closed");
+    expect(json.data.next_commands ?? []).toContain(expectedPublicCliCommand("claim"));
+  });
+
+  // Claiming needs a human in a browser, so --fix has nothing safe to do. The
+  // warning has to survive it rather than being silently "repaired".
+  it("leaves the claim warning (and the secret) alone under --fix", async () => {
+    const cwd = await makeHealthyProject();
+    await writeDetachedSecret(cwd);
+    const before = await readFile(join(cwd, ".zitadel/secret"), "utf8");
+
+    const res = await doctor(cwd, ["--fix"]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { data: { ok: boolean; checks: Check[] } };
+    expect(json.data.checks.find((check) => check.name === "claim")?.status).toBe("warn");
+    expect(await readFile(join(cwd, ".zitadel/secret"), "utf8")).toBe(before);
+  });
+
+  // A local project's claim depends on server state this offline check
+  // cannot see (platform.bootstrap_project), so the nudge must not follow
+  // `zitadel setup --server local` around; setup probes the server instead.
+  it("passes the claim check without a nudge for a local project", async () => {
+    const cwd = await makeHealthyProject();
+    await writeDetachedSecret(cwd);
+    await writeFile(
+      join(cwd, "zitadel.json"),
+      JSON.stringify({
+        project: "proj-001",
+        server: "http://localhost:8080",
+        framework: { id: "next" },
+        environments: { development: { issuer: "http://localhost:3000" } },
+      }),
+    );
+
+    const res = await doctor(cwd);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      data: { checks: Check[]; next_commands?: string[] };
+    };
+    expect(json.data.checks.find((check) => check.name === "claim")?.status).toBe("pass");
+    expect(json.data.next_commands ?? []).not.toContain(expectedPublicCliCommand("claim"));
+  });
+
+  // The skew stays advisory (the app keeps working on its pinned train), and
+  // the repair must be a structured next_command — the agent contract prefers
+  // that field over prose — using the project's package manager with an
+  // exact-save flag so the repair cannot float the pin.
+  it("warns on a trailing SDK pin and emits the exact-pin repair in next_commands", async () => {
+    const cwd = await makeHealthyProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^15", "@zitadel/sdk-next": "0.0.1" },
+      }),
+    );
+
+    const res = await doctor(cwd);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      cli_version: string;
+      data: { ok: boolean; checks: Check[]; next_commands?: string[] };
+    };
+    expect(json.data.ok).toBe(true);
+    expect(json.data.checks.find((check) => check.name === "dependency-version")?.status).toBe(
+      "warn",
+    );
+    expect(json.data.next_commands).toContain(
+      `npm install --save-exact @zitadel/sdk-next@${json.cli_version}`,
+    );
+  });
+
+  it("warns (but passes) when .zitadel/schemas is empty — legacy or interrupted projects", async () => {
+    const cwd = await makeHealthyProject();
+    await rm(join(cwd, ".zitadel/schemas/user.json"));
+
+    const res = await doctor(cwd);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      data: { ok: boolean; checks: Check[] };
+    };
+    expect(json.status).toBe("ok");
+    expect(json.data.ok).toBe(true);
+    const schemaCheck = json.data.checks.find((check) => check.name === "schema");
+    expect(schemaCheck?.status).toBe("warn");
+    expect(schemaCheck?.message).toContain("No schema files found");
   });
 
   it("fails the dependency check when no @zitadel package is present", async () => {
@@ -170,6 +336,19 @@ describe("doctor command", () => {
     const occupiedPort = Number(new URL(occupiedUrl).port);
 
     const fake = await fakeDocker();
+    // The port probe shells out to `lsof` and degrades to "no listeners" on
+    // ANY failure by contract (ports.ts), so asserting through the real
+    // system lsof makes this test environment-dependent — the listener
+    // silently vanished on CI runners. Fake lsof on the PATH the test
+    // already owns so the occupied port is always visible.
+    const lsofPath = join(fake.binDir, "lsof");
+    await writeFile(
+      lsofPath,
+      `#!/usr/bin/env node
+console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].join("\\n"));
+`,
+    );
+    await chmod(lsofPath, 0o755);
     const res = await runCliForTest(
       [
         "doctor",
@@ -184,6 +363,7 @@ describe("doctor command", () => {
       {
         PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
         DOCKER_LOG: fake.logPath,
+        LSOF_FIXTURE_PORT: String(occupiedPort),
       },
     );
 
@@ -271,6 +451,61 @@ describe("doctor command", () => {
     expect(json.details.checks.find((check) => check.name === "project-match")?.status).toBe(
       "fail",
     );
+  });
+
+  it("fails when a scaffolded infrastructure file is missing and --fix restores it", async () => {
+    const cwd = await makeHealthyProject();
+    await rm(join(cwd, "middleware.ts"));
+
+    const broken = await doctor(cwd);
+    expect(broken.exitCode).toBe(3);
+    const brokenJson = parseJson(broken.stdout) as {
+      status: string;
+      code: string;
+      details: { checks: Check[] };
+    };
+    expect(brokenJson.status).toBe("error");
+    expect(brokenJson.code).toBe("E_VALIDATION");
+    const drift = brokenJson.details.checks.find((check) => check.name === "managed-files");
+    expect(drift?.status).toBe("fail");
+    expect(drift?.message).toContain("middleware.ts");
+
+    const fixed = await doctor(cwd, ["--fix"]);
+    expect(fixed.exitCode).toBe(0);
+    const fixedJson = parseJson(fixed.stdout) as {
+      status: string;
+      data: { ok: boolean; checks: Check[] };
+    };
+    expect(fixedJson.status).toBe("ok");
+    expect(fixedJson.data.ok).toBe(true);
+    expect(fixedJson.data.checks.find((check) => check.name === "managed-files")?.status).toBe(
+      "pass",
+    );
+    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(MANAGED_MARKER);
+  });
+
+  it("warns on a missing scaffolded page and --fix restores it", async () => {
+    const cwd = await makeHealthyProject();
+    await rm(join(cwd, "app/login/page.tsx"));
+
+    const warned = await doctor(cwd);
+    expect(warned.exitCode).toBe(0);
+    const warnedJson = parseJson(warned.stdout) as {
+      status: string;
+      data: { ok: boolean; checks: Check[] };
+    };
+    expect(warnedJson.data.ok).toBe(true);
+    expect(warnedJson.data.checks.find((check) => check.name === "managed-files")?.status).toBe(
+      "warn",
+    );
+
+    const fixed = await doctor(cwd, ["--fix"]);
+    expect(fixed.exitCode).toBe(0);
+    const fixedJson = parseJson(fixed.stdout) as { data: { checks: Check[] } };
+    expect(fixedJson.data.checks.find((check) => check.name === "managed-files")?.status).toBe(
+      "pass",
+    );
+    expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toContain(MANAGED_MARKER);
   });
 
   it("re-applies a missing Zitadel dependency via --fix and then passes", async () => {

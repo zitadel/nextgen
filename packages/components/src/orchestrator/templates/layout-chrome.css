@@ -8,19 +8,44 @@
  * `:host` via the branding stylesheet.
  */
 
+/* Widget-first: the default host is content-sized and paints nothing —
+   the embedding app owns the page. `variant="page"` (hosted shell,
+   scaffolded login routes) opts into the full-page chrome. The
+   `--zl-page-min-height` custom property overrides the height in both
+   modes (a host-set value always wins over the variant default). */
 :host {
   display: block;
+  background: transparent;
+  color: var(--zl-foreground);
+  font-family: var(--zl-font-family-sans);
+}
+:host([variant="page"]) {
   min-height: 100%;
-  background: var(--zl-color-surface-default-black, #0f0f11);
-  color: var(--zl-color-text-primary-white, #f4f4f6);
-  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+  background: var(--zl-background);
+}
+/* A branding asset whose URL is well-formed but dead otherwise renders as a
+   0×0 <img> — a silent hole in the design. `asset-fallback.ts` stamps this
+   attribute from a real `error` listener (templates are DOMPurify-sanitised,
+   so inline `onerror` is not available to them) and the element leaves the
+   layout, degrading to the same result as "no asset configured". Qualified
+   on `img` so it outranks the `.zl-split__compact` display rules below
+   regardless of source order. */
+img[data-zl-asset-broken] {
+  display: none;
 }
 .zl-mount {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  /* Width-based chrome below (`@container`) responds to the widget's own
+     width, not the viewport — a sidebar embed on a desktop viewport must
+     collapse like a phone would. */
+  container-type: inline-size;
+  min-height: var(--zl-page-min-height, auto);
   background: inherit;
   color: inherit;
+}
+:host([variant="page"]) .zl-mount {
+  min-height: var(--zl-page-min-height, 100vh);
 }
 .zl-mount > zl-page-shell,
 .zl-mount > [data-zl-template-root] {
@@ -35,39 +60,149 @@
 .zl-attribution[hidden] {
   display: none;
 }
-/* Card header typography — Figma "Desktop/Headings/Small" + "Body Small
-   Regular" pattern shared by sign-in (6593:141740), passkey upsell
-   (6594:89142 / 6594:12796), and signed-in (6596:132845). Templates
-   slot raw <h1>/<p> elements into <zl-card>, which keeps them in the
-   light DOM where the orchestrator's stylesheet can reach them — the
-   atom intentionally doesn't dictate typography. */
+
+/* The trustmark: "Secured with" beside the logotype, at body size. It is not a
+   chip — the design reserves the chip beside it for the session badge. */
+.zl-trustmark {
+  flex-wrap: wrap;
+  gap: var(--zl-spacing-2-5);
+}
+.zl-trustmark__mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zl-spacing-2);
+  font-family: var(--zl-font-family-sans);
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  color: var(--zl-foreground);
+  text-decoration: none;
+}
+.zl-trustmark__mark:hover {
+  text-decoration: underline;
+  text-underline-offset: var(--zl-spacing-1);
+}
+/* One focus outline for every link this stylesheet paints. */
+.zl-trustmark__mark:focus-visible,
+.zl-card-nav__link:focus-visible,
+.zl-card-forgot__link:focus-visible {
+  outline: var(--zl-focus-width) solid var(--zl-ring);
+  outline-offset: var(--zl-focus-offset);
+}
+.zl-trustmark__mark:focus-visible {
+  border-radius: var(--zl-radius-sm);
+}
+.zl-trustmark__logotype {
+  display: block;
+  flex-shrink: 0;
+  width: 65px;
+  height: 16px;
+  line-height: 0;
+}
+.zl-trustmark__logotype-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* Brand mark above the card, from the resolved side's logo. `--zl-logo-scale`
+   is the tenant's `shape.logo_scale`; it multiplies whatever cap is in force so
+   a host override of the cap keeps working underneath it. Bounded the way the
+   split pane's mark is (`img.zl-split__compact`): a tenant asset carries no
+   intrinsic size the layout can trust, and an SVG with only a viewBox stretches
+   to fill whatever box it lands in — which here is the full page width. */
+.zl-card-logo {
+  width: auto;
+  max-width: min(12rem, 60%);
+  max-height: calc(var(--zl-card-logo-max-height, 2.5rem) * var(--zl-logo-scale, 1));
+  object-fit: contain;
+}
+/* Card header typography. Templates slot raw <h1>/<p> elements into
+   <zl-card>, which keeps them in the light DOM where this stylesheet can
+   reach them — the atom intentionally doesn't dictate typography.
+
+   `line-height: 1` on the title is the design's, not an oversight: the header
+   is a single line whose 6px gap to the description does the separating, so
+   leading above the cap height only pads the top of the card. */
 .zl-card-title {
   margin: 0;
-  font-family: var(--zl-font-family-heading, var(--zl-font-family-sans, system-ui, sans-serif));
-  font-size: 2rem;
-  font-weight: 700;
-  line-height: 2.5rem;
-  letter-spacing: -0.02em;
-  color: var(--zl-color-text-primary-white, #f4f4f6);
+  font-family: var(--zl-font-family-heading);
+  font-size: var(--zl-text-xl-size);
+  font-weight: var(--zl-font-weight-medium);
+  line-height: 1;
+  color: var(--zl-card-foreground);
   text-align: left;
 }
 .zl-card-subtitle {
   margin: 0;
-  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-  font-weight: 400;
-  color: var(--zl-color-text-primary-white, #f4f4f6);
+  font-family: var(--zl-font-family-sans);
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  font-weight: var(--zl-font-weight-normal);
+  color: var(--zl-muted-foreground);
 }
-/* Figma 6593:141989 / 6594:12882 — left-aligned in Field+CTAs (x=0, items-start). */
+
+/* The two groups the card body holds. The card spaces them 28px apart; each
+   packs its own members tighter. Explicit wrappers rather than sibling
+   selectors, so an ejected template composes them on purpose. */
+.zl-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-7);
+}
+/* A step can declare no fields at all — the passkey upsell is title, copy and
+   two buttons. The wrapper still renders, and an empty flex item would keep
+   claiming the card's 28px gap. `:has(*)` rather than `:empty` because Liquid
+   leaves whitespace text nodes behind, which `:empty` counts. */
+.zl-field-group:not(:has(*)) {
+  display: none;
+}
+.zl-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-3);
+}
+/* `<zl-passkey>` renders its pending status and cancel button into light DOM. */
+.zl-passkey-pending {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-3);
+}
+/* A terminal step is a heading with no form under it, so the heading is
+   centred in the card rather than left-aligned over fields that are not there.
+   The empty field group is already hidden (see `.zl-field-group:not(:has(*))`),
+   so the card's own region gap is what sits between the heading and the actions
+   — keep it, or the heading ends up flush against the buttons. When a terminal
+   step has no actions either, the empty body region hides itself and no gap
+   remains. */
+.zl-card--terminal .zl-card-title,
+.zl-card--terminal .zl-card-subtitle {
+  text-align: center;
+}
+/* suppress-header: the host asked for the heading block to be visually
+   hidden (its page already carries one). Stamped by the orchestrator on the
+   shell so it covers user-ejected templates too. Screen-reader-only rather
+   than display:none — the step keeps its accessible name. */
+[data-suppress-header] .zl-card-title,
+[data-suppress-header] .zl-card-subtitle {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* The sign-in <-> sign-up switcher, centred beneath the actions. The design
+   gives the link no colour of its own — the underline is what marks it. */
 .zl-card-nav {
   margin: 0;
-  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
-  font-size: 1rem;
-  line-height: 1.5rem;
-  font-weight: 400;
-  color: var(--zl-color-text-primary-white, #f4f4f6);
-  text-align: left;
+  font-family: var(--zl-font-family-sans);
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  font-weight: var(--zl-font-weight-normal);
+  color: var(--zl-muted-foreground);
+  text-align: center;
 }
 .zl-card-nav__link {
   display: inline;
@@ -77,21 +212,21 @@
   background: transparent;
   font: inherit;
   line-height: inherit;
-  color: var(--zl-color-icon-default-purple, #bba5e4);
-  text-decoration: none;
+  color: var(--zl-link);
+  text-decoration: underline;
+  text-underline-offset: var(--zl-spacing-1);
   cursor: pointer;
 }
+/* The switcher's underline is how the design marks it, so hover lifts the link
+   out of the muted line it sits in rather than taking the underline away. */
 .zl-card-nav__link:hover {
-  text-decoration: underline;
+  color: var(--zl-foreground);
 }
-.zl-card-nav__link:focus-visible {
-  outline: var(--zl-focus-width, 2px) solid var(--zl-focus-color, #f4f4f6);
-  outline-offset: var(--zl-focus-offset, 2px);
-}
-/* Figma 6593:141989 — forgot password row (left-aligned, before CTAs). */
+/* Standalone forgot-password row: emitted only by templates ejected before
+   `<zl-field>` carried the link on its label row. */
 .zl-card-forgot {
   margin: 0;
-  text-align: left;
+  text-align: right;
 }
 .zl-card-forgot__link {
   display: inline;
@@ -99,18 +234,380 @@
   padding: 0;
   border: none;
   background: transparent;
-  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
-  font-size: 1rem;
-  line-height: 1.5rem;
-  font-weight: 400;
-  color: var(--zl-color-icon-default-purple, #bba5e4);
+  font-family: var(--zl-font-family-sans);
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  font-weight: var(--zl-font-weight-normal);
+  color: var(--zl-link);
   text-decoration: none;
+  text-underline-offset: var(--zl-spacing-1);
   cursor: pointer;
 }
+/* Matches the field-level affordance in `zl-field.css`: the design draws
+   forgot-password as plain text, and the underline is the hover. */
 .zl-card-forgot__link:hover {
   text-decoration: underline;
 }
-.zl-card-forgot__link:focus-visible {
-  outline: var(--zl-focus-width, 2px) solid var(--zl-focus-color, #f4f4f6);
-  outline-offset: var(--zl-focus-offset, 2px);
+/* Split-design chrome (ADR 040 design catalog: `split` / `split-right`).
+   Those designs are retired from the eject catalog (#1039) — page layout
+   belongs in the embedding app — but revisions already published from them
+   keep rendering on this chrome (fixtures: orchestrator/__fixtures__/
+   legacy-designs/). A brand pane beside the form pane, collapsing to
+   form-only on narrow viewports. */
+.zl-split {
+  display: grid;
+  /* Tunable from the template root's style attribute (the sanitiser allows
+     style=""): custom properties cascade into this shadow chrome. */
+  grid-template-columns: var(--zl-split-columns, minmax(0, 1fr) minmax(0, 1fr));
+  align-items: var(--zl-split-align, center);
+  min-height: 100%;
+  /* Explicit, not content-derived: the column ratio applies to the full
+     available width, and the attribution row below mirrors the same tracks
+     to line the badge up under the form pane. */
+  width: 100%;
+  gap: var(--zl-spacing-8);
 }
+/* The block padding is what decides whether the pane reads as a peer of the
+   form card or as the thing the page is built around. The card is 384 wide and
+   roughly 342 tall on the sign-in step, so 3.25rem a side on top of the
+   placeholder's own footprint put the pane 200px past it — the grid centres the
+   card in that row and the attribution then sits a long way under it. 2rem
+   keeps the panes visually separated at the width they meet without the brand
+   side dictating the page height. Spacing tokens, not pixels: the branding
+   density knob writes `--zl-spacing-4` / `--zl-spacing-8`, so a compact tenant
+   tightens this pane along with everything else. */
+.zl-split__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--zl-spacing-6);
+  padding: var(--zl-spacing-8) var(--zl-spacing-4);
+}
+/* A width cap alone leaves the height open: a portrait lockup clamped to 16rem
+   wide still resolves whatever height its ratio asks for (a 500×2000 mark
+   renders 256×1024), and the content-sized brand pane hands that straight to
+   the page. `max-height` only, deliberately unlike `.zl-split__hero` below: a
+   logo is a mark, not a pane-filling image, so it shrinks proportionally and
+   keeps its whole shape rather than being cropped to a slot — and it is never
+   stretched to the pane, which is what `width: 100%` there would do. 16rem
+   squares off the existing width cap, so the logo fits a 16rem box either way.
+   That is the cap for a logo that has the pane to itself — when a hero shares
+   it, the rule below takes over. Raise `--zl-split-logo-max-height` from the
+   template root for a taller lockup. */
+.zl-split__logo {
+  max-width: min(16rem, 60%);
+  max-height: calc(var(--zl-split-logo-max-height, 16rem) * var(--zl-logo-scale, 1));
+}
+/* A tenant who sets both assets stacks them in this one pane, so the two solo
+   caps stop being independent — and the pane's own gap and padding are only
+   half the chrome they compete with. The shell around it adds 3.25rem of block
+   padding, a region gap, and the 2.5rem attribution pill. The logo first yields
+   to a header-mark cap; the hero then takes only the viewport height left after
+   that whole fixed budget, so the pair also fits short, wide laptop viewports.
+   Hero-only panes keep the larger cap below.
+
+   The floor is 6rem — the compact banner's cap — not 0. Below roughly a 420px
+   viewport the subtraction goes negative, and floored at 0 the hero silently
+   disappeared while the pane kept the logo. That bought nothing: at those
+   heights the form card is already taller than the brand pane, so it, not the
+   hero, sets the page height. A visible-but-small hero is the honest
+   degradation. */
+.zl-split__logo:has(+ .zl-split__hero) {
+  max-height: calc(var(--zl-split-logo-max-height, 8rem) * var(--zl-logo-scale, 1));
+}
+.zl-split__logo:has(+ .zl-split__hero) + .zl-split__hero {
+  max-height: min(
+    var(--zl-split-hero-max-height, 22.5rem),
+    max(
+      6rem,
+      calc(
+        100vh - 104px - var(--zl-spacing-8) - var(--zl-spacing-8) -
+          2.5rem - var(--zl-spacing-6) - var(--zl-spacing-6) -
+          calc(var(--zl-split-logo-max-height, 8rem) * var(--zl-logo-scale, 1))
+      )
+    )
+  );
+}
+/* Pinned width and a capped height, not a bare `max-width`. The brand pane is
+   content-sized — the grid centres it, nothing above the image constrains it —
+   so an unbounded hero *is* the page height. That bites hardest on an asset
+   with no intrinsic size (an SVG carrying only a viewBox, which every
+   framework scaffold ships): `width: auto` resolves to the pane's width and
+   the ratio squares it, so the pane grows past the viewport and pushes the
+   attribution below the fold. Pinning the width hands the excess to
+   `object-fit` instead of the layout: a wide banner is untouched (its height
+   never reaches the cap) and a tall or square one is cropped. The cap is the
+   `.zl-split__placeholder` footprint (18rem at 4 / 5), so a hero never claims
+   more vertical space than the panel it replaces, with a viewport term for
+   short screens. Tenants whose design wants a taller pane raise
+   `--zl-split-hero-max-height` from the template root. */
+.zl-split__hero {
+  width: 100%;
+  max-height: var(--zl-split-hero-max-height, min(22.5rem, 60vh));
+  border-radius: var(--zl-radius-lg);
+  object-fit: cover;
+}
+/* No-asset default for the brand pane: a token-gradient panel (same visual
+   language as .zl-hero__brand-mark) so a split design still reads as split
+   before branding.json names a logo_url/hero_url — an empty aside renders
+   the whole design as a lonely off-centre card. The templates swap it for
+   the real assets the moment one is set. */
+.zl-split__placeholder {
+  width: min(18rem, 85%);
+  aspect-ratio: 4 / 5;
+  border-radius: var(--zl-radius-lg);
+  background:
+    radial-gradient(
+      120% 120% at 18% 12%,
+      var(--zl-gradient-lavender-start) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      130% 130% at 85% 92%,
+      var(--zl-gradient-rose-start) 0%,
+      transparent 60%
+    ),
+    var(--zl-card);
+}
+/* A column at every width, not just the collapsed one: the trustmark is a
+   member of this pane (see the anchor in the split templates), and stacking it
+   under the card is what puts it the same 24px away that the centred design
+   gives it. On wide viewports the compact mark is hidden, so the column holds
+   the card and the trustmark alone. */
+.zl-split__form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--zl-spacing-6);
+  padding: 16px;
+}
+/* Condensed brand header inside the form pane. Hidden on wide viewports
+   (the full brand pane carries the branding there); shown on narrow ones
+   so collapsing the brand pane doesn't erase the tenant's identity. */
+.zl-split__compact {
+  display: none;
+  max-width: min(12rem, 60%);
+}
+/* The height cap is an image concern — it keeps a tall logo from crowding
+   out the card. The hero design's fallback is a <p> whose copy tenants are
+   meant to edit, and a shared cap would clip it the moment it wraps; the
+   `img` qualifier keeps the two cases from inheriting each other's limits.
+   Both rules are `img`-qualified so source order (not specificity) decides
+   between the logo cap and the hero banner cap. */
+img.zl-split__compact {
+  max-height: calc(2.5rem * var(--zl-logo-scale, 1));
+}
+/* hero_url-only tenants: the compact fallback renders the hero image as a
+   modest banner instead of vanishing with the brand pane. Same pinned-width +
+   capped-height shape as `.zl-split__hero`, and load-bearing for the same
+   reason — drop the `width` and an intrinsic-size-less asset sizes itself off
+   the form pane instead, squaring a banner slot into a wall above the card. */
+img.zl-split__compact--hero {
+  max-height: 6rem;
+  max-width: 100%;
+  width: 100%;
+  border-radius: var(--zl-radius-lg);
+  object-fit: cover;
+}
+.zl-split--right .zl-split__brand {
+  order: 2;
+}
+.zl-split--right .zl-split__form {
+  order: 1;
+}
+/* Only for a template with no attribution anchor — an ejected split from
+   before the mark moved into the form column, which still slots it into the
+   shell footer. That footer spans both panes, so a centred mark lands under the
+   pane seam: mirror the split's tracks (same custom property, same gap, same
+   width) on the footer row and park the mark in the form column. `:has` keys it
+   to the template actually rendering a split, so centred/minimal keep the plain
+   centring. */
+zl-page-shell:has(.zl-split) [slot="footer"].zl-attribution {
+  width: 100%;
+  display: grid;
+  grid-template-columns: var(--zl-split-columns, minmax(0, 1fr) minmax(0, 1fr));
+  gap: var(--zl-spacing-8);
+}
+zl-page-shell:has(.zl-split) [slot="footer"].zl-attribution > * {
+  grid-column: 2;
+  justify-self: center;
+}
+zl-page-shell:has(.zl-split--right) [slot="footer"].zl-attribution > * {
+  grid-column: 1;
+}
+/* Anything the host puts in `attribution-trailing` parks in the same column.
+   A slot is `display: contents`, so its projected nodes are the grid items and
+   `> *` above never reaches them — without this they would auto-place into the
+   brand column, on the far side of the seam from the mark they belong to. */
+zl-page-shell:has(.zl-split) [slot="footer"].zl-attribution ::slotted(*) {
+  grid-column: 2;
+  justify-self: center;
+}
+zl-page-shell:has(.zl-split--right) [slot="footer"].zl-attribution ::slotted(*) {
+  grid-column: 1;
+}
+/* Container query, not media query: keyed to the mount's inline size so a
+   narrow embed on a wide viewport collapses exactly like a phone. */
+@container (max-width: 48rem) {
+  .zl-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* Templates opt into keeping the full pane (stacked above the form) by
+     setting --zl-split-brand-mobile: flex on their root element. */
+  .zl-split__brand {
+    display: var(--zl-split-brand-mobile, none);
+  }
+  .zl-split__compact {
+    display: block;
+  }
+  /* Collapsed split is a single column — the badge recentres with it. */
+  zl-page-shell:has(.zl-split) [slot="footer"].zl-attribution {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  zl-page-shell:has(.zl-split) .zl-attribution > *,
+  zl-page-shell:has(.zl-split--right) [slot="footer"].zl-attribution > * {
+    grid-column: 1;
+  }
+}
+/* Hero-design landing primitives (`hero`): a token-styled mock landing
+   page inside .zl-split__brand. Consumed by the retired hero design (#1039;
+   fixture in orchestrator/__fixtures__/legacy-designs/hero.liquid), which
+   already-published revisions still use. The classes keep it on design
+   tokens so palettes and theme mode apply. */
+.zl-hero {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 34rem;
+  text-align: left;
+  color: var(--zl-foreground);
+  font-family: var(--zl-font-family-sans);
+}
+.zl-hero__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--zl-spacing-8);
+}
+.zl-hero__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zl-spacing-2);
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.zl-hero__brand-logo {
+  max-height: calc(1.75rem * var(--zl-logo-scale, 1));
+}
+.zl-hero__brand-mark {
+  display: inline-flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--zl-radius-md);
+  background: linear-gradient(
+    135deg,
+    var(--zl-gradient-lavender-start),
+    var(--zl-gradient-rose-start)
+  );
+}
+/* Text fallback for the mobile compact header when no logo_url is set
+   (display is owned by .zl-split__compact; this only styles the text).
+   Overrides the logo-sized width the shared class assumes, resets the
+   paragraph margin, and lets a long unbroken brand name wrap instead of
+   pushing the form pane sideways. */
+.zl-hero__compact-brand {
+  margin: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--zl-foreground);
+}
+.zl-hero__nav-links {
+  display: flex;
+  gap: var(--zl-spacing-6);
+  font-size: 0.9375rem;
+  color: var(--zl-muted-foreground);
+}
+.zl-hero__nav-links a {
+  color: inherit;
+  text-decoration: none;
+}
+.zl-hero__nav-links a:hover {
+  text-decoration: underline;
+}
+.zl-hero__eyebrow {
+  margin: 0 0 var(--zl-spacing-4);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--zl-muted-foreground);
+}
+.zl-hero__headline {
+  margin: 0 0 var(--zl-spacing-4);
+  font-family: var(--zl-font-family-heading);
+  font-size: 2.75rem;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.zl-hero__sub {
+  margin: 0 0 var(--zl-spacing-8);
+  max-width: 30rem;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--zl-muted-foreground);
+}
+.zl-hero__bullets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-2);
+  margin: 0 0 var(--zl-spacing-8);
+  padding: 0;
+  list-style: none;
+}
+.zl-hero__bullets li {
+  display: flex;
+  align-items: center;
+  gap: var(--zl-spacing-2);
+  font-size: 1rem;
+}
+.zl-hero__bullets li::before {
+  content: "✓";
+  color: var(--zl-success);
+  font-weight: 700;
+}
+.zl-hero__footnote {
+  margin: 0;
+  padding-top: var(--zl-spacing-6);
+  border-top: 1px solid var(--zl-border);
+  font-size: 0.8125rem;
+  color: var(--zl-muted-foreground);
+}
+.zl-hero__footnote strong {
+  color: var(--zl-muted-foreground);
+  font-weight: 600;
+}
+/* Minimal-design chrome (`minimal`): fields straight on the page, no card.
+   With no card to carry spacing, the pane's padding IS the page chrome, so
+   it follows the same widget-first rule as the shell's own padding: page
+   mode opts in, a widget embed is content-sized and the embedding app owns
+   spacing. The split panes above are different on purpose — their padding
+   separates the two panes' content and is part of that design's
+   composition, so it survives in both modes. */
+.zl-minimal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-6);
+  width: min(24rem, 100%);
+  margin-inline: auto;
+}
+:host([variant="page"]) .zl-minimal {
+  padding: 52px 16px;
+}
+

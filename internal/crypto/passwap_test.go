@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -458,6 +459,57 @@ func TestPasswordHashConfig_PasswordHasher(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPasswordHasher_Argon2idRehashesBcrypt verifies the ADR 029 default:
+// new passwords hash with argon2id, while pre-existing bcrypt hashes still
+// verify and are transparently rehashed to argon2id on the next verification.
+func TestPasswordHasher_Argon2idRehashesBcrypt(t *testing.T) {
+	const password = "Passw0rd!"
+
+	// A hasher configured with argon2id as the target hasher and bcrypt as a legacy verifier.
+	cfg := &HashConfig{
+		Verifiers: []HashName{HashNameBcrypt},
+		Hasher: HasherConfig{
+			Algorithm: HashNameArgon2id,
+			Params: map[string]any{
+				"time":    3,
+				"memory":  64 * 1024,
+				"threads": 4,
+			},
+		},
+		Limits: HashLimitsConfig{
+			Bcrypt: BcryptLimitsConfig{MinCost: 10, MaxCost: 16},
+		},
+	}
+	hasher, err := cfg.NewHasher()
+	require.NoError(t, err)
+
+	// New passwords are hashed with argon2id.
+	fresh, err := hasher.Hash(password)
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(fresh, argon2.Prefix), "new hash should use argon2id, got %q", fresh)
+
+	// Simulate a pre-existing bcrypt hash (e.g. migrated from a bcrypt default).
+	legacy, err := bcrypt.New(10, nil).Hash(password)
+	require.NoError(t, err)
+	require.True(t, strings.HasPrefix(legacy, bcrypt.Prefix))
+
+	// The legacy bcrypt hash still verifies...
+	updated, err := hasher.Verify(legacy, password)
+	require.NoError(t, err)
+	// ...and passwap returns a rehashed argon2id encoding to persist.
+	require.NotEmpty(t, updated, "expected a rehash to be returned for a legacy bcrypt hash")
+	assert.True(t, strings.HasPrefix(updated, argon2.Prefix), "rehash should be argon2id, got %q", updated)
+
+	// A wrong password against the legacy hash still fails.
+	_, err = hasher.Verify(legacy, "wrong")
+	assert.Error(t, err)
+
+	// Verifying an already-argon2id hash needs no rehash.
+	updated, err = hasher.Verify(fresh, password)
+	require.NoError(t, err)
+	assert.Empty(t, updated, "argon2id hash at target params should not be rehashed")
 }
 
 func TestHasher_ValidateEncodedHash(t *testing.T) {
@@ -939,4 +991,162 @@ func TestHasherConfig_sha2Params(t *testing.T) {
 			assert.Equal(t, tt.wantRounds, gotRounds)
 		})
 	}
+}
+
+// A deployment configures one hashing method and a set of verifiers; a project
+// may pick a different method, and the factory is what keeps the two apart --
+// the verifier set travels with every hasher it builds, so nothing a project
+// chooses can make an existing hash unreadable.
+func TestHasherFactory(t *testing.T) {
+	const password = "Passw0rd!"
+
+	newFactory := func(t *testing.T) *HasherFactory {
+		t.Helper()
+		cfg := HashConfig{
+			Verifiers: []HashName{HashNameArgon2, HashNameBcrypt, HashNameMd5},
+			Hasher: HasherConfig{
+				Algorithm: HashNameArgon2id,
+				Params:    map[string]any{"Time": 1, "Memory": 32 * 1024, "Threads": 1},
+			},
+			Limits: HashLimitsConfig{
+				Bcrypt: BcryptLimitsConfig{MinCost: 10, MaxCost: 14},
+				Argon2: Argon2LimitsConfig{
+					MinTime: 1, MaxTime: 8,
+					MinMemory: 32 * 1024, MaxMemory: 256 * 1024,
+					MinThreads: 1, MaxThreads: 8,
+				},
+			},
+		}
+		factory, err := cfg.NewHasherFactory()
+		require.NoError(t, err)
+		return factory
+	}
+
+	t.Run("the default is the configured hasher", func(t *testing.T) {
+		encoded, err := newFactory(t).Default().Hash(password)
+		require.NoError(t, err)
+		assert.True(t, strings.HasPrefix(encoded, argon2.Prefix), "got %q", encoded)
+	})
+
+	t.Run("a built hasher writes with its own algorithm", func(t *testing.T) {
+		factory := newFactory(t)
+		hasher, err := factory.New(HasherConfig{
+			Algorithm: HashNameBcrypt,
+			Params:    map[string]any{"Cost": 12},
+		})
+		require.NoError(t, err)
+
+		encoded, err := hasher.Hash(password)
+		require.NoError(t, err)
+		assert.True(t, strings.HasPrefix(encoded, bcrypt.Prefix), "got %q", encoded)
+	})
+
+	// The point of sharing one verifier set: a password written under one
+	// project's method has to stay readable to the deployment, which is the
+	// same thing as staying readable to every other project.
+	t.Run("every hasher verifies what any other wrote", func(t *testing.T) {
+		factory := newFactory(t)
+		bcryptHasher, err := factory.New(HasherConfig{
+			Algorithm: HashNameBcrypt,
+			Params:    map[string]any{"Cost": 12},
+		})
+		require.NoError(t, err)
+
+		writtenWithBcrypt, err := bcryptHasher.Hash(password)
+		require.NoError(t, err)
+		writtenWithArgon2, err := factory.Default().Hash(password)
+		require.NoError(t, err)
+
+		assert.NoError(t, factory.Default().VerifyHash(writtenWithBcrypt, password))
+		assert.NoError(t, bcryptHasher.VerifyHash(writtenWithArgon2, password))
+	})
+
+	t.Run("Check refuses a method the deployment would not take back", func(t *testing.T) {
+		factory := newFactory(t)
+
+		tests := map[string]struct {
+			cfg  HasherConfig
+			want error
+		}{
+			"cost under the limit": {
+				cfg:  HasherConfig{Algorithm: HashNameBcrypt, Params: map[string]any{"Cost": 4}},
+				want: ErrBoundsError,
+			},
+			"cost over the limit": {
+				cfg:  HasherConfig{Algorithm: HashNameBcrypt, Params: map[string]any{"Cost": 20}},
+				want: ErrBoundsError,
+			},
+			"argon2 memory over the limit": {
+				cfg: HasherConfig{
+					Algorithm: HashNameArgon2id,
+					Params:    map[string]any{"Time": 1, "Memory": 1024 * 1024, "Threads": 1},
+				},
+				want: ErrBoundsError,
+			},
+			// scrypt hashes fine, but this deployment configured no scrypt
+			// verifier, so a password written with it could never be read back.
+			"algorithm the deployment cannot verify": {
+				cfg:  HasherConfig{Algorithm: HashNameScrypt, Params: map[string]any{"Cost": 15}},
+				want: ErrAlgorithmNotSupported,
+			},
+		}
+		for name, tc := range tests {
+			t.Run(name, func(t *testing.T) {
+				err := factory.Check(tc.cfg)
+				require.Error(t, err)
+				assert.ErrorIs(t, err, tc.want)
+			})
+		}
+	})
+
+	t.Run("Check accepts a method inside the limits", func(t *testing.T) {
+		factory := newFactory(t)
+		assert.NoError(t, factory.Check(HasherConfig{
+			Algorithm: HashNameBcrypt,
+			Params:    map[string]any{"Cost": 12},
+		}))
+	})
+
+	// An algorithm that only verifies has no hasher to build, whichever way it
+	// is asked for.
+	t.Run("refuses a verify-only algorithm", func(t *testing.T) {
+		factory := newFactory(t)
+		_, err := factory.New(HasherConfig{Algorithm: HashNameMd5})
+		assert.Error(t, err)
+		assert.Error(t, factory.Check(HasherConfig{Algorithm: HashNameMd5}))
+	})
+
+	// The deployment's own hasher is not held to the limits: those bound what
+	// may be read in, and an operator who configures a cost is not asking to be
+	// second-guessed by the bounds they also configured.
+	t.Run("builds a default outside its own limits", func(t *testing.T) {
+		cfg := HashConfig{
+			Verifiers: []HashName{HashNameBcrypt},
+			Hasher: HasherConfig{
+				Algorithm: HashNameBcrypt,
+				Params:    map[string]any{"Cost": 4},
+			},
+			Limits: HashLimitsConfig{Bcrypt: BcryptLimitsConfig{MinCost: 10, MaxCost: 14}},
+		}
+		factory, err := cfg.NewHasherFactory()
+		require.NoError(t, err)
+		encoded, err := factory.Default().Hash(password)
+		require.NoError(t, err)
+		assert.NotEmpty(t, encoded)
+	})
+}
+
+func TestPasswapHasher_HashRejectsWhatBcryptCannotTake(t *testing.T) {
+	config := &HashConfig{Hasher: HasherConfig{
+		Algorithm: HashNameBcrypt,
+		Params:    map[string]any{"cost": 4},
+	}}
+	h, err := config.NewHasher()
+	require.NoError(t, err)
+
+	_, err = h.Hash(strings.Repeat("a", 72))
+	require.NoError(t, err, "72 bytes fit")
+
+	_, err = h.Hash(strings.Repeat("a", 73))
+	assert.ErrorIs(t, err, ErrPasswordTooLong)
 }

@@ -1,0 +1,6 @@
+type: string
+enum: [none, sm, md, lg, full]
+description: |
+  A named corner rounding: `none` (0), `sm` (4), `md` (8), `lg` (12), and
+  `full` (pill). Send `full` for a pill rather than a large pixel value.
+example: md

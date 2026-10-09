@@ -1,0 +1,18 @@
+type: object
+description: The started registration ceremony.
+required:
+  - registration_id
+  - options
+properties:
+  registration_id:
+    type: string
+    description: |
+      Identifier of this ceremony. Pass it back on
+      `POST /users/{user_id}/passkeys/registrations/{registration_id}` together with the
+      attestation.
+  options:
+    type: object
+    description: |
+      The `PublicKeyCredentialCreationOptions` object, passed directly to the
+      browser's `navigator.credentials.create()`.
+    additionalProperties: true

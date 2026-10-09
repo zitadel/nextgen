@@ -3,7 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "test": "node --test scripts/*.test.mjs",
+    "test": "vitest run",
+    "test:all": "pnpm run test",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "prepare-app": "node scripts/prepare-app.mjs",
     "publish-tarballs": "node scripts/publish-tarballs.mjs",
     "verify-tarballs": "node scripts/verify-tarballs.mjs",
@@ -12,6 +14,9 @@
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
-    "eslint-plugin-playwright": "catalog:"
+    "@types/node": "catalog:",
+    "@zitadel/testing": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

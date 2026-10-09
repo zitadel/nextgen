@@ -14,8 +14,11 @@ func ErrFlowDefinitionPurposeMismatch() Error {
 	return newError(PrefixFlowDefinition.ErrorCodePrefix("purpose_mismatch"), "flow definition: does not serve requested purpose", nil, nil)
 }
 
-func ErrFlowDefinitionAlreadyExists() Error {
-	return newError(PrefixFlowDefinition.ErrorCodePrefix("already_exists"), "flow definition: already exists", nil, nil)
+// ErrFlowDefinitionRevisionConflict reports that another revision of the same
+// flow already holds this creation timestamp. Which of the two is the latest
+// would be undecidable, so the loser is rejected and the caller can retry.
+func ErrFlowDefinitionRevisionConflict() Error {
+	return newError(PrefixFlowDefinition.ErrorCodePrefix("revision_conflict"), "flow definition: another revision of the same flow was created at the same instant", nil, nil)
 }
 
 func ErrFlowDefinitionInvalid(details any, parent error) Error {
@@ -34,6 +37,6 @@ func ErrMissingProjectID() Error {
 	return newError(PrefixFlowDefinition.ErrorCodePrefix("missing_project_id"), "flow definition: missing project id", nil, nil)
 }
 
-func ErrFlowDefinitionUpdateConflict(details any) Error {
-	return newError(PrefixFlowDefinition.ErrorCodePrefix("update_conflict"), "flow definition: update conflict", details, nil)
+func ErrFlowDefinitionPermissionDenied() Error {
+	return newError(PrefixFlowDefinition.ErrorCodePrefix("permission_denied"), "flow definition: the flow definition management API requires the project secret", nil, nil)
 }

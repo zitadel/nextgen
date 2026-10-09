@@ -5,45 +5,74 @@ stack: "frontend"
 dependsOn:
   - "api"
   - "api-mock"
+  - "config"
   - "design-tokens"
-  - "shared-component-styles"
 
 tasks:
-  lint:
-    command: "corepack pnpm exec oxlint ."
-    deps:
-      - "api:build"
-      - "design-tokens:build"
-      - "shared-component-styles:build"
-
   typecheck:
-    command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
     deps:
-      - "api:build"
-      - "design-tokens:build"
-      - "shared-component-styles:build"
-
-  build:
-    command: "corepack pnpm run build"
-    deps:
-      - "api:build"
-      - "design-tokens:build"
-      - "shared-component-styles:build"
-    outputs:
-      - "dist/**/*"
-
-  test:
-    command: "corepack pnpm run test"
-    deps:
-      - "api:build"
       - "api-mock:build"
       - "design-tokens:build"
-      - "shared-component-styles:build"
 
-  test-browser:
-    command: "corepack pnpm run test:browser"
+  build:
     deps:
-      - "build"
+      # The standalone bundle inlines @zitadel/config/template (see
+      # tsdown.config.ts); without this edge the two builds race in the moon
+      # graph and rolldown silently leaves the unresolvable import external —
+      # a broken (and cached!) standalone.mjs.
+      - "config:build"
+      - "design-tokens:build"
+
+  build-release:
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
+      node scripts/check-standalone-artifact.mjs
+    deps:
+      # Same edge as the dev build: the standalone bundle inlines
+      # @zitadel/config/template, and without ordering the release builds
+      # race — rolldown leaves the unresolvable import external and the
+      # published standalone.mjs breaks in the browser. The check script
+      # above fails the build if that ever regresses.
+      - "config:build-release"
+      - "design-tokens:build"
+    outputs:
+      - "dist/**/*"
     options:
+      cache: false
+      # Release builds remove stale package output and rebuild dist in one
+      # task. They stay out of `moon ci`; release:snapshot invokes them in
+      # the later release step instead of the normal build/test graph.
       runInCI: false
 
+  # Chromium for the browser project. Self-contained (like storybook): the
+  # `test` task depends on it so `moon ci :test` provisions it in CI.
+  install-browsers:
+    command: "corepack pnpm exec playwright install chromium"
+    options:
+      cache: false
+
+  # Full lane (the CI gate): `test:all` runs the jsdom `unit` project and the
+  # real-Chromium `browser` project in one Vitest process, so both land in one
+  # aggregated junit.xml. moon invokes `test:all` uniformly across every
+  # package. The fast unit-only lane is `pnpm test` for local iteration;
+  # `pnpm test:browser` runs the browser project alone. The browser project
+  # has a 60-120s Chromium cold start, which this lane pays in CI by design.
+  test:
+    deps:
+      - "install-browsers"
+      - "api-mock:build"
+      # standalone-artifact.spec.ts reads dist/standalone.mjs — the unit suite
+      # guards the built artifact, so the dev build must run first.
+      - "build"
+    options:
+      # Serialize the real-Chromium browser suites across projects. Each boots
+      # its own Chromium + Vite dev server; running several at once under moon's
+      # parallel CI graph starves the servers and drops in-flight module fetches
+      # ("Failed to fetch dynamically imported module"). A mutex shared by every
+      # browser-mode `test` task lets only one run at a time. (#1490)
+      mutex: "browser-tests"
+      # Retry a failed browser suite in CI. The flake is a cold-start race:
+      # the first attempt warms the Vite dep cache, so a retry runs warm and
+      # clears the "Failed to fetch dynamically imported module" failure. (#1490)
+      retryCount: 3

@@ -5,10 +5,9 @@ import { SHIPPED_ICON_NAMES } from "./zl-icon.js";
 import type { ZlIcon } from "./zl-icon.js";
 
 /**
- * `<zl-icon>` renders a curated Lucide glyph. The key invariant the code
- * comment promises ("keep playgrounds and parity tests in sync") is that
- * every name in `SHIPPED_ICON_NAMES` maps to a real glyph — asserted here so
- * a name added to the union without a node entry fails the build.
+ * `<zl-icon>` renders a curated Lucide glyph. Every name in
+ * `SHIPPED_ICON_NAMES` maps to a real glyph — asserted here so a name added
+ * to the union without a node entry fails the build.
  */
 describe("<zl-icon>", () => {
   let host: HTMLDivElement;
@@ -60,7 +59,9 @@ describe("<zl-icon>", () => {
   it("adds the spin modifier class when spin is set", async () => {
     const el = mount(`<zl-icon name="spinner" spin decorative></zl-icon>`);
     await el.updateComplete;
-    expect(el.shadowRoot?.querySelector(".zr-icon")?.classList.contains("zr-icon--spin")).toBe(true);
+    expect(el.shadowRoot?.querySelector(".zr-icon")?.classList.contains("zr-icon--spin")).toBe(
+      true,
+    );
   });
 
   it("adds a tone modifier class for non-default tones", async () => {
@@ -75,5 +76,38 @@ describe("<zl-icon>", () => {
     const el = mount(`<zl-icon name="check" size="16" decorative></zl-icon>`);
     await el.updateComplete;
     expect(el.getAttribute("size")).toBe("16");
+  });
+});
+
+/**
+ * Raised in review: a monochrome vendor mark (GitHub, Apple) must follow the
+ * label colour, or it renders black on the dark provider button. The wrapper
+ * already covers it -- the `<svg>` carries `fill="currentColor"`, which a
+ * multi-coloured mark overrides per path and a monochrome one inherits -- so
+ * this pins that rather than adding a flag to each entry.
+ */
+describe("brand marks and colour", () => {
+  let brandHost: HTMLDivElement;
+
+  beforeEach(() => {
+    brandHost = document.createElement("div");
+    document.body.appendChild(brandHost);
+  });
+
+  afterEach(() => {
+    brandHost.remove();
+  });
+
+  it("leaves the svg on currentColor, so a mark with no per-path fill follows the label", async () => {
+    brandHost.innerHTML = `<zl-icon name="brand-google" size="16" decorative></zl-icon>`;
+    const el = brandHost.querySelector("zl-icon") as ZlIcon;
+    await el.updateComplete;
+    const svg = el.shadowRoot?.querySelector("svg");
+
+    expect(svg?.getAttribute("fill")).toBe("currentColor");
+    // Google's is the multi-coloured case: every path overrides it.
+    const paths = [...(svg?.querySelectorAll("path") ?? [])];
+    expect(paths.length).toBeGreaterThan(0);
+    expect(paths.every((path) => path.getAttribute("fill") !== null)).toBe(true);
   });
 });

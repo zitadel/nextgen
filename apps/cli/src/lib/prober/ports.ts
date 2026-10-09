@@ -9,27 +9,15 @@ export type TcpListener = Readonly<{
 }>;
 
 /**
- * Enumerate TCP ports currently in LISTEN state on the loopback interface
- * (`127.0.0.1`, `::1`, or the wildcard `*`). Spawns `lsof -iTCP -sTCP:LISTEN
- * -P -n -F n` and parses its machine-readable output. Returns the unique,
- * numerically-sorted list of ports.
+ * Enumerate TCP LISTEN sockets on loopback/wildcard interfaces (`127.0.0.1`,
+ * `::1`, or the wildcard `*`) with enough metadata for CLI diagnostics.
+ * Spawns `lsof -iTCP -sTCP:LISTEN -P -n -F pcn` and parses its
+ * machine-readable output.
  *
  * Never throws. Returns `[]` whenever lsof is unavailable (e.g. Windows,
  * unusual PATH), the spawn errors, exits non-zero, or the call exceeds
  * `timeoutMs` (default 1000ms). The caller treats an empty list the same as
- * "no listeners worth probing."
- */
-export async function listListeningPorts(opts?: {
-  readonly timeoutMs?: number;
-}): Promise<ReadonlyArray<number>> {
-  const listeners = await listListeningTcpListeners(opts);
-  return uniqueSortedPorts(listeners);
-}
-
-/**
- * Enumerate TCP LISTEN sockets on loopback/wildcard interfaces with enough
- * metadata for CLI diagnostics. Never throws; an empty array means either no
- * visible listeners or that process inspection is unavailable.
+ * "no visible listeners."
  */
 export async function listListeningTcpListeners(opts?: {
   readonly timeoutMs?: number;
@@ -113,14 +101,6 @@ function parseLsofListeners(stdout: string): ReadonlyArray<TcpListener> {
     }
   }
   return listeners.sort((a, b) => a.port - b.port || (a.pid ?? 0) - (b.pid ?? 0));
-}
-
-function uniqueSortedPorts(listeners: ReadonlyArray<TcpListener>): ReadonlyArray<number> {
-  const ports = new Set<number>();
-  for (const listener of listeners) {
-    ports.add(listener.port);
-  }
-  return [...ports].sort((a, b) => a - b);
 }
 
 /** Recognised loopback host strings as emitted by `lsof -F n`. */

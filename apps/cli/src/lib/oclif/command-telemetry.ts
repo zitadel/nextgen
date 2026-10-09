@@ -24,18 +24,51 @@ export const FIRST_RUN_NOTICE =
   "collected. Opt out any time with DO_NOT_TRACK=1, ZITADEL_TELEMETRY=0, or " +
   "the --no-telemetry flag.";
 
+type DeviceFacts = {
+  readonly osLabel: string;
+  readonly countryCode: string | undefined;
+  readonly platform: NodeJS.Platform;
+  readonly arch: string;
+  readonly nodeVersion: string;
+  readonly cliVersion: string;
+};
+
 /**
  * Process-stable device facts shared by both the event bag and the user
  * profile, so the two never disagree on the same install's OS/arch/version.
  */
-function deviceProperties(meta: GlobalOptions): Properties {
+function deviceFacts(meta: GlobalOptions): DeviceFacts {
   return {
-    $os: operatingSystem.value(process.platform),
-    $country_code: country.value(undefined),
-    os: process.platform,
+    osLabel: operatingSystem.value(process.platform),
+    countryCode: country.value(undefined),
+    platform: process.platform,
     arch: process.arch,
-    node_version: process.versions.node,
-    cli_version: meta.cliVersion,
+    nodeVersion: process.versions.node,
+    cliVersion: meta.cliVersion,
+  };
+}
+
+function eventDeviceProperties(meta: GlobalOptions): Properties {
+  const facts = deviceFacts(meta);
+  return {
+    $os: facts.osLabel,
+    mp_country_code: facts.countryCode,
+    os: facts.platform,
+    arch: facts.arch,
+    node_version: facts.nodeVersion,
+    cli_version: facts.cliVersion,
+  };
+}
+
+function profileDeviceProperties(meta: GlobalOptions): Properties {
+  const facts = deviceFacts(meta);
+  return {
+    $os: facts.osLabel,
+    $country_code: facts.countryCode,
+    os: facts.platform,
+    arch: facts.arch,
+    node_version: facts.nodeVersion,
+    cli_version: facts.cliVersion,
   };
 }
 
@@ -55,7 +88,7 @@ export function commandEventProperties(
   const { env } = meta;
   return {
     ...extra,
-    ...deviceProperties(meta),
+    ...eventDeviceProperties(meta),
     ip: 0,
     invocation_id: invocationId,
     command: meta.command,
@@ -81,7 +114,7 @@ export function deviceProfileProperties(meta: GlobalOptions, distinctId: string)
   const agent = hostAgent.value(meta.env);
   const label = agent === "unknown" ? process.platform : agent;
   return {
-    ...deviceProperties(meta),
+    ...profileDeviceProperties(meta),
     $name: `${label} · ${distinctId.slice(0, 8)}`,
     host_agent: agent,
   };

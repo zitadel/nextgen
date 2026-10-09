@@ -59,7 +59,8 @@ function parseArgs(args) {
   }
 
   if (parsed.fast && parsed.full) usage("choose either --fast or --full");
-  if (parsed.only && (parsed.fast || parsed.full)) usage("--only cannot be combined with --fast or --full");
+  if (parsed.only && (parsed.fast || parsed.full))
+    usage("--only cannot be combined with --fast or --full");
   if (parsed.only && !phases.has(parsed.only)) usage(`unknown phase: ${parsed.only}`);
   return parsed;
 }
@@ -87,6 +88,7 @@ async function phaseOpenApi() {
 }
 
 async function phaseGo() {
+  await run("moon", ["run", "server:check-generate"]);
   await run("moon", ["run", "server:test"]);
 }
 
@@ -122,7 +124,7 @@ async function phasePack() {
 }
 
 async function phaseRelease() {
-  await run("node", ["scripts/release.mjs", "snapshot", "--skip-container"]);
+  await run("moon", ["run", "release:snapshot", "--", "--skip-container"]);
 }
 
 async function phaseJourney() {

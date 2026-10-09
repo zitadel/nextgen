@@ -2,23 +2,102 @@ server:
   address: ":8080"
   # Optional. If unset, a nextgen-data directory next to the server binary is used.
   data_dir: ./nextgen-data
-  # Optional. If unset, the server creates and reuses server.encryption_key_file.
-  # encryption_key: "4d61737465726b65794e65656473546f48617665333243686172616374657273"
-  # Optional. Defaults to <server.data_dir>/server-encryption-key.
-  encryption_key_file: ./nextgen-data/server-encryption-key
+  # Optional. Master keys that wrap the key encryption key (KEK) of every
+  # project, keyed by key ID. If unset, the server generates and reuses an RSA
+  # master key under <data_dir>/master-keys. Exactly one key must be marked
+  # use_for_encryption.
+  #
+  # Set generate_master_key to false (or pass --disable-master-key-generation)
+  # to fail the start instead of minting a key. Recommended anywhere the data
+  # dir is not durable: a per-instance key leaves the previous instance's
+  # project KEKs unwrappable.
+  # generate_master_key: false
+  # master_keys:
+  #   master-key:
+  #     use_for_encryption: true
+  #     # Provide the RSA private key as a file (PEM incl. OpenSSH, or JWK) ...
+  #     file: ./nextgen-data/master-keys/master-key.pem
+  #     # ... or inline it instead:
+  #     # private_key: |
+  #     #   -----BEGIN PRIVATE KEY-----
+  #     #   ...
+  #     #   -----END PRIVATE KEY-----
   console_enabled: true
   console_path: /ui/console
   login_enabled: true
   login_path: /ui/login
+  # Public origin browsers reach this deployment at; feeds the claim and
+  # dashboard URLs. Set to http://localhost:8080 when running the server
+  # locally by hand (env: NEXTGEN_SERVER_PUBLIC_BASE).
+  public_base: https://nextgen.zitadel.cloud
 
-database:
-  postgres: postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable
+# Optional. When omitted, the server uses SQLite at <data_dir>/zitadel.db.
+# Configure exactly one dialect to override the default:
+# database:
+#   sqlite: ./nextgen-data/zitadel.db
+#   # or:
+#   # postgres: postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable
+#   # or:
+#   # spanner: projects/PROJECT/instances/INSTANCE/databases/DATABASE
 
 password_hasher:
+  # Algorithm used to hash new passwords/secrets. Defaults to argon2id
+  # (RFC 9106). Existing hashes made with any of the verifiers below still
+  # validate and are transparently rehashed to the hasher algorithm on the
+  # next successful verification.
   hasher:
-    algorithm: bcrypt
-    cost: 10
+    algorithm: argon2id
+    # RFC 9106 second recommended option.
+    time: 3
+    memory: 65536 # KiB (64 MiB)
+    threads: 4
+    # To keep bcrypt as the hashing algorithm instead:
+    # algorithm: bcrypt
+    # cost: 10
+  verifiers:
+    - argon2
+    - bcrypt
+    - scrypt
+    - pbkdf2
+    - sha2
+    - md5
+    - md5salted
+    - phpass
+    - drupal7
 
 schema:
   lru_cache_size: 1000
   builtin_public_base: https://nextgen.com/api/schemas
+  # Bounds one whole schema ingest by URL, every $ref fetch included.
+  # Per-request limits live under httpclient.
+  resolve_timeout: 30s
+
+# Egress policy for outbound fetches of user-supplied URLs (schema ingest by
+# URL today). See the egress-policy ADR. Env: NEXTGEN_HTTPCLIENT_<KEY>, lists
+# comma separated.
+httpclient:
+  # Per-request timeout; schema.resolve_timeout caps the whole ingest.
+  timeout: 10s
+  # Response bodies larger than this are rejected, not truncated.
+  max_body_size: 1048576 # 1 MiB
+  # Redirects are re-checked against the deny list at every hop; 0 refuses
+  # redirects entirely.
+  max_redirects: 5
+  # A redirect from https to http fails unless explicitly allowed.
+  allow_https_downgrade: false
+  # Entries are hostnames (exact match), IPs, or CIDR ranges. Setting this
+  # key REPLACES the built-in default list (localhost, loopback, private,
+  # link-local/cloud-metadata, carrier-grade NAT, benchmark and unspecified
+  # ranges, IPv4 and IPv6, plus the deprecated 6to4/Teredo and local-use
+  # NAT64 transition prefixes) — prefer allow_list for exceptions.
+  # An address in the well-known NAT64 prefix (64:ff9b::/96) is also checked
+  # as the IPv4 address it embeds, so NAT64 networks keep working while
+  # embedded internal targets stay blocked. A custom (network-specific) NAT64
+  # prefix is invisible to that check: add your own entries for it.
+  # deny_list: [...]
+  # Exceptions carved out of the deny list: a matching target is allowed even
+  # when a deny entry covers it. A hostname entry only counters a hostname
+  # deny entry; countering an IP-range denial needs an IP or CIDR entry.
+  # For local development against loopback schema hosts:
+  # allow_list: [localhost, 127.0.0.0/8, "::1/128"]
+  allow_list: []

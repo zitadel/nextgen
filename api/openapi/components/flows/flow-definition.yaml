@@ -1,5 +1,6 @@
+x-meta-schema: true
 type: object
-required: [ name, user_schema, purposes, steps ]
+required: [ name, status, user_schema, purposes, steps ]
 description: |
   A flow definition is the server-side configuration that describes a complete
   authentication or identity flow. It is NOT sent to the frontend — the flow
@@ -9,28 +10,38 @@ description: |
   Flow definitions are created by administrators and stored in the project/team
   configuration hierarchy. The engine selects the matching definition based on
   the purpose + audience when a flow is created via POST /flow.
+additionalProperties: false
 properties:
+  "$schema":
+    type: string
+    description: |
+      Editor affordance: path or URL of this file's JSON meta-schema, so an
+      editor validates and autocompletes it. The CLI strips it before upload;
+      the platform ignores it.
   name:
     type: string
     pattern: '^[a-z][a-z0-9-]*$'
     examples: [ standard-login, combined-auth ]
     description: |
       Stable identifier for this flow, used as the target of cross-flow
-      `switch` and `pivot` transitions. Renaming is not supported — the
-      `name` is part of the public contract another definition may
-      reference. Acts as the human display label as well; no separate slug.
+      `switch` and `pivot` transitions. Every revision of a flow shares its
+      `name`; publishing a definition under an existing `name` adds a
+      revision to that flow. Renaming is not supported — the `name` is part
+      of the public contract another definition may reference. Acts as the
+      human display label as well; no separate slug.
 
   status:
     $ref: flow-definition-status.yaml
 
   user_schema:
     type: string
-    format: uri
     description: |
-      User schema this flow operates on. Step `fields` reference properties
-      defined in this schema. The engine resolves field types, validation,
-      and implicit outcomes from schema annotations at runtime.
-    example: https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml
+      Server-assigned identifier of the user schema this flow operates on,
+      as returned by `POST /schemas`. Opaque to the client — the shape is a
+      server implementation detail. Step `fields` reference properties
+      defined in the resolved schema; the engine resolves field types, validation, and
+      implicit outcomes from schema annotations at runtime.
+    example: sch_01KWHF18816ZQESRCS7Z2STJ05
 
   purposes:
     type: object
