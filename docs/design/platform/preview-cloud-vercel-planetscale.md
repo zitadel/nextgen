@@ -292,7 +292,7 @@ The server now runs in any Postgres schema: `?search_path=<schema>` on the
 DSN (or `schema:` in the map form) redirects every statement and every
 migration, and the goose history lives in that schema too (see the
 configuration guide). That is what makes a working server preview per PR
-cheap without a database branch per PR: one PS-DEV branch `preview` holds a
+cheap without a database branch per PR: one small preview database (`zitadel-preview`, PS-5) holds a
 schema per pull request.
 
 - Per PR: the build step appends `search_path=pr_<n>` to the Preview
@@ -361,7 +361,7 @@ Decision: the `server` service is a container image again
 the build of a second, internal Go-runtime service `migrate` that no
 rewrite exposes, and the runtime connects through PlanetScale's PgBouncer.
 Three measurements led there, all on 2026-10-08 against the preview
-database (PS-DEV, `max_connections` 25 of which PlanetScale's own
+database (`zitadel-preview`, PS-5, `max_connections` 25 of which PlanetScale's own
 processes hold about 13).
 
 **The Go runtime is not on Fluid compute** (the Fluid page lists Node.js,
@@ -396,8 +396,8 @@ failed requests with 500. That is what the Go runtime's failures were too.
 
 Through PgBouncer the server-side connections of the preview role stayed
 at 13 during the bursts; the direct port was saturated by PgBouncer's own
-server pool plus PlanetScale's processes, which is a PS-DEV sizing fact
-rather than an application one.
+server pool plus PlanetScale's processes, which is a PS-5 sizing fact
+rather than an application one. PlanetScale's dashboard shows it directly: PgBouncer 2/400 clients with 19 server connections, direct 22/25, and a "High connections on primary" warning. PgBouncer keeps idle server connections for ten minutes (`server_idle_timeout`), so the direct port stays tight for that long after a burst.
 
 **What changed:**
 

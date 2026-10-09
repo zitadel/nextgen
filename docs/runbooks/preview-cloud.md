@@ -53,7 +53,7 @@ same file) so the website can own every path.
      `launcher migrate` (`CLOUD_MIGRATOR_DATABASE_URL`).
    - `preview-server`: `pg_read_all_data` + `pg_write_all_data`. Used by the
      running server.
-2. Previews: a second database (`zitadel-preview`, PS-DEV is enough) with one
+2. Previews: a second database (`zitadel-preview`, PS-5) with one
    role `preview-pr` that inherits `postgres`: it creates the schema of each
    pull request and installs the extensions into `public`. Every preview is
    a schema of this database, never a branch.
@@ -64,7 +64,7 @@ same file) so the website can own every path.
    `sslmode=verify-full&sslrootcert=system`. Vercel starts one container
    per simultaneous request when none is warm, each with its own pgx
    pool, so without the pooler a burst exhausts a small cluster's
-   `max_connections` (PS-DEV: 25) within seconds.
+   `max_connections` (PS-5: 25) within seconds. Raise it to 50 in the cluster's Parameters tab, as PlanetScale's own "High connections on primary" warning suggests, or the direct port stays tight for ten minutes after every burst while PgBouncer holds its idle server connections.
 
 ### 2. Master keys
 
@@ -315,7 +315,7 @@ older state is a revert on `main`.
   each instance is a full server with its own pgx pool. Through PgBouncer
   the server-side connection count stays flat (measured: three bursts of
   24 seeded project creations, 72 of 72 answered 201); on the direct port
-  the same bursts exhausted a PS-DEV cluster's 25 connections within
+  the same bursts exhausted the PS-5 cluster's 25 connections within
   seconds and the instances that could not reach the database failed
   their boot, which Vercel reports as `FUNCTION_INVOCATION_FAILED`. The
   migrate step still uses the direct port, so a production build during a
