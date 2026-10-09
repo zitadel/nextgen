@@ -8,7 +8,7 @@ catalog:
   "@faker-js/faker": ^10.4.0
   '@fontsource/arimo': ^5.2.8
   "@fumapress/ai": ^0.6.2
-  "@moonrepo/cli": ^2.4.6
+  "@moonrepo/cli": ^2.6.1
   "@mswjs/http-middleware": ^0.10.3
   "@nuxt/kit": ^4.5.1
   "@nuxt/schema": ^4.5.1
@@ -21,6 +21,9 @@ catalog:
   '@oclif/plugin-version': ^2.2.46
   '@oclif/plugin-which': ^3.2.55
   "@playwright/test": ^1.60.0
+  # Exact: the OpenAPI lint gate, the casing-rule tests and the docs bundle all
+  # call the library the Redocly CLI is built on, so they must agree.
+  "@redocly/openapi-core": 2.31.5
   "@scalar/api-client-react": ^2.0.26
   "@storybook/addon-a11y": ^10.3.6
   "@storybook/addon-vitest": ^10.3.6
@@ -40,11 +43,10 @@ catalog:
   '@types/culori': ^4.0.1
   "@types/express": ^4.17.21
   "@types/mdx": ^2.0.14
-  "@types/node": ^25.6.0
+  "@types/node": ^24.19.1
   "@types/react": ^19.2.14
   "@types/react-dom": ^19.2.3
   "@types/semver": ^7.7.1
-  "@typescript/native-preview": 7.0.0-dev.20260421.2
   "@vitejs/plugin-react": ^6.0.1
   "@vitest/browser": ^4.1.11
   "@vitest/browser-playwright": ^4.1.11

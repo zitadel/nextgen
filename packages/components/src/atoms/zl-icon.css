@@ -1,12 +1,11 @@
 /* Styles for `<zl-icon>` — shadow host rules first, then the painted surface. */
 
-/* Lit-only: <zl-icon> defers box metrics to inner .zr-icon. */
+/* The host has no box; metrics live on the inner .zr-icon. */
 :host {
   display: contents;
   color: inherit;
 }
 
-/* Shared surface for `<zl-icon>` / `<Icon>`. Lit-only rules: lit/icon-host.css */
 .zr-icon {
   display: inline-flex;
   align-items: center;

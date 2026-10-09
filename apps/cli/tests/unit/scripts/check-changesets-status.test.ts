@@ -540,19 +540,15 @@ describe("release publish guard", () => {
     ).toBe(false);
   });
 
-  it("forces production telemetry while publishing npm packages", async () => {
+  it("merges overrides onto the process env for the publish step", async () => {
     const { releasePublishEnv } = await loadReleaseModule();
     const originalBase = process.env.ZITADEL_RELEASE_TEST_BASE;
     process.env.ZITADEL_RELEASE_TEST_BASE = "preserved";
     try {
-      const env = releasePublishEnv({
-        ZITADEL_RELEASE_TEST_OVERRIDE: "included",
-        ZITADEL_TELEMETRY_BUILD_CHANNEL: "development",
-      });
+      const env = releasePublishEnv({ ZITADEL_RELEASE_TEST_OVERRIDE: "included" });
 
       expect(env.ZITADEL_RELEASE_TEST_BASE).toBe("preserved");
       expect(env.ZITADEL_RELEASE_TEST_OVERRIDE).toBe("included");
-      expect(env.ZITADEL_TELEMETRY_BUILD_CHANNEL).toBe("production");
     } finally {
       if (originalBase === undefined) {
         delete process.env.ZITADEL_RELEASE_TEST_BASE;

@@ -16,10 +16,7 @@ import "./styles.css";
  *    (first-created, or the configured `platform.project_id` pin) plus its
  *    root ADR 036 publishable key.
  *
- * With nothing resolvable the shell renders a setup hint. It previously fell
- * back to the literal `"demo"`, which is not a project id any deployment
- * has: `/ui/login/` opened without a query param rendered "flow definition:
- * not found" on every server ever shipped.
+ * With nothing resolvable the shell renders a setup hint.
  *
  * Discovery has the three outcomes Console ADR 0004 §3 keeps distinct, and
  * this shell keeps them distinct too — for a different reason than the
@@ -109,8 +106,8 @@ async function discover(app: HTMLElement): Promise<void> {
 
 function loginWidget(projectId: string, publishableKey?: string): HTMLElement {
   const login = document.createElement("zitadel-login");
-  // The hosted shell IS the page — opt into the full-page chrome the
-  // widget-first default no longer paints on its own.
+  // The hosted shell IS the page — opt into the full-page chrome; the default
+  // `widget` variant paints no page chrome.
   login.setAttribute("variant", "page");
   login.setAttribute("purpose", "login");
   login.project = Object.freeze({ projectId, proxyPath, publishableKey });
@@ -127,18 +124,10 @@ function loginWidget(projectId: string, publishableKey?: string): HTMLElement {
  * 3. **unreachable, non-2xx, or unreadable** — `ok: false`; the connectivity
  *    error.
  *
- * The shell used to collapse 3 into 2, and the mux makes that worse than it
- * looks rather than better. `/ui/login/` is served from the binary's embedded
- * assets and touches no storage, while this document is resolved per request
- * from the default project and its encryption key (`standaloneRuntimeResolver`,
- * `cmd/server/console_runtime.go`), which answers `500` when that lookup
- * fails. So a healthy binary in front of an unhealthy database served this
- * page and then told the people trying to sign in that the deployment had
- * never been set up — an outage reported as a configuration state, to the
- * audience least able to tell the difference. That is the console's argument
- * one layer further down: there the server was unreachable, here it is
- * reachable and answering honestly, and only the client threw the answer
- * away.
+ * State 3 is not state 2: this page is served from embedded assets and
+ * touches no storage, while the document is resolved per request
+ * (`standaloneRuntimeResolver`, `cmd/server/console_runtime.go`) and answers
+ * `500` when that lookup fails.
  *
  * {@link parseRuntime} is what makes state 2 a positive assertion rather than
  * an absence. `mode` carries most of it — the resolver always sets it,
@@ -146,15 +135,14 @@ function loginWidget(projectId: string, publishableKey?: string): HTMLElement {
  * some other document (a proxy's error envelope, a dev server's `index.html`)
  * and must not read as "no project yet". The field types carry the rest: a
  * document is only "not provisioned" when the ids are *absent*, never when
- * they are present and unreadable. This is
- * why the shell no longer tolerates a non-JSON 200: `vite dev` proxies this
+ * they are present and unreadable. A non-JSON 200 is unreadable, not
+ * unprovisioned: `vite dev` proxies this
  * path to the backend (`vite.config.mts`), so the only surface still
  * answering `index.html` here is `vite preview`, which has no backend to sign
  * into either way — previewing widget chrome without one is what
  * `?project_id=` is for. Hence no `*_RUNTIME_FALLBACK` opt-in on this side:
  * no automated lane serves the shell without the document
- * (`console-e2e:e2e-embedded` runs the real binary with both surfaces on),
- * and a flag with no consumer is one more way to ship the bug back.
+ * (`console-e2e:e2e-embedded` runs the real binary with both surfaces on).
  */
 async function fetchRuntime(): Promise<RuntimeResult> {
   let response: Response;
@@ -237,8 +225,8 @@ function setupHint(): HTMLElement {
 }
 
 /**
- * Rendered when the runtime document could not be read at all — the state
- * that used to render the setup hint (see {@link fetchRuntime}).
+ * Rendered when the runtime document could not be read at all (see
+ * {@link fetchRuntime}).
  *
  * The console's equivalent screen addresses an operator and says so ("Server
  * unavailable … check that the Zitadel server is running"). This one is the

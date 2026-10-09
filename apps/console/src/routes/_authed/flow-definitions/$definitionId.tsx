@@ -147,5 +147,7 @@ function StepRow({ step }: { step: FlowStep }) {
 }
 
 const HEAD_CELL = PANEL_HEAD_CELL;
-// `whitespace-normal`: a register step's field list outruns a third of the panel.
-const BODY_CELL = `${PANEL_BODY_CELL} whitespace-normal`;
+// `whitespace-normal`: a register step's field list outruns a third of the
+// panel. `wrap-anywhere` as well: a field path like `x-auth-methods#password`
+// has no break point, and on a phone a third of the panel is narrower than it.
+const BODY_CELL = `${PANEL_BODY_CELL} whitespace-normal wrap-anywhere`;

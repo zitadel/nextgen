@@ -69,8 +69,7 @@ const DENSITY_MAP: Record<NonNullable<BrandingShape["density"]>, Record<string, 
 // the design-tokens variable names that atoms actually consume. The keys are
 // intentionally semantic — tenants do NOT see internal token names; they say
 // "background", "surface", "primary", "text". The orchestrator translates here,
-// which is what lets the internal vocabulary move (as it just did, off the
-// legacy `--zl-color-*` names onto the shadcn roles) without touching a single
+// which is what lets the internal vocabulary move without touching a single
 // tenant's `branding.json`.
 //
 // A key maps to more than one variable where the design system splits a role

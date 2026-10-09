@@ -38,7 +38,7 @@ const CONFIRM_WORD = "DELETE";
 // `max-w-sm` (384px) carries the important suffix because the primitive's own
 // `data-[size=default]:sm:max-w-lg` compiles to a higher-specificity selector
 // and would otherwise win, leaving the dialog 512px wide.
-const CONTENT = "gap-0 rounded-xl p-0 sm:max-w-sm!";
+const CONTENT = "gap-0 rounded-md p-0 sm:max-w-sm!";
 const HEADER = "flex flex-row items-start gap-6 p-6 text-left";
 // Flat 10% in both themes; only the destructive button lifts in dark.
 const MEDIA = "bg-destructive/10 text-destructive";

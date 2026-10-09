@@ -32,7 +32,7 @@ const sessionHandlers = [
 ];
 
 /**
- * `<zitadel-session>` is the post-sign-in "signed in" card (Figma `7355:8959`)
+ * `<zitadel-session>` is the post-sign-in "signed in" card
  * — the companion to `<zitadel-login>` for the "go straight to /login" flow.
  *
  * It fetches the signed-in identity (the user ref's display → identifier

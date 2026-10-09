@@ -1,18 +1,28 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { LogIn, Workflow } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Workflow } from "lucide-react";
 
 import { api } from "@/api/zitadel";
-import { EYEBROW } from "@/components/typography";
 import {
-  DIRECTORY_CHIP,
-  DIRECTORY_ROW_LINK,
-  DirectoryCard,
-  DirectoryRow,
-} from "@/components/directory-list";
-import { ResourcePage, ResourceTitle } from "@/components/resource-list";
+  RESOURCE_CELL,
+  RESOURCE_CELL_MUTED,
+  RESOURCE_ROW_ICON,
+  RESOURCE_ROW_LINK,
+  RESOURCE_TABLE_FIXED,
+  RESOURCE_TABLE_TOP,
+  RESOURCE_TABLE_WRAP,
+  ResourceEmptyRow,
+  ResourceHeadCell,
+  ResourceHeaderRow,
+  ResourceMenuHead,
+  ResourcePage,
+  ResourceRow,
+  ResourceTitle,
+  RowMenu,
+} from "@/components/resource-list";
 import { StatusBadge } from "@/components/status-badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { InlineCode } from "@/components/ui/inline-code";
+import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { formatDate } from "@/lib/date";
 import {
   type FlowDefinition,
@@ -75,86 +85,95 @@ function LoginFlowsScreen() {
     <ResourcePage>
       <ResourceTitle>Login flows</ResourceTitle>
 
-      <DirectoryCard empty={flows.length === 0 ? "This project has no login flows." : undefined}>
-        {flows.map((flow) => (
-          <FlowRowItem key={flow.id} {...flow} />
-        ))}
-      </DirectoryCard>
+      <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
+        {/* The same resource table as the other directories (D17). Six columns
+            need more room than four, so the table's own minimum width is wider
+            than the shared one; the step chips wrap within their column, so a
+            flow with many steps grows its row rather than the table. */}
+        <Table className={`${RESOURCE_TABLE_FIXED} min-w-[52rem]`}>
+          <TableHeader>
+            <ResourceHeaderRow>
+              <ResourceHeadCell className="w-[20%]">Name</ResourceHeadCell>
+              <ResourceHeadCell className="w-[16%]">Purposes</ResourceHeadCell>
+              <ResourceHeadCell className="w-[30%]">Steps</ResourceHeadCell>
+              <ResourceHeadCell className="w-[14%]">User schema</ResourceHeadCell>
+              <ResourceHeadCell className="w-[11%]">Last change</ResourceHeadCell>
+              <ResourceMenuHead className="w-[9%]" />
+            </ResourceHeaderRow>
+          </TableHeader>
+          <TableBody>
+            {flows.length === 0 ? (
+              <ResourceEmptyRow colSpan={6}>This project has no login flows.</ResourceEmptyRow>
+            ) : (
+              flows.map((flow) => <FlowRowItem key={flow.id} {...flow} />)
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </ResourcePage>
   );
 }
 
-/** One row of the flows directory. */
+/** One row of the flows directory. The whole row opens the flow. */
 function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRow) {
+  const navigate = useNavigate();
   const name = flowDisplayName(definition);
   const purposes = flowPurposeSummary(definition);
   const steps = flowStepNames(definition);
 
   return (
-    <DirectoryRow
-      name={name}
-      title={
-        <div className="flex items-center gap-2">
+    <ResourceRow
+      onOpen={() =>
+        void navigate({ to: "/flow-definitions/$definitionId", params: { definitionId: id } })
+      }
+    >
+      <TableCell className={`${RESOURCE_CELL} truncate`}>
+        <div className="flex min-w-0 items-center gap-2">
           <Link
             to="/flow-definitions/$definitionId"
             params={{ definitionId: id }}
-            className={DIRECTORY_ROW_LINK}
+            className={RESOURCE_ROW_LINK}
           >
+            <Workflow aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
             {name}
           </Link>
           {/* Drafts only: the engine never selects one, and the design draws
               only active flows. */}
           {definition.status === "draft" && <StatusBadge status={definition.status} />}
         </div>
-      }
-      caption={
-        purposes && (
-          <>
-            <LogIn className="size-3" aria-hidden />
-            {purposes}
-          </>
-        )
-      }
-      chips={steps.map((step) => (
-        <InlineCode key={step} className={DIRECTORY_CHIP}>
-          {step}
-        </InlineCode>
-      ))}
-      menu={
-        <DropdownMenuItem asChild>
-          <Link to="/flow-definitions/$definitionId" params={{ definitionId: id }}>
-            View flow
-          </Link>
-        </DropdownMenuItem>
-      }
-    >
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        {schemaName && (
-          <>
-            <span className={EYEBROW}>User schema</span>
-            {/* Above the row's stretched link, or it swallows the click. */}
-            {schemaId ? (
-              <Link
-                to="/schemas/$schemaId"
-                params={{ schemaId }}
-                className="relative z-10 w-fit truncate text-xs leading-4 font-medium text-foreground hover:underline"
-              >
-                {schemaName}
-              </Link>
-            ) : (
-              <span className="truncate text-xs leading-4 font-medium text-foreground">
-                {schemaName}
-              </span>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Baseline, not `items-start`: two faces sit differently in one line box. */}
-      <dl className="flex shrink-0 items-baseline gap-1 text-xs leading-4">
-        <dt className={EYEBROW}>Last change</dt>
-        <dd className="font-medium text-foreground">{formatDate(updatedAt)}</dd>
-      </dl>
-    </DirectoryRow>
+      </TableCell>
+      <TableCell className={RESOURCE_CELL_MUTED}>{purposes}</TableCell>
+      <TableCell className={RESOURCE_CELL}>
+        <div className="flex flex-wrap gap-1.5">
+          {steps.map((step) => (
+            <InlineCode key={step}>{step}</InlineCode>
+          ))}
+        </div>
+      </TableCell>
+      <TableCell className={`${RESOURCE_CELL} truncate text-sm`}>
+        {schemaName &&
+          (schemaId ? (
+            <Link
+              to="/schemas/$schemaId"
+              params={{ schemaId }}
+              className="text-foreground font-medium underline-offset-2 hover:underline"
+            >
+              {schemaName}
+            </Link>
+          ) : (
+            <span className="text-foreground font-medium">{schemaName}</span>
+          ))}
+      </TableCell>
+      <TableCell className={RESOURCE_CELL_MUTED}>{formatDate(updatedAt)}</TableCell>
+      <TableCell className={`${RESOURCE_CELL} text-right`}>
+        <RowMenu name={name}>
+          <DropdownMenuItem asChild>
+            <Link to="/flow-definitions/$definitionId" params={{ definitionId: id }}>
+              View flow
+            </Link>
+          </DropdownMenuItem>
+        </RowMenu>
+      </TableCell>
+    </ResourceRow>
   );
 }

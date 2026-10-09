@@ -23,12 +23,18 @@ export async function prepareLocalRegistry(input) {
   const resetStorage = input.resetStorage ?? true;
   const env = input.env ?? process.env;
 
+  // The tarballs staged for this run are always rebuilt from the current
+  // snapshot, so start from an empty staging dir either way.
+  await resetDirectory(paths.tarballsDir, input);
   if (resetStorage) {
-    await resetDirectory(paths.tarballsDir, input);
     await resetDirectory(paths.storagePath, input);
   } else {
-    await mkdirFn(input)(paths.tarballsDir, { recursive: true });
+    // Keep Verdaccio's uplink proxy cache — the public framework packages every
+    // scaffold re-downloads from npmjs — but drop the locally published
+    // @zitadel packages so this run's fresh snapshot republishes without a
+    // version conflict.
     await mkdirFn(input)(paths.storagePath, { recursive: true });
+    await rmFn(input)(join(paths.storagePath, "@zitadel"), { recursive: true, force: true });
   }
   await mkdirFn(input)(dirname(paths.verdaccioConfigPath), { recursive: true });
   await writeVerdaccioConfig(paths.verdaccioConfigPath, paths.storagePath, input);

@@ -1,10 +1,56 @@
 import { LitElement } from "lit";
 import { property } from "lit/decorators.js";
+import type { ZitadelProject } from "@zitadel/api/config";
 
 import type { Branding } from "./branding.js";
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { applyDefaultFont, applyFontUrl } from "./font-loader.js";
+import type { ProjectAttrs } from "./resolve-api.js";
 import { ThemeController, type ThemeMode } from "./theme-controller.js";
+
+/**
+ * Base for every orchestrator element: the project config `resolveApi` reads,
+ * as an SDK handle or as declarative attributes.
+ */
+export class ZitadelConfigured extends LitElement {
+  /**
+   * SDK project handle returned by `configureZitadel()`. Set from JS (or a
+   * framework binding). When set, takes precedence over both the
+   * `project-id`/`proxy-path`/`url` attributes and the global singleton from
+   * `getZitadelConfig()`.
+   */
+  @property({ attribute: false }) accessor project: ZitadelProject | undefined;
+
+  /**
+   * Project ID, set declaratively in HTML. Lets the component be configured on
+   * a plain page without JS or `configureZitadel()`. Ignored when the `project`
+   * property or a `configureZitadel()` global is set.
+   */
+  @property({ type: String, attribute: "project-id" }) accessor projectId = "";
+
+  /**
+   * Proxy path for API requests (e.g. `/__nextgen`), set declaratively in HTML.
+   * Defaults to `/__nextgen` when omitted, matching `configureZitadel()`.
+   */
+  @property({ type: String, attribute: "proxy-path" }) accessor proxyPath = "";
+
+  /**
+   * Full URL of the Zitadel auth backend, set declaratively in HTML. Optional —
+   * not needed in client-only setups.
+   */
+  @property({ type: String }) accessor url = "";
+
+  /** Declarative config read from this element's attributes. */
+  protected get projectAttrs(): ProjectAttrs {
+    return { projectId: this.projectId, proxyPath: this.proxyPath, url: this.url };
+  }
+}
+
+/** Stamp the resolved theme on a host so token lookups and host-page selectors flip with the mode. */
+export function stampTheme(host: HTMLElement, controller: ThemeController): void {
+  host.dataset.theme = controller.theme;
+  host.toggleAttribute("data-theme-dark", controller.theme === "dark");
+}
 
 /**
  * Shared base for the orchestrator host elements (`<zitadel-login>`,
@@ -18,7 +64,7 @@ import { ThemeController, type ThemeMode } from "./theme-controller.js";
  *
  * Not a registered custom element — purely an implementation-sharing base.
  */
-export class ZitadelSurface extends LitElement {
+export class ZitadelSurface extends ZitadelConfigured {
   /**
    * Sizing/chrome mode. Components size to content; pages compose them —
    * so the default is `widget`: content-sized, transparent host, no
@@ -86,7 +132,6 @@ export class ZitadelSurface extends LitElement {
       applyDefaultFont(root, page && !tenantFontUrl ? undefined : null);
       applyFontUrl(root, tenantFontUrl);
     }
-    this.dataset.theme = this.themeController.theme;
-    this.toggleAttribute("data-theme-dark", this.themeController.theme === "dark");
+    stampTheme(this, this.themeController);
   }
 }
