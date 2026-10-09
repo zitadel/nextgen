@@ -49,9 +49,9 @@ func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
 			h.EnsureVariableService(t),
 			h.EnsureHttpClient(t),
 		)), "code", "state")
-		// The same mounts as the production mux (buildHTTPMux), not its
-		// middleware chain: the callback on both its spellings, ahead of the API
-		// catch-all.
+		// The same paths as the production mux (buildHTTPMux), not its
+		// middleware chain: the callback on both its spellings, ahead of the
+		// API catch-all.
 		mux := http.NewServeMux()
 		mux.Handle(api.IDPCallbackPattern, callback)
 		mux.Handle(api.IDPCallbackUpstreamPattern, callback)

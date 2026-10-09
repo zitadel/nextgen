@@ -12,8 +12,6 @@ import (
 	"github.com/zitadel/nextgen/internal/idp"
 )
 
-// errSSOCallbackMixUp marks a callback that names another connection than
-// the one its state pins, by its path or by its `iss`.
 var errSSOCallbackMixUp = errors.New("sso callback answered by another connection")
 
 // refusedEventType is the event a callback refused before its exchange is
@@ -102,23 +100,10 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 	audit.BindPublicRequest(ctx, projectID, "", "")
 	pending := check.Pending
 
-	// Before anything reaches a provider: a callback on another connection's
-	// path carries that provider's answer, and exchanging its code at the
-	// pinned connection would hand the code to the wrong token endpoint (the
-	// mix-up attack, RFC 9700 §4.4). The check needs the consumed record,
-	// which alone names the pinned connection, so the state is spent like on
-	// every other failure after the consume.
 	if in.ConnectionSlug != pending.ProviderSlug {
 		return c.fail(ctx, projectID, check, fmt.Errorf("%w: the callback path names connection %q, the state pins %q", errSSOCallbackMixUp, in.ConnectionSlug, pending.ProviderSlug), refusedEventType(in))
 	}
-	// RFC 9207: an `iss` the provider sent names who answered. The
-	// per-connection path rests on every provider matching redirect_uri
-	// exactly; a provider registered with a wildcard could still answer on
-	// the pinned connection's path, and its own issuer gives it away. Checked
-	// before the provider's error is read too: a foreign provider's answer,
-	// an error included, is not the pinned connection's. Most providers send
-	// no `iss`, so only a present value is checked, as a simple string
-	// comparison.
+
 	var conn *idp.Connection
 	if in.Issuer != "" {
 		pinned, err := c.pinnedConnection(ctx, projectID, pending)
@@ -132,14 +117,10 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 	}
 
 	if in.Error != "" {
-		// access_denied is the person saying no and gets its own key. Every
-		// other code is the provider failing.
 		key := domain.FlowStepErrorSSOFailed
 		if in.Error == oauthErrorAccessDenied {
 			key = domain.FlowStepErrorSSOCancelled
 		}
-		// The description and URI are logged for the operator and never
-		// stored: the user sees only the localized key.
 		getLoggingContext(ctx, "flow").Warn("sso provider returned an error",
 			slog.String("project_id", projectID),
 			slog.String("slug", pending.ProviderSlug),
@@ -149,6 +130,7 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 		)
 		return c.park(ctx, projectID, check, key, domain.EventTypeAuthSSOAuthorizationFailed)
 	}
+
 	if in.Code == "" {
 		return c.fail(ctx, projectID, check, errors.New("the callback carried neither a code nor an error"), domain.EventTypeAuthSSOAuthorizationFailed)
 	}
@@ -174,8 +156,6 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 	return FlowSSOCallbackOutput{ReturnTarget: pending.ReturnTarget}, nil
 }
 
-// pinnedConnection parses the connection revision the record pinned at
-// submit.
 func (c *FlowSSOCallback) pinnedConnection(ctx context.Context, projectID string, pending *domain.SSOStatePayload) (idp.Connection, error) {
 	connection, err := c.connections.GetRevision(ctx, projectID, pending.ConnectionRevisionID)
 	if err != nil {
@@ -184,9 +164,6 @@ func (c *FlowSSOCallback) pinnedConnection(ctx context.Context, projectID string
 	return idp.ParseConnection(connection.RevisionID, connection.Document)
 }
 
-// exchange rebuilds the engine client from the revision and redirect URI the
-// record pinned at submit and runs the token exchange. pinned is the parsed
-// revision when the issuer check already read it, nil otherwise.
 func (c *FlowSSOCallback) exchange(ctx context.Context, projectID, code string, pending *domain.SSOStatePayload, pinned *idp.Connection) (idp.ExternalIdentity, error) {
 	var conn idp.Connection
 	if pinned != nil {

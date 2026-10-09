@@ -162,11 +162,8 @@ type ServerConfig struct {
 	PublicBase string `mapstructure:"public_base"`
 }
 
-// Validate refuses an enabled UI path at or under the IdP callback's routes.
-// The UI mounts its path as a subtree, which overlaps the per-connection
-// callback pattern without either being more specific: the mux would panic at
-// boot, and a provider's redirect could land on the UI.
 func (c ServerConfig) Validate() error {
+	// ensure there are no path collisions between idp callbacks and console/login paths
 	for _, ui := range []struct {
 		enabled bool
 		key     string
