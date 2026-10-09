@@ -2,6 +2,7 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { AbstractCLIScaffolder } from "./cli";
+import { removeInstall } from "./remove-install";
 
 /**
  * Scaffolds a new Qwik City app with `create-qwik` (the `empty` starter), then
@@ -18,5 +19,9 @@ export class QwikCityScaffolder extends AbstractCLIScaffolder {
   async scaffold(cwd: string, _framework: string): Promise<void> {
     this.runCommand("npx", ["-y", "create-qwik@latest", "empty", "."], cwd);
     await rm(join(cwd, "src/routes/index.tsx"), { force: true });
+    // `create-qwik` installs dependencies, leaving a lockfile that pins the
+    // public registry. Remove the install so setup picks npm (no lockfile) and
+    // installs the workspace packages from the detected registry instead.
+    await removeInstall(cwd);
   }
 }

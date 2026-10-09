@@ -2,6 +2,7 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { AbstractCLIScaffolder } from "./cli";
+import { removeInstall } from "./remove-install";
 
 /**
  * Scaffolds a new SolidStart app with `create-solid`, then removes the starter
@@ -26,5 +27,9 @@ export class SolidStartScaffolder extends AbstractCLIScaffolder {
       cwd,
     );
     await rm(join(cwd, "src/routes/index.tsx"), { force: true });
+    // `create-solid` installs with pnpm, leaving a pnpm-lock.yaml that pins the
+    // public registry. Remove the install so setup picks npm (no lockfile) and
+    // installs the workspace packages from the detected registry instead.
+    await removeInstall(cwd);
   }
 }
