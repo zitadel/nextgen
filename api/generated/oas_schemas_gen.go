@@ -17758,7 +17758,6 @@ func (*ErrorDetails) getBrandingByIdRes()      {}
 func (*ErrorDetails) getMyUserRes()            {}
 func (*ErrorDetails) initClaimRes()            {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
-func (*ErrorDetails) revokeReleaseRes()        {}
 func (*ErrorDetails) submitFlowStepRes()       {}
 
 // Additional error-specific context.
@@ -58132,16 +58131,16 @@ func (s *ReleaseRevokedEventDelegationType) UnmarshalText(data []byte) error {
 // release the way the CLI prints it and builds pin it.
 // Ref: #
 type ReleaseRevokedPayload struct {
-	ContentHash OptString `json:"content_hash"`
+	ContentHash ReleaseContentHash `json:"content_hash"`
 }
 
 // GetContentHash returns the value of ContentHash.
-func (s *ReleaseRevokedPayload) GetContentHash() OptString {
+func (s *ReleaseRevokedPayload) GetContentHash() ReleaseContentHash {
 	return s.ContentHash
 }
 
 // SetContentHash sets the value of ContentHash.
-func (s *ReleaseRevokedPayload) SetContentHash(val OptString) {
+func (s *ReleaseRevokedPayload) SetContentHash(val ReleaseContentHash) {
 	s.ContentHash = val
 }
 
@@ -59073,11 +59072,95 @@ func (s *RevokeMySessionNoContent) SetSetCookie(val string) {
 
 func (*RevokeMySessionNoContent) revokeMySessionRes() {}
 
+// The release cannot be revoked because origins still serve it.
+// Ref: #
+type RevokeReleaseConflict struct {
+	Code ErrorCode `json:"code"`
+	// Human-readable explanation of the error.
+	Message string                       `json:"message"`
+	Details RevokeReleaseConflictDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *RevokeReleaseConflict) GetCode() ErrorCode {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *RevokeReleaseConflict) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *RevokeReleaseConflict) GetDetails() RevokeReleaseConflictDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *RevokeReleaseConflict) SetCode(val ErrorCode) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *RevokeReleaseConflict) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *RevokeReleaseConflict) SetDetails(val RevokeReleaseConflictDetails) {
+	s.Details = val
+}
+
+func (*RevokeReleaseConflict) revokeReleaseRes() {}
+
+type RevokeReleaseConflictDetails struct {
+	// Every origin that still serves the release.
+	Origins []RevokeReleaseConflictDetailsOriginsItem `json:"origins"`
+}
+
+// GetOrigins returns the value of Origins.
+func (s *RevokeReleaseConflictDetails) GetOrigins() []RevokeReleaseConflictDetailsOriginsItem {
+	return s.Origins
+}
+
+// SetOrigins sets the value of Origins.
+func (s *RevokeReleaseConflictDetails) SetOrigins(val []RevokeReleaseConflictDetailsOriginsItem) {
+	s.Origins = val
+}
+
+type RevokeReleaseConflictDetailsOriginsItem struct {
+	// The origin, as scheme and host.
+	Origin url.URL `json:"origin"`
+	// The newest deployment to the origin, which pins the release.
+	DeploymentID DeploymentID `json:"deployment_id"`
+}
+
+// GetOrigin returns the value of Origin.
+func (s *RevokeReleaseConflictDetailsOriginsItem) GetOrigin() url.URL {
+	return s.Origin
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *RevokeReleaseConflictDetailsOriginsItem) GetDeploymentID() DeploymentID {
+	return s.DeploymentID
+}
+
+// SetOrigin sets the value of Origin.
+func (s *RevokeReleaseConflictDetailsOriginsItem) SetOrigin(val url.URL) {
+	s.Origin = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *RevokeReleaseConflictDetailsOriginsItem) SetDeploymentID(val DeploymentID) {
+	s.DeploymentID = val
+}
+
 // RevokeReleaseErrorResponse represents sum type.
 type RevokeReleaseErrorResponse struct {
 	Type             RevokeReleaseErrorResponseType // switch on this field
 	AuthUnauthorized AuthUnauthorized
 	Internal         Internal
+	NotImplemented   NotImplemented
 	ReqInvalid       ReqInvalid
 }
 
@@ -59088,6 +59171,7 @@ type RevokeReleaseErrorResponseType string
 const (
 	AuthUnauthorizedRevokeReleaseErrorResponse RevokeReleaseErrorResponseType = "auth.unauthorized"
 	InternalRevokeReleaseErrorResponse         RevokeReleaseErrorResponseType = "internal"
+	NotImplementedRevokeReleaseErrorResponse   RevokeReleaseErrorResponseType = "not_implemented"
 	ReqInvalidRevokeReleaseErrorResponse       RevokeReleaseErrorResponseType = "req.invalid"
 )
 
@@ -59099,6 +59183,11 @@ func (s RevokeReleaseErrorResponse) IsAuthUnauthorized() bool {
 // IsInternal reports whether RevokeReleaseErrorResponse is Internal.
 func (s RevokeReleaseErrorResponse) IsInternal() bool {
 	return s.Type == InternalRevokeReleaseErrorResponse
+}
+
+// IsNotImplemented reports whether RevokeReleaseErrorResponse is NotImplemented.
+func (s RevokeReleaseErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedRevokeReleaseErrorResponse
 }
 
 // IsReqInvalid reports whether RevokeReleaseErrorResponse is ReqInvalid.
@@ -59145,6 +59234,27 @@ func (s RevokeReleaseErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalRevokeReleaseErrorResponse(v Internal) RevokeReleaseErrorResponse {
 	var s RevokeReleaseErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets RevokeReleaseErrorResponse to NotImplemented.
+func (s *RevokeReleaseErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedRevokeReleaseErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if RevokeReleaseErrorResponse is NotImplemented.
+func (s RevokeReleaseErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from NotImplemented.
+func NewNotImplementedRevokeReleaseErrorResponse(v NotImplemented) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 

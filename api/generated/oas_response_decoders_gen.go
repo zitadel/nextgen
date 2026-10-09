@@ -12354,7 +12354,7 @@ func decodeRevokeReleaseResponse(resp *http.Response) (res RevokeReleaseRes, _ e
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response RevokeReleaseConflict
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -12370,6 +12370,15 @@ func decodeRevokeReleaseResponse(resp *http.Response) (res RevokeReleaseRes, _ e
 					Err:         err,
 				}
 				return res, err
+			}
+			// Validate response.
+			if err := func() error {
+				if err := response.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return res, errors.Wrap(err, "validate")
 			}
 			return &response, nil
 		default:

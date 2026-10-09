@@ -5957,7 +5957,15 @@ func encodeRevokeReleaseResponse(response RevokeReleaseRes, w http.ResponseWrite
 
 		return nil
 
-	case *ErrorDetails:
+	case *RevokeReleaseConflict:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
 		span.SetStatus(codes.Error, http.StatusText(409))

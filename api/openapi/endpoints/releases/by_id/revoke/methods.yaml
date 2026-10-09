@@ -66,11 +66,26 @@ post:
                     revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
     '409':
       description: |
-        At least one origin still serves the release. The details name each
-        such origin and the newest deployment to it.
+        At least one origin still serves the release. `details.origins`
+        names each such origin and the newest deployment to it.
       content:
         application/json:
           schema:
-            $ref: ../../../../components/error-details.yaml
+            $ref: revoke-release-conflict.yaml
+          examples:
+            stillServed:
+              summary: Two origins still serve the release
+              description: |
+                Deploy another release to these origins, or roll them back,
+                then revoke.
+              value:
+                code: rel.in_use
+                message: 'release: still served by an origin'
+                details:
+                  origins:
+                    - origin: https://app.acme.com
+                      deployment_id: dep_01KX4SB9C8E1F0N9WD3P2E4YM5
+                    - origin: https://acme-git-sso-acmeinc.vercel.app
+                      deployment_id: dep_01KX4SD2F7H3F0N9WD3P2E4YM5
     default:
       $ref: revokeRelease-error-response.yaml
