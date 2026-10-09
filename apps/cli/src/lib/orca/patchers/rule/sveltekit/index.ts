@@ -40,7 +40,7 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
   protected routeOps(ctx: PatchContext): FileOp[] {
     const src = (rel: string) => join(ctx.framework.appDir, rel);
     return [
-      { kind: "write", path: src("hooks.server.ts"), contents: hooksServerTemplate() },
+      { kind: "write", path: src("hooks.server.ts"), contents: hooksServerTemplate(ctx) },
       { kind: "write", path: src("routes/+layout.svelte"), contents: layoutTemplate() },
       { kind: "write", path: src("routes/+page.svelte"), contents: indexPageTemplate() },
       {
