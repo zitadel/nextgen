@@ -1,5 +1,14 @@
 # @zitadel/cli
 
+## 1.0.0-alpha.26
+
+### Patch Changes
+
+- Updated dependencies [[`1a46ed4`](https://github.com/zitadel/nextgen/commit/1a46ed42c668c172b6ffa7be6ce25ae683f7065d), [`b3b0b28`](https://github.com/zitadel/nextgen/commit/b3b0b2888f0e64a4805f373a9835d8dc853add84), [`7fbd942`](https://github.com/zitadel/nextgen/commit/7fbd942580560ccab74d3fdd19b3e1eb6d922ee7)]:
+  - @zitadel/server@1.0.0-alpha.26
+  - @zitadel/api@1.0.0-alpha.26
+  - @zitadel/config@1.0.0-alpha.26
+
 ## 1.0.0-alpha.25
 
 ### Minor Changes

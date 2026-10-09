@@ -1,5 +1,18 @@
 # @zitadel/components
 
+## 1.0.0-alpha.26
+
+### Patch Changes
+
+- [#1421](https://github.com/zitadel/nextgen/pull/1421) [`7fbd942`](https://github.com/zitadel/nextgen/commit/7fbd942580560ccab74d3fdd19b3e1eb6d922ee7) Thanks [@bastionstack](https://github.com/bastionstack)! - Tighten the login atoms. `<zl-field>` restores its initial `value` on form reset, as `<zl-select>` and `<zl-checkbox>` do, and takes an `aria-label` for inputs with no visible label. `<zl-alert>` lists its `detail` and `link` parts and slots in its manifest, so `<zitadel-login>` forwards them as `alert-detail` and `alert-link`. The package root exports `ZlPasskey`, `zlPasskeyManifest`, the passkey event detail types, `ZlFieldInputDetail`, `ZlSubmitDetail` and `SHIPPED_ICON_NAMES`, and `addEventListener` is typed for every `zl-*` event. The passkey pending status and its cancel button are spaced apart, the `<zitadel-logout>` menu takes its shadow and sizes from the design tokens, and the hosted login page's "Try again" button has its fill. Every input atom resets and restores through its `formValue`, so text a password manager writes straight into the native input clears on reset too, and an enclosing `<fieldset disabled>` disables the atoms as it does native controls.
+
+- [#1552](https://github.com/zitadel/nextgen/pull/1552) [`b3b0b28`](https://github.com/zitadel/nextgen/commit/b3b0b2888f0e64a4805f373a9835d8dc853add84) Thanks [@bastionstack](https://github.com/bastionstack)! - `<zitadel-session>` draws its "Signed in as" title at the same size and weight as the sign-in card's title.
+
+- [#1535](https://github.com/zitadel/nextgen/pull/1535) [`3301e90`](https://github.com/zitadel/nextgen/commit/3301e90778a633b6d900a8ca427944f9e0b996d8) Thanks [@mridang](https://github.com/mridang)! - Fix the spacing on a completed login step (the "You're signed in" terminal screen): the centred heading no longer sits flush against the action buttons. The terminal card kept a zero gap intended for a body-less screen, which collapsed the space once the empty field group was hidden; it now uses the card's standard heading-to-content gap.
+
+- Updated dependencies []:
+  - @zitadel/config@1.0.0-alpha.26
+
 ## 1.0.0-alpha.25
 
 ### Minor Changes

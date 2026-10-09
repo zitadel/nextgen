@@ -1,5 +1,14 @@
 # @zitadel/testing
 
+## 1.0.0-alpha.26
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/cli@1.0.0-alpha.26
+  - @zitadel/api@1.0.0-alpha.26
+  - @zitadel/config@1.0.0-alpha.26
+
 ## 1.0.0-alpha.25
 
 ### Patch Changes

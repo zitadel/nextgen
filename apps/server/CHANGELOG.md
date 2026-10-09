@@ -1,5 +1,15 @@
 # @zitadel/server
 
+## 1.0.0-alpha.26
+
+### Patch Changes
+
+- [#1420](https://github.com/zitadel/nextgen/pull/1420) [`1a46ed4`](https://github.com/zitadel/nextgen/commit/1a46ed42c668c172b6ffa7be6ce25ae683f7065d) Thanks [@bastionstack](https://github.com/bastionstack)! - Console: toasts take the popover surface, border and radius. A "Load more" that fails on the users, teams, projects or schemas list shows the error above the button. The route error screen shows the API's message. The users search field, the inline CLI commands on the sign-in and server-unavailable screens, and the remove-admin error use the shared components, and the schema drill-in, breadcrumb, colour section, project switcher and theme toggle buttons show the focus ring.
+
+- [#1552](https://github.com/zitadel/nextgen/pull/1552) [`b3b0b28`](https://github.com/zitadel/nextgen/commit/b3b0b2888f0e64a4805f373a9835d8dc853add84) Thanks [@bastionstack](https://github.com/bastionstack)! - Console: every surface now uses the 8px corner radius. The Users and Teams headers are the title with the Add button beside it at every width; the search inputs are gone from the headers until there is a console-wide search. The user schemas list is a data table like the other resource lists, and the schema detail header carries the schema id and created date card, matching Login flows. The sign-in, claim and server-unavailable screens no longer draw a mark above their card.
+
+- [#1421](https://github.com/zitadel/nextgen/pull/1421) [`7fbd942`](https://github.com/zitadel/nextgen/commit/7fbd942580560ccab74d3fdd19b3e1eb6d922ee7) Thanks [@bastionstack](https://github.com/bastionstack)! - Tighten the login atoms. `<zl-field>` restores its initial `value` on form reset, as `<zl-select>` and `<zl-checkbox>` do, and takes an `aria-label` for inputs with no visible label. `<zl-alert>` lists its `detail` and `link` parts and slots in its manifest, so `<zitadel-login>` forwards them as `alert-detail` and `alert-link`. The package root exports `ZlPasskey`, `zlPasskeyManifest`, the passkey event detail types, `ZlFieldInputDetail`, `ZlSubmitDetail` and `SHIPPED_ICON_NAMES`, and `addEventListener` is typed for every `zl-*` event. The passkey pending status and its cancel button are spaced apart, the `<zitadel-logout>` menu takes its shadow and sizes from the design tokens, and the hosted login page's "Try again" button has its fill. Every input atom resets and restores through its `formValue`, so text a password manager writes straight into the native input clears on reset too, and an enclosing `<fieldset disabled>` disables the atoms as it does native controls.
+
 ## 1.0.0-alpha.25
 
 ### Minor Changes
