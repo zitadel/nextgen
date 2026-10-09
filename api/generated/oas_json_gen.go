@@ -20078,7 +20078,7 @@ func (s *CreateProjectResponse) UnmarshalJSON(data []byte) error {
 
 // Encode encodes CreateReleaseCreated as json.
 func (s *CreateReleaseCreated) Encode(e *jx.Encoder) {
-	unwrapped := (*CreateReleaseResponse)(s)
+	unwrapped := (*Release)(s)
 
 	unwrapped.Encode(e)
 }
@@ -20088,7 +20088,7 @@ func (s *CreateReleaseCreated) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode CreateReleaseCreated to nil")
 	}
-	var unwrapped CreateReleaseResponse
+	var unwrapped Release
 	if err := func() error {
 		if err := unwrapped.Decode(d); err != nil {
 			return err
@@ -20414,7 +20414,7 @@ func (s *CreateReleaseErrorResponse) UnmarshalJSON(data []byte) error {
 
 // Encode encodes CreateReleaseOK as json.
 func (s *CreateReleaseOK) Encode(e *jx.Encoder) {
-	unwrapped := (*CreateReleaseResponse)(s)
+	unwrapped := (*Release)(s)
 
 	unwrapped.Encode(e)
 }
@@ -20424,7 +20424,7 @@ func (s *CreateReleaseOK) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode CreateReleaseOK to nil")
 	}
-	var unwrapped CreateReleaseResponse
+	var unwrapped Release
 	if err := func() error {
 		if err := unwrapped.Decode(d); err != nil {
 			return err
@@ -20700,127 +20700,6 @@ func (s *CreateReleaseRequest) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *CreateReleaseRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *CreateReleaseResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *CreateReleaseResponse) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("release")
-		s.Release.Encode(e)
-	}
-	{
-		e.FieldStart("revisions")
-		e.ArrStart()
-		for _, elem := range s.Revisions {
-			elem.Encode(e)
-		}
-		e.ArrEnd()
-	}
-}
-
-var jsonFieldsNameOfCreateReleaseResponse = [2]string{
-	0: "release",
-	1: "revisions",
-}
-
-// Decode decodes CreateReleaseResponse from json.
-func (s *CreateReleaseResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateReleaseResponse to nil")
-	}
-	var requiredBitSet [1]uint8
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "release":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				if err := s.Release.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"release\"")
-			}
-		case "revisions":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				s.Revisions = make([]PinnedRevision, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem PinnedRevision
-					if err := elem.Decode(d); err != nil {
-						return err
-					}
-					s.Revisions = append(s.Revisions, elem)
-					return nil
-				}); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"revisions\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode CreateReleaseResponse")
-	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00000011,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfCreateReleaseResponse) {
-					name = jsonFieldsNameOfCreateReleaseResponse[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CreateReleaseResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateReleaseResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -75794,151 +75673,6 @@ func (s PatchUserRequestAttributes) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *PatchUserRequestAttributes) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *PinnedRevision) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *PinnedRevision) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("kind")
-		s.Kind.Encode(e)
-	}
-	{
-		e.FieldStart("handle")
-		e.Str(s.Handle)
-	}
-	{
-		e.FieldStart("revision_id")
-		e.Str(s.RevisionID)
-	}
-	{
-		e.FieldStart("created")
-		e.Bool(s.Created)
-	}
-}
-
-var jsonFieldsNameOfPinnedRevision = [4]string{
-	0: "kind",
-	1: "handle",
-	2: "revision_id",
-	3: "created",
-}
-
-// Decode decodes PinnedRevision from json.
-func (s *PinnedRevision) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PinnedRevision to nil")
-	}
-	var requiredBitSet [1]uint8
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "kind":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				if err := s.Kind.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"kind\"")
-			}
-		case "handle":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				v, err := d.Str()
-				s.Handle = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"handle\"")
-			}
-		case "revision_id":
-			requiredBitSet[0] |= 1 << 2
-			if err := func() error {
-				v, err := d.Str()
-				s.RevisionID = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"revision_id\"")
-			}
-		case "created":
-			requiredBitSet[0] |= 1 << 3
-			if err := func() error {
-				v, err := d.Bool()
-				s.Created = bool(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"created\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode PinnedRevision")
-	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00001111,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfPinnedRevision) {
-					name = jsonFieldsNameOfPinnedRevision[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *PinnedRevision) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PinnedRevision) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

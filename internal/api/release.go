@@ -49,12 +49,12 @@ func (h *Handler) CreateRelease(ctx context.Context, req *api.CreateReleaseReque
 	// answers 200 with the release that already pins it, so a re-deploy of
 	// unchanged content is a no-op rather than an error the caller has to
 	// special-case.
-	response := toAPICreateReleaseResponse(result.Release)
+	release := toAPIRelease(result.Release)
 	if result.Created {
-		created := api.CreateReleaseCreated(response)
+		created := api.CreateReleaseCreated(release)
 		return &created, nil
 	}
-	reused := api.CreateReleaseOK(response)
+	reused := api.CreateReleaseOK(release)
 	return &reused, nil
 }
 
@@ -104,25 +104,6 @@ func (h *Handler) ListReleases(ctx context.Context, params api.ListReleasesParam
 }
 
 /* ---------------- CONVERTERS ---------------- */
-
-// toAPICreateReleaseResponse pairs the release with one entry per pointer.
-// The pointer form never allocates a revision, so every entry reads
-// created: false.
-func toAPICreateReleaseResponse(entity *domain.Release) api.CreateReleaseResponse {
-	revisions := make([]api.PinnedRevision, len(entity.Pointers))
-	for i, pointer := range entity.Pointers {
-		revisions[i] = api.PinnedRevision{
-			Kind:       api.ReleasePointerKind(pointer.Kind.String()),
-			Handle:     pointer.Handle,
-			RevisionID: pointer.RevisionID,
-			Created:    false,
-		}
-	}
-	return api.CreateReleaseResponse{
-		Release:   toAPIRelease(entity),
-		Revisions: revisions,
-	}
-}
 
 func toAPIRelease(entity *domain.Release) api.Release {
 	pointers := make([]api.ReleasePointer, len(entity.Pointers))
