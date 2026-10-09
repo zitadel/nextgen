@@ -1,3 +1,5 @@
+import { ciFlag } from "./dimensions/ci-flag";
+
 /**
  * Resolves the Mixpanel ingestion token and API host for a CLI invocation.
  *
@@ -38,18 +40,30 @@ const HOSTS = {
 export type TelemetryRegion = keyof typeof HOSTS;
 
 /**
- * Decide which project the events belong to. `ZITADEL_TELEMETRY_ENV` selects
- * `development` or `production` explicitly; otherwise the default is
- * `production`, because the single generic build carries no channel stamp and
- * the published CLI must route real traffic to prod with no per-user env.
- * Development/CI/test runs stay out of prod by opting out entirely
- * (`DO_NOT_TRACK` / `ZITADEL_TELEMETRY=0`) or by selecting the dev project.
+ * Decide which project the events belong to.
+ *
+ * `ZITADEL_TELEMETRY_ENV` selects `development` or `production` explicitly and
+ * wins outright. With no explicit selection the default is `production`, so the
+ * single generic build (no channel stamp) routes real user traffic to prod with
+ * no per-user env — EXCEPT that an unattended CI/automation run routes to the
+ * dev project instead. CI runs normally opt out entirely (`DO_NOT_TRACK` /
+ * `ZITADEL_TELEMETRY=0`, which our own CI sets); the CI check is a belt-and-
+ * braces guard so that if telemetry is somehow left on in an automated
+ * environment, it can never pollute the production project.
+ *
  * Ambient `NODE_ENV` is deliberately NOT consulted: a run with
  * `NODE_ENV=development` must not silently switch projects.
  */
 function resolveChannel(env: NodeJS.ProcessEnv): "development" | "production" {
   const explicit = (env.ZITADEL_TELEMETRY_ENV ?? "").trim().toLowerCase();
   if (explicit === "development") {
+    return "development";
+  }
+  if (explicit === "production") {
+    return "production";
+  }
+  // Never let an unattended CI/automation run reach the prod project.
+  if (ciFlag.value(env)) {
     return "development";
   }
   return "production";

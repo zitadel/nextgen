@@ -18,6 +18,21 @@ describe("resolveTelemetryToken", () => {
     expect(resolveTelemetryToken({ ZITADEL_TELEMETRY_ENV: "production" })).toBe(PROD_TOKEN);
   });
 
+  it("routes an unattended CI run to the dev project as a safeguard", () => {
+    expect(resolveTelemetryToken({ CI: "true" })).toBe(DEV_TOKEN);
+    expect(resolveTelemetryToken({ GITHUB_ACTIONS: "true" })).toBe(DEV_TOKEN);
+  });
+
+  it("ignores a falsey CI flag (CI=false is not a CI run)", () => {
+    expect(resolveTelemetryToken({ CI: "false" })).toBe(PROD_TOKEN);
+  });
+
+  it("lets an explicit production env win over the CI safeguard", () => {
+    expect(resolveTelemetryToken({ CI: "true", ZITADEL_TELEMETRY_ENV: "production" })).toBe(
+      PROD_TOKEN,
+    );
+  });
+
   it("lets ZITADEL_TELEMETRY_TOKEN override the channel outright", () => {
     expect(resolveTelemetryToken({ ZITADEL_TELEMETRY_TOKEN: "custom" })).toBe("custom");
   });
