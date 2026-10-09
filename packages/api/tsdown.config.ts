@@ -35,13 +35,7 @@ export default defineConfig({
   tsconfig: "tsconfig.lib.json",
   dts: true,
   sourcemap: true,
-  // `clean: true` would wipe the .d.ts files tsc emits during the
-  // `typecheck` target, breaking project-reference consumers
-  // (api-mock, components, sdk-next) whose tsc --build expects those
-  // .d.ts files to exist. tsdown still overwrites its own .mjs/.d.mts
-  // outputs on each rebuild — stale files just accumulate harmlessly
-  // until a full `git clean`.
-  clean: false,
+  clean: true,
   target: "es2022",
   deps: { neverBundle: ["msw", "zod", "@faker-js/faker"] },
 });
