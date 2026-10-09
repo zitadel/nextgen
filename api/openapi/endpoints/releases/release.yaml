@@ -12,8 +12,8 @@ description: |
   separate call.
 
   Two identifiers: `id` is the one paths and `release_id` fields take;
-  `content_hash` is the digest of what the release pins, printed by the CLI
-  and pinned by builds, and looked up through fields that name it.
+  `content_hash` is the digest of the content the release pins, printed by
+  the CLI and pinned by builds, and looked up through fields that name it.
 type: object
 required:
   - id
@@ -34,8 +34,8 @@ properties:
   content_hash:
     readOnly: true
     description: |
-      The digest of the pinned set. Identical for two releases that pin the
-      same revisions, which is why a project never holds two such releases.
+      The digest of the pinned content. Identical for two releases with the
+      same content, which is why a project never holds two such releases.
     $ref: ../../components/schemas/release-content-hash.yaml
   metadata:
     readOnly: true

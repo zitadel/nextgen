@@ -56526,16 +56526,16 @@ func (s *RelRevisionUnpinnableDetails) init() RelRevisionUnpinnableDetails {
 // A release exists on its own and is not tied to a target. Deploying it is a
 // separate call.
 // Two identifiers: `id` is the one paths and `release_id` fields take;
-// `content_hash` is the digest of what the release pins, printed by the CLI
-// and pinned by builds, and looked up through fields that name it.
+// `content_hash` is the digest of the content the release pins, printed by
+// the CLI and pinned by builds, and looked up through fields that name it.
 // Ref: #
 type Release struct {
 	// The opaque, immutable resource id, assigned at construction.
 	ID ReleaseID `json:"id"`
 	// The project this release belongs to.
 	ProjectID ProjectID `json:"project_id"`
-	// The digest of the pinned set. Identical for two releases that pin the
-	// same revisions, which is why a project never holds two such releases.
+	// The digest of the pinned content. Identical for two releases with the
+	// same content, which is why a project never holds two such releases.
 	ContentHash ReleaseContentHash `json:"content_hash"`
 	Metadata    ReleaseMetadata    `json:"metadata"`
 	// When the release was revoked, or null while it is not. A revoked
@@ -57885,7 +57885,7 @@ type ReleaseSummary struct {
 	ID ReleaseID `json:"id"`
 	// The project this release belongs to.
 	ProjectID ProjectID `json:"project_id"`
-	// The digest of the pinned set.
+	// The digest of the pinned content.
 	ContentHash ReleaseContentHash `json:"content_hash"`
 	Metadata    ReleaseMetadata    `json:"metadata"`
 	// When the release was revoked, or null while it is not.
