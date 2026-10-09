@@ -190,7 +190,7 @@ export const orchestratorBase = {
       options: ["none", ...Object.keys(brandingPresets)],
       description:
         "Backend-returned branding the mock overlays on every response (the component has no `branding` prop — it renders what the flow engine sends). `none` = no branding, so the component uses its design-system defaults (which ship both light and dark). Presets ending in a single side (`dark`, `light-only`) demonstrate the single-sided gating on `theme`.",
-      table: { category: "Flow engine", defaultValue: { summary: "none" } },
+      table: { category: "Flow engine", defaultValue: { summary: "centered" } },
     },
     sso: {
       control: {
