@@ -9,12 +9,10 @@ dependsOn:
 tasks:
   typecheck:
     deps:
-      - "api:build"
       - "sdk-core:build"
 
   build:
     deps:
-      - "api:build"
       - "sdk-core:build"
     options:
       mutex: "sdk-qwik-city-dist"
@@ -24,7 +22,6 @@ tasks:
       node ../../scripts/release-clean.mjs local-dist
       corepack pnpm run build
     deps:
-      - "api:build-release"
       - "sdk-core:build-release"
     outputs:
       - "dist/**/*"
@@ -48,7 +45,6 @@ tasks:
   dev:
     command: "corepack pnpm run dev"
     deps:
-      - "api:build"
       - "sdk-core:build"
     options:
       persistent: true
