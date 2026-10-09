@@ -4,6 +4,7 @@ package integration_test
 
 import (
 	"encoding/json"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
@@ -645,6 +646,11 @@ func errorResponseParts(t *testing.T, resp any) (status int, code, message strin
 
 	if e, isGeneric := resp.(*api.ErrorDetailsStatusCode); isGeneric {
 		return e.StatusCode, string(e.Response.Code), e.Response.Message, true
+	}
+	// A declared typed response carries no status field; its type is the
+	// status.
+	if e, isBadRequest := resp.(*api.CreateReleaseBadRequest); isBadRequest {
+		return http.StatusBadRequest, string(e.Code), e.Message, true
 	}
 
 	body := resp
