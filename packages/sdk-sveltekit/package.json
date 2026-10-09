@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-sveltekit",
-  "version": "0.1.0-alpha.11",
+  "version": "1.0.0-alpha.25",
   "description": "SvelteKit handle hook and helpers for Nextgen Auth",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-sveltekit#readme",
   "bugs": {

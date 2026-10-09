@@ -75,18 +75,25 @@ export function indexPageTemplate(): string {
  * A login/register page. Renders the idiomatic `<ZitadelLogin>` Svelte component
  * from `@zitadel/sdk-svelte` (typed props, callback events) behind a `browser`
  * guard so the widget only mounts on the client. `configureZitadel` returns the
- * project handle; the public project id comes from `PUBLIC_ZITADEL_PROJECT_ID`
- * via SvelteKit's `$env/dynamic/public`.
+ * project handle.
+ *
+ * The public project id is embedded directly rather than read from an `$env`
+ * module: the location of SvelteKit's public-env import differs between major
+ * versions (`$env/static/public` is deprecated in SvelteKit 3 in favour of
+ * `$app/env/public`, and `$env/dynamic/public` does not surface the value in
+ * every adapter), so a single template cannot import it and still support both
+ * SvelteKit 2 and 3. The project id is public (not a secret — it reaches the
+ * browser either way), and setup still writes `PUBLIC_ZITADEL_PROJECT_ID` to
+ * `.env.local` for app code that prefers to read it from the environment.
  */
-function authPage(purpose: "login" | "register"): string {
+function authPage(purpose: "login" | "register", projectId: string): string {
   return `<script lang="ts">
   ${MANAGED_MARKER}
   import { browser } from "$app/environment";
   import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-svelte";
-  import { env } from "$env/dynamic/public";
 
   const project = configureZitadel({
-    projectId: env.PUBLIC_ZITADEL_PROJECT_ID ?? "",
+    projectId: ${JSON.stringify(projectId)},
     proxyPath: "${PROXY_PATH}",
   });
 </script>
@@ -99,24 +106,23 @@ function authPage(purpose: "login" | "register"): string {
 `;
 }
 
-export function loginPageTemplate(): string {
-  return authPage("login");
+export function loginPageTemplate(projectId: string): string {
+  return authPage("login", projectId);
 }
 
-export function registerPageTemplate(): string {
-  return authPage("register");
+export function registerPageTemplate(projectId: string): string {
+  return authPage("register", projectId);
 }
 
 /** `src/routes/profile/+page.svelte` — the signed-in view with the logout widget. */
-export function profilePageTemplate(): string {
+export function profilePageTemplate(projectId: string): string {
   return `<script lang="ts">
   ${MANAGED_MARKER}
   import { browser } from "$app/environment";
   import { ZitadelLogout, configureZitadel } from "@zitadel/sdk-svelte";
-  import { env } from "$env/dynamic/public";
 
   const project = configureZitadel({
-    projectId: env.PUBLIC_ZITADEL_PROJECT_ID ?? "",
+    projectId: ${JSON.stringify(projectId)},
     proxyPath: "${PROXY_PATH}",
   });
 </script>

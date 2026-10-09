@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-qwik-city",
-  "version": "0.1.0-alpha.11",
+  "version": "1.0.0-alpha.25",
   "description": "Qwik City request handler and helpers for Nextgen Auth",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-qwik-city#readme",
   "bugs": {

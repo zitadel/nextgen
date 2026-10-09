@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-tanstack-start",
-  "version": "0.1.0-alpha.11",
+  "version": "1.0.0-alpha.25",
   "description": "TanStack Start request middleware and helpers for Nextgen Auth",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-tanstack-start#readme",
   "bugs": {

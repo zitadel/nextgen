@@ -43,13 +43,21 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
       { kind: "write", path: src("hooks.server.ts"), contents: hooksServerTemplate() },
       { kind: "write", path: src("routes/+layout.svelte"), contents: layoutTemplate() },
       { kind: "write", path: src("routes/+page.svelte"), contents: indexPageTemplate() },
-      { kind: "write", path: src("routes/login/+page.svelte"), contents: loginPageTemplate() },
+      {
+        kind: "write",
+        path: src("routes/login/+page.svelte"),
+        contents: loginPageTemplate(ctx.project.id),
+      },
       {
         kind: "write",
         path: src("routes/register/+page.svelte"),
-        contents: registerPageTemplate(),
+        contents: registerPageTemplate(ctx.project.id),
       },
-      { kind: "write", path: src("routes/profile/+page.svelte"), contents: profilePageTemplate() },
+      {
+        kind: "write",
+        path: src("routes/profile/+page.svelte"),
+        contents: profilePageTemplate(ctx.project.id),
+      },
       { kind: "merge-env", path: ".env.example", entries: { PUBLIC_ZITADEL_PROJECT_ID: "" } },
       {
         kind: "merge-env",
