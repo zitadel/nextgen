@@ -99,8 +99,7 @@ func TestCreateRelease(t *testing.T) {
 		GitSha:   api.NewOptString("4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7"),
 	})
 	require.IsType(t, &api.CreateReleaseCreated{}, resp, "create release: %s", helpers.MustMarshal(t, resp))
-	envelope := *resp.(*api.CreateReleaseCreated)
-	created := envelope.Release
+	created := api.Release(*resp.(*api.CreateReleaseCreated))
 
 	t.Run("the release records the handle each revision declares", func(t *testing.T) {
 		assert.True(t, domain.PrefixRelease.Matches(string(created.ID)), "id %q is not rel_-prefixed", created.ID)
@@ -137,8 +136,7 @@ func TestCreateRelease(t *testing.T) {
 			Message:  api.NewOptString("a different message entirely"),
 		})
 		require.IsType(t, &api.CreateReleaseOK{}, resp, "recreate release: %s", helpers.MustMarshal(t, resp))
-		reusedEnvelope := *resp.(*api.CreateReleaseOK)
-		reused := reusedEnvelope.Release
+		reused := api.Release(*resp.(*api.CreateReleaseOK))
 
 		assert.Equal(t, created.ID, reused.ID)
 		assert.Equal(t, "initial import", reused.Metadata.Message.Value,
@@ -165,7 +163,7 @@ func TestCreateRelease(t *testing.T) {
 			},
 		})
 		require.IsType(t, &api.CreateReleaseCreated{}, resp, "create release: %s", helpers.MustMarshal(t, resp))
-		assert.NotEqual(t, created.ID, resp.(*api.CreateReleaseCreated).Release.ID)
+		assert.NotEqual(t, created.ID, api.Release(*resp.(*api.CreateReleaseCreated)).ID)
 	})
 
 	// The endpoint pins revisions, it does not create them, so a revision the
