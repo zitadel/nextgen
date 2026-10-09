@@ -8,8 +8,18 @@
 // MASTER_KEY_ID become <data_dir>/nextgen.yaml, the optional bootstrap admin
 // document becomes <data_dir>/admin-user.json passed as --user-file, and the
 // listen address follows Vercel's PORT. Every other setting stays a NEXTGEN_*
-// variable. Migrations never run here: the launcher passes no --migrate and
-// refuses one, so a serving function cannot change a schema by starting.
+// variable.
+//
+// Migrations run at deploy time, never at startup: vercel-build.sh calls
+// `launcher migrate` after compiling, which resolves the same database URL
+// the function will use and runs the server's migrate command. The serving
+// invocation passes no --migrate and refuses one, so a function cannot
+// change a schema by starting.
+//
+// The database URL is resolved by one rule in both modes (see
+// resolveDatabaseURL): production uses it as configured, a preview
+// deployment appends the schema of its pull request or branch, so every
+// preview owns a schema of the shared preview database.
 package main
 
 import (
@@ -22,6 +32,7 @@ import (
 	"strings"
 
 	"github.com/zitadel/nextgen/cmd/server"
+	pgschema "github.com/zitadel/nextgen/internal/storage/dialect/postgres/schema"
 )
 
 const (
@@ -33,7 +44,13 @@ const (
 var keyIDPattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
 func main() {
-	args, err := prepare(os.Args[1:])
+	var args []string
+	var err error
+	if len(os.Args) > 1 && os.Args[1] == "migrate" {
+		args, err = prepareMigration(os.Args[2:])
+	} else {
+		args, err = prepare(os.Args[1:])
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "launcher:", err)
 		os.Exit(64)
@@ -46,13 +63,101 @@ func main() {
 	}
 }
 
+// prepareMigration is the deploy-time mode: it resolves the database URL the
+// deployment will serve from and returns the arguments of the server's
+// migrate command. Production migrates only from main, so a `vercel deploy
+// --prod` from another branch fails its build instead of changing the
+// production schema. The migrator role (CLOUD_MIGRATOR_DATABASE_URL) is used
+// when configured, else the serving role.
+func prepareMigration(extra []string) ([]string, error) {
+	env := os.Getenv("VERCEL_ENV")
+	if env == "production" {
+		if ref := os.Getenv("VERCEL_GIT_COMMIT_REF"); ref != "main" {
+			return nil, fmt.Errorf("refusing to migrate production from %q; only main deploys to production", ref)
+		}
+	}
+	base := os.Getenv("CLOUD_MIGRATOR_DATABASE_URL")
+	if base == "" {
+		base = os.Getenv("NEXTGEN_DATABASE_POSTGRES")
+	}
+	dsn, schema, err := resolveDatabaseURL(base, env)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.Setenv("NEXTGEN_DATABASE_POSTGRES", dsn); err != nil {
+		return nil, err
+	}
+	_ = os.Unsetenv("CLOUD_MIGRATOR_DATABASE_URL")
+	if os.Getenv("NEXTGEN_SERVER_DATA_DIR") == "" {
+		// migrate mints a throwaway master key here; keep it out of the tree.
+		if err := os.Setenv("NEXTGEN_SERVER_DATA_DIR", defaultDataDir); err != nil {
+			return nil, err
+		}
+	}
+	fmt.Fprintf(os.Stderr, "launcher: migrating schema %s (%s)\n", schema, env)
+	return append([]string{"migrate"}, extra...), nil
+}
+
+// resolveDatabaseURL applies the one schema rule of the cloud: a URL that
+// already names a search_path is used as is, production and local runs use
+// the URL as configured, and a preview deployment appends the schema of its
+// pull request (pr_<id>) or, without one, of its branch (br_<name>). The
+// server appends public to the search_path itself.
+func resolveDatabaseURL(base, env string) (dsn, schema string, err error) {
+	if base == "" {
+		if env == "production" || env == "preview" {
+			return "", "", errors.New("NEXTGEN_DATABASE_POSTGRES must be set for a " + env + " deployment")
+		}
+		return "", pgschema.Default, nil
+	}
+	if strings.Contains(base, "search_path=") {
+		return base, "<from search_path>", nil
+	}
+	if env != "preview" {
+		return base, pgschema.Default, nil
+	}
+	switch {
+	case os.Getenv("VERCEL_GIT_PULL_REQUEST_ID") != "":
+		schema = "pr_" + os.Getenv("VERCEL_GIT_PULL_REQUEST_ID")
+	case os.Getenv("VERCEL_GIT_COMMIT_REF") != "":
+		schema = "br_" + sanitizeSchemaPart(os.Getenv("VERCEL_GIT_COMMIT_REF"))
+	default:
+		return "", "", errors.New("preview deployment without VERCEL_GIT_PULL_REQUEST_ID or VERCEL_GIT_COMMIT_REF: cannot pick a schema")
+	}
+	if err := pgschema.Validate(schema); err != nil {
+		return "", "", err
+	}
+	separator := "?"
+	if strings.Contains(base, "?") {
+		separator = "&"
+	}
+	return base + separator + "search_path=" + schema, schema, nil
+}
+
+var notSchemaChar = regexp.MustCompile(`[^a-z0-9_]+`)
+
+// sanitizeSchemaPart turns a branch name into the tail of a schema name:
+// lowercase, every other character run becomes one underscore, trimmed and
+// cut to what fits a 63-byte identifier behind the br_ prefix.
+func sanitizeSchemaPart(ref string) string {
+	part := notSchemaChar.ReplaceAllString(strings.ToLower(ref), "_")
+	part = strings.Trim(part, "_")
+	if part == "" {
+		part = "x"
+	}
+	if len(part) > 60 {
+		part = strings.TrimRight(part[:60], "_")
+	}
+	return part
+}
+
 // prepare renders the config and bootstrap files from the environment and
 // returns the server arguments. Secrets are removed from the environment
 // once they are on disk, so the server process does not carry them.
 func prepare(extra []string) ([]string, error) {
 	for _, arg := range extra {
 		if arg == "--migrate" || strings.HasPrefix(arg, "--migrate=") {
-			return nil, errors.New("refusing --migrate; migrations run in cloud-deploy.yml, not in the function")
+			return nil, errors.New("refusing --migrate; migrations run in the build step (launcher migrate), never in the serving function")
 		}
 	}
 
@@ -115,6 +220,17 @@ func prepare(extra []string) ([]string, error) {
 	}
 	if err := os.Setenv("NEXTGEN_SERVER_ADDRESS", ":"+port); err != nil {
 		return nil, err
+	}
+
+	// The same database URL the build migrated, schema included.
+	dsn, _, err := resolveDatabaseURL(os.Getenv("NEXTGEN_DATABASE_POSTGRES"), os.Getenv("VERCEL_ENV"))
+	if err != nil {
+		return nil, err
+	}
+	if dsn != "" {
+		if err := os.Setenv("NEXTGEN_DATABASE_POSTGRES", dsn); err != nil {
+			return nil, err
+		}
 	}
 	return append(args, extra...), nil
 }

@@ -21,6 +21,11 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 	t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", "")
 	t.Setenv("PORT", "")
 	t.Setenv("NEXTGEN_SERVER_ADDRESS", "")
+	t.Setenv("NEXTGEN_DATABASE_POSTGRES", "")
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", "")
+	t.Setenv("VERCEL_ENV", "")
+	t.Setenv("VERCEL_GIT_PULL_REQUEST_ID", "")
+	t.Setenv("VERCEL_GIT_COMMIT_REF", "")
 }
 
 func TestPrepareRendersTheMasterKeyIntoTheConfig(t *testing.T) {
@@ -126,4 +131,109 @@ func TestPrepareRefusesBadInput(t *testing.T) {
 			assert.False(t, strings.HasPrefix(os.Getenv("NEXTGEN_SERVER_ADDRESS"), ":"), "nothing is configured when input is refused")
 		})
 	}
+}
+
+const previewDSN = "postgresql://u:p@db.example:5432/postgres?sslmode=verify-full"
+
+func TestResolveDatabaseURLPicksTheSchemaOfTheDeployment(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+
+	t.Run("production and local runs use the URL as configured", func(t *testing.T) {
+		for _, env := range []string{"production", "development", ""} {
+			dsn, schema, err := resolveDatabaseURL(previewDSN, env)
+			require.NoError(t, err)
+			assert.Equal(t, previewDSN, dsn, env)
+			assert.Equal(t, "zitadel_nextgen", schema, env)
+		}
+	})
+
+	t.Run("a preview of a pull request gets pr_<id>", func(t *testing.T) {
+		t.Setenv("VERCEL_GIT_PULL_REQUEST_ID", "1518")
+		t.Setenv("VERCEL_GIT_COMMIT_REF", "feature/x")
+		dsn, schema, err := resolveDatabaseURL(previewDSN, "preview")
+		require.NoError(t, err)
+		assert.Equal(t, previewDSN+"&search_path=pr_1518", dsn)
+		assert.Equal(t, "pr_1518", schema)
+	})
+
+	t.Run("a preview of a branch without a pull request gets br_<name>", func(t *testing.T) {
+		t.Setenv("VERCEL_GIT_COMMIT_REF", "claude/Nextgen-Deployment research--3b5ebe")
+		dsn, schema, err := resolveDatabaseURL("postgresql://u:p@db.example:5432/postgres", "preview")
+		require.NoError(t, err)
+		assert.Equal(t, "postgresql://u:p@db.example:5432/postgres?search_path=br_claude_nextgen_deployment_research_3b5ebe", dsn)
+		assert.Equal(t, "br_claude_nextgen_deployment_research_3b5ebe", schema)
+	})
+
+	t.Run("an explicit search_path wins", func(t *testing.T) {
+		t.Setenv("VERCEL_GIT_PULL_REQUEST_ID", "1518")
+		dsn, _, err := resolveDatabaseURL(previewDSN+"&search_path=pr_demo2", "preview")
+		require.NoError(t, err)
+		assert.Equal(t, previewDSN+"&search_path=pr_demo2", dsn)
+	})
+
+	t.Run("a preview needs a pull request or a branch", func(t *testing.T) {
+		_, _, err := resolveDatabaseURL(previewDSN, "preview")
+		assert.ErrorContains(t, err, "cannot pick a schema")
+	})
+
+	t.Run("deployments need a database", func(t *testing.T) {
+		_, _, err := resolveDatabaseURL("", "production")
+		assert.ErrorContains(t, err, "must be set")
+		dsn, _, err := resolveDatabaseURL("", "")
+		require.NoError(t, err)
+		assert.Empty(t, dsn, "a local run may fall through to the server defaults")
+	})
+}
+
+func TestSanitizeSchemaPart(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, "fix_login_v2", sanitizeSchemaPart("Fix/Login--v2"))
+	assert.Equal(t, "x", sanitizeSchemaPart("///"))
+	assert.LessOrEqual(t, len("br_"+sanitizeSchemaPart(strings.Repeat("a-", 80))), 63)
+}
+
+func TestPrepareMigrationGuardsProductionAndResolvesTheSchema(t *testing.T) {
+	t.Run("production migrates only from main", func(t *testing.T) {
+		setLauncherEnv(t, t.TempDir())
+		t.Setenv("VERCEL_ENV", "production")
+		t.Setenv("VERCEL_GIT_COMMIT_REF", "feature/x")
+		t.Setenv("NEXTGEN_DATABASE_POSTGRES", previewDSN)
+		_, err := prepareMigration(nil)
+		assert.ErrorContains(t, err, "refusing to migrate production")
+	})
+
+	t.Run("production from main uses the migrator role as configured", func(t *testing.T) {
+		setLauncherEnv(t, t.TempDir())
+		t.Setenv("VERCEL_ENV", "production")
+		t.Setenv("VERCEL_GIT_COMMIT_REF", "main")
+		t.Setenv("NEXTGEN_DATABASE_POSTGRES", previewDSN)
+		t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", "postgresql://migrator:p@db.example:5432/postgres")
+		args, err := prepareMigration([]string{"--log-level", "debug"})
+		require.NoError(t, err)
+		assert.Equal(t, []string{"migrate", "--log-level", "debug"}, args)
+		assert.Equal(t, "postgresql://migrator:p@db.example:5432/postgres", os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
+		assert.Empty(t, os.Getenv("CLOUD_MIGRATOR_DATABASE_URL"))
+	})
+
+	t.Run("a preview migrates its own schema", func(t *testing.T) {
+		setLauncherEnv(t, t.TempDir())
+		t.Setenv("VERCEL_ENV", "preview")
+		t.Setenv("VERCEL_GIT_PULL_REQUEST_ID", "77")
+		t.Setenv("NEXTGEN_DATABASE_POSTGRES", previewDSN)
+		args, err := prepareMigration(nil)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"migrate"}, args)
+		assert.Equal(t, previewDSN+"&search_path=pr_77", os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
+	})
+}
+
+func TestPrepareServesTheSameSchemaTheBuildMigrated(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "preview")
+	t.Setenv("VERCEL_GIT_PULL_REQUEST_ID", "77")
+	t.Setenv("NEXTGEN_DATABASE_POSTGRES", previewDSN)
+
+	_, err := prepare(nil)
+	require.NoError(t, err)
+	assert.Equal(t, previewDSN+"&search_path=pr_77", os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
 }

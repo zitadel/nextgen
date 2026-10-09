@@ -497,3 +497,23 @@ server's own boot. Nothing is cached for the Go step yet (Vercel picked
 go1.26.8 for `go 1.26` and downloaded all modules) and it is still the
 cheapest part of the build. Open: confirm in the dashboard that the function
 runs on Fluid compute; the Services guide says backends do by default.
+
+## Migrations in the build, Git deployments on (2026-10-08)
+
+Decision: the GitHub runner leaves the deploy path. `vercel-build.sh` runs
+`launcher migrate` right after compiling, so migrations run at deploy time
+inside the Vercel build and never at startup: production with the migrator
+role and only from `main` (`VERCEL_GIT_COMMIT_REF` guard in the launcher),
+a preview in `pr_<VERCEL_GIT_PULL_REQUEST_ID>` of the preview database.
+The launcher applies the same schema rule at runtime, so build and function
+always agree. `git.deploymentEnabled` is on: a push deploys. The workflow
+is reduced to dropping `pr_<n>` on pull request close. Each non-default
+schema takes its own migration advisory lock, so parallel preview builds on
+one database neither serialize nor deadlock on `CREATE INDEX CONCURRENTLY`.
+Self-hosters are untouched: `nextgen server --migrate` and `nextgen migrate`
+keep their behavior, the default schema keeps its lock.
+
+Given up: the smoke test in the pipeline (the script stays for manual
+runs; Vercel checks or a `deployment_status` action can bring it back) and
+the `main`-only migrator credential in a GitHub environment, replaced by the
+branch guard plus "who can create production builds".

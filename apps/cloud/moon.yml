@@ -14,9 +14,9 @@ tasks:
   test:
     command: "corepack pnpm run test:all"
 
-  # Deploys to production. Not a CI task: the GitHub workflow
-  # `cloud-deploy.yml` runs migrations first and then calls the
-  # Vercel CLI directly.
+  # Deploys to production from a workstation. Not a CI task: pushes deploy
+  # through Vercel's Git integration, and the server build step migrates
+  # before the deployment goes live (vercel-build.sh).
   deploy:
     command: "corepack pnpm run deploy"
     options:

@@ -113,7 +113,8 @@ that way, and a throwaway environment is removed with
 `public` is kept on the `search_path`. A schema name is a plain lowercase
 identifier (`[a-z_][a-z0-9_]*`, at most 63 characters).
 
-Migrations run automatically when the server starts.
+Migrations run when the server starts with `--migrate`, or on their own with
+`nextgen migrate`; a server started without the flag never changes the schema.
 
 ## Logging
 

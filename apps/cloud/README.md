@@ -24,23 +24,27 @@ The design and the platform research behind it are in
 
 | File | Role |
 |---|---|
-| `vercel-build.sh` | The `buildCommand` of the `server` service: writes the stub UI embeds (the UIs are services), stamps version and `commit.txt` into the binary, builds `launcher` to `$VERCEL_OUTPUT_FILE`. |
-| `launcher/` | The function's entrypoint: renders the master key into `nextgen.yaml` from `MASTER_KEY_PEM_B64` and the admin document for `--user-file`, follows `$PORT`, then runs the server command in process. Refuses `--migrate`. Tested with `go test ./apps/cloud/launcher`. |
+| `vercel-build.sh` | The `buildCommand` of the `server` service: writes the stub UI embeds (the UIs are services), stamps version and `commit.txt` into the binary, builds `launcher` to `$VERCEL_OUTPUT_FILE`, then runs `launcher migrate`. |
+| `launcher/` | The function's entrypoint: renders the master key into `nextgen.yaml` from `MASTER_KEY_PEM_B64` and the admin document for `--user-file`, follows `$PORT`, resolves the deployment's schema, then runs the server command in process. Refuses `--migrate`. `launcher migrate` is the build-time mode that runs the migrations. Tested with `go test ./apps/cloud/launcher`. |
 | `../../vercel.json` | The six services, the public route table (redirects for bare UI prefixes, rewrites per service, server catch-all), region `fra1`, a keep-warm cron on `/readyz`, Git deployments disabled so the workflow is the only deployer. |
 | `../../.vercelignore` | Keeps repo meta and build artifacts out of CLI uploads; Go sources and every moon project source stay in, the server and the UIs build from them. |
 | `scripts/admin-user.ts` | Mints the seeded platform admin: credential file plus the base64 bootstrap document for `BOOTSTRAP_ADMIN_USER_JSON_B64`. |
 | `scripts/smoke.ts` | Post-deploy gate: readiness, project create, user create and query, session probe, console and login pages, docs page and `llms.txt`, storybook, website start page. |
 
-## Why migrations run in CI, not in the function
+## Why migrations run in the build, not at startup
 
-`nextgen migrate` runs in `.github/workflows/cloud-deploy.yml` from a
-binary built from the same commit **before** `vercel deploy --prod`. A
+`vercel-build.sh` compiles the launcher and then runs `launcher migrate`,
+which resolves the deployment's database URL (production as configured and
+only from `main`; a preview in the schema `pr_<number>` of the preview
+database) and runs `nextgen migrate` **before** the deployment goes live. A
 server binary ahead of its schema boots green and fails per request, and a
 rollout briefly runs old and new binaries side by side, so every migration
 must be expand/contract and must already be applied when the new deployment
-receives traffic. The entrypoint refuses `--migrate`, and preview deployments carry
-no production database URL or master key, so nothing but that workflow step
-can touch the production schema.
+receives traffic. A failed migration fails the build and the previous
+deployment keeps serving. The serving invocation refuses `--migrate`, so
+nothing but that build step can touch a schema. Self-hosters are not
+affected: `nextgen server --migrate` and `nextgen migrate` keep working as
+documented.
 
 ## Local run
 

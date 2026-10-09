@@ -7,6 +7,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"io/fs"
 
@@ -20,8 +21,24 @@ var sqlFiles embed.FS
 
 // migrationLockID keys the session advisory lock that serializes Migrate
 // across all connections and processes sharing one database. Arbitrary but
-// stable: "zitadel" in hex.
+// stable: "zitadel" in hex. It is the lock of the default schema; every other
+// schema derives its own, see lockID.
 const migrationLockID = int64(0x7a69746164656c)
+
+// lockID returns the advisory lock key for schema. The default schema keeps
+// migrationLockID, so existing installations serialize exactly as before.
+// Any other schema gets a stable key of its own: several schemas of one
+// database are independent, so their migrators must not wait on each other,
+// and a CREATE INDEX CONCURRENTLY in one would otherwise deadlock against a
+// migrator of another schema that blocks on the shared lock.
+func lockID(schema string) int64 {
+	if schema == pgschema.Default {
+		return migrationLockID
+	}
+	h := fnv.New64a()
+	_, _ = h.Write([]byte("zitadel_nextgen:" + schema))
+	return int64(h.Sum64())
+}
 
 // extensions are the extensions the migrations rely on. Postgres installs an
 // extension once per database, not per schema: in the default schema the
@@ -55,7 +72,7 @@ func MigrateInto(ctx context.Context, db *sql.DB, schema string) (err error) {
 	if err := pgschema.Validate(schema); err != nil {
 		return err
 	}
-	locker := migrationSessionLocker{}
+	locker := migrationSessionLocker{lockID: lockID(schema)}
 	if err := bootstrap(ctx, db, locker, schema); err != nil {
 		return err
 	}
@@ -113,18 +130,20 @@ func bootstrap(ctx context.Context, db *sql.DB, locker migrationSessionLocker, s
 
 // migrationSessionLocker lets goose hold the advisory lock on the same
 // *sql.Conn it uses for version checks and SQL migrations.
-type migrationSessionLocker struct{}
+type migrationSessionLocker struct {
+	lockID int64
+}
 
-func (migrationSessionLocker) SessionLock(ctx context.Context, conn *sql.Conn) error {
-	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", migrationLockID); err != nil {
+func (l migrationSessionLocker) SessionLock(ctx context.Context, conn *sql.Conn) error {
+	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", l.lockID); err != nil {
 		return fmt.Errorf("acquire migration advisory lock: %w", err)
 	}
 	return nil
 }
 
-func (migrationSessionLocker) SessionUnlock(ctx context.Context, conn *sql.Conn) error {
+func (l migrationSessionLocker) SessionUnlock(ctx context.Context, conn *sql.Conn) error {
 	var unlocked bool
-	if err := conn.QueryRowContext(ctx, "SELECT pg_advisory_unlock($1)", migrationLockID).Scan(&unlocked); err != nil {
+	if err := conn.QueryRowContext(ctx, "SELECT pg_advisory_unlock($1)", l.lockID).Scan(&unlocked); err != nil {
 		return fmt.Errorf("release migration advisory lock: %w", err)
 	}
 	if !unlocked {

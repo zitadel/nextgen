@@ -78,6 +78,8 @@ project's key-encryption key unwrappable ([ADR 029](../adrs/029-cryptography-sec
    | Name | Value | Sensitive |
    |---|---|---|
    | `NEXTGEN_DATABASE_POSTGRES` | `postgresql://preview-server…:5432/postgres?sslmode=verify-full&sslrootcert=system` | yes, **Production only** |
+   | `CLOUD_MIGRATOR_DATABASE_URL` | the `preview-migrator` role, used only by the build step's `launcher migrate` | yes, **Production only** |
+   | `NEXTGEN_DATABASE_POSTGRES` (Preview target) | the `preview-pr` role of the `zitadel-preview` database; each preview appends `search_path=pr_<n>` itself | yes, **Preview only** |
    | `MASTER_KEY_PEM_B64` | contents of `master-key.b64` | yes, **Production only** |
    | `MASTER_KEY_ID` | `preview-2026-10` (stable; rotation adds a new id) | no |
    | `PORT` | `8080` | no |
@@ -115,20 +117,22 @@ project's key-encryption key unwrappable ([ADR 029](../adrs/029-cryptography-sec
 
 ### 4. GitHub
 
-Environment `preview-cloud` with:
+Connect the repository to the Vercel project (Project → Settings → Git, or
+`vercel git connect` from the repo root). `vercel.json` has Git deployments
+enabled: every push to `main` is a production deployment, every push to a
+pull request branch a preview deployment, and the Vercel bot posts the
+preview URL on the pull request. No GitHub Actions secrets are needed for
+deploying or migrating.
+
+One repository secret for the cleanup workflow
+(`.github/workflows/cloud-preview-cleanup.yml`):
 
 | Kind | Name |
 |---|---|
-| secret | `VERCEL_TOKEN` (team token, deploy scope) |
-| secret | `VERCEL_ORG_ID` |
-| secret | `PREVIEW_CLOUD_VERCEL_PROJECT_ID` |
-| secret | `PREVIEW_CLOUD_MIGRATOR_DATABASE_URL` (the `preview-migrator` role) |
-| variable | `PREVIEW_CLOUD_PUBLIC_BASE` (same value as `NEXTGEN_SERVER_PUBLIC_BASE`) |
+| secret | `PREVIEW_CLOUD_PREVIEW_DATABASE_URL` (the `preview-pr` role) |
 
-Restrict the environment to the `main` branch (Settings → Environments →
-`cloud-preview` → Deployment branches: selected branches, `main`). That is
-what keeps the migrator credential out of every pull-request workflow:
-migrations run only from this environment, only for commits on `main`.
+It drops `pr_<number>` when a pull request closes. Without it the job logs
+that there is nothing to drop and the schema stays until someone drops it.
 
 ### 5. Platform admin
 
@@ -150,39 +154,49 @@ can stay set. To rotate the password, mint a new document with the same
 
 ## Deploying
 
-- **Automatic:** every push to `main`.
-- **Manual:** run `cloud-deploy` from the Actions tab.
+- **Production:** every push to `main`. Vercel builds all six services;
+  the `server` service's build step (`apps/cloud/vercel-build.sh`) compiles
+  the launcher and then runs `launcher migrate`, which applies the
+  migrations against the production database with the migrator role
+  (`CLOUD_MIGRATOR_DATABASE_URL`) **before** the deployment goes live. A
+  failed migration fails the build and the previous deployment keeps
+  serving. The launcher refuses to migrate production unless
+  `VERCEL_GIT_COMMIT_REF` is `main`, so a `vercel deploy --prod` from a
+  feature branch fails its build instead of changing the production schema.
+- **Previews:** every push to a pull request branch. The same build step
+  migrates the preview database in the schema `pr_<number>` (branch name
+  without a pull request: `br_<name>`), the function serves from that
+  schema, and nothing is shared between previews except the database's
+  extensions in `public`. See the configuration guide on Postgres schemas.
+- **Startup never migrates:** the function starts the server without
+  `--migrate` and refuses one.
 
-The workflow is one job, in order: `go build` of the commit (a migrator
-binary, the embedded UI placeholders are irrelevant for it), `nextgen
-migrate` against the production database, `vercel deploy --prod` (Vercel
-compiles the server and builds the five other services), smoke test. A
-failed migration stops the deploy. The workflow writes the commit into
-`apps/cloud/commit.txt` so the build script can stamp it into the
-binary; CLI deploys without the file report `local`.
-
-`migrate` is idempotent: on a docs-only merge it connects, finds nothing
+`migrate` is idempotent: on a docs-only push it connects, finds nothing
 pending and exits. Only commits that add migrations apply something, and
 every migration must be expand/contract: the previous deployment keeps
-serving until the new one is promoted, and a rollback promotes an older
-deployment on the newer schema.
+serving until the new one is live, and a rollback promotes an older
+deployment on the newer schema. The build script stamps version, commit and
+date into the binary (`VERCEL_GIT_COMMIT_SHA` is not used; `apps/cloud/commit.txt`
+is only written by manual deploys).
 
 All services are rebuilt on every deploy. The Go step downloads the
-toolchain and the modules each time and still takes well under a minute;
-the whole deployment is bounded by the UI builds (about 2.5 minutes on
-2026-10-08, against 6 to 7 minutes with the earlier container build).
+toolchain and the modules each time and still takes well under a minute
+plus the migration run; the whole deployment is bounded by the UI builds
+(about 2.5 minutes on 2026-10-08, against 6 to 7 minutes with the earlier
+container build).
 
 ### Manual and staged deploys
 
-A `vercel deploy` from a workstation builds exactly the checked-out tree,
-**without migrating**. That is fine for UI, docs, storybook and website
-changes and wrong for a server change that ships a migration: run the
-migration first (`go build -o /tmp/nextgen . && NEXTGEN_DATABASE_POSTGRES=…
-/tmp/nextgen migrate` with the migrator role), or let the workflow do it.
+A `vercel deploy` from a workstation builds exactly the checked-out tree
+and migrates like any other build: a preview deploy migrates the schema of
+the local branch (`br_<name>`, or `pr_<n>` when the branch has a pull
+request), a `--prod` deploy migrates production only when the local branch
+is `main`. Write `git rev-parse HEAD > apps/cloud/commit.txt` first so the
+binary reports the commit.
 
 The serving function refuses `--migrate` (see `apps/cloud/launcher`), so
-no deploy of any kind can change the schema by starting; only an explicit
-migrate run can.
+no deploy of any kind can change the schema by starting; only the build
+step's explicit migrate run can.
 
 ### Rollback
 
