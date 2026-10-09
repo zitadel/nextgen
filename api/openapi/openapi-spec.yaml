@@ -53,8 +53,10 @@ tags:
       never resource content, which stays with the per-kind endpoints.
 
       A release is built from revision ids or from the resources as authored
-      on disk. Assembling a release does not deploy it: the same release can
-      later be run on any number of targets unchanged.
+      on disk, is addressed by its `rel_` id, and is looked up by its content
+      digest where a field names one. Assembling a release does not deploy
+      it: the same release can later be run on any number of targets
+      unchanged.
   - name: Environments
     description: |
       Endpoints for a project's runtime slots (ADR 035). Identity only:

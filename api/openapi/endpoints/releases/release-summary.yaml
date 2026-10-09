@@ -9,6 +9,7 @@ type: object
 required:
   - id
   - project_id
+  - content_hash
   - metadata
 properties:
   id:
@@ -19,6 +20,10 @@ properties:
     readOnly: true
     description: The project this release belongs to.
     $ref: ../../components/schemas/project-id.yaml
+  content_hash:
+    readOnly: true
+    description: The digest of the pinned set.
+    $ref: ../../components/schemas/release-content-hash.yaml
   metadata:
     readOnly: true
     $ref: release-metadata.yaml

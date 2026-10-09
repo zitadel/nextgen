@@ -10593,6 +10593,17 @@ func (s *Release) Validate() error {
 		})
 	}
 	if err := func() error {
+		if err := s.ContentHash.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "content_hash",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.Metadata.Validate(); err != nil {
 			return err
 		}
@@ -10641,6 +10652,26 @@ func (s *Release) Validate() error {
 	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s ReleaseContentHash) Validate() error {
+	alias := (string)(s)
+	if err := (validate.String{
+		MinLength:     71,
+		MinLengthSet:  true,
+		MaxLength:     71,
+		MaxLengthSet:  true,
+		Email:         false,
+		Hostname:      false,
+		Regex:         regexMap["^sha256:[0-9a-f]{64}$"],
+		MinNumeric:    0,
+		MinNumericSet: false,
+		MaxNumeric:    0,
+		MaxNumericSet: false,
+	}).Validate(string(alias)); err != nil {
+		return errors.Wrap(err, "string")
 	}
 	return nil
 }
@@ -10996,6 +11027,17 @@ func (s *ReleaseSummary) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.ContentHash.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "content_hash",
 			Error: err,
 		})
 	}

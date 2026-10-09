@@ -92,9 +92,10 @@ func (h *Handler) ListReleases(ctx context.Context, params api.ListReleasesParam
 	resp := api.ListReleasesResponse{Releases: make([]api.ReleaseSummary, len(result.Items))}
 	for i, entity := range result.Items {
 		resp.Releases[i] = api.ReleaseSummary{
-			ID:        api.ReleaseID(entity.ID),
-			ProjectID: api.ProjectID(entity.ProjectID),
-			Metadata:  toAPIReleaseMetadata(entity),
+			ID:          api.ReleaseID(entity.ID),
+			ProjectID:   api.ProjectID(entity.ProjectID),
+			ContentHash: toAPIReleaseContentHash(entity.ContentHash),
+			Metadata:    toAPIReleaseMetadata(entity),
 		}
 	}
 	if result.NextPageToken != "" {
@@ -104,6 +105,14 @@ func (h *Handler) ListReleases(ctx context.Context, params api.ListReleasesParam
 }
 
 /* ---------------- CONVERTERS ---------------- */
+
+// releaseContentHashWirePrefix names the digest algorithm on the wire. The
+// store keeps the bare hex; the prefix is added here and stripped here.
+const releaseContentHashWirePrefix = "sha256:"
+
+func toAPIReleaseContentHash(hash string) api.ReleaseContentHash {
+	return api.ReleaseContentHash(releaseContentHashWirePrefix + hash)
+}
 
 // toAPICreateReleaseResponse pairs the release with one entry per pointer.
 // The pointer form never allocates a revision, so every entry reads
@@ -134,10 +143,11 @@ func toAPIRelease(entity *domain.Release) api.Release {
 		}
 	}
 	return api.Release{
-		ID:        api.ReleaseID(entity.ID),
-		ProjectID: api.ProjectID(entity.ProjectID),
-		Metadata:  toAPIReleaseMetadata(entity),
-		Pointers:  pointers,
+		ID:          api.ReleaseID(entity.ID),
+		ProjectID:   api.ProjectID(entity.ProjectID),
+		ContentHash: toAPIReleaseContentHash(entity.ContentHash),
+		Metadata:    toAPIReleaseMetadata(entity),
+		Pointers:    pointers,
 	}
 }
 

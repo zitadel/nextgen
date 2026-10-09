@@ -7203,6 +7203,14 @@ func decodeListMyProjectsParams(args [0]string, argsEscaped bool, r *http.Reques
 type ListReleasesParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
+	// Narrows the list to the release with this content digest, given in full
+	// with its `sha256:` prefix. A project holds at most one release per digest,
+	// so the result has one entry or none.
+	// A digest no release of the project carries answers an empty list, not an
+	// error: the filter asks which release has this content, and "none" is a
+	// valid answer. Paths never take a digest; read the matched entry's `id`
+	// and use that.
+	ContentHash OptReleaseContentHash `json:",omitempty,omitzero"`
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
 	// Token for fetching the next page of results.
@@ -7219,6 +7227,15 @@ func unpackListReleasesParams(packed middleware.Parameters) (params ListReleases
 			In:   "query",
 		}
 		params.ProjectID = packed[key].(ProjectID)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "content_hash",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.ContentHash = v.(OptReleaseContentHash)
+		}
 	}
 	{
 		key := middleware.ParameterKey{
@@ -7290,6 +7307,69 @@ func decodeListReleasesParams(args [0]string, argsEscaped bool, r *http.Request)
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "project_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: content_hash.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "content_hash",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotContentHashVal ReleaseContentHash
+				if err := func() error {
+					var paramsDotContentHashValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotContentHashValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotContentHashVal = ReleaseContentHash(paramsDotContentHashValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ContentHash.SetTo(paramsDotContentHashVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.ContentHash.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "content_hash",
 			In:   "query",
 			Err:  err,
 		}
