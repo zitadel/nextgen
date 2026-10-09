@@ -20,7 +20,7 @@ function base64url(buf: Buffer): string {
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
-const publicKeyJwk = publicKey.export({ type: "spki", format: "jwk" }) as Record<string, unknown>;
+const publicKeyJwk = publicKey.export({ format: "jwk" }) as Record<string, unknown>;
 
 let kidCounter = 0;
 function nextKid(): string {
@@ -81,8 +81,8 @@ function makeEvent(
   opts: MakeEventOptions = {},
 ): { event: RequestEvent; resolve: ReturnType<typeof vi.fn> } {
   const headers: Record<string, string> = { ...(opts.headers ?? {}) };
-  if (opts.cookie) headers["cookie"] = opts.cookie;
-  if (opts.authorization) headers["authorization"] = opts.authorization;
+  if (opts.cookie) headers.cookie = opts.cookie;
+  if (opts.authorization) headers.authorization = opts.authorization;
 
   const request = new Request(url, { method: opts.method ?? "GET", headers });
   const cookies = makeCookieJar(opts.cookie);
@@ -172,7 +172,13 @@ describe("createNextgenHandle", () => {
     expect(res.status).toBe(200);
     expect(event.locals.nextgenAuth).toEqual({
       isAuthenticated: true,
-      session: { userId: "user-sk", email: "sk@example.com", name: null, token },
+      session: {
+        userId: "user-sk",
+        identifier: "sk@example.com",
+        identifierProperty: null,
+        display: null,
+        token,
+      },
     });
   });
 

@@ -206,6 +206,7 @@ describe("NextPatcher.artifacts", () => {
       "app/register/page.tsx",
       "app/profile/page.tsx",
       "middleware.ts",
+      "custom-elements.d.ts",
     ]);
     expect(artifacts.rootConfigFiles).toEqual(["zitadel.json"]);
     expect(artifacts.directories).toEqual([".zitadel"]);

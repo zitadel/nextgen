@@ -14,10 +14,10 @@ function ctx(appDir = "src"): PatchContext {
     rendererId: "solid",
     project: {
       id: "proj-1",
-      projectSecret: "sk_full",
-      previewSecret: "sk_preview",
-      previewOrigins: [],
-      createdAt: "2026-01-01T00:00:00.000Z",
+      project_secret: "sk_full",
+      preview_secret: "sk_preview",
+      preview_origins: [],
+      created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:3000",
     server: "https://api.zitadel.cloud",
@@ -60,7 +60,10 @@ describe("SolidStartPatcher.plan", () => {
     );
     expect(envOp?.entries).toMatchObject({ VITE_ZITADEL_PROJECT_ID: "proj-1" });
 
-    const edit = plan.ops.find((op): op is Extract<FileOp, { kind: "edit" }> => op.kind === "edit");
+    const edit = plan.ops.find(
+      (op): op is Extract<FileOp, { kind: "edit" }> =>
+        op.kind === "edit" && String(op.path).includes("vite.config"),
+    );
     expect(edit?.path).toContain("vite.config.ts");
   });
 

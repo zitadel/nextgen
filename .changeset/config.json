@@ -23,6 +23,10 @@
       "@zitadel/sdk-solid",
       "@zitadel/sdk-svelte",
       "@zitadel/sdk-qwik",
+      "@zitadel/sdk-sveltekit",
+      "@zitadel/sdk-solid-start",
+      "@zitadel/sdk-qwik-city",
+      "@zitadel/sdk-tanstack-start",
       "@zitadel/testing"
     ]
   ],

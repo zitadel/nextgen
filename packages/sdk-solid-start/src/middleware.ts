@@ -10,6 +10,14 @@ import {
 import { verifyJwt, base64UrlDecode } from "./lib/jwt";
 
 /**
+ * `process` is undefined in some edge/serverless runtimes; read env defensively
+ * so omitting `url`/`projectSecret` falls back to the default instead of throwing
+ * a ReferenceError.
+ */
+const PROCESS_ENV: Record<string, string | undefined> =
+  typeof process !== "undefined" && process.env ? process.env : {};
+
+/**
  * The slice of SolidStart's `FetchEvent` this middleware reads. SolidStart (and
  * its Vinxi/Nitro substrate) is not a dependency of this package — typing the
  * handful of fields we touch keeps the install light and resilient to the
@@ -31,7 +39,7 @@ export interface SolidFetchEvent {
  * `createMiddleware` call required.
  */
 export interface SolidMiddlewareConfig {
-  readonly onRequest: ReadonlyArray<(event: SolidFetchEvent) => Promise<Response | void>>;
+  readonly onRequest: ReadonlyArray<(event: SolidFetchEvent) => Promise<Response | undefined>>;
 }
 
 /**
@@ -199,7 +207,7 @@ async function handleAuth(
   event: SolidFetchEvent,
   url2: URL,
   opts: AuthHandlerOptions,
-): Promise<Response | void> {
+): Promise<Response | undefined> {
   const {
     url,
     protectedRoutes,
@@ -244,8 +252,9 @@ async function handleAuth(
       isAuthenticated: true,
       session: {
         userId: payload.sub,
-        email: payload.email ?? null,
-        name: payload.name ?? null,
+        identifier: payload.email ?? null,
+        identifierProperty: null,
+        display: payload.name ?? null,
         token,
       },
     };
@@ -259,8 +268,9 @@ async function handleAuth(
         isAuthenticated: true,
         session: {
           userId: opaqueResult.userId ?? "unknown",
-          email: null,
-          name: null,
+          identifier: null,
+          identifierProperty: null,
+          display: null,
           token: cookieToken,
         },
       };
@@ -281,6 +291,9 @@ async function handleAuth(
     }
     return new Response(null, { status: 302, headers });
   }
+
+  // Unprotected route with no session: continue the SolidStart pipeline.
+  return undefined;
 }
 
 /**
@@ -311,7 +324,7 @@ export function createNextgenMiddleware(
   options: NextgenMiddlewareOptions & { projectSecret?: string } = {},
 ): SolidMiddlewareConfig {
   const {
-    url = process.env.ZITADEL_URL ?? "http://localhost:8080",
+    url = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
     proxyPath = "/__nextgen",
     protectedRoutes = [],
     ignoredRoutes = [],
@@ -323,7 +336,7 @@ export function createNextgenMiddleware(
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
-    projectSecret = process.env.ZITADEL_PROJECT_SECRET,
+    projectSecret = PROCESS_ENV.ZITADEL_PROJECT_SECRET,
   } = options;
 
   // Guard against open-redirect: loginPath must be a relative path.
@@ -335,7 +348,7 @@ export function createNextgenMiddleware(
     );
   }
 
-  const onRequest = async (event: SolidFetchEvent): Promise<Response | void> => {
+  const onRequest = async (event: SolidFetchEvent): Promise<Response | undefined> => {
     const url2 = new URL(event.request.url);
     const { pathname } = url2;
 

@@ -36,9 +36,7 @@ describe("QwikCityDetector", () => {
 
   it("returns null for a bare Qwik SPA (no @builder.io/qwik-city)", async () => {
     expect(
-      await new QwikCityDetector().detect(
-        await project({ "@builder.io/qwik": "^1", vite: "^5" }),
-      ),
+      await new QwikCityDetector().detect(await project({ "@builder.io/qwik": "^1", vite: "^5" })),
     ).toBeNull();
   });
 

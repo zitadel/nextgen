@@ -20,7 +20,7 @@ function base64url(buf: Buffer): string {
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
-const publicKeyJwk = publicKey.export({ type: "spki", format: "jwk" }) as Record<string, unknown>;
+const publicKeyJwk = publicKey.export({ format: "jwk" }) as Record<string, unknown>;
 
 let kidCounter = 0;
 function nextKid(): string {
@@ -55,8 +55,8 @@ interface MakeEventOptions {
 
 function makeEvent(url: string, opts: MakeEventOptions = {}): SolidFetchEvent {
   const headers: Record<string, string> = { ...(opts.headers ?? {}) };
-  if (opts.cookie) headers["cookie"] = opts.cookie;
-  if (opts.authorization) headers["authorization"] = opts.authorization;
+  if (opts.cookie) headers.cookie = opts.cookie;
+  if (opts.authorization) headers.authorization = opts.authorization;
   return {
     request: new Request(url, { method: opts.method ?? "GET", headers }),
     locals: {},
@@ -67,7 +67,7 @@ function makeEvent(url: string, opts: MakeEventOptions = {}): SolidFetchEvent {
 function onRequest(
   config: ReturnType<typeof createNextgenMiddleware>,
   event: SolidFetchEvent,
-): Promise<Response | void> {
+): Promise<Response | undefined> {
   return config.onRequest[0]!(event);
 }
 
@@ -130,7 +130,13 @@ describe("createNextgenMiddleware (SolidStart)", () => {
     expect(res).toBeUndefined();
     expect(event.locals.nextgenAuth).toEqual({
       isAuthenticated: true,
-      session: { userId: "user-ss", email: "ss@example.com", name: null, token },
+      session: {
+        userId: "user-ss",
+        identifier: "ss@example.com",
+        identifierProperty: null,
+        display: null,
+        token,
+      },
     });
   });
 

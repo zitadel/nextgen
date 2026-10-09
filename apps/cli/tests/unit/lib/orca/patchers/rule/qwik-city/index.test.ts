@@ -14,10 +14,10 @@ function ctx(appDir = "src"): PatchContext {
     rendererId: "qwik",
     project: {
       id: "proj-1",
-      projectSecret: "sk_full",
-      previewSecret: "sk_preview",
-      previewOrigins: [],
-      createdAt: "2026-01-01T00:00:00.000Z",
+      project_secret: "sk_full",
+      preview_secret: "sk_preview",
+      preview_origins: [],
+      created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:5173",
     server: "https://api.zitadel.cloud",
@@ -61,7 +61,13 @@ describe("QwikCityPatcher.plan", () => {
         "PUBLIC_ZITADEL_PROJECT_ID" in op.entries,
     );
     expect(envOp?.entries).toMatchObject({ PUBLIC_ZITADEL_PROJECT_ID: "proj-1" });
-    expect(plan.ops.some((op) => op.kind === "edit")).toBe(false);
+    // baseOps adds AGENTS.md/README.md guidance edits to every plan; assert no
+    // framework CONFIG edit beyond those.
+    expect(
+      plan.ops.some(
+        (op) => op.kind === "edit" && !["AGENTS.md", "README.md"].includes(String(op.path)),
+      ),
+    ).toBe(false);
   });
 
   it("adds both SDKs as devDependencies at the CLI's prerelease tag", () => {

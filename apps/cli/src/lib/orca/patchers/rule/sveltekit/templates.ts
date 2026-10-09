@@ -4,8 +4,7 @@ import { PROXY_PATH } from "../proxy";
 
 // Enforce the dark surface the Zitadel widgets are designed for, so pages never
 // follow the OS light/dark setting.
-const WIDGET_WRAP =
-  "position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark";
+const WIDGET_WRAP = "position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark";
 
 /**
  * `src/hooks.server.ts` — the SvelteKit server hook. `createNextgenHandle`

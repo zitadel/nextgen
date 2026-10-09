@@ -10,6 +10,14 @@ import {
 import { verifyJwt, base64UrlDecode } from "./lib/jwt";
 
 /**
+ * `process` is undefined in some edge/serverless runtimes; read env defensively
+ * so omitting `url`/`projectSecret` falls back to the default instead of throwing
+ * a ReferenceError.
+ */
+const PROCESS_ENV: Record<string, string | undefined> =
+  typeof process !== "undefined" && process.env ? process.env : {};
+
+/**
  * The decision produced by {@link handleNextgenRequest}: either a ready-to-send
  * `Response` (proxy or login redirect) or an instruction to continue the request
  * with the resolved {@link AuthResult} attached to the router context.
@@ -166,7 +174,7 @@ export async function handleNextgenRequest(
   options: NextgenRequestOptions = {},
 ): Promise<NextgenRequestDecision> {
   const {
-    url = process.env.ZITADEL_URL ?? "http://localhost:8080",
+    url = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
     proxyPath = "/__nextgen",
     protectedRoutes = [],
     ignoredRoutes = [],
@@ -178,7 +186,7 @@ export async function handleNextgenRequest(
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
-    projectSecret = process.env.ZITADEL_PROJECT_SECRET,
+    projectSecret = PROCESS_ENV.ZITADEL_PROJECT_SECRET,
     clientAddress,
   } = options;
 
@@ -236,8 +244,9 @@ export async function handleNextgenRequest(
         isAuthenticated: true,
         session: {
           userId: payload.sub,
-          email: payload.email ?? null,
-          name: payload.name ?? null,
+          identifier: payload.email ?? null,
+          identifierProperty: null,
+          display: payload.name ?? null,
           token,
         },
       },
@@ -253,8 +262,9 @@ export async function handleNextgenRequest(
           isAuthenticated: true,
           session: {
             userId: opaqueResult.userId ?? "unknown",
-            email: null,
-            name: null,
+            identifier: null,
+            identifierProperty: null,
+            display: null,
             token: cookieToken,
           },
         },

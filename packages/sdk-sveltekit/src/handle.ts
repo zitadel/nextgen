@@ -10,6 +10,14 @@ import {
 
 import { verifyJwt, base64UrlDecode } from "./lib/jwt";
 
+/**
+ * `process` is undefined in some edge/serverless runtimes; read env defensively
+ * so omitting `url`/`projectSecret` falls back to the default instead of throwing
+ * a ReferenceError.
+ */
+const PROCESS_ENV: Record<string, string | undefined> =
+  typeof process !== "undefined" && process.env ? process.env : {};
+
 declare global {
   // SvelteKit reads `App.Locals` to type `event.locals`. Declaring the
   // interface here merges `nextgenAuth` into the consumer's own `App.Locals`
@@ -175,7 +183,12 @@ async function validateOpaqueSessionToken(
   token: string,
   issuerUrl: string,
   timeoutMs: number,
-): Promise<{ userId?: string } | null> {
+): Promise<{
+  userId?: string;
+  identifier: string | null;
+  identifierProperty: string | null;
+  display: string | null;
+} | null> {
   try {
     const res = await fetch(`${issuerUrl}/sessions/me`, {
       method: "GET",
@@ -183,8 +196,16 @@ async function validateOpaqueSessionToken(
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) return null;
-    const body = (await res.json()) as { user_id?: string };
-    return { userId: body.user_id };
+    const body = (await res.json()) as {
+      user_id?: string;
+      user?: { identifier?: string; identifier_property?: string; display?: string };
+    };
+    return {
+      userId: body.user_id,
+      identifier: body.user?.identifier ?? null,
+      identifierProperty: body.user?.identifier_property ?? null,
+      display: body.user?.display ?? null,
+    };
   } catch {
     return null;
   }
@@ -280,8 +301,9 @@ async function handleAuth(
       isAuthenticated: true,
       session: {
         userId: payload.sub,
-        email: payload.email ?? null,
-        name: payload.name ?? null,
+        identifier: payload.email ?? null,
+        identifierProperty: null,
+        display: payload.name ?? null,
         token,
       },
     };
@@ -299,8 +321,9 @@ async function handleAuth(
         isAuthenticated: true,
         session: {
           userId: opaqueResult.userId ?? "unknown",
-          email: null,
-          name: null,
+          identifier: opaqueResult.identifier,
+          identifierProperty: opaqueResult.identifierProperty,
+          display: opaqueResult.display,
           token: cookieToken,
         },
       };
@@ -362,7 +385,7 @@ export function createNextgenHandle(
   options: NextgenMiddlewareOptions & { projectSecret?: string } = {},
 ): Handle {
   const {
-    url = process.env.ZITADEL_URL ?? "http://localhost:8080",
+    url = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
     proxyPath = "/__nextgen",
     protectedRoutes = [],
     ignoredRoutes = [],
@@ -374,7 +397,7 @@ export function createNextgenHandle(
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
-    projectSecret = process.env.ZITADEL_PROJECT_SECRET,
+    projectSecret = PROCESS_ENV.ZITADEL_PROJECT_SECRET,
   } = options;
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute

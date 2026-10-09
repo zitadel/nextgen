@@ -10,6 +10,14 @@ import {
 import { verifyJwt, base64UrlDecode } from "./lib/jwt";
 
 /**
+ * `process` is undefined in some edge/serverless runtimes; read env defensively
+ * so the `process.env` fallback never throws a ReferenceError (Qwik City's
+ * `ev.env` is the primary source).
+ */
+const PROCESS_ENV: Record<string, string | undefined> =
+  typeof process !== "undefined" && process.env ? process.env : {};
+
+/**
  * The slice of Qwik City's `RequestEventCommon` this handler reads. Qwik City
  * (and Qwik 1.x, which peers Vite `>=5 <8`) is not a dependency of this package
  * — typing the handful of fields we touch keeps the package on the workspace's
@@ -238,8 +246,9 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
       isAuthenticated: true,
       session: {
         userId: payload.sub,
-        email: payload.email ?? null,
-        name: payload.name ?? null,
+        identifier: payload.email ?? null,
+        identifierProperty: null,
+        display: payload.name ?? null,
         token,
       },
     } satisfies AuthResult);
@@ -253,8 +262,9 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
         isAuthenticated: true,
         session: {
           userId: opaqueResult.userId ?? "unknown",
-          email: null,
-          name: null,
+          identifier: null,
+          identifierProperty: null,
+          display: null,
           token: cookieToken,
         },
       } satisfies AuthResult);
@@ -337,11 +347,11 @@ export function createNextgenOnRequest(
     // not surface `.env` files on `process.env`, so a factory-time read would
     // miss them and the proxy would fall back to :8080 ("fetch failed").
     const url =
-      urlOption ?? ev.env?.get("ZITADEL_URL") ?? process.env.ZITADEL_URL ?? "http://localhost:8080";
+      urlOption ?? ev.env?.get("ZITADEL_URL") ?? PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080";
     const projectSecret =
       projectSecretOption ??
       ev.env?.get("ZITADEL_PROJECT_SECRET") ??
-      process.env.ZITADEL_PROJECT_SECRET;
+      PROCESS_ENV.ZITADEL_PROJECT_SECRET;
 
     if (matchesRoutes(pathname, ignoredRoutes)) {
       return;

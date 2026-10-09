@@ -1,0 +1,27 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    // Qwik City (Qwik 1.x) JSX runtime. Preserved from the package's prior
+    // config so a consuming app's `.tsx` resolves the Qwik factory; the source
+    // here is `.ts`-only today but the setting keeps the SDK Qwik-authorable.
+    "jsx": "react-jsx",
+    "jsxImportSource": "@builder.io/qwik",
+    // tsup's dts step (rollup-plugin-dts) sets the deprecated `baseUrl` itself,
+    // which TypeScript 6 rejects with TS5101 unless deprecations are ignored.
+    "ignoreDeprecations": "6.0",
+    "declaration": true,
+    "declarationMap": true
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": [
+    "src/**/*.spec.ts",
+    "src/**/*.spec.tsx",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**",
+    "src/test-setup.ts"
+  ]
+}

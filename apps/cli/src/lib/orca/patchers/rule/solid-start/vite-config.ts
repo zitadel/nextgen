@@ -21,9 +21,13 @@ const MIDDLEWARE_PATH = "./src/middleware.ts";
 export function solidStartConfigEdit(): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
-      throw new ZitadelError("E_VALIDATION", "Cannot edit the SolidStart Vite config: file not found", {
-        hint: "Run setup from a SolidStart project that has a vite.config.ts.",
-      });
+      throw new ZitadelError(
+        "E_VALIDATION",
+        "Cannot edit the SolidStart Vite config: file not found",
+        {
+          hint: "Run setup from a SolidStart project that has a vite.config.ts.",
+        },
+      );
     }
 
     const callIndex = source.indexOf("solidStart(");
@@ -31,7 +35,9 @@ export function solidStartConfigEdit(): (source: string | undefined) => string {
       throw new ZitadelError(
         "E_VALIDATION",
         "Cannot wire middleware: no solidStart() plugin call found in the Vite config",
-        { hint: "Ensure vite.config.ts registers the solidStart() plugin from @solidjs/start/config." },
+        {
+          hint: "Ensure vite.config.ts registers the solidStart() plugin from @solidjs/start/config.",
+        },
       );
     }
 
@@ -63,7 +69,9 @@ export function solidStartConfigEdit(): (source: string | undefined) => string {
       throw new ZitadelError(
         "E_VALIDATION",
         "Cannot wire middleware: solidStart() is called with a non-object argument",
-        { hint: "Pass an options object to solidStart(), e.g. solidStart({ middleware: \"./src/middleware.ts\" })." },
+        {
+          hint: 'Pass an options object to solidStart(), e.g. solidStart({ middleware: "./src/middleware.ts" }).',
+        },
       );
     }
 

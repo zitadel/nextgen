@@ -1,7 +1,12 @@
 import { defineConfig } from "vitest/config";
 
+import { baseTest } from "../../vitest.shared.mjs";
+
 export default defineConfig({
+  cacheDir: ".vitest",
   test: {
-    globals: true,
+    ...baseTest,
+    name: "@zitadel/sdk-qwik-city",
+    environment: "node",
   },
 });

@@ -16,7 +16,7 @@ import { base64UrlDecode, decodeJwt, verifyJwt } from "../../lib/jwt";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const PRIVATE_KEY_PEM = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
-const PUBLIC_KEY_JWK = publicKey.export({ type: "spki", format: "jwk" }) as JsonWebKey;
+const PUBLIC_KEY_JWK = publicKey.export({ format: "jwk" }) as JsonWebKey;
 
 let kidCounter = 0;
 function nextKid(): string {

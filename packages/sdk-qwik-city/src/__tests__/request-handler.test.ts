@@ -21,7 +21,7 @@ function base64url(buf: Buffer): string {
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
-const publicKeyJwk = publicKey.export({ type: "spki", format: "jwk" }) as Record<string, unknown>;
+const publicKeyJwk = publicKey.export({ format: "jwk" }) as Record<string, unknown>;
 
 let kidCounter = 0;
 function nextKid(): string {
@@ -55,10 +55,12 @@ interface MakeEventOptions {
 }
 
 class RedirectMarker {
-  constructor(
-    readonly status: number,
-    readonly url: string,
-  ) {}
+  readonly status: number;
+  readonly url: string;
+  constructor(status: number, url: string) {
+    this.status = status;
+    this.url = url;
+  }
 }
 
 interface Harness {
@@ -70,8 +72,8 @@ interface Harness {
 
 function makeHarness(url: string, opts: MakeEventOptions = {}): Harness {
   const headers: Record<string, string> = { ...(opts.headers ?? {}) };
-  if (opts.cookie) headers["cookie"] = opts.cookie;
-  if (opts.authorization) headers["authorization"] = opts.authorization;
+  if (opts.cookie) headers.cookie = opts.cookie;
+  if (opts.authorization) headers.authorization = opts.authorization;
 
   const jar = new Map<string, string>();
   if (opts.cookie) {
@@ -177,7 +179,13 @@ describe("createNextgenOnRequest (Qwik City)", () => {
     expect(h.redirected).toBeUndefined();
     expect(getAuth(h.ev)).toEqual({
       isAuthenticated: true,
-      session: { userId: "user-qc", email: "qc@example.com", name: null, token },
+      session: {
+        userId: "user-qc",
+        identifier: "qc@example.com",
+        identifierProperty: null,
+        display: null,
+        token,
+      },
     });
   });
 

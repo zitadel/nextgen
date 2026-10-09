@@ -20,7 +20,7 @@ describe("solidStartConfigEdit", () => {
   });
 
   it("merges middleware into an existing solidStart({ ... }) options object", () => {
-    const source = BARE.replace("solidStart()", 'solidStart({ ssr: true })');
+    const source = BARE.replace("solidStart()", "solidStart({ ssr: true })");
     const out = edit(source);
     expect(out).toContain('middleware: "./src/middleware.ts"');
     expect(out).toContain("ssr: true");
