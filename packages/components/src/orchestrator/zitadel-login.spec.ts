@@ -170,8 +170,8 @@ describe("<zitadel-login> against the typed Flow API", () => {
       element.shadowRoot?.querySelector<ZlField>(`zl-field[name="${PASSWORD_FIELD}"]`),
     );
     expect(field.passwordToggle).toBe(true);
-    expect(field.showPasswordLabel).toBe("Show password");
-    expect(field.hidePasswordLabel).toBe("Hide password");
+    expect(field.showPasswordLabel).toBe("Show");
+    expect(field.hidePasswordLabel).toBe("Hide");
     // The choice is applied to the field, never written into the markup.
     expect(field.hasAttribute("password-toggle")).toBe(false);
   });

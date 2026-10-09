@@ -204,7 +204,7 @@ describe("<zl-field> password toggle", () => {
     });
     const actions = field.shadowRoot?.querySelectorAll('[part~="trailing-action"]') ?? [];
     expect(actions).toHaveLength(1);
-    expect(actions[0]?.getAttribute("aria-label")).toBe("Show password");
+    expect(actions[0]?.getAttribute("aria-label")).toBe("Show");
   });
 
   it("keeps the toggle in the error state instead of the alert icon", async () => {
@@ -237,6 +237,18 @@ describe("<zl-field> password toggle", () => {
     await field.updateComplete;
     expect(input(field).type).toBe("password");
     expect(toggle(field)!.getAttribute("aria-label")).toBe("Anzeigen");
+  });
+
+  it("keeps the toggle's name free of the field label, describing it instead", async () => {
+    const field = await mount(`<zl-field name="pw" type="password" label="Password"></zl-field>`, {
+      passwordToggle: true,
+    });
+    const button = toggle(field)!;
+    // Substring label lookups for "Password" must resolve to the input alone.
+    expect(button.getAttribute("aria-label")?.toLowerCase()).not.toContain("password");
+    const describedBy = button.getAttribute("aria-describedby") ?? "";
+    expect(field.shadowRoot?.getElementById(describedBy)?.textContent).toContain("Password");
+    expect(button.getAttribute("aria-controls")).toBe(input(field).id);
   });
 
   it("opts the input out of spellcheck and autocorrect", async () => {

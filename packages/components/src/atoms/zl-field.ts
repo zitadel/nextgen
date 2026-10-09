@@ -83,8 +83,14 @@ export class ZlField extends FormAtom {
    * template nor markup decides it.
    */
   @property({ attribute: false }) accessor passwordToggle = false;
-  @property({ attribute: false }) accessor showPasswordLabel = "Show password";
-  @property({ attribute: false }) accessor hidePasswordLabel = "Hide password";
+  /**
+   * The toggle's accessible name. Deliberately without "password": label
+   * lookups (`getByLabel("Password")`, agents reading the accessibility tree)
+   * match by substring, and a "Show password" button would make the field
+   * ambiguous. The button points at the field's label for that context.
+   */
+  @property({ attribute: false }) accessor showPasswordLabel = "Show";
+  @property({ attribute: false }) accessor hidePasswordLabel = "Hide";
   @property({ type: Boolean }) accessor required = false;
   @property({ type: Boolean, reflect: true }) accessor invalid = false;
 
@@ -167,7 +173,7 @@ export class ZlField extends FormAtom {
     const trailing = !showDefaultTrailing
       ? null
       : passwordToggle
-        ? this.renderPasswordToggle()
+        ? this.renderPasswordToggle(this.label ? labelId : undefined)
         : this.renderTrailingIcon();
     // A revealed password is a `type="text"` input, which browsers hand to
     // spellcheck and autocorrect — and "enhanced" spellcheck sends the text to
@@ -294,7 +300,7 @@ export class ZlField extends FormAtom {
     `;
   }
 
-  private renderPasswordToggle() {
+  private renderPasswordToggle(labelId: string | undefined) {
     const label = this.revealed ? this.hidePasswordLabel : this.showPasswordLabel;
     return html`
       <span class="zr-field__trailing zr-field__trailing--toggle" part="trailing-icon">
@@ -304,6 +310,8 @@ export class ZlField extends FormAtom {
           part="trailing-action password-toggle"
           aria-label=${label}
           aria-pressed=${this.revealed ? "true" : "false"}
+          aria-controls=${this.inputId}
+          aria-describedby=${ifDefined(labelId)}
           title=${label}
           tabindex="-1"
           @click=${this.handlePasswordToggle}
