@@ -424,6 +424,69 @@ rather than an application one. After raising `max_connections` to 50 (a restart
   module download, compile, push) is the long pole again at six to seven
   minutes per deployment, against about 2.5 minutes with the Go runtime.
 
+## Cloudflare Containers spike (2026-10-08, night; removed 2026-10-09)
+
+Cloudflare shipped Worker Previews on 2026-09-22: every branch gets its own
+Durable Object namespace and container application, so the earlier
+objection (no per-PR server previews) fell. A spike on a branch
+(`apps/cloud/cloudflare/`: one Worker serving console, login and storybook
+as static assets and forwarding everything else to a fixed pool of two
+containers built from the repo-root `Dockerfile.vercel`) was deployed from
+a laptop and measured against the same preview database.
+
+Functionally it worked: the smoke API steps passed, 72 of 72 concurrent
+seeded creates answered 201 with no platform errors, and PgBouncer's
+server-side connections stayed flat at 8 because a fixed pool does not fan
+out. Latency did not:
+
+| warm, single request | Vercel container (`fra1`) | Cloudflare container |
+|---|---|---|
+| `GET /console/runtime.json` | 0.36 s | 0.35–0.52 s |
+| `POST /projects` seeded | 0.35 s | 1.8–2.2 s |
+| 24 concurrent seeded creates | 0.4–0.55 s each | 3–7.6 s each |
+
+The cause is placement. `constraints.regions` is region-level (WEUR,
+EEUR), Cloudflare starts a container near the first request's location,
+and the requests came from the US, so both instances ran in Madrid, 25–30
+ms from Frankfurt, times about sixty round trips per seeded create.
+Instance size (`basic` against `standard-2`) made no difference, and
+Hyperdrive is a Workers binding that does not reach a container running
+its own queries.
+
+Decision: stay on Vercel containers. Cloudflare wins on predictability (a
+fixed pool, no fan-out, no connection storms) and on previews; Vercel wins
+on sitting in `fra1` next to the database, and for an API that makes
+sixty round trips per write that is the number that matters. The spike
+was removed on 2026-10-09: Worker, container application and registry
+image deleted, schema `cf_spike` dropped, branch deleted. What would
+reopen it: city-level placement, or a Frankfurt location with the image
+pre-fetched.
+
+## What two days cost (2026-10-09)
+
+The usage page for 2026-10-07 and 2026-10-08 (about eight deployments plus
+the bursts above): build CPU minutes 18 h for $3.95, provisioned memory
+76 GB-h for $1.16, active CPU 45 min for $0.14. Two readings:
+
+- Builds are the line that scales with the team. Every deployment builds
+  all seven services on Elastic machines at $0.0035 per CPU-minute (wall
+  minutes times vCPUs), about $0.50 per push today. Levers not yet
+  applied: `ignoreCommand` per service (valid inside a service object) so
+  the UI, docs and website builds skip when their paths did not change,
+  and pinning the build machine if Elastic assigns Turbo to a pnpm build.
+- Memory is the keep-warm cron. 76 GB-h is one 2 GB instance for the time
+  since the first deploy: a container bills provisioned memory for its
+  whole lifetime, and the five-minute cron never lets production scale in.
+  That is about $22 a month for a warm server, the price of an always-on
+  instance elsewhere; Vercel is only cheaper while idle. The bursts
+  against previews (30 s scale-in) are rounding error.
+
+At 100 million requests a month the per-request fees dominate (CDN
+requests at $2.60 per million or the $300 Flat Rate tier, invocations at
+$0.60 per million): roughly $430 to $840 a month in `fra1` depending on
+how far Vercel fans out, against about $75 for three always-on 2 GB
+instances on Render. A preview-cloud price, not a product price.
+
 ## Regions (deferred, needs a buyer)
 
 Customer-chosen regions require a global layer. The cheapest version is
@@ -453,6 +516,12 @@ Nothing of this is needed for a single-region preview cloud.
   readiness endpoint (`/readyz` is constant today).
 - The smoke test back in the pipeline, as a Vercel check or a
   `deployment_status` action.
+- The three background loops the server starts (request audit buffer,
+  event retention, event shipper) assume one long-lived process. On Vercel
+  the process is paused between requests and every fan-out instance runs
+  them: retention degrades to purge-at-boot, and the shipper, if enabled,
+  would double-deliver because its cursor has no lease. Needs a
+  single-runner `tick` under an advisory lock, driven by the cron.
 - Where the dev-inbox and egress-policy defaults land for a shared host
   ([ADR 050](../../adrs/050-dev-inbox.md), [ADR 061](../../adrs/061-egress-policy-user-injectable-urls.md)),
   and whether the preview cloud ever flips a project to production mode.
