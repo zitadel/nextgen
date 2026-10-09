@@ -57,6 +57,19 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 		expectNotImplemented(t, resp)
 	})
 
+	t.Run("rollback", func(t *testing.T) {
+		resp, err := fixture.client.RollbackDeployment(t.Context(),
+			api.NewOptRollbackDeploymentRequest(api.RollbackDeploymentRequest{
+				Message: api.NewOptString("phone_number broke sign-up"),
+			}),
+			api.RollbackDeploymentParams{
+				ProjectID:    project,
+				DeploymentID: "dep_01KX4SB9C8E1F0N9WD3P2E4YM5",
+			})
+		require.NoError(t, err)
+		expectNotImplemented(t, resp)
+	})
+
 	t.Run("get", func(t *testing.T) {
 		resp, err := fixture.client.GetDeploymentById(t.Context(), api.GetDeploymentByIdParams{
 			ProjectID:    project,

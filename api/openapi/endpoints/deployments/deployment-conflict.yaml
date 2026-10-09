@@ -1,9 +1,8 @@
-title: CreateDeploymentConflict
+title: DeploymentConflict
 type: object
 description: |
-  The deployment conflicts with the state of the project: `dep.conflict`
-  when `expected_deployment_id` did not match, `rel.revoked` when the
-  release is revoked. Only `dep.conflict` carries `details`.
+  The deployment conflicts with the state of the project. Only
+  `dep.conflict`, a stale `expected_deployment_id`, carries `details`.
 required:
   - code
   - message

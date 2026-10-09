@@ -19,9 +19,9 @@ properties:
     example: add phone_number to human-user
   rollback_to:
     description: |
-      The earlier deployment this one re-applied, with its release and its
-      targets. Null for every other deployment, including one created with
-      `reason: rollback` by naming a release directly.
+      The deployment `POST /deployments/{deployment_id}/rollback` re-applied,
+      with its release and its targets. Null for every other deployment,
+      including one created by `POST /deployments` with `reason: rollback`.
     oneOf:
       - $ref: ../../components/schemas/deployment-id.yaml
       - type: 'null'

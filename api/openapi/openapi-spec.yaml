@@ -213,6 +213,8 @@ paths:
     $ref: endpoints/deployments/methods.yaml
   /deployments/{deployment_id}:
     $ref: endpoints/deployments/by_id/methods.yaml
+  /deployments/{deployment_id}/rollback:
+    $ref: endpoints/deployments/by_id/rollback/methods.yaml
   /previews:
     $ref: endpoints/previews/methods.yaml
   /previews/remove:
