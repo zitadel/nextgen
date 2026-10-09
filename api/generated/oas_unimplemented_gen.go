@@ -1034,6 +1034,33 @@ func (UnimplementedHandler) RevokeSession(ctx context.Context, params RevokeSess
 	return r, ht.ErrNotImplemented
 }
 
+// RollbackDeployment implements rollbackDeployment operation.
+//
+// Re-deploys the deployment named in the path: a new deployment with the
+// same `release_id` and the same `targets`, `reason: rollback`, and
+// `rollback_to` in its metadata naming the deployment it re-applied. The
+// variable values that deployment resolved are re-applied with it, so the
+// targets serve exactly what they served then. The history is append-only,
+// so the deployments in between stay in it.
+// Only a deployment to primary origins can be rolled back. One whose
+// targets were preview URLs answers `409` with `dep.invalid`; deploy to
+// the preview again instead. Every target must still be a primary origin
+// of the project: when one is not, the request answers `409` with
+// `dep.invalid` naming it, and nothing changes. There is no narrowing to
+// some of the targets: to roll back one origin, deploy the earlier
+// release to it with `POST /deployments`.
+// When every target already serves the deployment's release, nothing
+// changes and the call answers `200` with the newest deployment to the
+// targets.
+// The release must not be revoked: a revoked one answers `409` with
+// `rel.revoked`. An unknown deployment id, or one of another project,
+// answers `404` with `dep.not_found`.
+//
+// POST /deployments/{deployment_id}/rollback
+func (UnimplementedHandler) RollbackDeployment(ctx context.Context, req OptRollbackDeploymentRequest, params RollbackDeploymentParams) (r RollbackDeploymentRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // SetUserPassword implements setUserPassword operation.
 //
 // Set user password.

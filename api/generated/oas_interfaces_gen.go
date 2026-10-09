@@ -297,6 +297,10 @@ type RevokeSessionRes interface {
 	revokeSessionRes()
 }
 
+type RollbackDeploymentRes interface {
+	rollbackDeploymentRes()
+}
+
 type SetUserPasswordRes interface {
 	setUserPasswordRes()
 }

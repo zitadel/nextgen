@@ -281,6 +281,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	RevokeSessionOperation: []string{
 		"session.delete",
 	},
+	RollbackDeploymentOperation: []string{
+		"deployment.write",
+	},
 	SetUserPasswordOperation: []string{
 		"user.write",
 	},

@@ -1,0 +1,22 @@
+title: RollbackDeploymentRequest
+type: object
+description: |
+  What to record alongside the rollback. The release and the targets come
+  from the deployment named in the path and cannot be changed here.
+additionalProperties: false
+properties:
+  message:
+    type: string
+    maxLength: 1024
+    description: |
+      A short free-form summary of why the rollback happened. Recorded on
+      the new deployment's metadata.
+    example: phone_number broke sign-up
+  expected_deployment_id:
+    description: |
+      An optimistic-concurrency guard: the deployment the caller believes is
+      the newest one to any of the targets. When present, the rollback only
+      happens if it still is; otherwise the request answers `409` with
+      `dep.conflict`, carrying the actual newest deployment, and nothing
+      changes.
+    $ref: ../../../../components/schemas/deployment-id.yaml
