@@ -1,6 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 import { resolve } from "node:path";
-import { fastChromiumLaunchOptions } from "@zitadel/testing/playwright";
+import {
+  e2eActionTimeouts,
+  e2eTimeouts,
+  fastChromiumLaunchOptions,
+} from "@zitadel/testing/playwright";
 
 const workspaceRoot = resolve(import.meta.dirname, "../..");
 
@@ -14,9 +18,11 @@ const workspaceRoot = resolve(import.meta.dirname, "../..");
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
+  ...e2eTimeouts,
   testDir: "./src",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
+    ...e2eActionTimeouts,
     baseURL: "http://localhost:4173",
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "on-first-retry",

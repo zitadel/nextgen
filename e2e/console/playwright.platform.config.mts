@@ -1,7 +1,12 @@
 import { join } from "node:path";
 
 import { defineConfig, devices } from "@playwright/test";
-import { fastChromiumLaunchOptions, withZitadel } from "@zitadel/testing/playwright";
+import {
+  e2eActionTimeouts,
+  e2eTimeouts,
+  fastChromiumLaunchOptions,
+  withZitadel,
+} from "@zitadel/testing/playwright";
 
 /**
  * The embedded console against a deployment with the platform project
@@ -25,6 +30,7 @@ const zitadelPort = Number(process.env.PLATFORM_ZITADEL_PORT ?? 8097);
 const origin = `http://localhost:${zitadelPort}`;
 
 export default defineConfig({
+  ...e2eTimeouts,
   testDir: "./src-platform",
   fullyParallel: true,
   workers: 2,
@@ -32,6 +38,7 @@ export default defineConfig({
   outputDir: "test-results/platform",
   reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report/platform" }]],
   use: {
+    ...e2eActionTimeouts,
     baseURL: origin,
     trace: "on-first-retry",
   },

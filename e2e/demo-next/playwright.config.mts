@@ -1,6 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 import { resolve } from "node:path";
-import { fastChromiumLaunchOptions } from "@zitadel/testing/playwright";
+import {
+  e2eActionTimeouts,
+  e2eTimeouts,
+  fastChromiumLaunchOptions,
+} from "@zitadel/testing/playwright";
 
 const workspaceRoot = resolve(import.meta.dirname, "../..");
 
@@ -19,8 +23,10 @@ const workspaceRoot = resolve(import.meta.dirname, "../..");
  * by `packages/components`'s Vitest suite — do not duplicate it here.
  */
 export default defineConfig({
+  ...e2eTimeouts,
   testDir: "./src",
   use: {
+    ...e2eActionTimeouts,
     baseURL: "http://localhost:3002",
     trace: "on-first-retry",
   },

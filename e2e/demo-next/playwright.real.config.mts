@@ -1,7 +1,13 @@
 import { join } from "node:path";
 
 import { defineConfig, devices } from "@playwright/test";
-import { fastChromiumLaunchOptions, nextAppEnv, withZitadel } from "@zitadel/testing/playwright";
+import {
+  e2eActionTimeouts,
+  e2eTimeouts,
+  fastChromiumLaunchOptions,
+  nextAppEnv,
+  withZitadel,
+} from "@zitadel/testing/playwright";
 
 /**
  * Real-instance variant of the embedded sign-in e2e:
@@ -21,10 +27,12 @@ const zitadelPort = Number(process.env.REAL_ZITADEL_PORT ?? 8092);
 const appOrigin = process.env.REAL_APP_ORIGIN ?? "http://localhost:3002";
 
 export default defineConfig({
+  ...e2eTimeouts,
   testDir: "./src-real",
   fullyParallel: true,
   workers: 2,
   use: {
+    ...e2eActionTimeouts,
     baseURL: appOrigin,
     trace: "on-first-retry",
   },

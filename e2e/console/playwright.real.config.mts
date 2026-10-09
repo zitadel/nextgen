@@ -1,7 +1,13 @@
 import { join } from "node:path";
 
 import { defineConfig, devices } from "@playwright/test";
-import { fastChromiumLaunchOptions, withZitadel, type AppEnvTemplate } from "@zitadel/testing/playwright";
+import {
+  e2eActionTimeouts,
+  e2eTimeouts,
+  fastChromiumLaunchOptions,
+  withZitadel,
+  type AppEnvTemplate,
+} from "@zitadel/testing/playwright";
 
 /**
  * Real-instance console coverage:
@@ -31,6 +37,7 @@ const consoleAppEnv: AppEnvTemplate = {
 };
 
 export default defineConfig({
+  ...e2eTimeouts,
   testDir: "./src-real",
   fullyParallel: true,
   workers: 2,
@@ -38,6 +45,7 @@ export default defineConfig({
   outputDir: "test-results/real",
   reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report/real" }]],
   use: {
+    ...e2eActionTimeouts,
     baseURL: consoleOrigin,
     trace: "on-first-retry",
   },

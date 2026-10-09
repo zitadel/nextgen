@@ -1,7 +1,12 @@
 import { join } from "node:path";
 
 import { defineConfig, devices } from "@playwright/test";
-import { fastChromiumLaunchOptions, withZitadel } from "@zitadel/testing/playwright";
+import {
+  e2eActionTimeouts,
+  e2eTimeouts,
+  fastChromiumLaunchOptions,
+  withZitadel,
+} from "@zitadel/testing/playwright";
 
 /**
  * The embedded surfaces, served the way a customer gets them.
@@ -35,6 +40,7 @@ const zitadelPort = Number(process.env.EMBEDDED_ZITADEL_PORT ?? 8095);
 const origin = `http://localhost:${zitadelPort}`;
 
 export default defineConfig({
+  ...e2eTimeouts,
   testDir: "./src-embedded",
   fullyParallel: true,
   workers: 2,
@@ -42,6 +48,7 @@ export default defineConfig({
   outputDir: "test-results/embedded",
   reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report/embedded" }]],
   use: {
+    ...e2eActionTimeouts,
     baseURL: origin,
     trace: "on-first-retry",
   },

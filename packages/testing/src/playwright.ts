@@ -126,6 +126,26 @@ export { expect } from "@playwright/test";
  *   tab) is not throttled, so parallel workers do not slow each other.
  * Spread into a project's `use.launchOptions`.
  */
+/**
+ * Timeouts that make a wedged or unresponsive server fail fast instead of
+ * hanging the whole run. A stale server answering `/healthz` can let readiness
+ * pass against the wrong instance; these caps turn that into a quick, clear
+ * failure. Spread `e2eTimeouts` at the top level of `defineConfig` and
+ * `e2eActionTimeouts` into `use`.
+ */
+export const e2eTimeouts = {
+  /** Per-test cap. */
+  timeout: 60_000,
+  /** Whole-lane hard cap — the backstop against a run that never ends. */
+  globalTimeout: 600_000,
+};
+export const e2eActionTimeouts = {
+  /** A single click/fill that hangs fails here, not after the test timeout. */
+  actionTimeout: 15_000,
+  /** A goto/redirect that hangs (e.g. a wedged server) fails here. */
+  navigationTimeout: 30_000,
+};
+
 export const fastChromiumLaunchOptions = {
   args: [
     "--disable-dev-shm-usage",
