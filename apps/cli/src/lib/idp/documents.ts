@@ -425,7 +425,7 @@ const LEGACY_OUTCOMES: ReadonlyArray<readonly [string, string]> = [
 
 /**
  * Rename the previous outcome keys on every step, in place. The validator
- * rejects the old keys, so leaving them would make `sso enable` write an
+ * rejects the old keys, so leaving them would make `auth-method sso enable` write an
  * invalid flow. Where a step already has the new key, that one wins. A key
  * that is also one of the step's action names is the action's transition and
  * stays. A new key that is an action name is refused: the old route would be
@@ -650,7 +650,7 @@ export function removeSsoFromSchema(schema: object, slug: string): SsoResult<obj
  * Remove a provider from every step of a login flow that offers it.
  *
  * Only the `sso_providers` lists change; a list left empty is dropped. The
- * routes and steps `sso enable` added stay: without a provider they are never
+ * routes and steps `auth-method sso enable` added stay: without a provider they are never
  * reached, they validate as they are, and enabling a provider again uses them
  * as they stand rather than rebuilding them.
  */

@@ -8,6 +8,7 @@ import {
   npmSelectorForCliVersion,
   publicCliCommand,
   isPortableShellWord,
+  portableCommands,
 } from "../../../src/lib/public-cli";
 
 describe("public CLI command formatting", () => {
@@ -135,5 +136,20 @@ describe("isPortableShellWord", () => {
     ]) {
       expect(isPortableShellWord(value), value).toBe(false);
     }
+  });
+});
+
+describe("portableCommands", () => {
+  it("prefixes every command when every argument is portable", () => {
+    expect(portableCommands([["plan"], ["apply", "--cwd", "/home/dev/app"]], "1.0.0")).toEqual([
+      expect.stringMatching(/ plan$/),
+      expect.stringMatching(/ apply --cwd \/home\/dev\/app$/),
+    ]);
+  });
+
+  it("returns none when any argument in any command needs quoting", () => {
+    expect(portableCommands([["plan"], ["apply", "--cwd", "/home/dev/my app"]], "1.0.0")).toEqual(
+      [],
+    );
   });
 });

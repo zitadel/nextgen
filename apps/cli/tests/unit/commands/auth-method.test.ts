@@ -140,7 +140,7 @@ describe("auth-method password and passkey", () => {
     });
 
     it("hands over the follow-ups as argument lists when the path needs quoting", async () => {
-      const parent = await mkdtemp(join(tmpdir(), "zitadel auth factor "));
+      const parent = await mkdtemp(join(tmpdir(), "zitadel auth method "));
       const cwd = await makeProject();
       const spaced = join(parent, "my project");
       await rename(cwd, spaced);
@@ -152,25 +152,6 @@ describe("auth-method password and passkey", () => {
         ["plan", "--cwd", expect.stringContaining("my project")],
         ["apply", "--cwd", expect.stringContaining("my project")],
       ]);
-    });
-
-    it("refuses a schema that points at an external url", async () => {
-      const cwd = await makeProject(
-        {
-          "default-human-user": {
-            kind: "schema-url",
-            url: "https://schemas.test.invalid/customers.json",
-          },
-        },
-        {},
-      );
-
-      const { envelope } = await run(cwd, "passkey", "disable");
-
-      expect(envelope).toMatchObject({
-        code: "E_VALIDATION",
-        details: { url: "https://schemas.test.invalid/customers.json" },
-      });
     });
 
     it("works with a local server that is not running", async () => {
@@ -186,7 +167,7 @@ describe("auth-method password and passkey", () => {
 
       const { envelope } = await run(cwd, "password", "enable");
 
-      expect(envelope.data).toMatchObject({ changed: false, next_commands: [] });
+      expect(envelope.data).toMatchObject({ changed: false, next_commands: [], next_args: [] });
     });
 
     it("does not count a register step that only enrols a passkey", async () => {
@@ -278,9 +259,16 @@ describe("auth-method password and passkey", () => {
     });
 
     it("warns about a factor no flow offers", async () => {
-      const cwd = await makeProject();
+      const cwd = await makeProject({
+        "default-human-user": {
+          ...passwordSchema(),
+          "x-auth-methods": { password: { enabled: true }, passkey: { enabled: false } },
+        },
+      });
 
       const { envelope } = await run(cwd, "passkey", "enable");
+
+      expect(envelope.data?.changed).toBe(true);
 
       expect(envelope.data?.not_offered).toEqual(["passkey"]);
       expect(envelope.warnings).toEqual([
@@ -321,6 +309,25 @@ describe("auth-method password and passkey", () => {
   });
 
   describe("refusals", () => {
+    it("refuses a schema that points at an external url", async () => {
+      const cwd = await makeProject(
+        {
+          "default-human-user": {
+            kind: "schema-url",
+            url: "https://schemas.test.invalid/customers.json",
+          },
+        },
+        {},
+      );
+
+      const { envelope } = await run(cwd, "passkey", "disable");
+
+      expect(envelope).toMatchObject({
+        code: "E_VALIDATION",
+        details: { url: "https://schemas.test.invalid/customers.json" },
+      });
+    });
+
     it("names the rule and step a disabled factor would break", async () => {
       const cwd = await makeProject();
 
@@ -677,10 +684,16 @@ describe("auth-method password and passkey", () => {
 
   describe("--dry-run", () => {
     it("still reports the warnings", async () => {
-      const cwd = await makeProject();
+      const cwd = await makeProject({
+        "default-human-user": {
+          ...passwordSchema(),
+          "x-auth-methods": { password: { enabled: true }, passkey: { enabled: false } },
+        },
+      });
 
       const { envelope } = await run(cwd, "passkey", "enable", "--dry-run");
 
+      expect(envelope.data?.changed).toBe(true);
       expect(envelope.warnings).toEqual([
         "No login flow for default-human-user offers passkey yet. Add it to a flow to show it.",
       ]);

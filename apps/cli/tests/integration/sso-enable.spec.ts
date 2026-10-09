@@ -11,10 +11,6 @@ const CREDENTIALS = {
   secret: "the-client-secret",
 };
 
-// `sso enable` is the deprecated alias of `auth-method sso enable` (ADR 069
-// §6). The command itself is covered by auth-method-sso-enable.spec.ts; this
-// spec covers only what the alias adds. The exact deprecation wording is the
-// unit test's (tests/unit/commands/sso-enable.test.ts).
 describe("sso enable", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
@@ -46,16 +42,6 @@ describe("sso enable", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
-      it("names the command to use instead", async () => {
-        const app = await aSetUpApp();
-
-        const result = await app.enableSsoDeprecated(GOOGLE, CREDENTIALS);
-
-        expect(app.envelopeOf(result).warnings).toEqual([
-          expect.stringContaining("auth-method sso enable"),
-        ]);
-      });
-
       describe("once applied", () => {
         it("offers the provider in the published schema", async () => {
           const app = await aSetUpApp();

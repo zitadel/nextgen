@@ -5,8 +5,6 @@ import { aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
-// The scaffolded login flow collects a password, so turning password off is
-// arranged by editing the schema by hand, as a developer could.
 describe("auth-method password enable", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
@@ -30,19 +28,6 @@ describe("auth-method password enable", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
-      it("turns password back on in the published schema once applied", async () => {
-        const app = await aSetUpApp();
-        await app.editUserSchema((schema) => {
-          schema["x-auth-methods"] = { ...schema["x-auth-methods"], password: { enabled: false } };
-        });
-
-        expect(await app.authMethod("password", "enable")).toSucceed();
-        expect(await app.apply()).toSucceed();
-
-        const { schema } = await app.publishedSchema();
-        expect(schema["x-auth-methods"]?.password).toEqual({ enabled: true });
-      });
-
       it("refuses a schema with no x-identifier to check a password against", async () => {
         const app = await aSetUpApp();
         await app.editUserSchema((schema) => {
@@ -68,6 +53,24 @@ describe("auth-method password enable", () => {
         expect(await app.authMethod("password", "enable")).toSucceed();
 
         expect(await app.plan()).toReportNothingToDo();
+      });
+
+      describe("once applied", () => {
+        it("publishes password as on after it was switched off by hand", async () => {
+          const app = await aSetUpApp();
+          await app.editUserSchema((schema) => {
+            schema["x-auth-methods"] = {
+              ...schema["x-auth-methods"],
+              password: { enabled: false },
+            };
+          });
+          expect(await app.authMethod("password", "enable")).toSucceed();
+          expect(await app.apply()).toSucceed();
+
+          const { schema } = await app.publishedSchema();
+
+          expect(schema["x-auth-methods"]?.password).toEqual({ enabled: true });
+        });
       });
     });
 

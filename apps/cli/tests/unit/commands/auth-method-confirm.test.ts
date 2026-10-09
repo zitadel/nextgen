@@ -10,9 +10,12 @@ import PasskeyDisable from "../../../src/commands/auth-method/passkey/disable";
 import SsoDisable from "../../../src/commands/auth-method/sso/disable";
 import { cliPackageRoot } from "../../helpers/oclif-build";
 
-// The confirmation is the guard against locking every user out, so its two
-// answers are driven here. The other auth-method tests run --non-interactive
-// against the built CLI, where a prompt cannot be answered.
+// The terminal paths of the shared auth-method base (src/commands/auth-method/
+// shared.ts): the confirmation that guards the last way to sign in, and the
+// runs that never prompt. The other auth-method tests run --non-interactive
+// against the built CLI, where a prompt cannot be answered; this file runs the
+// command classes in-process, so it can mock the prompt (a module-level
+// vi.mock, which is why it is a file of its own).
 vi.mock("@clack/prompts", async (importOriginal) => {
   const original = await importOriginal<typeof import("@clack/prompts")>();
   return {
@@ -44,11 +47,28 @@ beforeEach(() => {
   Object.defineProperty(process.stdin, "isTTY", { value: true, configurable: true });
 });
 
-afterEach(() => {
+afterEach(async () => {
   restore(process.stdout, tty.stdout);
   restore(process.stdin, tty.stdin);
   vi.mocked(confirm).mockReset();
+  // Back to the real check, so a one-off answer a failing test left unused
+  // cannot leak into the next test.
+  const original = await vi.importActual<typeof import("@clack/prompts")>("@clack/prompts");
+  vi.mocked(isCancel).mockReset().mockImplementation(original.isCancel);
+  vi.restoreAllMocks();
 });
+
+/**
+ * Run a command class in-process with its output kept out of the test log:
+ * oclif prints through console.log and console.error, consola through the streams.
+ */
+async function quietly<T>(run: () => Promise<T>): Promise<T> {
+  vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+  vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  vi.spyOn(console, "log").mockImplementation(() => undefined);
+  vi.spyOn(console, "error").mockImplementation(() => undefined);
+  return run();
+}
 
 /** A Project whose only enabled factor is passkey, with no flows to stop the change. */
 async function passkeyOnlyProject(): Promise<string> {
@@ -74,14 +94,9 @@ async function passkey(cwd: string): Promise<unknown> {
   return schema["x-auth-methods"].passkey;
 }
 
-async function disablePasskey(cwd: string) {
+async function disablePasskey(cwd: string, ...extra: string[]) {
   const config = await Config.load({ root: cliPackageRoot });
-  const log = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-  try {
-    return await PasskeyDisable.run(["--cwd", cwd, "--no-telemetry"], config);
-  } finally {
-    log.mockRestore();
-  }
+  return quietly(() => PasskeyDisable.run(["--cwd", cwd, "--no-telemetry", ...extra], config));
 }
 
 describe("auth-method passkey disable confirmation", () => {
@@ -162,12 +177,9 @@ async function sso(cwd: string): Promise<unknown> {
 
 async function disableGoogle(cwd: string) {
   const config = await Config.load({ root: cliPackageRoot });
-  const log = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-  try {
-    return await SsoDisable.run(["--provider", "google", "--cwd", cwd, "--no-telemetry"], config);
-  } finally {
-    log.mockRestore();
-  }
+  return quietly(() =>
+    SsoDisable.run(["--provider", "google", "--cwd", cwd, "--no-telemetry"], config),
+  );
 }
 
 describe("auth-method sso disable confirmation", () => {
@@ -207,5 +219,47 @@ describe("auth-method sso disable confirmation", () => {
       ],
     });
     expect(await sso(cwd)).toEqual({ enabled: false });
+  });
+});
+
+describe("auth-method passkey disable in a terminal without a prompt", () => {
+  it("refuses a dry run instead of asking", async () => {
+    const cwd = await passkeyOnlyProject();
+
+    await expect(disablePasskey(cwd, "--dry-run")).rejects.toThrow();
+
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it("does not ask when --force is passed", async () => {
+    const cwd = await passkeyOnlyProject();
+
+    const envelope = await disablePasskey(cwd, "--force");
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(envelope).toMatchObject({ status: "ok" });
+  });
+});
+
+describe("auth-method passkey disable run from inside the Project", () => {
+  it("suggests plan and apply without --cwd", async () => {
+    const cwd = await passkeyOnlyProject();
+    await writeFile(
+      join(cwd, ".zitadel/schemas/default-human-user.json"),
+      `${JSON.stringify({
+        type: "object",
+        "x-identifier": "email",
+        properties: { email: { type: "string" } },
+        "x-auth-methods": { password: { enabled: true }, passkey: { enabled: true } },
+      })}\n`,
+    );
+    vi.spyOn(process, "cwd").mockReturnValue(cwd);
+    const config = await Config.load({ root: cliPackageRoot });
+
+    const envelope = await quietly(() =>
+      PasskeyDisable.run(["--no-telemetry", "--non-interactive"], config),
+    );
+
+    expect(envelope).toMatchObject({ data: { next_args: [["plan"], ["apply"]] } });
   });
 });

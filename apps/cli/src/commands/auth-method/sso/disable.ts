@@ -28,7 +28,7 @@ import {
  * and from the login flows that run against it.
  *
  * The connection file and its published credentials are kept, so enabling the
- * provider again does not ask for them. The routes and steps `sso enable`
+ * provider again does not ask for them. The routes and steps `auth-method sso enable`
  * added stay in the flows; without a provider they are never reached.
  */
 export default class SsoDisable extends AuthMethodCommand {
@@ -39,7 +39,7 @@ export default class SsoDisable extends AuthMethodCommand {
     "<%= config.bin %> auth-method sso disable --provider google --schema customers",
   ];
   static override flags = {
-    // Not `required`, as on `sso enable`: the refusal below names the next
+    // Not `required`, as on `auth-method sso enable`: the refusal below names the next
     // move, and oclif's own would not. A provider is always named, because
     // removing every provider at once would be a different, larger change.
     provider: nonBlankString({ description: "Identity provider to remove." }),
@@ -58,7 +58,7 @@ export default class SsoDisable extends AuthMethodCommand {
         hint: `Pass --provider, e.g. --provider google. ${schema.name} offers: ${offered(schema.body).join(", ") || "none"}.`,
       });
     }
-    // The same shapes `sso enable` refuses: a region that is not what these
+    // The same shapes `auth-method sso enable` refuses: a region that is not what these
     // editors write is someone's, and is not overwritten.
     const malformed = ssoEditRefusal(schema.body, "schema");
     if (malformed !== undefined) {

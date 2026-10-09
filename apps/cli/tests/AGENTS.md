@@ -130,7 +130,7 @@ A spec body contains a fixture call, a command, and matchers — nothing else:
   that is down. Most fail. Some carry on deliberately, for one of two reasons:
   they never needed the server — `resources` describes the command surface,
   `stop`, `reset` and `eject` act on the machine — or they reach it and
-  tolerate the failure, as `plan` does for its old-state fetch, `sso enable`
+  tolerate the failure, as `plan` does for its old-state fetch, `auth-method sso enable`
   for publishing the credentials, and `doctor` and `status` for their probes.
   Either way it is worth stating rather than leaving to be discovered, and each
   spec's own first group is the record, not this sentence. The `--json` and rendered groups

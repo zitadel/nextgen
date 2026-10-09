@@ -102,14 +102,7 @@ describe("auth-method sso disable", () => {
       it("says which provider it removed, and from which schema", async () => {
         const app = await anAppServingGoogle();
 
-        const result = await app.run([
-          "auth-method",
-          "sso",
-          "disable",
-          "--non-interactive",
-          "--provider",
-          GOOGLE,
-        ]);
+        const result = await app.disableSsoRendered(GOOGLE);
 
         expect(result).toPrint("Removed google from default-human-user");
       });
@@ -117,14 +110,7 @@ describe("auth-method sso disable", () => {
       it("renders text rather than a json envelope", async () => {
         const app = await anAppServingGoogle();
 
-        const result = await app.run([
-          "auth-method",
-          "sso",
-          "disable",
-          "--non-interactive",
-          "--provider",
-          GOOGLE,
-        ]);
+        const result = await app.disableSsoRendered(GOOGLE);
 
         expect(result).toPrintNoJson();
       });

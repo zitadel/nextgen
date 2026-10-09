@@ -5,8 +5,6 @@ import { aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
-// The scaffolded login flow collects a password, so disabling password on a
-// set-up project is always refused (ADR 069 §3): the flow has to change first.
 describe("auth-method password disable", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {

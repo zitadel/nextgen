@@ -712,7 +712,7 @@ export default class Setup extends BaseCommand {
         ],
         // A JSON run prints no warnings, so a credential the project never
         // received would otherwise appear only as a `published` status with
-        // nothing to act on. `sso enable` reports the same recovery step.
+        // nothing to act on. `auth-method sso enable` reports the same recovery step.
         next_commands: [
           ...republishCommands(
             answers.sso.flatMap((answer) => {
@@ -857,7 +857,7 @@ async function ssoFromFlags(
   if (dryRun) {
     // A preview publishes nothing and materialises nothing, so demanding a
     // real credential to see what setup would do is a toll for no reason --
-    // and `sso enable --dry-run` returns before asking for one at all.
+    // and `auth-method sso enable --dry-run` returns before asking for one at all.
     return { provider: flags.sso, clientId, secret: "" };
   }
   const piped = process.stdin.isTTY ? "" : (await readStdin(process.stdin)).trim();
@@ -933,7 +933,7 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
   // Only the first: `--sso` takes one provider, and a scripted rerun can pipe
   // only one secret. A retry naming several would not be runnable, which is
   // the whole point of this line. The rest are not silently dropped -- the
-  // guidance that uses this emits an `sso enable` command for each, because
+  // guidance that uses this emits an `auth-method sso enable` command for each, because
   // `--sso` makes the rerun skip the multi-select, so a provider left out here
   // could not be reselected.
   const [firstSso] = opts.sso ?? [];
@@ -1047,12 +1047,12 @@ function ssoRecovery(
     // run verbatim, especially by agents, and nothing escapes them for a
     // shell: a value the wizard accepted -- it only refuses an empty one --
     // could split into two arguments or carry a metacharacter that changes
-    // what the command does. `sso enable` asks for the id, exactly as it asks
+    // what the command does. `auth-method sso enable` asks for the id, exactly as it asks
     // for the secret, which was never put in command text for the same
     // reason.
     // `--server local`, as the setup retry pins it. Server resolution prefers
     // `ZITADEL_API_BASE` over the project's own `zitadel.json`, so an
-    // unpinned `sso enable` run with that variable set would publish the
+    // unpinned `auth-method sso enable` run with that variable set would publish the
     // client id and secret to whatever it names, using the local project's
     // token -- leaving the local provider unconfigured and the credentials
     // somewhere nobody asked for. Both callers of this are local-server

@@ -313,6 +313,11 @@ export class ScaffoldedApp {
     return this.cli(["auth-method", method, verb, "--non-interactive"]);
   }
 
+  /** `auth-method sso disable` without `--json`, for what the developer reads. */
+  disableSsoRendered(provider: string): Promise<CliResult> {
+    return this.cli(["auth-method", "sso", "disable", "--non-interactive", "--provider", provider]);
+  }
+
   /** `auth-method sso disable`. */
   disableSso(provider: string, extraArgs: string[] = []): Promise<CliResult> {
     return this.cli([

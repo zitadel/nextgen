@@ -200,6 +200,23 @@ describe("auth-method sso disable", () => {
     expect(await entryProviders(cwd)).toBeUndefined();
   });
 
+  it("says it changed only the login flows when the schema no longer lists the provider", async () => {
+    const cwd = await makeProject({ password: { enabled: true } }, ["google"]);
+
+    const result = await runCliForTest([
+      "auth-method",
+      "sso",
+      "disable",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--provider",
+      "google",
+    ]);
+
+    expect(result.stdout).toContain("Removed google from the login flows of default-human-user");
+  });
+
   it("changes only the named schema and its flows", async () => {
     const cwd = await makeProject(passwordAndGoogle, ["google"]);
     await writeJson(cwd, ".zitadel/schemas/staff.json", schemaWith(passwordAndGoogle, "staff"));
@@ -310,6 +327,10 @@ describe("auth-method sso disable", () => {
       expect(envelope.details?.retry_args).toEqual(
         expect.arrayContaining(["--dry-run", "--force"]),
       );
+      expect(envelope.next_commands?.length).toBeGreaterThan(0);
+      for (const command of envelope.next_commands ?? []) {
+        expect(command).toContain("--dry-run");
+      }
     });
 
     it("suggests enabling password or passkey instead of removing the last provider", async () => {

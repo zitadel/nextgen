@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -576,6 +576,78 @@ describe("auth-method sso enable with a connection already on disk", () => {
 });
 
 describe("auth-method sso enable preflight", () => {
+  it("refuses a flow it cannot check before writing or publishing anything", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, ".zitadel/flows/default-human-user-login.json"),
+      `${JSON.stringify({ ...loginFlow("default-human-user"), purposes: { login: "missing" } })}\n`,
+    );
+
+    const result = await enable(cwd, "--client-id", "abc");
+
+    expect((parseJson(result.stdout) as { message: string }).message).toContain(
+      "cannot be checked against the changed schema",
+    );
+    await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
+  });
+
+  it("refuses a flow it cannot check on a dry run too", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, ".zitadel/flows/default-human-user-login.json"),
+      `${JSON.stringify({ ...loginFlow("default-human-user"), purposes: { login: "missing" } })}\n`,
+    );
+
+    const result = await enable(cwd, "--client-id", "abc", "--dry-run");
+
+    expect((parseJson(result.stdout) as { code: string }).code).toBe("E_VALIDATION");
+  });
+
+  it("warns when no active flow will offer a way to sign in", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, ".zitadel/flows/default-human-user-login.json"),
+      `${JSON.stringify({ ...loginFlow("default-human-user"), status: "draft" })}\n`,
+    );
+
+    const result = await enable(cwd, "--client-id", "abc", "--dry-run");
+
+    expect((parseJson(result.stdout) as { warnings: string[] }).warnings).toContain(
+      "No active login flow for default-human-user offers a method it enables, so nobody can sign in until one does.",
+    );
+  });
+
+  it("lists plan and apply, with --cwd, as next_args", async () => {
+    const cwd = await makeProject();
+
+    const result = await enable(cwd, "--client-id", "abc");
+
+    const { data } = parseJson(result.stdout) as { data: { next_args: string[][] } };
+    expect(data.next_args).toEqual(
+      expect.arrayContaining([
+        ["plan", "--cwd", expect.any(String)],
+        ["apply", "--cwd", expect.any(String)],
+      ]),
+    );
+    for (const args of data.next_args) {
+      expect(args).toContain("--cwd");
+    }
+  });
+
+  it("leaves the follow-ups out of next_commands when the path needs quoting", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "zitadel sso enable "));
+    const cwd = join(parent, "my project");
+    await rename(await makeProject(), cwd);
+
+    const result = await enable(cwd, "--client-id", "abc");
+
+    const { data } = parseJson(result.stdout) as {
+      data: { next_commands: string[]; next_args: string[][] };
+    };
+    expect(data.next_commands).toEqual([]);
+    expect(data.next_args.length).toBeGreaterThan(0);
+  });
+
   it("fails a dry run for the same reason the real run would", async () => {
     // A preview that reports "would create" for an invocation that cannot
     // succeed is worse than no preview: it is checked precisely to find this
