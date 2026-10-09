@@ -219,7 +219,7 @@ type Invoker interface {
 	// unchanged.
 	//
 	// POST /releases
-	CreateRelease(ctx context.Context, request *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error)
+	CreateRelease(ctx context.Context, request CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error)
 	// CreateSchema invokes createSchema operation.
 	//
 	// Create a new schema. The optional `$id` field is the JSON Schema document
@@ -2489,12 +2489,12 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 // unchanged.
 //
 // POST /releases
-func (c *Client) CreateRelease(ctx context.Context, request *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error) {
+func (c *Client) CreateRelease(ctx context.Context, request CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error) {
 	res, err := c.sendCreateRelease(ctx, request, params)
 	return res, err
 }
 
-func (c *Client) sendCreateRelease(ctx context.Context, request *CreateReleaseRequest, params CreateReleaseParams) (res CreateReleaseRes, err error) {
+func (c *Client) sendCreateRelease(ctx context.Context, request CreateReleaseRequest, params CreateReleaseParams) (res CreateReleaseRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {

@@ -199,7 +199,7 @@ type Handler interface {
 	// unchanged.
 	//
 	// POST /releases
-	CreateRelease(ctx context.Context, req *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error)
+	CreateRelease(ctx context.Context, req CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error)
 	// CreateSchema implements createSchema operation.
 	//
 	// Create a new schema. The optional `$id` field is the JSON Schema document

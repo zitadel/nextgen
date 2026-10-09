@@ -27,7 +27,15 @@ func (s *CreateProjectRequest) setDefaults() {
 }
 
 // setDefaults set default value of fields.
-func (s *CreateReleaseRequest) setDefaults() {
+func (s *CreateReleaseFromBundle) setDefaults() {
+	{
+		val := bool(false)
+		s.GitDirty.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *CreateReleaseFromPointers) setDefaults() {
 	{
 		val := bool(false)
 		s.GitDirty.SetTo(val)
