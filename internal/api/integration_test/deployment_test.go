@@ -29,7 +29,7 @@ func newDeploymentFixture(t *testing.T) deploymentFixture {
 	require.IsType(t, &api.CreateReleaseCreated{}, resp, helpers.MustMarshal(t, resp))
 	return deploymentFixture{
 		releaseFixture: fixture,
-		releaseID:      string(resp.(*api.CreateReleaseCreated).Release.ID),
+		releaseID:      string(resp.(*api.CreateReleaseCreated).ID),
 	}
 }
 
@@ -48,7 +48,7 @@ func (f deploymentFixture) newRelease(t *testing.T) string {
 	}
 	resp := f.create(t, &api.CreateReleaseRequest{Pointers: pointers})
 	require.IsType(t, &api.CreateReleaseCreated{}, resp, helpers.MustMarshal(t, resp))
-	return string(resp.(*api.CreateReleaseCreated).Release.ID)
+	return string(resp.(*api.CreateReleaseCreated).ID)
 }
 
 func (f deploymentFixture) deploy(t *testing.T, req *api.CreateDeploymentRequest) api.CreateDeploymentRes {

@@ -213,8 +213,8 @@ type Invoker interface {
 	// Idempotent on the pinned set: the content digest is computed over the
 	// sorted pointers with metadata excluded, so re-submitting the same content
 	// with a different `message` answers `200` with the release that already
-	// pins it, every revision `created: false`, rather than creating a second
-	// one. A release the project did not hold before answers `201`.
+	// pins it rather than creating a second one. A release the project did not
+	// hold before answers `201`.
 	// Creating a release does not deploy it. A release is not tied to a target,
 	// and the same release can later be deployed to any number of targets
 	// unchanged.
@@ -678,8 +678,8 @@ type Invoker interface {
 	//
 	// Lists the project's releases, newest first.
 	// Entries carry the digest, the metadata and `revoked_at` — the pinned set
-	// is omitted. Read one release with `GET /releases/{release_id}` to get its
-	// pointers.
+	// is omitted.
+	// Read one release with `GET /releases/{release_id}` to get its pointers.
 	// `content_hash` looks a release up by its content, as the CLI does when a
 	// person types the digest a transcript printed. The project holds at most
 	// one release per digest, so the filtered list has one entry or none, and
@@ -2484,8 +2484,8 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 // Idempotent on the pinned set: the content digest is computed over the
 // sorted pointers with metadata excluded, so re-submitting the same content
 // with a different `message` answers `200` with the release that already
-// pins it, every revision `created: false`, rather than creating a second
-// one. A release the project did not hold before answers `201`.
+// pins it rather than creating a second one. A release the project did not
+// hold before answers `201`.
 // Creating a release does not deploy it. A release is not tied to a target,
 // and the same release can later be deployed to any number of targets
 // unchanged.
@@ -9579,8 +9579,8 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 //
 // Lists the project's releases, newest first.
 // Entries carry the digest, the metadata and `revoked_at` — the pinned set
-// is omitted. Read one release with `GET /releases/{release_id}` to get its
-// pointers.
+// is omitted.
+// Read one release with `GET /releases/{release_id}` to get its pointers.
 // `content_hash` looks a release up by its content, as the CLI does when a
 // person types the digest a transcript printed. The project holds at most
 // one release per digest, so the filtered list has one entry or none, and

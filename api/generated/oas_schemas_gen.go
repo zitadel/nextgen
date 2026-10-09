@@ -12857,7 +12857,7 @@ func (s *CreateProjectResponse) SetCreatedAt(val time.Time) {
 
 func (*CreateProjectResponse) createProjectRes() {}
 
-type CreateReleaseCreated CreateReleaseResponse
+type CreateReleaseCreated Release
 
 func (*CreateReleaseCreated) createReleaseRes() {}
 
@@ -13181,7 +13181,7 @@ func (s *CreateReleaseErrorResponseStatusCode) SetResponse(val CreateReleaseErro
 
 func (*CreateReleaseErrorResponseStatusCode) createReleaseRes() {}
 
-type CreateReleaseOK CreateReleaseResponse
+type CreateReleaseOK Release
 
 func (*CreateReleaseOK) createReleaseRes() {}
 
@@ -13306,35 +13306,6 @@ func (s *CreateReleaseRequest) SetGitSha(val OptString) {
 // SetGitDirty sets the value of GitDirty.
 func (s *CreateReleaseRequest) SetGitDirty(val OptBool) {
 	s.GitDirty = val
-}
-
-// The release, plus one entry per resource it pins saying whether the
-// pinned revision existed before this call or was allocated by it.
-// Ref: #
-type CreateReleaseResponse struct {
-	Release Release `json:"release"`
-	// One entry per pinned resource, in the order of `release.pointers`.
-	Revisions []PinnedRevision `json:"revisions"`
-}
-
-// GetRelease returns the value of Release.
-func (s *CreateReleaseResponse) GetRelease() Release {
-	return s.Release
-}
-
-// GetRevisions returns the value of Revisions.
-func (s *CreateReleaseResponse) GetRevisions() []PinnedRevision {
-	return s.Revisions
-}
-
-// SetRelease sets the value of Release.
-func (s *CreateReleaseResponse) SetRelease(val Release) {
-	s.Release = val
-}
-
-// SetRevisions sets the value of Revisions.
-func (s *CreateReleaseResponse) SetRevisions(val []PinnedRevision) {
-	s.Revisions = val
 }
 
 // CreateSchemaErrorResponse represents sum type.
@@ -52150,63 +52121,6 @@ func (s *PatchUserRequestAttributes) init() PatchUserRequestAttributes {
 		*s = m
 	}
 	return m
-}
-
-// What `POST /releases` did for one resource of the release: which revision
-// it pinned and whether this call allocated it.
-// Ref: #
-type PinnedRevision struct {
-	Kind ReleasePointerKind `json:"kind"`
-	// The resource's handle, as recorded on the release pointer.
-	Handle string `json:"handle"`
-	// The revision the release pins for this resource.
-	RevisionID string `json:"revision_id"`
-	// `true` when this call allocated the revision because the bundled
-	// content differed from the project's newest revision of that handle;
-	// `false` when an existing revision was pinned. The `pointers` form never
-	// allocates, so every entry it returns reads `false`, as does every entry
-	// of a `200` answer.
-	Created bool `json:"created"`
-}
-
-// GetKind returns the value of Kind.
-func (s *PinnedRevision) GetKind() ReleasePointerKind {
-	return s.Kind
-}
-
-// GetHandle returns the value of Handle.
-func (s *PinnedRevision) GetHandle() string {
-	return s.Handle
-}
-
-// GetRevisionID returns the value of RevisionID.
-func (s *PinnedRevision) GetRevisionID() string {
-	return s.RevisionID
-}
-
-// GetCreated returns the value of Created.
-func (s *PinnedRevision) GetCreated() bool {
-	return s.Created
-}
-
-// SetKind sets the value of Kind.
-func (s *PinnedRevision) SetKind(val ReleasePointerKind) {
-	s.Kind = val
-}
-
-// SetHandle sets the value of Handle.
-func (s *PinnedRevision) SetHandle(val string) {
-	s.Handle = val
-}
-
-// SetRevisionID sets the value of RevisionID.
-func (s *PinnedRevision) SetRevisionID(val string) {
-	s.RevisionID = val
-}
-
-// SetCreated sets the value of Created.
-func (s *PinnedRevision) SetCreated(val bool) {
-	s.Created = val
 }
 
 // Merged schema.
