@@ -21,6 +21,9 @@ type Config struct {
 
 // Connect implements [database.Dialect].
 func (p Config) Connect(ctx context.Context) (database.Pool, error) {
+	if p.ConnConfig.Tracer == nil {
+		p.ConnConfig.Tracer = pgxTracer{}
+	}
 	pool, err := pgxpool.NewWithConfig(ctx, p.Config)
 	if err != nil {
 		return nil, err

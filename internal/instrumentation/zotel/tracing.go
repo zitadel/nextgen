@@ -38,6 +38,17 @@ func NewTracerProvider(ctx context.Context, cfg ExporterConfig, traceIDRatio flo
 	return tracerProvider, nil
 }
 
+// NewSampler returns the same sampler that [NewTracerProvider] builds, for
+// tests that set up their own provider. A root span is sampled at fraction
+// only when it is a Server span; a child follows its parent.
+func NewSampler(fraction float64) trace.Sampler {
+	ratio := trace.TraceIDRatioBased(fraction)
+	return trace.ParentBased(
+		spanKindBased(ratio, trace2.SpanKindServer),
+		trace.WithRemoteParentNotSampled(ratio),
+	)
+}
+
 func (cfg ExporterConfig) tracing(ctx context.Context) (_ trace.SpanExporter, err error) {
 	var exporter trace.SpanExporter
 	switch cfg.Type {
