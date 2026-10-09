@@ -112,7 +112,7 @@ export class SocialSignInPrompt implements SetupPrompt {
           : ["Register a client with the provider at:", issuer]),
         "",
         "Redirect URI:",
-        callbackUriFor(issuerFromPort(devPort)),
+        callbackUriFor(issuerFromPort(devPort), entry.slug),
       ].join("\n"),
       `${entry.displayName} sign-in`,
     );

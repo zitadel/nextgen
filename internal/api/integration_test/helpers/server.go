@@ -53,8 +53,8 @@ func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
 		// middleware chain: the callback on both its spellings, ahead of the
 		// API catch-all.
 		mux := http.NewServeMux()
-		mux.Handle(api.IDPCallbackPath, callback)
-		mux.Handle(api.IDPCallbackUpstreamPath, callback)
+		mux.Handle(api.IDPCallbackPattern, callback)
+		mux.Handle(api.IDPCallbackUpstreamPattern, callback)
 		mux.Handle("/", h.withServerLog(api.WithSessionStateNoStore(api.WithCSRFRequest(h.EnsureGeneratedServer(t)))))
 		h.testServer.value = httptest.NewServer(mux)
 	}

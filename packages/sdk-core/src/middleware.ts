@@ -82,8 +82,8 @@ export function matchesRoutes(pathname: string, routes: readonly string[]): bool
  * widget performs it, never as a proxied header.
  *
  * A relative reference resolves against the path it came from (RFC 3986 §5),
- * so `next?flow=x` answered to `/__nextgen/idp/callback` means
- * `/__nextgen/idp/next?flow=x`. An unparseable value is the one case with
+ * so `next?flow=x` answered to `/__nextgen/idp/google/callback` means
+ * `/__nextgen/idp/google/next?flow=x`. An unparseable value is the one case with
  * nothing to forward.
  */
 function ontoThisApp(location: string, selfUrl: string | undefined): string | undefined {
@@ -105,7 +105,7 @@ function ontoThisApp(location: string, selfUrl: string | undefined): string | un
  * `location` to a redirect that can only land on this app.
  *
  * `location` was stripped outright until the identity-provider callback
- * needed it: the provider returns the browser to `/__nextgen/idp/callback`,
+ * needed it: the provider returns the browser to `/__nextgen/idp/{slug}/callback`,
  * and the engine answers `303` back to the page the sign-in started on. That
  * is a top-level navigation with no JavaScript in the loop, so a dropped
  * `Location` leaves the browser on an empty page. Outbound redirects to a
@@ -216,7 +216,7 @@ export type NextgenMiddlewareOptions = {
    * URL path prefix that is reverse-proxied to the auth backend.
    *
    * Sign-in with an external provider currently requires the default: the
-   * provider returns to `/__nextgen/idp/callback`, which is proxied only under
+   * provider returns to `/__nextgen/idp/{slug}/callback`, which is proxied only under
    * the default prefix.
    * @default "/__nextgen"
    */

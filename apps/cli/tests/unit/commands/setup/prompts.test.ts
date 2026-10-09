@@ -352,7 +352,7 @@ describe("SocialSignInPrompt", () => {
     // The URI has to be exact — the vendor matches it literally — and the
     // port answered a moment earlier is what decides it.
     expect(vi.mocked(note).mock.calls[0]?.[0]).toContain(
-      "http://localhost:4321/__nextgen/idp/callback",
+      "http://localhost:4321/__nextgen/idp/google/callback",
     );
   });
 

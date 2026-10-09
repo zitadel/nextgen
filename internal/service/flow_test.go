@@ -753,7 +753,7 @@ func TestFlowService_Submit_PropagatesSSOReturnAndBindingNonce(t *testing.T) {
 		Step:            &domain.FlowStep{Name: domain.FlowStepNameSSORedirect},
 		SSOBindingNonce: "nonce-1",
 	}}
-	ssoReturn := &domain.FlowSSOReturn{RedirectURI: "https://login.example.test/__nextgen/idp/callback", ReturnTarget: "https://login.example.test/login"}
+	ssoReturn := &domain.FlowSSOReturn{RedirectURI: "https://login.example.test/__nextgen/idp/google/callback", ReturnTarget: "https://login.example.test/login"}
 
 	svc := service.NewFlowService(repo, sm)
 

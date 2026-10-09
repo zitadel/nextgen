@@ -28,11 +28,15 @@ import (
 
 const ssoCallbackState = "proj-1.random-part"
 
+// ssoCallbackSlug is the connection ssoCallbackPending pins; a callback on any
+// other connection's path is a mix-up.
+const ssoCallbackSlug = "google"
+
 func ssoCallbackPending() *domain.SSOStatePayload {
 	return &domain.SSOStatePayload{
-		ProviderSlug:         "google",
+		ProviderSlug:         ssoCallbackSlug,
 		ConnectionRevisionID: "idprev_1",
-		RedirectURI:          "https://auth.example.com/__nextgen/idp/callback",
+		RedirectURI:          "https://auth.example.com/__nextgen/idp/google/callback",
 		OIDCNonce:            "the-nonce",
 		ReturnTarget:         "https://app.example.com/login?flow=flow-1",
 	}
@@ -72,31 +76,101 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 		},
 		{
 			name:       "a consume failure passes through",
-			in:         service.FlowSSOCallbackInput{State: ssoCallbackState, Code: "the-code"},
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
 			consumeErr: domain.ErrSSOStateInvalid(),
 			wantErr:    domain.ErrSSOStateInvalid(),
 		},
 		{
 			name:       "access_denied stores the cancelled key",
-			in:         service.FlowSSOCallbackInput{State: ssoCallbackState, Error: "access_denied", ErrorDescription: "the provider's words"},
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "access_denied", ErrorDescription: "the provider's words"},
 			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
 			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
 		},
 		{
 			name:       "every other provider code stores the failed key",
-			in:         service.FlowSSOCallbackInput{State: ssoCallbackState, Error: "temporarily_unavailable"},
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "temporarily_unavailable"},
 			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
 			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
 		},
 		{
 			name:       "neither code nor error stores the failed key",
-			in:         service.FlowSSOCallbackInput{State: ssoCallbackState},
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
+		},
+		{
+			// The mix-up attack (RFC 9700 §4.4): another connection's provider
+			// sent the browser here. Its code must not reach the pinned
+			// connection's token endpoint, so the revision is never loaded.
+			// A code arrived, so the refusal is an exchange failure.
+			name:       "a path naming another connection stores the failed key without a token request",
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: "other", State: ssoCallbackState, Code: "the-code"},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
+		},
+		{
+			// No code arrived, so the refusal is an authorization failure, and
+			// the provider's error is not what the user sees: the answer is
+			// not the pinned connection's.
+			name:       "a provider error on another connection's path stores the failed key",
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: "other", State: ssoCallbackState, Error: "access_denied"},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
+		},
+		{
+			name:       "a path naming no connection stores the failed key",
+			in:         service.FlowSSOCallbackInput{State: ssoCallbackState, Code: "the-code"},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
+		},
+		{
+			// RFC 9207: a provider registered with a wildcard redirect URI can
+			// answer on the pinned connection's path, and its iss gives it
+			// away. The revision is read for the issuer; nothing else is.
+			name: "an iss that is not the connection's issuer stores the failed key without a token request",
+			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code", Issuer: "https://evil.example.test"},
+			connections: func(m *servicemocks.MockIDPConnectionService) {
+				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
+					Return(&domain.IDPConnection{Slug: ssoCallbackSlug, RevisionID: "idprev_1", Document: revisionDoc}, nil)
+			},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
+		},
+		{
+			// The provider's error is not read: it is not the pinned
+			// connection's answer, so the user sees the failure, not a
+			// cancellation. No code arrived, so it is an authorization failure.
+			name: "a provider error with a foreign iss stores the failed key",
+			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "access_denied", Issuer: "https://evil.example.test"},
+			connections: func(m *servicemocks.MockIDPConnectionService) {
+				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
+					Return(&domain.IDPConnection{Slug: ssoCallbackSlug, RevisionID: "idprev_1", Document: revisionDoc}, nil)
+			},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
+		},
+		{
+			name: "a provider error with the connection's iss is read as usual",
+			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "access_denied", Issuer: "https://accounts.example.test"},
+			connections: func(m *servicemocks.MockIDPConnectionService) {
+				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
+					Return(&domain.IDPConnection{Slug: ssoCallbackSlug, RevisionID: "idprev_1", Document: revisionDoc}, nil)
+			},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
+			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
+		},
+		{
+			name: "a revision that cannot be read for the iss check stores the failed key",
+			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "access_denied", Issuer: "https://accounts.example.test"},
+			connections: func(m *servicemocks.MockIDPConnectionService) {
+				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").Return(nil, domain.ErrIDPConnectionNotFound())
+			},
 			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
 			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
 		},
 		{
 			name: "a vanished revision stores the failed key",
-			in:   service.FlowSSOCallbackInput{State: ssoCallbackState, Code: "the-code"},
+			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
 			connections: func(m *servicemocks.MockIDPConnectionService) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").Return(nil, domain.ErrIDPConnectionNotFound())
 			},
@@ -105,7 +179,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 		},
 		{
 			name: "a missing client_secret variable stores the failed key without a token request",
-			in:   service.FlowSSOCallbackInput{State: ssoCallbackState, Code: "the-code"},
+			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
 			connections: func(m *servicemocks.MockIDPConnectionService) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
 					Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: revisionDoc}, nil)
@@ -118,7 +192,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 		},
 		{
 			name: "a client_secret variable not marked secret stores the failed key without a token request",
-			in:   service.FlowSSOCallbackInput{State: ssoCallbackState, Code: "the-code"},
+			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
 			connections: func(m *servicemocks.MockIDPConnectionService) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
 					Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: revisionDoc}, nil)
@@ -132,7 +206,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 		},
 		{
 			name: "a literal client_secret stores the failed key without a token request",
-			in:   service.FlowSSOCallbackInput{State: ssoCallbackState, Code: "the-code"},
+			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
 			connections: func(m *servicemocks.MockIDPConnectionService) {
 				doc := bytes.Replace(revisionDoc, []byte(`"${{ GOOGLE_SECRET }}"`), []byte(`"pasted-secret"`), 1)
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
@@ -143,7 +217,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 		},
 		{
 			name: "an internal failure stores the failed key",
-			in:   service.FlowSSOCallbackInput{State: ssoCallbackState, Code: "the-code"},
+			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
 			connections: func(m *servicemocks.MockIDPConnectionService) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").Return(nil, domain.ErrInternal(errors.New("db down")))
 			},
@@ -152,7 +226,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 		},
 		{
 			name:          "a refused result write passes through",
-			in:            service.FlowSSOCallbackInput{State: ssoCallbackState, Error: "access_denied"},
+			in:            service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "access_denied"},
 			setResultErrs: []error{domain.ErrSSOStateInvalid()},
 			wantErr:       domain.ErrSSOStateInvalid(),
 			wantResult:    &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
@@ -160,7 +234,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 		},
 		{
 			name: "a failed write of the failed key passes through",
-			in:   service.FlowSSOCallbackInput{State: ssoCallbackState, Code: "the-code"},
+			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
 			connections: func(m *servicemocks.MockIDPConnectionService) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").Return(nil, domain.ErrInternal(errors.New("db down")))
 			},
@@ -245,7 +319,7 @@ func TestFlowSSOCallback_Process_WarnsUnlessCancelled(t *testing.T) {
 			attempts := &fakeAuthAttempts{consumeCheck: &domain.SSOCallbackCheck{Pending: ssoCallbackPending()}}
 			svc := service.NewFlowSSOCallback(connections, attempts, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{Transport: tripwireTransport{t}})
 
-			_, err := svc.Process(ctx, service.FlowSSOCallbackInput{State: ssoCallbackState, Code: "the-code"})
+			_, err := svc.Process(ctx, service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"})
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantWarn, bytes.Contains(logs.Bytes(), []byte("sso callback failed")))
 		})
@@ -275,7 +349,7 @@ func TestFlowSSOCallback_Process_BindsTheProjectAfterConsume(t *testing.T) {
 			}
 			svc := service.NewFlowSSOCallback(servicemocks.NewMockIDPConnectionService(ctrl), attempts, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{Transport: tripwireTransport{t}})
 
-			_, _ = svc.Process(ctx, service.FlowSSOCallbackInput{State: ssoCallbackState, Error: "access_denied"})
+			_, _ = svc.Process(ctx, service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "access_denied"})
 
 			slot, ok := audit.ActorSlotFromContext(ctx)
 			require.True(t, ok)
@@ -286,7 +360,7 @@ func TestFlowSSOCallback_Process_BindsTheProjectAfterConsume(t *testing.T) {
 
 // ssoCallbackProvider is a fake provider for the full exchange: /keys serves
 // the signing key, /token checks the secret and answers a signed id_token.
-func ssoCallbackProvider(t *testing.T) (doc []byte) {
+func ssoCallbackProvider(t *testing.T) (doc []byte, issuer string) {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
@@ -341,7 +415,7 @@ func ssoCallbackProvider(t *testing.T) (doc []byte) {
 			"userinfo_endpoint": "` + srv.URL + `/userinfo",
 			"jwks_uri": "` + srv.URL + `/keys"
 		}
-	}`)
+	}`), srv.URL
 }
 
 func TestFlowSSOCallback_Process_StoresTheIdentity(t *testing.T) {
@@ -349,7 +423,9 @@ func TestFlowSSOCallback_Process_StoresTheIdentity(t *testing.T) {
 	tests := []struct {
 		name          string
 		setResultErrs []error
-		wantErr       error
+		// sendIssuer sends the connection's issuer as the RFC 9207 iss.
+		sendIssuer bool
+		wantErr    error
 		// wantErrorKey is the key stored last; "" means the identity was.
 		wantErrorKey string
 		// wantEvent is the event the last write was made with.
@@ -358,6 +434,11 @@ func TestFlowSSOCallback_Process_StoresTheIdentity(t *testing.T) {
 		{
 			name:      "the identity is stored",
 			wantEvent: domain.EventTypeAuthSSOExchangeSucceeded,
+		},
+		{
+			name:       "an iss that is the connection's issuer is accepted",
+			sendIssuer: true,
+			wantEvent:  domain.EventTypeAuthSSOExchangeSucceeded,
 		},
 		{
 			name:          "a failed identity write stores the failed key",
@@ -383,9 +464,10 @@ func TestFlowSSOCallback_Process_StoresTheIdentity(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctrl := gomock.NewController(t)
+			doc, issuer := ssoCallbackProvider(t)
 			connections := servicemocks.NewMockIDPConnectionService(ctrl)
 			connections.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
-				Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: ssoCallbackProvider(t)}, nil)
+				Return(&domain.IDPConnection{Slug: ssoCallbackSlug, RevisionID: "idprev_1", Document: doc}, nil)
 			variables := servicemocks.NewMockVariableService(ctrl)
 			variables.EXPECT().GetDecryptedVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, "GOOGLE_SECRET").
 				Return([]*domain.Variable{{Name: "GOOGLE_SECRET", Value: "secret-1", IsSecret: true}}, nil)
@@ -395,7 +477,11 @@ func TestFlowSSOCallback_Process_StoresTheIdentity(t *testing.T) {
 			}
 			svc := service.NewFlowSSOCallback(connections, attempts, servicemocks.NewMockKeyService(ctrl), variables, &http.Client{})
 
-			out, err := svc.Process(t.Context(), service.FlowSSOCallbackInput{State: ssoCallbackState, Code: "the-code", BindingNonce: "bind-1"})
+			in := service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code", BindingNonce: "bind-1"}
+			if tt.sendIssuer {
+				in.Issuer = issuer
+			}
+			out, err := svc.Process(t.Context(), in)
 
 			assert.Equal(t, ssoCallbackState, attempts.consumeState)
 			assert.Equal(t, "bind-1", attempts.consumeNonce)

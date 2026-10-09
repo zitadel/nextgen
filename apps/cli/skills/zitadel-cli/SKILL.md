@@ -242,6 +242,12 @@ no local admin for that server on the way up, it says so in the envelope's
 `warnings` and the project stays unattached, so the local console does not
 list it.
 
+When `setup --sso` or `sso enable` adds a social sign-in provider, the user
+must register the connection's redirect URI with the provider themselves: give
+them `data.sso[].callback_uri` from `setup`, or `data.callback_uri` from
+`sso enable`, verbatim. Each connection has its own URI, so a URI from another
+provider or an older CLI version does not work.
+
 After `setup`, follow `data.next_commands` to start the app. Prove the generated
 auth flow in a visible browser by registering a unique user, logging out, logging
 back in with the same email/password, and ending on the signed-in profile page.
