@@ -6,7 +6,20 @@ import { appPortFromUrl, frameworkForId, frameworkIds, frameworks } from "./fram
 test("framework registry lists every CLI journey target", () => {
   assert.deepEqual(
     frameworks.map((framework) => framework.id),
-    ["next", "nuxt", "react", "vue", "angular", "solid", "svelte", "qwik"],
+    [
+      "next",
+      "nuxt",
+      "react",
+      "vue",
+      "angular",
+      "solid",
+      "svelte",
+      "qwik",
+      "sveltekit",
+      "tanstack-start",
+      "solid-start",
+      "qwik-city",
+    ],
   );
   assert.deepEqual(
     frameworkIds,

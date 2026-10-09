@@ -1,0 +1,58 @@
+{
+  "name": "@zitadel/sdk-qwik-city",
+  "version": "1.0.0-alpha.25",
+  "description": "Qwik City request handler and helpers for Nextgen Auth",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-qwik-city#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "packages/sdk-qwik-city"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup --tsconfig tsconfig.lib.json src/index.ts src/server.ts src/client.ts src/types.ts --format esm --dts --clean",
+    "dev": "tsup --tsconfig tsconfig.lib.json src/index.ts src/server.ts src/client.ts --format esm --dts --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
+    "test": "vitest run",
+    "test:all": "pnpm run test"
+  },
+  "dependencies": {
+    "@zitadel/api": "workspace:*",
+    "@zitadel/sdk-core": "workspace:*"
+  },
+  "peerDependencies": {
+    "@builder.io/qwik": "^1.5.0",
+    "@builder.io/qwik-city": "^1.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

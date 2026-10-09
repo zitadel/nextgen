@@ -1,0 +1,56 @@
+id: "sdk-tanstack-start"
+language: "typescript"
+layer: "library"
+stack: "frontend"
+dependsOn:
+  - "api"
+  - "components"
+  - "sdk-core"
+
+tasks:
+  typecheck:
+    deps:
+      - "components:build"
+      - "sdk-core:build"
+
+  build:
+    deps:
+      - "components:build"
+      - "sdk-core:build"
+    options:
+      mutex: "sdk-tanstack-start-dist"
+
+  build-release:
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
+    deps:
+      - "components:build-release"
+      - "sdk-core:build-release"
+    outputs:
+      - "dist/**/*"
+    options:
+      cache: false
+      # Release builds remove stale package output and rebuild dist inside one
+      # mutex-held task. They stay out of `moon ci`; release:snapshot invokes
+      # them in the later release step instead of the normal build/test graph.
+      runInCI: false
+      # build-release rewrites the same dist/ that downstream demos resolve
+      # modules from; the mutex keeps the two from overlapping in the full
+      # CI graph.
+      mutex: "sdk-tanstack-start-dist"
+
+  test:
+    deps:
+      - "build"
+
+  # The same deps as build: tsup's declaration pass resolves the workspace
+  # packages, which need api's generated client and the built dependencies.
+  dev:
+    command: "corepack pnpm run dev"
+    deps:
+      - "components:build"
+      - "sdk-core:build"
+    options:
+      persistent: true
+      runInCI: false

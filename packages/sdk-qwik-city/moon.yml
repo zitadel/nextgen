@@ -1,0 +1,51 @@
+id: "sdk-qwik-city"
+language: "typescript"
+layer: "library"
+stack: "frontend"
+dependsOn:
+  - "api"
+  - "sdk-core"
+
+tasks:
+  typecheck:
+    deps:
+      - "sdk-core:build"
+
+  build:
+    deps:
+      - "sdk-core:build"
+    options:
+      mutex: "sdk-qwik-city-dist"
+
+  build-release:
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
+    deps:
+      - "sdk-core:build-release"
+    outputs:
+      - "dist/**/*"
+    options:
+      cache: false
+      # Release builds remove stale package output and rebuild dist inside one
+      # mutex-held task. They stay out of `moon ci`; release:snapshot invokes
+      # them in the later release step instead of the normal build/test graph.
+      runInCI: false
+      # build-release rewrites the same dist/ that a consuming demo build
+      # resolves modules from; the mutex keeps the two from overlapping in the
+      # full CI graph.
+      mutex: "sdk-qwik-city-dist"
+
+  test:
+    deps:
+      - "build"
+
+  # The same deps as build: tsup's declaration pass resolves the workspace
+  # packages, which need api's generated client and the built dependencies.
+  dev:
+    command: "corepack pnpm run dev"
+    deps:
+      - "sdk-core:build"
+    options:
+      persistent: true
+      runInCI: false
