@@ -2,7 +2,7 @@ import { CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 
 import { AUTH_FACTOR_FLAGS, AuthFactorCommand } from "./toggle";
 
-/** The `auth-factor enable` command (ADR 068). */
+/** The `auth-factor enable` command (ADR 069). */
 export default class AuthFactorEnable extends AuthFactorCommand {
   static override description = "Enable password or passkey sign-in for a user schema.";
   static override group = CommandGroups.configuration;

@@ -4,7 +4,7 @@ import { CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 
 import { AUTH_FACTOR_FLAGS, AuthFactorCommand } from "./toggle";
 
-/** The `auth-factor disable` command (ADR 068). */
+/** The `auth-factor disable` command (ADR 069). */
 export default class AuthFactorDisable extends AuthFactorCommand {
   static override description = "Disable password or passkey sign-in for a user schema.";
   static override group = CommandGroups.configuration;
@@ -16,7 +16,7 @@ export default class AuthFactorDisable extends AuthFactorCommand {
   static override flags = {
     ...AUTH_FACTOR_FLAGS,
     // `--force` is per command, not global: here it permits removing the last
-    // factor, which the server allows for API-managed schemas (ADR 068 §3).
+    // factor, which the server allows for API-managed schemas (ADR 069 §3).
     force: Flags.boolean({
       char: "f",
       description:

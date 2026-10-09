@@ -39,7 +39,7 @@ export const AUTH_FACTOR_FLAGS = {
 };
 
 /**
- * What `auth-factor enable` and `auth-factor disable` both do (ADR 068): set
+ * What `auth-factor enable` and `auth-factor disable` both do (ADR 069): set
  * `x-auth-methods.<factor>.enabled` on one local user schema and leave
  * publishing to `plan` and `apply`.
  *
@@ -155,7 +155,7 @@ export abstract class AuthFactorCommand extends BaseCommand {
     ) {
       // The schema still enables something, but no active flow offers it, so
       // the sign-in screen has no way in. Flows are not this command's to edit
-      // (ADR 068 §3), so it says so rather than refusing.
+      // (ADR 069 §3), so it says so rather than refusing.
       warnings.push(
         `No active login flow for ${schema.name} offers a factor it enables, ` +
           "so nobody can sign in until one does.",
