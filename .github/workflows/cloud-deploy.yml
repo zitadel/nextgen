@@ -2,8 +2,9 @@ name: cloud-deploy
 
 # Main is production for the hosted preview cloud: every push to main deploys
 # the commit. Vercel builds every service from the repo (vercel.json at the
-# repo root): the server container compiles the Go binary from source
-# (Dockerfile.vercel), the console and the login UI build as their
+# repo root): the server service compiles the Go binary from source on
+# Vercel's Go runtime (apps/cloud/vercel-build.sh, launched by
+# apps/cloud/launcher), the console and the login UI build as their
 # own static services, plus docs, storybook and website. Version tags remain
 # the self-hoster artifact and are produced by release-publish.yml.
 #
@@ -14,8 +15,8 @@ name: cloud-deploy
 # deployment takes traffic. Git-triggered Vercel deployments are disabled in
 # vercel.json; this workflow is the only deployer and the only place that
 # holds the migrator credential (GitHub environment `cloud-preview`,
-# restricted to main). Serving containers refuse --migrate (entrypoint.sh)
-# and preview deployments carry no production secrets.
+# restricted to main). The serving function refuses --migrate (the
+# launcher) and preview deployments carry no production secrets.
 
 on:
   push:

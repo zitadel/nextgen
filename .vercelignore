@@ -1,8 +1,9 @@
 # Upload filter for CLI deployments of the cloud project (repo root is the
 # deployment root, see vercel.json). The server service compiles the Go
-# binary from this tree (Dockerfile.vercel writes stub UI embeds itself), the UI services build with moon, so Go sources and
-# every moon project source (tools/) stay in. Only repo meta and build
-# artifacts are dropped.
+# binary from this tree on Vercel's Go runtime (apps/cloud/vercel-build.sh
+# writes the stub UI embeds itself), the UI services build with moon, so Go
+# sources and every moon project source (tools/) stay in. Only repo meta and
+# build artifacts are dropped.
 # Entries use gitignore syntax: anchor directories with a leading slash, or
 # `docs` would also drop `apps/docs`.
 /docs

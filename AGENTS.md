@@ -73,8 +73,8 @@ Development and test surfaces (`apps/`):
 - `apps/mock-zitadel/` — thin deployment wrapper that serves
   `packages/api-mock` as a live per-PR preview endpoint.
 - `apps/cloud/` — deployment wrapper for the hosted preview cloud: Vercel
-  compiles the server from the repo (repo-root `Dockerfile.vercel`) and runs it as a
-  container against PlanetScale Postgres. The repo-root `vercel.json`
+  compiles the server from the repo (`apps/cloud/vercel-build.sh`) and runs
+  it as a Go-runtime function against PlanetScale Postgres. The repo-root `vercel.json`
   deploys it together with `apps/console`, `apps/login-ui`, `apps/docs`,
   `apps/storybook` and `apps/website` as six services of one Vercel project;
   main is production there (runbook: `docs/runbooks/preview-cloud.md`).

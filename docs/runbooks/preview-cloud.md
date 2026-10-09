@@ -19,7 +19,7 @@ The Vercel project is one deployment with six
 
 | Service | Root | What it is | Public paths |
 |---|---|---|---|
-| `server` | `.` | the Go server, compiled in `Dockerfile.vercel` (no embedded UIs) | everything not listed below, incl. `/console/runtime.json` |
+| `server` | `.` | the Go server, compiled by `apps/cloud/vercel-build.sh` on Vercel's Go runtime and started by `apps/cloud/launcher` (no embedded UIs) | everything not listed below, incl. `/console/runtime.json` |
 | `console` | `apps/console` | the console SPA, built with `CONSOLE_BASE_PATH=/console`, relocated to `out/console` | `/console/*` |
 | `login` | `apps/login-ui` | the login UI, built with `LOGIN_BASE_PATH=/login`, relocated to `out/login` | `/login/*` |
 | `docs` | `apps/docs` | the docs site (Waku), built with `DOCS_BASE_PATH=/docs`, output relocated by `scripts/vercel-base-path.mjs` | `/docs/*` |
@@ -158,7 +158,7 @@ binary, the embedded UI placeholders are irrelevant for it), `nextgen
 migrate` against the production database, `vercel deploy --prod` (Vercel
 compiles the server and builds the five other services), smoke test. A
 failed migration stops the deploy. The workflow writes the commit into
-`apps/cloud/commit.txt` so the container build can stamp it into the
+`apps/cloud/commit.txt` so the build script can stamp it into the
 binary; CLI deploys without the file report `local`.
 
 `migrate` is idempotent: on a docs-only merge it connects, finds nothing
@@ -167,10 +167,10 @@ every migration must be expand/contract: the previous deployment keeps
 serving until the new one is promoted, and a rollback promotes an older
 deployment on the newer schema.
 
-All services are rebuilt on every deploy; the container layer cache has
-been cold on every build so far, so the Go compile runs from scratch each
-time. Measure the whole build in the deployment's inspector before deciding
-whether that needs attention.
+All services are rebuilt on every deploy. The Go step downloads the
+toolchain and the modules each time and still takes well under a minute;
+the whole deployment is bounded by the UI builds (about 2.5 minutes on
+2026-10-08, against 6 to 7 minutes with the earlier container build).
 
 ### Manual and staged deploys
 
@@ -180,15 +180,15 @@ changes and wrong for a server change that ships a migration: run the
 migration first (`go build -o /tmp/nextgen . && NEXTGEN_DATABASE_POSTGRES=…
 /tmp/nextgen migrate` with the migrator role), or let the workflow do it.
 
-Serving containers refuse `--migrate` (see `entrypoint.sh`), so no deploy
-of any kind can change the schema by starting; only an explicit migrate run
-can.
+The serving function refuses `--migrate` (see `apps/cloud/launcher`), so
+no deploy of any kind can change the schema by starting; only an explicit
+migrate run can.
 
 ### Rollback
 
 Promote the previous deployment in the Vercel dashboard (Deployments → … →
-Promote to Production) or `vercel promote <url>`; its image is kept in the
-Vercel Container Registry. All services roll back together: they are one
+Promote to Production) or `vercel promote <url>`; Vercel keeps every
+deployment's functions. All services roll back together: they are one
 deployment. A schema that the older binary cannot read is **not** rolled
 back; that is what the expand/contract rule protects. To redeploy an older
 commit with a build, run the workflow from that commit (`workflow_dispatch`
@@ -196,9 +196,10 @@ on a branch pointing at it).
 
 ## Lessons from the first deploy (2026-10-07)
 
-- `vercel.json` must say `"framework": "container"`. With `"framework": null`
+- Service objects need an explicit `framework`. With `"framework": null`
   the build finishes in one second, builds nothing, and every path is a 404
-  from the edge.
+  from the edge. The server ran as a `Dockerfile.vercel` container until
+  2026-10-08 and now uses `"framework": "go"` with a `buildCommand`.
 - The Vercel MCP connector could create the project but was refused (403)
   on environment variables; use `vercel env add NAME production,preview
   --sensitive --yes` with the value on stdin. A `--value` flag with an open
@@ -275,7 +276,7 @@ on a branch pointing at it).
 
 - **Master key rotation:** add a second key under a new `MASTER_KEY_ID`
   following ADR 029; this wrapper supports exactly one key per deployment
-  today, so rotation needs a small extension of `entrypoint.sh` first.
+  today, so rotation needs a small extension of the launcher first.
 
 ## Known limits
 

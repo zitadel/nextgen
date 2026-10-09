@@ -9,7 +9,8 @@ tags are for self-hosters.
 
 The Vercel project is a [services](https://vercel.com/docs/services)
 deployment defined in the repo-root `vercel.json`: `server` is the Go
-binary compiled from the repo root with the repo-root `Dockerfile.vercel`,
+binary compiled from the repo root by `vercel-build.sh` on Vercel's Go
+runtime and started by `launcher`,
 `console` and `login` are the two UIs built as static services at
 `/console` and `/login`, `docs`, `storybook` and `website` are the
 other apps, and the top-level rewrites give each its prefixes while
@@ -23,15 +24,14 @@ The design and the platform research behind it are in
 
 | File | Role |
 |---|---|
-| `../../Dockerfile.vercel` | Two stages: `golang` compiles the server from the repo root (UI embeds are placeholders, the UIs are services), `debian:12-slim` runs it with the entrypoint. Reads `commit.txt` for build metadata when the workflow wrote it. |
-| `entrypoint.sh` | Renders the master key into `nextgen.yaml` from `MASTER_KEY_PEM_B64`, binds to `$PORT`, execs `nextgen server --config …`. Refuses `--migrate`. |
+| `vercel-build.sh` | The `buildCommand` of the `server` service: writes the stub UI embeds (the UIs are services), stamps version and `commit.txt` into the binary, builds `launcher` to `$VERCEL_OUTPUT_FILE`. |
+| `launcher/` | The function's entrypoint: renders the master key into `nextgen.yaml` from `MASTER_KEY_PEM_B64` and the admin document for `--user-file`, follows `$PORT`, then runs the server command in process. Refuses `--migrate`. Tested with `go test ./apps/cloud/launcher`. |
 | `../../vercel.json` | The six services, the public route table (redirects for bare UI prefixes, rewrites per service, server catch-all), region `fra1`, a keep-warm cron on `/readyz`, Git deployments disabled so the workflow is the only deployer. |
 | `../../.vercelignore` | Keeps repo meta and build artifacts out of CLI uploads; Go sources and every moon project source stay in, the server and the UIs build from them. |
 | `scripts/admin-user.ts` | Mints the seeded platform admin: credential file plus the base64 bootstrap document for `BOOTSTRAP_ADMIN_USER_JSON_B64`. |
 | `scripts/smoke.ts` | Post-deploy gate: readiness, project create, user create and query, session probe, console and login pages, docs page and `llms.txt`, storybook, website start page. |
-| `src/entrypoint.test.ts` | Runs `entrypoint.sh` against a stub binary and asserts the rendered config. |
 
-## Why migrations run in CI, not in the container
+## Why migrations run in CI, not in the function
 
 `nextgen migrate` runs in `.github/workflows/cloud-deploy.yml` from a
 binary built from the same commit **before** `vercel deploy --prod`. A

@@ -470,3 +470,30 @@ schema per pull request.
   non-default schema, so all previews share them.
 - Still open: the PR workflow itself, the corpus fixture, and the preview
   key in the Vercel Preview target.
+
+## Go runtime instead of the container (2026-10-08)
+
+Decision: the `server` service uses Vercel's Go framework preset
+(`"framework": "go"`, `buildCommand: sh apps/cloud/vercel-build.sh`) instead
+of `Dockerfile.vercel`. The preset runs a bare binary that listens on
+`PORT`, so `apps/cloud/launcher` replaces `entrypoint.sh`: it renders the
+master key YAML and the admin document into the data dir, follows `PORT`,
+refuses `--migrate`, and calls the server command in process. `cmd/server`
+is unchanged.
+
+Measured side by side on the same commit, same six services, each server in
+its own schema of the preview cluster:
+
+| | container | Go preset |
+|---|---|---|
+| whole deployment build | 370 s and 403 s | 156 s |
+| server build step | minutes (image pull, compile, push) | 38 s incl. toolchain and module download |
+| cold `/readyz` after idle | 2.34 s, 2.37 s | 0.31 s, 0.45 s |
+| warm `/readyz` | 0.21 s | 0.22 s |
+| artifact | image in the registry | 25 MB function in `fra1` |
+
+The cold start no longer pays for an image pull; what remains is the
+server's own boot. Nothing is cached for the Go step yet (Vercel picked
+go1.26.8 for `go 1.26` and downloaded all modules) and it is still the
+cheapest part of the build. Open: confirm in the dashboard that the function
+runs on Fluid compute; the Services guide says backends do by default.

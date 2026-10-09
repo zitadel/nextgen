@@ -3,7 +3,8 @@
   "services": {
     "server": {
       "root": ".",
-      "entrypoint": "Dockerfile.vercel"
+      "framework": "go",
+      "buildCommand": "sh apps/cloud/vercel-build.sh"
     },
     "console": {
       "root": "apps/console",
