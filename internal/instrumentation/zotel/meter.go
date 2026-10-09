@@ -5,6 +5,7 @@ import (
 	"os"
 
 	google "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric"
+	"github.com/ogen-go/ogen/otelogen"
 	"go.opentelemetry.io/contrib/exporters/autoexport"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
@@ -15,7 +16,60 @@ import (
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
+
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 )
+
+// ogenAttributes are the attributes the generated server's request instruments
+// may carry: the operation, and the method, route template and status it
+// served. http.route is the template (`/users/{user_id}`), never the path.
+var ogenAttributes = []attribute.Key{
+	otelogen.OperationIDKey,
+	semconv.HTTPRequestMethodKey,
+	semconv.HTTPRouteKey,
+	semconv.HTTPResponseStatusCodeKey,
+}
+
+// otelhttpAttributes are the same, under the names otelhttp uses, which still
+// includes the pre-stable pair. The raw request path (http.target, url.path)
+// is deliberately absent: every distinct /users/{id} would be a series of its
+// own.
+var otelhttpAttributes = []attribute.Key{
+	semconv.HTTPRequestMethodKey,
+	semconv.HTTPResponseStatusCodeKey,
+	semconv.HTTPRouteKey,
+	"http.method",
+	"http.status_code",
+}
+
+// MeterViews returns the views every meter provider of the server is built
+// with. They are what bounds the series count: an attribute that a view does
+// not allow is dropped before it can create a series, whatever the code
+// recording it passed.
+//
+//   - ogen's request instruments, which serve every API request, keep the
+//     operation id, method, route template and status code.
+//   - otelhttp, were it ever put in front of a handler, keeps the same.
+//   - each application instrument keeps the attributes its catalogue entry
+//     declares.
+func MeterViews() []sdkmetric.View {
+	views := []sdkmetric.View{
+		allowAttributes(instrumentation.Scope{Name: otelogen.Name}, "", ogenAttributes),
+		allowAttributes(instrumentation.Scope{Name: otelhttp.ScopeName}, "", otelhttpAttributes),
+	}
+	for _, in := range metrics.Catalogue() {
+		views = append(views, allowAttributes(instrumentation.Scope{Name: metrics.ScopeName}, in.Name, in.AttributeKeys()))
+	}
+	return views
+}
+
+func allowAttributes(scope instrumentation.Scope, name string, keys []attribute.Key) sdkmetric.View {
+	return sdkmetric.NewView(
+		sdkmetric.Instrument{Name: name, Scope: scope},
+		sdkmetric.Stream{AttributeFilter: attribute.NewAllowKeysFilter(keys...)},
+	)
+}
 
 func NewMeterProvider(ctx context.Context, cfg ExporterConfig, resource *resource.Resource) (_ *sdkmetric.MeterProvider, err error) {
 	readerOption, err := cfg.metrics(ctx)
@@ -23,25 +77,43 @@ func NewMeterProvider(ctx context.Context, cfg ExporterConfig, resource *resourc
 		return nil, err
 	}
 
-	// create a view to filter out unwanted attributes
-	view := sdkmetric.NewView(
-		sdkmetric.Instrument{
-			Scope: instrumentation.Scope{Name: otelhttp.ScopeName},
-		},
-		sdkmetric.Stream{
-			AttributeFilter: attribute.NewAllowKeysFilter("http.method", "http.status_code", "http.target"),
-		},
-	)
-
 	opts := []sdkmetric.Option{
 		sdkmetric.WithResource(resource),
-		sdkmetric.WithView(view),
+		sdkmetric.WithView(MeterViews()...),
 	}
 	if readerOption != nil {
 		opts = append(opts, readerOption)
 	}
 	meterProvider := sdkmetric.NewMeterProvider(opts...)
 	return meterProvider, nil
+}
+
+// otelMetricsEnvConfigured reports whether the standard OpenTelemetry
+// environment says where metrics go.
+func otelMetricsEnvConfigured() bool {
+	return os.Getenv("OTEL_METRICS_EXPORTER") != "" ||
+		os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" ||
+		os.Getenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT") != "" ||
+		os.Getenv("OTEL_EXPORTER_OTLP_PROTOCOL") != "" ||
+		os.Getenv("OTEL_EXPORTER_OTLP_METRICS_PROTOCOL") != ""
+}
+
+// MetricsEnabled reports whether metrics are exported anywhere. When they are
+// not, the application instruments are left off: there is nobody to read them,
+// and recording one costs a stack walk per storage statement.
+//
+// For auto it is the guard [ExporterConfig.metrics] applies: an exporter
+// type the environment names but that resolves to none is still reported as
+// enabled, and costs only the recording.
+func (cfg ExporterConfig) MetricsEnabled() bool {
+	switch cfg.Type {
+	case ExporterTypeUnspecified, ExporterTypeNone:
+		return false
+	case ExporterTypeAuto:
+		return otelMetricsEnvConfigured()
+	default:
+		return true
+	}
 }
 
 func (cfg ExporterConfig) metrics(ctx context.Context) (_ sdkmetric.Option, err error) {
@@ -60,11 +132,7 @@ func (cfg ExporterConfig) metrics(ctx context.Context) (_ sdkmetric.Option, err 
 		// cover every possible OTLP env var (e.g. OTEL_EXPORTER_OTLP_HEADERS or
 		// OTEL_EXPORTER_OTLP_CERTIFICATE on their own), but those vars are
 		// meaningless without an endpoint or exporter type being set too.
-		if os.Getenv("OTEL_METRICS_EXPORTER") != "" ||
-			os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" ||
-			os.Getenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT") != "" ||
-			os.Getenv("OTEL_EXPORTER_OTLP_PROTOCOL") != "" ||
-			os.Getenv("OTEL_EXPORTER_OTLP_METRICS_PROTOCOL") != "" {
+		if otelMetricsEnvConfigured() {
 			var reader sdkmetric.Reader
 			reader, err = autoexport.NewMetricReader(ctx)
 			if err == nil && !autoexport.IsNoneMetricReader(reader) {

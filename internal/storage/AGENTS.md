@@ -101,6 +101,25 @@ Multi-write nesting uses the dialect `withTransaction` helpers above
 [`dialect/spanner/with_transaction.go`](dialect/spanner/with_transaction.go),
 [`dialect/sqlite/with_transaction.go`](dialect/sqlite/with_transaction.go)).
 
+### Statement timing
+
+Every executor call is timed as `zitadel.db.statement.duration`, named after the
+statement method that issued it ([`database.ObserveStatement`](database/statement_metrics.go),
+[`docs/operations/metrics.md`](../../docs/operations/metrics.md)). The name comes
+from the call stack, so it relies on two conventions:
+
+- A statements type is named `xStatements` and the methods that run SQL are its
+  methods. A helper that has no receiver (like `execAffected`) is fine: the
+  statement is the method that called it.
+- A new dialect, or a new kind of executor, calls `database.ObserveStatement` as
+  the first thing every executor method does and `Done` as the last, and
+  registers its connection pool with `metrics.Default().RegisterPool` when it
+  has one.
+
+Never pass a value that comes from a request (an id, a filter) as a statement
+name or an attribute: the metric views and the tests in
+`internal/instrumentation/metrics` exist to keep series bounded.
+
 ### No call-site SQL concatenation
 
 Do not assemble statement SQL at the call site with `+` or `fmt.Sprintf`

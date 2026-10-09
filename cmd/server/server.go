@@ -154,6 +154,22 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	}
 	sfs.Add(telemetry.Shutdown)
 
+	// The application instruments (storage, credentials, flows, audit) report
+	// through the same provider, and so through whichever exporter
+	// instrumentation.metric configures. This precedes startDatabase: the pool
+	// registers its connection gauge with the default when it is built.
+	// With no metric exporter the Application stays inert: nobody would read
+	// the instruments, and recording them costs a stack walk per statement.
+	var appMetricsOpts []metrics.Option
+	if cfg.Instrumentation.Metric.Exporter.MetricsEnabled() {
+		appMetricsOpts = append(appMetricsOpts, metrics.WithMeterProvider(telemetry.MeterProvider()))
+	}
+	appMetrics, err := metrics.NewApplication(appMetricsOpts...)
+	if err != nil {
+		return fmt.Errorf("failed to create application metrics: %w", err)
+	}
+	metrics.SetDefault(appMetrics)
+
 	setUpLogging(cfg.Instrumentation.Log, telemetry.LoggerProvider())
 
 	pool, err := startDatabase(ctx, cfg, applyMigrations)
@@ -234,7 +250,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		serviceDBPool,
 		sessionResolver,
 		userLookup,
-		passwordHasher,
+		crypto.NewMeteredHashVerifier(passwordHasher),
 	)
 	sessionService := service.NewSessionService(serviceDBPool, userRefs, service.SessionConfig{
 		DefaultTTL: cfg.Session.DefaultTTL,
@@ -328,7 +344,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	)
 	ssoCallback := service.NewFlowSSOCallback(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient)
 
-	flowService := service.NewFlowService(serviceDBPool, stateMachine)
+	flowService := service.NewMeteredFlowService(service.NewFlowService(serviceDBPool, stateMachine))
 	tokenService := service.NewTokenService(keyService, serviceDBPool)
 
 	// ── Default project resolution ──
@@ -355,7 +371,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	defer stop()
 
 	exportAdapter := service.EventExportAdapter{Pool: serviceDBPool}
-	requestEventBuf := audit.NewRequestBuffer(exportAdapter, audit.DefaultRequestBufferConfig())
+	requestEventBuf := audit.NewRequestBuffer(audit.NewMeteredBatchInserter(exportAdapter), audit.DefaultRequestBufferConfig())
 	defer requestEventBuf.Close()
 
 	retentionJob := audit.NewRetentionJob(exportAdapter, cfg.Events.Retention)
