@@ -1,10 +1,10 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { formatDate } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
+import { server } from "@/test/msw";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -58,14 +58,7 @@ const DEEP = {
   },
 };
 
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => {
-  server.close();
-  vi.unstubAllEnvs();
-});
+afterAll(() => vi.unstubAllEnvs());
 
 const CREATED_AT = "2026-07-12T16:59:04Z";
 
@@ -350,6 +343,9 @@ describe("user schema detail", () => {
     // same `$id` everywhere), so the id alone could resolve in the caller's own.
     const projects: (string | null)[] = [];
     server.use(
+      http.get("*/api/projects/proj_other", () =>
+        HttpResponse.json({ id: "proj_other", name: "Other project" }),
+      ),
       http.get(`${SCHEMAS_URL}/sch_business`, ({ request }) => {
         projects.push(new URL(request.url).searchParams.get("project_id"));
         return HttpResponse.json(envelope("sch_business", BUSINESS));

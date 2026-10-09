@@ -72,10 +72,9 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     name: "@zitadel/console",
     environment: "jsdom",
     setupFiles: ["./src/test-setup.ts"],
-    // The per-test runner budget must exceed the RTL asyncUtilTimeout (5s, set
-    // in test-setup.ts); otherwise a slow query hits Vitest's default 5s
-    // testTimeout before its own wait window elapses, cutting the findBy short
-    // and hiding Testing Library's diagnostic. Give it 4x headroom.
+    // Above the RTL asyncUtilTimeout (5s, set in test-setup.ts) with room for a
+    // test that makes several queries, so a slow query reports its own Testing
+    // Library diagnostic rather than being cut short by this budget.
     testTimeout: 20_000,
   },
 }));
