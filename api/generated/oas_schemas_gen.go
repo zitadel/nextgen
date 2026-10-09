@@ -9649,13 +9649,18 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 // transaction: for every resource it compares the content against the
 // project's newest revision of the same handle, reuses that revision when the
 // content matches and allocates a new one otherwise. The caller keeps no
-// state, so the same directory builds the same release on any project.
+// state.
 // Resources reference each other by handle: a flow definition's
-// `user_schema` names a schema by its `objectType`. A reference must resolve
-// to a resource in this bundle or to one the project already holds; a release
-// is refused when it does not, naming the pointer and the handle.
-// At least one resource across all kinds. More kinds join as they become
-// release kinds.
+// `user_schema` names a schema by its `objectType`. A reference resolves to
+// the resource with that handle in this bundle; failing that, to the
+// project's newest revision of it, which the release then pins as well. A
+// handle that neither holds refuses the release, naming the pointer and the
+// handle. A bundle that references only resources it carries builds the
+// same release on any project.
+// Carries at least one resource and at most 50 across all kinds, the most a
+// release pins; a kind with nothing to send is omitted rather than sent
+// empty. Unknown keys are refused. More kinds join as they become release
+// kinds.
 // Ref: #
 type ConfigurationBundle struct {
 	// User schemas, one per `.zitadel/schemas/*.json`.

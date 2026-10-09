@@ -3052,8 +3052,8 @@ func (s *ConfigurationBundle) Validate() error {
 			return nil // optional
 		}
 		if err := (validate.Array{
-			MinLength:    0,
-			MinLengthSet: false,
+			MinLength:    1,
+			MinLengthSet: true,
 			MaxLength:    50,
 			MaxLengthSet: true,
 		}).ValidateLength(len(s.Schemas)); err != nil {
@@ -3088,8 +3088,8 @@ func (s *ConfigurationBundle) Validate() error {
 			return nil // optional
 		}
 		if err := (validate.Array{
-			MinLength:    0,
-			MinLengthSet: false,
+			MinLength:    1,
+			MinLengthSet: true,
 			MaxLength:    50,
 			MaxLengthSet: true,
 		}).ValidateLength(len(s.FlowDefinitions)); err != nil {
@@ -3124,8 +3124,8 @@ func (s *ConfigurationBundle) Validate() error {
 			return nil // optional
 		}
 		if err := (validate.Array{
-			MinLength:    0,
-			MinLengthSet: false,
+			MinLength:    1,
+			MinLengthSet: true,
 			MaxLength:    1,
 			MaxLengthSet: true,
 		}).ValidateLength(len(s.Brandings)); err != nil {

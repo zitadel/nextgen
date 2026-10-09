@@ -6,30 +6,40 @@ description: |
   transaction: for every resource it compares the content against the
   project's newest revision of the same handle, reuses that revision when the
   content matches and allocates a new one otherwise. The caller keeps no
-  state, so the same directory builds the same release on any project.
+  state.
 
   Resources reference each other by handle: a flow definition's
-  `user_schema` names a schema by its `objectType`. A reference must resolve
-  to a resource in this bundle or to one the project already holds; a release
-  is refused when it does not, naming the pointer and the handle.
+  `user_schema` names a schema by its `objectType`. A reference resolves to
+  the resource with that handle in this bundle; failing that, to the
+  project's newest revision of it, which the release then pins as well. A
+  handle that neither holds refuses the release, naming the pointer and the
+  handle. A bundle that references only resources it carries builds the
+  same release on any project.
 
-  At least one resource across all kinds. More kinds join as they become
-  release kinds.
+  Carries at least one resource and at most 50 across all kinds, the most a
+  release pins; a kind with nothing to send is omitted rather than sent
+  empty. Unknown keys are refused. More kinds join as they become release
+  kinds.
+additionalProperties: false
+minProperties: 1
 properties:
   schemas:
     type: array
+    minItems: 1
     maxItems: 50
     description: User schemas, one per `.zitadel/schemas/*.json`.
     items:
       $ref: ../schemas/user-schema.yaml
   flow_definitions:
     type: array
+    minItems: 1
     maxItems: 50
     description: Flow definitions, one per `.zitadel/flows/*.json`.
     items:
       $ref: ../../components/flows/flow-definition.yaml
   brandings:
     type: array
+    minItems: 1
     maxItems: 1
     description: |
       The descriptor from `.zitadel/branding/branding.json` with its template
