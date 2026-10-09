@@ -77,7 +77,6 @@ const (
 	QueryTeamsOperation                    OperationName = "QueryTeams"
 	QueryUsersOperation                    OperationName = "QueryUsers"
 	RevokeMySessionOperation               OperationName = "RevokeMySession"
-	RevokeReleaseOperation                 OperationName = "RevokeRelease"
 	RevokeSessionOperation                 OperationName = "RevokeSession"
 	SetUserPasswordOperation               OperationName = "SetUserPassword"
 	SubmitFlowStepOperation                OperationName = "SubmitFlowStep"

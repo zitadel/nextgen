@@ -11,7 +11,6 @@ required:
   - project_id
   - content_hash
   - metadata
-  - revoked_at
 properties:
   id:
     readOnly: true
@@ -28,11 +27,3 @@ properties:
   metadata:
     readOnly: true
     $ref: release-metadata.yaml
-  revoked_at:
-    readOnly: true
-    description: When the release was revoked, or null while it is not.
-    oneOf:
-      - type: string
-        format: date-time
-      - type: 'null'
-    example: null

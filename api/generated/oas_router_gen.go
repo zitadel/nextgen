@@ -20,7 +20,7 @@ var (
 	rn70AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
-	rn90AllowedHeaders = map[string]string{
+	rn89AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type,Idempotency-Key",
 	}
 	rn16AllowedHeaders = map[string]string{
@@ -55,7 +55,7 @@ var (
 	rn11AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
-	rn87AllowedHeaders = map[string]string{
+	rn86AllowedHeaders = map[string]string{
 		"POST": "Content-Type,Origin",
 	}
 	rn12AllowedHeaders = map[string]string{
@@ -116,9 +116,6 @@ var (
 	rn63AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
-	rn84AllowedHeaders = map[string]string{
-		"POST": "Authorization",
-	}
 	rn20AllowedHeaders = map[string]string{
 		"GET":  "Authorization",
 		"POST": "Authorization,Content-Type",
@@ -173,7 +170,7 @@ var (
 	rn33AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
-	rn86AllowedHeaders = map[string]string{
+	rn85AllowedHeaders = map[string]string{
 		"PUT": "Authorization,Content-Type",
 	}
 	rn77AllowedHeaders = map[string]string{
@@ -377,7 +374,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 										default:
 											s.notAllowed(w, r, notAllowedParams{
 												allowedMethods: "POST",
-												allowedHeaders: rn90AllowedHeaders,
+												allowedHeaders: rn89AllowedHeaders,
 												acceptPost:     "application/json",
 												acceptPatch:    "",
 											})
@@ -766,7 +763,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "POST",
-									allowedHeaders: rn87AllowedHeaders,
+									allowedHeaders: rn86AllowedHeaders,
 									acceptPost:     "application/json",
 									acceptPatch:    "",
 								})
@@ -1440,15 +1437,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						}
 
 						// Param: "release_id"
-						// Match until "/"
+						// Leaf parameter, slashes are prohibited
 						idx := strings.IndexByte(elem, '/')
-						if idx < 0 {
-							idx = len(elem)
+						if idx >= 0 {
+							break
 						}
-						args[0] = elem[:idx]
-						elem = elem[idx:]
+						args[0] = elem
+						elem = ""
 
 						if len(elem) == 0 {
+							// Leaf node.
 							switch r.Method {
 							case "GET":
 								s.handleGetReleaseByIdRequest([1]string{
@@ -1464,35 +1462,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							}
 
 							return
-						}
-						switch elem[0] {
-						case '/': // Prefix: "/revoke"
-
-							if l := len("/revoke"); len(elem) >= l && elem[0:l] == "/revoke" {
-								elem = elem[l:]
-							} else {
-								break
-							}
-
-							if len(elem) == 0 {
-								// Leaf node.
-								switch r.Method {
-								case "POST":
-									s.handleRevokeReleaseRequest([1]string{
-										args[0],
-									}, elemIsEscaped, w, r)
-								default:
-									s.notAllowed(w, r, notAllowedParams{
-										allowedMethods: "POST",
-										allowedHeaders: rn84AllowedHeaders,
-										acceptPost:     "",
-										acceptPatch:    "",
-									})
-								}
-
-								return
-							}
-
 						}
 
 					}
@@ -2142,7 +2111,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 									default:
 										s.notAllowed(w, r, notAllowedParams{
 											allowedMethods: "PUT",
-											allowedHeaders: rn86AllowedHeaders,
+											allowedHeaders: rn85AllowedHeaders,
 											acceptPost:     "",
 											acceptPatch:    "",
 										})
@@ -3551,15 +3520,16 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						}
 
 						// Param: "release_id"
-						// Match until "/"
+						// Leaf parameter, slashes are prohibited
 						idx := strings.IndexByte(elem, '/')
-						if idx < 0 {
-							idx = len(elem)
+						if idx >= 0 {
+							break
 						}
-						args[0] = elem[:idx]
-						elem = elem[idx:]
+						args[0] = elem
+						elem = ""
 
 						if len(elem) == 0 {
+							// Leaf node.
 							switch method {
 							case "GET":
 								r.name = GetReleaseByIdOperation
@@ -3573,33 +3543,6 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							default:
 								return
 							}
-						}
-						switch elem[0] {
-						case '/': // Prefix: "/revoke"
-
-							if l := len("/revoke"); len(elem) >= l && elem[0:l] == "/revoke" {
-								elem = elem[l:]
-							} else {
-								break
-							}
-
-							if len(elem) == 0 {
-								// Leaf node.
-								switch method {
-								case "POST":
-									r.name = RevokeReleaseOperation
-									r.summary = "Revoke a release"
-									r.operationID = "revokeRelease"
-									r.operationGroup = ""
-									r.pathPattern = "/releases/{release_id}/revoke"
-									r.args = args
-									r.count = 1
-									return r, true
-								default:
-									return
-								}
-							}
-
 						}
 
 					}
