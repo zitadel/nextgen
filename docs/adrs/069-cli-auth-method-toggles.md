@@ -43,9 +43,10 @@ zitadel auth-method sso      disable --provider <name> [--schema <name>] [--forc
 
 - **The method is the noun.** Following ADR 064's resource-first grammar, each
   method is its own command with its own flags. `password` and `passkey` take
-  none of their own. `sso` takes `--provider` and the provider's credentials.
-  On `sso enable`, `--provider` is one of the providers the CLI can set up;
-  on `sso disable`, it is any provider the schema lists.
+  only `--schema`, and `--force` on `disable`. `sso` also takes `--provider`,
+  and `sso enable` the provider's credentials. On `sso enable`, `--provider` is
+  one of the providers the CLI can set up. On `sso disable` it is any name; one
+  that the schema and its flows do not list is reported as unchanged.
   A single command with a `--mode` switch was rejected, because flags such as
   `--client-id` would then mean something for one mode and nothing for the
   others, and help could not show which flags go together.
@@ -90,10 +91,19 @@ Files are rewritten with sorted keys. Running a command twice is safe: a method
 already in the requested state is reported as unchanged, and nothing is
 written.
 
+Every result lists its follow-ups in `next_commands`, with `plan` and `apply`
+only when a file changed. The schema name comes from a file name and `--cwd`
+from the user. When either would need shell quoting, `next_commands` is left
+empty, because quoting differs between POSIX shells, PowerShell and cmd.exe.
+The same commands are always given as argument lists: `data.next_args` on
+success, and `details.retry_args` and `details.suggested_args` on a refusal. A
+follow-up carries `--cwd` when the run did, and a dry run's suggestions keep
+`--dry-run`.
+
 ### 3. Refusals
 
-Every refusal happens before anything is written or published, including under
-`--dry-run`, so a dry run fails exactly where the real run would.
+Every refusal below happens before anything is written or published, including
+under `--dry-run`, so a dry run fails where the real run would for any of them.
 
 - **A flow would break.** Before any change, the command validates each login
   flow that runs against the schema, using the schema and flows as they would
@@ -103,15 +113,15 @@ Every refusal happens before anything is written or published, including under
   Errors the flow already had do not count. A flow belongs to the schema when
   its `user_schema` is the id `.zitadel/state.json` records for the schema or
   the id that one replaced; otherwise when it is the schema's `$id`; and, for a
-  schema with no `$id`, when it ends in the schema's file name. Before the
+  schema with no `$id`, when it ends in `/<file name>.json`. Before the
   first `apply` this can match more flows than `plan` does, so a command may
   refuse a change `plan` would accept, but never the reverse.
 - **A flow cannot be checked.** A flow file that does not match the flow
   schema, or that has a structural error such as a purpose pointing at a
   missing step, is not checked for sign-in methods by the validator. The
   command cannot tell whether such a flow still uses the method, and `plan`
-  would reject it once the changed schema re-pins it, so every command refuses
-  until the flow is fixed.
+  would reject it once the changed schema re-pins it, so every command that
+  would change the schema or a flow refuses until the flow is fixed.
 - **No way to sign in would be left.** Disabling the schema's last enabled
   method is guarded. Only password, passkey and SSO with at least one
   well-formed provider count. This guard is CLI policy, not a server rule. The
@@ -138,21 +148,15 @@ Every refusal happens before anything is written or published, including under
   every run warns when, after the change, the schema enables a method but no
   active flow offers any of them.
 
-- **Suggested commands stay safe to run.** The schema name comes from a file
-  name and `--cwd` from the user. When either would need shell quoting,
-  `next_commands` is left empty, because quoting differs between POSIX shells,
-  PowerShell and cmd.exe. The same commands are always given as argument lists:
-  `data.next_args` on success, and `details.retry_args` and
-  `details.suggested_args` on a refusal. A follow-up carries `--cwd` when the
-  run did, and a dry run's suggestions keep `--dry-run`.
 - **Password needs an identifier.** Enabling password on a schema without
   `x-identifier` is refused, because the server rejects that combination and
   `plan` does not catch it.
 - **Values that are not the right shape are refused, not overwritten.** This
-  covers an `x-auth-methods` that is not an object, an entry (`sso`
-  included) without a boolean `enabled`, an `sso.providers` that is not a
-  list, and a schema that points at an external URL instead of holding its
-  own methods.
+  covers an `x-auth-methods` that is not an object; the entry the command
+  edits (`sso` for the sso commands) when it is not an object or has no
+  boolean `enabled`; an `sso.providers`, or a step's `sso_providers`, that is
+  not a list; and a schema that points at an external URL instead of holding
+  its own methods.
 
 ### 4. Enabling does not make a method appear
 
@@ -172,8 +176,8 @@ commands, and they do not count as a way to sign in for the guard in §3.
 ### 6. `sso enable` becomes a deprecated alias
 
 `zitadel sso enable` keeps working and runs `zitadel auth-method sso enable`
-with the same flags. Each run reports a deprecation warning that names the new
-command. CLI output, `setup`'s suggestions and the agent contract
+with the same flags. Each run that gets past flag parsing reports a
+deprecation warning that names the new command. CLI output, `setup`'s suggestions and the agent contract
 (`SKILL.md`) point at the new command. Removing the alias is a separate change.
 
 ## Consequences
