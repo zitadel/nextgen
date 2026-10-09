@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 
@@ -13,13 +13,9 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
-
 const USERS_URL = "http://localhost/api/users";
 const USERS_QUERY_URL = `${USERS_URL}/query`;
 const SCHEMAS_URL = "http://localhost/api/schemas";
-
-afterAll(() => vi.unstubAllEnvs());
 
 async function renderUsers(path = scopedPath("/users")) {
   const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([

@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 
 // Safe as a static import where `@/auth/session` is not: the fixture's only
@@ -16,8 +16,6 @@ vi.mock("@/auth/session", async (importOriginal) => {
   const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
-
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 // Loaded after the env stub, for the same reason `renderProject` imports the
 // router dynamically: the API client reads its base once, at module load, and a
@@ -36,8 +34,6 @@ const GRANTS_QUERY_URL = `${GRANTS_URL}/query`;
 const USERS_QUERY_URL = "http://localhost/api/users/query";
 /** The signed-in address, read from the fixture rather than restated here. */
 const SELF = makeTestSession().user?.identifier ?? "";
-
-afterAll(() => vi.unstubAllEnvs());
 
 async function renderProject(projectId = PROJECT_ID) {
   const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([

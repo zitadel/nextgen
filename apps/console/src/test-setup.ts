@@ -120,13 +120,6 @@ if (typeof Element !== "undefined") {
   Element.prototype.scrollIntoView ??= () => undefined;
 }
 
-// Hermetic env: Vitest (via Vite) loads `.env.local`, so without this stub a
-// local VITE_CONSOLE_RUNTIME_FALLBACK would turn runtime-discovery failures
-// back into the standalone fallback (Console ADR 0004 §3), making outcomes
-// depend on a gitignored local file. Specs that need a value stub their own
-// (vi.stubEnv wins over this default).
-vi.stubEnv("VITE_CONSOLE_RUNTIME_FALLBACK", "");
-
 // Every spec starts with no runtime document, so no sign-in project. One that
 // needs a project sets it with `_setRuntimeForTesting`, as the server would.
 beforeEach(_resetRuntimeForTesting);

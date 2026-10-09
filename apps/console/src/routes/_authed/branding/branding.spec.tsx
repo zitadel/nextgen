@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 
@@ -41,13 +41,9 @@ vi.mock("@/components/branding/login-preview", () => ({
   ),
 }));
 
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
-
 const LIST_URL = "http://localhost/api/branding";
 const FLOWS_URL = "http://localhost/api/flow_definitions";
 const REVISION_URL = "http://localhost/api/branding/brnd_1";
-
-afterAll(() => vi.unstubAllEnvs());
 
 const PUBLISHED = {
   typography: { font_family: "Arimo, sans-serif", font_url: "https://cdn.example.com/font.css" },

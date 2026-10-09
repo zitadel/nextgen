@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 
@@ -13,12 +13,8 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
-
 const TEAM_ID = "team_1";
 const TEAM_URL = `http://localhost/api/teams/${TEAM_ID}`;
-
-afterAll(() => vi.unstubAllEnvs());
 
 function team(overrides: Record<string, unknown> = {}) {
   return {

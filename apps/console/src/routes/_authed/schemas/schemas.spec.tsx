@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { formatDate } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
@@ -13,8 +13,6 @@ vi.mock("@/auth/session", async (importOriginal) => {
   const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
-
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 const SCHEMAS_URL = "http://localhost/api/schemas";
 
@@ -57,8 +55,6 @@ const DEEP = {
     },
   },
 };
-
-afterAll(() => vi.unstubAllEnvs());
 
 const CREATED_AT = "2026-07-12T16:59:04Z";
 
