@@ -30,6 +30,8 @@ export {
 export {
   applySsoToFlow,
   applySsoToSchema,
+  removeSsoFromFlow,
+  removeSsoFromSchema,
   ssoEditRefusal,
   type SsoEditTarget,
   type SsoResult,

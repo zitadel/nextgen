@@ -6,11 +6,11 @@ import { confirm } from "@clack/prompts";
 import { Config } from "@oclif/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import AuthFactorDisable from "../../../src/commands/auth-factor/disable";
+import PasskeyDisable from "../../../src/commands/auth-method/passkey/disable";
 import { cliPackageRoot } from "../../helpers/oclif-build";
 
 // The confirmation is the guard against locking every user out, so its two
-// answers are driven here. The other auth-factor tests run --non-interactive
+// answers are driven here. The other auth-method tests run --non-interactive
 // against the built CLI, where a prompt cannot be answered.
 vi.mock("@clack/prompts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@clack/prompts")>()),
@@ -34,7 +34,7 @@ afterEach(() => {
 
 /** A Project whose only enabled factor is passkey, with no flows to stop the change. */
 async function passkeyOnlyProject(): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-auth-factor-confirm-"));
+  const cwd = await mkdtemp(join(tmpdir(), "zitadel-auth-method-confirm-"));
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
   await writeFile(join(cwd, "zitadel.json"), `${JSON.stringify({ version: "0.0.1" })}\n`);
   await writeFile(
@@ -60,16 +60,13 @@ async function disablePasskey(cwd: string) {
   const config = await Config.load({ root: cliPackageRoot });
   const log = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
   try {
-    return await AuthFactorDisable.run(
-      ["--mode", "passkey", "--cwd", cwd, "--no-telemetry"],
-      config,
-    );
+    return await PasskeyDisable.run(["--cwd", cwd, "--no-telemetry"], config);
   } finally {
     log.mockRestore();
   }
 }
 
-describe("auth-factor disable confirmation", () => {
+describe("auth-method passkey disable confirmation", () => {
   it("asks before removing the last way to sign in", async () => {
     const cwd = await passkeyOnlyProject();
     vi.mocked(confirm).mockResolvedValue(false);

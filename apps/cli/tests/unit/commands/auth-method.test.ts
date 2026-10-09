@@ -52,7 +52,7 @@ async function makeProject(
   schemas: Record<string, Record<string, unknown>> = { "default-human-user": passwordSchema() },
   flows: Record<string, unknown> = { "default-human-user-login": passwordFlow() },
 ): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-auth-factor-"));
+  const cwd = await mkdtemp(join(tmpdir(), "zitadel-auth-method-"));
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
   await mkdir(join(cwd, ".zitadel/flows"), { recursive: true });
   await writeFile(join(cwd, "zitadel.json"), `${JSON.stringify({ version: "0.0.1" })}\n`);
@@ -65,9 +65,15 @@ async function makeProject(
   return cwd;
 }
 
-async function run(cwd: string, verb: "enable" | "disable", ...args: string[]) {
+async function run(
+  cwd: string,
+  method: "password" | "passkey",
+  verb: "enable" | "disable",
+  ...args: string[]
+) {
   const result = await runCliForTest([
-    "auth-factor",
+    "auth-method",
+    method,
     verb,
     "--cwd",
     cwd,
@@ -80,7 +86,7 @@ async function run(cwd: string, verb: "enable" | "disable", ...args: string[]) {
 
 /** A suggested command with the CLI prefix and the temp --cwd path left out. */
 function suggested(command: string): string {
-  return command.replace(/^.*? auth-factor /, "").replace(/--cwd \S+/, "--cwd <cwd>");
+  return command.replace(/^.*? auth-method /, "").replace(/--cwd \S+/, "--cwd <cwd>");
 }
 
 /** A schema whose only enabled factor is passkey. */
@@ -102,18 +108,18 @@ async function readSchema(cwd: string, name = "default-human-user") {
 // Temp dirs are left for the OS to reclaim, as the integration helper does
 // (#1498): a recursive delete on teardown flakes under CI load.
 
-describe("auth-factor", () => {
+describe("auth-method password and passkey", () => {
   describe("the envelope", () => {
     it("reports what changed, what was already set, and what is left", async () => {
       const cwd = await makeProject();
 
-      const { envelope } = await run(cwd, "disable", "--mode", "passkey");
+      const { envelope } = await run(cwd, "passkey", "disable");
 
       expect(envelope.data).toMatchObject({
         schema: "default-human-user",
         file: ".zitadel/schemas/default-human-user.json",
-        changed: ["passkey"],
-        unchanged: [],
+        method: "passkey",
+        changed: true,
         usable: ["password"],
       });
     });
@@ -121,7 +127,7 @@ describe("auth-factor", () => {
     it("lists plan and apply as the next commands after a change", async () => {
       const cwd = await makeProject();
 
-      const { envelope } = await run(cwd, "disable", "--mode", "passkey");
+      const { envelope } = await run(cwd, "passkey", "disable");
 
       const next = envelope.data?.next_commands as string[];
       expect(
@@ -135,7 +141,7 @@ describe("auth-factor", () => {
       const spaced = join(parent, "my project");
       await rename(cwd, spaced);
 
-      const { envelope } = await run(spaced, "disable", "--mode", "passkey");
+      const { envelope } = await run(spaced, "passkey", "disable");
 
       expect(envelope.data?.next_commands).toEqual([]);
       expect(envelope.data?.next_args).toEqual([
@@ -155,7 +161,7 @@ describe("auth-factor", () => {
         {},
       );
 
-      const { envelope } = await run(cwd, "disable", "--mode", "passkey");
+      const { envelope } = await run(cwd, "passkey", "disable");
 
       expect(envelope).toMatchObject({
         code: "E_VALIDATION",
@@ -166,7 +172,7 @@ describe("auth-factor", () => {
     it("works with a local server that is not running", async () => {
       const cwd = await makeProject();
 
-      const { exitCode } = await run(cwd, "disable", "--mode", "passkey", "--server", "local");
+      const { exitCode } = await run(cwd, "passkey", "disable", "--server", "local");
 
       expect(exitCode).toBe(0);
     });
@@ -174,13 +180,9 @@ describe("auth-factor", () => {
     it("lists no next commands when nothing changed", async () => {
       const cwd = await makeProject();
 
-      const { envelope } = await run(cwd, "enable", "--mode", "password");
+      const { envelope } = await run(cwd, "password", "enable");
 
-      expect(envelope.data).toMatchObject({
-        changed: [],
-        unchanged: ["password"],
-        next_commands: [],
-      });
+      expect(envelope.data).toMatchObject({ changed: false, next_commands: [] });
     });
 
     it("does not count a register step that only enrols a passkey", async () => {
@@ -216,7 +218,7 @@ describe("auth-factor", () => {
         { "default-human-user-login": enrolling },
       );
 
-      const { envelope } = await run(cwd, "enable", "--mode", "passkey");
+      const { envelope } = await run(cwd, "passkey", "enable");
 
       expect(envelope.data?.not_offered).toEqual(["passkey"]);
     });
@@ -242,12 +244,12 @@ describe("auth-factor", () => {
         "draft-login": draft,
       });
 
-      const { envelope } = await run(cwd, "enable", "--mode", "passkey");
+      const { envelope } = await run(cwd, "passkey", "enable");
 
       expect(envelope.data?.not_offered).toEqual(["passkey"]);
     });
 
-    it("warns when no active flow offers any factor the schema enables", async () => {
+    it("warns when no active flow offers any method the schema enables", async () => {
       // Copilot's lockout case: password steps removed from the flow, passkey
       // enabled but never offered, then password disabled.
       const noPassword = {
@@ -264,60 +266,22 @@ describe("auth-factor", () => {
       };
       const cwd = await makeProject(undefined, { "default-human-user-login": noPassword });
 
-      const { envelope } = await run(cwd, "disable", "--mode", "password");
+      const { envelope } = await run(cwd, "password", "disable");
 
       expect(envelope.warnings).toEqual([
-        "No active login flow for default-human-user offers a factor it enables, so nobody can sign in until one does.",
+        "No active login flow for default-human-user offers a method it enables, so nobody can sign in until one does.",
       ]);
     });
 
     it("warns about a factor no flow offers", async () => {
       const cwd = await makeProject();
 
-      const { envelope } = await run(cwd, "enable", "--mode", "passkey");
+      const { envelope } = await run(cwd, "passkey", "enable");
 
       expect(envelope.data?.not_offered).toEqual(["passkey"]);
       expect(envelope.warnings).toEqual([
         "No login flow for default-human-user offers passkey yet. Add it to a flow to show it.",
       ]);
-    });
-  });
-
-  describe("repeated --mode", () => {
-    it("changes every factor named", async () => {
-      const cwd = await makeProject({
-        "default-human-user": {
-          ...passwordSchema(),
-          "x-auth-methods": { password: { enabled: false }, passkey: { enabled: false } },
-        },
-      });
-
-      const { envelope } = await run(cwd, "enable", "--mode", "password", "--mode", "passkey");
-
-      expect(envelope.data?.changed).toEqual(["password", "passkey"]);
-      expect((await readSchema(cwd))["x-auth-methods"]).toEqual({
-        password: { enabled: true },
-        passkey: { enabled: true },
-      });
-    });
-
-    it("changes neither when one of them is refused", async () => {
-      // Passkey alone could go; password is still collected by the flow.
-      const cwd = await makeProject();
-      const before = await readSchema(cwd);
-
-      const { envelope } = await run(cwd, "disable", "--mode", "password", "--mode", "passkey");
-
-      expect(envelope.code).toBe("E_VALIDATION");
-      expect(await readSchema(cwd)).toEqual(before);
-    });
-
-    it("counts a factor named twice once", async () => {
-      const cwd = await makeProject();
-
-      const { envelope } = await run(cwd, "disable", "--mode", "passkey", "--mode", "passkey");
-
-      expect(envelope.data?.changed).toEqual(["passkey"]);
     });
   });
 
@@ -328,7 +292,7 @@ describe("auth-factor", () => {
         { "customers-login": passwordFlow("customers"), "staff-login": passwordFlow("staff") },
       );
 
-      const { exitCode } = await run(cwd, "disable", "--mode", "passkey", "--schema", "staff");
+      const { exitCode } = await run(cwd, "passkey", "disable", "--schema", "staff");
 
       expect(exitCode).toBe(0);
       expect((await readSchema(cwd, "staff"))["x-auth-methods"].passkey).toEqual({
@@ -345,7 +309,7 @@ describe("auth-factor", () => {
         {},
       );
 
-      const { envelope } = await run(cwd, "disable", "--mode", "passkey");
+      const { envelope } = await run(cwd, "passkey", "disable");
 
       expect(envelope).toMatchObject({ status: "error", code: "E_VALIDATION" });
     });
@@ -355,7 +319,7 @@ describe("auth-factor", () => {
     it("names the rule and step a disabled factor would break", async () => {
       const cwd = await makeProject();
 
-      const { envelope } = await run(cwd, "disable", "--mode", "password");
+      const { envelope } = await run(cwd, "password", "disable");
 
       expect(envelope.code).toBe("E_VALIDATION");
       expect(envelope.details?.issues).toEqual([
@@ -375,7 +339,7 @@ describe("auth-factor", () => {
         { "default-human-user-login": broken },
       );
 
-      const { envelope } = await run(cwd, "enable", "--mode", "passkey");
+      const { envelope } = await run(cwd, "passkey", "enable");
 
       expect(envelope.code).toBe("E_VALIDATION");
       expect(envelope.details?.issues).toEqual([expect.objectContaining({ rule: "definition" })]);
@@ -385,7 +349,7 @@ describe("auth-factor", () => {
       const broken = { ...passwordFlow(), purposes: { login: "identifier", register: "missing" } };
       const cwd = await makeProject(undefined, { "default-human-user-login": broken });
 
-      const { envelope } = await run(cwd, "disable", "--mode", "password");
+      const { envelope } = await run(cwd, "password", "disable");
 
       expect(envelope.code).toBe("E_VALIDATION");
       expect(envelope.details?.issues).toEqual([expect.objectContaining({ rule: "definition" })]);
@@ -402,24 +366,13 @@ describe("auth-factor", () => {
         {},
       );
 
-      const { envelope } = await run(cwd, "disable", "--mode", "passkey");
+      const { envelope } = await run(cwd, "passkey", "disable");
 
       expect(envelope.code).toBe("E_VALIDATION");
       expect(envelope.details?.usable).toEqual(["passkey"]);
       expect(envelope.next_commands?.map(suggested)).toEqual([
-        "disable --mode passkey --schema default-human-user --cwd <cwd> --force",
-        "enable --mode password --schema default-human-user --cwd <cwd>",
-      ]);
-    });
-
-    it("still suggests a factor the user named that was already off", async () => {
-      const cwd = await makeProject(passkeyOnlySchema(), {});
-
-      const { envelope } = await run(cwd, "disable", "--mode", "password", "--mode", "passkey");
-
-      expect(envelope.next_commands?.map(suggested)).toEqual([
-        "disable --mode password --mode passkey --schema default-human-user --cwd <cwd> --force",
-        "enable --mode password --schema default-human-user --cwd <cwd>",
+        "passkey disable --schema default-human-user --cwd <cwd> --force",
+        "password enable --schema default-human-user --cwd <cwd>",
       ]);
     });
 
@@ -435,10 +388,10 @@ describe("auth-factor", () => {
         {},
       );
 
-      const { envelope } = await run(cwd, "disable", "--mode", "passkey");
+      const { envelope } = await run(cwd, "passkey", "disable");
 
       expect(envelope.next_commands?.map(suggested)).toEqual([
-        "disable --mode passkey --schema default-human-user --cwd <cwd> --force",
+        "passkey disable --schema default-human-user --cwd <cwd> --force",
       ]);
     });
 
@@ -453,15 +406,14 @@ describe("auth-factor", () => {
         {},
       );
 
-      const { envelope } = await run(cwd, "disable", "--mode", "passkey");
+      const { envelope } = await run(cwd, "passkey", "disable");
 
       expect(envelope.next_commands ?? []).toEqual([]);
       expect(envelope.details).toMatchObject({
         retry_args: [
-          "auth-factor",
-          "disable",
-          "--mode",
+          "auth-method",
           "passkey",
+          "disable",
           "--schema",
           "my users&calc",
           "--cwd",
@@ -471,10 +423,9 @@ describe("auth-factor", () => {
         suggested_args: [
           expect.arrayContaining(["disable", "--force"]),
           [
-            "auth-factor",
-            "enable",
-            "--mode",
+            "auth-method",
             "password",
+            "enable",
             "--schema",
             "my users&calc",
             "--cwd",
@@ -495,7 +446,7 @@ describe("auth-factor", () => {
         {},
       );
 
-      const { envelope } = await run(cwd, "disable", "--mode", "passkey");
+      const { envelope } = await run(cwd, "passkey", "disable");
 
       expect(envelope).toMatchObject({
         code: "E_VALIDATION",
@@ -513,7 +464,7 @@ describe("auth-factor", () => {
       };
       const cwd = await makeProject(undefined, { "default-human-user-login": malformed });
 
-      const { envelope } = await run(cwd, "disable", "--mode", "password");
+      const { envelope } = await run(cwd, "password", "disable");
 
       expect(envelope.code).toBe("E_VALIDATION");
       expect(envelope.details?.issues).toEqual([
@@ -535,7 +486,7 @@ describe("auth-factor", () => {
         {},
       );
 
-      const { envelope } = await run(cwd, "disable", "--mode", "passkey");
+      const { envelope } = await run(cwd, "passkey", "disable");
 
       expect(envelope.next_commands ?? []).toEqual([]);
       expect(envelope.details).toMatchObject({
@@ -557,7 +508,7 @@ describe("auth-factor", () => {
         {},
       );
 
-      const { envelope } = await run(cwd, "disable", "--mode", "passkey");
+      const { envelope } = await run(cwd, "passkey", "disable");
 
       expect(envelope).toMatchObject({
         code: "E_VALIDATION",
@@ -571,7 +522,7 @@ describe("auth-factor", () => {
         {},
       );
 
-      const { envelope } = await run(cwd, "enable", "--mode", "passkey");
+      const { envelope } = await run(cwd, "passkey", "enable");
 
       expect(envelope).toMatchObject({
         code: "E_VALIDATION",
@@ -590,7 +541,7 @@ describe("auth-factor", () => {
         {},
       );
 
-      const { envelope } = await run(cwd, "disable", "--mode", "password");
+      const { envelope } = await run(cwd, "password", "disable");
 
       expect(envelope).toMatchObject({
         code: "E_VALIDATION",
@@ -609,7 +560,7 @@ describe("auth-factor", () => {
         {},
       );
 
-      const { envelope } = await run(cwd, "disable", "--mode", "passkey");
+      const { envelope } = await run(cwd, "passkey", "disable");
 
       expect(envelope.code).toBe("E_VALIDATION");
     });
@@ -626,7 +577,7 @@ describe("auth-factor", () => {
         {},
       );
 
-      const { envelope } = await run(cwd, "enable", "--mode", "password");
+      const { envelope } = await run(cwd, "password", "enable");
 
       expect(envelope).toMatchObject({ code: "E_VALIDATION", details: { factor: "password" } });
     });
@@ -634,7 +585,7 @@ describe("auth-factor", () => {
     it("keeps --dry-run in the suggestions of a refused dry run", async () => {
       const cwd = await makeProject(passkeyOnlySchema(), {});
 
-      const { envelope } = await run(cwd, "disable", "--mode", "passkey", "--dry-run");
+      const { envelope } = await run(cwd, "passkey", "disable", "--dry-run");
 
       expect(envelope.details).toMatchObject({
         retry_args: expect.arrayContaining(["--dry-run", "--force"]),
@@ -647,7 +598,7 @@ describe("auth-factor", () => {
     it("refuses under --dry-run too", async () => {
       const cwd = await makeProject();
 
-      const { envelope } = await run(cwd, "disable", "--mode", "password", "--dry-run");
+      const { envelope } = await run(cwd, "password", "disable", "--dry-run");
 
       expect(envelope.code).toBe("E_VALIDATION");
     });
@@ -656,7 +607,7 @@ describe("auth-factor", () => {
       const cwd = await makeProject();
       const before = await readSchema(cwd);
 
-      await run(cwd, "disable", "--mode", "password");
+      await run(cwd, "password", "disable");
 
       expect(await readSchema(cwd)).toEqual(before);
     });
@@ -673,7 +624,7 @@ describe("auth-factor", () => {
     it("disables the last factor, which the server allows", async () => {
       const cwd = await makeProject(passkeyOnly(), {});
 
-      const { exitCode } = await run(cwd, "disable", "--mode", "passkey", "--force");
+      const { exitCode } = await run(cwd, "passkey", "disable", "--force");
 
       expect(exitCode).toBe(0);
       expect((await readSchema(cwd))["x-auth-methods"].passkey).toEqual({ enabled: false });
@@ -682,7 +633,7 @@ describe("auth-factor", () => {
     it("warns that nobody can sign in afterwards", async () => {
       const cwd = await makeProject(passkeyOnly(), {});
 
-      const { envelope } = await run(cwd, "disable", "--mode", "passkey", "--force");
+      const { envelope } = await run(cwd, "passkey", "disable", "--force");
 
       expect(envelope.warnings).toEqual([
         "default-human-user has no way to sign in left. Its users can only be managed through the API.",
@@ -693,7 +644,7 @@ describe("auth-factor", () => {
       const cwd = await makeProject(passkeyOnly(), {});
       await chmod(join(cwd, ".zitadel/schemas/default-human-user.json"), 0o444);
 
-      const { envelope } = await run(cwd, "disable", "--mode", "passkey", "--force");
+      const { envelope } = await run(cwd, "passkey", "disable", "--force");
 
       expect(envelope.status).toBe("error");
       expect(envelope).not.toHaveProperty("warnings");
@@ -702,7 +653,7 @@ describe("auth-factor", () => {
     it("does not override a flow that still uses the factor", async () => {
       const cwd = await makeProject();
 
-      const { envelope } = await run(cwd, "disable", "--mode", "password", "--force");
+      const { envelope } = await run(cwd, "password", "disable", "--force");
 
       expect(envelope.code).toBe("E_VALIDATION");
     });
@@ -712,7 +663,7 @@ describe("auth-factor", () => {
     it("still reports the warnings", async () => {
       const cwd = await makeProject();
 
-      const { envelope } = await run(cwd, "enable", "--mode", "passkey", "--dry-run");
+      const { envelope } = await run(cwd, "passkey", "enable", "--dry-run");
 
       expect(envelope.warnings).toEqual([
         "No login flow for default-human-user offers passkey yet. Add it to a flow to show it.",
@@ -722,19 +673,11 @@ describe("auth-factor", () => {
     it("previews the change without writing it", async () => {
       const cwd = await makeProject();
 
-      const { envelope } = await run(cwd, "disable", "--mode", "passkey", "--dry-run");
+      const { envelope } = await run(cwd, "passkey", "disable", "--dry-run");
 
       expect(envelope).toMatchObject({ status: "skipped", reason: "dry-run" });
-      expect(envelope.data?.changed).toEqual(["passkey"]);
+      expect(envelope.data?.changed).toBe(true);
       expect((await readSchema(cwd))["x-auth-methods"].passkey).toEqual({ enabled: true });
     });
-  });
-
-  it("asks for a factor rather than guessing one", async () => {
-    const cwd = await makeProject();
-
-    const { envelope } = await run(cwd, "disable");
-
-    expect(envelope).toMatchObject({ status: "error", code: "E_VALIDATION" });
   });
 });

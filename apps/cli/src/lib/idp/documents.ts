@@ -433,7 +433,7 @@ function migrateLegacyOutcomes(document: Json): boolean {
           "E_VALIDATION",
           `steps.${String(step.name)}: transition "${old}" is renamed to "${next}", which is an action on this step`,
           {
-            hint: `Rename the action "${next}" on step "${String(step.name)}" (and its transition), then run sso enable again.`,
+            hint: `Rename the action "${next}" on step "${String(step.name)}" (and its transition), then run auth-method sso enable again.`,
             details: { step: step.name, action: next },
           },
         );
@@ -448,7 +448,7 @@ function migrateLegacyOutcomes(document: Json): boolean {
             "E_VALIDATION",
             `steps.${String(step.name)}: transition "${old}" declares purpose or action, which "${next}" cannot`,
             {
-              hint: `Remove purpose and action from the transition "${old}" on step "${String(step.name)}", then run sso enable again.`,
+              hint: `Remove purpose and action from the transition "${old}" on step "${String(step.name)}", then run auth-method sso enable again.`,
               details: { step: step.name, transition: old },
             },
           );
@@ -488,9 +488,9 @@ function refuseOutcomeActionCollision(document: Json): void {
       if (isObject(action) && typeof action.name === "string" && keys.has(action.name)) {
         throw new ZitadelError(
           "E_VALIDATION",
-          `steps.${name}: action "${action.name}" uses a name sso enable writes as an outcome on this step`,
+          `steps.${name}: action "${action.name}" uses a name auth-method sso enable writes as an outcome on this step`,
           {
-            hint: `Rename the action "${action.name}" on step "${name}" (and its transition), then run sso enable again.`,
+            hint: `Rename the action "${action.name}" on step "${name}" (and its transition), then run auth-method sso enable again.`,
             details: { step: name, action: action.name },
           },
         );
@@ -603,4 +603,53 @@ export function applySsoToFlow(
   return changed || skipped.length > 0
     ? { document, changed, skipped }
     : { document: flow, changed: false, skipped };
+}
+
+/**
+ * Remove a provider from a user schema (`auth-method sso disable`, ADR 069).
+ *
+ * Only `x-auth-methods.sso` is touched. The provider leaves the list, and when
+ * none is left `sso` becomes `{ "enabled": false }`: the meta-schema requires
+ * at least one provider whenever the list is present. A provider the schema
+ * does not offer is a no-op.
+ */
+export function removeSsoFromSchema(schema: object, slug: string): SsoResult<object> {
+  const document = clone(schema) as Json;
+  const methods = isObject(document["x-auth-methods"]) ? { ...document["x-auth-methods"] } : {};
+  const sso = methods.sso;
+  if (!isObject(sso) || !Array.isArray(sso.providers) || !sso.providers.includes(slug)) {
+    return { document: schema, changed: false, skipped: [] };
+  }
+  const providers = sso.providers.filter((provider) => provider !== slug);
+  methods.sso = providers.length === 0 ? { enabled: false } : { ...sso, providers };
+  document["x-auth-methods"] = methods;
+  return { document, changed: true, skipped: [] };
+}
+
+/**
+ * Remove a provider from every step of a login flow that offers it.
+ *
+ * Only the `sso_providers` lists change; a list left empty is dropped. The
+ * routes and steps `sso enable` added stay: without a provider they are never
+ * reached, they validate as they are, and enabling a provider again uses them
+ * as they stand rather than rebuilding them.
+ */
+export function removeSsoFromFlow(flow: object, slug: string): SsoResult<object> {
+  const document = clone(flow) as Json;
+  let changed = false;
+  for (const step of steps(document)) {
+    if (!Array.isArray(step.sso_providers) || !step.sso_providers.includes(slug)) {
+      continue;
+    }
+    const providers = (step.sso_providers as unknown[]).filter((provider) => provider !== slug);
+    if (providers.length === 0) {
+      delete step.sso_providers;
+    } else {
+      step.sso_providers = providers;
+    }
+    changed = true;
+  }
+  return changed
+    ? { document, changed, skipped: [] }
+    : { document: flow, changed: false, skipped: [] };
 }

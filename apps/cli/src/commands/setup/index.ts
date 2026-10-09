@@ -1041,7 +1041,7 @@ function ssoRecovery(
   }
   return {
     hint:
-      `The rerun configures ${chosen[0]?.provider ?? ""} only; add the rest with the sso enable ` +
+      `The rerun configures ${chosen[0]?.provider ?? ""} only; add the rest with the auth-method sso enable ` +
       "commands below, which ask for each client id. ",
     // The client id is not interpolated into the command. These strings are
     // run verbatim, especially by agents, and nothing escapes them for a
@@ -1058,7 +1058,10 @@ function ssoRecovery(
     // somewhere nobody asked for. Both callers of this are local-server
     // failures, so `local` is the server meant in every case.
     commands: remaining.map((provider) =>
-      publicCliCommand(`sso enable --provider ${provider.provider} --server local`, cliVersion),
+      publicCliCommand(
+        `auth-method sso enable --provider ${provider.provider} --server local`,
+        cliVersion,
+      ),
     ),
   };
 }

@@ -6,7 +6,13 @@ import { describe, expect, it } from "vitest";
 
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { ZitadelError } from "../../../../src/lib/errors";
-import { applySsoToFlow, applySsoToSchema, ssoEditRefusal } from "../../../../src/lib/idp";
+import {
+  applySsoToFlow,
+  applySsoToSchema,
+  removeSsoFromFlow,
+  removeSsoFromSchema,
+  ssoEditRefusal,
+} from "../../../../src/lib/idp";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../../../../..");
 
@@ -735,5 +741,100 @@ describe("refusing a document the editors would overwrite", () => {
     expect(ssoEditRefusal({ "x-auth-methods": { sso: { providers: "google" } } }, "schema")).toBe(
       "x-auth-methods.sso.providers is not a list",
     );
+  });
+});
+
+/** A schema's `x-auth-methods`, typed for reading in the tests below. */
+function methodsOf(schema: object): Record<string, unknown> {
+  return (schema as { "x-auth-methods": Record<string, unknown> })["x-auth-methods"];
+}
+
+describe("removeSsoFromSchema", () => {
+  const withProviders = (providers: string[]) => ({
+    ...getDefaultHumanUserSchema(),
+    "x-auth-methods": {
+      password: { enabled: true },
+      sso: { enabled: true, providers },
+    },
+  });
+
+  it("takes one provider out and keeps the rest", () => {
+    const { document, changed } = removeSsoFromSchema(
+      withProviders(["google", "github"]),
+      "google",
+    );
+
+    expect(changed).toBe(true);
+    expect(methodsOf(document).sso).toEqual({
+      enabled: true,
+      providers: ["github"],
+    });
+  });
+
+  it("turns SSO off when the last provider goes", () => {
+    const { document } = removeSsoFromSchema(withProviders(["google"]), "google");
+
+    expect(methodsOf(document).sso).toEqual({ enabled: false });
+  });
+
+  it("leaves password and passkey as they are", () => {
+    const { document } = removeSsoFromSchema(withProviders(["google"]), "google");
+
+    expect(methodsOf(document).password).toEqual({ enabled: true });
+  });
+
+  it("changes nothing for a provider the schema does not offer", () => {
+    const schema = withProviders(["github"]);
+
+    expect(removeSsoFromSchema(schema, "google")).toEqual({
+      document: schema,
+      changed: false,
+      skipped: [],
+    });
+  });
+});
+
+describe("removeSsoFromFlow", () => {
+  /** The shipped flow after `sso enable` added these providers. */
+  function enabled(...slugs: string[]): Record<string, unknown> {
+    let flow: object = shippedFlow();
+    for (const slug of slugs) {
+      flow = applySsoToFlow(flow, slug, bothMethods).document;
+    }
+    return flow as Record<string, unknown>;
+  }
+
+  it("takes the provider off every step that offered it", () => {
+    const { document } = removeSsoFromFlow(enabled("google"), "google");
+
+    const offering = (document as { steps: Array<{ sso_providers?: string[] }> }).steps.filter(
+      (step) => step.sso_providers !== undefined,
+    );
+    expect(offering).toEqual([]);
+  });
+
+  it("keeps the other providers on each step", () => {
+    const { document } = removeSsoFromFlow(enabled("google", "github"), "google");
+
+    expect(stepNamed(document, "identifier").sso_providers).toEqual(["github"]);
+  });
+
+  it("keeps the routes and steps sso enable added", () => {
+    const before = enabled("google");
+
+    const { document } = removeSsoFromFlow(before, "google");
+
+    expect(targetsOf(document, "identifier")).toEqual(targetsOf(before, "identifier"));
+    expect(stepNamed(document, "sso-conflict")).toBeDefined();
+  });
+
+  it("changes nothing for a provider the flow does not offer", () => {
+    const flow = enabled("github");
+
+    expect(removeSsoFromFlow(flow, "google")).toEqual({
+      document: flow,
+      changed: false,
+      skipped: [],
+    });
   });
 });

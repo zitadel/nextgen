@@ -309,7 +309,7 @@ const CONNECTION_EXISTS: { hint: string; nextCommands: string[] } = {
     "A connection file is yours to keep, so setup never replaces or removes one. " +
     "Remove it and run setup again to scaffold a fresh one, or keep it and enable the " +
     "provider afterwards to reuse it.",
-  nextCommands: ["zitadel sso enable --provider google"],
+  nextCommands: ["zitadel auth-method sso enable --provider google"],
 };
 
 /** Whether a path is there, without caring why it is not. */

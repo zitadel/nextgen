@@ -8,10 +8,11 @@ import {
 import { isObject } from "./json";
 
 /**
- * The factors `auth-factor enable` and `auth-factor disable` switch (ADR 069).
+ * The methods `auth-method password` and `auth-method passkey` switch on and
+ * off by a flag alone (ADR 069).
  *
- * SSO is deliberately absent: a provider needs credentials and a connection
- * file, so it is `sso enable`'s job.
+ * SSO is not one of them: a provider needs credentials, a connection file and
+ * flow edits, so `auth-method sso` handles it with its own commands.
  */
 export const AUTH_FACTORS = ["password", "passkey"] as const;
 export type AuthFactor = (typeof AUTH_FACTORS)[number];
@@ -127,11 +128,14 @@ export function checkFlow(
   flow: object,
   before: Record<string, unknown>,
   after: Record<string, unknown>,
+  // The flow as the change leaves it. Password and passkey never edit a flow,
+  // so it defaults to the flow itself; `sso disable` removes the provider.
+  flowAfter: object = flow,
 ): FlowCheck {
   // The semantic validator reads a malformed shape leniently (a string where
   // `fields` should be a list reads as no fields), so the raw file is checked
   // against the canonical flow schema first, as `plan` does.
-  const shape = flowConfigSchema.safeParse(flow);
+  const shape = flowConfigSchema.safeParse(flowAfter);
   if (!shape.success) {
     return {
       kind: "unchecked",
@@ -144,7 +148,7 @@ export function checkFlow(
   }
   // The validator runs the schema rules only over a structurally sound flow,
   // so without this the change would always look harmless on a broken one.
-  const structural = validateFlowDefinition(flow);
+  const structural = validateFlowDefinition(flowAfter);
   if (structural.length > 0) {
     return { kind: "unchecked", issues: structural };
   }
@@ -156,7 +160,7 @@ export function checkFlow(
   );
   return {
     kind: "checked",
-    introduced: validateFlowDefinition(flow, after).filter(
+    introduced: validateFlowDefinition(flowAfter, after).filter(
       (issue) => issue.severity === "error" && !existing.has(key(issue)),
     ),
   };

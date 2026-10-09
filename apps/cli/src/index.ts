@@ -1,8 +1,12 @@
 import type { Command } from "@oclif/core";
 
 import Apply from "./commands/apply";
-import AuthFactorDisable from "./commands/auth-factor/disable";
-import AuthFactorEnable from "./commands/auth-factor/enable";
+import PasskeyDisable from "./commands/auth-method/passkey/disable";
+import PasskeyEnable from "./commands/auth-method/passkey/enable";
+import PasswordDisable from "./commands/auth-method/password/disable";
+import PasswordEnable from "./commands/auth-method/password/enable";
+import AuthMethodSsoDisable from "./commands/auth-method/sso/disable";
+import AuthMethodSsoEnable from "./commands/auth-method/sso/enable";
 import BrandingEject from "./commands/branding/eject";
 import Claim from "./commands/claim";
 import Console from "./commands/console";
@@ -46,8 +50,12 @@ export const COMMANDS: Record<string, typeof Command> = {
   start: Start,
   status: Status,
   stop: Stop,
-  "auth-factor:enable": AuthFactorEnable,
-  "auth-factor:disable": AuthFactorDisable,
+  "auth-method:password:enable": PasswordEnable,
+  "auth-method:password:disable": PasswordDisable,
+  "auth-method:passkey:enable": PasskeyEnable,
+  "auth-method:passkey:disable": PasskeyDisable,
+  "auth-method:sso:enable": AuthMethodSsoEnable,
+  "auth-method:sso:disable": AuthMethodSsoDisable,
   "branding:eject": BrandingEject,
   "sso:enable": SsoEnable,
   "variables:list": VariablesList,

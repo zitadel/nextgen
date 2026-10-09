@@ -19,75 +19,79 @@ Usage
   zitadel <command> [flags]
 
 Project commands
-  setup:                 Create a Zitadel project and scaffold local auth
-  claim:                 Claim this project to make it permanent
-  doctor:                Verify local runtime and project state
-  eject:                 Remove managed files and local Zitadel state
+  setup:                        Create a Zitadel project and scaffold local auth
+  claim:                        Claim this project to make it permanent
+  doctor:                       Verify local runtime and project state
+  eject:                        Remove managed files and local Zitadel state
 
 Local server commands
-  start:                 Start a local Zitadel server
-  stop:                  Stop the local Zitadel server
-  status:                Summarize the local Zitadel server and project state
-  logs:                  Show local Zitadel server logs
-  reset:                 Delete the local Zitadel server runtime and data
-  console:               Open the local console, signed in as the local admin created by \`zitadel start\`
+  start:                        Start a local Zitadel server
+  stop:                         Stop the local Zitadel server
+  status:                       Summarize the local Zitadel server and project state
+  logs:                         Show local Zitadel server logs
+  reset:                        Delete the local Zitadel server runtime and data
+  console:                      Open the local console, signed in as the local admin created by \`zitadel start\`
 
 Configuration commands
-  plan:                  Validate config without mutation and preview the sync diff
-  apply:                 Validate and upload repo config to the platform
-  branding eject:        Take ownership of the login template
-  auth-factor disable:   Disable password or passkey sign-in for a user schema
-  auth-factor enable:    Enable password or passkey sign-in for a user schema
-  branding get:          Get one branding revision by id
-  branding list:         List branding
-  environments get:      Get one environment by id
-  environments list:     List environments
-  flow-definitions get:  Get one flow definition by id
-  flow-definitions list: List flow-definitions
-  releases get:          Get one release by id
-  releases list:         List releases
-  schemas get:           Get one schema by id
-  schemas list:          List schemas
-  sso enable:            Enable an identity provider for a user schema
-  variables delete:      Delete one variable from the project
-  variables get:         Get one variable from the project
-  variables list:        List the variables entered on the project
-  variables set:         Set one variable on the project
+  plan:                         Validate config without mutation and preview the sync diff
+  apply:                        Validate and upload repo config to the platform
+  branding eject:               Take ownership of the login template
+  auth-method passkey disable:  Disable passkey sign-in for a user schema
+  auth-method passkey enable:   Enable passkey sign-in for a user schema
+  auth-method password disable: Disable password sign-in for a user schema
+  auth-method password enable:  Enable password sign-in for a user schema
+  auth-method sso disable:      Remove an identity provider from a user schema
+  auth-method sso enable:       Add an identity provider to a user schema
+  branding get:                 Get one branding revision by id
+  branding list:                List branding
+  environments get:             Get one environment by id
+  environments list:            List environments
+  flow-definitions get:         Get one flow definition by id
+  flow-definitions list:        List flow-definitions
+  releases get:                 Get one release by id
+  releases list:                List releases
+  schemas get:                  Get one schema by id
+  schemas list:                 List schemas
+  sso enable:                   Deprecated alias of auth-method sso enable
+  variables delete:             Delete one variable from the project
+  variables get:                Get one variable from the project
+  variables list:               List the variables entered on the project
+  variables set:                Set one variable on the project
 
 Resource commands
-  resources:             List the resources this CLI manages and what can be done to each
-  events get:            Get one event by id
-  events list:           List events
-  grants create:         Create a grant
-  grants delete:         Delete a grant by id
-  grants get:            Get one grant by id
-  grants list:           List grants
-  idps create:           Create an identity provider connection
-  idps get:              Get one identity provider connection by id
-  idps list:             List idps
-  projects get:          Get one project by id
-  projects list:         List projects
-  projects update:       Update a project by id
-  sessions get:          Get one session by id
-  sessions list:         List sessions
-  sessions revoke:       Revoke a session by id
-  teams create:          Create a team
-  teams deactivate:      Deactivate a team by id
-  teams get:             Get one team by id
-  teams list:            List teams
-  teams update:          Update a team by id
-  users create:          Create an user
-  users delete:          Delete an user by id
-  users get:             Get one user by id
-  users list:            List users
-  users update:          Update an user by id
+  resources:                    List the resources this CLI manages and what can be done to each
+  events get:                   Get one event by id
+  events list:                  List events
+  grants create:                Create a grant
+  grants delete:                Delete a grant by id
+  grants get:                   Get one grant by id
+  grants list:                  List grants
+  idps create:                  Create an identity provider connection
+  idps get:                     Get one identity provider connection by id
+  idps list:                    List idps
+  projects get:                 Get one project by id
+  projects list:                List projects
+  projects update:              Update a project by id
+  sessions get:                 Get one session by id
+  sessions list:                List sessions
+  sessions revoke:              Revoke a session by id
+  teams create:                 Create a team
+  teams deactivate:             Deactivate a team by id
+  teams get:                    Get one team by id
+  teams list:                   List teams
+  teams update:                 Update a team by id
+  users create:                 Create an user
+  users delete:                 Delete an user by id
+  users get:                    Get one user by id
+  users list:                   List users
+  users update:                 Update an user by id
 
 Additional commands
-  autocomplete:          Display autocomplete installation instructions
-  commands:              List all zitadel commands
-  search:                Search for a command
-  version:               Show the CLI version
-  which:                 Show which plugin a command is in
+  autocomplete:                 Display autocomplete installation instructions
+  commands:                     List all zitadel commands
+  search:                       Search for a command
+  version:                      Show the CLI version
+  which:                        Show which plugin a command is in
 
 Flags
   --help      Show help for command

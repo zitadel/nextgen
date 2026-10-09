@@ -31,6 +31,7 @@ export interface Envelope<T = Record<string, unknown>> {
   readonly message?: string;
   readonly hint?: string;
   readonly next_commands?: string[];
+  readonly warnings?: string[];
   readonly cli_version?: string;
   readonly command?: string;
   readonly source?: string;
@@ -232,10 +233,11 @@ export class ScaffoldedApp {
     );
   }
 
-  /** `sso enable` without `--json`, for a spec asserting what the developer reads. */
+  /** `auth-method sso enable` without `--json`, for a spec asserting what the developer reads. */
   enableSsoRendered(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingStdin(credentials.secret, () =>
       this.cli([
+        "auth-method",
         "sso",
         "enable",
         "--non-interactive",
@@ -250,6 +252,7 @@ export class ScaffoldedApp {
   enableSso(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingSecret(credentials.secret, () =>
       this.cli([
+        "auth-method",
         "sso",
         "enable",
         "--non-interactive",
@@ -262,33 +265,51 @@ export class ScaffoldedApp {
     );
   }
 
-  /** `auth-factor enable`, one `--mode` per factor. */
-  enableFactors(factors: string[], extraArgs: string[] = []): Promise<CliResult> {
-    return this.cli([
-      "auth-factor",
-      "enable",
-      "--non-interactive",
-      "--json",
-      ...modeFlags(factors),
-      ...extraArgs,
-    ]);
+  /** The deprecated `sso enable` alias, for the spec that covers it. */
+  enableSsoDeprecated(provider: string, credentials: Credentials): Promise<CliResult> {
+    return this.pipingSecret(credentials.secret, () =>
+      this.cli([
+        "sso",
+        "enable",
+        "--non-interactive",
+        "--json",
+        "--provider",
+        provider,
+        "--client-id",
+        credentials.clientId,
+      ]),
+    );
   }
 
-  /** `auth-factor disable`, one `--mode` per factor. */
-  disableFactors(factors: string[], extraArgs: string[] = []): Promise<CliResult> {
+  /** `auth-method password|passkey <verb>`. */
+  authMethod(
+    method: "password" | "passkey",
+    verb: "enable" | "disable",
+    extraArgs: string[] = [],
+  ): Promise<CliResult> {
+    return this.cli(["auth-method", method, verb, "--non-interactive", "--json", ...extraArgs]);
+  }
+
+  /** `auth-method password|passkey <verb>` without `--json`, for what the developer reads. */
+  authMethodRendered(
+    method: "password" | "passkey",
+    verb: "enable" | "disable",
+  ): Promise<CliResult> {
+    return this.cli(["auth-method", method, verb, "--non-interactive"]);
+  }
+
+  /** `auth-method sso disable`. */
+  disableSso(provider: string, extraArgs: string[] = []): Promise<CliResult> {
     return this.cli([
-      "auth-factor",
+      "auth-method",
+      "sso",
       "disable",
       "--non-interactive",
       "--json",
-      ...modeFlags(factors),
+      "--provider",
+      provider,
       ...extraArgs,
     ]);
-  }
-
-  /** `auth-factor <verb>` without `--json`, for a spec asserting what the developer reads. */
-  toggleFactorsRendered(verb: "enable" | "disable", factors: string[]): Promise<CliResult> {
-    return this.cli(["auth-factor", verb, "--non-interactive", ...modeFlags(factors)]);
   }
 
   /** Runs `doctor` against a fake docker on PATH and a port from this worker. */
@@ -705,10 +726,6 @@ export async function anApp({
     "export default function RootLayout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n",
   );
   return new ScaffoldedApp(path);
-}
-
-function modeFlags(factors: string[]): string[] {
-  return factors.flatMap((factor) => ["--mode", factor]);
 }
 
 /** An app already through `setup`, for specs about the commands after it. */

@@ -73,10 +73,19 @@
         "description": "Work with login branding revisions."
       },
       "sso": {
-        "description": "Manage the identity providers users can sign in with."
+        "description": "Deprecated: use auth-method sso."
       },
-      "auth-factor": {
-        "description": "Turn the password and passkey factors on or off."
+      "auth-method": {
+        "description": "Turn sign-in methods on or off for a user schema."
+      },
+      "auth-method:password": {
+        "description": "Turn password sign-in on or off."
+      },
+      "auth-method:passkey": {
+        "description": "Turn passkey sign-in on or off."
+      },
+      "auth-method:sso": {
+        "description": "Add or remove identity providers."
       }
     }
   },

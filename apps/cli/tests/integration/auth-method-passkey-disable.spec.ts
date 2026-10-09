@@ -5,14 +5,14 @@ import { aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
-describe("auth-factor disable", () => {
+describe("auth-method passkey disable", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
-      it("still turns the factor off, for apply to publish once it is back", async () => {
+      it("still turns passkey off, for apply to publish once it is back", async () => {
         const app = await aSetUpApp();
         platform.isNotZitadel();
 
-        expect(await app.disableFactors(["passkey"])).toSucceed();
+        expect(await app.authMethod("passkey", "disable")).toSucceed();
 
         platform.recovers();
         expect(await app.apply()).toSucceed();
@@ -22,11 +22,11 @@ describe("auth-factor disable", () => {
     });
 
     describe("that is down", () => {
-      it("still turns the factor off, for apply to publish once it is back", async () => {
+      it("still turns passkey off, for apply to publish once it is back", async () => {
         const app = await aSetUpApp();
         platform.isUnavailable();
 
-        expect(await app.disableFactors(["passkey"])).toSucceed();
+        expect(await app.authMethod("passkey", "disable")).toSucceed();
 
         platform.recovers();
         expect(await app.apply()).toSucceed();
@@ -41,46 +41,31 @@ describe("auth-factor disable", () => {
       it("leaves the change for apply to publish", async () => {
         const app = await aSetUpApp();
 
-        expect(await app.disableFactors(["passkey"])).toSucceed();
+        expect(await app.authMethod("passkey", "disable")).toSucceed();
 
         expect(await app.plan()).not.toReportNothingToDo();
       });
 
-      it("refuses a factor a login flow still asks for", async () => {
-        const app = await aSetUpApp();
-
-        expect(await app.disableFactors(["password"])).toFailWith("E_VALIDATION");
-      });
-
-      it("leaves the project as it was when it refuses", async () => {
-        const app = await aSetUpApp();
-        const files = await app.snapshot();
-
-        await app.disableFactors(["password"]);
-
-        expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
-      });
-
-      it("refuses passkey on a project whose login starts with a passkey", async () => {
+      it("refuses on a project whose login starts with a passkey", async () => {
         const app = await aSetUpApp(["--preset", "passkey-first"]);
 
-        expect(await app.disableFactors(["passkey"])).toFailWith("E_VALIDATION");
+        expect(await app.authMethod("passkey", "disable")).toFailWith("E_VALIDATION");
       });
 
-      it("changes nothing when the factor is already off", async () => {
+      it("changes nothing when passkey is already off", async () => {
         const app = await aSetUpApp();
-        expect(await app.disableFactors(["passkey"])).toSucceed();
+        expect(await app.authMethod("passkey", "disable")).toSucceed();
         const files = await app.snapshot();
 
-        expect(await app.disableFactors(["passkey"])).toSucceed();
+        expect(await app.authMethod("passkey", "disable")).toSucceed();
 
         expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
       });
 
       describe("once applied", () => {
-        it("publishes the factor as off", async () => {
+        it("publishes passkey as off", async () => {
           const app = await aSetUpApp();
-          expect(await app.disableFactors(["passkey"])).toSucceed();
+          expect(await app.authMethod("passkey", "disable")).toSucceed();
           expect(await app.apply()).toSucceed();
 
           const { schema } = await app.publishedSchema();
@@ -88,9 +73,9 @@ describe("auth-factor disable", () => {
           expect(schema["x-auth-methods"]?.passkey).toEqual({ enabled: false });
         });
 
-        it("keeps the other factors on", async () => {
+        it("keeps password on", async () => {
           const app = await aSetUpApp();
-          expect(await app.disableFactors(["passkey"])).toSucceed();
+          expect(await app.authMethod("passkey", "disable")).toSucceed();
           expect(await app.apply()).toSucceed();
 
           const { schema } = await app.publishedSchema();
@@ -100,7 +85,7 @@ describe("auth-factor disable", () => {
 
         it("leaves nothing to reconcile", async () => {
           const app = await aSetUpApp();
-          expect(await app.disableFactors(["passkey"])).toSucceed();
+          expect(await app.authMethod("passkey", "disable")).toSucceed();
           expect(await app.apply()).toSucceed();
 
           expect(await app.plan()).toReportNothingToDo();
@@ -109,10 +94,10 @@ describe("auth-factor disable", () => {
     });
 
     describe("rendered for a terminal", () => {
-      it("says which factor it disabled, and for which schema", async () => {
+      it("says what it disabled, and for which schema", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.toggleFactorsRendered("disable", ["passkey"]);
+        const result = await app.authMethodRendered("passkey", "disable");
 
         expect(result).toSucceed();
         expect(result).toPrint("Disabled passkey for default-human-user");
@@ -121,7 +106,7 @@ describe("auth-factor disable", () => {
       it("renders text rather than a json envelope", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.toggleFactorsRendered("disable", ["passkey"]);
+        const result = await app.authMethodRendered("passkey", "disable");
 
         expect(result).toPrintNoJson();
       });

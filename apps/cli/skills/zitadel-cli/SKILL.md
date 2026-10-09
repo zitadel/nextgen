@@ -247,22 +247,30 @@ auth flow in a visible browser by registering a unique user, logging out, loggin
 back in with the same email/password, and ending on the signed-in profile page.
 Do not treat a rendered login or registration form as completion.
 
-To turn password or passkey sign-in on or off later, run `auth-factor enable`
-or `auth-factor disable` with `--mode password` or `--mode passkey` (repeat it
-to change both, and add `--schema` when the project has more than one). Both
-commands edit only the user schema, and write nothing when they refuse. They
-refuse to disable a factor that a login flow still asks for, to change any
-factor while a flow has errors, and to enable password on a schema without
-`x-identifier`.
-Disabling the schema's last way to sign in needs `--force` when non-interactive;
-only pass it for a schema whose users are managed through the API, and ask the
-user first. A factor that is enabled but not offered by any active flow is
-reported in `warnings` and `data.not_offered`. Follow `data.next_commands`
-(`plan`, `apply`) to publish the change. When a path or schema name would need
-shell quoting, `next_commands` is empty and `data.next_args` (or
-`details.suggested_args` on a refusal, re-run first) holds the same commands
-as argument lists.
-A schema that points at an external url is refused: edit that schema instead.
+To change how users sign in after setup, use the `auth-method` commands. Each
+sign-in method has its own command, with `--schema` when the project has more
+than one:
+
+- `auth-method password enable` and `auth-method password disable`
+- `auth-method passkey enable` and `auth-method passkey disable`
+- `auth-method sso enable --provider google` adds a provider. It prompts for
+  the client id and secret, or takes `--client-id` with the secret piped on
+  stdin when non-interactive. `auth-method sso disable --provider google`
+  removes it.
+
+`sso enable` is a deprecated alias of `auth-method sso enable`; use the new
+command. The commands edit only local files, and write nothing when they
+refuse. They refuse to disable a method a login flow still asks for, to change
+any method while a flow has errors, to enable password on a schema without
+`x-identifier`, and to edit a schema that points at an external url. Disabling
+the schema's last way to sign in needs `--force` when non-interactive; only pass
+it for a schema whose users are managed through the API, and ask the user
+first. A method that is enabled but not offered by any active flow is reported
+in `warnings` and `data.not_offered`. Follow `data.next_commands` (`plan`,
+`apply`) to publish the change. When a path or schema name would need shell
+quoting, `next_commands` is empty and `data.next_args` (or
+`details.suggested_args` on a refusal, re-run first) holds the same commands as
+argument lists.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `plan` and `apply`. See the reference below for driving the login UI
