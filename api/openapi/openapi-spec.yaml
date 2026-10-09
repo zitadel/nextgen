@@ -54,8 +54,7 @@ tags:
 
       Create a release from the files in your `.zitadel/` directory, or from
       revision ids you already have. Creating a release doesn't deploy it,
-      and you can deploy the same release to as many environments as you
-      like.
+      and you can deploy the same release to any number of origins.
 
       Every release carries a digest of its content, so you can check
       whether the files you have are already released.
