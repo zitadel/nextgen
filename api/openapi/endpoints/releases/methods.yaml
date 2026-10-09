@@ -2,21 +2,54 @@ post:
   operationId: createRelease
   summary: Create a release
   description: |
-    Bundles a release from revisions that already exist, supplied as
-    `(kind, revision_id)` pairs. No new revisions are allocated — use the
-    per-kind create endpoints for that, then pin the ids here.
+    Assembles a release from exactly one of two body shapes.
 
-    Every referenced `revision_id` must exist in the project. Each one's handle
-    is read from the revision itself and recorded on the release, so a resource
+    `pointers` pins revisions that already exist, supplied as
+    `(kind, revision_id)` pairs. No new revisions are allocated — use the
+    per-kind create endpoints for that, then pin the ids here. Every
+    referenced `revision_id` must exist in the project; each one's handle is
+    read from the revision itself and recorded on the release, so a resource
     is always pinned under the identity it declares.
 
-    Creating a release does not deploy it. A release is environment-agnostic
-    and the same release can later be deployed to any number of environments
-    unchanged.
+    `bundle` takes the resources of `.zitadel/` as authored on disk, grouped
+    by kind. For every resource the server compares the content against the
+    project's newest revision of the same handle: unchanged content reuses
+    that revision, changed content allocates a new one. Construction is one
+    transaction — a failure anywhere leaves no revision and no release. The
+    caller records nothing. An empty bundle is refused.
 
-    Idempotent on the pinned set: metadata is excluded from the comparison, so
-    re-submitting the same revisions with a different `message` returns the
-    release that already pins them rather than creating a second one.
+    Every resource in a bundle is validated as its kind's create endpoint
+    validates it, and every failure is reported at once rather than only the
+    first: the request answers `400` with `rel.invalid`, and
+    `details.resources` lists each resource that failed.
+
+    `pointers` needs `release.write`. A bundle also writes revisions, so it
+    needs, in addition, the write scope of every kind it carries a resource
+    of — `schema.write`, `flow_definition.write` and `branding.write`, as the
+    per-kind create endpoints do. A missing scope answers `403` with
+    `rel.permission_denied`, naming the kind. An empty kind needs no scope.
+
+    Both shapes are closed the same way: every handle a pinned resource
+    references — a flow definition's `user_schema` naming a schema by
+    `objectType` — must be pinned by the same release. A bundle may leave a
+    referenced resource out when the project already holds it; the release
+    then pins the project's newest revision of that handle, so only a bundle
+    that carries everything it references builds the same release on any
+    project. A handle that resolves nowhere refuses the request with
+    `rel.unresolved_reference`. The message names the pointer
+    and the handle that did not resolve, for example
+    `flow_definition default-login: user_schema human-user not found`,
+    because a release pins many and the code alone does not say which one
+    failed.
+
+    Idempotent on the pinned set: metadata is excluded from the comparison,
+    so re-submitting the same content with a different `message` answers
+    `200` with the release that already pins it rather than creating a
+    second one. A release the project did not hold before answers `201`.
+
+    Creating a release does not deploy it. A release is not tied to an
+    origin, and the same release can later be deployed to any number of
+    origins unchanged.
   tags:
     - Releases
   parameters:
@@ -31,8 +64,64 @@ post:
         schema:
           $ref: create-release-request.yaml
         examples:
+          bundle:
+            summary: Built from the files on disk
+            description: |
+              The CLI's form: the schemas, flow definitions and branding as
+              authored, the flow naming its schema by `objectType`. The
+              server reuses whichever revisions already match and allocates
+              the rest.
+            value:
+              bundle:
+                schemas:
+                  - $schema: https://json-schema.org/draft/2020-12/schema
+                    kind: user-schema
+                    metaSchema: https://schemas.zitadel.com/user-schema/v1
+                    objectType: human-user
+                    x-auth-methods:
+                      password:
+                        enabled: true
+                    x-identifier: email
+                    properties:
+                      email:
+                        type: string
+                        format: email
+                        x-unique: project
+                      phone_number:
+                        type: string
+                flow_definitions:
+                  - name: default-login
+                    status: active
+                    user_schema: human-user
+                    purposes:
+                      login: identify
+                    steps:
+                      - name: identify
+                        fields: [email]
+                        actions:
+                          - name: submit
+                            kind: submit
+                            primary: true
+                        transitions:
+                          submit: { target: authenticate }
+                      - name: authenticate
+                        fields: [password]
+                        actions:
+                          - name: submit
+                            kind: submit
+                            primary: true
+                        transitions:
+                          submit: { target: done }
+                      - name: done
+                        complete: redirect
+                brandings:
+                  - layout: centered
+                    liquid_template: '<main>{{ step.name }}</main>'
+              message: add phone_number to human-user
+              git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+              git_dirty: false
           wholeProject:
-            summary: Pin every configurable resource of a project
+            summary: Pin every configurable resource of a project by revision
             description: |
               A project has several user schemas and several flow definitions,
               so `schema` and `flow_definition` each appear more than once.
@@ -52,27 +141,18 @@ post:
               message: add phone_number to human-user
               git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
               git_dirty: false
-          singleSchema:
-            summary: The smallest valid release
-            description: |
-              One pointer, no metadata. A release must pin at least one
-              revision; everything else is optional.
-            value:
-              pointers:
-                - kind: schema
-                  revision_id: sch_01KWHF18816ZQE7F0N9WD3P2E4
   responses:
     '200':
       description: |
         A release pinning this exact set already existed and was returned
-        unchanged. No new release was created.
+        unchanged. No new release and no new revision was created.
       content:
         application/json:
           schema:
             $ref: release.yaml
           examples:
             reused:
-              summary: The same set was submitted again under a new message
+              summary: The same content was submitted again under a new message
               description: |
                 The pinned set matched an existing release, so that release is
                 returned — note the message it was originally created with,
@@ -90,16 +170,10 @@ post:
                 pointers:
                   - kind: schema
                     handle: human-user
-                    revision_id: https://example.com/schemas/default-human-user.json
-                  - kind: schema
-                    handle: machine-user
-                    revision_id: sch_01KWHF2XY6RN7F0N9WD3P2E4YM
+                    revision_id: sch_01KWHF18816ZQE7F0N9WD3P2E4
                   - kind: flow_definition
                     handle: default-login
                     revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
-                  - kind: flow_definition
-                    handle: b2b-login
-                    revision_id: flowdef_01KWHG3B72K7M7F0N9WD3P2E4
                   - kind: branding
                     handle: default
                     revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
@@ -110,12 +184,13 @@ post:
           schema:
             $ref: release.yaml
           examples:
-            created:
-              summary: A newly assembled release
+            builtFromBundle:
+              summary: Built from a bundle
               description: |
                 Each pointer carries the handle the server read from the
-                revision it pins — `objectType` for a schema, `name` for a flow
-                definition, and `default` for branding.
+                resource — `objectType` for a schema, `name` for a flow
+                definition, and `default` for branding — and the revision it
+                reused or allocated for it.
               value:
                 id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
                 project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
@@ -129,6 +204,34 @@ post:
                 pointers:
                   - kind: schema
                     handle: human-user
+                    revision_id: sch_01KWHF18816ZQE7F0N9WD3P2E4
+                  - kind: flow_definition
+                    handle: default-login
+                    revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
+                  - kind: branding
+                    handle: default
+                    revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
+            pinnedByCI:
+              summary: Pinned from a pipeline, with a dirty tree
+              description: |
+                A project secret names no user, so `created_by` is null while
+                `created_by_type` still reports `service` — the release was
+                assembled by a machine. `git_dirty` records that the working
+                tree had uncommitted changes, so the content does not
+                correspond exactly to `git_sha`.
+              value:
+                id: rel_01KX4A2B9C7F0N9WD3P2E4YM5D2
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                metadata:
+                  message: deploy from CI
+                  git_sha: 8d4e1a0f2b3c4d5e6f708192a3b4c5d6e7f80912
+                  git_dirty: true
+                  created_at: '2026-07-15T11:02:00Z'
+                  created_by: null
+                  created_by_type: service
+                pointers:
+                  - kind: schema
+                    handle: human-user
                     revision_id: https://example.com/schemas/default-human-user.json
                   - kind: schema
                     handle: machine-user
@@ -141,35 +244,38 @@ post:
                     revision_id: flowdef_01KWHG3B72K7M7F0N9WD3P2E4
                   - kind: branding
                     handle: default
-                    revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
-            createdByCI:
-              summary: Assembled from a pipeline, with a dirty tree
-              description: |
-                A project secret names no user, so `created_by` is null while
-                `created_by_type` still reports `service` — the release was
-                assembled by a machine. `git_dirty` records that the working
-                tree had uncommitted changes, so the content does not
-                correspond exactly to `git_sha`.
-              value:
-                id: rel_550e8400-e29b-41d4-a716-446655440000
-                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
-                metadata:
-                  message: deploy from CI
-                  git_sha: 8d4e1a0f2b3c4d5e6f708192a3b4c5d6e7f80912
-                  git_dirty: true
-                  created_at: '2026-07-15T11:02:00Z'
-                  created_by: null
-                  created_by_type: service
-                pointers:
-                  - kind: schema
-                    handle: human-user
-                    revision_id: sch_01KWHF18816ZQE7F0N9WD3P2E4
-                  - kind: flow_definition
-                    handle: default-login
-                    revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
-                  - kind: branding
-                    handle: default
                     revision_id: brnd_01KWH8Q5NZT7F0N9WD3P2E4YM6
+    '400':
+      description: |
+        The request cannot build a release. A bundle whose resources fail
+        validation answers `rel.invalid` with every failing resource in
+        `details.resources`.
+      content:
+        application/json:
+          schema:
+            $ref: create-release-bad-request.yaml
+          examples:
+            invalidBundle:
+              summary: Two bundle resources fail validation
+              description: |
+                Each entry names the resource by kind, position and handle,
+                and carries the code and message its own create endpoint
+                would have answered.
+              value:
+                code: rel.invalid
+                message: 'release: invalid'
+                details:
+                  resources:
+                    - kind: schema
+                      index: 0
+                      handle: human-user
+                      code: sch.invalid_request
+                      message: 'properties.email: x-unique must be project'
+                    - kind: flow_definition
+                      index: 1
+                      handle: b2b-login
+                      code: flowdef.invalid
+                      message: 'steps[2]: unknown step type'
     default:
       $ref: createRelease-error-response.yaml
 

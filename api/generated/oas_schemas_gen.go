@@ -8607,6 +8607,69 @@ func (s *BrandingTypography) SetScale(val OptFloat64) {
 	s.Scale = val
 }
 
+// One bundle resource that failed validation.
+// Ref: #
+type BundleResourceError struct {
+	Kind ReleasePointerKind `json:"kind"`
+	// The resource's position in its kind's array in the bundle.
+	Index int `json:"index"`
+	// The resource's handle, when it declares one.
+	Handle OptString `json:"handle"`
+	Code   ErrorCode `json:"code"`
+	// What the kind's create endpoint would have answered.
+	Message string `json:"message"`
+}
+
+// GetKind returns the value of Kind.
+func (s *BundleResourceError) GetKind() ReleasePointerKind {
+	return s.Kind
+}
+
+// GetIndex returns the value of Index.
+func (s *BundleResourceError) GetIndex() int {
+	return s.Index
+}
+
+// GetHandle returns the value of Handle.
+func (s *BundleResourceError) GetHandle() OptString {
+	return s.Handle
+}
+
+// GetCode returns the value of Code.
+func (s *BundleResourceError) GetCode() ErrorCode {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *BundleResourceError) GetMessage() string {
+	return s.Message
+}
+
+// SetKind sets the value of Kind.
+func (s *BundleResourceError) SetKind(val ReleasePointerKind) {
+	s.Kind = val
+}
+
+// SetIndex sets the value of Index.
+func (s *BundleResourceError) SetIndex(val int) {
+	s.Index = val
+}
+
+// SetHandle sets the value of Handle.
+func (s *BundleResourceError) SetHandle(val OptString) {
+	s.Handle = val
+}
+
+// SetCode sets the value of Code.
+func (s *BundleResourceError) SetCode(val ErrorCode) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *BundleResourceError) SetMessage(val string) {
+	s.Message = val
+}
+
 type ChallengeID string
 
 // An authentication factor method a client can challenge. It leaves out
@@ -9642,6 +9705,69 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 	var s CompletedFactorPayload
 	s.SetPasskeyFactorPayload(v)
 	return s
+}
+
+// The resources of a project's `.zitadel/` directory as authored on disk,
+// grouped by kind. The server turns the bundle into a release in one
+// transaction: for every resource it compares the content against the
+// project's newest revision of the same handle, reuses that revision when the
+// content matches and allocates a new one otherwise. The caller keeps no
+// state.
+// Resources reference each other by handle: a flow definition's
+// `user_schema` names a schema by its `objectType`. A reference resolves to
+// the resource with that handle in this bundle; failing that, to the
+// project's newest revision of it, which the release then pins as well. A
+// handle that neither holds refuses the release, naming the pointer and the
+// handle. A bundle that references only resources it carries builds the
+// same release on any project.
+// Each kind is optional and may be empty: a project that never ejected its
+// branding sends none. Across all kinds the bundle carries at least one
+// resource and at most 50, the most a release pins; the server refuses
+// anything outside that with `rel.invalid`. Unknown keys are refused. More
+// kinds join as they become release kinds.
+// Each resource is validated as its kind's create endpoint validates it,
+// and every failing resource is reported in one `rel.invalid`. Sending a
+// resource needs that kind's write scope, as creating it directly does.
+// Ref: #
+type ConfigurationBundle struct {
+	// User schemas, one per `.zitadel/schemas/*.json`.
+	Schemas []UserSchema `json:"schemas"`
+	// Flow definitions, one per `.zitadel/flows/*.json`.
+	FlowDefinitions []FlowDefinition `json:"flow_definitions"`
+	// The descriptor from `.zitadel/branding/branding.json` with its template
+	// inlined, exactly as `POST /branding` takes it. A project has one
+	// branding, so at most one entry.
+	Brandings []Branding `json:"brandings"`
+}
+
+// GetSchemas returns the value of Schemas.
+func (s *ConfigurationBundle) GetSchemas() []UserSchema {
+	return s.Schemas
+}
+
+// GetFlowDefinitions returns the value of FlowDefinitions.
+func (s *ConfigurationBundle) GetFlowDefinitions() []FlowDefinition {
+	return s.FlowDefinitions
+}
+
+// GetBrandings returns the value of Brandings.
+func (s *ConfigurationBundle) GetBrandings() []Branding {
+	return s.Brandings
+}
+
+// SetSchemas sets the value of Schemas.
+func (s *ConfigurationBundle) SetSchemas(val []UserSchema) {
+	s.Schemas = val
+}
+
+// SetFlowDefinitions sets the value of FlowDefinitions.
+func (s *ConfigurationBundle) SetFlowDefinitions(val []FlowDefinition) {
+	s.FlowDefinitions = val
+}
+
+// SetBrandings sets the value of Brandings.
+func (s *ConfigurationBundle) SetBrandings(val []Branding) {
+	s.Brandings = val
 }
 
 // CreateAuthAttemptErrorResponse represents sum type.
@@ -12803,6 +12929,89 @@ func (s *CreateProjectResponse) SetCreatedAt(val time.Time) {
 
 func (*CreateProjectResponse) createProjectRes() {}
 
+// The request cannot build a release. `code` says why; for a bundle whose
+// resources fail validation it is `rel.invalid`, and `details.resources`
+// lists every resource that failed.
+// Ref: #
+type CreateReleaseBadRequest struct {
+	Code ErrorCode `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptCreateReleaseBadRequestDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *CreateReleaseBadRequest) GetCode() ErrorCode {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *CreateReleaseBadRequest) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *CreateReleaseBadRequest) GetDetails() OptCreateReleaseBadRequestDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *CreateReleaseBadRequest) SetCode(val ErrorCode) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *CreateReleaseBadRequest) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *CreateReleaseBadRequest) SetDetails(val OptCreateReleaseBadRequestDetails) {
+	s.Details = val
+}
+
+func (*CreateReleaseBadRequest) createReleaseRes() {}
+
+// Additional error-specific context.
+type CreateReleaseBadRequestDetails struct {
+	// Every bundle resource that failed validation, each with the code
+	// and message its kind's create endpoint would have answered.
+	Resources       []BundleResourceError `json:"resources"`
+	AdditionalProps CreateReleaseBadRequestDetailsAdditional
+}
+
+// GetResources returns the value of Resources.
+func (s *CreateReleaseBadRequestDetails) GetResources() []BundleResourceError {
+	return s.Resources
+}
+
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *CreateReleaseBadRequestDetails) GetAdditionalProps() CreateReleaseBadRequestDetailsAdditional {
+	return s.AdditionalProps
+}
+
+// SetResources sets the value of Resources.
+func (s *CreateReleaseBadRequestDetails) SetResources(val []BundleResourceError) {
+	s.Resources = val
+}
+
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *CreateReleaseBadRequestDetails) SetAdditionalProps(val CreateReleaseBadRequestDetailsAdditional) {
+	s.AdditionalProps = val
+}
+
+type CreateReleaseBadRequestDetailsAdditional map[string]jx.Raw
+
+func (s *CreateReleaseBadRequestDetailsAdditional) init() CreateReleaseBadRequestDetailsAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 type CreateReleaseCreated Release
 
 func (*CreateReleaseCreated) createReleaseRes() {}
@@ -13127,6 +13336,128 @@ func (s *CreateReleaseErrorResponseStatusCode) SetResponse(val CreateReleaseErro
 
 func (*CreateReleaseErrorResponseStatusCode) createReleaseRes() {}
 
+// A release built from the resources as authored on disk. Carries no
+// `pointers`.
+// Ref: #
+type CreateReleaseFromBundle struct {
+	Bundle ConfigurationBundle `json:"bundle"`
+	// A short summary of what the release changes, analogous to a git commit
+	// message. Recorded on the release and shown when listing releases.
+	Message OptString `json:"message"`
+	// The source commit the caller was operating from.
+	GitSha OptString `json:"git_sha"`
+	// Set when the working tree had uncommitted changes, so the release content
+	// does not correspond exactly to `git_sha`.
+	GitDirty OptBool `json:"git_dirty"`
+}
+
+// GetBundle returns the value of Bundle.
+func (s *CreateReleaseFromBundle) GetBundle() ConfigurationBundle {
+	return s.Bundle
+}
+
+// GetMessage returns the value of Message.
+func (s *CreateReleaseFromBundle) GetMessage() OptString {
+	return s.Message
+}
+
+// GetGitSha returns the value of GitSha.
+func (s *CreateReleaseFromBundle) GetGitSha() OptString {
+	return s.GitSha
+}
+
+// GetGitDirty returns the value of GitDirty.
+func (s *CreateReleaseFromBundle) GetGitDirty() OptBool {
+	return s.GitDirty
+}
+
+// SetBundle sets the value of Bundle.
+func (s *CreateReleaseFromBundle) SetBundle(val ConfigurationBundle) {
+	s.Bundle = val
+}
+
+// SetMessage sets the value of Message.
+func (s *CreateReleaseFromBundle) SetMessage(val OptString) {
+	s.Message = val
+}
+
+// SetGitSha sets the value of GitSha.
+func (s *CreateReleaseFromBundle) SetGitSha(val OptString) {
+	s.GitSha = val
+}
+
+// SetGitDirty sets the value of GitDirty.
+func (s *CreateReleaseFromBundle) SetGitDirty(val OptBool) {
+	s.GitDirty = val
+}
+
+// A release pinning revisions that already exist. Carries no `bundle`.
+// Ref: #
+type CreateReleaseFromPointers struct {
+	// The revisions to pin. Must not be empty.
+	// A kind usually appears more than once: a project has several user schemas
+	// and several flow definitions, and each is pinned on its own. What it
+	// cannot do is
+	// pin two revisions of the *same* resource — a second revision of the
+	// `human-user` schema is rejected rather than ordered, since a release
+	// describes one state of the project.
+	// The upper bound counts *resources*, not revisions — one release pins at
+	// most one revision of each — so it is a limit on how much a project
+	// configures, not on how often it changes. It keeps the server's
+	// per-pointer revision lookups bounded by the contract rather than by the
+	// request, and is set conservatively: raising it is a spec change, and
+	// widening a bound breaks no client that was already inside it.
+	Pointers []CreateReleasePointer `json:"pointers"`
+	// A short summary of what the release changes, analogous to a git commit
+	// message. Recorded on the release and shown when listing releases.
+	Message OptString `json:"message"`
+	// The source commit the caller was operating from.
+	GitSha OptString `json:"git_sha"`
+	// Set when the working tree had uncommitted changes, so the release content
+	// does not correspond exactly to `git_sha`.
+	GitDirty OptBool `json:"git_dirty"`
+}
+
+// GetPointers returns the value of Pointers.
+func (s *CreateReleaseFromPointers) GetPointers() []CreateReleasePointer {
+	return s.Pointers
+}
+
+// GetMessage returns the value of Message.
+func (s *CreateReleaseFromPointers) GetMessage() OptString {
+	return s.Message
+}
+
+// GetGitSha returns the value of GitSha.
+func (s *CreateReleaseFromPointers) GetGitSha() OptString {
+	return s.GitSha
+}
+
+// GetGitDirty returns the value of GitDirty.
+func (s *CreateReleaseFromPointers) GetGitDirty() OptBool {
+	return s.GitDirty
+}
+
+// SetPointers sets the value of Pointers.
+func (s *CreateReleaseFromPointers) SetPointers(val []CreateReleasePointer) {
+	s.Pointers = val
+}
+
+// SetMessage sets the value of Message.
+func (s *CreateReleaseFromPointers) SetMessage(val OptString) {
+	s.Message = val
+}
+
+// SetGitSha sets the value of GitSha.
+func (s *CreateReleaseFromPointers) SetGitSha(val OptString) {
+	s.GitSha = val
+}
+
+// SetGitDirty sets the value of GitDirty.
+func (s *CreateReleaseFromPointers) SetGitDirty(val OptBool) {
+	s.GitDirty = val
+}
+
 type CreateReleaseOK Release
 
 func (*CreateReleaseOK) createReleaseRes() {}
@@ -13165,74 +13496,85 @@ func (s *CreateReleasePointer) SetRevisionID(val string) {
 	s.RevisionID = val
 }
 
-// The set of revisions to bundle into a release, plus the metadata to record
-// alongside it.
+// What goes into the release, plus the metadata to record alongside it.
+// Exactly one of two forms: `pointers` or `bundle`, never both and never
+// neither.
+// `pointers` names revisions that already exist, as `(kind, revision_id)`
+// pairs; nothing is allocated. `bundle` carries the resources as authored on
+// disk; the server reuses the project's newest revision of each handle when
+// the content matches and allocates a new revision otherwise. Either way the
+// result is a release pinning one revision per resource, and the same
+// closure rule applies: every handle a pinned resource references must be
+// pinned by the same release.
 // `created_at` and `created_by` are derived server-side from the caller's
 // authentication context and are not accepted here.
 // Ref: #
+// CreateReleaseRequest represents sum type.
 type CreateReleaseRequest struct {
-	// The revisions to pin. Must not be empty.
-	// A kind usually appears more than once: a project has several user schemas
-	// and several flow definitions, and each is pinned on its own. What it
-	// cannot do is
-	// pin two revisions of the *same* resource — a second revision of the
-	// `human-user` schema is rejected rather than ordered, since a release
-	// describes one state of the project.
-	// The upper bound counts *resources*, not revisions — one release pins at
-	// most one revision of each — so it is a limit on how much a project
-	// configures, not on how often it changes. It keeps the server's
-	// per-pointer revision lookups bounded by the contract rather than by the
-	// request, and is set conservatively: raising it is a spec change, and
-	// widening a bound breaks no client that was already inside it.
-	Pointers []CreateReleasePointer `json:"pointers"`
-	// A short summary of what the release changes, analogous to a git commit
-	// message. Recorded on the release and shown when listing releases.
-	Message OptString `json:"message"`
-	// The source commit the caller was operating from.
-	GitSha OptString `json:"git_sha"`
-	// Set when the working tree had uncommitted changes, so the release content
-	// does not correspond exactly to `git_sha`.
-	GitDirty OptBool `json:"git_dirty"`
+	Type                      CreateReleaseRequestType // switch on this field
+	CreateReleaseFromPointers CreateReleaseFromPointers
+	CreateReleaseFromBundle   CreateReleaseFromBundle
 }
 
-// GetPointers returns the value of Pointers.
-func (s *CreateReleaseRequest) GetPointers() []CreateReleasePointer {
-	return s.Pointers
+// CreateReleaseRequestType is oneOf type of CreateReleaseRequest.
+type CreateReleaseRequestType string
+
+// Possible values for CreateReleaseRequestType.
+const (
+	CreateReleaseFromPointersCreateReleaseRequest CreateReleaseRequestType = "CreateReleaseFromPointers"
+	CreateReleaseFromBundleCreateReleaseRequest   CreateReleaseRequestType = "CreateReleaseFromBundle"
+)
+
+// IsCreateReleaseFromPointers reports whether CreateReleaseRequest is CreateReleaseFromPointers.
+func (s CreateReleaseRequest) IsCreateReleaseFromPointers() bool {
+	return s.Type == CreateReleaseFromPointersCreateReleaseRequest
 }
 
-// GetMessage returns the value of Message.
-func (s *CreateReleaseRequest) GetMessage() OptString {
-	return s.Message
+// IsCreateReleaseFromBundle reports whether CreateReleaseRequest is CreateReleaseFromBundle.
+func (s CreateReleaseRequest) IsCreateReleaseFromBundle() bool {
+	return s.Type == CreateReleaseFromBundleCreateReleaseRequest
 }
 
-// GetGitSha returns the value of GitSha.
-func (s *CreateReleaseRequest) GetGitSha() OptString {
-	return s.GitSha
+// SetCreateReleaseFromPointers sets CreateReleaseRequest to CreateReleaseFromPointers.
+func (s *CreateReleaseRequest) SetCreateReleaseFromPointers(v CreateReleaseFromPointers) {
+	s.Type = CreateReleaseFromPointersCreateReleaseRequest
+	s.CreateReleaseFromPointers = v
 }
 
-// GetGitDirty returns the value of GitDirty.
-func (s *CreateReleaseRequest) GetGitDirty() OptBool {
-	return s.GitDirty
+// GetCreateReleaseFromPointers returns CreateReleaseFromPointers and true boolean if CreateReleaseRequest is CreateReleaseFromPointers.
+func (s CreateReleaseRequest) GetCreateReleaseFromPointers() (v CreateReleaseFromPointers, ok bool) {
+	if !s.IsCreateReleaseFromPointers() {
+		return v, false
+	}
+	return s.CreateReleaseFromPointers, true
 }
 
-// SetPointers sets the value of Pointers.
-func (s *CreateReleaseRequest) SetPointers(val []CreateReleasePointer) {
-	s.Pointers = val
+// NewCreateReleaseFromPointersCreateReleaseRequest returns new CreateReleaseRequest from CreateReleaseFromPointers.
+func NewCreateReleaseFromPointersCreateReleaseRequest(v CreateReleaseFromPointers) CreateReleaseRequest {
+	var s CreateReleaseRequest
+	s.SetCreateReleaseFromPointers(v)
+	return s
 }
 
-// SetMessage sets the value of Message.
-func (s *CreateReleaseRequest) SetMessage(val OptString) {
-	s.Message = val
+// SetCreateReleaseFromBundle sets CreateReleaseRequest to CreateReleaseFromBundle.
+func (s *CreateReleaseRequest) SetCreateReleaseFromBundle(v CreateReleaseFromBundle) {
+	s.Type = CreateReleaseFromBundleCreateReleaseRequest
+	s.CreateReleaseFromBundle = v
 }
 
-// SetGitSha sets the value of GitSha.
-func (s *CreateReleaseRequest) SetGitSha(val OptString) {
-	s.GitSha = val
+// GetCreateReleaseFromBundle returns CreateReleaseFromBundle and true boolean if CreateReleaseRequest is CreateReleaseFromBundle.
+func (s CreateReleaseRequest) GetCreateReleaseFromBundle() (v CreateReleaseFromBundle, ok bool) {
+	if !s.IsCreateReleaseFromBundle() {
+		return v, false
+	}
+	return s.CreateReleaseFromBundle, true
 }
 
-// SetGitDirty sets the value of GitDirty.
-func (s *CreateReleaseRequest) SetGitDirty(val OptBool) {
-	s.GitDirty = val
+// NewCreateReleaseFromBundleCreateReleaseRequest returns new CreateReleaseRequest from CreateReleaseFromBundle.
+func NewCreateReleaseFromBundleCreateReleaseRequest(v CreateReleaseFromBundle) CreateReleaseRequest {
+	var s CreateReleaseRequest
+	s.SetCreateReleaseFromBundle(v)
+	return s
 }
 
 // CreateSchemaErrorResponse represents sum type.
@@ -37435,6 +37777,52 @@ func (o OptCompletedFactorPayload) Or(d CompletedFactorPayload) CompletedFactorP
 	return d
 }
 
+// NewOptCreateReleaseBadRequestDetails returns new OptCreateReleaseBadRequestDetails with value set to v.
+func NewOptCreateReleaseBadRequestDetails(v CreateReleaseBadRequestDetails) OptCreateReleaseBadRequestDetails {
+	return OptCreateReleaseBadRequestDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptCreateReleaseBadRequestDetails is optional CreateReleaseBadRequestDetails.
+type OptCreateReleaseBadRequestDetails struct {
+	Value CreateReleaseBadRequestDetails
+	Set   bool
+}
+
+// IsSet returns true if OptCreateReleaseBadRequestDetails was set.
+func (o OptCreateReleaseBadRequestDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptCreateReleaseBadRequestDetails) Reset() {
+	var v CreateReleaseBadRequestDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptCreateReleaseBadRequestDetails) SetTo(v CreateReleaseBadRequestDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptCreateReleaseBadRequestDetails) Get() (v CreateReleaseBadRequestDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptCreateReleaseBadRequestDetails) Or(d CreateReleaseBadRequestDetails) CreateReleaseBadRequestDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptCreateSessionRequestUserAgent returns new OptCreateSessionRequestUserAgent with value set to v.
 func NewOptCreateSessionRequestUserAgent(v CreateSessionRequestUserAgent) OptCreateSessionRequestUserAgent {
 	return OptCreateSessionRequestUserAgent{
@@ -56178,8 +56566,8 @@ func (s *RelRevisionUnpinnableDetails) init() RelRevisionUnpinnableDetails {
 // revisions belong together. Callers that need the resource bytes resolve each
 // `revision_id` through the per-kind read endpoints (`GET /schemas/{id}`,
 // `GET /flow_definitions/{id}`, …).
-// A release exists on its own and is not tied to an environment. Deploying it
-// is a separate call.
+// A release exists on its own and is not tied to an origin. Deploying it is a
+// separate call.
 // Ref: #
 type Release struct {
 	// The opaque, immutable resource id, assigned at construction.

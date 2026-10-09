@@ -4,7 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-faster/jx"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -72,4 +76,65 @@ func TestReleaseAccessRow(t *testing.T) {
 		_, _, err = requireProjectListAccess(context.Background(), stmts, "proj_a", releaseAccess, domain.ResourceKindRelease)
 		assertDomainCode(t, err, domain.ErrReleaseNotFound().Code)
 	})
+}
+
+// Pins the request contract of POST /releases at the decoder: exactly one of
+// pointers and bundle, and a bundle that refuses unknown keys. A generator or
+// schema change that loosens either fails here rather than reaching the
+// handler.
+func TestCreateReleaseRequestShape(t *testing.T) {
+	t.Parallel()
+
+	accepted := map[string]struct {
+		body string
+		want api.CreateReleaseRequestType
+	}{
+		"pointers": {
+			body: `{"pointers":[{"kind":"schema","revision_id":"sch_1"}]}`,
+			want: api.CreateReleaseFromPointersCreateReleaseRequest,
+		},
+		"bundle": {
+			body: `{"bundle":{"brandings":[{}]}}`,
+			want: api.CreateReleaseFromBundleCreateReleaseRequest,
+		},
+		// Every kind is optional, and a project that never ejected its
+		// branding sends it empty. An empty bundle as a whole is the
+		// server's to refuse, not the decoder's.
+		"bundle with an empty kind": {
+			body: `{"bundle":{"flow_definitions":[],"brandings":[]}}`,
+			want: api.CreateReleaseFromBundleCreateReleaseRequest,
+		},
+	}
+	for name, tc := range accepted {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			req, err := decodeCreateReleaseRequest(tc.body)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, req.Type)
+		})
+	}
+
+	refused := map[string]string{
+		"both":               `{"pointers":[{"kind":"schema","revision_id":"sch_1"}],"bundle":{"brandings":[{}]}}`,
+		"neither":            `{"message":"no content"}`,
+		"unknown bundle key": `{"bundle":{"flowDefinitions":[{}]}}`,
+		"empty pointers":     `{"pointers":[]}`,
+	}
+	for name, body := range refused {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			_, err := decodeCreateReleaseRequest(body)
+			assert.Error(t, err)
+		})
+	}
+}
+
+// decodeCreateReleaseRequest runs what the server runs on a request body:
+// decode, then validate.
+func decodeCreateReleaseRequest(body string) (api.CreateReleaseRequest, error) {
+	var req api.CreateReleaseRequest
+	if err := req.Decode(jx.DecodeStr(body)); err != nil {
+		return req, err
+	}
+	return req, req.Validate()
 }
