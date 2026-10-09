@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createLiquidEngine, localiseFlowErrorKeys, parseSsoError } from "./liquid.js";
+import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { en as fullLocale } from "./locales/en.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
@@ -710,84 +710,6 @@ function decodeEntities(value: string): string {
       .replaceAll("&amp;", "&")
   );
 }
-
-describe("parseSsoError", () => {
-  const tag = (obj: Record<string, string>) => `sso_error:${btoa(JSON.stringify(obj))}`;
-
-  it("returns null for a payload without the tag, so the catalog path handles it", () => {
-    expect(parseSsoError("error.invalid_credentials")).toBeNull();
-    expect(parseSsoError("user_not_found")).toBeNull();
-  });
-
-  it("unpacks code, description and uri into one form-level error", () => {
-    const errors = parseSsoError(
-      tag({
-        code: "access_denied",
-        description: "The user cancelled the sign-in.",
-        uri: "https://provider.example/errors/access_denied",
-      }),
-    );
-    expect(errors).toEqual([
-      {
-        text_key: "error.sso_cancelled",
-        code: "access_denied",
-        detail: "The user cancelled the sign-in.",
-        uri: "https://provider.example/errors/access_denied",
-      },
-    ]);
-    // No field, so the template renders it in the form-level banner.
-    expect(errors?.[0]?.field).toBeUndefined();
-  });
-
-  it("omits the optional fields the provider left out", () => {
-    // description and error_uri are optional in RFC 6749; a bare code is valid.
-    const errors = parseSsoError(tag({ code: "access_denied" }));
-    expect(errors?.[0]?.detail).toBeUndefined();
-    expect(errors?.[0]?.uri).toBeUndefined();
-  });
-
-  it("keeps a non-ascii description intact, as the server encoded it", () => {
-    // The server marshals JSON as UTF-8 before base64. Reading that back with
-    // `atob` alone gives one character per byte, so the provider's own words
-    // arrive as mojibake -- which is most providers, in most languages.
-    const utf8Tag = (obj: Record<string, string>) =>
-      `sso_error:${btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(obj))))}`;
-
-    const errors = parseSsoError(
-      utf8Tag({ code: "access_denied", description: "Anmeldung abgebrochen — über Google" }),
-    );
-
-    expect(errors?.[0]?.detail).toBe("Anmeldung abgebrochen — über Google");
-  });
-
-  it("only calls it cancelled when the provider says access_denied", () => {
-    // Telling someone they cancelled a sign-in they did not cancel sends them
-    // looking for a mistake they never made; a provider outage is not a
-    // decision the user took.
-    expect(parseSsoError(tag({ code: "access_denied" }))?.[0]?.text_key).toBe(
-      "error.sso_cancelled",
-    );
-    for (const code of ["server_error", "temporarily_unavailable", "invalid_client"]) {
-      expect(parseSsoError(tag({ code }))?.[0]?.text_key, code).toBe("error.sso_failed");
-    }
-  });
-
-  it("keeps the provider's own code on a failure, so support can act on it", () => {
-    const errors = parseSsoError(tag({ code: "server_error", description: "Upstream is down" }));
-
-    expect(errors?.[0]).toMatchObject({
-      text_key: "error.sso_failed",
-      code: "server_error",
-      detail: "Upstream is down",
-    });
-  });
-
-  it("degrades a corrupt payload to a generic failure rather than leaking it", () => {
-    expect(parseSsoError("sso_error:not-valid-base64!!")).toEqual([
-      { text_key: "error.sso_failed" },
-    ]);
-  });
-});
 
 describe("provider error renders in the alert", () => {
   const render = (errors: unknown) => {

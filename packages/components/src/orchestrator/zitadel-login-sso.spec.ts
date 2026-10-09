@@ -298,6 +298,104 @@ describe("<zitadel-login> with identity providers", () => {
     expect(seen).not.toContain("POST /flow");
   });
 
+  /**
+   * The whole round trip against the mock, the way the engine runs it: the
+   * provider button assigns `redirect_url`, the provider sends the browser to
+   * the callback route, the callback answers `303` to the `return_target` the
+   * submission carried, and the fresh page load resumes with `GET /flow/{id}`.
+   * Only the provider itself is missing, so the test makes its redirect.
+   */
+  describe("the provider round trip", () => {
+    /** Choose the first provider and return where the page was sent and asked to come back to. */
+    async function leaveForProvider(): Promise<{ redirectUrl: string; returnTarget: string }> {
+      const element = await mountLogin();
+      const atom = providerAtom(element);
+      await atom.updateComplete;
+      const navigations = await withStubbedNavigation(async () => {
+        atom.shadowRoot
+          ?.querySelectorAll("zl-button")[0]
+          ?.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+        await waitFor(() =>
+          element.shadowRoot?.querySelector('slot[name="loader"]') ? true : null,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+      element.remove();
+      const submit = mock
+        .getCaptured()
+        .find(
+          (entry): entry is Extract<typeof entry, { kind: "submitFlowStep" }> =>
+            entry.kind === "submitFlowStep",
+        );
+      return { redirectUrl: navigations[0] ?? "", returnTarget: submit?.body.return_target ?? "" };
+    }
+
+    /** The provider redirecting to the callback; answers where the callback sends the browser. */
+    async function provider(query: Record<string, string>): Promise<string> {
+      const res = await fetch(`${API_BASE}/__nextgen/idp/callback?${new URLSearchParams(query)}`, {
+        redirect: "manual",
+      });
+      expect(res.status).toBe(303);
+      return res.headers.get("location") ?? "";
+    }
+
+    /** Land on the return target as a fresh page load, and wait for the resumed step. */
+    async function landOn(
+      location: string,
+      ready: string,
+    ): Promise<{ element: ZitadelLogin; seen: string[] }> {
+      const seen: string[] = [];
+      const record = ({ request }: { request: Request }) => {
+        seen.push(`${request.method} ${new URL(request.url).pathname}`);
+      };
+      server.events.on("request:start", record);
+      const original = window.location.href;
+      const url = new URL(location);
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      try {
+        element.purpose = "login";
+        element.project = testProject;
+        host.appendChild(element);
+        await waitFor(() => element.shadowRoot?.querySelector(ready));
+        await element.updateComplete;
+      } finally {
+        window.history.replaceState({}, "", original);
+        server.events.removeListener("request:start", record);
+      }
+      return { element, seen };
+    }
+
+    it("comes back through the callback and resumes onto the next step", async () => {
+      const { redirectUrl, returnTarget } = await leaveForProvider();
+      expect(redirectUrl).toBe("https://idp.mock.invalid/authorize");
+
+      const location = await provider({ state: "s", code: "c", email: "ada@example.test" });
+      expect(location).toBe(returnTarget);
+
+      const { element, seen } = await landOn(location, 'zl-field[name="given_name"]');
+      expect(seen).toContain("GET /flow/flow_mock");
+      expect(seen).not.toContain("POST /flow");
+      expect(element.shadowRoot?.querySelector('zl-field[name="given_name"]')).not.toBeNull();
+    });
+
+    it.each([
+      ["access_denied", "Sign-in cancelled"],
+      ["server_error", "Sign-in failed"],
+    ])("shows the localised error on the step it started from after %s", async (error, title) => {
+      const { returnTarget } = await leaveForProvider();
+
+      const location = await provider({ state: "s", error });
+      expect(location).toBe(returnTarget);
+
+      const { element } = await landOn(location, "zl-alert");
+      const alert = element.shadowRoot?.querySelector("zl-alert");
+      expect(alert?.getAttribute("heading")).toBe(title);
+      // Back on the identifier, not stranded on the redirect step.
+      expect(element.shadowRoot?.querySelector('zl-field[name="email"]')).not.toBeNull();
+    });
+  });
+
   describe("when the server answers flow.restart_required", () => {
     const restartRequired = () =>
       HttpResponse.json(

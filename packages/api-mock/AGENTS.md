@@ -113,6 +113,29 @@ no longer routed to by the default paths (passkey registration is offered up
 front instead); their fixture emails (`passkey-cancel@…`, `passkey-unsupported@…`,
 `passkey-fail@…`) only matter for tests that inject those states directly.
 
+## The provider's return
+
+Choosing a provider is the `sso` submit; it answers `sso-redirect` with a
+`redirect_url` and records the submission's `return_target`. The provider's
+return is **not** a submit: as on the engine (`internal/api/idp_callback.go`),
+it is `GET /__nextgen/idp/callback` (also `/idp/callback`, the path an SDK proxy
+forwards), answered with `303` to the recorded `return_target`, after which the
+orchestrator resumes with `GET /flow/{id}`. A submit while the flow waits on the
+provider is refused with `flow.invalid_action`.
+
+The mock reads the provider's answer from the callback query:
+
+| Query | Result |
+|-------|--------|
+| `code=…` (`email=…` optional, standing in for the `id_token` email claim) | Resolves the identity: linked → `done`, account without link → `sso-conflict`, else `register-sso` |
+| `error=access_denied` | Back on the originating step with `error.sso_cancelled` |
+| any other `error=…`, or neither `code` nor `error` | Back on the originating step with `error.sso_failed` |
+
+A callback with no sign-in pending, or a replayed one, gets the engine's static
+error page (`400`). `returnFromProvider({ provider, email, error? })` drives the
+same transition in-process for callers that cannot leave the page (Storybook,
+component tests).
+
 ## Branding
 
 `applyBranding(branding)` writes a module-level overlay merged into

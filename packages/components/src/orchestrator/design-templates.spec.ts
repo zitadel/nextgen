@@ -18,9 +18,11 @@ import { describe, expect, it } from "vitest";
 import heroTemplate from "./__fixtures__/legacy-designs/hero.liquid";
 import splitRightTemplate from "./__fixtures__/legacy-designs/split-right.liquid";
 import splitTemplate from "./__fixtures__/legacy-designs/split.liquid";
-import { createLiquidEngine } from "./liquid.js";
+import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
+import { en } from "./locales/en.js";
 import { mandatoryGatesMarkerComment, patchMandatoryGates } from "./mandatory-gates.js";
 import { createSanitiser } from "./sanitiser.js";
+import { TEMPLATE_NAMES } from "./template-names.js";
 
 const locale: Record<string, string> = {
   "identifier.title": "Sign in",
@@ -215,6 +217,41 @@ describe("branding design catalog", () => {
       expect(render({ ...context, sso_providers: [] })).not.toContain("zl-sso-providers");
     });
   });
+
+  /**
+   * A failed provider sign-in comes back as a plain step error key the engine's
+   * callback stored on the originating step (`flow_sso_callback.go`), and the
+   * step shows it like any other form-level error: the key's `.title` and
+   * `.body`, through the same localisation the orchestrator applies.
+   */
+  describe.each([...BRANDING_DESIGNS, "default.liquid"])(
+    "%s after a failed provider return",
+    (design) => {
+      function render(stepError: string): string {
+        const engine = createLiquidEngine({ locale: en });
+        const errors = localiseFlowErrorKeys(stepError, {
+          locale: en,
+          stepName: step.name ?? "",
+          fields: (step.fields ?? []).map((field) => field.name),
+        });
+        const ctx = { ...context, errors };
+        const rendered =
+          design === "default.liquid"
+            ? engine.renderFileSync(TEMPLATE_NAMES.default, ctx)
+            : engine.parseAndRenderSync(getDefaultBrandingConfig(design).template, ctx);
+        return createSanitiser()(rendered);
+      }
+
+      it.each(["error.sso_cancelled", "error.sso_failed"])("renders %s's title and body", (key) => {
+        const html = render(key);
+
+        expect(html).toContain(en[`${key}.title`]);
+        expect(html).toContain(en[`${key}.body`]);
+        // The key itself must not leak through as copy.
+        expect(html).not.toContain(key);
+      });
+    },
+  );
 
   it("legacy split revisions keep the brand pane and mirror class", () => {
     const split = renderDesign("split");

@@ -36,7 +36,8 @@
  *   passkey-upsell --SUBMIT(*)----> passkey-setup --SUBMIT--> done
  *   passkey-login --SUBMIT--> done
  *   passkey-login --SUBMIT(cancel)--> identifier
- *   sso-redirect --SUBMIT--> done
+ *   sso-redirect --PROVIDER_RETURN--> register-sso | sso-conflict | done
+ *                --PROVIDER_RETURN(error)--> the step that chose the provider
  *   sso-conflict --SUBMIT(sso)-----> sso-redirect
  *   anything --RESET--> .idle  (root on: uses child-relative target syntax)
  */
@@ -69,12 +70,23 @@ export type FlowStepName =
  */
 export type SsoOutcome = "sso_authenticated" | "sso_user_not_found" | "user_already_exists";
 
+/**
+ * How the provider's return ended: an identity to route on, or `error` when the
+ * provider declined or the callback failed. Which error key the step shows is
+ * the callback's business, not the machine's; the machine only goes back.
+ */
+export type SsoReturn = SsoOutcome | "error";
+
+/** The steps that offer provider buttons, and so the steps a failed return goes back to. */
+export type SsoOrigin = "identifier" | "register" | "sso-conflict";
+
 export type FlowMachineContext = {
   tokenSeq: number;
   sessionToken: string;
   purpose: CreateFlowBodyPurpose | null;
   capturedFields: Record<string, string>;
   ssoProviderId: string | null;
+  ssoOrigin: SsoOrigin | null;
 };
 
 export type FlowMachineEvent =
@@ -84,7 +96,14 @@ export type FlowMachineEvent =
       action: string;
       fields: Record<string, string>;
       sso_provider_id?: string | null;
-      sso_outcome?: SsoOutcome | null;
+    }
+  | {
+      // The provider sending the browser back to the callback. It is not a
+      // SUBMIT because no client sends it: the engine's callback route is a
+      // plain GET the provider redirects to.
+      type: "PROVIDER_RETURN";
+      fields: Record<string, string>;
+      outcome?: SsoReturn | null;
     }
   | { type: "RESET" };
 
@@ -94,6 +113,7 @@ const initialContext = {
   purpose: null,
   capturedFields: {},
   ssoProviderId: null,
+  ssoOrigin: null,
 } satisfies FlowMachineContext;
 
 const rotateToken = assign<
@@ -109,7 +129,7 @@ const rotateToken = assign<
 
 const captureFields = assign<
   FlowMachineContext,
-  FlowMachineEvent & { type: "SUBMIT" },
+  FlowMachineEvent & { type: "SUBMIT" | "PROVIDER_RETURN" },
   undefined,
   FlowMachineEvent,
   never
@@ -134,21 +154,38 @@ const captureFields = assign<
  * engine.
  */
 type SubmitEvent = Extract<FlowMachineEvent, { type: "SUBMIT" }>;
+type ProviderReturnEvent = Extract<FlowMachineEvent, { type: "PROVIDER_RETURN" }>;
 
-const chooseProvider = {
-  guard: ({ event }: { event: SubmitEvent }) =>
-    event.action === "sso" &&
-    typeof event.sso_provider_id === "string" &&
-    event.sso_provider_id.length > 0,
-  target: "sso-redirect",
-  actions: [
-    captureFields,
-    assign<FlowMachineContext, SubmitEvent, undefined, FlowMachineEvent, never>({
-      ssoProviderId: ({ event }) => event.sso_provider_id ?? null,
-    }),
-    rotateToken,
-  ],
-} as const;
+/**
+ * The step is remembered because the engine never leaves it: `sso-redirect` is
+ * a response, not a step, and a failed return shows the step that offered the
+ * button again with the error on it.
+ */
+const chooseProvider = (origin: SsoOrigin) =>
+  ({
+    guard: ({ event }: { event: SubmitEvent }) =>
+      event.action === "sso" &&
+      typeof event.sso_provider_id === "string" &&
+      event.sso_provider_id.length > 0,
+    target: "sso-redirect",
+    actions: [
+      captureFields,
+      assign<FlowMachineContext, SubmitEvent, undefined, FlowMachineEvent, never>({
+        ssoProviderId: ({ event }) => event.sso_provider_id ?? null,
+        ssoOrigin: () => origin,
+      }),
+      rotateToken,
+    ],
+  }) as const;
+
+/** A failed return, back to the step the provider was chosen on. */
+const failedReturnTo = (origin: SsoOrigin) =>
+  ({
+    guard: ({ event, context }: { event: ProviderReturnEvent; context: FlowMachineContext }) =>
+      event.outcome === "error" && context.ssoOrigin === origin,
+    target: origin,
+    actions: [rotateToken],
+  }) as const;
 
 const setPurpose = assign<
   FlowMachineContext,
@@ -193,7 +230,7 @@ export const flowMachine = createMachine({
     identifier: {
       on: {
         SUBMIT: [
-          chooseProvider,
+          chooseProvider("identifier"),
           {
             guard: ({ event }) => event.action === "register",
             target: "register",
@@ -221,7 +258,7 @@ export const flowMachine = createMachine({
     register: {
       on: {
         SUBMIT: [
-          chooseProvider,
+          chooseProvider("register"),
           {
             guard: ({ event }) => event.action === "sign_in",
             target: "identifier",
@@ -309,17 +346,27 @@ export const flowMachine = createMachine({
       },
     },
     // Returning from the provider. The three branches are area 3's resolution
-    // branches, and the caller says which one applies.
+    // branches, and the caller says which one applies. Only the callback
+    // leaves this state: there is no client action that does.
     "sso-redirect": {
       on: {
-        SUBMIT: [
+        PROVIDER_RETURN: [
+          failedReturnTo("identifier"),
+          failedReturnTo("register"),
+          failedReturnTo("sso-conflict"),
           {
-            guard: ({ event }) => event.sso_outcome === "sso_user_not_found",
+            // An error with no origin to go back to: the sign-in screen.
+            guard: ({ event }) => event.outcome === "error",
+            target: "identifier",
+            actions: [rotateToken],
+          },
+          {
+            guard: ({ event }) => event.outcome === "sso_user_not_found",
             target: "register-sso",
             actions: [captureFields, rotateToken],
           },
           {
-            guard: ({ event }) => event.sso_outcome === "user_already_exists",
+            guard: ({ event }) => event.outcome === "user_already_exists",
             target: "sso-conflict",
             actions: [captureFields, rotateToken],
           },
@@ -327,7 +374,7 @@ export const flowMachine = createMachine({
             // `sso_authenticated`: a subject already linked to an account, so the round
             // trip is the whole sign-in. Guarded, so only this outcome reaches
             // it.
-            guard: ({ event }) => event.sso_outcome === "sso_authenticated",
+            guard: ({ event }) => event.outcome === "sso_authenticated",
             target: "done",
             actions: [captureFields, rotateToken],
           },
@@ -363,7 +410,7 @@ export const flowMachine = createMachine({
     "sso-conflict": {
       on: {
         SUBMIT: [
-          chooseProvider,
+          chooseProvider("sso-conflict"),
           {
             guard: ({ event }) => event.action === "passkey",
             target: "passkey-login",
