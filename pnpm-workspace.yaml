@@ -8,7 +8,7 @@ catalog:
   "@faker-js/faker": ^10.4.0
   '@fontsource/arimo': ^5.2.8
   "@fumapress/ai": ^0.6.2
-  "@moonrepo/cli": ^2.4.6
+  "@moonrepo/cli": ^2.6.1
   "@mswjs/http-middleware": ^0.10.3
   "@nuxt/kit": ^4.5.1
   "@nuxt/schema": ^4.5.1
