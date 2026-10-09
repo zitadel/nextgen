@@ -1,5 +1,14 @@
 # @zitadel/sdk-react
 
+## 1.0.0-alpha.26
+
+### Patch Changes
+
+- Updated dependencies [[`7fbd942`](https://github.com/zitadel/nextgen/commit/7fbd942580560ccab74d3fdd19b3e1eb6d922ee7), [`b3b0b28`](https://github.com/zitadel/nextgen/commit/b3b0b2888f0e64a4805f373a9835d8dc853add84), [`3301e90`](https://github.com/zitadel/nextgen/commit/3301e90778a633b6d900a8ca427944f9e0b996d8)]:
+  - @zitadel/components@1.0.0-alpha.26
+  - @zitadel/sdk-core@1.0.0-alpha.26
+  - @zitadel/api@1.0.0-alpha.26
+
 ## 1.0.0-alpha.25
 
 ### Minor Changes
