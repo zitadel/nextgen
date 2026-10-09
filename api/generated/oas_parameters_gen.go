@@ -1344,11 +1344,8 @@ type DeleteVariableParams struct {
 	ProjectID ProjectID
 	// The name of the variable.
 	VariableName VariableName
-	// Selects one environment of the project as the owner this request addresses.
-	// Omit it to address the project level instead. The two are separate owners,
-	// not a ladder: a variable entered on the project is not visible from an
-	// environment, and an environment's variables are not visible from the project.
-	// A value that has to hold in several environments is entered in each of them.
+	// No environment exists, so any value answers `env.not_found`. Omit it to
+	// address the project's variables.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
 }
 
@@ -3941,11 +3938,8 @@ type GetVariableParams struct {
 	ProjectID ProjectID
 	// The name of the variable.
 	VariableName VariableName
-	// Selects one environment of the project as the owner this request addresses.
-	// Omit it to address the project level instead. The two are separate owners,
-	// not a ladder: a variable entered on the project is not visible from an
-	// environment, and an environment's variables are not visible from the project.
-	// A value that has to hold in several environments is entered in each of them.
+	// No environment exists, so any value answers `env.not_found`. Omit it to
+	// address the project's variables.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
 }
 
@@ -4159,11 +4153,8 @@ func decodeGetVariableParams(args [1]string, argsEscaped bool, r *http.Request) 
 type GetVariablesParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// Selects one environment of the project as the owner this request addresses.
-	// Omit it to address the project level instead. The two are separate owners,
-	// not a ladder: a variable entered on the project is not visible from an
-	// environment, and an environment's variables are not visible from the project.
-	// A value that has to hold in several environments is entered in each of them.
+	// No environment exists, so any value answers `env.not_found`. Omit it to
+	// address the project's variables.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
 }
 
@@ -8906,11 +8897,8 @@ func decodeUpdateTeamParams(args [1]string, argsEscaped bool, r *http.Request) (
 type UpdateVariablesParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// Selects one environment of the project as the owner this request addresses.
-	// Omit it to address the project level instead. The two are separate owners,
-	// not a ladder: a variable entered on the project is not visible from an
-	// environment, and an environment's variables are not visible from the project.
-	// A value that has to hold in several environments is entered in each of them.
+	// No environment exists, so any value answers `env.not_found`. Omit it to
+	// address the project's variables.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
 }
 
