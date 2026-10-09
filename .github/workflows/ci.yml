@@ -26,6 +26,10 @@ jobs:
       # text and replays each failed task's own output. Green runs pay only a
       # pass/fail list; the replay section is empty when nothing failed.
       MOON_SUMMARY: detailed
+      # Suppress CLI telemetry for every step in CI. DO_NOT_TRACK is the
+      # cross-tool standard (https://consoledonottrack.com) the CLI honors, so
+      # no build runs here ever ship events to the telemetry backend.
+      DO_NOT_TRACK: "1"
     steps:
       - uses: actions/checkout@v6
         with:
