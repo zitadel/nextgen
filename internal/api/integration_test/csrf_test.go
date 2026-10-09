@@ -130,17 +130,19 @@ func TestSessionCSRF(t *testing.T) {
 
 	// Reads may omit the token (ADR 053 §5), but a POST query is still an
 	// unsafe method, so the origin check applies to it.
-	t.Run("a query POST needs no token but must be same-origin", func(t *testing.T) {
-		t.Parallel()
-		status, body := raw(t, http.MethodPost, "/teams/query?project_id="+home.ID, `{}`, nil)
-		assert.Equal(t, http.StatusOK, status, body)
+	for _, path := range []string{"/teams/query", "/idps/query"} {
+		t.Run("a query POST needs no token but must be same-origin: "+path, func(t *testing.T) {
+			t.Parallel()
+			status, body := raw(t, http.MethodPost, path+"?project_id="+home.ID, `{}`, nil)
+			assert.Equal(t, http.StatusOK, status, body)
 
-		status, body = raw(t, http.MethodPost, "/teams/query?project_id="+home.ID, `{}`, map[string]string{
-			"Sec-Fetch-Site": "cross-site",
-			"Origin":         "https://evil.example",
+			status, body = raw(t, http.MethodPost, path+"?project_id="+home.ID, `{}`, map[string]string{
+				"Sec-Fetch-Site": "cross-site",
+				"Origin":         "https://evil.example",
+			})
+			requireCSRFRefused(t, status, body)
 		})
-		requireCSRFRefused(t, status, body)
-	})
+	}
 
 	// Logout gets the origin check only: customer apps sign out through the
 	// SDK proxies, which cannot send the token yet. It signs out its own
