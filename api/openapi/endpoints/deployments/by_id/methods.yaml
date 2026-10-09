@@ -24,18 +24,23 @@ get:
           schema:
             $ref: ../deployment.yaml
           examples:
-            promoted:
-              summary: A promotion record
+            deployed:
+              summary: A deployment to every primary origin
+              description: |
+                Every target the deployment made the release live on, whether
+                or not a later deployment has since replaced it there.
               value:
                 id: dep_01KX5N7C9D2E7F0N9WD3P2E4YM6
                 project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
-                environment_id: env_01KX2QF7Z6D0F0N9WD3P2E4YM4
                 release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
-                deployed_at: '2026-07-14T10:02:00Z'
+                targets:
+                  - origin: https://app.acme.com
+                  - origin: https://www.acme.com
+                deployed_at: '2026-10-02T14:52:00Z'
                 metadata:
-                  reason: promote
-                  source_environment_id: env_01KX3RG8A7F0N9WD3P2E4YM5C1
-                  source_environment_name: dev
+                  reason: deploy
+                  message: add phone_number to human-user
+                  rollback_to: null
                   deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
                   deployed_by_type: human
     default:

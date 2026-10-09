@@ -71,25 +71,31 @@ type Invoker interface {
 	CreateBranding(ctx context.Context, request *Branding, params CreateBrandingParams) (CreateBrandingRes, error)
 	// CreateDeployment invokes createDeployment operation.
 	//
-	// Makes a release live on an environment by recording a deployment. The two
-	// happen atomically: when the call returns, the environment runs the named
-	// release and the record exists; on any failure the environment keeps
-	// running what it ran and no record is written.
-	// Deploying, promoting and rolling back are all this call — `reason` says
-	// which. None of them assembles a release: the release must already exist,
-	// and rolling back means deploying a release the environment ran earlier,
-	// chosen from its deployment history.
-	// Idempotent on the running release: deploying the release the environment
-	// already runs changes nothing and answers `200` with the deployment that
-	// made it live, so a re-run of `zitadel deploy` on unchanged content is a
-	// no-op end to end — matching `POST /releases`, which resolves the same
-	// content to the same release first. Anything else writes a new record,
-	// including the same release returning after something else ran in between:
-	// the log is append-only, and each row is one act of making a release live.
-	// `expected_current_deployment_id` guards against racing another deploy:
-	// when present, the swap only happens if the environment's current
-	// deployment still is the one named, and a mismatch answers `409` with the
-	// actual `current_deployment_id` and `current_release_id` in the details.
+	// Makes a release live on a set of targets by recording a deployment. The
+	// two happen atomically: when the call returns, every target serves the
+	// named release and the record exists; on any failure every target keeps
+	// serving what it served and no record is written.
+	// The release is named by exactly one of `release_id` or `content_hash`
+	// (both or neither answers `400` with `dep.invalid`), and must already
+	// exist in the project: deploying never assembles a release. An
+	// unknown release id or digest answers `404` with `rel.not_found`, and a
+	// revoked release answers `409` with `rel.revoked`.
+	// `targets` lists `primary`, which expands to every primary origin of the
+	// project, and exact origins. An origin that is not a primary origin of
+	// the project answers `403` with `proj.origin_not_allowed`, and `primary`
+	// on a project with no primary origin answers `400` with `dep.invalid`.
+	// The deployment records the resolved origins, sorted, never the keyword.
+	// Idempotent on what is served: when every resolved target already serves
+	// the release, nothing changes and the call answers `200` with the newest
+	// deployment to those targets, so a re-run of `zitadel deploy` on
+	// unchanged content is a no-op end to end. Anything else writes a new
+	// record covering all of the resolved targets, including the same release
+	// returning after something else was served in between: the log is
+	// append-only, and each record is one act of making a release live.
+	// `expected_deployment_id` guards against racing another deploy: when
+	// present, the write only happens if the newest deployment to any of the
+	// resolved targets still is the one named, and a mismatch answers `409`
+	// with `dep.conflict`, carrying the actual newest deployment.
 	//
 	// POST /deployments
 	CreateDeployment(ctx context.Context, request *CreateDeploymentRequest, params CreateDeploymentParams) (CreateDeploymentRes, error)
@@ -596,10 +602,15 @@ type Invoker interface {
 	// ListDeployments invokes listDeployments operation.
 	//
 	// Lists deployments newest first: what ran where, and when.
-	// With `environment_name`, the list is that environment's history and its
-	// first row is the environment's current deployment. Without it, the list
-	// interleaves every environment of the project — a project-wide audit view
-	// in which the first row is only the most recent deployment anywhere.
+	// By default the list is the history: every deployment of the project, each
+	// with every target it made the release live on. With `origin`, it is the
+	// history of that origin alone, and its first row is the deployment the
+	// origin serves.
+	// With `live=true`, the list is what is served now: the newest deployment
+	// to each target, each carrying only the targets it still serves. A
+	// deployment every target of which has since been replaced does not
+	// appear. Combined with `origin`, the live view is the one deployment that
+	// origin serves, or empty.
 	// `expand: ["release"]` embeds the release each deployment made live, so a
 	// history renders with each entry's content without resolving `release_id`
 	// one by one. Expanding requires `release.read` and does not affect the
@@ -1479,25 +1490,31 @@ func (c *Client) sendCreateBranding(ctx context.Context, request *Branding, para
 
 // CreateDeployment invokes createDeployment operation.
 //
-// Makes a release live on an environment by recording a deployment. The two
-// happen atomically: when the call returns, the environment runs the named
-// release and the record exists; on any failure the environment keeps
-// running what it ran and no record is written.
-// Deploying, promoting and rolling back are all this call — `reason` says
-// which. None of them assembles a release: the release must already exist,
-// and rolling back means deploying a release the environment ran earlier,
-// chosen from its deployment history.
-// Idempotent on the running release: deploying the release the environment
-// already runs changes nothing and answers `200` with the deployment that
-// made it live, so a re-run of `zitadel deploy` on unchanged content is a
-// no-op end to end — matching `POST /releases`, which resolves the same
-// content to the same release first. Anything else writes a new record,
-// including the same release returning after something else ran in between:
-// the log is append-only, and each row is one act of making a release live.
-// `expected_current_deployment_id` guards against racing another deploy:
-// when present, the swap only happens if the environment's current
-// deployment still is the one named, and a mismatch answers `409` with the
-// actual `current_deployment_id` and `current_release_id` in the details.
+// Makes a release live on a set of targets by recording a deployment. The
+// two happen atomically: when the call returns, every target serves the
+// named release and the record exists; on any failure every target keeps
+// serving what it served and no record is written.
+// The release is named by exactly one of `release_id` or `content_hash`
+// (both or neither answers `400` with `dep.invalid`), and must already
+// exist in the project: deploying never assembles a release. An
+// unknown release id or digest answers `404` with `rel.not_found`, and a
+// revoked release answers `409` with `rel.revoked`.
+// `targets` lists `primary`, which expands to every primary origin of the
+// project, and exact origins. An origin that is not a primary origin of
+// the project answers `403` with `proj.origin_not_allowed`, and `primary`
+// on a project with no primary origin answers `400` with `dep.invalid`.
+// The deployment records the resolved origins, sorted, never the keyword.
+// Idempotent on what is served: when every resolved target already serves
+// the release, nothing changes and the call answers `200` with the newest
+// deployment to those targets, so a re-run of `zitadel deploy` on
+// unchanged content is a no-op end to end. Anything else writes a new
+// record covering all of the resolved targets, including the same release
+// returning after something else was served in between: the log is
+// append-only, and each record is one act of making a release live.
+// `expected_deployment_id` guards against racing another deploy: when
+// present, the write only happens if the newest deployment to any of the
+// resolved targets still is the one named, and a mismatch answers `409`
+// with `dep.conflict`, carrying the actual newest deployment.
 //
 // POST /deployments
 func (c *Client) CreateDeployment(ctx context.Context, request *CreateDeploymentRequest, params CreateDeploymentParams) (CreateDeploymentRes, error) {
@@ -8087,10 +8104,15 @@ func (c *Client) sendListBranding(ctx context.Context, params ListBrandingParams
 // ListDeployments invokes listDeployments operation.
 //
 // Lists deployments newest first: what ran where, and when.
-// With `environment_name`, the list is that environment's history and its
-// first row is the environment's current deployment. Without it, the list
-// interleaves every environment of the project — a project-wide audit view
-// in which the first row is only the most recent deployment anywhere.
+// By default the list is the history: every deployment of the project, each
+// with every target it made the release live on. With `origin`, it is the
+// history of that origin alone, and its first row is the deployment the
+// origin serves.
+// With `live=true`, the list is what is served now: the newest deployment
+// to each target, each carrying only the targets it still serves. A
+// deployment every target of which has since been replaced does not
+// appear. Combined with `origin`, the live view is the one deployment that
+// origin serves, or empty.
 // `expand: ["release"]` embeds the release each deployment made live, so a
 // history renders with each entry's content without resolving `release_id`
 // one by one. Expanding requires `release.read` and does not affect the
@@ -8163,19 +8185,36 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 		}
 	}
 	{
-		// Encode "environment_name" parameter.
+		// Encode "origin" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "environment_name",
+			Name:    "origin",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.EnvironmentName.Get(); ok {
+			if val, ok := params.Origin.Get(); ok {
 				if unwrapped := string(val); true {
 					return e.EncodeValue(conv.StringToString(unwrapped))
 				}
 				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "live" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "live",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Live.Get(); ok {
+				return e.EncodeValue(conv.BoolToString(val))
 			}
 			return nil
 		}); err != nil {

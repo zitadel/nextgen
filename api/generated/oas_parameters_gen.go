@@ -4686,13 +4686,13 @@ func decodeListBrandingParams(args [0]string, argsEscaped bool, r *http.Request)
 type ListDeploymentsParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// Narrows the list to one environment of the project, addressed by name.
-	// A name nothing answers to is `env.not_found` rather than an empty list: with
-	// the filter present the caller is asking about a specific environment, so a
-	// typo reports the environment as missing instead of reporting its history as
-	// empty. Because that answer says whether an environment exists, using the
-	// filter requires `environment.read` in addition to `deployment.read`.
-	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
+	// Narrows the list to the deployments that targeted this origin, given
+	// exactly as the deployment records it. An origin no deployment targeted
+	// answers an empty list, not an error.
+	Origin OptOrigin `json:",omitempty,omitzero"`
+	// Lists what each target serves now instead of the history. Defaults
+	// to `false`.
+	Live OptBool `json:",omitempty,omitzero"`
 	// Related objects to embed on each returned deployment.
 	Expand []DeploymentExpand `json:",omitempty"`
 	// Maximum number of items to return.
@@ -4714,11 +4714,20 @@ func unpackListDeploymentsParams(packed middleware.Parameters) (params ListDeplo
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "environment_name",
+			Name: "origin",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
-			params.EnvironmentName = v.(OptEnvironmentName)
+			params.Origin = v.(OptOrigin)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "live",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.Live = v.(OptBool)
 		}
 	}
 	{
@@ -4804,19 +4813,19 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 			Err:  err,
 		}
 	}
-	// Decode query: environment_name.
+	// Decode query: origin.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "environment_name",
+			Name:    "origin",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotEnvironmentNameVal EnvironmentName
+				var paramsDotOriginVal Origin
 				if err := func() error {
-					var paramsDotEnvironmentNameValVal string
+					var paramsDotOriginValVal string
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
@@ -4828,23 +4837,23 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 							return err
 						}
 
-						paramsDotEnvironmentNameValVal = c
+						paramsDotOriginValVal = c
 						return nil
 					}(); err != nil {
 						return err
 					}
-					paramsDotEnvironmentNameVal = EnvironmentName(paramsDotEnvironmentNameValVal)
+					paramsDotOriginVal = Origin(paramsDotOriginValVal)
 					return nil
 				}(); err != nil {
 					return err
 				}
-				params.EnvironmentName.SetTo(paramsDotEnvironmentNameVal)
+				params.Origin.SetTo(paramsDotOriginVal)
 				return nil
 			}); err != nil {
 				return err
 			}
 			if err := func() error {
-				if value, ok := params.EnvironmentName.Get(); ok {
+				if value, ok := params.Origin.Get(); ok {
 					if err := func() error {
 						if err := value.Validate(); err != nil {
 							return err
@@ -4862,7 +4871,53 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "environment_name",
+			Name: "origin",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Set default value for query: live.
+	{
+		val := bool(false)
+		params.Live.SetTo(val)
+	}
+	// Decode query: live.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "live",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotLiveVal bool
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToBool(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotLiveVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.Live.SetTo(paramsDotLiveVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "live",
 			In:   "query",
 			Err:  err,
 		}

@@ -2,28 +2,35 @@ post:
   operationId: createDeployment
   summary: Create a deployment
   description: |
-    Makes a release live on an environment by recording a deployment. The two
-    happen atomically: when the call returns, the environment runs the named
-    release and the record exists; on any failure the environment keeps
-    running what it ran and no record is written.
+    Makes a release live on a set of targets by recording a deployment. The
+    two happen atomically: when the call returns, every target serves the
+    named release and the record exists; on any failure every target keeps
+    serving what it served and no record is written.
 
-    Deploying, promoting and rolling back are all this call — `reason` says
-    which. None of them assembles a release: the release must already exist,
-    and rolling back means deploying a release the environment ran earlier,
-    chosen from its deployment history.
+    The release is named by exactly one of `release_id` or `content_hash`
+    (both or neither answers `400` with `dep.invalid`), and must already
+    exist in the project: deploying never assembles a release. An
+    unknown release id or digest answers `404` with `rel.not_found`, and a
+    revoked release answers `409` with `rel.revoked`.
 
-    Idempotent on the running release: deploying the release the environment
-    already runs changes nothing and answers `200` with the deployment that
-    made it live, so a re-run of `zitadel deploy` on unchanged content is a
-    no-op end to end — matching `POST /releases`, which resolves the same
-    content to the same release first. Anything else writes a new record,
-    including the same release returning after something else ran in between:
-    the log is append-only, and each row is one act of making a release live.
+    `targets` lists `primary`, which expands to every primary origin of the
+    project, and exact origins. An origin that is not a primary origin of
+    the project answers `403` with `proj.origin_not_allowed`, and `primary`
+    on a project with no primary origin answers `400` with `dep.invalid`.
+    The deployment records the resolved origins, sorted, never the keyword.
 
-    `expected_current_deployment_id` guards against racing another deploy:
-    when present, the swap only happens if the environment's current
-    deployment still is the one named, and a mismatch answers `409` with the
-    actual `current_deployment_id` and `current_release_id` in the details.
+    Idempotent on what is served: when every resolved target already serves
+    the release, nothing changes and the call answers `200` with the newest
+    deployment to those targets, so a re-run of `zitadel deploy` on
+    unchanged content is a no-op end to end. Anything else writes a new
+    record covering all of the resolved targets, including the same release
+    returning after something else was served in between: the log is
+    append-only, and each record is one act of making a release live.
+
+    `expected_deployment_id` guards against racing another deploy: when
+    present, the write only happens if the newest deployment to any of the
+    resolved targets still is the one named, and a mismatch answers `409`
+    with `dep.conflict`, carrying the actual newest deployment.
   tags:
     - Deployments
   parameters:
@@ -38,95 +45,113 @@ post:
         schema:
           $ref: create-deployment-request.yaml
         examples:
-          deploy:
-            summary: Deploy a release
+          primary:
+            summary: Deploy to every primary origin
             value:
-              environment: dev
               release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
-              reason: deploy
-          promote:
-            summary: Promote what dev runs to prod
+              targets:
+                - primary
+              message: add phone_number to human-user
+          byContentHash:
+            summary: Deploy a release named by its digest, guarded
             description: |
-              The release id is still explicit: the caller promotes the
-              release it inspected on `dev`, not whatever `dev` happens to run
-              by the time the request lands.
+              The release is looked up by content. The guard names the
+              deployment the caller inspected before deploying.
             value:
-              environment: prod
-              release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
-              reason: promote
-              source_environment: dev
-          rollback:
-            summary: Roll prod back to the previous release
-            description: |
-              Guarded: the rollback only applies if the deployment being
-              rolled back is still the current one.
-            value:
-              environment: prod
-              release_id: rel_01KX2QF7Z6D0F0N9WD3P2E4YM40
-              reason: rollback
-              message: roll back the contrast change, it broke the dark theme
-              expected_current_deployment_id: dep_01KX4SB9C8E1F0N9WD3P2E4YM5
+              content_hash: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
+              targets:
+                - https://app.acme.com
+              expected_deployment_id: dep_01KX4SB9C8E1F0N9WD3P2E4YM5
   responses:
     '200':
       description: |
-        The environment already runs this release; nothing changed. The
-        answer is the existing deployment that made it live — note its
-        original `reason`, `message` and `deployed_at`, not this request's.
+        Every target already serves this release; nothing changed. The
+        deployment is the newest one to the targets — note its original
+        `reason`, `message` and `deployed_at`, not this request's.
       content:
         application/json:
           schema:
             $ref: deployment.yaml
           examples:
             alreadyLive:
-              summary: The release dev already runs was deployed again
+              summary: The release the primary origins already serve, deployed again
               value:
-                id: dep_01KX4SB9C8E1F0N9WD3P2E4YM5
+                id: dep_01KX5N7C9D2E7F0N9WD3P2E4YM6
                 project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
-                environment_id: env_01KX3RG8A7F0N9WD3P2E4YM5C1
                 release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
-                deployed_at: '2026-07-14T09:11:00Z'
+                targets:
+                  - origin: https://app.acme.com
+                  - origin: https://www.acme.com
+                deployed_at: '2026-10-02T14:52:00Z'
                 metadata:
                   reason: deploy
+                  message: add phone_number to human-user
+                  rollback_to: null
                   deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
                   deployed_by_type: human
     '201':
       description: |
-        The deployment was created and the environment now runs the release.
+        The deployment was created and every target now serves the release.
       content:
         application/json:
           schema:
             $ref: deployment.yaml
           examples:
             deployed:
-              summary: A release deployed to dev
-              value:
-                id: dep_01KX4SB9C8E1F0N9WD3P2E4YM5
-                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
-                environment_id: env_01KX3RG8A7F0N9WD3P2E4YM5C1
-                release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
-                deployed_at: '2026-07-14T09:11:00Z'
-                metadata:
-                  reason: deploy
-                  deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
-                  deployed_by_type: human
-            promoted:
-              summary: The same release promoted to prod
-              description: |
-                The release id is unchanged — promotion moves a release, it
-                does not copy it — and the metadata records where it came
-                from.
+              summary: A release deployed to every primary origin
+              description: '`primary` comes back as the origins it expanded to.'
               value:
                 id: dep_01KX5N7C9D2E7F0N9WD3P2E4YM6
                 project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
-                environment_id: env_01KX2QF7Z6D0F0N9WD3P2E4YM4
                 release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
-                deployed_at: '2026-07-14T10:02:00Z'
+                targets:
+                  - origin: https://app.acme.com
+                  - origin: https://www.acme.com
+                deployed_at: '2026-10-02T14:52:00Z'
                 metadata:
-                  reason: promote
-                  source_environment_id: env_01KX3RG8A7F0N9WD3P2E4YM5C1
-                  source_environment_name: dev
-                  deployed_by: null
-                  deployed_by_type: null
+                  reason: deploy
+                  message: add phone_number to human-user
+                  rollback_to: null
+                  deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                  deployed_by_type: human
+    '409':
+      description: |
+        Either the guard did not match, answered with `dep.conflict` and the
+        actual newest deployment in `details.deployment`, or the release is
+        revoked, answered with `rel.revoked`.
+      content:
+        application/json:
+          schema:
+            $ref: create-deployment-conflict.yaml
+          examples:
+            conflict:
+              summary: Another deployment reached the target first
+              description: |
+                Inspect the deployment in the details, then retry with its id
+                as `expected_deployment_id`, or stop.
+              value:
+                code: dep.conflict
+                message: 'deployment: the newest deployment to the targets does not match expected_deployment_id'
+                details:
+                  deployment:
+                    id: dep_01KX6P8D0E3F7F0N9WD3P2E4YM7
+                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    release_id: rel_01KX2QF7Z6D0F0N9WD3P2E4YM40
+                    targets:
+                      - origin: https://app.acme.com
+                      - origin: https://www.acme.com
+                    deployed_at: '2026-10-02T15:03:00Z'
+                    metadata:
+                      reason: deploy
+                      message: soften the sign-in page contrast
+                      rollback_to: null
+                      deployed_by: null
+                      deployed_by_type: null
+            revoked:
+              summary: The release is revoked
+              value:
+                code: rel.revoked
+                message: 'release: revoked'
     default:
       $ref: createDeployment-error-response.yaml
 get:
@@ -135,10 +160,16 @@ get:
   description: |
     Lists deployments newest first: what ran where, and when.
 
-    With `environment_name`, the list is that environment's history and its
-    first row is the environment's current deployment. Without it, the list
-    interleaves every environment of the project — a project-wide audit view
-    in which the first row is only the most recent deployment anywhere.
+    By default the list is the history: every deployment of the project, each
+    with every target it made the release live on. With `origin`, it is the
+    history of that origin alone, and its first row is the deployment the
+    origin serves.
+
+    With `live=true`, the list is what is served now: the newest deployment
+    to each target, each carrying only the targets it still serves. A
+    deployment every target of which has since been replaced does not
+    appear. Combined with `origin`, the live view is the one deployment that
+    origin serves, or empty.
 
     `expand: ["release"]` embeds the release each deployment made live, so a
     history renders with each entry's content without resolving `release_id`
@@ -148,7 +179,16 @@ get:
     - Deployments
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
-    - $ref: ../../components/parameters/environment-name-filter.yaml
+    - $ref: ../../components/parameters/origin-filter.yaml
+    - name: live
+      in: query
+      required: false
+      description: |
+        Lists what each target serves now instead of the history. Defaults
+        to `false`.
+      schema:
+        type: boolean
+        default: false
     - name: expand
       in: query
       required: false
@@ -173,79 +213,88 @@ get:
           schema:
             $ref: list-deployments-response.yaml
           examples:
-            environmentHistory:
-              summary: One environment's history, current deployment first
+            history:
+              summary: The history, newest first
               description: |
-                Filtered to `prod`. The first row is the rollback that is
-                current; the promotion it rolled back from follows it.
+                A later deployment replaced the release on `app` only, so the
+                earlier one keeps both of its targets in the history.
               value:
                 deployments:
                   - id: dep_01KX6P8D0E3F7F0N9WD3P2E4YM7
                     project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
-                    environment_id: env_01KX2QF7Z6D0F0N9WD3P2E4YM4
                     release_id: rel_01KX2QF7Z6D0F0N9WD3P2E4YM40
-                    deployed_at: '2026-07-15T08:30:00Z'
+                    targets:
+                      - origin: https://app.acme.com
+                    deployed_at: '2026-10-02T15:03:00Z'
                     metadata:
                       reason: rollback
-                      message: roll back the contrast change, it broke the dark theme
+                      message: phone_number broke sign-up
+                      rollback_to: null
                       deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
                       deployed_by_type: human
                   - id: dep_01KX5N7C9D2E7F0N9WD3P2E4YM6
                     project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
-                    environment_id: env_01KX2QF7Z6D0F0N9WD3P2E4YM4
                     release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
-                    deployed_at: '2026-07-14T10:02:00Z'
+                    targets:
+                      - origin: https://app.acme.com
+                      - origin: https://www.acme.com
+                    deployed_at: '2026-10-02T14:52:00Z'
                     metadata:
-                      reason: promote
-                      source_environment_id: env_01KX3RG8A7F0N9WD3P2E4YM5C1
-                      source_environment_name: dev
+                      reason: deploy
+                      message: add phone_number to human-user
+                      rollback_to: null
+                      deployed_by: null
+                      deployed_by_type: null
+                next_page_token: null
+            live:
+              summary: The same project, live view
+              description: |
+                Each deployment carries only the targets it still serves:
+                `app` moved on, `www` did not.
+              value:
+                deployments:
+                  - id: dep_01KX6P8D0E3F7F0N9WD3P2E4YM7
+                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    release_id: rel_01KX2QF7Z6D0F0N9WD3P2E4YM40
+                    targets:
+                      - origin: https://app.acme.com
+                    deployed_at: '2026-10-02T15:03:00Z'
+                    metadata:
+                      reason: rollback
+                      message: phone_number broke sign-up
+                      rollback_to: null
+                      deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                      deployed_by_type: human
+                  - id: dep_01KX5N7C9D2E7F0N9WD3P2E4YM6
+                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                    targets:
+                      - origin: https://www.acme.com
+                    deployed_at: '2026-10-02T14:52:00Z'
+                    metadata:
+                      reason: deploy
+                      message: add phone_number to human-user
+                      rollback_to: null
                       deployed_by: null
                       deployed_by_type: null
                 next_page_token: null
             expandedRelease:
-              summary: The same history with each release embedded
-              description: |
-                Asked for with `expand: ["release"]`: each entry carries the
-                release it made live — the same representation
-                `GET /releases/{release_id}` serves — so the history renders
-                without resolving `release_id` one by one.
+              summary: The history with each release embedded
               value:
                 deployments:
-                  - id: dep_01KX6P8D0E3F7F0N9WD3P2E4YM7
-                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
-                    environment_id: env_01KX2QF7Z6D0F0N9WD3P2E4YM4
-                    release_id: rel_01KX2QF7Z6D0F0N9WD3P2E4YM40
-                    deployed_at: '2026-07-15T08:30:00Z'
-                    metadata:
-                      reason: rollback
-                      deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
-                      deployed_by_type: human
-                    release:
-                      id: rel_01KX2QF7Z6D0F0N9WD3P2E4YM40
-                      project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
-                      metadata:
-                        message: soften the sign-in page contrast
-                        git_sha: 8d4e1a0f2b3c4d5e6f708192a3b4c5d6e7f80912
-                        git_dirty: false
-                        created_at: '2026-07-13T16:40:00Z'
-                        created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
-                        created_by_type: human
-                      pointers:
-                        - kind: schema
-                          handle: human-user
-                          revision_id: https://example.com/schemas/default-human-user.json
-                        - kind: branding
-                          handle: default
-                          revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
                   - id: dep_01KX5N7C9D2E7F0N9WD3P2E4YM6
                     project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
-                    environment_id: env_01KX2QF7Z6D0F0N9WD3P2E4YM4
                     release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
-                    deployed_at: '2026-07-14T10:02:00Z'
+                    targets:
+                      - origin: https://app.acme.com
+                      - origin: https://www.acme.com
+                    deployed_at: '2026-10-02T14:52:00Z'
                     metadata:
-                      reason: promote
-                      source_environment_id: env_01KX3RG8A7F0N9WD3P2E4YM5C1
-                      source_environment_name: dev
+                      reason: deploy
+                      message: add phone_number to human-user
+                      rollback_to: null
+                      deployed_by: null
+                      deployed_by_type: null
                     release:
                       id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
                       project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
@@ -253,13 +302,13 @@ get:
                         message: add phone_number to human-user
                         git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
                         git_dirty: false
-                        created_at: '2026-07-14T09:11:00Z'
+                        created_at: '2026-10-02T14:51:00Z'
                         created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
                         created_by_type: human
                       pointers:
                         - kind: schema
                           handle: human-user
-                          revision_id: https://example.com/schemas/default-human-user.json
+                          revision_id: sch_01KWHF18816ZQE7F0N9WD3P2E4
                         - kind: branding
                           handle: default
                           revision_id: brnd_01KWH8Q5NZT7F0N9WD3P2E4YM6

@@ -1,46 +1,37 @@
+title: CreateDeploymentRequest
 type: object
 description: |
-  The release to make live and the environment to make it live on.
-
-  Environments are addressed by name here — the name is the environment's
-  wire address — and resolved to ids once, when the deployment is created.
-  The stored record carries the ids, so it survives renames.
+  The release to make live and the targets to make it live on. The release
+  is named by exactly one of `release_id` or `content_hash`; a request with
+  both or neither answers `400` with `dep.invalid`.
 
   `deployed_at` and `deployed_by` are derived server-side from the caller's
   authentication context and are not accepted here.
 required:
-  - environment
-  - release_id
+  - targets
+additionalProperties: false
 properties:
-  environment:
-    description: The name of the environment to deploy to.
-    $ref: ../../components/schemas/environment-name.yaml
   release_id:
     description: |
-      The release to make live. Must already exist in the project — deploying
-      never assembles a release.
-
-      Always explicit, for `promote` too: a promotion names the release it
-      moves rather than asking the server to read the source environment's
-      current one, so the caller promotes the release it inspected, not
-      whatever is current by the time the request lands.
+      The release to make live. Must exist in the project; deploying never
+      assembles a release.
     $ref: ../../components/schemas/release-id.yaml
+  content_hash:
+    description: |
+      The content digest of the release to make live, in full with its
+      `sha256:` prefix. A digest no release of the project carries answers
+      `404` with `rel.not_found`; deploying never assembles a release.
+    type: string
+    pattern: '^sha256:[0-9a-f]{64}$'
+    minLength: 71
+    maxLength: 71
+    example: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
+  targets:
+    $ref: deployment-targets-request.yaml
   reason:
     description: |
-      Why this deployment happens. Omitted, the server records `deploy` —
-      the plain case needs no annotation. Applied server-side rather than as
-      a schema `default`: a default declared next to the shared reason
-      schema would leak into every other use of it.
+      Why this deployment happens. Omitted, the server records `deploy`.
     $ref: ../../components/schemas/deployment-reason.yaml
-  source_environment:
-    description: |
-      The name of the environment the release is promoted from. Required when
-      `reason` is `promote`, rejected otherwise — before the name is
-      resolved, so a source on a non-promotion answers `400` whether or not
-      the name exists.
-    oneOf:
-      - $ref: ../../components/schemas/environment-name.yaml
-      - type: 'null'
   message:
     type: string
     maxLength: 1024
@@ -48,16 +39,15 @@ properties:
       A short free-form summary of why this deployment happened, analogous to
       a git commit message. Recorded on the deployment's metadata and shown
       when listing the history.
-    example: hotfix for the login outage
-  expected_current_deployment_id:
+    example: add phone_number to human-user
+  expected_deployment_id:
     description: |
-      An optimistic-concurrency guard. When present, the deployment is only
-      created if the environment's current deployment is exactly this one;
-      otherwise the request answers `409` carrying the actual
-      `current_deployment_id` and `current_release_id` in its details, and
+      An optimistic-concurrency guard: the deployment the caller believes is
+      the newest one to any of its targets. When present, the deployment
+      is only created if the newest deployment to any of the resolved
+      targets is exactly this one; otherwise the request answers `409`
+      with `dep.conflict`, carrying the actual newest deployment, and
       nothing changes.
 
-      Not persisted — it guards the swap, it is not part of the record.
-    oneOf:
-      - $ref: ../../components/schemas/deployment-id.yaml
-      - type: 'null'
+      Not persisted; it guards the write, it is not part of the record.
+    $ref: ../../components/schemas/deployment-id.yaml

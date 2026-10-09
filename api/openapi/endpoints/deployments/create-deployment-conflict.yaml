@@ -1,0 +1,28 @@
+title: CreateDeploymentConflict
+type: object
+description: |
+  The deployment conflicts with the state of the project: `dep.conflict`
+  when `expected_deployment_id` did not match, `rel.revoked` when the
+  release is revoked. Only `dep.conflict` carries `details`.
+required:
+  - code
+  - message
+properties:
+  code:
+    $ref: ../../components/schemas/error-code.yaml
+  message:
+    type: string
+    description: Human-readable explanation of the error.
+  details:
+    type: object
+    required:
+      - deployment
+    properties:
+      deployment:
+        description: |
+          The actual newest deployment to the targets, to inspect before
+          retrying with its id as `expected_deployment_id`. Null when nothing
+          has been deployed to any of the targets yet.
+        oneOf:
+          - $ref: deployment.yaml
+          - type: 'null'

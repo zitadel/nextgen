@@ -1,0 +1,8 @@
+title: DeploymentTarget
+type: object
+description: One origin a deployment made its release live on.
+required:
+  - origin
+properties:
+  origin:
+    $ref: ../../components/schemas/origin.yaml
