@@ -272,9 +272,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	QueryUsersOperation: []string{
 		"user.read",
 	},
-	RevokeReleaseOperation: []string{
-		"release.write",
-	},
 	RevokeSessionOperation: []string{
 		"session.delete",
 	},

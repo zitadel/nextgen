@@ -285,10 +285,6 @@ type RevokeMySessionRes interface {
 	revokeMySessionRes()
 }
 
-type RevokeReleaseRes interface {
-	revokeReleaseRes()
-}
-
 type RevokeSessionRes interface {
 	revokeSessionRes()
 }
