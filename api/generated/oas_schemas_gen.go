@@ -47195,52 +47195,6 @@ func (o OptRelease) Or(d Release) Release {
 	return d
 }
 
-// NewOptReleaseContentHash returns new OptReleaseContentHash with value set to v.
-func NewOptReleaseContentHash(v ReleaseContentHash) OptReleaseContentHash {
-	return OptReleaseContentHash{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptReleaseContentHash is optional ReleaseContentHash.
-type OptReleaseContentHash struct {
-	Value ReleaseContentHash
-	Set   bool
-}
-
-// IsSet returns true if OptReleaseContentHash was set.
-func (o OptReleaseContentHash) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptReleaseContentHash) Reset() {
-	var v ReleaseContentHash
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptReleaseContentHash) SetTo(v ReleaseContentHash) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptReleaseContentHash) Get() (v ReleaseContentHash, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptReleaseContentHash) Or(d ReleaseContentHash) ReleaseContentHash {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptReleaseCreatedEventDelegationType returns new OptReleaseCreatedEventDelegationType with value set to v.
 func NewOptReleaseCreatedEventDelegationType(v ReleaseCreatedEventDelegationType) OptReleaseCreatedEventDelegationType {
 	return OptReleaseCreatedEventDelegationType{
@@ -56431,19 +56385,13 @@ func (s *RelRevisionUnpinnableDetails) init() RelRevisionUnpinnableDetails {
 // `GET /flow_definitions/{id}`, …).
 // A release exists on its own and is not tied to a target. Deploying it is a
 // separate call.
-// Two identifiers: `id` is the one paths and `release_id` fields take;
-// `content_hash` is the digest of what the release pins, printed by the CLI
-// and pinned by builds, and looked up through fields that name it.
 // Ref: #
 type Release struct {
 	// The opaque, immutable resource id, assigned at construction.
 	ID ReleaseID `json:"id"`
 	// The project this release belongs to.
-	ProjectID ProjectID `json:"project_id"`
-	// The digest of the pinned set. Identical for two releases that pin the
-	// same revisions, which is why a project never holds two such releases.
-	ContentHash ReleaseContentHash `json:"content_hash"`
-	Metadata    ReleaseMetadata    `json:"metadata"`
+	ProjectID ProjectID       `json:"project_id"`
+	Metadata  ReleaseMetadata `json:"metadata"`
 	// The revisions this release pins, one entry per `(kind, handle)`. Never
 	// empty: a release must contain at least one resource, and never longer
 	// than the set `POST /releases` accepts.
@@ -56458,11 +56406,6 @@ func (s *Release) GetID() ReleaseID {
 // GetProjectID returns the value of ProjectID.
 func (s *Release) GetProjectID() ProjectID {
 	return s.ProjectID
-}
-
-// GetContentHash returns the value of ContentHash.
-func (s *Release) GetContentHash() ReleaseContentHash {
-	return s.ContentHash
 }
 
 // GetMetadata returns the value of Metadata.
@@ -56485,11 +56428,6 @@ func (s *Release) SetProjectID(val ProjectID) {
 	s.ProjectID = val
 }
 
-// SetContentHash sets the value of ContentHash.
-func (s *Release) SetContentHash(val ReleaseContentHash) {
-	s.ContentHash = val
-}
-
 // SetMetadata sets the value of Metadata.
 func (s *Release) SetMetadata(val ReleaseMetadata) {
 	s.Metadata = val
@@ -56501,8 +56439,6 @@ func (s *Release) SetPointers(val []ReleasePointer) {
 }
 
 func (*Release) getReleaseByIdRes() {}
-
-type ReleaseContentHash string
 
 // Merged schema.
 // Ref: #
@@ -57310,10 +57246,8 @@ type ReleaseSummary struct {
 	// The opaque, immutable resource id, assigned at construction.
 	ID ReleaseID `json:"id"`
 	// The project this release belongs to.
-	ProjectID ProjectID `json:"project_id"`
-	// The digest of the pinned set.
-	ContentHash ReleaseContentHash `json:"content_hash"`
-	Metadata    ReleaseMetadata    `json:"metadata"`
+	ProjectID ProjectID       `json:"project_id"`
+	Metadata  ReleaseMetadata `json:"metadata"`
 }
 
 // GetID returns the value of ID.
@@ -57324,11 +57258,6 @@ func (s *ReleaseSummary) GetID() ReleaseID {
 // GetProjectID returns the value of ProjectID.
 func (s *ReleaseSummary) GetProjectID() ProjectID {
 	return s.ProjectID
-}
-
-// GetContentHash returns the value of ContentHash.
-func (s *ReleaseSummary) GetContentHash() ReleaseContentHash {
-	return s.ContentHash
 }
 
 // GetMetadata returns the value of Metadata.
@@ -57344,11 +57273,6 @@ func (s *ReleaseSummary) SetID(val ReleaseID) {
 // SetProjectID sets the value of ProjectID.
 func (s *ReleaseSummary) SetProjectID(val ProjectID) {
 	s.ProjectID = val
-}
-
-// SetContentHash sets the value of ContentHash.
-func (s *ReleaseSummary) SetContentHash(val ReleaseContentHash) {
-	s.ContentHash = val
 }
 
 // SetMetadata sets the value of Metadata.
