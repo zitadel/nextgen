@@ -262,3 +262,19 @@ func variableErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return internalErrorResponse(err)
 	}
 }
+
+// environmentErrorResponse maps the environment error codes onto statuses.
+// The environment a variables request addresses is resolved by name, and the
+// project access check answers env.project_not_found for a foreign project.
+func environmentErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
+	switch err.Code {
+	case domain.ErrEnvironmentNotFound().Code, domain.ErrEnvironmentProjectNotFound().Code:
+		return errorResponseWithStatusCode(http.StatusNotFound, err)
+	case domain.ErrEnvironmentNameInvalid().Code:
+		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	case domain.ErrEnvironmentPermissionDenied().Code:
+		return errorResponseWithStatusCode(http.StatusForbidden, err)
+	default:
+		return internalErrorResponse(err)
+	}
+}

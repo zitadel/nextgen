@@ -169,9 +169,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetDeploymentByIdOperation: []string{
 		"deployment.read",
 	},
-	GetEnvironmentByNameOperation: []string{
-		"environment.read",
-	},
 	GetEventOperation: []string{
 		"events.read",
 	},
@@ -222,9 +219,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	ListDeploymentsOperation: []string{
 		"deployment.read",
-	},
-	ListEnvironmentsOperation: []string{
-		"environment.read",
 	},
 	ListEventsOperation: []string{
 		"events.read",

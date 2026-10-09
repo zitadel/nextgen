@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -51,22 +50,8 @@ func seedDefaultEnvironments(ctx context.Context, stmts AllStatements, projectID
 		if err := stmts.CreateEnvironment(ctx, entity); err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to seed default environment")
 		}
-		if err := emitEnvironmentCreated(ctx, stmts, entity); err != nil {
-			return err
-		}
 	}
 	return nil
-}
-
-func emitEnvironmentCreated(ctx context.Context, stmts EventStatements, entity *domain.Environment) error {
-	return audit.Emit(ctx, stmts, audit.EmitSpec{
-		Type:       domain.EventTypeEnvironmentCreated,
-		Category:   domain.EventCategoryAdmin,
-		ProjectID:  entity.ProjectID,
-		EntityType: "environment",
-		EntityID:   entity.ID,
-		Payload:    domain.EnvironmentPayload{Name: entity.Name},
-	})
 }
 
 func (s *EnvironmentService) GetByName(ctx context.Context, projectID, name string) (*domain.Environment, error) {

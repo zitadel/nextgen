@@ -68,15 +68,22 @@ func (f deploymentFixture) mustDeploy(t *testing.T, req *api.CreateDeploymentReq
 	return &deployed
 }
 
-func (f deploymentFixture) environmentByName(t *testing.T, name string) *api.Environment {
+func (f deploymentFixture) environmentByName(t *testing.T, name string) *domain.Environment {
 	t.Helper()
-	resp, err := f.client.GetEnvironmentByName(t.Context(), api.GetEnvironmentByNameParams{
-		ProjectID: api.ProjectID(f.project),
-		Name:      api.EnvironmentName(name),
-	})
+	env, err := harness.EnsureEnvironmentService(t).GetByName(t.Context(), f.project, name)
 	require.NoError(t, err)
-	require.IsType(t, &api.Environment{}, resp, helpers.MustMarshal(t, resp))
-	return resp.(*api.Environment)
+	return env
+}
+
+// current is the environment's current deployment: the first row of its
+// history.
+func (f deploymentFixture) current(t *testing.T, name string) api.DeploymentID {
+	t.Helper()
+	resp := f.list(t, api.ListDeploymentsParams{EnvironmentName: api.NewOptEnvironmentName(api.EnvironmentName(name))})
+	require.IsType(t, &api.ListDeploymentsResponse{}, resp, helpers.MustMarshal(t, resp))
+	listed := resp.(*api.ListDeploymentsResponse).Deployments
+	require.NotEmpty(t, listed, "nothing deployed to %s", name)
+	return listed[0].ID
 }
 
 func (f deploymentFixture) list(t *testing.T, params api.ListDeploymentsParams) api.ListDeploymentsRes {
@@ -118,19 +125,6 @@ func TestDeployments(t *testing.T) {
 
 		dev := fixture.environmentByName(t, "dev")
 		assert.Equal(t, dev.ID, deployed.EnvironmentID, "environment resolved from its name")
-	})
-
-	t.Run("environment reads surface the current deployment", func(t *testing.T) {
-		dev := fixture.environmentByName(t, "dev")
-		require.False(t, dev.CurrentDeployment.IsNull())
-		current := dev.CurrentDeployment.Value
-		assert.Equal(t, deployed.ID, current.ID)
-		assert.Equal(t, fixture.releaseID, string(current.ReleaseID))
-		assert.Equal(t, api.DeploymentReasonDeploy, current.Reason)
-
-		// An environment nothing was deployed to reads as explicit null.
-		staging := fixture.environmentByName(t, "staging")
-		assert.True(t, staging.CurrentDeployment.IsNull())
 	})
 
 	t.Run("get by id", func(t *testing.T) {
@@ -188,9 +182,7 @@ func TestDeployments(t *testing.T) {
 			Reason:      api.NewOptDeploymentReason(api.DeploymentReasonDeploy),
 		})
 
-		dev := fixture.environmentByName(t, "dev")
-		require.False(t, dev.CurrentDeployment.IsNull())
-		assert.Equal(t, second.ID, dev.CurrentDeployment.Value.ID)
+		assert.Equal(t, second.ID, fixture.current(t, "dev"))
 
 		resp := fixture.list(t, api.ListDeploymentsParams{
 			EnvironmentName: api.NewOptEnvironmentName("dev"),
@@ -297,9 +289,7 @@ func TestDeploymentExpectedCurrentGuard(t *testing.T) {
 	assert.Equal(t, secondRelease, details.CurrentReleaseID)
 
 	// Nothing changed: the environment still runs the second deployment.
-	dev := fixture.environmentByName(t, "dev")
-	require.False(t, dev.CurrentDeployment.IsNull())
-	assert.Equal(t, second.ID, dev.CurrentDeployment.Value.ID)
+	assert.Equal(t, second.ID, fixture.current(t, "dev"))
 }
 
 func TestDeploymentValidation(t *testing.T) {
