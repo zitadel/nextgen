@@ -742,15 +742,13 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 	}
 	// The same chain: the callback reads its cookie by the request scheme
 	// (WithRequestHostMiddleware). Its code is a credential and its state is
-	// single-use, so the request log hides both, on the retired shared route
-	// too: a log line must not be able to replay a sign-in. Both spellings
-	// serve one handler: the prefixed path arrives when the instance is the
-	// browser origin, the stripped one through a scaffolded app's SDK proxy.
-	if err := api.MountIDPCallback(mux, idpCallbackHandler, func(h http.Handler) http.Handler {
-		return chain(h, "code", "state")
-	}); err != nil {
-		return nil, err
-	}
+	// single-use, so the request log hides both: a log line must not be able
+	// to replay a sign-in. Both spellings serve one handler: the prefixed path
+	// arrives when the instance is the browser origin, the stripped one through
+	// a scaffolded app's SDK proxy.
+	callback := chain(idpCallbackHandler, "code", "state")
+	mux.Handle(api.IDPCallbackPattern, callback)
+	mux.Handle(api.IDPCallbackUpstreamPattern, callback)
 	mux.Handle("/", chain(apiHandler))
 	return mux, nil
 }

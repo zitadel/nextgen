@@ -129,18 +129,14 @@ func TestBuildHTTPMuxMountsTheIDPCallback(t *testing.T) {
 	}
 }
 
-// The shared callback that preceded the per-connection routes is retired.
-// alpha.25 served it, so a provider registered then still sends the browser
-// there: it is mounted, through the same chain, to answer the uniform page
-// rather than reach the API, whose request log does not redact code and state.
-func TestBuildHTTPMuxAnswersTheRetiredSharedIDPCallback(t *testing.T) {
+// The shared callback that preceded the per-connection routes is not mounted:
+// a callback that names no connection is the shape the mix-up attack relies on
+// (RFC 9700 §4.4). It falls through to the API, which does not process it.
+func TestBuildHTTPMuxServesNoSharedIDPCallback(t *testing.T) {
 	mux := newTestMux(t, uiConfig(false, false))
 
 	for _, path := range []string{"/__nextgen/idp/callback", "/idp/callback"} {
-		rec := get(t, mux, path+"?state=s&code=c")
-		assert.Empty(t, rec.Header().Get("X-Test-Handler"), "%s must not reach the API or the live callback", path)
-		assert.Equal(t, http.StatusBadRequest, rec.Code, path)
-		assert.Equal(t, "private, no-store", rec.Header().Get("Cache-Control"), path)
+		assert.Equal(t, "api", get(t, mux, path+"?state=s&code=c").Header().Get("X-Test-Handler"), path)
 	}
 }
 
@@ -168,20 +164,6 @@ func TestBuildHTTPMuxHandsTheCallbackItsConnectionSlug(t *testing.T) {
 		require.Equal(t, http.StatusSeeOther, rec.Code, path)
 		assert.Equal(t, "google", recorder.in.ConnectionSlug, path)
 	}
-}
-
-// A UI path configured under /idp/ overlaps the callback route. That is a
-// startup error, not ServeMux's panic.
-func TestBuildHTTPMuxRefusesAUIPathOverlappingTheIDPCallback(t *testing.T) {
-	requireEmbeddedUI(t)
-	cfg := uiConfig(false, true)
-	cfg.LoginPath = "/idp/login"
-
-	_, err := buildHTTPMux(cfg, idgen.NewULID(), apiEcho(), idpCallbackEcho(),
-		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
-		nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "/idp/login/")
 }
 
 // The runtime document is not console-only: the hosted login shell resolves

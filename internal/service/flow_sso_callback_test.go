@@ -137,6 +137,38 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
+			// The provider's error is not read: it is not the pinned
+			// connection's answer, so the user sees the failure, not a
+			// cancellation. No code arrived, so it is an authorization failure.
+			name: "a provider error with a foreign iss stores the failed key",
+			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "access_denied", Issuer: "https://evil.example.test"},
+			connections: func(m *servicemocks.MockIDPConnectionService) {
+				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
+					Return(&domain.IDPConnection{Slug: ssoCallbackSlug, RevisionID: "idprev_1", Document: revisionDoc}, nil)
+			},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
+		},
+		{
+			name: "a provider error with the connection's iss is read as usual",
+			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "access_denied", Issuer: "https://accounts.example.test"},
+			connections: func(m *servicemocks.MockIDPConnectionService) {
+				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
+					Return(&domain.IDPConnection{Slug: ssoCallbackSlug, RevisionID: "idprev_1", Document: revisionDoc}, nil)
+			},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
+			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
+		},
+		{
+			name: "a revision that cannot be read for the iss check stores the failed key",
+			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "access_denied", Issuer: "https://accounts.example.test"},
+			connections: func(m *servicemocks.MockIDPConnectionService) {
+				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").Return(nil, domain.ErrIDPConnectionNotFound())
+			},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
+		},
+		{
 			name: "a vanished revision stores the failed key",
 			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
 			connections: func(m *servicemocks.MockIDPConnectionService) {

@@ -37,7 +37,8 @@ func (s *stubSSOCallback) Process(_ context.Context, in service.FlowSSOCallbackI
 func callbackMux(t *testing.T, handler http.Handler) http.Handler {
 	t.Helper()
 	mux := http.NewServeMux()
-	require.NoError(t, api.MountIDPCallback(mux, handler, func(h http.Handler) http.Handler { return h }))
+	mux.Handle(api.IDPCallbackPattern, handler)
+	mux.Handle(api.IDPCallbackUpstreamPattern, handler)
 	return mux
 }
 
@@ -243,41 +244,4 @@ func TestIDPCallbackHandler_SetsTheOperationID(t *testing.T) {
 
 	operationID, _ := middleware.GetOperationIDContext(ctx)
 	assert.Equal(t, "idpCallback", operationID)
-}
-
-// A provider registered with the retired shared route still sends the browser
-// there. It gets the uniform page, is never processed, and the warning names
-// what to fix.
-func TestIDPCallbackHandler_RetiredSharedRoute(t *testing.T) {
-	t.Parallel()
-	for _, path := range []string{"/__nextgen/idp/callback", "/idp/callback"} {
-		t.Run(path, func(t *testing.T) {
-			t.Parallel()
-			var logs bytes.Buffer
-			ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logs, nil)))
-			stub := &stubSSOCallback{}
-			req := httptest.NewRequestWithContext(ctx, http.MethodGet, path+"?state=proj-1.rand&code=the-code", nil)
-			rec := httptest.NewRecorder()
-			callbackMux(t, api.NewIDPCallbackHandler(stub)).ServeHTTP(rec, req)
-
-			assert.Equal(t, http.StatusBadRequest, rec.Code)
-			assert.Contains(t, rec.Body.String(), "could not be completed")
-			assert.Equal(t, "private, no-store", rec.Header().Get("Cache-Control"))
-			assert.Zero(t, stub.calls)
-			assert.Contains(t, logs.String(), "retired shared route")
-			assert.NotContains(t, logs.String(), "the-code")
-		})
-	}
-}
-
-// A pattern already on the mux that overlaps the callback, such as a UI path
-// configured under /idp/, is an error at startup, not ServeMux's panic.
-func TestMountIDPCallback_ReportsAConflict(t *testing.T) {
-	t.Parallel()
-	mux := http.NewServeMux()
-	mux.Handle("/idp/login/", http.NotFoundHandler())
-
-	err := api.MountIDPCallback(mux, http.NotFoundHandler(), func(h http.Handler) http.Handler { return h })
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "/idp/login/")
 }

@@ -93,16 +93,3 @@ func writeIDPCallbackErrorPage(w http.ResponseWriter, status int) {
 	w.WriteHeader(status)
 	_, _ = io.WriteString(w, idpCallbackErrorPage)
 }
-
-// serveRetiredIDPCallback answers the retired shared callback route: the
-// provider was registered with it before the routes became per connection.
-// The answer is the uniform page, and the warning tells the operator which
-// registration to update; the request log redacts the code and state as on
-// the live route.
-func serveRetiredIDPCallback(w http.ResponseWriter, r *http.Request) {
-	ctx := middleware.WithOperationIDContext(r.Context(), "idpCallback")
-	zlog.GetLoggingContext(ctx).Warn("sso callback on the retired shared route: register the connection's own callback URI, /__nextgen/idp/{slug}/callback, with the provider",
-		slog.String("path", r.URL.Path))
-	w.Header().Set("Cache-Control", "private, no-store")
-	writeIDPCallbackErrorPage(w, http.StatusBadRequest)
-}

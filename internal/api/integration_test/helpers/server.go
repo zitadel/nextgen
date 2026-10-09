@@ -42,20 +42,19 @@ func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
 	defer h.testServer.mutex.Unlock()
 
 	if h.testServer.value == nil {
-		callback := api.NewIDPCallbackHandler(service.NewFlowSSOCallback(
+		callback := h.withServerLog(api.NewIDPCallbackHandler(service.NewFlowSSOCallback(
 			h.EnsureIDPConnectionService(t),
 			h.EnsureAuthAttemptService(t),
 			h.EnsureKeyService(t),
 			h.EnsureVariableService(t),
 			h.EnsureHttpClient(t),
-		))
+		)), "code", "state")
 		// The same mounts as the production mux (buildHTTPMux), not its
-		// middleware chain: the callback on both its spellings and the retired
-		// shared route, ahead of the API catch-all.
+		// middleware chain: the callback on both its spellings, ahead of the API
+		// catch-all.
 		mux := http.NewServeMux()
-		require.NoError(t, api.MountIDPCallback(mux, callback, func(next http.Handler) http.Handler {
-			return h.withServerLog(next, "code", "state")
-		}))
+		mux.Handle(api.IDPCallbackPattern, callback)
+		mux.Handle(api.IDPCallbackUpstreamPattern, callback)
 		mux.Handle("/", h.withServerLog(api.WithSessionStateNoStore(api.WithCSRFRequest(h.EnsureGeneratedServer(t)))))
 		h.testServer.value = httptest.NewServer(mux)
 	}

@@ -59,10 +59,9 @@ connection's issuer is refused the same way, before the exchange. `iss` alone
 was not enough: few providers send it, and an absent value cannot be refused
 without breaking those that do not.
 
-The retired shared route, `/__nextgen/idp/callback` (and `/idp/callback`),
-served by the first release, answers the uniform error page and logs a warning
-naming the per-connection URI to register instead; its `code` and `state` stay
-redacted from the request log.
+The shared route that preceded these, `/__nextgen/idp/callback` (and
+`/idp/callback`), is not served: a provider still registered with it gets no
+sign-in until the connection's own URI is registered.
 
 The shape's two structural halves:
 
@@ -543,7 +542,6 @@ and recovery route without exposing internal technical details to the end user.
 | **User cancels / provider denies (`access_denied`)** | Originating step with a localized `text_key` error. | The step remains rendered, allowing the user to retry or select another offered authentication method. |
 | **Provider configuration error (invalid client, bad scope)** | Originating step with a generic `text_key` error. | Details are written to the server log; tenant-side misconfigurations are hidden from the end user. |
 | **Callback path names another connection than the `state` pins, or `iss` is not its issuer** | Originating step with `error.sso_failed`. | The `state` is consumed and the code reaches no token endpoint. The server log records both slugs, or the `iss` and the issuer. |
-| **Callback on the retired shared route** | The callback route's uniform error page. | Nothing is processed and the `state` is not consumed. The server log warns which URI to register instead. |
 | **State expired, unknown, or reused** | The callback route's uniform error page. | The page asks the user to return to the application and try again. Every invalid state shape is answered with the same bytes, so the response confirms nothing about what exists. |
 | **Binding cookie absent or mismatched** | The callback route's uniform error page, indistinguishable from an invalid state. | The `state` is **not** consumed: a request without the right cookie cannot finish the ceremony, so the record stays pending for the user's own tab and the state expires with the attempt. The user retries from the page the sign-in started on. |
 | **Code exchange / `userinfo` failure** | Originating step with a generic error. | The user can retry; detailed error diagnostics are written to server logs. |
