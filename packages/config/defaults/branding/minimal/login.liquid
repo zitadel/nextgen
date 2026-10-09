@@ -6,9 +6,12 @@
     {% assign password_field = fields | where: "type", "password" | first %}
     <div class="zl-field-group">
     {% comment %}
-      Fields bind by name only: <zitadel-login> fills label, type, placeholder,
-      help, error, test hook and the forgot-password link from the step. An
-      attribute written here wins over the filled one.
+      Fields bind by name only. <zitadel-login> fills in label, data-testid,
+      error/invalid, value (checked), type, autocomplete, required,
+      placeholder, help, select options and the forgot-password link from the
+      step. An attribute written here wins: label="Work email" keeps your
+      label, placeholder="" or forgot-password-href="" leaves that part out.
+      Full table: the branding README, section "Fields".
     {% endcomment %}
     {% for f in fields %}
       {% case f.type %}

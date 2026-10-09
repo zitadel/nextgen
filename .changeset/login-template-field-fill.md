@@ -22,3 +22,7 @@ shrinks from 44 lines to 7:
 
 An attribute a template writes itself always wins, so custom wording keeps
 working and templates ejected before this change render exactly as before.
+To leave a filled part out, write it empty (`placeholder=""`,
+`forgot-password-href=""`). The scaffolded branding `README.md` gains a
+"Fields" section listing every attribute that is filled in and where it
+comes from.

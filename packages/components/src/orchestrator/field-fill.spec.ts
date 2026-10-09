@@ -105,6 +105,16 @@ describe("fillFields", () => {
     expect(email.getAttribute("error")).toBe("Enter a valid email.");
   });
 
+  it("lets an empty attribute switch a filled part off", () => {
+    const root = render(
+      `<zl-field name="x-auth-methods#password" forgot-password-href=""></zl-field>`,
+    );
+    fillFields(root, context());
+    const password = field(root, "x-auth-methods#password");
+    // The atom renders no link for an empty href; the fill must leave it empty.
+    expect(password.getAttribute("forgot-password-href")).toBe("");
+  });
+
   it("ignores atoms whose name the step does not declare", () => {
     const root = render(`<zl-field name="nickname"></zl-field>`);
     fillFields(root, context());
