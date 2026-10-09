@@ -807,14 +807,16 @@ type Invoker interface {
 	RevokeMySession(ctx context.Context) (RevokeMySessionRes, error)
 	// RevokeRelease invokes revokeRelease operation.
 	//
-	// Marks the release revoked, the operator's hard stop on content that must
-	// not be served anywhere. From then on the release cannot be deployed and
-	// is refused on every path that would serve it, including to a build that
-	// pins its digest, with `rel.revoked`.
-	// Nothing is undone: deployments naming the release stay in the history,
-	// and the targets they serve answer `rel.revoked` until something else is
-	// deployed there. Rolling a deployment back is the soft alternative — it
-	// moves what the targets serve and leaves pinned builds where they are.
+	// Marks the release revoked, so that its content is never served again.
+	// From then on the release cannot be deployed and is refused on every path
+	// that would serve it, including to a build that pins its digest, with
+	// `rel.revoked`.
+	// A release that is still the current deployment of any environment cannot
+	// be revoked: the call answers `409` with `rel.in_use`, naming each such
+	// environment and its current deployment. Deploy another release there or
+	// roll the deployment back first, then revoke. Revocation therefore never
+	// takes a running environment down. Deployments that named the release
+	// earlier stay in the history.
 	// Idempotent: revoking a release that is already revoked answers `200`
 	// with the release unchanged, `revoked_at` still naming the first
 	// revocation. There is no un-revoke; build a new release instead.
@@ -11779,14 +11781,16 @@ func (c *Client) sendRevokeMySession(ctx context.Context) (res RevokeMySessionRe
 
 // RevokeRelease invokes revokeRelease operation.
 //
-// Marks the release revoked, the operator's hard stop on content that must
-// not be served anywhere. From then on the release cannot be deployed and
-// is refused on every path that would serve it, including to a build that
-// pins its digest, with `rel.revoked`.
-// Nothing is undone: deployments naming the release stay in the history,
-// and the targets they serve answer `rel.revoked` until something else is
-// deployed there. Rolling a deployment back is the soft alternative — it
-// moves what the targets serve and leaves pinned builds where they are.
+// Marks the release revoked, so that its content is never served again.
+// From then on the release cannot be deployed and is refused on every path
+// that would serve it, including to a build that pins its digest, with
+// `rel.revoked`.
+// A release that is still the current deployment of any environment cannot
+// be revoked: the call answers `409` with `rel.in_use`, naming each such
+// environment and its current deployment. Deploy another release there or
+// roll the deployment back first, then revoke. Revocation therefore never
+// takes a running environment down. Deployments that named the release
+// earlier stay in the history.
 // Idempotent: revoking a release that is already revoked answers `200`
 // with the release unchanged, `revoked_at` still naming the first
 // revocation. There is no un-revoke; build a new release instead.

@@ -17609,6 +17609,7 @@ func (*ErrorDetails) getBrandingByIdRes()      {}
 func (*ErrorDetails) getMyUserRes()            {}
 func (*ErrorDetails) initClaimRes()            {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
+func (*ErrorDetails) revokeReleaseRes()        {}
 func (*ErrorDetails) submitFlowStepRes()       {}
 
 // Additional error-specific context.
@@ -56614,9 +56615,10 @@ type Release struct {
 	Metadata    ReleaseMetadata    `json:"metadata"`
 	// When the release was revoked, or null while it is not. A revoked
 	// release cannot be deployed and is refused on every path that would
-	// serve it, including to a build that pins its digest; deployments that
-	// already name it stay in the history, and the targets they serve answer
-	// `rel.revoked` until something else is deployed there.
+	// serve it, including to a build that pins its digest. No environment's
+	// current deployment names a revoked release, since a release still
+	// deployed cannot be revoked; earlier deployments that named it stay in
+	// the history.
 	RevokedAt NilDateTime `json:"revoked_at"`
 	// The revisions this release pins, one entry per `(kind, handle)`. Never
 	// empty: a release must contain at least one resource, and never longer
