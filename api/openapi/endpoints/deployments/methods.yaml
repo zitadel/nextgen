@@ -14,10 +14,17 @@ post:
     revoked release answers `409` with `rel.revoked`.
 
     `targets` lists `primary`, which expands to every primary origin of the
-    project, and exact origins. An origin that is not a primary origin of
-    the project answers `403` with `proj.origin_not_allowed`, and `primary`
-    on a project with no primary origin answers `400` with `dep.invalid`.
-    The deployment records the resolved origins, sorted, never the keyword.
+    project, and exact origins. An origin that is neither a primary origin
+    of the project nor matches one of its preview patterns answers `403`
+    with `proj.origin_not_allowed`, and `primary` on a project with no
+    primary origin answers `400` with `dep.invalid`. The deployment records
+    the resolved origins, sorted, never the keyword.
+
+    A deployment to preview URLs creates the preview for each of them, or
+    renews it when it exists, in the same transaction, with the expiry set
+    from `ttl`; each target in the response carries that expiry. Primary
+    origins and preview URLs cannot be mixed in one deployment: that
+    answers `400` with `dep.invalid`.
 
     Idempotent on what is served: when every resolved target already serves
     the release, nothing changes and the call answers `200` with the newest
@@ -62,6 +69,14 @@ post:
               targets:
                 - https://app.acme.com
               expected_deployment_id: dep_01KX4SB9C8E1F0N9WD3P2E4YM5
+          preview:
+            summary: Deploy to two preview URLs for a week
+            value:
+              content_hash: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
+              targets:
+                - https://acme-git-sso-acmeinc.vercel.app
+                - https://acme-k3x9v2-acmeinc.vercel.app
+              ttl: 168h
   responses:
     '200':
       description: |
@@ -114,6 +129,25 @@ post:
                   rollback_to: null
                   deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
                   deployed_by_type: human
+            previewed:
+              summary: A release deployed to two preview URLs
+              description: Each target carries the expiry of its preview.
+              value:
+                id: dep_01KX5M2A0C4D7F0N9WD3P2E4YM8
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                targets:
+                  - origin: https://acme-git-sso-acmeinc.vercel.app
+                    expires_at: '2026-10-09T14:10:00Z'
+                  - origin: https://acme-k3x9v2-acmeinc.vercel.app
+                    expires_at: '2026-10-09T14:10:00Z'
+                deployed_at: '2026-10-02T14:10:00Z'
+                metadata:
+                  reason: deploy
+                  message: null
+                  rollback_to: null
+                  deployed_by: null
+                  deployed_by_type: service
     '409':
       description: |
         Either the guard did not match, answered with `dep.conflict` and the
@@ -166,9 +200,10 @@ get:
     origin serves.
 
     With `live=true`, the list is what is served now: the newest deployment
-    to each target, each carrying only the targets it still serves. A
-    deployment every target of which has since been replaced does not
-    appear. Combined with `origin`, the live view is the one deployment that
+    to each target, each carrying only the targets it still serves, with
+    the expiry of each preview URL. A deployment every target of which has
+    since been replaced, or whose previews have all expired or been
+    removed, does not appear. Combined with `origin`, the live view is the one deployment that
     origin serves, or empty.
 
     `expand: ["release"]` embeds the release each deployment made live, so a

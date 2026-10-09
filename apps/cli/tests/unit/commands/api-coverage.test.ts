@@ -52,6 +52,9 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // history is that command's to read. Registry CRUD would offer a `create`
   // that skips the release construction the command exists to do.
   deployments: "created and read through `zitadel deploy` orchestration, not registry CRUD (#529)",
+  // A preview exists only through a deployment to it, so it has no create to
+  // offer; listing and removing it are `zitadel preview`'s.
+  previews: "created by deploying to a preview URL; listed and removed by `zitadel preview` (#1312)",
 };
 
 /**

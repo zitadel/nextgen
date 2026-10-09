@@ -10,10 +10,11 @@ description: |
     deployment is created. The deployment records the origins it expanded
     to, so a primary origin added later is not part of it.
   - An exact origin, such as `https://app.acme.com`, which must be one of
-    the project's primary origins.
+    the project's primary origins or match one of its preview patterns.
 
-  The deployment covers every target in one transaction: either all of
-  them serve the release afterwards or none does.
+  A deployment goes either to primary origins or to preview URLs, never to
+  both. It covers every target in one transaction: either all of them serve
+  the release afterwards or none does.
 items:
   type: string
   pattern: '^(primary|https?://[^/?#\s]+)$'
