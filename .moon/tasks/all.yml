@@ -20,4 +20,4 @@ implicitInputs:
 # inherits it via implicitInputs above, so the change forces a full moon DAG
 # rebuild (no remote-cache hits) and makes the Go toolchain cache the thing
 # under test. Bump the token for each benchmark run.
-# cache-bust: cloudx-1
+# cache-bust: cloudx-2
