@@ -200,12 +200,15 @@ type Invoker interface {
 	// project's newest revision of the same handle: unchanged content reuses
 	// that revision, changed content allocates a new one. Construction is one
 	// transaction — a failure anywhere leaves no revision and no release. The
-	// caller records nothing, so the same directory builds the same release on
-	// any project. An empty bundle is refused.
+	// caller records nothing. An empty bundle is refused.
 	// Both shapes are closed the same way: every handle a pinned resource
 	// references — a flow definition's `user_schema` naming a schema by
-	// `objectType` — must be pinned by the same release, or the request is
-	// refused with `rel.unresolved_reference`. The message names the pointer
+	// `objectType` — must be pinned by the same release. A bundle may leave a
+	// referenced resource out when the project already holds it; the release
+	// then pins the project's newest revision of that handle, so only a bundle
+	// that carries everything it references builds the same release on any
+	// project. A handle that resolves nowhere refuses the request with
+	// `rel.unresolved_reference`. The message names the pointer
 	// and the handle that did not resolve, for example
 	// `flow_definition default-login: user_schema human-user not found`,
 	// because a release pins many and the code alone does not say which one
@@ -2450,12 +2453,15 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 // project's newest revision of the same handle: unchanged content reuses
 // that revision, changed content allocates a new one. Construction is one
 // transaction — a failure anywhere leaves no revision and no release. The
-// caller records nothing, so the same directory builds the same release on
-// any project. An empty bundle is refused.
+// caller records nothing. An empty bundle is refused.
 // Both shapes are closed the same way: every handle a pinned resource
 // references — a flow definition's `user_schema` naming a schema by
-// `objectType` — must be pinned by the same release, or the request is
-// refused with `rel.unresolved_reference`. The message names the pointer
+// `objectType` — must be pinned by the same release. A bundle may leave a
+// referenced resource out when the project already holds it; the release
+// then pins the project's newest revision of that handle, so only a bundle
+// that carries everything it references builds the same release on any
+// project. A handle that resolves nowhere refuses the request with
+// `rel.unresolved_reference`. The message names the pointer
 // and the handle that did not resolve, for example
 // `flow_definition default-login: user_schema human-user not found`,
 // because a release pins many and the code alone does not say which one
