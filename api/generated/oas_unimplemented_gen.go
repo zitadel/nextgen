@@ -230,9 +230,8 @@ func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjec
 // failed.
 // Idempotent on the pinned set: metadata is excluded from the comparison,
 // so re-submitting the same content with a different `message` answers
-// `200` with the release that already pins it, every revision
-// `created: false`, rather than creating a second one. A release the
-// project did not hold before answers `201`.
+// `200` with the release that already pins it rather than creating a
+// second one. A release the project did not hold before answers `201`.
 // Creating a release does not deploy it. A release is not tied to a target,
 // and the same release can later be deployed to any number of targets
 // unchanged.
