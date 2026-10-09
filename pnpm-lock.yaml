@@ -1318,6 +1318,9 @@ importers:
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.0(@tsdown/css@0.23.0)(@volar/typescript@2.4.28)(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
