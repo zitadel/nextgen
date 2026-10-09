@@ -116,10 +116,38 @@ export class ZlField extends FormAtom {
     if (changed.has("value") || changed.has("required") || changed.has("error")) {
       this.syncFormState();
     }
-    if ((changed.has("type") || changed.has("passwordToggle")) && !this.hasPasswordToggle) {
+    // Whenever the button is not drawn there is no way to hide the value
+    // again, so it must not stay revealed.
+    if (this.revealed && (!this.hasPasswordToggle || this.hasSuffixSlot || this.isDisabled)) {
       this.revealed = false;
     }
   }
+
+  /**
+   * Form-associated lifecycle: the browser calls this whenever the owning
+   * form changes, including `null` on removal. The submit listener lives on
+   * the form because every submit path — a submit button and Enter alike —
+   * ends in `form.requestSubmit()`, which dispatches `submit` synchronously.
+   */
+  formAssociatedCallback(form: HTMLFormElement | null): void {
+    this.associatedForm?.removeEventListener("submit", this.concealOnSubmit, true);
+    this.associatedForm = form;
+    form?.addEventListener("submit", this.concealOnSubmit, true);
+  }
+
+  private associatedForm: HTMLFormElement | null = null;
+
+  /**
+   * Hide the value before the submit event reaches anyone else on the form.
+   * Setting `revealed` alone is not enough: Lit applies it on a later
+   * microtask, after the submit has already been dispatched with the input
+   * still `type="text"`.
+   */
+  private concealOnSubmit = (): void => {
+    if (!this.revealed) return;
+    this.revealed = false;
+    if (this.inputEl) this.inputEl.type = this.type;
+  };
 
   override formResetCallback(): void {
     this.revealed = false;
@@ -170,19 +198,23 @@ export class ZlField extends FormAtom {
     const passwordToggle = this.hasPasswordToggle;
     const showDefaultTrailing =
       (this.trailingIcon || passwordToggle) && !this.hasSuffixSlot && !this.isDisabled;
+    // The toggle lives in the trailing slot, so a filled `suffix` (or a
+    // disabled field) means it is not drawn. Everything that assumes our
+    // button — the revealed type, hiding Edge's own reveal — keys off this.
+    const toggleShown = passwordToggle && showDefaultTrailing;
     const trailing = !showDefaultTrailing
       ? null
-      : passwordToggle
+      : toggleShown
         ? this.renderPasswordToggle(this.label ? labelId : undefined)
         : this.renderTrailingIcon();
     // A revealed password is a `type="text"` input, which browsers hand to
     // spellcheck and autocorrect — and "enhanced" spellcheck sends the text to
     // a cloud service. Opting out up front covers the revealed state.
-    const revealed = passwordToggle && this.revealed;
+    const revealed = toggleShown && this.revealed;
     const wrapClass = classMap({
       "zr-field__wrap": true,
       "zr-field__wrap--trailing": showDefaultTrailing,
-      "zr-field__wrap--toggle": passwordToggle,
+      "zr-field__wrap--toggle": toggleShown,
     });
 
     return html`
@@ -197,9 +229,9 @@ export class ZlField extends FormAtom {
             data-testid=${ifDefined(this.nativeInputTestId())}
             name=${this.name}
             type=${revealed ? "text" : this.type}
-            spellcheck=${ifDefined(passwordToggle ? "false" : undefined)}
-            autocapitalize=${ifDefined(passwordToggle ? "off" : undefined)}
-            autocorrect=${ifDefined(passwordToggle ? "off" : undefined)}
+            spellcheck=${ifDefined(toggleShown ? "false" : undefined)}
+            autocapitalize=${ifDefined(toggleShown ? "off" : undefined)}
+            autocorrect=${ifDefined(toggleShown ? "off" : undefined)}
             .value=${live(this.value)}
             placeholder=${this.placeholder}
             autocomplete=${ifDefined(this.autocomplete)}
@@ -398,7 +430,6 @@ export class ZlField extends FormAtom {
       const form = this.internals.form;
       if (form) {
         event.preventDefault();
-        this.revealed = false;
         form.requestSubmit();
       }
     }

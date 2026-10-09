@@ -197,3 +197,82 @@ describe("<zl-field> form participation (chromium)", () => {
     expect((hostInputEvent as InputEvent).inputType).toBe("insertText");
   });
 });
+
+describe("<zl-field> password toggle (chromium)", () => {
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  async function mountRevealed(markup: string): Promise<{
+    form: HTMLFormElement;
+    field: ZlField;
+    input: HTMLInputElement;
+  }> {
+    host.innerHTML = markup;
+    const form = host.querySelector("form") as HTMLFormElement;
+    const field = host.querySelector("zl-field") as ZlField;
+    field.passwordToggle = true;
+    await field.updateComplete;
+    field.shadowRoot?.querySelector<HTMLButtonElement>('[part~="password-toggle"]')?.click();
+    await field.updateComplete;
+    const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    expect(input.type).toBe("text");
+    return { form, field, input };
+  }
+
+  it("hides the value when the owning form is reset", async () => {
+    const { form, field, input } = await mountRevealed(
+      `<form><zl-field name="pw" type="password" value="hunter2"></zl-field></form>`,
+    );
+    form.reset();
+    await field.updateComplete;
+    expect(input.type).toBe("password");
+  });
+
+  it("hides the value before any submit listener runs", async () => {
+    const { form, input } = await mountRevealed(
+      `<form><zl-field name="pw" type="password" value="hunter2"></zl-field></form>`,
+    );
+    let typeAtSubmit = "";
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      typeAtSubmit = input.type;
+    });
+    // The path a submit button and Enter both take; no await in between.
+    form.requestSubmit();
+    expect(typeAtSubmit).toBe("password");
+  });
+
+  it("stops listening once the field leaves its form", async () => {
+    const { form, field, input } = await mountRevealed(
+      `<form><zl-field name="pw" type="password" value="hunter2"></zl-field></form>`,
+    );
+    host.appendChild(field);
+    form.addEventListener("submit", (event) => event.preventDefault());
+    form.requestSubmit();
+    expect(input.type).toBe("text");
+  });
+
+  it("never leaves the value revealed when a suffix takes the toggle's place", async () => {
+    const { field, input } = await mountRevealed(
+      `<form><zl-field name="pw" type="password" value="hunter2"></zl-field></form>`,
+    );
+    const suffix = document.createElement("span");
+    suffix.slot = "suffix";
+    suffix.textContent = "kg";
+    field.appendChild(suffix);
+    await new Promise((resolve) => setTimeout(resolve));
+    await field.updateComplete;
+    expect(input.type).toBe("password");
+    expect(field.shadowRoot?.querySelector('[part~="password-toggle"]')).toBeNull();
+    // Edge's own reveal must stay available when ours is not drawn.
+    expect(field.shadowRoot?.querySelector(".zr-field__wrap--toggle")).toBeNull();
+  });
+});

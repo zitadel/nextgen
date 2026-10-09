@@ -1,5 +1,6 @@
 ---
 "@zitadel/components": minor
+"@zitadel/server": minor
 "@zitadel/sdk-core": minor
 "@zitadel/sdk-react": minor
 "@zitadel/sdk-vue": minor
@@ -7,6 +8,8 @@
 "@zitadel/sdk-svelte": minor
 "@zitadel/sdk-qwik": minor
 "@zitadel/sdk-angular": minor
+"@zitadel/sdk-next": minor
+"@zitadel/sdk-nuxt": minor
 ---
 
 feat: password fields in `<zitadel-login>` now have a show/hide button, as

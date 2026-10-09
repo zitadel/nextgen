@@ -13,6 +13,7 @@ import {
 } from "@zitadel/sdk-core/types";
 import { describe, expect, it } from "vitest";
 
+import { PasswordToggleHarness } from "./__tests__/password-toggle-harness";
 import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
@@ -231,5 +232,17 @@ describe("ZitadelSession", () => {
 describe("businessLocales", () => {
   it("re-exports the business copy overlay from @zitadel/components", () => {
     expect(businessLocales).toBe(componentsBusinessLocales);
+  });
+});
+
+describe("ZitadelLogin suppressPasswordToggle", () => {
+  it("returns to the default when the prop goes from true back to unset", async () => {
+    const host = await renderWidget(<PasswordToggleHarness />);
+    const el = () => host.querySelector<ZitadelLoginElement>("zitadel-login")!;
+    await expect.poll(() => el().suppressPasswordToggle).toBe(true);
+
+    await expect.poll(() => window.__unsetSuppressPasswordToggle).toBeTypeOf("function");
+    window.__unsetSuppressPasswordToggle!();
+    await expect.poll(() => el().suppressPasswordToggle).toBe(false);
   });
 });
