@@ -501,8 +501,8 @@ type Handler interface {
 	GetReady(ctx context.Context) (GetReadyRes, error)
 	// GetReleaseById implements getReleaseById operation.
 	//
-	// Reads one release: its digest, its metadata and the
-	// `(kind, handle, revision_id)` tuples it pins.
+	// Reads one release: its digest, its metadata, whether it was revoked, and
+	// the `(kind, handle, revision_id)` tuples it pins.
 	// The path takes the `rel_` id only. To find a release from its digest,
 	// list with the `content_hash` filter and read the matched entry's `id`.
 	// Does not embed resource content. Resolve each `revision_id` through the
@@ -668,7 +668,8 @@ type Handler interface {
 	// ListReleases implements listReleases operation.
 	//
 	// Lists the project's releases, newest first.
-	// Entries carry the digest and the metadata — the pinned set is omitted.
+	// Entries carry the digest, the metadata and `revoked_at` — the pinned set
+	// is omitted.
 	// Read one release with `GET /releases/{release_id}` to get its pointers.
 	// `content_hash` looks a release up by its content, as the CLI does when a
 	// person types the digest a transcript printed. The project holds at most
@@ -793,6 +794,27 @@ type Handler interface {
 	//
 	// DELETE /sessions/me
 	RevokeMySession(ctx context.Context) (RevokeMySessionRes, error)
+	// RevokeRelease implements revokeRelease operation.
+	//
+	// Marks the release revoked, so that its content is never served again.
+	// From then on the release cannot be deployed and is refused on every path
+	// that would serve it, including to a build that pins its digest, with
+	// `rel.revoked`.
+	// A release that any origin still serves cannot be revoked. An origin
+	// serves the release of the newest deployment to it, so the call answers
+	// `409` with `rel.in_use`, naming each such origin and that deployment.
+	// Deploy another release there or roll back first, then revoke. Revoking
+	// therefore never takes an origin down. Deployments that named the release
+	// earlier stay in the history.
+	// Idempotent: revoking a release that is already revoked answers `200`
+	// with the release unchanged, `revoked_at` still naming the first
+	// revocation. There is no un-revoke; build a new release instead.
+	// Takes no body. The lookup is scoped to the project in `project_id`, so a
+	// release id of another project answers not found exactly as an unknown id
+	// does.
+	//
+	// POST /releases/{release_id}/revoke
+	RevokeRelease(ctx context.Context, params RevokeReleaseParams) (RevokeReleaseRes, error)
 	// RevokeSession implements revokeSession operation.
 	//
 	// Permanently deletes the session, terminating it immediately.

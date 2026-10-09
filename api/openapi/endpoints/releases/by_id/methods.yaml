@@ -2,8 +2,8 @@ get:
   operationId: getReleaseById
   summary: Get a release by id
   description: |
-    Reads one release: its digest, its metadata and the
-    `(kind, handle, revision_id)` tuples it pins.
+    Reads one release: its digest, its metadata, whether it was revoked, and
+    the `(kind, handle, revision_id)` tuples it pins.
 
     The path takes the `rel_` id only. To find a release from its digest,
     list with the `content_hash` filter and read the matched entry's `id`.
@@ -49,6 +49,7 @@ get:
                   created_at: '2026-07-14T09:11:00Z'
                   created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
                   created_by_type: human
+                revoked_at: null
                 pointers:
                   - kind: schema
                     handle: human-user
@@ -83,6 +84,7 @@ get:
                   created_at: '2026-07-16T14:20:00Z'
                   created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
                   created_by_type: human
+                revoked_at: null
                 pointers:
                   - kind: schema
                     handle: human-user

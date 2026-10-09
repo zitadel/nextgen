@@ -9,6 +9,12 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
+// RevokeRelease answers 501 until the release service can revoke. Without it
+// the generated stub's sentinel is not a domain error and maps to 500.
+func (h *Handler) RevokeRelease(context.Context, api.RevokeReleaseParams) (api.RevokeReleaseRes, error) {
+	return nil, domain.ErrNotImplemented()
+}
+
 func (h *Handler) CreateRelease(ctx context.Context, req api.CreateReleaseRequest, params api.CreateReleaseParams) (api.CreateReleaseRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), releaseAccess, opWrite); err != nil {
 		return nil, err
@@ -101,6 +107,7 @@ func (h *Handler) ListReleases(ctx context.Context, params api.ListReleasesParam
 			ProjectID:   api.ProjectID(entity.ProjectID),
 			ContentHash: toAPIReleaseContentHash(entity.ContentHash),
 			Metadata:    toAPIReleaseMetadata(entity),
+			RevokedAt:   api.NilDateTime{Null: true},
 		}
 	}
 	if result.NextPageToken != "" {
@@ -133,6 +140,7 @@ func toAPIRelease(entity *domain.Release) api.Release {
 		ProjectID:   api.ProjectID(entity.ProjectID),
 		ContentHash: toAPIReleaseContentHash(entity.ContentHash),
 		Metadata:    toAPIReleaseMetadata(entity),
+		RevokedAt:   api.NilDateTime{Null: true},
 		Pointers:    pointers,
 	}
 }

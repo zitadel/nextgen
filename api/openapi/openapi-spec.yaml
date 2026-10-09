@@ -58,6 +58,10 @@ tags:
 
       Every release carries a digest of its content, so you can check
       whether the files you have are already released.
+
+      A release's content never changes. If it must never be served again,
+      revoke it. A release can't be revoked while any origin still serves
+      it.
   - name: Environments
     description: |
       Endpoints for a project's runtime slots (ADR 035). Identity only:
@@ -194,6 +198,8 @@ paths:
     $ref: endpoints/releases/methods.yaml
   /releases/{release_id}:
     $ref: endpoints/releases/by_id/methods.yaml
+  /releases/{release_id}/revoke:
+    $ref: endpoints/releases/by_id/revoke/methods.yaml
   /grants:
     $ref: endpoints/grants/methods.yaml
   /grants/query:

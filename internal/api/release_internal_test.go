@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/go-faster/jx"
@@ -137,4 +138,12 @@ func decodeCreateReleaseRequest(body string) (api.CreateReleaseRequest, error) {
 		return req, err
 	}
 	return req, req.Validate()
+}
+
+// Pins revoke's answer until the service can revoke: 501, not the 500 the
+// generated stub's sentinel would map to.
+func TestRevokeReleaseNotImplemented(t *testing.T) {
+	_, err := (&Handler{}).RevokeRelease(t.Context(), api.RevokeReleaseParams{})
+	require.Error(t, err)
+	assert.Equal(t, http.StatusNotImplemented, errorResponse(err).StatusCode)
 }
