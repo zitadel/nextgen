@@ -411,3 +411,22 @@ decisions when this ADR moves to Accepted.
   discovery (`available` vs `configured`) and the three consumers stay
   on one contract, and network isolation stays a deploy/config concern,
   not a second surface.
+
+## Amendment (2026-10-08): scope is the project
+
+There are no environments ([ADR 068](068-project-is-the-data-boundary.md)),
+so every place this ADR scopes something to a project and environment scopes
+it to the project:
+
+- A captured message carries `project_id`; `environment_id` is withdrawn.
+  Cursors, retention and purge are per project.
+- `provider_required` is a project policy. The claim flow and operators set
+  it on the project; deploying a release that enables email-dependent flows
+  without a working provider fails the deploy as before.
+- In `@zitadel/testing`, `InstanceHandle` carries the project; the
+  `environmentId` option is withdrawn. In the CLI, `--env` keeps its meaning
+  from the spike behind #1389: it selects which `.env.<name>.local` file
+  names the server and project, and the envelope echoes that resolution.
+- Whether previews default to capture is a question for the preview
+  deployment, which the server knows by the `preview` kind of the origin it
+  was deployed to.

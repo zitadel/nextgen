@@ -37,13 +37,27 @@ tasks:
       cache: false
       runInCI: false
 
-  # Starts a built image the way an operator would — no flags, no volumes, no
-  # --user override — and asserts it serves. Covers the container contract that
-  # unit tests cannot: the Dockerfile's data dir default against the non-root
-  # USER it declares. Needs a local Docker daemon and an image built by
-  # `node scripts/build-local-runtime-image.mjs`, so it stays out of CI.
+  # The local runtime image (ghcr.io/zitadel/nextgen:local-dev): the server
+  # cross-compiled for linux, with both UI dists embedded, in the release
+  # Dockerfile. Needs Docker, so it stays out of CI.
+  build-local-image:
+    command: "node scripts/build-local-runtime-image.mjs"
+    deps:
+      - "console:build"
+      - "login-ui:build"
+    options:
+      cache: false
+      runInCI: false
+
+  # Starts the image build-local-image produced the way an operator would — no
+  # flags, no volumes, no --user override — and asserts it serves. Covers the
+  # container contract that unit tests cannot: the Dockerfile's data dir
+  # default against the non-root USER it declares. Needs a local Docker daemon,
+  # so it stays out of CI.
   smoke-container:
     command: "node scripts/smoke-container.mjs"
+    deps:
+      - "build-local-image"
     options:
       cache: false
       runInCI: false
@@ -121,11 +135,26 @@ tasks:
       - "scripts/assert-file.mjs"
       - "scripts/testdata/openapi-casing/**"
       - "/redocly.yaml"
-      # The test reads the pinned redocly version from this file.
-      - "apps/server/moon.yml"
+      - "/.redocly.lint-ignore.yaml"
       - "vitest.config.ts"
       - "vitest.shared.mjs"
       - "vitest.shared.d.mts"
+    options:
+      cache: true
+      runInCI: true
+
+  # The moon graph rules in .moon/AGENTS.md: no transitive duplicate deps, and
+  # cross-project deps match each package.json.
+  check-moon-graph:
+    command: "node scripts/check-moon-graph.mjs"
+    inputs:
+      - "scripts/check-moon-graph.mjs"
+      - "moon.yml"
+      - "apps/*/moon.yml"
+      - "packages/*/moon.yml"
+      - "tools/*/moon.yml"
+      - "apps/*/package.json"
+      - "packages/*/package.json"
     options:
       cache: true
       runInCI: true

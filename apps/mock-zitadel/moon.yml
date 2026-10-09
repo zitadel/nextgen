@@ -10,22 +10,17 @@ tasks:
   # tsdown.config.ts). The deployed entry imports this, not the workspace
   # TypeScript source.
   build:
-    command: "corepack pnpm run build"
     deps:
       - "api-mock:build"
-    outputs:
-      - "dist/**"
 
   # The `typecheck` script generates @zitadel/api first (its source is
   # gitignored and produced by orval), so it is self-contained — it passes
   # whether run via Moon or standalone (e.g. the Vercel "TypeCheck"
   # deployment check, which runs the npm script in a sandbox without Moon).
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
-      - "api:generate"
+      - "api-mock:build"
 
   test:
-    command: "corepack pnpm run test:all"
     deps:
       - "api-mock:build"

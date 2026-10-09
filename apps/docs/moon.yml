@@ -2,46 +2,61 @@ id: "docs"
 language: "typescript"
 layer: "application"
 stack: "frontend"
+dependsOn:
+  - "design-tokens"
+
+workspace:
+  inheritedTasks:
+    # No unit tests; the site is checked by `typecheck` and `build`.
+    exclude:
+      - "test"
 
 tasks:
   generate-openapi:
     command: "corepack pnpm run generate:openapi"
     inputs:
+      - "**/*"
       - "/api/openapi/**/*.yaml"
-      - "scripts/bundle-openapi.mjs"
+      # The bundle applies the repo's Redocly config.
+      - "/redocly.yaml"
     outputs:
-      - ".generated/openapi.yaml"
-      - ".generated/openapi.json"
       - ".generated/openapi.mjs"
 
   generate:
     command: "corepack pnpm run generate"
     inputs:
+      - "**/*"
       - "/api/openapi/**/*.yaml"
-      - "content/**/*"
-      - "source.config.ts"
-      - "scripts/bundle-openapi.mjs"
+      # The bundle applies the repo's Redocly config.
+      - "/redocly.yaml"
     outputs:
-      - ".generated/openapi.yaml"
-      - ".generated/openapi.json"
       - ".generated/openapi.mjs"
       - ".source/**/*"
 
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
       - "generate"
 
   build:
     command: "corepack pnpm exec waku build"
     deps:
+      # src/app.css imports @zitadel/design-tokens/css/tokens.css.
+      - "design-tokens:build"
       - "generate"
-    outputs:
-      - "dist/**/*"
+    inputs:
+      - "**/*"
+      # waku picks its adapter from VERCEL, so a Vercel build is never
+      # restored from a local-adapter cache (or the reverse).
+      - "$VERCEL"
+    options:
+      # Runs waku directly (generation is the `generate` dep), replacing the
+      # inherited `pnpm run build` arguments rather than adding to them.
+      mergeArgs: "replace"
 
   dev:
     command: "corepack pnpm exec waku dev --port 3003"
     deps:
+      - "design-tokens:build"
       - "generate"
     options:
       persistent: true

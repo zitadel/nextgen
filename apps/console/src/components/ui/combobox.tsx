@@ -23,20 +23,19 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
  * `registry:ui` combobox belongs to shadcn's newer Base UI track, which this
  * console does not use. This file is that composition, done once.
  *
- * Geometry comes from the design system file (`HToNyqKwShDmqVurU7Xbld`), not from
+ * Geometry comes from the design system's Combobox, not from
  * instances on a screen mock — the mock wires `Select`-shaped triggers to
  * Combobox menus, so its trigger differs from the canonical one:
  *
- * - `Combobox / Item` — the trigger. `Type=Default | Multiple |
- *   Invalid` × `Default | Active | Focus | Disabled`. `h-9`, `gap-1.5`,
+ * - Trigger: default, multiple or invalid, each resting, active, focused or
+ *   disabled. `h-9`, `gap-1.5`,
  *   `pl-2.5 pr-1 py-1`, `rounded-md`, `border-input`, `shadow-xs`,
  *   `bg-background dark:bg-input/30`; optional inline addon glyph at 50% opacity;
  *   trailing 24px box holding a 12px chevron.
- * - `Combobox / Combobox List` — `rounded-lg`, `bg-popover`,
+ * - List: `rounded-md`, `bg-popover`,
  *   `shadow-md`, hairline in `foreground/10`.
- * - `Combobox / Menu Item` — `Type=Simple` (32px, one line) and
- *   `Type=Custom` (48px, label over description).
- * - `Multiple Selection Item` — the removable chip.
+ * - Menu item: one-line (32px) and two-line (48px, label over description).
+ * - Chip: the removable selection in a multiple trigger.
  */
 
 const TRIGGER_BASE =
@@ -47,14 +46,14 @@ const TRIGGER_DISABLED = "cursor-not-allowed bg-input/50 opacity-50 dark:bg-inpu
 const TRIGGER_INVALID =
   "border-destructive ring-destructive/20 dark:ring-destructive/40 aria-invalid:ring-[3px]";
 
-const LIST = "w-(--radix-popover-trigger-width) rounded-lg border-foreground/10 p-0";
+const LIST = "w-(--radix-popover-trigger-width) rounded-md border-foreground/10 p-0";
 
-// `Type=Simple` is one 32px line; `Type=Custom` stacks a 14px label over a 12px
-// description and measures 48px.
+// One-line is 32px; two-line stacks a 14px label over a 12px description and
+// measures 48px.
 const ITEM_SIMPLE = "h-8 gap-1.5 rounded-sm py-1.5 pr-8 pl-2";
 const ITEM_CUSTOM = "gap-1.5 rounded-sm py-1.5 pr-8 pl-2";
 // cmdk marks an item active as soon as the list mounts, but every state of
-// `Combobox / Menu Item` renders transparent — a resting list must not paint a
+// the design's menu item renders transparent — a resting list must not paint a
 // filled row, so the fill is suppressed until the operator points or arrows.
 const ITEM_RESTING = "data-[selected=true]:bg-transparent";
 
@@ -184,7 +183,7 @@ export function ComboboxChip({ label, onRemove }: { label: string; onRemove: () 
 export interface ComboboxOption {
   value: string;
   label: string;
-  /** Second line — renders the `Type=Custom` 48px row. */
+  /** Second line — renders the two-line 48px row. */
   description?: string;
   /** Optional leading glyph for the row. */
   icon?: ReactNode;

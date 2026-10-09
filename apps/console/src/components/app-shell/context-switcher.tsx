@@ -8,29 +8,24 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-import { api } from "../../api/zitadel";
+import { api } from "@/api/zitadel";
 import {
   listMyProjectsCached,
   useProjectScope,
   useSelectProjectTarget,
   withoutTrailingSlash,
-} from "../../lib/project-scope";
+} from "@/lib/project-scope";
 
 /**
- * Org / project pills — Figma `Sidebar / PopoverContextSwitcher`
- * (`j3qqriDab6WQfrlgLujf4Y`). Desktop: 196px `bg-card` pills side-by-side.
- * Mobile (`Dashboard xs`): full-width stacked rows. Built on shadcn `Popover`.
+ * Project switcher pill. Desktop: 196px `bg-card` pills side by side. Mobile:
+ * full-width stacked rows. Built on shadcn `Popover`.
  *
  * The project popover's footer links to the Projects overview (`All projects`),
  * the same screen as the sidebar's first entry, for someone already in the
  * switcher looking for a project it does not list.
  *
- * There is deliberately no create action in the footer. One used to render here,
- * but because this component backs both switchers it said "Create team" inside
- * the *project* popover too, and it carried no handler in either. `POST /teams`
- * and `POST /projects` both exist, so a create action is feasible — it needs a
- * designed flow and a per-switcher label before it comes back, not a shared
- * button that is wrong in one of the two places it appears.
+ * No create action in the footer: this component backs both switchers, so one
+ * shared button would be mislabelled in one of them.
  */
 
 /**
@@ -84,8 +79,8 @@ export function ContextSwitcher() {
               change nothing on screen until the users list passes it through.
 
           Restore this when a current team is resolvable and the list reads accept
-          it. The plan badge has since been dropped from the design; if it returns,
-          take it from billing (#667) rather than a literal.
+          it. If a plan badge returns, take it from billing (#667) rather than a
+          literal.
 
           <Switcher
             icon={Box}
@@ -259,7 +254,7 @@ function Switcher({
           type="button"
           aria-label={ariaLabel}
           className={cn(
-            "flex h-12 w-full items-center gap-2 rounded-xs bg-card px-2 text-sm transition-colors hover:bg-accent md:h-10 md:w-[196px]",
+            "flex h-12 w-full items-center gap-2 rounded-xs bg-card px-2 text-sm transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 md:h-10 md:w-[196px]",
           )}
         >
           <Icon size={16} className="shrink-0 text-foreground" aria-hidden />

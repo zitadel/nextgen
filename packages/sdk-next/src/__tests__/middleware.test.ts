@@ -9,7 +9,6 @@ const { privateKey, publicKey } = generateKeyPairSync("rsa", {
 });
 const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
 const publicKeyJwk = publicKey.export({
-  type: "spki",
   format: "jwk",
 }) as Record<string, unknown>;
 
