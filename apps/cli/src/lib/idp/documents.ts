@@ -154,6 +154,26 @@ export function ssoEditRefusal(document: object, target: SsoEditTarget): string 
 }
 
 function flowRefusal(flow: Json): string | undefined {
+  const providers = ssoProvidersRefusal(flow);
+  if (providers !== undefined) {
+    return providers;
+  }
+  // Last, because it is about where the generated routes point rather than
+  // whether the document can be read at all.
+  if (terminalStep(flow) === undefined) {
+    return "no step marks where a completed sign-in ends";
+  }
+  return undefined;
+}
+
+/**
+ * Why a flow's steps cannot be read for their provider lists, or `undefined`
+ * when they can. This is all removing a provider needs (`auth-method sso
+ * disable`): unlike enabling, it writes no route, so it does not care where a
+ * completed sign-in ends.
+ */
+export function ssoProvidersRefusal(document: object): string | undefined {
+  const flow = document as Json;
   if (flow.steps !== undefined && !Array.isArray(flow.steps)) {
     return "steps is not a list";
   }
@@ -171,11 +191,6 @@ function flowRefusal(flow: Json): string | undefined {
     if (step.sso_providers !== undefined && !Array.isArray(step.sso_providers)) {
       return `steps.${name}.sso_providers is not a list`;
     }
-  }
-  // Last, because it is about where the generated routes point rather than
-  // whether the document can be read at all.
-  if (terminalStep(flow) === undefined) {
-    return "no step marks where a completed sign-in ends";
   }
   return undefined;
 }

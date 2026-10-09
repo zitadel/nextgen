@@ -5,7 +5,12 @@ import { consola } from "consola";
 
 import { usableSignInMethods } from "../../../lib/auth-methods";
 import { ZitadelError } from "../../../lib/errors";
-import { removeSsoFromFlow, removeSsoFromSchema, ssoEditRefusal } from "../../../lib/idp";
+import {
+  removeSsoFromFlow,
+  removeSsoFromSchema,
+  ssoEditRefusal,
+  ssoProvidersRefusal,
+} from "../../../lib/idp";
 import { isObject, stableStringify } from "../../../lib/json";
 import { CommandGroups, type JsonEnvelope, nonBlankString } from "../../../lib/oclif";
 import {
@@ -60,7 +65,7 @@ export default class SsoDisable extends AuthMethodCommand {
       throw malformedRefusal(schema, malformed);
     }
     for (const file of flows) {
-      const refusal = ssoEditRefusal(file.body, "flow");
+      const refusal = ssoProvidersRefusal(file.body);
       if (refusal !== undefined) {
         throw new ZitadelError("E_VALIDATION", `${file.path}: ${refusal}`, {
           hint:

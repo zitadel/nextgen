@@ -212,6 +212,14 @@ export abstract class AuthMethodCommand extends BaseCommand {
         schema,
         change.document,
         flows.map((file) => ({ file, after: file.body })),
+        enabled
+          ? undefined
+          : {
+              heading: `A login flow still uses what ${schema.path} would disable:`,
+              hint:
+                "Remove the method from those steps first, then run the command again. " +
+                "Login flows are not edited for you.",
+            },
       );
       const proceed = await this.confirmLastMethod({
         schema,
@@ -360,7 +368,7 @@ function refuseLastMethod(input: {
   ];
   throw new ZitadelError("E_VALIDATION", `${schema.path} would have no way to sign in left`, {
     hint:
-      "Enable another method first, such as `auth-method sso enable --provider <name>`. " +
+      "Enable another method first, such as `zitadel auth-method sso enable --provider <name>`. " +
       "If the schema's users are only managed through the API, re-run with --force " +
       "(details.retry_args holds the exact arguments).",
     details: {
@@ -381,15 +389,21 @@ export function refuseBrokenFlows(
   schema: SchemaFile,
   after: Record<string, unknown>,
   flows: readonly FlowChange[],
+  // What to say about errors the change introduces. Neutral by default; the
+  // disable commands that leave flows alone say which method is still used.
+  introduced: { heading: string; hint: string } = {
+    heading: "A login flow would stop validating after this change:",
+    hint: "Fix the steps named above, then run the command again.",
+  },
 ): void {
   const unchecked: Array<{ path: string; issue: FlowValidationIssue }> = [];
-  const introduced: Array<{ path: string; issue: FlowValidationIssue }> = [];
+  const added: Array<{ path: string; issue: FlowValidationIssue }> = [];
   for (const { file, after: flowAfter } of flows) {
     const check = checkFlow(file.body, schema.body, after, flowAfter);
     if (check.kind === "unchecked") {
       unchecked.push(...check.issues.map((issue) => ({ path: file.path, issue })));
     } else {
-      introduced.push(...check.introduced.map((issue) => ({ path: file.path, issue })));
+      added.push(...check.introduced.map((issue) => ({ path: file.path, issue })));
     }
   }
   if (unchecked.length > 0) {
@@ -397,16 +411,11 @@ export function refuseBrokenFlows(
       schema.path,
       unchecked,
       "A login flow has errors, so it cannot be checked against the changed schema:",
-      "Fix those errors first (`plan` reports them too), then run the command again.",
+      "Fix those errors first (`zitadel plan` reports them too), then run the command again.",
     );
   }
-  if (introduced.length > 0) {
-    throw flowRefusal(
-      schema.path,
-      introduced,
-      `A login flow still uses what ${schema.path} would disable:`,
-      "Remove the method from those steps first, then run the command again. Login flows are not edited for you.",
-    );
+  if (added.length > 0) {
+    throw flowRefusal(schema.path, added, introduced.heading, introduced.hint);
   }
 }
 

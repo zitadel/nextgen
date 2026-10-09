@@ -30,7 +30,6 @@ import {
   readSchemaFiles,
   reportClientIdOutcome,
   type StoredVariables,
-  republishCommands,
   ssoEditRefusal,
   type SsoEditTarget,
   type SsoResult,
@@ -58,6 +57,7 @@ import {
   optionArgs,
   refuseBrokenFlows,
   refuseExternalSchema,
+  SCHEMA_FLAG,
 } from "../shared";
 
 /**
@@ -89,9 +89,7 @@ export default class SsoEnable extends AuthMethodCommand {
       options: [...IDP_PROVIDERS],
       description: "Identity provider to enable.",
     }),
-    schema: nonBlankString({
-      description: "User schema to change. Required when the Project has more than one.",
-    }),
+    ...SCHEMA_FLAG,
     "client-id": nonBlankString({
       description: "Client id of the application registered with the provider.",
     }),
@@ -133,9 +131,6 @@ export default class SsoEnable extends AuthMethodCommand {
     const plan = planConnection({ provider, files: connections, clientId: clientIdFlag });
 
     const reusing = plan.action === "reuse";
-    // A reused connection may name its own variables — it is an editable file
-    // — so the credentials go where it actually looks rather than where this
-    // command would have put them.
     // A reused connection may name its own variables — it is an editable file
     // — so the credentials go where it actually looks rather than where this
     // command would have put them. A name is `undefined` when the file holds
@@ -318,9 +313,37 @@ export default class SsoEnable extends AuthMethodCommand {
       reportSecretOutcome(secret, this.meta.cliVersion, reusing);
     }
     this.reportOutcome(outcome);
+    // `variables set` only for a credential that did not reach the project:
+    // the connection references it as `${{ NAME }}` and the engine resolves
+    // that from the project's variables, so a button whose credential never
+    // arrived fails at token exchange. Then plan and apply, when a file
+    // changed. All carry --cwd when the run did.
+    const recovery = [
+      { name: idVariable, secret: false, published: clientIdState },
+      { name: variable, secret: true, published: secret?.published },
+    ].flatMap(({ name, secret: isSecret, published }) =>
+      name !== undefined && published !== undefined && published !== "stored"
+        ? [
+            [
+              "variables",
+              "set",
+              name,
+              "--project-level",
+              ...(isSecret ? ["--secret"] : []),
+              ...cwdArgs,
+            ],
+          ]
+        : [],
+    );
+    const filesChanged = !reusing || written.length > 0;
     const followUps = [
-      ["plan", ...cwdArgs],
-      ["apply", ...cwdArgs],
+      ...recovery,
+      ...(filesChanged
+        ? [
+            ["plan", ...cwdArgs],
+            ["apply", ...cwdArgs],
+          ]
+        : []),
     ];
 
     return this.emit({
@@ -338,24 +361,10 @@ export default class SsoEnable extends AuthMethodCommand {
           changed: written,
           skipped: edits.skipped,
         }),
-        // `variables set` only when the secret did not reach the project:
-        // the connection references it as `${{ NAME }}` and the engine
-        // resolves that from the project's variables, so a button whose
-        // credential never arrived fails at token exchange. An ok result
-        // carries its follow-ups in data.next_commands (errors use the
-        // top-level nextCommands instead).
-        next_commands: [
-          ...republishCommands(
-            [
-              { name: idVariable, secret: false, published: clientIdState },
-              { name: variable, secret: true, published: secret?.published },
-            ],
-            this.meta.cliVersion,
-          ),
-          ...portableCommands(followUps, this.meta.cliVersion),
-        ],
-        // The plan and apply follow-ups as argument lists, as on the other
-        // auth-method commands: present even when a --cwd path needs quoting.
+        // An ok result carries its follow-ups in data.next_commands (errors
+        // use the top-level nextCommands instead), as strings only when every
+        // argument is safe to run as written, and always as argument lists.
+        next_commands: portableCommands(followUps, this.meta.cliVersion),
         next_args: followUps,
       },
       pretty: `Enabled ${entry.displayName} for ${schema.name}`,
@@ -384,11 +393,6 @@ export default class SsoEnable extends AuthMethodCommand {
   }
 
   /**
-   * Enable the provider in the schema and every login flow that runs against
-   * it, writing only what changed. A flow belonging to another schema is left
-   * alone: enabling Google for customers must not touch the employee journey.
-   */
-  /**
    * The flows this provider must be added to, or a refusal.
    *
    * Called before the connection is written and before either credential is
@@ -403,7 +407,7 @@ export default class SsoEnable extends AuthMethodCommand {
       throw new ZitadelError("E_NOT_FOUND", `No login flow runs against ${schema.name}`, {
         hint:
           "The provider is offered by a flow, and none of the files under .zitadel/flows/ " +
-          "names this schema. Check the flow's user_schema, or run `apply` first so the " +
+          "names this schema. Check the flow's user_schema, or run `zitadel apply` first so the " +
           "schema's published id is recorded in .zitadel/state.json.",
         details: { schema: schema.path },
       });
