@@ -213,6 +213,12 @@ func prepare(extra []string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := applyRole(); err != nil {
+		return nil, err
+	}
+	if err := applyUIMode(); err != nil {
+		return nil, err
+	}
 	configPath := filepath.Join(dataDir, "nextgen.yaml")
 	if err := os.WriteFile(configPath, renderConfig(keyID, pem, homeHeaders()), 0o600); err != nil {
 		return nil, err
@@ -444,6 +450,89 @@ func decodePEM(b64 string) ([]string, error) {
 // becomes the x-vercel-protection-bypass request header of
 // platform.home.headers, a map the server only reads from its YAML.
 const homeBypassSecretVariable = "CLOUD_HOME_BYPASS_SECRET"
+
+// Roles.
+//
+// A deployment of several services on one host names each service's role and
+// mount point in the function's environment (apps/cloud/build-output.sh
+// writes them): CLOUD_ROLE is "home" for the identity home and "region" for
+// a regional server, CLOUD_PATH_PREFIX the path the service is mounted under
+// ("/eu"; empty at the root). From them the launcher derives what the server
+// needs and a build cannot know: the public base (the host plus the prefix)
+// and, for a region, the URL of the home (the host's root). The host is
+// CLOUD_HOST when set, else the project's production domain in production,
+// else the deployment's branch URL, else its deployment URL. An explicit
+// NEXTGEN_SERVER_PUBLIC_BASE or NEXTGEN_PLATFORM_HOME_URL is left alone.
+const (
+	roleVariable   = "CLOUD_ROLE"
+	prefixVariable = "CLOUD_PATH_PREFIX"
+	hostVariable   = "CLOUD_HOST"
+)
+
+// deploymentHost is the host this deployment is reached at, without scheme.
+func deploymentHost() string {
+	if host := os.Getenv(hostVariable); host != "" {
+		return host
+	}
+	if os.Getenv("VERCEL_ENV") == "production" {
+		if host := os.Getenv("VERCEL_PROJECT_PRODUCTION_URL"); host != "" {
+			return host
+		}
+	}
+	if host := os.Getenv("VERCEL_BRANCH_URL"); host != "" {
+		return host
+	}
+	return os.Getenv("VERCEL_URL")
+}
+
+// applyRole sets the public base and the home URL from the role, when there
+// is one and they are not set explicitly.
+func applyRole() error {
+	role := os.Getenv(roleVariable)
+	if role == "" {
+		return nil
+	}
+	if role != "home" && role != "region" {
+		return fmt.Errorf("%s must be home or region, got %q", roleVariable, role)
+	}
+	prefix := os.Getenv(prefixVariable)
+	if prefix != "" && (!strings.HasPrefix(prefix, "/") || strings.HasSuffix(prefix, "/")) {
+		return fmt.Errorf("%s must start and not end with a slash, got %q", prefixVariable, prefix)
+	}
+	host := deploymentHost()
+	if host == "" {
+		return fmt.Errorf("%s is %s but no host is known: set %s, or expose VERCEL_URL", roleVariable, role, hostVariable)
+	}
+	if os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE") == "" {
+		if err := os.Setenv("NEXTGEN_SERVER_PUBLIC_BASE", "https://"+host+prefix); err != nil {
+			return err
+		}
+	}
+	if role == "region" && os.Getenv("NEXTGEN_PLATFORM_HOME_URL") == "" {
+		if err := os.Setenv("NEXTGEN_PLATFORM_HOME_URL", "https://"+host); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// uiModeVariable is the server's UI mode (server.ui). The cloud embeds no
+// UI (build.sh compiles with the noui tag; the UIs are services next to the
+// server), so the default is external, the runtime document alone, and a
+// region, whose console is the home's, runs headless. An explicit value
+// wins.
+const uiModeVariable = "NEXTGEN_SERVER_UI"
+
+func applyUIMode() error {
+	if os.Getenv(uiModeVariable) != "" {
+		return nil
+	}
+	mode := server.UIExternal
+	if os.Getenv(roleVariable) == "region" {
+		mode = server.UIHeadless
+	}
+	return os.Setenv(uiModeVariable, mode)
+}
 
 // homeHeaders returns the request headers for the identity home: the
 // deployment-protection bypass when a home is configured and the secret is

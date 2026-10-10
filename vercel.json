@@ -1,10 +1,23 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "services": {
-    "server": {
+    "home": {
       "root": ".",
-      "framework": "go",
-      "buildCommand": "OUT=\"$VERCEL_OUTPUT_FILE\" sh apps/cloud/build.sh"
+      "framework": "vite",
+      "installCommand": "echo no install step",
+      "buildCommand": "CLOUD_SERVICE=home sh apps/cloud/build-output.sh"
+    },
+    "server_eu": {
+      "root": ".",
+      "framework": "vite",
+      "installCommand": "echo no install step",
+      "buildCommand": "CLOUD_SERVICE=server_eu sh apps/cloud/build-output.sh"
+    },
+    "server_us": {
+      "root": ".",
+      "framework": "vite",
+      "installCommand": "echo no install step",
+      "buildCommand": "CLOUD_SERVICE=server_us sh apps/cloud/build-output.sh"
     },
     "migrate": {
       "root": ".",
@@ -21,19 +34,6 @@
         {
           "source": "/console/(.*)",
           "destination": "/console/index.html"
-        }
-      ]
-    },
-    "login": {
-      "root": "apps/login-ui",
-      "framework": "vite",
-      "installCommand": "corepack pnpm install --frozen-lockfile",
-      "buildCommand": "cd ../.. && corepack pnpm exec moon run login-ui:build && cd apps/login-ui && rm -rf out && mkdir -p out/login && cp -R ../../internal/staticui/login/dist/. out/login/",
-      "outputDirectory": "out",
-      "rewrites": [
-        {
-          "source": "/login/(.*)",
-          "destination": "/login/index.html"
         }
       ]
     },
@@ -67,11 +67,6 @@
       "source": "/console",
       "destination": "/console/",
       "permanent": true
-    },
-    {
-      "source": "/login",
-      "destination": "/login/",
-      "permanent": true
     }
   ],
   "rewrites": [
@@ -90,19 +85,13 @@
     {
       "source": "/console/runtime.json",
       "destination": {
-        "service": "server"
+        "service": "home"
       }
     },
     {
       "source": "/console/(.*)",
       "destination": {
         "service": "console"
-      }
-    },
-    {
-      "source": "/login/(.*)",
-      "destination": {
-        "service": "login"
       }
     },
     {
@@ -184,9 +173,33 @@
       }
     },
     {
+      "source": "/eu",
+      "destination": {
+        "service": "server_eu"
+      }
+    },
+    {
+      "source": "/eu/(.*)",
+      "destination": {
+        "service": "server_eu"
+      }
+    },
+    {
+      "source": "/us",
+      "destination": {
+        "service": "server_us"
+      }
+    },
+    {
+      "source": "/us/(.*)",
+      "destination": {
+        "service": "server_us"
+      }
+    },
+    {
       "source": "/(.*)",
       "destination": {
-        "service": "server"
+        "service": "home"
       }
     }
   ],

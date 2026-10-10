@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/zitadel/nextgen/cmd/server"
 )
 
 const testPEM = "-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu\n-----END RSA PRIVATE KEY-----\n"
@@ -30,6 +32,11 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 	t.Setenv("CLOUD_DATABASE_KEY", "")
 	t.Setenv("NEXTGEN_PLATFORM_HOME_URL", "")
 	t.Setenv("CLOUD_HOME_BYPASS_SECRET", "")
+	t.Setenv("NEXTGEN_SERVER_PUBLIC_BASE", "")
+	t.Setenv(uiModeVariable, "")
+	for _, name := range []string{roleVariable, prefixVariable, hostVariable, "VERCEL_URL", "VERCEL_BRANCH_URL", "VERCEL_PROJECT_PRODUCTION_URL"} {
+		t.Setenv(name, "")
+	}
 	for _, kv := range os.Environ() {
 		if name, _, _ := strings.Cut(kv, "="); isDatabaseURLVariable(name, false) {
 			t.Setenv(name, "")
@@ -382,5 +389,107 @@ func TestPrepareRendersTheHomeHeaders(t *testing.T) {
 		config, err := os.ReadFile(filepath.Join(os.Getenv("NEXTGEN_SERVER_DATA_DIR"), "nextgen.yaml"))
 		require.NoError(t, err)
 		assert.NotContains(t, string(config), "platform:")
+	})
+}
+
+func TestPrepareDerivesTheURLsOfARole(t *testing.T) {
+	t.Run("a region under a prefix", func(t *testing.T) {
+		dataDir := t.TempDir()
+		setLauncherEnv(t, dataDir)
+		t.Setenv(roleVariable, "region")
+		t.Setenv(prefixVariable, "/eu")
+		t.Setenv(hostVariable, "cloud.example")
+		t.Setenv("CLOUD_HOME_BYPASS_SECRET", "bypass-secret")
+
+		_, err := prepare(nil)
+		require.NoError(t, err)
+		assert.Equal(t, "https://cloud.example/eu", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
+		assert.Equal(t, "https://cloud.example", os.Getenv("NEXTGEN_PLATFORM_HOME_URL"))
+		config, err := os.ReadFile(filepath.Join(dataDir, "nextgen.yaml"))
+		require.NoError(t, err)
+		assert.Contains(t, string(config), "x-vercel-protection-bypass: \"bypass-secret\"", "the home URL derived from the role enables the home headers")
+	})
+	t.Run("the home at the root", func(t *testing.T) {
+		setLauncherEnv(t, t.TempDir())
+		t.Setenv(roleVariable, "home")
+		t.Setenv(hostVariable, "cloud.example")
+		_, err := prepare(nil)
+		require.NoError(t, err)
+		assert.Equal(t, "https://cloud.example", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
+		assert.Empty(t, os.Getenv("NEXTGEN_PLATFORM_HOME_URL"), "the home has no home")
+	})
+	t.Run("explicit settings win", func(t *testing.T) {
+		setLauncherEnv(t, t.TempDir())
+		t.Setenv(roleVariable, "region")
+		t.Setenv(prefixVariable, "/eu")
+		t.Setenv(hostVariable, "cloud.example")
+		t.Setenv("NEXTGEN_SERVER_PUBLIC_BASE", "https://api.example/eu")
+		t.Setenv("NEXTGEN_PLATFORM_HOME_URL", "https://home.example")
+		_, err := prepare(nil)
+		require.NoError(t, err)
+		assert.Equal(t, "https://api.example/eu", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
+		assert.Equal(t, "https://home.example", os.Getenv("NEXTGEN_PLATFORM_HOME_URL"))
+	})
+	t.Run("no role, nothing derived", func(t *testing.T) {
+		setLauncherEnv(t, t.TempDir())
+		t.Setenv("VERCEL_URL", "x.vercel.app")
+		_, err := prepare(nil)
+		require.NoError(t, err)
+		assert.Empty(t, os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
+	})
+	t.Run("the host of a deployment", func(t *testing.T) {
+		setLauncherEnv(t, t.TempDir())
+		t.Setenv("VERCEL_URL", "proj-abc-team.vercel.app")
+		assert.Equal(t, "proj-abc-team.vercel.app", deploymentHost(), "the deployment URL is the last resort")
+		t.Setenv("VERCEL_BRANCH_URL", "proj-git-main-team.vercel.app")
+		assert.Equal(t, "proj-git-main-team.vercel.app", deploymentHost(), "a branch URL outranks it")
+		t.Setenv("VERCEL_PROJECT_PRODUCTION_URL", "cloud.example")
+		assert.Equal(t, "proj-git-main-team.vercel.app", deploymentHost(), "the production domain only in production")
+		t.Setenv("VERCEL_ENV", "production")
+		assert.Equal(t, "cloud.example", deploymentHost())
+		t.Setenv(hostVariable, "preview.example")
+		assert.Equal(t, "preview.example", deploymentHost(), "an explicit host outranks everything")
+	})
+	t.Run("refused", func(t *testing.T) {
+		for name, env := range map[string]map[string]string{
+			"unknown role":  {roleVariable: "edge", hostVariable: "cloud.example"},
+			"bad prefix":    {roleVariable: "region", prefixVariable: "eu/", hostVariable: "cloud.example"},
+			"no host known": {roleVariable: "region", prefixVariable: "/eu"},
+		} {
+			t.Run(name, func(t *testing.T) {
+				setLauncherEnv(t, t.TempDir())
+				for k, v := range env {
+					t.Setenv(k, v)
+				}
+				_, err := prepare(nil)
+				require.Error(t, err)
+			})
+		}
+	})
+}
+
+func TestPrepareSetsTheUIMode(t *testing.T) {
+	t.Run("external by default", func(t *testing.T) {
+		setLauncherEnv(t, t.TempDir())
+		_, err := prepare(nil)
+		require.NoError(t, err)
+		assert.Equal(t, server.UIExternal, os.Getenv(uiModeVariable))
+	})
+	t.Run("a region is headless", func(t *testing.T) {
+		setLauncherEnv(t, t.TempDir())
+		t.Setenv(roleVariable, "region")
+		t.Setenv(hostVariable, "cloud.example")
+		_, err := prepare(nil)
+		require.NoError(t, err)
+		assert.Equal(t, server.UIHeadless, os.Getenv(uiModeVariable))
+	})
+	t.Run("explicit wins", func(t *testing.T) {
+		setLauncherEnv(t, t.TempDir())
+		t.Setenv(roleVariable, "region")
+		t.Setenv(hostVariable, "cloud.example")
+		t.Setenv(uiModeVariable, server.UIEmbedded)
+		_, err := prepare(nil)
+		require.NoError(t, err)
+		assert.Equal(t, server.UIEmbedded, os.Getenv(uiModeVariable))
 	})
 }
