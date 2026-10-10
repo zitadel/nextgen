@@ -1648,6 +1648,194 @@ func (s *AttProofRejectedDetails) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *AttSSOStateInvalid) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AttSSOStateInvalid) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("att.sso_state_invalid")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfAttSSOStateInvalid = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes AttSSOStateInvalid from json.
+func (s *AttSSOStateInvalid) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AttSSOStateInvalid to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AttSSOStateInvalid")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAttSSOStateInvalid) {
+					name = jsonFieldsNameOfAttSSOStateInvalid[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AttSSOStateInvalid) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AttSSOStateInvalid) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s AttSSOStateInvalidDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s AttSSOStateInvalidDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes AttSSOStateInvalidDetails from json.
+func (s *AttSSOStateInvalidDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AttSSOStateInvalidDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AttSSOStateInvalidDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AttSSOStateInvalidDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AttSSOStateInvalidDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *AttStaleChallenge) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -17066,6 +17254,22 @@ func (s CreateFlowErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case AttNotFoundCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.not_found")
+		{
+			s := s.AttNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case EncKeyDecryptFailedCreateFlowErrorResponse:
 		e.FieldStart("code")
 		e.Str("enc_key.decrypt_failed")
@@ -17194,6 +17398,134 @@ func (s CreateFlowErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case FlowRestartRequiredCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("flow.restart_required")
+		{
+			s := s.FlowRestartRequired
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpNotFoundCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.not_found")
+		{
+			s := s.IdpNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpEndpointCleartextCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.endpoint_cleartext")
+		{
+			s := s.IdpEndpointCleartext
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpEndpointsPartialCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.endpoints_partial")
+		{
+			s := s.IdpEndpointsPartial
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpOAuth2UnsupportedCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.oauth2_unsupported")
+		{
+			s := s.IdpOAuth2Unsupported
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpProtocolBlockMissingCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.protocol_block_missing")
+		{
+			s := s.IdpProtocolBlockMissing
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpScopesMissingOpenidCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.scopes_missing_openid")
+		{
+			s := s.IdpScopesMissingOpenid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpStrategyPointerUnsupportedCreateFlowErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.strategy_pointer_unsupported")
+		{
+			s := s.IdpStrategyPointerUnsupported
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalCreateFlowErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -17303,6 +17635,9 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 				case "att.invalid_request":
 					s.Type = AttInvalidRequestCreateFlowErrorResponse
 					found = true
+				case "att.not_found":
+					s.Type = AttNotFoundCreateFlowErrorResponse
+					found = true
 				case "enc_key.decrypt_failed":
 					s.Type = EncKeyDecryptFailedCreateFlowErrorResponse
 					found = true
@@ -17326,6 +17661,30 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "flow.invalid_purpose":
 					s.Type = FlowInvalidPurposeCreateFlowErrorResponse
+					found = true
+				case "flow.restart_required":
+					s.Type = FlowRestartRequiredCreateFlowErrorResponse
+					found = true
+				case "idp.not_found":
+					s.Type = IdpNotFoundCreateFlowErrorResponse
+					found = true
+				case "idp.endpoint_cleartext":
+					s.Type = IdpEndpointCleartextCreateFlowErrorResponse
+					found = true
+				case "idp.endpoints_partial":
+					s.Type = IdpEndpointsPartialCreateFlowErrorResponse
+					found = true
+				case "idp.oauth2_unsupported":
+					s.Type = IdpOAuth2UnsupportedCreateFlowErrorResponse
+					found = true
+				case "idp.protocol_block_missing":
+					s.Type = IdpProtocolBlockMissingCreateFlowErrorResponse
+					found = true
+				case "idp.scopes_missing_openid":
+					s.Type = IdpScopesMissingOpenidCreateFlowErrorResponse
+					found = true
+				case "idp.strategy_pointer_unsupported":
+					s.Type = IdpStrategyPointerUnsupportedCreateFlowErrorResponse
 					found = true
 				case "internal":
 					s.Type = InternalCreateFlowErrorResponse
@@ -17360,6 +17719,10 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.AttInvalidRequest.Decode(d); err != nil {
 			return err
 		}
+	case AttNotFoundCreateFlowErrorResponse:
+		if err := s.AttNotFound.Decode(d); err != nil {
+			return err
+		}
 	case EncKeyDecryptFailedCreateFlowErrorResponse:
 		if err := s.EncKeyDecryptFailed.Decode(d); err != nil {
 			return err
@@ -17390,6 +17753,38 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case FlowInvalidPurposeCreateFlowErrorResponse:
 		if err := s.FlowInvalidPurpose.Decode(d); err != nil {
+			return err
+		}
+	case FlowRestartRequiredCreateFlowErrorResponse:
+		if err := s.FlowRestartRequired.Decode(d); err != nil {
+			return err
+		}
+	case IdpNotFoundCreateFlowErrorResponse:
+		if err := s.IdpNotFound.Decode(d); err != nil {
+			return err
+		}
+	case IdpEndpointCleartextCreateFlowErrorResponse:
+		if err := s.IdpEndpointCleartext.Decode(d); err != nil {
+			return err
+		}
+	case IdpEndpointsPartialCreateFlowErrorResponse:
+		if err := s.IdpEndpointsPartial.Decode(d); err != nil {
+			return err
+		}
+	case IdpOAuth2UnsupportedCreateFlowErrorResponse:
+		if err := s.IdpOAuth2Unsupported.Decode(d); err != nil {
+			return err
+		}
+	case IdpProtocolBlockMissingCreateFlowErrorResponse:
+		if err := s.IdpProtocolBlockMissing.Decode(d); err != nil {
+			return err
+		}
+	case IdpScopesMissingOpenidCreateFlowErrorResponse:
+		if err := s.IdpScopesMissingOpenid.Decode(d); err != nil {
+			return err
+		}
+	case IdpStrategyPointerUnsupportedCreateFlowErrorResponse:
+		if err := s.IdpStrategyPointerUnsupported.Decode(d); err != nil {
 			return err
 		}
 	case InternalCreateFlowErrorResponse:
@@ -61955,6 +62350,40 @@ func (s *OptAttProofRejectedDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes AttSSOStateInvalidDetails as json.
+func (o OptAttSSOStateInvalidDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes AttSSOStateInvalidDetails from json.
+func (o *OptAttSSOStateInvalidDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAttSSOStateInvalidDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(AttSSOStateInvalidDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAttSSOStateInvalidDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAttSSOStateInvalidDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes AttStaleChallengeDetails as json.
 func (o OptAttStaleChallengeDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -96058,6 +96487,102 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case IdpEndpointCleartextSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.endpoint_cleartext")
+		{
+			s := s.IdpEndpointCleartext
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpEndpointsPartialSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.endpoints_partial")
+		{
+			s := s.IdpEndpointsPartial
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpOAuth2UnsupportedSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.oauth2_unsupported")
+		{
+			s := s.IdpOAuth2Unsupported
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpProtocolBlockMissingSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.protocol_block_missing")
+		{
+			s := s.IdpProtocolBlockMissing
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpScopesMissingOpenidSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.scopes_missing_openid")
+		{
+			s := s.IdpScopesMissingOpenid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.strategy_pointer_unsupported")
+		{
+			s := s.IdpStrategyPointerUnsupported
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalSubmitFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -96111,6 +96636,22 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AttSSOStateInvalidSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("att.sso_state_invalid")
+		{
+			s := s.AttSSOStateInvalid
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -96314,6 +96855,24 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "flow.unsupported":
 					s.Type = FlowUnsupportedSubmitFlowStepErrorResponse
 					found = true
+				case "idp.endpoint_cleartext":
+					s.Type = IdpEndpointCleartextSubmitFlowStepErrorResponse
+					found = true
+				case "idp.endpoints_partial":
+					s.Type = IdpEndpointsPartialSubmitFlowStepErrorResponse
+					found = true
+				case "idp.oauth2_unsupported":
+					s.Type = IdpOAuth2UnsupportedSubmitFlowStepErrorResponse
+					found = true
+				case "idp.protocol_block_missing":
+					s.Type = IdpProtocolBlockMissingSubmitFlowStepErrorResponse
+					found = true
+				case "idp.scopes_missing_openid":
+					s.Type = IdpScopesMissingOpenidSubmitFlowStepErrorResponse
+					found = true
+				case "idp.strategy_pointer_unsupported":
+					s.Type = IdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalSubmitFlowStepErrorResponse
 					found = true
@@ -96325,6 +96884,9 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidSubmitFlowStepErrorResponse
+					found = true
+				case "att.sso_state_invalid":
+					s.Type = AttSSOStateInvalidSubmitFlowStepErrorResponse
 					found = true
 				case "enc_key.unknown_alg":
 					s.Type = EncKeyUnknownAlgSubmitFlowStepErrorResponse
@@ -96433,6 +96995,30 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.FlowUnsupported.Decode(d); err != nil {
 			return err
 		}
+	case IdpEndpointCleartextSubmitFlowStepErrorResponse:
+		if err := s.IdpEndpointCleartext.Decode(d); err != nil {
+			return err
+		}
+	case IdpEndpointsPartialSubmitFlowStepErrorResponse:
+		if err := s.IdpEndpointsPartial.Decode(d); err != nil {
+			return err
+		}
+	case IdpOAuth2UnsupportedSubmitFlowStepErrorResponse:
+		if err := s.IdpOAuth2Unsupported.Decode(d); err != nil {
+			return err
+		}
+	case IdpProtocolBlockMissingSubmitFlowStepErrorResponse:
+		if err := s.IdpProtocolBlockMissing.Decode(d); err != nil {
+			return err
+		}
+	case IdpScopesMissingOpenidSubmitFlowStepErrorResponse:
+		if err := s.IdpScopesMissingOpenid.Decode(d); err != nil {
+			return err
+		}
+	case IdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse:
+		if err := s.IdpStrategyPointerUnsupported.Decode(d); err != nil {
+			return err
+		}
 	case InternalSubmitFlowStepErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
@@ -96447,6 +97033,10 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidSubmitFlowStepErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case AttSSOStateInvalidSubmitFlowStepErrorResponse:
+		if err := s.AttSSOStateInvalid.Decode(d); err != nil {
 			return err
 		}
 	case EncKeyUnknownAlgSubmitFlowStepErrorResponse:

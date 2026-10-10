@@ -395,13 +395,20 @@ Modeled after `register-password`, this step creates the user from the external
 identity.
 *   **Fields:** Renders schema fields from the register entry (defaulting to
     `email` plus any active use-case properties).
+    The scaffold leaves out credential fields. A password field added by hand
+    stores the password with the user
+    ([area 3](3-social-login-flow.md#engine-rules-for-prefill--confirmation)).
 *   **Execution:** Pre-fills values from mapped IdP claims and enforces
     completion for empty required fields.
-    If a user modifies a pre-filled value, its verification status is dropped.
+    A changed unique value the provider verified is refused
+    (`error.sso_verified_unique_value_changed`).
+    If a user modifies any other pre-filled value, its verification status is
+    dropped.
 *   **Action:** Executes `on_success: "create_user_with_sso"` upon submission to
     consume the identity.
-*   **Collision Routing:** If a modified field causes a collision upon
-    submission, `user_already_exists` routes the user to `sso-conflict`.
+*   **Collision Routing:** If a submitted value collides with an existing
+    user, the engine binds that user and `user_already_exists` routes to
+    `sso-conflict`.
 
 #### 4. The Unified Conflict Step (`sso-conflict`)
 This is a comprehensive recovery step presented under "account exists"
