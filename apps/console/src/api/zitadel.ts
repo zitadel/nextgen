@@ -1,4 +1,6 @@
-import { configureZitadel, getApi } from "@zitadel/api/config";
+import { type ZitadelProject, configureZitadel, getApi } from "@zitadel/api/config";
+
+import type { ConsoleRegion } from "@/runtime/runtime";
 
 /**
  * Console SDK configuration (Console ADR 0002).
@@ -45,5 +47,69 @@ export const apiBase = import.meta.env.VITE_CONSOLE_API_BASE || (import.meta.env
  */
 export const project = configureZitadel({ proxyPath: apiBase, projectId: "" });
 
-/** Typed Zitadel API client, base URL pre-bound, no client-held token. */
-export const api = getApi(project);
+/**
+ * The client of the deployment that serves the console — in platform mode the
+ * identity home (Console ADR 0004 §6). The session lives there whatever
+ * project is selected, so the session helpers and the sign-in handle use this
+ * one and never {@link api}.
+ */
+export const homeApi = getApi(project);
+
+type Api = typeof homeApi;
+
+/**
+ * A region's API base joined with the console's own: a path (`/eu`) sits below
+ * the console's base — the dev proxy's `/api`, or the origin root — so the
+ * same cookie and the same CSRF token reach it; an absolute URL stands on its
+ * own.
+ */
+export function resolveRegionBase(regionBase: string): string {
+  return /^https?:\/\//.test(regionBase) ? regionBase : `${apiBase}${regionBase}`;
+}
+
+const regionHandles = new Map<string, ZitadelProject>();
+
+/**
+ * The client of a region, by its API base. One handle per base, kept so the
+ * SDK's per-handle client cache applies (`getApi`), with no project id and no
+ * key: a region is called with the session cookie like the home is.
+ */
+export function apiForRegion(region: Pick<ConsoleRegion, "api_base">): Api {
+  const base = resolveRegionBase(region.api_base);
+  let handle = regionHandles.get(base);
+  if (!handle) {
+    handle = Object.freeze({ projectId: "", proxyPath: base });
+    regionHandles.set(base, handle);
+  }
+  return getApi(handle);
+}
+
+let active: Api = homeApi;
+
+/**
+ * Points {@link api} at a region, or back at the home with `undefined`.
+ *
+ * In platform mode a project lives in one region, and every call a
+ * project-scoped screen makes has to reach that region's API. Rather than
+ * thread a client through twenty screens, the `_authed` guard sets the active
+ * region from the selected project (`?project=`, `lib/project-scope.ts`)
+ * before any loader runs, and the screens keep calling {@link api}. Standalone
+ * never calls this: the home is the one deployment.
+ */
+export function setActiveApi(region: Pick<ConsoleRegion, "api_base"> | undefined): void {
+  active = region ? apiForRegion(region) : homeApi;
+}
+
+/** Test-only: the client {@link api} currently forwards to. */
+export function _getActiveApiForTesting(): Api {
+  return active;
+}
+
+/**
+ * Typed Zitadel API client, base URL pre-bound, no client-held token: the
+ * client of the selected project's region in platform mode (see
+ * {@link setActiveApi}), of the one deployment otherwise.
+ */
+export const api: Api = new Proxy(homeApi, {
+  get: (_target, property) => Reflect.get(active, property, active),
+});

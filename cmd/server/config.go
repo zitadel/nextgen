@@ -3,6 +3,9 @@ package server
 import (
 	"errors"
 	"fmt"
+	"net/url"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/api"
@@ -38,10 +41,20 @@ type EventsConfig struct {
 	Export    audit.ExportConfig    `mapstructure:"export"`
 }
 
+// RegionConfig is one region of the cloud this deployment is the identity
+// home of, as the console learns it from the runtime document: an id, a name
+// to show, and the base every API call for a project of that region targets,
+// a path on this host ("/eu") or an absolute URL.
+type RegionConfig struct {
+	ID      string `mapstructure:"id"`
+	Name    string `mapstructure:"name"`
+	APIBase string `mapstructure:"api_base"`
+}
+
 // PlatformConfig configures the deployment's default project resolution
-// (Console ADR 0004). Portal-related keys (billing, support access) are
-// intentionally absent until platform mode is implemented; this deployment
-// always reports mode "standalone" for now.
+// (Console ADR 0004) and, when it is the identity home of a cloud, its
+// regions. Portal keys beyond that (billing, support access) are absent
+// until a cloud service answers behind them.
 type PlatformConfig struct {
 	// ProjectID pins a standalone deployment's default project to an existing
 	// project (an id of the form "proj_<...>"). When empty (the default), the
@@ -65,11 +78,35 @@ type PlatformConfig struct {
 	// home's users into its platform project on first sight (see
 	// internal/api/homesession.go). Empty: none.
 	Home api.HomeConfig `mapstructure:"home"`
+
+	// Regions lists the regions of the cloud this deployment is the identity
+	// home of. Non-empty switches the console's runtime document to platform
+	// mode (Console ADR 0004 §6): the console signs in here and manages the
+	// projects of every region, each through its API base. Empty: standalone.
+	Regions []RegionConfig `mapstructure:"regions"`
 }
+
+var regionIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 
 func (c PlatformConfig) Validate() error {
 	if err := c.Home.Validate(); err != nil {
 		return err
+	}
+	seen := map[string]bool{}
+	for i, region := range c.Regions {
+		if !regionIDPattern.MatchString(region.ID) {
+			return fmt.Errorf("platform.regions[%d].id %q must be lowercase letters, digits and hyphens, starting with a letter", i, region.ID)
+		}
+		if seen[region.ID] {
+			return fmt.Errorf("platform.regions[%d].id %q is listed twice", i, region.ID)
+		}
+		seen[region.ID] = true
+		if region.Name == "" {
+			return fmt.Errorf("platform.regions[%d] (%s) needs a name", i, region.ID)
+		}
+		if err := validateAPIBase(region.APIBase); err != nil {
+			return fmt.Errorf("platform.regions[%d] (%s): %w", i, region.ID, err)
+		}
 	}
 	if c.Home.URL != "" && !c.BootstrapProject {
 		return errors.New("platform.home.url needs platform.bootstrap_project: the home's users are provisioned into this deployment's platform project")
@@ -110,6 +147,25 @@ func (c PlatformConfig) ProvisioningProjectID() string {
 		return domain.PlatformProjectID
 	}
 	return ""
+}
+
+// validateAPIBase accepts a path on this host ("/eu") or an absolute http(s)
+// URL, neither ending in a slash, so that "<base>/users" is the operation.
+func validateAPIBase(base string) error {
+	if base == "" {
+		return errors.New("api_base must be set")
+	}
+	if strings.HasSuffix(base, "/") {
+		return fmt.Errorf("api_base %q must not end with a slash", base)
+	}
+	if strings.HasPrefix(base, "/") {
+		return nil
+	}
+	u, err := url.Parse(base)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return fmt.Errorf("api_base %q must be a path on this host or an absolute http(s) URL", base)
+	}
+	return nil
 }
 
 func (c Config) Validate() error {

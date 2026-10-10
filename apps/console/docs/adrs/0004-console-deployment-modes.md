@@ -213,6 +213,21 @@ project. They are omitted while bootstrap has not completed. The response is
 resolved per request and served with `no-store`, so completing bootstrap does
 not require a server restart.
 
+> **Amendment (2026-10-10, the cloud):** platform mode is real for the
+> cloud's identity home. The document then carries `"mode": "platform"` and
+> `"regions": [{ "id", "name", "api_base" }]`, the regions of the cloud as
+> the server's `platform.regions` lists them, each with the base its API is
+> called at (a path on the console's host, `/eu`, or an absolute URL). The
+> Console signs in at the home as before and manages the projects of every
+> region: `GET /users/me/projects` is read from each region
+> (`lib/project-scope.ts`), and the shared API client follows the selected
+> project's region (`api/zitadel.ts`, `setActiveApi`, set by the `_authed`
+> guard before any loader runs), so the project-scoped screens are
+> unchanged. Creating a project names the region it lives in, and is the
+> public create followed by the claim, in that region. Portal surfaces
+> beyond that (billing, usage, support) wait for the cloud service that
+> answers behind them.
+
 **Transitional caveat.** That paragraph describes the target. Until §2's
 cutover completes, the id is the pinned or first-created project — an ordinary
 customer project — and it is omitted because no project exists yet rather than

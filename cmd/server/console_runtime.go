@@ -18,16 +18,29 @@ import (
 // outside the OpenAPI product surface.
 const consoleRuntimePath = "/console/runtime.json"
 
-// ConsoleModeStandalone is the only deployment mode implemented today;
-// platform (cloud portal) mode is future work tracked in Console ADR 0004.
-const ConsoleModeStandalone = "standalone"
+// The deployment modes of the runtime document (Console ADR 0004 §6):
+// standalone, the default, and platform, the identity home of a cloud, which
+// names its regions so the console manages projects across them.
+const (
+	ConsoleModeStandalone = "standalone"
+	ConsoleModePlatform   = "platform"
+)
+
+// consoleRegion is a region of the cloud as the console learns it: public
+// runtime metadata, an id, a name and the API base of the region.
+type consoleRegion struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	APIBase string `json:"api_base"`
+}
 
 // consoleRuntime is the payload of GET /console/runtime.json. Every field is
 // public runtime metadata in the root ADR 005 sense — ids and an enum, never
 // secrets or feature inventories (per-surface gating rides effective
 // permissions, Console ADR 0004 §5).
 type consoleRuntime struct {
-	// Mode is "standalone" or, in the future, "platform".
+	// Mode is "standalone" or "platform" (the identity home of a cloud, with
+	// Regions set).
 	Mode string `json:"mode"`
 	// ConsoleProjectID is the one project the console signs into and
 	// manages: the resolved default in standalone (Console ADR 0004 §2),
@@ -43,6 +56,9 @@ type consoleRuntime struct {
 	// it carries `project.read` only and no management operation accepts
 	// it (`internal/api/authz.go`).
 	PublishableKey string `json:"publishable_key,omitempty"`
+	// Regions are the regions of the cloud in platform mode, in the order
+	// configured; absent in standalone.
+	Regions []consoleRegion `json:"regions,omitempty"`
 }
 
 // runtimeResolver produces the current runtime document. Resolved per
@@ -50,21 +66,31 @@ type consoleRuntime struct {
 // deployment's first project, without a server restart.
 type runtimeResolver func(ctx context.Context) (consoleRuntime, error)
 
-// standaloneRuntimeResolver resolves the standalone runtime document from
-// the deployment's default project (configured pin or first-created),
-// including the project's publishable key derived from its token encryption key.
-func standaloneRuntimeResolver(
+// newRuntimeResolver resolves the runtime document from the deployment's
+// default project (configured pin or first-created), including the project's
+// publishable key derived from its token encryption key. With regions the
+// document is the platform one: the same sign-in project, plus the regions.
+func newRuntimeResolver(
 	projects service.ProjectService,
 	tokens service.TokenService,
 	keys service.KeyService,
 	cfgProjectID string,
+	regions []RegionConfig,
 ) runtimeResolver {
+	mode := ConsoleModeStandalone
+	var published []consoleRegion
+	if len(regions) > 0 {
+		mode = ConsoleModePlatform
+		for _, region := range regions {
+			published = append(published, consoleRegion{ID: region.ID, Name: region.Name, APIBase: region.APIBase})
+		}
+	}
 	return func(ctx context.Context) (consoleRuntime, error) {
 		project, err := projects.DefaultProject(ctx, cfgProjectID)
 		if err != nil {
 			return consoleRuntime{}, err
 		}
-		meta := consoleRuntime{Mode: ConsoleModeStandalone}
+		meta := consoleRuntime{Mode: mode, Regions: published}
 		if project == nil {
 			return meta, nil
 		}

@@ -1,8 +1,9 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Box, Boxes } from "lucide-react";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { Box, Boxes, Plus } from "lucide-react";
 
 import { api } from "@/api/zitadel";
 import { validateNextSearch } from "@/auth/session";
+import { NewProjectDialog } from "@/components/new-project-dialog";
 import {
   LoadMore,
   RESOURCE_CELL,
@@ -22,11 +23,19 @@ import {
   ResourceTitle,
   RowMenu,
 } from "@/components/resource-list";
+import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { formatDate } from "@/lib/date";
-import { useProjectScope, useSelectProjectTarget } from "@/lib/project-scope";
+import {
+  type MyProject,
+  listMyProjectsCached,
+  useProjectScope,
+  useSelectProjectTarget,
+} from "@/lib/project-scope";
+import { clearSessionCaches } from "@/lib/session-cache";
+import { type ConsoleRegion, getRegions, isPlatformMode } from "@/runtime/runtime";
 
 /**
  * Projects overview — every project the person can act on.
@@ -42,18 +51,34 @@ import { useProjectScope, useSelectProjectTarget } from "@/lib/project-scope";
  * A row opens the project — selects it and goes to its first screen — rather
  * than a detail page: the project's own page is `Project settings` in the
  * sidebar once it is selected, and the row menu links there directly.
+ *
+ * In platform mode (Console ADR 0004 §6) the projects live in the regions, so
+ * the list is every region's first page with the region beside each row, and
+ * the screen's action creates a project in a chosen region.
  */
 export const Route = createFileRoute("/_authed/projects/")({
   // Order 1: above Teams (2), the first of the selected project's screens.
   staticData: { nav: { label: "Projects", order: 1, icon: Boxes } },
   // Sanitized like the login screen's: only a router-relative path is followed.
   validateSearch: validateNextSearch,
-  loader: async () => {
+  loader: async (): Promise<{
+    projects: MyProject[];
+    nextPageToken: string | undefined;
+    unreachable: ConsoleRegion[];
+  }> => {
+    if (isPlatformMode()) {
+      const { projects, unreachable } = await listMyProjectsCached();
+      return { projects, nextPageToken: undefined, unreachable };
+    }
     // The projects the signed-in person can act on (root ADR 053 §6), read with
     // the session cookie — not `POST /projects/query`, which the server pins to
     // the calling credential's one home project (#1237).
     const page = await api.listMyProjects({ limit: PAGE_SIZE });
-    return { projects: page.projects, nextPageToken: page.next_page_token ?? undefined };
+    return {
+      projects: page.projects,
+      nextPageToken: page.next_page_token ?? undefined,
+      unreachable: [],
+    };
   },
   component: ProjectsScreen,
 });
@@ -65,14 +90,17 @@ export const Route = createFileRoute("/_authed/projects/")({
  */
 const PAGE_SIZE = 25;
 
-/** Three equal columns; the trailing one carries the row menu. */
-const COLUMN = "w-1/3";
-
 function ProjectsScreen() {
   const loaded = Route.useLoaderData();
   const navigate = useNavigate();
+  const router = useRouter();
   const selected = useProjectScope();
   const selectTarget = useSelectProjectTarget();
+  const platform = isPlatformMode();
+  const regions = getRegions();
+  // Equal columns; the trailing one carries the row menu. Platform mode adds
+  // the region.
+  const column = platform ? "w-1/4" : "w-1/3";
 
   const paging = useLoadMore(
     loaded,
@@ -82,11 +110,38 @@ function ProjectsScreen() {
     },
     "Could not load more projects.",
   );
-  const projects = [...loaded.projects, ...paging.extra];
+  const projects: MyProject[] = [...loaded.projects, ...paging.extra];
 
   return (
     <ResourcePage>
-      <ResourceTitle>Projects</ResourceTitle>
+      <ResourceTitle
+        action={
+          platform && regions.length > 0 ? (
+            <NewProjectDialog
+              regions={regions}
+              onCreated={() => {
+                // The cached fan-out is what this screen and the switcher
+                // show; drop it so the new project is listed.
+                clearSessionCaches();
+                void router.invalidate();
+              }}
+            >
+              <Button className="shrink-0 gap-1.5 px-2.5!">
+                <Plus aria-hidden />
+                New project
+              </Button>
+            </NewProjectDialog>
+          ) : undefined
+        }
+      >
+        Projects
+      </ResourceTitle>
+      {loaded.unreachable.length > 0 && (
+        <p className={`${RESOURCE_HEADER} text-destructive mt-2 text-sm`}>
+          Could not list the projects in{" "}
+          {loaded.unreachable.map((region) => region.name).join(", ")}.
+        </p>
+      )}
       {/* Until a project is selected the sidebar lists only this screen, so the
           page says why and what to do about it. */}
       {!selected && projects.length > 0 && (
@@ -101,14 +156,15 @@ function ProjectsScreen() {
         <Table className={RESOURCE_TABLE_FIXED}>
           <TableHeader>
             <ResourceHeaderRow>
-              <ResourceHeadCell className={COLUMN}>Name</ResourceHeadCell>
-              <ResourceHeadCell className={COLUMN}>Created</ResourceHeadCell>
-              <ResourceMenuHead className={COLUMN} />
+              <ResourceHeadCell className={column}>Name</ResourceHeadCell>
+              {platform && <ResourceHeadCell className={column}>Region</ResourceHeadCell>}
+              <ResourceHeadCell className={column}>Created</ResourceHeadCell>
+              <ResourceMenuHead className={column} />
             </ResourceHeaderRow>
           </TableHeader>
           <TableBody>
             {projects.length === 0 ? (
-              <ResourceEmptyRow colSpan={3}>No projects yet.</ResourceEmptyRow>
+              <ResourceEmptyRow colSpan={platform ? 4 : 3}>No projects yet.</ResourceEmptyRow>
             ) : (
               projects.map((project) => (
                 // The whole row opens the project: selects it and lands on its
@@ -129,6 +185,11 @@ function ProjectsScreen() {
                       {project.name}
                     </Link>
                   </TableCell>
+                  {platform && (
+                    <TableCell className={RESOURCE_CELL_MUTED}>
+                      {project.region?.name ?? "—"}
+                    </TableCell>
+                  )}
                   <TableCell className={RESOURCE_CELL_MUTED}>
                     {formatDate(project.created_at)}
                   </TableCell>

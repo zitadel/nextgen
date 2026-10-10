@@ -28,9 +28,30 @@
  * old silent fallback, and the embedded production build never sets it.
  */
 
+/**
+ * A region of the cloud, in platform mode (Console ADR 0004 §6): public
+ * runtime metadata, like the rest of the document.
+ */
+export interface ConsoleRegion {
+  /** A stable id, as the server's `platform.regions` names it: `eu`, `us`. */
+  id: string;
+  /** What the console shows for it. */
+  name: string;
+  /**
+   * The base every API call for a project of this region targets: a path on
+   * the console's host (`/eu`) or an absolute URL. `api/zitadel.ts` joins it
+   * with the console's own base.
+   */
+  api_base: string;
+}
+
 /** The payload of `GET /console/runtime.json`, served by the Go mux. */
 export interface ConsoleRuntime {
-  /** `"platform"` (cloud portal) is future work; servers send `"standalone"` today. */
+  /**
+   * `"standalone"`, or `"platform"` when the server is the identity home of a
+   * cloud: the console then signs in here and manages the projects of every
+   * region in `regions` (Console ADR 0004 §6).
+   */
   mode: "platform" | "standalone";
   /**
    * The project used to sign in to the Console. Today this is the standalone
@@ -49,6 +70,8 @@ export interface ConsoleRuntime {
    * server-side secret injection.
    */
   publishable_key?: string;
+  /** The regions of the cloud in platform mode, in the server's order; absent in standalone. */
+  regions?: ConsoleRegion[];
 }
 
 /** Why discovery produced no document — ADR 0004 §3's third state. */
@@ -139,6 +162,19 @@ export function getPublishableKey(): string | undefined {
   return getRuntime().publishable_key;
 }
 
+/** The regions of the cloud in platform mode; empty in standalone. */
+export function getRegions(): readonly ConsoleRegion[] {
+  return getRuntime().regions ?? [];
+}
+
+/**
+ * Whether this console is a cloud's: signed into the identity home, managing
+ * projects across the regions the document lists (Console ADR 0004 §6).
+ */
+export function isPlatformMode(): boolean {
+  return getRuntime().mode === "platform";
+}
+
 async function discover(): Promise<ConsoleRuntimeResult> {
   let response: Response;
   try {
@@ -199,12 +235,42 @@ function parseRuntime(doc: unknown): ConsoleRuntime | undefined {
   const record = doc as Record<string, unknown>;
   // Destructured first: a type predicate does not narrow a property read off
   // a `Record<string, unknown>`, only a local.
-  const { mode, console_project_id: projectId, publishable_key: publishableKey } = record;
+  const { mode, console_project_id: projectId, publishable_key: publishableKey, regions } = record;
 
   if (mode !== "standalone" && mode !== "platform") return undefined;
   if (!absentOrString(projectId) || !absentOrString(publishableKey)) return undefined;
+  const parsedRegions = parseRegions(regions);
+  if (parsedRegions === null) return undefined;
 
-  return { mode, console_project_id: projectId, publishable_key: publishableKey };
+  const document: ConsoleRuntime = {
+    mode,
+    console_project_id: projectId,
+    publishable_key: publishableKey,
+  };
+  if (parsedRegions) document.regions = parsedRegions;
+  return document;
+}
+
+/**
+ * The document's `regions`: absent, or a list of complete entries. A present
+ * list with anything else in it came from something that is not our server,
+ * and reads as a broken document (`null`) for the same reason as the ids above.
+ */
+function parseRegions(value: unknown): ConsoleRegion[] | undefined | null {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return null;
+  const regions: ConsoleRegion[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null) return null;
+    const { id, name, api_base: apiBase } = entry as Record<string, unknown>;
+    if (!isNonEmptyString(id) || !isNonEmptyString(name) || !isNonEmptyString(apiBase)) return null;
+    regions.push({ id, name, api_base: apiBase });
+  }
+  return regions;
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value !== "";
 }
 
 /**

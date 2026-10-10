@@ -417,7 +417,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
 		api.NewIDPCallbackHandler(ssoCallback),
-		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
+		newRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID(), cfg.Platform.Regions),
 		requestEventBuf)
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)

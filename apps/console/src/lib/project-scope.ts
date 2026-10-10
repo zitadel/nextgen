@@ -1,6 +1,8 @@
 import { useRouter, useSearch } from "@tanstack/react-router";
+import type { ListMyProjects200ProjectsItem } from "@zitadel/api/generated/model";
 
-import { api } from "@/api/zitadel";
+import { apiForRegion, homeApi } from "@/api/zitadel";
+import { type ConsoleRegion, getRegions, isPlatformMode } from "@/runtime/runtime";
 import { sessionCached } from "./session-cache";
 
 /**
@@ -31,12 +33,67 @@ export interface ProjectScopeSearch {
   project?: string;
 }
 
+/** A project the person can act on; in platform mode, with the region it lives in. */
+export type MyProject = ListMyProjects200ProjectsItem & { region?: ConsoleRegion };
+
+export interface MyProjects {
+  projects: MyProject[];
+  next_page_token?: string | null;
+  /** Regions whose list could not be read (platform mode); empty otherwise. */
+  unreachable: ConsoleRegion[];
+}
+
 /**
  * `GET /users/me/projects`, shared by the `_authed` guard and the project
- * switcher: on a landing both need it, and one request answers both. The
- * Projects screen pages the list itself and does not use this.
+ * switcher: on a landing both need it, and one request answers both. In
+ * standalone the Projects screen pages the list itself and does not use this;
+ * in platform mode it shows this one, read from every region.
  */
-export const listMyProjectsCached = sessionCached(() => api.listMyProjects(), 15_000);
+export const listMyProjectsCached = sessionCached(loadMyProjects, 15_000);
+
+/**
+ * The home's list in standalone. In platform mode the person's projects live
+ * in the regions, each of which lists its own (the home holds none), so the
+ * first page of every region is read and tagged with it; a region that cannot
+ * be reached is reported, not fatal, so the others still show.
+ */
+async function loadMyProjects(): Promise<MyProjects> {
+  if (!isPlatformMode()) {
+    const page = await homeApi.listMyProjects();
+    return { ...page, unreachable: [] };
+  }
+  const regions = getRegions();
+  const results = await Promise.allSettled(
+    regions.map((region) => apiForRegion(region).listMyProjects()),
+  );
+  const projects: MyProject[] = [];
+  const unreachable: ConsoleRegion[] = [];
+  for (const [index, result] of results.entries()) {
+    const region = regions[index];
+    if (!region) continue;
+    if (result.status === "fulfilled") {
+      projects.push(...result.value.projects.map((project) => ({ ...project, region })));
+    } else {
+      unreachable.push(region);
+    }
+  }
+  return { projects, next_page_token: undefined, unreachable };
+}
+
+/**
+ * The region a project lives in, in platform mode: `undefined` in standalone,
+ * and for a project the person cannot act on, which then falls to the home
+ * and answers like any unknown project would.
+ */
+export async function regionOfProject(projectId: string): Promise<ConsoleRegion | undefined> {
+  if (!isPlatformMode()) return undefined;
+  try {
+    const { projects } = await listMyProjectsCached();
+    return projects.find((project) => project.id === projectId)?.region;
+  } catch {
+    return undefined;
+  }
+}
 
 /** `validateSearch` for the `_authed` layout: an id, or nothing. */
 export function validateProjectScopeSearch(search: Record<string, unknown>): ProjectScopeSearch {

@@ -6,7 +6,7 @@ import {
 } from "@zitadel/api/runtime/auth";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
-import { api, apiBase } from "@/api/zitadel";
+import { apiBase, homeApi } from "@/api/zitadel";
 import { clearSessionCaches } from "@/lib/session-cache";
 import { stringParam } from "@/lib/search-params";
 
@@ -109,7 +109,8 @@ export async function fetchSession(): Promise<ConsoleSession | null> {
   }
   let session: ConsoleSession;
   try {
-    session = await api.getMySession(withCredentials);
+    // The home's session, whatever region a selected project put `api` on.
+    session = await homeApi.getMySession(withCredentials);
   } catch (cause) {
     // The session is gone, and with it the token and the reads cached for it.
     // A transport failure says nothing about the session and keeps them.
@@ -140,7 +141,7 @@ export async function fetchSession(): Promise<ConsoleSession | null> {
 
 /** Reads the token; `undefined` when the read fails. */
 function readCsrfToken(): Promise<string | undefined> {
-  return api.getMySessionCsrfToken(withCredentials).then(
+  return homeApi.getMySessionCsrfToken(withCredentials).then(
     (body) => body.csrf_token,
     () => undefined,
   );
@@ -181,7 +182,7 @@ async function recheckAfterRejection(): Promise<string | undefined> {
   const token = readCsrfToken();
   let session: ConsoleSession;
   try {
-    session = await api.getMySession(withCredentials);
+    session = await homeApi.getMySession(withCredentials);
   } catch (cause) {
     if (cause instanceof ApiError && cause.status === 401) void startOver();
     return undefined;
@@ -212,7 +213,7 @@ setApiCsrfRejectionHandler(() => {
 export async function signOut(): Promise<void> {
   invalidateSessionCache();
   try {
-    await api.revokeMySession(withCredentials);
+    await homeApi.revokeMySession(withCredentials);
   } catch {
     // Already signed out (401) or unreachable — the redirect to /login is
     // the user-visible outcome either way.

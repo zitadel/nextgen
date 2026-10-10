@@ -197,7 +197,7 @@ func TestStandaloneRuntimeResolverWithoutProject(t *testing.T) {
 	tokens.EXPECT().GetActivePreviewToken(gomock.Any(), gomock.Any()).Times(0)
 	tokens.EXPECT().GenerateJWE(gomock.Any(), gomock.Any()).Times(0)
 
-	resolve := standaloneRuntimeResolver(&fakeProjectService{}, tokens, servicemocks.NewMockKeyService(ctrl), "")
+	resolve := newRuntimeResolver(&fakeProjectService{}, tokens, servicemocks.NewMockKeyService(ctrl), "", nil)
 	meta, err := resolve(context.Background())
 
 	require.NoError(t, err)
@@ -229,7 +229,7 @@ func TestStandaloneRuntimeResolverReusesPreviewToken(t *testing.T) {
 		GetProjectCrypter(gomock.Any(), project.ID, domain.EncryptionKeyPurposeToken).
 		Return(crypter, nil)
 
-	resolve := standaloneRuntimeResolver(&fakeProjectService{project: project}, tokens, keys, "")
+	resolve := newRuntimeResolver(&fakeProjectService{project: project}, tokens, keys, "", nil)
 	meta, err := resolve(context.Background())
 
 	require.NoError(t, err)
@@ -257,7 +257,7 @@ func TestStandaloneRuntimeResolverMintsWhenPreviewTokenIsGone(t *testing.T) {
 			return "pk_minted", nil
 		})
 
-	resolve := standaloneRuntimeResolver(&fakeProjectService{project: project}, tokens, servicemocks.NewMockKeyService(ctrl), "")
+	resolve := newRuntimeResolver(&fakeProjectService{project: project}, tokens, servicemocks.NewMockKeyService(ctrl), "", nil)
 	meta, err := resolve(context.Background())
 
 	require.NoError(t, err)
@@ -276,7 +276,7 @@ func TestStandaloneRuntimeResolverPropagatesPreviewTokenError(t *testing.T) {
 		Return(nil, domain.ErrInternal(errors.New("db down")))
 	tokens.EXPECT().GenerateJWE(gomock.Any(), gomock.Any()).Times(0)
 
-	resolve := standaloneRuntimeResolver(&fakeProjectService{project: project}, tokens, servicemocks.NewMockKeyService(ctrl), "")
+	resolve := newRuntimeResolver(&fakeProjectService{project: project}, tokens, servicemocks.NewMockKeyService(ctrl), "", nil)
 	_, err := resolve(context.Background())
 
 	assert.Error(t, err)
@@ -286,8 +286,36 @@ func TestStandaloneRuntimeResolverPropagatesProjectError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	tokens := servicemocks.NewMockTokenService(ctrl)
 
-	resolve := standaloneRuntimeResolver(&fakeProjectService{err: errors.New("db down")}, tokens, servicemocks.NewMockKeyService(ctrl), "")
+	resolve := newRuntimeResolver(&fakeProjectService{err: errors.New("db down")}, tokens, servicemocks.NewMockKeyService(ctrl), "", nil)
 	_, err := resolve(context.Background())
 
 	assert.Error(t, err)
+}
+
+// The identity home of a cloud publishes the platform document: the same
+// sign-in project, plus the regions the console manages projects across.
+func TestRuntimeResolverPublishesTheRegionsInPlatformMode(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	tokens := servicemocks.NewMockTokenService(ctrl)
+	tokens.EXPECT().GetActivePreviewToken(gomock.Any(), gomock.Any()).Return(nil, domain.TokenNotFound()).AnyTimes()
+	tokens.EXPECT().GenerateJWE(gomock.Any(), gomock.Any()).Return("pk", nil).AnyTimes()
+	project := &domain.Project{ID: "proj_platform"}
+	regions := []RegionConfig{
+		{ID: "eu", Name: "EU (Frankfurt)", APIBase: "/eu"},
+		{ID: "us", Name: "US (Ohio)", APIBase: "https://us.example"},
+	}
+	resolve := newRuntimeResolver(&fakeProjectService{project: project}, tokens, servicemocks.NewMockKeyService(ctrl), "", regions)
+
+	meta, err := resolve(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, ConsoleModePlatform, meta.Mode)
+	assert.Equal(t, "proj_platform", meta.ConsoleProjectID)
+	assert.Equal(t, []consoleRegion{
+		{ID: "eu", Name: "EU (Frankfurt)", APIBase: "/eu"},
+		{ID: "us", Name: "US (Ohio)", APIBase: "https://us.example"},
+	}, meta.Regions)
+
+	body, err := json.Marshal(meta)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"mode":"platform","console_project_id":"proj_platform","publishable_key":"pk","regions":[{"id":"eu","name":"EU (Frankfurt)","api_base":"/eu"},{"id":"us","name":"US (Ohio)","api_base":"https://us.example"}]}`, string(body))
 }

@@ -2,7 +2,9 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { _resetRuntimeForTesting, _setRuntimeForTesting } from "@/runtime/runtime";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -278,5 +280,117 @@ describe("projects screen", () => {
     // Absent rather than disabled: its absence is how the screen says the list
     // is complete (design decisions log D5 — no total count to show instead).
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+});
+
+describe("projects screen in platform mode", () => {
+  const EU = { id: "eu", name: "EU (Frankfurt)", api_base: "/eu" };
+  const US = { id: "us", name: "US (Ohio)", api_base: "/us" };
+  const row = (id: string, name: string) => ({
+    id,
+    name,
+    created_at: "2026-07-08T09:00:00Z",
+    updated_at: "2026-07-08T09:00:00Z",
+  });
+
+  beforeEach(() => {
+    _setRuntimeForTesting({
+      mode: "platform",
+      console_project_id: "proj_platform",
+      regions: [EU, US],
+    });
+  });
+  afterEach(() => _resetRuntimeForTesting());
+
+  it("lists the projects of every region with their region", async () => {
+    server.use(
+      http.get("http://localhost/api/eu/users/me/projects", () =>
+        HttpResponse.json({ projects: [row("proj_eu", "River")] }),
+      ),
+      http.get("http://localhost/api/us/users/me/projects", () =>
+        HttpResponse.json({ projects: [row("proj_us", "Delta")] }),
+      ),
+    );
+    await renderProjects();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByRole("link", { name: "River" })).toBeInTheDocument();
+    expect(table.getByText("EU (Frankfurt)")).toBeInTheDocument();
+    expect(table.getByRole("link", { name: "Delta" })).toBeInTheDocument();
+    expect(table.getByText("US (Ohio)")).toBeInTheDocument();
+  });
+
+  it("names a region it could not list and shows the rest", async () => {
+    server.use(
+      http.get("http://localhost/api/eu/users/me/projects", () =>
+        HttpResponse.json({ projects: [row("proj_eu", "River")] }),
+      ),
+      http.get("http://localhost/api/us/users/me/projects", () =>
+        HttpResponse.json({ code: "internal", message: "down" }, { status: 500 }),
+      ),
+    );
+    await renderProjects();
+
+    expect(
+      await screen.findByText("Could not list the projects in US (Ohio)."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "River" })).toBeInTheDocument();
+  });
+
+  it("creates a project in the chosen region and claims it", async () => {
+    const calls: string[] = [];
+    server.use(
+      http.get("http://localhost/api/eu/users/me/projects", () =>
+        HttpResponse.json({ projects: [] }),
+      ),
+      http.get("http://localhost/api/us/users/me/projects", () =>
+        HttpResponse.json({ projects: [] }),
+      ),
+      http.post("http://localhost/api/eu/projects", async ({ request }) => {
+        const body = (await request.json()) as { name: string };
+        calls.push(`create ${body.name}`);
+        return HttpResponse.json(
+          {
+            id: "proj_new",
+            name: body.name,
+            project_secret: "secret_once",
+            preview_secret: "pk_new",
+            preview_origins: [],
+            created_at: "2026-10-10T00:00:00Z",
+          },
+          { status: 201 },
+        );
+      }),
+      http.post("http://localhost/api/eu/projects/proj_new/claim/init", ({ request }) => {
+        calls.push(`init ${request.headers.get("authorization")}`);
+        return HttpResponse.json(
+          {
+            claim_url: "http://localhost/console/claim?c=c1",
+            challenge_id: "c1",
+            expires_at: "2100-01-01T00:00:00Z",
+          },
+          { status: 201 },
+        );
+      }),
+      http.post("http://localhost/api/eu/projects/proj_new/claim/complete", async ({ request }) => {
+        const body = (await request.json()) as { challenge_id: string };
+        calls.push(`complete ${body.challenge_id}`);
+        return HttpResponse.json({
+          project_id: "proj_new",
+          team_id: "team_1",
+          claimed_at: "2026-10-10T00:00:00Z",
+        });
+      }),
+    );
+    await renderProjects();
+
+    await userEvent.click(await screen.findByRole("button", { name: "New project" }));
+    await userEvent.type(await screen.findByLabelText("Name"), "Riverbed");
+    await userEvent.click(screen.getByRole("button", { name: "Create project" }));
+
+    expect(await screen.findByText("Project created in EU (Frankfurt).")).toBeInTheDocument();
+    // The public create, the challenge with the one-time secret, the
+    // completion with the session: all in the chosen region.
+    expect(calls).toEqual(["create Riverbed", "init Bearer secret_once", "complete c1"]);
   });
 });

@@ -54,7 +54,12 @@ direction for the console build-out (issue
   A runtime document the Console cannot read is an **error, not a mode** (§3):
   keep "unreachable/erroring" and "no project yet" separate states, and do not
   reintroduce a silent fallback to `standalone` — backend-less dev and preview
-  runs opt in with `VITE_CONSOLE_RUNTIME_FALLBACK` instead.
+  runs opt in with `VITE_CONSOLE_RUNTIME_FALLBACK` instead. **Platform mode**
+  (2026-10-10) is the cloud's identity home: the runtime document lists
+  `regions`, `lib/project-scope.ts` reads the person's projects from every
+  region, and `api/zitadel.ts` points the shared `api` at the selected
+  project's region (`setActiveApi`, from the `_authed` guard) while
+  `homeApi` stays at the home for the session; screens keep calling `api`.
 
 If an implementation needs to diverge from an ADR, update the ADR in the same
 change rather than letting code and decision drift.

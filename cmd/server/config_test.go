@@ -62,6 +62,22 @@ func TestPlatformConfigValidate(t *testing.T) {
 		assert.Contains(t, err.Error(), "proj_platform")
 	})
 
+	t.Run("regions", func(t *testing.T) {
+		t.Parallel()
+		ok := []RegionConfig{{ID: "eu", Name: "EU", APIBase: "/eu"}, {ID: "us-east", Name: "US", APIBase: "https://us.example/api"}}
+		require.NoError(t, PlatformConfig{Regions: ok}.Validate())
+		for name, regions := range map[string][]RegionConfig{
+			"bad id":            {{ID: "EU", Name: "EU", APIBase: "/eu"}},
+			"duplicate id":      {{ID: "eu", Name: "EU", APIBase: "/eu"}, {ID: "eu", Name: "EU 2", APIBase: "/eu2"}},
+			"no name":           {{ID: "eu", APIBase: "/eu"}},
+			"no base":           {{ID: "eu", Name: "EU"}},
+			"base with slash":   {{ID: "eu", Name: "EU", APIBase: "/eu/"}},
+			"base not absolute": {{ID: "eu", Name: "EU", APIBase: "eu.example/api"}},
+		} {
+			assert.Error(t, PlatformConfig{Regions: regions}.Validate(), name)
+		}
+	})
+
 	t.Run("pinned project id without bootstrap validates", func(t *testing.T) {
 		t.Parallel()
 		require.NoError(t, PlatformConfig{ProjectID: "proj_01H0000000000000000000000"}.Validate())

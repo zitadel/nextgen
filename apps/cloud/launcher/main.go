@@ -29,6 +29,7 @@ package main
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -219,8 +220,12 @@ func prepare(extra []string) ([]string, error) {
 	if err := applyUIMode(); err != nil {
 		return nil, err
 	}
+	regions, err := cloudRegions()
+	if err != nil {
+		return nil, err
+	}
 	configPath := filepath.Join(dataDir, "nextgen.yaml")
-	if err := os.WriteFile(configPath, renderConfig(keyID, pem, homeHeaders()), 0o600); err != nil {
+	if err := os.WriteFile(configPath, renderConfig(keyID, pem, homeHeaders(), regions), 0o600); err != nil {
 		return nil, err
 	}
 	_ = os.Unsetenv("MASTER_KEY_PEM_B64")
@@ -516,6 +521,35 @@ func applyRole() error {
 	return nil
 }
 
+// regionsVariable lists, on the identity home, the regions of the cloud as a
+// JSON array of {id, name, api_base} (apps/cloud/build-output.sh writes it).
+// The launcher renders it as platform.regions, which switches the console's
+// runtime document to platform mode. Unset: no regions, standalone.
+const regionsVariable = "CLOUD_REGIONS"
+
+type cloudRegion struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	APIBase string `json:"api_base"`
+}
+
+func cloudRegions() ([]cloudRegion, error) {
+	raw := os.Getenv(regionsVariable)
+	if raw == "" {
+		return nil, nil
+	}
+	var regions []cloudRegion
+	if err := json.Unmarshal([]byte(raw), &regions); err != nil {
+		return nil, fmt.Errorf("%s is not a JSON array of regions: %w", regionsVariable, err)
+	}
+	for i, region := range regions {
+		if region.ID == "" || region.Name == "" || region.APIBase == "" {
+			return nil, fmt.Errorf("%s[%d] needs id, name and api_base", regionsVariable, i)
+		}
+	}
+	return regions, nil
+}
+
 // uiModeVariable is the server's UI mode (server.ui). The cloud embeds no
 // UI (build.sh compiles with the noui tag; the UIs are services next to the
 // server), so the default is external, the runtime document alone, and a
@@ -546,9 +580,10 @@ func homeHeaders() map[string]string {
 }
 
 // renderConfig writes the settings that cannot come from the environment:
-// the master key as a YAML block scalar under its key id, and the request
-// headers for the identity home when there are any.
-func renderConfig(keyID string, pem []string, homeHeaders map[string]string) []byte {
+// the master key as a YAML block scalar under its key id, the request headers
+// for the identity home when there are any, and the regions of the cloud on
+// the home.
+func renderConfig(keyID string, pem []string, homeHeaders map[string]string, regions []cloudRegion) []byte {
 	var b strings.Builder
 	b.WriteString("server:\n")
 	b.WriteString("  generate_master_key: false\n")
@@ -559,12 +594,22 @@ func renderConfig(keyID string, pem []string, homeHeaders map[string]string) []b
 	for _, line := range pem {
 		b.WriteString("        " + line + "\n")
 	}
-	if len(homeHeaders) > 0 {
+	if len(homeHeaders) > 0 || len(regions) > 0 {
 		b.WriteString("platform:\n")
+	}
+	if len(homeHeaders) > 0 {
 		b.WriteString("  home:\n")
 		b.WriteString("    headers:\n")
 		for _, name := range slices.Sorted(maps.Keys(homeHeaders)) {
 			fmt.Fprintf(&b, "      %s: %q\n", name, homeHeaders[name])
+		}
+	}
+	if len(regions) > 0 {
+		b.WriteString("  regions:\n")
+		for _, region := range regions {
+			fmt.Fprintf(&b, "    - id: %q\n", region.ID)
+			fmt.Fprintf(&b, "      name: %q\n", region.Name)
+			fmt.Fprintf(&b, "      api_base: %q\n", region.APIBase)
 		}
 	}
 	return []byte(b.String())

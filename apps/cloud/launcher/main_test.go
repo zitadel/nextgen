@@ -34,6 +34,7 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 	t.Setenv("CLOUD_HOME_BYPASS_SECRET", "")
 	t.Setenv("NEXTGEN_SERVER_PUBLIC_BASE", "")
 	t.Setenv(uiModeVariable, "")
+	t.Setenv(regionsVariable, "")
 	for _, name := range []string{roleVariable, prefixVariable, hostVariable, "VERCEL_URL", "VERCEL_BRANCH_URL", "VERCEL_PROJECT_PRODUCTION_URL"} {
 		t.Setenv(name, "")
 	}
@@ -491,5 +492,50 @@ func TestPrepareSetsTheUIMode(t *testing.T) {
 		_, err := prepare(nil)
 		require.NoError(t, err)
 		assert.Equal(t, server.UIEmbedded, os.Getenv(uiModeVariable))
+	})
+}
+
+func TestPrepareRendersTheRegions(t *testing.T) {
+	dataDir := t.TempDir()
+	setLauncherEnv(t, dataDir)
+	t.Setenv(regionsVariable, `[{"id":"eu","name":"EU (Frankfurt)","api_base":"/eu"},{"id":"us","name":"US (Ohio)","api_base":"/us"}]`)
+
+	_, err := prepare(nil)
+	require.NoError(t, err)
+	config, err := os.ReadFile(filepath.Join(dataDir, "nextgen.yaml"))
+	require.NoError(t, err)
+	assert.True(t, strings.HasSuffix(string(config),
+		"platform:\n"+
+			"  regions:\n"+
+			"    - id: \"eu\"\n"+
+			"      name: \"EU (Frankfurt)\"\n"+
+			"      api_base: \"/eu\"\n"+
+			"    - id: \"us\"\n"+
+			"      name: \"US (Ohio)\"\n"+
+			"      api_base: \"/us\"\n"), string(config))
+
+	t.Run("with the home headers, one platform block", func(t *testing.T) {
+		dataDir := t.TempDir()
+		setLauncherEnv(t, dataDir)
+		t.Setenv(regionsVariable, `[{"id":"eu","name":"EU","api_base":"/eu"}]`)
+		t.Setenv("NEXTGEN_PLATFORM_HOME_URL", "https://home.example")
+		t.Setenv("CLOUD_HOME_BYPASS_SECRET", "bypass-secret")
+		_, err := prepare(nil)
+		require.NoError(t, err)
+		config, err := os.ReadFile(filepath.Join(dataDir, "nextgen.yaml"))
+		require.NoError(t, err)
+		assert.Equal(t, 1, strings.Count(string(config), "platform:\n"))
+		assert.Contains(t, string(config), "  home:\n    headers:\n")
+		assert.Contains(t, string(config), "  regions:\n    - id: \"eu\"\n")
+	})
+	t.Run("refused", func(t *testing.T) {
+		for name, value := range map[string]string{"not json": "eu,us", "missing field": `[{"id":"eu","name":"EU"}]`} {
+			t.Run(name, func(t *testing.T) {
+				setLauncherEnv(t, t.TempDir())
+				t.Setenv(regionsVariable, value)
+				_, err := prepare(nil)
+				require.Error(t, err)
+			})
+		}
 	})
 }

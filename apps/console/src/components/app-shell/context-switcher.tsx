@@ -131,7 +131,15 @@ function useProjects(): SwitcherOption[] | undefined {
     void listMyProjectsCached()
       .then((result) => {
         if (cancelled) return;
-        setProjects(result.projects.map((project) => ({ id: project.id, label: project.name })));
+        // In platform mode the region tells two same-named projects apart.
+        setProjects(
+          result.projects.map((project) => ({
+            id: project.id,
+            label: project.region
+              ? `${project.name} · ${project.region.id.toUpperCase()}`
+              : project.name,
+          })),
+        );
       })
       .catch(() => {
         if (!cancelled) setProjects([]);

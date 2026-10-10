@@ -5,8 +5,10 @@ import {
   _resetRuntimeForTesting,
   getConsoleProjectId,
   getPublishableKey,
+  getRegions,
   getRuntime,
   initRuntime,
+  isPlatformMode,
   retryRuntime,
 } from "./runtime";
 
@@ -204,5 +206,44 @@ describe("getConsoleProjectId", () => {
   it("resolves to an empty id before discovery", () => {
     expect(getRuntime()).toEqual({ mode: "standalone" });
     expect(getConsoleProjectId()).toBe("");
+  });
+});
+
+describe("platform mode", () => {
+  const eu = { id: "eu", name: "EU (Frankfurt)", api_base: "/eu" };
+
+  it("parses the regions of the platform document", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ mode: "platform", console_project_id: "proj_platform", regions: [eu] }),
+    );
+    const result = await initRuntime();
+    expect(result.ok).toBe(true);
+    expect(isPlatformMode()).toBe(true);
+    expect(getRegions()).toEqual([eu]);
+  });
+
+  it("is standalone, with no regions, for the standalone document", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ mode: "standalone", console_project_id: "proj_first" }),
+    );
+    await initRuntime();
+    expect(isPlatformMode()).toBe(false);
+    expect(getRegions()).toEqual([]);
+  });
+
+  it("refuses a document whose regions are incomplete", async () => {
+    // A present list with a half entry came from something that is not our
+    // server: a broken document, the same verdict as a malformed id.
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        mode: "platform",
+        console_project_id: "proj_platform",
+        regions: [{ id: "eu" }],
+      }),
+    );
+    expect(await initRuntime()).toEqual({
+      ok: false,
+      failure: { status: 200, detail: "the response was not a runtime document" },
+    });
   });
 });

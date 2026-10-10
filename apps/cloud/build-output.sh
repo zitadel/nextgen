@@ -65,10 +65,13 @@ cp "$tmp/package/bin/proxy-linux-amd64" "$func/executable"
 chmod 755 "$func/executable"
 rm -rf "$tmp"
 
-# The function: what the preset writes, plus regions and the role.
+# The function: what the preset writes, plus regions and the role. The home
+# also announces the regions of the cloud (CLOUD_REGIONS, see the launcher),
+# which puts the console it serves into platform mode.
+regions='[{"id":"eu","name":"EU (Frankfurt)","api_base":"/eu"},{"id":"us","name":"US (Ohio)","api_base":"/us"}]'
 env="\"CLOUD_ROLE\": \"$role\""
 [ -n "$prefix" ] && env="$env, \"CLOUD_PATH_PREFIX\": \"$prefix\""
-[ "$role" = home ] && env="$env, \"CLOUD_DATABASE_KEY\": \"HOME\""
+[ "$role" = home ] && env="$env, \"CLOUD_DATABASE_KEY\": \"HOME\", \"CLOUD_REGIONS\": \"$(printf '%s' "$regions" | sed 's/"/\\"/g')\""
 cat > "$func/.vc-config.json" <<EOF
 {
   "handler": "executable",

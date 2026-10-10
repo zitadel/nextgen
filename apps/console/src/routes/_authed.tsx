@@ -6,11 +6,13 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 
+import { setActiveApi } from "@/api/zitadel";
 import { fetchSession, signOut } from "@/auth/session";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { routerRelativeHref } from "@/lib/base-path";
 import {
   PROJECT_SCOPE_PARAM,
+  regionOfProject,
   resolveDefaultProjectScope,
   validateProjectScopeSearch,
   withoutTrailingSlash,
@@ -46,6 +48,10 @@ export const Route = createFileRoute("/_authed")({
     if (!session) {
       throw redirect({ to: "/login", search: { next: routerRelativeHref(location.href) } });
     }
+    // In platform mode the selected project's calls go to its region: point
+    // the shared client there before any loader runs, and back at the home
+    // while nothing is selected (`api/zitadel.ts`). A no-op in standalone.
+    setActiveApi(search.project ? await regionOfProject(search.project) : undefined);
     const leaf = matches[matches.length - 1];
     if (!search.project && leaf) {
       const project = await resolveDefaultProjectScope();
