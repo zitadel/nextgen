@@ -122,6 +122,11 @@ func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (a
 // service's own errors, sess.not_found included, come back as they are, for
 // each caller to answer in its own way.
 func (h Handler) mySession(ctx context.Context, withUserIdentity bool) (*domain.Session, error) {
+	if session, ok := remoteSessionFromContext(ctx); ok {
+		// The identity home vouched for this session (homesession.go); it
+		// has no row here, and the home already resolved its user.
+		return session, nil
+	}
 	sessionToken, ok := sessionTokenFromContext(ctx)
 	if !ok {
 		return nil, invalidSessionCredential(domain.ErrSessionTokenInvalid())

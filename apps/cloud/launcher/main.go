@@ -31,8 +31,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"os"
 	"maps"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -214,10 +214,11 @@ func prepare(extra []string) ([]string, error) {
 		return nil, err
 	}
 	configPath := filepath.Join(dataDir, "nextgen.yaml")
-	if err := os.WriteFile(configPath, renderConfig(keyID, pem), 0o600); err != nil {
+	if err := os.WriteFile(configPath, renderConfig(keyID, pem, homeHeaders()), 0o600); err != nil {
 		return nil, err
 	}
 	_ = os.Unsetenv("MASTER_KEY_PEM_B64")
+	_ = os.Unsetenv(homeBypassSecretVariable)
 
 	args := []string{"server", "--config", configPath}
 
@@ -437,9 +438,28 @@ func decodePEM(b64 string) ([]string, error) {
 	return lines, nil
 }
 
-// renderConfig writes the one setting that cannot come from the environment:
-// the master key as a YAML block scalar under its key id.
-func renderConfig(keyID string, pem []string) []byte {
+// homeBypassSecretVariable carries the deployment-protection bypass secret
+// a regional function needs on its calls to the identity home
+// (platform.home.url) while the home is a protected Vercel deployment. It
+// becomes the x-vercel-protection-bypass request header of
+// platform.home.headers, a map the server only reads from its YAML.
+const homeBypassSecretVariable = "CLOUD_HOME_BYPASS_SECRET"
+
+// homeHeaders returns the request headers for the identity home: the
+// deployment-protection bypass when a home is configured and the secret is
+// set, else none.
+func homeHeaders() map[string]string {
+	secret := os.Getenv(homeBypassSecretVariable)
+	if secret == "" || os.Getenv("NEXTGEN_PLATFORM_HOME_URL") == "" {
+		return nil
+	}
+	return map[string]string{"x-vercel-protection-bypass": secret}
+}
+
+// renderConfig writes the settings that cannot come from the environment:
+// the master key as a YAML block scalar under its key id, and the request
+// headers for the identity home when there are any.
+func renderConfig(keyID string, pem []string, homeHeaders map[string]string) []byte {
 	var b strings.Builder
 	b.WriteString("server:\n")
 	b.WriteString("  generate_master_key: false\n")
@@ -449,6 +469,14 @@ func renderConfig(keyID string, pem []string) []byte {
 	b.WriteString("      private_key: |\n")
 	for _, line := range pem {
 		b.WriteString("        " + line + "\n")
+	}
+	if len(homeHeaders) > 0 {
+		b.WriteString("platform:\n")
+		b.WriteString("  home:\n")
+		b.WriteString("    headers:\n")
+		for _, name := range slices.Sorted(maps.Keys(homeHeaders)) {
+			fmt.Fprintf(&b, "      %s: %q\n", name, homeHeaders[name])
+		}
 	}
 	return []byte(b.String())
 }

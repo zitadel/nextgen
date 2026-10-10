@@ -368,6 +368,15 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	}
 	defer shipper.Close()
 
+	securityHandler := api.NewSecurityHandler(tokenService)
+	if cfg.Platform.Home.URL != "" {
+		home, err := api.NewHomeSessionResolver(cfg.Platform.Home, cfg.Platform.ResolvedProjectID(), userService, personalTeams)
+		if err != nil {
+			return fmt.Errorf("identity home: %w", err)
+		}
+		securityHandler = securityHandler.WithHomeSessions(home)
+		slog.Info("accepting the identity home's sessions", slog.String("home", cfg.Platform.Home.URL))
+	}
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
 			flowService,
@@ -394,7 +403,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
 		).WithPersonalTeamEnsurer(personalTeams),
-		api.NewSecurityHandler(tokenService),
+		securityHandler,
 		oasapi.WithMiddleware(
 			middleware.AddOperationIdToContext(),
 			// logging is done at net/http level

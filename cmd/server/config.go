@@ -1,9 +1,11 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -57,9 +59,21 @@ type PlatformConfig struct {
 	// resolves it as the default. Off by default: no environment gets a
 	// platform project created silently. Needs no ProjectID. (#605)
 	BootstrapProject bool `mapstructure:"bootstrap_project"`
+
+	// Home names the identity home whose sessions this deployment accepts: a
+	// region of the cloud trusts the home's session cookie and provisions the
+	// home's users into its platform project on first sight (see
+	// internal/api/homesession.go). Empty: none.
+	Home api.HomeConfig `mapstructure:"home"`
 }
 
 func (c PlatformConfig) Validate() error {
+	if err := c.Home.Validate(); err != nil {
+		return err
+	}
+	if c.Home.URL != "" && !c.BootstrapProject {
+		return errors.New("platform.home.url needs platform.bootstrap_project: the home's users are provisioned into this deployment's platform project")
+	}
 	if c.ProjectID != "" && !domain.PrefixProject.Matches(c.ProjectID) {
 		return fmt.Errorf("platform.project_id %q must be a project id of the form %q",
 			c.ProjectID, domain.PrefixProject.IDPrefix("<id>"))

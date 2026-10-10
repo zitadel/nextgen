@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/stretchr/testify/require"
@@ -394,6 +395,55 @@ func TestHandleNextgenSession(t *testing.T) {
 
 		handler := NewSecurityHandler(tokenService)
 		_, err := handler.HandleNextgenSession(safeRequestContext(t), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
+		require.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
+	})
+}
+
+func TestHandleNextgenSessionAcceptsTheIdentityHome(t *testing.T) {
+	t.Parallel()
+
+	t.Run("a cookie the home vouches for is a user session of the platform project here", func(t *testing.T) {
+		t.Parallel()
+		home := newFakeHome(t, "home-cookie", [2]string{})
+		resolver, err := NewHomeSessionResolver(HomeConfig{URL: home.URL, CacheTTL: time.Minute}, "proj_platform", &fakeHomeUsers{}, &fakeTeams{})
+		require.NoError(t, err)
+
+		mock := gomock.NewController(t)
+		tokenService := mocks.NewMockTokenService(mock)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "home-cookie").Return(nil, errors.New("not a token of this server"))
+
+		handler := NewSecurityHandler(tokenService).WithHomeSessions(resolver)
+		ctx, err := handler.HandleNextgenSession(safeRequestContext(t), api.ListMyProjectsOperation, api.NextgenSession{APIKey: "home-cookie"})
+		require.NoError(t, err)
+
+		token, ok := sessionTokenFromContext(ctx)
+		require.True(t, ok)
+		require.Equal(t, "proj_platform", token.ProjectID)
+		require.Equal(t, "user_home", token.UserID)
+		scope, ok := GetScopeContext(ctx)
+		require.True(t, ok)
+		require.Equal(t, domain.AuthzPrincipalTypeUser, scope.PrincipalType)
+		require.Equal(t, "user_home", scope.PrincipalID)
+		session, ok := remoteSessionFromContext(ctx)
+		require.True(t, ok)
+		require.Equal(t, "sess_home", session.ID)
+		cookie, ok := sessionCookieFromContext(ctx)
+		require.True(t, ok)
+		require.Equal(t, "home-cookie", cookie, "the CSRF token derives from the cookie as for a local session")
+	})
+
+	t.Run("a cookie the home refuses is refused here", func(t *testing.T) {
+		t.Parallel()
+		home := newFakeHome(t, "home-cookie", [2]string{})
+		resolver, err := NewHomeSessionResolver(HomeConfig{URL: home.URL}, "proj_platform", &fakeHomeUsers{}, nil)
+		require.NoError(t, err)
+
+		mock := gomock.NewController(t)
+		tokenService := mocks.NewMockTokenService(mock)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "stranger").Return(nil, errors.New("not a token of this server"))
+
+		handler := NewSecurityHandler(tokenService).WithHomeSessions(resolver)
+		_, err = handler.HandleNextgenSession(safeRequestContext(t), api.ListMyProjectsOperation, api.NextgenSession{APIKey: "stranger"})
 		require.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
 	})
 }

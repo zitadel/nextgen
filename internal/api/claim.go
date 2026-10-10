@@ -123,6 +123,15 @@ func (h Handler) verifyClaimSession(ctx context.Context) (string, error) {
 		return "", invalidSessionCredential(domain.ErrClaimSessionWrongProject())
 	}
 
+	// A session the identity home vouched for (homesession.go) has no row
+	// here; the resolver already checked it is active and user-bound.
+	if session, ok := remoteSessionFromContext(ctx); ok {
+		if time.Now().After(session.ExpiresAt) {
+			return "", invalidSessionCredential(domain.ErrClaimSessionExpired())
+		}
+		return *session.UserID, nil
+	}
+
 	session, err := h.sessionService.Get(ctx, service.GetSessionInput{
 		ProjectID: sessionToken.ProjectID,
 		SessionID: gu.Value(sessionToken.SessionID),

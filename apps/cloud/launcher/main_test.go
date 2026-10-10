@@ -28,6 +28,8 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 	t.Setenv("VERCEL_GIT_COMMIT_REF", "")
 	t.Setenv("VERCEL_REGION", "")
 	t.Setenv("CLOUD_DATABASE_KEY", "")
+	t.Setenv("NEXTGEN_PLATFORM_HOME_URL", "")
+	t.Setenv("CLOUD_HOME_BYPASS_SECRET", "")
 	for _, kv := range os.Environ() {
 		if name, _, _ := strings.Cut(kv, "="); isDatabaseURLVariable(name, false) {
 			t.Setenv(name, "")
@@ -351,5 +353,34 @@ func TestRegionalDatabases(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "postgresql://u:p@eu.example:6432/postgres?schema=home", os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
 		assert.Empty(t, os.Getenv("CLOUD_DATABASE_URL_FRA1"))
+	})
+}
+
+func TestPrepareRendersTheHomeHeaders(t *testing.T) {
+	dataDir := t.TempDir()
+	setLauncherEnv(t, dataDir)
+	t.Setenv("NEXTGEN_PLATFORM_HOME_URL", "https://home.example")
+	t.Setenv("CLOUD_HOME_BYPASS_SECRET", "bypass-secret")
+
+	_, err := prepare(nil)
+	require.NoError(t, err)
+
+	config, err := os.ReadFile(filepath.Join(dataDir, "nextgen.yaml"))
+	require.NoError(t, err)
+	assert.True(t, strings.HasSuffix(string(config),
+		"platform:\n"+
+			"  home:\n"+
+			"    headers:\n"+
+			"      x-vercel-protection-bypass: \"bypass-secret\"\n"), string(config))
+	assert.Empty(t, os.Getenv("CLOUD_HOME_BYPASS_SECRET"), "the secret leaves the environment once it is on disk")
+
+	t.Run("no home, no headers", func(t *testing.T) {
+		setLauncherEnv(t, t.TempDir())
+		t.Setenv("CLOUD_HOME_BYPASS_SECRET", "bypass-secret")
+		_, err := prepare(nil)
+		require.NoError(t, err)
+		config, err := os.ReadFile(filepath.Join(os.Getenv("NEXTGEN_SERVER_DATA_DIR"), "nextgen.yaml"))
+		require.NoError(t, err)
+		assert.NotContains(t, string(config), "platform:")
 	})
 }

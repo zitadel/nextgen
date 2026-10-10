@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -17,6 +19,9 @@ import (
 
 type SecurityHandler struct {
 	tokenService service.TokenService
+	// home, when set, vouches for session cookies this server cannot
+	// introspect: the identity home's (homesession.go).
+	home *HomeSessionResolver
 }
 
 func NewSecurityHandler(
@@ -25,6 +30,13 @@ func NewSecurityHandler(
 	return &SecurityHandler{
 		tokenService: tokenService,
 	}
+}
+
+// WithHomeSessions makes the handler accept the identity home's session
+// cookies through r (homesession.go). Chainable like the Handler's setters.
+func (s *SecurityHandler) WithHomeSessions(r *HomeSessionResolver) *SecurityHandler {
+	s.home = r
+	return s
 }
 
 func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.OperationName, t api.OAuth2) (context.Context, error) {
@@ -74,7 +86,21 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 	}
 	token, err := s.tokenService.IntrospectToken(ctx, t.APIKey)
 	if err != nil {
-		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		// Not a token of this server. With an identity home configured the
+		// cookie may be one of its sessions: the home vouches for it and the
+		// request carries the session it described (homesession.go).
+		if s.home == nil {
+			return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+		homeToken, homeSession, homeErr := s.home.Resolve(ctx, t.APIKey)
+		if homeErr != nil {
+			if !errors.Is(homeErr, domain.ErrSessionTokenInvalid()) {
+				slog.WarnContext(ctx, "identity home session lookup failed", slog.Any("error", homeErr))
+			}
+			return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+		token = homeToken
+		ctx = withRemoteSession(ctx, homeSession)
 	}
 	err = domain.ValidateSessionToken(token)
 	if err != nil {
