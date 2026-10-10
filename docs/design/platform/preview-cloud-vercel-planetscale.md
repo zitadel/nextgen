@@ -592,11 +592,123 @@ separate product. The seams, in build order:
 
 Nothing of this is needed for a single-region preview cloud.
 
+## Two regions and an identity home (2026-10-09 and 10)
+
+Branch `claude/vercel-two-region-spike`. Question: can one Vercel project
+serve from two regions, each against the PlanetScale database of that
+region, and carry the identity home of the cloud next to them? Yes, and it
+is the layout of the repo-root `vercel.json` now: the home at the root of
+the host (fra1, its own schema on the Frankfurt cluster, selected by
+`CLOUD_DATABASE_KEY=HOME`), the EU region under `/eu` (fra1, the
+`eu-preview` database in `eu-central-1`), the US region under `/us` (cle1,
+`us-preview` in `us-east-2`), the control plane under `/cloud`, the console
+at `/console`, and docs, storybook and the website as before. Verified on
+`nextgen-home.vercel.app`; the two throwaway databases stay until the
+layout moves to real ones.
+
+What was established, in the order it mattered:
+
+- **Placement and isolation.** `x-vercel-id` shows `fra1` behind `/eu` and
+  `cle1` behind `/us`; a project created through one region exists only in
+  that region's database, each database bootstraps its own platform
+  project, and a project secret presented to the other region is a plain
+  `auth.unauthorized`: the regions share nothing, and a request routed to
+  the wrong region is a 401, not a leak. Warm latency from San Francisco:
+  seeded project create EU 0.40 s / US 0.29 s, user read 0.24–0.33 s /
+  0.14 s, the difference being the client's distance; both functions sit
+  in the AWS region of their database.
+- **Per-function regions come from the Build Output, and a service's build
+  command can emit it.** A service's `functions: {"index.go": {"regions":
+  […]}}` is accepted and silently ignored: `index.go` is the right key (the
+  Go preset registers its build under that `src`), but `@vercel/go` v20
+  passes no function option through, its code holds neither `regions` nor
+  `maxDuration`. The documented `regions` field of `.vc-config.json` is
+  honoured. And a service declared `framework: vite` has Vercel's
+  static-build pipeline run its build command and take `.vercel/output` as
+  emitted, in `vercel build` and in a cloud build alike; a service with no
+  framework is refused ("multiple frameworks detected", and `null` is not
+  a string there). `apps/cloud/build-output.sh` compiles the binary, takes
+  the proxy the preset runs in front of a server from the `@vercel/go`
+  package (`bin/proxy-linux-amd64`, byte for byte the preset's
+  `executable`), downloads Go when the build image has none, and writes
+  the function with `regions`, its role in the environment and the route
+  below. No prebuilt deploys, no patch script.
+- **Path prefixes need a route in front of the preset's catch-all.** A
+  rewrite routes `/us/readyz` to `cle1`, but neither `destination.path`
+  nor a `request.path` transform in the service's own routes changes what
+  the server sees: the preset's catch-all sets `request.path` afterwards,
+  last write wins. A route in front of it with the same destination and a
+  `request.path` of `/$1` strips the prefix; the build writes it into the
+  service's `config.json`.
+- **Host routing works as documented** (`has: [{type: host, …}]` on a
+  service rewrite) and was the first shape. The regions moved under path
+  prefixes of one host because `*.vercel.app` is a public suffix, so a
+  parent-domain cookie is impossible, and one host is what lets the home's
+  session cookie reach the regions.
+- **Environment is per project, not per service.** Every function receives
+  all regional URLs (`CLOUD_DATABASE_URL_<REGION>`,
+  `CLOUD_MIGRATOR_DATABASE_URL_<REGION>`); the launcher picks by
+  `VERCEL_REGION` or `CLOUD_DATABASE_KEY` and unsets the rest before the
+  server starts, and the `migrate` build step migrates every database, one
+  child per region. A deployment that must never hold another region's
+  credentials is a separate Vercel project.
+- **CLI deploys from a worktree carry no git metadata** (`commit unknown`,
+  no `VERCEL_GIT_*`), so the launcher cannot derive a preview schema; the
+  regional URLs name their schema instead (`&schema=…`), which the launcher
+  uses as is. A Git deployment derives `br_<branch>` or `pr_<n>` in every
+  database. And a cloud build reads the uploaded `vercel.json`, not
+  `--local-config`, which applies to `vercel build` and prebuilt deploys
+  only.
+- **One sign-in, both regions.** A region cannot introspect the home's
+  cookie (a token the home encrypted), so with `platform.home.url` set it
+  asks the home: `GET /sessions/me` with the cookie forwarded, cached a
+  minute, and on first sight it provisions the home's user into its own
+  platform project under the same id, with the attributes the home
+  reports, plus the personal team
+  ([internal/api/homesession.go](../../../internal/api/homesession.go)).
+  From there the request looks like a local session to the handlers, the
+  CSRF token derives from the cookie as before, and grants and claims
+  attach to the shadow. Verified: sign in at the home, then
+  `GET /eu/sessions/me` and `/us/sessions/me` answer the same session
+  (0.8 s on a region's first call, 0.1–0.2 s cached), a project created and
+  claimed in each region with that session, each region listing its own.
+  Known gaps of this shape: a revocation at the home reaches a region when
+  the cache expires; the home being down fails uncached regional requests;
+  the shadow's attributes are never refreshed. A signed token minted by the
+  home and verified locally replaces the lookup without changing what
+  follows it.
+- **The identity home is a plain nextgen in platform mode**, holding the
+  people and nothing of any project, with `platform.regions` naming the
+  regions; its runtime document then puts the console into platform mode
+  (Console ADR 0004 §6): projects read from every region, the shared client
+  following the selected project's region, a project created in a chosen
+  region. The server got a UI mode (`server.ui`: embedded, external,
+  headless) and a `noui` build tag, so the cloud binary embeds nothing, the
+  home serves the runtime document alone and a region serves no UI at all.
+  The hosted login UI is not deployed on this host: the console's own
+  sign-in route is the cloud's sign-in, and a hosted login for a regional
+  project's end-users returns under the region prefix when a customer
+  needs one.
+- **The control plane** (`apps/cloud/api`, under `/cloud`, schema `cloud`
+  in the home's database) holds what only a cloud needs: the region
+  directory, where each project lives, and creating a project in a region
+  through the region's own API, authenticated by asking the home for the
+  cookie as a region does. The plan it follows, with status per item, is
+  [cloud-plan-2026-10-09.md](cloud-plan-2026-10-09.md).
+
+Not built: the signed token; routing an untagged request
+(`/users?project_id=…`) to its region (Routing Middleware over a Global
+Config directory, or a region tag in ids and keys); the console reading the
+control plane instead of fanning out to the regions; platform roles
+asserted by the home and enforced in the regions, for support and
+engineering staff; the dedicated or customer-owned database per project (a
+routing `poolClient` at `clientFor` in the Postgres dialect); a project per
+dedicated customer (Pro allows unlimited projects but 150 Git-connected
+projects per repository, so those would deploy through the API).
+
 ## Open
 
 - A corpus fixture for previews, seeded through the public API.
-- An external-UI mode in the server (serve `/console/runtime.json` with the
-  embedded UIs disabled) so the build stops writing stub `index.html` files.
 - A boot-time schema version check in the server, and a database-aware
   readiness endpoint (`/readyz` is constant today).
 - The smoke test back in the pipeline, as a Vercel check or a

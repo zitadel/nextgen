@@ -13,24 +13,26 @@ self-hoster artifact, produced separately by `release-publish.yml`, and are
 not what the cloud runs. Production stays on GCP; this is a single-region
 preview offering with the same topology as self-hosted.
 
-The Vercel project is one deployment with seven
+The Vercel project is one deployment with nine
 [services](https://vercel.com/docs/services), defined in the repo-root
 `vercel.json`:
 
 | Service | Root | What it is | Public paths |
 |---|---|---|---|
-| `server` | `.` | the Go server on Vercel's Go preset (`apps/cloud/build.sh` compiles one static binary, `apps/cloud/launcher`, no embedded UIs) | everything not listed below, incl. `/console/runtime.json` |
-| `migrate` | `.` | internal, never routed: a Go-runtime service whose build step runs the migrations (`apps/cloud/vercel-build.sh`) | none |
+| `home` | `.` | the identity home: the Go server (`apps/cloud/build-output.sh` compiles `apps/cloud/launcher` and emits the function, pinned to `fra1`, no embedded UI, the runtime document only), its own schema (`CLOUD_DATABASE_URL_HOME`) | everything not listed below, incl. `/console/runtime.json` |
+| `server_eu` | `.` | the EU region: the same binary, pinned to `fra1`, the Frankfurt database (`CLOUD_DATABASE_URL_FRA1`), headless, accepts the home's session | `/eu`, `/eu/*` (prefix stripped) |
+| `server_us` | `.` | the US region: pinned to `cle1`, the Ohio database (`CLOUD_DATABASE_URL_CLE1`), headless | `/us`, `/us/*` (prefix stripped) |
+| `cloud` | `.` | the control plane (`apps/cloud/api`): regions, placements, create a project in a region; pinned to `fra1`, schema `cloud` in the home's database, migrated at its startup | `/cloud`, `/cloud/*` (prefix stripped) |
+| `migrate` | `.` | internal, never routed: a Go-preset service whose build step runs the migrations of every database (`apps/cloud/vercel-build.sh`) | none |
 | `console` | `apps/console` | the console SPA, built with `CONSOLE_BASE_PATH=/console`, relocated to `out/console` | `/console/*` |
-| `login` | `apps/login-ui` | the login UI, built with `LOGIN_BASE_PATH=/login`, relocated to `out/login` | `/login/*` |
 | `docs` | `apps/docs` | the docs site (Waku), built unchanged at base `/` | `/docs*`, `/reference/*`, `/assets/*`, `/RSC/*`, `/api/search`, `/llms.txt`, `/llms-full.txt`, `/mcp*` |
 | `storybook` | `apps/storybook` | the `@zitadel/components` workbench, static build relocated to `out/storybook` | `/storybook/*` |
 | `website` | `apps/website` | the website scaffold (Next.js), one start page | `/`, `/_next/*` |
 
 The route table is one rewrite per prefix (the docs have several, because
 the site serves its pages at `/docs` and `/reference` and its runtime files
-at the root), one exception (`/console/runtime.json` stays with the server)
-and the server catch-all. The server's own namespaces (`/projects`,
+at the root), the two regions, one exception (`/console/runtime.json` stays
+with the home) and the home as catch-all. The server's own namespaces (`/projects`,
 `/users`, `/sessions`, …) never overlap with those prefixes; a new
 top-level docs route needs a rewrite entry. Bare UI prefixes redirect to
 the slash form (308), as the server's own UI handler does, because the
@@ -164,7 +166,7 @@ Preview target gets its own document the same way.
 
 ## Deploying
 
-- **Production:** every push to `main`. Vercel builds all seven services;
+- **Production:** every push to `main`. Vercel builds all nine services;
   the `migrate` service's build step (`apps/cloud/vercel-build.sh`) compiles
   the launcher and then runs `launcher migrate`, which applies the
   migrations against the production database with the migrator role
@@ -259,12 +261,12 @@ older state is a revert on `main`.
   it: the page loads but its relative asset links resolve against `/`.
   Bare prefixes redirect to the slash form instead.
 - The server validates at boot that every enabled embedded UI has an
-  `index.html` (`ValidateDist`) and mounts `/console/runtime.json` only while
-  a UI is enabled. With the UIs served as Vercel services, the build script
-  writes a stub `index.html` per UI so the server boots and keeps the
-  runtime endpoint; the stubs are shadowed by the route table. The clean
-  fix is a server change: serve the runtime endpoint with both embedded UIs
-  disabled (`console_enabled`/`login_enabled` false), then drop the stubs.
+  `index.html` (`ValidateDist`). With the UIs served as Vercel services the
+  binary is built with the `noui` tag (nothing embedded) and the launcher
+  runs the server in the external UI mode (`server.ui: external`): no
+  embedded UI, the runtime document `/console/runtime.json` alone. A
+  regional server runs headless. Before the mode existed, the build wrote
+  a stub `index.html` per UI to keep the server booting.
 - Storybook builds with moon, so a CLI upload must contain every moon
   project source (`tools/` stays out of `.vercelignore`); moon itself runs
   fine without a `.git` directory.
