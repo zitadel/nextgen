@@ -13,7 +13,8 @@
 #   CLOUD_SERVICE=server_eu sh apps/cloud/build-output.sh
 #
 # CLOUD_SERVICE names the service: home (fra1, the root, the home's database),
-# server_eu (fra1, /eu), server_us (cle1, /us). Output goes to
+# server_eu (fra1, /eu), server_us (cle1, /us), and cloud (fra1, /cloud: the
+# control plane, apps/cloud/api, next to the home). Output goes to
 # .vercel/output (CLOUD_OUTPUT_DIR), the Build Output API tree Vercel deploys
 # when a build command produces one. Needs Go 1.26 or downloads it
 # (GO_VERSION), npm for the proxy (VERCEL_GO_VERSION pins @vercel/go).
@@ -21,10 +22,12 @@ set -eu
 cd "$(dirname "$0")/../.."
 
 service=${CLOUD_SERVICE:?CLOUD_SERVICE names the service: home, server_eu or server_us}
+pkg=./apps/cloud/launcher
 case "$service" in
-  home)      region=fra1; prefix=;    role=home ;;
-  server_eu) region=fra1; prefix=/eu; role=region ;;
-  server_us) region=cle1; prefix=/us; role=region ;;
+  home)      region=fra1; prefix=;       role=home ;;
+  server_eu) region=fra1; prefix=/eu;    role=region ;;
+  server_us) region=cle1; prefix=/us;    role=region ;;
+  cloud)     region=fra1; prefix=/cloud; role=cloud; pkg=./apps/cloud/api ;;
   *) echo "build-output.sh: unknown service $service" >&2; exit 64 ;;
 esac
 out=${CLOUD_OUTPUT_DIR:-.vercel/output}
@@ -55,8 +58,8 @@ echo "build-output.sh: $(go version)"
 rm -rf "$func" "$out/config.json"
 mkdir -p "$func"
 
-# The server, for the function's platform.
-GOOS=linux GOARCH=amd64 OUT="$func/user-server" sh apps/cloud/build.sh
+# The server (or the control plane), for the function's platform.
+GOOS=linux GOARCH=amd64 PKG="$pkg" OUT="$func/user-server" sh apps/cloud/build.sh
 
 # The proxy the Go preset runs in front of a server: @vercel/go ships it.
 tmp=$(mktemp -d)
@@ -66,12 +69,13 @@ chmod 755 "$func/executable"
 rm -rf "$tmp"
 
 # The function: what the preset writes, plus regions and the role. The home
-# also announces the regions of the cloud (CLOUD_REGIONS, see the launcher),
-# which puts the console it serves into platform mode.
+# and the control plane also get the regions of the cloud (CLOUD_REGIONS, see
+# the launcher and apps/cloud/api), which puts the console into platform mode.
 regions='[{"id":"eu","name":"EU (Frankfurt)","api_base":"/eu"},{"id":"us","name":"US (Ohio)","api_base":"/us"}]'
 env="\"CLOUD_ROLE\": \"$role\""
 [ -n "$prefix" ] && env="$env, \"CLOUD_PATH_PREFIX\": \"$prefix\""
-[ "$role" = home ] && env="$env, \"CLOUD_DATABASE_KEY\": \"HOME\", \"CLOUD_REGIONS\": \"$(printf '%s' "$regions" | sed 's/"/\\"/g')\""
+[ "$role" = home ] && env="$env, \"CLOUD_DATABASE_KEY\": \"HOME\""
+case "$role" in home|cloud) env="$env, \"CLOUD_REGIONS\": \"$(printf '%s' "$regions" | sed 's/"/\\"/g')\"" ;; esac
 cat > "$func/.vc-config.json" <<EOF
 {
   "handler": "executable",

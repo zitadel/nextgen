@@ -40,6 +40,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/zitadel/nextgen/apps/cloud/internal/deployment"
 	"github.com/zitadel/nextgen/cmd/server"
 	pgschema "github.com/zitadel/nextgen/internal/storage/dialect/postgres/schema"
 )
@@ -471,24 +472,8 @@ const homeBypassSecretVariable = "CLOUD_HOME_BYPASS_SECRET"
 const (
 	roleVariable   = "CLOUD_ROLE"
 	prefixVariable = "CLOUD_PATH_PREFIX"
-	hostVariable   = "CLOUD_HOST"
+	hostVariable   = deployment.HostVariable
 )
-
-// deploymentHost is the host this deployment is reached at, without scheme.
-func deploymentHost() string {
-	if host := os.Getenv(hostVariable); host != "" {
-		return host
-	}
-	if os.Getenv("VERCEL_ENV") == "production" {
-		if host := os.Getenv("VERCEL_PROJECT_PRODUCTION_URL"); host != "" {
-			return host
-		}
-	}
-	if host := os.Getenv("VERCEL_BRANCH_URL"); host != "" {
-		return host
-	}
-	return os.Getenv("VERCEL_URL")
-}
 
 // applyRole sets the public base and the home URL from the role, when there
 // is one and they are not set explicitly.
@@ -504,7 +489,7 @@ func applyRole() error {
 	if prefix != "" && (!strings.HasPrefix(prefix, "/") || strings.HasSuffix(prefix, "/")) {
 		return fmt.Errorf("%s must start and not end with a slash, got %q", prefixVariable, prefix)
 	}
-	host := deploymentHost()
+	host := deployment.Host()
 	if host == "" {
 		return fmt.Errorf("%s is %s but no host is known: set %s, or expose VERCEL_URL", roleVariable, role, hostVariable)
 	}

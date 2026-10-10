@@ -6,9 +6,11 @@
 # their own services, nothing is embedded, and the launcher runs the server
 # in the external UI mode (the runtime document only) or headless. Build
 # metadata comes from the server manifest and the deployment's commit.
-# Output: $OUT, default bin/nextgen-launcher.
+# Output: $OUT, default bin/nextgen-launcher. PKG picks another main package
+# of the cloud, the control plane (./apps/cloud/api).
 set -eu
 cd "$(dirname "$0")/../.."
+pkg="${PKG:-./apps/cloud/launcher}"
 
 version="$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' apps/server/package.json | head -1)"
 commit="${VERCEL_GIT_COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"
@@ -21,5 +23,5 @@ CGO_ENABLED=0 go build -trimpath -tags noui \
     -X github.com/zitadel/nextgen/internal/build.version=${version}+cloud \
     -X github.com/zitadel/nextgen/internal/build.commit=${commit} \
     -X github.com/zitadel/nextgen/internal/build.date=${date}" \
-  -o "$out" ./apps/cloud/launcher
-echo "built $out (version ${version}+cloud, commit ${commit})"
+  -o "$out" "$pkg"
+echo "built $out from $pkg (version ${version}+cloud, commit ${commit})"

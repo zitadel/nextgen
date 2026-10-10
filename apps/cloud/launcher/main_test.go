@@ -438,19 +438,6 @@ func TestPrepareDerivesTheURLsOfARole(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
 	})
-	t.Run("the host of a deployment", func(t *testing.T) {
-		setLauncherEnv(t, t.TempDir())
-		t.Setenv("VERCEL_URL", "proj-abc-team.vercel.app")
-		assert.Equal(t, "proj-abc-team.vercel.app", deploymentHost(), "the deployment URL is the last resort")
-		t.Setenv("VERCEL_BRANCH_URL", "proj-git-main-team.vercel.app")
-		assert.Equal(t, "proj-git-main-team.vercel.app", deploymentHost(), "a branch URL outranks it")
-		t.Setenv("VERCEL_PROJECT_PRODUCTION_URL", "cloud.example")
-		assert.Equal(t, "proj-git-main-team.vercel.app", deploymentHost(), "the production domain only in production")
-		t.Setenv("VERCEL_ENV", "production")
-		assert.Equal(t, "cloud.example", deploymentHost())
-		t.Setenv(hostVariable, "preview.example")
-		assert.Equal(t, "preview.example", deploymentHost(), "an explicit host outranks everything")
-	})
 	t.Run("refused", func(t *testing.T) {
 		for name, env := range map[string]map[string]string{
 			"unknown role":  {roleVariable: "edge", hostVariable: "cloud.example"},

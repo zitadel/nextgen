@@ -19,6 +19,12 @@
       "installCommand": "echo no install step",
       "buildCommand": "CLOUD_SERVICE=server_us sh apps/cloud/build-output.sh"
     },
+    "cloud": {
+      "root": ".",
+      "framework": "vite",
+      "installCommand": "echo no install step",
+      "buildCommand": "CLOUD_SERVICE=cloud sh apps/cloud/build-output.sh"
+    },
     "migrate": {
       "root": ".",
       "framework": "go",
@@ -194,6 +200,18 @@
       "source": "/us/(.*)",
       "destination": {
         "service": "server_us"
+      }
+    },
+    {
+      "source": "/cloud",
+      "destination": {
+        "service": "cloud"
+      }
+    },
+    {
+      "source": "/cloud/(.*)",
+      "destination": {
+        "service": "cloud"
       }
     },
     {
