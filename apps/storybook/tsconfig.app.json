@@ -5,7 +5,11 @@
     // `.storybook/main.ts` imports `packages/components/vite-liquid-plugin.ts`
     // by source path, which lies outside any root inside this app.
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    // `.storybook/main.ts` and the Vitest config import sibling plugins by
+    // their `.ts` source path so the native Vite config loader can resolve
+    // them; nothing here emits, so importing the extension is safe.
+    "allowImportingTsExtensions": true
   },
   // api + api-mock resolve to their source via the `@zitadel/source` condition
   // (like every other workspace dep here), so no project references are needed.

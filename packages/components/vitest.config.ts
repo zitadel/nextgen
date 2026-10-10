@@ -2,7 +2,7 @@ import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
 import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
-import { liquidRaw } from "./vite-liquid-plugin.js";
+import { liquidRaw } from "./vite-liquid-plugin.ts";
 
 /** Shared plugins for every project in this config. */
 const sharedPlugins = () => [liquidRaw()];
