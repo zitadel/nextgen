@@ -20,6 +20,11 @@
 // resolveDatabaseURL): production uses it as configured, a preview
 // deployment appends the schema of its pull request or branch, so every
 // preview owns a schema of the shared preview database.
+//
+// A deployment whose services run in several Vercel regions names one
+// database per region instead (CLOUD_DATABASE_URL_<REGION>, see the regional
+// database section): the function serves from the database of the region it
+// runs in and the build migrates every one of them.
 package main
 
 import (
@@ -27,8 +32,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"maps"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/zitadel/nextgen/cmd/server"
@@ -47,6 +55,9 @@ func main() {
 	var args []string
 	var err error
 	if len(os.Args) > 1 && os.Args[1] == "migrate" {
+		if targets := regionalMigrationTargets(); len(targets) > 0 {
+			os.Exit(migrateRegions(targets, os.Args[2:]))
+		}
 		args, err = prepareMigration(os.Args[2:])
 	} else {
 		args, err = prepare(os.Args[1:])
@@ -235,8 +246,13 @@ func prepare(extra []string) ([]string, error) {
 		return nil, err
 	}
 
-	// The same database URL the build migrated, schema included.
-	dsn, _, err := resolveDatabaseURL(os.Getenv("NEXTGEN_DATABASE_POSTGRES"), os.Getenv("VERCEL_ENV"))
+	// The same database URL the build migrated, schema included: the one of
+	// this function's region when the deployment names regional databases.
+	base, err := servingDatabaseURL()
+	if err != nil {
+		return nil, err
+	}
+	dsn, _, err := resolveDatabaseURL(base, os.Getenv("VERCEL_ENV"))
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +261,161 @@ func prepare(extra []string) ([]string, error) {
 			return nil, err
 		}
 	}
+	unsetDatabaseURLs(false)
 	return append(args, extra...), nil
+}
+
+// Regional databases.
+//
+// A deployment whose services are pinned to several Vercel regions holds one
+// database per region, in the region: CLOUD_DATABASE_URL_<REGION> is the URL
+// the functions of that region serve from and CLOUD_MIGRATOR_DATABASE_URL_<REGION>
+// the one their migrations use (the migrator role; the serving URL when
+// absent), <REGION> being the Vercel region code in upper case, FRA1 or CLE1.
+// The serving function picks the database of VERCEL_REGION, or of
+// CLOUD_DATABASE_KEY when a service owns a database that is not its region's,
+// and drops every other database variable from its environment, so a function
+// never carries another region's credentials. The migrate build step runs in no region and
+// migrates every regional database, one child launcher per region. As soon as
+// one regional variable is set, the plain NEXTGEN_DATABASE_POSTGRES and
+// CLOUD_MIGRATOR_DATABASE_URL are ignored: a multi-region deployment names a
+// database for every region it serves from, or its function refuses to start.
+// Without regional variables the plain pair applies, as before.
+const (
+	regionalDatabasePrefix = "CLOUD_DATABASE_URL_"
+	regionalMigratorPrefix = "CLOUD_MIGRATOR_DATABASE_URL_"
+)
+
+// migrationTarget is one regional database and the URL its migrations use.
+type migrationTarget struct {
+	region string
+	url    string
+}
+
+// databaseKeyVariable names the database a function serves from when it is
+// not the one of its region: a service that shares a region with another but
+// owns a database of its own (the identity home next to a regional server)
+// sets CLOUD_DATABASE_KEY=home and names CLOUD_DATABASE_URL_HOME.
+const databaseKeyVariable = "CLOUD_DATABASE_KEY"
+
+// databaseKey is the variable suffix of the database this function serves
+// from: CLOUD_DATABASE_KEY when set, else the region the function runs in
+// (VERCEL_REGION); upper case, anything but letters and digits replaced by
+// an underscore; empty outside Vercel.
+func databaseKey() string {
+	key := os.Getenv(databaseKeyVariable)
+	if key == "" {
+		key = os.Getenv("VERCEL_REGION")
+	}
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+			return r
+		case r >= 'a' && r <= 'z':
+			return r - 'a' + 'A'
+		}
+		return '_'
+	}, key)
+}
+
+// regionalDatabaseURLs maps every region named by a CLOUD_DATABASE_URL_<REGION>
+// variable to its serving URL.
+func regionalDatabaseURLs() map[string]string {
+	urls := map[string]string{}
+	for _, kv := range os.Environ() {
+		name, url, ok := strings.Cut(kv, "=")
+		if !ok || url == "" || !strings.HasPrefix(name, regionalDatabasePrefix) {
+			continue
+		}
+		urls[strings.TrimPrefix(name, regionalDatabasePrefix)] = url
+	}
+	return urls
+}
+
+// servingDatabaseURL returns the URL this function serves from before the
+// schema rule: the database of its region when the deployment names regional
+// databases, else NEXTGEN_DATABASE_POSTGRES as configured.
+func servingDatabaseURL() (string, error) {
+	urls := regionalDatabaseURLs()
+	if len(urls) == 0 {
+		return os.Getenv("NEXTGEN_DATABASE_POSTGRES"), nil
+	}
+	key := databaseKey()
+	if url, ok := urls[key]; ok {
+		return url, nil
+	}
+	keys := slices.Sorted(maps.Keys(urls))
+	return "", fmt.Errorf("no %s%s: this deployment names databases for %s; %s is %q and VERCEL_REGION is %q",
+		regionalDatabasePrefix, key, strings.Join(keys, ", "), databaseKeyVariable, os.Getenv(databaseKeyVariable), os.Getenv("VERCEL_REGION"))
+}
+
+// regionalMigrationTargets lists the databases a multi-region deployment
+// migrates, by region: the region's migrator URL when set, else its serving
+// URL. Empty when the deployment names no regional database.
+func regionalMigrationTargets() []migrationTarget {
+	var targets []migrationTarget
+	for region, url := range regionalDatabaseURLs() {
+		if migrator := os.Getenv(regionalMigratorPrefix + region); migrator != "" {
+			url = migrator
+		}
+		targets = append(targets, migrationTarget{region: region, url: url})
+	}
+	slices.SortFunc(targets, func(a, b migrationTarget) int { return strings.Compare(a.region, b.region) })
+	return targets
+}
+
+// migrateRegions runs the migrations of every regional database, each in a
+// child launcher whose environment names that one database as
+// NEXTGEN_DATABASE_POSTGRES, so prepareMigration applies unchanged: the
+// production guard, the schema rule and the migrate command. It returns the
+// process exit code; the first failure stops the run.
+func migrateRegions(targets []migrationTarget, extra []string) int {
+	self, err := os.Executable()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "launcher:", err)
+		return 64
+	}
+	for _, target := range targets {
+		fmt.Fprintf(os.Stderr, "launcher: migrating the database of region %s\n", target.region)
+		cmd := exec.Command(self, append([]string{"migrate"}, extra...)...)
+		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+		cmd.Env = childEnv(os.Environ(), target.url)
+		if err := cmd.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "launcher: migrating the database of region %s failed: %v\n", target.region, err)
+			return 1
+		}
+	}
+	return 0
+}
+
+// childEnv is env without any database variable, plus url as the one
+// database the child works with.
+func childEnv(env []string, url string) []string {
+	out := make([]string, 0, len(env)+1)
+	for _, kv := range env {
+		if name, _, _ := strings.Cut(kv, "="); !isDatabaseURLVariable(name, true) {
+			out = append(out, kv)
+		}
+	}
+	return append(out, "NEXTGEN_DATABASE_POSTGRES="+url)
+}
+
+// unsetDatabaseURLs removes the regional database variables from the
+// environment, and with plain also NEXTGEN_DATABASE_POSTGRES and
+// CLOUD_MIGRATOR_DATABASE_URL.
+func unsetDatabaseURLs(plain bool) {
+	for _, kv := range os.Environ() {
+		if name, _, _ := strings.Cut(kv, "="); isDatabaseURLVariable(name, plain) {
+			_ = os.Unsetenv(name)
+		}
+	}
+}
+
+func isDatabaseURLVariable(name string, plain bool) bool {
+	if plain && (name == "NEXTGEN_DATABASE_POSTGRES" || name == "CLOUD_MIGRATOR_DATABASE_URL") {
+		return true
+	}
+	return strings.HasPrefix(name, regionalDatabasePrefix) || strings.HasPrefix(name, regionalMigratorPrefix)
 }
 
 // decodePEM returns the key's PEM lines, normalized the way the shell

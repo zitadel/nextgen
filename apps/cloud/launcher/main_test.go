@@ -26,6 +26,13 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 	t.Setenv("VERCEL_ENV", "")
 	t.Setenv("VERCEL_GIT_PULL_REQUEST_ID", "")
 	t.Setenv("VERCEL_GIT_COMMIT_REF", "")
+	t.Setenv("VERCEL_REGION", "")
+	t.Setenv("CLOUD_DATABASE_KEY", "")
+	for _, kv := range os.Environ() {
+		if name, _, _ := strings.Cut(kv, "="); isDatabaseURLVariable(name, false) {
+			t.Setenv(name, "")
+		}
+	}
 }
 
 func TestPrepareRendersTheMasterKeyIntoTheConfig(t *testing.T) {
@@ -246,4 +253,103 @@ func TestPrepareServesTheSameSchemaTheBuildMigrated(t *testing.T) {
 	_, err := prepare(nil)
 	require.NoError(t, err)
 	assert.Equal(t, previewDSN+"&schema=pr_77", os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
+}
+
+func TestRegionalDatabases(t *testing.T) {
+	const (
+		fra1 = "postgresql://u:p@eu.example:6432/postgres?sslmode=verify-full"
+		cle1 = "postgresql://u:p@us.example:6432/postgres?sslmode=verify-full"
+	)
+
+	t.Run("a function serves from the database of its region, schema rule applied", func(t *testing.T) {
+		setLauncherEnv(t, t.TempDir())
+		t.Setenv("VERCEL_ENV", "preview")
+		t.Setenv("VERCEL_GIT_PULL_REQUEST_ID", "77")
+		t.Setenv("VERCEL_REGION", "cle1")
+		t.Setenv("NEXTGEN_DATABASE_POSTGRES", previewDSN)
+		t.Setenv("CLOUD_DATABASE_URL_FRA1", fra1)
+		t.Setenv("CLOUD_DATABASE_URL_CLE1", cle1)
+		t.Setenv("CLOUD_MIGRATOR_DATABASE_URL_CLE1", "postgresql://migrator:p@us.example:5432/postgres")
+
+		_, err := prepare(nil)
+		require.NoError(t, err)
+		assert.Equal(t, cle1+"&schema=pr_77", os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
+		assert.Empty(t, os.Getenv("CLOUD_DATABASE_URL_FRA1"), "another region's database leaves the environment")
+		assert.Empty(t, os.Getenv("CLOUD_DATABASE_URL_CLE1"))
+		assert.Empty(t, os.Getenv("CLOUD_MIGRATOR_DATABASE_URL_CLE1"), "the migrator role leaves the serving function")
+	})
+
+	t.Run("a region without a database refuses to start", func(t *testing.T) {
+		setLauncherEnv(t, t.TempDir())
+		t.Setenv("VERCEL_REGION", "iad1")
+		t.Setenv("NEXTGEN_DATABASE_POSTGRES", previewDSN)
+		t.Setenv("CLOUD_DATABASE_URL_FRA1", fra1)
+		t.Setenv("CLOUD_DATABASE_URL_CLE1", cle1)
+
+		_, err := prepare(nil)
+		assert.ErrorContains(t, err, "no CLOUD_DATABASE_URL_IAD1")
+		assert.ErrorContains(t, err, "CLE1, FRA1")
+	})
+
+	t.Run("without regional databases the plain pair applies", func(t *testing.T) {
+		setLauncherEnv(t, t.TempDir())
+		t.Setenv("VERCEL_REGION", "fra1")
+		t.Setenv("NEXTGEN_DATABASE_POSTGRES", previewDSN)
+
+		_, err := prepare(nil)
+		require.NoError(t, err)
+		assert.Equal(t, previewDSN, os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
+		assert.Empty(t, regionalMigrationTargets())
+	})
+
+	t.Run("the build migrates every regional database, migrator role first", func(t *testing.T) {
+		setLauncherEnv(t, t.TempDir())
+		t.Setenv("NEXTGEN_DATABASE_POSTGRES", previewDSN)
+		t.Setenv("CLOUD_DATABASE_URL_FRA1", fra1)
+		t.Setenv("CLOUD_DATABASE_URL_CLE1", cle1)
+		t.Setenv("CLOUD_MIGRATOR_DATABASE_URL_CLE1", "postgresql://migrator:p@us.example:5432/postgres")
+
+		assert.Equal(t, []migrationTarget{
+			{region: "CLE1", url: "postgresql://migrator:p@us.example:5432/postgres"},
+			{region: "FRA1", url: fra1},
+		}, regionalMigrationTargets())
+
+		env := childEnv([]string{
+			"PATH=/bin",
+			"NEXTGEN_DATABASE_POSTGRES=" + previewDSN,
+			"CLOUD_MIGRATOR_DATABASE_URL=postgresql://m:p@db.example:5432/postgres",
+			"CLOUD_DATABASE_URL_FRA1=" + fra1,
+			"CLOUD_DATABASE_URL_CLE1=" + cle1,
+			"CLOUD_MIGRATOR_DATABASE_URL_CLE1=postgresql://migrator:p@us.example:5432/postgres",
+			"VERCEL_ENV=preview",
+		}, cle1)
+		assert.Equal(t, []string{"PATH=/bin", "VERCEL_ENV=preview", "NEXTGEN_DATABASE_POSTGRES=" + cle1}, env,
+			"the child sees exactly one database")
+	})
+
+	t.Run("the database key is the upper-case region code unless CLOUD_DATABASE_KEY names another", func(t *testing.T) {
+		t.Setenv("CLOUD_DATABASE_KEY", "")
+		t.Setenv("VERCEL_REGION", "fra1")
+		assert.Equal(t, "FRA1", databaseKey())
+		t.Setenv("VERCEL_REGION", "dev-1")
+		assert.Equal(t, "DEV_1", databaseKey())
+		t.Setenv("VERCEL_REGION", "")
+		assert.Empty(t, databaseKey())
+		t.Setenv("CLOUD_DATABASE_KEY", "home")
+		t.Setenv("VERCEL_REGION", "fra1")
+		assert.Equal(t, "HOME", databaseKey())
+	})
+
+	t.Run("a service with its own database in a shared region serves from it", func(t *testing.T) {
+		setLauncherEnv(t, t.TempDir())
+		t.Setenv("VERCEL_REGION", "fra1")
+		t.Setenv("CLOUD_DATABASE_KEY", "home")
+		t.Setenv("CLOUD_DATABASE_URL_FRA1", fra1)
+		t.Setenv("CLOUD_DATABASE_URL_HOME", "postgresql://u:p@eu.example:6432/postgres?schema=home")
+
+		_, err := prepare(nil)
+		require.NoError(t, err)
+		assert.Equal(t, "postgresql://u:p@eu.example:6432/postgres?schema=home", os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
+		assert.Empty(t, os.Getenv("CLOUD_DATABASE_URL_FRA1"))
+	})
 }
