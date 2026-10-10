@@ -39,7 +39,7 @@ export default defineConfig({
   webServer: [
     {
       command: "pnpm --filter @zitadel/api-mock start",
-      url: "http://localhost:8080/.well-known/jwks.json",
+      url: "http://127.0.0.1:8080/.well-known/jwks.json",
       reuseExistingServer: true,
       cwd: workspaceRoot,
       stdout: "pipe",
@@ -47,7 +47,7 @@ export default defineConfig({
     },
     {
       command: "pnpm --filter @zitadel/demo-next dev",
-      url: "http://localhost:3002/login",
+      url: "http://127.0.0.1:3002/login",
       reuseExistingServer: true,
       cwd: workspaceRoot,
       stdout: "pipe",
