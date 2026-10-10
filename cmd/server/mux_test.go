@@ -174,3 +174,38 @@ func TestBuildHTTPMuxRecordsCSRFRequestState(t *testing.T) {
 	require.Equal(t, http.StatusTeapot, rec.Code, "the request must reach the API handler")
 	require.True(t, recorded, "api.WithCSRFRequest must wrap the API handler")
 }
+
+// External UI mode: the UIs are built and served next to the server (the
+// cloud's static services), so nothing is embedded and the surface switches
+// do not matter, but the runtime document the UIs boot from is still served.
+func TestBuildHTTPMuxExternalUIServesOnlyTheRuntimeDocument(t *testing.T) {
+	cfg := uiConfig(true, true)
+	cfg.UI = UIExternal
+	mux := newTestMux(t, cfg)
+
+	rec := get(t, mux, consoleRuntimePath)
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.JSONEq(t, `{"mode":"standalone","console_project_id":"proj_first"}`, rec.Body.String())
+	for _, path := range []string{"/ui/console/", "/ui/login/"} {
+		assert.Equal(t, "api", get(t, mux, path).Header().Get("X-Test-Handler"), "%s is not a mount in the external mode", path)
+	}
+}
+
+// Headless: an API-only deployment serves no UI and no runtime document,
+// whatever the surface switches say.
+func TestBuildHTTPMuxHeadlessServesNoUISurface(t *testing.T) {
+	cfg := uiConfig(true, true)
+	cfg.UI = UIHeadless
+	mux := newTestMux(t, cfg)
+
+	for _, path := range []string{consoleRuntimePath, "/ui/console/", "/ui/login/"} {
+		assert.Equal(t, "api", get(t, mux, path).Header().Get("X-Test-Handler"), path)
+	}
+}
+
+func TestServerConfigValidatesTheUIMode(t *testing.T) {
+	for _, ui := range []string{"", UIEmbedded, UIExternal, UIHeadless} {
+		assert.NoError(t, ServerConfig{UI: ui}.Validate(), ui)
+	}
+	assert.Error(t, ServerConfig{UI: "none"}.Validate())
+}

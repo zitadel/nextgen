@@ -510,6 +510,7 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 	}
 	v.SetDefault("server.address", ":8080")
 	v.SetDefault("server.data_dir", dataDir)
+	v.SetDefault("server.ui", UIEmbedded)
 	v.SetDefault("server.console_enabled", true)
 	v.SetDefault("server.console_path", "/ui/console")
 	v.SetDefault("server.public_base", "https://nextgen.zitadel.cloud")
@@ -702,8 +703,9 @@ func mustBindEnv(v *viper.Viper, key string) {
 
 func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
+	consoleOn, loginOn, runtimeDocument := cfg.uiSurfaces()
 
-	if cfg.LoginEnabled {
+	if loginOn {
 		if err := login.ValidateDist(); err != nil {
 			return nil, err
 		}
@@ -715,7 +717,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 		mux.Handle(cfg.LoginPath+"/", loginHandler)
 	}
 
-	if cfg.ConsoleEnabled {
+	if consoleOn {
 		if err := console.ValidateDist(); err != nil {
 			return nil, err
 		}
@@ -732,9 +734,10 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 	// describes the deployment — the default project and its publishable key
 	// — and the hosted login shell resolves the project it signs into from
 	// the same two fields, so it is mounted for either surface rather than
-	// only alongside the console. Registered as an exact path, so it wins
-	// over the catch-all API mount below.
-	if cfg.ConsoleEnabled || cfg.LoginEnabled {
+	// only alongside the console, and on its own in the external UI mode,
+	// where the surfaces are served next to the server. Registered as an
+	// exact path, so it wins over the catch-all API mount below.
+	if runtimeDocument {
 		mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
 	}
 

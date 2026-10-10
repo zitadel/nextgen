@@ -1,16 +1,12 @@
 package console
 
 import (
-	"embed"
 	"fmt"
 	"io/fs"
 	"net/http"
 
 	"github.com/zitadel/nextgen/internal/staticui"
 )
-
-//go:embed all:dist
-var dist embed.FS
 
 // Handler serves the embedded console SPA at prefix (e.g. "/ui/console").
 func Handler(prefix string) (http.Handler, error) {

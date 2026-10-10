@@ -114,6 +114,7 @@ func (c PlatformConfig) ProvisioningProjectID() string {
 
 func (c Config) Validate() error {
 	for _, validate := range []func() error{
+		c.Server.Validate,
 		c.Session.Validate,
 		c.Platform.Validate,
 		c.HTTPClient.Validate,
@@ -130,6 +131,13 @@ type SessionConfig struct {
 	DefaultTTL time.Duration `mapstructure:"default_ttl"`
 	MaxTTL     time.Duration `mapstructure:"max_ttl"`
 }
+
+// The UI modes of ServerConfig.UI.
+const (
+	UIEmbedded = "embedded"
+	UIExternal = "external"
+	UIHeadless = "headless"
+)
 
 type ServerConfig struct {
 	Address string `mapstructure:"address"`
@@ -162,6 +170,15 @@ type ServerConfig struct {
 	// the failure that can still be recovered from.
 	GenerateMasterKey bool `mapstructure:"generate_master_key"`
 
+	// UI is how this deployment serves its UI surfaces. "embedded", the
+	// default, serves the console and the login UI from the binary (each
+	// still switched by console_enabled and login_enabled) and the runtime
+	// document with them. "external" serves no embedded UI but keeps the
+	// runtime document (`GET /console/runtime.json`), for a deployment whose
+	// UIs are built and served next to it on the same host, as the cloud
+	// does. "headless" serves neither: an API-only deployment, such as a
+	// region of the cloud, whose console is the home's.
+	UI             string `mapstructure:"ui"`
 	ConsoleEnabled bool   `mapstructure:"console_enabled"`
 	ConsolePath    string `mapstructure:"console_path"`
 	LoginEnabled   bool   `mapstructure:"login_enabled"`
@@ -171,6 +188,26 @@ type ServerConfig struct {
 	// stays on schema.builtin_public_base, which is an identifier namespace,
 	// not an address.
 	PublicBase string `mapstructure:"public_base"`
+}
+
+func (c ServerConfig) Validate() error {
+	switch c.UI {
+	case "", UIEmbedded, UIExternal, UIHeadless:
+		return nil
+	}
+	return fmt.Errorf("server.ui must be %s, %s or %s, got %q", UIEmbedded, UIExternal, UIHeadless, c.UI)
+}
+
+// uiSurfaces reports what the mux mounts for the UIs: the embedded console,
+// the embedded login UI, and the runtime document they boot from.
+func (c ServerConfig) uiSurfaces() (console, login, runtimeDocument bool) {
+	switch c.UI {
+	case UIHeadless:
+		return false, false, false
+	case UIExternal:
+		return false, false, true
+	}
+	return c.ConsoleEnabled, c.LoginEnabled, c.ConsoleEnabled || c.LoginEnabled
 }
 
 // KeysConfig sizes the in-process key caches. Both are read-through and hold

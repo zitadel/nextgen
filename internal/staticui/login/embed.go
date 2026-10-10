@@ -1,16 +1,12 @@
 package login
 
 import (
-	"embed"
 	"fmt"
 	"io/fs"
 	"net/http"
 
 	"github.com/zitadel/nextgen/internal/staticui"
 )
-
-//go:embed all:dist
-var dist embed.FS
 
 // Handler serves the embedded login shell at prefix (e.g. "/ui/login").
 func Handler(prefix string) (http.Handler, error) {
