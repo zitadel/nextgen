@@ -2,7 +2,6 @@
   "name": "@zitadel/cli-journey-e2e",
   "version": "0.0.1",
   "private": true,
-  "type": "module",
   "scripts": {
     "test": "vitest run",
     "test:all": "pnpm run test",
