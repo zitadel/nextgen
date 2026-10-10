@@ -80,7 +80,7 @@ const NON_SHIPPING_ROOT_FILES = new Set([
   "redocly.yaml",
   "tsconfig.base.json",
   "tsconfig.json",
-  "vitest.config.ts",
+  "vitest.config.mts",
   "vitest.shared.mjs",
   "vitest.shared.d.mts",
 ]);

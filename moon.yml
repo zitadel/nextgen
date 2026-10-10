@@ -89,7 +89,7 @@ tasks:
       - "scripts/assert-file.mjs"
       # Shared Vitest config these tests run under (root project is not covered
       # by the TypeScript implicitInputs).
-      - "vitest.config.ts"
+      - "vitest.config.mts"
       - "vitest.shared.mjs"
       - "vitest.shared.d.mts"
     options:
@@ -113,7 +113,7 @@ tasks:
       - "packages/*/package.json"
       - "apps/*/tsconfig*.json"
       - "packages/*/tsconfig*.json"
-      - "vitest.config.ts"
+      - "vitest.config.mts"
       - "vitest.shared.mjs"
       - "vitest.shared.d.mts"
     options:
@@ -136,7 +136,7 @@ tasks:
       - "scripts/testdata/openapi-casing/**"
       - "/redocly.yaml"
       - "/.redocly.lint-ignore.yaml"
-      - "vitest.config.ts"
+      - "vitest.config.mts"
       - "vitest.shared.mjs"
       - "vitest.shared.d.mts"
     options:

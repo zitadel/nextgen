@@ -11,7 +11,7 @@ import type { StorybookConfig } from "@storybook/web-components-vite";
 // through a package export that would resolve to an unpublished `.ts` file.
 import { liquidRaw } from "../../../packages/components/vite-liquid-plugin.js";
 
-import { optimizeDepsExclude, optimizeDepsInclude } from "./optimize-deps.js";
+import { optimizeDepsExclude, optimizeDepsInclude } from "./optimize-deps.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const packagesDir = resolve(here, "../../../packages");

@@ -373,7 +373,7 @@ packages/components/
 │   ├── manifests.ts       per-atom attribute / part / event manifests
 │   └── index.ts           barrel
 ├── tsdown.config.ts       library build (externalises lit/liquidjs/dompurify)
-└── vitest.config.ts       jsdom (unit) + chromium (browser) projects
+└── vitest.config.mts      jsdom (unit) + chromium (browser) projects
 ```
 
 The interactive workbench (the atoms and the `<zitadel-login>`

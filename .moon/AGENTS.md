@@ -34,7 +34,7 @@ empty script to fill the gap.
 ## Inputs
 
 A task uses moon's default inputs, the whole project folder, so any file added
-to a package (a new `vite.config.ts`, say) is covered without a list to keep
+to a package (a new `vite.config.mts`, say) is covered without a list to keep
 up to date. Do not write an `inputs` list that names a package's own files.
 
 The exceptions name only what lies outside the project folder:

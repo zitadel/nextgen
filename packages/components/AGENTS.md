@@ -197,7 +197,7 @@ trade-offs, browser quirks, or constraints the code itself can't convey.
 
 ## Tests
 
-Two Vitest projects, one config (`vitest.config.ts`):
+Two Vitest projects, one config (`vitest.config.mts`):
 
 - `unit` — `jsdom`. The fast local lane; what `pnpm test` runs.
 - `browser` — Chromium via `@vitest/browser-playwright`. Run alone with
