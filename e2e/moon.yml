@@ -51,6 +51,9 @@ tasks:
       - "e2e:demo-next-real"
       - "e2e:demo-nuxt-mock"
       - "e2e:journey-local"
+      # The test kit's own real-instance suite. Ran in the old workflow via the
+      # same step as demo-next-real; kept in CI here as a dependency.
+      - "testing:test-integration"
     options:
       runInCI: true
 

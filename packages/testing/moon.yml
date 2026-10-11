@@ -41,8 +41,9 @@ tasks:
     deps:
       - "build"
 
-  # Boots a real local server (binary runtime + SQLite by default). Kept out
-  # of CI and the cache: it spawns OS processes and takes a few seconds per boot.
+  # Boots a real local server (binary runtime + SQLite by default). Not cached
+  # (it spawns OS processes). Runs in CI as a dependency of `e2e:test` — the
+  # kit's own real-instance suite, alongside the e2e app lanes.
   test-integration:
     command: "corepack pnpm run test:integration"
     deps:
@@ -58,4 +59,4 @@ tasks:
       NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
     options:
       cache: false
-      runInCI: false
+      runInCI: true
