@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Shield, Users, Workflow } from "lucide-react";
-import { Fragment, type ReactNode } from "react";
+import { Shield, Users } from "lucide-react";
 
 import {
   LoadMore,
@@ -19,69 +18,57 @@ import {
   ResourceTitle,
   RowMenu,
 } from "@/components/resource-list";
-import { SignInStateBadge } from "@/components/sign-in-state-badge";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { InlineCode } from "@/components/ui/inline-code";
-import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { formatDate } from "@/lib/date";
-import { type FlowDefinitionEntry, flowDisplayName } from "@/lib/flow-definition";
 import {
-  fetchAllFlows,
   fetchAllIdps,
   fetchAllSchemas,
   fetchIdpPage,
-  flowsForSchema,
   type IdpConnection,
-  idpProtocolLabel,
-  schemaProviders,
+  type IdpReference,
+  nameSummary,
+  type SchemaEntry,
+  schemasUsingIdp,
+  type SignInMethodRow,
+  signInMethodRows,
 } from "@/lib/idp";
 import {
   projectScopeDeps,
   requireProjectScope,
   useRequiredProjectScope,
 } from "@/lib/project-scope";
-import { schemaAuthMethods, schemaDisplayName, type UserSchema } from "@/lib/schema";
-import { stringParam } from "@/lib/search-params";
 
 /**
- * Authentication — how users of each schema sign in, and the project's identity
- * provider connections. Read-only: sign-in methods live in the schema document
- * and connections are applied through the CLI (#998).
+ * Authentication — the sign-in methods in use across the project's user
+ * schemas, and its identity provider connections. Read-only: sign-in methods
+ * live in the schema document and connections are applied through the CLI
+ * (#998).
  *
- * Both tabs are in the URL (`?tab=`, `?schema=`), so a reload or a shared link
- * opens the same view.
+ * The open tab is in the URL (`?tab=`), so a reload or a shared link opens
+ * the same one.
  */
 export interface AuthenticationSearch {
-  /** `identity-providers`, or absent for the default Sign-in tab. */
+  /** `identity-providers`, or absent for the default Sign-in methods tab. */
   tab?: "identity-providers";
-  /** The schema whose sign-in methods are open on the Sign-in tab. */
-  schema?: string;
 }
 
 export const Route = createFileRoute("/_authed/authentication/")({
   // Order 4: between Users (3) and Login flows (5), as the design places it.
   staticData: { scope: "project", nav: { label: "Authentication", order: 4, icon: Shield } },
-  validateSearch: (search: Record<string, unknown>): AuthenticationSearch => {
-    const schema = stringParam(search.schema);
-    return {
-      ...(search.tab === "identity-providers" ? { tab: "identity-providers" as const } : {}),
-      ...(schema ? { schema } : {}),
-    };
-  },
+  validateSearch: (search: Record<string, unknown>): AuthenticationSearch =>
+    search.tab === "identity-providers" ? { tab: "identity-providers" } : {},
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }): Promise<Loaded> => {
     const projectId = requireProjectScope(deps.project);
-    // The whole project's schemas, flows and connections: the Sign-in tab
-    // resolves every slug and lists every flow pinning a schema, and no API
-    // answers either directly.
-    const [schemas, flows, idps] = await Promise.all([
+    // The whole project's schemas and connections: both tabs join the two on
+    // the slug, and no API answers that join directly.
+    const [schemas, idps] = await Promise.all([
       fetchAllSchemas(projectId),
-      fetchAllFlows(projectId),
       fetchAllIdps(projectId),
     ]);
     // The list's own first page, newest first. Skipped without `idp.read`,
@@ -89,7 +76,6 @@ export const Route = createFileRoute("/_authed/authentication/")({
     const page = idps ? await fetchIdpPage(projectId) : undefined;
     return {
       schemas,
-      flows,
       idps,
       list: page ? { idps: page.idps, nextPageToken: page.nextPageToken } : undefined,
     };
@@ -99,8 +85,7 @@ export const Route = createFileRoute("/_authed/authentication/")({
 
 /** What the loader hands the tabs. Exported because the route tree names it. */
 export interface Loaded {
-  schemas: Array<{ id: string; schema: UserSchema; createdAt: string }>;
-  flows: FlowDefinitionEntry[];
+  schemas: SchemaEntry[];
   /** `null` without `idp.read`. */
   idps: IdpConnection[] | null;
   /** The list tab's first page; absent without `idp.read`. */
@@ -113,7 +98,7 @@ function AuthenticationScreen() {
   const navigate = useNavigate({ from: Route.fullPath });
 
   // Without `idp.read` the tab does not exist, so a link to it opens Sign-in
-  // rather than an empty strip.
+  // methods rather than an empty strip.
   const canReadIdps = loaded.list !== undefined;
   const tab = canReadIdps && search.tab === "identity-providers" ? search.tab : "sign-in";
 
@@ -121,32 +106,20 @@ function AuthenticationScreen() {
     <ResourcePage>
       <ResourceTitle>Authentication</ResourceTitle>
 
+      {/* 8px under the title and 16px over the table, as the page header
+          draws the tab strip. */}
       <Tabs
         value={tab}
         onValueChange={(next) =>
           void navigate({
-            search: (prev) => ({
-              ...prev,
-              tab: next === "identity-providers" ? "identity-providers" : undefined,
-              schema: undefined,
-            }),
+            search: { tab: next === "identity-providers" ? "identity-providers" : undefined },
           })
         }
-        className="mt-4 gap-4 lg:mt-5"
+        className="mt-2 gap-4"
       >
         <TabsList className="h-10 px-0 py-[3px]">
-          <TabsTrigger
-            value="sign-in"
-            variant="muted"
-            // Radix does not report a click on the active trigger, and the
-            // per-schema view sits under it: this is the way back to the list.
-            onClick={() => {
-              if (search.schema) {
-                void navigate({ search: (prev) => ({ ...prev, schema: undefined }) });
-              }
-            }}
-          >
-            Sign-in
+          <TabsTrigger value="sign-in" variant="muted">
+            Sign-in methods
           </TabsTrigger>
           {canReadIdps && (
             <TabsTrigger value="identity-providers" variant="muted">
@@ -156,16 +129,12 @@ function AuthenticationScreen() {
         </TabsList>
 
         <TabsContent value="sign-in">
-          {search.schema ? (
-            <SchemaSignIn schemaId={search.schema} loaded={loaded} />
-          ) : (
-            <SignInOverview loaded={loaded} />
-          )}
+          <SignInMethods loaded={loaded} />
         </TabsContent>
 
         {loaded.list && (
           <TabsContent value="identity-providers">
-            <IdentityProviders first={loaded.list} />
+            <IdentityProviders first={loaded.list} schemas={loaded.schemas} />
           </TabsContent>
         )}
       </Tabs>
@@ -173,56 +142,34 @@ function AuthenticationScreen() {
   );
 }
 
+/** The first and last columns; the user schema column takes the rest. */
+const COLUMN = "w-1/4";
+
 /**
- * One row per user schema, with a badge per enabled method — one per listed
- * provider in place of a single `SSO` — answering "how can users of this
- * schema sign in?" at a glance.
+ * One row per sign-in method in use — Passkey, Password, then each provider
+ * — with the user schemas that allow it: "who can sign in with this?" at a
+ * glance.
  */
-function SignInOverview({ loaded }: { loaded: Loaded }) {
-  const navigate = useNavigate({ from: Route.fullPath });
+function SignInMethods({ loaded }: { loaded: Loaded }) {
+  const rows = signInMethodRows(loaded.schemas, loaded.idps);
 
   return (
     <div className={RESOURCE_TABLE_WRAP}>
       <Table className={RESOURCE_TABLE_FIXED}>
         <TableHeader>
           <ResourceHeaderRow>
-            <ResourceHeadCell className="w-1/3">User schema</ResourceHeadCell>
-            <ResourceHeadCell>Sign-in methods</ResourceHeadCell>
+            <ResourceHeadCell className={COLUMN}>Method</ResourceHeadCell>
+            <ResourceHeadCell>User schema</ResourceHeadCell>
+            <ResourceHeadCell className={COLUMN}>Last change</ResourceHeadCell>
           </ResourceHeaderRow>
         </TableHeader>
         <TableBody>
-          {loaded.schemas.length === 0 ? (
-            <ResourceEmptyRow colSpan={2}>This project has no user schemas.</ResourceEmptyRow>
+          {rows.length === 0 ? (
+            <ResourceEmptyRow colSpan={3}>
+              No user schema in this project enables a sign-in method.
+            </ResourceEmptyRow>
           ) : (
-            loaded.schemas.map(({ id, schema }) => {
-              const name = schemaDisplayName(schema, id);
-              return (
-                <ResourceRow
-                  key={id}
-                  onOpen={() => void navigate({ search: (prev) => ({ ...prev, schema: id }) })}
-                >
-                  <TableCell className={`${RESOURCE_CELL} truncate`}>
-                    <Link
-                      from={Route.fullPath}
-                      search={(prev) => ({ ...prev, schema: id })}
-                      className={RESOURCE_ROW_LINK}
-                    >
-                      <Users aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
-                      {name}
-                    </Link>
-                  </TableCell>
-                  <TableCell className={RESOURCE_CELL}>
-                    <div className="flex flex-wrap gap-1.5">
-                      {methodBadges(schema, loaded.idps).map((label) => (
-                        <Badge key={label} variant="secondary">
-                          {label}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                </ResourceRow>
-              );
-            })
+            rows.map((row) => <MethodRow key={row.key} row={row} />)
           )}
         </TableBody>
       </Table>
@@ -230,161 +177,68 @@ function SignInOverview({ loaded }: { loaded: Loaded }) {
   );
 }
 
-/**
- * The enabled methods of a schema as badge labels: the plain methods first, in
- * `schemaAuthMethods`' stable order, then one per listed provider by its
- * connection's name — or its slug, without `idp.read` or without a connection.
- */
-function methodBadges(schema: UserSchema, idps: IdpConnection[] | null): string[] {
-  const methods = schemaAuthMethods(schema)
-    .filter((method) => method.enabled && method.key !== "sso")
-    .map((method) => method.label);
-  const providers = schemaProviders(schema, idps)
-    .filter((provider) => provider.state !== "disabled")
-    .map((provider) => provider.name);
-  return [...methods, ...providers];
-}
-
-/**
- * "Allowed sign-in methods" for one schema: Passkey and Password with their
- * state, one row per provider, and the login flows that pin the schema.
- */
-function SchemaSignIn({ schemaId, loaded }: { schemaId: string; loaded: Loaded }) {
-  const entry = loaded.schemas.find((candidate) => candidate.id === schemaId);
-  if (!entry) {
-    return (
-      <Card className="items-center px-6 py-8 text-sm text-muted-foreground">
-        This project has no user schema “{schemaId}”.
-      </Card>
-    );
-  }
-
-  const name = schemaDisplayName(entry.schema, entry.id);
-  const declared = schemaAuthMethods(entry.schema);
-  // Passkey and Password always have a row: "how can these users sign in" is
-  // answered by what is off as much as by what is on. Any other method the
-  // document declares follows (D10: a declared method is never hidden).
-  const methods = [
-    ...ALWAYS_SHOWN.map(
-      (key) =>
-        declared.find((method) => method.key === key) ?? {
-          key,
-          label: key === "passkey" ? "Passkey" : "Password",
-          enabled: false,
-        },
-    ),
-    ...declared.filter((method) => method.key !== "sso" && !ALWAYS_SHOWN.includes(method.key)),
-  ];
-  const providers = schemaProviders(entry.schema, loaded.idps);
-  const flows = flowsForSchema(entry.id, loaded.flows);
+function MethodRow({ row }: { row: SignInMethodRow }) {
+  const navigate = useNavigate();
+  // A provider with a connection opens it; Passkey and Password have no page.
+  const idpId = row.idpId;
 
   return (
-    <Card className="gap-0 py-0">
-      <div className="flex flex-col gap-2 px-4 pt-3.5 pb-1.5">
-        <h2 className="font-serif text-lg leading-6 text-foreground">{name}</h2>
-        <h3 className="font-serif text-[15px] leading-[22px] text-foreground">
-          Allowed sign-in methods
-        </h3>
-      </div>
-      {methods.map((method, index) => (
-        <Fragment key={method.key}>
-          {index > 0 && <Separator className={RULE} />}
-          <MethodRow label={method.label} state={method.enabled ? "enabled" : "disabled"} />
-        </Fragment>
-      ))}
-      {providers.map((provider) => (
-        <Fragment key={provider.slug}>
-          <Separator className={RULE} />
-          <MethodRow
-            label={
-              provider.idpId ? (
-                <Link
-                  to="/authentication/idps/$idpId"
-                  params={{ idpId: provider.idpId }}
-                  className="underline-offset-2 hover:underline"
-                >
-                  {provider.name}
-                </Link>
-              ) : (
-                provider.name
-              )
-            }
-            detail={provider.name === provider.slug ? undefined : provider.slug}
-            state={provider.state}
-          />
-        </Fragment>
-      ))}
-      <Separator className={RULE} />
-      <div className={ROW}>
-        <span className={ROW_LABEL}>Login flows</span>
-        <FlowLinks flows={flows} />
-      </div>
-    </Card>
+    <ResourceRow
+      onOpen={
+        idpId
+          ? () => void navigate({ to: "/authentication/idps/$idpId", params: { idpId } })
+          : undefined
+      }
+    >
+      <TableCell className={`${RESOURCE_CELL} truncate`}>
+        {idpId ? (
+          <Link to="/authentication/idps/$idpId" params={{ idpId }} className={RESOURCE_ROW_LINK}>
+            {row.label}
+          </Link>
+        ) : row.missing ? (
+          // A slug no connection has: shown as written, like the schema
+          // screens show it, and flagged — a broken option would otherwise
+          // look like a working one.
+          <span className="inline-flex items-center gap-2.5">
+            <InlineCode>{row.label}</InlineCode>
+            <Badge variant="destructive">No connection</Badge>
+          </span>
+        ) : (
+          <span className="text-sm font-medium text-foreground">{row.label}</span>
+        )}
+      </TableCell>
+      <TableCell className={RESOURCE_CELL_MUTED}>
+        <SchemaNames items={row.schemas} />
+      </TableCell>
+      <TableCell className={RESOURCE_CELL_MUTED}>{formatDate(row.lastChange)}</TableCell>
+    </ResourceRow>
   );
 }
 
-const ALWAYS_SHOWN = ["passkey", "password"];
-
-/** A row: the method, a muted detail column, and its state at the end. */
-const ROW = "flex items-center gap-4 px-4 py-3";
-const ROW_LABEL = "w-40 shrink-0 text-sm font-medium text-foreground sm:w-[230px]";
-
 /**
- * Hairlines between rows, inset to the card's 16px gutter. `w-auto!` because
- * `Separator`'s `data-[orientation=horizontal]:w-full` out-specifies a plain
- * width and would push the inset rule past the card's edge.
+ * The user schemas a row concerns, behind the users glyph: the first two by
+ * name and a count for the rest, as the design truncates them.
  */
-const RULE = "mx-4 w-auto!";
-
-function MethodRow({
-  label,
-  detail,
-  state,
-}: {
-  label: ReactNode;
-  detail?: string;
-  state: "enabled" | "disabled" | "missing";
-}) {
+function SchemaNames({ items }: { items: IdpReference[] }) {
+  if (items.length === 0) return <>Not used</>;
   return (
-    <div className={ROW}>
-      <span className={`${ROW_LABEL} truncate`}>{label}</span>
-      {/* The slug repeats what the linked name opens, so a phone, which has
-          no room for it beside the label, drops it rather than clip it. */}
-      <span className="hidden min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground sm:block">
-        {detail}
-      </span>
-      <span aria-hidden className="flex-1 sm:hidden" />
-      <SignInStateBadge state={state} />
-    </div>
-  );
-}
-
-function FlowLinks({ flows }: { flows: FlowDefinitionEntry[] }) {
-  if (flows.length === 0) {
-    return <span className="text-sm text-muted-foreground">No login flow uses this schema.</span>;
-  }
-  return (
-    <span className="flex min-w-0 flex-wrap gap-x-3 gap-y-1">
-      {flows.map((entry) => (
-        <Link
-          key={entry.id}
-          to="/flow-definitions/$definitionId"
-          params={{ definitionId: entry.id }}
-          className="inline-flex items-center gap-1.5 text-sm text-foreground underline-offset-2 hover:underline"
-        >
-          <Workflow aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
-          {flowDisplayName(entry.flow_definition)}
-        </Link>
-      ))}
+    <span className="inline-flex max-w-full items-center gap-2">
+      <Users aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
+      <span className="truncate">{nameSummary(items.map((item) => item.name))}</span>
     </span>
   );
 }
 
-/** The project's connections, newest first, paged with `Load more`. */
+/**
+ * The project's connections, newest first, paged with `Load more`, each with
+ * the user schemas that list its slug.
+ */
 function IdentityProviders({
   first,
+  schemas,
 }: {
   first: { idps: IdpConnection[]; nextPageToken?: string };
+  schemas: SchemaEntry[];
 }) {
   const projectId = useRequiredProjectScope();
   const paging = useLoadMore(
@@ -402,25 +256,23 @@ function IdentityProviders({
   return (
     <>
       <div className={RESOURCE_TABLE_WRAP}>
-        <Table className={`${RESOURCE_TABLE_FIXED} min-w-[44rem]`}>
+        <Table className={RESOURCE_TABLE_FIXED}>
           <TableHeader>
             <ResourceHeaderRow>
-              <ResourceHeadCell className="w-[26%]">Name</ResourceHeadCell>
-              <ResourceHeadCell className="w-[18%]">Slug</ResourceHeadCell>
-              <ResourceHeadCell className="w-[16%]">Template</ResourceHeadCell>
-              <ResourceHeadCell className="w-[14%]">Protocol</ResourceHeadCell>
-              <ResourceHeadCell className="w-[16%]">Created</ResourceHeadCell>
-              <ResourceMenuHead className="w-[10%]" />
+              <ResourceHeadCell className={COLUMN}>Provider</ResourceHeadCell>
+              <ResourceHeadCell>User schema</ResourceHeadCell>
+              <ResourceHeadCell className="w-[18%]">Last change</ResourceHeadCell>
+              <ResourceMenuHead className="w-[7%]" />
             </ResourceHeaderRow>
           </TableHeader>
           <TableBody>
             {idps.length === 0 ? (
-              <ResourceEmptyRow colSpan={6}>
+              <ResourceEmptyRow colSpan={4}>
                 This project has no identity providers. Add one with{" "}
                 <InlineCode>zitadel sso enable</InlineCode>.
               </ResourceEmptyRow>
             ) : (
-              idps.map((idp) => <IdpRow key={idp.id} idp={idp} />)
+              idps.map((idp) => <IdpRow key={idp.id} idp={idp} schemas={schemas} />)
             )}
           </TableBody>
         </Table>
@@ -430,7 +282,7 @@ function IdentityProviders({
   );
 }
 
-function IdpRow({ idp }: { idp: IdpConnection }) {
+function IdpRow({ idp, schemas }: { idp: IdpConnection; schemas: SchemaEntry[] }) {
   const navigate = useNavigate();
   const name = idp.definition.display_name;
 
@@ -448,14 +300,12 @@ function IdpRow({ idp }: { idp: IdpConnection }) {
           {name}
         </Link>
       </TableCell>
-      <TableCell className={`${RESOURCE_CELL} truncate`}>
-        <InlineCode>{idp.slug}</InlineCode>
-      </TableCell>
-      <TableCell className={RESOURCE_CELL_MUTED}>{idp.definition.template ?? "—"}</TableCell>
       <TableCell className={RESOURCE_CELL_MUTED}>
-        {idpProtocolLabel(idp.definition.protocol)}
+        <SchemaNames items={schemasUsingIdp(idp.slug, schemas)} />
       </TableCell>
-      <TableCell className={RESOURCE_CELL_MUTED}>{formatDate(idp.created_at)}</TableCell>
+      {/* `updated_at` is when the newest revision was created: the last
+          change to the connection. */}
+      <TableCell className={RESOURCE_CELL_MUTED}>{formatDate(idp.updated_at)}</TableCell>
       <TableCell className={`${RESOURCE_CELL} text-right`}>
         <RowMenu name={name}>
           <DropdownMenuItem asChild>

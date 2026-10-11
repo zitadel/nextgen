@@ -6,7 +6,12 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { api } from "@/api/zitadel";
 import type { FlowDefinitionEntry } from "./flow-definition";
-import { type UserSchema, schemaDisplayName, schemaSsoProviders } from "./schema";
+import {
+  type UserSchema,
+  schemaAuthMethods,
+  schemaDisplayName,
+  schemaSsoProviders,
+} from "./schema";
 
 /**
  * Identity provider connections as the Authentication screens read them.
@@ -69,10 +74,15 @@ export async function fetchAllIdps(projectId: string): Promise<IdpConnection[] |
   }
 }
 
+/** A user schema at its latest revision, with that revision's created date. */
+export interface SchemaEntry {
+  id: string;
+  schema: UserSchema;
+  createdAt: string;
+}
+
 /** Every user schema in the project, at its latest revision. */
-export async function fetchAllSchemas(
-  projectId: string,
-): Promise<Array<{ id: string; schema: UserSchema; createdAt: string }>> {
+export async function fetchAllSchemas(projectId: string): Promise<SchemaEntry[]> {
   const entries = await walk(async (pageToken) => {
     const page = await api.listSchemas({
       project_id: projectId,
@@ -149,7 +159,7 @@ export interface IdpReference {
  */
 export function schemasUsingIdp(
   slug: string,
-  schemas: Array<{ id: string; schema: UserSchema }>,
+  schemas: Array<Pick<SchemaEntry, "id" | "schema">>,
 ): IdpReference[] {
   return schemas
     .filter(({ schema }) => schemaSsoProviders(schema).includes(slug))
@@ -164,68 +174,101 @@ export function flowsUsingIdp(slug: string, flows: FlowDefinitionEntry[]): FlowD
   );
 }
 
-/** The flows that pin a schema (`user_schema`). */
-export function flowsForSchema(
-  schemaId: string,
-  flows: FlowDefinitionEntry[],
-): FlowDefinitionEntry[] {
-  return flows.filter((entry) => entry.flow_definition.user_schema === schemaId);
-}
-
 function byName(a: IdpReference, b: IdpReference): number {
   return a.name.localeCompare(b.name);
 }
 
 /**
- * One SSO row of a schema's sign-in view.
- *
- * - `enabled`: the schema lists the slug and a connection has it.
- * - `disabled`: a connection in the project the schema does not list.
- * - `missing`: the schema lists a slug no connection has. The CLI validator
- *   rejects this, but the server can still hold it, and hiding it would make
- *   a broken sign-in option look absent rather than broken.
+ * "Business, Consumer ... +4": the first `shown` names and a count for the
+ * rest, as the design truncates a list of user schemas in a table cell.
  */
-export interface SchemaProvider {
-  slug: string;
-  /** The connection's `display_name`, or the slug when there is none to read. */
-  name: string;
-  state: "enabled" | "disabled" | "missing";
-  /** The connection behind the row, for its link. */
-  idpId?: string;
+export function nameSummary(names: string[], shown = 2): string {
+  const rest = names.length - shown;
+  return rest > 0 ? `${names.slice(0, shown).join(", ")} ... +${rest}` : names.join(", ");
 }
 
 /**
- * The SSO rows of a schema: the slugs it lists, in its own order, then the
- * project's other connections, by name.
- *
- * With `idps` `null` — no `idp.read` — the listed slugs come back raw and
- * enabled, and there are no others: whether a slug has a connection, and
- * which connections exist, are both things the caller cannot see.
+ * One row of the Sign-in methods tab: a method some schema enables, and the
+ * schemas that enable it.
  */
-export function schemaProviders(
-  schema: UserSchema,
-  idps: IdpConnection[] | null,
-): SchemaProvider[] {
-  const listed = schemaSsoProviders(schema);
-  if (!idps) return listed.map((slug) => ({ slug, name: slug, state: "enabled" }));
+export interface SignInMethodRow {
+  /** `passkey`, `password`, or `sso:<slug>`. */
+  key: string;
+  /** The method's label, or a provider's connection name — its slug without one. */
+  label: string;
+  /** The schemas enabling the method, by name. */
+  schemas: IdpReference[];
+  /** The newest of the schema revisions behind the row, and the connection's. */
+  lastChange: string;
+  /** The connection behind a provider row, for its link. */
+  idpId?: string;
+  /**
+   * A listed slug no connection has. The CLI validator rejects this, but the
+   * server can still hold it, and hiding it would make a broken sign-in
+   * option look absent rather than broken. Never set without `idp.read`.
+   */
+  missing?: boolean;
+}
 
-  const bySlug = new Map(idps.map((idp) => [idp.slug, idp]));
-  const rows: SchemaProvider[] = listed.map((slug) => {
-    const idp = bySlug.get(slug);
-    return idp
-      ? { slug, name: idp.definition.display_name, state: "enabled", idpId: idp.id }
-      : { slug, name: slug, state: "missing" };
-  });
-  const others = idps
-    .filter((idp) => !listed.includes(idp.slug))
-    .map(
-      (idp): SchemaProvider => ({
-        slug: idp.slug,
-        name: idp.definition.display_name,
-        state: "disabled",
+/**
+ * The methods in use across the project: Passkey and Password where any
+ * schema enables them, then one row per listed provider slug by connection
+ * name. A connection no schema lists is not a way anyone signs in, so it has
+ * no row here; the Identity providers tab shows it as `Not used`.
+ *
+ * With `idps` `null` — no `idp.read` — provider rows carry the raw slug, and
+ * whether a connection backs it is not known.
+ */
+export function signInMethodRows(
+  schemas: SchemaEntry[],
+  idps: IdpConnection[] | null,
+): SignInMethodRow[] {
+  const rows = new Map<string, SignInMethodRow>();
+  const add = (key: string, label: string, entry: SchemaEntry) => {
+    const row = rows.get(key) ?? { key, label, schemas: [], lastChange: entry.createdAt };
+    row.schemas.push({ id: entry.id, name: schemaDisplayName(entry.schema, entry.id) });
+    row.lastChange = latest(row.lastChange, entry.createdAt);
+    rows.set(key, row);
+  };
+  for (const entry of schemas) {
+    for (const method of schemaAuthMethods(entry.schema)) {
+      if (!method.enabled) continue;
+      if (method.key === "sso") {
+        for (const slug of method.providers) add(`sso:${slug}`, slug, entry);
+      } else {
+        add(method.key, method.label, entry);
+      }
+    }
+  }
+
+  const bySlug = new Map((idps ?? []).map((idp) => [idp.slug, idp]));
+  const methods: SignInMethodRow[] = [];
+  const providers: SignInMethodRow[] = [];
+  for (const row of rows.values()) {
+    row.schemas.sort(byName);
+    if (!row.key.startsWith("sso:")) {
+      methods.push(row);
+      continue;
+    }
+    const idp = bySlug.get(row.label);
+    if (idp) {
+      providers.push({
+        ...row,
+        label: idp.definition.display_name,
         idpId: idp.id,
-      }),
-    )
-    .sort((a, b) => a.name.localeCompare(b.name));
-  return [...rows, ...others];
+        lastChange: latest(row.lastChange, idp.updated_at),
+      });
+    } else {
+      providers.push(idps ? { ...row, missing: true } : row);
+    }
+  }
+  // Passkey before Password, the order `schemaAuthMethods` keeps; providers
+  // by name.
+  methods.sort((a, b) => a.key.localeCompare(b.key));
+  providers.sort((a, b) => a.label.localeCompare(b.label));
+  return [...methods, ...providers];
+}
+
+function latest(a: string, b: string): string {
+  return new Date(b).getTime() > new Date(a).getTime() ? b : a;
 }

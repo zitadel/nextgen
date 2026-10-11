@@ -20,6 +20,7 @@ const SCHEMAS = "*/api/schemas";
 const FLOWS = "*/api/flow_definitions";
 
 const CREATED_AT = "2026-07-12T16:59:04Z";
+const UPDATED_AT = "2026-08-01T09:00:00Z";
 
 function connection(id: string, slug: string, displayName: string, extra: object = {}) {
   return {
@@ -27,7 +28,7 @@ function connection(id: string, slug: string, displayName: string, extra: object
     revision_id: `${id}_rev`,
     slug,
     created_at: CREATED_AT,
-    updated_at: CREATED_AT,
+    updated_at: UPDATED_AT,
     definition: {
       slug,
       protocol: "oidc",
@@ -45,31 +46,25 @@ function connection(id: string, slug: string, displayName: string, extra: object
 }
 
 const GOOGLE = connection("idp_google", "google", "Google");
+/** A connection no schema lists. */
 const GITHUB = connection("idp_github", "github", "GitHub");
 
+function schema(id: string, title: string, methods: object, createdAt = CREATED_AT) {
+  return { id, metadata: { created_at: createdAt }, schema: { title, "x-auth-methods": methods } };
+}
+
 /** Lists `google` and a slug no connection has. */
-const CUSTOMERS = {
-  id: "sch_customers",
-  metadata: { created_at: CREATED_AT },
-  schema: {
-    title: "Customer users",
-    "x-auth-methods": {
-      passkey: { enabled: true },
-      password: { enabled: false },
-      sso: { enabled: true, providers: ["google", "okta"] },
-    },
-  },
-};
+const CUSTOMERS = schema("sch_customers", "Customer users", {
+  passkey: { enabled: true },
+  password: { enabled: false },
+  sso: { enabled: true, providers: ["google", "okta"] },
+});
 
 /** No `sso` at all. */
-const EMPLOYEES = {
-  id: "sch_employees",
-  metadata: { created_at: CREATED_AT },
-  schema: {
-    title: "Employees",
-    "x-auth-methods": { passkey: { enabled: false }, password: { enabled: true } },
-  },
-};
+const EMPLOYEES = schema("sch_employees", "Employees", {
+  passkey: { enabled: false },
+  password: { enabled: true },
+});
 
 const LOGIN_FLOW = {
   id: "flow_login",
@@ -85,17 +80,6 @@ const LOGIN_FLOW = {
   },
 };
 
-const OTHER_FLOW = {
-  ...LOGIN_FLOW,
-  id: "flow_staff",
-  flow_definition: {
-    ...LOGIN_FLOW.flow_definition,
-    name: "staff-login",
-    user_schema: "sch_employees",
-    steps: [{ name: "identifier" }],
-  },
-};
-
 /**
  * The reads both screens make. `idps` is what the query answers, or `403` for
  * a caller without `idp.read`. Returns the bodies the query was sent, so a
@@ -104,7 +88,7 @@ const OTHER_FLOW = {
 function serve({
   idps = [GOOGLE, GITHUB] as unknown[] | 403,
   schemas = [CUSTOMERS, EMPLOYEES],
-  flows = [LOGIN_FLOW, OTHER_FLOW],
+  flows = [LOGIN_FLOW],
   nextPageToken,
 }: {
   idps?: unknown[] | 403;
@@ -154,24 +138,79 @@ async function renderAt(path: string) {
   return router;
 }
 
+/** The table row whose first cell reads `label`. */
+function row(label: string) {
+  const cell = screen.getByText(label).closest("tr");
+  expect(cell).not.toBeNull();
+  return within(cell as HTMLElement);
+}
+
 describe("authentication screen", () => {
-  it("opens on the Sign-in tab, with a badge per enabled method and listed provider", async () => {
+  it("opens on Sign-in methods, one row per method in use with the schemas that allow it", async () => {
     serve();
     await renderAt("/authentication");
 
     expect(await screen.findByRole("heading", { name: "Authentication" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Sign-in" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Sign-in methods" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    const table = within(await screen.findByRole("table"));
+    for (const column of ["Method", "User schema", "Last change"]) {
+      expect(table.getByRole("columnheader", { name: column })).toBeInTheDocument();
+    }
 
-    const customers = (await screen.findByRole("link", { name: "Customer users" })).closest("tr");
-    expect(customers).not.toBeNull();
-    const row = within(customers as HTMLElement);
-    // The connection's name for a resolved slug, the raw slug for one without.
-    expect(row.getByText("Passkey")).toBeInTheDocument();
-    expect(row.getByText("Google")).toBeInTheDocument();
-    expect(row.getByText("okta")).toBeInTheDocument();
-    // Declared but off, and a connection the schema does not list.
-    expect(row.queryByText("Password")).not.toBeInTheDocument();
-    expect(row.queryByText("GitHub")).not.toBeInTheDocument();
+    // Passkey, Password, then providers by name: the resolved slug under its
+    // connection's name and the unresolved one as written. A connection no
+    // schema lists is not a sign-in method.
+    const labels = table
+      .getAllByRole("row")
+      .slice(1)
+      .map((tr) => tr.querySelector("td")?.textContent);
+    expect(labels).toEqual(["Passkey", "Password", "Google", "oktaNo connection"]);
+
+    expect(row("Passkey").getByText("Customer users")).toBeInTheDocument();
+    expect(row("Password").getByText("Employees")).toBeInTheDocument();
+    expect(row("Google").getByText("Customer users")).toBeInTheDocument();
+    expect(table.queryByText("GitHub")).not.toBeInTheDocument();
+
+    // A provider with a connection opens it; a plain method has no page.
+    expect(screen.getByRole("link", { name: "Google" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("/authentication/idps/idp_google"),
+    );
+    expect(screen.queryByRole("link", { name: "Passkey" })).not.toBeInTheDocument();
+  });
+
+  it("dates a row by the newest schema revision behind it, or the connection's if later", async () => {
+    const newer = "2026-09-15T12:00:00Z";
+    serve({
+      schemas: [
+        CUSTOMERS,
+        EMPLOYEES,
+        schema("sch_staff", "Staff", { passkey: { enabled: true } }, newer),
+      ],
+    });
+    await renderAt("/authentication");
+    await screen.findByRole("table");
+
+    expect(row("Passkey").getByText(formatDate(newer))).toBeInTheDocument();
+    expect(row("Password").getByText(formatDate(CREATED_AT))).toBeInTheDocument();
+    expect(row("Google").getByText(formatDate(UPDATED_AT))).toBeInTheDocument();
+  });
+
+  it("names the first two schemas and counts the rest", async () => {
+    serve({
+      schemas: [
+        CUSTOMERS,
+        schema("sch_a", "Alpha", { passkey: { enabled: true } }),
+        schema("sch_b", "Beta", { passkey: { enabled: true } }),
+        schema("sch_c", "Gamma", { passkey: { enabled: true } }),
+      ],
+    });
+    await renderAt("/authentication");
+    await screen.findByRole("table");
+    expect(row("Passkey").getByText("Alpha, Beta ... +2")).toBeInTheDocument();
   });
 
   it("keeps the selected tab in the URL", async () => {
@@ -189,59 +228,30 @@ describe("authentication screen", () => {
     expect(tabs.at(-1)).toHaveAttribute("aria-selected", "true");
   });
 
-  it("opens a schema's allowed sign-in methods", async () => {
-    serve();
-    await renderAt("/authentication");
-    await userEvent.click(await screen.findByRole("link", { name: "Customer users" }));
-
-    expect(await screen.findByText("Allowed sign-in methods")).toBeInTheDocument();
-    const rows = screen.getAllByText(/^(Enabled|Disabled|No connection)$/);
-    // Passkey, Password, google (listed), okta (listed, no connection),
-    // github (unlisted).
-    expect(rows.map((badge) => badge.textContent)).toEqual([
-      "Enabled",
-      "Disabled",
-      "Enabled",
-      "No connection",
-      "Disabled",
-    ]);
-    expect(screen.getByRole("link", { name: "Google" })).toHaveAttribute(
-      "href",
-      expect.stringContaining("/authentication/idps/idp_google"),
-    );
-    expect(screen.getByRole("link", { name: "GitHub" })).toBeInTheDocument();
-    expect(screen.getByText("okta")).toBeInTheDocument();
-
-    // Only the flow that pins this schema.
-    expect(screen.getByRole("link", { name: "Default login" })).toHaveAttribute(
-      "href",
-      expect.stringContaining("/flow-definitions/flow_login"),
-    );
-    expect(screen.queryByRole("link", { name: "Staff login" })).not.toBeInTheDocument();
-  });
-
   it("without idp.read, hides the Identity providers tab and shows raw slugs", async () => {
     serve({ idps: 403 });
     await renderAt("/authentication?tab=identity-providers");
 
-    const customers = (await screen.findByRole("link", { name: "Customer users" })).closest("tr");
-    const row = within(customers as HTMLElement);
-    expect(row.getByText("google")).toBeInTheDocument();
-    expect(row.getByText("okta")).toBeInTheDocument();
+    await screen.findByRole("table");
     expect(screen.queryByRole("tab", { name: "Identity providers" })).not.toBeInTheDocument();
+    expect(screen.getByText("google")).toBeInTheDocument();
+    expect(screen.getByText("okta")).toBeInTheDocument();
+    // Whether a slug has a connection is not something this caller can see.
+    expect(screen.queryByText("No connection")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "google" })).not.toBeInTheDocument();
   });
 
-  it("lists every connection newest first and pages with the same sorting", async () => {
+  it("lists every connection newest first with its schemas, and pages with the same sorting", async () => {
     const bodies = serve({ nextPageToken: "tok_2" });
     await renderAt("/authentication?tab=identity-providers");
 
     const table = within(await screen.findByRole("table"));
-    for (const column of ["Name", "Slug", "Template", "Protocol", "Created"]) {
+    for (const column of ["Provider", "User schema", "Last change"]) {
       expect(table.getByRole("columnheader", { name: column })).toBeInTheDocument();
     }
-    expect(table.getByRole("link", { name: "Google" })).toBeInTheDocument();
-    expect(table.getAllByText("OIDC")).toHaveLength(2);
-    expect(table.getAllByText(formatDate(CREATED_AT))).toHaveLength(2);
+    expect(row("Google").getByText("Customer users")).toBeInTheDocument();
+    expect(row("GitHub").getByText("Not used")).toBeInTheDocument();
+    expect(table.getAllByText(formatDate(UPDATED_AT))).toHaveLength(2);
 
     await userEvent.click(screen.getByRole("button", { name: "Load more" }));
     expect(await table.findByRole("link", { name: "Older" })).toBeInTheDocument();
