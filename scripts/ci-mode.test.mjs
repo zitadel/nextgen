@@ -126,7 +126,7 @@ const COMPONENTS_CLASS = [
   "demo-next:lint",
   "demo-next:start",
   "demo-next:typecheck",
-  "demo-nuxt-e2e:e2e",
+  "e2e:demo-nuxt-mock",
   "demo-nuxt:build",
   "demo-nuxt:dev",
   "demo-nuxt:lint",

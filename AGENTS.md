@@ -175,13 +175,13 @@ scripts so server processes are signaled and cleaned up directly.
 startup, then runs `go run .`. Direct `go run .` callers must build the embedded
 UI surfaces themselves or disable both embedded UI surfaces.
 
-Checked-in end-to-end tests are **opt-in for local runs** — they are not part
-of the default `moon ci :lint :typecheck :build :test` invocation because they
-boot real dev servers and need browsers installed. CI does run selected lanes:
-their tasks carry `runInCI: false` only to keep them out of moon's automatic
-selection, and the `full-pr` job runs the real-instance and embedded-surface
-lanes through explicit workflow steps — the canonical statement of that
-interaction is in
+Checked-in end-to-end tests now run as part of the default
+`moon ci :lint :typecheck :build :test`: the root `e2e` project's `test` task
+depends on every lane (console real/embedded/platform, demo mock/real, the CLI
+journey matrix, and the kit's real-instance suite), so a normal `:test` launches
+the full system suite — it boots real servers and needs browsers installed. The
+lanes are `runInCI: true` dependencies of `e2e:test`, not separate workflow
+steps; the canonical details are in
 [packages/testing/AGENTS.md](packages/testing/AGENTS.md). (More in
 [CONTRIBUTING.md](CONTRIBUTING.md#running-integration-and-end-to-end-tests)):
 

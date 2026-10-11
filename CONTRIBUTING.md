@@ -261,36 +261,29 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
 
 **Full mode** (normal PRs) runs, in order:
 
-- `moon run server:check-generate` — Go generated-file drift check.
-- Playwright Chromium install for the `:test` graph, the e2e suites and the
-  journeys. The `components`/`api-mock` browser projects run in CI as part of
-  their `:test` task (via `test:all`), each pulling in Chromium through a moon
-  `install-browsers` dep.
-- `moon ci :lint :typecheck :build :test :check-adrs`.
-- `moon run server:test`, then `moon run server:test-postgres` and
-  `moon run server:test-sqlite`.
+- `moon run server:check-generate-pruned` — Go generated-file drift check.
+- Playwright Chromium install for the e2e lanes. The `components`/`api-mock`
+  browser projects pull in their own Chromium through a moon `install-browsers`
+  dep on their `:test` task.
 - `moon run release:snapshot -- --skip-container` — a non-publishing release
-  snapshot.
-- All consumer journey variants in one process (`e2e:journey-local
-  --ci`): the fresh-app framework matrix, the passkey-first preset, the
-  pre-existing-app posture, and the test-kit consumer suite — run against the
-  npm binary runtime. The runner builds its own release tarballs (via
-  `release:pack`), so it needs no snapshot handoff.
-- The real-instance suites: `testing:test-integration` with
-  `e2e:demo-next-real`, then `e2e:console-real`.
+  snapshot, built here (outside the main graph) and handed to the journey via
+  `JOURNEY_TARBALLS_DIR`; the journey must not pack inside `moon ci` (a nested
+  moon graph is forbidden).
+- `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph`. The
+  `:test` target runs the whole `e2e` project through its `test` task: every
+  console, demo, journey, and `testing:test-integration` lane, as dependencies.
+- `moon run server:test-postgres`, then `moon run server:test-sqlite` — Go
+  integration lanes (not `test` tasks, so `:test` does not select them).
 
-Within full mode, the steps after the `moon ci` graph are additionally gated
-by moon's affected task selection (`moon query tasks --affected --downstream
-deep`, computed in `scripts/ci-mode.mjs`): a lane is skipped when the diff
-provably cannot reach its
-tasks — a docs-only PR runs almost nothing, a frontend-only PR skips the Go
-suites, a console-only PR runs the e2e suites but no journeys. The journeys run
-together in the one `--ci` step, gated on whether any journey surface is
-affected (the map lives as task-space constants in `scripts/ci-mode.mjs`);
-the fresh-app framework matrix still collapses to a single framework unless an
-SDK, the CLI, or the journey project itself moved. The
-snapshot runs iff any journey does — the tarball handoff between them is a
-filesystem contract moon cannot see. The gates fail open: known repo-wide
+Within full mode the `moon ci` graph selects only the tasks the diff affects
+(`--downstream deep --include-relations`): a lane is skipped when the diff
+provably cannot reach it — a docs-only PR runs almost nothing, a frontend-only
+PR skips the Go suites. The e2e lanes run whenever the `e2e` project — which
+depends on the console, demos, CLI, SDKs, api-mock and testing kit — is
+affected, so most code PRs run them; the journey's fresh-app matrix always runs
+all frameworks (the single-framework collapse was dropped with the
+consolidation). `scripts/ci-mode.mjs` now only picks the mode (full vs
+version-only) and the `go_tests` gate. The gates fail open: known repo-wide
 files no moon task claims (workflow definitions, `scripts/`, moon config,
 root manifests and compiler/release inputs such as `tsconfig.base.json`), an
 empty diff, or a failed query all force the

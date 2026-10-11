@@ -108,11 +108,23 @@ jobs:
         # interfaces only; loopback and the runner's NIC keep it. (#1490)
         run: sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
 
+      # Build the journey's release tarballs OUTSIDE the main graph, then hand
+      # them to the journey via JOURNEY_TARBALLS_DIR. The journey must not pack
+      # inside `moon ci` below: that would spawn a second, concurrent moon graph
+      # (forbidden — see packages/testing/AGENTS.md) and race the dist-rewriting
+      # build tasks. `release:*` are runInCI:false, so unset CI to run them.
+      - name: Build release snapshot for the journey
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: |
+          env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container
+          version="$(node -p "require('./apps/server/package.json').version")"
+          echo "JOURNEY_TARBALLS_DIR=$PWD/dist/release/${version}/npm" >> "$GITHUB_ENV"
+
       # The e2e suites run here too: the `e2e` project's `test` task fans out to
       # every lane (console real/embedded/platform, demo mock/real, the CLI
       # journey matrix) and depends on server:build / cli:build, so `:test`
-      # orders and runs them through the DAG — no hand-written per-lane steps,
-      # no release-snapshot handoff (the journey runner builds its own tarballs).
+      # orders and runs them through the DAG — no hand-written per-lane steps.
+      # The journey reads the prebuilt JOURNEY_TARBALLS_DIR from the step above.
       - name: Run Moon build and test graph
         id: moon-ci
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}

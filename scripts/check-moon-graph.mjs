@@ -32,7 +32,7 @@ function artifactEdge(project, target) {
   // The e2e suite runs built apps and the server binary; demo-next's dev server
   // loads the built sdk-next, demo-nuxt's the built sdk-nuxt.
   if (project === "e2e" || project.endsWith("-e2e"))
-    return ["cli", "server", "console", "sdk-next", "sdk-nuxt"].includes(target);
+    return ["cli", "server", "console"].includes(target) || target.startsWith("sdk-");
   return false;
 }
 

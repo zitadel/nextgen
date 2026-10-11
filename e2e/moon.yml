@@ -190,14 +190,18 @@ tasks:
 
   # The CLI customer setup journey. `--ci` runs the fixed variant set in one
   # process (fresh-app framework matrix, passkey preset, pre-existing app,
-  # testkit); `--runtime binary` drives the built server binary; the runner
-  # builds its own release tarballs (via release:pack), so it is self-contained
-  # — no snapshot handoff from the workflow.
-  # The command truly unsets CI / GITHUB_ACTIONS (not just blanks them): the
-  # runner spawns `moon run release:pack`, a `runInCI: false` task that moon
-  # hides whenever it detects CI — and moon detects CI from the var being
-  # present, so an empty value is not enough. `env -u` removes them outright,
-  # matching the old workflow's `env -u CI -u GITHUB_ACTIONS` step.
+  # testkit); `--runtime binary` drives the built server binary. In CI the
+  # runner reads prebuilt tarballs from JOURNEY_TARBALLS_DIR (built by a prior
+  # workflow step, outside this graph); locally, with that env unset, it packs
+  # its own. Either way it never spawns a nested `moon run` inside this graph.
+  #
+  # The command unsets CI / GITHUB_ACTIONS outright (not just blanks them) so
+  # the runner behaves as a local run, matching the old `env -u CI` step; a
+  # blank value is not enough because moon detects CI from the var's presence.
+  #
+  # It depends on every framework SDK build so that a change isolated to one SDK
+  # still selects this lane (the fresh-app matrix scaffolds an app per SDK) —
+  # the affected-selection edge the old ci-mode gating provided by hand.
   journey-local:
     command: "env -u CI -u GITHUB_ACTIONS corepack pnpm run e2e-local -- --ci --matrix full --runtime binary"
     env:
@@ -205,6 +209,14 @@ tasks:
     deps:
       - "cli:build"
       - "testing:build"
+      # sdk-next is omitted: cli:build already reaches it (no duplicate edges).
+      - "sdk-nuxt:build"
+      - "sdk-react:build"
+      - "sdk-vue:build"
+      - "sdk-angular:build"
+      - "sdk-solid:build"
+      - "sdk-svelte:build"
+      - "sdk-qwik:build"
     options:
       cache: false
       runInCI: true
