@@ -11,13 +11,13 @@ stack: "frontend"
 # Outside this file the project is just another package with a `test` task:
 # `moon ci :test` runs it like every other package. The individual lanes below
 # are an internal detail — `test` depends on them, so there is no need to name a
-# lane anywhere else. They are `runInCI: true` because `test` (which runs in CI)
-# depends on them; the `:test` target selects `test`, and the lanes run as its
-# dependencies.
+# lane anywhere else.
 #
-# The backend-booting lanes share the `e2e-serial` mutex so moon runs them one at
-# a time — the old workflow ran them as sequential steps, and several bind the
-# same ports (e.g. both demo-next lanes drive @zitadel/demo-next on :3002).
+# Every lane clears CI / GITHUB_ACTIONS (the old workflow ran each e2e step with
+# `env -u CI -u GITHUB_ACTIONS`, so the suites and the journey runner behave as
+# local runs). The backend-booting lanes share the `e2e-serial` mutex so moon
+# runs them one at a time — the old workflow ran them as sequential steps, and
+# several bind the same ports (both demo-next lanes drive demo-next on :3002).
 dependsOn:
   - "api-mock"
   - "cli"
@@ -66,7 +66,12 @@ tasks:
   # embed base. No live API, own port — safe to run alongside the serial lanes.
   console-smoke:
     command: "corepack pnpm exec playwright test --config console/playwright.config.mts"
+    env:
+      CI: ""
+      GITHUB_ACTIONS: ""
     deps:
+      # Its config imports @zitadel/testing/playwright (shared launch options).
+      - "testing:build"
       - "console:build"
     options:
       runInCI: true
@@ -79,6 +84,8 @@ tasks:
       - "cli:build"
       - "server:build"
     env:
+      CI: ""
+      GITHUB_ACTIONS: ""
       REAL_ZITADEL_PORT: "8093"
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
       NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false"
@@ -97,6 +104,8 @@ tasks:
       - "cli:build"
       - "server:build"
     env:
+      CI: ""
+      GITHUB_ACTIONS: ""
       EMBEDDED_ZITADEL_PORT: "8095"
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
       NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false"
@@ -114,6 +123,8 @@ tasks:
       - "cli:build"
       - "server:build"
     env:
+      CI: ""
+      GITHUB_ACTIONS: ""
       PLATFORM_ZITADEL_PORT: "8097"
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
     options:
@@ -126,7 +137,12 @@ tasks:
   # Mock lane: the demo against the standalone @zitadel/api-mock TCP server.
   demo-next-mock:
     command: "corepack pnpm exec playwright test --config demo-next/playwright.config.mts"
+    env:
+      CI: ""
+      GITHUB_ACTIONS: ""
     deps:
+      # Its config imports @zitadel/testing/playwright (shared launch options).
+      - "testing:build"
       - "api-mock:build"
       - "sdk-next:build"
     options:
@@ -142,6 +158,8 @@ tasks:
       - "cli:build"
       - "server:build"
     env:
+      CI: ""
+      GITHUB_ACTIONS: ""
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
       NEXTGEN_SERVER_LOGIN_ENABLED: "false"
       NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
@@ -156,7 +174,12 @@ tasks:
   # Mock lane: the Vue / Nitro demo against @zitadel/api-mock.
   demo-nuxt-mock:
     command: "corepack pnpm exec playwright test --config demo-nuxt/playwright.config.mts"
+    env:
+      CI: ""
+      GITHUB_ACTIONS: ""
     deps:
+      # Its config imports @zitadel/testing/playwright (shared launch options).
+      - "testing:build"
       - "api-mock:build"
       - "sdk-nuxt:build"
     options:
@@ -173,6 +196,8 @@ tasks:
   journey-local:
     command: "corepack pnpm run e2e-local -- --ci --matrix full --runtime binary"
     env:
+      CI: ""
+      GITHUB_ACTIONS: ""
       ZITADEL_TELEMETRY: "0"
     deps:
       - "cli:build"

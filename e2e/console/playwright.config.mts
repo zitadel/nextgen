@@ -31,7 +31,7 @@ export default defineConfig({
   webServer: {
     command:
       "corepack pnpm --filter @zitadel/console run build && corepack pnpm --filter @zitadel/console run preview",
-    url: "http://127.0.0.1:4173",
+    url: "http://localhost:4173",
     reuseExistingServer: true,
     cwd: workspaceRoot,
   },

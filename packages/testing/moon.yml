@@ -51,6 +51,9 @@ tasks:
       - "cli:build"
       - "server:build"
     env:
+      # Behave as a local run (the old workflow used `env -u CI`).
+      CI: ""
+      GITHUB_ACTIONS: ""
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
       # server:build embeds the console/login UIs via its task deps; keep the
       # server-hosted surfaces off anyway — these tests drive the API and

@@ -193,7 +193,7 @@ export function withZitadel(
   };
   const supervisorEntry: WebServerEntry = {
     command: `node ${JSON.stringify(resolveEntry("supervisor"))}`,
-    url: `http://127.0.0.1:${port}/healthz`,
+    url: `http://localhost:${port}/healthz`,
     reuseExistingServer: false,
     cwd: configDir,
     stdout: "pipe",
@@ -220,22 +220,12 @@ export function withZitadel(
     handshakeTimeoutMs: app.readyTimeoutMs ?? 180_000,
   };
 
-  // Poll readiness over IPv4. `localhost` resolves to `::1` before `127.0.0.1`
-  // on macOS, so while the dev server is up on IPv4 but not yet bound on IPv6
-  // the readiness check gets ECONNREFUSED ::1 and hangs until the timeout. The
-  // browser still navigates to appOrigin (kept as `localhost`, which WebAuthn
-  // requires); only this HTTP poll is pinned to 127.0.0.1.
-  const appReadinessUrl = new URL(app.readyPath, appOrigin);
-  if (appReadinessUrl.hostname === "localhost") {
-    appReadinessUrl.hostname = "127.0.0.1";
-  }
-
   return {
     webServer: [
       supervisorEntry,
       {
         command: `node ${JSON.stringify(resolveEntry("app-runner"))}`,
-        url: appReadinessUrl.toString(),
+        url: new URL(app.readyPath, appOrigin).toString(),
         reuseExistingServer: false,
         cwd: configDir,
         stdout: "pipe",
