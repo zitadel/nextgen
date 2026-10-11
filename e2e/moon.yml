@@ -193,11 +193,14 @@ tasks:
   # testkit); `--runtime binary` drives the built server binary; the runner
   # builds its own release tarballs (via release:pack), so it is self-contained
   # — no snapshot handoff from the workflow.
+  # The command truly unsets CI / GITHUB_ACTIONS (not just blanks them): the
+  # runner spawns `moon run release:pack`, a `runInCI: false` task that moon
+  # hides whenever it detects CI — and moon detects CI from the var being
+  # present, so an empty value is not enough. `env -u` removes them outright,
+  # matching the old workflow's `env -u CI -u GITHUB_ACTIONS` step.
   journey-local:
-    command: "corepack pnpm run e2e-local -- --ci --matrix full --runtime binary"
+    command: "env -u CI -u GITHUB_ACTIONS corepack pnpm run e2e-local -- --ci --matrix full --runtime binary"
     env:
-      CI: ""
-      GITHUB_ACTIONS: ""
       ZITADEL_TELEMETRY: "0"
     deps:
       - "cli:build"
