@@ -160,10 +160,9 @@ a `testing:build` task dep.
 - Dogfood: `moon run e2e:demo-next-real`, `moon run e2e:console-real`,
   `moon run e2e:journey-local` (runs the testkit variant among others).
 
-The real-instance lanes carry `runInCI: false`, but that only keeps them
-out of moon's automatic CI selection — `full-pr` runs all of them through
-explicit `env -u CI` workflow steps (`.github/workflows/ci.yml`). Locally,
-use the same `env -u CI` incantation.
+The real-instance lanes are `runInCI: true` and run as dependencies of the
+`e2e` project's `test` task, so `moon ci :test` executes them through the DAG
+(`.github/workflows/ci.yml`). Run one locally with `moon run e2e:<lane>`.
 
 Serialize moon invocations — two concurrent graphs produce spurious
 failures. Orphaned runtimes from aborted e2e runs squat fixed ports;

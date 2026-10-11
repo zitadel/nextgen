@@ -14,6 +14,10 @@ stack: "frontend"
 # lane anywhere else. They are `runInCI: true` because `test` (which runs in CI)
 # depends on them; the `:test` target selects `test`, and the lanes run as its
 # dependencies.
+#
+# The backend-booting lanes share the `e2e-serial` mutex so moon runs them one at
+# a time — the old workflow ran them as sequential steps, and several bind the
+# same ports (e.g. both demo-next lanes drive @zitadel/demo-next on :3002).
 dependsOn:
   - "api-mock"
   - "cli"
@@ -25,7 +29,7 @@ dependsOn:
 workspace:
   inheritedTasks:
     # Nothing to build. `test` is inherited (it runs the journey harness unit
-    # tests via `pnpm run test:all`), so it is not excluded.
+    # tests via `pnpm run test:all`) and is not excluded.
     exclude:
       - "build"
 
@@ -36,12 +40,11 @@ tasks:
       # @zitadel/testing/playwright.
       - "testing:build"
 
-  # The one task the rest of the repo sees. Its own command runs the journey
-  # harness unit tests; its deps run every browser lane. So `moon run e2e:test`
-  # (and `moon ci :test`) execute the whole suite — unit and spec alike — with
-  # moon ordering the shared build deps (server:build, cli:build, …) once.
+  # The one task the rest of the repo sees. It keeps the inherited command
+  # (`corepack pnpm run test:all`, the journey harness unit tests) — overriding
+  # the command here makes moon append it to the inherited one. Its deps run
+  # every browser lane, so `moon ci :test` runs the whole suite.
   test:
-    command: "corepack pnpm run test"
     deps:
       - "e2e:console-smoke"
       - "e2e:console-real"
@@ -60,7 +63,7 @@ tasks:
   # ── console lanes (former @zitadel/console-e2e) ──────────────────────────────
 
   # Embedded shell smoke: Vite preview of the built console under its production
-  # embed base. No live API.
+  # embed base. No live API, own port — safe to run alongside the serial lanes.
   console-smoke:
     command: "corepack pnpm exec playwright test --config console/playwright.config.mts"
     deps:
@@ -83,6 +86,7 @@ tasks:
     options:
       cache: false
       runInCI: true
+      mutex: "e2e-serial"
 
   # The embedded surfaces, served by the binary itself — no Vite, no proxy. The
   # only lane proving the console's API base and the Go mux routing table agree.
@@ -99,6 +103,7 @@ tasks:
     options:
       cache: false
       runInCI: true
+      mutex: "e2e-serial"
 
   # The embedded console against a deployment with the platform project
   # bootstrapped (the server default).
@@ -114,6 +119,7 @@ tasks:
     options:
       cache: false
       runInCI: true
+      mutex: "e2e-serial"
 
   # ── demo-next lanes (former @zitadel/demo-next-e2e) ──────────────────────────
 
@@ -125,6 +131,7 @@ tasks:
       - "sdk-next:build"
     options:
       runInCI: true
+      mutex: "e2e-serial"
 
   # Real lane: the same sign-in journey against a real ephemeral instance seeded
   # via @zitadel/testing instead of api-mock.
@@ -142,6 +149,7 @@ tasks:
     options:
       cache: false
       runInCI: true
+      mutex: "e2e-serial"
 
   # ── demo-nuxt lane (former @zitadel/demo-nuxt-e2e) ───────────────────────────
 
@@ -153,6 +161,7 @@ tasks:
       - "sdk-nuxt:build"
     options:
       runInCI: true
+      mutex: "e2e-serial"
 
   # ── journey lane (former @zitadel/cli-journey-e2e) ───────────────────────────
 
@@ -171,3 +180,4 @@ tasks:
     options:
       cache: false
       runInCI: true
+      mutex: "e2e-serial"

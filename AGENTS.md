@@ -65,11 +65,11 @@ Development and test surfaces (`apps/`):
   (`@zitadel/components`).
 - `apps/demo-next/` and `apps/demo-nuxt/` — reference integrations of the
   embedded sign-in component on each framework.
-- `apps/*-e2e/` — Playwright projects: one per demo (real framework
-  middleware against the api-mock server), `console-e2e/` for the console,
-  and `cli-journey-e2e/` for the fresh consumer journey (CLI setup plus real
-  registration/login flows, installing local package tarballs through a
-  temporary registry).
+- `e2e/` — the single root-level end-to-end project (a system test of the
+  assembled product). Subfolders `console/`, `demo-next/`, `demo-nuxt/` and
+  `journey/` hold the lanes; the journey covers the fresh consumer path (CLI
+  setup plus real registration/login, installing local package tarballs through
+  a temporary registry). `moon ci :test` runs the whole suite.
 - `apps/mock-zitadel/` — thin deployment wrapper that serves
   `packages/api-mock` as a live per-PR preview endpoint.
 
@@ -242,13 +242,12 @@ upward**. When deciding where a new test belongs:
    `*.browser.spec.ts`.
 3. **End-to-end (Playwright)** — full HTTP path through framework
    middleware, the `/__nextgen` proxy, real `Set-Cookie` round-trip,
-   and full-page navigation. Owned by the `apps/*-e2e/` projects: the demo
-   projects (`demo-next-e2e`, `demo-nuxt-e2e` — each with a mock lane and,
-   for next, an `e2e-real` lane on `@zitadel/testing`), `console-e2e`
-   (shell smoke, dev-proxy real-instance, binary-served embedded, and
-   platform-project lanes),
-   and `cli-journey-e2e` (the framework matrix across all 8 SDKs).
-   Middleware-owning SDKs get their own e2e project because
+   and full-page navigation. Owned by the single root-level `e2e/` project, as
+   lanes: demo-next/demo-nuxt (each a mock lane and, for next, a real lane on
+   `@zitadel/testing`), console (shell smoke, dev-proxy real-instance,
+   binary-served embedded, and platform-project lanes), and the journey (the
+   framework matrix across all 8 SDKs). Middleware-owning SDKs get their own
+   lane because
    the proxy and route-protection layers are framework-specific.
 
 The consumer journey suite is the exception to the checked-in demo ownership

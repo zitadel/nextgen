@@ -273,8 +273,9 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
   snapshot.
 - All consumer journey variants in one process (`e2e:journey-local
   --ci`): the fresh-app framework matrix, the passkey-first preset, the
-  pre-existing-app posture, and the test-kit consumer suite — run concurrently
-  with the npm binary runtime against the snapshot's packed tarballs.
+  pre-existing-app posture, and the test-kit consumer suite — run against the
+  npm binary runtime. The runner builds its own release tarballs (via
+  `release:pack`), so it needs no snapshot handoff.
 - The real-instance suites: `testing:test-integration` with
   `e2e:demo-next-real`, then `e2e:console-real`.
 

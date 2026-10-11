@@ -151,7 +151,7 @@ it stays here deliberately rather than by oversight.
 - **No listen-on-zero port probes.** A bind-then-close probe races the other
   vitest workers, and retrying on `E_PORT_IN_USE` hides the race rather than
   fixing it. Take a port from a per-worker allocation, the way
-  [`e2e/journey/AGENTS.md`](../../e2e/journey/AGENTS.md) requires.
+  [`e2e/journey/AGENTS.md`](../../../e2e/journey/AGENTS.md) requires.
 - **No doubles of our own modules.** A spec that stubs something in `src/` has
   stopped being a spec. Fake an external binary on `PATH` if the journey needs
   one; never fake our own code.

@@ -27,6 +27,8 @@
     "journey/playwright*.config.mts",
     "journey/vitest.config.ts",
     "journey/scripts/**/*.mjs",
-    "journey/src/**/*.ts"
+    "journey/src/**/*.ts",
+    "journey/fixtures/testkit/**/*.mts",
+    "journey/fixtures/testkit/**/*.ts"
   ]
 }

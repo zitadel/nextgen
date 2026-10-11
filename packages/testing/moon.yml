@@ -60,3 +60,4 @@ tasks:
     options:
       cache: false
       runInCI: true
+      mutex: "e2e-serial"

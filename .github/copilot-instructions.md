@@ -42,7 +42,7 @@ touched path** — read those first; the scoped files under
 - Licensing split: [`LICENSING.md`](../LICENSING.md).
 - Journey-gate changes (`e2e/journey/**`, `ci.yml` journey steps):
   [`e2e/journey/AGENTS.md`](../e2e/journey/AGENTS.md) is
-  canonical (the project id is `cli-journey-e2e`).
+  canonical (the project id is `e2e`).
 - Local runtime command changes: verify `.zitadel/local/` state handling,
   `--server local` resolution, and the zero-config smoke paths per
   [`apps/cli/SKILLS.md`](../apps/cli/SKILLS.md).
