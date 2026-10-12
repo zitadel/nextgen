@@ -1,20 +1,17 @@
 import type { ZitadelClient } from "@zitadel/api/client";
-import type { CreateDeployment201, RollbackDeployment201 } from "@zitadel/api/generated/model";
+import type {
+  CreateDeployment200,
+  CreateDeployment201,
+  RollbackDeployment201,
+} from "@zitadel/api/generated/model";
 
 /**
- * A non-fatal advisory a deployment create returns alongside the deployment: a
- * preview deploy that froze an `all` secret because the variable has no preview
- * override, so the preview URL serves the production credential (ADR 062 §7,
- * #1617). Allowed, but worth surfacing.
+ * A deployment, as create returns it: the deployment record plus the
+ * `warnings` the create response carries (the 200 and 201 shapes match). The
+ * field is part of the generated model now, so callers read it directly rather
+ * than casting a warnings shape onto a plain deployment.
  */
-export type DeploymentWarning = { code: string; message: string; variable: string };
-
-/**
- * A deployment, as create and rollback return it (the 200/201 shapes match).
- * `warnings` is not in the generated 201 shape yet — the server emits it ahead
- * of the OpenAPI regen — so it is carried here as an optional field.
- */
-export type Deployment = CreateDeployment201 & { readonly warnings?: readonly DeploymentWarning[] };
+export type Deployment = CreateDeployment200 | CreateDeployment201;
 
 /** What target a deploy goes to: every primary origin, or one exact origin. */
 export type DeployTargets = ["primary"] | [string];
@@ -57,7 +54,7 @@ export async function createDeployment(
     },
     { project_id: projectId },
   );
-  return result as Deployment;
+  return result;
 }
 
 /**

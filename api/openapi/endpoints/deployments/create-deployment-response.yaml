@@ -1,0 +1,31 @@
+title: CreateDeploymentResponse
+description: |
+  The deployment that was created (or the one already serving the release)
+  together with any non-blocking warnings raised while making it live.
+
+  `warnings` belongs to this response, not to the deployment: it describes
+  this act of deploying, so listing or reading the deployment afterwards
+  never carries it. The deploy succeeded regardless of any warning.
+allOf:
+  - $ref: deployment.yaml
+  - type: object
+    properties:
+      warnings:
+        type: array
+        description: |
+          Non-blocking advisories raised while deploying. Absent or empty
+          when there were none; present ones did not stop the deploy.
+        items:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              description: A stable, machine-readable identifier for the advisory.
+              example: preview.ttl_clamped
+            message:
+              type: string
+              description: A human-readable description of the advisory.
+              example: the requested ttl exceeded the project maximum and was clamped

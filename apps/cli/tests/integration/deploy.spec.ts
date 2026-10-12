@@ -1,3 +1,6 @@
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
@@ -80,6 +83,38 @@ describe("deploy", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
+      it("checks for a primary origin before syncing IdP connections", async () => {
+        const app = await aSetUpApp();
+        // A connection the IdP step would create — were it reached. The project
+        // has no primary origin, so the deploy must fail before the IdP step
+        // writes anything, leaving no connection behind.
+        await mkdir(join(app.path, ".zitadel/idps"), { recursive: true });
+        await app.writeProjectFile(
+          ".zitadel/idps/google.json",
+          `${JSON.stringify(
+            {
+              slug: "google",
+              protocol: "oidc",
+              template: "google",
+              display_name: "Google",
+              oidc: {
+                issuer: "https://accounts.google.com",
+                client_id: "111.apps.googleusercontent.com",
+                client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+                scopes: ["openid"],
+              },
+            },
+            null,
+            2,
+          )}\n`,
+        );
+
+        const result = await app.deploy();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(await app.registeredIdps()).toEqual([]);
+      });
+
       it("refuses an --origin a preview wildcard covers as a preview", async () => {
         const app = await aSetUpApp();
         await app.addOrigin("https://*-acme.vercel.app", "preview");
@@ -103,6 +138,21 @@ describe("deploy", () => {
         const data = await app.deployData(["--origin", "https://app-acme.vercel.app"]);
 
         expect(data.origins).toEqual(["https://app-acme.vercel.app"]);
+      });
+
+      it("omits the guard on a first deploy, when nothing is live", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+
+        // Nothing is deployed yet, so there is no deployment to guard against.
+        // The deploy must omit expected_deployment_id entirely: an empty or
+        // placeholder id would be rejected by the request schema, so a
+        // succeeding first deploy proves the field was left off.
+        const data = await app.deployData();
+
+        expect(data.deployment_id).toMatch(/^dep_/);
+        const listed = await app.run(["deployment", "list", "--json"]);
+        expect(app.envelopeOf<{ count: number }>(listed).data.count).toBe(1);
       });
 
       it("passes the observed deployment and re-deploys unchanged content", async () => {

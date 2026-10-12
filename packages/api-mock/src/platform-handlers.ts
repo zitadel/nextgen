@@ -1477,12 +1477,20 @@ export function setupPlatformHandlers() {
         );
       }
 
+      // The contract stores an otherwise-valid pattern as written, so the
+      // stored and echoed value keeps the submitted casing: validation and the
+      // shared-host checks above fold case through `normalized`, but that lower-
+      // cased form is never what gets stored.
+      const pattern = body.data.pattern.trim();
       // One row per `(project, pattern)`: a repeat of the same pattern replaces
-      // its kind rather than storing a second row.
-      auth.project.origins = auth.project.origins.filter((origin) => origin.pattern !== normalized);
-      auth.project.origins.push({ pattern: normalized, kind: body.data.kind });
+      // its kind rather than storing a second row. Dedup folds case too, since a
+      // host that differs only in case is the same origin.
+      auth.project.origins = auth.project.origins.filter(
+        (origin) => normalizeOrigin(origin.pattern) !== normalized,
+      );
+      auth.project.origins.push({ pattern, kind: body.data.kind });
 
-      const responseBody: AddOrigin201 = { pattern: normalized, kind: body.data.kind };
+      const responseBody: AddOrigin201 = { pattern, kind: body.data.kind };
       const out = parse(AddOriginResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
@@ -1878,7 +1886,9 @@ export function setupPlatformHandlers() {
               ? { origin: row.origin, expiresAt }
               : row,
           );
-          return HttpResponse.json(deploymentResponse(newest, rows), { status: 200 });
+          // The create-deployment response wraps the deployment with the
+          // non-blocking `warnings` it raised; this mock raises none.
+          return HttpResponse.json({ ...deploymentResponse(newest, rows), warnings: [] }, { status: 200 });
         }
       }
 
@@ -2006,7 +2016,18 @@ export function setupPlatformHandlers() {
           deploymentResponse(deployment, deployment.targets, { release: expandRelease }),
         );
       }
-      return HttpResponse.json({ deployments: items });
+      // The real cursor is opaque; the mock's is the next start index, like the
+      // schemas list. A target beyond the first page is only reachable by
+      // following the cursor, so a caller that needs the whole history pages
+      // through it rather than reading the first page alone.
+      const start = query.data.page_token === undefined ? 0 : Number(query.data.page_token);
+      if (!Number.isInteger(start) || start < 0) {
+        return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
+      }
+      const page = items.slice(start, start + query.data.limit);
+      const next =
+        start + query.data.limit < items.length ? String(start + query.data.limit) : undefined;
+      return HttpResponse.json({ deployments: page, next_page_token: next });
     }),
 
     http.get("*/deployments/:deployment_id", ({ params, request }) => {

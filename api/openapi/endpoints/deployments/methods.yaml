@@ -86,7 +86,7 @@ post:
       content:
         application/json:
           schema:
-            $ref: deployment.yaml
+            $ref: create-deployment-response.yaml
           examples:
             alreadyLive:
               summary: The release the primary origins already serve, deployed again
@@ -110,7 +110,7 @@ post:
       content:
         application/json:
           schema:
-            $ref: deployment.yaml
+            $ref: create-deployment-response.yaml
           examples:
             deployed:
               summary: A release deployed to every primary origin

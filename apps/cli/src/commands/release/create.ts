@@ -37,7 +37,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(ReleaseCreate);
     await this.toMeta(flags);
-    const { cwd, env, isTTY } = this.meta;
+    const { cwd, env, dryRun, isTTY } = this.meta;
     const json = this.jsonEnabled();
 
     const { client, projectId } = await this.connect();
@@ -49,13 +49,24 @@ export default class ReleaseCreate extends EnvironmentCommand {
       projectId,
       env,
       mode: "deploy",
-      dryRun: false,
+      dryRun,
       json,
       color: !json && isTTY && flags.color !== false && !process.env.NO_COLOR,
       bundle,
       brandingSources,
     };
     await runSteps([validateStep], ctx);
+
+    // `release create` carries the same no-mutation promise every command does
+    // under `--dry-run`: validate the bundle the same way, then stop before the
+    // release is posted so nothing is written server-side.
+    if (dryRun) {
+      return this.emit({
+        status: "ok",
+        data: { dry_run: true, resources: resourceCount },
+        pretty: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"}. No release was created (dry run).`,
+      });
+    }
 
     const release = await createReleaseFromBundle(client, projectId, bundle, {
       message: flags.message,

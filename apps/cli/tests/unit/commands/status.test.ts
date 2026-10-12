@@ -208,6 +208,30 @@ describe("status command", () => {
     expect(json.data.project.lifecycle).toBe("orphaned-config");
   });
 
+  it("reports the resolved environment's project when --env names one without a local secret", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "zitadel.json"),
+      JSON.stringify({ project: "proj-local", server: "https://api.zitadel.cloud" }),
+    );
+    await writeFile(
+      join(cwd, ".env.production.local"),
+      "ZITADEL_URL=https://api.zitadel.cloud\nZITADEL_PROJECT_ID=proj-prod\nZITADEL_PROJECT_SECRET=sk_prod\n",
+    );
+
+    const res = await runCliForTest(["status", "--cwd", cwd, "--json", "--env", "production"]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      data: { project: { lifecycle: string; project_id?: string } };
+    };
+    // Without the reorder this reads "orphaned-config" because `.zitadel/secret`
+    // is absent; the resolved environment names proj-prod, so status reports
+    // that project as configured and ignores config.project.
+    expect(json.data.project.lifecycle).toBe("configured");
+    expect(json.data.project.project_id).toBe("proj-prod");
+  });
+
   it("reports not-configured when zitadel.json is missing entirely", async () => {
     const cwd = await makeProject();
 

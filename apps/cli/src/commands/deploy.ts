@@ -110,6 +110,21 @@ export default class Deploy extends EnvironmentCommand {
           nextCommands: ["zitadel origin list"],
         });
       }
+    } else if (!dryRun) {
+      // With no --origin the deploy goes to every primary origin, so the
+      // project must have at least one. Checked here, before the bundle is
+      // built and the IdP connections are synced, so a project with no primary
+      // origin fails before the IdP step does a partial write rather than
+      // after it, when the final deploy would report the missing origin. A dry
+      // run writes nothing and never reaches the deploy, so it is exempt: it
+      // still validates and previews a project that has no primary origin yet.
+      const origins = (await client.getProject(projectId)).origins ?? [];
+      if (!origins.some((entry) => entry.kind === "primary")) {
+        throw new ZitadelError("E_VALIDATION", "The project has no primary origin to deploy to", {
+          hint: "Add one with `zitadel origin add <url> --kind primary`, then deploy.",
+          nextCommands: ["zitadel origin list"],
+        });
+      }
     }
 
     const { bundle, resourceCount, brandingSources } = await buildBundle(cwd);
@@ -172,7 +187,12 @@ export default class Deploy extends EnvironmentCommand {
         releaseId: release.id,
         targets,
         message,
-        expectedDeploymentId: observed,
+        // On a project's first deploy nothing is live, so there is no
+        // deployment to guard against: the field is omitted rather than sent
+        // empty or as a placeholder, which an optional id cannot stand in for.
+        // When a deployment is live its id is sent so a racing deploy is caught
+        // with a 409 (#538).
+        ...(observed === undefined ? {} : { expectedDeploymentId: observed }),
       });
     } catch (error) {
       // A 409 means another deploy landed between our inspection and this
@@ -191,6 +211,14 @@ export default class Deploy extends EnvironmentCommand {
           nextCommands: ["zitadel deployment list --live"],
         },
       );
+    }
+
+    // The create response carries any non-blocking advisories the server
+    // raised while making the release live (a clamped preview ttl, say). The
+    // deploy succeeded regardless, so they are surfaced as warnings, not an
+    // error.
+    for (const warning of deployment.warnings ?? []) {
+      reportWarning(warning.message);
     }
 
     const servedOrigins = deployment.targets.map((target) => target.origin);
