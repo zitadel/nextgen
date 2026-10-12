@@ -81,8 +81,8 @@ See [Local runtime commands](/docs/cli/local-runtime) for what that link does an
 Setup scaffolded editable copies of your user schema and login flow into `.zitadel/schemas/` and `.zitadel/flows/` — each folder has a README explaining what you can change. Edit the files, then preview and publish:
 
 ```sh
-npx @zitadel/cli@alpha plan
-npx @zitadel/cli@alpha apply
+npx @zitadel/cli@alpha deploy --dry-run
+npx @zitadel/cli@alpha deploy
 ```
 
 See [Deploy](/docs/cli/deploy) for a walkthrough that adds a `company` field to registration.
