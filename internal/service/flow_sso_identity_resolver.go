@@ -5,9 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
-
-	"github.com/ianlancetaylor/jsonschema/types"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -310,21 +307,9 @@ func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in domain.Fl
 		if errors.Is(err, domain.ErrUserInvalid()) {
 			// The validator's messages quote the values, so only where they
 			// failed is logged.
-			var failed []*types.ValidationError
-			var one *types.ValidationError
-			var many *types.ValidationErrors
-			if errors.As(err, &many) {
-				failed = many.Errs
-			} else if errors.As(err, &one) {
-				failed = append(failed, one)
-			}
 			var locations []string
-			for _, ve := range failed {
-				location := ""
-				if ve.Loc != nil {
-					location = "/" + strings.Join(*ve.Loc, "/")
-				}
-				locations = append(locations, location)
+			for _, ve := range domain.ValidationFailures(err) {
+				locations = append(locations, domain.ValidationLocation(ve))
 			}
 			getLoggingContext(ctx, "flow").WarnContext(ctx, "sso user fails the user schema",
 				slog.String("project_id", in.ProjectID),
