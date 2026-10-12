@@ -52,10 +52,9 @@ tags:
       at those revisions and never copies their content, which stays with
       each resource's own endpoints.
 
-      Create a release from the files in your `.zitadel/` directory, or by
-      pinning revision ids you already have. Assembling a release does not
-      deploy it: the same release can later be run on any number of targets
-      unchanged.
+      Create a release from the files in your `.zitadel/` directory, or from
+      revision ids you already have. Creating a release doesn't deploy it,
+      and you can deploy the same release to any number of origins.
   - name: Grants
     description: |
       Collaboration grants that bind a user or team to project.viewer,
