@@ -6582,6 +6582,13 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 		w.expectOwner("email", "alice@example.com", "")
 		w.expectOwner("username", "alice", "")
 	}
+	// schemaInvalid is the error the user service returns for doc failing
+	// schema.
+	schemaInvalid := func(schema string, doc map[string]any) error {
+		var s jsonschema.Schema
+		require.NoError(t, json.Unmarshal([]byte(schema), &s))
+		return domain.ErrUserInvalid().WithParent(s.Validate(doc))
+	}
 	for name, tc := range map[string]struct {
 		fields   []domain.Field
 		claims   map[string]any
@@ -6639,6 +6646,58 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 			expect: func(w *flowTestWorld) {
 				probeMisses(w)
 				w.expectCreateLinked(complete, "", "", domain.ErrUserInvalid())
+			},
+			wantErr: domain.FlowStepErrorSSOUserInvalid,
+		},
+		"property allOf requires that the step does not show": {
+			expect: func(w *flowTestWorld) {
+				probeMisses(w)
+				w.expectCreateLinked(complete, "", "", schemaInvalid(`{"allOf": [{"required": ["phone"]}]}`, complete))
+			},
+			wantErr: domain.FlowStepErrorSSOUserCannotBeCreated,
+		},
+		"property a reference requires that the step does not show": {
+			expect: func(w *flowTestWorld) {
+				probeMisses(w)
+				w.expectCreateLinked(complete, "", "", schemaInvalid(`{"$defs": {"user": {"required": ["phone"]}}, "$ref": "#/$defs/user"}`, complete))
+			},
+			wantErr: domain.FlowStepErrorSSOUserCannotBeCreated,
+		},
+		"nested property allOf requires that the step does not show": {
+			fields: []domain.Field{"email", "username", "given_name", "family_name", "account.handle"},
+			edit:   func(fields map[string]any) { fields["account.handle"] = "ali" },
+			expect: func(w *flowTestWorld) {
+				attributes := maps.Clone(complete)
+				attributes["account"] = map[string]any{"handle": "ali"}
+				probeMisses(w)
+				w.expectOwner("account.handle", "ali", "")
+				w.expectCreateLinked(attributes, "", "", schemaInvalid(
+					`{"properties": {"account": {"allOf": [{"required": ["id"]}]}}}`, attributes))
+			},
+			wantErr: domain.FlowStepErrorSSOUserCannotBeCreated,
+		},
+		// The schema library reports a then requirement without its condition,
+		// so clearing given_name does not count as a fix.
+		"property a then requires that the step does not show": {
+			expect: func(w *flowTestWorld) {
+				probeMisses(w)
+				w.expectCreateLinked(complete, "", "", schemaInvalid(`{"if": {"required": ["given_name"]}, "then": {"required": ["phone"]}}`, complete))
+			},
+			wantErr: domain.FlowStepErrorSSOUserCannotBeCreated,
+		},
+		// The user can fill the field in.
+		"property allOf requires that the step shows": {
+			expect: func(w *flowTestWorld) {
+				probeMisses(w)
+				w.expectCreateLinked(complete, "", "", schemaInvalid(`{"allOf": [{"required": ["given_name", "phone"]}]}`, map[string]any{"phone": "1"}))
+			},
+			wantErr: domain.FlowStepErrorSSOUserInvalid,
+		},
+		// The schema library does not say which property anyOf misses.
+		"property one anyOf branch requires": {
+			expect: func(w *flowTestWorld) {
+				probeMisses(w)
+				w.expectCreateLinked(complete, "", "", schemaInvalid(`{"anyOf": [{"required": ["phone"]}, {"required": ["fax"]}]}`, complete))
 			},
 			wantErr: domain.FlowStepErrorSSOUserInvalid,
 		},
