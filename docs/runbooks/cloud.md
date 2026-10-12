@@ -1,17 +1,17 @@
-# Runbook: hosted cloud (Vercel + Neon)
+# Runbook: hosted cloud (Vercel + PlanetScale Postgres)
 
 > **Code:** [`apps/cloud/`](../../apps/cloud/) and the repo-root
 > [`vercel.json`](../../vercel.json)
 > **Vercel project:** `zitadel/nextgen-preview-cloud`
-> **Neon project:** `nextgen` (organization "Vercel: zitadel", AWS
-> `eu-central-1`)
+> **PlanetScale:** organization `zitadel`, Postgres databases `production`
+> and `preview`, both in AWS `eu-central-1`
 
 The hosted cloud is the current `main`, built by Vercel from the repository
-and run in Frankfurt (`fra1`) against a Neon Postgres database in the same
-AWS region. **`main` is production:** every merge deploys. A pull request
-that touches the server, the console or the login UI gets a preview
-deployment with its own copy of the database. Version tags and their npm
-packages remain the self-hosted artifact; this cloud does not run them.
+and run in Frankfurt (`fra1`) against PlanetScale Postgres in the same AWS
+region. **`main` is production:** every merge deploys. A branch that touches
+the server, the console or the login UI gets a preview deployment with a
+database of its own. Version tags and their npm packages remain the
+self-hosted artifact; this cloud does not run them.
 
 ## Layout
 
@@ -34,44 +34,48 @@ Any `NEXTGEN_*` variable overrides a default.
 
 ## Database
 
-- **Production** is the Neon `main` branch. The server serves from the
-  pooled URL (`DATABASE_URL`, PgBouncer in transaction mode) with at most
-  four connections per function instance, because Vercel starts one
-  instance per concurrent request from cold. Migrations use the direct URL
-  (`DATABASE_URL_UNPOOLED`): they hold a session advisory lock.
-- **Previews** get a Neon branch `preview/<git branch>`, created by the
-  integration from `main` on the branch's first preview deployment, with
-  its URLs injected into that deployment only. The build migrates the
-  branch; the database is otherwise production's data at the moment the
-  branch was created.
-- **Previews share production's data and master key.** Decided 2026-10-12
-  for simplicity: a copied branch is only readable with the key that
-  encrypted it. Previews stay within the team: their URLs sit behind
-  Vercel Authentication, and a pull request from a fork deploys only after
-  a team member approves it. A preview still runs its branch's code against
-  a copy of production's data.
-- **Cleanup:** Neon deletes a preview's branch when Vercel deletes the
-  branch's last preview deployment, which follows the project's retention
-  policy for preview deployments (Settings → Security → Deployment
-  Retention Policy). Vercel never deletes the latest preview of a branch
-  whose pull request is open, nor the 20 newest ready previews, so the
-  branch of a merged pull request goes once it has aged out of both.
+Two variables in both Vercel environments: `CLOUD_DATABASE_URL`, the pooled
+URL (PgBouncer, port 6432) the server serves from with at most four
+connections per function instance, because Vercel starts one instance per
+concurrent request from cold; and `CLOUD_MIGRATOR_DATABASE_URL`, the direct
+URL (port 5432) the build migrates through, because migrations hold a
+session advisory lock.
+
+- **Production** is the PlanetScale database `production`. Both URLs name
+  its `postgres` database.
+- **Previews** live on the separate PlanetScale database `preview`. Both
+  URLs name its `postgres` database with a role that may create databases;
+  the launcher swaps in the preview's own: one per Git branch, named
+  `preview_<branch>_<hash>`
+  ([`database.go`](../../apps/cloud/launcher/database.go)). The build
+  creates it when it is missing, stamps it with the branch and the time of
+  the deployment (a database comment), and migrates it; the function serves
+  from it. Previews start empty and never see production data.
+- **Cleanup** is not automated yet. The plan: drop preview databases whose
+  stamp is older than 30 days. Until then, by hand on `preview`:
+
+  ```sql
+  SELECT datname, shobj_description(oid, 'pg_database') AS stamp
+  FROM pg_database WHERE datname LIKE 'preview\_%' ORDER BY 2;
+  DROP DATABASE "preview_…" WITH (FORCE);
+  ```
 
 ## One-time setup
 
-### 1. Neon
+### 1. PlanetScale
 
-In Vercel → Storage → `nextgen`:
+Two Postgres databases in AWS `eu-central-1`, so production never shares a
+cluster, a connection budget or an admin role with pull request code:
 
-1. **Plan:** the free plan to start. It caps the project at 10 branches
-   (production plus nine previews at a time) and 100 compute hours a month
-   shared by production and every preview; when the hours run out, the
-   computes stay suspended until the month resets. Move to Launch (usage
-   based) once either limit bites.
-2. **Connect the project** `nextgen-preview-cloud` for Production and
-   Preview. Under Advanced Options → Deployments Configuration turn on
-   **Required → Preview** and **Resource must be active before
-   deployment**. That is what creates a branch per preview.
+- **`production`**, highly available once anyone depends on it. Two roles
+  on its `main` branch: one inheriting `pg_read_all_data` and
+  `pg_write_all_data` for the running server, and one inheriting `postgres`
+  for the migrations (they create extensions and the schema and set
+  database options).
+- **`preview`**, single node. One role inheriting `postgres`: it creates the
+  preview databases, migrates them and serves from them. Postgres never
+  passes the `CREATEDB` attribute on through membership, so the launcher
+  creates a database as `postgres` when the role lacks the attribute itself.
 
 ### 2. Master key
 
@@ -82,6 +86,8 @@ base64 < master-key.pem | tr -d '\n' > master-key.b64
 
 Keep `master-key.pem` in the team password manager. Losing it makes every
 project's key-encryption key unwrappable ([ADR 029](../adrs/029-cryptography-secrets-and-key-lifecycle.md)).
+Previews may use a key of their own: their databases hold nothing of
+production's.
 
 ### 3. Vercel project
 
@@ -91,16 +97,23 @@ and Speed Insights enabled (their tabs in the project). Deployment
 Protection stays on Vercel Authentication.
 
 Environment variables (add secrets with
-`vercel env add NAME production,preview --sensitive --yes`, value on stdin):
+`vercel env add NAME production --sensitive --yes`, value on stdin):
 
 | Name | Target | Value |
 |---|---|---|
-| `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `PG*`, `POSTGRES_*` | Production (previews get theirs per deployment) | set by the Neon integration; do not edit |
-| `MASTER_KEY_PEM_B64` | Production, Preview; sensitive | contents of `master-key.b64`, the same key in both (see Database) |
+| `CLOUD_DATABASE_URL` | Production; sensitive | `production`, the server's role, port 6432, database `postgres` |
+| `CLOUD_MIGRATOR_DATABASE_URL` | Production; sensitive | `production`, the migrations' role, port 5432, database `postgres` |
+| `CLOUD_DATABASE_URL` | Preview; sensitive | `preview`, its role, port 6432, database `postgres` |
+| `CLOUD_MIGRATOR_DATABASE_URL` | Preview; sensitive | `preview`, its role, port 5432, database `postgres` |
+| `MASTER_KEY_PEM_B64` | Production, Preview; sensitive | contents of `master-key.b64` |
 | `MASTER_KEY_ID` | Production, Preview | a stable id such as `cloud-2026-10`; rotation adds a new id |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Production; sensitive; optional | a platform admin document (below) |
 | `ENABLE_EXPERIMENTAL_COREPACK` | Production, Preview | `1`: the builds run package scripts that call `pnpm`, which must be the workspace's pinned version |
 | `CLOUD_PRODUCTION_BRANCH` | Production; only while testing a pull request as production | the branch production deploys from; unset means `main` (see Deploying) |
+
+Database URLs take the form PlanetScale's Connect dialog gives,
+`postgresql://<role>.<branch id>:<password>@<host>:<port>/postgres?sslmode=verify-full&sslrootcert=system`,
+without pool parameters: the launcher adds them.
 
 Every other variable is a leftover; delete it. `NEXTGEN_*` variables
 override the launcher's defaults on purpose, so a stale one changes the
@@ -133,6 +146,11 @@ encoded. The server imports it on the next deploy and skips it afterwards.
   migrations this way that `main` will receive unchanged.
   Afterwards point the production branch back at `main` and delete
   `CLOUD_PRODUCTION_BRANCH`.
+- **A CLI deployment** (`vercel deploy` from a checkout) carries no Git
+  metadata, so pass the branch and commit as build variables:
+  `--build-env VERCEL_GIT_COMMIT_REF=<branch> --build-env VERCEL_GIT_COMMIT_SHA=<sha>`.
+  The branch picks a preview's database and must match the production
+  branch for a `--prod` deployment.
 - **Previews:** every push to a branch, if
   [`ignore-build.sh`](../../apps/cloud/ignore-build.sh) finds a change to
   what the deployment runs since the branch's last preview, or since it
@@ -144,24 +162,24 @@ encoded. The server imports it on the next deploy and skips it afterwards.
 
 ## Operating
 
-- **Logs:** Vercel runtime logs of the `server` function (JSON). Add a log
-  drain for retention.
-- **Cold starts:** a Go instance boots in about a second. Neon suspends an
-  idle compute after five minutes; the first query afterwards wakes it,
-  which adds a few hundred milliseconds.
-- **Connections:** four per instance through Neon's PgBouncer. A 0.25 CU
-  compute allows 104 connections, of which the pooler uses up to 90 %.
-  Raise the compute size before raising the pool size.
+- **Logs:** Vercel runtime logs of the `server` function (JSON). The
+  launcher's first line names the database host and database it serves
+  from. Add a log drain for retention.
+- **Cold starts:** a Go instance boots in about a second; a burst from cold
+  starts one instance per concurrent request.
+- **Connections:** four per instance through PlanetScale's PgBouncer, which
+  pools per database and role: on `preview` every preview database is a
+  pool of its own, so the cluster's `max_connections` bounds how many
+  previews can be busy at the same time. Raise it (Parameters tab, needs a
+  restart) before raising the pool size.
 - **Analytics:** the console reports page views and Web Vitals per route
   pattern (`/ui/console/users/$userId`) to the project's Analytics and Speed
   Insights tabs.
 
 ## Later: read replicas in other regions
 
-- Neon read replicas run in the primary's region only. A replica elsewhere
-  means a second Neon project in that region fed by logical replication,
-  which does not carry schema changes: migrations would have to run on
-  both.
+- PlanetScale Postgres adds read replicas in other regions of the same
+  cloud provider, asynchronous, with a host of their own.
 - The server has no read/write split yet; reads in another region need one
   before a replica helps.
 - Vercel's Go preset ignores per-function regions. Pinning functions to a

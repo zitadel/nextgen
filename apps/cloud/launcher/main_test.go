@@ -444,3 +444,23 @@ func TestDescribeDatabaseNamesTheHostAndDatabaseOnly(t *testing.T) {
 func TestQuoteLiteral(t *testing.T) {
 	assert.Equal(t, `'{"branch":"it''s"}'`, quoteLiteral(`{"branch":"it's"}`))
 }
+
+func TestPrepareMigrationRefusesToServeThroughTheDirectPort(t *testing.T) {
+	stubEnsureDatabase(t)
+	for _, env := range []string{"production", "preview"} {
+		t.Run(env, func(t *testing.T) {
+			setLauncherEnv(t, t.TempDir())
+			t.Setenv("VERCEL_ENV", env)
+			t.Setenv("VERCEL_GIT_COMMIT_REF", "main")
+			t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
+			t.Setenv("CLOUD_DATABASE_URL", strings.Replace(pooledURL, ":6432", ":5432", 1))
+
+			_, err := prepareMigration(nil)
+			assert.ErrorContains(t, err, "serve through PgBouncer", "the build fails before a deployment that cannot hold a burst goes live")
+
+			t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+			_, err = prepareMigration(nil)
+			assert.NoError(t, err)
+		})
+	}
+}

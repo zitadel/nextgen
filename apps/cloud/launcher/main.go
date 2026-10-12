@@ -119,6 +119,11 @@ func prepareMigration(extra []string) ([]string, error) {
 	if dsn == "" && deployed(env) {
 		return nil, fmt.Errorf("%s must be set for a %s deployment", migratorDatabaseURLVar, env)
 	}
+	if deployed(env) {
+		if err := checkServedThroughPooler(os.Getenv(databaseURLVar), dsn); err != nil {
+			return nil, err
+		}
+	}
 	if dsn != "" && env == "preview" {
 		name, err := previewDatabaseName(ref)
 		if err != nil {

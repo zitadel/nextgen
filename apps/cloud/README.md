@@ -1,9 +1,9 @@
 # apps/cloud
 
 The deployment wrapper that runs `main` as a hosted, production-like cloud on
-Vercel with a Neon Postgres database in Frankfurt. Every merge to `main`
-deploys to production; every pull request that touches the server, the
-console or the login UI gets a preview with its own Neon branch.
+Vercel with PlanetScale Postgres in Frankfurt. Every merge to `main` deploys
+to production; every branch that touches the server, the console or the
+login UI gets a preview with a database of its own.
 
 The repo-root [`vercel.json`](../../vercel.json) defines the Vercel
 deployment as two [services](https://vercel.com/docs/services):
@@ -19,7 +19,7 @@ unchanged.
 
 | File | Role |
 |---|---|
-| [`launcher/`](launcher/) | the function binary: maps Neon's `DATABASE_URL` / `DATABASE_URL_UNPOOLED`, the master key and Vercel's `PORT` onto the server's configuration, and runs `migrate` at build time |
+| [`launcher/`](launcher/) | the function binary: maps `CLOUD_DATABASE_URL` / `CLOUD_MIGRATOR_DATABASE_URL`, the master key and Vercel's `PORT` onto the server's configuration; at build time it creates a preview's database and migrates |
 | [`build.sh`](build.sh) | the `server` service's build: login UI, launcher, migrations |
 | [`ignore-build.sh`](ignore-build.sh) | the Ignored Build Step: production always deploys, a preview only when its branch touches what the deployment runs |
 
