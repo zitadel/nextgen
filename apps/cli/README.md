@@ -1706,7 +1706,7 @@ Deploy a release from .zitadel/ to a pull-request build's preview URLs.
 USAGE
   $ zitadel preview [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--origin <value>...] [--ttl <value>]
+    <value>] [--origin <value>...] [--ttl <value>] [--strict]
 
 FLAGS
   -c, --cwd=<value>        Project directory to operate on.
@@ -1724,6 +1724,8 @@ FLAGS
                            process environment. Cannot be combined with --env.
       --origin=<value>...  A preview URL to deploy to, instead of detecting them
                            from the platform build. Repeatable.
+      --strict             Fail instead of warning when no preview credential
+                           (ZITADEL_PREVIEW_TOKEN) is set.
       --[no-]telemetry     Send anonymous usage analytics. Disable with
                            --no-telemetry.
       --ttl=<value>        How long each preview stays live, e.g. 7d, 12h or
