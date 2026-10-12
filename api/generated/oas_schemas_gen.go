@@ -8607,17 +8607,34 @@ func (s *BrandingTypography) SetScale(val OptFloat64) {
 	s.Scale = val
 }
 
-// One bundle resource that failed validation.
+// Merged schema.
 // Ref: #
 type BundleResourceError struct {
-	Kind ReleasePointerKind `json:"kind"`
+	Code ErrorCode `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptBundleResourceErrorDetails `json:"details"`
+	Kind    ReleasePointerKind            `json:"kind"`
 	// The resource's position in its kind's array in the bundle; `0` for the branding.
 	Index int `json:"index"`
 	// The resource's handle, when it declares one.
 	Handle OptString `json:"handle"`
-	Code   ErrorCode `json:"code"`
-	// What the kind's create endpoint would have answered.
-	Message string `json:"message"`
+}
+
+// GetCode returns the value of Code.
+func (s *BundleResourceError) GetCode() ErrorCode {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *BundleResourceError) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *BundleResourceError) GetDetails() OptBundleResourceErrorDetails {
+	return s.Details
 }
 
 // GetKind returns the value of Kind.
@@ -8635,14 +8652,19 @@ func (s *BundleResourceError) GetHandle() OptString {
 	return s.Handle
 }
 
-// GetCode returns the value of Code.
-func (s *BundleResourceError) GetCode() ErrorCode {
-	return s.Code
+// SetCode sets the value of Code.
+func (s *BundleResourceError) SetCode(val ErrorCode) {
+	s.Code = val
 }
 
-// GetMessage returns the value of Message.
-func (s *BundleResourceError) GetMessage() string {
-	return s.Message
+// SetMessage sets the value of Message.
+func (s *BundleResourceError) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *BundleResourceError) SetDetails(val OptBundleResourceErrorDetails) {
+	s.Details = val
 }
 
 // SetKind sets the value of Kind.
@@ -8660,14 +8682,16 @@ func (s *BundleResourceError) SetHandle(val OptString) {
 	s.Handle = val
 }
 
-// SetCode sets the value of Code.
-func (s *BundleResourceError) SetCode(val ErrorCode) {
-	s.Code = val
-}
+// Additional error-specific context.
+type BundleResourceErrorDetails map[string]jx.Raw
 
-// SetMessage sets the value of Message.
-func (s *BundleResourceError) SetMessage(val string) {
-	s.Message = val
+func (s *BundleResourceErrorDetails) init() BundleResourceErrorDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
 type ChallengeID string
@@ -37538,6 +37562,52 @@ func (o OptBrandingTypography) Get() (v BrandingTypography, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptBrandingTypography) Or(d BrandingTypography) BrandingTypography {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptBundleResourceErrorDetails returns new OptBundleResourceErrorDetails with value set to v.
+func NewOptBundleResourceErrorDetails(v BundleResourceErrorDetails) OptBundleResourceErrorDetails {
+	return OptBundleResourceErrorDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBundleResourceErrorDetails is optional BundleResourceErrorDetails.
+type OptBundleResourceErrorDetails struct {
+	Value BundleResourceErrorDetails
+	Set   bool
+}
+
+// IsSet returns true if OptBundleResourceErrorDetails was set.
+func (o OptBundleResourceErrorDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBundleResourceErrorDetails) Reset() {
+	var v BundleResourceErrorDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBundleResourceErrorDetails) SetTo(v BundleResourceErrorDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBundleResourceErrorDetails) Get() (v BundleResourceErrorDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBundleResourceErrorDetails) Or(d BundleResourceErrorDetails) BundleResourceErrorDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}

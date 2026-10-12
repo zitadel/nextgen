@@ -259,8 +259,8 @@ post:
               summary: Two bundle resources fail validation
               description: |
                 Each entry names the resource by kind, position and handle,
-                and carries the code and message its own create endpoint
-                would have answered.
+                and carries the error its own create endpoint would have
+                answered, details included.
               value:
                 code: rel.invalid
                 message: 'release: invalid'
@@ -270,12 +270,14 @@ post:
                       index: 0
                       handle: human-user
                       code: sch.invalid_request
-                      message: 'properties.email: x-unique must be project'
+                      message: 'schema designation invalid: "x-identifier" property "email" must carry "x-unique" "project", has "none"'
                     - kind: flow_definition
                       index: 1
                       handle: b2b-login
                       code: flowdef.invalid
-                      message: 'steps[2]: unknown step type'
+                      message: 'flow definition: invalid'
+                      details:
+                        details: no purposes defined
     default:
       $ref: createRelease-error-response.yaml
 
