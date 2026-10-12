@@ -15,6 +15,14 @@ tasks:
   build:
     deps:
       - "sdk-react:build"
+    inputs:
+      # Declaring inputs drops the default project folder, so it is restated.
+      - "**/*"
+      # The hosted cloud's build bakes Vercel's insights in
+      # (src/vite-env.d.ts), so the variable is part of the cache key: that
+      # build is never restored into the server's embedded console, or the
+      # reverse.
+      - "$VITE_CONSOLE_VERCEL_INSIGHTS"
     outputs:
       - "/internal/staticui/console/dist/**/*"
     options:
