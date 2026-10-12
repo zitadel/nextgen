@@ -39,8 +39,8 @@ regression fails inside the spec of the command that broke. A dedicated
 contract suite only ever covers the commands somebody remembered to list, and
 reports the failure far from its cause.
 
-A topic's commands are separate commands: `variables set` is
-`variables-set.spec.ts`, not a suite inside a shared file, so coverage is
+A topic's commands are separate commands: `variable set` is
+`variable-set.spec.ts`, not a suite inside a shared file, so coverage is
 discoverable by filename. The binary's own behaviour — an unknown command,
 which server it resolves — is `cli.spec.ts`.
 
@@ -74,7 +74,7 @@ Three rules make that shape hold:
 2. **Observe by running a command.** A spec's subject is how the CLI behaves,
    not how it stores things, so what a command did is checked by running
    another one: `idps list`, `schemas list`, `flow-definitions list`,
-   `variables list --project-level`, `plan`. Never `.zitadel/state.json` and
+   `variable list`, `deployment list`. Never `.zitadel/state.json` and
    never the mock's own store — a corrupt file matters only insofar as a later
    command surfaces it, and that surfacing is the assertion.
 
