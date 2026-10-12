@@ -88,5 +88,5 @@ The repo pins `@redocly/openapi-core` (the library behind the
 
 ```shell
 moon run server:openapi          # lint openapi-spec.yaml
-moon run docs:generate-openapi   # bundle it into apps/docs/.generated/openapi.mjs
+moon run docs:generate          # bundle it into apps/docs/.generated/openapi.mjs
 ```
