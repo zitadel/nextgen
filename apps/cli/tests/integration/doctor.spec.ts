@@ -58,6 +58,34 @@ describe("doctor", () => {
         expect(result).toSucceed();
       });
 
+      it("verifies the resolved environment connects under --env", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctor(["--env", "development"]);
+
+        expect(result).toSucceed();
+        const { checks } = app.envelopeOf<{ checks: Array<{ name: string; status: string }> }>(
+          result,
+        ).data;
+        expect(checks).toContainEqual(
+          expect.objectContaining({ name: "environment", status: "pass" }),
+        );
+      });
+
+      it("fails when the resolved environment names a project the server does not have", async () => {
+        const app = await aSetUpApp();
+        await app.bindEnvironment("production", {
+          ZITADEL_URL: "https://prod.example",
+          ZITADEL_PROJECT_ID: "proj_missing",
+          ZITADEL_PROJECT_SECRET: "sk_prod",
+        });
+
+        const result = await app.doctor(["--env", "production"]);
+
+        expect(result).toFail();
+        expect(result.stdout).toContain("environment");
+      });
+
       it("reports an unsupported framework version", async () => {
         const app = await aSetUpApp();
         await downgradeTheFramework(app);

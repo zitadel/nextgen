@@ -1056,8 +1056,19 @@ function ssoRecovery(
     // leaving the local provider unconfigured and the credentials somewhere
     // nobody asked for. Both callers of this are local-server failures, so
     // `local` is the server meant in every case.
+    //
+    // `--env-file .env.development.local` pins the project and credential too:
+    // `sso enable` is an EnvironmentCommand that resolves those from the
+    // environment, where the process environment outranks the `.env` files, so
+    // in a shell holding production values `--server local` alone would send
+    // the production token to the local server. `--env-file` outranks the
+    // process environment (unlike `--env`), so it is the one that forces the
+    // generated development credential the local project actually expects.
     commands: remaining.map((provider) =>
-      publicCliCommand(`sso enable --provider ${provider.provider} --server local`, cliVersion),
+      publicCliCommand(
+        `sso enable --provider ${provider.provider} --server local --env-file .env.development.local`,
+        cliVersion,
+      ),
     ),
   };
 }

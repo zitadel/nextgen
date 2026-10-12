@@ -13,6 +13,7 @@ function ctx(overrides: Partial<StepContext>): StepContext {
     json: true,
     color: false,
     bundle: { schemas: [], flow_definitions: [], brandings: [] },
+    brandingSources: [],
     ...overrides,
   };
 }

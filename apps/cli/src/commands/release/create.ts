@@ -3,12 +3,12 @@ import { Flags } from "@oclif/core";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
 import {
   buildBundle,
-  configIsDirty,
   createReleaseFromBundle,
   headSha,
   runSteps,
   type StepContext,
   validateStep,
+  worktreeIsDirty,
 } from "../../lib/release";
 
 /**
@@ -41,7 +41,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
     const json = this.jsonEnabled();
 
     const { client, projectId } = await this.connect();
-    const { bundle, resourceCount } = await buildBundle(cwd);
+    const { bundle, resourceCount, brandingSources } = await buildBundle(cwd);
 
     const ctx: StepContext = {
       cwd,
@@ -53,13 +53,14 @@ export default class ReleaseCreate extends EnvironmentCommand {
       json,
       color: !json && isTTY && flags.color !== false && !process.env.NO_COLOR,
       bundle,
+      brandingSources,
     };
     await runSteps([validateStep], ctx);
 
     const release = await createReleaseFromBundle(client, projectId, bundle, {
       message: flags.message,
       gitSha: await headSha(cwd),
-      gitDirty: await configIsDirty(cwd),
+      gitDirty: await worktreeIsDirty(cwd),
     });
 
     return this.emit({

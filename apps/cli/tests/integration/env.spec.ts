@@ -97,6 +97,18 @@ describe("env", () => {
 
         expect(result.stdout).not.toContain("sk_0123456789abcdef");
       });
+
+      it("never shows a short secret whole", async () => {
+        const app = await aSetUpApp();
+        await app.bindEnvironment("production", {
+          ZITADEL_PROJECT_ID: "proj_prod",
+          ZITADEL_PROJECT_SECRET: "sk_short",
+        });
+
+        const result = await app.run(["env", "--env", "production", "--json"]);
+
+        expect(result.stdout).not.toContain("sk_short");
+      });
     });
 
     describe("rendered for a terminal", () => {

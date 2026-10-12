@@ -140,10 +140,13 @@ func decodeCreateReleaseRequest(body string) (api.CreateReleaseRequest, error) {
 	return req, req.Validate()
 }
 
-// Pins revoke's answer until the service can revoke: 501, not the 500 the
-// generated stub's sentinel would map to.
-func TestRevokeReleaseNotImplemented(t *testing.T) {
+// The access check runs before the not-implemented stub: an unconfigured
+// handler is stopped by the gate (500) and never reaches the 501 the stub
+// would return, so a caller without the permission never learns the operation
+// is unimplemented. A real authorized caller's 501 is pinned in the
+// integration test.
+func TestRevokeReleaseRunsAccessCheckBeforeStub(t *testing.T) {
 	_, err := (&Handler{}).RevokeRelease(t.Context(), api.RevokeReleaseParams{})
 	require.Error(t, err)
-	assert.Equal(t, http.StatusNotImplemented, errorResponse(err).StatusCode)
+	assert.NotEqual(t, http.StatusNotImplemented, errorResponse(err).StatusCode)
 }

@@ -3,7 +3,6 @@ import { Flags } from "@oclif/core";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
 import {
   buildBundle,
-  configIsDirty,
   createDeployment,
   createReleaseFromBundle,
   diffStep,
@@ -12,8 +11,12 @@ import {
   runSteps,
   type StepContext,
   validateStep,
+  worktreeIsDirty,
 } from "../lib/release";
+import { ApiError } from "@zitadel/api/runtime/fetch";
+
 import { ZitadelError } from "../lib/errors";
+import { reportWarning } from "../lib/warnings";
 
 /**
  * `zitadel deploy` — publish `.zitadel/` to the project's primary origins.
@@ -49,9 +52,21 @@ export default class Deploy extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Deploy);
     await this.toMeta(flags);
-    const { cwd, env, dryRun, isTTY } = this.meta;
+    const { cwd, env, dryRun, isTTY, nonInteractive } = this.meta;
     const json = this.jsonEnabled();
     const color = !json && isTTY && flags.color !== false && !process.env.NO_COLOR;
+
+    // A deploy records why it happened. Interactively the reason can be left
+    // off, but a non-interactive caller (CI) has no prompt to fall back on, so
+    // it must name one. Rejected here, before the pipeline writes anything, so
+    // a missing message never leaves a half-synced IdP behind. A dry run makes
+    // no release, so it is exempt.
+    const message = flags.message?.trim() ? flags.message.trim() : undefined;
+    if (nonInteractive && !dryRun && message === undefined) {
+      throw new ZitadelError("E_VALIDATION", "A deploy needs a message in non-interactive mode", {
+        hint: "Pass -m/--message with a short summary of what this release changes.",
+      });
+    }
 
     const { client, projectId } = await this.connect();
 
@@ -74,7 +89,7 @@ export default class Deploy extends EnvironmentCommand {
       }
     }
 
-    const { bundle, resourceCount } = await buildBundle(cwd);
+    const { bundle, resourceCount, brandingSources } = await buildBundle(cwd);
     this.recordTelemetry({ resources: resourceCount });
     const ctx: StepContext = {
       cwd,
@@ -87,6 +102,7 @@ export default class Deploy extends EnvironmentCommand {
       color,
       origin,
       bundle,
+      brandingSources,
     };
 
     // Before-release steps: validate, sync IdPs (skipped on a dry run), diff.
@@ -104,16 +120,54 @@ export default class Deploy extends EnvironmentCommand {
       });
     }
 
+    // Record whether the whole worktree was dirty when this release was built,
+    // and warn: a release pins content, but its git provenance is only exact
+    // when the tree was clean, so the reader knows the commit is approximate.
+    const gitDirty = await worktreeIsDirty(cwd);
+    if (gitDirty) {
+      reportWarning(
+        "The git working tree has uncommitted changes; this release records its commit as approximate.",
+      );
+    }
+
     const release = await createReleaseFromBundle(client, projectId, bundle, {
-      message: flags.message,
+      message,
       gitSha: await headSha(cwd),
-      gitDirty: await configIsDirty(cwd),
+      gitDirty,
     });
-    const deployment = await createDeployment(client, projectId, {
-      releaseId: release.id,
-      targets: origin ? [origin] : ["primary"],
-      message: flags.message,
-    });
+
+    // What the targets serve right now, newest first. Its id guards the create
+    // against another deploy that raced in since we inspected: the server
+    // refuses with 409 rather than overwriting that deploy unseen (#538).
+    const liveQuery = { project_id: projectId, live: true, ...(origin ? { origin } : {}) };
+    const observed = (await client.listDeployments(liveQuery)).deployments[0]?.id;
+    const targets = origin ? [origin] : ["primary"];
+    let deployment: Awaited<ReturnType<typeof createDeployment>>;
+    try {
+      deployment = await createDeployment(client, projectId, {
+        releaseId: release.id,
+        targets,
+        message,
+        expectedDeploymentId: observed,
+      });
+    } catch (error) {
+      // A 409 means another deploy landed between our inspection and this
+      // create. Re-read what the targets serve now and report that actual
+      // deployment, so the caller re-runs against current state (#538).
+      if (!(error instanceof ApiError) || error.status !== 409) {
+        throw error;
+      }
+      const current = (await client.listDeployments(liveQuery)).deployments[0];
+      throw new ZitadelError(
+        "E_CONFLICT",
+        "Another deploy changed the targets since this one was prepared",
+        {
+          hint: "Re-run `zitadel deploy`; it will build and deploy against the current state.",
+          details: current === undefined ? undefined : { current_deployment: current },
+          nextCommands: ["zitadel deployment list --live"],
+        },
+      );
+    }
 
     const servedOrigins = deployment.targets.map((target) => target.origin);
     this.recordTelemetry({ origin_count: servedOrigins.length });

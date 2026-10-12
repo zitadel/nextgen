@@ -23,6 +23,11 @@ export interface StepContext {
   /** The one primary origin a deploy narrowed to with `--origin`, if any. */
   readonly origin?: string;
   readonly bundle: ConfigurationBundle;
+  /**
+   * The branding descriptors as authored, before `$file` inlining, so
+   * `validate` can report a missing reference the wire bundle has dropped.
+   */
+  readonly brandingSources: readonly Record<string, unknown>[];
 }
 
 /**

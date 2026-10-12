@@ -1,5 +1,7 @@
 import { type FlowValidationIssue, validateFlowDefinition } from "@zitadel/config/validate";
+import { brandingConfigSchema, schemaConfigSchema } from "@zitadel/config/schemas";
 
+import { readDescriptorTemplate } from "../../branding";
 import { ZitadelError } from "../../errors";
 import { flowEnvRefs } from "../../flows";
 import { reportWarning } from "../../warnings";
@@ -22,11 +24,64 @@ export const validateStep: Step = {
   async run(ctx: StepContext): Promise<void> {
     assertEnvRefsResolve(ctx);
     validateFlows(ctx);
+    validateBundleShapes(ctx);
     for (const warning of await brandingAssetWarnings(ctx.bundle.brandings)) {
       reportWarning(warning);
     }
   },
 };
+
+/**
+ * Parse every schema and branding descriptor against the same Zod the server
+ * enforces, before any writing step runs. Without this a malformed schema or
+ * branding only fails at `createRelease`, after the IdP-sync step has already
+ * written — leaving a half-applied deploy. Errors across every bundle kind
+ * aggregate into one `E_VALIDATION`. Branding is parsed from the descriptor as
+ * authored (not the inlined wire body), so a `$file` that cannot be read is
+ * reported here rather than silently dropped.
+ */
+function validateBundleShapes(ctx: StepContext): void {
+  const failures: string[] = [];
+  ctx.bundle.schemas.forEach((schema, index) => {
+    const result = schemaConfigSchema.safeParse(schema);
+    if (!result.success) {
+      const handle =
+        typeof schema.objectType === "string" ? schema.objectType : `schema #${index + 1}`;
+      for (const issue of result.error.issues) {
+        failures.push(`${handle}: ${issue.path.join(".") || "(root)"} ${issue.message}`);
+      }
+    }
+  });
+  ctx.brandingSources.forEach((descriptor, index) => {
+    const handle = `branding #${index + 1}`;
+    const result = brandingConfigSchema.safeParse(descriptor);
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        failures.push(`${handle}: ${issue.path.join(".") || "(root)"} ${issue.message}`);
+      }
+    }
+    // An unreadable `$file` reference throws here; the wire bundle dropped it,
+    // so this is the only place the deploy can still catch it.
+    try {
+      readDescriptorTemplate(ctx.cwd, descriptor);
+    } catch (error) {
+      failures.push(`${handle}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  });
+  if (failures.length === 0) {
+    return;
+  }
+  const noun = failures.length === 1 ? "issue" : "issues";
+  throw new ZitadelError(
+    "E_VALIDATION",
+    `Configuration validation failed (${failures.length} ${noun}):\n` +
+      failures.map((failure) => `  - ${failure}`).join("\n"),
+    {
+      hint: "These are the same rules the server enforces. Fix the file(s) and re-run.",
+      details: { issues: failures },
+    },
+  );
+}
 
 /** The schema a flow's `user_schema` names, found by `objectType` in the bundle. */
 function schemaFor(ctx: StepContext, flow: Record<string, unknown>): object | undefined {

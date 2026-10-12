@@ -22,6 +22,12 @@ export type ConfigurationBundle = {
 export type BuiltBundle = {
   bundle: ConfigurationBundle;
   resourceCount: number;
+  /**
+   * The branding descriptors as authored, before `$file` inlining. The wire
+   * bundle drops an unreadable reference so hashing stays total, so `validate`
+   * needs the originals to report a missing `$file` before anything is written.
+   */
+  brandingSources: Record<string, unknown>[];
 };
 
 /** The most resources a release may pin — the cap `POST /releases` enforces. */
@@ -44,7 +50,10 @@ function stripSchema(resource: Record<string, unknown>): Record<string, unknown>
 export async function buildBundle(cwd: string): Promise<BuiltBundle> {
   const schemas = (await readJsonDir(join(cwd, SCHEMAS_DIR))).map(stripSchema);
   const flow_definitions = (await readJsonDir(join(cwd, FLOWS_DIR))).map(stripSchema);
-  const brandings = (await readJsonDir(join(cwd, BRANDING_DIR))).map(
+  const brandingSources = (await readJsonDir(join(cwd, BRANDING_DIR))).map((descriptor) => ({
+    ...descriptor,
+  }));
+  const brandings = brandingSources.map(
     (descriptor) => toBrandingWireBody(cwd, descriptor) as Record<string, unknown>,
   );
 
@@ -61,5 +70,5 @@ export async function buildBundle(cwd: string): Promise<BuiltBundle> {
     );
   }
 
-  return { bundle: { schemas, flow_definitions, brandings }, resourceCount };
+  return { bundle: { schemas, flow_definitions, brandings }, resourceCount, brandingSources };
 }
