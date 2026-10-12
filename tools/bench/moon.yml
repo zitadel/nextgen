@@ -24,18 +24,14 @@ fileGroups:
     - "/packages/config/defaults/**/*"
 
 tasks:
-  # Tracked Go files only, as the server project checks them.
+  # Tracked Go files below this directory only, as the server project checks
+  # its own. The same script file as the server's task, so the task is the
+  # same command under every task runner.
   format:
-    script: |
-      unformatted="$(git ls-files -z -- '*.go' | xargs -0 gofmt -l)"
-      if [ -n "$unformatted" ]; then
-        echo "error: gofmt would rewrite the following files:" >&2
-        printf '%s\n' "$unformatted" >&2
-        echo "hint: run gofmt -w on those paths, then re-check with moon run bench:format" >&2
-        exit 1
-      fi
+    command: "node ../../scripts/go-format-check.mjs"
     inputs:
       - "**/*.go"
+      - "/scripts/go-format-check.mjs"
 
   vet:
     command: "go vet ./..."

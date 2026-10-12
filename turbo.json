@@ -128,9 +128,17 @@
     },
 
     // ---- The root project (moon's `workspace`): the scripts/*.mjs
-    // orchestration. The root package's default inputs are every file no
-    // other package owns, so the cached tasks list theirs as moon.yml does.
-    "//#lint": {},
+    // orchestration. The root package's default inputs are the whole
+    // repository, so every root task lists its inputs: the cached ones as
+    // moon.yml does, the uncached ones so that only a change to their own
+    // scripts marks them affected (scripts/ci-mode.mjs).
+    //
+    // The root lint checks the whole repository, so its inputs are every file
+    // Biome checks (moon's workspace:lint has no inputs and is never selected
+    // by affectedness, which is a gap rather than a behaviour to copy).
+    "//#lint": {
+      "inputs": ["**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}", "biome.json"]
+    },
     "//#test": {
       "inputs": [
         "scripts/ci-mode.mjs",
@@ -189,7 +197,8 @@
       "inputs": ["docs/adrs/**/*.md", "scripts/check-adrs-index.mjs", "scripts/dev-process.mjs"]
     },
     "//#doctor": {
-      "cache": false
+      "cache": false,
+      "inputs": ["scripts/doctor.mjs", "scripts/dev-process.mjs"]
     },
     // `workspace:cli` is not a turbo task: it is interactive, which turbo only
     // supports inside its terminal UI. Run `pnpm run cli -- ...` directly.
@@ -197,16 +206,24 @@
       "cache": false,
       "persistent": true,
       "dependsOn": ["@zitadel/console#build", "@zitadel/login-ui#build"],
+      "inputs": ["scripts/run-server.mjs", "scripts/dev-process.mjs", "scripts/task-runner.mjs"],
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
     },
     "//#server-debug": {
       "cache": false,
       "persistent": true,
       "dependsOn": ["@zitadel/console#build", "@zitadel/login-ui#build"],
+      "inputs": [
+        "scripts/run-server-debug.mjs",
+        "scripts/server-build.mjs",
+        "scripts/dev-process.mjs",
+        "scripts/task-runner.mjs"
+      ],
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
     },
     "//#journey": {
       "cache": false,
+      "inputs": ["scripts/run-journey.mjs", "scripts/dev-process.mjs"],
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "PLAYWRIGHT_*", "DOCKER_*"]
     },
     // The local runtime image: the server cross-compiled for linux with both
@@ -214,15 +231,18 @@
     "//#build-local-image": {
       "cache": false,
       "dependsOn": ["@zitadel/console#build", "@zitadel/login-ui#build"],
+      "inputs": ["scripts/build-local-runtime-image.mjs", "scripts/dev-process.mjs", "Dockerfile"],
       "passThroughEnv": ["ZITADEL_*", "DOCKER_*", "GOFLAGS"]
     },
     "//#smoke-container": {
       "cache": false,
       "dependsOn": ["//#build-local-image"],
+      "inputs": ["scripts/smoke-container.mjs", "scripts/dev-process.mjs"],
       "passThroughEnv": ["ZITADEL_*", "DOCKER_*"]
     },
     "//#check": {
       "cache": false,
+      "inputs": ["scripts/check.mjs", "scripts/dev-process.mjs", "scripts/task-runner.mjs"],
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "DOCKER_*", "TESTCONTAINERS_*", "GOFLAGS"]
     }
   }

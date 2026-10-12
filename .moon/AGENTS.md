@@ -3,6 +3,16 @@
 How tasks, inputs and dependencies are laid out across the workspace. Read this
 before editing any `moon.yml` or a file under `.moon/`.
 
+## Turborepo runs beside moon
+
+Every task here also exists in a `turbo.json` — the root one for the shared
+tasks, one per package for the rest — described in
+[docs/design/build/turborepo.md](../docs/design/build/turborepo.md). Until the
+cutover in [docs/design/build/turborepo-migration.md](../docs/design/build/turborepo-migration.md),
+a change to a task's command, dependencies, inputs or outputs goes into both
+files, and the command is a `package.json` script both runners run. CI runs
+the turbo version as the non-required `ci-turbo` job.
+
 ## Shared tasks live in `.moon/tasks`
 
 - `.moon/tasks/all.yml` applies to every project. Its `implicitInputs` are the

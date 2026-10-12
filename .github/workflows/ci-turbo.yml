@@ -1,18 +1,19 @@
 name: ci-turbo
 
-# DRAFT — the Turborepo version of ci.yml's moon steps, for the dual-run
-# period of docs/design/build/turborepo-migration.md. It is not a required
-# check: branch protection stays on `ci / full-pr`, and this job may fail
-# without blocking a merge. Deliberately not wired to pull requests yet; run
-# it by hand against a branch (`gh workflow run ci-turbo.yml --ref <branch>`)
-# until the parity period starts, then add `pull_request` and `merge_group`
-# triggers (same as ci.yml) so every PR runs both.
+# The Turborepo version of ci.yml's moon steps, for the dual-run period of
+# docs/design/build/turborepo-migration.md: every pull request runs both, and
+# the two are compared (pass/fail per task, the lanes ci-mode gated, the job
+# time). It is not a required check: branch protection stays on `ci /
+# full-pr`, and this job may fail without blocking a merge. At the cutover
+# these steps replace the moon steps in ci.yml and this file goes.
 #
 # What differs from ci.yml, step by step, is commented inline. The intent is
 # the same: install, decide the lanes, run the gate, then the explicit lanes
 # that moon kept out of its automatic selection.
 
 on:
+  pull_request:
+  merge_group:
   workflow_dispatch:
 
 permissions:
@@ -78,9 +79,12 @@ jobs:
       # TURBO_TEAM (the Vercel team slug) and a "Turborepo CLI" OIDC policy
       # for this repository in the Vercel team's settings (Build and
       # Deployment → OIDC Policies for CLI Access). Skipped on forks, which
-      # cannot mint the token.
+      # cannot mint the token. Until the policy exists the exchange fails;
+      # the job then runs with the local cache only ("Remote caching
+      # disabled" in turbo's output), which is why the step may fail.
       - name: Set up Turborepo remote cache
         if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork) }}
+        continue-on-error: true
         uses: vercel/setup-turborepo-remote-cache-action@v1.0.0
         with:
           team: ${{ vars.TURBO_TEAM }}

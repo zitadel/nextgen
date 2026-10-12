@@ -1,9 +1,11 @@
 # Migrating from moon to Turborepo: the plan
 
-> **Status:** proposal, 2026-10-12, written from a full prototype. Turborepo
-> 2.11.7 against moon 2.6.1. The research and the reasons to consider the
-> switch are in [turborepo-pilot.md](turborepo-pilot.md); this document is the
-> how. Nothing here is decided: the open decisions are listed at the end.
+> **Status:** accepted for phase 1 (dual run) on 2026-10-12; the decisions
+> are recorded at the end. Turborepo 2.11.7 against moon 2.6.1. The research
+> and the reasons to consider the switch are in
+> [turborepo-pilot.md](turborepo-pilot.md); this document is the how, and
+> [turborepo.md](turborepo.md) is the contributor-facing description of the
+> turbo configuration.
 >
 > **Prototype:** branch `claude/turborepo-migration-prototype-98fc8b`. It
 > configures every moon task for turbo, leaves moon fully working, and ports
@@ -37,7 +39,7 @@ workflow, not the task graph.
 | Inline scripts | `scripts/go-format-check.mjs`, `scripts/go-lint.mjs` | File versions of the `format` and `lint` inline scripts of the two Go projects. |
 | Runner selection | `scripts/task-runner.mjs` (+ `.d.mts`) | `NEXTGEN_TASK_RUNNER=moon\|turbo` picks the runner the contributor scripts build through; maps `project:task` to turbo tasks and back. |
 | Ported scripts | `ci-mode.mjs`, `check.mjs`, `run-server.mjs`, `run-server-debug.mjs`, `run-cli.mjs`, `apps/console/scripts/dev-real.mts`, `apps/cli-journey-e2e/scripts/local-registry.mjs`, new `report-turbo-failures.mjs` | Work under either runner; tests added for the turbo paths. |
-| CI draft | `.github/workflows/ci-turbo.yml` | The turbo version of ci.yml's moon steps, non-required, `workflow_dispatch` only until the parity period. |
+| CI | `.github/workflows/ci-turbo.yml` | The turbo version of ci.yml's moon steps, run on every pull request and merge-group entry as a non-required job for the parity period. |
 | Unchanged | all `moon.yml`, `.moon/`, ci.yml, the required check | Moon runs exactly as before. |
 
 Verified in the prototype, 2026-10-12:
@@ -112,9 +114,17 @@ exercises the strict environment mode and the variables the scripts now set.
 Two side findings about today's CI from these runs: `moon ci` runs the
 `runInCI: true` database lanes inside the gate step even though ci.yml names
 `:test`, so on a Depot runner they run there and again in their explicit steps
-(`cache: false`), and `moon ci` did not select `workspace:lint` in either
-round, so the root `scripts/*.mjs` are linted only through package lint tasks
-that happen to reach them. Both are worth a look in a real CI log.
+(`cache: false`); and `moon ci` did not select `workspace:lint` in either
+round — a root-project task without explicit inputs has no inputs in moon, so
+the root lint is never selected by affectedness and the root `scripts/*.mjs`
+are linted only where a package task happens to reach them. Both are worth a
+look in a real CI log. The turbo configuration gives `//#lint` the files Biome
+checks as inputs instead of copying the gap.
+
+The port's affected sets were also compared with today's moon on two real
+commits (a console-only and a Go-only change): the lane gates and the journey
+matrix come out identical; the sets differ only in moon listing the console's
+persistent dev tasks (never gated on) and turbo listing `//#lint`.
 
 Not measured here: the e2e lanes and the release graph under load (see the
 dual-run phase), and the remote cache, which the pilot covered on Vercel.
@@ -486,26 +496,26 @@ the release graph.
    (pilot, Long-term support); the difference is who pays. The configuration
    is small enough to move again.
 
-## Open decisions for Florian
+## Decisions (Florian, 2026-10-12)
 
-1. **Go ahead, or keep hedging?** The pilot's triggers (moon unmaintained
-   for three months, a blocking bug, turbo's Go support accepting a root
-   module) have not fired. The prototype removes most of the uncertainty
-   about cost; it does not change the pilot's finding that turbo buys no
-   build speed.
-2. **Which remote cache:** Vercel over OIDC (recommended, needs the policy
-   and the variable) or Depot's (nothing to set up).
-3. **Write policy on Vercel previews:** set `TURBO_CACHE=local:rw,remote:r`
-   in the Preview environment, or let previews write too.
-4. **Where the Go tasks' scripts live:** in `apps/server/package.json` (the
-   prototype; published, inert) or in a private `tools/server/package.json`
-   (clean manifest; the moon project name moves).
-5. **Release output directories:** keep the in-place `dist/` rewrite and the
-   edge chain, or give release builds their own output directory (removes
-   the chain, the last race and three of moon's mutexes; touches
-   `release.mjs`, `release-artifacts.mjs`, `verify-tarballs.mjs`, the
-   Dockerfile).
-6. **Test script naming:** `test` = full lane and `test:unit` = fast lane
-   (the prototype), or keep `test` fast and run the gate as `turbo run
-   lint typecheck build test:all`.
-7. **Dual-run length and the exit criterion** above.
+1. **Go ahead.** Phase 1 starts with the prototype branch as a pull request;
+   the pilot's triggers (moon unmaintained for three months, a blocking bug,
+   turbo's Go support accepting a root module) are no longer the gate.
+2. **Remote cache: Vercel over OIDC.** The repository variable `TURBO_TEAM`
+   is set; the "Turborepo CLI" OIDC policy in the Vercel team settings is
+   the remaining step, and until it exists `ci-turbo` runs with the local
+   cache only.
+3. **Vercel previews read the cache and do not write it.** Vercel builds
+   upload their results to the team cache by default, previews included, so
+   a production build could restore what a branch build produced. Setting
+   `TURBO_CACHE=local:rw,remote:r` on the project's Preview environment
+   (a Vercel setting) keeps uploads to production builds. Recommended; not
+   needed before phase 1.
+4. **The Go tasks' scripts stay in `apps/server/package.json`** (published,
+   inert).
+5. **Release builds keep rewriting `dist/` in place**, ordered by the edge
+   chain; separate output directories stay a later cleanup.
+6. **`test` is the full lane, `test:unit` the fast one** in `components` and
+   `api-mock`.
+7. **Dual run as proposed:** two to four weeks, exit after two consecutive
+   weeks without a divergence that was turbo's fault.
