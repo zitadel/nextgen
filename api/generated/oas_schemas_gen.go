@@ -9745,10 +9745,11 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 // handle. A bundle that references only resources it carries builds the
 // same release on any project.
 // Each kind is optional, and the arrays may be empty: a project that never
-// ejected its branding omits `branding`. Across all kinds the bundle carries at least one
-// resource and at most 50, the most a release pins; the server refuses
-// anything outside that with `rel.invalid`. Unknown keys are refused. More
-// kinds join as they become release kinds.
+// ejected its branding omits `branding`. The bundle carries at least one
+// resource, and the release it builds pins at most 50, the most a release
+// pins: the resources the bundle carries plus those resolved from the
+// project. The server refuses anything outside that with `rel.invalid`.
+// Unknown keys are refused. More kinds join as they become release kinds.
 // Each resource is validated as its kind's create endpoint validates it,
 // and every failing resource is reported in one `rel.invalid`. Sending a
 // resource needs that kind's write scope, as creating it directly does.
