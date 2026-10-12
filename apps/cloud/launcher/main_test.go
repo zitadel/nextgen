@@ -375,6 +375,7 @@ func TestPrepareMigrationMigratesProductionInPlace(t *testing.T) {
 	setLauncherEnv(t, t.TempDir())
 	t.Setenv("VERCEL_ENV", "production")
 	t.Setenv("VERCEL_GIT_COMMIT_REF", "main")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
 	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
 
 	_, err := prepareMigration(nil)
@@ -382,11 +383,54 @@ func TestPrepareMigrationMigratesProductionInPlace(t *testing.T) {
 
 	assert.Empty(t, *calls, "production creates no database")
 	assert.Equal(t, migratorURL, os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
+	assert.NoFileExists(t, filepath.Join(os.Getenv("NEXTGEN_SERVER_DATA_DIR"), "nextgen.yaml"), "the build only parses the function's configuration")
+}
+
+func TestPrepareMigrationRefusesWhatTheFunctionWouldRefuse(t *testing.T) {
+	cases := map[string]struct {
+		set    map[string]string
+		reason string
+	}{
+		"a missing master key":    {map[string]string{"MASTER_KEY_PEM_B64": ""}, "MASTER_KEY_PEM_B64 must be set"},
+		"a garbled master key":    {map[string]string{"MASTER_KEY_PEM_B64": base64.StdEncoding.EncodeToString([]byte("not a key"))}, "does not decode to a PEM block"},
+		"a bad key id":            {map[string]string{"MASTER_KEY_ID": "bad id:"}, "MASTER_KEY_ID must be set and match"},
+		"no database to serve":    {map[string]string{"CLOUD_DATABASE_URL": ""}, "CLOUD_DATABASE_URL must be set"},
+		"a broken admin document": {map[string]string{"BOOTSTRAP_ADMIN_USER_JSON_B64": "%%%"}, "BOOTSTRAP_ADMIN_USER_JSON_B64 is not base64"},
+	}
+	for _, env := range []string{"production", "preview"} {
+		for name, tc := range cases {
+			t.Run(env+"/"+name, func(t *testing.T) {
+				stubEnsureDatabase(t)
+				setLauncherEnv(t, t.TempDir())
+				t.Setenv("VERCEL_ENV", env)
+				t.Setenv("VERCEL_GIT_COMMIT_REF", "main")
+				t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+				t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
+				for key, value := range tc.set {
+					t.Setenv(key, value)
+				}
+
+				_, err := prepareMigration(nil)
+				assert.ErrorContains(t, err, "the serving function would refuse to start", "the build fails, the serving deployment stays")
+				assert.ErrorContains(t, err, tc.reason)
+			})
+		}
+	}
+
+	t.Run("a local migration needs no master key", func(t *testing.T) {
+		setLauncherEnv(t, t.TempDir())
+		t.Setenv("MASTER_KEY_PEM_B64", "")
+		t.Setenv("NEXTGEN_DATABASE_POSTGRES", "postgres://local/db")
+
+		_, err := prepareMigration(nil)
+		require.NoError(t, err)
+	})
 }
 
 func TestPrepareMigrationMigratesProductionOnlyFromItsBranch(t *testing.T) {
 	setLauncherEnv(t, t.TempDir())
 	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
 	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
 
 	t.Setenv("VERCEL_GIT_COMMIT_REF", "feature")
@@ -405,6 +449,7 @@ func TestPrepareMigrationMigratesProductionOnlyFromItsBranch(t *testing.T) {
 func TestPrepareMigrationFollowsATestedProductionBranch(t *testing.T) {
 	setLauncherEnv(t, t.TempDir())
 	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
 	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
 	t.Setenv("CLOUD_PRODUCTION_BRANCH", "feature")
 

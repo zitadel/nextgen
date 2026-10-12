@@ -77,17 +77,34 @@ cluster, a connection budget or an admin role with pull request code:
   passes the `CREATEDB` attribute on through membership, so the launcher
   creates a database as `postgres` when the role lacks the attribute itself.
 
-### 2. Master key
+### 2. Master keys and root admins
+
+Each environment has a master key of its own and a root admin of its own,
+both kept in 1Password. A preview runs pull request code; with its own key, a
+preview never holds the key that unwraps production's data
+([ADR 029](../adrs/029-cryptography-secrets-and-key-lifecycle.md)).
 
 ```sh
-openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out master-key.pem
-base64 < master-key.pem | tr -d '\n' > master-key.b64
+sh apps/cloud/setup-secrets.sh --email admin@zitadel.com production preview
 ```
 
-Keep `master-key.pem` in the team password manager. Losing it makes every
-project's key-encryption key unwrappable ([ADR 029](../adrs/029-cryptography-secrets-and-key-lifecycle.md)).
-Previews may use a key of their own: their databases hold nothing of
-production's.
+[`setup-secrets.sh`](../../apps/cloud/setup-secrets.sh) mints, per
+environment, an RSA 4096 master key with the id `cloud-<environment>-<year>-<month>`
+and a root admin ([`admin-document.mjs`](../../apps/cloud/admin-document.mjs):
+a random password, the bootstrap document with its PBKDF2 hash, the ids
+`user_platformadmin` and `team_platformadmin` in the platform project), writes
+them owner-only under `~/.zitadel/cloud/<environment>/`, and replaces the
+three variables below for that environment on Vercel. With the 1Password CLI
+on `PATH` and `OP_VAULT` set, it stores the key as a document item and the
+login as a login item; otherwise store `master-key.pem` and `admin.json` by
+hand. Losing a master key makes every project key of that environment
+unwrappable; losing the admin password means a new document and, for
+production, a password reset by hand.
+
+The server imports the document on the next deployment and skips it once
+the user exists, so the password 1Password holds stays valid. Every preview
+database starts empty and imports the preview root admin on its first start:
+one login opens every preview.
 
 ### 3. Vercel project
 
@@ -105,9 +122,12 @@ Environment variables (add secrets with
 | `CLOUD_MIGRATOR_DATABASE_URL` | Production; sensitive | `production`, the migrations' role, port 5432, database `postgres` |
 | `CLOUD_DATABASE_URL` | Preview; sensitive | `preview`, its role, port 6432, database `postgres` |
 | `CLOUD_MIGRATOR_DATABASE_URL` | Preview; sensitive | `preview`, its role, port 5432, database `postgres` |
-| `MASTER_KEY_PEM_B64` | Production, Preview; sensitive | contents of `master-key.b64` |
-| `MASTER_KEY_ID` | Production, Preview | a stable id such as `cloud-2026-10`; rotation adds a new id |
-| `BOOTSTRAP_ADMIN_USER_JSON_B64` | Production; sensitive; optional | a platform admin document (below) |
+| `MASTER_KEY_PEM_B64` | Production; sensitive | production's `master-key.b64` (`setup-secrets.sh`) |
+| `MASTER_KEY_PEM_B64` | Preview; sensitive | preview's `master-key.b64` |
+| `MASTER_KEY_ID` | Production | production's `master-key.id`, `cloud-production-<year>-<month>` |
+| `MASTER_KEY_ID` | Preview | preview's `master-key.id`, `cloud-preview-<year>-<month>` |
+| `BOOTSTRAP_ADMIN_USER_JSON_B64` | Production; sensitive | production's `admin-user.b64`: the root admin document |
+| `BOOTSTRAP_ADMIN_USER_JSON_B64` | Preview; sensitive | preview's `admin-user.b64` |
 | `ENABLE_EXPERIMENTAL_COREPACK` | Production, Preview | `1`: the builds run package scripts that call `pnpm`, which must be the workspace's pinned version |
 | `CLOUD_PRODUCTION_BRANCH` | Production; only while testing a pull request as production | the branch production deploys from; unset means `main` (see Deploying) |
 
@@ -119,12 +139,9 @@ Every other variable is a leftover; delete it. `NEXTGEN_*` variables
 override the launcher's defaults on purpose, so a stale one changes the
 deployment.
 
-**Platform admin.** The platform project has no users until someone signs
-up or a bootstrap document seeds one. Mint the document the way
-`zitadel start` writes its local admin
-([`admin-credential.ts`](../../apps/cli/src/lib/local-server/admin-credential.ts)),
-set its ids, username and email to the cloud admin's, and add it base64
-encoded. The server imports it on the next deploy and skips it afterwards.
+The build parses everything the function needs to start (the master key,
+its id, the serving URL, the admin document), so a variable that is missing
+or garbled fails the build and the serving deployment stays.
 
 ## Deploying
 
@@ -160,6 +177,26 @@ encoded. The server imports it on the next deploy and skips it afterwards.
   an older deployment without touching the schema.
 - **Startup never migrates:** the serving function refuses `--migrate`.
 
+## Replacing the secrets
+
+A new master key cannot unwrap what the old one wrapped, and the server
+cannot re-wrap yet, so replacing an environment's key means starting that
+environment's data over. Nothing production holds today is worth keeping;
+once it is, key rotation needs the server to re-wrap the project keys first.
+
+1. `sh apps/cloud/setup-secrets.sh --force <environment>`: new key, new root
+   admin, the previous files kept under `replaced-<time>/`, the variables
+   replaced on Vercel. Store the new key and login in 1Password.
+2. The running deployment keeps its old variables; the data has to go
+   before the next deployment:
+   - **production:** on the production database, as the migrations' role,
+     `DROP SCHEMA zitadel_nextgen CASCADE;` (every table, the migration
+     history included; extensions stay).
+   - **preview:** drop the preview databases (Database, cleanup). The next
+     build of a branch recreates and migrates its own.
+3. Deploy: push, or redeploy the current deployment. The build migrates the
+   empty schema and the first start imports the new root admin.
+
 ## Operating
 
 - **Logs:** Vercel runtime logs of the `server` function (JSON). The
@@ -175,6 +212,9 @@ encoded. The server imports it on the next deploy and skips it afterwards.
 - **Analytics:** the console reports page views and Web Vitals per route
   pattern (`/ui/console/users/$userId`) to the project's Analytics and Speed
   Insights tabs.
+- **Signing in:** `/ui/console/` with the environment's root admin from
+  1Password (production and preview have different passwords). Anyone else
+  registers through the login UI.
 
 ## Later: read replicas in other regions
 

@@ -25,7 +25,9 @@
 // `launcher migrate` after compiling, which creates a preview's database when
 // it is missing and runs the server's migrate command against the direct
 // URL. The serving invocation refuses --migrate, so a function cannot change
-// a schema by starting.
+// a schema by starting. The build also parses everything the function needs
+// to start (parseServing), so a deployment whose function could not start
+// fails its build and never replaces the deployment that serves.
 package main
 
 import (
@@ -123,6 +125,13 @@ func prepareMigration(extra []string) ([]string, error) {
 		if err := checkServedThroughPooler(os.Getenv(databaseURLVar), dsn); err != nil {
 			return nil, err
 		}
+		// The function's own configuration, parsed here without writing
+		// anything: a missing database URL or a garbled master key would
+		// otherwise pass the build and fail every cold start of the deployment
+		// that then replaces the one that serves.
+		if _, err := parseServing(env); err != nil {
+			return nil, fmt.Errorf("the serving function would refuse to start: %w", err)
+		}
 	}
 	if dsn != "" && env == "preview" {
 		name, err := previewDatabaseName(ref)
@@ -148,29 +157,38 @@ func prepareMigration(extra []string) ([]string, error) {
 	return append([]string{"migrate"}, extra...), nil
 }
 
-// prepareServer renders the config and bootstrap files from the environment
-// and returns the server arguments. Secrets leave the environment once they
-// are on disk, so the server process does not carry them.
-func prepareServer(extra []string) ([]string, error) {
-	for _, arg := range extra {
-		if arg == "--migrate" || strings.HasPrefix(arg, "--migrate=") {
-			return nil, errors.New("refusing --migrate; migrations run in the build step (launcher migrate), never in the serving function")
-		}
-	}
-	env := os.Getenv("VERCEL_ENV")
+// serving is what the function needs to start, read from the environment
+// and nothing else. prepareServer writes it to disk; prepareMigration only
+// parses it, so the build refuses what the function would refuse.
+type serving struct {
+	keyID string
+	pem   []string
+	// dsn is the URL the function serves from: the pooled URL with a
+	// preview's own database swapped in and the pool parameters added. Empty
+	// in a local run without CLOUD_DATABASE_URL, which keeps the server's
+	// own configuration.
+	dsn string
+	// database names dsn's host and database for the log, no credentials.
+	database string
+	// admin is the bootstrap admin document, nil when none is configured.
+	admin []byte
+}
 
+func parseServing(env string) (*serving, error) {
+	s := &serving{}
 	keyB64 := os.Getenv("MASTER_KEY_PEM_B64")
 	if keyB64 == "" {
 		return nil, errors.New("MASTER_KEY_PEM_B64 must be set (base64 of the master key PEM)")
 	}
-	keyID := os.Getenv("MASTER_KEY_ID")
-	if !keyIDPattern.MatchString(keyID) {
-		return nil, fmt.Errorf("MASTER_KEY_ID must be set and match %s, got %q", keyIDPattern, keyID)
+	s.keyID = os.Getenv("MASTER_KEY_ID")
+	if !keyIDPattern.MatchString(s.keyID) {
+		return nil, fmt.Errorf("MASTER_KEY_ID must be set and match %s, got %q", keyIDPattern, s.keyID)
 	}
 	pem, err := decodePEM(keyB64)
 	if err != nil {
 		return nil, err
 	}
+	s.pem = pem
 
 	dsn := os.Getenv(databaseURLVar)
 	if dsn == "" && deployed(env) {
@@ -186,14 +204,44 @@ func prepareServer(extra []string) ([]string, error) {
 		}
 	}
 	if dsn != "" {
-		pooled, err := withParams(dsn, servingParams)
+		s.database = describeDatabase(dsn)
+		if s.dsn, err = withParams(dsn, servingParams); err != nil {
+			return nil, err
+		}
+	}
+
+	if adminB64 := os.Getenv("BOOTSTRAP_ADMIN_USER_JSON_B64"); adminB64 != "" {
+		doc, err := base64.StdEncoding.DecodeString(adminB64)
 		if err != nil {
+			return nil, fmt.Errorf("BOOTSTRAP_ADMIN_USER_JSON_B64 is not base64: %w", err)
+		}
+		if !strings.Contains(string(doc), `"header"`) || !strings.Contains(string(doc), `"authenticators"`) {
+			return nil, errors.New("BOOTSTRAP_ADMIN_USER_JSON_B64 does not decode to a bootstrap user document")
+		}
+		s.admin = doc
+	}
+	return s, nil
+}
+
+// prepareServer renders the config and bootstrap files from the environment
+// and returns the server arguments. Secrets leave the environment once they
+// are on disk, so the server process does not carry them.
+func prepareServer(extra []string) ([]string, error) {
+	for _, arg := range extra {
+		if arg == "--migrate" || strings.HasPrefix(arg, "--migrate=") {
+			return nil, errors.New("refusing --migrate; migrations run in the build step (launcher migrate), never in the serving function")
+		}
+	}
+	env := os.Getenv("VERCEL_ENV")
+	s, err := parseServing(env)
+	if err != nil {
+		return nil, err
+	}
+	if s.dsn != "" {
+		if err := os.Setenv("NEXTGEN_DATABASE_POSTGRES", s.dsn); err != nil {
 			return nil, err
 		}
-		if err := os.Setenv("NEXTGEN_DATABASE_POSTGRES", pooled); err != nil {
-			return nil, err
-		}
-		fmt.Fprintf(os.Stderr, "launcher: serving the %s database%s\n", describeEnv(env), describeDatabase(dsn))
+		fmt.Fprintf(os.Stderr, "launcher: serving the %s database%s\n", describeEnv(env), s.database)
 	}
 
 	if err := setDefault("NEXTGEN_SERVER_DATA_DIR", defaultDataDir); err != nil {
@@ -205,23 +253,16 @@ func prepareServer(extra []string) ([]string, error) {
 		return nil, err
 	}
 	configPath := filepath.Join(dataDir, "nextgen.yaml")
-	if err := os.WriteFile(configPath, renderConfig(keyID, pem), 0o600); err != nil {
+	if err := os.WriteFile(configPath, renderConfig(s.keyID, s.pem), 0o600); err != nil {
 		return nil, err
 	}
 	_ = os.Unsetenv("MASTER_KEY_PEM_B64")
 
 	args := []string{"server", "--config", configPath}
 
-	if adminB64 := os.Getenv("BOOTSTRAP_ADMIN_USER_JSON_B64"); adminB64 != "" {
-		doc, err := base64.StdEncoding.DecodeString(adminB64)
-		if err != nil {
-			return nil, fmt.Errorf("BOOTSTRAP_ADMIN_USER_JSON_B64 is not base64: %w", err)
-		}
-		if !strings.Contains(string(doc), `"header"`) || !strings.Contains(string(doc), `"authenticators"`) {
-			return nil, errors.New("BOOTSTRAP_ADMIN_USER_JSON_B64 does not decode to a bootstrap user document")
-		}
+	if s.admin != nil {
 		adminPath := filepath.Join(dataDir, "admin-user.json")
-		if err := os.WriteFile(adminPath, doc, 0o600); err != nil {
+		if err := os.WriteFile(adminPath, s.admin, 0o600); err != nil {
 			return nil, err
 		}
 		_ = os.Unsetenv("BOOTSTRAP_ADMIN_USER_JSON_B64")
