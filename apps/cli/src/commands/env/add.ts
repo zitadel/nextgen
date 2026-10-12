@@ -236,7 +236,10 @@ export default class EnvAdd extends BaseCommand {
         // secret cannot). The human-facing line below still spells it out.
         next_commands: [
           ...(issuer !== undefined && writtenKeys.has("ZITADEL_PROJECT_SECRET")
-            ? [`zitadel origin add ${issuer} --kind primary --env ${name}`]
+            ? // Single-quote the origin: an IPv6 issuer like http://[::1]:3000 carries
+              // brackets a shell such as zsh would treat as a glob. A URL cannot contain
+              // a single quote, so wrapping is always safe here.
+              [`zitadel origin add '${issuer}' --kind primary --env ${name}`]
             : []),
           `zitadel env --env ${name}`,
         ],

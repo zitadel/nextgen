@@ -961,10 +961,7 @@ export function setupPlatformHandlers() {
       const normalized = normalizeOrigin(body.data.pattern);
       if (normalized === null) {
         return HttpResponse.json(
-          errorBody(
-            "origin.invalid",
-            "origin: must be scheme://host[:port], lowercase, with no path",
-          ),
+          errorBody("origin.invalid", "origin: must be scheme://host[:port] with no path"),
           { status: 400 },
         );
       }
@@ -1029,7 +1026,13 @@ export function setupPlatformHandlers() {
       const normalized =
         normalizeOrigin(body.data.pattern) ?? body.data.pattern.trim().toLowerCase();
       const before = auth.project.origins.length;
-      auth.project.origins = auth.project.origins.filter((origin) => origin.pattern !== normalized);
+      // Stored patterns keep their submitted casing, so match case-insensitively
+      // through `normalizeOrigin` (mirroring the add-path dedup); otherwise a
+      // mixed-case `https://App.Acme.com` could never be removed.
+      auth.project.origins = auth.project.origins.filter(
+        (origin) =>
+          (normalizeOrigin(origin.pattern) ?? origin.pattern.trim().toLowerCase()) !== normalized,
+      );
       if (auth.project.origins.length === before) {
         return HttpResponse.json(
           errorBody("origin.not_found", "origin: no such pattern on this project"),
