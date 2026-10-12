@@ -62,7 +62,7 @@ Product surfaces (`apps/`):
 Development and test surfaces (`apps/`):
 
 - `apps/storybook/` — the component workbench for the login surface
-  (`@zitadel/components`).
+  (`@zitadel/components`), served by the hosted cloud at `/storybook/`.
 - `apps/demo-next/` and `apps/demo-nuxt/` — reference integrations of the
   embedded sign-in component on each framework.
 - `e2e/` — the single root-level end-to-end project (a system test of the
@@ -72,6 +72,10 @@ Development and test surfaces (`apps/`):
   a temporary registry). `moon ci :test` runs the whole suite.
 - `apps/mock-zitadel/` — thin deployment wrapper that serves
   `packages/api-mock` as a live per-PR preview endpoint.
+- `apps/cloud/` — deployment wrapper of the hosted cloud: `main` on Vercel
+  with PlanetScale Postgres, a preview with a database of its own per branch.
+  The repo-root `vercel.json` defines its services; operations live in
+  [docs/runbooks/cloud.md](docs/runbooks/cloud.md).
 
 Published libraries (`packages/`):
 

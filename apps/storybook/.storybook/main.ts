@@ -11,7 +11,7 @@ import type { StorybookConfig } from "@storybook/web-components-vite";
 // through a package export that would resolve to an unpublished `.ts` file.
 import { liquidRaw } from "../../../packages/components/vite-liquid-plugin.js";
 
-import { optimizeDepsExclude, optimizeDepsInclude } from "./optimize-deps.js";
+import { optimizeDepsExclude, optimizeDepsInclude } from "./optimize-deps.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const packagesDir = resolve(here, "../../../packages");
@@ -51,8 +51,8 @@ const reloadPollerScript = `<script>
  * See `apps/storybook/README.md`.
  *
  * `@zitadel/api-mock`'s public dir is served statically so MSW finds
- * `mockServiceWorker.js` at `/mockServiceWorker.js` (the orchestrator stories
- * mock the Flow API through `msw-storybook-addon`).
+ * `mockServiceWorker.js` at the site root (the orchestrator stories mock the
+ * Flow API through `msw-storybook-addon`).
  */
 const config: StorybookConfig = {
   framework: "@storybook/web-components-vite",
