@@ -11,7 +11,6 @@ async function aConfiguredApp(): Promise<ScaffoldedApp> {
   await app.writeConfig({
     project: "proj-001",
     server: "https://self.example",
-    environments: { development: { issuer: "http://localhost:3000" } },
   });
   await app.writeLocalSecret("proj-001");
   return app;

@@ -228,6 +228,14 @@ describe("scaffold - merge-env", () => {
     expect(text).toContain("BAR=2");
   });
 
+  it("creates the file with the requested mode", async () => {
+    await scaffold(
+      plan({ kind: "merge-env", path: ".env.local", entries: { FOO: "1" }, mode: 0o600 }),
+      { cwd: dir, dryRun: false, force: false },
+    );
+    expect((await stat(join(dir, ".env.local"))).mode & 0o777).toBe(0o600);
+  });
+
   it("only adds keys not already present", async () => {
     await writeFile(join(dir, ".env.local"), "FOO=existing\n");
     await scaffold(

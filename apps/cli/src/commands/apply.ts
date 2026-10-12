@@ -1,7 +1,6 @@
 import { consola } from "consola";
 
-import { createZitadelClient } from "../lib/api-client";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
 import {
   buildSyncPlan,
   collectPlanWarnings,
@@ -11,7 +10,6 @@ import {
   runSyncLoop,
   summarizePlan,
 } from "../lib/sync";
-import { readZitadelSecret } from "../lib/project";
 import { publicCliCommand } from "../lib/public-cli";
 
 /**
@@ -23,7 +21,7 @@ import { publicCliCommand } from "../lib/public-cli";
  * so an invalid or under-configured file fails with `E_VALIDATION` before any
  * platform call.
  */
-export default class Apply extends BaseCommand {
+export default class Apply extends EnvironmentCommand {
   static override description = "Validate and upload repo config to the platform.";
   static override group = CommandGroups.configuration;
   static override groupOrder = 2;
@@ -31,19 +29,13 @@ export default class Apply extends BaseCommand {
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Apply);
     await this.toMeta(flags);
-    const { cwd, source, env, dryRun, isTTY } = this.meta;
+    const { cwd, env, dryRun, isTTY } = this.meta;
 
-    const secret = await readZitadelSecret(cwd);
-    consola.info(`Project   ${secret.project_id}`);
-    consola.info(`Server    ${source}`);
     // Verbatim: the sync loop diffs and writes back what it reads.
-    const client = createZitadelClient(
-      { baseUrl: source, token: secret.project_secret },
-      { verbatim: true },
-    );
+    const { client, projectId } = await this.connect({ verbatim: true });
     const syncers = makeSyncers({
       client,
-      projectId: secret.project_id,
+      projectId,
       env,
       cwd,
     });

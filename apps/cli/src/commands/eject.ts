@@ -100,7 +100,7 @@ export default class Eject extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Eject);
-    await this.toMeta(flags);
+    await this.toMeta(flags, { resolveServer: false });
     const { cwd, force, nonInteractive, dryRun } = this.meta;
 
     if (!force && nonInteractive) {

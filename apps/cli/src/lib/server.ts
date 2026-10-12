@@ -1,99 +1,63 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-
 import { ZitadelError } from "./errors";
 import { resolveLocalServer } from "./local-server/runtime";
-import { parseJsonObject } from "./json";
 
 /**
- * Server URL used when nothing else resolves. Also surfaced in hints and
- * the interactive setup prompt as the suggested value, so it is exported
- * rather than kept private.
+ * Server URL `setup` connects to when `--server` is not given. Also surfaced
+ * in hints and the interactive setup prompt as the suggested value, so it is
+ * exported rather than kept private.
  */
 export const DEFAULT_SERVER = "https://api.zitadel.cloud";
 
 /**
  * The resolved target server plus the source it came from. `origin` is
  * retained (not just the value) so callers can report *why* a server was
- * chosen and so the precedence order stays auditable.
+ * chosen.
  */
 export type ResolvedServer = {
   value: string;
-  origin: "flag" | "env" | "config-top" | "default" | "local";
+  origin: "flag" | "default" | "local";
 };
 
 /**
- * Inputs to {@link resolveServer}. Passed explicitly (cwd, env) rather
- * than read from globals so resolution is pure and testable. `serverFlag`
- * comes from the parsed CLI invocation.
+ * Inputs to {@link resolveServer}. Passed explicitly (cwd) rather than read
+ * from globals so resolution is pure and testable. `serverFlag` comes from the
+ * parsed CLI invocation.
  */
 export type ResolveServerInput = {
   cwd: string;
-  env: NodeJS.ProcessEnv;
   serverFlag?: string;
 };
 
 /**
- * Resolves which server the CLI should target, applying a fixed
- * precedence: explicit `--server` flag, then `ZITADEL_API_BASE`, then the
- * `server` in `zitadel.json`, falling back to {@link DEFAULT_SERVER}. Every
- * candidate is validated to a normalised origin; an invalid URL throws a
+ * Resolves which server `setup` should create its project on: the `--server`
+ * flag, else {@link DEFAULT_SERVER}. Every other command takes its server from
+ * `ZITADEL_URL` (see `resolveEnvironment`), because a project belongs to the
+ * server that created it and the default says nothing about that. A flag
+ * value is validated to a normalised origin; an invalid URL throws a
  * `ZitadelError` rather than silently falling through.
  */
 export async function resolveServer(input: ResolveServerInput): Promise<ResolvedServer> {
-  if (input.serverFlag) {
-    return validate(input.cwd, { value: input.serverFlag, origin: "flag" });
+  if (!input.serverFlag) {
+    return { value: DEFAULT_SERVER, origin: "default" };
   }
-  const envValue = input.env.ZITADEL_API_BASE;
-  if (envValue) {
-    return validate(input.cwd, { value: envValue, origin: "env" });
+  if (input.serverFlag === "local") {
+    return { value: await resolveLocalServer(input.cwd), origin: "local" };
   }
-
-  const config = await readConfig(input.cwd);
-  if (typeof config?.server === "string") {
-    return validate(input.cwd, { value: config.server, origin: "config-top" });
-  }
-
-  return { value: DEFAULT_SERVER, origin: "default" };
+  return { value: serverOrigin(input.serverFlag), origin: "flag" };
 }
 
-async function validate(cwd: string, resolved: ResolvedServer): Promise<ResolvedServer> {
-  if (resolved.value === "local") {
-    return { value: await resolveLocalServer(cwd), origin: "local" };
-  }
-
-  try {
-    const url = new URL(resolved.value);
-    if (url.protocol !== "https:" && url.protocol !== "http:") {
-      throw new ZitadelError("E_VALIDATION", `Server URL must use http(s): ${resolved.value}`, {
-        hint: `Set "server" in zitadel.json to a URL like ${DEFAULT_SERVER}.`,
-      });
-    }
-    return { value: url.origin, origin: resolved.origin };
-  } catch (error) {
-    if (error instanceof ZitadelError) {
-      throw error;
-    }
-    throw new ZitadelError("E_VALIDATION", `Invalid server "${resolved.value}"`, {
+/** Normalises a server URL to its origin, or throws `E_VALIDATION` when it is not an http(s) URL. */
+export function serverOrigin(value: string): string {
+  if (!URL.canParse(value)) {
+    throw new ZitadelError("E_VALIDATION", `Invalid server "${value}"`, {
       hint: `Use a URL like ${DEFAULT_SERVER}.`,
-      details: { origin: resolved.origin },
     });
   }
-}
-
-async function readConfig(cwd: string): Promise<Record<string, unknown> | undefined> {
-  try {
-    const contents = await readFile(join(cwd, "zitadel.json"), "utf8");
-    return parseJsonObject(contents, "zitadel.json");
-  } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      (error as { code?: string }).code === "ENOENT"
-    ) {
-      return undefined;
-    }
-    throw error;
+  const url = new URL(value);
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new ZitadelError("E_VALIDATION", `Server URL must use http(s): ${value}`, {
+      hint: `Use a URL like ${DEFAULT_SERVER}.`,
+    });
   }
+  return url.origin;
 }

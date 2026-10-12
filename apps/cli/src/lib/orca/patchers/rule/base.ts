@@ -271,6 +271,18 @@ export abstract class AbstractRulePatcher implements Patcher {
           ZITADEL_URL: ctx.server,
         },
       },
+      // What the CLI reads, as opposed to `.env.local`, which the app reads.
+      {
+        kind: "merge-env",
+        path: ".env.development.local",
+        mode: 0o600,
+        entries: {
+          ZITADEL_URL: ctx.server,
+          ZITADEL_PROJECT_ID: ctx.project.id,
+          ZITADEL_PROJECT_SECRET: ctx.project.project_secret,
+          ZITADEL_PREVIEW_TOKEN: ctx.project.preview_secret,
+        },
+      },
       {
         kind: "write",
         path: ".zitadel/state.json",
@@ -330,21 +342,12 @@ async function readTextIfExists(path: string): Promise<string | undefined> {
 
 /** Builds the `zitadel.json` body persisted at the project root. */
 function projectConfig(ctx: PatchContext): Record<string, unknown> {
-  const environments: Record<string, unknown> = { development: { issuer: ctx.issuer } };
-  if (ctx.project.preview_origins.length > 0) {
-    // preview_origins are already full origins (scheme://host[:port]); don't
-    // prepend a scheme or it doubles up (https://http://localhost:3000).
-    environments.preview = {
-      issuer_pattern: [...ctx.project.preview_origins],
-    };
-  }
   return {
     $schema: "https://schemas.zitadel.com/v2/project.schema.json",
     project: ctx.project.id,
     server: resolveServerOrigin(ctx.server),
     framework: { id: ctx.framework.id },
     branding: { renderer: ctx.rendererId, attribution: "visible" },
-    environments,
     ...(ctx.preset === undefined ? {} : { preset: ctx.preset }),
     ...(ctx.useCase === undefined ? {} : { useCase: ctx.useCase }),
   };

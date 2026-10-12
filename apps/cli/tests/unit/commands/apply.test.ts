@@ -88,12 +88,12 @@ describe("apply command pre-flight", () => {
     expect(json.message).toContain("Missing environment variables");
   });
 
-  it.each(["-e", "--environment"])("refuses %s, which addresses no environment", async (flag) => {
+  it("refuses --environment, which addresses no environment", async () => {
     const cwd = await makeCwd({});
 
     const res = await runCliForTest([
       "apply",
-      flag,
+      "--environment",
       "prod",
       "--cwd",
       cwd,

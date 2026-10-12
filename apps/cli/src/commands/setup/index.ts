@@ -1050,13 +1050,12 @@ function ssoRecovery(
     // what the command does. `sso enable` asks for the id, exactly as it asks
     // for the secret, which was never put in command text for the same
     // reason.
-    // `--server local`, as the setup retry pins it. Server resolution prefers
-    // `ZITADEL_API_BASE` over the project's own `zitadel.json`, so an
-    // unpinned `sso enable` run with that variable set would publish the
-    // client id and secret to whatever it names, using the local project's
-    // token -- leaving the local provider unconfigured and the credentials
-    // somewhere nobody asked for. Both callers of this are local-server
-    // failures, so `local` is the server meant in every case.
+    // `--server local`, as the setup retry pins it. An unpinned `sso enable`
+    // takes its server from `ZITADEL_URL`, so with that variable set to
+    // another server it would publish the client id and secret there --
+    // leaving the local provider unconfigured and the credentials somewhere
+    // nobody asked for. Both callers of this are local-server failures, so
+    // `local` is the server meant in every case.
     commands: remaining.map((provider) =>
       publicCliCommand(`sso enable --provider ${provider.provider} --server local`, cliVersion),
     ),
@@ -1189,6 +1188,7 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   "zitadel.json": { subject: "the Zitadel project configuration" },
   ".env.example": { subject: "the .env example template" },
   ".env.local": { subject: "the local development environment variables" },
+  ".env.development.local": { subject: "the environment variables the CLI reads" },
   ".zitadel/state.json": { subject: "the sync state file" },
   ".zitadel/flows/default-login.json": { subject: "the editable default login flow" },
   ".zitadel/flows/README.md": { subject: "the flows folder README" },

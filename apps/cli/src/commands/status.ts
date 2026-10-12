@@ -1,4 +1,3 @@
-import { createZitadelClient } from "../lib/api-client";
 import {
   claimAction,
   claimCommand,
@@ -15,12 +14,16 @@ import {
   readRuntimeMetadata,
   runtimeSummary,
 } from "../lib/local-server/runtime";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import {
+  type Connection,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+} from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
 import {
   hasZitadelConfig,
   hasZitadelSecret,
-  readDevelopmentIssuer,
   readProjectServer,
   readZitadelConfig,
   readZitadelSecret,
@@ -34,7 +37,7 @@ import { publicCliCommand } from "../lib/public-cli";
  * local server, or orphaned config should be visible without making `status`
  * itself fail.
  */
-export default class Status extends BaseCommand {
+export default class Status extends EnvironmentCommand {
   static override description = "Summarize the local Zitadel server and project state.";
   static override group = CommandGroups.localServer;
   static override groupOrder = 3;
@@ -64,10 +67,13 @@ export default class Status extends BaseCommand {
     const processRunning = runtime?.backend === "binary" ? isProcessRunning(runtime.pid) : false;
     const serverLifecycle = lifecycleForRuntime({ docker, healthy, processRunning, runtime });
 
-    const project = await projectStatus(this.meta.cwd);
+    const project = await projectStatus(
+      this.meta.cwd,
+      this.environment.values.ZITADEL_ISSUER?.value,
+    );
     const users =
       project.lifecycle === "configured"
-        ? await detectUserPresence(this.meta.cwd, this.meta.source)
+        ? await detectUserPresence(() => this.connect({ quiet: true }))
         : "unknown";
     const nextCommands = nextCommandsFor(serverLifecycle, project, users, this.meta.cliVersion);
     const nextActions = nextActionsFor(project, users, this.meta.cliVersion);
@@ -151,7 +157,7 @@ type ProjectStatus =
       claim?: ClaimState;
     };
 
-async function projectStatus(cwd: string): Promise<ProjectStatus> {
+async function projectStatus(cwd: string, issuer: string | undefined): Promise<ProjectStatus> {
   if (!(await hasZitadelConfig(cwd))) {
     return {
       lifecycle: "not-configured",
@@ -176,7 +182,7 @@ async function projectStatus(cwd: string): Promise<ProjectStatus> {
   return {
     lifecycle: "configured",
     project_id: String(config.project ?? secret.project_id ?? ""),
-    issuer: readDevelopmentIssuer(config),
+    issuer,
     ...(claim.kind === "not-applicable" ? {} : { claim }),
   };
 }
@@ -192,13 +198,9 @@ const PRESENCE_PROBE_TIMEOUT_MS = 1500;
  * effort by design: any failure (server unreachable, stale secret, timeout)
  * reads as `unknown` and the caller keeps the lifecycle-only output.
  */
-async function detectUserPresence(cwd: string, source: string): Promise<UserPresence> {
+async function detectUserPresence(connect: () => Promise<Connection>): Promise<UserPresence> {
   try {
-    const secret = await readZitadelSecret(cwd);
-    const client = createZitadelClient({
-      baseUrl: source,
-      token: secret.project_secret,
-    });
+    const { client } = await connect();
     const probe = client
       .queryUsers({ limit: 1 }, undefined, {
         signal: AbortSignal.timeout(PRESENCE_PROBE_TIMEOUT_MS),

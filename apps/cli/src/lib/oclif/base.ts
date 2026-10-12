@@ -152,9 +152,12 @@ export abstract class BaseCommand extends Command {
   }
 
   /**
-   * Builds {@link GlobalOptions} from parsed flags, resolving the server
-   * `source` by the documented precedence and storing the result on
-   * `this.meta` so the error handler can render a complete envelope.
+   * Builds {@link GlobalOptions} from parsed flags and stores the result on
+   * `this.meta` so the error handler can render a complete envelope. The server
+   * `source` is `--server` or the cloud default, which is `setup`'s rule; a
+   * command that takes its server from the environment extends
+   * `EnvironmentCommand`, and one that never talks to a server passes
+   * `resolveServer: false`.
    */
   protected async toMeta(
     flags: Record<string, unknown>,
@@ -165,7 +168,7 @@ export abstract class BaseCommand extends Command {
     const source =
       options.resolveServer === false
         ? { value: options.source ?? "", origin: "default" as const }
-        : await resolveServer({ cwd, env: process.env, serverFlag });
+        : await resolveServer({ cwd, serverFlag });
     const json = this.jsonEnabled();
     const isTTY = Boolean(process.stdout.isTTY && process.stdin.isTTY);
     const verbose = Boolean(flags.verbose);

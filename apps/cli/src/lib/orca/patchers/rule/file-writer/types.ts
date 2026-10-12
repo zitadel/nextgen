@@ -26,6 +26,8 @@ export type FileOp =
       readonly kind: "merge-env";
       readonly path: string;
       readonly entries: Readonly<Record<string, string>>;
+      /** Permission bits for a file this op creates; an existing file keeps its own. */
+      readonly mode?: number;
       /**
        * Lines written as `# ` comments above the entries the first time any of
        * them is added; a file that already carries the first line keeps it.

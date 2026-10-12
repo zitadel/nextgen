@@ -84,7 +84,7 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>> 
         return { status: "skipped", reason: `${verb}-cancelled` };
       }
     }
-    await spec.call(await this.connect(meta), id);
+    await spec.call(await this.context(), id);
     return {
       status: "ok",
       data: { id, [past]: true },
