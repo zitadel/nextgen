@@ -59595,11 +59595,14 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) SetDeploymentID(val Deployment
 
 // RevokeReleaseErrorResponse represents sum type.
 type RevokeReleaseErrorResponse struct {
-	Type             RevokeReleaseErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	NotImplemented   NotImplemented
-	ReqInvalid       ReqInvalid
+	Type                RevokeReleaseErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	NotImplemented      NotImplemented
+	RelNotFound         RelNotFound
+	RelPermissionDenied RelPermissionDenied
+	RelProjectNotFound  RelProjectNotFound
+	ReqInvalid          ReqInvalid
 }
 
 // RevokeReleaseErrorResponseType is oneOf type of RevokeReleaseErrorResponse.
@@ -59607,10 +59610,13 @@ type RevokeReleaseErrorResponseType string
 
 // Possible values for RevokeReleaseErrorResponseType.
 const (
-	AuthUnauthorizedRevokeReleaseErrorResponse RevokeReleaseErrorResponseType = "auth.unauthorized"
-	InternalRevokeReleaseErrorResponse         RevokeReleaseErrorResponseType = "internal"
-	NotImplementedRevokeReleaseErrorResponse   RevokeReleaseErrorResponseType = "not_implemented"
-	ReqInvalidRevokeReleaseErrorResponse       RevokeReleaseErrorResponseType = "req.invalid"
+	AuthUnauthorizedRevokeReleaseErrorResponse    RevokeReleaseErrorResponseType = "auth.unauthorized"
+	InternalRevokeReleaseErrorResponse            RevokeReleaseErrorResponseType = "internal"
+	NotImplementedRevokeReleaseErrorResponse      RevokeReleaseErrorResponseType = "not_implemented"
+	RelNotFoundRevokeReleaseErrorResponse         RevokeReleaseErrorResponseType = "rel.not_found"
+	RelPermissionDeniedRevokeReleaseErrorResponse RevokeReleaseErrorResponseType = "rel.permission_denied"
+	RelProjectNotFoundRevokeReleaseErrorResponse  RevokeReleaseErrorResponseType = "rel.project_not_found"
+	ReqInvalidRevokeReleaseErrorResponse          RevokeReleaseErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether RevokeReleaseErrorResponse is AuthUnauthorized.
@@ -59626,6 +59632,21 @@ func (s RevokeReleaseErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether RevokeReleaseErrorResponse is NotImplemented.
 func (s RevokeReleaseErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedRevokeReleaseErrorResponse
+}
+
+// IsRelNotFound reports whether RevokeReleaseErrorResponse is RelNotFound.
+func (s RevokeReleaseErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundRevokeReleaseErrorResponse
+}
+
+// IsRelPermissionDenied reports whether RevokeReleaseErrorResponse is RelPermissionDenied.
+func (s RevokeReleaseErrorResponse) IsRelPermissionDenied() bool {
+	return s.Type == RelPermissionDeniedRevokeReleaseErrorResponse
+}
+
+// IsRelProjectNotFound reports whether RevokeReleaseErrorResponse is RelProjectNotFound.
+func (s RevokeReleaseErrorResponse) IsRelProjectNotFound() bool {
+	return s.Type == RelProjectNotFoundRevokeReleaseErrorResponse
 }
 
 // IsReqInvalid reports whether RevokeReleaseErrorResponse is ReqInvalid.
@@ -59693,6 +59714,69 @@ func (s RevokeReleaseErrorResponse) GetNotImplemented() (v NotImplemented, ok bo
 func NewNotImplementedRevokeReleaseErrorResponse(v NotImplemented) RevokeReleaseErrorResponse {
 	var s RevokeReleaseErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetRelNotFound sets RevokeReleaseErrorResponse to RelNotFound.
+func (s *RevokeReleaseErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundRevokeReleaseErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if RevokeReleaseErrorResponse is RelNotFound.
+func (s RevokeReleaseErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from RelNotFound.
+func NewRelNotFoundRevokeReleaseErrorResponse(v RelNotFound) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelPermissionDenied sets RevokeReleaseErrorResponse to RelPermissionDenied.
+func (s *RevokeReleaseErrorResponse) SetRelPermissionDenied(v RelPermissionDenied) {
+	s.Type = RelPermissionDeniedRevokeReleaseErrorResponse
+	s.RelPermissionDenied = v
+}
+
+// GetRelPermissionDenied returns RelPermissionDenied and true boolean if RevokeReleaseErrorResponse is RelPermissionDenied.
+func (s RevokeReleaseErrorResponse) GetRelPermissionDenied() (v RelPermissionDenied, ok bool) {
+	if !s.IsRelPermissionDenied() {
+		return v, false
+	}
+	return s.RelPermissionDenied, true
+}
+
+// NewRelPermissionDeniedRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from RelPermissionDenied.
+func NewRelPermissionDeniedRevokeReleaseErrorResponse(v RelPermissionDenied) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetRelPermissionDenied(v)
+	return s
+}
+
+// SetRelProjectNotFound sets RevokeReleaseErrorResponse to RelProjectNotFound.
+func (s *RevokeReleaseErrorResponse) SetRelProjectNotFound(v RelProjectNotFound) {
+	s.Type = RelProjectNotFoundRevokeReleaseErrorResponse
+	s.RelProjectNotFound = v
+}
+
+// GetRelProjectNotFound returns RelProjectNotFound and true boolean if RevokeReleaseErrorResponse is RelProjectNotFound.
+func (s RevokeReleaseErrorResponse) GetRelProjectNotFound() (v RelProjectNotFound, ok bool) {
+	if !s.IsRelProjectNotFound() {
+		return v, false
+	}
+	return s.RelProjectNotFound, true
+}
+
+// NewRelProjectNotFoundRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from RelProjectNotFound.
+func NewRelProjectNotFoundRevokeReleaseErrorResponse(v RelProjectNotFound) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetRelProjectNotFound(v)
 	return s
 }
 
