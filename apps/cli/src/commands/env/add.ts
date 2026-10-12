@@ -228,9 +228,16 @@ export default class EnvAdd extends BaseCommand {
         platform,
         // A freshly bound project admits every origin until the first pattern
         // closes it, so the first step is to add one and restrict the project —
-        // `origin add` — before anything ships.
+        // `origin add` — before anything ships. `next_commands` is machine-
+        // readable, so the entry is included only when it is actually runnable:
+        // a concrete origin (without `--app-url` it would be a `<your-app-url>`
+        // placeholder the shell reads as redirection) and a project secret in
+        // the file for it to authenticate with (a `--project` bind with no
+        // secret cannot). The human-facing line below still spells it out.
         next_commands: [
-          `zitadel origin add ${issuer ?? "<your-app-url>"} --kind primary --env ${name}`,
+          ...(issuer !== undefined && writtenKeys.has("ZITADEL_PROJECT_SECRET")
+            ? [`zitadel origin add ${issuer} --kind primary --env ${name}`]
+            : []),
           `zitadel env --env ${name}`,
         ],
       },
