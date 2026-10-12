@@ -29,6 +29,15 @@ class PreviewProbe extends EnvironmentCommand {
   }
 }
 
+/** Exposes the selector suffix the base class derives from the resolution. */
+class SelectorProbe extends EnvironmentCommand {
+  async run() {
+    const { flags } = await this.parse(SelectorProbe);
+    await this.toMeta(flags);
+    return { selector: this.environmentSelector() };
+  }
+}
+
 let config: Config;
 let dir: string;
 
@@ -136,5 +145,36 @@ describe("EnvironmentCommand.connect", () => {
     const { telemetry } = await new ProjectProbe(["--cwd", dir], config).run();
 
     expect(telemetry).toEqual({ credential: "project", has_env_file: false });
+  });
+});
+
+describe("EnvironmentCommand.environmentSelector", () => {
+  it("is empty when no selector flag was passed", async () => {
+    const { selector } = await new SelectorProbe(["--cwd", dir], config).run();
+
+    expect(selector).toBe("");
+  });
+
+  it("reflects a non-default --env", async () => {
+    const { selector } = await new SelectorProbe(["--cwd", dir, "--env", "staging"], config).run();
+
+    expect(selector).toBe(" --env staging");
+  });
+
+  it("reflects --env-file", async () => {
+    const file = await envFile(URL_AND_PROJECT);
+
+    const { selector } = await new SelectorProbe(["--cwd", dir, "--env-file", file], config).run();
+
+    expect(selector).toBe(` --env-file ${file}`);
+  });
+
+  it("reflects --server as the resolved origin", async () => {
+    const { selector } = await new SelectorProbe(
+      ["--cwd", dir, "--server", "https://staging.example"],
+      config,
+    ).run();
+
+    expect(selector).toBe(" --server https://staging.example");
   });
 });

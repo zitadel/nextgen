@@ -93,6 +93,26 @@ function environmentName(env: NodeJS.ProcessEnv, flag?: string): Resolved {
   return { value: "development", source: "default" };
 }
 
+/**
+ * An environment name is interpolated into the `.env.<name>.local` paths the
+ * chain reads and writes, so a name carrying a slash or `..` would let a value
+ * from `--env` or `ZITADEL_ENV` escape the project directory. Only a
+ * conservative charset is allowed — letters, digits, dot, dash, underscore —
+ * and a `..` sequence is refused outright, before the name reaches any path.
+ */
+const ENVIRONMENT_NAME = /^[A-Za-z0-9._-]+$/;
+
+function assertEnvironmentName(name: Resolved): void {
+  if (ENVIRONMENT_NAME.test(name.value) && !name.value.includes("..")) {
+    return;
+  }
+  throw new ZitadelError("E_VALIDATION", `${name.value} is not a valid environment name`, {
+    hint:
+      `The ${name.source} environment name may use only letters, digits, dot, dash ` +
+      'and underscore, and may not contain "..". Pass a safe --env or set ZITADEL_ENV.',
+  });
+}
+
 /** The dotenv files read for an environment, highest priority first. */
 function environmentFiles(name: string): readonly string[] {
   return [`.env.${name}.local`, ...(name === "test" ? [] : [".env.local"]), `.env.${name}`, ".env"];
@@ -144,6 +164,7 @@ export async function resolveEnvironment(input: ResolveEnvironmentInput): Promis
     });
   }
   const name = environmentName(input.env, input.envName);
+  assertEnvironmentName(name);
 
   const sources: Array<{ source: string; values: Values | undefined }> = [
     {

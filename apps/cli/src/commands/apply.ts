@@ -59,7 +59,11 @@ export default class Apply extends EnvironmentCommand {
                   "Changes are live — reload your app to see them.",
                   "Re-run plan to confirm local config and platform are in sync.",
                 ],
-          next_commands: [publicCliCommand("plan", this.meta.cliVersion)],
+          // Carry the selector in effect so the suggested re-run targets the
+          // same environment this apply did, not the default one.
+          next_commands: [
+            publicCliCommand(`plan${this.environmentSelector()}`, this.meta.cliVersion),
+          ],
         },
       });
     }
