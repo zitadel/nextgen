@@ -55,7 +55,6 @@ func TestProjectCreate_EventPayloadIncludesPreviewOrigins(t *testing.T) {
 	statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
 	statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 	statements.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any())
-	statements.EXPECT().CreateEnvironment(gomock.Any(), gomock.Any()).Times(len(domain.DefaultEnvironmentNames))
 	statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 	statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 
@@ -559,7 +558,6 @@ func TestProjectCreate_SchemaCreatedPayloadCarriesKind(t *testing.T) {
 	statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
 	statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 	statements.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any())
-	statements.EXPECT().CreateEnvironment(gomock.Any(), gomock.Any()).Times(len(domain.DefaultEnvironmentNames))
 	statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 	statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 
