@@ -382,9 +382,9 @@ multiple identity providers.
   `error.sso_verified_unique_value_changed`: an edited, unregistered address
   would otherwise get an account linked to the editor's provider subject.
   The engine sets `read_only` on that field, so the login components render
-  it read-only.
-  A template that ignores `read_only` keeps an editable field, and the submit
-  refusal still applies.
+  it read-only on a text field.
+  A select field, or a template that ignores `read_only`, stays editable, and
+  the submit refusal still applies.
   `x-editable` was removed in
   [#901](https://github.com/zitadel/nextgen/pull/901).
 * **Verification Loss on Edit:** Editing any other prefilled value revokes its
