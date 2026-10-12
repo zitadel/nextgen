@@ -44,6 +44,9 @@ describe("TanStackStartPatcher.plan", () => {
     // `startInstance` from `createStart`, not call `registerGlobalMiddleware`.
     expect(writeContents(plan, "src/start.ts")).toContain("createStart");
     expect(writeContents(plan, "src/start.ts")).toContain("export const startInstance");
+    // Writing src/start.ts opts the app out of TanStack Start's auto-installed
+    // CSRF middleware, so the managed entry must restore it explicitly.
+    expect(writeContents(plan, "src/start.ts")).toContain("createCsrfMiddleware");
 
     expect(writeContents(plan, "src/routes/index.tsx")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "src/routes/login.tsx")).toContain(MANAGED_MARKER);

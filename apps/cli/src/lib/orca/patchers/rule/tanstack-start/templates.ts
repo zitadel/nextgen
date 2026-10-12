@@ -16,11 +16,21 @@ import { PROXY_PATH } from "../proxy";
  * unauthenticated requests away from protected routes. `url` and `projectSecret`
  * default from `process.env` (seeded in `.env.local`), so only the route policy
  * is spelled out here. The managed marker sits in a JS comment.
+ *
+ * `createCsrfMiddleware` is listed first and kept explicitly: TanStack Start
+ * only auto-installs its CSRF protection for server functions when the app has
+ * no `src/start.ts`. Writing this file opts out of that default, so we restore
+ * it here (ahead of auth, so cross-site requests are rejected before any
+ * session work runs) rather than silently dropping CSRF protection.
  */
 export function startTemplate(): string {
   return `${MANAGED_MARKER}
-import { createMiddleware, createStart } from "@tanstack/react-start";
+import { createCsrfMiddleware, createMiddleware, createStart } from "@tanstack/react-start";
 import { createNextgenRequestMiddleware } from "@zitadel/sdk-tanstack-start/server";
+
+const csrfMiddleware = createCsrfMiddleware({
+  filter: (ctx) => ctx.handlerType === "serverFn",
+});
 
 const authMiddleware = createMiddleware({ type: "request" }).server(
   createNextgenRequestMiddleware({
@@ -30,7 +40,7 @@ const authMiddleware = createMiddleware({ type: "request" }).server(
 );
 
 export const startInstance = createStart(() => ({
-  requestMiddleware: [authMiddleware],
+  requestMiddleware: [csrfMiddleware, authMiddleware],
 }));
 `;
 }
