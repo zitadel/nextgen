@@ -57,7 +57,8 @@ Product surfaces (`apps/`):
   wrapper and its per-platform binary packages (one per OS/arch).
 - `apps/console/` and `apps/login-ui/` — the two SPAs embedded into the Go
   server at `/ui/console/` and `/ui/login/`.
-- `apps/docs/` — the Fumapress/Fumadocs documentation site.
+- `apps/docs/` — the documentation site: Fumadocs on Next.js, served under
+  `/docs`, in the hosted cloud too.
 
 Development and test surfaces (`apps/`):
 

@@ -2,8 +2,6 @@ id: "docs"
 language: "typescript"
 layer: "application"
 stack: "frontend"
-dependsOn:
-  - "design-tokens"
 
 workspace:
   inheritedTasks:
@@ -12,16 +10,9 @@ workspace:
       - "test"
 
 tasks:
-  generate-openapi:
-    command: "corepack pnpm run generate:openapi"
-    inputs:
-      - "**/*"
-      - "/api/openapi/**/*.yaml"
-      # The bundle applies the repo's Redocly config.
-      - "/redocly.yaml"
-    outputs:
-      - ".generated/openapi.mjs"
-
+  # Bundles api/openapi into .generated/, which lib/openapi.ts imports. The
+  # content needs no generation step: lib/source.ts defines its collection
+  # with Fumadocs MDX's macro.
   generate:
     command: "corepack pnpm run generate"
     inputs:
@@ -31,39 +22,35 @@ tasks:
       - "/redocly.yaml"
     outputs:
       - ".generated/openapi.mjs"
-      - ".source/**/*"
+      - ".generated/openapi.d.mts"
 
   typecheck:
     deps:
       - "generate"
 
   build:
-    command: "corepack pnpm exec waku build"
+    command: "corepack pnpm exec next build"
     deps:
-      # src/app.css imports @zitadel/design-tokens/css/tokens.css.
-      - "design-tokens:build"
       - "generate"
-    inputs:
-      - "**/*"
-      # waku picks its adapter from VERCEL, so a Vercel build is never
-      # restored from a local-adapter cache (or the reverse).
-      - "$VERCEL"
+    outputs:
+      - ".next/**/*"
     options:
-      # Runs waku directly (generation is the `generate` dep), replacing the
+      # Runs next directly (generation is the `generate` dep), replacing the
       # inherited `pnpm run build` arguments rather than adding to them.
       mergeArgs: "replace"
+      # Replaces the inherited dist/**/* rather than adding to it.
+      mergeOutputs: "replace"
 
   dev:
-    command: "corepack pnpm exec waku dev --port 3003"
+    command: "corepack pnpm exec next dev --port 3003"
     deps:
-      - "design-tokens:build"
       - "generate"
     options:
       persistent: true
       runInCI: false
 
-  preview:
-    command: "corepack pnpm run preview"
+  start:
+    command: "corepack pnpm exec next start --port 3003"
     deps:
       - "build"
     options:

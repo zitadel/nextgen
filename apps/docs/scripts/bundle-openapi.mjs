@@ -19,10 +19,22 @@ if (totals.errors > 0) {
   throw new Error(`bundling ${input} failed with ${totals.errors} error(s)`);
 }
 
-// press.config.tsx imports the bundle as a module, so it ships inside the
-// build instead of being read from a build-machine path at runtime.
+// lib/openapi.ts imports the bundle as a module, so it ships inside the
+// build instead of being read from a build-machine path at runtime. The
+// declaration types it as the OpenAPI document it is, instead of the literal
+// type TypeScript would infer from the data.
 await mkdir(outputDir, { recursive: true });
 await writeFile(
   resolve(outputDir, "openapi.mjs"),
   `export default ${JSON.stringify(result.parsed, null, 2)};\n`,
+);
+await writeFile(
+  resolve(outputDir, "openapi.d.mts"),
+  [
+    'import type { OpenAPIV3_1 } from "fumadocs-openapi";',
+    "",
+    "declare const document: OpenAPIV3_1.Document;",
+    "export default document;",
+    "",
+  ].join("\n"),
 );
