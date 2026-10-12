@@ -1,0 +1,131 @@
+post:
+  operationId: rollbackDeployment
+  summary: Roll back to a deployment
+  description: |
+    Re-deploys the deployment named in the path: a new deployment with the
+    same `release_id` and the same `targets`, `reason: rollback`, and
+    `rollback_to` in its metadata naming the deployment it re-applied. The
+    variable values that deployment resolved are re-applied with it, so the
+    targets serve exactly what they served then. The history is append-only,
+    so the deployments in between stay in it.
+
+    Only a deployment to primary origins can be rolled back. One whose
+    targets were preview URLs answers `409` with `dep.invalid`; deploy to
+    the preview again instead. Every target must still be a primary origin
+    of the project: when one is not, the request answers `409` with
+    `dep.invalid` naming it, and nothing changes. There is no narrowing to
+    some of the targets: to roll back one origin, deploy the earlier
+    release to it with `POST /deployments`.
+
+    When every target already serves the deployment's release, nothing
+    changes and the call answers `200` with the newest deployment to the
+    targets.
+
+    The release must not be revoked: a revoked one answers `409` with
+    `rel.revoked`. An unknown deployment id, or one of another project,
+    answers `404` with `dep.not_found`.
+  tags:
+    - Deployments
+  parameters:
+    - $ref: ../../../../components/parameters/project-id.yaml
+    - $ref: ../../../../components/parameters/deployment-id.yaml
+  security:
+    - oauth2:
+        - deployment.write
+  requestBody:
+    required: false
+    content:
+      application/json:
+        schema:
+          $ref: rollback-deployment-request.yaml
+        examples:
+          rollback:
+            summary: Roll back with a message
+            value:
+              message: phone_number broke sign-up
+  responses:
+    '200':
+      description: |
+        Every target already serves the release; nothing changed. The
+        deployment is the newest one to the targets.
+      content:
+        application/json:
+          schema:
+            $ref: ../../deployment.yaml
+          examples:
+            alreadyServed:
+              summary: The targets already serve the release
+              value:
+                id: dep_01KX6P8D0E3F7F0N9WD3P2E4YM7
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                release_id: rel_01KX2QF7Z6D0F0N9WD3P2E4YM40
+                targets:
+                  - origin: https://app.acme.com
+                  - origin: https://www.acme.com
+                deployed_at: '2026-10-02T15:03:00Z'
+                metadata:
+                  reason: rollback
+                  message: phone_number broke sign-up
+                  rollback_to: dep_01KX4SB9C8E1F0N9WD3P2E4YM5
+                  deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                  deployed_by_type: human
+    '201':
+      description: |
+        The rollback deployment was created and every target serves the
+        release again.
+      content:
+        application/json:
+          schema:
+            $ref: ../../deployment.yaml
+          examples:
+            rolledBack:
+              summary: Rolled back to an earlier deployment
+              description: |
+                The new deployment copies the release and the targets of the
+                one named in the path, and `rollback_to` names it.
+              value:
+                id: dep_01KX6P8D0E3F7F0N9WD3P2E4YM7
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                release_id: rel_01KX2QF7Z6D0F0N9WD3P2E4YM40
+                targets:
+                  - origin: https://app.acme.com
+                  - origin: https://www.acme.com
+                deployed_at: '2026-10-02T15:03:00Z'
+                metadata:
+                  reason: rollback
+                  message: phone_number broke sign-up
+                  rollback_to: dep_01KX4SB9C8E1F0N9WD3P2E4YM5
+                  deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                  deployed_by_type: human
+    '409':
+      description: |
+        The rollback cannot happen: `dep.conflict` when the guard did not
+        match, with the actual newest deployment in `details.deployment`;
+        `dep.invalid` when the deployment targeted preview URLs or one of
+        its targets is no longer a primary origin; `rel.revoked` when its
+        release is revoked.
+      content:
+        application/json:
+          schema:
+            $ref: ../../deployment-conflict.yaml
+          examples:
+            preview:
+              summary: The deployment targeted preview URLs
+              value:
+                code: dep.invalid
+                message: 'deployment: a deployment to preview URLs cannot be rolled back'
+            targetRemoved:
+              summary: A target is no longer a primary origin
+              description: |
+                Roll back the remaining origins by deploying the earlier
+                release to them with `POST /deployments`.
+              value:
+                code: dep.invalid
+                message: 'deployment: https://www.acme.com is no longer a primary origin of the project'
+            revoked:
+              summary: The release is revoked
+              value:
+                code: rel.revoked
+                message: 'release: revoked'
+    default:
+      $ref: rollbackDeployment-error-response.yaml

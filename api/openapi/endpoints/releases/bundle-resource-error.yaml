@@ -1,0 +1,23 @@
+title: BundleResourceError
+type: object
+description: One bundle resource that failed validation.
+required:
+  - kind
+  - index
+  - code
+  - message
+properties:
+  kind:
+    $ref: ../../components/schemas/release-pointer-kind.yaml
+  index:
+    type: integer
+    minimum: 0
+    description: The resource's position in its kind's array in the bundle.
+  handle:
+    type: string
+    description: The resource's handle, when it declares one.
+  code:
+    $ref: ../../components/schemas/error-code.yaml
+  message:
+    type: string
+    description: What the kind's create endpoint would have answered.

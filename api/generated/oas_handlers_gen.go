@@ -1052,25 +1052,37 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 
 // handleCreateDeploymentRequest handles createDeployment operation.
 //
-// Makes a release live on an environment by recording a deployment. The two
-// happen atomically: when the call returns, the environment runs the named
-// release and the record exists; on any failure the environment keeps
-// running what it ran and no record is written.
-// Deploying, promoting and rolling back are all this call — `reason` says
-// which. None of them assembles a release: the release must already exist,
-// and rolling back means deploying a release the environment ran earlier,
-// chosen from its deployment history.
-// Idempotent on the running release: deploying the release the environment
-// already runs changes nothing and answers `200` with the deployment that
-// made it live, so a re-run of `zitadel deploy` on unchanged content is a
-// no-op end to end — matching `POST /releases`, which resolves the same
-// content to the same release first. Anything else writes a new record,
-// including the same release returning after something else ran in between:
-// the log is append-only, and each row is one act of making a release live.
-// `expected_current_deployment_id` guards against racing another deploy:
-// when present, the swap only happens if the environment's current
-// deployment still is the one named, and a mismatch answers `409` with the
-// actual `current_deployment_id` and `current_release_id` in the details.
+// Makes a release live on a set of targets by recording a deployment. The
+// two happen atomically: when the call returns, every target serves the
+// named release and the record exists; on any failure every target keeps
+// serving what it served and no record is written.
+// The release is named by exactly one of `release_id` or `content_hash`
+// (both or neither answers `400` with `dep.invalid`), and must already
+// exist in the project: deploying never assembles a release. An
+// unknown release id or digest answers `404` with `rel.not_found`, and a
+// revoked release answers `409` with `rel.revoked`.
+// `targets` lists `primary`, which expands to every primary origin of the
+// project, and exact origins. An origin that is neither a primary origin
+// of the project nor matches one of its preview patterns answers `403`
+// with `proj.origin_not_allowed`, and `primary` on a project with no
+// primary origin answers `400` with `dep.invalid`. The deployment records
+// the resolved origins, sorted, never the keyword.
+// A deployment to preview URLs creates the preview for each of them, or
+// renews it when it exists, in the same transaction, with the expiry set
+// from `ttl`; each target in the response carries that expiry. Primary
+// origins and preview URLs cannot be mixed in one deployment: that
+// answers `400` with `dep.invalid`.
+// Idempotent on what is served: when every resolved target already serves
+// the release, nothing changes and the call answers `200` with the newest
+// deployment to those targets, so a re-run of `zitadel deploy` on
+// unchanged content is a no-op end to end. Anything else writes a new
+// record covering all of the resolved targets, including the same release
+// returning after something else was served in between: the log is
+// append-only, and each record is one act of making a release live.
+// `expected_deployment_id` guards against racing another deploy: when
+// present, the write only happens if the newest deployment to any of the
+// resolved targets still is the one named, and a mismatch answers `409`
+// with `dep.conflict`, carrying the actual newest deployment.
 //
 // POST /deployments
 func (s *Server) handleCreateDeploymentRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -2415,18 +2427,47 @@ func (s *Server) handleCreateProjectRequest(args [0]string, argsEscaped bool, w 
 
 // handleCreateReleaseRequest handles createRelease operation.
 //
-// Bundles a release from revisions that already exist, supplied as
+// Assembles a release from exactly one of two body shapes.
+// `pointers` pins revisions that already exist, supplied as
 // `(kind, revision_id)` pairs. No new revisions are allocated — use the
-// per-kind create endpoints for that, then pin the ids here.
-// Every referenced `revision_id` must exist in the project. Each one's handle
-// is read from the revision itself and recorded on the release, so a resource
+// per-kind create endpoints for that, then pin the ids here. Every
+// referenced `revision_id` must exist in the project; each one's handle is
+// read from the revision itself and recorded on the release, so a resource
 // is always pinned under the identity it declares.
-// Creating a release does not deploy it. A release is environment-agnostic
-// and the same release can later be deployed to any number of environments
-// unchanged.
-// Idempotent on the pinned set: metadata is excluded from the comparison, so
-// re-submitting the same revisions with a different `message` returns the
-// release that already pins them rather than creating a second one.
+// `bundle` takes the resources of `.zitadel/` as authored on disk, grouped
+// by kind. For every resource the server compares the content against the
+// project's newest revision of the same handle: unchanged content reuses
+// that revision, changed content allocates a new one. Construction is one
+// transaction — a failure anywhere leaves no revision and no release. The
+// caller records nothing. An empty bundle is refused.
+// Every resource in a bundle is validated as its kind's create endpoint
+// validates it, and every failure is reported at once rather than only the
+// first: the request answers `400` with `rel.invalid`, and
+// `details.resources` lists each resource that failed.
+// `pointers` needs `release.write`. A bundle also writes revisions, so it
+// needs, in addition, the write scope of every kind it carries a resource
+// of — `schema.write`, `flow_definition.write` and `branding.write`, as the
+// per-kind create endpoints do. A missing scope answers `403` with
+// `rel.permission_denied`, naming the kind. An empty kind needs no scope.
+// Both shapes are closed the same way: every handle a pinned resource
+// references — a flow definition's `user_schema` naming a schema by
+// `objectType` — must be pinned by the same release. A bundle may leave a
+// referenced resource out when the project already holds it; the release
+// then pins the project's newest revision of that handle, so only a bundle
+// that carries everything it references builds the same release on any
+// project. A handle that resolves nowhere refuses the request with
+// `rel.unresolved_reference`. The message names the pointer
+// and the handle that did not resolve, for example
+// `flow_definition default-login: user_schema human-user not found`,
+// because a release pins many and the code alone does not say which one
+// failed.
+// Idempotent on content: the content digest excludes metadata, so
+// re-submitting the same content with a different `message` answers `200`
+// with the release that already has it rather than creating a second one.
+// A release the project did not hold before answers `201`.
+// Creating a release does not deploy it. A release is not tied to an
+// origin, and the same release can later be deployed to any number of
+// origins unchanged.
 //
 // POST /releases
 func (s *Server) handleCreateReleaseRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -2591,7 +2632,7 @@ func (s *Server) handleCreateReleaseRequest(args [0]string, argsEscaped bool, w 
 		}
 
 		type (
-			Request  = *CreateReleaseRequest
+			Request  = CreateReleaseRequest
 			Params   = CreateReleaseParams
 			Response = CreateReleaseRes
 		)
@@ -8129,8 +8170,10 @@ func (s *Server) handleGetReadyRequest(args [0]string, argsEscaped bool, w http.
 
 // handleGetReleaseByIdRequest handles getReleaseById operation.
 //
-// Reads one release: its metadata and the `(kind, handle, revision_id)`
-// tuples it pins.
+// Reads one release: its digest, its metadata, whether it was revoked, and
+// the `(kind, handle, revision_id)` tuples it pins.
+// The path takes the `rel_` id only. To find a release from its digest,
+// list with the `content_hash` filter and read the matched entry's `id`.
 // Does not embed resource content. Resolve each `revision_id` through the
 // per-kind read endpoints when the bytes are needed.
 // The lookup is scoped to the project in `project_id`: a release id belonging
@@ -10158,10 +10201,16 @@ func (s *Server) handleListBrandingRequest(args [0]string, argsEscaped bool, w h
 // handleListDeploymentsRequest handles listDeployments operation.
 //
 // Lists deployments newest first: what ran where, and when.
-// With `environment_name`, the list is that environment's history and its
-// first row is the environment's current deployment. Without it, the list
-// interleaves every environment of the project — a project-wide audit view
-// in which the first row is only the most recent deployment anywhere.
+// By default the list is the history: every deployment of the project, each
+// with every target it made the release live on. With `origin`, it is the
+// history of that origin alone, and its first row is the deployment the
+// origin serves.
+// With `live=true`, the list is what is served now: the newest deployment
+// to each target, each carrying only the targets it still serves, with
+// the expiry of each preview URL. A deployment every target of which has
+// since been replaced, or whose previews have all expired or been
+// removed, does not appear. Combined with `origin`, the live view is the one deployment that
+// origin serves, or empty.
 // `expand: ["release"]` embeds the release each deployment made live, so a
 // history renders with each entry's content without resolving `release_id`
 // one by one. Expanding requires `release.read` and does not affect the
@@ -10311,9 +10360,13 @@ func (s *Server) handleListDeploymentsRequest(args [0]string, argsEscaped bool, 
 					In:   "query",
 				}: params.ProjectID,
 				{
-					Name: "environment_name",
+					Name: "origin",
 					In:   "query",
-				}: params.EnvironmentName,
+				}: params.Origin,
+				{
+					Name: "live",
+					In:   "query",
+				}: params.Live,
 				{
 					Name: "expand",
 					In:   "query",
@@ -11451,8 +11504,14 @@ func (s *Server) handleListMyProjectsRequest(args [0]string, argsEscaped bool, w
 // handleListReleasesRequest handles listReleases operation.
 //
 // Lists the project's releases, newest first.
-// Entries carry metadata only — the pinned set is omitted. Read one release
-// with `GET /releases/{release_id}` to get its pointers.
+// Entries carry the digest, the metadata and `revoked_at` — the pinned set
+// is omitted.
+// Read one release with `GET /releases/{release_id}` to get its pointers.
+// `content_hash` looks a release up by its content, as the CLI does when a
+// person types the digest a transcript printed. The project holds at most
+// one release per digest, so the filtered list has one entry or none, and
+// an unknown digest is an empty list rather than an error. Paths take the
+// `rel_` id only; the matched entry's `id` is what to use there.
 //
 // GET /releases
 func (s *Server) handleListReleasesRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -11597,6 +11656,10 @@ func (s *Server) handleListReleasesRequest(args [0]string, argsEscaped bool, w h
 					Name: "project_id",
 					In:   "query",
 				}: params.ProjectID,
+				{
+					Name: "content_hash",
+					In:   "query",
+				}: params.ContentHash,
 				{
 					Name: "limit",
 					In:   "query",
@@ -14551,6 +14614,212 @@ func (s *Server) handleRevokeMySessionRequest(args [0]string, argsEscaped bool, 
 	}
 }
 
+// handleRevokeReleaseRequest handles revokeRelease operation.
+//
+// Marks the release revoked, so that its content is never served again.
+// From then on the release cannot be deployed and is refused on every path
+// that would serve it, including to a build that pins its digest, with
+// `rel.revoked`.
+// A release that any origin still serves cannot be revoked. An origin
+// serves the release of the newest deployment to it, so the call answers
+// `409` with `rel.in_use`, naming each such origin and that deployment.
+// Deploy another release there or roll back first, then revoke. Revoking
+// therefore never takes an origin down. Deployments that named the release
+// earlier stay in the history.
+// Idempotent: revoking a release that is already revoked answers `200`
+// with the release unchanged, `revoked_at` still naming the first
+// revocation. There is no un-revoke; build a new release instead.
+// Takes no body. The lookup is scoped to the project in `project_id`, so a
+// release id of another project answers not found exactly as an unknown id
+// does.
+//
+// POST /releases/{release_id}/revoke
+func (s *Server) handleRevokeReleaseRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("revokeRelease"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.HTTPRouteKey.String("/releases/{release_id}/revoke"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), RevokeReleaseOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(codeAttr)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: RevokeReleaseOperation,
+			ID:   "revokeRelease",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, RevokeReleaseOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeRevokeReleaseParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response RevokeReleaseRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    RevokeReleaseOperation,
+			OperationSummary: "Revoke a release",
+			OperationID:      "revokeRelease",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+				{
+					Name: "release_id",
+					In:   "path",
+				}: params.ReleaseID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = RevokeReleaseParams
+			Response = RevokeReleaseRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackRevokeReleaseParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.RevokeRelease(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.RevokeRelease(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeRevokeReleaseResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
 // handleRevokeSessionRequest handles revokeSession operation.
 //
 // Permanently deletes the session, terminating it immediately.
@@ -14736,6 +15005,230 @@ func (s *Server) handleRevokeSessionRequest(args [1]string, argsEscaped bool, w 
 	}
 
 	if err := encodeRevokeSessionResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
+// handleRollbackDeploymentRequest handles rollbackDeployment operation.
+//
+// Re-deploys the deployment named in the path: a new deployment with the
+// same `release_id` and the same `targets`, `reason: rollback`, and
+// `rollback_to` in its metadata naming the deployment it re-applied. The
+// variable values that deployment resolved are re-applied with it, so the
+// targets serve exactly what they served then. The history is append-only,
+// so the deployments in between stay in it.
+// Only a deployment to primary origins can be rolled back. One whose
+// targets were preview URLs answers `409` with `dep.invalid`; deploy to
+// the preview again instead. Every target must still be a primary origin
+// of the project: when one is not, the request answers `409` with
+// `dep.invalid` naming it, and nothing changes. There is no narrowing to
+// some of the targets: to roll back one origin, deploy the earlier
+// release to it with `POST /deployments`.
+// When every target already serves the deployment's release, nothing
+// changes and the call answers `200` with the newest deployment to the
+// targets.
+// The release must not be revoked: a revoked one answers `409` with
+// `rel.revoked`. An unknown deployment id, or one of another project,
+// answers `404` with `dep.not_found`.
+//
+// POST /deployments/{deployment_id}/rollback
+func (s *Server) handleRollbackDeploymentRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("rollbackDeployment"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.HTTPRouteKey.String("/deployments/{deployment_id}/rollback"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), RollbackDeploymentOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(codeAttr)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: RollbackDeploymentOperation,
+			ID:   "rollbackDeployment",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, RollbackDeploymentOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeRollbackDeploymentParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+	request, rawBody, close, err := s.decodeRollbackDeploymentRequest(r)
+	if err != nil {
+		err = &ogenerrors.DecodeRequestError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeRequest", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+	defer func() {
+		if err := close(); err != nil {
+			recordError("CloseRequest", err)
+		}
+	}()
+
+	var response RollbackDeploymentRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    RollbackDeploymentOperation,
+			OperationSummary: "Roll back to a deployment",
+			OperationID:      "rollbackDeployment",
+			Body:             request,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+				{
+					Name: "deployment_id",
+					In:   "path",
+				}: params.DeploymentID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = OptRollbackDeploymentRequest
+			Params   = RollbackDeploymentParams
+			Response = RollbackDeploymentRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackRollbackDeploymentParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.RollbackDeployment(ctx, request, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.RollbackDeployment(ctx, request, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeRollbackDeploymentResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)

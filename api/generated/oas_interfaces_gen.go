@@ -293,8 +293,16 @@ type RevokeMySessionRes interface {
 	revokeMySessionRes()
 }
 
+type RevokeReleaseRes interface {
+	revokeReleaseRes()
+}
+
 type RevokeSessionRes interface {
 	revokeSessionRes()
+}
+
+type RollbackDeploymentRes interface {
+	rollbackDeploymentRes()
 }
 
 type SetUserPasswordRes interface {

@@ -1,0 +1,27 @@
+title: CreateReleaseBadRequest
+type: object
+description: |
+  The request cannot build a release. `code` says why; for a bundle whose
+  resources fail validation it is `rel.invalid`, and `details.resources`
+  lists every resource that failed.
+required:
+  - code
+  - message
+properties:
+  code:
+    $ref: ../../components/schemas/error-code.yaml
+  message:
+    type: string
+    description: Human-readable explanation of the error.
+  details:
+    type: object
+    description: Additional error-specific context.
+    additionalProperties: true
+    properties:
+      resources:
+        type: array
+        description: |
+          Every bundle resource that failed validation, each with the code
+          and message its kind's create endpoint would have answered.
+        items:
+          $ref: bundle-resource-error.yaml

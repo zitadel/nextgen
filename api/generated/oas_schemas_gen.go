@@ -8729,6 +8729,69 @@ func (s *BrandingTypography) SetScale(val OptFloat64) {
 	s.Scale = val
 }
 
+// One bundle resource that failed validation.
+// Ref: #
+type BundleResourceError struct {
+	Kind ReleasePointerKind `json:"kind"`
+	// The resource's position in its kind's array in the bundle.
+	Index int `json:"index"`
+	// The resource's handle, when it declares one.
+	Handle OptString `json:"handle"`
+	Code   ErrorCode `json:"code"`
+	// What the kind's create endpoint would have answered.
+	Message string `json:"message"`
+}
+
+// GetKind returns the value of Kind.
+func (s *BundleResourceError) GetKind() ReleasePointerKind {
+	return s.Kind
+}
+
+// GetIndex returns the value of Index.
+func (s *BundleResourceError) GetIndex() int {
+	return s.Index
+}
+
+// GetHandle returns the value of Handle.
+func (s *BundleResourceError) GetHandle() OptString {
+	return s.Handle
+}
+
+// GetCode returns the value of Code.
+func (s *BundleResourceError) GetCode() ErrorCode {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *BundleResourceError) GetMessage() string {
+	return s.Message
+}
+
+// SetKind sets the value of Kind.
+func (s *BundleResourceError) SetKind(val ReleasePointerKind) {
+	s.Kind = val
+}
+
+// SetIndex sets the value of Index.
+func (s *BundleResourceError) SetIndex(val int) {
+	s.Index = val
+}
+
+// SetHandle sets the value of Handle.
+func (s *BundleResourceError) SetHandle(val OptString) {
+	s.Handle = val
+}
+
+// SetCode sets the value of Code.
+func (s *BundleResourceError) SetCode(val ErrorCode) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *BundleResourceError) SetMessage(val string) {
+	s.Message = val
+}
+
 type ChallengeID string
 
 // An authentication factor method a client can challenge. It leaves out
@@ -9766,6 +9829,69 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 	return s
 }
 
+// The resources of a project's `.zitadel/` directory as authored on disk,
+// grouped by kind. The server turns the bundle into a release in one
+// transaction: for every resource it compares the content against the
+// project's newest revision of the same handle, reuses that revision when the
+// content matches and allocates a new one otherwise. The caller keeps no
+// state.
+// Resources reference each other by handle: a flow definition's
+// `user_schema` names a schema by its `objectType`. A reference resolves to
+// the resource with that handle in this bundle; failing that, to the
+// project's newest revision of it, which the release then pins as well. A
+// handle that neither holds refuses the release, naming the pointer and the
+// handle. A bundle that references only resources it carries builds the
+// same release on any project.
+// Each kind is optional and may be empty: a project that never ejected its
+// branding sends none. Across all kinds the bundle carries at least one
+// resource and at most 50, the most a release pins; the server refuses
+// anything outside that with `rel.invalid`. Unknown keys are refused. More
+// kinds join as they become release kinds.
+// Each resource is validated as its kind's create endpoint validates it,
+// and every failing resource is reported in one `rel.invalid`. Sending a
+// resource needs that kind's write scope, as creating it directly does.
+// Ref: #
+type ConfigurationBundle struct {
+	// User schemas, one per `.zitadel/schemas/*.json`.
+	Schemas []UserSchema `json:"schemas"`
+	// Flow definitions, one per `.zitadel/flows/*.json`.
+	FlowDefinitions []FlowDefinition `json:"flow_definitions"`
+	// The descriptor from `.zitadel/branding/branding.json` with its template
+	// inlined, exactly as `POST /branding` takes it. A project has one
+	// branding, so at most one entry.
+	Brandings []Branding `json:"brandings"`
+}
+
+// GetSchemas returns the value of Schemas.
+func (s *ConfigurationBundle) GetSchemas() []UserSchema {
+	return s.Schemas
+}
+
+// GetFlowDefinitions returns the value of FlowDefinitions.
+func (s *ConfigurationBundle) GetFlowDefinitions() []FlowDefinition {
+	return s.FlowDefinitions
+}
+
+// GetBrandings returns the value of Brandings.
+func (s *ConfigurationBundle) GetBrandings() []Branding {
+	return s.Brandings
+}
+
+// SetSchemas sets the value of Schemas.
+func (s *ConfigurationBundle) SetSchemas(val []UserSchema) {
+	s.Schemas = val
+}
+
+// SetFlowDefinitions sets the value of FlowDefinitions.
+func (s *ConfigurationBundle) SetFlowDefinitions(val []FlowDefinition) {
+	s.FlowDefinitions = val
+}
+
+// SetBrandings sets the value of Brandings.
+func (s *ConfigurationBundle) SetBrandings(val []Branding) {
+	s.Brandings = val
+}
+
 // CreateAuthAttemptErrorResponse represents sum type.
 type CreateAuthAttemptErrorResponse struct {
 	Type              CreateAuthAttemptErrorResponseType // switch on this field
@@ -9994,14 +10120,11 @@ func (*CreateDeploymentCreated) createDeploymentRes() {}
 type CreateDeploymentErrorResponse struct {
 	Type                CreateDeploymentErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
-	DepConflict         DepConflict
-	DepInvalid          DepInvalid
 	DepNotFound         DepNotFound
 	DepPermissionDenied DepPermissionDenied
-	EnvNotFound         EnvNotFound
 	EnvProjectNotFound  EnvProjectNotFound
-	EvtInvalid          EvtInvalid
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 }
 
@@ -10011,30 +10134,17 @@ type CreateDeploymentErrorResponseType string
 // Possible values for CreateDeploymentErrorResponseType.
 const (
 	AuthUnauthorizedCreateDeploymentErrorResponse    CreateDeploymentErrorResponseType = "auth.unauthorized"
-	DepConflictCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "dep.conflict"
-	DepInvalidCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "dep.invalid"
 	DepNotFoundCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "dep.not_found"
 	DepPermissionDeniedCreateDeploymentErrorResponse CreateDeploymentErrorResponseType = "dep.permission_denied"
-	EnvNotFoundCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "env.not_found"
 	EnvProjectNotFoundCreateDeploymentErrorResponse  CreateDeploymentErrorResponseType = "env.project_not_found"
-	EvtInvalidCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "evt.invalid"
 	InternalCreateDeploymentErrorResponse            CreateDeploymentErrorResponseType = "internal"
+	NotImplementedCreateDeploymentErrorResponse      CreateDeploymentErrorResponseType = "not_implemented"
 	ReqInvalidCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether CreateDeploymentErrorResponse is AuthUnauthorized.
 func (s CreateDeploymentErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedCreateDeploymentErrorResponse
-}
-
-// IsDepConflict reports whether CreateDeploymentErrorResponse is DepConflict.
-func (s CreateDeploymentErrorResponse) IsDepConflict() bool {
-	return s.Type == DepConflictCreateDeploymentErrorResponse
-}
-
-// IsDepInvalid reports whether CreateDeploymentErrorResponse is DepInvalid.
-func (s CreateDeploymentErrorResponse) IsDepInvalid() bool {
-	return s.Type == DepInvalidCreateDeploymentErrorResponse
 }
 
 // IsDepNotFound reports whether CreateDeploymentErrorResponse is DepNotFound.
@@ -10047,24 +10157,19 @@ func (s CreateDeploymentErrorResponse) IsDepPermissionDenied() bool {
 	return s.Type == DepPermissionDeniedCreateDeploymentErrorResponse
 }
 
-// IsEnvNotFound reports whether CreateDeploymentErrorResponse is EnvNotFound.
-func (s CreateDeploymentErrorResponse) IsEnvNotFound() bool {
-	return s.Type == EnvNotFoundCreateDeploymentErrorResponse
-}
-
 // IsEnvProjectNotFound reports whether CreateDeploymentErrorResponse is EnvProjectNotFound.
 func (s CreateDeploymentErrorResponse) IsEnvProjectNotFound() bool {
 	return s.Type == EnvProjectNotFoundCreateDeploymentErrorResponse
 }
 
-// IsEvtInvalid reports whether CreateDeploymentErrorResponse is EvtInvalid.
-func (s CreateDeploymentErrorResponse) IsEvtInvalid() bool {
-	return s.Type == EvtInvalidCreateDeploymentErrorResponse
-}
-
 // IsInternal reports whether CreateDeploymentErrorResponse is Internal.
 func (s CreateDeploymentErrorResponse) IsInternal() bool {
 	return s.Type == InternalCreateDeploymentErrorResponse
+}
+
+// IsNotImplemented reports whether CreateDeploymentErrorResponse is NotImplemented.
+func (s CreateDeploymentErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCreateDeploymentErrorResponse
 }
 
 // IsReqInvalid reports whether CreateDeploymentErrorResponse is ReqInvalid.
@@ -10090,48 +10195,6 @@ func (s CreateDeploymentErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized
 func NewAuthUnauthorizedCreateDeploymentErrorResponse(v AuthUnauthorized) CreateDeploymentErrorResponse {
 	var s CreateDeploymentErrorResponse
 	s.SetAuthUnauthorized(v)
-	return s
-}
-
-// SetDepConflict sets CreateDeploymentErrorResponse to DepConflict.
-func (s *CreateDeploymentErrorResponse) SetDepConflict(v DepConflict) {
-	s.Type = DepConflictCreateDeploymentErrorResponse
-	s.DepConflict = v
-}
-
-// GetDepConflict returns DepConflict and true boolean if CreateDeploymentErrorResponse is DepConflict.
-func (s CreateDeploymentErrorResponse) GetDepConflict() (v DepConflict, ok bool) {
-	if !s.IsDepConflict() {
-		return v, false
-	}
-	return s.DepConflict, true
-}
-
-// NewDepConflictCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from DepConflict.
-func NewDepConflictCreateDeploymentErrorResponse(v DepConflict) CreateDeploymentErrorResponse {
-	var s CreateDeploymentErrorResponse
-	s.SetDepConflict(v)
-	return s
-}
-
-// SetDepInvalid sets CreateDeploymentErrorResponse to DepInvalid.
-func (s *CreateDeploymentErrorResponse) SetDepInvalid(v DepInvalid) {
-	s.Type = DepInvalidCreateDeploymentErrorResponse
-	s.DepInvalid = v
-}
-
-// GetDepInvalid returns DepInvalid and true boolean if CreateDeploymentErrorResponse is DepInvalid.
-func (s CreateDeploymentErrorResponse) GetDepInvalid() (v DepInvalid, ok bool) {
-	if !s.IsDepInvalid() {
-		return v, false
-	}
-	return s.DepInvalid, true
-}
-
-// NewDepInvalidCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from DepInvalid.
-func NewDepInvalidCreateDeploymentErrorResponse(v DepInvalid) CreateDeploymentErrorResponse {
-	var s CreateDeploymentErrorResponse
-	s.SetDepInvalid(v)
 	return s
 }
 
@@ -10177,27 +10240,6 @@ func NewDepPermissionDeniedCreateDeploymentErrorResponse(v DepPermissionDenied) 
 	return s
 }
 
-// SetEnvNotFound sets CreateDeploymentErrorResponse to EnvNotFound.
-func (s *CreateDeploymentErrorResponse) SetEnvNotFound(v EnvNotFound) {
-	s.Type = EnvNotFoundCreateDeploymentErrorResponse
-	s.EnvNotFound = v
-}
-
-// GetEnvNotFound returns EnvNotFound and true boolean if CreateDeploymentErrorResponse is EnvNotFound.
-func (s CreateDeploymentErrorResponse) GetEnvNotFound() (v EnvNotFound, ok bool) {
-	if !s.IsEnvNotFound() {
-		return v, false
-	}
-	return s.EnvNotFound, true
-}
-
-// NewEnvNotFoundCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from EnvNotFound.
-func NewEnvNotFoundCreateDeploymentErrorResponse(v EnvNotFound) CreateDeploymentErrorResponse {
-	var s CreateDeploymentErrorResponse
-	s.SetEnvNotFound(v)
-	return s
-}
-
 // SetEnvProjectNotFound sets CreateDeploymentErrorResponse to EnvProjectNotFound.
 func (s *CreateDeploymentErrorResponse) SetEnvProjectNotFound(v EnvProjectNotFound) {
 	s.Type = EnvProjectNotFoundCreateDeploymentErrorResponse
@@ -10219,27 +10261,6 @@ func NewEnvProjectNotFoundCreateDeploymentErrorResponse(v EnvProjectNotFound) Cr
 	return s
 }
 
-// SetEvtInvalid sets CreateDeploymentErrorResponse to EvtInvalid.
-func (s *CreateDeploymentErrorResponse) SetEvtInvalid(v EvtInvalid) {
-	s.Type = EvtInvalidCreateDeploymentErrorResponse
-	s.EvtInvalid = v
-}
-
-// GetEvtInvalid returns EvtInvalid and true boolean if CreateDeploymentErrorResponse is EvtInvalid.
-func (s CreateDeploymentErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
-	if !s.IsEvtInvalid() {
-		return v, false
-	}
-	return s.EvtInvalid, true
-}
-
-// NewEvtInvalidCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from EvtInvalid.
-func NewEvtInvalidCreateDeploymentErrorResponse(v EvtInvalid) CreateDeploymentErrorResponse {
-	var s CreateDeploymentErrorResponse
-	s.SetEvtInvalid(v)
-	return s
-}
-
 // SetInternal sets CreateDeploymentErrorResponse to Internal.
 func (s *CreateDeploymentErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalCreateDeploymentErrorResponse
@@ -10258,6 +10279,27 @@ func (s CreateDeploymentErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalCreateDeploymentErrorResponse(v Internal) CreateDeploymentErrorResponse {
 	var s CreateDeploymentErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets CreateDeploymentErrorResponse to NotImplemented.
+func (s *CreateDeploymentErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCreateDeploymentErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CreateDeploymentErrorResponse is NotImplemented.
+func (s CreateDeploymentErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from NotImplemented.
+func NewNotImplementedCreateDeploymentErrorResponse(v NotImplemented) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -10314,54 +10356,62 @@ type CreateDeploymentOK Deployment
 
 func (*CreateDeploymentOK) createDeploymentRes() {}
 
-// The release to make live and the environment to make it live on.
-// Environments are addressed by name here — the name is the environment's
-// wire address — and resolved to ids once, when the deployment is created.
-// The stored record carries the ids, so it survives renames.
+// The release to make live and the targets to make it live on. The release
+// is named by exactly one of `release_id` or `content_hash`; a request with
+// both or neither answers `400` with `dep.invalid`.
 // `deployed_at` and `deployed_by` are derived server-side from the caller's
 // authentication context and are not accepted here.
 // Ref: #
 type CreateDeploymentRequest struct {
-	// The name of the environment to deploy to.
-	Environment EnvironmentName `json:"environment"`
-	// The release to make live. Must already exist in the project — deploying
-	// never assembles a release.
-	// Always explicit, for `promote` too: a promotion names the release it
-	// moves rather than asking the server to read the source environment's
-	// current one, so the caller promotes the release it inspected, not
-	// whatever is current by the time the request lands.
-	ReleaseID ReleaseID `json:"release_id"`
-	// Why this deployment happens. Omitted, the server records `deploy` —
-	// the plain case needs no annotation. Applied server-side rather than as
-	// a schema `default`: a default declared next to the shared reason
-	// schema would leak into every other use of it.
+	// The release to make live. Must exist in the project; deploying never
+	// assembles a release.
+	ReleaseID OptReleaseID `json:"release_id"`
+	// The content digest of the release to make live, in full with its
+	// `sha256:` prefix. A digest no release of the project carries answers
+	// `404` with `rel.not_found`; deploying never assembles a release.
+	ContentHash OptString                `json:"content_hash"`
+	Targets     DeploymentTargetsRequest `json:"targets"`
+	// How long each preview URL in `targets` stays live, counted from this
+	// deployment. Every preview it writes gets the same expiry, renewing a
+	// preview that already exists. Omitted, the project's default applies; a
+	// value above the project's maximum answers `400` with `dep.invalid`.
+	// Only valid when the targets are preview URLs: with primary origins it
+	// answers `400` with `dep.invalid`.
+	TTL OptPreviewTTL `json:"ttl"`
+	// Why this deployment happens. Omitted, the server records `deploy`.
 	Reason OptDeploymentReason `json:"reason"`
-	// The name of the environment the release is promoted from. Required when
-	// `reason` is `promote`, rejected otherwise — before the name is
-	// resolved, so a source on a non-promotion answers `400` whether or not
-	// the name exists.
-	SourceEnvironment OptNilEnvironmentName `json:"source_environment"`
 	// A short free-form summary of why this deployment happened, analogous to
 	// a git commit message. Recorded on the deployment's metadata and shown
 	// when listing the history.
 	Message OptString `json:"message"`
-	// An optimistic-concurrency guard. When present, the deployment is only
-	// created if the environment's current deployment is exactly this one;
-	// otherwise the request answers `409` carrying the actual
-	// `current_deployment_id` and `current_release_id` in its details, and
+	// An optimistic-concurrency guard: the deployment the caller believes is
+	// the newest one to any of its targets. When present, the deployment
+	// is only created if the newest deployment to any of the resolved
+	// targets is exactly this one; otherwise the request answers `409`
+	// with `dep.conflict`, carrying the actual newest deployment, and
 	// nothing changes.
-	// Not persisted — it guards the swap, it is not part of the record.
-	ExpectedCurrentDeploymentID OptNilDeploymentID `json:"expected_current_deployment_id"`
-}
-
-// GetEnvironment returns the value of Environment.
-func (s *CreateDeploymentRequest) GetEnvironment() EnvironmentName {
-	return s.Environment
+	// Not persisted; it guards the write, it is not part of the record.
+	ExpectedDeploymentID OptDeploymentID `json:"expected_deployment_id"`
 }
 
 // GetReleaseID returns the value of ReleaseID.
-func (s *CreateDeploymentRequest) GetReleaseID() ReleaseID {
+func (s *CreateDeploymentRequest) GetReleaseID() OptReleaseID {
 	return s.ReleaseID
+}
+
+// GetContentHash returns the value of ContentHash.
+func (s *CreateDeploymentRequest) GetContentHash() OptString {
+	return s.ContentHash
+}
+
+// GetTargets returns the value of Targets.
+func (s *CreateDeploymentRequest) GetTargets() DeploymentTargetsRequest {
+	return s.Targets
+}
+
+// GetTTL returns the value of TTL.
+func (s *CreateDeploymentRequest) GetTTL() OptPreviewTTL {
+	return s.TTL
 }
 
 // GetReason returns the value of Reason.
@@ -10369,29 +10419,34 @@ func (s *CreateDeploymentRequest) GetReason() OptDeploymentReason {
 	return s.Reason
 }
 
-// GetSourceEnvironment returns the value of SourceEnvironment.
-func (s *CreateDeploymentRequest) GetSourceEnvironment() OptNilEnvironmentName {
-	return s.SourceEnvironment
-}
-
 // GetMessage returns the value of Message.
 func (s *CreateDeploymentRequest) GetMessage() OptString {
 	return s.Message
 }
 
-// GetExpectedCurrentDeploymentID returns the value of ExpectedCurrentDeploymentID.
-func (s *CreateDeploymentRequest) GetExpectedCurrentDeploymentID() OptNilDeploymentID {
-	return s.ExpectedCurrentDeploymentID
-}
-
-// SetEnvironment sets the value of Environment.
-func (s *CreateDeploymentRequest) SetEnvironment(val EnvironmentName) {
-	s.Environment = val
+// GetExpectedDeploymentID returns the value of ExpectedDeploymentID.
+func (s *CreateDeploymentRequest) GetExpectedDeploymentID() OptDeploymentID {
+	return s.ExpectedDeploymentID
 }
 
 // SetReleaseID sets the value of ReleaseID.
-func (s *CreateDeploymentRequest) SetReleaseID(val ReleaseID) {
+func (s *CreateDeploymentRequest) SetReleaseID(val OptReleaseID) {
 	s.ReleaseID = val
+}
+
+// SetContentHash sets the value of ContentHash.
+func (s *CreateDeploymentRequest) SetContentHash(val OptString) {
+	s.ContentHash = val
+}
+
+// SetTargets sets the value of Targets.
+func (s *CreateDeploymentRequest) SetTargets(val DeploymentTargetsRequest) {
+	s.Targets = val
+}
+
+// SetTTL sets the value of TTL.
+func (s *CreateDeploymentRequest) SetTTL(val OptPreviewTTL) {
+	s.TTL = val
 }
 
 // SetReason sets the value of Reason.
@@ -10399,19 +10454,14 @@ func (s *CreateDeploymentRequest) SetReason(val OptDeploymentReason) {
 	s.Reason = val
 }
 
-// SetSourceEnvironment sets the value of SourceEnvironment.
-func (s *CreateDeploymentRequest) SetSourceEnvironment(val OptNilEnvironmentName) {
-	s.SourceEnvironment = val
-}
-
 // SetMessage sets the value of Message.
 func (s *CreateDeploymentRequest) SetMessage(val OptString) {
 	s.Message = val
 }
 
-// SetExpectedCurrentDeploymentID sets the value of ExpectedCurrentDeploymentID.
-func (s *CreateDeploymentRequest) SetExpectedCurrentDeploymentID(val OptNilDeploymentID) {
-	s.ExpectedCurrentDeploymentID = val
+// SetExpectedDeploymentID sets the value of ExpectedDeploymentID.
+func (s *CreateDeploymentRequest) SetExpectedDeploymentID(val OptDeploymentID) {
+	s.ExpectedDeploymentID = val
 }
 
 // CreateFlowDefinitionErrorResponse represents sum type.
@@ -12925,6 +12975,89 @@ func (s *CreateProjectResponse) SetCreatedAt(val time.Time) {
 
 func (*CreateProjectResponse) createProjectRes() {}
 
+// The request cannot build a release. `code` says why; for a bundle whose
+// resources fail validation it is `rel.invalid`, and `details.resources`
+// lists every resource that failed.
+// Ref: #
+type CreateReleaseBadRequest struct {
+	Code ErrorCode `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptCreateReleaseBadRequestDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *CreateReleaseBadRequest) GetCode() ErrorCode {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *CreateReleaseBadRequest) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *CreateReleaseBadRequest) GetDetails() OptCreateReleaseBadRequestDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *CreateReleaseBadRequest) SetCode(val ErrorCode) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *CreateReleaseBadRequest) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *CreateReleaseBadRequest) SetDetails(val OptCreateReleaseBadRequestDetails) {
+	s.Details = val
+}
+
+func (*CreateReleaseBadRequest) createReleaseRes() {}
+
+// Additional error-specific context.
+type CreateReleaseBadRequestDetails struct {
+	// Every bundle resource that failed validation, each with the code
+	// and message its kind's create endpoint would have answered.
+	Resources       []BundleResourceError `json:"resources"`
+	AdditionalProps CreateReleaseBadRequestDetailsAdditional
+}
+
+// GetResources returns the value of Resources.
+func (s *CreateReleaseBadRequestDetails) GetResources() []BundleResourceError {
+	return s.Resources
+}
+
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *CreateReleaseBadRequestDetails) GetAdditionalProps() CreateReleaseBadRequestDetailsAdditional {
+	return s.AdditionalProps
+}
+
+// SetResources sets the value of Resources.
+func (s *CreateReleaseBadRequestDetails) SetResources(val []BundleResourceError) {
+	s.Resources = val
+}
+
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *CreateReleaseBadRequestDetails) SetAdditionalProps(val CreateReleaseBadRequestDetailsAdditional) {
+	s.AdditionalProps = val
+}
+
+type CreateReleaseBadRequestDetailsAdditional map[string]jx.Raw
+
+func (s *CreateReleaseBadRequestDetailsAdditional) init() CreateReleaseBadRequestDetailsAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 type CreateReleaseCreated Release
 
 func (*CreateReleaseCreated) createReleaseRes() {}
@@ -13249,6 +13382,128 @@ func (s *CreateReleaseErrorResponseStatusCode) SetResponse(val CreateReleaseErro
 
 func (*CreateReleaseErrorResponseStatusCode) createReleaseRes() {}
 
+// A release built from the resources as authored on disk. Carries no
+// `pointers`.
+// Ref: #
+type CreateReleaseFromBundle struct {
+	Bundle ConfigurationBundle `json:"bundle"`
+	// A short summary of what the release changes, analogous to a git commit
+	// message. Recorded on the release and shown when listing releases.
+	Message OptString `json:"message"`
+	// The source commit the caller was operating from.
+	GitSha OptString `json:"git_sha"`
+	// Set when the working tree had uncommitted changes, so the release content
+	// does not correspond exactly to `git_sha`.
+	GitDirty OptBool `json:"git_dirty"`
+}
+
+// GetBundle returns the value of Bundle.
+func (s *CreateReleaseFromBundle) GetBundle() ConfigurationBundle {
+	return s.Bundle
+}
+
+// GetMessage returns the value of Message.
+func (s *CreateReleaseFromBundle) GetMessage() OptString {
+	return s.Message
+}
+
+// GetGitSha returns the value of GitSha.
+func (s *CreateReleaseFromBundle) GetGitSha() OptString {
+	return s.GitSha
+}
+
+// GetGitDirty returns the value of GitDirty.
+func (s *CreateReleaseFromBundle) GetGitDirty() OptBool {
+	return s.GitDirty
+}
+
+// SetBundle sets the value of Bundle.
+func (s *CreateReleaseFromBundle) SetBundle(val ConfigurationBundle) {
+	s.Bundle = val
+}
+
+// SetMessage sets the value of Message.
+func (s *CreateReleaseFromBundle) SetMessage(val OptString) {
+	s.Message = val
+}
+
+// SetGitSha sets the value of GitSha.
+func (s *CreateReleaseFromBundle) SetGitSha(val OptString) {
+	s.GitSha = val
+}
+
+// SetGitDirty sets the value of GitDirty.
+func (s *CreateReleaseFromBundle) SetGitDirty(val OptBool) {
+	s.GitDirty = val
+}
+
+// A release pinning revisions that already exist. Carries no `bundle`.
+// Ref: #
+type CreateReleaseFromPointers struct {
+	// The revisions to pin. Must not be empty.
+	// A kind usually appears more than once: a project has several user schemas
+	// and several flow definitions, and each is pinned on its own. What it
+	// cannot do is
+	// pin two revisions of the *same* resource — a second revision of the
+	// `human-user` schema is rejected rather than ordered, since a release
+	// describes one state of the project.
+	// The upper bound counts *resources*, not revisions — one release pins at
+	// most one revision of each — so it is a limit on how much a project
+	// configures, not on how often it changes. It keeps the server's
+	// per-pointer revision lookups bounded by the contract rather than by the
+	// request, and is set conservatively: raising it is a spec change, and
+	// widening a bound breaks no client that was already inside it.
+	Pointers []CreateReleasePointer `json:"pointers"`
+	// A short summary of what the release changes, analogous to a git commit
+	// message. Recorded on the release and shown when listing releases.
+	Message OptString `json:"message"`
+	// The source commit the caller was operating from.
+	GitSha OptString `json:"git_sha"`
+	// Set when the working tree had uncommitted changes, so the release content
+	// does not correspond exactly to `git_sha`.
+	GitDirty OptBool `json:"git_dirty"`
+}
+
+// GetPointers returns the value of Pointers.
+func (s *CreateReleaseFromPointers) GetPointers() []CreateReleasePointer {
+	return s.Pointers
+}
+
+// GetMessage returns the value of Message.
+func (s *CreateReleaseFromPointers) GetMessage() OptString {
+	return s.Message
+}
+
+// GetGitSha returns the value of GitSha.
+func (s *CreateReleaseFromPointers) GetGitSha() OptString {
+	return s.GitSha
+}
+
+// GetGitDirty returns the value of GitDirty.
+func (s *CreateReleaseFromPointers) GetGitDirty() OptBool {
+	return s.GitDirty
+}
+
+// SetPointers sets the value of Pointers.
+func (s *CreateReleaseFromPointers) SetPointers(val []CreateReleasePointer) {
+	s.Pointers = val
+}
+
+// SetMessage sets the value of Message.
+func (s *CreateReleaseFromPointers) SetMessage(val OptString) {
+	s.Message = val
+}
+
+// SetGitSha sets the value of GitSha.
+func (s *CreateReleaseFromPointers) SetGitSha(val OptString) {
+	s.GitSha = val
+}
+
+// SetGitDirty sets the value of GitDirty.
+func (s *CreateReleaseFromPointers) SetGitDirty(val OptBool) {
+	s.GitDirty = val
+}
+
 type CreateReleaseOK Release
 
 func (*CreateReleaseOK) createReleaseRes() {}
@@ -13287,74 +13542,85 @@ func (s *CreateReleasePointer) SetRevisionID(val string) {
 	s.RevisionID = val
 }
 
-// The set of revisions to bundle into a release, plus the metadata to record
-// alongside it.
+// What goes into the release, plus the metadata to record alongside it.
+// Exactly one of two forms: `pointers` or `bundle`, never both and never
+// neither.
+// `pointers` names revisions that already exist, as `(kind, revision_id)`
+// pairs; nothing is allocated. `bundle` carries the resources as authored on
+// disk; the server reuses the project's newest revision of each handle when
+// the content matches and allocates a new revision otherwise. Either way the
+// result is a release pinning one revision per resource, and the same
+// closure rule applies: every handle a pinned resource references must be
+// pinned by the same release.
 // `created_at` and `created_by` are derived server-side from the caller's
 // authentication context and are not accepted here.
 // Ref: #
+// CreateReleaseRequest represents sum type.
 type CreateReleaseRequest struct {
-	// The revisions to pin. Must not be empty.
-	// A kind usually appears more than once: a project has several user schemas
-	// and several flow definitions, and each is pinned on its own. What it
-	// cannot do is
-	// pin two revisions of the *same* resource — a second revision of the
-	// `human-user` schema is rejected rather than ordered, since a release
-	// describes one state of the project.
-	// The upper bound counts *resources*, not revisions — one release pins at
-	// most one revision of each — so it is a limit on how much a project
-	// configures, not on how often it changes. It keeps the server's
-	// per-pointer revision lookups bounded by the contract rather than by the
-	// request, and is set conservatively: raising it is a spec change, and
-	// widening a bound breaks no client that was already inside it.
-	Pointers []CreateReleasePointer `json:"pointers"`
-	// A short summary of what the release changes, analogous to a git commit
-	// message. Recorded on the release and shown when listing releases.
-	Message OptString `json:"message"`
-	// The source commit the caller was operating from.
-	GitSha OptString `json:"git_sha"`
-	// Set when the working tree had uncommitted changes, so the release content
-	// does not correspond exactly to `git_sha`.
-	GitDirty OptBool `json:"git_dirty"`
+	Type                      CreateReleaseRequestType // switch on this field
+	CreateReleaseFromPointers CreateReleaseFromPointers
+	CreateReleaseFromBundle   CreateReleaseFromBundle
 }
 
-// GetPointers returns the value of Pointers.
-func (s *CreateReleaseRequest) GetPointers() []CreateReleasePointer {
-	return s.Pointers
+// CreateReleaseRequestType is oneOf type of CreateReleaseRequest.
+type CreateReleaseRequestType string
+
+// Possible values for CreateReleaseRequestType.
+const (
+	CreateReleaseFromPointersCreateReleaseRequest CreateReleaseRequestType = "CreateReleaseFromPointers"
+	CreateReleaseFromBundleCreateReleaseRequest   CreateReleaseRequestType = "CreateReleaseFromBundle"
+)
+
+// IsCreateReleaseFromPointers reports whether CreateReleaseRequest is CreateReleaseFromPointers.
+func (s CreateReleaseRequest) IsCreateReleaseFromPointers() bool {
+	return s.Type == CreateReleaseFromPointersCreateReleaseRequest
 }
 
-// GetMessage returns the value of Message.
-func (s *CreateReleaseRequest) GetMessage() OptString {
-	return s.Message
+// IsCreateReleaseFromBundle reports whether CreateReleaseRequest is CreateReleaseFromBundle.
+func (s CreateReleaseRequest) IsCreateReleaseFromBundle() bool {
+	return s.Type == CreateReleaseFromBundleCreateReleaseRequest
 }
 
-// GetGitSha returns the value of GitSha.
-func (s *CreateReleaseRequest) GetGitSha() OptString {
-	return s.GitSha
+// SetCreateReleaseFromPointers sets CreateReleaseRequest to CreateReleaseFromPointers.
+func (s *CreateReleaseRequest) SetCreateReleaseFromPointers(v CreateReleaseFromPointers) {
+	s.Type = CreateReleaseFromPointersCreateReleaseRequest
+	s.CreateReleaseFromPointers = v
 }
 
-// GetGitDirty returns the value of GitDirty.
-func (s *CreateReleaseRequest) GetGitDirty() OptBool {
-	return s.GitDirty
+// GetCreateReleaseFromPointers returns CreateReleaseFromPointers and true boolean if CreateReleaseRequest is CreateReleaseFromPointers.
+func (s CreateReleaseRequest) GetCreateReleaseFromPointers() (v CreateReleaseFromPointers, ok bool) {
+	if !s.IsCreateReleaseFromPointers() {
+		return v, false
+	}
+	return s.CreateReleaseFromPointers, true
 }
 
-// SetPointers sets the value of Pointers.
-func (s *CreateReleaseRequest) SetPointers(val []CreateReleasePointer) {
-	s.Pointers = val
+// NewCreateReleaseFromPointersCreateReleaseRequest returns new CreateReleaseRequest from CreateReleaseFromPointers.
+func NewCreateReleaseFromPointersCreateReleaseRequest(v CreateReleaseFromPointers) CreateReleaseRequest {
+	var s CreateReleaseRequest
+	s.SetCreateReleaseFromPointers(v)
+	return s
 }
 
-// SetMessage sets the value of Message.
-func (s *CreateReleaseRequest) SetMessage(val OptString) {
-	s.Message = val
+// SetCreateReleaseFromBundle sets CreateReleaseRequest to CreateReleaseFromBundle.
+func (s *CreateReleaseRequest) SetCreateReleaseFromBundle(v CreateReleaseFromBundle) {
+	s.Type = CreateReleaseFromBundleCreateReleaseRequest
+	s.CreateReleaseFromBundle = v
 }
 
-// SetGitSha sets the value of GitSha.
-func (s *CreateReleaseRequest) SetGitSha(val OptString) {
-	s.GitSha = val
+// GetCreateReleaseFromBundle returns CreateReleaseFromBundle and true boolean if CreateReleaseRequest is CreateReleaseFromBundle.
+func (s CreateReleaseRequest) GetCreateReleaseFromBundle() (v CreateReleaseFromBundle, ok bool) {
+	if !s.IsCreateReleaseFromBundle() {
+		return v, false
+	}
+	return s.CreateReleaseFromBundle, true
 }
 
-// SetGitDirty sets the value of GitDirty.
-func (s *CreateReleaseRequest) SetGitDirty(val OptBool) {
-	s.GitDirty = val
+// NewCreateReleaseFromBundleCreateReleaseRequest returns new CreateReleaseRequest from CreateReleaseFromBundle.
+func NewCreateReleaseFromBundleCreateReleaseRequest(v CreateReleaseFromBundle) CreateReleaseRequest {
+	var s CreateReleaseRequest
+	s.SetCreateReleaseFromBundle(v)
+	return s
 }
 
 // CreateSchemaErrorResponse represents sum type.
@@ -15513,112 +15779,6 @@ func (*DeleteVariableNoContent) deleteVariableRes() {}
 
 // Merged schema.
 // Ref: #
-type DepConflict struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptDepConflictDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *DepConflict) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *DepConflict) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *DepConflict) GetDetails() OptDepConflictDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *DepConflict) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *DepConflict) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *DepConflict) SetDetails(val OptDepConflictDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type DepConflictDetails map[string]jx.Raw
-
-func (s *DepConflictDetails) init() DepConflictDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-// Merged schema.
-// Ref: #
-type DepInvalid struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptDepInvalidDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *DepInvalid) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *DepInvalid) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *DepInvalid) GetDetails() OptDepInvalidDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *DepInvalid) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *DepInvalid) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *DepInvalid) SetDetails(val OptDepInvalidDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type DepInvalidDetails map[string]jx.Raw
-
-func (s *DepInvalidDetails) init() DepInvalidDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-// Merged schema.
-// Ref: #
 type DepNotFound struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -15723,25 +15883,28 @@ func (s *DepPermissionDeniedDetails) init() DepPermissionDeniedDetails {
 	return m
 }
 
-// An immutable record of a release being made live on an environment.
-// Deploying, promoting and rolling back all create a deployment. The record
-// is what ran where and when — the ids and the timestamp — plus metadata
-// saying why and who. It is append-only: written once when the environment
-// starts running the release and never changed afterwards, so the deployment
-// log is the audit trail of what ran where.
-// Environments are referenced by id, not name. Names are resolved when the
-// deployment is created, so renaming an environment later does not reattach
-// its history.
+// An immutable record of a release being made live on a set of targets.
+// Deploying and rolling back both create a deployment. The record is what
+// ran where and when — the release, the targets and the timestamp — plus
+// metadata saying why and who. It is append-only: written once, in one
+// transaction for all of its targets, and never changed afterwards, so the
+// deployment log is the audit trail of what ran where.
+// A target serves the release of the newest deployment that targeted it.
+// An older deployment stays in the history after a newer one replaces it on
+// some or all of its targets.
 // Ref: #
 type Deployment struct {
 	// The opaque, immutable resource id, assigned at creation.
 	ID DeploymentID `json:"id"`
 	// The project this deployment belongs to.
 	ProjectID ProjectID `json:"project_id"`
-	// The environment this deployment made the release live on.
-	EnvironmentID string `json:"environment_id"`
-	// The release this deployment made live.
+	// The release this deployment made live. Always the release id, also
+	// when the request named the release by `content_hash`.
 	ReleaseID ReleaseID `json:"release_id"`
+	// The origins this deployment made the release live on, as resolved when
+	// it was created: `primary` appears here as the origins it expanded to.
+	// Sorted by origin.
+	Targets []DeploymentTarget `json:"targets"`
 	// When the deployment was created.
 	DeployedAt time.Time          `json:"deployed_at"`
 	Metadata   DeploymentMetadata `json:"metadata"`
@@ -15761,14 +15924,14 @@ func (s *Deployment) GetProjectID() ProjectID {
 	return s.ProjectID
 }
 
-// GetEnvironmentID returns the value of EnvironmentID.
-func (s *Deployment) GetEnvironmentID() string {
-	return s.EnvironmentID
-}
-
 // GetReleaseID returns the value of ReleaseID.
 func (s *Deployment) GetReleaseID() ReleaseID {
 	return s.ReleaseID
+}
+
+// GetTargets returns the value of Targets.
+func (s *Deployment) GetTargets() []DeploymentTarget {
+	return s.Targets
 }
 
 // GetDeployedAt returns the value of DeployedAt.
@@ -15796,14 +15959,14 @@ func (s *Deployment) SetProjectID(val ProjectID) {
 	s.ProjectID = val
 }
 
-// SetEnvironmentID sets the value of EnvironmentID.
-func (s *Deployment) SetEnvironmentID(val string) {
-	s.EnvironmentID = val
-}
-
 // SetReleaseID sets the value of ReleaseID.
 func (s *Deployment) SetReleaseID(val ReleaseID) {
 	s.ReleaseID = val
+}
+
+// SetTargets sets the value of Targets.
+func (s *Deployment) SetTargets(val []DeploymentTarget) {
+	s.Targets = val
 }
 
 // SetDeployedAt sets the value of DeployedAt.
@@ -15822,6 +15985,66 @@ func (s *Deployment) SetRelease(val OptRelease) {
 }
 
 func (*Deployment) getDeploymentByIdRes() {}
+
+// The deployment conflicts with the state of the project. Only
+// `dep.conflict`, a stale `expected_deployment_id`, carries `details`.
+// Ref: #
+type DeploymentConflict struct {
+	Code ErrorCode `json:"code"`
+	// Human-readable explanation of the error.
+	Message string                       `json:"message"`
+	Details OptDeploymentConflictDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *DeploymentConflict) GetCode() ErrorCode {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *DeploymentConflict) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *DeploymentConflict) GetDetails() OptDeploymentConflictDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *DeploymentConflict) SetCode(val ErrorCode) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *DeploymentConflict) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *DeploymentConflict) SetDetails(val OptDeploymentConflictDetails) {
+	s.Details = val
+}
+
+func (*DeploymentConflict) createDeploymentRes()   {}
+func (*DeploymentConflict) rollbackDeploymentRes() {}
+
+type DeploymentConflictDetails struct {
+	// The actual newest deployment to the targets, to inspect before
+	// retrying with its id as `expected_deployment_id`. Null when nothing
+	// has been deployed to any of the targets yet.
+	Deployment NilDeployment `json:"deployment"`
+}
+
+// GetDeployment returns the value of Deployment.
+func (s *DeploymentConflictDetails) GetDeployment() NilDeployment {
+	return s.Deployment
+}
+
+// SetDeployment sets the value of Deployment.
+func (s *DeploymentConflictDetails) SetDeployment(val NilDeployment) {
+	s.Deployment = val
+}
 
 // Merged schema.
 // Ref: #
@@ -16269,26 +16492,25 @@ func (s *DeploymentCreatedEventDelegationType) UnmarshalText(data []byte) error 
 }
 
 // Allowlisted fields for `deployment.created`. The deployment id is already
-// the event's `entity_id`; the ids here say what went live where. Ids, not
-// names: they survive environment renames, and because events carry no
-// foreign key, the audit trail of a deleted environment lives on here.
+// the event's `entity_id`; the fields here say what went live where.
 // Ref: #
 type DeploymentCreatedPayload struct {
-	EnvironmentID       OptString `json:"environment_id"`
-	ReleaseID           OptString `json:"release_id"`
-	Reason              OptString `json:"reason"`
-	Message             OptString `json:"message"`
-	SourceEnvironmentID OptString `json:"source_environment_id"`
-}
-
-// GetEnvironmentID returns the value of EnvironmentID.
-func (s *DeploymentCreatedPayload) GetEnvironmentID() OptString {
-	return s.EnvironmentID
+	ReleaseID OptString `json:"release_id"`
+	// The origins the release went live on, sorted.
+	Targets    []string  `json:"targets"`
+	Reason     OptString `json:"reason"`
+	Message    OptString `json:"message"`
+	RollbackTo OptString `json:"rollback_to"`
 }
 
 // GetReleaseID returns the value of ReleaseID.
 func (s *DeploymentCreatedPayload) GetReleaseID() OptString {
 	return s.ReleaseID
+}
+
+// GetTargets returns the value of Targets.
+func (s *DeploymentCreatedPayload) GetTargets() []string {
+	return s.Targets
 }
 
 // GetReason returns the value of Reason.
@@ -16301,19 +16523,19 @@ func (s *DeploymentCreatedPayload) GetMessage() OptString {
 	return s.Message
 }
 
-// GetSourceEnvironmentID returns the value of SourceEnvironmentID.
-func (s *DeploymentCreatedPayload) GetSourceEnvironmentID() OptString {
-	return s.SourceEnvironmentID
-}
-
-// SetEnvironmentID sets the value of EnvironmentID.
-func (s *DeploymentCreatedPayload) SetEnvironmentID(val OptString) {
-	s.EnvironmentID = val
+// GetRollbackTo returns the value of RollbackTo.
+func (s *DeploymentCreatedPayload) GetRollbackTo() OptString {
+	return s.RollbackTo
 }
 
 // SetReleaseID sets the value of ReleaseID.
 func (s *DeploymentCreatedPayload) SetReleaseID(val OptString) {
 	s.ReleaseID = val
+}
+
+// SetTargets sets the value of Targets.
+func (s *DeploymentCreatedPayload) SetTargets(val []string) {
+	s.Targets = val
 }
 
 // SetReason sets the value of Reason.
@@ -16326,9 +16548,9 @@ func (s *DeploymentCreatedPayload) SetMessage(val OptString) {
 	s.Message = val
 }
 
-// SetSourceEnvironmentID sets the value of SourceEnvironmentID.
-func (s *DeploymentCreatedPayload) SetSourceEnvironmentID(val OptString) {
-	s.SourceEnvironmentID = val
+// SetRollbackTo sets the value of RollbackTo.
+func (s *DeploymentCreatedPayload) SetRollbackTo(val OptString) {
+	s.RollbackTo = val
 }
 
 // A related object to embed on each returned deployment.
@@ -16375,27 +16597,20 @@ func (s *DeploymentExpand) UnmarshalText(data []byte) error {
 
 type DeploymentID string
 
-// Why the release went live here and who made it happen. Set when the
-// deployment is created and never mutated afterwards — enrichment of the
-// record, while the ids and timestamp on the deployment itself say what ran
-// where and when. Every field is optional; a sparse object is a deployment
-// that simply was not annotated further.
+// Why the release went live and who made it happen. Set when the deployment
+// is created and never mutated afterwards — enrichment of the record, while
+// the release, targets and timestamp on the deployment itself say what ran
+// where and when.
 // Ref: #
 type DeploymentMetadata struct {
 	Reason OptDeploymentReason `json:"reason"`
 	// The caller-supplied summary of why this deployment happened, analogous
 	// to a git commit message.
 	Message OptNilString `json:"message"`
-	// The environment the release was promoted from. Set exactly when
-	// `reason` is `promote`.
-	// Recorded as it stood at deployment time: it is not re-resolved later,
-	// so it may name an environment that has since been deleted.
-	SourceEnvironmentID OptNilString `json:"source_environment_id"`
-	// The name the source environment had at deployment time, set exactly
-	// when `source_environment_id` is. A snapshot for reading the history,
-	// not an address: a later rename does not update it, and the id is what
-	// identifies the environment.
-	SourceEnvironmentName OptNilEnvironmentName `json:"source_environment_name"`
+	// The deployment `POST /deployments/{deployment_id}/rollback` re-applied,
+	// with its release and its targets. Null for every other deployment,
+	// including one created by `POST /deployments` with `reason: rollback`.
+	RollbackTo OptNilDeploymentID `json:"rollback_to"`
 	// The identity that created the deployment. Absent when the caller is a
 	// machine principal carrying no user identity, which is the common case
 	// for deployments made from CI.
@@ -16414,14 +16629,9 @@ func (s *DeploymentMetadata) GetMessage() OptNilString {
 	return s.Message
 }
 
-// GetSourceEnvironmentID returns the value of SourceEnvironmentID.
-func (s *DeploymentMetadata) GetSourceEnvironmentID() OptNilString {
-	return s.SourceEnvironmentID
-}
-
-// GetSourceEnvironmentName returns the value of SourceEnvironmentName.
-func (s *DeploymentMetadata) GetSourceEnvironmentName() OptNilEnvironmentName {
-	return s.SourceEnvironmentName
+// GetRollbackTo returns the value of RollbackTo.
+func (s *DeploymentMetadata) GetRollbackTo() OptNilDeploymentID {
+	return s.RollbackTo
 }
 
 // GetDeployedBy returns the value of DeployedBy.
@@ -16444,14 +16654,9 @@ func (s *DeploymentMetadata) SetMessage(val OptNilString) {
 	s.Message = val
 }
 
-// SetSourceEnvironmentID sets the value of SourceEnvironmentID.
-func (s *DeploymentMetadata) SetSourceEnvironmentID(val OptNilString) {
-	s.SourceEnvironmentID = val
-}
-
-// SetSourceEnvironmentName sets the value of SourceEnvironmentName.
-func (s *DeploymentMetadata) SetSourceEnvironmentName(val OptNilEnvironmentName) {
-	s.SourceEnvironmentName = val
+// SetRollbackTo sets the value of RollbackTo.
+func (s *DeploymentMetadata) SetRollbackTo(val OptNilDeploymentID) {
+	s.RollbackTo = val
 }
 
 // SetDeployedBy sets the value of DeployedBy.
@@ -16519,19 +16724,20 @@ func (s *DeploymentMetadataDeployedByType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Why the deployment was created. All three are the same operation — a new
-// deployment pointing the environment at a release — and the reason records
+type DeploymentOrigin string
+
+// Why the deployment was created. Both are the same operation — a new
+// deployment making a release live on its targets — and the reason records
 // the caller's intent:
-// - `deploy` — a release goes live on the environment.
-// - `promote` — a release that already runs on another environment goes live
-// here; `source_environment_id` records where it came from.
-// - `rollback` — a release the environment ran earlier goes live again.
+// - `deploy` — a release goes live on the targets.
+// - `rollback` — a release the targets served earlier goes live again.
+// `POST /deployments/{deployment_id}/rollback` records it, and so may
+// `POST /deployments` when the caller picks the earlier release itself.
 // Ref: #
 type DeploymentReason string
 
 const (
 	DeploymentReasonDeploy   DeploymentReason = "deploy"
-	DeploymentReasonPromote  DeploymentReason = "promote"
 	DeploymentReasonRollback DeploymentReason = "rollback"
 )
 
@@ -16539,7 +16745,6 @@ const (
 func (DeploymentReason) AllValues() []DeploymentReason {
 	return []DeploymentReason{
 		DeploymentReasonDeploy,
-		DeploymentReasonPromote,
 		DeploymentReasonRollback,
 	}
 }
@@ -16548,8 +16753,6 @@ func (DeploymentReason) AllValues() []DeploymentReason {
 func (s DeploymentReason) MarshalText() ([]byte, error) {
 	switch s {
 	case DeploymentReasonDeploy:
-		return []byte(s), nil
-	case DeploymentReasonPromote:
 		return []byte(s), nil
 	case DeploymentReasonRollback:
 		return []byte(s), nil
@@ -16564,9 +16767,6 @@ func (s *DeploymentReason) UnmarshalText(data []byte) error {
 	case DeploymentReasonDeploy:
 		*s = DeploymentReasonDeploy
 		return nil
-	case DeploymentReasonPromote:
-		*s = DeploymentReasonPromote
-		return nil
 	case DeploymentReasonRollback:
 		*s = DeploymentReasonRollback
 		return nil
@@ -16574,6 +16774,38 @@ func (s *DeploymentReason) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+// One origin a deployment made its release live on.
+// Ref: #
+type DeploymentTarget struct {
+	Origin DeploymentOrigin `json:"origin"`
+	// Present only on a target that is a preview URL: when its preview
+	// expires. Null once the preview has expired or was removed. Absent on a
+	// primary origin, which does not expire.
+	ExpiresAt OptNilDateTime `json:"expires_at"`
+}
+
+// GetOrigin returns the value of Origin.
+func (s *DeploymentTarget) GetOrigin() DeploymentOrigin {
+	return s.Origin
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *DeploymentTarget) GetExpiresAt() OptNilDateTime {
+	return s.ExpiresAt
+}
+
+// SetOrigin sets the value of Origin.
+func (s *DeploymentTarget) SetOrigin(val DeploymentOrigin) {
+	s.Origin = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *DeploymentTarget) SetExpiresAt(val OptNilDateTime) {
+	s.ExpiresAt = val
+}
+
+type DeploymentTargetsRequest []string
 
 // Empty payload for event types with no typed fields
 // (e.g. `project.deleted`, `user.deleted`, `session.expired`).
@@ -17628,6 +17860,7 @@ type Event struct {
 	ProjectDeletedEvent             ProjectDeletedEvent
 	ProjectUpdatedEvent             ProjectUpdatedEvent
 	ReleaseCreatedEvent             ReleaseCreatedEvent
+	ReleaseRevokedEvent             ReleaseRevokedEvent
 	RequestAPIEvent                 RequestAPIEvent
 	SchemaCreatedEvent              SchemaCreatedEvent
 	SessionDeletedEvent             SessionDeletedEvent
@@ -17672,6 +17905,7 @@ const (
 	ProjectDeletedEventEvent             EventType = "project.deleted"
 	ProjectUpdatedEventEvent             EventType = "project.updated"
 	ReleaseCreatedEventEvent             EventType = "release.created"
+	ReleaseRevokedEventEvent             EventType = "release.revoked"
 	RequestAPIEventEvent                 EventType = "request.api"
 	SchemaCreatedEventEvent              EventType = "schema.created"
 	SessionDeletedEventEvent             EventType = "session.deleted"
@@ -17770,6 +18004,9 @@ func (s Event) IsProjectUpdatedEvent() bool { return s.Type == ProjectUpdatedEve
 
 // IsReleaseCreatedEvent reports whether Event is ReleaseCreatedEvent.
 func (s Event) IsReleaseCreatedEvent() bool { return s.Type == ReleaseCreatedEventEvent }
+
+// IsReleaseRevokedEvent reports whether Event is ReleaseRevokedEvent.
+func (s Event) IsReleaseRevokedEvent() bool { return s.Type == ReleaseRevokedEventEvent }
 
 // IsRequestAPIEvent reports whether Event is RequestAPIEvent.
 func (s Event) IsRequestAPIEvent() bool { return s.Type == RequestAPIEventEvent }
@@ -18347,6 +18584,27 @@ func (s Event) GetReleaseCreatedEvent() (v ReleaseCreatedEvent, ok bool) {
 func NewReleaseCreatedEventEvent(v ReleaseCreatedEvent) Event {
 	var s Event
 	s.SetReleaseCreatedEvent(v)
+	return s
+}
+
+// SetReleaseRevokedEvent sets Event to ReleaseRevokedEvent.
+func (s *Event) SetReleaseRevokedEvent(v ReleaseRevokedEvent) {
+	s.Type = ReleaseRevokedEventEvent
+	s.ReleaseRevokedEvent = v
+}
+
+// GetReleaseRevokedEvent returns ReleaseRevokedEvent and true boolean if Event is ReleaseRevokedEvent.
+func (s Event) GetReleaseRevokedEvent() (v ReleaseRevokedEvent, ok bool) {
+	if !s.IsReleaseRevokedEvent() {
+		return v, false
+	}
+	return s.ReleaseRevokedEvent, true
+}
+
+// NewReleaseRevokedEventEvent returns new Event from ReleaseRevokedEvent.
+func NewReleaseRevokedEventEvent(v ReleaseRevokedEvent) Event {
+	var s Event
+	s.SetReleaseRevokedEvent(v)
 	return s
 }
 
@@ -24836,6 +25094,7 @@ type GetDeploymentByIdErrorResponse struct {
 	DepNotFound         DepNotFound
 	DepPermissionDenied DepPermissionDenied
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 }
 
@@ -24848,6 +25107,7 @@ const (
 	DepNotFoundGetDeploymentByIdErrorResponse         GetDeploymentByIdErrorResponseType = "dep.not_found"
 	DepPermissionDeniedGetDeploymentByIdErrorResponse GetDeploymentByIdErrorResponseType = "dep.permission_denied"
 	InternalGetDeploymentByIdErrorResponse            GetDeploymentByIdErrorResponseType = "internal"
+	NotImplementedGetDeploymentByIdErrorResponse      GetDeploymentByIdErrorResponseType = "not_implemented"
 	ReqInvalidGetDeploymentByIdErrorResponse          GetDeploymentByIdErrorResponseType = "req.invalid"
 )
 
@@ -24869,6 +25129,11 @@ func (s GetDeploymentByIdErrorResponse) IsDepPermissionDenied() bool {
 // IsInternal reports whether GetDeploymentByIdErrorResponse is Internal.
 func (s GetDeploymentByIdErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetDeploymentByIdErrorResponse
+}
+
+// IsNotImplemented reports whether GetDeploymentByIdErrorResponse is NotImplemented.
+func (s GetDeploymentByIdErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetDeploymentByIdErrorResponse
 }
 
 // IsReqInvalid reports whether GetDeploymentByIdErrorResponse is ReqInvalid.
@@ -24957,6 +25222,27 @@ func (s GetDeploymentByIdErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetDeploymentByIdErrorResponse(v Internal) GetDeploymentByIdErrorResponse {
 	var s GetDeploymentByIdErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetDeploymentByIdErrorResponse to NotImplemented.
+func (s *GetDeploymentByIdErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetDeploymentByIdErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetDeploymentByIdErrorResponse is NotImplemented.
+func (s GetDeploymentByIdErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetDeploymentByIdErrorResponse returns new GetDeploymentByIdErrorResponse from NotImplemented.
+func NewNotImplementedGetDeploymentByIdErrorResponse(v NotImplemented) GetDeploymentByIdErrorResponse {
+	var s GetDeploymentByIdErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -33062,8 +33348,8 @@ type ListDeploymentsErrorResponse struct {
 	AuthUnauthorized    AuthUnauthorized
 	DepNotFound         DepNotFound
 	DepPermissionDenied DepPermissionDenied
-	EnvNotFound         EnvNotFound
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 }
 
@@ -33075,8 +33361,8 @@ const (
 	AuthUnauthorizedListDeploymentsErrorResponse    ListDeploymentsErrorResponseType = "auth.unauthorized"
 	DepNotFoundListDeploymentsErrorResponse         ListDeploymentsErrorResponseType = "dep.not_found"
 	DepPermissionDeniedListDeploymentsErrorResponse ListDeploymentsErrorResponseType = "dep.permission_denied"
-	EnvNotFoundListDeploymentsErrorResponse         ListDeploymentsErrorResponseType = "env.not_found"
 	InternalListDeploymentsErrorResponse            ListDeploymentsErrorResponseType = "internal"
+	NotImplementedListDeploymentsErrorResponse      ListDeploymentsErrorResponseType = "not_implemented"
 	ReqInvalidListDeploymentsErrorResponse          ListDeploymentsErrorResponseType = "req.invalid"
 )
 
@@ -33095,14 +33381,14 @@ func (s ListDeploymentsErrorResponse) IsDepPermissionDenied() bool {
 	return s.Type == DepPermissionDeniedListDeploymentsErrorResponse
 }
 
-// IsEnvNotFound reports whether ListDeploymentsErrorResponse is EnvNotFound.
-func (s ListDeploymentsErrorResponse) IsEnvNotFound() bool {
-	return s.Type == EnvNotFoundListDeploymentsErrorResponse
-}
-
 // IsInternal reports whether ListDeploymentsErrorResponse is Internal.
 func (s ListDeploymentsErrorResponse) IsInternal() bool {
 	return s.Type == InternalListDeploymentsErrorResponse
+}
+
+// IsNotImplemented reports whether ListDeploymentsErrorResponse is NotImplemented.
+func (s ListDeploymentsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListDeploymentsErrorResponse
 }
 
 // IsReqInvalid reports whether ListDeploymentsErrorResponse is ReqInvalid.
@@ -33173,27 +33459,6 @@ func NewDepPermissionDeniedListDeploymentsErrorResponse(v DepPermissionDenied) L
 	return s
 }
 
-// SetEnvNotFound sets ListDeploymentsErrorResponse to EnvNotFound.
-func (s *ListDeploymentsErrorResponse) SetEnvNotFound(v EnvNotFound) {
-	s.Type = EnvNotFoundListDeploymentsErrorResponse
-	s.EnvNotFound = v
-}
-
-// GetEnvNotFound returns EnvNotFound and true boolean if ListDeploymentsErrorResponse is EnvNotFound.
-func (s ListDeploymentsErrorResponse) GetEnvNotFound() (v EnvNotFound, ok bool) {
-	if !s.IsEnvNotFound() {
-		return v, false
-	}
-	return s.EnvNotFound, true
-}
-
-// NewEnvNotFoundListDeploymentsErrorResponse returns new ListDeploymentsErrorResponse from EnvNotFound.
-func NewEnvNotFoundListDeploymentsErrorResponse(v EnvNotFound) ListDeploymentsErrorResponse {
-	var s ListDeploymentsErrorResponse
-	s.SetEnvNotFound(v)
-	return s
-}
-
 // SetInternal sets ListDeploymentsErrorResponse to Internal.
 func (s *ListDeploymentsErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalListDeploymentsErrorResponse
@@ -33212,6 +33477,27 @@ func (s ListDeploymentsErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalListDeploymentsErrorResponse(v Internal) ListDeploymentsErrorResponse {
 	var s ListDeploymentsErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets ListDeploymentsErrorResponse to NotImplemented.
+func (s *ListDeploymentsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListDeploymentsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListDeploymentsErrorResponse is NotImplemented.
+func (s ListDeploymentsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListDeploymentsErrorResponse returns new ListDeploymentsErrorResponse from NotImplemented.
+func NewNotImplementedListDeploymentsErrorResponse(v NotImplemented) ListDeploymentsErrorResponse {
+	var s ListDeploymentsErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -33265,10 +33551,9 @@ func (s *ListDeploymentsErrorResponseStatusCode) SetResponse(val ListDeployments
 func (*ListDeploymentsErrorResponseStatusCode) listDeploymentsRes() {}
 
 // Deployments, newest first.
-// Filtered to one environment, the first row is that environment's current
-// deployment and the rest is its history. Unfiltered, the list interleaves
-// every environment of the project, so the first row is only the most recent
-// deployment anywhere, not any particular environment's current one.
+// In the history (the default), each deployment carries every target it
+// made the release live on. In the live view (`live=true`), each deployment
+// carries only the targets it still serves.
 // Ref: #
 type ListDeploymentsResponse struct {
 	Deployments []Deployment `json:"deployments"`
@@ -35547,6 +35832,96 @@ func (o NilCurrentDeployment) Or(d CurrentDeployment) CurrentDeployment {
 	return d
 }
 
+// NewNilDateTime returns new NilDateTime with value set to v.
+func NewNilDateTime(v time.Time) NilDateTime {
+	return NilDateTime{
+		Value: v,
+	}
+}
+
+// NilDateTime is nullable time.Time.
+type NilDateTime struct {
+	Value time.Time
+	Null  bool
+}
+
+// SetTo sets value to v.
+func (o *NilDateTime) SetTo(v time.Time) {
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o NilDateTime) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *NilDateTime) SetToNull() {
+	o.Null = true
+	var v time.Time
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o NilDateTime) Get() (v time.Time, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o NilDateTime) Or(d time.Time) time.Time {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewNilDeployment returns new NilDeployment with value set to v.
+func NewNilDeployment(v Deployment) NilDeployment {
+	return NilDeployment{
+		Value: v,
+	}
+}
+
+// NilDeployment is nullable Deployment.
+type NilDeployment struct {
+	Value Deployment
+	Null  bool
+}
+
+// SetTo sets value to v.
+func (o *NilDeployment) SetTo(v Deployment) {
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o NilDeployment) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *NilDeployment) SetToNull() {
+	o.Null = true
+	var v Deployment
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o NilDeployment) Get() (v Deployment, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o NilDeployment) Or(d Deployment) Deployment {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // Merged schema.
 // Ref: #
 type NotImplemented struct {
@@ -37557,6 +37932,52 @@ func (o OptCompletedFactorPayload) Or(d CompletedFactorPayload) CompletedFactorP
 	return d
 }
 
+// NewOptCreateReleaseBadRequestDetails returns new OptCreateReleaseBadRequestDetails with value set to v.
+func NewOptCreateReleaseBadRequestDetails(v CreateReleaseBadRequestDetails) OptCreateReleaseBadRequestDetails {
+	return OptCreateReleaseBadRequestDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptCreateReleaseBadRequestDetails is optional CreateReleaseBadRequestDetails.
+type OptCreateReleaseBadRequestDetails struct {
+	Value CreateReleaseBadRequestDetails
+	Set   bool
+}
+
+// IsSet returns true if OptCreateReleaseBadRequestDetails was set.
+func (o OptCreateReleaseBadRequestDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptCreateReleaseBadRequestDetails) Reset() {
+	var v CreateReleaseBadRequestDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptCreateReleaseBadRequestDetails) SetTo(v CreateReleaseBadRequestDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptCreateReleaseBadRequestDetails) Get() (v CreateReleaseBadRequestDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptCreateReleaseBadRequestDetails) Or(d CreateReleaseBadRequestDetails) CreateReleaseBadRequestDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptCreateSessionRequestUserAgent returns new OptCreateSessionRequestUserAgent with value set to v.
 func NewOptCreateSessionRequestUserAgent(v CreateSessionRequestUserAgent) OptCreateSessionRequestUserAgent {
 	return OptCreateSessionRequestUserAgent{
@@ -37643,98 +38064,6 @@ func (o OptDateTime) Get() (v time.Time, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptDateTime) Or(d time.Time) time.Time {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptDepConflictDetails returns new OptDepConflictDetails with value set to v.
-func NewOptDepConflictDetails(v DepConflictDetails) OptDepConflictDetails {
-	return OptDepConflictDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptDepConflictDetails is optional DepConflictDetails.
-type OptDepConflictDetails struct {
-	Value DepConflictDetails
-	Set   bool
-}
-
-// IsSet returns true if OptDepConflictDetails was set.
-func (o OptDepConflictDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptDepConflictDetails) Reset() {
-	var v DepConflictDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptDepConflictDetails) SetTo(v DepConflictDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptDepConflictDetails) Get() (v DepConflictDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptDepConflictDetails) Or(d DepConflictDetails) DepConflictDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptDepInvalidDetails returns new OptDepInvalidDetails with value set to v.
-func NewOptDepInvalidDetails(v DepInvalidDetails) OptDepInvalidDetails {
-	return OptDepInvalidDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptDepInvalidDetails is optional DepInvalidDetails.
-type OptDepInvalidDetails struct {
-	Value DepInvalidDetails
-	Set   bool
-}
-
-// IsSet returns true if OptDepInvalidDetails was set.
-func (o OptDepInvalidDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptDepInvalidDetails) Reset() {
-	var v DepInvalidDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptDepInvalidDetails) SetTo(v DepInvalidDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptDepInvalidDetails) Get() (v DepInvalidDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptDepInvalidDetails) Or(d DepInvalidDetails) DepInvalidDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -37833,6 +38162,52 @@ func (o OptDepPermissionDeniedDetails) Or(d DepPermissionDeniedDetails) DepPermi
 	return d
 }
 
+// NewOptDeploymentConflictDetails returns new OptDeploymentConflictDetails with value set to v.
+func NewOptDeploymentConflictDetails(v DeploymentConflictDetails) OptDeploymentConflictDetails {
+	return OptDeploymentConflictDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDeploymentConflictDetails is optional DeploymentConflictDetails.
+type OptDeploymentConflictDetails struct {
+	Value DeploymentConflictDetails
+	Set   bool
+}
+
+// IsSet returns true if OptDeploymentConflictDetails was set.
+func (o OptDeploymentConflictDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDeploymentConflictDetails) Reset() {
+	var v DeploymentConflictDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDeploymentConflictDetails) SetTo(v DeploymentConflictDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDeploymentConflictDetails) Get() (v DeploymentConflictDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDeploymentConflictDetails) Or(d DeploymentConflictDetails) DeploymentConflictDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptDeploymentCreatedEventDelegationType returns new OptDeploymentCreatedEventDelegationType with value set to v.
 func NewOptDeploymentCreatedEventDelegationType(v DeploymentCreatedEventDelegationType) OptDeploymentCreatedEventDelegationType {
 	return OptDeploymentCreatedEventDelegationType{
@@ -37873,6 +38248,98 @@ func (o OptDeploymentCreatedEventDelegationType) Get() (v DeploymentCreatedEvent
 
 // Or returns value if set, or given parameter if does not.
 func (o OptDeploymentCreatedEventDelegationType) Or(d DeploymentCreatedEventDelegationType) DeploymentCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptDeploymentID returns new OptDeploymentID with value set to v.
+func NewOptDeploymentID(v DeploymentID) OptDeploymentID {
+	return OptDeploymentID{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDeploymentID is optional DeploymentID.
+type OptDeploymentID struct {
+	Value DeploymentID
+	Set   bool
+}
+
+// IsSet returns true if OptDeploymentID was set.
+func (o OptDeploymentID) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDeploymentID) Reset() {
+	var v DeploymentID
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDeploymentID) SetTo(v DeploymentID) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDeploymentID) Get() (v DeploymentID, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDeploymentID) Or(d DeploymentID) DeploymentID {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptDeploymentOrigin returns new OptDeploymentOrigin with value set to v.
+func NewOptDeploymentOrigin(v DeploymentOrigin) OptDeploymentOrigin {
+	return OptDeploymentOrigin{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDeploymentOrigin is optional DeploymentOrigin.
+type OptDeploymentOrigin struct {
+	Value DeploymentOrigin
+	Set   bool
+}
+
+// IsSet returns true if OptDeploymentOrigin was set.
+func (o OptDeploymentOrigin) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDeploymentOrigin) Reset() {
+	var v DeploymentOrigin
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDeploymentOrigin) SetTo(v DeploymentOrigin) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDeploymentOrigin) Get() (v DeploymentOrigin, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDeploymentOrigin) Or(d DeploymentOrigin) DeploymentOrigin {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -43584,69 +44051,6 @@ func (o OptNilEnvironmentCreatedEventActorType) Or(d EnvironmentCreatedEventActo
 	return d
 }
 
-// NewOptNilEnvironmentName returns new OptNilEnvironmentName with value set to v.
-func NewOptNilEnvironmentName(v EnvironmentName) OptNilEnvironmentName {
-	return OptNilEnvironmentName{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptNilEnvironmentName is optional nullable EnvironmentName.
-type OptNilEnvironmentName struct {
-	Value EnvironmentName
-	Set   bool
-	Null  bool
-}
-
-// IsSet returns true if OptNilEnvironmentName was set.
-func (o OptNilEnvironmentName) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptNilEnvironmentName) Reset() {
-	var v EnvironmentName
-	o.Value = v
-	o.Set = false
-	o.Null = false
-}
-
-// SetTo sets value to v.
-func (o *OptNilEnvironmentName) SetTo(v EnvironmentName) {
-	o.Set = true
-	o.Null = false
-	o.Value = v
-}
-
-// IsNull returns true if value is Null.
-func (o OptNilEnvironmentName) IsNull() bool { return o.Null }
-
-// SetToNull sets value to null.
-func (o *OptNilEnvironmentName) SetToNull() {
-	o.Set = true
-	o.Null = true
-	var v EnvironmentName
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptNilEnvironmentName) Get() (v EnvironmentName, ok bool) {
-	if o.Null {
-		return v, false
-	}
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptNilEnvironmentName) Or(d EnvironmentName) EnvironmentName {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptNilFlowDefinitionStepTransitionsItemAction returns new OptNilFlowDefinitionStepTransitionsItemAction with value set to v.
 func NewOptNilFlowDefinitionStepTransitionsItemAction(v FlowDefinitionStepTransitionsItemAction) OptNilFlowDefinitionStepTransitionsItemAction {
 	return OptNilFlowDefinitionStepTransitionsItemAction{
@@ -44586,6 +44990,69 @@ func (o OptNilReleaseMetadataCreatedByType) Get() (v ReleaseMetadataCreatedByTyp
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilReleaseMetadataCreatedByType) Or(d ReleaseMetadataCreatedByType) ReleaseMetadataCreatedByType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilReleaseRevokedEventActorType returns new OptNilReleaseRevokedEventActorType with value set to v.
+func NewOptNilReleaseRevokedEventActorType(v ReleaseRevokedEventActorType) OptNilReleaseRevokedEventActorType {
+	return OptNilReleaseRevokedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilReleaseRevokedEventActorType is optional nullable ReleaseRevokedEventActorType.
+type OptNilReleaseRevokedEventActorType struct {
+	Value ReleaseRevokedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilReleaseRevokedEventActorType was set.
+func (o OptNilReleaseRevokedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilReleaseRevokedEventActorType) Reset() {
+	var v ReleaseRevokedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilReleaseRevokedEventActorType) SetTo(v ReleaseRevokedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilReleaseRevokedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilReleaseRevokedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v ReleaseRevokedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilReleaseRevokedEventActorType) Get() (v ReleaseRevokedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilReleaseRevokedEventActorType) Or(d ReleaseRevokedEventActorType) ReleaseRevokedEventActorType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -46065,6 +46532,52 @@ func (o OptPatchUserRequestAttributes) Or(d PatchUserRequestAttributes) PatchUse
 	return d
 }
 
+// NewOptPreviewTTL returns new OptPreviewTTL with value set to v.
+func NewOptPreviewTTL(v PreviewTTL) OptPreviewTTL {
+	return OptPreviewTTL{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPreviewTTL is optional PreviewTTL.
+type OptPreviewTTL struct {
+	Value PreviewTTL
+	Set   bool
+}
+
+// IsSet returns true if OptPreviewTTL was set.
+func (o OptPreviewTTL) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPreviewTTL) Reset() {
+	var v PreviewTTL
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPreviewTTL) SetTo(v PreviewTTL) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPreviewTTL) Get() (v PreviewTTL, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPreviewTTL) Or(d PreviewTTL) PreviewTTL {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptProjClaimExpiredDetails returns new OptProjClaimExpiredDetails with value set to v.
 func NewOptProjClaimExpiredDetails(v ProjClaimExpiredDetails) OptProjClaimExpiredDetails {
 	return OptProjClaimExpiredDetails{
@@ -47169,6 +47682,52 @@ func (o OptRelease) Or(d Release) Release {
 	return d
 }
 
+// NewOptReleaseContentHash returns new OptReleaseContentHash with value set to v.
+func NewOptReleaseContentHash(v ReleaseContentHash) OptReleaseContentHash {
+	return OptReleaseContentHash{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptReleaseContentHash is optional ReleaseContentHash.
+type OptReleaseContentHash struct {
+	Value ReleaseContentHash
+	Set   bool
+}
+
+// IsSet returns true if OptReleaseContentHash was set.
+func (o OptReleaseContentHash) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptReleaseContentHash) Reset() {
+	var v ReleaseContentHash
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptReleaseContentHash) SetTo(v ReleaseContentHash) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptReleaseContentHash) Get() (v ReleaseContentHash, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptReleaseContentHash) Or(d ReleaseContentHash) ReleaseContentHash {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptReleaseCreatedEventDelegationType returns new OptReleaseCreatedEventDelegationType with value set to v.
 func NewOptReleaseCreatedEventDelegationType(v ReleaseCreatedEventDelegationType) OptReleaseCreatedEventDelegationType {
 	return OptReleaseCreatedEventDelegationType{
@@ -47209,6 +47768,98 @@ func (o OptReleaseCreatedEventDelegationType) Get() (v ReleaseCreatedEventDelega
 
 // Or returns value if set, or given parameter if does not.
 func (o OptReleaseCreatedEventDelegationType) Or(d ReleaseCreatedEventDelegationType) ReleaseCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptReleaseID returns new OptReleaseID with value set to v.
+func NewOptReleaseID(v ReleaseID) OptReleaseID {
+	return OptReleaseID{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptReleaseID is optional ReleaseID.
+type OptReleaseID struct {
+	Value ReleaseID
+	Set   bool
+}
+
+// IsSet returns true if OptReleaseID was set.
+func (o OptReleaseID) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptReleaseID) Reset() {
+	var v ReleaseID
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptReleaseID) SetTo(v ReleaseID) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptReleaseID) Get() (v ReleaseID, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptReleaseID) Or(d ReleaseID) ReleaseID {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptReleaseRevokedEventDelegationType returns new OptReleaseRevokedEventDelegationType with value set to v.
+func NewOptReleaseRevokedEventDelegationType(v ReleaseRevokedEventDelegationType) OptReleaseRevokedEventDelegationType {
+	return OptReleaseRevokedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptReleaseRevokedEventDelegationType is optional ReleaseRevokedEventDelegationType.
+type OptReleaseRevokedEventDelegationType struct {
+	Value ReleaseRevokedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptReleaseRevokedEventDelegationType was set.
+func (o OptReleaseRevokedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptReleaseRevokedEventDelegationType) Reset() {
+	var v ReleaseRevokedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptReleaseRevokedEventDelegationType) SetTo(v ReleaseRevokedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptReleaseRevokedEventDelegationType) Get() (v ReleaseRevokedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptReleaseRevokedEventDelegationType) Or(d ReleaseRevokedEventDelegationType) ReleaseRevokedEventDelegationType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -47301,6 +47952,52 @@ func (o OptRequestAPIEventDelegationType) Get() (v RequestAPIEventDelegationType
 
 // Or returns value if set, or given parameter if does not.
 func (o OptRequestAPIEventDelegationType) Or(d RequestAPIEventDelegationType) RequestAPIEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptRollbackDeploymentRequest returns new OptRollbackDeploymentRequest with value set to v.
+func NewOptRollbackDeploymentRequest(v RollbackDeploymentRequest) OptRollbackDeploymentRequest {
+	return OptRollbackDeploymentRequest{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRollbackDeploymentRequest is optional RollbackDeploymentRequest.
+type OptRollbackDeploymentRequest struct {
+	Value RollbackDeploymentRequest
+	Set   bool
+}
+
+// IsSet returns true if OptRollbackDeploymentRequest was set.
+func (o OptRollbackDeploymentRequest) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRollbackDeploymentRequest) Reset() {
+	var v RollbackDeploymentRequest
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRollbackDeploymentRequest) SetTo(v RollbackDeploymentRequest) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRollbackDeploymentRequest) Get() (v RollbackDeploymentRequest, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRollbackDeploymentRequest) Or(d RollbackDeploymentRequest) RollbackDeploymentRequest {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -51975,6 +52672,8 @@ func (s *PatchUserRequestAttributes) init() PatchUserRequestAttributes {
 	return m
 }
 
+type PreviewTTL string
+
 // Merged schema.
 // Ref: #
 type ProjClaimExpired struct {
@@ -56388,15 +57087,27 @@ func (s *RelRevisionUnpinnableDetails) init() RelRevisionUnpinnableDetails {
 // revisions belong together. Callers that need the resource bytes resolve each
 // `revision_id` through the per-kind read endpoints (`GET /schemas/{id}`,
 // `GET /flow_definitions/{id}`, …).
-// A release exists on its own and is not tied to an environment. Deploying it
-// is a separate call.
+// A release exists on its own and is not tied to an origin. Deploying it is a
+// separate call.
+// Two identifiers: `id` is the one paths and `release_id` fields take;
+// `content_hash` is the digest of the content the release pins, printed by
+// the CLI and pinned by builds, and looked up through fields that name it.
 // Ref: #
 type Release struct {
 	// The opaque, immutable resource id, assigned at construction.
 	ID ReleaseID `json:"id"`
 	// The project this release belongs to.
-	ProjectID ProjectID       `json:"project_id"`
-	Metadata  ReleaseMetadata `json:"metadata"`
+	ProjectID ProjectID `json:"project_id"`
+	// The digest of the pinned content. Identical for two releases with the
+	// same content, which is why a project never holds two such releases.
+	ContentHash ReleaseContentHash `json:"content_hash"`
+	Metadata    ReleaseMetadata    `json:"metadata"`
+	// When the release was revoked, or null while it is not. A revoked
+	// release cannot be deployed and is refused on every path that would
+	// serve it, including to a build that pins its digest. No origin serves
+	// a revoked release, since a release an origin still serves cannot be
+	// revoked; earlier deployments that named it stay in the history.
+	RevokedAt NilDateTime `json:"revoked_at"`
 	// The revisions this release pins, one entry per `(kind, handle)`. Never
 	// empty: a release must contain at least one resource, and never longer
 	// than the set `POST /releases` accepts.
@@ -56413,9 +57124,19 @@ func (s *Release) GetProjectID() ProjectID {
 	return s.ProjectID
 }
 
+// GetContentHash returns the value of ContentHash.
+func (s *Release) GetContentHash() ReleaseContentHash {
+	return s.ContentHash
+}
+
 // GetMetadata returns the value of Metadata.
 func (s *Release) GetMetadata() ReleaseMetadata {
 	return s.Metadata
+}
+
+// GetRevokedAt returns the value of RevokedAt.
+func (s *Release) GetRevokedAt() NilDateTime {
+	return s.RevokedAt
 }
 
 // GetPointers returns the value of Pointers.
@@ -56433,9 +57154,19 @@ func (s *Release) SetProjectID(val ProjectID) {
 	s.ProjectID = val
 }
 
+// SetContentHash sets the value of ContentHash.
+func (s *Release) SetContentHash(val ReleaseContentHash) {
+	s.ContentHash = val
+}
+
 // SetMetadata sets the value of Metadata.
 func (s *Release) SetMetadata(val ReleaseMetadata) {
 	s.Metadata = val
+}
+
+// SetRevokedAt sets the value of RevokedAt.
+func (s *Release) SetRevokedAt(val NilDateTime) {
+	s.RevokedAt = val
 }
 
 // SetPointers sets the value of Pointers.
@@ -56444,6 +57175,9 @@ func (s *Release) SetPointers(val []ReleasePointer) {
 }
 
 func (*Release) getReleaseByIdRes() {}
+func (*Release) revokeReleaseRes()  {}
+
+type ReleaseContentHash string
 
 // Merged schema.
 // Ref: #
@@ -57242,6 +57976,469 @@ func (s *ReleasePointerKind) UnmarshalText(data []byte) error {
 	}
 }
 
+// Merged schema.
+// Ref: #
+type ReleaseRevokedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category ReleaseRevokedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilReleaseRevokedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptReleaseRevokedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                            `json:"delegation_id"`
+	Grantor        OptString                            `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString          `json:"flow_id"`
+	Metadata OptEventMetadata      `json:"metadata"`
+	Payload  ReleaseRevokedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *ReleaseRevokedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *ReleaseRevokedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *ReleaseRevokedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *ReleaseRevokedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *ReleaseRevokedEvent) GetCategory() ReleaseRevokedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *ReleaseRevokedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ReleaseRevokedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *ReleaseRevokedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *ReleaseRevokedEvent) GetActorType() OptNilReleaseRevokedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *ReleaseRevokedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *ReleaseRevokedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *ReleaseRevokedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *ReleaseRevokedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *ReleaseRevokedEvent) GetDelegationType() OptReleaseRevokedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *ReleaseRevokedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *ReleaseRevokedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *ReleaseRevokedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *ReleaseRevokedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *ReleaseRevokedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *ReleaseRevokedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *ReleaseRevokedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *ReleaseRevokedEvent) GetPayload() ReleaseRevokedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *ReleaseRevokedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *ReleaseRevokedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *ReleaseRevokedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *ReleaseRevokedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *ReleaseRevokedEvent) SetCategory(val ReleaseRevokedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *ReleaseRevokedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ReleaseRevokedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *ReleaseRevokedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *ReleaseRevokedEvent) SetActorType(val OptNilReleaseRevokedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *ReleaseRevokedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *ReleaseRevokedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *ReleaseRevokedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *ReleaseRevokedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *ReleaseRevokedEvent) SetDelegationType(val OptReleaseRevokedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *ReleaseRevokedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *ReleaseRevokedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *ReleaseRevokedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *ReleaseRevokedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *ReleaseRevokedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *ReleaseRevokedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *ReleaseRevokedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *ReleaseRevokedEvent) SetPayload(val ReleaseRevokedPayload) {
+	s.Payload = val
+}
+
+type ReleaseRevokedEventActorType string
+
+const (
+	ReleaseRevokedEventActorTypeHuman   ReleaseRevokedEventActorType = "human"
+	ReleaseRevokedEventActorTypeService ReleaseRevokedEventActorType = "service"
+	ReleaseRevokedEventActorTypeSystem  ReleaseRevokedEventActorType = "system"
+	ReleaseRevokedEventActorTypeAgent   ReleaseRevokedEventActorType = "agent"
+)
+
+// AllValues returns all ReleaseRevokedEventActorType values.
+func (ReleaseRevokedEventActorType) AllValues() []ReleaseRevokedEventActorType {
+	return []ReleaseRevokedEventActorType{
+		ReleaseRevokedEventActorTypeHuman,
+		ReleaseRevokedEventActorTypeService,
+		ReleaseRevokedEventActorTypeSystem,
+		ReleaseRevokedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ReleaseRevokedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case ReleaseRevokedEventActorTypeHuman:
+		return []byte(s), nil
+	case ReleaseRevokedEventActorTypeService:
+		return []byte(s), nil
+	case ReleaseRevokedEventActorTypeSystem:
+		return []byte(s), nil
+	case ReleaseRevokedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ReleaseRevokedEventActorType) UnmarshalText(data []byte) error {
+	switch ReleaseRevokedEventActorType(data) {
+	case ReleaseRevokedEventActorTypeHuman:
+		*s = ReleaseRevokedEventActorTypeHuman
+		return nil
+	case ReleaseRevokedEventActorTypeService:
+		*s = ReleaseRevokedEventActorTypeService
+		return nil
+	case ReleaseRevokedEventActorTypeSystem:
+		*s = ReleaseRevokedEventActorTypeSystem
+		return nil
+	case ReleaseRevokedEventActorTypeAgent:
+		*s = ReleaseRevokedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type ReleaseRevokedEventCategory string
+
+const (
+	ReleaseRevokedEventCategoryRequest ReleaseRevokedEventCategory = "request"
+	ReleaseRevokedEventCategoryAuth    ReleaseRevokedEventCategory = "auth"
+	ReleaseRevokedEventCategorySession ReleaseRevokedEventCategory = "session"
+	ReleaseRevokedEventCategoryAdmin   ReleaseRevokedEventCategory = "admin"
+	ReleaseRevokedEventCategoryEntity  ReleaseRevokedEventCategory = "entity"
+	ReleaseRevokedEventCategorySignal  ReleaseRevokedEventCategory = "signal"
+)
+
+// AllValues returns all ReleaseRevokedEventCategory values.
+func (ReleaseRevokedEventCategory) AllValues() []ReleaseRevokedEventCategory {
+	return []ReleaseRevokedEventCategory{
+		ReleaseRevokedEventCategoryRequest,
+		ReleaseRevokedEventCategoryAuth,
+		ReleaseRevokedEventCategorySession,
+		ReleaseRevokedEventCategoryAdmin,
+		ReleaseRevokedEventCategoryEntity,
+		ReleaseRevokedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ReleaseRevokedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case ReleaseRevokedEventCategoryRequest:
+		return []byte(s), nil
+	case ReleaseRevokedEventCategoryAuth:
+		return []byte(s), nil
+	case ReleaseRevokedEventCategorySession:
+		return []byte(s), nil
+	case ReleaseRevokedEventCategoryAdmin:
+		return []byte(s), nil
+	case ReleaseRevokedEventCategoryEntity:
+		return []byte(s), nil
+	case ReleaseRevokedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ReleaseRevokedEventCategory) UnmarshalText(data []byte) error {
+	switch ReleaseRevokedEventCategory(data) {
+	case ReleaseRevokedEventCategoryRequest:
+		*s = ReleaseRevokedEventCategoryRequest
+		return nil
+	case ReleaseRevokedEventCategoryAuth:
+		*s = ReleaseRevokedEventCategoryAuth
+		return nil
+	case ReleaseRevokedEventCategorySession:
+		*s = ReleaseRevokedEventCategorySession
+		return nil
+	case ReleaseRevokedEventCategoryAdmin:
+		*s = ReleaseRevokedEventCategoryAdmin
+		return nil
+	case ReleaseRevokedEventCategoryEntity:
+		*s = ReleaseRevokedEventCategoryEntity
+		return nil
+	case ReleaseRevokedEventCategorySignal:
+		*s = ReleaseRevokedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type ReleaseRevokedEventDelegationType string
+
+const (
+	ReleaseRevokedEventDelegationTypeDirect    ReleaseRevokedEventDelegationType = "direct"
+	ReleaseRevokedEventDelegationTypeDelegated ReleaseRevokedEventDelegationType = "delegated"
+	ReleaseRevokedEventDelegationTypePatShared ReleaseRevokedEventDelegationType = "pat_shared"
+	ReleaseRevokedEventDelegationTypeExchanged ReleaseRevokedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all ReleaseRevokedEventDelegationType values.
+func (ReleaseRevokedEventDelegationType) AllValues() []ReleaseRevokedEventDelegationType {
+	return []ReleaseRevokedEventDelegationType{
+		ReleaseRevokedEventDelegationTypeDirect,
+		ReleaseRevokedEventDelegationTypeDelegated,
+		ReleaseRevokedEventDelegationTypePatShared,
+		ReleaseRevokedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ReleaseRevokedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case ReleaseRevokedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case ReleaseRevokedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case ReleaseRevokedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case ReleaseRevokedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ReleaseRevokedEventDelegationType) UnmarshalText(data []byte) error {
+	switch ReleaseRevokedEventDelegationType(data) {
+	case ReleaseRevokedEventDelegationTypeDirect:
+		*s = ReleaseRevokedEventDelegationTypeDirect
+		return nil
+	case ReleaseRevokedEventDelegationTypeDelegated:
+		*s = ReleaseRevokedEventDelegationTypeDelegated
+		return nil
+	case ReleaseRevokedEventDelegationTypePatShared:
+		*s = ReleaseRevokedEventDelegationTypePatShared
+		return nil
+	case ReleaseRevokedEventDelegationTypeExchanged:
+		*s = ReleaseRevokedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Allowlisted fields for `release.revoked`. The release id is already the
+// event's `entity_id`; the digest is repeated so the audit stream names the
+// release the way the CLI prints it and builds pin it.
+// Ref: #
+type ReleaseRevokedPayload struct {
+	ContentHash ReleaseContentHash `json:"content_hash"`
+}
+
+// GetContentHash returns the value of ContentHash.
+func (s *ReleaseRevokedPayload) GetContentHash() ReleaseContentHash {
+	return s.ContentHash
+}
+
+// SetContentHash sets the value of ContentHash.
+func (s *ReleaseRevokedPayload) SetContentHash(val ReleaseContentHash) {
+	s.ContentHash = val
+}
+
 // A release without its pinned set — the shape `GET /releases` returns.
 // Pointers are omitted rather than optional so that a list entry can never be
 // mistaken for a release that pins nothing; fetch them with
@@ -57251,8 +58448,12 @@ type ReleaseSummary struct {
 	// The opaque, immutable resource id, assigned at construction.
 	ID ReleaseID `json:"id"`
 	// The project this release belongs to.
-	ProjectID ProjectID       `json:"project_id"`
-	Metadata  ReleaseMetadata `json:"metadata"`
+	ProjectID ProjectID `json:"project_id"`
+	// The digest of the pinned content.
+	ContentHash ReleaseContentHash `json:"content_hash"`
+	Metadata    ReleaseMetadata    `json:"metadata"`
+	// When the release was revoked, or null while it is not.
+	RevokedAt NilDateTime `json:"revoked_at"`
 }
 
 // GetID returns the value of ID.
@@ -57265,9 +58466,19 @@ func (s *ReleaseSummary) GetProjectID() ProjectID {
 	return s.ProjectID
 }
 
+// GetContentHash returns the value of ContentHash.
+func (s *ReleaseSummary) GetContentHash() ReleaseContentHash {
+	return s.ContentHash
+}
+
 // GetMetadata returns the value of Metadata.
 func (s *ReleaseSummary) GetMetadata() ReleaseMetadata {
 	return s.Metadata
+}
+
+// GetRevokedAt returns the value of RevokedAt.
+func (s *ReleaseSummary) GetRevokedAt() NilDateTime {
+	return s.RevokedAt
 }
 
 // SetID sets the value of ID.
@@ -57280,9 +58491,19 @@ func (s *ReleaseSummary) SetProjectID(val ProjectID) {
 	s.ProjectID = val
 }
 
+// SetContentHash sets the value of ContentHash.
+func (s *ReleaseSummary) SetContentHash(val ReleaseContentHash) {
+	s.ContentHash = val
+}
+
 // SetMetadata sets the value of Metadata.
 func (s *ReleaseSummary) SetMetadata(val ReleaseMetadata) {
 	s.Metadata = val
+}
+
+// SetRevokedAt sets the value of RevokedAt.
+func (s *ReleaseSummary) SetRevokedAt(val NilDateTime) {
+	s.RevokedAt = val
 }
 
 // RemoveOriginErrorResponse represents sum type.
@@ -58289,6 +59510,241 @@ func (s *RevokeMySessionNoContent) SetSetCookie(val string) {
 
 func (*RevokeMySessionNoContent) revokeMySessionRes() {}
 
+// The release cannot be revoked because origins still serve it.
+// Ref: #
+type RevokeReleaseConflict struct {
+	Code ErrorCode `json:"code"`
+	// Human-readable explanation of the error.
+	Message string                       `json:"message"`
+	Details RevokeReleaseConflictDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *RevokeReleaseConflict) GetCode() ErrorCode {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *RevokeReleaseConflict) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *RevokeReleaseConflict) GetDetails() RevokeReleaseConflictDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *RevokeReleaseConflict) SetCode(val ErrorCode) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *RevokeReleaseConflict) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *RevokeReleaseConflict) SetDetails(val RevokeReleaseConflictDetails) {
+	s.Details = val
+}
+
+func (*RevokeReleaseConflict) revokeReleaseRes() {}
+
+type RevokeReleaseConflictDetails struct {
+	// Every origin that still serves the release.
+	Origins []RevokeReleaseConflictDetailsOriginsItem `json:"origins"`
+}
+
+// GetOrigins returns the value of Origins.
+func (s *RevokeReleaseConflictDetails) GetOrigins() []RevokeReleaseConflictDetailsOriginsItem {
+	return s.Origins
+}
+
+// SetOrigins sets the value of Origins.
+func (s *RevokeReleaseConflictDetails) SetOrigins(val []RevokeReleaseConflictDetailsOriginsItem) {
+	s.Origins = val
+}
+
+type RevokeReleaseConflictDetailsOriginsItem struct {
+	// The origin, as scheme and host.
+	Origin url.URL `json:"origin"`
+	// The newest deployment to the origin, which pins the release.
+	DeploymentID DeploymentID `json:"deployment_id"`
+}
+
+// GetOrigin returns the value of Origin.
+func (s *RevokeReleaseConflictDetailsOriginsItem) GetOrigin() url.URL {
+	return s.Origin
+}
+
+// GetDeploymentID returns the value of DeploymentID.
+func (s *RevokeReleaseConflictDetailsOriginsItem) GetDeploymentID() DeploymentID {
+	return s.DeploymentID
+}
+
+// SetOrigin sets the value of Origin.
+func (s *RevokeReleaseConflictDetailsOriginsItem) SetOrigin(val url.URL) {
+	s.Origin = val
+}
+
+// SetDeploymentID sets the value of DeploymentID.
+func (s *RevokeReleaseConflictDetailsOriginsItem) SetDeploymentID(val DeploymentID) {
+	s.DeploymentID = val
+}
+
+// RevokeReleaseErrorResponse represents sum type.
+type RevokeReleaseErrorResponse struct {
+	Type             RevokeReleaseErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	NotImplemented   NotImplemented
+	ReqInvalid       ReqInvalid
+}
+
+// RevokeReleaseErrorResponseType is oneOf type of RevokeReleaseErrorResponse.
+type RevokeReleaseErrorResponseType string
+
+// Possible values for RevokeReleaseErrorResponseType.
+const (
+	AuthUnauthorizedRevokeReleaseErrorResponse RevokeReleaseErrorResponseType = "auth.unauthorized"
+	InternalRevokeReleaseErrorResponse         RevokeReleaseErrorResponseType = "internal"
+	NotImplementedRevokeReleaseErrorResponse   RevokeReleaseErrorResponseType = "not_implemented"
+	ReqInvalidRevokeReleaseErrorResponse       RevokeReleaseErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether RevokeReleaseErrorResponse is AuthUnauthorized.
+func (s RevokeReleaseErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedRevokeReleaseErrorResponse
+}
+
+// IsInternal reports whether RevokeReleaseErrorResponse is Internal.
+func (s RevokeReleaseErrorResponse) IsInternal() bool {
+	return s.Type == InternalRevokeReleaseErrorResponse
+}
+
+// IsNotImplemented reports whether RevokeReleaseErrorResponse is NotImplemented.
+func (s RevokeReleaseErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedRevokeReleaseErrorResponse
+}
+
+// IsReqInvalid reports whether RevokeReleaseErrorResponse is ReqInvalid.
+func (s RevokeReleaseErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidRevokeReleaseErrorResponse
+}
+
+// SetAuthUnauthorized sets RevokeReleaseErrorResponse to AuthUnauthorized.
+func (s *RevokeReleaseErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedRevokeReleaseErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if RevokeReleaseErrorResponse is AuthUnauthorized.
+func (s RevokeReleaseErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedRevokeReleaseErrorResponse(v AuthUnauthorized) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets RevokeReleaseErrorResponse to Internal.
+func (s *RevokeReleaseErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalRevokeReleaseErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if RevokeReleaseErrorResponse is Internal.
+func (s RevokeReleaseErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from Internal.
+func NewInternalRevokeReleaseErrorResponse(v Internal) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets RevokeReleaseErrorResponse to NotImplemented.
+func (s *RevokeReleaseErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedRevokeReleaseErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if RevokeReleaseErrorResponse is NotImplemented.
+func (s RevokeReleaseErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from NotImplemented.
+func NewNotImplementedRevokeReleaseErrorResponse(v NotImplemented) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets RevokeReleaseErrorResponse to ReqInvalid.
+func (s *RevokeReleaseErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidRevokeReleaseErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if RevokeReleaseErrorResponse is ReqInvalid.
+func (s RevokeReleaseErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from ReqInvalid.
+func NewReqInvalidRevokeReleaseErrorResponse(v ReqInvalid) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// RevokeReleaseErrorResponseStatusCode wraps RevokeReleaseErrorResponse with StatusCode.
+type RevokeReleaseErrorResponseStatusCode struct {
+	StatusCode int
+	Response   RevokeReleaseErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *RevokeReleaseErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *RevokeReleaseErrorResponseStatusCode) GetResponse() RevokeReleaseErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *RevokeReleaseErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *RevokeReleaseErrorResponseStatusCode) SetResponse(val RevokeReleaseErrorResponse) {
+	s.Response = val
+}
+
+func (*RevokeReleaseErrorResponseStatusCode) revokeReleaseRes() {}
+
 // RevokeSessionErrorResponse represents sum type.
 type RevokeSessionErrorResponse struct {
 	Type                 RevokeSessionErrorResponseType // switch on this field
@@ -58509,6 +59965,285 @@ func (*RevokeSessionNoContent) revokeSessionRes() {}
 type RevokeSessionUnauthorized ErrorDetails
 
 func (*RevokeSessionUnauthorized) revokeSessionRes() {}
+
+type RollbackDeploymentCreated Deployment
+
+func (*RollbackDeploymentCreated) rollbackDeploymentRes() {}
+
+// RollbackDeploymentErrorResponse represents sum type.
+type RollbackDeploymentErrorResponse struct {
+	Type                RollbackDeploymentErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	DepNotFound         DepNotFound
+	DepPermissionDenied DepPermissionDenied
+	EnvProjectNotFound  EnvProjectNotFound
+	Internal            Internal
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+}
+
+// RollbackDeploymentErrorResponseType is oneOf type of RollbackDeploymentErrorResponse.
+type RollbackDeploymentErrorResponseType string
+
+// Possible values for RollbackDeploymentErrorResponseType.
+const (
+	AuthUnauthorizedRollbackDeploymentErrorResponse    RollbackDeploymentErrorResponseType = "auth.unauthorized"
+	DepNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.not_found"
+	DepPermissionDeniedRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "dep.permission_denied"
+	EnvProjectNotFoundRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "env.project_not_found"
+	InternalRollbackDeploymentErrorResponse            RollbackDeploymentErrorResponseType = "internal"
+	NotImplementedRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "not_implemented"
+	ReqInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether RollbackDeploymentErrorResponse is AuthUnauthorized.
+func (s RollbackDeploymentErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedRollbackDeploymentErrorResponse
+}
+
+// IsDepNotFound reports whether RollbackDeploymentErrorResponse is DepNotFound.
+func (s RollbackDeploymentErrorResponse) IsDepNotFound() bool {
+	return s.Type == DepNotFoundRollbackDeploymentErrorResponse
+}
+
+// IsDepPermissionDenied reports whether RollbackDeploymentErrorResponse is DepPermissionDenied.
+func (s RollbackDeploymentErrorResponse) IsDepPermissionDenied() bool {
+	return s.Type == DepPermissionDeniedRollbackDeploymentErrorResponse
+}
+
+// IsEnvProjectNotFound reports whether RollbackDeploymentErrorResponse is EnvProjectNotFound.
+func (s RollbackDeploymentErrorResponse) IsEnvProjectNotFound() bool {
+	return s.Type == EnvProjectNotFoundRollbackDeploymentErrorResponse
+}
+
+// IsInternal reports whether RollbackDeploymentErrorResponse is Internal.
+func (s RollbackDeploymentErrorResponse) IsInternal() bool {
+	return s.Type == InternalRollbackDeploymentErrorResponse
+}
+
+// IsNotImplemented reports whether RollbackDeploymentErrorResponse is NotImplemented.
+func (s RollbackDeploymentErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedRollbackDeploymentErrorResponse
+}
+
+// IsReqInvalid reports whether RollbackDeploymentErrorResponse is ReqInvalid.
+func (s RollbackDeploymentErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidRollbackDeploymentErrorResponse
+}
+
+// SetAuthUnauthorized sets RollbackDeploymentErrorResponse to AuthUnauthorized.
+func (s *RollbackDeploymentErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedRollbackDeploymentErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if RollbackDeploymentErrorResponse is AuthUnauthorized.
+func (s RollbackDeploymentErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedRollbackDeploymentErrorResponse(v AuthUnauthorized) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetDepNotFound sets RollbackDeploymentErrorResponse to DepNotFound.
+func (s *RollbackDeploymentErrorResponse) SetDepNotFound(v DepNotFound) {
+	s.Type = DepNotFoundRollbackDeploymentErrorResponse
+	s.DepNotFound = v
+}
+
+// GetDepNotFound returns DepNotFound and true boolean if RollbackDeploymentErrorResponse is DepNotFound.
+func (s RollbackDeploymentErrorResponse) GetDepNotFound() (v DepNotFound, ok bool) {
+	if !s.IsDepNotFound() {
+		return v, false
+	}
+	return s.DepNotFound, true
+}
+
+// NewDepNotFoundRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from DepNotFound.
+func NewDepNotFoundRollbackDeploymentErrorResponse(v DepNotFound) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetDepNotFound(v)
+	return s
+}
+
+// SetDepPermissionDenied sets RollbackDeploymentErrorResponse to DepPermissionDenied.
+func (s *RollbackDeploymentErrorResponse) SetDepPermissionDenied(v DepPermissionDenied) {
+	s.Type = DepPermissionDeniedRollbackDeploymentErrorResponse
+	s.DepPermissionDenied = v
+}
+
+// GetDepPermissionDenied returns DepPermissionDenied and true boolean if RollbackDeploymentErrorResponse is DepPermissionDenied.
+func (s RollbackDeploymentErrorResponse) GetDepPermissionDenied() (v DepPermissionDenied, ok bool) {
+	if !s.IsDepPermissionDenied() {
+		return v, false
+	}
+	return s.DepPermissionDenied, true
+}
+
+// NewDepPermissionDeniedRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from DepPermissionDenied.
+func NewDepPermissionDeniedRollbackDeploymentErrorResponse(v DepPermissionDenied) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetDepPermissionDenied(v)
+	return s
+}
+
+// SetEnvProjectNotFound sets RollbackDeploymentErrorResponse to EnvProjectNotFound.
+func (s *RollbackDeploymentErrorResponse) SetEnvProjectNotFound(v EnvProjectNotFound) {
+	s.Type = EnvProjectNotFoundRollbackDeploymentErrorResponse
+	s.EnvProjectNotFound = v
+}
+
+// GetEnvProjectNotFound returns EnvProjectNotFound and true boolean if RollbackDeploymentErrorResponse is EnvProjectNotFound.
+func (s RollbackDeploymentErrorResponse) GetEnvProjectNotFound() (v EnvProjectNotFound, ok bool) {
+	if !s.IsEnvProjectNotFound() {
+		return v, false
+	}
+	return s.EnvProjectNotFound, true
+}
+
+// NewEnvProjectNotFoundRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from EnvProjectNotFound.
+func NewEnvProjectNotFoundRollbackDeploymentErrorResponse(v EnvProjectNotFound) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetEnvProjectNotFound(v)
+	return s
+}
+
+// SetInternal sets RollbackDeploymentErrorResponse to Internal.
+func (s *RollbackDeploymentErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalRollbackDeploymentErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if RollbackDeploymentErrorResponse is Internal.
+func (s RollbackDeploymentErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from Internal.
+func NewInternalRollbackDeploymentErrorResponse(v Internal) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets RollbackDeploymentErrorResponse to NotImplemented.
+func (s *RollbackDeploymentErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedRollbackDeploymentErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if RollbackDeploymentErrorResponse is NotImplemented.
+func (s RollbackDeploymentErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from NotImplemented.
+func NewNotImplementedRollbackDeploymentErrorResponse(v NotImplemented) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets RollbackDeploymentErrorResponse to ReqInvalid.
+func (s *RollbackDeploymentErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidRollbackDeploymentErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if RollbackDeploymentErrorResponse is ReqInvalid.
+func (s RollbackDeploymentErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from ReqInvalid.
+func NewReqInvalidRollbackDeploymentErrorResponse(v ReqInvalid) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// RollbackDeploymentErrorResponseStatusCode wraps RollbackDeploymentErrorResponse with StatusCode.
+type RollbackDeploymentErrorResponseStatusCode struct {
+	StatusCode int
+	Response   RollbackDeploymentErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *RollbackDeploymentErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *RollbackDeploymentErrorResponseStatusCode) GetResponse() RollbackDeploymentErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *RollbackDeploymentErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *RollbackDeploymentErrorResponseStatusCode) SetResponse(val RollbackDeploymentErrorResponse) {
+	s.Response = val
+}
+
+func (*RollbackDeploymentErrorResponseStatusCode) rollbackDeploymentRes() {}
+
+type RollbackDeploymentOK Deployment
+
+func (*RollbackDeploymentOK) rollbackDeploymentRes() {}
+
+// What to record alongside the rollback. The release and the targets come
+// from the deployment named in the path and cannot be changed here.
+// Ref: #
+type RollbackDeploymentRequest struct {
+	// A short free-form summary of why the rollback happened. Recorded on
+	// the new deployment's metadata.
+	Message OptString `json:"message"`
+	// An optimistic-concurrency guard: the deployment the caller believes is
+	// the newest one to any of the targets. When present, the rollback only
+	// happens if it still is; otherwise the request answers `409` with
+	// `dep.conflict`, carrying the actual newest deployment, and nothing
+	// changes.
+	ExpectedDeploymentID OptDeploymentID `json:"expected_deployment_id"`
+}
+
+// GetMessage returns the value of Message.
+func (s *RollbackDeploymentRequest) GetMessage() OptString {
+	return s.Message
+}
+
+// GetExpectedDeploymentID returns the value of ExpectedDeploymentID.
+func (s *RollbackDeploymentRequest) GetExpectedDeploymentID() OptDeploymentID {
+	return s.ExpectedDeploymentID
+}
+
+// SetMessage sets the value of Message.
+func (s *RollbackDeploymentRequest) SetMessage(val OptString) {
+	s.Message = val
+}
+
+// SetExpectedDeploymentID sets the value of ExpectedDeploymentID.
+func (s *RollbackDeploymentRequest) SetExpectedDeploymentID(val OptDeploymentID) {
+	s.ExpectedDeploymentID = val
+}
 
 // Ref: #
 type SSOAuthMethod struct {
