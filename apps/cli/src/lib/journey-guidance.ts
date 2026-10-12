@@ -31,8 +31,8 @@ export function customizeAndPublishActions(cliVersion: string): string[] {
     "Customize what you ask for and how people sign in: edit .zitadel/schemas/ to change " +
       "the information you collect, and .zitadel/flows/ to change the sign-up/sign-in " +
       "experience. Each folder has a README with examples.",
-    `See your changes before they go live: ${publicCliCommand("plan", cliVersion)} to preview, ` +
-      `then ${publicCliCommand("apply", cliVersion)} to publish.`,
+    `See your changes before they go live: ${publicCliCommand("deploy --dry-run", cliVersion)} to ` +
+      `preview, then ${publicCliCommand("deploy", cliVersion)} to publish.`,
   ];
 }
 

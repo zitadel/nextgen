@@ -54,20 +54,12 @@ describe("status", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
-      it("offers plan while nobody has registered", async () => {
+      it("offers a dry-run deploy while nobody has registered", async () => {
         const app = await aSetUpApp();
 
         const result = await app.status();
 
-        expect(result).toSuggest("plan");
-      });
-
-      it("withholds apply while nobody has registered", async () => {
-        const app = await aSetUpApp();
-
-        const result = await app.status();
-
-        expect(result).not.toSuggest("apply");
+        expect(result).toSuggest("deploy --dry-run");
       });
 
       it("asks for a registered user before anything else", async () => {

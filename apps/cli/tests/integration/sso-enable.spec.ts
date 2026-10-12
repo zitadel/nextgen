@@ -18,10 +18,11 @@ async function anAppWithGoogle(): Promise<ScaffoldedApp> {
   return app;
 }
 
-/** The same, with the edit published. */
+/** The same, with the edit deployed to a primary origin. */
 async function anAppServingGoogle(): Promise<ScaffoldedApp> {
   const app = await anAppWithGoogle();
-  expect(await app.apply()).toSucceed();
+  await app.addPrimaryOrigin();
+  expect(await app.deploy()).toSucceed();
   return app;
 }
 
@@ -123,12 +124,9 @@ describe("sso enable", () => {
         expect(await app.filesContaining(CREDENTIALS.clientId)).toEqual([]);
       });
 
-      it("leaves the provider for apply to publish", async () => {
+      it("leaves the provider unpublished until a deploy", async () => {
         const app = await anAppWithGoogle();
 
-        const result = await app.plan();
-
-        expect(result.total).toBeGreaterThan(0);
         expect(await app.registeredIdps()).toEqual([]);
       });
 
@@ -148,7 +146,6 @@ describe("sso enable", () => {
         expect(await app.committed.idpConnection(GOOGLE)).toEqual(before.connection);
         expect(await app.publishedSchema()).toEqual(before.schema);
         expect(await app.publishedFlow()).toEqual(before.flow);
-        expect(await app.plan()).toReportNothingToDo();
         expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
       });
 
@@ -192,10 +189,13 @@ describe("sso enable", () => {
           }
         });
 
-        it("leaves nothing to reconcile", async () => {
+        it("re-deploys the same release when nothing changed", async () => {
           const app = await anAppServingGoogle();
+          const before = await app.deployData();
 
-          expect(await app.plan()).toReportNothingToDo();
+          const after = await app.deployData();
+
+          expect(after.content_hash).toBe(before.content_hash);
         });
       });
     });
