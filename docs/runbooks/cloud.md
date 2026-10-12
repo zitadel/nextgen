@@ -192,6 +192,41 @@ or garbled fails the build and the serving deployment stays.
   an older deployment without touching the schema.
 - **Startup never migrates:** the serving function refuses `--migrate`.
 
+## Deployment checks
+
+Every deployment is tested once Vercel built it, on its own URL
+(`cloud-<hash>-zitadel.vercel.app`, never a production alias):
+[`deployment.yml`](../../.github/workflows/deployment.yml) runs on the
+`deployment_status` event Vercel posts to GitHub and runs each service's
+contract suite against the deployment, today the docs'
+(`moon run docs:e2e-deployment`, [`apps/docs/AGENTS.md`](../../apps/docs/AGENTS.md)).
+The check lands on the deployed commit: on the pull request for a preview,
+on `main` for production.
+
+- The suites reach the protected deployment with the project's Protection
+  Bypass for Automation secret, which the workflow expects as the repository
+  secret `VERCEL_AUTOMATION_BYPASS_SECRET`. To set it from the project's
+  settings without printing it:
+
+  ```sh
+  npx -y vercel@63.1.2 api "/v9/projects/cloud?teamId=team_IDtOs36TGPOejsKm40wr1p3C" \
+    | jq -r '.protectionBypass | keys[0]' \
+    | gh secret set VERCEL_AUTOMATION_BYPASS_SECRET --repo zitadel/nextgen
+  ```
+
+  Regenerating the secret in the project settings invalidates it: set it
+  again.
+- By hand, against any deployment:
+  `DOCS_BASE_URL=https://cloud-….vercel.app VERCEL_AUTOMATION_BYPASS_SECRET=… moon run docs:e2e-deployment`,
+  or `gh workflow run deployment.yml --ref <branch> -f url=https://cloud-….vercel.app`,
+  which is also how to try a change to the workflow before it is on `main`.
+- Production is not held back by the check yet: a red run on `main` shows on
+  the commit while the deployment already serves. To gate it, enable
+  Deployment Checks in the project's Build & Deployment settings and select
+  the `docs` check: Vercel then assigns the production domain only once the
+  check passes, so a red deployment never replaces the one serving (Force
+  Promote on the deployment's page bypasses it).
+
 ## Rotating the master key
 
 The server re-wraps every project key to the current master key at startup

@@ -56,3 +56,26 @@ tasks:
     options:
       persistent: true
       runInCI: false
+
+  # The site's contract suite (tests/, playwright.config.mts): the index and
+  # every page it lists, as HTML and as Markdown, the search, the MCP server,
+  # the assets. Opt-in like every e2e lane; Playwright serves the build on
+  # port 3003, or reuses `moon run docs:start`.
+  e2e:
+    command: "corepack pnpm exec playwright test"
+    deps:
+      - "build"
+    options:
+      cache: false
+      runInCI: false
+
+  # The same suite against a deployment of the hosted cloud, which
+  # DOCS_BASE_URL names (VERCEL_AUTOMATION_BYPASS_SECRET opens its
+  # protection); .github/workflows/deployment.yml runs it for every deployment.
+  e2e-deployment:
+    script: |
+      [ -n "${DOCS_BASE_URL:-}" ] || { echo "DOCS_BASE_URL names the deployment to test" >&2; exit 1; }
+      corepack pnpm exec playwright test
+    options:
+      cache: false
+      runInCI: false

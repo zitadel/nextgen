@@ -27,4 +27,9 @@ under `/docs` ([`apps/docs/AGENTS.md`](../docs/AGENTS.md)).
 | [`ignore-build.sh`](ignore-build.sh) | the Ignored Build Step: production always deploys, a preview only when its branch touches what the deployment runs |
 | [`setup-secrets.sh`](setup-secrets.sh) | mints an environment's master key and root admin (with [`admin-document.mjs`](admin-document.mjs)) and sets them on the Vercel project; the originals go to 1Password |
 
+Every deployment is tested once it is built:
+[`deployment.yml`](../../.github/workflows/deployment.yml) runs the services'
+contract suites against the deployment's URL (the runbook's
+[Deployment checks](../../docs/runbooks/cloud.md#deployment-checks)).
+
 Setup, configuration and operations: [the runbook](../../docs/runbooks/cloud.md).

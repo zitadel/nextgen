@@ -1,0 +1,107 @@
+name: deployment
+
+# Tests a deployment of the Vercel project `cloud` once Vercel built it: a
+# preview for a branch, production for main. Vercel posts a GitHub deployment
+# per deployment, and this workflow runs on its `deployment_status`, so the job
+# runs on the deployed commit and its check lands there: on the pull request
+# for a preview, on main for production, where Vercel's Deployment Checks can
+# hold the production domain until it passes (docs/runbooks/cloud.md).
+#
+# The job runs each service's contract suite, today the docs', the way the
+# service runs it locally, but against the deployment's URL instead of a local
+# server (`docs:e2e-deployment`): what is checked is the artifact Vercel built,
+# routed by the repo-root vercel.json, behind Vercel's protection.
+#
+# `workflow_dispatch` runs the same job against any deployment URL from any
+# branch: the way to try a change to this file before it is on main.
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "The deployment to test, e.g. https://cloud-abc1234de-zitadel.vercel.app"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deployment-${{ inputs.url || github.event.deployment_status.environment_url }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    # Only a deployment of `cloud` that is ready: Vercel posts a status per
+    # state. The URL is the deployment's own (cloud-<hash>-zitadel.vercel.app),
+    # never a production alias, so production is tested before it is promoted
+    # rather than whatever serves the alias.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment.creator.login == 'vercel[bot]' &&
+       startsWith(github.event.deployment_status.environment_url, 'https://cloud-'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      DOCS_BASE_URL: ${{ inputs.url || github.event.deployment_status.environment_url }}
+      # The project's Protection Bypass for Automation secret, as a repository
+      # secret of the same name; the runbook says how to set it.
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      # See ci.yml.
+      MOON_SUMMARY: detailed
+      DO_NOT_TRACK: "1"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # The deployed commit; a dispatch takes the ref it was started from.
+          ref: ${{ github.event.deployment.sha || github.ref }}
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        run: corepack pnpm --filter @zitadel/docs exec playwright install chromium
+
+      # Without the secret every request would end at Vercel's sign-in page;
+      # fail on the cause instead.
+      - name: Check the bypass secret is set
+        run: |
+          [ -n "$VERCEL_AUTOMATION_BYPASS_SECRET" ] || {
+            echo "::error::Set the repository secret VERCEL_AUTOMATION_BYPASS_SECRET (docs/runbooks/cloud.md, Deployment checks)"
+            exit 1
+          }
+
+      # `env -u CI`: the lane is `runInCI: false` to stay out of `moon ci`'s
+      # selection, which also makes moon skip it under CI (see ci.yml).
+      - name: Run the docs suite against the deployment
+        run: env -u CI -u GITHUB_ACTIONS moon run docs:e2e-deployment
+
+      - name: Upload the Playwright report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-deployment-report
+          path: |
+            apps/docs/playwright-report
+            apps/docs/test-results
+          if-no-files-found: ignore
+          retention-days: 7

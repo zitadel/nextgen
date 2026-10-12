@@ -53,3 +53,25 @@ live under `/docs` here:
 look at the build on port 3003. On Vercel the build runs `pnpm run build`,
 never moon: moon cannot archive the symlinks Vercel's Next.js adapter writes
 into `.next/output`.
+
+## Tests
+
+`tests/` is the site's contract suite (Playwright, `playwright.config.mts`),
+written against a URL rather than the code. `moon run docs:e2e` runs it
+against the local build on port 3003; `DOCS_BASE_URL=https://cloud-….vercel.app
+moon run docs:e2e-deployment` against a deployment of the hosted cloud, with
+`VERCEL_AUTOMATION_BYPASS_SECRET` for its protection, which
+[`deployment.yml`](../../.github/workflows/deployment.yml) does for every
+deployment. The specs use paths only, so one spec proves both.
+
+- `/docs/llms.txt` is the suite's page list: every page it names is fetched as
+  HTML, at its `.md` URL and through `Accept: text/markdown`, and every site
+  link in the Markdown must resolve. A page needs no test of its own.
+- The routes that are not pages each have a test in `tests/agents.spec.ts`:
+  search, the MCP server (`initialize`, `tools/list`, `get_page`), the
+  plain-text answers, the Open Graph image. A new route under `app/docs/` gets
+  one there, and goes into the matcher of `proxy.ts` (above).
+- `tests/pages.spec.ts` also pins the assets to `/docs/_next/` and
+  `llms-full.txt` to the pages without the API operations.
+- One browser test (`*.browser.spec.ts`, Chromium) proves the site hydrates
+  and navigates; everything else is HTTP through Playwright's request fixture.
