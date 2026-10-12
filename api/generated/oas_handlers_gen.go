@@ -244,9 +244,9 @@ func (s *Server) handleBeginUserPasskeyRegistrationRequest(args [1]string, argsE
 // Builds a release from the resources of `.zitadel/` as authored on disk,
 // grouped by kind, in one transaction: a failure anywhere leaves no
 // revision and no release. The caller records nothing.
-// If the project already holds a release with the same content, the
-// request answers `200` with that release and allocates nothing, however
-// long ago it was built. Otherwise every resource is compared against the
+// If the project already holds a release with the same content, the same
+// `content_hash`, the request answers `200` with that release and
+// allocates nothing, however long ago it was built. Otherwise every resource is compared against the
 // project's newest revision of the same handle: unchanged content reuses
 // that revision, changed content allocates a new one, and the request
 // answers `201` with the new release. Metadata is excluded from the
@@ -7983,8 +7983,10 @@ func (s *Server) handleGetReadyRequest(args [0]string, argsEscaped bool, w http.
 
 // handleGetReleaseByIdRequest handles getReleaseById operation.
 //
-// Reads one release: its metadata and the `(kind, handle, revision_id)`
-// tuples it pins.
+// Reads one release: its digest, its metadata and the
+// `(kind, handle, revision_id)` tuples it pins.
+// The path takes the `rel_` id only. To find a release from its digest,
+// list with the `content_hash` filter and read the matched entry's `id`.
 // Does not embed resource content. Resolve each `revision_id` through the
 // per-kind read endpoints when the bytes are needed.
 // The lookup is scoped to the project in `project_id`: a release id belonging
@@ -11102,8 +11104,13 @@ func (s *Server) handleListMyProjectsRequest(args [0]string, argsEscaped bool, w
 // handleListReleasesRequest handles listReleases operation.
 //
 // Lists the project's releases, newest first.
-// Entries carry metadata only — the pinned set is omitted. Read one release
-// with `GET /releases/{release_id}` to get its pointers.
+// Entries carry the digest and the metadata — the pinned set is omitted.
+// Read one release with `GET /releases/{release_id}` to get its pointers.
+// `content_hash` looks a release up by its content, as the CLI does when a
+// person types the digest a transcript printed. The project holds at most
+// one release per digest, so the filtered list has one entry or none, and
+// an unknown digest is an empty list rather than an error. Paths take the
+// `rel_` id only; the matched entry's `id` is what to use there.
 //
 // GET /releases
 func (s *Server) handleListReleasesRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -11248,6 +11255,10 @@ func (s *Server) handleListReleasesRequest(args [0]string, argsEscaped bool, w h
 					Name: "project_id",
 					In:   "query",
 				}: params.ProjectID,
+				{
+					Name: "content_hash",
+					In:   "query",
+				}: params.ContentHash,
 				{
 					Name: "limit",
 					In:   "query",
