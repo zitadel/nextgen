@@ -52925,6 +52925,7 @@ func (*QueryIdpsBadRequest) queryIdpsRes() {}
 // QueryIdpsErrorResponse represents sum type.
 type QueryIdpsErrorResponse struct {
 	Type                QueryIdpsErrorResponseType // switch on this field
+	AuthCsrfInvalid     AuthCsrfInvalid
 	AuthUnauthorized    AuthUnauthorized
 	IdpNotFound         IdpNotFound
 	IdpPermissionDenied IdpPermissionDenied
@@ -52938,6 +52939,7 @@ type QueryIdpsErrorResponseType string
 
 // Possible values for QueryIdpsErrorResponseType.
 const (
+	AuthCsrfInvalidQueryIdpsErrorResponse     QueryIdpsErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedQueryIdpsErrorResponse    QueryIdpsErrorResponseType = "auth.unauthorized"
 	IdpNotFoundQueryIdpsErrorResponse         QueryIdpsErrorResponseType = "idp.not_found"
 	IdpPermissionDeniedQueryIdpsErrorResponse QueryIdpsErrorResponseType = "idp.permission_denied"
@@ -52945,6 +52947,11 @@ const (
 	NotImplementedQueryIdpsErrorResponse      QueryIdpsErrorResponseType = "not_implemented"
 	ReqInvalidQueryIdpsErrorResponse          QueryIdpsErrorResponseType = "req.invalid"
 )
+
+// IsAuthCsrfInvalid reports whether QueryIdpsErrorResponse is AuthCsrfInvalid.
+func (s QueryIdpsErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidQueryIdpsErrorResponse
+}
 
 // IsAuthUnauthorized reports whether QueryIdpsErrorResponse is AuthUnauthorized.
 func (s QueryIdpsErrorResponse) IsAuthUnauthorized() bool {
@@ -52972,6 +52979,27 @@ func (s QueryIdpsErrorResponse) IsNotImplemented() bool {
 // IsReqInvalid reports whether QueryIdpsErrorResponse is ReqInvalid.
 func (s QueryIdpsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidQueryIdpsErrorResponse
+}
+
+// SetAuthCsrfInvalid sets QueryIdpsErrorResponse to AuthCsrfInvalid.
+func (s *QueryIdpsErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidQueryIdpsErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if QueryIdpsErrorResponse is AuthCsrfInvalid.
+func (s QueryIdpsErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidQueryIdpsErrorResponse returns new QueryIdpsErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidQueryIdpsErrorResponse(v AuthCsrfInvalid) QueryIdpsErrorResponse {
+	var s QueryIdpsErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets QueryIdpsErrorResponse to AuthUnauthorized.
