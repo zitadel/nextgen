@@ -20,7 +20,7 @@
  *   afterAll(() => server.close());
  *   afterEach(() => { server.resetHandlers(); resetPlatformStore(); });
  */
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import type {
   AddOrigin201,
@@ -47,7 +47,11 @@ import {
   CreateIdpBody,
   CreateIdpQueryParams,
   CreateIdpResponse,
+  CreateDeploymentBody,
+  CreateDeploymentQueryParams,
   CreateProjectBody,
+  CreateReleaseBody,
+  CreateReleaseQueryParams,
   CreateSchemaBody,
   CreateSchemaQueryParams,
   DeleteVariableParams,
@@ -58,6 +62,8 @@ import {
   GetClaimWindowParams,
   GetClaimWindowQueryParams,
   GetClaimWindowResponse,
+  GetDeploymentByIdParams,
+  GetDeploymentByIdQueryParams,
   GetFlowDefinitionParams,
   GetFlowDefinitionResponse,
   GetIdpByIdParams,
@@ -65,6 +71,8 @@ import {
   GetIdpByIdResponse,
   GetProjectParams,
   GetProjectResponse,
+  GetReleaseByIdParams,
+  GetReleaseByIdQueryParams,
   GetSchemaByIdParams,
   GetSchemaByIdQueryParams,
   GetVariableParams,
@@ -73,8 +81,10 @@ import {
   GetVariablesQueryParams,
   GetVariablesResponse,
   InitClaimParams,
+  ListDeploymentsQueryParams,
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
+  ListReleasesQueryParams,
   ListSchemasQueryParams,
   QueryIdpsBody,
   QueryIdpsQueryParams,
@@ -82,6 +92,11 @@ import {
   QueryUsersBody,
   RemoveOriginBody,
   RemoveOriginParams,
+  RevokeReleaseParams,
+  RevokeReleaseQueryParams,
+  RollbackDeploymentBody,
+  RollbackDeploymentParams,
+  RollbackDeploymentQueryParams,
   UpdateVariablesBody,
   UpdateVariablesQueryParams,
   UpdateVariablesResponse,
@@ -280,11 +295,61 @@ type IdpConnectionRecord = {
  */
 type VariableRecord = { value: string | number | boolean; secret: boolean };
 
+/**
+ * One pinned resource of a release: which resource (`kind` + `handle`) and
+ * which revision of it. A bundle synthesises the revision id; `pointers` pins
+ * one that already exists.
+ */
+type ReleasePointer = { kind: string; handle: string; revision_id: string };
+
+/**
+ * A release in the store. `contentHash` is the bare 64-hex digest without the
+ * `sha256:` prefix — the prefix is added at the wire boundary, as the Go
+ * converter does — and is what dedupes a re-submitted bundle or pointer set.
+ * `revokedAt` is null until the release is revoked, after which it can never be
+ * served again.
+ */
+type ReleaseRecord = {
+  id: string;
+  projectId: string;
+  contentHash: string;
+  pointers: ReleasePointer[];
+  message: string | null;
+  gitSha: string | null;
+  gitDirty: boolean;
+  createdAt: string;
+  revokedAt: string | null;
+  seq: number;
+};
+
+/** One origin a deployment made its release live on, with a preview's expiry. */
+type DeploymentTargetRow = { origin: string; expiresAt: string | null };
+
+/**
+ * A deployment in the store: the release, the resolved targets, and why it
+ * happened. Append-only — a later deployment to an origin supersedes this one
+ * there without rewriting it. `rollbackTo` names the deployment a rollback
+ * re-applied, null otherwise.
+ */
+type DeploymentRecord = {
+  id: string;
+  projectId: string;
+  releaseId: string;
+  targets: DeploymentTargetRow[];
+  reason: "deploy" | "rollback";
+  message: string | null;
+  rollbackTo: string | null;
+  deployedAt: string;
+  seq: number;
+};
+
 type Store = {
   projects: Map<string, ProjectRecord>;
   schemas: Map<string, SchemaRecord>;
   flowDefinitions: Map<string, FlowDefinitionRecord>;
   idps: Map<string, IdpConnectionRecord>;
+  releases: Map<string, ReleaseRecord>;
+  deployments: Map<string, DeploymentRecord>;
   /**
    * Owner key -> variable name -> value. The project level and each
    * environment are separate owners: the project does not see into its
@@ -307,6 +372,8 @@ function makeStore(): Store {
     schemas: new Map(),
     flowDefinitions: new Map(),
     idps: new Map(),
+    releases: new Map(),
+    deployments: new Map(),
     variables: new Map(),
     claimChallenges: new Map(),
     claims: new Map(),
@@ -590,6 +657,12 @@ export type PlatformStoreSnapshot = {
   flowDefinitionIds: string[];
   /** Connection slugs, which is what schemas and flows reference. */
   idpSlugs: string[];
+  /** Release ids, newest first, for a caller that drove the HTTP API. */
+  releaseIds: string[];
+  /** Release content digests (full `sha256:` form), insertion order. */
+  releaseContentHashes: string[];
+  /** Deployment ids, newest first. */
+  deploymentIds: string[];
   /**
    * Variable names entered at the project, secrets included. Names only: a
    * secret's value is not readable over the API, and a snapshot that returned
@@ -623,6 +696,15 @@ export function snapshotPlatformStore(): PlatformStoreSnapshot {
     schemaIds: [...store.schemas.keys()],
     flowDefinitionIds: [...store.flowDefinitions.keys()],
     idpSlugs: [...store.idps.values()].map((record) => record.slug),
+    releaseIds: [...store.releases.values()]
+      .sort((a, b) => b.seq - a.seq)
+      .map((release) => release.id),
+    releaseContentHashes: [...store.releases.values()].map(
+      (release) => `${RELEASE_CONTENT_HASH_PREFIX}${release.contentHash}`,
+    ),
+    deploymentIds: [...store.deployments.values()]
+      .sort((a, b) => b.seq - a.seq)
+      .map((deployment) => deployment.id),
     variableNames: [...store.variables.values()].flatMap((owned) => [...owned.keys()]),
     originPatterns: [...store.projects.values()].flatMap((project) =>
       project.origins.map((origin) => origin.pattern),
@@ -872,6 +954,223 @@ function authorizeProjectWrite(
   };
 }
 
+// --- releases and deployments ------------------------------------------
+// Releases and deployments are stored in their own block so the two features
+// do not collide with the rest of the store. The Go handlers are unimplemented
+// stubs; the behaviour the CLI drives against lives here.
+
+/** The wire prefix for a release digest. The store keeps the bare hex. */
+const RELEASE_CONTENT_HASH_PREFIX = "sha256:";
+
+/**
+ * A stable digest over the content a release pins. Faithful enough for the
+ * mock: it is a sha256 over a canonical JSON of the sorted entries, so the
+ * same content always digests the same way and a re-submission dedupes. It
+ * does not reproduce the server's RFC 8785 canonicalisation.
+ */
+function contentDigest(entries: { kind: string; handle: string; content: unknown }[]): string {
+  const sorted = [...entries].sort((a, b) =>
+    a.kind === b.kind ? a.handle.localeCompare(b.handle) : a.kind.localeCompare(b.kind),
+  );
+  const canonical = JSON.stringify({ version: 1, resources: sorted });
+  return createHash("sha256").update(canonical).digest("hex");
+}
+
+/** The handle a schema, flow definition or branding declares. */
+function bundleResourceHandle(kind: string, resource: Record<string, unknown>): string {
+  if (kind === "schema") {
+    return typeof resource.objectType === "string" ? resource.objectType : "schema";
+  }
+  if (kind === "flow_definition") {
+    return typeof resource.name === "string" ? resource.name : "flow";
+  }
+  return "default";
+}
+
+/** The pointers a bundle pins, with a synthesised revision id per resource. */
+function pointersFromBundle(bundle: Record<string, unknown>): ReleasePointer[] {
+  const pointers: ReleasePointer[] = [];
+  const groups: [string, string][] = [
+    ["schemas", "schema"],
+    ["flow_definitions", "flow_definition"],
+    ["brandings", "branding"],
+  ];
+  for (const [field, kind] of groups) {
+    const items = bundle[field];
+    if (!Array.isArray(items)) {
+      continue;
+    }
+    for (const item of items) {
+      const resource = isObject(item) ? item : {};
+      const handle = bundleResourceHandle(kind, resource);
+      pointers.push({ kind, handle, revision_id: `${kind}_${shortId()}` });
+    }
+  }
+  return pointers;
+}
+
+/** Everything a bundle carries, flattened for the digest, in input order. */
+function bundleDigestEntries(
+  bundle: Record<string, unknown>,
+): { kind: string; handle: string; content: unknown }[] {
+  const entries: { kind: string; handle: string; content: unknown }[] = [];
+  const groups: [string, string][] = [
+    ["schemas", "schema"],
+    ["flow_definitions", "flow_definition"],
+    ["brandings", "branding"],
+  ];
+  for (const [field, kind] of groups) {
+    const items = bundle[field];
+    if (!Array.isArray(items)) {
+      continue;
+    }
+    for (const item of items) {
+      const resource = isObject(item) ? item : {};
+      entries.push({ kind, handle: bundleResourceHandle(kind, resource), content: resource });
+    }
+  }
+  return entries;
+}
+
+/**
+ * The handle a pinned revision declares. Resolved from the store so a release
+ * records the identity of the revision it pins, as the server does; `default`
+ * for branding, and the revision id itself when nothing in the store answers.
+ */
+function pointerHandle(kind: string, revisionId: string): string {
+  if (kind === "schema") {
+    const record = store.schemas.get(revisionId);
+    if (record?.objectType) {
+      return record.objectType;
+    }
+  }
+  if (kind === "flow_definition") {
+    const record = store.flowDefinitions.get(revisionId);
+    const name = record?.body.name;
+    if (typeof name === "string") {
+      return name;
+    }
+  }
+  if (kind === "branding") {
+    return "default";
+  }
+  return revisionId;
+}
+
+/** Turn a `ttl` (`30m`, `168h`, `7d`) into an ISO expiry counted from now. */
+function ttlToExpiry(ttl: string): string {
+  const match = /^([1-9][0-9]*)([mhd])$/.exec(ttl);
+  if (!match) {
+    return new Date().toISOString();
+  }
+  const amount = Number(match[1]);
+  const unitMs = match[2] === "m" ? 60_000 : match[2] === "h" ? 3_600_000 : 86_400_000;
+  return new Date(Date.now() + amount * unitMs).toISOString();
+}
+
+/** The project's primary origins, as exact URLs, sorted. */
+function primaryOrigins(project: ProjectRecord): string[] {
+  return project.origins
+    .filter((origin) => origin.kind === "primary")
+    .map((origin) => origin.pattern)
+    .sort();
+}
+
+/**
+ * Whether a concrete origin matches one of the project's preview patterns. A
+ * `*` in a pattern matches one or more characters that are not a dot, as the
+ * origin rule (#1582) defines it.
+ */
+function matchesPreviewPattern(project: ProjectRecord, origin: string): boolean {
+  for (const entry of project.origins) {
+    if (entry.kind !== "preview") {
+      continue;
+    }
+    const pattern = entry.pattern
+      .replace(/[.*+?^${}()|[\]\\]/g, (ch) => (ch === "*" ? "\u0000" : `\\${ch}`))
+      .replaceAll("\u0000", "[^.]+");
+    if (new RegExp(`^${pattern}$`).test(origin)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** The newest deployment to an origin, treating an expired preview as gone. */
+function newestDeploymentForOrigin(
+  projectId: string,
+  origin: string,
+): DeploymentRecord | undefined {
+  const now = Date.now();
+  return [...store.deployments.values()]
+    .filter((deployment) => deployment.projectId === projectId)
+    .filter((deployment) =>
+      deployment.targets.some(
+        (target) =>
+          target.origin === origin &&
+          (target.expiresAt === null || new Date(target.expiresAt).getTime() > now),
+      ),
+    )
+    .sort((a, b) => b.seq - a.seq)[0];
+}
+
+/** The release metadata block, nulls written explicitly as the server does. */
+function releaseMetadata(release: ReleaseRecord): Record<string, unknown> {
+  return {
+    message: release.message,
+    git_sha: release.gitSha,
+    git_dirty: release.gitDirty,
+    created_at: release.createdAt,
+    created_by: null,
+    created_by_type: "service",
+  };
+}
+
+/** The wire shape of a release, with its pointers. */
+function releaseResponse(release: ReleaseRecord): Record<string, unknown> {
+  return {
+    id: release.id,
+    project_id: release.projectId,
+    content_hash: `${RELEASE_CONTENT_HASH_PREFIX}${release.contentHash}`,
+    metadata: releaseMetadata(release),
+    revoked_at: release.revokedAt,
+    pointers: release.pointers,
+  };
+}
+
+/** The wire shape of a deployment, optionally over a restricted target set. */
+function deploymentResponse(
+  deployment: DeploymentRecord,
+  targets: DeploymentTargetRow[] = deployment.targets,
+  expand?: { release: boolean },
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    id: deployment.id,
+    project_id: deployment.projectId,
+    release_id: deployment.releaseId,
+    targets: targets.map((target) =>
+      target.expiresAt === null
+        ? { origin: target.origin }
+        : { origin: target.origin, expires_at: target.expiresAt },
+    ),
+    deployed_at: deployment.deployedAt,
+    metadata: {
+      reason: deployment.reason,
+      message: deployment.message,
+      rollback_to: deployment.rollbackTo,
+      deployed_by: null,
+      deployed_by_type: "service",
+    },
+  };
+  if (expand?.release) {
+    const release = store.releases.get(deployment.releaseId);
+    if (release) {
+      body.release = releaseResponse(release);
+    }
+  }
+  return body;
+}
+
 export function setupPlatformHandlers() {
   return [
     http.post("*/projects", async ({ request }) => {
@@ -1029,6 +1328,515 @@ export function setupPlatformHandlers() {
         );
       }
       return new HttpResponse(null, { status: 204 });
+    }),
+
+    // --- releases --------------------------------------------------------
+    // A release is assembled from a bundle (the CLI's form) or from pointers.
+    // The content digest dedupes a re-submission; revoke blocks it from ever
+    // being served again. The Go handlers are unimplemented stubs.
+
+    http.post("*/releases", async ({ request }) => {
+      const query = parse(CreateReleaseQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(CreateReleaseBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+      const project = store.projects.get(query.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("rel.project_not_found", "release: project not found"), {
+          status: 404,
+        });
+      }
+
+      const data = body.data as Record<string, unknown>;
+      let pointers: ReleasePointer[];
+      let digest: string;
+      if (isObject(data.bundle)) {
+        const entries = bundleDigestEntries(data.bundle);
+        if (entries.length === 0 || entries.length > 50) {
+          return HttpResponse.json(
+            errorBody("rel.invalid", "release: a bundle carries between 1 and 50 resources"),
+            { status: 400 },
+          );
+        }
+        pointers = pointersFromBundle(data.bundle);
+        digest = contentDigest(entries);
+      } else if (Array.isArray(data.pointers)) {
+        pointers = data.pointers.map((item) => {
+          const pointer = item as { kind: string; revision_id: string };
+          return {
+            kind: pointer.kind,
+            handle: pointerHandle(pointer.kind, pointer.revision_id),
+            revision_id: pointer.revision_id,
+          };
+        });
+        digest = contentDigest(
+          pointers.map((pointer) => ({
+            kind: pointer.kind,
+            handle: pointer.handle,
+            content: pointer.revision_id,
+          })),
+        );
+      } else {
+        return HttpResponse.json(
+          errorBody("rel.invalid", "release: send exactly one of pointers or bundle"),
+          { status: 400 },
+        );
+      }
+
+      const existing = [...store.releases.values()].find(
+        (release) => release.projectId === project.id && release.contentHash === digest,
+      );
+      if (existing) {
+        return HttpResponse.json(releaseResponse(existing), { status: 200 });
+      }
+
+      const id = `rel_${shortId()}`;
+      const record: ReleaseRecord = {
+        id,
+        projectId: project.id,
+        contentHash: digest,
+        pointers,
+        message: typeof data.message === "string" ? data.message : null,
+        gitSha: typeof data.git_sha === "string" ? data.git_sha : null,
+        gitDirty: data.git_dirty === true,
+        createdAt: nowIso(),
+        revokedAt: null,
+        seq: ++store.lastSeq,
+      };
+      store.releases.set(id, record);
+      return HttpResponse.json(releaseResponse(record), { status: 201 });
+    }),
+
+    http.get("*/releases", ({ request }) => {
+      const query = parse(ListReleasesQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const contentHash = queryRecord(request).content_hash;
+      const releases = [...store.releases.values()]
+        .filter((release) => release.projectId === query.data.project_id)
+        .filter((release) =>
+          contentHash === undefined
+            ? true
+            : `${RELEASE_CONTENT_HASH_PREFIX}${release.contentHash}` === contentHash,
+        )
+        .sort((a, b) => b.seq - a.seq)
+        .map((release) => ({
+          id: release.id,
+          project_id: release.projectId,
+          content_hash: `${RELEASE_CONTENT_HASH_PREFIX}${release.contentHash}`,
+          metadata: releaseMetadata(release),
+          revoked_at: release.revokedAt,
+        }));
+      return HttpResponse.json({ releases });
+    }),
+
+    http.get("*/releases/:release_id", ({ params, request }) => {
+      const path = parse(GetReleaseByIdParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetReleaseByIdQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const release = store.releases.get(path.data.release_id);
+      if (!release || release.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("rel.not_found", "release: not found"), { status: 404 });
+      }
+      return HttpResponse.json(releaseResponse(release));
+    }),
+
+    http.post("*/releases/:release_id/revoke", ({ params, request }) => {
+      const path = parse(RevokeReleaseParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(RevokeReleaseQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const release = store.releases.get(path.data.release_id);
+      if (!release || release.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("rel.not_found", "release: not found"), { status: 404 });
+      }
+      if (release.revokedAt !== null) {
+        return HttpResponse.json(releaseResponse(release), { status: 200 });
+      }
+
+      // A release an origin still serves cannot be revoked: the live deployment
+      // to any origin must not pin it.
+      const servedBy: { origin: string; deployment_id: string }[] = [];
+      const origins = new Set(
+        [...store.deployments.values()]
+          .filter((deployment) => deployment.projectId === release.projectId)
+          .flatMap((deployment) => deployment.targets.map((target) => target.origin)),
+      );
+      for (const origin of origins) {
+        const newest = newestDeploymentForOrigin(release.projectId, origin);
+        if (newest?.releaseId === release.id) {
+          servedBy.push({ origin, deployment_id: newest.id });
+        }
+      }
+      if (servedBy.length > 0) {
+        return HttpResponse.json(
+          errorBody("rel.in_use", "release: still served by an origin", {
+            origins: servedBy.sort((a, b) => a.origin.localeCompare(b.origin)),
+          }),
+          { status: 409 },
+        );
+      }
+
+      release.revokedAt = nowIso();
+      return HttpResponse.json(releaseResponse(release), { status: 200 });
+    }),
+
+    // --- deployments -----------------------------------------------------
+    // A deployment makes a release live on a set of targets, expanding
+    // `primary` to the project's primary origins. It is idempotent on what is
+    // served and append-only; rollback re-applies an earlier one. Variable
+    // freezing arrives with the variables work. The Go handlers are stubs.
+
+    http.post("*/deployments", async ({ request }) => {
+      const query = parse(CreateDeploymentQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(CreateDeploymentBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+      const project = store.projects.get(query.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("env.project_not_found", "project not found"), {
+          status: 404,
+        });
+      }
+
+      const data = body.data as Record<string, unknown>;
+      const hasReleaseId = typeof data.release_id === "string";
+      const hasContentHash = typeof data.content_hash === "string";
+      if (hasReleaseId === hasContentHash) {
+        return HttpResponse.json(
+          errorBody("dep.invalid", "deployment: name the release by exactly one of id or digest"),
+          { status: 400 },
+        );
+      }
+      const release = hasReleaseId
+        ? store.releases.get(data.release_id as string)
+        : [...store.releases.values()].find(
+            (candidate) => `${RELEASE_CONTENT_HASH_PREFIX}${candidate.contentHash}` === data.content_hash,
+          );
+      if (!release || release.projectId !== project.id) {
+        return HttpResponse.json(errorBody("rel.not_found", "release: not found"), { status: 404 });
+      }
+      if (release.revokedAt !== null) {
+        return HttpResponse.json(errorBody("rel.revoked", "release: revoked"), { status: 409 });
+      }
+
+      const requested = data.targets as string[];
+      const primaries = primaryOrigins(project);
+      const resolved = new Set<string>();
+      let sawPreview = false;
+      let sawPrimary = false;
+      for (const target of requested) {
+        if (target === "primary") {
+          if (primaries.length === 0) {
+            return HttpResponse.json(
+              errorBody("dep.invalid", "deployment: the project has no primary origin"),
+              { status: 400 },
+            );
+          }
+          for (const origin of primaries) {
+            resolved.add(origin);
+          }
+          sawPrimary = true;
+          continue;
+        }
+        if (primaries.includes(target)) {
+          resolved.add(target);
+          sawPrimary = true;
+          continue;
+        }
+        if (matchesPreviewPattern(project, target)) {
+          resolved.add(target);
+          sawPreview = true;
+          continue;
+        }
+        return HttpResponse.json(
+          errorBody(
+            "proj.origin_not_allowed",
+            `deployment: ${target} is neither a primary origin nor a preview URL of the project`,
+          ),
+          { status: 403 },
+        );
+      }
+      if (sawPreview && sawPrimary) {
+        return HttpResponse.json(
+          errorBody("dep.invalid", "deployment: primary origins and preview URLs cannot be mixed"),
+          { status: 400 },
+        );
+      }
+      const ttl = typeof data.ttl === "string" ? data.ttl : undefined;
+      if (ttl !== undefined && !sawPreview) {
+        return HttpResponse.json(
+          errorBody("dep.invalid", "deployment: ttl is only valid for preview URLs"),
+          { status: 400 },
+        );
+      }
+
+      const targets = [...resolved].sort();
+      const expectedId = typeof data.expected_deployment_id === "string" ? data.expected_deployment_id : undefined;
+      if (expectedId !== undefined) {
+        for (const origin of targets) {
+          const newest = newestDeploymentForOrigin(project.id, origin);
+          if (newest && newest.id !== expectedId) {
+            return HttpResponse.json(
+              errorBody(
+                "dep.conflict",
+                "deployment: the newest deployment to the targets does not match expected_deployment_id",
+                { deployment: deploymentResponse(newest) },
+              ),
+              { status: 409 },
+            );
+          }
+        }
+      }
+
+      // Idempotent on what is served: when every target already runs this
+      // release, the newest deployment to the targets is returned unchanged.
+      const alreadyServed = targets.every(
+        (origin) => newestDeploymentForOrigin(project.id, origin)?.releaseId === release.id,
+      );
+      if (targets.length > 0 && alreadyServed) {
+        const newest = [...store.deployments.values()]
+          .filter(
+            (deployment) =>
+              deployment.projectId === project.id &&
+              deployment.releaseId === release.id &&
+              deployment.targets.some((target) => targets.includes(target.origin)),
+          )
+          .sort((a, b) => b.seq - a.seq)[0];
+        if (newest) {
+          return HttpResponse.json(deploymentResponse(newest), { status: 200 });
+        }
+      }
+
+      const expiresAt = sawPreview && ttl ? ttlToExpiry(ttl) : null;
+      const id = `dep_${shortId()}`;
+      const record: DeploymentRecord = {
+        id,
+        projectId: project.id,
+        releaseId: release.id,
+        targets: targets.map((origin) => ({ origin, expiresAt: sawPreview ? expiresAt : null })),
+        reason: data.reason === "rollback" ? "rollback" : "deploy",
+        message: typeof data.message === "string" ? data.message : null,
+        rollbackTo: null,
+        deployedAt: nowIso(),
+        seq: ++store.lastSeq,
+      };
+      store.deployments.set(id, record);
+      return HttpResponse.json(deploymentResponse(record), { status: 201 });
+    }),
+
+    http.get("*/deployments", ({ request }) => {
+      // URLs carry strings and the generated zod does not coerce: `live` is a
+      // boolean, `limit` an int and `expand` an array, so build those before
+      // validating, the way the schemas list handler coerces `limit`.
+      const record = queryRecord(request);
+      const expandRelease = (request.url.match(/[?&]expand=release\b/) ?? []).length > 0;
+      const { live: liveRaw, limit, expand: _expand, ...rest } = record;
+      const query = parse(
+        ListDeploymentsQueryParams,
+        {
+          ...rest,
+          ...(liveRaw === undefined ? {} : { live: liveRaw === "true" }),
+          ...(limit === undefined ? {} : { limit: Number(limit) }),
+          ...(expandRelease ? { expand: ["release"] } : {}),
+        },
+        "invalid_query",
+      );
+      if (!query.ok) {
+        return query.response;
+      }
+      const origin = record.origin;
+      const live = liveRaw === "true";
+
+      let deployments = [...store.deployments.values()]
+        .filter((deployment) => deployment.projectId === query.data.project_id)
+        .sort((a, b) => b.seq - a.seq);
+      if (origin !== undefined) {
+        deployments = deployments.filter((deployment) =>
+          deployment.targets.some((target) => target.origin === origin),
+        );
+      }
+
+      let items: Record<string, unknown>[];
+      if (live) {
+        // What each target serves now: the newest deployment per origin, each
+        // carrying only the targets it still serves.
+        const serving = new Map<string, DeploymentTargetRow[]>();
+        const now = Date.now();
+        const liveOrigins = new Set(
+          deployments.flatMap((deployment) => deployment.targets.map((target) => target.origin)),
+        );
+        for (const target of liveOrigins) {
+          if (origin !== undefined && target !== origin) {
+            continue;
+          }
+          const newest = newestDeploymentForOrigin(query.data.project_id, target);
+          if (!newest) {
+            continue;
+          }
+          const row = newest.targets.find(
+            (candidate) =>
+              candidate.origin === target &&
+              (candidate.expiresAt === null || new Date(candidate.expiresAt).getTime() > now),
+          );
+          if (!row) {
+            continue;
+          }
+          const rows = serving.get(newest.id) ?? [];
+          rows.push(row);
+          serving.set(newest.id, rows);
+        }
+        items = [...serving.entries()]
+          .map(([id, rows]) => {
+            const deployment = store.deployments.get(id);
+            return deployment
+              ? { deployment, rows }
+              : undefined;
+          })
+          .filter((entry): entry is { deployment: DeploymentRecord; rows: DeploymentTargetRow[] } =>
+            entry !== undefined,
+          )
+          .sort((a, b) => b.deployment.seq - a.deployment.seq)
+          .map((entry) =>
+            deploymentResponse(entry.deployment, entry.rows, { release: expandRelease }),
+          );
+      } else {
+        items = deployments.map((deployment) =>
+          deploymentResponse(deployment, deployment.targets, { release: expandRelease }),
+        );
+      }
+      return HttpResponse.json({ deployments: items });
+    }),
+
+    http.get("*/deployments/:deployment_id", ({ params, request }) => {
+      const path = parse(GetDeploymentByIdParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetDeploymentByIdQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const deployment = store.deployments.get(path.data.deployment_id);
+      if (!deployment || deployment.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("dep.not_found", "deployment: not found"), {
+          status: 404,
+        });
+      }
+      return HttpResponse.json(deploymentResponse(deployment));
+    }),
+
+    http.post("*/deployments/:deployment_id/rollback", async ({ params, request }) => {
+      const path = parse(RollbackDeploymentParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(RollbackDeploymentQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = (await readJson(request)) ?? {};
+      const body = parse(RollbackDeploymentBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+      const target = store.deployments.get(path.data.deployment_id);
+      if (!target || target.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("dep.not_found", "deployment: not found"), {
+          status: 404,
+        });
+      }
+      const project = store.projects.get(query.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("env.project_not_found", "project not found"), {
+          status: 404,
+        });
+      }
+
+      // Only a deployment to primary origins can be rolled back, and every
+      // target must still be a primary origin of the project.
+      if (target.targets.some((row) => row.expiresAt !== null)) {
+        return HttpResponse.json(
+          errorBody("dep.invalid", "deployment: a deployment to preview URLs cannot be rolled back"),
+          { status: 409 },
+        );
+      }
+      const primaries = primaryOrigins(project);
+      const removed = target.targets.find((row) => !primaries.includes(row.origin));
+      if (removed) {
+        return HttpResponse.json(
+          errorBody(
+            "dep.invalid",
+            `deployment: ${removed.origin} is no longer a primary origin of the project`,
+          ),
+          { status: 409 },
+        );
+      }
+      const release = store.releases.get(target.releaseId);
+      if (release?.revokedAt) {
+        return HttpResponse.json(errorBody("rel.revoked", "release: revoked"), { status: 409 });
+      }
+
+      const origins = target.targets.map((row) => row.origin);
+      const alreadyServed = origins.every(
+        (origin) => newestDeploymentForOrigin(project.id, origin)?.releaseId === target.releaseId,
+      );
+      if (alreadyServed) {
+        const newest = [...store.deployments.values()]
+          .filter(
+            (deployment) =>
+              deployment.projectId === project.id &&
+              deployment.releaseId === target.releaseId &&
+              deployment.targets.some((row) => origins.includes(row.origin)),
+          )
+          .sort((a, b) => b.seq - a.seq)[0];
+        if (newest) {
+          return HttpResponse.json(deploymentResponse(newest), { status: 200 });
+        }
+      }
+
+      const id = `dep_${shortId()}`;
+      const record: DeploymentRecord = {
+        id,
+        projectId: project.id,
+        releaseId: target.releaseId,
+        targets: origins.sort().map((origin) => ({ origin, expiresAt: null })),
+        reason: "rollback",
+        message: typeof (body.data as Record<string, unknown>).message === "string"
+          ? ((body.data as Record<string, unknown>).message as string)
+          : null,
+        rollbackTo: target.id,
+        deployedAt: nowIso(),
+        seq: ++store.lastSeq,
+      };
+      store.deployments.set(id, record);
+      return HttpResponse.json(deploymentResponse(record), { status: 201 });
     }),
 
     // POST /projects/:project_id/claim/init — mint a claim challenge. Auth
