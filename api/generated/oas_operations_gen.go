@@ -34,6 +34,7 @@ const (
 	GetClaimStatusOperation                OperationName = "GetClaimStatus"
 	GetClaimWindowOperation                OperationName = "GetClaimWindow"
 	GetDeploymentByIdOperation             OperationName = "GetDeploymentById"
+	GetDeploymentVariablesOperation        OperationName = "GetDeploymentVariables"
 	GetEnvironmentByNameOperation          OperationName = "GetEnvironmentByName"
 	GetEventOperation                      OperationName = "GetEvent"
 	GetFlowDefinitionOperation             OperationName = "GetFlowDefinition"

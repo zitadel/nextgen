@@ -12,11 +12,17 @@ get:
 
     Secret values are not returned. A secret appears as `{"secret": true}`,
     which says a value is held without disclosing it.
+
+    `applies_to` selects which value is read: `all` (the default) is the value
+    every deploy freezes, `preview` is the override a preview deploy prefers.
+    The two are not merged — a `preview` read returns only the names that hold a
+    preview override.
   tags:
     - Variables
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
     - $ref: ../../components/parameters/environment-name-query.yaml
+    - $ref: ../../components/parameters/applies-to.yaml
   security:
     - oauth2:
         - variable.read
@@ -51,11 +57,18 @@ patch:
     The body is applied whole or not at all, so a rejected request leaves the
     owner exactly as it was. Writing the same name and owner twice replaces the
     value rather than duplicating it, which makes a retry safe.
+
+    `applies_to` selects which value is written: `all` (the default) is the
+    value every deploy freezes, `preview` is the override a preview deploy
+    prefers. A name holds at most these two values, and writing one does not
+    touch the other. Nothing written here reaches a deployment already made:
+    every deploy freezes the values it resolved.
   tags:
     - Variables
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
     - $ref: ../../components/parameters/environment-name-query.yaml
+    - $ref: ../../components/parameters/applies-to.yaml
   security:
     - oauth2:
         - variable.write

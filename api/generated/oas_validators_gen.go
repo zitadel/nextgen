@@ -14364,6 +14364,17 @@ func (s Variable) Validate() error {
 	}
 }
 
+func (s VariableAppliesTo) Validate() error {
+	switch s {
+	case "all":
+		return nil
+	case "preview":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s VariableInput) Validate() error {
 	switch s.Type {
 	case NullVariableInput:

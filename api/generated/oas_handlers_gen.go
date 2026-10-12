@@ -4149,6 +4149,8 @@ func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w
 // A variable is deletable only by the owner that entered it. Deleting a name
 // another owner of the same project holds answers `var.not_found` and leaves
 // that owner's value standing.
+// `applies_to` selects which value is removed: `all` (the default) or the
+// `preview` override. Removing one leaves the other standing.
 //
 // DELETE /variables/{variable_name}
 func (s *Server) handleDeleteVariableRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -4301,6 +4303,10 @@ func (s *Server) handleDeleteVariableRequest(args [1]string, argsEscaped bool, w
 					Name: "environment_name",
 					In:   "query",
 				}: params.EnvironmentName,
+				{
+					Name: "applies_to",
+					In:   "query",
+				}: params.AppliesTo,
 			},
 			Raw: r,
 		}
@@ -5704,6 +5710,201 @@ func (s *Server) handleGetDeploymentByIdRequest(args [1]string, argsEscaped bool
 	}
 
 	if err := encodeGetDeploymentByIdResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
+// handleGetDeploymentVariablesRequest handles getDeploymentVariables operation.
+//
+// The values frozen onto the deployment when it was written — what the target
+// serves, not what the store holds now. A preview deployment prefers the
+// `preview` override of each name and falls back to the `all` value; a primary
+// deployment runs only the `all` values. Secrets are reported as held and
+// never disclosed.
+//
+// GET /deployments/{deployment_id}/variables
+func (s *Server) handleGetDeploymentVariablesRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getDeploymentVariables"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.HTTPRouteKey.String("/deployments/{deployment_id}/variables"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), GetDeploymentVariablesOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(codeAttr)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: GetDeploymentVariablesOperation,
+			ID:   "getDeploymentVariables",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, GetDeploymentVariablesOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeGetDeploymentVariablesParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response GetDeploymentVariablesRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    GetDeploymentVariablesOperation,
+			OperationSummary: "Get the variables a deployment runs",
+			OperationID:      "getDeploymentVariables",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+				{
+					Name: "deployment_id",
+					In:   "path",
+				}: params.DeploymentID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = GetDeploymentVariablesParams
+			Response = GetDeploymentVariablesRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackGetDeploymentVariablesParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.GetDeploymentVariables(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.GetDeploymentVariables(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeGetDeploymentVariablesResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -9202,6 +9403,9 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 // A name that owner has not entered answers `var.not_found`, even when
 // another owner of the same project holds it: nothing is inherited. A secret
 // is found but not disclosed: the response is `{"secret": true}`.
+// `applies_to` selects which value is read: `all` (the default) or the
+// `preview` override. A name with no value for the selected `applies_to`
+// answers `var.not_found`.
 //
 // GET /variables/{variable_name}
 func (s *Server) handleGetVariableRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -9354,6 +9558,10 @@ func (s *Server) handleGetVariableRequest(args [1]string, argsEscaped bool, w ht
 					Name: "environment_name",
 					In:   "query",
 				}: params.EnvironmentName,
+				{
+					Name: "applies_to",
+					In:   "query",
+				}: params.AppliesTo,
 			},
 			Raw: r,
 		}
@@ -9404,6 +9612,10 @@ func (s *Server) handleGetVariableRequest(args [1]string, argsEscaped bool, w ht
 // everything a project holds therefore means reading each owner in turn.
 // Secret values are not returned. A secret appears as `{"secret": true}`,
 // which says a value is held without disclosing it.
+// `applies_to` selects which value is read: `all` (the default) is the value
+// every deploy freezes, `preview` is the override a preview deploy prefers.
+// The two are not merged — a `preview` read returns only the names that hold a
+// preview override.
 //
 // GET /variables
 func (s *Server) handleGetVariablesRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -9552,6 +9764,10 @@ func (s *Server) handleGetVariablesRequest(args [0]string, argsEscaped bool, w h
 					Name: "environment_name",
 					In:   "query",
 				}: params.EnvironmentName,
+				{
+					Name: "applies_to",
+					In:   "query",
+				}: params.AppliesTo,
 			},
 			Raw: r,
 		}
@@ -15878,6 +16094,11 @@ func (s *Server) handleUpdateTeamRequest(args [1]string, argsEscaped bool, w htt
 // The body is applied whole or not at all, so a rejected request leaves the
 // owner exactly as it was. Writing the same name and owner twice replaces the
 // value rather than duplicating it, which makes a retry safe.
+// `applies_to` selects which value is written: `all` (the default) is the
+// value every deploy freezes, `preview` is the override a preview deploy
+// prefers. A name holds at most these two values, and writing one does not
+// touch the other. Nothing written here reaches a deployment already made:
+// every deploy freezes the values it resolved.
 //
 // PATCH /variables
 func (s *Server) handleUpdateVariablesRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -16041,6 +16262,10 @@ func (s *Server) handleUpdateVariablesRequest(args [0]string, argsEscaped bool, 
 					Name: "environment_name",
 					In:   "query",
 				}: params.EnvironmentName,
+				{
+					Name: "applies_to",
+					In:   "query",
+				}: params.AppliesTo,
 			},
 			Raw: r,
 		}

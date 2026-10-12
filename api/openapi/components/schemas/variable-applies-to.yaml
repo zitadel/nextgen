@@ -1,0 +1,9 @@
+type: string
+enum:
+  - all
+  - preview
+default: all
+description: |
+  Which value of a variable a request addresses. `all` is the value every
+  deploy freezes; `preview` is the override a preview deploy prefers where one
+  exists. A name holds at most these two values.
