@@ -1334,12 +1334,20 @@ export function setupPlatformHandlers() {
         );
       }
 
+      // The contract stores an otherwise-valid pattern as written, so the
+      // stored and echoed value keeps the submitted casing: validation and the
+      // shared-host checks above fold case through `normalized`, but that lower-
+      // cased form is never what gets stored.
+      const pattern = body.data.pattern.trim();
       // One row per `(project, pattern)`: a repeat of the same pattern replaces
-      // its kind rather than storing a second row.
-      auth.project.origins = auth.project.origins.filter((origin) => origin.pattern !== normalized);
-      auth.project.origins.push({ pattern: normalized, kind: body.data.kind });
+      // its kind rather than storing a second row. Dedup folds case too, since a
+      // host that differs only in case is the same origin.
+      auth.project.origins = auth.project.origins.filter(
+        (origin) => normalizeOrigin(origin.pattern) !== normalized,
+      );
+      auth.project.origins.push({ pattern, kind: body.data.kind });
 
-      const responseBody: AddOrigin201 = { pattern: normalized, kind: body.data.kind };
+      const responseBody: AddOrigin201 = { pattern, kind: body.data.kind };
       const out = parse(AddOriginResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
         return out.response;

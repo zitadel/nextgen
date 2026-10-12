@@ -98,4 +98,14 @@ describe("origin rm", () => {
     expect(result.exitCode).toBe(0);
     expect(removed).toEqual([]);
   });
+
+  it("keeps the active --env in the suggested retry command", async () => {
+    const cwd = await anAppDir();
+
+    const result = await remove(cwd, ["--env", "production"]);
+
+    const envelope = parseJson(result.stdout) as { code: string; next_commands?: string[] };
+    expect(envelope.code).toBe("E_VALIDATION");
+    expect(envelope.next_commands?.[0]).toContain("--env production");
+  });
 });

@@ -257,6 +257,23 @@ describe("resolveEnvironment", () => {
         message: expect.stringContaining("missing.env"),
       });
     });
+
+    it("refuses an environment name that would escape the project directory", async () => {
+      await expect(resolve({ envName: "../evil" })).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: expect.stringContaining("valid environment name"),
+      });
+      await expect(resolve({ env: { ZITADEL_ENV: "a/b" } })).rejects.toMatchObject({
+        code: "E_VALIDATION",
+      });
+      await expect(resolve({ envName: "a..b" })).rejects.toMatchObject({ code: "E_VALIDATION" });
+    });
+
+    it("accepts a name of letters, digits, dot, dash and underscore", async () => {
+      for (const name of ["staging", "preview-1", "feature.branch", "env_2"]) {
+        expect((await resolve({ envName: name })).name.value).toBe(name);
+      }
+    });
   });
 
   describe("what it reports", () => {

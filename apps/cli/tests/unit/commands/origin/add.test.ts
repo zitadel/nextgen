@@ -122,4 +122,19 @@ describe("origin add", () => {
     expect(requests).toEqual([]);
     expect(envelope.data).toMatchObject({ dry_run: true, verb: "add", topic: "origin" });
   });
+
+  it("keeps the active --env in the suggested next command", async () => {
+    const cwd = await anAppDir();
+
+    const { envelope } = await add(
+      cwd,
+      "https://app.acme.com",
+      "--kind",
+      "primary",
+      "--env",
+      "production",
+    );
+
+    expect((envelope.data.next_commands as string[])[0]).toContain("--env production");
+  });
 });

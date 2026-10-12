@@ -177,7 +177,14 @@ async function projectStatus(
   }
 
   const config = await readZitadelConfig(cwd);
-  if (!(await hasZitadelSecret(cwd))) {
+  const secret = (await hasZitadelSecret(cwd)) ? await readZitadelSecret(cwd) : undefined;
+  // The resolved environment decides the project when it names one — a
+  // `status --env production` reads the project from `.env.production.local`,
+  // which the local `.zitadel/secret` need not back. Only a config that
+  // resolves to no project at all, with no local secret to fall back on, is
+  // genuinely orphaned; derive the project first so the env wins over that
+  // fallback.
+  if (secret === undefined && resolvedProjectId === undefined) {
     return {
       lifecycle: "orphaned-config",
       project_id: typeof config.project === "string" ? config.project : undefined,
@@ -185,8 +192,7 @@ async function projectStatus(
     };
   }
 
-  const secret = await readZitadelSecret(cwd);
-  const projectId = resolvedProjectId ?? String(config.project ?? secret.project_id ?? "");
+  const projectId = resolvedProjectId ?? String(config.project ?? secret?.project_id ?? "");
   // The claim record lives in `.zitadel/secret`, which belongs to the local
   // project. It describes `projectId` only when the resolved environment points
   // at that same project; a `--env` aimed at another project has no local claim
@@ -195,7 +201,7 @@ async function projectStatus(
   // `status --server local` rewrites the source for the health probe but does
   // not move the project, so the source would answer the wrong question.
   const claim =
-    projectId === secret.project_id
+    secret !== undefined && projectId === secret.project_id
       ? claimState({ secret, server: readProjectServer(config) })
       : ({ kind: "not-applicable" } as const);
   return {
