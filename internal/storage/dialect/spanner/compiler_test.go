@@ -14,7 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/flowdefinition"
 )
 
-const testProjectQuery = "SELECT id, created_at, updated_at, origins FROM projects"
+const testProjectQuery = "SELECT id, created_at, updated_at FROM projects"
 
 const testFlowDefinitionQuery = "SELECT project_id, id, name FROM flow_definitions"
 

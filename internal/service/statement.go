@@ -26,6 +26,7 @@ type ManagedIDGenerator interface {
 type AllStatements interface {
 	ManagedIDGenerator
 	ProjectStatements
+	OriginStatements
 	FlowDefinitionStatements
 	CryptoKeyStatements
 	JSONSchemaStatements
@@ -74,6 +75,28 @@ type ProjectStatements interface {
 	ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 	// DeleteProjectByID removes the project. changed is false when no row matched.
 	DeleteProjectByID(ctx context.Context, id string) (changed bool, err error)
+}
+
+// OriginStatements persists project origin patterns under the natural key
+// (project_id, pattern). There is no minted origin id.
+type OriginStatements interface {
+	Statements
+	// ListOriginsByProjectID returns the project's origins ordered by
+	// created_at, then pattern.
+	ListOriginsByProjectID(ctx context.Context, projectID string) ([]domain.Origin, error)
+	// ListOriginsByProjectIDs returns origins for many projects, keyed by
+	// project id. Missing projects are absent from the map.
+	ListOriginsByProjectIDs(ctx context.Context, projectIDs []string) (map[string][]domain.Origin, error)
+	// GetOriginByPattern returns the origin stored under pattern, or a
+	// [database.NoRowFoundError] when none matches.
+	GetOriginByPattern(ctx context.Context, projectID, pattern string) (*domain.Origin, error)
+	// InsertOrigin stores one origin. inserted is false when the same
+	// (project_id, pattern) already exists (caller decides kind conflict vs
+	// idempotent add).
+	InsertOrigin(ctx context.Context, projectID string, origin domain.Origin) (inserted bool, err error)
+	// DeleteOriginByPattern removes one pattern. deleted is false when none
+	// matched. When deleted, removed carries the row that was deleted.
+	DeleteOriginByPattern(ctx context.Context, projectID, pattern string) (deleted bool, removed *domain.Origin, err error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

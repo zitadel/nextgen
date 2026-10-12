@@ -6,6 +6,7 @@ import (
 
 type statements struct {
 	projectStatements
+	originStatements
 	flowDefinitionStatements
 	cryptoKeyStatements
 	jsonSchemaStatements
@@ -44,6 +45,7 @@ func (s statements) IsStatements() {}
 func newStatements(db queryExecutor) statements {
 	return statements{
 		projectStatements:             newProjectStatements(db),
+		originStatements:              newOriginStatements(db),
 		flowDefinitionStatements:      newFlowDefinitionStatements(db),
 		cryptoKeyStatements:           newCryptoKeyStatements(db),
 		jsonSchemaStatements:          newJSONSchemaStatements(db),
