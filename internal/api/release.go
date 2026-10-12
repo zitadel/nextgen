@@ -16,7 +16,7 @@ func (h *Handler) CreateRelease(ctx context.Context, req api.CreateReleaseReques
 
 	body, ok := req.GetCreateReleaseFromPointers()
 	if !ok {
-		return nil, domain.ErrReleaseInvalid("building a release from a bundle is not supported yet; send pointers", nil)
+		return nil, domain.ErrReleaseInvalid(nil, nil).WithMessage("release: building a release from a bundle is not supported yet; send pointers")
 	}
 
 	pointers := make([]service.CreateReleasePointer, 0, len(body.Pointers))
