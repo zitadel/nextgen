@@ -621,6 +621,31 @@ describe("passkey overlay", () => {
     expect(login.step.challenge?.method).toBe("passkey");
   });
 
+  test("the passkey action survives a password credential-error response", async () => {
+    applyPasskey(true);
+
+    // Reach the password step, then submit a wrong password so the handler's
+    // credential-error branch returns the password step directly.
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const password = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: { email: "wrong@example.com" },
+    });
+    expect(password.step.name).toBe("password");
+    const errored = await submitFlowStep(password.id, {
+      session_token: password.session_token,
+      action: "submit",
+      fields: { [PASSWORD_FIELD]: "hunter2" },
+    });
+
+    // Error response is still the password step, and the overlay must not drop
+    // the passkey action just because the submission failed.
+    expect(errored.step.name).toBe("password");
+    expect(errored.step.error).toBe("error.invalid_credentials");
+    expect((errored.step.actions ?? []).filter((a) => a.name === "passkey")).toHaveLength(1);
+  });
+
   test("clearPasskey removes the action again", async () => {
     applyPasskey(true);
     clearPasskey();

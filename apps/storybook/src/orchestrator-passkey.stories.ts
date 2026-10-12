@@ -34,10 +34,11 @@ export default {
   argTypes: {
     ...orchestratorArgTypes,
     // This group is defined by passkeys being enabled on a login flow, so lock
-    // the two controls that would break it: `purpose` (passkey is offered only
-    // on the identifier step, so `register` has no passkey action) and `passkey`
-    // itself (turning it off removes the action these stories depend on, timing
-    // out PasskeyLogin's play). The rest — variant, theme, branding, sso — stay.
+    // the two controls that would break it: `purpose` (passkey is offered on the
+    // login steps — identifier and password — so the `register` entry step has
+    // no passkey action) and `passkey` itself (turning it off removes the action
+    // these stories depend on, timing out PasskeyLogin's play). The rest —
+    // variant, theme, branding, sso — stay.
     purpose: {
       ...orchestratorArgTypes.purpose,
       control: false,

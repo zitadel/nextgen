@@ -191,12 +191,24 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
    * step fixture. Called after every state transition and on `GET /flow/{id}`.
    */
   /**
+   * The non-branding overlays: identity providers and the passkey offer on the
+   * steps that can start a sign-in. Branding is applied per-step inside
+   * `renderCurrentStep`; these are applied to every outgoing response. An error
+   * early-return below builds its step directly, so it must run through this too
+   * — otherwise an enabled SSO or passkey offer vanishes from the error
+   * response even though project enablement has not changed.
+   */
+  function withOverlays(step: CreateFlow201): CreateFlow201 {
+    return withPasskey(withSsoProviders(step));
+  }
+
+  /**
    * The current step as a wire response, with the module-level overlays
    * applied: branding on every response, identity providers on the steps that
    * can start a sign-in. Both are off unless a caller opted in.
    */
   async function currentResponse(): Promise<CreateFlow201> {
-    return withPasskey(withSsoProviders(await renderCurrentStep()));
+    return withOverlays(await renderCurrentStep());
   }
 
   async function renderCurrentStep(): Promise<CreateFlow201> {
@@ -280,7 +292,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
           : null;
       if (registrationErrorKey) {
         const base = withBranding(registerStep(fixtureInput));
-        return ok({ ...base, step: { ...base.step, error: registrationErrorKey } });
+        return ok(withOverlays({ ...base, step: { ...base.step, error: registrationErrorKey } }));
       }
 
       const contextEmail = snapshot.context.capturedFields.email;
@@ -296,7 +308,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
           : null;
       if (loginErrorKey) {
         const base = withBranding(passwordStep({ ...fixtureInput, capturedEmail: contextEmail }));
-        return ok({ ...base, step: { ...base.step, error: loginErrorKey } });
+        return ok(withOverlays({ ...base, step: { ...base.step, error: loginErrorKey } }));
       }
 
       const passkeyUpsellInput = { ...fixtureInput, capturedEmail: contextEmail };
@@ -307,7 +319,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
           : null;
       if (upsellErrorKey) {
         const base = withBranding(passkeyUpsellStep(passkeyUpsellInput));
-        return ok({ ...base, step: { ...base.step, error: upsellErrorKey } });
+        return ok(withOverlays({ ...base, step: { ...base.step, error: upsellErrorKey } }));
       }
 
       const proof = body.challenge_response?.proof as PasskeyProof | undefined;
@@ -321,7 +333,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       if (setupErrorKey) {
         const base = withBranding(passkeySetupStep(passkeyUpsellInput));
         const { challenge: _c, ...step } = base.step;
-        return ok({ ...base, step: { ...step, error: setupErrorKey } });
+        return ok(withOverlays({ ...base, step: { ...step, error: setupErrorKey } }));
       }
 
       const loginCred =
@@ -343,7 +355,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         };
         const base = withBranding(passkeyLoginStep(loginInput));
         const { challenge: _c, ...step } = base.step;
-        return ok({ ...base, step: { ...step, error: passkeyLoginErrorKey } });
+        return ok(withOverlays({ ...base, step: { ...step, error: passkeyLoginErrorKey } }));
       }
 
       const submitted = loginCred ? { ...fields, email: loginCred.userHandle } : fields;
