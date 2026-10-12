@@ -43,6 +43,9 @@ Configuration commands
   branding list:         List branding
   flow-definitions get:  Get one flow definition by id
   flow-definitions list: List flow-definitions
+  origin add:            Add an origin pattern to the project
+  origin list:           List the origin patterns on the project
+  origin rm:             Remove an origin pattern from the project
   releases get:          Get one release by id
   releases list:         List releases
   schemas get:           Get one schema by id
