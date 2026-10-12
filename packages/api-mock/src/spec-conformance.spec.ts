@@ -1720,7 +1720,7 @@ describe("api-mock releases and deployments", () => {
       await fetch(`${BASE}/deployments?project_id=${project.id}&live=true`)
     ).json()) as { deployments: { release_id: string }[] };
     expect(live.deployments).toHaveLength(1);
-    expect(live.deployments[0].release_id).toBe(first.id);
+    expect(live.deployments[0]?.release_id).toBe(first.id);
   });
 
   test("refuses to revoke a release an origin still serves, then allows it", async () => {
