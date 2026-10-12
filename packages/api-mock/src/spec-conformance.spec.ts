@@ -1584,6 +1584,13 @@ describe("api-mock releases and deployments", () => {
       body: JSON.stringify({ pattern, kind: "primary" }),
     });
 
+  const addPreview = (id: string, secret: string, pattern: string) =>
+    fetch(`${BASE}/projects/${id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
+      body: JSON.stringify({ pattern, kind: "preview" }),
+    });
+
   const rel1 = { pointers: [{ kind: "schema", revision_id: "sch_a" }] };
   const rel2 = { pointers: [{ kind: "schema", revision_id: "sch_b" }] };
 
@@ -1721,6 +1728,84 @@ describe("api-mock releases and deployments", () => {
     ).json()) as { deployments: { release_id: string }[] };
     expect(live.deployments).toHaveLength(1);
     expect(live.deployments[0].release_id).toBe(first.id);
+  });
+
+  test("a preview deployment requires a ttl, and renews one preview per URL", async () => {
+    const project = await newProject("deploy-preview");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const url = "https://acme-git-sso-acmeinc.vercel.app";
+
+    const noTtl = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: [url],
+    });
+    expect(noTtl.status).toBe(400);
+    expect(((await noTtl.json()) as { code: string }).code).toBe("dep.invalid");
+
+    const deployed = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: [url],
+      ttl: "168h",
+    });
+    expect(deployed.status).toBe(201);
+    const body = (await deployed.json()) as { targets: { origin: string; expires_at: string }[] };
+    expect(body.targets[0]?.origin).toBe(url);
+    expect(new Date(body.targets[0]?.expires_at as string).getTime()).toBeGreaterThan(Date.now());
+
+    const listed = (await (
+      await fetch(`${BASE}/previews?project_id=${project.id}`)
+    ).json()) as { previews: { origin: string }[] };
+    expect(listed.previews.map((preview) => preview.origin)).toEqual([url]);
+  });
+
+  test("refuses a deployment that mixes preview URLs with primary origins", async () => {
+    const project = await newProject("deploy-mixed");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+
+    const mixed = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["https://app.acme.com", "https://acme-git-sso-acmeinc.vercel.app"],
+      ttl: "168h",
+    });
+    expect(mixed.status).toBe(400);
+    expect(((await mixed.json()) as { code: string }).code).toBe("dep.invalid");
+  });
+
+  test("removes a preview idempotently and stops listing it", async () => {
+    const project = await newProject("preview-remove");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const url = "https://acme-git-sso-acmeinc.vercel.app";
+    await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: [url],
+      ttl: "168h",
+    });
+
+    const removePreview = () =>
+      fetch(`${BASE}/previews/remove?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ origin: url }),
+      });
+
+    expect((await removePreview()).status).toBe(204);
+    const afterFirst = (await (
+      await fetch(`${BASE}/previews?project_id=${project.id}`)
+    ).json()) as { previews: unknown[] };
+    expect(afterFirst.previews).toHaveLength(0);
+
+    // Idempotent: removing an already-gone preview still answers 204.
+    expect((await removePreview()).status).toBe(204);
   });
 
   test("refuses to revoke a release an origin still serves, then allows it", async () => {

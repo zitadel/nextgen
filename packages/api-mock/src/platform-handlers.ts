@@ -84,6 +84,8 @@ import {
   ListDeploymentsQueryParams,
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
+  ListPreviewsQueryParams,
+  ListPreviewsResponse,
   ListReleasesQueryParams,
   ListSchemasQueryParams,
   QueryIdpsBody,
@@ -92,6 +94,8 @@ import {
   QueryUsersBody,
   RemoveOriginBody,
   RemoveOriginParams,
+  RemovePreviewBody,
+  RemovePreviewQueryParams,
   RevokeReleaseParams,
   RevokeReleaseQueryParams,
   RollbackDeploymentBody,
@@ -343,6 +347,21 @@ type DeploymentRecord = {
   seq: number;
 };
 
+/**
+ * A live preview: an origin matching one of the project's preview patterns
+ * that a preview deployment wrote. `createdAt` is set by the first deployment
+ * to the URL and kept across renewals; `expiresAt` is reset from each
+ * deployment's `ttl`. Removed outright by `POST /previews/remove` and treated
+ * as gone once past `expiresAt`. Keyed by {@link previewKey}.
+ */
+type PreviewRecord = {
+  projectId: string;
+  origin: string;
+  expiresAt: string;
+  createdAt: string;
+  seq: number;
+};
+
 type Store = {
   projects: Map<string, ProjectRecord>;
   schemas: Map<string, SchemaRecord>;
@@ -350,6 +369,7 @@ type Store = {
   idps: Map<string, IdpConnectionRecord>;
   releases: Map<string, ReleaseRecord>;
   deployments: Map<string, DeploymentRecord>;
+  previews: Map<string, PreviewRecord>;
   /**
    * Owner key -> variable name -> value. The project level and each
    * environment are separate owners: the project does not see into its
@@ -374,6 +394,7 @@ function makeStore(): Store {
     idps: new Map(),
     releases: new Map(),
     deployments: new Map(),
+    previews: new Map(),
     variables: new Map(),
     claimChallenges: new Map(),
     claims: new Map(),
@@ -663,6 +684,8 @@ export type PlatformStoreSnapshot = {
   releaseContentHashes: string[];
   /** Deployment ids, newest first. */
   deploymentIds: string[];
+  /** Live preview origins across every project, newest first. */
+  previewOrigins: string[];
   /**
    * Variable names entered at the project, secrets included. Names only: a
    * secret's value is not readable over the API, and a snapshot that returned
@@ -705,6 +728,10 @@ export function snapshotPlatformStore(): PlatformStoreSnapshot {
     deploymentIds: [...store.deployments.values()]
       .sort((a, b) => b.seq - a.seq)
       .map((deployment) => deployment.id),
+    previewOrigins: [...store.previews.values()]
+      .filter((preview) => previewIsLive(preview))
+      .sort(compareNewestFirst)
+      .map((preview) => preview.origin),
     variableNames: [...store.variables.values()].flatMap((owned) => [...owned.keys()]),
     originPatterns: [...store.projects.values()].flatMap((project) =>
       project.origins.map((origin) => origin.pattern),
@@ -1144,6 +1171,16 @@ function matchesPreviewPattern(project: ProjectRecord, origin: string): boolean 
     }
   }
   return false;
+}
+
+/** The store key for a preview: unique per `(project, origin)`. */
+function previewKey(projectId: string, origin: string): string {
+  return `${projectId}\u0000${origin}`;
+}
+
+/** Whether a preview is still live: it exists and has not passed its expiry. */
+function previewIsLive(preview: PreviewRecord | undefined): preview is PreviewRecord {
+  return preview !== undefined && new Date(preview.expiresAt).getTime() > Date.now();
 }
 
 /** The newest deployment to an origin, treating an expired preview as gone. */
@@ -1652,6 +1689,15 @@ export function setupPlatformHandlers() {
           { status: 400 },
         );
       }
+      // A preview URL expires, so a deployment to one must say when. The CLI's
+      // `preview` command always sends a ttl; a request that omits it is
+      // refused rather than written with no expiry.
+      if (sawPreview && ttl === undefined) {
+        return HttpResponse.json(
+          errorBody("dep.invalid", "deployment: a preview deployment requires a ttl"),
+          { status: 400 },
+        );
+      }
 
       const targets = [...resolved].sort();
       const expectedId =
@@ -1693,6 +1739,7 @@ export function setupPlatformHandlers() {
 
       const expiresAt = sawPreview && ttl ? ttlToExpiry(ttl) : null;
       const id = `dep_${shortId()}`;
+      const createdAt = nowIso();
       const record: DeploymentRecord = {
         id,
         projectId: project.id,
@@ -1701,10 +1748,27 @@ export function setupPlatformHandlers() {
         reason: data.reason === "rollback" ? "rollback" : "deploy",
         message: typeof data.message === "string" ? data.message : null,
         rollbackTo: null,
-        deployedAt: nowIso(),
+        deployedAt: createdAt,
         seq: ++store.lastSeq,
       };
       store.deployments.set(id, record);
+
+      // A preview deployment writes a preview per target URL, or renews the one
+      // that already exists — keeping its `createdAt` and resetting `expiresAt`
+      // from this deployment's ttl, in the same transaction as the deployment.
+      if (sawPreview && expiresAt !== null) {
+        for (const origin of targets) {
+          const key = previewKey(project.id, origin);
+          const existing = store.previews.get(key);
+          store.previews.set(key, {
+            projectId: project.id,
+            origin,
+            expiresAt,
+            createdAt: existing?.createdAt ?? createdAt,
+            seq: existing?.seq ?? ++store.lastSeq,
+          });
+        }
+      }
       return HttpResponse.json(deploymentResponse(record), { status: 201 });
     }),
 
@@ -1897,6 +1961,77 @@ export function setupPlatformHandlers() {
       };
       store.deployments.set(id, record);
       return HttpResponse.json(deploymentResponse(record), { status: 201 });
+    }),
+
+    // --- previews --------------------------------------------------------
+    // A preview is written by a preview deployment above and lives until it
+    // expires or is removed here. There is no create endpoint. Kept in its own
+    // block so parallel PRs do not collide. Auth matches the deployments
+    // endpoints: no bearer check, so the narrower preview token the CLI uses
+    // works — the Go handlers are unimplemented stubs regardless.
+
+    http.get("*/previews", ({ request }) => {
+      // `limit` arrives as a string on the URL and the generated zod does not
+      // coerce, so build it before validating, as the deployments list does.
+      const record = queryRecord(request);
+      const { limit, ...rest } = record;
+      const query = parse(
+        ListPreviewsQueryParams,
+        { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) },
+        "invalid_query",
+      );
+      if (!query.ok) {
+        return query.response;
+      }
+
+      const previews = [...store.previews.values()]
+        .filter((preview) => preview.projectId === query.data.project_id && previewIsLive(preview))
+        .sort(compareNewestFirst)
+        .map((preview) => ({
+          origin: preview.origin,
+          expires_at: preview.expiresAt,
+          created_at: preview.createdAt,
+        }));
+
+      // Pagination is specced but, as with the deployments list, the mock
+      // returns the whole set in one page: the CLI reads it in full.
+      const out = parse(ListPreviewsResponse, { previews, next_page_token: null }, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.post("*/previews/remove", async ({ request }) => {
+      const query = parse(RemovePreviewQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(RemovePreviewBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
+      // Idempotent: a URL with no live preview answers 204 too. Removing the
+      // preview also expires the deployment rows that served it, so the live
+      // deployments view stops listing a deployment whose previews are all gone.
+      store.previews.delete(previewKey(query.data.project_id, body.data.origin));
+      const past = new Date(Date.now() - 1000).toISOString();
+      for (const deployment of store.deployments.values()) {
+        if (deployment.projectId !== query.data.project_id) {
+          continue;
+        }
+        for (const target of deployment.targets) {
+          if (target.origin === body.data.origin && target.expiresAt !== null) {
+            target.expiresAt = past;
+          }
+        }
+      }
+      return new HttpResponse(null, { status: 204 });
     }),
 
     // POST /projects/:project_id/claim/init — mint a claim challenge. Auth
