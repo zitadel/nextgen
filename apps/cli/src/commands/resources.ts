@@ -405,7 +405,7 @@ export const RESOURCES = {
     },
   },
 
-  releases: {
+  release: {
     group: CommandGroups.configuration,
     singular: "release",
     idField: "id",

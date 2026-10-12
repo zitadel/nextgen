@@ -169,7 +169,7 @@ const STANDALONE: Readonly<Record<string, readonly string[]>> = {
   origin: ["origin/add", "origin/list", "origin/rm"],
   // A release is built from `.zitadel/` and posted as one bundle (`deploy`,
   // `release create`), looked up and revoked by id. The registry serves
-  // `releases list`/`get`; the acts of building and revoking are these.
+  // `release list`/`get`; the acts of building and revoking are these.
   releases: ["deploy", "release/create", "release/revoke"],
   // A deployment is an act, not a file: `deploy` and `deployment create` make a
   // release live, `deployment list`/`get` read the history, `deployment

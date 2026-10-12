@@ -165,9 +165,9 @@ which ships in this package.
 * [`zitadel projects list`](#zitadel-projects-list)
 * [`zitadel projects update ID`](#zitadel-projects-update-id)
 * [`zitadel release create`](#zitadel-release-create)
+* [`zitadel release get ID`](#zitadel-release-get-id)
+* [`zitadel release list`](#zitadel-release-list)
 * [`zitadel release revoke RELEASE_ID`](#zitadel-release-revoke-release_id)
-* [`zitadel releases get ID`](#zitadel-releases-get-id)
-* [`zitadel releases list`](#zitadel-releases-list)
 * [`zitadel reset`](#zitadel-reset)
 * [`zitadel resources`](#zitadel-resources)
 * [`zitadel schemas get SCHEMA`](#zitadel-schemas-get-schema)
@@ -1874,6 +1874,98 @@ EXAMPLES
   $ zitadel release create -m 'add phone_number to human-user'
 ```
 
+## `zitadel release get ID`
+
+Get one release by id.
+
+```
+USAGE
+  $ zitadel release get ID [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--fields <value>]
+
+ARGUMENTS
+  ID  release id
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then development.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
+      --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to
+                          the resource's own; `--json` is unaffected.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Get one release by id.
+
+EXAMPLES
+  $ zitadel release get <id>
+
+  $ zitadel release get <id> --json
+```
+
+## `zitadel release list`
+
+List release.
+
+```
+USAGE
+  $ zitadel release list [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
+    [--plain]
+
+FLAGS
+  -a, --all                 Fetch every page instead of one.
+  -c, --cwd=<value>         Project directory to operate on.
+  -e, --env=<value>         Environment to run against, e.g. production.
+                            Defaults to ZITADEL_ENV, then development.
+  -n, --non-interactive     Disable prompts. Required when scripting or running
+                            as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+  -v, --verbose             Verbose logging.
+      --[no-]color          Colorize human output. Disable with --no-color;
+                            NO_COLOR and FORCE_COLOR are honored too.
+      --debug               Debug logging.
+      --dry-run             Preview without mutating files or the platform.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the
+                            process environment. Cannot be combined with --env.
+      --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the resource's own
+                            columns; `--json` is unaffected.
+      --limit=<value>       Page size (server default 20, max 100).
+      --page-token=<value>  Continue from a previous page's next_page_token.
+      --plain               Tab-separated rows with no header, for piping.
+                            Implied when stdout is not a terminal.
+      --[no-]telemetry      Send anonymous usage analytics. Disable with
+                            --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List release.
+
+EXAMPLES
+  $ zitadel release list --json
+
+  $ zitadel release list --all --json
+```
+
 ## `zitadel release revoke RELEASE_ID`
 
 Revoke a release so its content is never served again.
@@ -1916,98 +2008,6 @@ EXAMPLES
   $ zitadel release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1
 
   $ zitadel release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1 --force
-```
-
-## `zitadel releases get ID`
-
-Get one release by id.
-
-```
-USAGE
-  $ zitadel releases get ID [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--fields <value>]
-
-ARGUMENTS
-  ID  release id
-
-FLAGS
-  -c, --cwd=<value>       Project directory to operate on.
-  -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
-  -n, --non-interactive   Disable prompts. Required when scripting or running as
-                          an agent.
-  -s, --server=<value>    Override the resolved server URL.
-  -v, --verbose           Verbose logging.
-      --[no-]color        Colorize human output. Disable with --no-color;
-                          NO_COLOR and FORCE_COLOR are honored too.
-      --debug             Debug logging.
-      --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
-      --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to
-                          the resource's own; `--json` is unaffected.
-      --[no-]telemetry    Send anonymous usage analytics. Disable with
-                          --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Get one release by id.
-
-EXAMPLES
-  $ zitadel releases get <id>
-
-  $ zitadel releases get <id> --json
-```
-
-## `zitadel releases list`
-
-List releases.
-
-```
-USAGE
-  $ zitadel releases list [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--plain]
-
-FLAGS
-  -a, --all                 Fetch every page instead of one.
-  -c, --cwd=<value>         Project directory to operate on.
-  -e, --env=<value>         Environment to run against, e.g. production.
-                            Defaults to ZITADEL_ENV, then development.
-  -n, --non-interactive     Disable prompts. Required when scripting or running
-                            as an agent.
-  -s, --server=<value>      Override the resolved server URL.
-  -v, --verbose             Verbose logging.
-      --[no-]color          Colorize human output. Disable with --no-color;
-                            NO_COLOR and FORCE_COLOR are honored too.
-      --debug               Debug logging.
-      --dry-run             Preview without mutating files or the platform.
-      --env-file=<value>    Read ZITADEL_* values from this file ahead of the
-                            process environment. Cannot be combined with --env.
-      --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
-                            id,attributes.email). Defaults to the resource's own
-                            columns; `--json` is unaffected.
-      --limit=<value>       Page size (server default 20, max 100).
-      --page-token=<value>  Continue from a previous page's next_page_token.
-      --plain               Tab-separated rows with no header, for piping.
-                            Implied when stdout is not a terminal.
-      --[no-]telemetry      Send anonymous usage analytics. Disable with
-                            --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  List releases.
-
-EXAMPLES
-  $ zitadel releases list --json
-
-  $ zitadel releases list --all --json
 ```
 
 ## `zitadel reset`
