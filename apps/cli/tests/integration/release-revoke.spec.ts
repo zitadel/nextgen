@@ -54,6 +54,38 @@ describe("release revoke", () => {
         ).not.toBeNull();
       });
 
+      it("revokes nothing on a dry run, needing no --force", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const releaseId = await aRelease(app);
+
+        // A dry run is exempt from the destructive-confirm gate, so it succeeds
+        // without --force even non-interactively.
+        const result = await app.run([
+          "release",
+          "revoke",
+          releaseId,
+          "--dry-run",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toSucceed();
+        expect(app.envelopeOf<{ dry_run: boolean }>(result).data.dry_run).toBe(true);
+
+        // The release was not revoked: it can still be deployed, which a
+        // revoked release refuses.
+        const deployed = await app.run([
+          "deployment",
+          "create",
+          "--release",
+          releaseId,
+          "--non-interactive",
+          "--json",
+        ]);
+        expect(deployed).toSucceed();
+      });
+
       it("refuses to revoke a release an origin still serves", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

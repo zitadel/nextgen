@@ -46,6 +46,23 @@ describe("release create", () => {
         expect(app.envelopeOf<{ count: number }>(listed).data.count).toBe(0);
       });
 
+      it("creates no release on a dry run", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([
+          "release",
+          "create",
+          "--dry-run",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toSucceed();
+        const data = app.envelopeOf<Release & { dry_run: boolean }>(result).data;
+        expect(data.dry_run).toBe(true);
+        expect(data.release_id).toBeUndefined();
+      });
+
       it("returns the same release for the same content", async () => {
         const app = await aSetUpApp();
 

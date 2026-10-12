@@ -115,6 +115,33 @@ describe("deployment rollback", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
+      it("rolls back nothing on a dry run, needing no --force", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.company = { type: "string" };
+        });
+        await app.deployData();
+
+        // A dry run is exempt from the destructive-confirm gate, so it succeeds
+        // without --force even non-interactively.
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          "--dry-run",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toSucceed();
+        expect(app.envelopeOf<{ dry_run: boolean }>(result).data.dry_run).toBe(true);
+        // No rollback deployment was written: the history still holds the two
+        // deploys and nothing more.
+        const listed = await app.run(["deployment", "list", "--json"]);
+        expect(app.envelopeOf<{ count: number }>(listed).data.count).toBe(2);
+      });
+
       it("fails when there is no earlier deployment", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

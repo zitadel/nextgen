@@ -41,7 +41,7 @@ export default class DeploymentRollback extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(DeploymentRollback);
     await this.toMeta(flags);
-    const { nonInteractive, force, cliVersion } = this.meta;
+    const { nonInteractive, dryRun, force, cliVersion } = this.meta;
 
     const { client, projectId } = await this.connect();
 
@@ -89,6 +89,17 @@ export default class DeploymentRollback extends EnvironmentCommand {
         );
       }
       targetId = [...priorIds][0] as string;
+    }
+
+    // A dry run re-applies nothing, so it stops once the target is resolved,
+    // before the destructive-confirm gate and the write: a rollback re-serves
+    // an earlier release, and a dry run must leave what is served untouched.
+    if (dryRun) {
+      return this.emit({
+        status: "ok",
+        data: { dry_run: true, deployment_id: targetId },
+        pretty: `Would re-apply ${targetId}. Nothing was rolled back (dry run).`,
+      });
     }
 
     if (!force) {
