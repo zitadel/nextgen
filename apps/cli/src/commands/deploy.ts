@@ -185,7 +185,12 @@ export default class Deploy extends EnvironmentCommand {
         releaseId: release.id,
         targets,
         message,
-        expectedDeploymentId: observed,
+        // On a project's first deploy nothing is live, so there is no
+        // deployment to guard against: the field is omitted rather than sent
+        // empty or as a placeholder, which an optional id cannot stand in for.
+        // When a deployment is live its id is sent so a racing deploy is caught
+        // with a 409 (#538).
+        ...(observed === undefined ? {} : { expectedDeploymentId: observed }),
       });
     } catch (error) {
       // A 409 means another deploy landed between our inspection and this

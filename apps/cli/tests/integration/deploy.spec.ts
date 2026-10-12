@@ -140,6 +140,21 @@ describe("deploy", () => {
         expect(data.origins).toEqual(["https://app-acme.vercel.app"]);
       });
 
+      it("omits the guard on a first deploy, when nothing is live", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+
+        // Nothing is deployed yet, so there is no deployment to guard against.
+        // The deploy must omit expected_deployment_id entirely: an empty or
+        // placeholder id would be rejected by the request schema, so a
+        // succeeding first deploy proves the field was left off.
+        const data = await app.deployData();
+
+        expect(data.deployment_id).toMatch(/^dep_/);
+        const listed = await app.run(["deployment", "list", "--json"]);
+        expect(app.envelopeOf<{ count: number }>(listed).data.count).toBe(1);
+      });
+
       it("passes the observed deployment and re-deploys unchanged content", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
