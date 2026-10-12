@@ -22,7 +22,13 @@ under `/docs` ([`apps/docs/AGENTS.md`](../docs/AGENTS.md)).
 | File | Role |
 |---|---|
 | [`launcher/`](launcher/) | the function binary: maps `CLOUD_DATABASE_URL` / `CLOUD_MIGRATOR_DATABASE_URL`, the master key and Vercel's `PORT` onto the server's configuration; at build time it creates a preview's database, checks the function's configuration and migrates |
+| [`install.sh`](install.sh) | every service's install: the workspace's packages, native ones only for the build machine, so Vercel's build cache stays under its 1.5 GB limit |
 | [`build.sh`](build.sh) | the `server` service's build: login UI, launcher, migrations |
 | [`setup-secrets.sh`](setup-secrets.sh) | mints an environment's master key and root admin (with [`admin-document.mjs`](admin-document.mjs)) and sets them on the Vercel project; the originals go to 1Password |
+
+Every deployment is tested once it is built:
+[`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) runs the services'
+contract suites against the deployment's URL (the runbook's
+[Deployment checks](../../docs/runbooks/cloud.md#deployment-checks)).
 
 Setup, configuration and operations: [the runbook](../../docs/runbooks/cloud.md).

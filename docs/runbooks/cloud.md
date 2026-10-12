@@ -138,6 +138,8 @@ Environment variables (add secrets with
 | `MASTER_KEY_ID` | Preview | preview's `master-key.id`, `cloud-preview-<year>-<month>` |
 | `MASTER_KEY_PREVIOUS_PEM_B64` | Production or Preview; sensitive; only during a rotation | the key being rotated out, which `setup-secrets.sh --force` sets |
 | `MASTER_KEY_PREVIOUS_ID` | Production or Preview; only during a rotation | its id |
+| `CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE` | Production or Preview; optional | the share of console page loads that send Speed Insights, `0` to `1`; unset sends every one |
+| `DOCS_SPEED_INSIGHTS_SAMPLE_RATE` | Production or Preview; optional | the same for the docs |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Production; sensitive | production's `admin-user.b64`: the root admin document |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Preview; sensitive | preview's `admin-user.b64` |
 | `ENABLE_EXPERIMENTAL_COREPACK` | Production, Preview | `1`: the builds run package scripts that call `pnpm`, which must be the workspace's pinned version |
@@ -189,6 +191,59 @@ or garbled fails the build and the serving deployment stays.
   an older deployment without touching the schema.
 - **Startup never migrates:** the serving function refuses `--migrate`.
 
+## Deployment checks
+
+Every deployment is tested once Vercel built it, on its own URL
+(`cloud-<hash>-zitadel.vercel.app`, never a production alias):
+[`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) runs each
+service's contract suite against the deployment, today the docs'
+(`moon run docs:e2e-deployment`, [`apps/docs/AGENTS.md`](../../apps/docs/AGENTS.md)).
+What starts it, and where the result lands, depends on the environment:
+
+- **A preview:** the `deployment_status` event Vercel posts to GitHub. The
+  check lands on the pull request: `deployment-checks / docs (Preview)`.
+- **Production:** [`production-checks.yml`](../../.github/workflows/production-checks.yml),
+  on the `vercel.deployment.ready` dispatch Vercel sends once the deployment
+  is built, before its Deployment Checks run. It calls the same job and sets
+  the commit status `docs (Production)` on the deployed commit. A dispatch
+  runs the workflow as it is on `main`: a change to it takes effect once
+  merged.
+- The suites reach the protected deployment with the project's Protection
+  Bypass for Automation secret, which the workflow expects as the repository
+  secret `VERCEL_AUTOMATION_BYPASS_SECRET`. To set it from the project's
+  settings without printing it:
+
+  ```sh
+  npx -y vercel@63.1.2 api "/v9/projects/cloud?teamId=team_IDtOs36TGPOejsKm40wr1p3C" \
+    | jq -r '.protectionBypass | keys[0]' \
+    | gh secret set VERCEL_AUTOMATION_BYPASS_SECRET --repo zitadel/nextgen
+  ```
+
+  Regenerating the secret in the project settings invalidates it: set it
+  again.
+- **Reading a red check**, in this order: the check's name says the service
+  and the environment (production's status links its run); its annotations
+  name the failing contract (the test's title) and list every URL that
+  failed; the run's summary names the deployment and the command that
+  reproduces the run; the `docs-deployment-report` artifact holds the
+  Playwright report and the traces. A flaky production run is run again
+  from that run's page: it reports on the same commit again.
+- By hand, against any deployment:
+  `DOCS_BASE_URL=https://cloud-….vercel.app VERCEL_AUTOMATION_BYPASS_SECRET=… moon run docs:e2e-deployment`,
+  or `gh workflow run deployment-checks.yml --ref <branch> -f url=https://cloud-….vercel.app`
+  for a run without a new deployment; it reports `docs (dispatch)`, never
+  production's status. A change to `deployment-checks.yml` needs no
+  dispatch: a `deployment_status` run uses the file as it is on the deployed
+  commit, so the branch's own preview checks it.
+- **Holding production back on it:** in the project's Build & Deployment
+  settings, Deployment Checks, add the GitHub check `docs (Production)` and
+  let it block. Vercel then assigns the production domains only once the
+  status passes, so a red deployment never replaces the one serving (Force
+  Promote on the deployment's page bypasses it). Until then a red status
+  only shows on the commit while the deployment already serves. A check
+  added there has to come from `production-checks.yml`: one that starts on
+  `deployment_status` waits for the very domains it holds back.
+
 ## Rotating the master key
 
 The server re-wraps every project key to the current master key at startup
@@ -235,10 +290,29 @@ project and imports the root admin.
   restart) before raising the pool size.
 - **Analytics:** the console reports page views and Web Vitals per route
   pattern (`/ui/console/users/$userId`), the docs per page, to the project's
-  Analytics and Speed Insights tabs.
+  Analytics and Speed Insights tabs. Speed Insights samples by the two
+  `*_SPEED_INSIGHTS_SAMPLE_RATE` variables, read at build time, so a new rate
+  takes a redeploy; `0` turns it off. Web Analytics has no sampling and counts
+  every page view.
 - **Signing in:** `/ui/console/` with the environment's root admin from
   1Password (production and preview have different passwords). Anyone else
   registers through the login UI.
+- **Build cache:** Vercel keeps one per branch (a branch's first build
+  starts from production's) and restores it before the installs: every
+  `node_modules`, the docs' `.next/cache`, and `.vercel/cache/golang`, the
+  Go toolchain with its module and build caches. Compressed, it must stay
+  under 1.5 GB, the limit of the project's Standard build machines. A
+  bigger one is still created after the deployment, minutes of build
+  machine time, then dropped ("Build cache size … exceeds limit"), and the
+  next build installs every package and compiles the server from scratch.
+  So the services install with
+  [`apps/cloud/install.sh`](../../apps/cloud/install.sh), which leaves out
+  the other platforms' native packages that the workspace installs
+  everywhere else (`supportedArchitectures` in `pnpm-workspace.yaml`). That
+  took the cache from 1.52 GB to 0.86 GB, a little over half of it the Go
+  caches. Go would keep each rebuild's compiled packages for five days, so
+  `build.sh` drops those no build used in the last two hours. Each build
+  log ends with the cache's size: `Uploading build cache [...]`.
 
 ## Later: read replicas in other regions
 

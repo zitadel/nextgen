@@ -15,9 +15,9 @@
 set -eu
 cd "$(dirname "$0")/../.."
 
-# The service's installCommand normally ran already; the Go preset is not
-# known to honour it, so install when nothing is there.
-[ -x node_modules/.bin/turbo ] || corepack pnpm install --frozen-lockfile
+# The other services' installs normally ran already; the Go preset does not
+# run this service's installCommand, so install when nothing is there.
+[ -x node_modules/.bin/turbo ] || sh apps/cloud/install.sh
 # turbo restores the login UI from Vercel's remote cache when nothing it
 # builds from changed. The project's secrets stay hidden from the JS builds
 # (turbo's strict env mode); TURBO_PLATFORM_ENV_DISABLED stops turbo warning
@@ -41,5 +41,13 @@ CGO_ENABLED=0 go build -trimpath \
     -X main.buildRef=${ref}" \
   -o "$out" ./apps/cloud/launcher
 echo "built $out (version ${version}+cloud, commit ${commit})"
+
+# Go drops a build cache entry only after five days unused, and Vercel
+# carries the cache from build to build, so every rebuild's packages would
+# pile up towards the build cache's limit. On Vercel, drop what no build
+# used in the last two hours (Go refreshes an entry's time at most hourly).
+if [ -n "${VERCEL_OUTPUT_FILE:-}" ]; then
+  find -H "$(go env GOCACHE)" -mindepth 2 -type f -mmin +120 -delete
+fi
 
 "$out" migrate

@@ -21,6 +21,11 @@ export default defineConfig(({ command, mode, isPreview }) => ({
   // so it must opt into the same base or the built index.html's asset links
   // 404 and the SPA never mounts. The dev server (plain "serve") stays at "/".
   base: command === "build" || isPreview ? consoleBase : "/",
+  define: {
+    "import.meta.env.CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE": JSON.stringify(
+      speedInsightsSampleRate(mode),
+    ),
+  },
   server: {
     port: 5174,
     strictPort: true,
@@ -145,6 +150,19 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
       },
     },
   };
+}
+
+// The hosted cloud's Speed Insights sample rate (src/vite-env.d.ts). Named like
+// the docs' DOCS_SPEED_INSIGHTS_SAMPLE_RATE, without the VITE_ prefix, so the
+// config reads it and inlines this one value through `define`. A value outside
+// 0–1 fails the build rather than reaching the browser unnoticed.
+function speedInsightsSampleRate(mode: string): string {
+  const name = "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE";
+  const value = loadEnv(mode, import.meta.dirname, "")[name] ?? "";
+  if (value && !(Number(value) >= 0 && Number(value) <= 1)) {
+    throw new Error(`${name} must be a number from 0 to 1, got "${value}".`);
+  }
+  return value;
 }
 
 function keepGoEmbedPlaceholder(outDir: string) {

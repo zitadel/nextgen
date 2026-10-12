@@ -115,3 +115,19 @@ catalog:
   zod: ^4.3.6
 
 catalogMode: strict
+
+# Installs every platform's native packages (esbuild, Biome, moon, Next.js'
+# SWC, sharp, …), not only this machine's. Set here, not in package.json: in
+# a workspace, pnpm 10 lets package.json's value override the `--os` and
+# `--cpu` flags of `pnpm install`, which the cloud build passes to install
+# only its own platform (apps/cloud/install.sh).
+supportedArchitectures:
+  os:
+    - current
+    - darwin
+    - linux
+    - win32
+  cpu:
+    - current
+    - x64
+    - arm64
