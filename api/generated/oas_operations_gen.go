@@ -6,6 +6,7 @@ package api
 type OperationName = string
 
 const (
+	AddOriginOperation                     OperationName = "AddOrigin"
 	BeginUserPasskeyRegistrationOperation  OperationName = "BeginUserPasskeyRegistration"
 	CompleteClaimOperation                 OperationName = "CompleteClaim"
 	CreateAuthAttemptOperation             OperationName = "CreateAuthAttempt"
@@ -76,6 +77,7 @@ const (
 	QuerySessionsOperation                 OperationName = "QuerySessions"
 	QueryTeamsOperation                    OperationName = "QueryTeams"
 	QueryUsersOperation                    OperationName = "QueryUsers"
+	RemoveOriginOperation                  OperationName = "RemoveOrigin"
 	RevokeMySessionOperation               OperationName = "RevokeMySession"
 	RevokeSessionOperation                 OperationName = "RevokeSession"
 	SetUserPasswordOperation               OperationName = "SetUserPassword"

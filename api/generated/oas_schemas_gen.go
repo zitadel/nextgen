@@ -12,6 +12,128 @@ import (
 	"github.com/zitadel/nextgen/internal/api/ogenx"
 )
 
+// AddOriginErrorResponse represents sum type.
+type AddOriginErrorResponse struct {
+	Type             AddOriginErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// AddOriginErrorResponseType is oneOf type of AddOriginErrorResponse.
+type AddOriginErrorResponseType string
+
+// Possible values for AddOriginErrorResponseType.
+const (
+	AuthUnauthorizedAddOriginErrorResponse AddOriginErrorResponseType = "auth.unauthorized"
+	InternalAddOriginErrorResponse         AddOriginErrorResponseType = "internal"
+	ReqInvalidAddOriginErrorResponse       AddOriginErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether AddOriginErrorResponse is AuthUnauthorized.
+func (s AddOriginErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedAddOriginErrorResponse
+}
+
+// IsInternal reports whether AddOriginErrorResponse is Internal.
+func (s AddOriginErrorResponse) IsInternal() bool { return s.Type == InternalAddOriginErrorResponse }
+
+// IsReqInvalid reports whether AddOriginErrorResponse is ReqInvalid.
+func (s AddOriginErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidAddOriginErrorResponse
+}
+
+// SetAuthUnauthorized sets AddOriginErrorResponse to AuthUnauthorized.
+func (s *AddOriginErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedAddOriginErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if AddOriginErrorResponse is AuthUnauthorized.
+func (s AddOriginErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedAddOriginErrorResponse returns new AddOriginErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedAddOriginErrorResponse(v AuthUnauthorized) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets AddOriginErrorResponse to Internal.
+func (s *AddOriginErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalAddOriginErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if AddOriginErrorResponse is Internal.
+func (s AddOriginErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalAddOriginErrorResponse returns new AddOriginErrorResponse from Internal.
+func NewInternalAddOriginErrorResponse(v Internal) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets AddOriginErrorResponse to ReqInvalid.
+func (s *AddOriginErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidAddOriginErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if AddOriginErrorResponse is ReqInvalid.
+func (s AddOriginErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidAddOriginErrorResponse returns new AddOriginErrorResponse from ReqInvalid.
+func NewReqInvalidAddOriginErrorResponse(v ReqInvalid) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// AddOriginErrorResponseStatusCode wraps AddOriginErrorResponse with StatusCode.
+type AddOriginErrorResponseStatusCode struct {
+	StatusCode int
+	Response   AddOriginErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *AddOriginErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *AddOriginErrorResponseStatusCode) GetResponse() AddOriginErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *AddOriginErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *AddOriginErrorResponseStatusCode) SetResponse(val AddOriginErrorResponse) {
+	s.Response = val
+}
+
+func (*AddOriginErrorResponseStatusCode) addOriginRes() {}
+
 // Merged schema.
 // Ref: #
 type AlreadyClaimedResponse struct {
@@ -50055,6 +50177,81 @@ func (o OptVarPermissionDeniedDetails) Or(d VarPermissionDeniedDetails) VarPermi
 	return d
 }
 
+// One of a project's origins: a pattern and what it is for. A `primary`
+// pattern admits requests from the URLs it matches; a `preview` pattern only
+// bounds which URLs a preview deploy may register, and a request from such a
+// URL is admitted by its live preview alone. A `primary` pattern is an exact
+// URL with no wildcard. A `*` matches one or more characters, none of them a
+// dot, and a literal beats a wildcard.
+// Ref: #
+type Origin struct {
+	Pattern string     `json:"pattern"`
+	Kind    OriginKind `json:"kind"`
+}
+
+// GetPattern returns the value of Pattern.
+func (s *Origin) GetPattern() string {
+	return s.Pattern
+}
+
+// GetKind returns the value of Kind.
+func (s *Origin) GetKind() OriginKind {
+	return s.Kind
+}
+
+// SetPattern sets the value of Pattern.
+func (s *Origin) SetPattern(val string) {
+	s.Pattern = val
+}
+
+// SetKind sets the value of Kind.
+func (s *Origin) SetKind(val OriginKind) {
+	s.Kind = val
+}
+
+func (*Origin) addOriginRes() {}
+
+type OriginKind string
+
+const (
+	OriginKindPrimary OriginKind = "primary"
+	OriginKindPreview OriginKind = "preview"
+)
+
+// AllValues returns all OriginKind values.
+func (OriginKind) AllValues() []OriginKind {
+	return []OriginKind{
+		OriginKindPrimary,
+		OriginKindPreview,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s OriginKind) MarshalText() ([]byte, error) {
+	switch s {
+	case OriginKindPrimary:
+		return []byte(s), nil
+	case OriginKindPreview:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *OriginKind) UnmarshalText(data []byte) error {
+	switch OriginKind(data) {
+	case OriginKindPrimary:
+		*s = OriginKindPrimary
+		return nil
+	case OriginKindPreview:
+		*s = OriginKindPreview
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 type PageToken string
 
 // WebAuthn-specific challenge data for passkey authentication.
@@ -53208,6 +53405,9 @@ type ProjectResponse struct {
 	Name string `json:"name"`
 	// Origins which are allowed for previewing and testing the project.
 	PreviewOrigins []string `json:"preview_origins"`
+	// The project's origin patterns, each a `{pattern, kind}`. An empty list
+	// admits every origin until the first pattern is added.
+	Origins []Origin `json:"origins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"created_at"`
 	// The time when the project was last updated.
@@ -53230,6 +53430,11 @@ func (s *ProjectResponse) GetName() string {
 // GetPreviewOrigins returns the value of PreviewOrigins.
 func (s *ProjectResponse) GetPreviewOrigins() []string {
 	return s.PreviewOrigins
+}
+
+// GetOrigins returns the value of Origins.
+func (s *ProjectResponse) GetOrigins() []Origin {
+	return s.Origins
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -53260,6 +53465,11 @@ func (s *ProjectResponse) SetName(val string) {
 // SetPreviewOrigins sets the value of PreviewOrigins.
 func (s *ProjectResponse) SetPreviewOrigins(val []string) {
 	s.PreviewOrigins = val
+}
+
+// SetOrigins sets the value of Origins.
+func (s *ProjectResponse) SetOrigins(val []Origin) {
+	s.Origins = val
 }
 
 // SetCreatedAt sets the value of CreatedAt.
@@ -57183,6 +57393,149 @@ func (s *ReleaseSummary) SetProjectID(val ProjectID) {
 // SetMetadata sets the value of Metadata.
 func (s *ReleaseSummary) SetMetadata(val ReleaseMetadata) {
 	s.Metadata = val
+}
+
+// RemoveOriginErrorResponse represents sum type.
+type RemoveOriginErrorResponse struct {
+	Type             RemoveOriginErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// RemoveOriginErrorResponseType is oneOf type of RemoveOriginErrorResponse.
+type RemoveOriginErrorResponseType string
+
+// Possible values for RemoveOriginErrorResponseType.
+const (
+	AuthUnauthorizedRemoveOriginErrorResponse RemoveOriginErrorResponseType = "auth.unauthorized"
+	InternalRemoveOriginErrorResponse         RemoveOriginErrorResponseType = "internal"
+	ReqInvalidRemoveOriginErrorResponse       RemoveOriginErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether RemoveOriginErrorResponse is AuthUnauthorized.
+func (s RemoveOriginErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedRemoveOriginErrorResponse
+}
+
+// IsInternal reports whether RemoveOriginErrorResponse is Internal.
+func (s RemoveOriginErrorResponse) IsInternal() bool {
+	return s.Type == InternalRemoveOriginErrorResponse
+}
+
+// IsReqInvalid reports whether RemoveOriginErrorResponse is ReqInvalid.
+func (s RemoveOriginErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidRemoveOriginErrorResponse
+}
+
+// SetAuthUnauthorized sets RemoveOriginErrorResponse to AuthUnauthorized.
+func (s *RemoveOriginErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedRemoveOriginErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if RemoveOriginErrorResponse is AuthUnauthorized.
+func (s RemoveOriginErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedRemoveOriginErrorResponse(v AuthUnauthorized) RemoveOriginErrorResponse {
+	var s RemoveOriginErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets RemoveOriginErrorResponse to Internal.
+func (s *RemoveOriginErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalRemoveOriginErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if RemoveOriginErrorResponse is Internal.
+func (s RemoveOriginErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from Internal.
+func NewInternalRemoveOriginErrorResponse(v Internal) RemoveOriginErrorResponse {
+	var s RemoveOriginErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets RemoveOriginErrorResponse to ReqInvalid.
+func (s *RemoveOriginErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidRemoveOriginErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if RemoveOriginErrorResponse is ReqInvalid.
+func (s RemoveOriginErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from ReqInvalid.
+func NewReqInvalidRemoveOriginErrorResponse(v ReqInvalid) RemoveOriginErrorResponse {
+	var s RemoveOriginErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// RemoveOriginErrorResponseStatusCode wraps RemoveOriginErrorResponse with StatusCode.
+type RemoveOriginErrorResponseStatusCode struct {
+	StatusCode int
+	Response   RemoveOriginErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *RemoveOriginErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *RemoveOriginErrorResponseStatusCode) GetResponse() RemoveOriginErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *RemoveOriginErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *RemoveOriginErrorResponseStatusCode) SetResponse(val RemoveOriginErrorResponse) {
+	s.Response = val
+}
+
+func (*RemoveOriginErrorResponseStatusCode) removeOriginRes() {}
+
+// RemoveOriginNoContent is response for RemoveOrigin operation.
+type RemoveOriginNoContent struct{}
+
+func (*RemoveOriginNoContent) removeOriginRes() {}
+
+type RemoveOriginReq struct {
+	Pattern string `json:"pattern"`
+}
+
+// GetPattern returns the value of Pattern.
+func (s *RemoveOriginReq) GetPattern() string {
+	return s.Pattern
+}
+
+// SetPattern sets the value of Pattern.
+func (s *RemoveOriginReq) SetPattern(val string) {
+	s.Pattern = val
 }
 
 // Merged schema.

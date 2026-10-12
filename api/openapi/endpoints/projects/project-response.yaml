@@ -18,6 +18,13 @@ properties:
       type: string
     description: |
       Origins which are allowed for previewing and testing the project.
+  origins:
+    type: array
+    items:
+      $ref: origin.yaml
+    description: |
+      The project's origin patterns, each a `{pattern, kind}`. An empty list
+      admits every origin until the first pattern is added.
   created_at:
     type: string
     format: date-time

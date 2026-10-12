@@ -8,6 +8,17 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
+	// AddOrigin implements addOrigin operation.
+	//
+	// Adds one `{pattern, kind}` to the project's origins. A `primary` pattern
+	// must be an exact URL with no wildcard; a `preview` pattern may carry a
+	// wildcard but a wildcard on a shared host needs a literal label of your own
+	// beside the host. A malformed pattern, a wildcard primary and an unbounded
+	// preview wildcard are each rejected; a host the server has no rule for is
+	// stored as written.
+	//
+	// POST /projects/{project_id}/origins
+	AddOrigin(ctx context.Context, req *Origin, params AddOriginParams) (AddOriginRes, error)
 	// BeginUserPasskeyRegistration implements beginUserPasskeyRegistration operation.
 	//
 	// Starts a WebAuthn registration ceremony for the user and returns the
@@ -747,6 +758,14 @@ type Handler interface {
 	//
 	// POST /users/query
 	QueryUsers(ctx context.Context, req *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
+	// RemoveOrigin implements removeOrigin operation.
+	//
+	// Removes one pattern from the project's origins. Requests from URLs only
+	// that pattern admitted are refused from now on; live previews and
+	// deployment history are untouched.
+	//
+	// POST /projects/{project_id}/origins/remove
+	RemoveOrigin(ctx context.Context, req *RemoveOriginReq, params RemoveOriginParams) (RemoveOriginRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Logs out by permanently deleting the session.

@@ -134,6 +134,10 @@ paths:
     $ref: endpoints/projects/query/methods.yaml
   /projects/{project_id}:
     $ref: endpoints/projects/by_id/methods.yaml
+  /projects/{project_id}/origins:
+    $ref: endpoints/projects/by_id/origins/methods.yaml
+  /projects/{project_id}/origins/remove:
+    $ref: endpoints/projects/by_id/origins/remove/methods.yaml
   /projects/{project_id}/claim/init:
     $ref: endpoints/projects/by_id/claim/init/methods.yaml
   /projects/{project_id}/claim/status:
