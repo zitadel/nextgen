@@ -45,21 +45,50 @@ export default class DeploymentRollback extends EnvironmentCommand {
 
     const { client, projectId } = await this.connect();
 
-    // Bare: re-apply the deployment that ran before the current one. With an
-    // id, re-apply exactly that one.
+    // Bare: undo the latest deployment by re-applying what its targets served
+    // before it. With an id, re-apply exactly that one.
     let targetId = args.deployment_id as string | undefined;
     if (targetId === undefined) {
       const { deployments } = await client.listDeployments({
         project_id: projectId,
         ...(flags.origin === undefined ? {} : { origin: flags.origin }),
       });
-      const previous = deployments[1];
-      if (!previous) {
+      const latest = deployments[0];
+      if (!latest) {
+        throw new ZitadelError("E_VALIDATION", "There is no deployment to roll back", {
+          hint: "Nothing has been deployed yet; check `zitadel deployment list`.",
+        });
+      }
+      // Undoing the latest deploy means restoring each origin it touched to
+      // the deployment that served it just before — the next one down that
+      // origin's history. `--origin` narrows it to that one origin.
+      const origins =
+        flags.origin === undefined ? latest.targets.map((target) => target.origin) : [flags.origin];
+      const priors = origins.map((origin) =>
+        deployments
+          .slice(1)
+          .find((deployment) => deployment.targets.some((target) => target.origin === origin)),
+      );
+      if (priors.some((prior) => prior === undefined)) {
         throw new ZitadelError("E_VALIDATION", "There is no earlier deployment to roll back to", {
           hint: "Name a deployment to re-apply, or check `zitadel deployment list`.",
         });
       }
-      targetId = previous.id;
+      // A single rollback re-applies one deployment. When the latest deploy's
+      // origins were last served by different deployments, no single one
+      // restores them all, so it is refused rather than rolling some back.
+      const priorIds = new Set(priors.map((prior) => prior?.id));
+      if (priorIds.size !== 1) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          "The last deployment's origins have different histories, so one rollback can't undo it",
+          {
+            hint: "Name the deployment to re-apply, or roll back one origin at a time with --origin.",
+            nextCommands: ["zitadel deployment list"],
+          },
+        );
+      }
+      targetId = [...priorIds][0] as string;
     }
 
     if (!force) {
