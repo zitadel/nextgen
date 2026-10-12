@@ -907,33 +907,60 @@ func (s *authAttemptService) recordProofFailure(ctx context.Context, attempt *do
 	})
 }
 
-// checkPassword checks the user's password under a lock on their password
-// row, so concurrent checks of one user run one at a time and each sees the
-// failures before it. The rate limit counts the auth.check.failed events of
-// password checks, so a wrong password records its failure in the same
-// transaction, before the lock is released.
+// checkPassword checks the user's password against the rate limit, which
+// counts the auth.check.failed events of password checks. The hash runs
+// between two transactions, as hashing is slow by design: a transaction held
+// across it would hold the lock on the user's password row as long, and on
+// the Spanner emulator, which serves one transaction at a time, it starves.
+//
+// The first transaction refuses a user who is already limited, so a lockout
+// costs no hash. The second takes the lock again and decides: it refuses the
+// check when failures recorded since then reached the limit, whatever the
+// hash said, and otherwise records a wrong password. Concurrent checks of one
+// user commit one at a time, so only the checks that commit under the limit
+// get an answer.
 //
 // A check refused by the rate limit is not recorded at all: no password was
 // tried, and counting refusals would keep a user locked out for as long as
 // someone keeps guessing. handled reports that the error needs no failure
 // recorded by the caller, for either reason.
 func (s *authAttemptService) checkPassword(ctx context.Context, attempt *domain.AuthAttempt, challenge domain.AuthChallenge, userID, plain string) (handled bool, err error) {
-	var wrong, limited error
+	var (
+		password *domain.UserPassword
+		limited  error
+	)
 	err = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		wrong, limited = nil, nil
-		stmts := tx.Statements()
-		password, err := stmts.LockUserPassword(ctx, attempt.ProjectID, userID)
+		pw, failures, err := lockUserPasswordFailures(ctx, tx.Statements(), attempt.ProjectID, userID)
 		if err != nil {
 			return err
 		}
-		failures, err := stmts.GetUserPasswordFailures(ctx, attempt.ProjectID, userID, domain.UserPasswordFailuresSince(time.Now()))
+		password, limited = pw, failures.CheckRateLimit()
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+	if limited != nil {
+		return true, limited
+	}
+
+	verified := password.Verify(plain, s.passwordVerifier)
+	var wrong error
+	err = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		wrong = verified
+		stmts := tx.Statements()
+		current, failures, err := lockUserPasswordFailures(ctx, stmts, attempt.ProjectID, userID)
 		if err != nil {
 			return err
 		}
 		if limited = failures.CheckRateLimit(); limited != nil {
 			return nil
 		}
-		if wrong = password.Verify(plain, s.passwordVerifier); wrong == nil {
+		if current.ID != password.ID {
+			// Changed during the hash: the check was against the old one.
+			wrong = domain.ErrUserPasswordInvalid()
+		}
+		if wrong == nil {
 			return nil
 		}
 		if err := stmts.AuthAttemptChallengeFailed(ctx, attempt.ProjectID, attempt.ID, challenge); err != nil {
@@ -948,6 +975,20 @@ func (s *authAttemptService) checkPassword(ctx context.Context, attempt *domain.
 		return true, limited
 	}
 	return wrong != nil, wrong
+}
+
+// lockUserPasswordFailures reads the user's password, locking its row, and
+// their password failures in the rate limit's window.
+func lockUserPasswordFailures(ctx context.Context, stmts AllStatements, projectID, userID string) (*domain.UserPassword, domain.UserPasswordFailures, error) {
+	password, err := stmts.LockUserPassword(ctx, projectID, userID)
+	if err != nil {
+		return nil, domain.UserPasswordFailures{}, err
+	}
+	failures, err := stmts.GetUserPasswordFailures(ctx, projectID, userID, domain.UserPasswordFailuresSince(time.Now()))
+	if err != nil {
+		return nil, domain.UserPasswordFailures{}, err
+	}
+	return password, failures, nil
 }
 
 // BeginPasskeyEnrollment starts a management-plane enrollment ceremony on an
