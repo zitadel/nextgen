@@ -310,3 +310,10 @@ func TestPrepareMigrationNeedsTheDirectURLWhenDeployed(t *testing.T) {
 	require.NoError(t, err, "a local run migrates whatever it is configured with")
 	assert.Equal(t, "postgres://local/db", os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
 }
+
+func TestDescribeDatabaseNamesTheBranchEndpointOnly(t *testing.T) {
+	assert.Equal(t, " at ep-quiet-sun-123456.c-8.eu-central-1.aws.neon.tech/neondb", describeDatabase(unpooledURL))
+	assert.NotContains(t, describeDatabase(unpooledURL), "secret", "credentials stay out of the logs")
+	assert.Empty(t, describeDatabase(""))
+	assert.Empty(t, describeDatabase("host=db user=u"))
+}

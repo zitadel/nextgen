@@ -110,7 +110,7 @@ func prepareMigration(extra []string) ([]string, error) {
 	if err := setDefault("NEXTGEN_SERVER_DATA_DIR", defaultDataDir); err != nil {
 		return nil, err
 	}
-	fmt.Fprintf(os.Stderr, "launcher: migrating the %s database\n", describeEnv(env))
+	fmt.Fprintf(os.Stderr, "launcher: migrating the %s database%s\n", describeEnv(env), describeDatabase(dsn))
 	return append([]string{"migrate"}, extra...), nil
 }
 
@@ -150,6 +150,7 @@ func prepareServer(extra []string) ([]string, error) {
 		if err := os.Setenv("NEXTGEN_DATABASE_POSTGRES", pooled); err != nil {
 			return nil, err
 		}
+		fmt.Fprintf(os.Stderr, "launcher: serving the %s database%s\n", describeEnv(env), describeDatabase(dsn))
 	}
 
 	if err := setDefault("NEXTGEN_SERVER_DATA_DIR", defaultDataDir); err != nil {
@@ -263,6 +264,17 @@ func describeEnv(env string) string {
 		return "local"
 	}
 	return env
+}
+
+// describeDatabase names the host and database of a URL, never its
+// credentials. Every Neon branch has its own endpoint host, so the build and
+// runtime logs show which branch a deployment uses.
+func describeDatabase(dsn string) string {
+	u, err := url.Parse(dsn)
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	return " at " + u.Host + u.Path
 }
 
 // setDefault sets a variable only when the environment leaves it unset or
