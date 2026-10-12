@@ -34,7 +34,8 @@
     "test": "node ../../scripts/task-guard.mjs --mutex browser-tests --retries 3 -- vitest run",
     "test:all": "pnpm run test",
     "lint": "biome check .",
-    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build"
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
+    "install-browsers": "playwright install chromium"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",

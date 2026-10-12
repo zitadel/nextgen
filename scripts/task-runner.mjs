@@ -68,3 +68,28 @@ export function runnerLabel(targets, env = process.env) {
   const { command, args } = runnerCommand(targets, env);
   return [command, ...args].join(" ");
 }
+
+/**
+ * The command that runs the named tasks across the whole workspace, as `moon
+ * ci :lint ...` does. Moon selects the affected tasks itself; turbo runs every
+ * task and lets the cache skip the unchanged ones, because its own
+ * `--affected` only follows package.json edges and would miss the artifact
+ * edges (the server embeds the UI builds) that scripts/ci-mode.mjs resolves.
+ */
+export function workspaceCommand(tasks, env = process.env) {
+  if (taskRunner(env) === "moon") {
+    return { command: "moon", args: ["ci", ...tasks.map((task) => `:${task}`)] };
+  }
+  return { command: "turbo", args: ["run", ...tasks, "--continue=dependencies-successful"] };
+}
+
+const PROJECT_OF_PACKAGE = new Map([...PACKAGE_OF_PROJECT].map(([id, name]) => [name, id]));
+const TASK_OF_SCRIPT = new Map([...SCRIPT_OF_TASK].map(([task, script]) => [script, task]));
+
+/** The moon `project:task` id of a turbo task (`@zitadel/server#test` → `server:test`). */
+export function moonTargetOf(packageName, taskName) {
+  const project =
+    PROJECT_OF_PACKAGE.get(packageName) ??
+    (packageName.startsWith("@zitadel/") ? packageName.slice("@zitadel/".length) : packageName);
+  return `${project}:${TASK_OF_SCRIPT.get(taskName) ?? taskName}`;
+}

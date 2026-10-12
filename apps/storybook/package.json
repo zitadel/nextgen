@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "node ../../scripts/task-guard.mjs --mutex browser-tests --retries 3 -- vitest run --project=storybook",
     "test:all": "pnpm run test",
-    "lint": "biome check ."
+    "lint": "biome check .",
+    "install-browsers": "playwright install chromium"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",

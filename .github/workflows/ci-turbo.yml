@@ -1,0 +1,230 @@
+name: ci-turbo
+
+# DRAFT — the Turborepo version of ci.yml's moon steps, for the dual-run
+# period of docs/design/build/turborepo-migration.md. It is not a required
+# check: branch protection stays on `ci / full-pr`, and this job may fail
+# without blocking a merge. Deliberately not wired to pull requests yet; run
+# it by hand against a branch (`gh workflow run ci-turbo.yml --ref <branch>`)
+# until the parity period starts, then add `pull_request` and `merge_group`
+# triggers (same as ci.yml) so every PR runs both.
+#
+# What differs from ci.yml, step by step, is commented inline. The intent is
+# the same: install, decide the lanes, run the gate, then the explicit lanes
+# that moon kept out of its automatic selection.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-turbo-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  full-pr-turbo:
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || 'depot-ubuntu-24.04-16' }}
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      # The remote-cache step below exchanges this job's OIDC token for a
+      # short-lived Turborepo token (Vercel's remote cache). Unused by the
+      # Depot-cache alternative, see that step.
+      id-token: write
+    env:
+      DO_NOT_TRACK: "1"
+      TURBO_TELEMETRY_DISABLED: "1"
+      # The contributor scripts (run-cli, local-registry, check) build through
+      # turbo instead of moon; scripts/ci-mode.mjs asks turbo's graph.
+      NEXTGEN_TASK_RUNNER: turbo
+      # Depot runners point TURBO_API at Depot's own turbo cache. This job uses
+      # Vercel's instead (one cache shared with the cloud deployments); delete
+      # this line and the remote-cache step to use Depot's, which needs no
+      # setup on Depot runners.
+      TURBO_API: https://vercel.com
+      # Pull requests read the remote cache and never write it; only the merge
+      # queue (the commits that become main) uploads. Forks get no token at all
+      # and run with the local cache only, as with moon's Depot cache.
+      TURBO_CACHE: ${{ github.event_name == 'merge_group' && 'local:rw,remote:rw' || 'local:rw,remote:r' }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      # Bare `turbo` below is the workspace's own pinned turbo (and `moon` is
+      # still there for scripts/check-moon-graph.mjs during the dual run).
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      # Vercel Remote Cache over OIDC: needs the repository variable
+      # TURBO_TEAM (the Vercel team slug) and a "Turborepo CLI" OIDC policy
+      # for this repository in the Vercel team's settings (Build and
+      # Deployment → OIDC Policies for CLI Access). Skipped on forks, which
+      # cannot mint the token.
+      - name: Set up Turborepo remote cache
+        if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork) }}
+        uses: vercel/setup-turborepo-remote-cache-action@v1.0.0
+        with:
+          team: ${{ vars.TURBO_TEAM }}
+
+      - name: Check PR title
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/check-pr-title.mjs --title "$PR_TITLE" --base "$BASE_SHA" --summary
+
+      # Same outputs and gates as ci.yml; the affected set comes from turbo's
+      # task graph (NEXTGEN_TASK_RUNNER above) instead of `moon query`.
+      - name: Detect CI mode
+        id: ci-mode
+        run: node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
+
+      - name: Check Go generated files
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
+        run: turbo run check-generate-pruned --filter=@zitadel/server
+
+      - name: Cache Playwright browsers
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.browsers == 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.browsers == 'true' }}
+        run: corepack pnpm --filter @zitadel/components exec playwright install chromium
+
+      - name: Keep Docker's interface churn away from Chromium
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+
+      # The gate. No `--affected`: turbo's package-level selection would miss
+      # the artifact edges (a console change must re-run the server's tests,
+      # which embed it), so every task runs and the cache skips the unchanged
+      # ones. `--continue=dependencies-successful` is moon's behaviour: a
+      # failure skips its dependents and nothing else. The summary feeds the
+      # report step.
+      - name: Run turbo build and test graph
+        id: turbo-gate
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: turbo run lint typecheck build test check-adrs check-moon-graph --continue=dependencies-successful --summarize
+
+      - name: Report turbo failures
+        if: ${{ failure() && steps.turbo-gate.conclusion == 'failure' }}
+        run: node scripts/report-turbo-failures.mjs
+
+      # `server:test` is part of the gate above (moon re-ran it explicitly
+      # because `moon ci` selects by affectedness); the database lanes stay
+      # explicit, as in ci.yml.
+      - name: Run Go integration tests (postgres)
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
+        run: turbo run test-postgres --filter=@zitadel/server
+
+      - name: Run Go integration tests (sqlite)
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
+        run: turbo run test-sqlite --filter=@zitadel/server
+
+      # No `env -u CI`: turbo has no runInCI, so nothing hides these tasks.
+      - name: Build release snapshot without container
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
+        run: turbo run snapshot --filter=@zitadel/release -- --skip-container
+
+      - name: Cache journey registry packages
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/journey-verdaccio-storage
+          key: journey-verdaccio-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            journey-verdaccio-${{ runner.os }}-
+
+      - name: Run journey e2e lanes
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
+        env:
+          JOURNEY_REGISTRY_STORAGE: ${{ runner.temp }}/journey-verdaccio-storage
+        run: |
+          version="$(node -p "require('./apps/server/package.json').version")"
+          turbo run e2e-local --filter=@zitadel/cli-journey-e2e -- \
+            --ci \
+            --matrix "${{ steps.ci-mode.outputs.journey_matrix }}" \
+            --runtime binary \
+            --work-dir "${RUNNER_TEMP}/ci-journey" \
+            --tarballs-dir "dist/release/${version}/npm"
+
+      - name: Run @zitadel/testing real-instance suites
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_testing_demo == 'true' }}
+        run: turbo run test:integration e2e-real --filter=@zitadel/testing --filter=@zitadel/demo-next-e2e
+
+      - name: Run console real-instance suite
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_console == 'true' }}
+        run: turbo run e2e-real --filter=@zitadel/console-e2e
+
+      - name: Run console embedded-surface suite
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_console == 'true' }}
+        run: turbo run e2e-embedded --filter=@zitadel/console-e2e
+
+      - name: Run console platform-project suite
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_console == 'true' }}
+        run: turbo run e2e-platform --filter=@zitadel/console-e2e
+
+      - name: Validate version PR
+        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
+        run: turbo run version --filter=@zitadel/release
+
+      - name: Pack version PR artifacts
+        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
+        run: turbo run pack --filter=@zitadel/release
+
+      - name: Verify version PR tarballs
+        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
+        run: |
+          version="$(node -p "require('./apps/server/package.json').version")"
+          node apps/cli-journey-e2e/scripts/verify-tarballs.mjs "dist/release/${version}/npm"
+
+      - name: Upload release snapshot
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-snapshot-turbo
+          path: dist/release
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload journey diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: journey-diagnostics-turbo
+          path: ${{ runner.temp }}/ci-journey/diagnostics
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload console e2e diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: console-e2e-diagnostics-turbo
+          path: |
+            apps/console-e2e/test-results
+            apps/console-e2e/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7

@@ -40,6 +40,8 @@ import { fileURLToPath } from "node:url";
 
 import { startLocalZitadel, type LocalZitadel, type SeededUser } from "@zitadel/testing";
 
+import { runnerCommand, runnerLabel } from "../../../scripts/task-runner.mjs";
+
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const workspaceRoot = resolve(appDir, "../..");
 
@@ -106,8 +108,9 @@ if (configuredServerBinary) {
   // Build (or cache-hit) the embedded server binary. Spawned here instead of
   // declared as a task dep: server:build depends on console:build, so a
   // dev-real -> server:build task dep would cycle the project graph.
+  const serverBuild = runnerCommand(["server:build"]);
   await new Promise<void>((resolveBuild, rejectBuild) => {
-    const build = spawn("moon", ["run", "server:build"], {
+    const build = spawn(serverBuild.command, serverBuild.args, {
       cwd: workspaceRoot,
       stdio: "inherit",
     });
@@ -118,7 +121,7 @@ if (configuredServerBinary) {
         return;
       }
       const detail = signal ? `signal ${signal}` : `exit ${code}`;
-      rejectBuild(new Error(`moon run server:build failed with ${detail}`));
+      rejectBuild(new Error(`${runnerLabel(["server:build"])} failed with ${detail}`));
     });
   });
 }
