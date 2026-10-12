@@ -244,14 +244,17 @@ project and imports the root admin.
   `node_modules`, the docs' `.next/cache`, and `.vercel/cache/golang`, the
   Go toolchain with its module and build caches. Compressed, it must stay
   under 1.5 GB, the limit of the project's Standard build machines. A
-  bigger one is created after the deployment and then dropped ("Build cache
-  size … exceeds limit"), and every build installs all packages and
-  compiles the server from scratch. So the services install with
+  bigger one is still created after the deployment, minutes of build
+  machine time, then dropped ("Build cache size … exceeds limit"), and the
+  next build installs every package and compiles the server from scratch.
+  So the services install with
   [`apps/cloud/install.sh`](../../apps/cloud/install.sh), which leaves out
   the other platforms' native packages that the workspace installs
   everywhere else (`supportedArchitectures` in `pnpm-workspace.yaml`). That
   took the cache from 1.52 GB to 0.86 GB, a little over half of it the Go
-  caches. Each build log ends with its size: `Uploading build cache [...]`.
+  caches. Go would keep each rebuild's compiled packages for five days, so
+  `build.sh` drops those no build used in the last two hours. Each build
+  log ends with the cache's size: `Uploading build cache [...]`.
 
 ## Later: read replicas in other regions
 

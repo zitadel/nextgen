@@ -38,4 +38,12 @@ CGO_ENABLED=0 go build -trimpath \
   -o "$out" ./apps/cloud/launcher
 echo "built $out (version ${version}+cloud, commit ${commit})"
 
+# Go drops a build cache entry only after five days unused, and Vercel
+# carries the cache from build to build, so every rebuild's packages would
+# pile up towards the build cache's limit. On Vercel, drop what no build
+# used in the last two hours (Go refreshes an entry's time at most hourly).
+if [ -n "${VERCEL_OUTPUT_FILE:-}" ]; then
+  find -H "$(go env GOCACHE)" -mindepth 2 -type f -mmin +120 -delete
+fi
+
 "$out" migrate
