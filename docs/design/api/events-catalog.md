@@ -120,12 +120,12 @@ tracked below.
 | `DeleteSessionByID` (operator/API revoke) | `session.deleted` | `session` | `session` | `reason` (`revoked`) |
 | `CreateAuthAttempt` | `auth.attempt.created` | `auth` | `auth_attempt` | _(empty; `flow_id` / `session_id` columns)_ |
 | `HandoffAuthAttempt` | `auth.attempt.handed_off` | `auth` | `auth_attempt` | _(empty; `session_id` column set)_ |
-| Challenge failed | `auth.check.failed` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
-| Challenge succeeded | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
+| Challenge failed | `auth.check.failed` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id`, `user_id` (when the attempt is pinned to a user) |
+| Challenge succeeded | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id`, `user_id` (when the attempt is pinned to a user) |
 | SSO authorization failed (the provider's error response, `access_denied` included, or a callback with no code) | `auth.sso.authorization.failed` | `auth` | `check` | `check_id`, `check_type` (`SSOCallback`), `auth_attempt_id` |
 | SSO exchange failed (token exchange, `id_token` or userinfo validation, configuration, or a server-side failure after a code arrived) | `auth.sso.exchange.failed` | `auth` | `check` | `check_id`, `check_type` (`SSOCallback`), `auth_attempt_id` |
 | SSO exchange succeeded (`SetSSOCallbackResult`; not a sign-in: the identity may still match no account) | `auth.sso.exchange.succeeded` | `auth` | `check` | `check_id`, `check_type` (`SSOCallback`), `auth_attempt_id` |
-| Direct factor recorded (no challenge/proof cycle: sign-up establishing user+password/user factors, discoverable assertion pinning the resolved user, SSO bind recording the user and SSO factors) | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
+| Direct factor recorded (no challenge/proof cycle: sign-up establishing user+password/user factors, discoverable assertion pinning the resolved user, SSO bind recording the user and SSO factors) | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id`, `user_id` (when the attempt is pinned to a user) |
 | Flow definition create | `flowdef.created` | `admin` | `flow_definition` | `name`, `status`, `user_schema`, `purposes`, `audience` |
 | JSON schema create | `schema.created` | `admin` | `json_schema` | `kind`, `object_type` |
 | Branding create | `branding.created` | `admin` | `branding` | `layout`, `logo_url`, `font_url`, `hero_url` |

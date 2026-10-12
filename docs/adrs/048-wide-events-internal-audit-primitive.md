@@ -144,6 +144,13 @@ see [ADR 049 §3](049-events-api-retention-export.md).
   `id` is required: many events share the same `created_at` (same millisecond),
   and without the tie-breaker column cursors are unstable and the planner cannot
   satisfy the tuple predicate as an efficient index range scan.
+- **Password checks:** `idx_events_password_checks` on `(project_id,
+  payload user_id, event_type, created_at)`, partial to `check_type =
+  'Password'` (Spanner: a generated `password_check_user_id` column and a
+  NULL_FILTERED index). The password rate limit counts a user's
+  `auth.check.failed` password checks since their last `auth.check.succeeded`
+  one, so `user_id` is a secondary id on check payloads, and retention may not
+  be shorter than the failure window (24h).
 - **Deferred:** Additional indexes when concrete query paths and predicates are
   measured. Avoid speculative partial indexes on `NOT NULL DEFAULT ''` columns
   unless predicates exclude empty strings.

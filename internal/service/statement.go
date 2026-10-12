@@ -473,9 +473,6 @@ type UserPasswordStatements interface {
 	// until the surrounding transaction ends, so concurrent password checks
 	// of one user are admitted one at a time.
 	LockUserPassword(ctx context.Context, projectID, userID string) (*domain.UserPassword, error)
-	GetUserPasswordFailures(ctx context.Context, projectID, userID string, since time.Time) (domain.UserPasswordFailures, error)
-	AddUserPasswordFailure(ctx context.Context, projectID, userID string, at, forgetBefore time.Time) error
-	ClearUserPasswordFailures(ctx context.Context, projectID, userID string, until time.Time) error
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -738,4 +735,8 @@ type EventStatements interface {
 	GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error)
 	UpsertEventSinkCursor(ctx context.Context, cursor *domain.EventSinkCursor) error
 	ListEventsAfterCursor(ctx context.Context, projectID string, afterCreatedAt time.Time, afterID string, limit uint32) ([]*domain.Event, error)
+	// GetUserPasswordFailures summarizes the auth.check.failed events of the
+	// user's password checks created after since and after the user's last
+	// auth.check.succeeded password check.
+	GetUserPasswordFailures(ctx context.Context, projectID, userID string, since time.Time) (domain.UserPasswordFailures, error)
 }

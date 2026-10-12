@@ -22,8 +22,6 @@ func ErrUserPasswordInvalid() Error {
 	return newError("user.password_invalid", "The password provided is invalid.", nil, nil)
 }
 
-const PrefixUserPasswordFailure ResourcePrefix = "upwf"
-
 const (
 	UserPasswordFreeFailures  = 5
 	UserPasswordBackoffBase   = 30 * time.Second

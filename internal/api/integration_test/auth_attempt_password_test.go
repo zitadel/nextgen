@@ -5,6 +5,7 @@ package integration_test
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
@@ -230,4 +231,48 @@ func completedMethods(attempt *api.AuthAttemptResponse) []api.FactorMethod {
 		methods = append(methods, factor.Method)
 	}
 	return methods
+}
+
+func TestAuthAttemptPasswordRateLimit(t *testing.T) {
+	project, team := attemptProject(t)
+
+	const (
+		userID    = "user_attempt_ratelimit"
+		userEmail = "ratelimit@example.com"
+		userPass  = "correct-horse-battery-staple"
+	)
+	createAttemptUser(t, project, team, defaultSchemaURL(), userID, map[string]string{"email": userEmail})
+	setAttemptPassword(t, project, userID, userPass)
+	client := attemptClient(t, project)
+
+	submitPassword := func(password string) api.VerifyChallengeProofRes {
+		t.Helper()
+		attemptID := newAttempt(t, client, project)
+		verifyAttemptProof(t, client, attemptID, api.ChallengeMethodIdentifier, identifierProof(userEmail))
+		challengeID := issueAttemptChallenge(t, client, attemptID, api.ChallengeMethodPassword)
+		resp, err := client.VerifyChallengeProof(t.Context(), &api.VerifyChallengeRequest{
+			OneOf: api.NewPasswordProofVerifyChallengeRequestSum(api.PasswordProof{Password: password}),
+		}, api.VerifyChallengeProofParams{AttemptID: attemptID, ChallengeID: challengeID})
+		require.NoError(t, err)
+		return resp
+	}
+	rejectedType := func(resp api.VerifyChallengeProofRes) api.VerifyChallengeProofErrorResponseType {
+		t.Helper()
+		rejected, ok := resp.(*api.VerifyChallengeProofErrorResponseStatusCode)
+		require.True(t, ok, "expected a rejection, got %s", helpers.MustMarshal(t, resp))
+		return rejected.Response.Type
+	}
+
+	// One more than the free failures: the last of them starts the wait.
+	for range domain.UserPasswordFreeFailures + 1 {
+		require.Equal(t, api.AttProofRejectedVerifyChallengeProofErrorResponse, rejectedType(submitPassword("wrong")))
+	}
+	// The refusal is a rejected proof like a wrong password, so it does not
+	// tell a guesser whether the password was right.
+	require.Equal(t, api.AttProofRejectedVerifyChallengeProofErrorResponse, rejectedType(submitPassword(userPass)),
+		"the right password is refused while the wait lasts")
+
+	failures, err := harness.EnsureServiceDB(t).Statements().GetUserPasswordFailures(t.Context(), project.ID, userID, domain.UserPasswordFailuresSince(time.Now()))
+	require.NoError(t, err)
+	require.Equal(t, domain.UserPasswordFreeFailures+1, failures.Count, "the refusal did not count as a failure")
 }

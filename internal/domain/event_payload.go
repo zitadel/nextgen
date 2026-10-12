@@ -102,6 +102,7 @@ type AuthCheckPayload struct {
 	CheckID       string `json:"check_id"`
 	CheckType     string `json:"check_type,omitempty"`
 	AuthAttemptID string `json:"auth_attempt_id,omitempty"`
+	UserID        string `json:"user_id,omitempty"`
 }
 
 type ClaimChallengeCreatedPayload struct{}

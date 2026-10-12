@@ -36,6 +36,15 @@ type EventsConfig struct {
 	Export    audit.ExportConfig    `mapstructure:"export"`
 }
 
+func (c EventsConfig) Validate() error {
+	r := c.Retention
+	if r.Enabled && r.Retention > 0 && r.Retention < domain.UserPasswordFailureWindow {
+		return fmt.Errorf("events.retention.window %s must be at least %s, the password failure window",
+			r.Retention, domain.UserPasswordFailureWindow)
+	}
+	return nil
+}
+
 // PlatformConfig configures the deployment's default project resolution
 // (Console ADR 0004). Portal-related keys (billing, support access) are
 // intentionally absent until platform mode is implemented; this deployment
@@ -104,6 +113,7 @@ func (c Config) Validate() error {
 		c.Platform.Validate,
 		c.HTTPClient.Validate,
 		c.Schema.Validate,
+		c.Events.Validate,
 	} {
 		if err := validate(); err != nil {
 			return err
