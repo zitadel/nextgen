@@ -62,7 +62,7 @@ Product surfaces (`apps/`):
 Development and test surfaces (`apps/`):
 
 - `apps/storybook/` — the component workbench for the login surface
-  (`@zitadel/components`).
+  (`@zitadel/components`), served by the hosted cloud at `/storybook/`.
 - `apps/demo-next/` and `apps/demo-nuxt/` — reference integrations of the
   embedded sign-in component on each framework.
 - `apps/*-e2e/` — Playwright projects: one per demo (real framework

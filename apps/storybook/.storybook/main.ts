@@ -51,8 +51,8 @@ const reloadPollerScript = `<script>
  * See `apps/storybook/README.md`.
  *
  * `@zitadel/api-mock`'s public dir is served statically so MSW finds
- * `mockServiceWorker.js` at `/mockServiceWorker.js` (the orchestrator stories
- * mock the Flow API through `msw-storybook-addon`).
+ * `mockServiceWorker.js` at the site root (the orchestrator stories mock the
+ * Flow API through `msw-storybook-addon`).
  */
 const config: StorybookConfig = {
   framework: "@storybook/web-components-vite",

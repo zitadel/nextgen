@@ -38,10 +38,21 @@ configureZitadel({ proxyPath: window.location.origin, projectId: "storybook" });
 // it can already see the registration, which it cannot at that moment. Apply
 // the same remedy once the worker has started; the flag stops a reload loop if
 // the page stays uncontrolled.
+//
+// The worker script follows Vite's base. `storybook build` emits a relocatable
+// site (base `./`), which the hosted cloud serves under `/storybook/` (repo-root
+// vercel.json): the worker loads from there and its scope stays inside the
+// prefix, so it never intercepts the console's or login UI's requests. The dev
+// server and the Vitest browser runner have base `/`, so they keep loading
+// `/mockServiceWorker.js`.
 const RELOADED_FOR_CONTROL = "zitadel-storybook:msw-control-reload";
+const viteBase = (import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/";
 const startWorker = async () => {
   const worker = setupWorker();
-  await worker.start({ onUnhandledRequest: "bypass" });
+  await worker.start({
+    onUnhandledRequest: "bypass",
+    serviceWorker: { url: `${viteBase}mockServiceWorker.js` },
+  });
   if (navigator.serviceWorker.controller) {
     sessionStorage.removeItem(RELOADED_FOR_CONTROL);
   } else if (!sessionStorage.getItem(RELOADED_FOR_CONTROL)) {

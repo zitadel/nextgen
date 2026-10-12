@@ -12,7 +12,9 @@ orchestrators can be driven against `@zitadel/api-mock`. This is the workbench
 for the **login surface only**; console UI iterates on the console dev server
 (ADR 055). It is a dev tool, not a published npm package (`private`): it ships
 no package `dist`. It does build a static site into `dist/` via `storybook:build`
-— deployed to Vercel as a shared preview, and the `dist` output convention is in
+— deployed as the hosted cloud's `storybook` service at `/storybook/` (repo-root
+[`vercel.json`](../../vercel.json); production from `main`, a preview per branch
+that touches it), and the `dist` output convention is in
 [`apps/AGENTS.md`](../AGENTS.md). That build runs in CI (Vercel is a CI
 environment), as does `storybook:test`.
 
@@ -40,6 +42,12 @@ environment), as does `storybook:test`.
   stories give it handlers, through `parameters.msw`. The atoms make no
   requests, and the orchestrator stories are tagged `no-test` to keep network
   out of the test run.
+- **The static build is relocatable.** The cloud serves it under `/storybook/`,
+  on the same origin as the console and the login UI. Address files relative
+  to the page or to Vite's base, never from `/`. The MSW worker follows the
+  base (`.storybook/preview.ts`), which keeps its scope inside `/storybook/`:
+  a worker scoped to `/` would intercept the console's and the login UI's
+  requests.
 
 ## Orchestrator stories & the flow engine
 
