@@ -21,8 +21,7 @@ import (
 // `error.*`-prefixed step errors, so anything else renders verbatim (see
 // `localiseFlowErrorKeys` in
 // packages/components/src/orchestrator/liquid.ts). New emission sites
-// add a const here; [FlowStepErrorAllowed] and its contract test keep
-// the set honest.
+// add a const here; TestFlowStepErrorContract keeps the set honest.
 const (
 	// FlowStepErrorInvalidCredentials reports a rejected password
 	// proof. The client routes it inline to the password field
@@ -92,12 +91,6 @@ var unwiredOutcomeErrors = map[string]string{
 // property. The user may not change a verified value, and the account cannot
 // hold this one, so nothing is created and no step is shown to collect it.
 var errSSOClaimRejected = errors.New("flow state machine: the user schema rejects a verified unique claim")
-
-// FlowStepErrorAllowed reports whether a step error value honors the
-// client contract: a localizable `error.*` text key.
-func FlowStepErrorAllowed(key string) bool {
-	return strings.HasPrefix(key, "error.")
-}
 
 // UnwiredOutcomeError returns the step error an unwired outcome renders.
 func UnwiredOutcomeError(outcome string) string {

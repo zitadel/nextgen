@@ -3689,7 +3689,7 @@ func TestFlowStepErrorContract(t *testing.T) {
 		domain.FlowStepErrorOutcomeUnhandled,
 	}
 	for _, key := range stepErrorConsts {
-		assert.True(t, domain.FlowStepErrorAllowed(key), "step-error const %q must honor the contract", key)
+		assert.True(t, strings.HasPrefix(key, "error."), "step-error const %q must honor the contract", key)
 	}
 
 	challenges := []domain.FlowFieldChallenge{
@@ -3721,13 +3721,9 @@ func TestFlowStepErrorContract(t *testing.T) {
 	for _, field := range []string{"email", "x-auth-methods#password"} {
 		for _, rule := range rules {
 			key := domain.FlowFieldValidationError{Field: field, Rule: rule}.TextKey()
-			assert.True(t, domain.FlowStepErrorAllowed(key),
+			assert.True(t, strings.HasPrefix(key, "error."),
 				"validation key %q (field %q, rule %q) must honor the contract", key, field, rule)
 		}
-	}
-
-	for _, key := range []string{"auth_attempt.password_invalid", "password_invalid", domain.FlowImplicitOutcomeUserNotFound, ""} {
-		assert.False(t, domain.FlowStepErrorAllowed(key), "%q must not pass the contract", key)
 	}
 }
 
