@@ -5,6 +5,10 @@ type BeginUserPasskeyRegistrationRes interface {
 	beginUserPasskeyRegistrationRes()
 }
 
+type BuildReleaseRes interface {
+	buildReleaseRes()
+}
+
 type CompleteClaimRes interface {
 	completeClaimRes()
 }
@@ -109,10 +113,6 @@ type GetDeploymentByIdRes interface {
 	getDeploymentByIdRes()
 }
 
-type GetEnvironmentByNameRes interface {
-	getEnvironmentByNameRes()
-}
-
 type GetEventRes interface {
 	getEventRes()
 }
@@ -209,10 +209,6 @@ type ListDeploymentsRes interface {
 	listDeploymentsRes()
 }
 
-type ListEnvironmentsRes interface {
-	listEnvironmentsRes()
-}
-
 type ListEventsRes interface {
 	listEventsRes()
 }
@@ -283,6 +279,10 @@ type QueryUsersRes interface {
 
 type RevokeMySessionRes interface {
 	revokeMySessionRes()
+}
+
+type RevokeReleaseRes interface {
+	revokeReleaseRes()
 }
 
 type RevokeSessionRes interface {

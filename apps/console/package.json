@@ -5,6 +5,7 @@
     "node": "24.x"
   },
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -20,6 +21,8 @@
     "@tanstack/react-devtools": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-router-devtools": "catalog:",
+    "@vercel/analytics": "catalog:",
+    "@vercel/speed-insights": "catalog:",
     "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
     "@zitadel/config": "workspace:*",
