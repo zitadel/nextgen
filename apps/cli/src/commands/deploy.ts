@@ -13,6 +13,8 @@ import {
   validateStep,
   worktreeIsDirty,
 } from "../lib/release";
+import { ApiError } from "@zitadel/api/runtime/fetch";
+
 import { ZitadelError } from "../lib/errors";
 import { reportWarning } from "../lib/warnings";
 
@@ -132,11 +134,39 @@ export default class Deploy extends EnvironmentCommand {
       gitSha: await headSha(cwd),
       gitDirty,
     });
-    const deployment = await createDeployment(client, projectId, {
-      releaseId: release.id,
-      targets: origin ? [origin] : ["primary"],
-      message,
-    });
+
+    // What the targets serve right now, newest first. Its id guards the create
+    // against another deploy that raced in since we inspected: the server
+    // refuses with 409 rather than overwriting that deploy unseen (#538).
+    const liveQuery = { project_id: projectId, live: true, ...(origin ? { origin } : {}) };
+    const observed = (await client.listDeployments(liveQuery)).deployments[0]?.id;
+    const targets = origin ? [origin] : ["primary"];
+    let deployment: Awaited<ReturnType<typeof createDeployment>>;
+    try {
+      deployment = await createDeployment(client, projectId, {
+        releaseId: release.id,
+        targets,
+        message,
+        expectedDeploymentId: observed,
+      });
+    } catch (error) {
+      // A 409 means another deploy landed between our inspection and this
+      // create. Re-read what the targets serve now and report that actual
+      // deployment, so the caller re-runs against current state (#538).
+      if (!(error instanceof ApiError) || error.status !== 409) {
+        throw error;
+      }
+      const current = (await client.listDeployments(liveQuery)).deployments[0];
+      throw new ZitadelError(
+        "E_CONFLICT",
+        "Another deploy changed the targets since this one was prepared",
+        {
+          hint: "Re-run `zitadel deploy`; it will build and deploy against the current state.",
+          details: current === undefined ? undefined : { current_deployment: current },
+          nextCommands: ["zitadel deployment list --live"],
+        },
+      );
+    }
 
     const servedOrigins = deployment.targets.map((target) => target.origin);
     this.recordTelemetry({ origin_count: servedOrigins.length });
