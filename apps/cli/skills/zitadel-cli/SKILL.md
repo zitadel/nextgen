@@ -148,6 +148,12 @@ Each invocation prints one JSON object:
   (the origins it went live on) and `data.resources` (how many it pinned). A
   re-run on unchanged config returns the same digest. Use it to confirm what
   went live.
+- `preview` is `deploy` for a pull-request build: it deploys the release to the
+  build's preview URLs (from the platform, or `--origin`) for `--ttl` and emits
+  `data.previews` plus `data.release_env` (the `NEXT_PUBLIC_ZITADEL_RELEASE`
+  line to pin). It uses `ZITADEL_PREVIEW_TOKEN`, never the project secret, and
+  in a production build with no `--origin` it is a no-op. `preview list` and
+  `preview rm <url>` read and end live previews.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 
