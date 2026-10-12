@@ -63,6 +63,33 @@ export abstract class EnvironmentCommand extends BaseCommand {
   }
 
   /**
+   * The flags that reproduce this invocation's environment selection, as a
+   * suffix to append to a `zitadel` command this run suggests (e.g.
+   * ` --env production`). A retry the CLI prints must resolve the same server,
+   * project and credential this run did; without the selector it would fall
+   * back to the default environment and quietly target the wrong project.
+   *
+   * Only flags actually passed are reproduced: a name that came from
+   * `ZITADEL_ENV` or a platform signal needs none, because the next run in the
+   * same environment inherits it. `--env` and `--env-file` are mutually
+   * exclusive; `--server` (the URL only) can accompany either. Empty when the
+   * invocation used no selector.
+   */
+  protected environmentSelector(): string {
+    const { environment } = this;
+    const parts: string[] = [];
+    if (environment.envFile !== undefined) {
+      parts.push(`--env-file ${environment.envFile}`);
+    } else if (environment.name.source === "--env") {
+      parts.push(`--env ${environment.name.value}`);
+    }
+    if (environment.values.ZITADEL_URL?.source === "--server") {
+      parts.push(`--server ${environment.values.ZITADEL_URL.value}`);
+    }
+    return parts.length === 0 ? "" : ` ${parts.join(" ")}`;
+  }
+
+  /**
    * Open the platform connection, authenticated with this command's
    * credential. It fails, naming the variable, when the server, the project or
    * the credential is missing.
