@@ -9,18 +9,20 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Handler) CreateRelease(ctx context.Context, req api.CreateReleaseRequest, params api.CreateReleaseParams) (api.CreateReleaseRes, error) {
+// BuildRelease answers 501 until the release service can build from a
+// bundle. Without it the generated stub's sentinel is not a domain error and
+// maps to 500.
+func (h *Handler) BuildRelease(context.Context, *api.BuildReleaseRequest, api.BuildReleaseParams) (api.BuildReleaseRes, error) {
+	return nil, domain.ErrNotImplemented()
+}
+
+func (h *Handler) CreateRelease(ctx context.Context, req *api.CreateReleaseRequest, params api.CreateReleaseParams) (api.CreateReleaseRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), releaseAccess, opWrite); err != nil {
 		return nil, err
 	}
 
-	body, ok := req.GetCreateReleaseFromPointers()
-	if !ok {
-		return nil, domain.ErrReleaseInvalid(nil, nil).WithMessage("release: building a release from a bundle is not supported yet; send pointers")
-	}
-
-	pointers := make([]service.CreateReleasePointer, 0, len(body.Pointers))
-	for _, pointer := range body.Pointers {
+	pointers := make([]service.CreateReleasePointer, 0, len(req.Pointers))
+	for _, pointer := range req.Pointers {
 		kind, err := domain.ReleasePointerKindString(string(pointer.Kind))
 		if err != nil {
 			// Unreachable over HTTP — the wire enum is closed and the decoder
@@ -36,12 +38,12 @@ func (h *Handler) CreateRelease(ctx context.Context, req api.CreateReleaseReques
 	input := service.CreateReleaseInput{
 		ProjectID: string(params.ProjectID),
 		Pointers:  pointers,
-		GitDirty:  body.GitDirty.Or(false),
+		GitDirty:  req.GitDirty.Or(false),
 	}
-	if message, ok := body.Message.Get(); ok {
+	if message, ok := req.Message.Get(); ok {
 		input.Message = &message
 	}
-	if gitSHA, ok := body.GitSha.Get(); ok {
+	if gitSHA, ok := req.GitSha.Get(); ok {
 		input.GitSHA = &gitSHA
 	}
 

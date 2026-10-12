@@ -5,6 +5,10 @@ type BeginUserPasskeyRegistrationRes interface {
 	beginUserPasskeyRegistrationRes()
 }
 
+type BuildReleaseRes interface {
+	buildReleaseRes()
+}
+
 type CompleteClaimRes interface {
 	completeClaimRes()
 }

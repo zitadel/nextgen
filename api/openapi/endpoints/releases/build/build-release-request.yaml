@@ -1,8 +1,11 @@
-title: CreateReleaseFromBundle
+title: BuildReleaseRequest
 type: object
 description: |
-  A release built from the resources as authored on disk. Carries no
-  `pointers`.
+  The resources to build a release from, plus the metadata to record
+  alongside it.
+
+  `created_at` and `created_by` are derived server-side from the caller's
+  authentication context and are not accepted here.
 required:
   - bundle
 additionalProperties: false

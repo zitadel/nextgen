@@ -4,14 +4,14 @@ description: |
   endpoint would have answered, `code`, `message` and `details` unchanged,
   with the resource it belongs to.
 allOf:
-  - $ref: ../../components/error-details.yaml
+  - $ref: ../../../components/error-details.yaml
   - type: object
     required:
       - kind
       - index
     properties:
       kind:
-        $ref: ../../components/schemas/release-pointer-kind.yaml
+        $ref: ../../../components/schemas/release-pointer-kind.yaml
       index:
         type: integer
         minimum: 0

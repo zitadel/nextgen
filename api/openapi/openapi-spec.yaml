@@ -189,6 +189,8 @@ paths:
     $ref: endpoints/idps/revisions/by_id/methods.yaml
   /releases:
     $ref: endpoints/releases/methods.yaml
+  /releases/build:
+    $ref: endpoints/releases/build/methods.yaml
   /releases/{release_id}:
     $ref: endpoints/releases/by_id/methods.yaml
   /grants:

@@ -2,11 +2,7 @@ title: ConfigurationBundle
 type: object
 description: |
   The resources of a project's `.zitadel/` directory as authored on disk,
-  grouped by kind. The server turns the bundle into a release in one
-  transaction: for every resource it compares the content against the
-  project's newest revision of the same handle, reuses that revision when the
-  content matches and allocates a new one otherwise. The caller keeps no
-  state.
+  grouped by kind.
 
   Resources reference each other by handle: a flow definition's
   `user_schema` names a schema by its `objectType`. A reference resolves to
@@ -27,26 +23,41 @@ description: |
   pins: the resources the bundle carries plus those resolved from the
   project. The server refuses anything outside that with `rel.invalid`.
   Unknown keys are refused. More kinds join as they become release kinds.
-
-  Each resource is validated as its kind's create endpoint validates it,
-  and every failing resource is reported in one `rel.invalid`. Sending a
-  resource needs that kind's write scope, as creating it directly does.
 additionalProperties: false
 properties:
   schemas:
     type: array
     maxItems: 50
-    description: User schemas, one per `.zitadel/schemas/*.json`.
+    description: |
+      User schemas, one per `.zitadel/schemas/*.json`, in either form
+      `POST /schemas` takes.
+
+      An inline `user-schema` must not declare `$id`: a schema's `$id` is
+      its revision's identity, so a changed schema under the same `$id`
+      could never become a new revision. Such a schema gets a `rel.invalid`
+      entry.
+
+      A `schema-url` entry's handle is the `objectType` of the document the
+      URL serves. Its revision is identified by the URL, so the release
+      reuses the project's revision for a URL the project already holds and
+      fetches the document only for a URL it does not.
     items:
-      $ref: ../schemas/user-schema.yaml
+      oneOf:
+        - $ref: ../../schemas/user-schema.yaml
+        - $ref: ../../schemas/schema-url.yaml
+      discriminator:
+        propertyName: kind
+        mapping:
+          user-schema: ../../schemas/user-schema.yaml
+          schema-url: ../../schemas/schema-url.yaml
   flow_definitions:
     type: array
     maxItems: 50
     description: Flow definitions, one per `.zitadel/flows/*.json`.
     items:
-      $ref: ../../components/flows/flow-definition.yaml
+      $ref: ../../../components/flows/flow-definition.yaml
   branding:
-    $ref: ../../components/flows/branding.yaml
+    $ref: ../../../components/flows/branding.yaml
     description: |
       The descriptor from `.zitadel/branding/branding.json` with its template
       inlined, exactly as `POST /branding` takes it. A project has one

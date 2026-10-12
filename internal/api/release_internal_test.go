@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/go-faster/jx"
@@ -78,46 +79,31 @@ func TestReleaseAccessRow(t *testing.T) {
 	})
 }
 
-// Pins the request contract of POST /releases at the decoder: exactly one of
-// pointers and bundle, and a bundle that refuses unknown keys. A generator or
-// schema change that loosens either fails here rather than reaching the
-// handler.
-func TestCreateReleaseRequestShape(t *testing.T) {
+// Pins the request contract of POST /releases/build at the decoder: a closed
+// bundle with a single branding. A generator or schema change that loosens it
+// fails here rather than reaching the handler.
+func TestBuildReleaseRequestShape(t *testing.T) {
 	t.Parallel()
 
-	accepted := map[string]struct {
-		body string
-		want api.CreateReleaseRequestType
-	}{
-		"pointers": {
-			body: `{"pointers":[{"kind":"schema","revision_id":"sch_1"}]}`,
-			want: api.CreateReleaseFromPointersCreateReleaseRequest,
-		},
-		"bundle": {
-			body: `{"bundle":{"branding":{}}}`,
-			want: api.CreateReleaseFromBundleCreateReleaseRequest,
-		},
+	accepted := map[string]string{
+		"branding only": `{"bundle":{"branding":{}}}`,
 		// Every kind is optional, and a kind's array may be empty. An empty
 		// bundle as a whole is the server's to refuse, not the decoder's.
-		"bundle with an empty kind": {
-			body: `{"bundle":{"schemas":[],"flow_definitions":[]}}`,
-			want: api.CreateReleaseFromBundleCreateReleaseRequest,
-		},
+		"empty kinds": `{"bundle":{"schemas":[],"flow_definitions":[]}}`,
+		"schema url":  `{"bundle":{"schemas":[{"kind":"schema-url","url":"https://acme.example/human.json"}]}}`,
 	}
-	for name, tc := range accepted {
+	for name, body := range accepted {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			req, err := decodeCreateReleaseRequest(tc.body)
+			_, err := decodeBuildReleaseRequest(body)
 			require.NoError(t, err)
-			assert.Equal(t, tc.want, req.Type)
 		})
 	}
 
 	refused := map[string]string{
-		"both":               `{"pointers":[{"kind":"schema","revision_id":"sch_1"}],"bundle":{"branding":{}}}`,
-		"neither":            `{"message":"no content"}`,
+		"no bundle":          `{"message":"no content"}`,
+		"pointers":           `{"pointers":[{"kind":"schema","revision_id":"sch_1"}],"bundle":{"branding":{}}}`,
 		"unknown bundle key": `{"bundle":{"flowDefinitions":[{}]}}`,
-		"empty pointers":     `{"pointers":[]}`,
 		// A project has one branding: an array of them is refused at
 		// decoding, before it can be materialised element by element.
 		"branding as an array": `{"bundle":{"branding":[{},{}]}}`,
@@ -125,18 +111,26 @@ func TestCreateReleaseRequestShape(t *testing.T) {
 	for name, body := range refused {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			_, err := decodeCreateReleaseRequest(body)
+			_, err := decodeBuildReleaseRequest(body)
 			assert.Error(t, err)
 		})
 	}
 }
 
-// decodeCreateReleaseRequest runs what the server runs on a request body:
+// decodeBuildReleaseRequest runs what the server runs on a request body:
 // decode, then validate.
-func decodeCreateReleaseRequest(body string) (api.CreateReleaseRequest, error) {
-	var req api.CreateReleaseRequest
+func decodeBuildReleaseRequest(body string) (api.BuildReleaseRequest, error) {
+	var req api.BuildReleaseRequest
 	if err := req.Decode(jx.DecodeStr(body)); err != nil {
 		return req, err
 	}
 	return req, req.Validate()
+}
+
+// Pins build's answer until the service can build: 501, not the 500 the
+// generated stub's sentinel would map to.
+func TestBuildReleaseNotImplemented(t *testing.T) {
+	_, err := (&Handler{}).BuildRelease(t.Context(), &api.BuildReleaseRequest{}, api.BuildReleaseParams{})
+	require.Error(t, err)
+	assert.Equal(t, http.StatusNotImplemented, errorResponse(err).StatusCode)
 }

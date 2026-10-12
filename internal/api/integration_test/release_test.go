@@ -76,9 +76,8 @@ func (f releaseFixture) pointers() []api.CreateReleasePointer {
 	}
 }
 
-func (f releaseFixture) create(t *testing.T, body *api.CreateReleaseFromPointers) api.CreateReleaseRes {
+func (f releaseFixture) create(t *testing.T, req *api.CreateReleaseRequest) api.CreateReleaseRes {
 	t.Helper()
-	req := api.NewCreateReleaseFromPointersCreateReleaseRequest(*body)
 	resp, err := f.client.CreateRelease(t.Context(), req, api.CreateReleaseParams{
 		ProjectID: api.ProjectID(f.project),
 	})
@@ -94,7 +93,7 @@ func TestCreateRelease(t *testing.T) {
 
 	fixture := newReleaseFixture(t)
 
-	resp := fixture.create(t, &api.CreateReleaseFromPointers{
+	resp := fixture.create(t, &api.CreateReleaseRequest{
 		Pointers: fixture.pointers(),
 		Message:  api.NewOptString("initial import"),
 		GitSha:   api.NewOptString("4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7"),
@@ -132,7 +131,7 @@ func TestCreateRelease(t *testing.T) {
 	// content under a new message resolves to the release that already pins it
 	// rather than creating a second one.
 	t.Run("re-submitting the same set returns the existing release", func(t *testing.T) {
-		resp := fixture.create(t, &api.CreateReleaseFromPointers{
+		resp := fixture.create(t, &api.CreateReleaseRequest{
 			Pointers: fixture.pointers(),
 			Message:  api.NewOptString("a different message entirely"),
 		})
@@ -156,7 +155,7 @@ func TestCreateRelease(t *testing.T) {
 		next := publishBranding(t, fixture.client, fixture.project,
 			`<zl-page-shell data-rev="2">{% mandatory_gates %}</zl-page-shell>`)
 
-		resp := fixture.create(t, &api.CreateReleaseFromPointers{
+		resp := fixture.create(t, &api.CreateReleaseRequest{
 			Pointers: []api.CreateReleasePointer{
 				{Kind: api.ReleasePointerKindSchema, RevisionID: fixture.schemaURL},
 				{Kind: api.ReleasePointerKindFlowDefinition, RevisionID: fixture.flowdefID},
@@ -170,16 +169,16 @@ func TestCreateRelease(t *testing.T) {
 	// The endpoint pins revisions, it does not create them, so a revision the
 	// project does not hold is the caller's mistake about their own project.
 	t.Run("pinning a revision that does not exist is rejected", func(t *testing.T) {
-		resp := fixture.create(t, &api.CreateReleaseFromPointers{
+		resp := fixture.create(t, &api.CreateReleaseRequest{
 			Pointers: []api.CreateReleasePointer{
 				{Kind: api.ReleasePointerKindFlowDefinition, RevisionID: "flowdef_does_not_exist"},
 			},
 		})
-		// createRelease declares 400, so the type is the status assertion.
-		require.IsType(t, &api.CreateReleaseBadRequest{}, resp, "unexpected response: %s", helpers.MustMarshal(t, resp))
-		bad := resp.(*api.CreateReleaseBadRequest)
-		assert.Equal(t, api.ErrorCode(domain.ErrReleaseRevisionNotFound(nil).Code), bad.Code)
-		assert.NotEmpty(t, bad.Message)
+		status, code, message, ok := errorResponseParts(t, resp)
+		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, resp))
+		assert.Equal(t, http.StatusBadRequest, status)
+		assert.Equal(t, domain.ErrReleaseRevisionNotFound(nil).Code, code)
+		assert.NotEmpty(t, message)
 	})
 
 	// A release describes one state of the project, so it cannot hold two
@@ -189,14 +188,16 @@ func TestCreateRelease(t *testing.T) {
 		second := publishBranding(t, fixture.client, fixture.project,
 			`<zl-page-shell data-rev="3">{% mandatory_gates %}</zl-page-shell>`)
 
-		resp := fixture.create(t, &api.CreateReleaseFromPointers{
+		resp := fixture.create(t, &api.CreateReleaseRequest{
 			Pointers: []api.CreateReleasePointer{
 				{Kind: api.ReleasePointerKindBranding, RevisionID: fixture.brandingID},
 				{Kind: api.ReleasePointerKindBranding, RevisionID: second},
 			},
 		})
-		require.IsType(t, &api.CreateReleaseBadRequest{}, resp, "unexpected response: %s", helpers.MustMarshal(t, resp))
-		assert.Equal(t, api.ErrorCode(domain.ErrReleaseInvalid(nil, nil).Code), resp.(*api.CreateReleaseBadRequest).Code)
+		status, code, _, ok := errorResponseParts(t, resp)
+		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, resp))
+		assert.Equal(t, http.StatusBadRequest, status)
+		assert.Equal(t, domain.ErrReleaseInvalid(nil, nil).Code, code)
 	})
 
 	// Both size bounds are sent raw rather than through the generated client,
@@ -256,13 +257,15 @@ func TestCreateReleaseCannotPinAnotherProjectsRevision(t *testing.T) {
 	mine := newReleaseFixture(t)
 	theirs := newReleaseFixture(t)
 
-	resp := mine.create(t, &api.CreateReleaseFromPointers{
+	resp := mine.create(t, &api.CreateReleaseRequest{
 		Pointers: []api.CreateReleasePointer{
 			{Kind: api.ReleasePointerKindBranding, RevisionID: theirs.brandingID},
 		},
 	})
-	require.IsType(t, &api.CreateReleaseBadRequest{}, resp, "unexpected response: %s", helpers.MustMarshal(t, resp))
-	assert.Equal(t, api.ErrorCode(domain.ErrReleaseRevisionNotFound(nil).Code), resp.(*api.CreateReleaseBadRequest).Code)
+	status, code, _, ok := errorResponseParts(t, resp)
+	require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, resp))
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Equal(t, domain.ErrReleaseRevisionNotFound(nil).Code, code)
 }
 
 func TestCreateReleaseUnauthenticated(t *testing.T) {
@@ -271,12 +274,11 @@ func TestCreateReleaseUnauthenticated(t *testing.T) {
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
 
-	req := api.NewCreateReleaseFromPointersCreateReleaseRequest(api.CreateReleaseFromPointers{
+	resp, err := client.CreateRelease(t.Context(), &api.CreateReleaseRequest{
 		Pointers: []api.CreateReleasePointer{
 			{Kind: api.ReleasePointerKindBranding, RevisionID: "brnd_1234"},
 		},
-	})
-	resp, err := client.CreateRelease(t.Context(), req, api.CreateReleaseParams{ProjectID: "proj_1234"})
+	}, api.CreateReleaseParams{ProjectID: "proj_1234"})
 	require.NoError(t, err)
 	status, code, _, ok := errorResponseParts(t, resp)
 	require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, resp))
