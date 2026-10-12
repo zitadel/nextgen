@@ -105,7 +105,7 @@ func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
 			Return(false, new(database.ForeignKeyError))
 
 		_, err := svc.Create(t.Context(), deploymentInput())
-		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid(nil, nil).Code)
+		assertServiceDomainCode(t, err, domain.ErrReleaseNotFound().Code)
 	})
 
 	// The conflict is raised inside the statement with its details attached;

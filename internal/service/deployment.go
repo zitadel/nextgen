@@ -105,15 +105,21 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 		return emitDeploymentCreated(ctx, tx.Statements(), entity)
 	})
 	if err != nil {
-		// The project row is locked first, so a missing one surfaces here
-		// rather than as a constraint violation.
+		// Both are backstops for a project or release that went away after
+		// the caller resolved it. Each maps to one cause because of how the
+		// statement is built, so a new read or foreign key there has to be
+		// reflected here.
+		//
+		// The only read that can find nothing is the project lock: the
+		// newest deployment it reads next is named by rows under that lock.
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrProjectNotFound()
 		}
-		// The release reference is the one foreign key a caller can trip:
-		// the project was already locked.
+		// The only foreign key a caller can trip is the release: the
+		// project is locked, the targets name the deployment just written,
+		// and the previews name the locked project.
 		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
-			return nil, domain.ErrDeploymentInvalid("release not found in this project", err)
+			return nil, domain.ErrReleaseNotFound()
 		}
 		if de, ok := errors.AsType[domain.Error](err); ok {
 			return nil, de
