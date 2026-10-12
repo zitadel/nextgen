@@ -15,6 +15,10 @@ const mono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
+// Unset reports every page load; next.config.mjs rejects a value outside 0–1.
+// Web Analytics has no sampling and counts every page view.
+const speedInsightsSampleRate = Number(process.env.DOCS_SPEED_INSIGHTS_SAMPLE_RATE || 1);
+
 export default function Layout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geist.variable} ${mono.variable}`} suppressHydrationWarning>
@@ -26,7 +30,9 @@ export default function Layout({ children }: LayoutProps<"/">) {
           {children}
         </RootProvider>
         <Analytics />
-        <SpeedInsights />
+        {/* The package reads a rate of 0 as unset, which would send every
+            page load. */}
+        {speedInsightsSampleRate > 0 && <SpeedInsights sampleRate={speedInsightsSampleRate} />}
       </body>
     </html>
   );
