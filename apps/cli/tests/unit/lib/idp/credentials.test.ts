@@ -5,20 +5,22 @@ import { republishCommand, republishCommands } from "../../../../src/lib/idp";
 const VERSION = "1.0.0-alpha.23";
 
 describe("the recovery command for a credential", () => {
-  it("names the owner, without which every variables command refuses", () => {
-    // `variables set NAME` alone fails with "Name the owner: --project-level"
-    // before making a request, so the recovery step would repair nothing.
-    expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION)).toContain("--project-level");
+  it("is the project-level set the engine resolves the credential from", () => {
+    // The project is the only owner a `variable set` without `--preview`
+    // addresses, which is where the engine resolves a connection's reference.
+    expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION)).toContain(
+      "variable set GOOGLE_CLIENT_ID",
+    );
   });
 
   it("is runnable rather than a bare subcommand", () => {
     // A JSON result is read by agents, which execute these as shell commands.
-    expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION)).toMatch(/^npx .+ variables set /);
+    expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION)).toMatch(/^npx .+ variable set /);
   });
 
   it("marks a secret as one, so the value is not stored in the clear", () => {
     expect(republishCommand("GOOGLE_CLIENT_SECRET", true, VERSION)).toContain(
-      "variables set GOOGLE_CLIENT_SECRET --project-level --secret",
+      "variable set GOOGLE_CLIENT_SECRET --secret",
     );
     expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION)).not.toContain("--secret");
   });
@@ -47,7 +49,7 @@ describe("the recovery commands a result carries", () => {
     );
 
     expect(commands).toHaveLength(1);
-    expect(commands[0]).toContain("variables set GOOGLE_CLIENT_SECRET --project-level --secret");
+    expect(commands[0]).toContain("variable set GOOGLE_CLIENT_SECRET --secret");
   });
 
   it("covers a deferred publish, not just a failed one", () => {
