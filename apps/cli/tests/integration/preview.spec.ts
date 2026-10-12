@@ -42,14 +42,7 @@ describe("preview", () => {
         const app = await aSetUpApp();
         await app.addOrigin(PREVIEW_PATTERN, "preview");
 
-        const result = await app.run([
-          "preview",
-          "--origin",
-          PREVIEW_URL,
-          "--ttl",
-          "1d",
-          "--json",
-        ]);
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--ttl", "1d", "--json"]);
 
         expect(result).toSucceed();
         const data = app.envelopeOf<{
@@ -71,9 +64,9 @@ describe("preview", () => {
 
         expect(listed).toSucceed();
         expect(
-          app.envelopeOf<{ previews: { origin: string }[] }>(listed).data.previews.map(
-            (preview) => preview.origin,
-          ),
+          app
+            .envelopeOf<{ previews: { origin: string }[] }>(listed)
+            .data.previews.map((preview) => preview.origin),
         ).toEqual([PREVIEW_URL]);
       });
 

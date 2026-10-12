@@ -53,9 +53,9 @@ describe("preview list", () => {
 
         expect(result).toSucceed();
         expect(
-          app.envelopeOf<{ previews: { origin: string }[] }>(result).data.previews.map(
-            (preview) => preview.origin,
-          ),
+          app
+            .envelopeOf<{ previews: { origin: string }[] }>(result)
+            .data.previews.map((preview) => preview.origin),
         ).toEqual([PREVIEW_URL]);
       });
     });

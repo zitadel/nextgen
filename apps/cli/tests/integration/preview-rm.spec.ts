@@ -64,13 +64,7 @@ describe("preview rm", () => {
       it("requires --force when non-interactive", async () => {
         const app = await anAppWithAPreview();
 
-        const result = await app.run([
-          "preview",
-          "rm",
-          PREVIEW_URL,
-          "--non-interactive",
-          "--json",
-        ]);
+        const result = await app.run(["preview", "rm", PREVIEW_URL, "--non-interactive", "--json"]);
 
         expect(result).toFailWith("E_VALIDATION");
       });
