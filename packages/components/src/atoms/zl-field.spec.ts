@@ -51,7 +51,9 @@ describe("<zl-field> aria wiring", () => {
   });
 
   it("keeps the error icon on a read-only field", async () => {
-    const field = mount(`<zl-field name="email" value="alice@acme.com" readonly error="Taken"></zl-field>`);
+    const field = mount(
+      `<zl-field name="email" value="alice@acme.com" readonly error="Taken"></zl-field>`,
+    );
     await field.updateComplete;
     expect(field.shadowRoot?.querySelector('[part="trailing-icon"]')).not.toBeNull();
   });
