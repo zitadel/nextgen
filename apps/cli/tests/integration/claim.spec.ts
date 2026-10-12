@@ -64,6 +64,26 @@ describe("claim", () => {
 
         expect(result).toFail();
       });
+
+      it("targets the project the environment resolves, not the fallback secret", async () => {
+        const app = await aSetUpApp();
+        await app.bindEnvironment("production", {
+          ZITADEL_URL: "https://prod.example",
+          ZITADEL_PROJECT_ID: "proj_prod",
+          ZITADEL_PROJECT_SECRET: "sk_prod",
+        });
+
+        const result = await app.run([
+          "claim",
+          "--env",
+          "production",
+          "--no-open",
+          "--dry-run",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf<{ project_id: string }>(result).data.project_id).toBe("proj_prod");
+      });
     });
 
     it("claims the project once the challenge is completed", async () => {

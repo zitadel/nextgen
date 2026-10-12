@@ -60,13 +60,11 @@ type Project = { id: string; project_secret: string };
  * written. Going through the API rather than poking the store keeps the
  * project secret and the store in agreement, which `claim/init` checks.
  */
-async function makeProject(overrides: Record<string, unknown> = {}): Promise<{
-  cwd: string;
-  project: Project;
-}> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
-  tempDirs.push(cwd);
-
+/**
+ * Creates a project through the mock's own create endpoint (msw intercepts the
+ * fetch) so its secret and the store agree — `claim/init` checks that.
+ */
+async function createProjectOnMock(): Promise<Project> {
   const response = await fetch(`${SERVER}/projects`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -79,6 +77,17 @@ async function makeProject(overrides: Record<string, unknown> = {}): Promise<{
   if (typeof project.project_secret !== "string") {
     throw new Error(`mock POST /projects returned no project_secret: ${JSON.stringify(project)}`);
   }
+  return project;
+}
+
+async function makeProject(overrides: Record<string, unknown> = {}): Promise<{
+  cwd: string;
+  project: Project;
+}> {
+  const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
+  tempDirs.push(cwd);
+
+  const project = await createProjectOnMock();
 
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeSecret(cwd, {
@@ -353,6 +362,63 @@ describe("claim", () => {
     expect(snapshotPlatformStore().claimChallengeIds).toEqual([]);
     expect(snapshotPlatformStore().claims).toBe(0);
     expect((await readSecret(cwd)).team_id).toBeUndefined();
+  });
+
+  it("claims the project the resolved environment names, not the fallback secret", async () => {
+    const { cwd, project: fallback } = await makeProject();
+    const envProject = await createProjectOnMock();
+    await writeFile(
+      join(cwd, ".env.production.local"),
+      [
+        `ZITADEL_URL=${SERVER}`,
+        `ZITADEL_PROJECT_ID=${envProject.id}`,
+        `ZITADEL_PROJECT_SECRET=${envProject.project_secret}`,
+        "",
+      ].join("\n"),
+      { mode: 0o600 },
+    );
+
+    const [res] = await Promise.all([
+      claim(cwd, ["--env", "production"]),
+      onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, envProject.id)),
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { status: string; data: { project_id: string } };
+    expect(json.status).toBe("ok");
+    expect(json.data.project_id).toBe(envProject.id);
+    // The fallback `.zitadel/secret` describes a different project, so it must
+    // not be marked claimed — that would conflate the two environments.
+    const secret = await readSecret(cwd);
+    expect(secret.project_id).toBe(fallback.id);
+    expect(secret.team_id).toBeUndefined();
+    expect(secret.claimed_at).toBeUndefined();
+  });
+
+  it("claims from an env file with no local secret present", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
+    tempDirs.push(cwd);
+    const envProject = await createProjectOnMock();
+    const file = join(cwd, "prod.env");
+    await writeFile(
+      file,
+      [
+        `ZITADEL_URL=${SERVER}`,
+        `ZITADEL_PROJECT_ID=${envProject.id}`,
+        `ZITADEL_PROJECT_SECRET=${envProject.project_secret}`,
+        "",
+      ].join("\n"),
+    );
+
+    const [res] = await Promise.all([
+      runCliForTest(["claim", "--cwd", cwd, "--json", "--no-open", "--env-file", file]),
+      onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, envProject.id)),
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { status: string; data: { project_id: string } };
+    expect(json.status).toBe("ok");
+    expect(json.data.project_id).toBe(envProject.id);
   });
 
   describe("--server local", () => {

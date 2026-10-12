@@ -79,6 +79,20 @@ describe("status", () => {
         expect(data.next_actions.join("\n")).toContain("register a user");
       });
 
+      it("reports the project the environment resolves under --env", async () => {
+        const app = await aSetUpApp();
+        await app.bindEnvironment("production", {
+          ZITADEL_URL: "https://prod.example",
+          ZITADEL_PROJECT_ID: "proj_prod",
+        });
+
+        const result = await app.run(["status", "--env", "production", "--json"]);
+
+        expect(
+          app.envelopeOf<{ project: { project_id: string } }>(result).data.project.project_id,
+        ).toBe("proj_prod");
+      });
+
       it("calls config pointing at a project that no longer exists orphaned", async () => {
         const app = await anApp();
         await app.writeConfig({
