@@ -50,10 +50,12 @@ Any `NEXTGEN_*` variable overrides a default.
   Vercel Authentication, and a pull request from a fork deploys only after
   a team member approves it. A preview still runs its branch's code against
   a copy of production's data.
-- **Cleanup:** `.github/workflows/neon-preview-cleanup.yml` deletes
-  `preview/<branch>` when the pull request closes or the branch is deleted.
-  Without it Neon only deletes the branch once Vercel deletes the
-  deployment, which its retention policy delays by months.
+- **Cleanup:** Neon deletes a preview's branch when Vercel deletes the
+  branch's last preview deployment, which follows the project's retention
+  policy for preview deployments (Settings → Security → Deployment
+  Retention Policy). Vercel never deletes the latest preview of a branch
+  whose pull request is open, nor the 20 newest ready previews, so the
+  branch of a merged pull request goes once it has aged out of both.
 
 ## One-time setup
 
@@ -70,10 +72,6 @@ In Vercel → Storage → `nextgen`:
    Preview. Under Advanced Options → Deployments Configuration turn on
    **Required → Preview** and **Resource must be active before
    deployment**. That is what creates a branch per preview.
-3. **Cleanup credentials:** create an organization API key in the Neon
-   console (organization "Vercel: zitadel" → Settings → API keys). In
-   GitHub, add it as the repository secret `NEON_API_KEY` and the project id
-   `spring-sound-94380481` as the repository variable `NEON_PROJECT_ID`.
 
 ### 2. Master key
 
