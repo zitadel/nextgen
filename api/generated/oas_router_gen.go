@@ -20,13 +20,7 @@ var (
 	rn69AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
-<<<<<<< HEAD
 	rn90AllowedHeaders = map[string]string{
-||||||| merged common ancestors
-	rn92AllowedHeaders = map[string]string{
-=======
-	rn88AllowedHeaders = map[string]string{
->>>>>>> origin/feat/cli-origin-commands
 		"POST": "Authorization,Content-Type,Idempotency-Key",
 	}
 	rn18AllowedHeaders = map[string]string{
@@ -46,61 +40,9 @@ var (
 	rn42AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
-<<<<<<< HEAD
 	rn84AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
-||||||| merged common ancestors
-	rn13AllowedHeaders = map[string]string{
-		"POST": "Authorization,Content-Type",
-	}
-	rn78AllowedHeaders = map[string]string{
-		"POST": "Authorization,Content-Type",
-	}
-	rn26AllowedHeaders = map[string]string{
-		"DELETE": "Authorization",
-		"GET":    "Authorization",
-	}
-	rn17AllowedHeaders = map[string]string{
-		"POST": "Authorization,Content-Type",
-	}
-	rn79AllowedHeaders = map[string]string{
-		"POST": "Authorization,Content-Type",
-	}
-	rn54AllowedHeaders = map[string]string{
-		"GET": "Authorization",
-	}
-	rn52AllowedHeaders = map[string]string{
-=========
-	rn44AllowedHeaders = map[string]string{
-		"GET": "Authorization",
-	}
-	rn13AllowedHeaders = map[string]string{
-		"POST": "Authorization,Content-Type",
-	}
-	rn74AllowedHeaders = map[string]string{
-		"POST": "Authorization,Content-Type",
-	}
-	rn26AllowedHeaders = map[string]string{
-		"DELETE": "Authorization",
-		"GET":    "Authorization",
-	}
-	rn17AllowedHeaders = map[string]string{
-		"POST": "Authorization,Content-Type",
-	}
-	rn75AllowedHeaders = map[string]string{
-		"POST": "Authorization,Content-Type",
-	}
-	rn51AllowedHeaders = map[string]string{
-		"GET": "Authorization",
-	}
-	rn49AllowedHeaders = map[string]string{
->>>>>>>>> Temporary merge branch 2
-		"GET": "Authorization",
-	}
-	rn69AllowedHeaders = map[string]string{
-=======
->>>>>>> origin/feat/cli-origin-commands
 	rn70AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
@@ -110,14 +52,7 @@ var (
 	rn13AllowedHeaders = map[string]string{
 		"POST": "Content-Type",
 	}
-<<<<<<< HEAD
 	rn87AllowedHeaders = map[string]string{
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-	rn89AllowedHeaders = map[string]string{
-=======
-	rn85AllowedHeaders = map[string]string{
->>>>>>> origin/feat/cli-origin-commands
 		"POST": "Content-Type,Origin",
 	}
 	rn14AllowedHeaders = map[string]string{
@@ -241,13 +176,7 @@ var (
 	rn35AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
-<<<<<<< HEAD
 	rn86AllowedHeaders = map[string]string{
-||||||| merged common ancestors
-	rn88AllowedHeaders = map[string]string{
-=======
-	rn84AllowedHeaders = map[string]string{
->>>>>>> origin/feat/cli-origin-commands
 		"PUT": "Authorization,Content-Type",
 	}
 	rn75AllowedHeaders = map[string]string{
@@ -451,19 +380,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 										default:
 											s.notAllowed(w, r, notAllowedParams{
 												allowedMethods: "POST",
-<<<<<<< HEAD
 												allowedHeaders: rn90AllowedHeaders,
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-												allowedHeaders: rn92AllowedHeaders,
-||||||||| c205f49fa
-												allowedHeaders: rn89AllowedHeaders,
-=========
-												allowedHeaders: rn85AllowedHeaders,
->>>>>>>>> Temporary merge branch 2
-=======
-												allowedHeaders: rn88AllowedHeaders,
->>>>>>> origin/feat/cli-origin-commands
 												acceptPost:     "application/json",
 												acceptPatch:    "",
 											})
@@ -804,19 +721,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "POST",
-<<<<<<< HEAD
 									allowedHeaders: rn87AllowedHeaders,
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-									allowedHeaders: rn89AllowedHeaders,
-||||||||| c205f49fa
-									allowedHeaders: rn86AllowedHeaders,
-=========
-									allowedHeaders: rn82AllowedHeaders,
->>>>>>>>> Temporary merge branch 2
-=======
-									allowedHeaders: rn85AllowedHeaders,
->>>>>>> origin/feat/cli-origin-commands
 									acceptPost:     "application/json",
 									acceptPatch:    "",
 								})
@@ -2261,19 +2166,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 									default:
 										s.notAllowed(w, r, notAllowedParams{
 											allowedMethods: "PUT",
-<<<<<<< HEAD
 											allowedHeaders: rn86AllowedHeaders,
-||||||| merged common ancestors
-<<<<<<<<< Temporary merge branch 1
-											allowedHeaders: rn88AllowedHeaders,
-||||||||| c205f49fa
-											allowedHeaders: rn85AllowedHeaders,
-=========
-											allowedHeaders: rn81AllowedHeaders,
->>>>>>>>> Temporary merge branch 2
-=======
-											allowedHeaders: rn84AllowedHeaders,
->>>>>>> origin/feat/cli-origin-commands
 											acceptPost:     "",
 											acceptPatch:    "",
 										})
