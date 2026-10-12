@@ -71,6 +71,11 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // endpoints are never called by the CLI.
   createSchema: "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
   createBranding: "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
+  // `deploy` builds a release from the `.zitadel/` bundle via `buildRelease`
+  // (`POST /releases/build`); pinning pre-existing revision ids with
+  // `createRelease` is not a CLI flow.
+  createRelease:
+    "the CLI builds from a bundle via buildRelease, not by pinning revision ids (ADR 035)",
   createFlowDefinition:
     "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
 

@@ -40,6 +40,40 @@ func (UnimplementedHandler) BeginUserPasskeyRegistration(ctx context.Context, re
 	return r, ht.ErrNotImplemented
 }
 
+// BuildRelease implements buildRelease operation.
+//
+// Builds a release from the resources of `.zitadel/` as authored on disk,
+// grouped by kind, in one transaction: a failure anywhere leaves no
+// revision and no release. The caller records nothing.
+// If the project already holds a release with the same content, the same
+// `content_hash`, the request answers `200` with that release and
+// allocates nothing, however long ago it was built. Otherwise every resource is compared against the
+// project's newest revision of the same handle: unchanged content reuses
+// that revision, changed content allocates a new one, and the request
+// answers `201` with the new release. Metadata is excluded from the
+// comparison, so the same content under a different `message` is the same
+// release.
+// A structurally malformed request is refused while decoding with
+// `req.invalid`, naming the offending fields. A well-formed bundle is then
+// checked resource by resource, as each kind's create endpoint checks it,
+// and every failure is reported at once: the request answers `400` with
+// `rel.invalid`, and `details.resources` lists each resource that failed.
+// A handle that resolves neither in the bundle nor in the project answers
+// `rel.unresolved_reference`, naming the pointer and the handle.
+// Building writes revisions, so besides `release.write` it needs the write
+// scope of every kind the bundle carries a resource of: `schema.write`,
+// `flow_definition.write`, `branding.write` and `idp.write`, as the
+// per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
+// naming the kind. An empty kind needs no scope.
+// Building a release does not deploy it. A release is not tied to an
+// origin, and the same release can later be deployed to any number of
+// origins unchanged.
+//
+// POST /releases/build
+func (UnimplementedHandler) BuildRelease(ctx context.Context, req *BuildReleaseRequest, params BuildReleaseParams) (r BuildReleaseRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CompleteClaim implements completeClaim operation.
 //
 // Called by the browser after the developer authenticates on the claim page.
@@ -232,50 +266,32 @@ func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjec
 
 // CreateRelease implements createRelease operation.
 //
-// Assembles a release from exactly one of two body shapes.
-// `pointers` pins revisions that already exist, supplied as
-// `(kind, revision_id)` pairs. No new revisions are allocated — use the
-// per-kind create endpoints for that, then pin the ids here. Every
-// referenced `revision_id` must exist in the project; each one's handle is
-// read from the revision itself and recorded on the release, so a resource
-// is always pinned under the identity it declares.
-// `bundle` takes the resources of `.zitadel/` as authored on disk, grouped
-// by kind. For every resource the server compares the content against the
-// project's newest revision of the same handle: unchanged content reuses
-// that revision, changed content allocates a new one. Construction is one
-// transaction — a failure anywhere leaves no revision and no release. The
-// caller records nothing. An empty bundle is refused.
-// Every resource in a bundle is validated as its kind's create endpoint
-// validates it, and every failure is reported at once rather than only the
-// first: the request answers `400` with `rel.invalid`, and
-// `details.resources` lists each resource that failed.
-// `pointers` needs `release.write`. A bundle also writes revisions, so it
-// needs, in addition, the write scope of every kind it carries a resource
-// of — `schema.write`, `flow_definition.write` and `branding.write`, as the
-// per-kind create endpoints do. A missing scope answers `403` with
-// `rel.permission_denied`, naming the kind. An empty kind needs no scope.
-// Both shapes are closed the same way: every handle a pinned resource
-// references — a flow definition's `user_schema` naming a schema by
-// `objectType` — must be pinned by the same release. A bundle may leave a
-// referenced resource out when the project already holds it; the release
-// then pins the project's newest revision of that handle, so only a bundle
-// that carries everything it references builds the same release on any
-// project. A handle that resolves nowhere refuses the request with
-// `rel.unresolved_reference`. The message names the pointer
-// and the handle that did not resolve, for example
+// Assembles a release from revisions that already exist, supplied as
+// `(kind, revision_id)` pairs. No new revisions are allocated: to build a
+// release from the files on disk, use `POST /releases/build`, which
+// allocates them.
+// Every referenced `revision_id` must exist in the project. Each one's
+// handle is read from the revision itself and recorded on the release, so a
+// resource is always pinned under the identity it declares.
+// Every handle a pinned resource references, such as a flow definition's
+// `user_schema` naming a schema by `objectType`, or a flow step's
+// `sso_providers` naming IDP connections by `slug`, must be pinned by the
+// same release. A handle the release does not pin refuses the request with
+// `rel.unresolved_reference`. The message names the pointer and the handle
+// that did not resolve, for example
 // `flow_definition default-login: user_schema human-user not found`,
 // because a release pins many and the code alone does not say which one
 // failed.
-// Idempotent on content: the content digest excludes metadata, so
-// re-submitting the same content with a different `message` answers `200`
-// with the release that already has it rather than creating a second one.
-// A release the project did not hold before answers `201`.
+// Idempotent on the pinned set: metadata is excluded from the comparison,
+// so re-submitting the same revisions with a different `message` answers
+// `200` with the release that already pins them rather than creating a
+// second one. A release the project did not hold before answers `201`.
 // Creating a release does not deploy it. A release is not tied to an
 // origin, and the same release can later be deployed to any number of
 // origins unchanged.
 //
 // POST /releases
-func (UnimplementedHandler) CreateRelease(ctx context.Context, req CreateReleaseRequest, params CreateReleaseParams) (r CreateReleaseRes, _ error) {
+func (UnimplementedHandler) CreateRelease(ctx context.Context, req *CreateReleaseRequest, params CreateReleaseParams) (r CreateReleaseRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

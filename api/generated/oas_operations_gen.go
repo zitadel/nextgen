@@ -8,6 +8,7 @@ type OperationName = string
 const (
 	AddOriginOperation                     OperationName = "AddOrigin"
 	BeginUserPasskeyRegistrationOperation  OperationName = "BeginUserPasskeyRegistration"
+	BuildReleaseOperation                  OperationName = "BuildRelease"
 	CompleteClaimOperation                 OperationName = "CompleteClaim"
 	CreateAuthAttemptOperation             OperationName = "CreateAuthAttempt"
 	CreateBrandingOperation                OperationName = "CreateBranding"

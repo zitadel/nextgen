@@ -47,6 +47,8 @@ import {
   CreateIdpBody,
   CreateIdpQueryParams,
   CreateIdpResponse,
+  BuildReleaseBody,
+  BuildReleaseQueryParams,
   CreateDeploymentBody,
   CreateDeploymentQueryParams,
   CreateProjectBody,
@@ -1319,6 +1321,41 @@ function deploymentResponse(
   return body;
 }
 
+/**
+ * Create-or-dedup a release: an existing release with the same content answers
+ * 200 and allocates nothing; otherwise a new record is written and answers 201.
+ * `makePointers` is deferred so a bundle only materialises revisions when the
+ * release is new, not on a deduped resubmission.
+ */
+function upsertRelease(
+  projectId: string,
+  digest: string,
+  makePointers: () => ReleasePointer[],
+  data: Record<string, unknown>,
+) {
+  const existing = [...store.releases.values()].find(
+    (release) => release.projectId === projectId && release.contentHash === digest,
+  );
+  if (existing) {
+    return HttpResponse.json(releaseResponse(existing), { status: 200 });
+  }
+  const id = `rel_${shortId()}`;
+  const record: ReleaseRecord = {
+    id,
+    projectId,
+    contentHash: digest,
+    pointers: makePointers(),
+    message: typeof data.message === "string" ? data.message : null,
+    gitSha: typeof data.git_sha === "string" ? data.git_sha : null,
+    gitDirty: data.git_dirty === true,
+    createdAt: nowIso(),
+    revokedAt: null,
+    seq: ++store.lastSeq,
+  };
+  store.releases.set(id, record);
+  return HttpResponse.json(releaseResponse(record), { status: 201 });
+}
+
 export function setupPlatformHandlers() {
   return [
     http.post("*/projects", async ({ request }) => {
@@ -1494,6 +1531,53 @@ export function setupPlatformHandlers() {
     // The content digest dedupes a re-submission; revoke blocks it from ever
     // being served again. The Go handlers are unimplemented stubs.
 
+    // `POST /releases/build` — the CLI's path: build a release from the
+    // `.zitadel/` bundle, reusing matching revisions and allocating the rest.
+    http.post("*/releases/build", async ({ request }) => {
+      const query = parse(BuildReleaseQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(BuildReleaseBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+      const project = store.projects.get(query.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("rel.project_not_found", "release: project not found"), {
+          status: 404,
+        });
+      }
+      const data = body.data as Record<string, unknown>;
+      if (!isObject(data.bundle)) {
+        return HttpResponse.json(errorBody("rel.invalid", "release: a build carries a bundle"), {
+          status: 400,
+        });
+      }
+      const bundle = data.bundle;
+      const entries = bundleDigestEntries(bundle);
+      if (entries.length === 0 || entries.length > 50) {
+        return HttpResponse.json(
+          errorBody("rel.invalid", "release: a bundle carries between 1 and 50 resources"),
+          { status: 400 },
+        );
+      }
+      // `makePointers` is deferred so a bundle only materialises revisions when
+      // the release is new, not on a deduped resubmission.
+      return upsertRelease(
+        project.id,
+        contentDigest(entries),
+        () => materializeBundle(project.id, bundle),
+        data,
+      );
+    }),
+
+    // `POST /releases` — pin pre-existing revision ids. Not a CLI flow, kept for
+    // contract completeness.
     http.post("*/releases", async ({ request }) => {
       const query = parse(CreateReleaseQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
@@ -1513,70 +1597,28 @@ export function setupPlatformHandlers() {
           status: 404,
         });
       }
-
       const data = body.data as Record<string, unknown>;
-      // `makePointers` is deferred so a bundle only materialises revisions when
-      // the release is new, not on a deduped resubmission.
-      let digest: string;
-      let makePointers: () => ReleasePointer[];
-      if (isObject(data.bundle)) {
-        const bundle = data.bundle;
-        const entries = bundleDigestEntries(bundle);
-        if (entries.length === 0 || entries.length > 50) {
-          return HttpResponse.json(
-            errorBody("rel.invalid", "release: a bundle carries between 1 and 50 resources"),
-            { status: 400 },
-          );
-        }
-        digest = contentDigest(entries);
-        makePointers = () => materializeBundle(project.id, bundle);
-      } else if (Array.isArray(data.pointers)) {
-        const pointers = data.pointers.map((item) => {
-          const pointer = item as { kind: string; revision_id: string };
-          return {
-            kind: pointer.kind,
-            handle: pointerHandle(pointer.kind, pointer.revision_id),
-            revision_id: pointer.revision_id,
-          };
+      if (!Array.isArray(data.pointers)) {
+        return HttpResponse.json(errorBody("rel.invalid", "release: a create pins pointers"), {
+          status: 400,
         });
-        digest = contentDigest(
-          pointers.map((pointer) => ({
-            kind: pointer.kind,
-            handle: pointer.handle,
-            content: pointer.revision_id,
-          })),
-        );
-        makePointers = () => pointers;
-      } else {
-        return HttpResponse.json(
-          errorBody("rel.invalid", "release: send exactly one of pointers or bundle"),
-          { status: 400 },
-        );
       }
-
-      const existing = [...store.releases.values()].find(
-        (release) => release.projectId === project.id && release.contentHash === digest,
+      const pointers = data.pointers.map((item) => {
+        const pointer = item as { kind: string; revision_id: string };
+        return {
+          kind: pointer.kind,
+          handle: pointerHandle(pointer.kind, pointer.revision_id),
+          revision_id: pointer.revision_id,
+        };
+      });
+      const digest = contentDigest(
+        pointers.map((pointer) => ({
+          kind: pointer.kind,
+          handle: pointer.handle,
+          content: pointer.revision_id,
+        })),
       );
-      if (existing) {
-        return HttpResponse.json(releaseResponse(existing), { status: 200 });
-      }
-
-      const pointers = makePointers();
-      const id = `rel_${shortId()}`;
-      const record: ReleaseRecord = {
-        id,
-        projectId: project.id,
-        contentHash: digest,
-        pointers,
-        message: typeof data.message === "string" ? data.message : null,
-        gitSha: typeof data.git_sha === "string" ? data.git_sha : null,
-        gitDirty: data.git_dirty === true,
-        createdAt: nowIso(),
-        revokedAt: null,
-        seq: ++store.lastSeq,
-      };
-      store.releases.set(id, record);
-      return HttpResponse.json(releaseResponse(record), { status: 201 });
+      return upsertRelease(project.id, digest, () => pointers, data);
     }),
 
     http.get("*/releases", ({ request }) => {

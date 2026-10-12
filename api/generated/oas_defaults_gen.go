@@ -11,6 +11,14 @@ func (s *Branding) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *BuildReleaseRequest) setDefaults() {
+	{
+		val := bool(false)
+		s.GitDirty.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *CreateFlowRequest) setDefaults() {
 	{
 		val := bool(false)
@@ -27,15 +35,7 @@ func (s *CreateProjectRequest) setDefaults() {
 }
 
 // setDefaults set default value of fields.
-func (s *CreateReleaseFromBundle) setDefaults() {
-	{
-		val := bool(false)
-		s.GitDirty.SetTo(val)
-	}
-}
-
-// setDefaults set default value of fields.
-func (s *CreateReleaseFromPointers) setDefaults() {
+func (s *CreateReleaseRequest) setDefaults() {
 	{
 		val := bool(false)
 		s.GitDirty.SetTo(val)
