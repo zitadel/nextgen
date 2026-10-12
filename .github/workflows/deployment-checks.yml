@@ -17,8 +17,10 @@ name: deployment-checks
 # title) and every URL that failed; the run's summary names the deployment and
 # the command that reproduces the run; the uploaded report holds the traces.
 #
-# `workflow_dispatch` runs the same job against any deployment URL from any
-# branch: the way to try a change to this file before it is on main.
+# A `deployment_status` run uses this file as it is on the deployed commit, so
+# a branch that changes it is checked by its own preview. `workflow_dispatch`
+# runs the same job against any deployment URL, from any branch: a run again
+# without a new deployment, or against production by hand.
 on:
   deployment_status:
   workflow_dispatch:

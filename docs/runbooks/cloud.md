@@ -225,8 +225,10 @@ The check lands on the deployed commit, named after what it tested:
   traces.
 - By hand, against any deployment:
   `DOCS_BASE_URL=https://cloud-….vercel.app VERCEL_AUTOMATION_BYPASS_SECRET=… moon run docs:e2e-deployment`,
-  or `gh workflow run deployment-checks.yml --ref <branch> -f url=https://cloud-….vercel.app`,
-  which is also how to try a change to the workflow before it is on `main`.
+  or `gh workflow run deployment-checks.yml --ref <branch> -f url=https://cloud-….vercel.app`
+  for a run without a new deployment. A change to the workflow needs no
+  dispatch: a `deployment_status` run uses the file as it is on the deployed
+  commit, so the branch's own preview checks it.
 - Production is not held back by the check yet: a red run on `main` shows on
   the commit while the deployment already serves. To gate it, enable
   Deployment Checks in the project's Build & Deployment settings and select
