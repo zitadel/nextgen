@@ -178,7 +178,10 @@ describe("NextPatcher.plan", () => {
     const base = ctxFor("app");
     const ctx = {
       ...base,
-      project: { ...base.project, origins: [{ pattern: "https://nextgen.dev.mrida.ng", kind: "preview" }] },
+      project: {
+        ...base.project,
+        origins: [{ pattern: "https://nextgen.dev.mrida.ng", kind: "preview" as const }],
+      },
     };
     const zitadelJson = JSON.parse(
       writeContents(new NextPatcher().plan(ctx), "zitadel.json") ?? "{}",

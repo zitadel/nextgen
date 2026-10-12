@@ -415,9 +415,7 @@ describe("setup command", () => {
     expect(res.exitCode).toBe(0);
     expect(createProjectBody).toMatchObject({
       name: expect.any(String),
-      origins: expect.arrayContaining([
-        { pattern: "http://localhost:3000", kind: "preview" },
-      ]),
+      origins: expect.arrayContaining([{ pattern: "http://localhost:3000", kind: "preview" }]),
       seed_defaults: false,
     });
     const projectName = (createProjectBody as { name?: unknown }).name;
