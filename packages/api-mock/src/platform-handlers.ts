@@ -1995,7 +1995,11 @@ export function setupPlatformHandlers() {
 
       // Pagination is specced but, as with the deployments list, the mock
       // returns the whole set in one page: the CLI reads it in full.
-      const out = parse(ListPreviewsResponse, { previews, next_page_token: null }, "mock_response_invalid");
+      const out = parse(
+        ListPreviewsResponse,
+        { previews, next_page_token: null },
+        "mock_response_invalid",
+      );
       if (!out.ok) {
         return out.response;
       }

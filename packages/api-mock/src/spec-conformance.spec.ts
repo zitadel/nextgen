@@ -1755,9 +1755,9 @@ describe("api-mock releases and deployments", () => {
     expect(body.targets[0]?.origin).toBe(url);
     expect(new Date(body.targets[0]?.expires_at as string).getTime()).toBeGreaterThan(Date.now());
 
-    const listed = (await (
-      await fetch(`${BASE}/previews?project_id=${project.id}`)
-    ).json()) as { previews: { origin: string }[] };
+    const listed = (await (await fetch(`${BASE}/previews?project_id=${project.id}`)).json()) as {
+      previews: { origin: string }[];
+    };
     expect(listed.previews.map((preview) => preview.origin)).toEqual([url]);
   });
 
