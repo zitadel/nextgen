@@ -59,7 +59,7 @@ them yourself. The project's default user schema and login flow are provisioned
 from versioned local defaults; setup writes editable copies into
 `.zitadel/schemas/default-human-user.json` and
 `.zitadel/flows/default-login.json`, uploads them through the schema and flow
-APIs, then seeds `.zitadel/state.json` so `zitadel plan` is immediately empty.
+APIs, then seeds `.zitadel/state.json` so `zitadel deploy --dry-run` shows no diff.
 Open the dev server URL printed by your framework, register a user, log out,
 log back in, and end on the signed-in profile page. That user is an end user
 of your app. The management console is a separate sign-in: run
@@ -81,8 +81,8 @@ passkey can sign in with either credential.
 
 Repo config is authoritative: edit `zitadel.json`, `.zitadel/schemas/*.json`,
 `.zitadel/flows/*.json`, or `.zitadel/branding/` (a `branding.json` descriptor
-plus a `login.liquid` LiquidJS template), then re-run `zitadel plan` and
-`zitadel apply`. Server-provisioned defaults remain a fallback for non-CLI
+plus a `login.liquid` LiquidJS template), then re-run `zitadel deploy`.
+Server-provisioned defaults remain a fallback for non-CLI
 project creation, but CLI-created projects are authored from local files first.
 Login templates are supported: scaffold them with the `branding eject` command
 (`--design centered|minimal`); setup never does;
@@ -107,8 +107,8 @@ and agent UIs may display stderr package-manager progress together with stdout.
 - `zitadel doctor`: verify the local runtime and generated project files
   (including scaffold drift and dependency-version alignment)
 - `zitadel status`: summarise the local runtime and project
-- `zitadel plan`: validate config and preview sync changes without mutation
-- `zitadel apply`: validate and upload repo config to Zitadel
+- `zitadel deploy`: build a release from `.zitadel/` and deploy it to the project
+  (`--dry-run` validates and shows the diff without publishing)
 - `zitadel branding eject`: scaffold an editable login template from a design
 - `zitadel schemas list`: list the project's user schemas
 - `zitadel variables list|get|set|delete`: manage the project's variables and
@@ -128,7 +128,6 @@ which ships in this package.
 <summary>Full command reference</summary>
 
 <!-- commands -->
-* [`zitadel apply`](#zitadel-apply)
 * [`zitadel autocomplete [SHELL]`](#zitadel-autocomplete-shell)
 * [`zitadel branding eject`](#zitadel-branding-eject)
 * [`zitadel branding get ID`](#zitadel-branding-get-id)
@@ -136,6 +135,11 @@ which ships in this package.
 * [`zitadel claim`](#zitadel-claim)
 * [`zitadel commands`](#zitadel-commands)
 * [`zitadel console`](#zitadel-console)
+* [`zitadel deploy`](#zitadel-deploy)
+* [`zitadel deployment create`](#zitadel-deployment-create)
+* [`zitadel deployment get DEPLOYMENT_ID`](#zitadel-deployment-get-deployment_id)
+* [`zitadel deployment list`](#zitadel-deployment-list)
+* [`zitadel deployment rollback [DEPLOYMENT_ID]`](#zitadel-deployment-rollback-deployment_id)
 * [`zitadel doctor`](#zitadel-doctor)
 * [`zitadel eject`](#zitadel-eject)
 * [`zitadel env`](#zitadel-env)
@@ -157,10 +161,11 @@ which ships in this package.
 * [`zitadel origin add PATTERN`](#zitadel-origin-add-pattern)
 * [`zitadel origin list`](#zitadel-origin-list)
 * [`zitadel origin rm PATTERN`](#zitadel-origin-rm-pattern)
-* [`zitadel plan`](#zitadel-plan)
 * [`zitadel projects get ID`](#zitadel-projects-get-id)
 * [`zitadel projects list`](#zitadel-projects-list)
 * [`zitadel projects update ID`](#zitadel-projects-update-id)
+* [`zitadel release create`](#zitadel-release-create)
+* [`zitadel release revoke RELEASE_ID`](#zitadel-release-revoke-release_id)
 * [`zitadel releases get ID`](#zitadel-releases-get-id)
 * [`zitadel releases list`](#zitadel-releases-list)
 * [`zitadel reset`](#zitadel-reset)
@@ -193,40 +198,6 @@ which ships in this package.
 * [`zitadel variables set NAME`](#zitadel-variables-set-name)
 * [`zitadel version`](#zitadel-version)
 * [`zitadel which`](#zitadel-which)
-
-## `zitadel apply`
-
-Validate and upload repo config to the platform.
-
-```
-USAGE
-  $ zitadel apply [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>]
-
-FLAGS
-  -c, --cwd=<value>       Project directory to operate on.
-  -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
-  -n, --non-interactive   Disable prompts. Required when scripting or running as
-                          an agent.
-  -s, --server=<value>    Override the resolved server URL.
-  -v, --verbose           Verbose logging.
-      --[no-]color        Colorize human output. Disable with --no-color;
-                          NO_COLOR and FORCE_COLOR are honored too.
-      --debug             Debug logging.
-      --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
-      --[no-]telemetry    Send anonymous usage analytics. Disable with
-                          --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Validate and upload repo config to the platform.
-```
 
 ## `zitadel autocomplete [SHELL]`
 
@@ -490,6 +461,225 @@ EXAMPLES
   $ zitadel console
 
   $ zitadel console --no-open
+```
+
+## `zitadel deploy`
+
+Build a release from .zitadel/ and deploy it to the project.
+
+```
+USAGE
+  $ zitadel deploy [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [-m <value>] [--origin <value>]
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then development.
+  -m, --message=<value>   A short summary of what this release changes.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
+      --origin=<value>    Deploy to one primary origin instead of every primary
+                          origin.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Build a release from .zitadel/ and deploy it to the project.
+
+EXAMPLES
+  $ zitadel deploy -m 'add phone_number to human-user'
+
+  $ zitadel deploy --origin https://app.acme.com
+
+  $ zitadel deploy --dry-run
+```
+
+## `zitadel deployment create`
+
+Deploy an existing release to the project's origins.
+
+```
+USAGE
+  $ zitadel deployment create --release <value> [--json] [-c <value>] [-s
+    <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e
+    <value>] [--env-file <value>] [--origin <value>] [-m <value>]
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then development.
+  -m, --message=<value>   A short summary of why this deploys.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
+      --origin=<value>    Deploy to one primary origin instead of every primary
+                          origin.
+      --release=<value>   (required) The release id to deploy.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Deploy an existing release to the project's origins.
+
+EXAMPLES
+  $ zitadel deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+
+  $ zitadel deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1 --origin https://app.acme.com
+```
+
+## `zitadel deployment get DEPLOYMENT_ID`
+
+Read one deployment by id.
+
+```
+USAGE
+  $ zitadel deployment get DEPLOYMENT_ID [--json] [-c <value>] [-s <value>]
+    [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>]
+    [--env-file <value>]
+
+ARGUMENTS
+  DEPLOYMENT_ID  The deployment to read.
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then development.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Read one deployment by id.
+
+EXAMPLES
+  $ zitadel deployment get dep_01KX5N7C9D2E7F0N9WD3P2E4YM6
+```
+
+## `zitadel deployment list`
+
+List the project's deployments, newest first.
+
+```
+USAGE
+  $ zitadel deployment list [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--origin <value>] [--live] [--plain]
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then development.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
+      --live              What each target serves now, not the full history.
+      --origin=<value>    Only deployments that targeted this origin.
+      --plain             Tab-separated rows with no header, for piping. Implied
+                          when stdout is not a terminal.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List the project's deployments, newest first.
+
+EXAMPLES
+  $ zitadel deployment list
+
+  $ zitadel deployment list --live
+
+  $ zitadel deployment list --origin https://app.acme.com
+```
+
+## `zitadel deployment rollback [DEPLOYMENT_ID]`
+
+Roll back to an earlier deployment.
+
+```
+USAGE
+  $ zitadel deployment rollback [DEPLOYMENT_ID] [--json] [-c <value>] [-s
+    <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e
+    <value>] [--env-file <value>] [--origin <value>] [-f]
+
+ARGUMENTS
+  [DEPLOYMENT_ID]  The deployment to re-apply. Omit to undo the last deploy.
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then development.
+  -f, --force             Roll back without the confirmation prompt. Required
+                          when non-interactive.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
+      --origin=<value>    Which origin's history the bare form reads.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Roll back to an earlier deployment.
+
+EXAMPLES
+  $ zitadel deployment rollback
+
+  $ zitadel deployment rollback dep_01KX5N7C9D2E7F0N9WD3P2E4YM6
+
+  $ zitadel deployment rollback --origin https://app.acme.com --force
 ```
 
 ## `zitadel doctor`
@@ -1493,40 +1683,6 @@ EXAMPLES
   $ zitadel origin rm https://app.acme.com --force
 ```
 
-## `zitadel plan`
-
-Validate config without mutation and preview the sync diff.
-
-```
-USAGE
-  $ zitadel plan [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>]
-
-FLAGS
-  -c, --cwd=<value>       Project directory to operate on.
-  -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
-  -n, --non-interactive   Disable prompts. Required when scripting or running as
-                          an agent.
-  -s, --server=<value>    Override the resolved server URL.
-  -v, --verbose           Verbose logging.
-      --[no-]color        Colorize human output. Disable with --no-color;
-                          NO_COLOR and FORCE_COLOR are honored too.
-      --debug             Debug logging.
-      --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
-      --[no-]telemetry    Send anonymous usage analytics. Disable with
-                          --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Validate config without mutation and preview the sync diff.
-```
-
 ## `zitadel projects get ID`
 
 Get one project by id.
@@ -1676,6 +1832,90 @@ EXAMPLES
   $ zitadel projects update <id> --data '{...}' --json
 
   $ zitadel projects update <id> --file ./project.json
+```
+
+## `zitadel release create`
+
+Build a release from .zitadel/ without deploying it.
+
+```
+USAGE
+  $ zitadel release create [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [-m <value>]
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then development.
+  -m, --message=<value>   A short summary of what this release changes.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Build a release from .zitadel/ without deploying it.
+
+EXAMPLES
+  $ zitadel release create
+
+  $ zitadel release create -m 'add phone_number to human-user'
+```
+
+## `zitadel release revoke RELEASE_ID`
+
+Revoke a release so its content is never served again.
+
+```
+USAGE
+  $ zitadel release revoke RELEASE_ID [--json] [-c <value>] [-s <value>]
+    [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>]
+    [--env-file <value>] [-f]
+
+ARGUMENTS
+  RELEASE_ID  The release to revoke.
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then development.
+  -f, --force             Revoke without the confirmation prompt. Required when
+                          non-interactive.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Revoke a release so its content is never served again.
+
+EXAMPLES
+  $ zitadel release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+
+  $ zitadel release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1 --force
 ```
 
 ## `zitadel releases get ID`

@@ -6,7 +6,7 @@
       "id": 1,
       "title": "Set up a project (agent elicits the fields + sign-in method)",
       "grade": "setup",
-      "prompt": "I want to add sign-up and sign-in to the app in this directory using Zitadel. Set up a new Zitadel project and apply it to a running local server. This is my app, so ask me whatever you need to decide how sign-up and sign-in should work rather than guessing.",
+      "prompt": "I want to add sign-up and sign-in to the app in this directory using Zitadel. Set up a new Zitadel project and deploy it to a running local server. This is my app, so ask me whatever you need to decide how sign-up and sign-in should work rather than guessing.",
       "user": "You are the developer who owns this app. You want people to sign up with their first name and last name, and sign in with a password. You do NOT want passkeys or single sign-on yet. Answer the agent's questions briefly and concretely from these preferences, and don't volunteer requirements it didn't ask about."
     },
     {
