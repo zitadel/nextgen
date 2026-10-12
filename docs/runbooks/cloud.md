@@ -126,6 +126,8 @@ Environment variables (add secrets with
 | `MASTER_KEY_PEM_B64` | Preview; sensitive | preview's `master-key.b64` |
 | `MASTER_KEY_ID` | Production | production's `master-key.id`, `cloud-production-<year>-<month>` |
 | `MASTER_KEY_ID` | Preview | preview's `master-key.id`, `cloud-preview-<year>-<month>` |
+| `MASTER_KEY_PREVIOUS_PEM_B64` | Production or Preview; sensitive; only during a rotation | the key being rotated out, which `setup-secrets.sh --force` sets |
+| `MASTER_KEY_PREVIOUS_ID` | Production or Preview; only during a rotation | its id |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Production; sensitive | production's `admin-user.b64`: the root admin document |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Preview; sensitive | preview's `admin-user.b64` |
 | `ENABLE_EXPERIMENTAL_COREPACK` | Production, Preview | `1`: the builds run package scripts that call `pnpm`, which must be the workspace's pinned version |
@@ -177,28 +179,37 @@ or garbled fails the build and the serving deployment stays.
   an older deployment without touching the schema.
 - **Startup never migrates:** the serving function refuses `--migrate`.
 
-## Replacing the secrets
+## Rotating the master key
 
-A new master key cannot unwrap what the old one wrapped. The server re-wraps
-every project key to the newest configured master key at startup
-(`MigrateToLatestMasterKey`), but only while the previous key is still
-configured for decryption, and the launcher renders exactly one key. Until
-it renders the previous key as well, replacing an environment's key means
-starting that environment's data over. Nothing production holds today is
-worth keeping; once it is, add that support before the next rotation.
+The server re-wraps every project key to the current master key at startup
+(`MigrateToLatestMasterKey`), as long as the key being rotated out is still
+configured for decryption. The launcher renders both: the current key from
+`MASTER_KEY_PEM_B64` and `MASTER_KEY_ID`, the previous one from
+`MASTER_KEY_PREVIOUS_PEM_B64` and `MASTER_KEY_PREVIOUS_ID`.
 
-1. `sh apps/cloud/setup-secrets.sh --force <environment>`: new key, new root
-   admin, the previous files kept under `replaced-<time>/`, the variables
-   replaced on Vercel. Store the new key and login in 1Password.
-2. The running deployment keeps its old variables; the data has to go
-   before the next deployment:
-   - **production:** on the production database, as the migrations' role,
-     `DROP SCHEMA zitadel_nextgen CASCADE;` (every table, the migration
-     history included; extensions stay).
-   - **preview:** drop the preview databases (Database, cleanup). The next
-     build of a branch recreates and migrates its own.
-3. Deploy: push, or redeploy the current deployment. The build migrates the
-   empty schema and the first start imports the new root admin.
+1. `sh apps/cloud/setup-secrets.sh --force <environment>`: mints a new key,
+   moves the old one to `~/.zitadel/cloud/<environment>/replaced-<time>/`
+   and sets it as the previous key on Vercel. Store the new key in 1Password.
+   The root admin is untouched; its password changes in the console.
+2. Deploy: push, or redeploy the **current** deployment, never an older one,
+   whose code may predate the schema. The first start re-wraps every project
+   key; the launcher's log line names both keys.
+3. Remove the previous key for that environment:
+   `vercel env rm MASTER_KEY_PREVIOUS_PEM_B64 <environment> --yes`, the same
+   for `MASTER_KEY_PREVIOUS_ID`. The next deployment runs on the new key only.
+
+## Starting an environment over
+
+Dropping an environment's data is the migrations' role's job: it owns the
+schema, and PlanetScale's `postgres` role is neither a superuser nor a
+member of it, so neither the dashboard console nor `postgres` can drop what
+the migrations created. Connect as the migrations' role, whose connection
+string is in Vercel, and run `DROP SCHEMA zitadel_nextgen CASCADE;`; for a
+preview, drop its database (Database, cleanup) and the next build recreates
+it. Run `setup-secrets.sh --force --new-admin <environment>` if the key or
+the root admin should change as well, then deploy the current deployment:
+the build migrates the empty schema, the first start seeds the platform
+project and imports the root admin.
 
 ## Operating
 

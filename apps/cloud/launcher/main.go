@@ -13,6 +13,9 @@
 //   - The master key. server.master_keys can only come from a config file
 //     (the server ignores NEXTGEN_SERVER_MASTER_KEYS_*), so
 //     MASTER_KEY_PEM_B64 and MASTER_KEY_ID become <data_dir>/nextgen.yaml.
+//     During a rotation MASTER_KEY_PREVIOUS_PEM_B64 and MASTER_KEY_PREVIOUS_ID
+//     add the key the data is still wrapped with, marked for decryption only;
+//     the server re-wraps every project key to the current one at startup.
 //   - The optional bootstrap admin document, BOOTSTRAP_ADMIN_USER_JSON_B64,
 //     becomes a --user-file.
 //   - The deployment's shape. The listen address follows PORT, the data dir
@@ -163,6 +166,11 @@ func prepareMigration(extra []string) ([]string, error) {
 type serving struct {
 	keyID string
 	pem   []string
+	// previousID and previousPEM are the key being rotated out, configured
+	// for decryption only so the server can re-wrap what it wrapped. Empty
+	// outside a rotation.
+	previousID  string
+	previousPEM []string
 	// dsn is the URL the function serves from: the pooled URL with a
 	// preview's own database swapped in and the pool parameters added. Empty
 	// in a local run without CLOUD_DATABASE_URL, which keeps the server's
@@ -184,11 +192,28 @@ func parseServing(env string) (*serving, error) {
 	if !keyIDPattern.MatchString(s.keyID) {
 		return nil, fmt.Errorf("MASTER_KEY_ID must be set and match %s, got %q", keyIDPattern, s.keyID)
 	}
-	pem, err := decodePEM(keyB64)
+	pem, err := decodePEM("MASTER_KEY_PEM_B64", keyB64)
 	if err != nil {
 		return nil, err
 	}
 	s.pem = pem
+
+	previousB64, previousID := os.Getenv("MASTER_KEY_PREVIOUS_PEM_B64"), os.Getenv("MASTER_KEY_PREVIOUS_ID")
+	if previousB64 != "" || previousID != "" {
+		if previousB64 == "" || previousID == "" {
+			return nil, errors.New("MASTER_KEY_PREVIOUS_PEM_B64 and MASTER_KEY_PREVIOUS_ID go together: the key being rotated out and its id")
+		}
+		if !keyIDPattern.MatchString(previousID) {
+			return nil, fmt.Errorf("MASTER_KEY_PREVIOUS_ID must match %s, got %q", keyIDPattern, previousID)
+		}
+		if previousID == s.keyID {
+			return nil, fmt.Errorf("MASTER_KEY_PREVIOUS_ID %q is the current key's id; the previous key is the one being rotated out", previousID)
+		}
+		if s.previousPEM, err = decodePEM("MASTER_KEY_PREVIOUS_PEM_B64", previousB64); err != nil {
+			return nil, err
+		}
+		s.previousID = previousID
+	}
 
 	dsn := os.Getenv(databaseURLVar)
 	if dsn == "" && deployed(env) {
@@ -253,10 +278,14 @@ func prepareServer(extra []string) ([]string, error) {
 		return nil, err
 	}
 	configPath := filepath.Join(dataDir, "nextgen.yaml")
-	if err := os.WriteFile(configPath, renderConfig(s.keyID, s.pem), 0o600); err != nil {
+	if err := os.WriteFile(configPath, renderConfig(s), 0o600); err != nil {
 		return nil, err
 	}
 	_ = os.Unsetenv("MASTER_KEY_PEM_B64")
+	_ = os.Unsetenv("MASTER_KEY_PREVIOUS_PEM_B64")
+	if s.previousID != "" {
+		fmt.Fprintf(os.Stderr, "launcher: master key %s, re-wrapping what %s wrapped; delete MASTER_KEY_PREVIOUS_PEM_B64 and MASTER_KEY_PREVIOUS_ID once this deployment has started\n", s.keyID, s.previousID)
+	}
 
 	args := []string{"server", "--config", configPath}
 
@@ -370,11 +399,12 @@ func setDefault(key, value string) error {
 }
 
 // decodePEM returns the key's PEM lines, normalized: no carriage returns, no
-// blank lines, no stray indentation, as pasted keys arrive.
-func decodePEM(b64 string) ([]string, error) {
+// blank lines, no stray indentation, as pasted keys arrive. name is the
+// variable the key came from, for the error.
+func decodePEM(name, b64 string) ([]string, error) {
 	raw, err := base64.StdEncoding.DecodeString(b64)
 	if err != nil {
-		return nil, fmt.Errorf("MASTER_KEY_PEM_B64 is not base64: %w", err)
+		return nil, fmt.Errorf("%s is not base64: %w", name, err)
 	}
 	var lines []string
 	for _, line := range strings.Split(strings.ReplaceAll(string(raw), "\r", ""), "\n") {
@@ -383,23 +413,31 @@ func decodePEM(b64 string) ([]string, error) {
 		}
 	}
 	if len(lines) < 2 || !strings.HasPrefix(lines[0], "-----BEGIN ") || !strings.HasPrefix(lines[len(lines)-1], "-----END ") {
-		return nil, errors.New("MASTER_KEY_PEM_B64 does not decode to a PEM block")
+		return nil, fmt.Errorf("%s does not decode to a PEM block", name)
 	}
 	return lines, nil
 }
 
 // renderConfig writes the one setting that cannot come from the environment:
-// the master key as a YAML block scalar under its key id.
-func renderConfig(keyID string, pem []string) []byte {
+// the master keys as YAML block scalars under their ids. The current key
+// encrypts; a previous key, during a rotation, only decrypts until the
+// server has re-wrapped everything it wrapped.
+func renderConfig(s *serving) []byte {
 	var b strings.Builder
 	b.WriteString("server:\n")
 	b.WriteString("  generate_master_key: false\n")
 	b.WriteString("  master_keys:\n")
-	fmt.Fprintf(&b, "    %s:\n", keyID)
-	b.WriteString("      use_for_encryption: true\n")
-	b.WriteString("      private_key: |\n")
-	for _, line := range pem {
-		b.WriteString("        " + line + "\n")
+	writeKey := func(id string, pem []string, encrypts bool) {
+		fmt.Fprintf(&b, "    %s:\n", id)
+		fmt.Fprintf(&b, "      use_for_encryption: %t\n", encrypts)
+		b.WriteString("      private_key: |\n")
+		for _, line := range pem {
+			b.WriteString("        " + line + "\n")
+		}
+	}
+	writeKey(s.keyID, s.pem, true)
+	if s.previousID != "" {
+		writeKey(s.previousID, s.previousPEM, false)
 	}
 	return []byte(b.String())
 }

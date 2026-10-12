@@ -32,6 +32,8 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 		"CLOUD_DATABASE_URL",
 		"CLOUD_MIGRATOR_DATABASE_URL",
 		"CLOUD_PRODUCTION_BRANCH",
+		"MASTER_KEY_PREVIOUS_ID",
+		"MASTER_KEY_PREVIOUS_PEM_B64",
 		"NEXTGEN_DATABASE_POSTGRES",
 		"NEXTGEN_INSTRUMENTATION_LOG_FORMAT",
 		"NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT",
@@ -125,6 +127,38 @@ func TestPrepareServerNormalizesThePEM(t *testing.T) {
 	assert.Contains(t, string(config), "        -----BEGIN RSA PRIVATE KEY-----\n        MIIBOg")
 	assert.NotContains(t, string(config), "\r")
 	assert.Equal(t, ":8080", os.Getenv("NEXTGEN_SERVER_ADDRESS"), "PORT defaults to 8080")
+}
+
+// A rotation configures the key being rotated out for decryption only; the
+// server re-wraps what it wrapped at startup.
+func TestPrepareServerRendersThePreviousMasterKeyForDecryption(t *testing.T) {
+	dataDir := t.TempDir()
+	setLauncherEnv(t, dataDir)
+	const previousPEM = "-----BEGIN RSA PRIVATE KEY-----\nOLDKEY\n-----END RSA PRIVATE KEY-----\n"
+	t.Setenv("MASTER_KEY_PREVIOUS_PEM_B64", base64.StdEncoding.EncodeToString([]byte(previousPEM)))
+	t.Setenv("MASTER_KEY_PREVIOUS_ID", "cloud-2026-09")
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	config, err := os.ReadFile(filepath.Join(dataDir, "nextgen.yaml"))
+	require.NoError(t, err)
+	assert.Equal(t, "server:\n"+
+		"  generate_master_key: false\n"+
+		"  master_keys:\n"+
+		"    cloud-2026-10:\n"+
+		"      use_for_encryption: true\n"+
+		"      private_key: |\n"+
+		"        -----BEGIN RSA PRIVATE KEY-----\n"+
+		"        MIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu\n"+
+		"        -----END RSA PRIVATE KEY-----\n"+
+		"    cloud-2026-09:\n"+
+		"      use_for_encryption: false\n"+
+		"      private_key: |\n"+
+		"        -----BEGIN RSA PRIVATE KEY-----\n"+
+		"        OLDKEY\n"+
+		"        -----END RSA PRIVATE KEY-----\n", string(config))
+	assert.Empty(t, os.Getenv("MASTER_KEY_PREVIOUS_PEM_B64"), "the previous key leaves the environment too")
 }
 
 func TestPrepareServerServesProductionFromThePooledURL(t *testing.T) {
@@ -335,6 +369,27 @@ func TestPrepareServerRefusesBadInput(t *testing.T) {
 			_, err := prepareServer(nil)
 			assert.ErrorContains(t, err, "must be postgres:// or postgresql:// URLs")
 		},
+		"a previous key without its id, or the reverse": func(t *testing.T) {
+			t.Setenv("MASTER_KEY_PREVIOUS_PEM_B64", base64.StdEncoding.EncodeToString([]byte(testPEM)))
+			_, err := prepareServer(nil)
+			assert.ErrorContains(t, err, "MASTER_KEY_PREVIOUS_PEM_B64 and MASTER_KEY_PREVIOUS_ID go together")
+			t.Setenv("MASTER_KEY_PREVIOUS_PEM_B64", "")
+			t.Setenv("MASTER_KEY_PREVIOUS_ID", "cloud-2026-09")
+			_, err = prepareServer(nil)
+			assert.ErrorContains(t, err, "go together")
+		},
+		"a previous key that is the current one": func(t *testing.T) {
+			t.Setenv("MASTER_KEY_PREVIOUS_PEM_B64", base64.StdEncoding.EncodeToString([]byte(testPEM)))
+			t.Setenv("MASTER_KEY_PREVIOUS_ID", "cloud-2026-10")
+			_, err := prepareServer(nil)
+			assert.ErrorContains(t, err, `MASTER_KEY_PREVIOUS_ID "cloud-2026-10" is the current key's id`)
+		},
+		"a previous key that is not a PEM block": func(t *testing.T) {
+			t.Setenv("MASTER_KEY_PREVIOUS_PEM_B64", base64.StdEncoding.EncodeToString([]byte("not a key")))
+			t.Setenv("MASTER_KEY_PREVIOUS_ID", "cloud-2026-09")
+			_, err := prepareServer(nil)
+			assert.ErrorContains(t, err, "MASTER_KEY_PREVIOUS_PEM_B64 does not decode to a PEM block")
+		},
 		"a bootstrap document that is not one": func(t *testing.T) {
 			t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(`{"user":"x"}`)))
 			_, err := prepareServer(nil)
@@ -391,11 +446,12 @@ func TestPrepareMigrationRefusesWhatTheFunctionWouldRefuse(t *testing.T) {
 		set    map[string]string
 		reason string
 	}{
-		"a missing master key":    {map[string]string{"MASTER_KEY_PEM_B64": ""}, "MASTER_KEY_PEM_B64 must be set"},
-		"a garbled master key":    {map[string]string{"MASTER_KEY_PEM_B64": base64.StdEncoding.EncodeToString([]byte("not a key"))}, "does not decode to a PEM block"},
-		"a bad key id":            {map[string]string{"MASTER_KEY_ID": "bad id:"}, "MASTER_KEY_ID must be set and match"},
-		"no database to serve":    {map[string]string{"CLOUD_DATABASE_URL": ""}, "CLOUD_DATABASE_URL must be set"},
-		"a broken admin document": {map[string]string{"BOOTSTRAP_ADMIN_USER_JSON_B64": "%%%"}, "BOOTSTRAP_ADMIN_USER_JSON_B64 is not base64"},
+		"a missing master key":          {map[string]string{"MASTER_KEY_PEM_B64": ""}, "MASTER_KEY_PEM_B64 must be set"},
+		"a garbled master key":          {map[string]string{"MASTER_KEY_PEM_B64": base64.StdEncoding.EncodeToString([]byte("not a key"))}, "does not decode to a PEM block"},
+		"a bad key id":                  {map[string]string{"MASTER_KEY_ID": "bad id:"}, "MASTER_KEY_ID must be set and match"},
+		"no database to serve":          {map[string]string{"CLOUD_DATABASE_URL": ""}, "CLOUD_DATABASE_URL must be set"},
+		"a broken admin document":       {map[string]string{"BOOTSTRAP_ADMIN_USER_JSON_B64": "%%%"}, "BOOTSTRAP_ADMIN_USER_JSON_B64 is not base64"},
+		"a previous key without its id": {map[string]string{"MASTER_KEY_PREVIOUS_PEM_B64": base64.StdEncoding.EncodeToString([]byte(testPEM))}, "go together"},
 	}
 	for _, env := range []string{"production", "preview"} {
 		for name, tc := range cases {
