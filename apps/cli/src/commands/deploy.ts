@@ -3,7 +3,6 @@ import { Flags } from "@oclif/core";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
 import {
   buildBundle,
-  configIsDirty,
   createDeployment,
   createReleaseFromBundle,
   diffStep,
@@ -12,8 +11,10 @@ import {
   runSteps,
   type StepContext,
   validateStep,
+  worktreeIsDirty,
 } from "../lib/release";
 import { ZitadelError } from "../lib/errors";
+import { reportWarning } from "../lib/warnings";
 
 /**
  * `zitadel deploy` — publish `.zitadel/` to the project's primary origins.
@@ -116,10 +117,20 @@ export default class Deploy extends EnvironmentCommand {
       });
     }
 
+    // Record whether the whole worktree was dirty when this release was built,
+    // and warn: a release pins content, but its git provenance is only exact
+    // when the tree was clean, so the reader knows the commit is approximate.
+    const gitDirty = await worktreeIsDirty(cwd);
+    if (gitDirty) {
+      reportWarning(
+        "The git working tree has uncommitted changes; this release records its commit as approximate.",
+      );
+    }
+
     const release = await createReleaseFromBundle(client, projectId, bundle, {
       message,
       gitSha: await headSha(cwd),
-      gitDirty: await configIsDirty(cwd),
+      gitDirty,
     });
     const deployment = await createDeployment(client, projectId, {
       releaseId: release.id,

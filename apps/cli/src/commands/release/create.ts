@@ -3,12 +3,12 @@ import { Flags } from "@oclif/core";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
 import {
   buildBundle,
-  configIsDirty,
   createReleaseFromBundle,
   headSha,
   runSteps,
   type StepContext,
   validateStep,
+  worktreeIsDirty,
 } from "../../lib/release";
 
 /**
@@ -59,7 +59,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
     const release = await createReleaseFromBundle(client, projectId, bundle, {
       message: flags.message,
       gitSha: await headSha(cwd),
-      gitDirty: await configIsDirty(cwd),
+      gitDirty: await worktreeIsDirty(cwd),
     });
 
     return this.emit({

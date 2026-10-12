@@ -24,9 +24,14 @@ export async function headSha(cwd: string): Promise<string | null> {
   return stdout === null ? null : stdout.trim() || null;
 }
 
-/** Whether the working tree has uncommitted changes under `.zitadel/`. */
-export async function configIsDirty(cwd: string): Promise<boolean> {
-  const stdout = await git(cwd, ["status", "--porcelain", "--", CONFIG_PATH]);
+/**
+ * Whether the repository's working tree has any uncommitted change, anywhere —
+ * not only under `.zitadel/`. A release records the provenance of the whole
+ * commit it was built from, so a change outside `.zitadel/` (a code change that
+ * the config depends on, say) makes that provenance just as inexact.
+ */
+export async function worktreeIsDirty(cwd: string): Promise<boolean> {
+  const stdout = await git(cwd, ["status", "--porcelain"]);
   return stdout !== null && stdout.trim() !== "";
 }
 
