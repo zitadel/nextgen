@@ -15,8 +15,10 @@ application, not in this template.
 3. `zitadel deploy` — builds `.zitadel/` into an immutable release and makes it
    live. The login UI picks up the newest release on the next step response.
 
-Every deploy publishes a new release; there is no in-place update. Roll back a
-deployment with `zitadel deployment rollback`.
+A deploy of changed content publishes a new immutable release; there is no
+in-place update. Unchanged content is deduplicated and reuses the existing
+release rather than publishing another. Roll back a deployment with
+`zitadel deployment rollback`.
 
 ## Rules of the template
 

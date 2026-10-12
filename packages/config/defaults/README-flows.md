@@ -100,9 +100,9 @@ anything here afterwards.
 
 ## Schema revisions
 
-Editing a schema publishes a new immutable revision. When you `deploy` a
-schema edit, the CLI rewrites `user_schema` in the flow files pinned to
-the old revision and publishes new revisions of those flows in the same
-run — `deploy --dry-run` announces the re-pin beforehand, and the rewrite shows up
-in your git diff. Remember to update `steps[].fields[]` yourself when the
-edit added or removed properties the flow should collect.
+Editing a schema publishes a new immutable revision. Flows reference
+`user_schema` by its stable `objectType` handle, so a schema edit does not
+re-pin the flow files and `deploy` never rewrites anything locally — there is
+no re-pin to announce and nothing shows up in your git diff. Remember to update
+`steps[].fields[]` yourself when the edit added or removed properties the flow
+should collect.
