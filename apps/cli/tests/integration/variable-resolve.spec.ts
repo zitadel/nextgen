@@ -5,7 +5,7 @@ import { aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
-type Resolved = { variables: { name: string; value?: string }[] };
+type Resolved = { origins: string[]; variables: { name: string; value?: string }[] };
 
 describe("variable resolve", () => {
   describe("against an invalid server", () => {
@@ -62,9 +62,13 @@ describe("variable resolve", () => {
         const result = await app.resolveVariables();
 
         expect(result).toSucceed();
-        expect(app.envelopeOf<Resolved>(result).data.variables).toEqual([
+        const data = app.envelopeOf<Resolved>(result).data;
+        expect(data.variables).toEqual([
           { name: "API_URL", secret: false, value: "https://api.acme.com" },
         ]);
+        // The chosen origin is named, so a bare resolve says which target the
+        // frozen map runs on (#1617).
+        expect(data.origins).toEqual(["https://app.example.com"]);
       });
 
       it("serves the frozen value, not a later write to the store", async () => {
