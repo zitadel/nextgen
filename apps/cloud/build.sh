@@ -18,7 +18,11 @@ cd "$(dirname "$0")/../.."
 # The service's installCommand normally ran already; the Go preset is not
 # known to honour it, so install when nothing is there.
 [ -x node_modules/.bin/turbo ] || corepack pnpm install --frozen-lockfile
-TURBO_TELEMETRY_DISABLED=1 corepack pnpm exec turbo run build --filter=@zitadel/login-ui
+# turbo restores the login UI from Vercel's remote cache when nothing it
+# builds from changed. The project's secrets stay hidden from the JS builds
+# (turbo's strict env mode); TURBO_PLATFORM_ENV_DISABLED stops turbo warning
+# about each of them for every task.
+TURBO_TELEMETRY_DISABLED=1 TURBO_PLATFORM_ENV_DISABLED=1 corepack pnpm exec turbo run build --filter=@zitadel/login-ui
 
 version="$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' apps/server/package.json | head -1)"
 commit="${VERCEL_GIT_COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"

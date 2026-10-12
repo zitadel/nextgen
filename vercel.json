@@ -11,7 +11,7 @@
       "root": "apps/console",
       "framework": "vite",
       "installCommand": "corepack pnpm install --frozen-lockfile",
-      "buildCommand": "cd ../.. && VITE_CONSOLE_VERCEL_INSIGHTS=1 TURBO_TELEMETRY_DISABLED=1 corepack pnpm exec turbo run build --filter=@zitadel/console && rm -rf apps/console/dist && mkdir -p apps/console/dist/ui/console && cp -R internal/staticui/console/dist/. apps/console/dist/ui/console/",
+      "buildCommand": "cd ../.. && VITE_CONSOLE_VERCEL_INSIGHTS=1 TURBO_TELEMETRY_DISABLED=1 TURBO_PLATFORM_ENV_DISABLED=1 corepack pnpm exec turbo run build --filter=@zitadel/console && rm -rf apps/console/dist && mkdir -p apps/console/dist/ui/console && cp -R internal/staticui/console/dist/. apps/console/dist/ui/console/",
       "outputDirectory": "dist",
       "rewrites": [
         {
@@ -24,7 +24,7 @@
       "root": "apps/storybook",
       "framework": "storybook",
       "installCommand": "corepack pnpm install --frozen-lockfile",
-      "buildCommand": "cd ../.. && TURBO_TELEMETRY_DISABLED=1 corepack pnpm exec turbo run build --filter=@zitadel/storybook && cd apps/storybook && mv dist storybook && mkdir dist && mv storybook dist/",
+      "buildCommand": "cd ../.. && TURBO_TELEMETRY_DISABLED=1 TURBO_PLATFORM_ENV_DISABLED=1 corepack pnpm exec turbo run build --filter=@zitadel/storybook && cd apps/storybook && mv dist storybook && mkdir dist && mv storybook dist/",
       "outputDirectory": "dist"
     },
     "docs": {
