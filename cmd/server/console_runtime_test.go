@@ -159,11 +159,11 @@ type fakeProjectService struct {
 
 var _ service.ProjectService = (*fakeProjectService)(nil)
 
-func (f *fakeProjectService) Create(context.Context, string, []string, bool) (*domain.Project, error) {
+func (f *fakeProjectService) Create(context.Context, string, []domain.Origin, bool) (*domain.Project, error) {
 	panic("unused")
 }
 
-func (f *fakeProjectService) CreateWithID(context.Context, string, string, []string, bool) (*domain.Project, error) {
+func (f *fakeProjectService) CreateWithID(context.Context, string, string, []domain.Origin, bool) (*domain.Project, error) {
 	panic("unused")
 }
 

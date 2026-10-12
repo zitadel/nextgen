@@ -19,8 +19,11 @@ import (
 func TestOriginsNotImplemented(t *testing.T) {
 	t.Parallel()
 
-	h := helpers.EnsureTestServer(t)
-	client, projectID := helpers.EnsureProjectService(t, h)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, false)
+	require.NoError(t, err)
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetScopedTokenOnApiClient(t, client, project, "origin.write", "origin.delete")
 
 	expectNotImplemented := func(t *testing.T, resp any) {
 		t.Helper()
@@ -34,7 +37,7 @@ func TestOriginsNotImplemented(t *testing.T) {
 		resp, err := client.AddOrigin(t.Context(), &api.Origin{
 			Pattern: "https://app.example.com",
 			Kind:    api.OriginKindPrimary,
-		}, api.AddOriginParams{ProjectID: api.ProjectID(projectID)})
+		}, api.AddOriginParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 		expectNotImplemented(t, resp)
 	})
@@ -42,7 +45,7 @@ func TestOriginsNotImplemented(t *testing.T) {
 	t.Run("remove", func(t *testing.T) {
 		resp, err := client.RemoveOrigin(t.Context(), &api.RemoveOriginReq{
 			Pattern: "https://app.example.com",
-		}, api.RemoveOriginParams{ProjectID: api.ProjectID(projectID)})
+		}, api.RemoveOriginParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 		expectNotImplemented(t, resp)
 	})
