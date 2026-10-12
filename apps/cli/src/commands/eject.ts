@@ -12,16 +12,16 @@ import { readRendererId, readZitadelConfig } from "../lib/project";
 
 /**
  * Asks the framework patcher which artifacts it owns. Falls back to the
- * framework-agnostic set (`zitadel.json`, `.zitadel/`, `.env.local`) when the
- * framework or its patcher cannot be resolved, so an orphaned/partial project
- * can still be cleaned up.
+ * framework-agnostic set (`zitadel.json`, `.zitadel/`, `.env.local`,
+ * `.env.development.local`) when the framework or its patcher cannot be
+ * resolved, so an orphaned/partial project can still be cleaned up.
  */
 async function resolveEjectActions(cwd: string): Promise<EjectActions> {
   const fallback: EjectActions = {
     markedFiles: [],
     rootConfigFiles: ["zitadel.json"],
     directories: [".zitadel"],
-    envBackups: [".env.local"],
+    envBackups: [".env.local", ".env.development.local"],
     dependencies: [],
     configEdits: [],
     guidanceFiles: ["AGENTS.md", "README.md"],
@@ -44,9 +44,9 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
 
 /**
  * Builds the `next_commands` envelope field — manual follow-ups `eject` can't
- * safely run itself: deleting the `.env.local.ejected-*` backups it created
- * (only when some were made), and uninstalling the SDK packages the patcher
- * added (the CLI never modifies the user's `package.json` + lockfile +
+ * safely run itself: deleting the `.env*.ejected-*` backups it created (only
+ * when some were made), and uninstalling the SDK packages the patcher added
+ * (the CLI never modifies the user's `package.json` + lockfile +
  * `node_modules` directly; it just suggests the command).
  */
 function assembleNextCommands(
@@ -55,7 +55,8 @@ function assembleNextCommands(
 ): ReadonlyArray<string> {
   const commands: string[] = [];
   if (backedUp.length > 0) {
-    commands.push("rm -f .env.local.ejected-*");
+    // Glob covers every env backup (`.env.local`, `.env.development.local`).
+    commands.push("rm -f .env*.ejected-*");
   }
   for (const dep of dependencies) {
     commands.push(`npm uninstall ${dep}`);

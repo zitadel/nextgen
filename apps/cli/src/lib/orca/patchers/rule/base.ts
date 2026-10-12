@@ -146,7 +146,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       markedFiles,
       rootConfigFiles: ["zitadel.json"],
       directories: [".zitadel"],
-      envBackups: [".env.local"],
+      envBackups: [".env.local", ".env.development.local"],
       dependencies: this.routeDeps(view),
       configEdits: this.routeConfigEdits(view),
       guidanceFiles: ["AGENTS.md", "README.md"],

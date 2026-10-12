@@ -1,7 +1,9 @@
 import { Flags } from "@oclif/core";
 import consola from "consola";
 
+import { createZitadelClient } from "../../lib/api-client";
 import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
+import { type Environment, resolveEnvironment } from "../../lib/environment";
 import { ZitadelError } from "../../lib/errors";
 import { assertServerPackageAvailable } from "../../lib/local-server/binary";
 import { dockerAvailable, imageAvailable } from "../../lib/local-server/docker";
@@ -24,6 +26,7 @@ import {
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
+import { environmentFlags } from "../../lib/oclif/environment-flags";
 import { createOrca } from "../../lib/orca";
 import { hasZitadelConfig } from "../../lib/project";
 import { listenersForPort } from "../../lib/prober/ports";
@@ -65,6 +68,10 @@ export default class Doctor extends BaseCommand {
       description: "Local runtime backend.",
       options: ["binary", "docker"],
     }),
+    // Doctor's local-runtime checks are about the machine, but with `--env` /
+    // `--env-file` it also verifies the environment a command would connect to:
+    // the same flags every EnvironmentCommand takes, resolved the same way.
+    ...environmentFlags,
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -106,7 +113,14 @@ export default class Doctor extends BaseCommand {
     const projectChecks = hasConfig
       ? await Promise.all(SANITY_CHECKS.map((check) => check.run(ctx)))
       : [];
-    const checks = [...runtimeChecks, ...projectChecks];
+    const environmentChecks = await runEnvironmentChecks({
+      cwd,
+      env: this.meta.env,
+      envName: typeof flags.env === "string" ? flags.env : undefined,
+      envFile: typeof flags["env-file"] === "string" ? flags["env-file"] : undefined,
+      serverFlag: typeof flags.server === "string" ? flags.server : undefined,
+    });
+    const checks = [...runtimeChecks, ...projectChecks, ...environmentChecks];
     const failed = checks.filter((check) => check.status === "fail");
     const warnings = checks.filter((check) => check.status === "warn");
     const warningAdvice = advisoryForWarnings(warnings, this.meta.cliVersion);
@@ -236,6 +250,13 @@ function failureAdvice(
     return { hint: typed.hint, nextCommands: [publicCliCommand("doctor", cliVersion)] };
   }
 
+  if (failedNames.has("environment")) {
+    return {
+      hint: "The resolved environment could not connect. Check the server, project and credential it resolves with `zitadel env`, then rerun `zitadel doctor` with the same --env / --env-file.",
+      nextCommands: [publicCliCommand("env", cliVersion), publicCliCommand("doctor", cliVersion)],
+    };
+  }
+
   const hasProjectFailure = failed.some((check) => !LOCAL_RUNTIME_CHECK_NAMES.has(check.name));
   if (hasProjectFailure) {
     return {
@@ -302,6 +323,71 @@ function advisoryForWarnings(
     return undefined;
   }
   return { nextActions: unique(nextActions), nextCommands: unique(nextCommands) };
+}
+
+/**
+ * Environment-aware checks, run only when `--env` / `--env-file` is given so a
+ * plain `doctor` is unchanged (its default development environment is the local
+ * server the runtime checks already cover). One authenticated `getProject`
+ * against the resolved connection settles both questions at once: a response
+ * proves the server is reachable, and that the resolved project exists and the
+ * resolved credential can read it — the drift env resolution could introduce.
+ *
+ * Deliberately small: it does not re-run every sanity check against the remote
+ * project (that would need the files the environment points at, which do not
+ * exist locally), only the connection the environment resolves.
+ */
+async function runEnvironmentChecks(input: {
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  envName?: string;
+  envFile?: string;
+  serverFlag?: string;
+}): Promise<CheckOutcome[]> {
+  if (input.envName === undefined && input.envFile === undefined) {
+    return [];
+  }
+  let environment: Environment;
+  try {
+    environment = await resolveEnvironment({
+      cwd: input.cwd,
+      env: input.env,
+      envName: input.envName,
+      envFile: input.envFile,
+      serverFlag: input.serverFlag,
+    });
+  } catch (error) {
+    return [
+      {
+        name: "environment",
+        status: "fail",
+        message: error instanceof Error ? error.message : String(error),
+      },
+    ];
+  }
+  const name = environment.name.value;
+  return [
+    await check(`environment`, `Resolved ${name} environment connects`, async () => {
+      const server = environment.values.ZITADEL_URL?.value;
+      const projectId = environment.values.ZITADEL_PROJECT_ID?.value;
+      const token = environment.values.ZITADEL_PROJECT_SECRET?.value;
+      if (server === undefined || projectId === undefined) {
+        throw new Error(
+          `ZITADEL_URL and ZITADEL_PROJECT_ID must resolve for the ${name} environment`,
+        );
+      }
+      if (token === undefined) {
+        throw new Error(
+          `ZITADEL_PROJECT_SECRET must resolve to verify project ${projectId} on ${server}`,
+        );
+      }
+      const project = await createZitadelClient({ baseUrl: server, token }).getProject(projectId);
+      if (project.id !== projectId) {
+        throw new Error(`${server} returned project ${project.id}, not the resolved ${projectId}`);
+      }
+      return `${server} is reachable and project ${projectId} matches`;
+    }),
+  ];
 }
 
 async function runLocalRuntimeChecks(

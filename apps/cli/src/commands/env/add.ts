@@ -151,6 +151,9 @@ export default class EnvAdd extends BaseCommand {
       ZITADEL_PROJECT_ID: projectId,
       ...(projectSecret === undefined ? {} : { ZITADEL_PROJECT_SECRET: projectSecret }),
       ...(previewToken === undefined ? {} : { ZITADEL_PREVIEW_TOKEN: previewToken }),
+      // The origin the app serves from, so a CLI run against this environment
+      // resolves the same ZITADEL_ISSUER the deployed app registers.
+      ...(issuer === undefined ? {} : { ZITADEL_ISSUER: issuer }),
       ...(publicVariable === undefined ? {} : { [publicVariable]: projectId }),
     };
     await writeFile(
@@ -198,10 +201,18 @@ export default class EnvAdd extends BaseCommand {
         { name: "ZITADEL_PROJECT_SECRET", secret: true },
       ],
     };
+    // Only a secret actually written to the file can be copied from it. When
+    // `--project` binds an id with no ZITADEL_PROJECT_SECRET / PREVIEW_TOKEN in
+    // the process environment, the file holds neither, so "copy it from <file>"
+    // would send the user to a value that is not there — point them at the
+    // project's own secret instead.
+    const writtenKeys = new Set(Object.keys(values));
     const render = (variables: PlatformVariable[]): string[] =>
       variables.map((variable) =>
         variable.secret
-          ? `  ${variable.name}  (secret, copy it from ${file})`
+          ? writtenKeys.has(variable.name)
+            ? `  ${variable.name}  (secret, copy it from ${file})`
+            : `  ${variable.name}  (secret, copy it from wherever you got this project)`
           : `  ${variable.name}=${variable.value}`,
       );
 
@@ -215,11 +226,17 @@ export default class EnvAdd extends BaseCommand {
         project_id: projectId,
         keys: Object.keys(values),
         platform,
-        next_commands: [`zitadel env --env ${name}`],
+        // A freshly bound project serves no origin until one is allowed, so the
+        // first step is to restrict it — `origin add` — before anything ships.
+        next_commands: [
+          `zitadel origin add ${issuer ?? "<your-app-url>"} --kind primary --env ${name}`,
+          `zitadel env --env ${name}`,
+        ],
       },
       pretty: [
         `Wrote ${file} with ${Object.keys(values).join(", ")}`,
         "",
+        `Allow this project's origin: zitadel origin add ${issuer ?? "<your-app-url>"} --kind primary --env ${name}`,
         `Check what resolves: zitadel env --env ${name}`,
         "",
         "The deployed app never reads that file. Set these where it is built and run.",
