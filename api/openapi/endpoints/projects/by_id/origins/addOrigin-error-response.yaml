@@ -5,26 +5,47 @@ content:
     schema:
       oneOf:
         - $ref: '../../../../components/schemas/errors/auth-unauthorized.yaml'
+        - $ref: '../../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../../components/schemas/errors/origin-invalid.yaml'
+        - $ref: '../../../../components/schemas/errors/origin-kind_conflict.yaml'
         - $ref: '../../../../components/schemas/errors/origin-not_found.yaml'
         - $ref: '../../../../components/schemas/errors/origin-permission_denied.yaml'
+        - $ref: '../../../../components/schemas/errors/origin-primary_not_exact.yaml'
+        - $ref: '../../../../components/schemas/errors/origin-unbounded.yaml'
+        - $ref: '../../../../components/schemas/errors/proj-missing_id.yaml'
+        - $ref: '../../../../components/schemas/errors/proj-not_found.yaml'
         - $ref: '../../../../components/schemas/errors/req-invalid.yaml'
+        - $ref: '../../../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
           auth.unauthorized: '../../../../components/schemas/errors/auth-unauthorized.yaml'
+          evt.invalid: '../../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../../components/schemas/errors/internal.yaml'
           not_implemented: '../../../../components/schemas/errors/not_implemented.yaml'
+          origin.invalid: '../../../../components/schemas/errors/origin-invalid.yaml'
+          origin.kind_conflict: '../../../../components/schemas/errors/origin-kind_conflict.yaml'
           origin.not_found: '../../../../components/schemas/errors/origin-not_found.yaml'
           origin.permission_denied: '../../../../components/schemas/errors/origin-permission_denied.yaml'
+          origin.primary_not_exact: '../../../../components/schemas/errors/origin-primary_not_exact.yaml'
+          origin.unbounded: '../../../../components/schemas/errors/origin-unbounded.yaml'
+          proj.missing_id: '../../../../components/schemas/errors/proj-missing_id.yaml'
+          proj.not_found: '../../../../components/schemas/errors/proj-not_found.yaml'
           req.invalid: '../../../../components/schemas/errors/req-invalid.yaml'
+          unavailable: '../../../../components/schemas/errors/unavailable.yaml'
     examples:
       auth.unauthorized:
         summary: auth.unauthorized
         value:
           code: auth.unauthorized
           message: 'The request lacks valid authentication credentials.'
+      evt.invalid:
+        summary: evt.invalid
+        value:
+          code: evt.invalid
+          message: 'event: invalid'
       internal:
         summary: internal
         value:
@@ -35,6 +56,16 @@ content:
         value:
           code: not_implemented
           message: 'This feature is not implemented yet.'
+      origin.invalid:
+        summary: origin.invalid
+        value:
+          code: origin.invalid
+          message: 'origin: must be scheme://host[:port], lowercase, with no path'
+      origin.kind_conflict:
+        summary: origin.kind_conflict
+        value:
+          code: origin.kind_conflict
+          message: 'origin: the pattern is already stored with a different kind'
       origin.not_found:
         summary: origin.not_found
         value:
@@ -45,8 +76,33 @@ content:
         value:
           code: origin.permission_denied
           message: 'origin: permission denied'
+      origin.primary_not_exact:
+        summary: origin.primary_not_exact
+        value:
+          code: origin.primary_not_exact
+          message: 'a primary origin is an exact URL, no wildcard'
+      origin.unbounded:
+        summary: origin.unbounded
+        value:
+          code: origin.unbounded
+          message: 'origin: a wildcard on a shared host needs a literal label of your own beside the host'
+      proj.missing_id:
+        summary: proj.missing_id
+        value:
+          code: proj.missing_id
+          message: 'project: missing id'
+      proj.not_found:
+        summary: proj.not_found
+        value:
+          code: proj.not_found
+          message: 'project not found'
       req.invalid:
         summary: req.invalid
         value:
           code: req.invalid
           message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+      unavailable:
+        summary: unavailable
+        value:
+          code: unavailable
+          message: 'The service could not complete the request right now. Try again.'
