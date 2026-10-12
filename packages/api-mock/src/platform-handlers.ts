@@ -987,26 +987,76 @@ function bundleResourceHandle(kind: string, resource: Record<string, unknown>): 
   return "default";
 }
 
-/** The pointers a bundle pins, with a synthesised revision id per resource. */
-function pointersFromBundle(bundle: Record<string, unknown>): ReleasePointer[] {
+/**
+ * Turn a bundle into pinned revisions, materialising each resource into the
+ * store the way the server allocates revisions from a bundle: a schema or flow
+ * whose content matches the project's newest revision of the same handle reuses
+ * it, anything else allocates a new one. This is what makes a deployed schema or
+ * flow observable through `schemas list` / `flow-definitions list`. Branding has
+ * no store here, so it keeps a synthesised revision id.
+ */
+function materializeBundle(projectId: string, bundle: Record<string, unknown>): ReleasePointer[] {
   const pointers: ReleasePointer[] = [];
-  const groups: [string, string][] = [
-    ["schemas", "schema"],
-    ["flow_definitions", "flow_definition"],
-    ["brandings", "branding"],
-  ];
-  for (const [field, kind] of groups) {
-    const items = bundle[field];
-    if (!Array.isArray(items)) {
-      continue;
+  for (const item of asArray(bundle.schemas)) {
+    const resource = isObject(item) ? item : {};
+    const handle = bundleResourceHandle("schema", resource);
+    const existing = [...store.schemas.values()].find(
+      (record) =>
+        record.projectId === projectId &&
+        record.objectType === handle &&
+        JSON.stringify(record.body) === JSON.stringify(resource),
+    );
+    const id = existing?.id ?? `sch_${shortId()}`;
+    if (!existing) {
+      store.schemas.set(id, {
+        id,
+        projectId,
+        objectType: handle,
+        createdAt: nowIso(),
+        seq: ++store.lastSeq,
+        body: resource as unknown as GetSchemaById200Schema,
+      });
     }
-    for (const item of items) {
-      const resource = isObject(item) ? item : {};
-      const handle = bundleResourceHandle(kind, resource);
-      pointers.push({ kind, handle, revision_id: `${kind}_${shortId()}` });
+    pointers.push({ kind: "schema", handle, revision_id: id });
+  }
+  for (const item of asArray(bundle.flow_definitions)) {
+    const resource = isObject(item) ? item : {};
+    const handle = bundleResourceHandle("flow_definition", resource);
+    const existing = [...store.flowDefinitions.values()].find(
+      (record) =>
+        record.projectId === projectId &&
+        record.body.name === handle &&
+        JSON.stringify(record.body) === JSON.stringify(resource),
+    );
+    const id = existing?.id ?? `flowdef_${shortId()}`;
+    if (!existing) {
+      const createdAt = nowIso();
+      store.flowDefinitions.set(id, {
+        id,
+        projectId,
+        status: typeof resource.status === "string" ? resource.status : "active",
+        createdAt,
+        updatedAt: createdAt,
+        seq: ++store.lastSeq,
+        body: resource,
+      });
     }
+    pointers.push({ kind: "flow_definition", handle, revision_id: id });
+  }
+  for (const item of asArray(bundle.brandings)) {
+    const resource = isObject(item) ? item : {};
+    pointers.push({
+      kind: "branding",
+      handle: bundleResourceHandle("branding", resource),
+      revision_id: `branding_${shortId()}`,
+    });
   }
   return pointers;
+}
+
+/** The array at a bundle field, or an empty one when the field is absent. */
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
 }
 
 /** Everything a bundle carries, flattened for the digest, in input order. */
@@ -1356,20 +1406,23 @@ export function setupPlatformHandlers() {
       }
 
       const data = body.data as Record<string, unknown>;
-      let pointers: ReleasePointer[];
+      // `makePointers` is deferred so a bundle only materialises revisions when
+      // the release is new, not on a deduped resubmission.
       let digest: string;
+      let makePointers: () => ReleasePointer[];
       if (isObject(data.bundle)) {
-        const entries = bundleDigestEntries(data.bundle);
+        const bundle = data.bundle;
+        const entries = bundleDigestEntries(bundle);
         if (entries.length === 0 || entries.length > 50) {
           return HttpResponse.json(
             errorBody("rel.invalid", "release: a bundle carries between 1 and 50 resources"),
             { status: 400 },
           );
         }
-        pointers = pointersFromBundle(data.bundle);
         digest = contentDigest(entries);
+        makePointers = () => materializeBundle(project.id, bundle);
       } else if (Array.isArray(data.pointers)) {
-        pointers = data.pointers.map((item) => {
+        const pointers = data.pointers.map((item) => {
           const pointer = item as { kind: string; revision_id: string };
           return {
             kind: pointer.kind,
@@ -1384,6 +1437,7 @@ export function setupPlatformHandlers() {
             content: pointer.revision_id,
           })),
         );
+        makePointers = () => pointers;
       } else {
         return HttpResponse.json(
           errorBody("rel.invalid", "release: send exactly one of pointers or bundle"),
@@ -1398,6 +1452,7 @@ export function setupPlatformHandlers() {
         return HttpResponse.json(releaseResponse(existing), { status: 200 });
       }
 
+      const pointers = makePointers();
       const id = `rel_${shortId()}`;
       const record: ReleaseRecord = {
         id,
@@ -1537,7 +1592,8 @@ export function setupPlatformHandlers() {
       const release = hasReleaseId
         ? store.releases.get(data.release_id as string)
         : [...store.releases.values()].find(
-            (candidate) => `${RELEASE_CONTENT_HASH_PREFIX}${candidate.contentHash}` === data.content_hash,
+            (candidate) =>
+              `${RELEASE_CONTENT_HASH_PREFIX}${candidate.contentHash}` === data.content_hash,
           );
       if (!release || release.projectId !== project.id) {
         return HttpResponse.json(errorBody("rel.not_found", "release: not found"), { status: 404 });
@@ -1598,7 +1654,8 @@ export function setupPlatformHandlers() {
       }
 
       const targets = [...resolved].sort();
-      const expectedId = typeof data.expected_deployment_id === "string" ? data.expected_deployment_id : undefined;
+      const expectedId =
+        typeof data.expected_deployment_id === "string" ? data.expected_deployment_id : undefined;
       if (expectedId !== undefined) {
         for (const origin of targets) {
           const newest = newestDeploymentForOrigin(project.id, origin);
@@ -1715,12 +1772,11 @@ export function setupPlatformHandlers() {
         items = [...serving.entries()]
           .map(([id, rows]) => {
             const deployment = store.deployments.get(id);
-            return deployment
-              ? { deployment, rows }
-              : undefined;
+            return deployment ? { deployment, rows } : undefined;
           })
-          .filter((entry): entry is { deployment: DeploymentRecord; rows: DeploymentTargetRow[] } =>
-            entry !== undefined,
+          .filter(
+            (entry): entry is { deployment: DeploymentRecord; rows: DeploymentTargetRow[] } =>
+              entry !== undefined,
           )
           .sort((a, b) => b.deployment.seq - a.deployment.seq)
           .map((entry) =>
@@ -1783,7 +1839,10 @@ export function setupPlatformHandlers() {
       // target must still be a primary origin of the project.
       if (target.targets.some((row) => row.expiresAt !== null)) {
         return HttpResponse.json(
-          errorBody("dep.invalid", "deployment: a deployment to preview URLs cannot be rolled back"),
+          errorBody(
+            "dep.invalid",
+            "deployment: a deployment to preview URLs cannot be rolled back",
+          ),
           { status: 409 },
         );
       }
@@ -1828,9 +1887,10 @@ export function setupPlatformHandlers() {
         releaseId: target.releaseId,
         targets: origins.sort().map((origin) => ({ origin, expiresAt: null })),
         reason: "rollback",
-        message: typeof (body.data as Record<string, unknown>).message === "string"
-          ? ((body.data as Record<string, unknown>).message as string)
-          : null,
+        message:
+          typeof (body.data as Record<string, unknown>).message === "string"
+            ? ((body.data as Record<string, unknown>).message as string)
+            : null,
         rollbackTo: target.id,
         deployedAt: nowIso(),
         seq: ++store.lastSeq,

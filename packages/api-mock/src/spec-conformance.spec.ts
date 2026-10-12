@@ -1617,9 +1617,9 @@ describe("api-mock releases and deployments", () => {
 
   test("filters the release list by content hash", async () => {
     const project = await newProject("release-filter");
-    const created = (await (
-      await createRelease(project.id, project.secret, rel1)
-    ).json()) as { content_hash: string };
+    const created = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      content_hash: string;
+    };
 
     const match = await fetch(
       `${BASE}/releases?project_id=${project.id}&content_hash=${encodeURIComponent(created.content_hash)}`,
@@ -1685,13 +1685,19 @@ describe("api-mock releases and deployments", () => {
       id: string;
     };
     const firstDeploy = (await (
-      await createDeployment(project.id, project.secret, { release_id: first.id, targets: ["primary"] })
+      await createDeployment(project.id, project.secret, {
+        release_id: first.id,
+        targets: ["primary"],
+      })
     ).json()) as { id: string };
 
-    const second = (await (
-      await createRelease(project.id, project.secret, rel2)
-    ).json()) as { id: string };
-    await createDeployment(project.id, project.secret, { release_id: second.id, targets: ["primary"] });
+    const second = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
+      id: string;
+    };
+    await createDeployment(project.id, project.secret, {
+      release_id: second.id,
+      targets: ["primary"],
+    });
 
     const rollback = await fetch(
       `${BASE}/deployments/${firstDeploy.id}/rollback?project_id=${project.id}`,
@@ -1723,7 +1729,10 @@ describe("api-mock releases and deployments", () => {
     const served = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
       id: string;
     };
-    await createDeployment(project.id, project.secret, { release_id: served.id, targets: ["primary"] });
+    await createDeployment(project.id, project.secret, {
+      release_id: served.id,
+      targets: ["primary"],
+    });
 
     const inUse = await fetch(`${BASE}/releases/${served.id}/revoke?project_id=${project.id}`, {
       method: "POST",
@@ -1732,10 +1741,13 @@ describe("api-mock releases and deployments", () => {
     expect(inUse.status).toBe(409);
     expect(((await inUse.json()) as { code: string }).code).toBe("rel.in_use");
 
-    const next = (await (
-      await createRelease(project.id, project.secret, rel2)
-    ).json()) as { id: string };
-    await createDeployment(project.id, project.secret, { release_id: next.id, targets: ["primary"] });
+    const next = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
+      id: string;
+    };
+    await createDeployment(project.id, project.secret, {
+      release_id: next.id,
+      targets: ["primary"],
+    });
 
     const ok = await fetch(`${BASE}/releases/${served.id}/revoke?project_id=${project.id}`, {
       method: "POST",
