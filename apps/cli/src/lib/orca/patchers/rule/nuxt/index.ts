@@ -6,6 +6,7 @@ import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
 import { devScriptPortOp } from "../dev-script-port";
+import { PUBLIC_PROJECT_ID_VARIABLE } from "../public-project-id";
 import { nuxtConfigEdit } from "./nuxt-config";
 import {
   appVueTemplate,
@@ -63,11 +64,15 @@ export class NuxtPatcher extends AbstractRulePatcher {
         // Runtime config + proxy wiring: auth breaks without it.
         wiring: "infrastructure",
       },
-      { kind: "merge-env", path: ".env.example", entries: { NUXT_PUBLIC_ZITADEL_PROJECT_ID: "" } },
+      {
+        kind: "merge-env",
+        path: ".env.example",
+        entries: { [PUBLIC_PROJECT_ID_VARIABLE.nuxt]: "" },
+      },
       {
         kind: "merge-env",
         path: ".env.local",
-        entries: { NUXT_PUBLIC_ZITADEL_PROJECT_ID: ctx.project.id },
+        entries: { [PUBLIC_PROJECT_ID_VARIABLE.nuxt]: ctx.project.id },
       },
       {
         kind: "add-dep",
