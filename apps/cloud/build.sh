@@ -39,3 +39,6 @@ CGO_ENABLED=0 go build -trimpath \
 echo "built $out (version ${version}+cloud, commit ${commit})"
 
 "$out" migrate
+
+# TEMPORARY: measure the build cache contents; removed before merge.
+sh apps/cloud/cache-report.sh || true
