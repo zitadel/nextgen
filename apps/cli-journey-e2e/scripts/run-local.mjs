@@ -42,6 +42,14 @@ const workDir = resolve(
 );
 const diagnosticsDir = join(workDir, "diagnostics");
 const registryPaths = localRegistryPaths(workDir);
+// CI points Verdaccio's storage at a path it caches between runs, so the public
+// framework packages every scaffold pulls through the npmjs uplink are not
+// re-downloaded on every run. Unset (local dev) keeps the ephemeral per-run
+// store that is wiped with the work dir.
+const persistentRegistryStorage = process.env.JOURNEY_REGISTRY_STORAGE;
+if (persistentRegistryStorage) {
+  registryPaths.storagePath = resolve(persistentRegistryStorage);
+}
 // Reserved ports are bound long after reservation (Verdaccio within seconds,
 // the app and Zitadel ports only minutes later), so they come from the fixed
 // non-ephemeral journey block — see ports.mjs for why listen(:0) flaked.
@@ -89,6 +97,7 @@ try {
     registryPort,
     registryUrl,
     repoRoot,
+    resetStorage: !persistentRegistryStorage,
     prebuiltTarballsDir: prebuiltTarballsDir ? resolve(repoRoot, prebuiltTarballsDir) : "",
     run,
     workDir,

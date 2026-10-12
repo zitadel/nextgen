@@ -51,11 +51,13 @@ tasks:
       # clears the "Failed to fetch dynamically imported module" failure. (#1490)
       retryCount: 3
 
+  # Loads the same packages as build.
   dev:
     command: "corepack pnpm run dev"
     deps:
       # .storybook/main.ts imports @zitadel/api-mock/public-dir under Node.
       - "api-mock:build"
+      - "components:build"
     options:
       persistent: true
       runInCI: false
