@@ -34764,6 +34764,161 @@ func (s *ListMyProjectsResponseHeaders) SetResponse(val ListMyProjectsResponse) 
 
 func (*ListMyProjectsResponseHeaders) listMyProjectsRes() {}
 
+// ListPreviewsErrorResponse represents sum type.
+type ListPreviewsErrorResponse struct {
+	Type             ListPreviewsErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// ListPreviewsErrorResponseType is oneOf type of ListPreviewsErrorResponse.
+type ListPreviewsErrorResponseType string
+
+// Possible values for ListPreviewsErrorResponseType.
+const (
+	AuthUnauthorizedListPreviewsErrorResponse ListPreviewsErrorResponseType = "auth.unauthorized"
+	InternalListPreviewsErrorResponse         ListPreviewsErrorResponseType = "internal"
+	ReqInvalidListPreviewsErrorResponse       ListPreviewsErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether ListPreviewsErrorResponse is AuthUnauthorized.
+func (s ListPreviewsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListPreviewsErrorResponse
+}
+
+// IsInternal reports whether ListPreviewsErrorResponse is Internal.
+func (s ListPreviewsErrorResponse) IsInternal() bool {
+	return s.Type == InternalListPreviewsErrorResponse
+}
+
+// IsReqInvalid reports whether ListPreviewsErrorResponse is ReqInvalid.
+func (s ListPreviewsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListPreviewsErrorResponse
+}
+
+// SetAuthUnauthorized sets ListPreviewsErrorResponse to AuthUnauthorized.
+func (s *ListPreviewsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListPreviewsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListPreviewsErrorResponse is AuthUnauthorized.
+func (s ListPreviewsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListPreviewsErrorResponse returns new ListPreviewsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListPreviewsErrorResponse(v AuthUnauthorized) ListPreviewsErrorResponse {
+	var s ListPreviewsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListPreviewsErrorResponse to Internal.
+func (s *ListPreviewsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListPreviewsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListPreviewsErrorResponse is Internal.
+func (s ListPreviewsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListPreviewsErrorResponse returns new ListPreviewsErrorResponse from Internal.
+func NewInternalListPreviewsErrorResponse(v Internal) ListPreviewsErrorResponse {
+	var s ListPreviewsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListPreviewsErrorResponse to ReqInvalid.
+func (s *ListPreviewsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListPreviewsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListPreviewsErrorResponse is ReqInvalid.
+func (s ListPreviewsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListPreviewsErrorResponse returns new ListPreviewsErrorResponse from ReqInvalid.
+func NewReqInvalidListPreviewsErrorResponse(v ReqInvalid) ListPreviewsErrorResponse {
+	var s ListPreviewsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// ListPreviewsErrorResponseStatusCode wraps ListPreviewsErrorResponse with StatusCode.
+type ListPreviewsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListPreviewsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListPreviewsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListPreviewsErrorResponseStatusCode) GetResponse() ListPreviewsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListPreviewsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListPreviewsErrorResponseStatusCode) SetResponse(val ListPreviewsErrorResponse) {
+	s.Response = val
+}
+
+func (*ListPreviewsErrorResponseStatusCode) listPreviewsRes() {}
+
+// The project's live previews, newest first.
+// Ref: #
+type ListPreviewsResponse struct {
+	Previews []Preview `json:"previews"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetPreviews returns the value of Previews.
+func (s *ListPreviewsResponse) GetPreviews() []Preview {
+	return s.Previews
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListPreviewsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetPreviews sets the value of Previews.
+func (s *ListPreviewsResponse) SetPreviews(val []Preview) {
+	s.Previews = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListPreviewsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListPreviewsResponse) listPreviewsRes() {}
+
 // ListReleasesErrorResponse represents sum type.
 type ListReleasesErrorResponse struct {
 	Type                ListReleasesErrorResponseType // switch on this field
@@ -52672,6 +52827,54 @@ func (s *PatchUserRequestAttributes) init() PatchUserRequestAttributes {
 	return m
 }
 
+// A preview URL that is live: an origin matching one of the project's
+// preview patterns, with something deployed to it, until it expires.
+// There is no create operation. A deployment whose targets are preview URLs
+// creates the preview for each of them, or renews it when it exists, in the
+// same transaction, so a preview with nothing deployed to it cannot exist.
+// A preview ends when it expires or is removed with `POST /previews/remove`;
+// the deployments to it stay in the history either way.
+// Ref: #
+type Preview struct {
+	// The preview URL, as scheme and host.
+	Origin DeploymentOrigin `json:"origin"`
+	// When the preview stops being served. Every deployment to it sets this
+	// again from its `ttl`.
+	ExpiresAt time.Time `json:"expires_at"`
+	// When the first deployment to the URL created the preview.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetOrigin returns the value of Origin.
+func (s *Preview) GetOrigin() DeploymentOrigin {
+	return s.Origin
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *Preview) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *Preview) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetOrigin sets the value of Origin.
+func (s *Preview) SetOrigin(val DeploymentOrigin) {
+	s.Origin = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *Preview) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *Preview) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
 type PreviewTTL string
 
 // Merged schema.
@@ -58647,6 +58850,152 @@ func (s *RemoveOriginReq) GetPattern() string {
 // SetPattern sets the value of Pattern.
 func (s *RemoveOriginReq) SetPattern(val string) {
 	s.Pattern = val
+}
+
+// RemovePreviewErrorResponse represents sum type.
+type RemovePreviewErrorResponse struct {
+	Type             RemovePreviewErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+}
+
+// RemovePreviewErrorResponseType is oneOf type of RemovePreviewErrorResponse.
+type RemovePreviewErrorResponseType string
+
+// Possible values for RemovePreviewErrorResponseType.
+const (
+	AuthUnauthorizedRemovePreviewErrorResponse RemovePreviewErrorResponseType = "auth.unauthorized"
+	InternalRemovePreviewErrorResponse         RemovePreviewErrorResponseType = "internal"
+	ReqInvalidRemovePreviewErrorResponse       RemovePreviewErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether RemovePreviewErrorResponse is AuthUnauthorized.
+func (s RemovePreviewErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedRemovePreviewErrorResponse
+}
+
+// IsInternal reports whether RemovePreviewErrorResponse is Internal.
+func (s RemovePreviewErrorResponse) IsInternal() bool {
+	return s.Type == InternalRemovePreviewErrorResponse
+}
+
+// IsReqInvalid reports whether RemovePreviewErrorResponse is ReqInvalid.
+func (s RemovePreviewErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidRemovePreviewErrorResponse
+}
+
+// SetAuthUnauthorized sets RemovePreviewErrorResponse to AuthUnauthorized.
+func (s *RemovePreviewErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedRemovePreviewErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if RemovePreviewErrorResponse is AuthUnauthorized.
+func (s RemovePreviewErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedRemovePreviewErrorResponse(v AuthUnauthorized) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets RemovePreviewErrorResponse to Internal.
+func (s *RemovePreviewErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalRemovePreviewErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if RemovePreviewErrorResponse is Internal.
+func (s RemovePreviewErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from Internal.
+func NewInternalRemovePreviewErrorResponse(v Internal) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets RemovePreviewErrorResponse to ReqInvalid.
+func (s *RemovePreviewErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidRemovePreviewErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if RemovePreviewErrorResponse is ReqInvalid.
+func (s RemovePreviewErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from ReqInvalid.
+func NewReqInvalidRemovePreviewErrorResponse(v ReqInvalid) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// RemovePreviewErrorResponseStatusCode wraps RemovePreviewErrorResponse with StatusCode.
+type RemovePreviewErrorResponseStatusCode struct {
+	StatusCode int
+	Response   RemovePreviewErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *RemovePreviewErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *RemovePreviewErrorResponseStatusCode) GetResponse() RemovePreviewErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *RemovePreviewErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *RemovePreviewErrorResponseStatusCode) SetResponse(val RemovePreviewErrorResponse) {
+	s.Response = val
+}
+
+func (*RemovePreviewErrorResponseStatusCode) removePreviewRes() {}
+
+// RemovePreviewNoContent is response for RemovePreview operation.
+type RemovePreviewNoContent struct{}
+
+func (*RemovePreviewNoContent) removePreviewRes() {}
+
+// The preview to remove.
+// Ref: #
+type RemovePreviewRequest struct {
+	// The preview URL, exactly as `GET /previews` lists it.
+	Origin DeploymentOrigin `json:"origin"`
+}
+
+// GetOrigin returns the value of Origin.
+func (s *RemovePreviewRequest) GetOrigin() DeploymentOrigin {
+	return s.Origin
+}
+
+// SetOrigin sets the value of Origin.
+func (s *RemovePreviewRequest) SetOrigin(val DeploymentOrigin) {
+	s.Origin = val
 }
 
 // Merged schema.

@@ -1,0 +1,36 @@
+post:
+  operationId: removePreview
+  summary: Remove a preview
+  description: |
+    Ends a preview before it expires: the URL stops being served at once.
+    The deployments to it stay in the history.
+
+    Idempotent: a URL with no live preview, including one that has already
+    expired or was removed before, answers `204` too, so a cleanup that
+    races the expiry still succeeds.
+
+    The URL travels in the body rather than the path because an origin
+    contains `/`.
+  tags:
+    - Previews
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+  security:
+    - oauth2:
+        - deployment.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: remove-preview-request.yaml
+        examples:
+          remove:
+            summary: Remove a branch preview
+            value:
+              origin: https://acme-git-sso-acmeinc.vercel.app
+  responses:
+    '204':
+      description: The URL has no live preview.
+    default:
+      $ref: removePreview-error-response.yaml

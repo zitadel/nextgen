@@ -873,6 +873,17 @@ func (UnimplementedHandler) ListMyProjects(ctx context.Context, params ListMyPro
 	return r, ht.ErrNotImplemented
 }
 
+// ListPreviews implements listPreviews operation.
+//
+// Lists the project's live previews, newest first by `created_at`. An
+// expired or removed preview is not listed; what was deployed to it stays
+// in `GET /deployments`.
+//
+// GET /previews
+func (UnimplementedHandler) ListPreviews(ctx context.Context, params ListPreviewsParams) (r ListPreviewsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListReleases implements listReleases operation.
 //
 // Lists the project's releases, newest first.
@@ -1039,6 +1050,21 @@ func (UnimplementedHandler) QueryUsers(ctx context.Context, req *QueryUsersReque
 //
 // POST /projects/{project_id}/origins/remove
 func (UnimplementedHandler) RemoveOrigin(ctx context.Context, req *RemoveOriginReq, params RemoveOriginParams) (r RemoveOriginRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// RemovePreview implements removePreview operation.
+//
+// Ends a preview before it expires: the URL stops being served at once.
+// The deployments to it stay in the history.
+// Idempotent: a URL with no live preview, including one that has already
+// expired or was removed before, answers `204` too, so a cleanup that
+// races the expiry still succeeds.
+// The URL travels in the body rather than the path because an origin
+// contains `/`.
+//
+// POST /previews/remove
+func (UnimplementedHandler) RemovePreview(ctx context.Context, req *RemovePreviewRequest, params RemovePreviewParams) (r RemovePreviewRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

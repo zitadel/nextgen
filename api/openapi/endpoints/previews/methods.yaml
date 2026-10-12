@@ -1,0 +1,39 @@
+get:
+  operationId: listPreviews
+  summary: List previews
+  description: |
+    Lists the project's live previews, newest first by `created_at`. An
+    expired or removed preview is not listed; what was deployed to it stays
+    in `GET /deployments`.
+  tags:
+    - Previews
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/limit.yaml
+    - $ref: ../../components/parameters/page-token.yaml
+  security:
+    - oauth2:
+        - deployment.read
+  responses:
+    '200':
+      description: The previews were listed successfully.
+      content:
+        application/json:
+          schema:
+            $ref: list-previews-response.yaml
+          examples:
+            previews:
+              summary: Two previews of one branch
+              description: |
+                One preview deploy wrote both, so they share an expiry.
+              value:
+                previews:
+                  - origin: https://acme-git-sso-acmeinc.vercel.app
+                    expires_at: '2026-10-09T14:10:00Z'
+                    created_at: '2026-10-02T14:10:00Z'
+                  - origin: https://acme-k3x9v2-acmeinc.vercel.app
+                    expires_at: '2026-10-09T14:10:00Z'
+                    created_at: '2026-10-02T14:10:00Z'
+                next_page_token: null
+    default:
+      $ref: listPreviews-error-response.yaml

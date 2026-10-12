@@ -694,6 +694,14 @@ type Handler interface {
 	//
 	// GET /users/me/projects
 	ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error)
+	// ListPreviews implements listPreviews operation.
+	//
+	// Lists the project's live previews, newest first by `created_at`. An
+	// expired or removed preview is not listed; what was deployed to it stays
+	// in `GET /deployments`.
+	//
+	// GET /previews
+	ListPreviews(ctx context.Context, params ListPreviewsParams) (ListPreviewsRes, error)
 	// ListReleases implements listReleases operation.
 	//
 	// Lists the project's releases, newest first.
@@ -821,6 +829,18 @@ type Handler interface {
 	//
 	// POST /projects/{project_id}/origins/remove
 	RemoveOrigin(ctx context.Context, req *RemoveOriginReq, params RemoveOriginParams) (RemoveOriginRes, error)
+	// RemovePreview implements removePreview operation.
+	//
+	// Ends a preview before it expires: the URL stops being served at once.
+	// The deployments to it stay in the history.
+	// Idempotent: a URL with no live preview, including one that has already
+	// expired or was removed before, answers `204` too, so a cleanup that
+	// races the expiry still succeeds.
+	// The URL travels in the body rather than the path because an origin
+	// contains `/`.
+	//
+	// POST /previews/remove
+	RemovePreview(ctx context.Context, req *RemovePreviewRequest, params RemovePreviewParams) (RemovePreviewRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Logs out by permanently deleting the session.
