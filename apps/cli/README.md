@@ -603,28 +603,32 @@ List the project's deployments, newest first.
 USAGE
   $ zitadel deployment list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--origin <value>] [--live] [--plain]
+    <value>] [--origin <value>] [--live] [--limit <value>] [-a | --page-token
+    <value>] [--plain]
 
 FLAGS
-  -c, --cwd=<value>       Project directory to operate on.
-  -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
-  -n, --non-interactive   Disable prompts. Required when scripting or running as
-                          an agent.
-  -s, --server=<value>    Override the resolved server URL.
-  -v, --verbose           Verbose logging.
-      --[no-]color        Colorize human output. Disable with --no-color;
-                          NO_COLOR and FORCE_COLOR are honored too.
-      --debug             Debug logging.
-      --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
-      --live              What each target serves now, not the full history.
-      --origin=<value>    Only deployments that targeted this origin.
-      --plain             Tab-separated rows with no header, for piping. Implied
-                          when stdout is not a terminal.
-      --[no-]telemetry    Send anonymous usage analytics. Disable with
-                          --no-telemetry.
+  -a, --all                 Fetch every page instead of one.
+  -c, --cwd=<value>         Project directory to operate on.
+  -e, --env=<value>         Environment to run against, e.g. production.
+                            Defaults to ZITADEL_ENV, then development.
+  -n, --non-interactive     Disable prompts. Required when scripting or running
+                            as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+  -v, --verbose             Verbose logging.
+      --[no-]color          Colorize human output. Disable with --no-color;
+                            NO_COLOR and FORCE_COLOR are honored too.
+      --debug               Debug logging.
+      --dry-run             Preview without mutating files or the platform.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the
+                            process environment. Cannot be combined with --env.
+      --limit=<value>       Page size (server default 20, max 100).
+      --live                What each target serves now, not the full history.
+      --origin=<value>      Only deployments that targeted this origin.
+      --page-token=<value>  Continue from a previous page's next_page_token.
+      --plain               Tab-separated rows with no header, for piping.
+                            Implied when stdout is not a terminal.
+      --[no-]telemetry      Send anonymous usage analytics. Disable with
+                            --no-telemetry.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -634,6 +638,8 @@ DESCRIPTION
 
 EXAMPLES
   $ zitadel deployment list
+
+  $ zitadel deployment list --all
 
   $ zitadel deployment list --live
 
@@ -695,10 +701,12 @@ Verify local runtime and project state.
 USAGE
   $ zitadel doctor [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fix] [--image <value>]
-    [--port <value>] [--runtime binary|docker]
+    [--port <value>] [--runtime binary|docker] [-e <value>] [--env-file <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -707,6 +715,8 @@ FLAGS
                           NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
       --fix               Repair missing files and stale managed wiring.
       --image=<value>     Container image to check.
       --port=<value>      [default: 8080] Local HTTP port.
@@ -1716,8 +1726,9 @@ FLAGS
                            from the platform build. Repeatable.
       --[no-]telemetry     Send anonymous usage analytics. Disable with
                            --no-telemetry.
-      --ttl=<value>        [default: 7d] How long each preview stays live, e.g.
-                           7d, 12h or 90m. Between 60s and 30d.
+      --ttl=<value>        How long each preview stays live, e.g. 7d, 12h or
+                           90m. Between 60s and 30d. Omitted, the project's
+                           default applies.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -1741,26 +1752,29 @@ List the project's live previews, newest first.
 USAGE
   $ zitadel preview list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--plain]
+    <value>] [--limit <value>] [-a | --page-token <value>] [--plain]
 
 FLAGS
-  -c, --cwd=<value>       Project directory to operate on.
-  -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
-  -n, --non-interactive   Disable prompts. Required when scripting or running as
-                          an agent.
-  -s, --server=<value>    Override the resolved server URL.
-  -v, --verbose           Verbose logging.
-      --[no-]color        Colorize human output. Disable with --no-color;
-                          NO_COLOR and FORCE_COLOR are honored too.
-      --debug             Debug logging.
-      --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
-      --plain             Tab-separated rows with no header, for piping. Implied
-                          when stdout is not a terminal.
-      --[no-]telemetry    Send anonymous usage analytics. Disable with
-                          --no-telemetry.
+  -a, --all                 Fetch every page instead of one.
+  -c, --cwd=<value>         Project directory to operate on.
+  -e, --env=<value>         Environment to run against, e.g. production.
+                            Defaults to ZITADEL_ENV, then development.
+  -n, --non-interactive     Disable prompts. Required when scripting or running
+                            as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+  -v, --verbose             Verbose logging.
+      --[no-]color          Colorize human output. Disable with --no-color;
+                            NO_COLOR and FORCE_COLOR are honored too.
+      --debug               Debug logging.
+      --dry-run             Preview without mutating files or the platform.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the
+                            process environment. Cannot be combined with --env.
+      --limit=<value>       Page size (server default 20, max 100).
+      --page-token=<value>  Continue from a previous page's next_page_token.
+      --plain               Tab-separated rows with no header, for piping.
+                            Implied when stdout is not a terminal.
+      --[no-]telemetry      Send anonymous usage analytics. Disable with
+                            --no-telemetry.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -1770,6 +1784,8 @@ DESCRIPTION
 
 EXAMPLES
   $ zitadel preview list
+
+  $ zitadel preview list --all
 
   $ zitadel preview list --plain
 ```
