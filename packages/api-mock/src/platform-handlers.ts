@@ -23,6 +23,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 
 import type {
+  AddOrigin201,
   CompleteClaim200,
   CreateFlowDefinition201,
   CreateProject201,
@@ -38,6 +39,9 @@ import type {
   ListSchemas200,
 } from "@zitadel/api/generated/model";
 import {
+  AddOriginBody,
+  AddOriginParams,
+  AddOriginResponse,
   CompleteClaimResponse,
   CreateFlowDefinitionBody,
   CreateIdpBody,
@@ -76,6 +80,8 @@ import {
   QueryIdpsQueryParams,
   QueryIdpsResponse,
   QueryUsersBody,
+  RemoveOriginBody,
+  RemoveOriginParams,
   UpdateVariablesBody,
   UpdateVariablesQueryParams,
   UpdateVariablesResponse,
@@ -182,9 +188,17 @@ type ProjectRecord = {
   projectSecret: string;
   previewSecret: string;
   previewOrigins: string[];
+  origins: OriginEntry[];
   createdAt: string;
   updatedAt: string;
 };
+
+/**
+ * One of a project's origins (#1582): a normalised pattern and what it is for.
+ * Stored one row per `(project, pattern)`; the project response reads them back
+ * as `origins`.
+ */
+type OriginEntry = { pattern: string; kind: "primary" | "preview" };
 
 /**
  * Server-side metadata wrapped around the flow body so the mock can answer
@@ -583,6 +597,12 @@ export type PlatformStoreSnapshot = {
    */
   variableNames: string[];
   /**
+   * The origin patterns stored across every project, in insertion order. A
+   * caller driving the mock over HTTP observes origins through `GET
+   * /projects/:id` (the CLI's `origin list`); this is the in-process view.
+   */
+  originPatterns: string[];
+  /**
    * Ids of the live challenges. A caller that drove `claim/init` over HTTP
    * (a CLI under test, say) never sees the response body, so this is the only
    * way to learn the id it needs to hand to {@link completeClaimChallenge} or
@@ -604,6 +624,9 @@ export function snapshotPlatformStore(): PlatformStoreSnapshot {
     flowDefinitionIds: [...store.flowDefinitions.keys()],
     idpSlugs: [...store.idps.values()].map((record) => record.slug),
     variableNames: [...store.variables.values()].flatMap((owned) => [...owned.keys()]),
+    originPatterns: [...store.projects.values()].flatMap((project) =>
+      project.origins.map((origin) => origin.pattern),
+    ),
     claimChallengeIds: [...store.claimChallenges.keys()],
   };
 }
@@ -736,6 +759,119 @@ function invalidFlowDefinitionResponse(flowDefinition: Record<string, unknown>):
   );
 }
 
+// --- origins -----------------------------------------------------------
+// Origin patterns are project state (#1582). The Go handler is an
+// unimplemented stub for now, so this mock is where the add-time rules live:
+// a `primary` pattern is an exact URL, a `preview` pattern may carry a `*`
+// (one or more characters, none a dot), and a `*` on a shared host needs a
+// literal label the tenant owns. A host the server has no rule for is stored
+// as written. Kept in one block so parallel PRs do not collide.
+
+/** A host anyone can mint names under, and the shape a tenant-unique label takes there. */
+const SHARED_ORIGIN_HOSTS: readonly { suffix: string; bounded: (left: string) => boolean }[] = [
+  // <project>-git-<branch>-<team>.vercel.app: the team slug ends the label.
+  { suffix: ".vercel.app", bounded: (left) => /^\*-[^*]+$/.test(left) },
+  // deploy-preview-<n>--<site>.netlify.app: the site name ends the label.
+  { suffix: ".netlify.app", bounded: (left) => /^\*--[^*]+$/.test(left) },
+  // <hash>.<project>.pages.dev: the project is its own dotted label.
+  { suffix: ".pages.dev", bounded: dottedOriginLabel },
+  // <version>-<worker>.<account>.workers.dev: the account is its own dotted label.
+  { suffix: ".workers.dev", bounded: dottedOriginLabel },
+];
+
+/** Accepts `*.<label>` where the label carries no wildcard of its own. */
+function dottedOriginLabel(left: string): boolean {
+  const rest = left.startsWith("*.") ? left.slice(2) : undefined;
+  return rest !== undefined && rest.length > 0 && !rest.includes("*");
+}
+
+/**
+ * Lowercase and validate an origin or an origin pattern: `scheme://host[:port]`
+ * with no path, query, fragment or credentials. A `*` is accepted anywhere in
+ * the host, which is what makes this usable for patterns too. Returns the
+ * normalised form, or null when it is malformed.
+ */
+function normalizeOrigin(raw: string): string | null {
+  const origin = raw.trim().toLowerCase();
+  const sep = origin.indexOf("://");
+  if (sep < 0) {
+    return null;
+  }
+  const scheme = origin.slice(0, sep);
+  const host = origin.slice(sep + 3);
+  if ((scheme !== "http" && scheme !== "https") || host === "" || /[/?#@ \t]/.test(host)) {
+    return null;
+  }
+  const hostname = host.replace(/:\d+$/, "");
+  if (
+    hostname === "" ||
+    hostname.startsWith(".") ||
+    hostname.endsWith(".") ||
+    hostname.includes("..")
+  ) {
+    return null;
+  }
+  return origin;
+}
+
+/**
+ * Whether a wildcard pattern sits on a shared host the server knows with no
+ * tenant-unique label beside the wildcard. A host with no rule returns false:
+ * it is stored as written.
+ */
+function originUnbounded(pattern: string): boolean {
+  const host = pattern.slice(pattern.indexOf("://") + 3).replace(/:\d+$/, "");
+  for (const shared of SHARED_ORIGIN_HOSTS) {
+    if (host.endsWith(shared.suffix)) {
+      return !shared.bounded(host.slice(0, host.length - shared.suffix.length));
+    }
+  }
+  return false;
+}
+
+/**
+ * The project the write addresses, once the bearer is checked. Add and remove
+ * carry no session fallback (#1582): the project secret is the only credential
+ * that widens or narrows the list, so a preview-deploy token is refused with
+ * `proj.permission_denied` and an unknown token with `auth.unauthorized`.
+ */
+function authorizeProjectWrite(
+  request: Request,
+  projectId: string,
+): { ok: true; project: ProjectRecord } | { ok: false; response: HttpResponse<ErrorBody> } {
+  const project = store.projects.get(projectId);
+  if (!project) {
+    return {
+      ok: false,
+      response: HttpResponse.json(errorBody("proj.not_found", "project not found"), {
+        status: 404,
+      }),
+    };
+  }
+  const token = bearerToken(request);
+  if (token === project.projectSecret) {
+    return { ok: true, project };
+  }
+  if (token === project.previewSecret) {
+    return {
+      ok: false,
+      response: HttpResponse.json(
+        errorBody(
+          "proj.permission_denied",
+          "the project management API requires the project secret",
+        ),
+        { status: 403 },
+      ),
+    };
+  }
+  return {
+    ok: false,
+    response: HttpResponse.json(errorBody("auth.unauthorized", "missing or invalid credentials"), {
+      status: 401,
+    }),
+  };
+}
+
 export function setupPlatformHandlers() {
   return [
     http.post("*/projects", async ({ request }) => {
@@ -756,6 +892,7 @@ export function setupPlatformHandlers() {
         projectSecret: `sk_proj_${id.replaceAll("-", "")}_full`,
         previewSecret: `sk_proj_${id.replaceAll("-", "")}_preview`,
         previewOrigins: body.data.preview_origins ?? [],
+        origins: [],
         createdAt,
         updatedAt: createdAt,
       };
@@ -787,6 +924,7 @@ export function setupPlatformHandlers() {
       const responseBody: GetProject200 = {
         id: project.id,
         name: project.name,
+        origins: project.origins,
         created_at: project.createdAt,
         updated_at: project.updatedAt,
       };
@@ -795,6 +933,102 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data);
+    }),
+
+    // --- origins ---------------------------------------------------------
+    // Add one `{pattern, kind}` to the project, or remove one by its pattern.
+    // The validation here stands in for the server rule (#1582); the Go
+    // handler is an unimplemented stub.
+
+    http.post("*/projects/:project_id/origins", async ({ params, request }) => {
+      const path = parse(AddOriginParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(AddOriginBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+      const auth = authorizeProjectWrite(request, path.data.project_id);
+      if (!auth.ok) {
+        return auth.response;
+      }
+
+      const normalized = normalizeOrigin(body.data.pattern);
+      if (normalized === null) {
+        return HttpResponse.json(
+          errorBody(
+            "origin.invalid",
+            "origin: must be scheme://host[:port], lowercase, with no path",
+          ),
+          { status: 400 },
+        );
+      }
+      const hasStar = normalized.includes("*");
+      if (body.data.kind === "primary" && hasStar) {
+        return HttpResponse.json(
+          errorBody("origin.primary_not_exact", "a primary origin is an exact URL, no wildcard"),
+          { status: 400 },
+        );
+      }
+      if (hasStar && originUnbounded(normalized)) {
+        return HttpResponse.json(
+          errorBody(
+            "origin.unbounded",
+            "origin: a wildcard on a shared host needs a literal label of your own beside the host",
+          ),
+          { status: 400 },
+        );
+      }
+
+      // One row per `(project, pattern)`: a repeat of the same pattern replaces
+      // its kind rather than storing a second row.
+      auth.project.origins = auth.project.origins.filter((origin) => origin.pattern !== normalized);
+      auth.project.origins.push({ pattern: normalized, kind: body.data.kind });
+
+      const responseBody: AddOrigin201 = { pattern: normalized, kind: body.data.kind };
+      const out = parse(AddOriginResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 201 });
+    }),
+
+    http.post("*/projects/:project_id/origins/remove", async ({ params, request }) => {
+      const path = parse(RemoveOriginParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(RemoveOriginBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+      const auth = authorizeProjectWrite(request, path.data.project_id);
+      if (!auth.ok) {
+        return auth.response;
+      }
+
+      // A malformed pattern cannot match a stored one, so it falls through to
+      // the not-found answer rather than being rejected.
+      const normalized =
+        normalizeOrigin(body.data.pattern) ?? body.data.pattern.trim().toLowerCase();
+      const before = auth.project.origins.length;
+      auth.project.origins = auth.project.origins.filter((origin) => origin.pattern !== normalized);
+      if (auth.project.origins.length === before) {
+        return HttpResponse.json(
+          errorBody("origin.not_found", "origin: no such pattern on this project"),
+          { status: 404 },
+        );
+      }
+      return new HttpResponse(null, { status: 204 });
     }),
 
     // POST /projects/:project_id/claim/init — mint a claim challenge. Auth
