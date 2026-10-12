@@ -64,7 +64,7 @@ export default class VariableRm extends EnvironmentCommand {
     if (!force) {
       if (nonInteractive) {
         const retry = publicCliCommand(
-          `variable rm ${name}${flags.preview ? " --preview" : ""} --force`,
+          `variable rm ${name}${flags.preview ? " --preview" : ""} --force${this.environmentSelector()}`,
           cliVersion,
         );
         throw new ZitadelError(

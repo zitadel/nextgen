@@ -114,12 +114,14 @@ type Handler interface {
 	// origins and preview URLs cannot be mixed in one deployment: that
 	// answers `400` with `dep.invalid`.
 	// Idempotent on what is served: when every resolved target already serves
-	// the release, nothing changes and the call answers `200` with the newest
-	// deployment to those targets, so a re-run of `zitadel deploy` on
-	// unchanged content is a no-op end to end. Anything else writes a new
-	// record covering all of the resolved targets, including the same release
-	// returning after something else was served in between: the log is
-	// append-only, and each record is one act of making a release live.
+	// the release under the same frozen variable snapshot, nothing changes and
+	// the call answers `200` with the newest deployment to those targets, so a
+	// re-run of `zitadel deploy` on unchanged content is a no-op end to end.
+	// Anything else writes a new record covering all of the resolved targets —
+	// a different release, the same release returning after something else was
+	// served in between, or the same release when a variable write has changed
+	// the snapshot it would freeze: the log is append-only, and each record is
+	// one act of making a release live.
 	// `expected_deployment_id` guards against racing another deploy: when
 	// present, the write only happens if the newest deployment to any of the
 	// resolved targets still is the one named, and a mismatch answers `409`
