@@ -1232,6 +1232,14 @@ function pointerHandle(kind: string, revisionId: string): string {
   return revisionId;
 }
 
+/**
+ * The project's default preview lifetime, applied when a preview deployment
+ * omits `ttl`. A real project configures this; the mock stands in one value
+ * for every project, matching the spec's "omitted, the project's default
+ * applies" (create-deployment-request.yaml).
+ */
+const DEFAULT_PREVIEW_TTL = "7d";
+
 /** Turn a `ttl` (`30m`, `168h`, `7d`) into an ISO expiry counted from now. */
 function ttlToExpiry(ttl: string): string {
   const match = /^([1-9][0-9]*)([mhd])$/.exec(ttl);
@@ -1780,22 +1788,18 @@ export function setupPlatformHandlers() {
           { status: 400 },
         );
       }
-      const ttl = typeof data.ttl === "string" ? data.ttl : undefined;
-      if (ttl !== undefined && !sawPreview) {
+      const requestedTtl = typeof data.ttl === "string" ? data.ttl : undefined;
+      if (requestedTtl !== undefined && !sawPreview) {
         return HttpResponse.json(
           errorBody("dep.invalid", "deployment: ttl is only valid for preview URLs"),
           { status: 400 },
         );
       }
-      // A preview URL expires, so a deployment to one must say when. The CLI's
-      // `preview` command always sends a ttl; a request that omits it is
-      // refused rather than written with no expiry.
-      if (sawPreview && ttl === undefined) {
-        return HttpResponse.json(
-          errorBody("dep.invalid", "deployment: a preview deployment requires a ttl"),
-          { status: 400 },
-        );
-      }
+      // A preview URL expires, so a deployment to one always gets a ttl. An
+      // omitted ttl is not refused: the project's default applies, per
+      // create-deployment-request.yaml, so a caller (the CLI included) need not
+      // pin a lifetime of its own. A primary-only deployment keeps none.
+      const ttl = sawPreview ? (requestedTtl ?? DEFAULT_PREVIEW_TTL) : undefined;
 
       const targets = [...resolved].sort();
       const expectedId =

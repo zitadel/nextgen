@@ -1784,7 +1784,7 @@ describe("api-mock releases and deployments", () => {
     expect(live.deployments[0]?.release_id).toBe(first.id);
   });
 
-  test("a preview deployment requires a ttl, and renews one preview per URL", async () => {
+  test("a preview deployment defaults an omitted ttl and writes one preview per URL", async () => {
     const project = await newProject("deploy-preview");
     await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
     const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
@@ -1792,17 +1792,11 @@ describe("api-mock releases and deployments", () => {
     };
     const url = "https://acme-git-sso-acmeinc.vercel.app";
 
-    const noTtl = await createDeployment(project.id, project.secret, {
-      release_id: release.id,
-      targets: [url],
-    });
-    expect(noTtl.status).toBe(400);
-    expect(((await noTtl.json()) as { code: string }).code).toBe("dep.invalid");
-
+    // An omitted ttl is accepted: the project's default applies, so the preview
+    // is written with a future expiry rather than being refused.
     const deployed = await createDeployment(project.id, project.secret, {
       release_id: release.id,
       targets: [url],
-      ttl: "168h",
     });
     expect(deployed.status).toBe(201);
     const body = (await deployed.json()) as { targets: { origin: string; expires_at: string }[] };
@@ -1830,6 +1824,24 @@ describe("api-mock releases and deployments", () => {
     });
     expect(mixed.status).toBe(400);
     expect(((await mixed.json()) as { code: string }).code).toBe("dep.invalid");
+  });
+
+  test("refuses a ttl on a primary-origin deployment", async () => {
+    const project = await newProject("deploy-primary-ttl");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+
+    // ttl is only meaningful for previews: a primary-origin deployment that
+    // carries one is refused, even though an omitted ttl on a preview defaults.
+    const withTtl = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["primary"],
+      ttl: "168h",
+    });
+    expect(withTtl.status).toBe(400);
+    expect(((await withTtl.json()) as { code: string }).code).toBe("dep.invalid");
   });
 
   test("removes a preview idempotently and stops listing it", async () => {
