@@ -23,11 +23,25 @@ import type { Step, StepContext } from "../pipeline";
 export const idpConnectionsStep: Step = {
   name: "idp-connections",
   runsFor: ["deploy"],
-  writes: true,
+  // Not marked `writes`: a dry run must still run this step to validate and
+  // preview the connection files. The write itself (`POST /idps`) is guarded on
+  // `ctx.dryRun` below rather than the whole step being skipped, so a dry run
+  // reports what it would sync without a bad file slipping past validation.
   async run(ctx: StepContext): Promise<void> {
     const connections = await readJsonDir(join(ctx.cwd, IDPS_DIR));
     for (const connection of connections) {
+      // Validation runs on every deploy, dry or not: a dry run must surface a
+      // malformed file (or a literal client_secret) rather than defer it.
       validateConnection(connection);
+      if (ctx.dryRun) {
+        // A dry run writes nothing; it only reports what the real deploy would
+        // sync. Withheld under `--json` so the envelope travels alone on stdout.
+        if (!ctx.json) {
+          const slug = typeof connection.slug === "string" ? connection.slug : "(unnamed)";
+          process.stdout.write(`Would sync idp connection ${slug}\n`);
+        }
+        continue;
+      }
       // `POST /idps` dedupes on the slug inside the body, so re-sending an
       // unchanged connection revises it in place rather than creating a second.
       const result = await ctx.client.createIdp(

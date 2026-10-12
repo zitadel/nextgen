@@ -128,7 +128,8 @@ export default class Deploy extends EnvironmentCommand {
       brandingSources,
     };
 
-    // Before-release steps: validate, sync IdPs (skipped on a dry run), diff.
+    // Before-release steps: validate, sync IdPs (validated and previewed but
+    // not written on a dry run), diff.
     await runSteps([validateStep, idpConnectionsStep, diffStep], ctx);
 
     if (dryRun) {
