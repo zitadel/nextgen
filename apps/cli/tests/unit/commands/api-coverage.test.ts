@@ -47,9 +47,6 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   readyz: "readiness probe, not a resource",
   flow: "the runtime login flow protocol, driven by the login UI and the SDKs",
   auth_attempts: "the runtime authentication protocol, driven by the login UI and the SDKs",
-  // An environment is a name on the developer's machine now, resolved from env
-  // files (`zitadel env`), not something the server holds.
-  environments: "an environment is an env file on the developer's machine, not a server resource",
 };
 
 /**
@@ -76,11 +73,6 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   createBranding: "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
   createFlowDefinition:
     "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
-
-  // The environment API stays in the spec until its removal lands; the CLI no
-  // longer reads it.
-  listEnvironments: "the environment API is pending removal; environments are env files now",
-  getEnvironmentByName: "the environment API is pending removal; environments are env files now",
 
   // End-user self-service, authenticated as that user. The CLI holds an
   // operator credential (ADR 036), so these are not its to call.
