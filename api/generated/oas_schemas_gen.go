@@ -9744,6 +9744,10 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 // handle that neither holds refuses the release, naming the pointer and the
 // handle. A bundle that references only resources it carries builds the
 // same release on any project.
+// A handle names one resource of its kind in a bundle. Two schemas with the
+// same `objectType`, two flow definitions with the same `name`, or a schema
+// without an `objectType` refuse the release with `rel.invalid`, with an
+// entry for each such resource.
 // Each kind is optional, and the arrays may be empty: a project that never
 // ejected its branding omits `branding`. The bundle carries at least one
 // resource, and the release it builds pins at most 50, the most a release
