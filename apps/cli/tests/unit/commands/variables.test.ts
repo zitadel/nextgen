@@ -1018,9 +1018,9 @@ describe("naming the owner", () => {
       const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
       expect(json.code).toBe("E_VALIDATION");
       expect(json.message).toContain("--project-level");
-      // The refusal has to say why there is nothing else to name, or it reads
-      // as a flag someone forgot rather than the only owner there is.
-      expect(json.hint).toContain("--environment");
+      // The refusal has to say there is nothing else to name, or it reads as
+      // a flag someone forgot rather than the only owner there is.
+      expect(json.hint).toContain("only owner");
     }
   });
 
