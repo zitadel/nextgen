@@ -80,7 +80,9 @@ export default class ReleaseCreate extends EnvironmentCommand {
         release_id: release.id,
         content_hash: release.content_hash,
         resources: resourceCount,
-        next_commands: [`zitadel deployment create --release ${release.id}`],
+        next_commands: [
+          `zitadel deployment create --release ${release.id}${this.environmentSelector()}`,
+        ],
       },
       pretty: `Created ${release.id} (${release.content_hash})`,
     });
