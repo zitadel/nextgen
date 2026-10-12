@@ -1453,10 +1453,7 @@ export function setupPlatformHandlers() {
       const normalized = normalizeOrigin(body.data.pattern);
       if (normalized === null) {
         return HttpResponse.json(
-          errorBody(
-            "origin.invalid",
-            "origin: must be scheme://host[:port], lowercase, with no path",
-          ),
+          errorBody("origin.invalid", "origin: must be scheme://host[:port] with no path"),
           { status: 400 },
         );
       }
@@ -1521,7 +1518,13 @@ export function setupPlatformHandlers() {
       const normalized =
         normalizeOrigin(body.data.pattern) ?? body.data.pattern.trim().toLowerCase();
       const before = auth.project.origins.length;
-      auth.project.origins = auth.project.origins.filter((origin) => origin.pattern !== normalized);
+      // Stored patterns keep their submitted casing, so match case-insensitively
+      // through `normalizeOrigin` (mirroring the add-path dedup); otherwise a
+      // mixed-case `https://App.Acme.com` could never be removed.
+      auth.project.origins = auth.project.origins.filter(
+        (origin) =>
+          (normalizeOrigin(origin.pattern) ?? origin.pattern.trim().toLowerCase()) !== normalized,
+      );
       if (auth.project.origins.length === before) {
         return HttpResponse.json(
           errorBody("origin.not_found", "origin: no such pattern on this project"),
@@ -1892,13 +1895,17 @@ export function setupPlatformHandlers() {
               : row,
           );
           // The create-deployment response wraps the deployment with the
-          // non-blocking `warnings` it raised. A re-deploy that still falls back
-          // to a production secret must keep warning, so the idempotent 200
-          // carries the freshly computed warnings rather than dropping them.
-          return HttpResponse.json(
-            { ...deploymentResponse(newest, rows), warnings },
-            { status: 200 },
-          );
+          // non-blocking `warnings` it raised. Re-deploying an unchanged preview
+          // that still falls back to an `all` secret keeps raising
+          // `variable.missing_preview_secret`, so the idempotent 200 carries the
+          // renewed warnings rather than dropping them — the preview consumer
+          // surfaces the safety warning on every retry, not only the first. The
+          // renewed-expiry `rows` are reported too, so the 200 reflects the
+          // clock the preview now runs on.
+          const base = deploymentResponse(newest, rows);
+          return HttpResponse.json(warnings.length > 0 ? { ...base, warnings } : base, {
+            status: 200,
+          });
         }
       }
 

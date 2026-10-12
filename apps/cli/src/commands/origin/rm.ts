@@ -48,8 +48,14 @@ export default class OriginRm extends EnvironmentCommand {
 
     if (!force) {
       if (nonInteractive) {
+        // A preview pattern can carry a `*`, so the retry is copy-pasteable only
+        // if the shell will not expand it: single-quote any pattern holding a
+        // glob or other special character before interpolating it.
+        const quoted = /[^A-Za-z0-9._:/@%+-]/.test(pattern)
+          ? `'${pattern.replaceAll("'", `'\\''`)}'`
+          : pattern;
         const retry = publicCliCommand(
-          `origin rm ${pattern} --force${this.environmentSelector()}`,
+          `origin rm ${quoted} --force${this.environmentSelector()}`,
           cliVersion,
         );
         throw new ZitadelError(

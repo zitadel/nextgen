@@ -7,6 +7,7 @@ import { consola } from "consola";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { ZitadelError } from "../../lib/errors";
+import { isEnvironmentName } from "../../lib/environment";
 import { isObject } from "../../lib/json";
 import {
   BaseCommand,
@@ -64,9 +65,9 @@ export default class EnvAdd extends BaseCommand {
     await this.toMeta(flags, { resolveServer: false });
     const { cwd, env, nonInteractive, dryRun, serverFlag } = this.meta;
     const name = args.name;
-    if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(name)) {
+    if (!isEnvironmentName(name)) {
       throw new ZitadelError("E_VALIDATION", `"${name}" is not a usable environment name`, {
-        hint: "Use letters, digits, - and _, e.g. production.",
+        hint: 'Use letters, digits, dot, dash and underscore, and no "..", e.g. production.',
       });
     }
     const file = `.env.${name}.local`;
@@ -228,9 +229,19 @@ export default class EnvAdd extends BaseCommand {
         platform,
         // A freshly bound project admits every origin until the first pattern
         // closes it, so the first step is to add one and restrict the project —
-        // `origin add` — before anything ships.
+        // `origin add` — before anything ships. `next_commands` is machine-
+        // readable, so the entry is included only when it is actually runnable:
+        // a concrete origin (without `--app-url` it would be a `<your-app-url>`
+        // placeholder the shell reads as redirection) and a project secret in
+        // the file for it to authenticate with (a `--project` bind with no
+        // secret cannot). The human-facing line below still spells it out.
         next_commands: [
-          `zitadel origin add ${issuer ?? "<your-app-url>"} --kind primary --env ${name}`,
+          ...(issuer !== undefined && writtenKeys.has("ZITADEL_PROJECT_SECRET")
+            ? // Single-quote the origin: an IPv6 issuer like http://[::1]:3000 carries
+              // brackets a shell such as zsh would treat as a glob. A URL cannot contain
+              // a single quote, so wrapping is always safe here.
+              [`zitadel origin add '${issuer}' --kind primary --env ${name}`]
+            : []),
           `zitadel env --env ${name}`,
         ],
       },

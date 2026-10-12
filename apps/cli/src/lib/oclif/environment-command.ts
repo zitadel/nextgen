@@ -8,6 +8,19 @@ import { CREDENTIALS, type CredentialKind } from "./credentials";
 import { environmentFlags } from "./environment-flags";
 import type { GlobalOptions } from "./types";
 
+/**
+ * A single argument for a `next_commands` string, POSIX-quoted only when it
+ * carries a character outside the shell-safe set, so a reproduced `--env-file`
+ * path with a space or metacharacter stays one argument while an ordinary name
+ * or URL is left bare.
+ */
+function shellArg(value: string): string {
+  if (/^[A-Za-z0-9._:/@=-]+$/.test(value)) {
+    return value;
+  }
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
 /** The platform connection {@link EnvironmentCommand.connect} opens. */
 export type Connection = Readonly<{
   client: ZitadelClient;
@@ -79,12 +92,12 @@ export abstract class EnvironmentCommand extends BaseCommand {
     const { environment } = this;
     const parts: string[] = [];
     if (environment.envFile !== undefined) {
-      parts.push(`--env-file ${environment.envFile}`);
+      parts.push(`--env-file ${shellArg(environment.envFile)}`);
     } else if (environment.name.source === "--env") {
-      parts.push(`--env ${environment.name.value}`);
+      parts.push(`--env ${shellArg(environment.name.value)}`);
     }
     if (environment.values.ZITADEL_URL?.source === "--server") {
-      parts.push(`--server ${environment.values.ZITADEL_URL.value}`);
+      parts.push(`--server ${shellArg(environment.values.ZITADEL_URL.value)}`);
     }
     return parts.length === 0 ? "" : ` ${parts.join(" ")}`;
   }

@@ -65,12 +65,27 @@ export async function rollbackDeployment(
   client: ZitadelClient,
   projectId: string,
   deploymentId: string,
-  message?: string,
+  options?: {
+    message?: string;
+    /**
+     * Optimistic-concurrency guard: the deployment the caller believes is the
+     * newest one to the targets. The server answers 409 (`dep.conflict`) when
+     * another deploy raced in between the caller reading state and this write,
+     * so a rollback never overwrites a change the caller never saw.
+     */
+    expectedDeploymentId?: string;
+  },
 ): Promise<RollbackDeployment201> {
+  const body = {
+    ...(options?.message === undefined ? {} : { message: options.message }),
+    ...(options?.expectedDeploymentId === undefined
+      ? {}
+      : { expected_deployment_id: options.expectedDeploymentId }),
+  };
   const result = await client.rollbackDeployment(
     deploymentId,
     { project_id: projectId },
-    message === undefined ? undefined : { message },
+    Object.keys(body).length === 0 ? undefined : body,
   );
   return result as RollbackDeployment201;
 }

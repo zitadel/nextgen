@@ -50,13 +50,16 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
  * `node_modules` directly; it just suggests the command).
  */
 function assembleNextCommands(
-  backedUp: ReadonlyArray<unknown>,
+  backedUp: ReadonlyArray<string>,
   dependencies: ReadonlyArray<string>,
 ): ReadonlyArray<string> {
   const commands: string[] = [];
   if (backedUp.length > 0) {
-    // Glob covers every env backup (`.env.local`, `.env.development.local`).
-    commands.push("rm -f .env*.ejected-*");
+    // Name only the backups eject actually created (each `backedUp` entry is
+    // `<rel> -> <backup>`), so this destructive glob can't also sweep up
+    // unrelated `.env*.ejected-*` files a user happens to keep.
+    const patterns = backedUp.map((entry) => `${entry.split(" -> ")[0]}.ejected-*`);
+    commands.push(`rm -f ${patterns.join(" ")}`);
   }
   for (const dep of dependencies) {
     commands.push(`npm uninstall ${dep}`);
