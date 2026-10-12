@@ -4,11 +4,12 @@
 // it, so the binary itself turns the environment a Vercel function receives
 // into what the server accepts:
 //
-//   - The database. Neon's Vercel integration injects DATABASE_URL (pooled,
-//     through PgBouncer) and DATABASE_URL_UNPOOLED (direct); a preview
-//     deployment gets the URLs of its own Neon branch. The server serves from
-//     the pooled URL with a small pgx pool, because Vercel starts an instance
-//     per concurrent request from cold and every instance holds its own pool.
+//   - The database (database.go). CLOUD_DATABASE_URL (pooled, through
+//     PgBouncer) and CLOUD_MIGRATOR_DATABASE_URL (direct) name PlanetScale
+//     Postgres; a preview gets a database of its own on the preview cluster,
+//     created by its build. The server serves from the pooled URL with a small
+//     pgx pool, because Vercel starts an instance per concurrent request from
+//     cold and every instance holds its own pool.
 //   - The master key. server.master_keys can only come from a config file
 //     (the server ignores NEXTGEN_SERVER_MASTER_KEYS_*), so
 //     MASTER_KEY_PEM_B64 and MASTER_KEY_ID become <data_dir>/nextgen.yaml.
@@ -21,12 +22,14 @@
 //     variable says otherwise.
 //
 // Migrations run at deploy time, never at startup: build.sh calls
-// `launcher migrate` after compiling, which runs the server's migrate command
-// against the direct URL. The serving invocation refuses --migrate, so a
-// function cannot change a schema by starting.
+// `launcher migrate` after compiling, which creates a preview's database when
+// it is missing and runs the server's migrate command against the direct
+// URL. The serving invocation refuses --migrate, so a function cannot change
+// a schema by starting.
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -35,6 +38,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/zitadel/nextgen/cmd/server"
 )
@@ -97,22 +101,35 @@ func deployed(env string) bool {
 	return env == "production" || env == "preview"
 }
 
-// prepareMigration is the deploy-time mode: it points the server's migrate
-// command at the direct URL of the deployment's database. Migrations hold a
-// session advisory lock, which a transaction pooler cannot keep. Production
-// migrates only from its production branch, so a production build of any
-// other branch (a promoted preview, which Vercel rebuilds with production
-// variables, or a CLI deploy) fails instead of changing the schema.
+// prepareMigration is the deploy-time mode: it creates a preview's database
+// when it is missing and points the server's migrate command at the direct
+// URL of the deployment's database. Production migrates only from its
+// production branch, so a production build of any other branch (a promoted
+// preview, which Vercel rebuilds with production variables, or a CLI deploy)
+// fails instead of changing the schema.
 func prepareMigration(extra []string) ([]string, error) {
 	env := os.Getenv("VERCEL_ENV")
+	ref := gitRef()
 	if env == "production" {
-		if ref, branch := os.Getenv("VERCEL_GIT_COMMIT_REF"), productionBranch(); ref != branch {
+		if branch := productionBranch(); ref != branch {
 			return nil, fmt.Errorf("refusing to migrate production from %q: production deploys from %q (CLOUD_PRODUCTION_BRANCH)", ref, branch)
 		}
 	}
-	dsn := os.Getenv("DATABASE_URL_UNPOOLED")
+	dsn := os.Getenv(migratorDatabaseURLVar)
 	if dsn == "" && deployed(env) {
-		return nil, fmt.Errorf("DATABASE_URL_UNPOOLED must be set for a %s deployment (Neon's Vercel integration sets it)", env)
+		return nil, fmt.Errorf("%s must be set for a %s deployment", migratorDatabaseURLVar, env)
+	}
+	if dsn != "" && env == "preview" {
+		name, err := previewDatabaseName(ref)
+		if err != nil {
+			return nil, err
+		}
+		if err := ensureDatabase(context.Background(), dsn, name, ref, time.Now()); err != nil {
+			return nil, err
+		}
+		if dsn, err = withDatabase(dsn, name); err != nil {
+			return nil, err
+		}
 	}
 	if dsn != "" {
 		if err := os.Setenv("NEXTGEN_DATABASE_POSTGRES", dsn); err != nil {
@@ -150,9 +167,18 @@ func prepareServer(extra []string) ([]string, error) {
 		return nil, err
 	}
 
-	dsn := os.Getenv("DATABASE_URL")
+	dsn := os.Getenv(databaseURLVar)
 	if dsn == "" && deployed(env) {
-		return nil, fmt.Errorf("DATABASE_URL must be set for a %s deployment (Neon's Vercel integration sets it)", env)
+		return nil, fmt.Errorf("%s must be set for a %s deployment", databaseURLVar, env)
+	}
+	if dsn != "" && env == "preview" {
+		name, err := previewDatabaseName(gitRef())
+		if err != nil {
+			return nil, err
+		}
+		if dsn, err = withDatabase(dsn, name); err != nil {
+			return nil, err
+		}
 	}
 	if dsn != "" {
 		pooled, err := withParams(dsn, servingParams)
@@ -231,14 +257,13 @@ func prepareServer(extra []string) ([]string, error) {
 	return append(args, extra...), nil
 }
 
-// withParams adds each parameter the URL does not set yet. The integration's
-// URLs are postgresql:// URLs; the server also accepts the key=value form,
-// but nothing here produces it, so anything else is refused rather than
-// guessed at.
+// withParams adds each parameter the URL does not set yet. The server also
+// accepts the key=value form, but nothing here produces it, so anything but a
+// postgres:// URL is refused rather than guessed at.
 func withParams(dsn string, params []struct{ key, value string }) (string, error) {
-	u, err := url.Parse(dsn)
-	if err != nil || (u.Scheme != "postgres" && u.Scheme != "postgresql") {
-		return "", errors.New("DATABASE_URL must be a postgres:// or postgresql:// URL")
+	u, err := parsePostgresURL(dsn)
+	if err != nil {
+		return "", err
 	}
 	query := u.Query()
 	for _, param := range params {
@@ -279,8 +304,8 @@ func describeEnv(env string) string {
 }
 
 // describeDatabase names the host and database of a URL, never its
-// credentials. Every Neon branch has its own endpoint host, so the build and
-// runtime logs show which branch a deployment uses.
+// credentials, so the build and runtime logs show which database a
+// deployment uses.
 func describeDatabase(dsn string) string {
 	u, err := url.Parse(dsn)
 	if err != nil || u.Host == "" {

@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,8 +17,9 @@ import (
 const testPEM = "-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu\n-----END RSA PRIVATE KEY-----\n"
 
 const (
-	pooledURL   = "postgresql://neondb_owner:secret@ep-quiet-sun-123456-pooler.c-8.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-	unpooledURL = "postgresql://neondb_owner:secret@ep-quiet-sun-123456.c-8.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+	pooledURL   = "postgresql://cloud-server.abc123:secret@eu-central.pg.psdb.cloud:6432/postgres?sslmode=verify-full&sslrootcert=system"
+	migratorURL = "postgresql://cloud-migrator.abc123:secret@eu-central.pg.psdb.cloud:5432/postgres?sslmode=verify-full&sslrootcert=system"
+	branch      = "claude/nextgen-deployment-plan-bd5396"
 )
 
 // setLauncherEnv gives every variable the launcher reads or writes a known
@@ -25,9 +29,9 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 	t.Helper()
 	for _, key := range []string{
 		"BOOTSTRAP_ADMIN_USER_JSON_B64",
+		"CLOUD_DATABASE_URL",
+		"CLOUD_MIGRATOR_DATABASE_URL",
 		"CLOUD_PRODUCTION_BRANCH",
-		"DATABASE_URL",
-		"DATABASE_URL_UNPOOLED",
 		"NEXTGEN_DATABASE_POSTGRES",
 		"NEXTGEN_INSTRUMENTATION_LOG_FORMAT",
 		"NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT",
@@ -48,6 +52,31 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
 	t.Setenv("MASTER_KEY_PEM_B64", base64.StdEncoding.EncodeToString([]byte(testPEM)))
 	t.Setenv("MASTER_KEY_ID", "cloud-2026-10")
+}
+
+type ensureCall struct {
+	baseDSN, name, ref string
+}
+
+// stubEnsureDatabase records the preview databases the launcher asks for
+// instead of connecting anywhere.
+func stubEnsureDatabase(t *testing.T) *[]ensureCall {
+	t.Helper()
+	calls := &[]ensureCall{}
+	previous := ensureDatabase
+	ensureDatabase = func(_ context.Context, baseDSN, name, ref string, _ time.Time) error {
+		*calls = append(*calls, ensureCall{baseDSN, name, ref})
+		return nil
+	}
+	t.Cleanup(func() { ensureDatabase = previous })
+	return calls
+}
+
+func previewName(t *testing.T) string {
+	t.Helper()
+	name, err := previewDatabaseName(branch)
+	require.NoError(t, err)
+	return name
 }
 
 func TestPrepareServerRendersTheMasterKeyIntoTheConfig(t *testing.T) {
@@ -98,26 +127,75 @@ func TestPrepareServerNormalizesThePEM(t *testing.T) {
 	assert.Equal(t, ":8080", os.Getenv("NEXTGEN_SERVER_ADDRESS"), "PORT defaults to 8080")
 }
 
-func TestPrepareServerServesFromThePooledURL(t *testing.T) {
+func TestPrepareServerServesProductionFromThePooledURL(t *testing.T) {
 	setLauncherEnv(t, t.TempDir())
-	t.Setenv("VERCEL_ENV", "preview")
-	t.Setenv("DATABASE_URL", pooledURL)
-	t.Setenv("DATABASE_URL_UNPOOLED", unpooledURL)
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
 
 	_, err := prepareServer(nil)
 	require.NoError(t, err)
 
 	served, err := url.Parse(os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
 	require.NoError(t, err)
-	assert.Equal(t, "ep-quiet-sun-123456-pooler.c-8.eu-central-1.aws.neon.tech", served.Host, "the pooled host, never the direct one")
-	assert.Equal(t, "neondb_owner", served.User.Username())
-	assert.Equal(t, "/neondb", served.Path)
+	assert.Equal(t, "eu-central.pg.psdb.cloud:6432", served.Host, "the pooler, never the direct port")
+	assert.Equal(t, "cloud-server.abc123", served.User.Username())
+	assert.Equal(t, "/postgres", served.Path, "production serves the database it is given")
 	assert.Equal(t, url.Values{
-		"sslmode":                 {"require"},
-		"channel_binding":         {"require"},
+		"sslmode":                 {"verify-full"},
+		"sslrootcert":             {"system"},
 		"pool_max_conns":          {"4"},
 		"default_query_exec_mode": {"cache_describe"},
 	}, served.Query())
+}
+
+func TestPrepareServerServesAPreviewFromItsOwnDatabase(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "preview")
+	t.Setenv("VERCEL_GIT_COMMIT_REF", branch)
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	served, err := url.Parse(os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
+	require.NoError(t, err)
+	assert.Equal(t, "eu-central.pg.psdb.cloud:6432", served.Host)
+	assert.Equal(t, "/"+previewName(t), served.Path, "the branch's database, not the cluster's base database")
+	assert.Equal(t, "4", served.Query().Get("pool_max_conns"))
+}
+
+func TestPreviewDatabaseName(t *testing.T) {
+	name := previewName(t)
+	assert.Regexp(t, `^preview_claude_nextgen_deployment_plan_bd5396_[0-9a-f]{8}$`, name)
+
+	again, err := previewDatabaseName(branch)
+	require.NoError(t, err)
+	assert.Equal(t, name, again, "every build and every function of a branch agree")
+
+	long := "feature/" + strings.Repeat("a-very-long-branch-name-", 4)
+	first, err := previewDatabaseName(long + "one")
+	require.NoError(t, err)
+	second, err := previewDatabaseName(long + "two")
+	require.NoError(t, err)
+	assert.NotEqual(t, first, second, "the hash keeps branches apart where the readable part is cut")
+	assert.LessOrEqual(t, len(first), 63, "Postgres identifiers hold 63 bytes")
+
+	odd, err := previewDatabaseName("---")
+	require.NoError(t, err)
+	assert.Regexp(t, `^preview_[0-9a-f]{8}$`, odd)
+
+	_, err = previewDatabaseName("")
+	assert.ErrorContains(t, err, "needs its Git branch")
+}
+
+func TestWithDatabaseKeepsCredentialsAndParameters(t *testing.T) {
+	dsn, err := withDatabase(migratorURL, "preview_x_0000")
+	require.NoError(t, err)
+	assert.Equal(t, "postgresql://cloud-migrator.abc123:secret@eu-central.pg.psdb.cloud:5432/preview_x_0000?sslmode=verify-full&sslrootcert=system", dsn)
+
+	_, err = withDatabase("host=db user=u", "x")
+	assert.ErrorContains(t, err, "postgres:// or postgresql://")
 }
 
 func TestWithParamsKeepsWhatTheURLAlreadySets(t *testing.T) {
@@ -134,7 +212,7 @@ func TestWithParamsKeepsWhatTheURLAlreadySets(t *testing.T) {
 func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
 	setLauncherEnv(t, t.TempDir())
 	t.Setenv("VERCEL_ENV", "production")
-	t.Setenv("DATABASE_URL", pooledURL)
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
 	t.Setenv("VERCEL_PROJECT_PRODUCTION_URL", "nextgen-preview-cloud.vercel.app")
 	// Leftovers from an earlier layout must not move the console or the login.
 	t.Setenv("NEXTGEN_SERVER_CONSOLE_ENABLED", "true")
@@ -155,7 +233,7 @@ func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
 func TestPrepareServerKeepsExplicitDefaults(t *testing.T) {
 	setLauncherEnv(t, t.TempDir())
 	t.Setenv("VERCEL_ENV", "production")
-	t.Setenv("DATABASE_URL", pooledURL)
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
 	t.Setenv("VERCEL_PROJECT_PRODUCTION_URL", "nextgen-preview-cloud.vercel.app")
 	t.Setenv("NEXTGEN_SERVER_PUBLIC_BASE", "https://cloud.example.com")
 	t.Setenv("NEXTGEN_INSTRUMENTATION_LOG_FORMAT", "text")
@@ -208,7 +286,7 @@ func TestPrepareServerLocallyKeepsTheConfiguredDatabase(t *testing.T) {
 	_, err := prepareServer(nil)
 	require.NoError(t, err)
 
-	assert.Equal(t, "postgres://local/db", os.Getenv("NEXTGEN_DATABASE_POSTGRES"), "without DATABASE_URL a local run keeps its own database")
+	assert.Equal(t, "postgres://local/db", os.Getenv("NEXTGEN_DATABASE_POSTGRES"), "without CLOUD_DATABASE_URL a local run keeps its own database")
 }
 
 func TestPrepareServerRefusesBadInput(t *testing.T) {
@@ -243,13 +321,19 @@ func TestPrepareServerRefusesBadInput(t *testing.T) {
 			for _, env := range []string{"production", "preview"} {
 				t.Setenv("VERCEL_ENV", env)
 				_, err := prepareServer(nil)
-				assert.ErrorContains(t, err, "DATABASE_URL must be set for a "+env+" deployment")
+				assert.ErrorContains(t, err, "CLOUD_DATABASE_URL must be set for a "+env+" deployment")
 			}
 		},
-		"a database URL that is not a postgres URL": func(t *testing.T) {
-			t.Setenv("DATABASE_URL", "host=db user=u")
+		"a preview that does not know its branch": func(t *testing.T) {
+			t.Setenv("VERCEL_ENV", "preview")
+			t.Setenv("CLOUD_DATABASE_URL", pooledURL)
 			_, err := prepareServer(nil)
-			assert.ErrorContains(t, err, "must be a postgres:// or postgresql:// URL")
+			assert.ErrorContains(t, err, "needs its Git branch")
+		},
+		"a database URL that is not a postgres URL": func(t *testing.T) {
+			t.Setenv("CLOUD_DATABASE_URL", "host=db user=u")
+			_, err := prepareServer(nil)
+			assert.ErrorContains(t, err, "must be postgres:// or postgresql:// URLs")
 		},
 		"a bootstrap document that is not one": func(t *testing.T) {
 			t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(`{"user":"x"}`)))
@@ -265,24 +349,45 @@ func TestPrepareServerRefusesBadInput(t *testing.T) {
 	}
 }
 
-func TestPrepareMigrationUsesTheDirectURL(t *testing.T) {
+func TestPrepareMigrationCreatesAndMigratesAPreviewDatabase(t *testing.T) {
+	calls := stubEnsureDatabase(t)
 	setLauncherEnv(t, "")
 	t.Setenv("VERCEL_ENV", "preview")
-	t.Setenv("DATABASE_URL", pooledURL)
-	t.Setenv("DATABASE_URL_UNPOOLED", unpooledURL)
+	t.Setenv("VERCEL_GIT_COMMIT_REF", branch)
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
 
 	args, err := prepareMigration(nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"migrate"}, args)
-	assert.Equal(t, unpooledURL, os.Getenv("NEXTGEN_DATABASE_POSTGRES"), "the migration lock needs a session, which the pooler cannot hold")
+	assert.Equal(t, []ensureCall{{migratorURL, previewName(t), branch}}, *calls,
+		"the database is created through the base database of the preview cluster")
+	migrated, err := url.Parse(os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
+	require.NoError(t, err)
+	assert.Equal(t, "eu-central.pg.psdb.cloud:5432", migrated.Host, "the migration lock needs a session, which the pooler cannot hold")
+	assert.Equal(t, "/"+previewName(t), migrated.Path)
 	assert.Equal(t, defaultDataDir, os.Getenv("NEXTGEN_SERVER_DATA_DIR"))
+}
+
+func TestPrepareMigrationMigratesProductionInPlace(t *testing.T) {
+	calls := stubEnsureDatabase(t)
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("VERCEL_GIT_COMMIT_REF", "main")
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
+
+	_, err := prepareMigration(nil)
+	require.NoError(t, err)
+
+	assert.Empty(t, *calls, "production creates no database")
+	assert.Equal(t, migratorURL, os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
 }
 
 func TestPrepareMigrationMigratesProductionOnlyFromItsBranch(t *testing.T) {
 	setLauncherEnv(t, t.TempDir())
 	t.Setenv("VERCEL_ENV", "production")
-	t.Setenv("DATABASE_URL_UNPOOLED", unpooledURL)
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
 
 	t.Setenv("VERCEL_GIT_COMMIT_REF", "feature")
 	_, err := prepareMigration(nil)
@@ -300,7 +405,7 @@ func TestPrepareMigrationMigratesProductionOnlyFromItsBranch(t *testing.T) {
 func TestPrepareMigrationFollowsATestedProductionBranch(t *testing.T) {
 	setLauncherEnv(t, t.TempDir())
 	t.Setenv("VERCEL_ENV", "production")
-	t.Setenv("DATABASE_URL_UNPOOLED", unpooledURL)
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
 	t.Setenv("CLOUD_PRODUCTION_BRANCH", "feature")
 
 	t.Setenv("VERCEL_GIT_COMMIT_REF", "feature")
@@ -313,12 +418,14 @@ func TestPrepareMigrationFollowsATestedProductionBranch(t *testing.T) {
 }
 
 func TestPrepareMigrationNeedsTheDirectURLWhenDeployed(t *testing.T) {
+	stubEnsureDatabase(t)
 	setLauncherEnv(t, t.TempDir())
 	t.Setenv("VERCEL_ENV", "preview")
-	t.Setenv("DATABASE_URL", pooledURL)
+	t.Setenv("VERCEL_GIT_COMMIT_REF", branch)
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
 
 	_, err := prepareMigration(nil)
-	assert.ErrorContains(t, err, "DATABASE_URL_UNPOOLED must be set for a preview deployment")
+	assert.ErrorContains(t, err, "CLOUD_MIGRATOR_DATABASE_URL must be set for a preview deployment")
 
 	t.Setenv("VERCEL_ENV", "")
 	t.Setenv("NEXTGEN_DATABASE_POSTGRES", "postgres://local/db")
@@ -327,9 +434,13 @@ func TestPrepareMigrationNeedsTheDirectURLWhenDeployed(t *testing.T) {
 	assert.Equal(t, "postgres://local/db", os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
 }
 
-func TestDescribeDatabaseNamesTheBranchEndpointOnly(t *testing.T) {
-	assert.Equal(t, " at ep-quiet-sun-123456.c-8.eu-central-1.aws.neon.tech/neondb", describeDatabase(unpooledURL))
-	assert.NotContains(t, describeDatabase(unpooledURL), "secret", "credentials stay out of the logs")
+func TestDescribeDatabaseNamesTheHostAndDatabaseOnly(t *testing.T) {
+	assert.Equal(t, " at eu-central.pg.psdb.cloud:5432/postgres", describeDatabase(migratorURL))
+	assert.NotContains(t, describeDatabase(migratorURL), "secret", "credentials stay out of the logs")
 	assert.Empty(t, describeDatabase(""))
 	assert.Empty(t, describeDatabase("host=db user=u"))
+}
+
+func TestQuoteLiteral(t *testing.T) {
+	assert.Equal(t, `'{"branch":"it''s"}'`, quoteLiteral(`{"branch":"it's"}`))
 }
