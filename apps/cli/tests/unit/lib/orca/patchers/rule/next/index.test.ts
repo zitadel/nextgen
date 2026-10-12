@@ -193,6 +193,7 @@ describe("NextPatcher.plan", () => {
       ZITADEL_PROJECT_ID: "proj-1",
       ZITADEL_PROJECT_SECRET: "sk_proj_full",
       ZITADEL_PREVIEW_TOKEN: "sk_proj_preview",
+      ZITADEL_ISSUER: "http://localhost:3000",
     });
   });
 

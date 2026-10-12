@@ -232,7 +232,7 @@ npx @zitadel/cli@alpha doctor --non-interactive --json
 npx @zitadel/cli@alpha start --non-interactive --json
 npx @zitadel/cli@alpha setup --framework next --server local --force --non-interactive --json
 npx @zitadel/cli@alpha doctor --non-interactive --json
-npx @zitadel/cli@alpha deploy --non-interactive --json
+npx @zitadel/cli@alpha deploy -m "<why this release changes>" --non-interactive --json
 ```
 
 `setup` scaffolds into an empty directory, or patches an existing app project

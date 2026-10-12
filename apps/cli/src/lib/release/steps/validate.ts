@@ -1,5 +1,9 @@
 import { type FlowValidationIssue, validateFlowDefinition } from "@zitadel/config/validate";
-import { brandingConfigSchema, schemaConfigSchema } from "@zitadel/config/schemas";
+import {
+  brandingConfigSchema,
+  flowConfigSchema,
+  schemaConfigSchema,
+} from "@zitadel/config/schemas";
 
 import { readDescriptorTemplate } from "../../branding";
 import { ZitadelError } from "../../errors";
@@ -23,8 +27,13 @@ export const validateStep: Step = {
   runsFor: ["deploy", "preview"],
   async run(ctx: StepContext): Promise<void> {
     assertEnvRefsResolve(ctx);
-    validateFlows(ctx);
+    // Structural parsing first: `validateFlowDefinition` is the semantic
+    // validator and assumes its input already parsed against `flowConfigSchema`,
+    // so a flow missing a required `name`/`status`/`user_schema` has to be
+    // rejected here, not left to fail at release creation after the IdP step
+    // has already written.
     validateBundleShapes(ctx);
+    validateFlows(ctx);
     for (const warning of await brandingAssetWarnings(ctx.bundle.brandings)) {
       reportWarning(warning);
     }
@@ -32,13 +41,13 @@ export const validateStep: Step = {
 };
 
 /**
- * Parse every schema and branding descriptor against the same Zod the server
- * enforces, before any writing step runs. Without this a malformed schema or
- * branding only fails at `createRelease`, after the IdP-sync step has already
- * written — leaving a half-applied deploy. Errors across every bundle kind
- * aggregate into one `E_VALIDATION`. Branding is parsed from the descriptor as
- * authored (not the inlined wire body), so a `$file` that cannot be read is
- * reported here rather than silently dropped.
+ * Parse every schema, flow and branding descriptor against the same Zod the
+ * server enforces, before any writing step runs. Without this a malformed
+ * schema, flow or branding only fails at `createRelease`, after the IdP-sync
+ * step has already written — leaving a half-applied deploy. Errors across
+ * every bundle kind aggregate into one `E_VALIDATION`. Branding is parsed from
+ * the descriptor as authored (not the inlined wire body), so a `$file` that
+ * cannot be read is reported here rather than silently dropped.
  */
 function validateBundleShapes(ctx: StepContext): void {
   const failures: string[] = [];
@@ -47,6 +56,15 @@ function validateBundleShapes(ctx: StepContext): void {
     if (!result.success) {
       const handle =
         typeof schema.objectType === "string" ? schema.objectType : `schema #${index + 1}`;
+      for (const issue of result.error.issues) {
+        failures.push(`${handle}: ${issue.path.join(".") || "(root)"} ${issue.message}`);
+      }
+    }
+  });
+  ctx.bundle.flow_definitions.forEach((flow, index) => {
+    const result = flowConfigSchema.safeParse(flow);
+    if (!result.success) {
+      const handle = typeof flow.name === "string" ? flow.name : `flow #${index + 1}`;
       for (const issue of result.error.issues) {
         failures.push(`${handle}: ${issue.path.join(".") || "(root)"} ${issue.message}`);
       }

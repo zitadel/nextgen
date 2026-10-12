@@ -281,6 +281,11 @@ export abstract class AbstractRulePatcher implements Patcher {
           ZITADEL_PROJECT_ID: ctx.project.id,
           ZITADEL_PROJECT_SECRET: ctx.project.project_secret,
           ZITADEL_PREVIEW_TOKEN: ctx.project.preview_secret,
+          // The setup issuer, so the SSO recovery command (which pins
+          // `--env-file .env.development.local`) resolves the local origin
+          // rather than falling through to a production `ZITADEL_ISSUER` in
+          // the process environment.
+          ZITADEL_ISSUER: ctx.issuer,
         },
       },
       {

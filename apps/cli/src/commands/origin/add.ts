@@ -23,7 +23,7 @@ export default class OriginAdd extends EnvironmentCommand {
   static override group = CommandGroups.configuration;
   static override examples = [
     "<%= config.bin %> origin add https://app.acme.com --kind primary",
-    "<%= config.bin %> origin add https://*-acme.vercel.app --kind preview",
+    "<%= config.bin %> origin add 'https://*-acme.vercel.app' --kind preview",
   ];
   static override args = {
     pattern: nonBlankArg({ required: true, description: "The origin pattern to add." }),
