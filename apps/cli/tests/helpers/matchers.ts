@@ -183,7 +183,6 @@ expect.extend({
           : `expected the output to say "${text}", but it was:\n\n${output.trim().slice(0, 600)}`,
     };
   },
-
 });
 
 declare module "vitest" {

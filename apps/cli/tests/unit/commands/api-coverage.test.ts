@@ -175,12 +175,7 @@ const STANDALONE: Readonly<Record<string, readonly string[]>> = {
   // release live, `deployment list`/`get` read the history, `deployment
   // rollback` re-applies one. The operations live in the `lib/release` wrappers
   // these commands call, which {@link standaloneOperations} scans too.
-  deployments: [
-    "deployment/create",
-    "deployment/list",
-    "deployment/get",
-    "deployment/rollback",
-  ],
+  deployments: ["deployment/create", "deployment/list", "deployment/get", "deployment/rollback"],
 };
 
 /**
