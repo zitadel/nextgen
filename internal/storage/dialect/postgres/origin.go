@@ -20,8 +20,10 @@ ORDER BY created_at ASC, pattern ASC`
 	getOriginByPatternStmt = `SELECT pattern, kind FROM zitadel_nextgen.project_origins
 WHERE project_id = $1 AND pattern = $2`
 
-	insertOriginStmt = `INSERT INTO zitadel_nextgen.project_origins (project_id, pattern, kind)
-VALUES ($1, $2, $3)
+	// clock_timestamp() (not now()) so sequential inserts in one transaction
+	// keep distinct created_at values; list order is created_at then pattern.
+	insertOriginStmt = `INSERT INTO zitadel_nextgen.project_origins (project_id, pattern, kind, created_at)
+VALUES ($1, $2, $3, clock_timestamp())
 ON CONFLICT (project_id, pattern) DO NOTHING`
 
 	deleteOriginByPatternStmt = `DELETE FROM zitadel_nextgen.project_origins

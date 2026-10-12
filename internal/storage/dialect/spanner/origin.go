@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/spanner"
 	"google.golang.org/grpc/codes"
@@ -21,7 +22,10 @@ const (
 WHERE project_id = @p1
 ORDER BY created_at ASC, pattern ASC`
 
-	insertOriginStmt = `INSERT INTO project_origins (project_id, pattern, kind) VALUES (@p1, @p2, @p3)`
+	// Explicit created_at so sequential inserts in one transaction keep a
+	// stable list order (created_at then pattern) instead of collapsing on
+	// the column default.
+	insertOriginStmt = `INSERT INTO project_origins (project_id, pattern, kind, created_at) VALUES (@p1, @p2, @p3, @p4)`
 
 	deleteOriginByPatternStmt = `DELETE FROM project_origins
 WHERE project_id = @p1 AND pattern = @p2`
@@ -80,7 +84,13 @@ func (s originStatements) GetOriginByPattern(ctx context.Context, projectID, pat
 
 // InsertOrigin implements [service.OriginStatements].
 func (s originStatements) InsertOrigin(ctx context.Context, projectID string, origin domain.Origin) (bool, error) {
-	stmt := buildStatement(insertOriginStmt, projectID, strings.TrimSpace(origin.Pattern), string(origin.Kind)).statement()
+	stmt := buildStatement(
+		insertOriginStmt,
+		projectID,
+		strings.TrimSpace(origin.Pattern),
+		string(origin.Kind),
+		time.Now().UTC(),
+	).statement()
 	if _, err := s.db.Update(ctx, stmt); err != nil {
 		if status.Code(err) == codes.AlreadyExists {
 			return false, nil

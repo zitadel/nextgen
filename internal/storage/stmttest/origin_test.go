@@ -25,11 +25,12 @@ func TestOriginsRoundTrip(t *testing.T) {
 
 		got, err := d.stmts.GetProjectByID(t.Context(), project.ID)
 		require.NoError(t, err)
-		assert.ElementsMatch(t, project.Origins, got.Origins)
+		// Create order must survive hydrate: list is created_at then pattern.
+		assert.Equal(t, project.Origins, got.Origins)
 
 		listed, err := d.stmts.ListOriginsByProjectID(t.Context(), project.ID)
 		require.NoError(t, err)
-		assert.ElementsMatch(t, project.Origins, listed)
+		assert.Equal(t, project.Origins, listed)
 	})
 }
 
