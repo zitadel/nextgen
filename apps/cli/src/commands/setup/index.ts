@@ -171,6 +171,15 @@ export default class Setup extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Setup);
+    // First thing `setup` prints, so ahead of `toMeta`, which opens telemetry
+    // (its first-run notice goes to stderr) and can throw on server resolution.
+    await showSkillsHint({
+      env: process.env,
+      interactive:
+        !this.jsonEnabled() &&
+        !flags["non-interactive"] &&
+        Boolean(process.stdout.isTTY && process.stdin.isTTY),
+    });
     // Before toMeta and before anything touches the server or the disk.
     if (flags.design !== undefined) {
       throw setupDesignRemovedError(this.config.version);
@@ -181,7 +190,6 @@ export default class Setup extends BaseCommand {
       throw localSetupHint(error, retryOptionsFromFlags(flags), this.config.version);
     }
     const { cwd, nonInteractive, dryRun, force } = this.meta;
-    await showSkillsHint({ env: process.env, interactive: !nonInteractive });
 
     if (await hasZitadelConfig(cwd)) {
       return this.emit({ status: "skipped", reason: "already-initialized" });

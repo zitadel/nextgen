@@ -67,6 +67,14 @@ describe("showSkillsHint", () => {
     expect(box).not.toHaveBeenCalled();
   });
 
+  it("shows once even when two first runs race for the marker", async () => {
+    const first = showSkillsHint({ env, interactive: true });
+    const second = showSkillsHint({ env, interactive: true });
+    await Promise.all([first, second]);
+
+    expect(box).toHaveBeenCalledTimes(1);
+  });
+
   it("never throws into the command", async () => {
     rosie.agents.mockRejectedValue(new Error("boom"));
 

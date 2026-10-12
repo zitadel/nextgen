@@ -24,7 +24,8 @@ const INSTALL_COMMAND = "npx skills add zitadel/nextgen --full-depth";
  *
  * Silent in CI, in non-interactive runs, when no agent is detected, once it has
  * been shown, and when `NO_SKILLS_PROMPT` is set. Fail-open: nothing here may
- * fail the command the user actually ran.
+ * fail the command the user actually ran, and losing the race to create the marker
+ * (`EEXIST`) just means another run is showing the banner.
  */
 export async function showSkillsHint({ env, interactive }: SkillsHintInput): Promise<void> {
   try {
@@ -41,9 +42,12 @@ export async function showSkillsHint({ env, interactive }: SkillsHintInput): Pro
     if (names.length === 0) {
       return;
     }
-    // Written before printing, so an interrupted run does not show it twice.
+    // Created exclusively and before printing: of two concurrent first runs only
+    // one gets past `wx`, and an interrupted run never shows the banner twice.
     mkdirSync(dirname(shownPath), { recursive: true });
-    writeFileSync(shownPath, `${JSON.stringify({ date: new Date().toISOString() })}\n`);
+    writeFileSync(shownPath, `${JSON.stringify({ date: new Date().toISOString() })}\n`, {
+      flag: "wx",
+    });
 
     consola.box({
       title: "Zitadel skills",
