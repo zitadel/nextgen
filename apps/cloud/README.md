@@ -26,4 +26,9 @@ under `/docs` ([`apps/docs/AGENTS.md`](../docs/AGENTS.md)).
 | [`build.sh`](build.sh) | the `server` service's build: login UI, launcher, migrations |
 | [`setup-secrets.sh`](setup-secrets.sh) | mints an environment's master key and root admin (with [`admin-document.mjs`](admin-document.mjs)) and sets them on the Vercel project; the originals go to 1Password |
 
+Every deployment is tested once it is built:
+[`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) runs the services'
+contract suites against the deployment's URL (the runbook's
+[Deployment checks](../../docs/runbooks/cloud.md#deployment-checks)).
+
 Setup, configuration and operations: [the runbook](../../docs/runbooks/cloud.md).
