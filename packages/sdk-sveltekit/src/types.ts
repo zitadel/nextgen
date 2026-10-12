@@ -25,10 +25,15 @@ import type { UnauthState } from "@zitadel/sdk-core/middleware";
 export type ClientSession = {
   /** The user's unique identifier (`sub` claim). */
   userId: string;
-  /** The user's email address, or `null` if not present in the token. */
-  email: string | null;
-  /** The user's display name, or `null` if not present in the token. */
-  name: string | null;
+  /**
+   * The user schema's designated identifier value (the login identifier, e.g.
+   * an email address or username), or `null` when unresolved.
+   */
+  identifier: string | null;
+  /** The schema property `identifier` came from (e.g. `"email"`), or `null`. */
+  identifierProperty: string | null;
+  /** The user's display name rendering, or `null` when the schema designates none. */
+  display: string | null;
 };
 
 /** Client-safe auth state when the user is signed in. */
