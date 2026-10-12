@@ -10,6 +10,12 @@ interface ImportMetaEnv {
    * embedded production build.
    */
   readonly VITE_CONSOLE_RUNTIME_FALLBACK?: string;
+  /**
+   * `1` in the hosted cloud's build (repo-root `vercel.json`): the console
+   * then sends Vercel Web Analytics and Speed Insights, which only Vercel
+   * serves. Never set for the build the Go server embeds.
+   */
+  readonly VITE_CONSOLE_VERCEL_INSIGHTS?: string;
 }
 
 interface ImportMeta {
