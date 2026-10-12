@@ -1874,6 +1874,47 @@ describe("api-mock releases and deployments", () => {
     expect((await removePreview()).status).toBe(204);
   });
 
+  test("renews a preview's expiry on a re-deploy of unchanged content", async () => {
+    const project = await newProject("preview-renew");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const url = "https://acme-git-sso-acmeinc.vercel.app";
+
+    const first = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: [url],
+      ttl: "60m",
+    });
+    expect(first.status).toBe(201);
+    const expiresFirst = (
+      (await (await fetch(`${BASE}/previews?project_id=${project.id}`)).json()) as {
+        previews: { expires_at: string }[];
+      }
+    ).previews[0]?.expires_at as string;
+
+    // Re-deploying the same release and variables is idempotent on the
+    // deployment (200, no new one written), but the preview expiry is still
+    // renewed from this deploy's ttl, so a longer ttl pushes it later.
+    const again = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: [url],
+      ttl: "168h",
+    });
+    expect(again.status).toBe(200);
+    const renewedBody = (await again.json()) as { targets: { expires_at: string }[] };
+    const expiresAgain = (
+      (await (await fetch(`${BASE}/previews?project_id=${project.id}`)).json()) as {
+        previews: { expires_at: string }[];
+      }
+    ).previews[0]?.expires_at as string;
+    expect(new Date(expiresAgain).getTime()).toBeGreaterThan(new Date(expiresFirst).getTime());
+    // The idempotent 200 reports the renewed expiry, not the one frozen onto
+    // the earlier deployment.
+    expect(renewedBody.targets[0]?.expires_at).toBe(expiresAgain);
+  });
+
   const setVars = (id: string, query: string, payload: object) =>
     fetch(`${BASE}/variables?project_id=${id}${query}`, {
       method: "PATCH",

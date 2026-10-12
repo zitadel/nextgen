@@ -1800,6 +1800,9 @@ export function setupPlatformHandlers() {
       // create-deployment-request.yaml, so a caller (the CLI included) need not
       // pin a lifetime of its own. A primary-only deployment keeps none.
       const ttl = sawPreview ? (requestedTtl ?? DEFAULT_PREVIEW_TTL) : undefined;
+      // Resolved up here because a preview deploy renews its targets' previews
+      // from this ttl whether or not a new deployment is written below.
+      const expiresAt = sawPreview && ttl ? ttlToExpiry(ttl) : null;
 
       const targets = [...resolved].sort();
       const expectedId =
@@ -1825,6 +1828,24 @@ export function setupPlatformHandlers() {
       // release untouched but must still create a new deployment.
       const { frozen, warnings } = freezeVariables(project.id, sawPreview);
 
+      // A preview deploy always renews its targets' previews — writing a new one
+      // or extending the live one's expiry from this deploy's ttl — before the
+      // idempotency short-circuit below, so re-deploying unchanged content keeps
+      // the preview URL alive rather than letting it expire on its old clock.
+      if (sawPreview && expiresAt !== null) {
+        for (const origin of targets) {
+          const key = previewKey(project.id, origin);
+          const existing = store.previews.get(key);
+          store.previews.set(key, {
+            projectId: project.id,
+            origin,
+            expiresAt,
+            createdAt: existing?.createdAt ?? nowIso(),
+            seq: existing?.seq ?? ++store.lastSeq,
+          });
+        }
+      }
+
       // Idempotent on what is served: a new deployment is skipped only when
       // every target already runs this release *and* the same frozen variable
       // snapshot. A later variable write changes the snapshot, so the same
@@ -1848,11 +1869,19 @@ export function setupPlatformHandlers() {
           )
           .sort((a, b) => b.seq - a.seq)[0];
         if (newest) {
-          return HttpResponse.json(deploymentResponse(newest), { status: 200 });
+          // The deployment record is immutable history, so its stored target
+          // rows keep the expiry they were written with; the renewed expiry is
+          // reported from the preview row instead, so the 200 reflects the clock
+          // the preview now runs on without mutating the historical deployment.
+          const rows = newest.targets.map((row) =>
+            row.expiresAt !== null && targets.includes(row.origin)
+              ? { origin: row.origin, expiresAt }
+              : row,
+          );
+          return HttpResponse.json(deploymentResponse(newest, rows), { status: 200 });
         }
       }
 
-      const expiresAt = sawPreview && ttl ? ttlToExpiry(ttl) : null;
       const id = `dep_${shortId()}`;
       const createdAt = nowIso();
       const record: DeploymentRecord = {
@@ -1871,22 +1900,9 @@ export function setupPlatformHandlers() {
       };
       store.deployments.set(id, record);
 
-      // A preview deployment writes a preview per target URL, or renews the one
-      // that already exists — keeping its `createdAt` and resetting `expiresAt`
-      // from this deployment's ttl, in the same transaction as the deployment.
-      if (sawPreview && expiresAt !== null) {
-        for (const origin of targets) {
-          const key = previewKey(project.id, origin);
-          const existing = store.previews.get(key);
-          store.previews.set(key, {
-            projectId: project.id,
-            origin,
-            expiresAt,
-            createdAt: existing?.createdAt ?? createdAt,
-            seq: existing?.seq ?? ++store.lastSeq,
-          });
-        }
-      }
+      // The preview rows were already renewed above, before the idempotency
+      // short-circuit, so a preview deploy renews them whether or not it reaches
+      // this new-deployment path.
 
       // Warnings ride the create response (a preview falling back to an `all`
       // secret), surfaced only when there are any so the common case stays the
