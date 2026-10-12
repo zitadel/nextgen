@@ -40,11 +40,16 @@ properties it fixes, both of which this mock got wrong until they were corrected
   so the orchestrator's tests, the Storybook story, and both demo e2e suites were
   all walking a screen the server never emits.
 - **Credential fields are keyed by the schema pointer** `x-auth-methods#password`
-  (exported as `PASSWORD_FIELD`), on `password`, `register-password` and
-  `sso-conflict`. The
+  (exported as `PASSWORD_FIELD`), on both `password` and `register-password`. The
   server answers `req.invalid` to a submit keyed on plain `password`, so the short
   name let the orchestrator send a key the real backend refuses — invisible to
   every mock-backed test.
+
+Steps that `zitadel sso enable` adds (`register-sso`, `sso-conflict`) are not in
+`default-login.json`. Their authority is
+[`docs/design/idp/schemas/default-login.scaffold.json`](../../docs/design/idp/schemas/default-login.scaffold.json),
+which the CLI's `applySsoToFlow` test keeps in step with the generator. Their
+credential fields are keyed by `PASSWORD_FIELD` as well.
 
 Two knowing, documented exceptions: the `identifier` step keeps a `recover`
 navigate action (the default flow defines no recovery step yet) so that screen
