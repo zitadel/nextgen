@@ -51,7 +51,6 @@ holds and never writes them here:
 | Resource            | Verbs     | Backing endpoints                                    |
 | ------------------- | --------- | ---------------------------------------------------- |
 | `schemas`           | list, get | `GET /schemas`, `GET /schemas/{id}`                  |
-| `environments`      | list, get | `GET /environments`, `GET /environments/{name}`      |
 | `releases`          | list, get | `GET /releases`, `GET /releases/{id}`                |
 | `flow-definitions`  | list, get | `GET /flow_definitions`, `GET /flow_definitions/{id}` |
 | `branding`          | list, get | `GET /branding`, `GET /branding/{id}`                |
@@ -59,8 +58,7 @@ holds and never writes them here:
 Three of these behave differently underneath, and the registry says so rather
 than the caller having to learn it. `schemas list` and `flow-definitions list` send
 `revisions=latest`, so they show the current schemas and flows rather than
-every revision ever written; `--filter revisions=all` gives the history. `environments get` takes a name,
-because that is what the endpoint addresses. `branding list` has no paging
+every revision ever written; `--filter revisions=all` gives the history. `branding list` has no paging
 flags at all, because its endpoint has no cursor and answers with a bare array.
 
 `schemas` and `flow-definitions` are also addressable by the value that groups
@@ -111,11 +109,13 @@ the create's required fields.
 
 ## Credential and scope
 
-Every verb reads `.zitadel/secret` and sends the project secret as the bearer
-(operator plane, [ADR 036](../../adrs/036-api-credential-planes.md)). Endpoints
-that take `project_id` receive it from the secret; there is no project flag.
-The server is resolved exactly as for the other commands (`--server`, `ZITADEL_API_BASE`,
-`zitadel.json`, default).
+Every verb sends the project secret as the bearer (operator plane,
+[ADR 036](../../adrs/036-api-credential-planes.md)). The secret, the project and
+the server come from the environment the command runs in, resolved like those of
+every command that talks to a project: `--server`, `--env-file`, the process
+environment, the `.env` files, then `.zitadel/secret`. Endpoints that take
+`project_id` receive it from there; there is no project flag. `--env` and
+`--env-file` choose the environment.
 
 ## Listing and pagination
 

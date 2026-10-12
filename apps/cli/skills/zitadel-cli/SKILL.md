@@ -62,6 +62,16 @@ The CLI requires Node.js 24+.
   you will miss flags further down.
 - **Working directory.** Add `--cwd <path>` when operating outside the current
   working directory.
+- **Server and project.** A command that talks to a project reads
+  `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET`, each from the
+  first source that has it: `--server` (the URL only), `--env-file <path>`, the
+  process environment, `.env.<env>.local`, `.env.local`, `.env.<env>`, `.env`,
+  then `.zitadel/secret`. `<env>` is `--env`, else `ZITADEL_ENV`, else
+  `development`. A missing value fails with `E_VALIDATION` naming the variable
+  and the files it looked in; there is no cloud default outside `setup`, and
+  `zitadel.json` names no server. `zitadel env` shows what resolved and where
+  each value came from; `zitadel env add <name>` binds another environment to a
+  project.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need
