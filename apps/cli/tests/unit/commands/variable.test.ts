@@ -60,7 +60,7 @@ async function asTerminal<T>(run: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Run with `value` on stdin, the way a scripted `zitadel variables set NAME <
+ * Run with `value` on stdin, the way a scripted `zitadel variable set NAME <
  * value.txt` supplies it. `runCliForTest` runs in-process, so the stream is
  * swapped for the duration of the call and restored afterwards.
  */
@@ -79,7 +79,7 @@ async function withStdin<T>(value: string, run: () => Promise<T>): Promise<T> {
   }
 }
 
-describe("variables list", () => {
+describe("variable list", () => {
   it("returns the project's variables, withholding secret values", async () => {
     const cwd = await makeProject();
     server.use(
@@ -91,7 +91,7 @@ describe("variables list", () => {
       ),
     );
 
-    const res = await runCliForTest(["variables", "list", "--project-level", ...base(cwd)]);
+    const res = await runCliForTest(["variable", "list", ...base(cwd)]);
 
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as {
@@ -113,7 +113,7 @@ describe("variables list", () => {
     const cwd = await makeProject();
     server.use(http.get("*/variables", () => HttpResponse.json({ S: { secret: true } })));
 
-    const res = await runCliForTest(["variables", "list", "--project-level", ...base(cwd)]);
+    const res = await runCliForTest(["variable", "list", ...base(cwd)]);
 
     const json = parseJson(res.stdout) as { data: { variables: Array<Record<string, unknown>> } };
     expect(json.data.variables[0]).not.toHaveProperty("value");
@@ -129,7 +129,7 @@ describe("variables list", () => {
       }),
     );
 
-    const res = await runCliForTest(["variables", "list", "--project-level", ...base(cwd)]);
+    const res = await runCliForTest(["variable", "list", ...base(cwd)]);
 
     expect(res.exitCode).toBe(0);
     expect(seen).toBeNull();
@@ -146,8 +146,8 @@ describe("variables list", () => {
       ),
     );
 
-    const rows = await runCliForTest(["variables", "list", "--project-level", ...plainArgs(cwd)]);
-    const empty = await runCliForTest(["variables", "list", "--project-level", ...plainArgs(cwd)]);
+    const rows = await runCliForTest(["variable", "list", ...plainArgs(cwd)]);
+    const empty = await runCliForTest(["variable", "list", ...plainArgs(cwd)]);
 
     expect(rows.exitCode).toBe(0);
     expect(rows.stdout.trim().split("\n")).toEqual(["A\t(secret)", "B\ttwo"]);
@@ -159,11 +159,9 @@ describe("variables list", () => {
     const cwd = await makeProject();
     server.use(http.get("*/variables", () => HttpResponse.json({ V: "one\ntwo\u001b[31m" })));
 
-    const table = await asTerminal(() =>
-      runCliForTest(["variables", "list", "--project-level", ...plainArgs(cwd)]),
-    );
+    const table = await asTerminal(() => runCliForTest(["variable", "list", ...plainArgs(cwd)]));
     const plain = await asTerminal(() =>
-      runCliForTest(["variables", "list", "--project-level", "--plain", ...plainArgs(cwd)]),
+      runCliForTest(["variable", "list", "--plain", ...plainArgs(cwd)]),
     );
 
     expect(table.stdout).toMatch(/name\s+value/);
@@ -179,9 +177,7 @@ describe("variables list", () => {
     const cwd = await makeProject();
     server.use(http.get("*/variables", () => HttpResponse.json({})));
 
-    const res = await asTerminal(() =>
-      runCliForTest(["variables", "list", "--project-level", ...plainArgs(cwd)]),
-    );
+    const res = await asTerminal(() => runCliForTest(["variable", "list", ...plainArgs(cwd)]));
 
     expect(res.stdout).toContain("No variables on the project.");
   });
@@ -200,14 +196,7 @@ describe("variables list", () => {
       }),
     );
 
-    const res = await runCliForTest([
-      "variables",
-      "list",
-      "--project-level",
-      "--cwd",
-      cwd,
-      "--json",
-    ]);
+    const res = await runCliForTest(["variable", "list", "--cwd", cwd, "--json"]);
 
     expect(res.exitCode).not.toBe(0);
     expect(requested).toBe(false);
@@ -222,10 +211,8 @@ describe("variables list", () => {
 
     // The harness captures stdout, so process.stdout.isTTY is undefined here —
     // the same condition a pipe or a redirect creates.
-    const piped = await runCliForTest(["variables", "list", "--project-level", ...plainArgs(cwd)]);
-    const terminal = await asTerminal(() =>
-      runCliForTest(["variables", "list", "--project-level", ...plainArgs(cwd)]),
-    );
+    const piped = await runCliForTest(["variable", "list", ...plainArgs(cwd)]);
+    const terminal = await asTerminal(() => runCliForTest(["variable", "list", ...plainArgs(cwd)]));
 
     expect(piped.exitCode).toBe(0);
     expect(piped.stdout).not.toContain("Project   ");
@@ -247,21 +234,14 @@ describe("variables list", () => {
       }),
     );
 
-    const res = await runCliForTest([
-      "variables",
-      "list",
-      "--project-level",
-      "--cwd",
-      cwd,
-      "--json",
-    ]);
+    const res = await runCliForTest(["variable", "list", "--cwd", cwd, "--json"]);
 
     expect(res.exitCode).toBe(0);
     expect(hit).toBe(SERVER);
   });
 });
 
-describe("variables get", () => {
+describe("variable get", () => {
   it("returns a non-secret value, addressing the project level", async () => {
     const cwd = await makeProject();
     let path = "";
@@ -274,13 +254,7 @@ describe("variables get", () => {
       }),
     );
 
-    const res = await runCliForTest([
-      "variables",
-      "get",
-      "GOOGLE_CLIENT_ID",
-      "--project-level",
-      ...base(cwd),
-    ]);
+    const res = await runCliForTest(["variable", "get", "GOOGLE_CLIENT_ID", ...base(cwd)]);
 
     expect(res.exitCode).toBe(0);
     expect(path).toBe("GOOGLE_CLIENT_ID");
@@ -299,13 +273,7 @@ describe("variables get", () => {
     const cwd = await makeProject();
     server.use(http.get("*/variables/:name", () => HttpResponse.json("999-prod")));
 
-    const res = await runCliForTest([
-      "variables",
-      "get",
-      "GOOGLE_CLIENT_ID",
-      "--project-level",
-      ...plainArgs(cwd),
-    ]);
+    const res = await runCliForTest(["variable", "get", "GOOGLE_CLIENT_ID", ...plainArgs(cwd)]);
 
     expect(res.exitCode).toBe(0);
     expect(JSON.parse(res.stdout)).toEqual({
@@ -319,13 +287,7 @@ describe("variables get", () => {
     const cwd = await makeProject();
     server.use(http.get("*/variables/:name", () => HttpResponse.json({ secret: true })));
 
-    const res = await runCliForTest([
-      "variables",
-      "get",
-      "TOKEN",
-      "--project-level",
-      ...plainArgs(cwd),
-    ]);
+    const res = await runCliForTest(["variable", "get", "TOKEN", ...plainArgs(cwd)]);
 
     expect(res.exitCode).toBe(0);
     expect(JSON.parse(res.stdout)).toEqual({ name: "TOKEN", secret: true });
@@ -336,7 +298,7 @@ describe("variables get", () => {
     server.use(http.get("*/variables/:name", () => HttpResponse.json("999-prod")));
 
     const res = await asTerminal(() =>
-      runCliForTest(["variables", "get", "GOOGLE_CLIENT_ID", "--project-level", ...plainArgs(cwd)]),
+      runCliForTest(["variable", "get", "GOOGLE_CLIENT_ID", ...plainArgs(cwd)]),
     );
 
     expect(res.exitCode).toBe(0);
@@ -355,10 +317,10 @@ describe("variables get", () => {
     );
 
     const secret = await asTerminal(() =>
-      runCliForTest(["variables", "get", "TOKEN", "--project-level", ...plainArgs(cwd)]),
+      runCliForTest(["variable", "get", "TOKEN", ...plainArgs(cwd)]),
     );
     const empty = await asTerminal(() =>
-      runCliForTest(["variables", "get", "BLANK", "--project-level", ...plainArgs(cwd)]),
+      runCliForTest(["variable", "get", "BLANK", ...plainArgs(cwd)]),
     );
 
     expect(secret.stdout).toMatch(/value\s+\(secret\)/);
@@ -369,7 +331,7 @@ describe("variables get", () => {
     const cwd = await makeProject();
     server.use(http.get("*/variables/:name", () => HttpResponse.json({ secret: true })));
 
-    const res = await runCliForTest(["variables", "get", "TOKEN", "--project-level", ...base(cwd)]);
+    const res = await runCliForTest(["variable", "get", "TOKEN", ...base(cwd)]);
 
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as { data: Record<string, unknown> };
@@ -382,7 +344,7 @@ describe("variables get", () => {
     server.use(http.get("*/variables/:name", () => HttpResponse.json("a\u001b[31mb")));
 
     const res = await asTerminal(() =>
-      runCliForTest(["variables", "get", "NASTY", "--project-level", ...plainArgs(cwd)]),
+      runCliForTest(["variable", "get", "NASTY", ...plainArgs(cwd)]),
     );
 
     expect(res.exitCode).toBe(0);
@@ -393,13 +355,7 @@ describe("variables get", () => {
   it("rejects a variable name the platform would refuse", async () => {
     const cwd = await makeProject();
 
-    const res = await runCliForTest([
-      "variables",
-      "get",
-      "BAD-NAME",
-      "--project-level",
-      ...base(cwd),
-    ]);
+    const res = await runCliForTest(["variable", "get", "BAD-NAME", ...base(cwd)]);
 
     expect(res.exitCode).not.toBe(0);
     const json = parseJson(res.stdout) as { code: string };
@@ -407,7 +363,7 @@ describe("variables get", () => {
   });
 });
 
-describe("variables set", () => {
+describe("variable set", () => {
   it("sends the piped value and marks it secret", async () => {
     const cwd = await makeProject();
     let body: Record<string, unknown> = {};
@@ -422,10 +378,9 @@ describe("variables set", () => {
 
     const res = await withStdin("GOCSPX-abc\n", () =>
       runCliForTest([
-        "variables",
+        "variable",
         "set",
         "GOOGLE_CLIENT_SECRET",
-        "--project-level",
         "--secret",
         "--non-interactive",
         ...base(cwd),
@@ -436,7 +391,12 @@ describe("variables set", () => {
     expect(environment).toBeNull();
     expect(body).toEqual({ GOOGLE_CLIENT_SECRET: { value: "GOCSPX-abc", secret: true } });
     const json = parseJson(res.stdout) as { data: Record<string, unknown> };
-    expect(json.data).toEqual({ name: "GOOGLE_CLIENT_SECRET", secret: true, type: "string" });
+    expect(json.data).toEqual({
+      name: "GOOGLE_CLIENT_SECRET",
+      secret: true,
+      type: "string",
+      applies_to: "all",
+    });
   });
 
   it("says on a terminal that the value was set on the project", async () => {
@@ -444,20 +404,11 @@ describe("variables set", () => {
     server.use(http.patch("*/variables", () => HttpResponse.json({})));
 
     const plain = await asTerminal(() =>
-      withStdin("v", () =>
-        runCliForTest(["variables", "set", "TOKEN", "--project-level", ...plainArgs(cwd)]),
-      ),
+      withStdin("v", () => runCliForTest(["variable", "set", "TOKEN", ...plainArgs(cwd)])),
     );
     const secret = await asTerminal(() =>
       withStdin("v", () =>
-        runCliForTest([
-          "variables",
-          "set",
-          "TOKEN",
-          "--project-level",
-          "--secret",
-          ...plainArgs(cwd),
-        ]),
+        runCliForTest(["variable", "set", "TOKEN", "--secret", ...plainArgs(cwd)]),
       ),
     );
 
@@ -475,10 +426,9 @@ describe("variables set", () => {
     });
     try {
       const res = await runCliForTest([
-        "variables",
+        "variable",
         "set",
         "TOKEN",
-        "--project-level",
         "--non-interactive",
         ...base(cwd),
       ]);
@@ -505,14 +455,7 @@ describe("variables set", () => {
     );
 
     const res = await withStdin("", () =>
-      runCliForTest([
-        "variables",
-        "set",
-        "BLANK",
-        "--project-level",
-        "--non-interactive",
-        ...base(cwd),
-      ]),
+      runCliForTest(["variable", "set", "BLANK", "--non-interactive", ...base(cwd)]),
     );
 
     expect(res.exitCode).toBe(0);
@@ -526,10 +469,9 @@ describe("variables set", () => {
     Object.defineProperty(process, "stdin", { value: { isTTY: true }, configurable: true });
     try {
       const res = await runCliForTest([
-        "variables",
+        "variable",
         "set",
         "TOKEN",
-        "--project-level",
         "--secret",
         "--non-interactive",
         ...base(cwd),
@@ -538,11 +480,11 @@ describe("variables set", () => {
       expect(res.exitCode).not.toBe(0);
       const json = parseJson(res.stdout) as { next_commands: string[]; hint: string };
       const retry = json.next_commands.join(" ");
-      // Dropping the owner or the secret flag would hand back a command that
-      // names no owner, or writes the credential as a readable value.
-      expect(retry).toContain("--project-level");
+      // Dropping the secret flag would hand back a command that writes the
+      // credential as a readable value.
+      expect(retry).toContain("variable set TOKEN");
       expect(retry).toContain("--secret");
-      expect(json.hint).toContain("--project-level");
+      expect(json.hint).toContain("Pipe the value in");
     } finally {
       if (original) {
         Object.defineProperty(process, "stdin", original);
@@ -554,10 +496,9 @@ describe("variables set", () => {
     const cwd = await makeProject();
 
     const res = await runCliForTest([
-      "variables",
+      "variable",
       "set",
       "BAD-NAME",
-      "--project-level",
       "--non-interactive",
       ...base(cwd),
     ]);
@@ -572,15 +513,7 @@ describe("variables set", () => {
     server.use(http.patch("*/variables", () => HttpResponse.json({})));
 
     const res = await withStdin("s3cr3t-value", () =>
-      runCliForTest([
-        "variables",
-        "set",
-        "TOKEN",
-        "--project-level",
-        "--secret",
-        "--non-interactive",
-        ...base(cwd),
-      ]),
+      runCliForTest(["variable", "set", "TOKEN", "--secret", "--non-interactive", ...base(cwd)]),
     );
 
     expect(res.exitCode).toBe(0);
@@ -599,15 +532,7 @@ describe("variables set", () => {
     );
 
     const res = await withStdin("value", () =>
-      runCliForTest([
-        "variables",
-        "set",
-        "TOKEN",
-        "--project-level",
-        "--non-interactive",
-        "--dry-run",
-        ...base(cwd),
-      ]),
+      runCliForTest(["variable", "set", "TOKEN", "--non-interactive", "--dry-run", ...base(cwd)]),
     );
 
     expect(res.exitCode).toBe(0);
@@ -619,7 +544,7 @@ describe("variables set", () => {
     expect(json.data).toMatchObject({
       dry_run: true,
       verb: "set",
-      topic: "variables",
+      topic: "variable",
       id: "TOKEN",
       secret: false,
       as: "string",
@@ -634,10 +559,9 @@ describe("variables set", () => {
     const res = await asTerminal(() =>
       withStdin("5", () =>
         runCliForTest([
-          "variables",
+          "variable",
           "set",
           "RETRY_COUNT",
-          "--project-level",
           "--as",
           "number",
           "--dry-run",
@@ -662,14 +586,7 @@ describe("variables set", () => {
     );
 
     const res = await withStdin("", () =>
-      runCliForTest([
-        "variables",
-        "set",
-        "EMPTY",
-        "--project-level",
-        "--non-interactive",
-        ...base(cwd),
-      ]),
+      runCliForTest(["variable", "set", "EMPTY", "--non-interactive", ...base(cwd)]),
     );
 
     expect(res.exitCode).toBe(0);
@@ -690,14 +607,7 @@ describe("variables set", () => {
     );
 
     const res = await withStdin("value", () =>
-      runCliForTest([
-        "variables",
-        "set",
-        "A".repeat(256),
-        "--project-level",
-        "--non-interactive",
-        ...base(cwd),
-      ]),
+      runCliForTest(["variable", "set", "A".repeat(256), "--non-interactive", ...base(cwd)]),
     );
 
     expect(patched).toBe(false);
@@ -710,7 +620,7 @@ describe("variables set", () => {
   });
 });
 
-describe("variables set --as", () => {
+describe("variable set --as", () => {
   const capture = () => {
     const bodies: Array<Record<string, unknown>> = [];
     server.use(
@@ -728,10 +638,9 @@ describe("variables set --as", () => {
 
     const res = await withStdin("5", () =>
       runCliForTest([
-        "variables",
+        "variable",
         "set",
         "RETRY_COUNT",
-        "--project-level",
         "--as",
         "number",
         "--non-interactive",
@@ -749,10 +658,9 @@ describe("variables set --as", () => {
 
     await withStdin("true", () =>
       runCliForTest([
-        "variables",
+        "variable",
         "set",
         "DEBUG",
-        "--project-level",
         "--as",
         "boolean",
         "--non-interactive",
@@ -768,14 +676,7 @@ describe("variables set --as", () => {
     const bodies = capture();
 
     await withStdin("5", () =>
-      runCliForTest([
-        "variables",
-        "set",
-        "ZIP",
-        "--project-level",
-        "--non-interactive",
-        ...base(cwd),
-      ]),
+      runCliForTest(["variable", "set", "ZIP", "--non-interactive", ...base(cwd)]),
     );
 
     expect(bodies).toEqual([{ ZIP: { value: "5", secret: false } }]);
@@ -787,10 +688,9 @@ describe("variables set --as", () => {
 
     const res = await withStdin("abc", () =>
       runCliForTest([
-        "variables",
+        "variable",
         "set",
         "RETRY_COUNT",
-        "--project-level",
         "--as",
         "number",
         "--non-interactive",
@@ -819,10 +719,9 @@ describe("variables set --as", () => {
     Object.defineProperty(process, "stdin", { value: stdin, configurable: true });
     try {
       const res = await runCliForTest([
-        "variables",
+        "variable",
         "set",
         "API_KEY",
-        "--project-level",
         "--secret",
         "--as",
         "number",
@@ -848,10 +747,9 @@ describe("variables set --as", () => {
     Object.defineProperty(process, "stdin", { value: { isTTY: true }, configurable: true });
     try {
       const res = await runCliForTest([
-        "variables",
+        "variable",
         "set",
         "RETRY_COUNT",
-        "--project-level",
         "--as",
         "number",
         "--non-interactive",
@@ -868,7 +766,7 @@ describe("variables set --as", () => {
   });
 });
 
-describe("variables delete", () => {
+describe("variable rm", () => {
   it("deletes the name at the project level", async () => {
     const cwd = await makeProject();
     let path = "";
@@ -882,10 +780,9 @@ describe("variables delete", () => {
     );
 
     const res = await runCliForTest([
-      "variables",
-      "delete",
+      "variable",
+      "rm",
       "SUPPORT_EMAIL",
-      "--project-level",
       "--non-interactive",
       "--force",
       ...base(cwd),
@@ -895,25 +792,18 @@ describe("variables delete", () => {
     expect(path).toBe("SUPPORT_EMAIL");
     expect(environment).toBeNull();
     const json = parseJson(res.stdout) as { data: Record<string, unknown> };
-    expect(json.data).toEqual({ name: "SUPPORT_EMAIL", deleted: true });
+    expect(json.data).toEqual({ name: "SUPPORT_EMAIL", deleted: true, applies_to: "all" });
   });
 
-  it("says on a terminal that the name was deleted from the project", async () => {
+  it("says on a terminal that the name was removed from the project", async () => {
     const cwd = await makeProject();
     server.use(http.delete("*/variables/:name", () => new HttpResponse(null, { status: 204 })));
 
     const res = await asTerminal(() =>
-      runCliForTest([
-        "variables",
-        "delete",
-        "SUPPORT_EMAIL",
-        "--project-level",
-        "--force",
-        ...plainArgs(cwd),
-      ]),
+      runCliForTest(["variable", "rm", "SUPPORT_EMAIL", "--force", ...plainArgs(cwd)]),
     );
 
-    expect(res.stdout).toContain("Deleted SUPPORT_EMAIL from the project");
+    expect(res.stdout).toContain("Removed SUPPORT_EMAIL from the project");
   });
 
   it("sends no request under --dry-run", async () => {
@@ -927,10 +817,9 @@ describe("variables delete", () => {
     );
 
     const res = await runCliForTest([
-      "variables",
-      "delete",
+      "variable",
+      "rm",
       "SUPPORT_EMAIL",
-      "--project-level",
       "--non-interactive",
       "--force",
       "--dry-run",
@@ -943,14 +832,13 @@ describe("variables delete", () => {
     expect(json.status).toBe("ok");
     expect(json.data).toMatchObject({
       dry_run: true,
-      verb: "delete",
-      topic: "variables",
+      verb: "remove",
+      topic: "variable",
       id: "SUPPORT_EMAIL",
     });
-    expect(String(res.stdout)).toContain("variables");
-    // Nothing was deleted, so the preview must not say it was.
+    expect(String(res.stdout)).toContain("variable");
+    // Nothing was removed, so the preview must not say it was.
     expect(json.data).not.toHaveProperty("deleted");
-    expect(json.data).not.toHaveProperty("environment");
   });
 
   it("refuses to delete without --force in non-interactive mode", async () => {
@@ -964,10 +852,9 @@ describe("variables delete", () => {
     );
 
     const res = await runCliForTest([
-      "variables",
-      "delete",
+      "variable",
+      "rm",
       "SUPPORT_EMAIL",
-      "--project-level",
       "--non-interactive",
       ...base(cwd),
     ]);
@@ -980,179 +867,181 @@ describe("variables delete", () => {
       next_commands: string[];
     };
     expect(json.code).toBe("E_VALIDATION");
-    // Both flags, or the retry is refused again for the owner it dropped.
     expect(json.next_commands.join(" ")).toContain("--force");
-    expect(json.next_commands.join(" ")).toContain("--project-level");
     expect(json.hint).toContain("from the project");
   });
 });
 
-describe("naming the owner", () => {
-  it("refuses a run that names no owner, on a terminal as in a script", async () => {
+describe("variable set value argument and --preview", () => {
+  it("sends a plain value given on the command line, piping nothing", async () => {
     const cwd = await makeProject();
-    let requested = false;
+    let body: Record<string, unknown> = {};
     server.use(
-      http.get("*/variables", () => {
-        requested = true;
+      http.patch("*/variables", async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({});
       }),
     );
 
-    const scripted = await runCliForTest(["variables", "list", ...base(cwd)]);
-    const terminal = await asTerminal(() =>
-      runCliForTest(["variables", "list", "--cwd", cwd, "--json", "--server", SERVER]),
-    );
+    const res = await runCliForTest([
+      "variable",
+      "set",
+      "API_URL",
+      "https://acme.com",
+      ...base(cwd),
+    ]);
 
-    expect(scripted.exitCode).not.toBe(0);
-    expect(terminal.exitCode).not.toBe(0);
-    expect(requested).toBe(false);
-    for (const res of [scripted, terminal]) {
-      const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
-      expect(json.code).toBe("E_VALIDATION");
-      expect(json.message).toContain("--project-level");
-      // The refusal has to say why there is nothing else to name, or it reads
-      // as a flag someone forgot rather than the only owner there is.
-      expect(json.hint).toContain("only owner");
-    }
+    expect(res.exitCode).toBe(0);
+    expect(body).toEqual({ API_URL: { value: "https://acme.com", secret: false } });
   });
 
-  it("refuses before reading the value, so a secret is never read for nothing", async () => {
+  it("refuses a value on the command line for a secret, reading nothing", async () => {
     const cwd = await makeProject();
-    // A stream that records whether anything drew on it. The owner is settled
-    // before the value is read; if that order were reversed, the value would be
-    // consumed and then thrown away by the refusal.
-    let consumed = false;
-    const stdin = new Readable({
-      read() {
-        consumed = true;
-        this.push("GOCSPX-abc");
-        this.push(null);
-      },
-    });
+    let called = false;
+    server.use(
+      http.patch("*/variables", () => {
+        called = true;
+        return HttpResponse.json({});
+      }),
+    );
+
+    const res = await runCliForTest([
+      "variable",
+      "set",
+      "TOKEN",
+      "s3cret",
+      "--secret",
+      ...base(cwd),
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    expect(called).toBe(false);
+    const json = parseJson(res.stdout) as { code: string };
+    expect(json.code).toBe("E_VALIDATION");
+  });
+
+  it("writes the preview override under --preview", async () => {
+    const cwd = await makeProject();
+    let appliesTo: string | null = "unset";
+    server.use(
+      http.patch("*/variables", ({ request }) => {
+        appliesTo = new URL(request.url).searchParams.get("applies_to");
+        return HttpResponse.json({});
+      }),
+    );
+
+    const res = await runCliForTest([
+      "variable",
+      "set",
+      "API_URL",
+      "https://preview.acme.com",
+      "--preview",
+      ...base(cwd),
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(appliesTo).toBe("preview");
+    const json = parseJson(res.stdout) as { data: { applies_to: string } };
+    expect(json.data.applies_to).toBe("preview");
+  });
+
+  it("keeps --preview in the retry it suggests when nothing is piped in", async () => {
+    const cwd = await makeProject();
+    // A terminal on stdin is what triggers the retry rather than a blocking read.
     const original = Object.getOwnPropertyDescriptor(process, "stdin");
-    Object.defineProperty(process, "stdin", { value: stdin, configurable: true });
+    Object.defineProperty(process, "stdin", { value: { isTTY: true }, configurable: true });
     try {
-      const res = await runCliForTest(["variables", "set", "TOKEN", "--secret", ...base(cwd)]);
+      const res = await runCliForTest([
+        "variable",
+        "set",
+        "API_URL",
+        "--preview",
+        "--non-interactive",
+        ...base(cwd),
+      ]);
 
       expect(res.exitCode).not.toBe(0);
-      const json = parseJson(res.stdout) as { message: string };
-      expect(json.message).toContain("--project-level");
-      expect(consumed).toBe(false);
+      const json = parseJson(res.stdout) as { next_commands: string[] };
+      expect(json.next_commands.join(" ")).toContain("--preview");
     } finally {
       if (original) {
         Object.defineProperty(process, "stdin", original);
       }
     }
   });
+});
 
-  it("no longer accepts --environment, which named an environment", async () => {
+describe("variable resolve", () => {
+  const live = (deployments: unknown[]) =>
+    http.get("*/deployments", () => HttpResponse.json({ deployments }));
+
+  it("is a miss when nothing is deployed", async () => {
     const cwd = await makeProject();
+    server.use(live([]));
+
+    const res = await runCliForTest(["variable", "resolve", ...base(cwd)]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { code: string };
+    expect(json.code).toBe("E_NOT_FOUND");
+  });
+
+  it("reads the frozen map of the newest live deployment", async () => {
+    const cwd = await makeProject();
+    server.use(
+      live([{ id: "dep_1", targets: [{ origin: "https://app.acme.com" }] }]),
+      http.get("*/deployments/:id/variables", ({ params }) => {
+        expect(String(params.id)).toBe("dep_1");
+        return HttpResponse.json({ API_URL: "https://api.acme.com", TOKEN: { secret: true } });
+      }),
+    );
+
+    const res = await runCliForTest(["variable", "resolve", ...base(cwd)]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      data: { deployment_id: string; variables: Array<Record<string, unknown>> };
+    };
+    expect(json.data.deployment_id).toBe("dep_1");
+    expect(json.data.variables).toEqual([
+      { name: "API_URL", secret: false, value: "https://api.acme.com" },
+      { name: "TOKEN", secret: true },
+    ]);
+  });
+
+  it("asks the server only for the named origin's live deployment", async () => {
+    const cwd = await makeProject();
+    let origin: string | null = "unset";
+    server.use(
+      http.get("*/deployments", ({ request }) => {
+        origin = new URL(request.url).searchParams.get("origin");
+        return HttpResponse.json({ deployments: [{ id: "dep_2", targets: [] }] });
+      }),
+      http.get("*/deployments/:id/variables", () => HttpResponse.json({})),
+    );
 
     const res = await runCliForTest([
-      "variables",
-      "list",
-      "--environment",
-      "prod",
-      "--project-level",
+      "variable",
+      "resolve",
+      "--origin",
+      "https://app.acme.com",
       ...base(cwd),
     ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(origin).toBe("https://app.acme.com");
+  });
+});
+
+describe("variable list no longer accepts --environment", () => {
+  it("rejects --environment, which named an environment", async () => {
+    const cwd = await makeProject();
+
+    const res = await runCliForTest(["variable", "list", "--environment", "prod", ...base(cwd)]);
 
     expect(res.exitCode).not.toBe(0);
     const json = parseJson(res.stdout) as { code: string; message: string };
     expect(json.code).toBe("E_VALIDATION");
     expect(json.message).toContain("Nonexistent flag");
-  });
-
-  // Every command inherits the owner flag from one base class, so each one has
-  // to refuse: a command that quietly resolved an owner would write where the
-  // run never said to.
-  it.each([
-    ["list", ["variables", "list"]],
-    ["get", ["variables", "get", "GOOGLE_CLIENT_ID"]],
-    ["set", ["variables", "set", "GOOGLE_CLIENT_ID"]],
-    ["delete", ["variables", "delete", "GOOGLE_CLIENT_ID", "--force"]],
-  ])("refuses %s when no owner is named, before any request", async (_verb, argv) => {
-    const cwd = await makeProject();
-    let requested = false;
-    const record = () => {
-      requested = true;
-      return HttpResponse.json({});
-    };
-    server.use(
-      http.get("*/variables", record),
-      http.get("*/variables/:name", record),
-      http.patch("*/variables", record),
-      http.delete("*/variables/:name", record),
-    );
-
-    const res = await runCliForTest([...argv, ...base(cwd)]);
-
-    expect(res.exitCode).not.toBe(0);
-    expect(requested).toBe(false);
-    const json = parseJson(res.stdout) as { code: string; message: string };
-    expect(json.code).toBe("E_VALIDATION");
-    expect(json.message).toContain("--project-level");
-  });
-
-  it("refuses under --dry-run too, so a preview cannot imply an owner", async () => {
-    const cwd = await makeProject();
-    let requested = false;
-    server.use(
-      http.patch("*/variables", () => {
-        requested = true;
-        return HttpResponse.json({});
-      }),
-    );
-
-    const res = await withStdin("v", () =>
-      runCliForTest(["variables", "set", "TOKEN", "--dry-run", ...base(cwd)]),
-    );
-
-    expect(res.exitCode).not.toBe(0);
-    expect(requested).toBe(false);
-    const json = parseJson(res.stdout) as { code: string; message: string };
-    expect(json.code).toBe("E_VALIDATION");
-    expect(json.message).toContain("--project-level");
-  });
-
-  it("refuses before the server is resolved, so --server local needs nothing running", async () => {
-    const cwd = await makeProject();
-
-    // `--server local` reads `.zitadel/local/runtime.json` and probes the
-    // runtime's health, which this project has never started. The owner is
-    // settled first, so the refusal is about the owner rather than the runtime.
-    const res = await runCliForTest([
-      "variables",
-      "list",
-      "--cwd",
-      cwd,
-      "--json",
-      "--server",
-      "local",
-    ]);
-
-    expect(res.exitCode).not.toBe(0);
-    const json = parseJson(res.stdout) as { code: string; message: string };
-    expect(json.code).toBe("E_VALIDATION");
-    expect(json.message).toContain("--project-level");
-  });
-
-  it("asks the platform for no environments, since there is nothing to choose", async () => {
-    const cwd = await makeProject();
-    let listed = false;
-    server.use(
-      http.get("*/environments", () => {
-        listed = true;
-        return HttpResponse.json({ environments: [] });
-      }),
-      http.get("*/variables", () => HttpResponse.json({})),
-    );
-
-    const refused = await runCliForTest(["variables", "list", ...base(cwd)]);
-    const named = await runCliForTest(["variables", "list", "--project-level", ...base(cwd)]);
-
-    expect(refused.exitCode).not.toBe(0);
-    expect(named.exitCode).toBe(0);
-    expect(listed).toBe(false);
   });
 });

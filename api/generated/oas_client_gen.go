@@ -341,6 +341,8 @@ type Invoker interface {
 	// A variable is deletable only by the owner that entered it. Deleting a name
 	// another owner of the same project holds answers `var.not_found` and leaves
 	// that owner's value standing.
+	// `applies_to` selects which value is removed: `all` (the default) or the
+	// `preview` override. Removing one leaves the other standing.
 	//
 	// DELETE /variables/{variable_name}
 	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
@@ -424,6 +426,16 @@ type Invoker interface {
 	//
 	// GET /deployments/{deployment_id}
 	GetDeploymentById(ctx context.Context, params GetDeploymentByIdParams) (GetDeploymentByIdRes, error)
+	// GetDeploymentVariables invokes getDeploymentVariables operation.
+	//
+	// The values frozen onto the deployment when it was written — what the target
+	// serves, not what the store holds now. A preview deployment prefers the
+	// `preview` override of each name and falls back to the `all` value; a primary
+	// deployment runs only the `all` values. Secrets are reported as held and
+	// never disclosed.
+	//
+	// GET /deployments/{deployment_id}/variables
+	GetDeploymentVariables(ctx context.Context, params GetDeploymentVariablesParams) (GetDeploymentVariablesRes, error)
 	// GetEnvironmentByName invokes getEnvironmentByName operation.
 	//
 	// Reads one environment of the project by its name.
@@ -601,6 +613,9 @@ type Invoker interface {
 	// A name that owner has not entered answers `var.not_found`, even when
 	// another owner of the same project holds it: nothing is inherited. A secret
 	// is found but not disclosed: the response is `{"secret": true}`.
+	// `applies_to` selects which value is read: `all` (the default) or the
+	// `preview` override. A name with no value for the selected `applies_to`
+	// answers `var.not_found`.
 	//
 	// GET /variables/{variable_name}
 	GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error)
@@ -614,6 +629,10 @@ type Invoker interface {
 	// everything a project holds therefore means reading each owner in turn.
 	// Secret values are not returned. A secret appears as `{"secret": true}`,
 	// which says a value is held without disclosing it.
+	// `applies_to` selects which value is read: `all` (the default) is the value
+	// every deploy freezes, `preview` is the override a preview deploy prefers.
+	// The two are not merged — a `preview` read returns only the names that hold a
+	// preview override.
 	//
 	// GET /variables
 	GetVariables(ctx context.Context, params GetVariablesParams) (GetVariablesRes, error)
@@ -999,6 +1018,11 @@ type Invoker interface {
 	// The body is applied whole or not at all, so a rejected request leaves the
 	// owner exactly as it was. Writing the same name and owner twice replaces the
 	// value rather than duplicating it, which makes a retry safe.
+	// `applies_to` selects which value is written: `all` (the default) is the
+	// value every deploy freezes, `preview` is the override a preview deploy
+	// prefers. A name holds at most these two values, and writing one does not
+	// touch the other. Nothing written here reaches a deployment already made:
+	// every deploy freezes the values it resolved.
 	//
 	// PATCH /variables
 	UpdateVariables(ctx context.Context, request UpdateVariablesRequest, params UpdateVariablesParams) (UpdateVariablesRes, error)
@@ -3962,6 +3986,8 @@ func (c *Client) sendDeleteUserByID(ctx context.Context, params DeleteUserByIDPa
 // A variable is deletable only by the owner that entered it. Deleting a name
 // another owner of the same project holds answers `var.not_found` and leaves
 // that owner's value standing.
+// `applies_to` selects which value is removed: `all` (the default) or the
+// `preview` override. Removing one leaves the other standing.
 //
 // DELETE /variables/{variable_name}
 func (c *Client) DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error) {
@@ -4064,6 +4090,23 @@ func (c *Client) sendDeleteVariable(ctx context.Context, params DeleteVariablePa
 					return e.EncodeValue(conv.StringToString(unwrapped))
 				}
 				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "applies_to" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "applies_to",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.AppliesTo.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
 			}
 			return nil
 		}); err != nil {
@@ -5138,6 +5181,160 @@ func (c *Client) sendGetDeploymentById(ctx context.Context, params GetDeployment
 
 	stage = "DecodeResponse"
 	result, err := decodeGetDeploymentByIdResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// GetDeploymentVariables invokes getDeploymentVariables operation.
+//
+// The values frozen onto the deployment when it was written — what the target
+// serves, not what the store holds now. A preview deployment prefers the
+// `preview` override of each name and falls back to the `all` value; a primary
+// deployment runs only the `all` values. Secrets are reported as held and
+// never disclosed.
+//
+// GET /deployments/{deployment_id}/variables
+func (c *Client) GetDeploymentVariables(ctx context.Context, params GetDeploymentVariablesParams) (GetDeploymentVariablesRes, error) {
+	res, err := c.sendGetDeploymentVariables(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetDeploymentVariables(ctx context.Context, params GetDeploymentVariablesParams) (res GetDeploymentVariablesRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getDeploymentVariables"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/deployments/{deployment_id}/variables"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetDeploymentVariablesOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/deployments/"
+	{
+		// Encode "deployment_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "deployment_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.DeploymentID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/variables"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, GetDeploymentVariablesOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetDeploymentVariablesResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -7669,6 +7866,9 @@ func (c *Client) sendGetUserByID(ctx context.Context, params GetUserByIDParams) 
 // A name that owner has not entered answers `var.not_found`, even when
 // another owner of the same project holds it: nothing is inherited. A secret
 // is found but not disclosed: the response is `{"secret": true}`.
+// `applies_to` selects which value is read: `all` (the default) or the
+// `preview` override. A name with no value for the selected `applies_to`
+// answers `var.not_found`.
 //
 // GET /variables/{variable_name}
 func (c *Client) GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error) {
@@ -7777,6 +7977,23 @@ func (c *Client) sendGetVariable(ctx context.Context, params GetVariableParams) 
 			return res, errors.Wrap(err, "encode query")
 		}
 	}
+	{
+		// Encode "applies_to" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "applies_to",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.AppliesTo.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
 	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
@@ -7845,6 +8062,10 @@ func (c *Client) sendGetVariable(ctx context.Context, params GetVariableParams) 
 // everything a project holds therefore means reading each owner in turn.
 // Secret values are not returned. A secret appears as `{"secret": true}`,
 // which says a value is held without disclosing it.
+// `applies_to` selects which value is read: `all` (the default) is the value
+// every deploy freezes, `preview` is the override a preview deploy prefers.
+// The two are not merged — a `preview` read returns only the names that hold a
+// preview override.
 //
 // GET /variables
 func (c *Client) GetVariables(ctx context.Context, params GetVariablesParams) (GetVariablesRes, error) {
@@ -7926,6 +8147,23 @@ func (c *Client) sendGetVariables(ctx context.Context, params GetVariablesParams
 					return e.EncodeValue(conv.StringToString(unwrapped))
 				}
 				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "applies_to" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "applies_to",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.AppliesTo.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
 			}
 			return nil
 		}); err != nil {
@@ -13470,6 +13708,11 @@ func (c *Client) sendUpdateTeam(ctx context.Context, request *UpdateTeamRequest,
 // The body is applied whole or not at all, so a rejected request leaves the
 // owner exactly as it was. Writing the same name and owner twice replaces the
 // value rather than duplicating it, which makes a retry safe.
+// `applies_to` selects which value is written: `all` (the default) is the
+// value every deploy freezes, `preview` is the override a preview deploy
+// prefers. A name holds at most these two values, and writing one does not
+// touch the other. Nothing written here reaches a deployment already made:
+// every deploy freezes the values it resolved.
 //
 // PATCH /variables
 func (c *Client) UpdateVariables(ctx context.Context, request UpdateVariablesRequest, params UpdateVariablesParams) (UpdateVariablesRes, error) {
@@ -13560,6 +13803,23 @@ func (c *Client) sendUpdateVariables(ctx context.Context, request UpdateVariable
 					return e.EncodeValue(conv.StringToString(unwrapped))
 				}
 				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "applies_to" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "applies_to",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.AppliesTo.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
 			}
 			return nil
 		}); err != nil {

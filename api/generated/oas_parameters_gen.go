@@ -1430,6 +1430,10 @@ type DeleteVariableParams struct {
 	// environment, and an environment's variables are not visible from the project.
 	// A value that has to hold in several environments is entered in each of them.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
+	// Which value of a variable the request addresses. `all` (the default) is the
+	// value every deploy freezes; `preview` is the override a preview deploy prefers
+	// where one exists. A name holds at most these two values.
+	AppliesTo OptVariableAppliesTo `json:",omitempty,omitzero"`
 }
 
 func unpackDeleteVariableParams(packed middleware.Parameters) (params DeleteVariableParams) {
@@ -1454,6 +1458,15 @@ func unpackDeleteVariableParams(packed middleware.Parameters) (params DeleteVari
 		}
 		if v, ok := packed[key]; ok {
 			params.EnvironmentName = v.(OptEnvironmentName)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "applies_to",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.AppliesTo = v.(OptVariableAppliesTo)
 		}
 	}
 	return params
@@ -1631,6 +1644,67 @@ func decodeDeleteVariableParams(args [1]string, argsEscaped bool, r *http.Reques
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "environment_name",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Set default value for query: applies_to.
+	{
+		val := VariableAppliesTo("all")
+		params.AppliesTo.SetTo(val)
+	}
+	// Decode query: applies_to.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "applies_to",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotAppliesToVal VariableAppliesTo
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotAppliesToVal = VariableAppliesTo(c)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.AppliesTo.SetTo(paramsDotAppliesToVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.AppliesTo.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "applies_to",
 			In:   "query",
 			Err:  err,
 		}
@@ -2352,6 +2426,148 @@ func unpackGetDeploymentByIdParams(packed middleware.Parameters) (params GetDepl
 }
 
 func decodeGetDeploymentByIdParams(args [1]string, argsEscaped bool, r *http.Request) (params GetDeploymentByIdParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode query: project_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotProjectIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.ProjectID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode path: deployment_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "deployment_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotDeploymentIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotDeploymentIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.DeploymentID = DeploymentID(paramsDotDeploymentIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.DeploymentID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "deployment_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// GetDeploymentVariablesParams is parameters of getDeploymentVariables operation.
+type GetDeploymentVariablesParams struct {
+	// The unique identifier of the project.
+	ProjectID ProjectID
+	// The unique identifier of the deployment.
+	DeploymentID DeploymentID
+}
+
+func unpackGetDeploymentVariablesParams(packed middleware.Parameters) (params GetDeploymentVariablesParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "query",
+		}
+		params.ProjectID = packed[key].(ProjectID)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "deployment_id",
+			In:   "path",
+		}
+		params.DeploymentID = packed[key].(DeploymentID)
+	}
+	return params
+}
+
+func decodeGetDeploymentVariablesParams(args [1]string, argsEscaped bool, r *http.Request) (params GetDeploymentVariablesParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode query: project_id.
 	if err := func() error {
@@ -4169,6 +4385,10 @@ type GetVariableParams struct {
 	// environment, and an environment's variables are not visible from the project.
 	// A value that has to hold in several environments is entered in each of them.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
+	// Which value of a variable the request addresses. `all` (the default) is the
+	// value every deploy freezes; `preview` is the override a preview deploy prefers
+	// where one exists. A name holds at most these two values.
+	AppliesTo OptVariableAppliesTo `json:",omitempty,omitzero"`
 }
 
 func unpackGetVariableParams(packed middleware.Parameters) (params GetVariableParams) {
@@ -4193,6 +4413,15 @@ func unpackGetVariableParams(packed middleware.Parameters) (params GetVariablePa
 		}
 		if v, ok := packed[key]; ok {
 			params.EnvironmentName = v.(OptEnvironmentName)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "applies_to",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.AppliesTo = v.(OptVariableAppliesTo)
 		}
 	}
 	return params
@@ -4374,6 +4603,67 @@ func decodeGetVariableParams(args [1]string, argsEscaped bool, r *http.Request) 
 			Err:  err,
 		}
 	}
+	// Set default value for query: applies_to.
+	{
+		val := VariableAppliesTo("all")
+		params.AppliesTo.SetTo(val)
+	}
+	// Decode query: applies_to.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "applies_to",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotAppliesToVal VariableAppliesTo
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotAppliesToVal = VariableAppliesTo(c)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.AppliesTo.SetTo(paramsDotAppliesToVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.AppliesTo.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "applies_to",
+			In:   "query",
+			Err:  err,
+		}
+	}
 	return params, nil
 }
 
@@ -4387,6 +4677,10 @@ type GetVariablesParams struct {
 	// environment, and an environment's variables are not visible from the project.
 	// A value that has to hold in several environments is entered in each of them.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
+	// Which value of a variable the request addresses. `all` (the default) is the
+	// value every deploy freezes; `preview` is the override a preview deploy prefers
+	// where one exists. A name holds at most these two values.
+	AppliesTo OptVariableAppliesTo `json:",omitempty,omitzero"`
 }
 
 func unpackGetVariablesParams(packed middleware.Parameters) (params GetVariablesParams) {
@@ -4404,6 +4698,15 @@ func unpackGetVariablesParams(packed middleware.Parameters) (params GetVariables
 		}
 		if v, ok := packed[key]; ok {
 			params.EnvironmentName = v.(OptEnvironmentName)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "applies_to",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.AppliesTo = v.(OptVariableAppliesTo)
 		}
 	}
 	return params
@@ -4521,6 +4824,67 @@ func decodeGetVariablesParams(args [0]string, argsEscaped bool, r *http.Request)
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "environment_name",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Set default value for query: applies_to.
+	{
+		val := VariableAppliesTo("all")
+		params.AppliesTo.SetTo(val)
+	}
+	// Decode query: applies_to.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "applies_to",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotAppliesToVal VariableAppliesTo
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotAppliesToVal = VariableAppliesTo(c)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.AppliesTo.SetTo(paramsDotAppliesToVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.AppliesTo.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "applies_to",
 			In:   "query",
 			Err:  err,
 		}
@@ -10134,6 +10498,10 @@ type UpdateVariablesParams struct {
 	// environment, and an environment's variables are not visible from the project.
 	// A value that has to hold in several environments is entered in each of them.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
+	// Which value of a variable the request addresses. `all` (the default) is the
+	// value every deploy freezes; `preview` is the override a preview deploy prefers
+	// where one exists. A name holds at most these two values.
+	AppliesTo OptVariableAppliesTo `json:",omitempty,omitzero"`
 }
 
 func unpackUpdateVariablesParams(packed middleware.Parameters) (params UpdateVariablesParams) {
@@ -10151,6 +10519,15 @@ func unpackUpdateVariablesParams(packed middleware.Parameters) (params UpdateVar
 		}
 		if v, ok := packed[key]; ok {
 			params.EnvironmentName = v.(OptEnvironmentName)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "applies_to",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.AppliesTo = v.(OptVariableAppliesTo)
 		}
 	}
 	return params
@@ -10268,6 +10645,67 @@ func decodeUpdateVariablesParams(args [0]string, argsEscaped bool, r *http.Reque
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "environment_name",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Set default value for query: applies_to.
+	{
+		val := VariableAppliesTo("all")
+		params.AppliesTo.SetTo(val)
+	}
+	// Decode query: applies_to.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "applies_to",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotAppliesToVal VariableAppliesTo
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotAppliesToVal = VariableAppliesTo(c)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.AppliesTo.SetTo(paramsDotAppliesToVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.AppliesTo.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "applies_to",
 			In:   "query",
 			Err:  err,
 		}

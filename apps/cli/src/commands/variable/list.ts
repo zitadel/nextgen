@@ -1,28 +1,32 @@
 import { Flags } from "@oclif/core";
 
-import { CommandGroups, OwnerCommand, type JsonEnvelope } from "../../lib/oclif";
+import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
 import { renderRows, renderTable } from "../../lib/oclif/crud/table";
-import { toVariableRows, variableCells } from "../../lib/variables";
+import { toVariableRows, variableCells, variableScope } from "../../lib/variables";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["name", "value"] as const;
 
 /**
- * The `variables list` topic command — show the variables entered at the
- * project level.
+ * `zitadel variable list` — show the variables entered on the project.
  *
- * Owners are separate, not a ladder (ADR 062 §4), so this is the project's own
- * set and not a merge of anything an environment holds. A secret is reported as
- * held without its value, because the platform never discloses one.
+ * The project's own set. A secret is reported as held without its value, because
+ * the platform never discloses one. `--preview` lists the preview overrides
+ * instead, not merged with the frozen values — only the names that hold one.
  */
-export default class VariablesList extends OwnerCommand {
+export default class VariableList extends EnvironmentCommand {
   static override description = "List the variables entered on the project.";
   static override group = CommandGroups.configuration;
   static override examples = [
-    "<%= config.bin %> variables list --project-level",
-    "<%= config.bin %> variables list --project-level --json",
+    "<%= config.bin %> variable list",
+    "<%= config.bin %> variable list --preview",
+    "<%= config.bin %> variable list --json",
   ];
   static override flags = {
+    preview: Flags.boolean({
+      default: false,
+      description: "List the preview overrides instead of the values every deploy freezes.",
+    }),
     plain: Flags.boolean({
       description:
         "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
@@ -30,9 +34,10 @@ export default class VariablesList extends OwnerCommand {
   };
 
   async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(VariablesList);
+    const { flags } = await this.parse(VariableList);
     await this.toMeta(flags);
-    const { client, scope } = await this.connect();
+    const { client, projectId } = await this.connect();
+    const scope = variableScope(projectId, flags.preview);
 
     const rows = toVariableRows(await client.getVariables(scope));
     this.recordTelemetry({ variable_count: rows.length });
@@ -42,6 +47,9 @@ export default class VariablesList extends OwnerCommand {
     // empty, so `cut`, `awk` and `wc -l` work on it; a terminal gets a table.
     const cells = variableCells(rows);
     const plain = flags.plain || !process.stdout.isTTY;
+    const empty = flags.preview
+      ? "No preview overrides on the project."
+      : "No variables on the project.";
     return this.emit({
       status: "ok",
       data: {
@@ -51,7 +59,7 @@ export default class VariablesList extends OwnerCommand {
       pretty: plain
         ? renderRows(COLUMNS, cells)
         : rows.length === 0
-          ? "No variables on the project."
+          ? empty
           : [
               renderTable(COLUMNS, cells),
               "",

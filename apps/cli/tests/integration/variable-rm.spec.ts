@@ -5,14 +5,14 @@ import { aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
-describe("variables delete", () => {
+describe("variable rm", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
         const app = await aSetUpApp();
         platform.isNotZitadel();
 
-        const result = await app.deleteVariable("FOO");
+        const result = await app.removeVariable("FOO");
 
         expect(result).toFailWith("E_NOT_FOUND");
       });
@@ -23,7 +23,7 @@ describe("variables delete", () => {
         const app = await aSetUpApp();
         platform.isUnavailable();
 
-        const result = await app.deleteVariable("FOO");
+        const result = await app.removeVariable("FOO");
 
         expect(result).toFailWith("E_NETWORK");
       });
@@ -34,7 +34,7 @@ describe("variables delete", () => {
         const app = await aSetUpApp();
         platform.refusesConnections();
 
-        const result = await app.deleteVariable("FOO");
+        const result = await app.removeVariable("FOO");
 
         expect(result).toFailWith("E_NETWORK");
       });
@@ -47,7 +47,7 @@ describe("variables delete", () => {
         const app = await aSetUpApp();
         expect(await app.setVariable("FOO", "bar")).toSucceed();
 
-        const result = await app.deleteVariable("FOO");
+        const result = await app.removeVariable("FOO");
 
         expect(result).toSucceed();
       });
@@ -56,17 +56,32 @@ describe("variables delete", () => {
         const app = await aSetUpApp();
         expect(await app.setVariable("FOO", "bar")).toSucceed();
 
-        expect(await app.deleteVariable("FOO")).toSucceed();
+        expect(await app.removeVariable("FOO")).toSucceed();
 
         expect(await app.projectVariables()).not.toEqual(
           expect.arrayContaining([expect.objectContaining({ name: "FOO" })]),
         );
       });
 
+      it("removes the preview override and leaves the frozen value", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("API_URL", "https://api.acme.com")).toSucceed();
+        expect(
+          await app.setVariable("API_URL", "https://preview.acme.com", { preview: true }),
+        ).toSucceed();
+
+        expect(await app.removeVariable("API_URL", { preview: true })).toSucceed();
+
+        expect(await app.projectVariables({ preview: true })).toEqual([]);
+        expect(await app.projectVariables()).toEqual([
+          { name: "API_URL", secret: false, value: "https://api.acme.com" },
+        ]);
+      });
+
       it("refuses a name the project does not hold", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.deleteVariable("NOT_THERE");
+        const result = await app.removeVariable("NOT_THERE");
 
         expect(result).toFail();
       });
@@ -76,15 +91,7 @@ describe("variables delete", () => {
       const app = await aSetUpApp();
       expect(await app.setVariable("FOO", "bar")).toSucceed();
 
-      const result = await app.run([
-        "variables",
-        "delete",
-        "FOO",
-        "--project-level",
-        "--force",
-        "--dry-run",
-        "--json",
-      ]);
+      const result = await app.run(["variable", "rm", "FOO", "--force", "--dry-run", "--json"]);
 
       expect(result).toSucceed();
       expect(await app.projectVariables()).toEqual(

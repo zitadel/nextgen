@@ -5,7 +5,7 @@ import { aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
-describe("variables set", () => {
+describe("variable set", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
@@ -43,20 +43,30 @@ describe("variables set", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
-      it("enters a variable on the project", async () => {
+      it("enters a plain value given on the command line", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.setVariable("FOO", "bar");
+        const result = await app.run(["variable", "set", "FOO", "bar", "--json"]);
 
         expect(result).toSucceed();
+        const [row] = await app.projectVariables();
+        expect(row).toEqual({ name: "FOO", secret: false, value: "bar" });
       });
 
-      it("reports the name it entered", async () => {
+      it("enters a plain value piped in when none is given", async () => {
         const app = await aSetUpApp();
 
         const result = await app.setVariable("FOO", "bar");
 
         expect(app.envelopeOf<{ name: string }>(result).data.name).toBe("FOO");
+      });
+
+      it("refuses a value on the command line for a secret", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["variable", "set", "TOKEN", "s3cret", "--secret", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
       });
 
       it("says a secret is held as a secret", async () => {
@@ -66,19 +76,36 @@ describe("variables set", () => {
 
         expect(app.envelopeOf<{ secret: boolean }>(result).data.secret).toBe(true);
       });
+
+      it("writes the preview override into its own bucket", async () => {
+        const app = await aSetUpApp();
+        await app.setVariable("API_URL", "https://api.acme.com");
+
+        await app.setVariable("API_URL", "https://preview.acme.com", { preview: true });
+
+        expect(await app.projectVariables()).toEqual([
+          { name: "API_URL", secret: false, value: "https://api.acme.com" },
+        ]);
+        expect(await app.projectVariables({ preview: true })).toEqual([
+          { name: "API_URL", secret: false, value: "https://preview.acme.com" },
+        ]);
+      });
+    });
+
+    describe("rendered for a terminal", () => {
+      it("reports the name it set", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["variable", "set", "FOO", "bar"]);
+
+        expect(result).toPrint("FOO");
+      });
     });
 
     it("enters nothing on a dry run", async () => {
       const app = await aSetUpApp();
 
-      const result = await app.run([
-        "variables",
-        "set",
-        "FOO",
-        "--project-level",
-        "--dry-run",
-        "--json",
-      ]);
+      const result = await app.run(["variable", "set", "FOO", "bar", "--dry-run", "--json"]);
 
       expect(result).toSucceed();
       expect(await app.projectVariables()).toEqual([]);

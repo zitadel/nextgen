@@ -1,34 +1,48 @@
-import { CommandGroups, type JsonEnvelope, nonBlankArg, OwnerCommand } from "../../lib/oclif";
+import { Flags } from "@oclif/core";
+
+import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { renderDetail } from "../../lib/oclif/crud/table";
-import { assertVariableName, toVariableRow, variableCells } from "../../lib/variables";
+import {
+  assertVariableName,
+  toVariableRow,
+  variableCells,
+  variableScope,
+} from "../../lib/variables";
 
 /**
- * The `variables get` topic command — read one variable by name at the project
- * level.
+ * `zitadel variable get NAME` — read one variable by name from the project.
  *
- * A name the project level has not entered answers `var.not_found`, even when
- * an environment of the same project holds it: nothing is inherited
- * (ADR 062 §4). A secret is found but not disclosed, so the answer says it is
- * held and nothing more.
+ * A name the project has not entered answers `var.not_found`. A secret is found
+ * but not disclosed, so the answer says it is held and nothing more. `--preview`
+ * reads the override a preview deploy prefers instead of the frozen value; a
+ * name with no preview override is a miss under `--preview`.
  */
-export default class VariablesGet extends OwnerCommand {
+export default class VariableGet extends EnvironmentCommand {
   static override description = "Get one variable from the project.";
   static override group = CommandGroups.configuration;
   static override examples = [
-    "<%= config.bin %> variables get GOOGLE_CLIENT_ID --project-level",
-    "<%= config.bin %> variables get GOOGLE_CLIENT_ID --project-level --json",
+    "<%= config.bin %> variable get GOOGLE_CLIENT_ID",
+    "<%= config.bin %> variable get API_URL --preview",
+    "<%= config.bin %> variable get GOOGLE_CLIENT_ID --json",
   ];
   static override args = {
     name: nonBlankArg({ required: true, description: "Variable name to read." }),
   };
+  static override flags = {
+    preview: Flags.boolean({
+      default: false,
+      description: "Read the preview override instead of the value every deploy freezes.",
+    }),
+  };
 
   async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(VariablesGet);
+    const { args, flags } = await this.parse(VariableGet);
     await this.toMeta(flags);
     const name = args.name;
 
     assertVariableName(name);
-    const { client, scope } = await this.connect();
+    const { client, projectId } = await this.connect();
+    const scope = variableScope(projectId, flags.preview);
 
     // The single-name endpoint answers in the same two forms the collection
     // does, so the row projection is shared rather than duplicated.

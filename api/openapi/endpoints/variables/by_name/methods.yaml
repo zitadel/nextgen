@@ -9,12 +9,17 @@ get:
     A name that owner has not entered answers `var.not_found`, even when
     another owner of the same project holds it: nothing is inherited. A secret
     is found but not disclosed: the response is `{"secret": true}`.
+
+    `applies_to` selects which value is read: `all` (the default) or the
+    `preview` override. A name with no value for the selected `applies_to`
+    answers `var.not_found`.
   tags:
     - Variables
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/variable-name.yaml
     - $ref: ../../../components/parameters/environment-name-query.yaml
+    - $ref: ../../../components/parameters/applies-to.yaml
   security:
     - oauth2:
         - variable.read
@@ -37,12 +42,16 @@ delete:
     A variable is deletable only by the owner that entered it. Deleting a name
     another owner of the same project holds answers `var.not_found` and leaves
     that owner's value standing.
+
+    `applies_to` selects which value is removed: `all` (the default) or the
+    `preview` override. Removing one leaves the other standing.
   tags:
     - Variables
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/variable-name.yaml
     - $ref: ../../../components/parameters/environment-name-query.yaml
+    - $ref: ../../../components/parameters/applies-to.yaml
   security:
     - oauth2:
         - variable.write

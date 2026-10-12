@@ -321,6 +321,8 @@ type Handler interface {
 	// A variable is deletable only by the owner that entered it. Deleting a name
 	// another owner of the same project holds answers `var.not_found` and leaves
 	// that owner's value standing.
+	// `applies_to` selects which value is removed: `all` (the default) or the
+	// `preview` override. Removing one leaves the other standing.
 	//
 	// DELETE /variables/{variable_name}
 	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
@@ -404,6 +406,16 @@ type Handler interface {
 	//
 	// GET /deployments/{deployment_id}
 	GetDeploymentById(ctx context.Context, params GetDeploymentByIdParams) (GetDeploymentByIdRes, error)
+	// GetDeploymentVariables implements getDeploymentVariables operation.
+	//
+	// The values frozen onto the deployment when it was written — what the target
+	// serves, not what the store holds now. A preview deployment prefers the
+	// `preview` override of each name and falls back to the `all` value; a primary
+	// deployment runs only the `all` values. Secrets are reported as held and
+	// never disclosed.
+	//
+	// GET /deployments/{deployment_id}/variables
+	GetDeploymentVariables(ctx context.Context, params GetDeploymentVariablesParams) (GetDeploymentVariablesRes, error)
 	// GetEnvironmentByName implements getEnvironmentByName operation.
 	//
 	// Reads one environment of the project by its name.
@@ -581,6 +593,9 @@ type Handler interface {
 	// A name that owner has not entered answers `var.not_found`, even when
 	// another owner of the same project holds it: nothing is inherited. A secret
 	// is found but not disclosed: the response is `{"secret": true}`.
+	// `applies_to` selects which value is read: `all` (the default) or the
+	// `preview` override. A name with no value for the selected `applies_to`
+	// answers `var.not_found`.
 	//
 	// GET /variables/{variable_name}
 	GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error)
@@ -594,6 +609,10 @@ type Handler interface {
 	// everything a project holds therefore means reading each owner in turn.
 	// Secret values are not returned. A secret appears as `{"secret": true}`,
 	// which says a value is held without disclosing it.
+	// `applies_to` selects which value is read: `all` (the default) is the value
+	// every deploy freezes, `preview` is the override a preview deploy prefers.
+	// The two are not merged — a `preview` read returns only the names that hold a
+	// preview override.
 	//
 	// GET /variables
 	GetVariables(ctx context.Context, params GetVariablesParams) (GetVariablesRes, error)
@@ -979,6 +998,11 @@ type Handler interface {
 	// The body is applied whole or not at all, so a rejected request leaves the
 	// owner exactly as it was. Writing the same name and owner twice replaces the
 	// value rather than duplicating it, which makes a retry safe.
+	// `applies_to` selects which value is written: `all` (the default) is the
+	// value every deploy freezes, `preview` is the override a preview deploy
+	// prefers. A name holds at most these two values, and writing one does not
+	// touch the other. Nothing written here reaches a deployment already made:
+	// every deploy freezes the values it resolved.
 	//
 	// PATCH /variables
 	UpdateVariables(ctx context.Context, req UpdateVariablesRequest, params UpdateVariablesParams) (UpdateVariablesRes, error)

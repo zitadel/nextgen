@@ -6,14 +6,14 @@ import { pressCtrlC } from "../helpers/run-cli";
 
 const platform = usePlatformMock();
 
-describe("variables list", () => {
+describe("variable list", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
         const app = await aSetUpApp();
         platform.isNotZitadel();
 
-        const result = await app.run(["variables", "list", "--project-level", "--json"]);
+        const result = await app.run(["variable", "list", "--json"]);
 
         expect(result).toFailWith("E_NOT_FOUND");
       });
@@ -24,7 +24,7 @@ describe("variables list", () => {
         const app = await aSetUpApp();
         platform.isUnavailable();
 
-        const result = await app.run(["variables", "list", "--project-level", "--json"]);
+        const result = await app.run(["variable", "list", "--json"]);
 
         expect(result).toFailWith("E_NETWORK");
       });
@@ -35,7 +35,7 @@ describe("variables list", () => {
         const app = await aSetUpApp();
         const waiting = platform.hangs();
 
-        const result = app.run(["variables", "list", "--project-level", "--json"]);
+        const result = app.run(["variable", "list", "--json"]);
         await waiting;
         pressCtrlC();
 
@@ -48,7 +48,7 @@ describe("variables list", () => {
         const app = await aSetUpApp();
         platform.refusesConnections();
 
-        const result = await app.run(["variables", "list", "--project-level", "--json"]);
+        const result = await app.run(["variable", "list", "--json"]);
 
         expect(result).toFailWith("E_NETWORK");
       });
@@ -75,6 +75,18 @@ describe("variables list", () => {
         expect(listed.find((variable) => variable.name === "FOO")?.value).toBe("bar");
       });
 
+      it("lists only the preview overrides under --preview", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+        expect(
+          await app.setVariable("API_URL", "https://preview.acme.com", { preview: true }),
+        ).toSucceed();
+
+        const listed = await app.projectVariables({ preview: true });
+
+        expect(listed.map((variable) => variable.name)).toEqual(["API_URL"]);
+      });
+
       it("withholds a secret's value", async () => {
         const app = await aSetUpApp();
         expect(await app.setVariable("TOKEN", "s3cret", { secret: true })).toSucceed();
@@ -84,6 +96,17 @@ describe("variables list", () => {
         const held = listed.find((variable) => variable.name === "TOKEN");
         expect(held).toMatchObject({ secret: true });
         expect(held).not.toHaveProperty("value");
+      });
+    });
+
+    describe("rendered for a terminal", () => {
+      it("prints a variable that was entered", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        const result = await app.run(["variable", "list"]);
+
+        expect(result).toPrint("FOO");
       });
     });
   });

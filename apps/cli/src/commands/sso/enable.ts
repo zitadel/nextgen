@@ -60,7 +60,7 @@ import { reportWarning } from "../../lib/warnings";
  * written. It works on the local Project `zitadel setup` created and does not
  * require claiming, because this is the local development path.
  *
- * The client secret never comes from a flag, following `variables set`: it is
+ * The client secret never comes from a flag, following `variable set`: it is
  * prompted for, or read from stdin when scripting, so it cannot land in shell
  * history, a process listing, or CI logs.
  */
@@ -96,8 +96,7 @@ export default class SsoEnable extends EnvironmentCommand {
     const provider = flags.provider;
     if (provider === undefined) {
       // Named rather than prompted for: the catalog holds one provider today,
-      // and a question offering a single answer is a keystroke, not a choice
-      // (the same reasoning `OwnerCommand` gives for requiring an owner).
+      // and a question offering a single answer is a keystroke, not a choice.
       throw new ZitadelError("E_VALIDATION", "Name the provider to enable", {
         hint: `Pass --provider, e.g. --provider ${IDP_PROVIDERS[0]}.`,
       });
@@ -297,7 +296,7 @@ export default class SsoEnable extends EnvironmentCommand {
           changed: edits.written,
           skipped: edits.skipped,
         }),
-        // `variables set` only when the secret did not reach the project:
+        // `variable set` only when the secret did not reach the project:
         // the connection references it as `${{ NAME }}` and the engine
         // resolves that from the project's variables, so a button whose
         // credential never arrived fails at token exchange. An ok result
@@ -322,9 +321,8 @@ export default class SsoEnable extends EnvironmentCommand {
   /**
    * How the connection's credentials reach the project, or `undefined` when there is
    * no project behind this run: `--source mock` answers from fixtures and has
-   * no variables to write. It publishes through the connection rather than
-   * `OwnerCommand.connect` because this command addresses the local Project it
-   * was pointed at, not an owner the developer named.
+   * no variables to write. It publishes to the project's own variables, which
+   * is where the engine resolves a connection's `${{ NAME }}` references from.
    */
   private publisher(client: ZitadelClient, projectId: string): SecretPublisher | undefined {
     if (this.meta.source === "mock") {
