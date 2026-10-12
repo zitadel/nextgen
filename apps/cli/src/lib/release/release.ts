@@ -1,7 +1,7 @@
 import type { ZitadelClient } from "@zitadel/api/client";
 import type {
-  CreateRelease201,
-  CreateReleaseBody,
+  BuildRelease201,
+  BuildReleaseBody,
   GetReleaseById200,
   ListReleases200ReleasesItem,
 } from "@zitadel/api/generated/model";
@@ -9,10 +9,10 @@ import type {
 import type { ConfigurationBundle } from "./bundle";
 
 /**
- * A release, as every create/get returns it. `CreateRelease200` (the dedupe
- * answer) and `CreateRelease201` share this shape, so one alias covers both.
+ * A release, as every build/get returns it. `BuildRelease200` (the dedupe
+ * answer) and `BuildRelease201` share this shape, so one alias covers both.
  */
-export type Release = CreateRelease201;
+export type Release = BuildRelease201;
 
 /** Metadata recorded alongside a release, mirroring the source commit. */
 export type ReleaseSource = {
@@ -22,9 +22,11 @@ export type ReleaseSource = {
 };
 
 /**
- * Post a release built from the `.zitadel/` bundle. The server reuses the
- * revisions that already match and allocates the rest, and dedupes on content:
- * re-posting the same bundle returns the release that already carries it.
+ * Build a release from the `.zitadel/` bundle (`POST /releases/build`). The
+ * server reuses the revisions that already match and allocates the rest, and
+ * dedupes on content: re-posting the same bundle returns the release that
+ * already carries it. (`POST /releases` pins pre-existing revision ids and is
+ * not a CLI flow.)
  */
 export async function createReleaseFromBundle(
   client: ZitadelClient,
@@ -39,8 +41,8 @@ export async function createReleaseFromBundle(
     ...(source.message === undefined ? {} : { message: source.message }),
     ...(source.gitSha === null ? {} : { git_sha: source.gitSha }),
     git_dirty: source.gitDirty,
-  } as unknown as CreateReleaseBody;
-  const result = await client.createRelease(body, { project_id: projectId });
+  } as unknown as BuildReleaseBody;
+  const result = await client.buildRelease(body, { project_id: projectId });
   return result as Release;
 }
 

@@ -1,3 +1,5 @@
+import { api } from "@/api/zitadel";
+import { readAllPages } from "./paging";
 import { field } from "./record";
 
 /**
@@ -9,6 +11,32 @@ import { field } from "./record";
  * the same defensive posture `lib/user.ts` takes for users themselves.
  */
 export type UserSchema = Record<string, unknown>;
+
+/** A user schema at its latest revision, with that revision's created date. */
+export interface SchemaEntry {
+  id: string;
+  schema: UserSchema;
+  createdAt: string;
+}
+
+/** Every user schema in the project, at its latest revision. */
+export async function fetchAllSchemas(projectId: string): Promise<SchemaEntry[]> {
+  const entries = await readAllPages(async (pageToken) => {
+    const page = await api.listSchemas({
+      project_id: projectId,
+      kind: "user-schema",
+      revisions: "latest",
+      limit: 100,
+      page_token: pageToken,
+    });
+    return { items: page.schemas, next: page.next_page_token };
+  });
+  return entries.map((entry) => ({
+    id: entry.id,
+    schema: entry.schema as UserSchema,
+    createdAt: entry.metadata.created_at,
+  }));
+}
 
 /** One rendered form control, derived from a single schema property. */
 export interface SchemaField {
@@ -163,6 +191,13 @@ export interface SchemaAuthMethod {
   key: string;
   label: string;
   enabled: boolean;
+  /**
+   * The connection slugs an enabled `sso` lists in `providers`, verbatim and in
+   * the document's order. Empty for every other method, and for `sso` while it
+   * is disabled: the meta-schema forbids `providers` then, so a stray list on a
+   * disabled method describes nothing a user can sign in with.
+   */
+  providers: string[];
 }
 
 /**
@@ -184,13 +219,45 @@ export function schemaAuthMethods(schema: UserSchema): SchemaAuthMethod[] {
   return Object.entries(methods as Record<string, unknown>)
     .map(([key, value]) => {
       const entry = (value ?? {}) as Record<string, unknown>;
+      const enabled = entry.enabled === true;
       return {
         key,
         label: AUTH_METHOD_LABELS[key] ?? key,
-        enabled: entry.enabled === true,
+        enabled,
+        providers: key === "sso" && enabled ? readProviders(entry.providers) : [],
       };
     })
     .sort((a, b) => a.key.localeCompare(b.key));
+}
+
+/**
+ * The connection slugs a schema's latest revision makes available to its users
+ * (`x-auth-methods.sso.providers`), or none when SSO is off or undeclared.
+ */
+export function schemaSsoProviders(schema: UserSchema): string[] {
+  return schemaAuthMethods(schema).find((method) => method.key === "sso")?.providers ?? [];
+}
+
+/**
+ * `"Passkey + SSO (google, github)"` — the enabled methods as one line, for the
+ * schemas list. The slugs are shown raw: resolving them to connection names
+ * needs `idp.read`, which the schema screens do not assume.
+ */
+export function schemaSignInSummary(schema: UserSchema): string {
+  return schemaAuthMethods(schema)
+    .filter((method) => method.enabled)
+    .map((method) =>
+      method.providers.length > 0
+        ? `${method.label} (${method.providers.join(", ")})`
+        : method.label,
+    )
+    .join(" + ");
+}
+
+function readProviders(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((slug): slug is string => typeof slug === "string")
+    : [];
 }
 
 /**

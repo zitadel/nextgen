@@ -15,9 +15,12 @@ description: |
   To compute it:
 
   1. Take every resource in the release as the `bundle` of
-     `POST /releases` carries it, with `kind` set to `schema`,
-     `flow_definition` or `branding`, and `handle` set to the schema's
-     `objectType`, the flow definition's `name`, or `default` for branding.
+     `POST /releases/build` carries it, with `kind` set to `schema`,
+     `flow_definition`, `branding` or `idp`, and `handle` set to the
+     schema's `objectType`, the flow definition's `name`, `default` for
+     branding, or the IDP connection's `slug`.
+     A `schema-url` entry's content is the entry as written, and its handle
+     is the `objectType` of the document the URL serves.
   2. Build the JSON document
      `{"version": 1, "resources": [{"kind": …, "handle": …, "content": …}, …]}`,
      with `resources` sorted by `kind`, then by `handle`.
