@@ -1,0 +1,50 @@
+title: ConfigurationBundle
+type: object
+description: |
+  The resources of a project's `.zitadel/` directory as authored on disk,
+  grouped by kind. The server turns the bundle into a release in one
+  transaction: for every resource it compares the content against the
+  project's newest revision of the same handle, reuses that revision when the
+  content matches and allocates a new one otherwise. The caller keeps no
+  state.
+
+  Resources reference each other by handle: a flow definition's
+  `user_schema` names a schema by its `objectType`. A reference resolves to
+  the resource with that handle in this bundle; failing that, to the
+  project's newest revision of it, which the release then pins as well. A
+  handle that neither holds refuses the release, naming the pointer and the
+  handle. A bundle that references only resources it carries builds the
+  same release on any project.
+
+  Each kind is optional and may be empty: a project that never ejected its
+  branding sends none. Across all kinds the bundle carries at least one
+  resource and at most 50, the most a release pins; the server refuses
+  anything outside that with `rel.invalid`. Unknown keys are refused. More
+  kinds join as they become release kinds.
+
+  Each resource is validated as its kind's create endpoint validates it,
+  and every failing resource is reported in one `rel.invalid`. Sending a
+  resource needs that kind's write scope, as creating it directly does.
+additionalProperties: false
+properties:
+  schemas:
+    type: array
+    maxItems: 50
+    description: User schemas, one per `.zitadel/schemas/*.json`.
+    items:
+      $ref: ../schemas/user-schema.yaml
+  flow_definitions:
+    type: array
+    maxItems: 50
+    description: Flow definitions, one per `.zitadel/flows/*.json`.
+    items:
+      $ref: ../../components/flows/flow-definition.yaml
+  brandings:
+    type: array
+    maxItems: 1
+    description: |
+      The descriptor from `.zitadel/branding/branding.json` with its template
+      inlined, exactly as `POST /branding` takes it. A project has one
+      branding, so at most one entry.
+    items:
+      $ref: ../../components/flows/branding.yaml

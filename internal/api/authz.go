@@ -490,11 +490,6 @@ func requireReleaseRead(ctx context.Context) error {
 		"expanding a deployment's release requires release.read")
 }
 
-func requireEnvironmentRead(ctx context.Context) error {
-	return requireExpandScope(ctx, "environment.read", domain.ErrDeploymentPermissionDenied,
-		"filtering deployments by environment name requires environment.read")
-}
-
 func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) error {
 	switch dec {
 	case resolver.DecisionAllow:

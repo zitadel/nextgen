@@ -84,6 +84,7 @@ const (
 	EventTypeEnvironmentCreated EventType = "environment.created"
 
 	EventTypeReleaseCreated EventType = "release.created"
+	EventTypeReleaseRevoked EventType = "release.revoked"
 
 	EventTypeIDPCreated EventType = "idp.created"
 	EventTypeIDPUpdated EventType = "idp.updated"
