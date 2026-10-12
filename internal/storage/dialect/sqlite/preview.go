@@ -13,9 +13,11 @@ import (
 )
 
 const (
-	previewQuery      = `SELECT project_id, origin, expires_at, created_at FROM previews`
-	deletePreviewStmt = `DELETE FROM previews WHERE project_id = ? AND origin = ?`
-	// See the postgres statement.
+	upsertPreviewsStmt = `INSERT INTO previews (project_id, origin, expires_at, created_at)` +
+		` SELECT ?, value, ?, ? FROM json_each(?) WHERE true` +
+		` ON CONFLICT (project_id, origin) DO UPDATE SET expires_at = excluded.expires_at`
+	previewQuery             = `SELECT project_id, origin, expires_at, created_at FROM previews`
+	deletePreviewStmt        = `DELETE FROM previews WHERE project_id = ? AND origin = ?`
 	deleteExpiredPreviewStmt = deletePreviewStmt + ` AND expires_at <= ?`
 )
 
@@ -23,6 +25,16 @@ type previewStatements struct{ statement }
 
 func newPreviewStatements(client queryExecutor) previewStatements {
 	return previewStatements{statement: statement{client: client}}
+}
+
+// UpsertPreviews implements [service.PreviewStatements].
+func (ps previewStatements) UpsertPreviews(ctx context.Context, projectID string, origins []string, expiresAt, createdAt time.Time) error {
+	encoded, err := jsonArray(origins)
+	if err != nil {
+		return err
+	}
+	_, err = ps.client.Exec(ctx, upsertPreviewsStmt, projectID, expiresAt.UnixNano(), createdAt.UnixNano(), encoded)
+	return wrapError(err)
 }
 
 // GetPreview implements [service.PreviewStatements].
@@ -53,8 +65,7 @@ func (ps previewStatements) ListPreviews(ctx context.Context, filter *database.L
 	items, nextCursor, err := pagination.Page(filter.Pagination, preview.Schema, func(limit uint32) ([]*domain.Preview, error) {
 		filter := filter.WithLimit(limit)
 		var compiler statementCompiler
-		// See the postgres statement for why there is no resource-scope
-		// predicate.
+		// No resource-scope predicate: a preview has no id of its own.
 		if err := compileList(ctx, &compiler, previewQuery, filter, preview.Schema, "", ""); err != nil {
 			return nil, err
 		}

@@ -1,6 +1,5 @@
 -- +goose Up
--- See the postgres migration. Timestamps are unix nanos stamped in Go, as
--- everywhere else in this dialect.
+-- See the postgres migration.
 -- +goose StatementBegin
 DROP TABLE deployments;
 -- +goose StatementEnd
@@ -18,7 +17,6 @@ CREATE TABLE deployments (
     CONSTRAINT chk_deployments_metadata CHECK (json_type(metadata) = 'object'),
     CONSTRAINT fk_deployments_project
         FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
-    -- See the postgres migration for why this is NO ACTION.
     CONSTRAINT fk_deployments_release
         FOREIGN KEY (project_id, release_id) REFERENCES releases (project_id, id)
 );

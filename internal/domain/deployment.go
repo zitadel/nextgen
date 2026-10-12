@@ -13,9 +13,7 @@ const (
 // MaxDeploymentTargets caps the origins one deployment covers.
 const MaxDeploymentTargets = 50
 
-// DeploymentReason records why a deployment was created. Both are the same
-// operation — a new deployment pointing its targets at a release — and the
-// reason keeps the caller's intent on the record.
+// DeploymentReason records why a deployment was created.
 //
 //go:generate go tool enumer -type DeploymentReason -transform snake -trimprefix DeploymentReason -sql
 type DeploymentReason uint8
@@ -25,8 +23,8 @@ const (
 	DeploymentReasonRollback
 )
 
-// DeploymentTargetKind says what the targets of a deployment are: primary
-// origins of the project, or preview URLs. One deployment never mixes them.
+// DeploymentTargetKind says whether a deployment's targets are primary origins
+// or preview URLs. One deployment never mixes them.
 //
 //go:generate go tool enumer -type DeploymentTargetKind -transform snake -trimprefix DeploymentTargetKind -sql
 type DeploymentTargetKind uint8
@@ -48,33 +46,21 @@ func ErrDeploymentPermissionDenied() Error {
 	return newError(PrefixDeployment.ErrorCodePrefix("permission_denied"), "deployment: requires an operator-grade token bound to the project (project.write or a deployment.* scope)", nil, nil)
 }
 
-// DeploymentConflictDetails is the payload of ErrDeploymentConflict: the
-// newest deployment to any of the targets, so the caller can decide whether to
-// retry on top of it. Deployment is nil when nothing was ever deployed there.
+// DeploymentConflictDetails carries the newest deployment to the targets, nil
+// when nothing was deployed there.
 type DeploymentConflictDetails struct {
 	Deployment *Deployment `json:"deployment"`
 }
 
-// ErrDeploymentConflict reports a failed expected_deployment_id check: the
-// newest deployment to the targets is not the one the caller expected, and
-// nothing was changed.
+// ErrDeploymentConflict reports a failed expected_deployment_id check.
 func ErrDeploymentConflict(details DeploymentConflictDetails) Error {
 	return newError(PrefixDeployment.ErrorCodePrefix("conflict"), "deployment: the newest deployment to the targets does not match expected_deployment_id", details, nil)
 }
 
-// DeploymentMetadata records why the release went live and who made it
-// happen. Set at creation and never mutated. Everything here is enrichment —
-// the ids, targets and timestamp on the deployment itself say what ran where
-// and when — which is why it lives in one document rather than in columns:
-// nothing filters or orders on it, and a new field costs no migration.
-//
-// DeployedBy and DeployedByType mirror the actor recording on releases: a
-// caller without a user identity (for example, a project secret used from CI)
-// leaves both fields nil.
+// DeploymentMetadata records why the release went live and who did it. A
+// caller without a user identity leaves DeployedBy and DeployedByType nil.
 type DeploymentMetadata struct {
-	Reason DeploymentReason
-	// Message is the caller's summary of why this deployment happened,
-	// analogous to a git commit message.
+	Reason  DeploymentReason
 	Message *string
 	// RollbackTo names the deployment a rollback re-applied.
 	RollbackTo     *string
@@ -87,14 +73,9 @@ type DeploymentTarget struct {
 	Origin string
 }
 
-// Deployment is an immutable, project-scoped record of a release being made
-// live on a set of targets. Rows are append-only: one is written, with every
-// target, when the targets start serving the release, and never changes
-// afterwards. What a target serves is the newest deployment that names it.
-//
-// Targets are origin strings, not references: an origin keeps its history
-// after the pattern or preview that admitted it is gone. Targets are sorted by
-// origin.
+// Deployment is an append-only record of a release going live on a set of
+// targets, sorted by origin. What a target serves is the newest deployment
+// that names it.
 type Deployment struct {
 	ProjectID  string
 	ID         string
@@ -114,9 +95,68 @@ func (d *Deployment) Origins() []string {
 	return origins
 }
 
+// TargetDeployment is one deployment to one origin.
+type TargetDeployment struct {
+	Origin       string
+	DeploymentID string
+	ReleaseID    string
+	DeployedAt   time.Time
+}
+
+// NewestTargetDeployment returns the newest of deployments, ordered by
+// deployed_at then deployment id, or nil for none.
+func NewestTargetDeployment(deployments []TargetDeployment) *TargetDeployment {
+	var newest *TargetDeployment
+	for i := range deployments {
+		d := &deployments[i]
+		if newest == nil || d.DeployedAt.After(newest.DeployedAt) ||
+			(d.DeployedAt.Equal(newest.DeployedAt) && d.DeploymentID > newest.DeploymentID) {
+			newest = d
+		}
+	}
+	return newest
+}
+
+// Unchanged reports whether writing d would change nothing, given what each
+// target serves: its targets are primary origins that all serve its release.
+// A deployment to preview URLs is always written, since it renews them.
+func (d *Deployment) Unchanged(serving []TargetDeployment) bool {
+	if d.TargetKind != DeploymentTargetKindPrimary {
+		return false
+	}
+	byOrigin := make(map[string]string, len(serving))
+	for _, s := range serving {
+		byOrigin[s.Origin] = s.ReleaseID
+	}
+	for _, target := range d.Targets {
+		if release, ok := byOrigin[target.Origin]; !ok || release != d.ReleaseID {
+			return false
+		}
+	}
+	return true
+}
+
+// CheckExpectedDeployment fails with ErrDeploymentConflict unless expected is
+// nil or names current, the newest deployment to the targets.
+func CheckExpectedDeployment(current *Deployment, expected *string) error {
+	if expected == nil || (current != nil && current.ID == *expected) {
+		return nil
+	}
+	return ErrDeploymentConflict(DeploymentConflictDetails{Deployment: current})
+}
+
+// DeployedNotBefore is the earliest deployed_at a deployment superseding
+// newest may take, so it stays newer even if the clock went back. Nil when
+// nothing was deployed.
+func DeployedNotBefore(newest *TargetDeployment) *time.Time {
+	if newest == nil {
+		return nil
+	}
+	return new(newest.DeployedAt.Add(time.Microsecond))
+}
+
 // DeploymentField enumerates the fields of Deployment which can be used for
-// filtering and ordering in list operations. The metadata lives in a column
-// no query filters on, so it is not bound.
+// filtering and ordering in list operations.
 type DeploymentField uint8
 
 const (
@@ -125,22 +165,14 @@ const (
 	DeploymentFieldID
 	DeploymentFieldReleaseID
 	DeploymentFieldDeployedAt
-	// DeploymentFieldOrigin matches the deployments that named an origin. It
-	// filters, never orders.
+	// DeploymentFieldOrigin filters to the deployments that named an origin.
 	DeploymentFieldOrigin
-	// DeploymentFieldLive matches the deployments that some target still
-	// serves: the newest deployment to at least one of their targets. It
-	// filters, never orders.
+	// DeploymentFieldLive filters to the deployments some target still serves.
 	DeploymentFieldLive
 )
 
-// NewDeployment validates the record and puts its targets in canonical order.
-// The ID is left empty for the dialect to mint, and DeployedAt is stamped by
-// the insert. The release is already resolved to its id and the targets to
-// exact origins.
-//
-// A zero metadata is a plain deploy: DeploymentReasonDeploy is the zero value
-// of the enum, matching the wire default.
+// NewDeployment validates the record and sorts its targets. The dialect mints
+// the ID and stamps DeployedAt.
 func NewDeployment(projectID, releaseID string, kind DeploymentTargetKind, origins []string, metadata DeploymentMetadata) (*Deployment, error) {
 	if !metadata.Reason.IsADeploymentReason() {
 		return nil, ErrDeploymentInvalid("unknown reason", nil)
@@ -169,9 +201,6 @@ func NewDeployment(projectID, releaseID string, kind DeploymentTargetKind, origi
 		targets[i] = DeploymentTarget{Origin: origin}
 	}
 
-	// rollback_to names what a rollback re-applied, so it is required exactly
-	// when there is a rollback to record and rejected otherwise rather than
-	// silently dropped.
 	if metadata.Reason == DeploymentReasonRollback {
 		if metadata.RollbackTo == nil || strings.TrimSpace(*metadata.RollbackTo) == "" {
 			return nil, ErrDeploymentInvalid("reason rollback requires rollback_to", nil)

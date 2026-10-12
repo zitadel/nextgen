@@ -592,45 +592,6 @@ func (c *MockAllStatementsCreateChallengeCall) DoAndReturn(f func(context.Contex
 	return c
 }
 
-// CreateDeployment mocks base method.
-func (m *MockAllStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, expectedDeploymentID *string, previewTTL time.Duration) (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateDeployment", ctx, entity, expectedDeploymentID, previewTTL)
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CreateDeployment indicates an expected call of CreateDeployment.
-func (mr *MockAllStatementsMockRecorder) CreateDeployment(ctx, entity, expectedDeploymentID, previewTTL any) *MockAllStatementsCreateDeploymentCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateDeployment", reflect.TypeOf((*MockAllStatements)(nil).CreateDeployment), ctx, entity, expectedDeploymentID, previewTTL)
-	return &MockAllStatementsCreateDeploymentCall{Call: call}
-}
-
-// MockAllStatementsCreateDeploymentCall wrap *gomock.Call
-type MockAllStatementsCreateDeploymentCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsCreateDeploymentCall) Return(created bool, err error) *MockAllStatementsCreateDeploymentCall {
-	c.Call = c.Call.Return(created, err)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsCreateDeploymentCall) Do(f func(context.Context, *domain.Deployment, *string, time.Duration) (bool, error)) *MockAllStatementsCreateDeploymentCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsCreateDeploymentCall) DoAndReturn(f func(context.Context, *domain.Deployment, *string, time.Duration) (bool, error)) *MockAllStatementsCreateDeploymentCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // CreateEncryptionKey mocks base method.
 func (m *MockAllStatements) CreateEncryptionKey(ctx context.Context, key *domain.EncryptionKey) error {
 	m.ctrl.T.Helper()
@@ -3956,6 +3917,44 @@ func (c *MockAllStatementsHasAuthzProjectFootholdCall) DoAndReturn(f func(contex
 	return c
 }
 
+// InsertDeployment mocks base method.
+func (m *MockAllStatements) InsertDeployment(ctx context.Context, entity *domain.Deployment, notBefore *time.Time) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "InsertDeployment", ctx, entity, notBefore)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// InsertDeployment indicates an expected call of InsertDeployment.
+func (mr *MockAllStatementsMockRecorder) InsertDeployment(ctx, entity, notBefore any) *MockAllStatementsInsertDeploymentCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertDeployment", reflect.TypeOf((*MockAllStatements)(nil).InsertDeployment), ctx, entity, notBefore)
+	return &MockAllStatementsInsertDeploymentCall{Call: call}
+}
+
+// MockAllStatementsInsertDeploymentCall wrap *gomock.Call
+type MockAllStatementsInsertDeploymentCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsInsertDeploymentCall) Return(arg0 error) *MockAllStatementsInsertDeploymentCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsInsertDeploymentCall) Do(f func(context.Context, *domain.Deployment, *time.Time) error) *MockAllStatementsInsertDeploymentCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsInsertDeploymentCall) DoAndReturn(f func(context.Context, *domain.Deployment, *time.Time) error) *MockAllStatementsInsertDeploymentCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // InsertEvent mocks base method.
 func (m *MockAllStatements) InsertEvent(ctx context.Context, event *domain.Event) error {
 	m.ctrl.T.Helper()
@@ -5276,6 +5275,44 @@ func (c *MockAllStatementsLockIDPConnectionCall) DoAndReturn(f func(context.Cont
 	return c
 }
 
+// LockProject mocks base method.
+func (m *MockAllStatements) LockProject(ctx context.Context, projectID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LockProject", ctx, projectID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// LockProject indicates an expected call of LockProject.
+func (mr *MockAllStatementsMockRecorder) LockProject(ctx, projectID any) *MockAllStatementsLockProjectCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LockProject", reflect.TypeOf((*MockAllStatements)(nil).LockProject), ctx, projectID)
+	return &MockAllStatementsLockProjectCall{Call: call}
+}
+
+// MockAllStatementsLockProjectCall wrap *gomock.Call
+type MockAllStatementsLockProjectCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsLockProjectCall) Return(arg0 error) *MockAllStatementsLockProjectCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsLockProjectCall) Do(f func(context.Context, string) error) *MockAllStatementsLockProjectCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsLockProjectCall) DoAndReturn(f func(context.Context, string) error) *MockAllStatementsLockProjectCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // MarkChallengeCompleted mocks base method.
 func (m *MockAllStatements) MarkChallengeCompleted(ctx context.Context, projectID, id string) error {
 	m.ctrl.T.Helper()
@@ -5426,6 +5463,45 @@ func (c *MockAllStatementsNewestDeploymentCall) Do(f func(context.Context, strin
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsNewestDeploymentCall) DoAndReturn(f func(context.Context, string, string) (*domain.Deployment, error)) *MockAllStatementsNewestDeploymentCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// NewestTargets mocks base method.
+func (m *MockAllStatements) NewestTargets(ctx context.Context, projectID string, origins []string) ([]domain.TargetDeployment, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewestTargets", ctx, projectID, origins)
+	ret0, _ := ret[0].([]domain.TargetDeployment)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewestTargets indicates an expected call of NewestTargets.
+func (mr *MockAllStatementsMockRecorder) NewestTargets(ctx, projectID, origins any) *MockAllStatementsNewestTargetsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewestTargets", reflect.TypeOf((*MockAllStatements)(nil).NewestTargets), ctx, projectID, origins)
+	return &MockAllStatementsNewestTargetsCall{Call: call}
+}
+
+// MockAllStatementsNewestTargetsCall wrap *gomock.Call
+type MockAllStatementsNewestTargetsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsNewestTargetsCall) Return(arg0 []domain.TargetDeployment, arg1 error) *MockAllStatementsNewestTargetsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsNewestTargetsCall) Do(f func(context.Context, string, []string) ([]domain.TargetDeployment, error)) *MockAllStatementsNewestTargetsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsNewestTargetsCall) DoAndReturn(f func(context.Context, string, []string) ([]domain.TargetDeployment, error)) *MockAllStatementsNewestTargetsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -5583,18 +5659,18 @@ func (c *MockAllStatementsRevokeAuthzAssignmentCall) DoAndReturn(f func(context.
 }
 
 // RevokeRelease mocks base method.
-func (m *MockAllStatements) RevokeRelease(ctx context.Context, projectID, id string, now time.Time) (*domain.Release, error) {
+func (m *MockAllStatements) RevokeRelease(ctx context.Context, projectID, id string) (*domain.Release, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RevokeRelease", ctx, projectID, id, now)
+	ret := m.ctrl.Call(m, "RevokeRelease", ctx, projectID, id)
 	ret0, _ := ret[0].(*domain.Release)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // RevokeRelease indicates an expected call of RevokeRelease.
-func (mr *MockAllStatementsMockRecorder) RevokeRelease(ctx, projectID, id, now any) *MockAllStatementsRevokeReleaseCall {
+func (mr *MockAllStatementsMockRecorder) RevokeRelease(ctx, projectID, id any) *MockAllStatementsRevokeReleaseCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeRelease", reflect.TypeOf((*MockAllStatements)(nil).RevokeRelease), ctx, projectID, id, now)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeRelease", reflect.TypeOf((*MockAllStatements)(nil).RevokeRelease), ctx, projectID, id)
 	return &MockAllStatementsRevokeReleaseCall{Call: call}
 }
 
@@ -5610,13 +5686,13 @@ func (c *MockAllStatementsRevokeReleaseCall) Return(arg0 *domain.Release, arg1 e
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsRevokeReleaseCall) Do(f func(context.Context, string, string, time.Time) (*domain.Release, error)) *MockAllStatementsRevokeReleaseCall {
+func (c *MockAllStatementsRevokeReleaseCall) Do(f func(context.Context, string, string) (*domain.Release, error)) *MockAllStatementsRevokeReleaseCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsRevokeReleaseCall) DoAndReturn(f func(context.Context, string, string, time.Time) (*domain.Release, error)) *MockAllStatementsRevokeReleaseCall {
+func (c *MockAllStatementsRevokeReleaseCall) DoAndReturn(f func(context.Context, string, string) (*domain.Release, error)) *MockAllStatementsRevokeReleaseCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -6207,6 +6283,44 @@ func (c *MockAllStatementsUpsertEventSinkCursorCall) DoAndReturn(f func(context.
 	return c
 }
 
+// UpsertPreviews mocks base method.
+func (m *MockAllStatements) UpsertPreviews(ctx context.Context, projectID string, origins []string, expiresAt, createdAt time.Time) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpsertPreviews", ctx, projectID, origins, expiresAt, createdAt)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpsertPreviews indicates an expected call of UpsertPreviews.
+func (mr *MockAllStatementsMockRecorder) UpsertPreviews(ctx, projectID, origins, expiresAt, createdAt any) *MockAllStatementsUpsertPreviewsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertPreviews", reflect.TypeOf((*MockAllStatements)(nil).UpsertPreviews), ctx, projectID, origins, expiresAt, createdAt)
+	return &MockAllStatementsUpsertPreviewsCall{Call: call}
+}
+
+// MockAllStatementsUpsertPreviewsCall wrap *gomock.Call
+type MockAllStatementsUpsertPreviewsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsUpsertPreviewsCall) Return(arg0 error) *MockAllStatementsUpsertPreviewsCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsUpsertPreviewsCall) Do(f func(context.Context, string, []string, time.Time, time.Time) error) *MockAllStatementsUpsertPreviewsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsUpsertPreviewsCall) DoAndReturn(f func(context.Context, string, []string, time.Time, time.Time) error) *MockAllStatementsUpsertPreviewsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // UpsertResourceScope mocks base method.
 func (m *MockAllStatements) UpsertResourceScope(ctx context.Context, scope *domain.ResourceScope) error {
 	m.ctrl.T.Helper()
@@ -6495,6 +6609,44 @@ func (c *MockProjectStatementsListProjectsCall) Do(f func(context.Context, *data
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockProjectStatementsListProjectsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)) *MockProjectStatementsListProjectsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// LockProject mocks base method.
+func (m *MockProjectStatements) LockProject(ctx context.Context, projectID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LockProject", ctx, projectID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// LockProject indicates an expected call of LockProject.
+func (mr *MockProjectStatementsMockRecorder) LockProject(ctx, projectID any) *MockProjectStatementsLockProjectCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LockProject", reflect.TypeOf((*MockProjectStatements)(nil).LockProject), ctx, projectID)
+	return &MockProjectStatementsLockProjectCall{Call: call}
+}
+
+// MockProjectStatementsLockProjectCall wrap *gomock.Call
+type MockProjectStatementsLockProjectCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockProjectStatementsLockProjectCall) Return(arg0 error) *MockProjectStatementsLockProjectCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockProjectStatementsLockProjectCall) Do(f func(context.Context, string) error) *MockProjectStatementsLockProjectCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockProjectStatementsLockProjectCall) DoAndReturn(f func(context.Context, string) error) *MockProjectStatementsLockProjectCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

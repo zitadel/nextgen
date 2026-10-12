@@ -241,9 +241,7 @@ func ReleasePayloadSnapshot(rel *Release) ReleasePayload {
 	return payload
 }
 
-// DeploymentPayload records what went live where. It carries ids and
-// origins, not names, and this event has no foreign key, so the audit trail
-// outlives whatever the targets named (ADR 061).
+// DeploymentPayload records what went live where (ADR 061).
 type DeploymentPayload struct {
 	ReleaseID  string   `json:"release_id,omitempty"`
 	Targets    []string `json:"targets,omitempty"`

@@ -13,30 +13,23 @@ import (
 
 // ---- Input / output types ---------------------------------------------------
 
-// CreateDeploymentInput carries a resolved release id and exact target
-// origins: the API edge resolves a content hash and expands `primary` before
-// calling the service.
+// CreateDeploymentInput carries a resolved release id and exact origins.
 type CreateDeploymentInput struct {
 	ProjectID  string
 	ReleaseID  string
 	TargetKind domain.DeploymentTargetKind
 	Origins    []string
 	Reason     domain.DeploymentReason
-	// Message is the caller's summary of why this deployment happened.
-	Message *string
-	// RollbackTo names the deployment a rollback re-applies. Required with
-	// reason rollback, rejected otherwise.
+	Message    *string
 	RollbackTo *string
 	// ExpectedDeploymentID makes the write conditional. Not persisted.
 	ExpectedDeploymentID *string
-	// PreviewTTL sets the expiry of the previews a deployment to preview URLs
-	// creates or renews.
+	// PreviewTTL is the lifetime of the previews a preview deploy renews.
 	PreviewTTL time.Duration
 }
 
-// CreateDeploymentOutput distinguishes a new deployment from the idempotent
-// answer: deploying the release every target already serves returns the
-// newest deployment to them, which the caller answers 200 to rather than 201.
+// CreateDeploymentOutput reports Created false when nothing was written and
+// Deployment is the newest deployment to the targets.
 type CreateDeploymentOutput struct {
 	Deployment *domain.Deployment
 	Created    bool
@@ -44,8 +37,7 @@ type CreateDeploymentOutput struct {
 
 type ListDeploymentsInput struct {
 	ProjectID string
-	// Origin narrows the list to one origin's history. Nil lists the whole
-	// project, every origin interleaved.
+	// Origin narrows the list to one origin's history.
 	Origin *string
 	// IncludeReleases embeds the release each deployment made live (ADR 059).
 	IncludeReleases bool
@@ -70,12 +62,8 @@ func NewDeploymentService(v2Pool *DB) *DeploymentService {
 	return &DeploymentService{v2Pool: v2Pool}
 }
 
-// Create makes a release live on its targets by recording a deployment, with
-// every target or not at all.
-//
-// Idempotent on what the targets serve: deploying the release every target
-// already serves writes nothing and returns the newest deployment to them.
-// Anything else appends — each row is one act of making a release live.
+// Create deploys a release to its targets under the project lock, so
+// concurrent deploys to the project serialize.
 func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentInput) (*CreateDeploymentOutput, error) {
 	actor, _ := audit.ActorFromContext(ctx)
 	entity, err := domain.NewDeployment(input.ProjectID, input.ReleaseID, input.TargetKind, input.Origins, domain.DeploymentMetadata{
@@ -88,45 +76,66 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 	if err != nil {
 		return nil, err
 	}
+	if entity.TargetKind == domain.DeploymentTargetKindPreview && input.PreviewTTL <= 0 {
+		return nil, domain.ErrDeploymentInvalid("a deployment to preview URLs needs a ttl", nil)
+	}
 
-	var created bool
+	var output *CreateDeploymentOutput
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		var err error
-		created, err = tx.Statements().CreateDeployment(ctx, entity, input.ExpectedDeploymentID, input.PreviewTTL)
+		output = nil
+		stmts := tx.Statements()
+		if err := stmts.LockProject(ctx, entity.ProjectID); err != nil {
+			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+				return domain.ErrProjectNotFound()
+			}
+			return err
+		}
+		serving, err := stmts.NewestTargets(ctx, entity.ProjectID, entity.Origins())
 		if err != nil {
 			return err
 		}
-		// The idempotent answer changed nothing, so there is nothing to
-		// audit: the event of the deployment being returned was emitted when
-		// it was created.
-		if !created {
+		newest := domain.NewestTargetDeployment(serving)
+		var current *domain.Deployment
+		if newest != nil {
+			if current, err = stmts.GetDeploymentByID(ctx, entity.ProjectID, newest.DeploymentID); err != nil {
+				return err
+			}
+		}
+		if err := domain.CheckExpectedDeployment(current, input.ExpectedDeploymentID); err != nil {
+			return err
+		}
+		if entity.Unchanged(serving) {
+			output = &CreateDeploymentOutput{Deployment: current}
 			return nil
 		}
-		return emitDeploymentCreated(ctx, tx.Statements(), entity)
+
+		// A copy per attempt: a retried transaction mints and stamps afresh.
+		written := *entity
+		if err := stmts.InsertDeployment(ctx, &written, domain.DeployedNotBefore(newest)); err != nil {
+			if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
+				return domain.ErrReleaseNotFound()
+			}
+			return err
+		}
+		if written.TargetKind == domain.DeploymentTargetKindPreview {
+			if err := stmts.UpsertPreviews(ctx, written.ProjectID, written.Origins(),
+				written.DeployedAt.Add(input.PreviewTTL), written.DeployedAt); err != nil {
+				return err
+			}
+		}
+		if err := emitDeploymentCreated(ctx, stmts, &written); err != nil {
+			return err
+		}
+		output = &CreateDeploymentOutput{Deployment: &written, Created: true}
+		return nil
 	})
 	if err != nil {
-		// Both are backstops for a project or release that went away after
-		// the caller resolved it. Each maps to one cause because of how the
-		// statement is built, so a new read or foreign key there has to be
-		// reflected here.
-		//
-		// The only read that can find nothing is the project lock: the
-		// newest deployment it reads next is named by rows under that lock.
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return nil, domain.ErrProjectNotFound()
-		}
-		// The only foreign key a caller can trip is the release: the
-		// project is locked, the targets name the deployment just written,
-		// and the previews name the locked project.
-		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
-			return nil, domain.ErrReleaseNotFound()
-		}
 		if de, ok := errors.AsType[domain.Error](err); ok {
 			return nil, de
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to create deployment")
 	}
-	return &CreateDeploymentOutput{Deployment: entity, Created: created}, nil
+	return output, nil
 }
 
 func emitDeploymentCreated(ctx context.Context, stmts EventStatements, entity *domain.Deployment) error {

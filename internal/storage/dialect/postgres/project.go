@@ -15,6 +15,10 @@ import (
 
 const createProjectStmt = `INSERT INTO zitadel_nextgen.projects (id, name, preview_origins, password_hash_policy) VALUES ($1, $2, $3, $4) RETURNING id, created_at, updated_at`
 
+// FOR NO KEY UPDATE, not FOR UPDATE: inserts referencing the project take FOR
+// KEY SHARE on it, which FOR UPDATE would block, sign-ins included.
+const lockProjectStmt = `SELECT id FROM zitadel_nextgen.projects WHERE id = $1 FOR NO KEY UPDATE`
+
 type projectStatements struct{ statement }
 
 func newProjectStatements(client queryExecutor) projectStatements {
@@ -188,3 +192,9 @@ var projectSchema = database.NewSchema(map[domain.ProjectField]database.FieldBin
 		Coerce:   database.CoerceSliceAsAny(database.CoerceStringValue),
 	},
 })
+
+// LockProject implements [service.ProjectStatements].
+func (ps projectStatements) LockProject(ctx context.Context, projectID string) error {
+	var locked string
+	return wrapError(ps.client.QueryRow(ctx, lockProjectStmt, projectID).Scan(&locked))
+}

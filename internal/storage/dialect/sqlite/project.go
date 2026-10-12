@@ -13,6 +13,9 @@ import (
 )
 
 const (
+	// No FOR UPDATE in SQLite: the write transaction already serializes. The
+	// read keeps a missing project a NoRowFoundError.
+	lockProjectStmt   = `SELECT id FROM projects WHERE id = ?`
 	createProjectStmt = `INSERT INTO projects (id, name, preview_origins, password_hash_policy, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?) RETURNING id, created_at, updated_at`
 
@@ -216,3 +219,9 @@ var projectSchema = database.NewSchema(map[domain.ProjectField]database.FieldBin
 		Coerce:   database.CoerceSliceAsAny(database.CoerceStringValue),
 	},
 })
+
+// LockProject implements [service.ProjectStatements].
+func (ps projectStatements) LockProject(ctx context.Context, projectID string) error {
+	var locked string
+	return wrapError(ps.client.QueryRow(ctx, lockProjectStmt, projectID).Scan(&locked))
+}

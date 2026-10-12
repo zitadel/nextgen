@@ -238,3 +238,11 @@ var projectSchema = database.NewSchema(map[domain.ProjectField]database.FieldBin
 		Coerce:   database.CoerceSliceAsAny(database.CoerceStringValue),
 	},
 })
+
+// LockProject implements [service.ProjectStatements]. The read-write
+// transaction is serializable: two deploys that read the same targets and both
+// write cannot both commit, so the read only has to find the project.
+func (ps projectStatements) LockProject(ctx context.Context, projectID string) error {
+	_, err := ps.db.ReadRow(ctx, projectsTable, spanner.Key{projectID}, []string{"id"})
+	return err
+}

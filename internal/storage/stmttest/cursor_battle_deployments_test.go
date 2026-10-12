@@ -21,7 +21,7 @@ func seedDeployments(t *testing.T, d dialect, projectID string, originOf func(in
 	want := make([]string, 0, 5)
 	for i := range 5 {
 		rel := createRelease(t, d.stmts, projectID, string(rune('a'+i)), domain.ReleaseMetadata{})
-		dep, _ := deploy(t, d.stmts, projectID, rel.ID, []string{originOf(i)}, deployArgs{})
+		dep := deploy(t, d.stmts, projectID, rel.ID, []string{originOf(i)}, deployArgs{})
 		want = append(want, dep.ID)
 	}
 	return want

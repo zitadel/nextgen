@@ -3,7 +3,6 @@
 package stmttest
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -27,93 +26,53 @@ func previewOrigins(t *testing.T, stmts service.AllStatements, opts *database.Li
 	return origins
 }
 
-// A deploy to preview URLs creates their previews, expiring ttl after the
-// deploy, and a later deploy renews them while keeping when each was created.
-func TestPreviewStatements_DeployCreatesAndRenews(t *testing.T) {
+// An upsert creates missing previews and renews existing ones, keeping their
+// created_at.
+func TestPreviewStatements_UpsertCreatesAndRenews(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureReleaseProject(t, d.stmts)
-		relA := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
-		relB := createRelease(t, d.stmts, projectID, "0002", domain.ReleaseMetadata{})
+		t0 := time.Now().UTC().Truncate(time.Microsecond)
 
-		first, _ := deploy(t, d.stmts, projectID, relA.ID, []string{gitOrigin}, previewDeploy(time.Hour))
+		require.NoError(t, d.stmts.UpsertPreviews(t.Context(), projectID, []string{gitOrigin}, t0.Add(time.Hour), t0))
 		created, err := d.stmts.GetPreview(t.Context(), projectID, gitOrigin)
 		require.NoError(t, err)
-		assert.True(t, created.CreatedAt.Equal(first.DeployedAt))
-		assert.True(t, created.ExpiresAt.Equal(first.DeployedAt.Add(time.Hour)))
+		assert.True(t, created.CreatedAt.Equal(t0))
+		assert.True(t, created.ExpiresAt.Equal(t0.Add(time.Hour)))
 
-		second, _ := deploy(t, d.stmts, projectID, relB.ID, []string{gitOrigin, shaOrigin}, previewDeploy(168*time.Hour))
+		t1 := t0.Add(time.Minute)
+		require.NoError(t, d.stmts.UpsertPreviews(t.Context(), projectID, []string{gitOrigin, shaOrigin}, t1.Add(168*time.Hour), t1))
 		renewed, err := d.stmts.GetPreview(t.Context(), projectID, gitOrigin)
 		require.NoError(t, err)
-		assert.True(t, renewed.CreatedAt.Equal(first.DeployedAt), "a renewal keeps created_at")
-		assert.True(t, renewed.ExpiresAt.Equal(second.DeployedAt.Add(168*time.Hour)))
+		assert.True(t, renewed.CreatedAt.Equal(t0), "a renewal keeps created_at")
+		assert.True(t, renewed.ExpiresAt.Equal(t1.Add(168*time.Hour)))
 
 		fresh, err := d.stmts.GetPreview(t.Context(), projectID, shaOrigin)
 		require.NoError(t, err)
-		assert.True(t, fresh.CreatedAt.Equal(second.DeployedAt))
-
-		// A primary deploy never creates a preview.
-		deploy(t, d.stmts, projectID, relA.ID, []string{appOrigin}, deployArgs{})
-		_, err = d.stmts.GetPreview(t.Context(), projectID, appOrigin)
-		assert.ErrorIs(t, err, new(database.NoRowFoundError))
-	})
-}
-
-// Re-running a preview deploy of the release the URLs already serve is still
-// written: that record is the renewal, so the expiry moves.
-func TestPreviewStatements_RedeployOfTheSameReleaseRenews(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID := ensureReleaseProject(t, d.stmts)
-		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
-
-		first, _ := deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin, shaOrigin}, previewDeploy(time.Hour))
-		again, created := deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin, shaOrigin}, previewDeploy(168*time.Hour))
-		assert.True(t, created)
-		assert.NotEqual(t, first.ID, again.ID)
-
-		renewed, err := d.stmts.GetPreview(t.Context(), projectID, gitOrigin)
-		require.NoError(t, err)
-		assert.True(t, renewed.CreatedAt.Equal(first.DeployedAt))
-		assert.True(t, renewed.ExpiresAt.Equal(again.DeployedAt.Add(168*time.Hour)))
-		assert.Equal(t, []string{again.ID, first.ID}, deploymentIDs(history(t, d.stmts, projectID, gitOrigin)))
-	})
-}
-
-// A deploy to preview URLs has to say how long they live.
-func TestPreviewStatements_DeployNeedsTTL(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID := ensureReleaseProject(t, d.stmts)
-		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
-
-		_, err := tryDeploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin}, previewDeploy(0))
-		de, ok := errors.AsType[domain.Error](err)
-		require.True(t, ok, "expected a domain error, got %T: %v", err, err)
-		assert.Equal(t, domain.ErrDeploymentInvalid(nil, nil).Code, de.Code)
+		assert.True(t, fresh.CreatedAt.Equal(t1))
 	})
 }
 
 // The live list holds the previews that have not expired, newest first; the
-// expired list holds the rest, the ones to sweep.
+// expired list holds the ones to sweep.
 func TestPreviewStatements_LiveAndExpired(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureReleaseProject(t, d.stmts)
 		otherProject := ensureReleaseProject(t, d.stmts)
-		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
-		otherRel := createRelease(t, d.stmts, otherProject, "0001", domain.ReleaseMetadata{})
+		t0 := time.Now().UTC().Truncate(time.Microsecond)
 
-		short, _ := deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin}, previewDeploy(time.Minute))
-		deploy(t, d.stmts, projectID, rel.ID, []string{shaOrigin}, previewDeploy(time.Hour))
-		deploy(t, d.stmts, otherProject, otherRel.ID, []string{gitOrigin}, previewDeploy(time.Minute))
+		require.NoError(t, d.stmts.UpsertPreviews(t.Context(), projectID, []string{gitOrigin}, t0.Add(time.Minute), t0))
+		require.NoError(t, d.stmts.UpsertPreviews(t.Context(), projectID, []string{shaOrigin}, t0.Add(time.Hour), t0.Add(time.Second)))
+		require.NoError(t, d.stmts.UpsertPreviews(t.Context(), otherProject, []string{gitOrigin}, t0.Add(time.Minute), t0))
 
-		now := time.Now()
-		assert.Equal(t, []string{shaOrigin, gitOrigin}, previewOrigins(t, d.stmts, preview.LiveListOptions(projectID, now, 50)))
-		assert.Empty(t, previewOrigins(t, d.stmts, preview.ExpiredListOptions(projectID, now, 50)))
+		assert.Equal(t, []string{shaOrigin, gitOrigin}, previewOrigins(t, d.stmts, preview.LiveListOptions(projectID, t0, 50)))
+		assert.Empty(t, previewOrigins(t, d.stmts, preview.ExpiredListOptions(projectID, t0, 50)))
 
 		// At the instant of expiry a preview no longer admits its URL.
-		expiry := short.DeployedAt.Add(time.Minute)
+		expiry := t0.Add(time.Minute)
 		assert.Equal(t, []string{shaOrigin}, previewOrigins(t, d.stmts, preview.LiveListOptions(projectID, expiry, 50)))
 		assert.Equal(t, []string{gitOrigin}, previewOrigins(t, d.stmts, preview.ExpiredListOptions(projectID, expiry, 50)))
 
-		later := now.Add(2 * time.Hour)
+		later := t0.Add(2 * time.Hour)
 		assert.Empty(t, previewOrigins(t, d.stmts, preview.LiveListOptions(projectID, later, 50)))
 		assert.Equal(t, []string{gitOrigin, shaOrigin}, previewOrigins(t, d.stmts, preview.ExpiredListOptions(projectID, later, 50)))
 	})
@@ -124,7 +83,7 @@ func TestPreviewStatements_Delete(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureReleaseProject(t, d.stmts)
 		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
-		dep, _ := deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin}, previewDeploy(time.Hour))
+		dep := deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin}, previewDeploy(time.Hour))
 
 		deleted, err := d.stmts.DeletePreview(t.Context(), projectID, gitOrigin)
 		require.NoError(t, err)
@@ -139,74 +98,25 @@ func TestPreviewStatements_Delete(t *testing.T) {
 	})
 }
 
-// The sweep deletes a preview only if it has expired, so a renewal that
-// landed after the sweep listed it survives.
+// The sweep deletes only an expired preview, so a renewal that landed after
+// the sweep listed it survives.
 func TestPreviewStatements_SweepSparesARenewal(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureReleaseProject(t, d.stmts)
-		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
-		relB := createRelease(t, d.stmts, projectID, "0002", domain.ReleaseMetadata{})
-		first, _ := deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin}, previewDeploy(time.Minute))
+		t0 := time.Now().UTC().Truncate(time.Microsecond)
+		require.NoError(t, d.stmts.UpsertPreviews(t.Context(), projectID, []string{gitOrigin}, t0.Add(time.Minute), t0))
 
-		sweepAt := first.DeployedAt.Add(2 * time.Minute)
+		sweepAt := t0.Add(2 * time.Minute)
 		require.Equal(t, []string{gitOrigin}, previewOrigins(t, d.stmts, preview.ExpiredListOptions(projectID, sweepAt, 50)))
 
-		// The renewal lands between the sweep's list and its delete.
-		deploy(t, d.stmts, projectID, relB.ID, []string{gitOrigin}, previewDeploy(time.Hour))
+		require.NoError(t, d.stmts.UpsertPreviews(t.Context(), projectID, []string{gitOrigin}, t0.Add(time.Hour), t0.Add(time.Minute)))
 
 		swept, err := d.stmts.DeleteExpiredPreview(t.Context(), projectID, gitOrigin, sweepAt)
 		require.NoError(t, err)
 		assert.False(t, swept)
-		_, err = d.stmts.GetPreview(t.Context(), projectID, gitOrigin)
-		require.NoError(t, err)
 
-		swept, err = d.stmts.DeleteExpiredPreview(t.Context(), projectID, gitOrigin, time.Now().Add(2*time.Hour))
+		swept, err = d.stmts.DeleteExpiredPreview(t.Context(), projectID, gitOrigin, t0.Add(2*time.Hour))
 		require.NoError(t, err)
 		assert.True(t, swept)
-	})
-}
-
-// A release an origin still serves cannot be revoked: the refusal names each
-// origin and the deployment it serves. Once nothing serves it — another
-// release deployed over it, its preview expired — the revoke goes through.
-func TestReleaseStatements_RevokeRefusedWhileServed(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID := ensureReleaseProject(t, d.stmts)
-		relA := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
-		relB := createRelease(t, d.stmts, projectID, "0002", domain.ReleaseMetadata{})
-
-		onPrimaries, _ := deploy(t, d.stmts, projectID, relA.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
-		onPreview, _ := deploy(t, d.stmts, projectID, relA.ID, []string{gitOrigin}, previewDeploy(time.Hour))
-
-		_, err := d.stmts.RevokeRelease(t.Context(), projectID, relA.ID, time.Now())
-		de, ok := errors.AsType[domain.Error](err)
-		require.True(t, ok, "expected a domain error, got %T: %v", err, err)
-		assert.Equal(t, domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code, de.Code)
-		assert.Equal(t, domain.ReleaseInUseDetails{Origins: []domain.ReleaseServedOrigin{
-			{Origin: gitOrigin, DeploymentID: onPreview.ID},
-			{Origin: appOrigin, DeploymentID: onPrimaries.ID},
-			{Origin: wwwOrigin, DeploymentID: onPrimaries.ID},
-		}}, de.Details)
-
-		got, err := d.stmts.GetReleaseByID(t.Context(), projectID, relA.ID)
-		require.NoError(t, err)
-		assert.Nil(t, got.RevokedAt, "a refused revoke writes nothing")
-
-		deploy(t, d.stmts, projectID, relB.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
-
-		// The preview still serves it until it expires.
-		_, err = d.stmts.RevokeRelease(t.Context(), projectID, relA.ID, time.Now())
-		de, ok = errors.AsType[domain.Error](err)
-		require.True(t, ok, "expected a domain error, got %T: %v", err, err)
-		assert.Equal(t, domain.ReleaseInUseDetails{Origins: []domain.ReleaseServedOrigin{
-			{Origin: gitOrigin, DeploymentID: onPreview.ID},
-		}}, de.Details)
-
-		revoked, err := d.stmts.RevokeRelease(t.Context(), projectID, relA.ID, time.Now().Add(2*time.Hour))
-		require.NoError(t, err)
-		assert.NotNil(t, revoked.RevokedAt)
-
-		// The history that named it stays.
-		assert.Len(t, history(t, d.stmts, projectID, appOrigin), 2)
 	})
 }

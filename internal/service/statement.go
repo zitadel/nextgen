@@ -75,6 +75,10 @@ type ProjectStatements interface {
 	ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 	// DeleteProjectByID removes the project. changed is false when no row matched.
 	DeleteProjectByID(ctx context.Context, id string) (changed bool, err error)
+	// LockProject holds the project row until the transaction ends, so
+	// deploys and revokes of one project serialize. It does not block inserts
+	// under the project. A missing project is a NoRowFoundError.
+	LockProject(ctx context.Context, projectID string) error
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -150,13 +154,9 @@ type ReleaseStatements interface {
 	// absent from the result, not an error.
 	GetReleasesByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Release, error)
 	ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error)
-	// RevokeRelease stamps revoked_at and returns the release. Revoking a
-	// revoked release changes nothing and returns the first stamp. While any
-	// origin still serves the release at now, nothing is written and
-	// domain.ErrReleaseInUse names those origins; the check is serialised
-	// with CreateDeployment, so no deploy can make the release live under a
-	// revoke.
-	RevokeRelease(ctx context.Context, projectID, id string, now time.Time) (*domain.Release, error)
+	// RevokeRelease stamps revoked_at once; revoking again returns the first
+	// stamp.
+	RevokeRelease(ctx context.Context, projectID, id string) (*domain.Release, error)
 }
 
 // IDPConnectionStatements persists identity provider connections and their
@@ -222,58 +222,39 @@ type IDPIdentityLinkStatements interface {
 
 type DeploymentStatements interface {
 	Statements
-	// CreateDeployment writes the deployment with every one of its targets,
-	// or nothing. Concurrent creates in one project are serialised, so the
-	// newer deployment is the one stamped later.
-	//
-	// A non-nil expectedDeploymentID makes the write conditional: when the
-	// newest deployment to any of the targets is not exactly that one,
-	// nothing is written and domain.ErrDeploymentConflict carries the
-	// actual newest deployment. A project that does not exist is a
-	// NoRowFoundError.
-	//
-	// A deployment to primary origins is idempotent on what they serve: when
-	// every target's newest deployment already uses entity's release,
-	// nothing is written, entity is overwritten with the newest deployment
-	// to the targets, and created is false.
-	//
-	// A deployment to preview URLs is always written: it creates or renews
-	// the preview of each target, expiring previewTTL after deployed_at, and
-	// that record is the renewal.
-	CreateDeployment(ctx context.Context, entity *domain.Deployment, expectedDeploymentID *string, previewTTL time.Duration) (created bool, err error)
+	// NewestTargets returns, for each of origins that has one, the newest
+	// deployment to it.
+	NewestTargets(ctx context.Context, projectID string, origins []string) ([]domain.TargetDeployment, error)
+	// InsertDeployment writes the deployment with every target, stamping
+	// deployed_at no earlier than notBefore. Run it under LockProject so
+	// concurrent deploys serialize.
+	InsertDeployment(ctx context.Context, entity *domain.Deployment, notBefore *time.Time) error
 	GetDeploymentByID(ctx context.Context, projectID, id string) (*domain.Deployment, error)
-	// GetDeploymentsByIDs reads the named deployments in one round trip.
-	// Unknown ids are simply absent from the result, not an error.
+	// GetDeploymentsByIDs skips unknown ids.
 	GetDeploymentsByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Deployment, error)
-	// ListDeployments lists deployments with every target they named. With
-	// the origin filter it is that origin's history, newest first.
+	// ListDeployments lists deployments with every target they named.
 	ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
-	// ListLiveDeployments is the live view at now, built with
-	// deployment.LiveListOptions: the deployments some target still serves,
-	// each narrowed to the targets it serves.
+	// ListLiveDeployments takes deployment.LiveListOptions and narrows each
+	// deployment to the targets it still serves at now.
 	ListLiveDeployments(ctx context.Context, now time.Time, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
-	// NewestDeployment is the deployment origin serves: the newest that named
-	// it. Nothing deployed there is a NoRowFoundError.
+	// NewestDeployment is the deployment origin serves.
 	NewestDeployment(ctx context.Context, projectID, origin string) (*domain.Deployment, error)
-	// DeploymentAt is the deployment origin served at an instant: the newest
-	// that named it no later than at. Nothing deployed there by then is a
-	// NoRowFoundError.
+	// DeploymentAt is the deployment origin served at an instant.
 	DeploymentAt(ctx context.Context, projectID, origin string, at time.Time) (*domain.Deployment, error)
 }
 
-// PreviewStatements persists previews. Deployments create and renew them
-// (see DeploymentStatements.CreateDeployment); these read and remove them.
 type PreviewStatements interface {
 	Statements
+	// UpsertPreviews creates the previews of origins or renews their expiry,
+	// keeping created_at.
+	UpsertPreviews(ctx context.Context, projectID string, origins []string, expiresAt, createdAt time.Time) error
 	GetPreview(ctx context.Context, projectID, origin string) (*domain.Preview, error)
-	// ListPreviews lists with preview.LiveListOptions or
-	// preview.ExpiredListOptions.
+	// ListPreviews takes preview.LiveListOptions or preview.ExpiredListOptions.
 	ListPreviews(ctx context.Context, filter *database.ListOptions[domain.PreviewField]) (*database.ListResult[*domain.Preview], error)
-	// DeletePreview removes a preview early. Removing one that is gone is not
-	// an error; deleted reports whether a row went.
+	// DeletePreview is idempotent.
 	DeletePreview(ctx context.Context, projectID, origin string) (deleted bool, err error)
-	// DeleteExpiredPreview sweeps a preview only if it expired by now, so a
-	// renewal racing the sweep survives it.
+	// DeleteExpiredPreview deletes only if the preview expired by now, so a
+	// racing renewal survives the sweep.
 	DeleteExpiredPreview(ctx context.Context, projectID, origin string, now time.Time) (deleted bool, err error)
 }
 

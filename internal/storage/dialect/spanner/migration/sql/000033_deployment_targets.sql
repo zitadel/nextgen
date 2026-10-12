@@ -1,7 +1,6 @@
 -- +goose NO TRANSACTION
 -- +goose Up
--- See the postgres migration. Nothing stored is kept, so deployments is
--- recreated.
+-- See the postgres migration.
 -- +goose StatementBegin
 DROP INDEX IF EXISTS idx_deployments_project_deployed_at
 -- +goose StatementEnd
@@ -25,7 +24,6 @@ CREATE TABLE deployments (
         FOREIGN KEY (project_id)
         REFERENCES projects (id)
         ON DELETE CASCADE,
-    -- See the postgres migration for why this is NO ACTION.
     CONSTRAINT fk_deployments_release
         FOREIGN KEY (project_id, release_id)
         REFERENCES releases (project_id, id),

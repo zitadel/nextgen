@@ -18,33 +18,17 @@ const (
 	targetsTable     = "zitadel_nextgen.deployment_targets"
 	previewsTable    = "zitadel_nextgen.previews"
 
-	// Serializes the writes that decide what a project's targets serve:
-	// deploys, and revokes, which must not race a deploy of the release they
-	// refuse. The second waits for the first and then reads its rows.
-	//
-	// FOR NO KEY UPDATE, not FOR UPDATE: inserting any row that references
-	// the project takes FOR KEY SHARE on it, which FOR UPDATE would block for
-	// as long as the deploy runs — every sign-in of the project included.
-	// FOR NO KEY UPDATE still conflicts with itself, so deploys and revokes
-	// still queue.
-	lockProjectStmt = `SELECT id FROM zitadel_nextgen.projects WHERE id = $1 FOR NO KEY UPDATE`
-	// clock_timestamp, not now(): now() is the transaction's start, and a
-	// deploy that waited on the lock has to stamp after the one it waited for.
+	// clock_timestamp, not now(): a deploy that waited on the project lock
+	// has to stamp after the one it waited for.
 	clockStmt            = `SELECT clock_timestamp()`
 	createDeploymentStmt = `INSERT INTO zitadel_nextgen.deployments` +
 		` (project_id, id, release_id, target_kind, metadata, deployed_at) VALUES ($1, $2, $3, $4, $5, $6)`
 	createDeploymentTargetsStmt = `INSERT INTO zitadel_nextgen.deployment_targets` +
 		` (project_id, deployment_id, origin, release_id, deployed_at)` +
 		` SELECT $1, $2, origin, $3, $4 FROM unnest($5::text[]) AS origin`
-	// A renewal moves the expiry and keeps created_at, the first deploy.
-	upsertPreviewsStmt = `INSERT INTO zitadel_nextgen.previews (project_id, origin, expires_at, created_at)` +
-		` SELECT $1, origin, $2, $3 FROM unnest($4::text[]) AS origin` +
-		` ON CONFLICT (project_id, origin) DO UPDATE SET expires_at = EXCLUDED.expires_at`
 	deploymentQuery = `SELECT project_id, id, release_id, target_kind, metadata, deployed_at FROM zitadel_nextgen.deployments`
-	targetsQuery    = `SELECT deployment_id, origin, release_id, deployed_at FROM zitadel_nextgen.deployment_targets` +
+	targetsQuery    = `SELECT origin, deployment_id, release_id, deployed_at FROM zitadel_nextgen.deployment_targets` +
 		` WHERE project_id = $1 AND deployment_id = ANY($2)`
-	// The deployment an origin serves, or served at $3: its newest target row
-	// no later than that, joined back to the operation.
 	newestDeploymentStmt = deploymentQuery + ` WHERE project_id = $1 AND id = (` +
 		`SELECT t.deployment_id FROM zitadel_nextgen.deployment_targets t` +
 		` WHERE t.project_id = $1 AND t.origin = $2` +
@@ -58,20 +42,12 @@ const (
 var (
 	deploymentSchema = deployment.NewSchema(deploymentsTable, targetsTable, previewsTable)
 
-	// The newest row of each named origin: what each serves.
-	newestTargetsStmt = `SELECT t.deployment_id, t.origin, t.release_id, t.deployed_at FROM zitadel_nextgen.deployment_targets t` +
+	newestTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at FROM zitadel_nextgen.deployment_targets t` +
 		` WHERE t.project_id = $1 AND t.origin = ANY($2) AND NOT ` + deployment.NewerTargetExists(targetsTable)
-	// The target rows of the named deployments that still serve at $3.
-	liveTargetsStmt = `SELECT t.deployment_id, t.origin, t.release_id, t.deployed_at FROM zitadel_nextgen.deployment_targets t` +
+	liveTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at FROM zitadel_nextgen.deployment_targets t` +
 		` JOIN zitadel_nextgen.deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
 		` WHERE t.project_id = $1 AND t.deployment_id = ANY($2) AND NOT ` + deployment.NewerTargetExists(targetsTable) +
-		` AND ` + deployment.TargetServesAt(previewsTable) + `$3))`
-	// The origins still serving release $2 at $3.
-	servingTargetsStmt = `SELECT t.deployment_id, t.origin, t.release_id, t.deployed_at FROM zitadel_nextgen.deployment_targets t` +
-		` JOIN zitadel_nextgen.deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
-		` WHERE t.project_id = $1 AND t.release_id = $2 AND NOT ` + deployment.NewerTargetExists(targetsTable) +
-		` AND ` + deployment.TargetServesAt(previewsTable) + `$3))` +
-		` ORDER BY t.origin`
+		` AND ` + deployment.TargetServesAt("d", previewsTable) + `$3))`
 )
 
 type deploymentStatements struct{ statement }
@@ -80,98 +56,49 @@ func newDeploymentStatements(client queryExecutor) deploymentStatements {
 	return deploymentStatements{statement: statement{client: client}}
 }
 
-func lockProject(ctx context.Context, tx queryExecutor, projectID string) error {
-	var locked string
-	return wrapError(tx.QueryRow(ctx, lockProjectStmt, projectID).Scan(&locked))
+// NewestTargets implements [service.DeploymentStatements].
+func (ds deploymentStatements) NewestTargets(ctx context.Context, projectID string, origins []string) ([]domain.TargetDeployment, error) {
+	return ds.collectTargets(ctx, ds.client, newestTargetsStmt, projectID, origins)
 }
 
-// CreateDeployment implements [service.DeploymentStatements].
-func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, expectedDeploymentID *string, previewTTL time.Duration) (created bool, err error) {
-	if entity.TargetKind == domain.DeploymentTargetKindPreview && previewTTL <= 0 {
-		return false, domain.ErrDeploymentInvalid("a deployment to preview URLs needs a ttl", nil)
-	}
+// InsertDeployment implements [service.DeploymentStatements].
+func (ds deploymentStatements) InsertDeployment(ctx context.Context, entity *domain.Deployment, notBefore *time.Time) error {
 	if err := ensureManagedID(&entity.ID, domain.PrefixDeployment); err != nil {
-		return false, err
+		return err
 	}
 	metadata, err := deployment.MarshalMetadata(entity.Metadata)
 	if err != nil {
-		return false, err
+		return err
 	}
-	origins := entity.Origins()
-	// The idempotent answer and the stamp are staged here and copied onto
-	// the entity only after the transaction commits: the callback must stay
-	// replayable, and overwriting the entity inside an attempt that later
-	// aborts would make the retry compare — and insert — with another
-	// deployment's values.
-	var (
-		existing   *domain.Deployment
-		deployedAt time.Time
-	)
+	var deployedAt time.Time
 	err = withTransaction(ctx, ds.client, func(ctx context.Context, tx queryExecutor) error {
-		created = false
-		existing = nil
-		if err := lockProject(ctx, tx, entity.ProjectID); err != nil {
-			return err
-		}
-		newest, err := ds.collectTargets(ctx, tx, newestTargetsStmt, entity.ProjectID, origins)
-		if err != nil {
-			return err
-		}
-		top := deployment.Newest(newest)
-		var current *domain.Deployment
-		if top != nil {
-			if current, err = ds.getInTx(ctx, tx, entity.ProjectID, top.DeploymentID); err != nil {
-				return err
-			}
-		}
-		if err := deployment.CheckExpected(current, expectedDeploymentID); err != nil {
-			return err
-		}
-		if deployment.Unchanged(entity, newest) {
-			existing = current
-			return nil
-		}
-
 		var now time.Time
 		if err := tx.QueryRow(ctx, clockStmt).Scan(&now); err != nil {
 			return wrapError(err)
 		}
-		deployedAt = deployment.Stamp(now, deployment.StampFloor(top))
+		deployedAt = deployment.Stamp(now, notBefore)
 		if _, err := tx.Exec(ctx, createDeploymentStmt,
 			entity.ProjectID, entity.ID, entity.ReleaseID, entity.TargetKind.String(), metadata, deployedAt,
 		); err != nil {
 			return wrapError(err)
 		}
 		if _, err := tx.Exec(ctx, createDeploymentTargetsStmt,
-			entity.ProjectID, entity.ID, entity.ReleaseID, deployedAt, origins,
+			entity.ProjectID, entity.ID, entity.ReleaseID, deployedAt, entity.Origins(),
 		); err != nil {
 			return wrapError(err)
 		}
-		if entity.TargetKind == domain.DeploymentTargetKindPreview {
-			expiresAt := deployedAt.Add(previewTTL).Truncate(time.Microsecond)
-			if _, err := tx.Exec(ctx, upsertPreviewsStmt,
-				entity.ProjectID, expiresAt, deployedAt, origins,
-			); err != nil {
-				return wrapError(err)
-			}
-		}
-		created = true
 		rsi := newResourceScopeStatements(tx)
 		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindDeployment, entity.ProjectID, entity.ID))
 	})
 	if err != nil {
-		return false, err
+		return err
 	}
-	if existing != nil {
-		*entity = *existing
-	} else {
-		entity.DeployedAt = deployedAt
-	}
-	return created, nil
+	entity.DeployedAt = deployedAt
+	return nil
 }
 
-// getInTx reads one deployment with every target it named.
-func (ds deploymentStatements) getInTx(ctx context.Context, tx queryExecutor, projectID, id string) (*domain.Deployment, error) {
+// GetDeploymentByID implements [service.DeploymentStatements].
+func (ds deploymentStatements) GetDeploymentByID(ctx context.Context, projectID, id string) (*domain.Deployment, error) {
 	var compiler statementCompiler
 	if err := compileRead(&compiler, deploymentQuery, &database.ListOptions[domain.DeploymentField]{
 		Filter: database.And(
@@ -181,11 +108,21 @@ func (ds deploymentStatements) getInTx(ctx context.Context, tx queryExecutor, pr
 	}, deploymentSchema); err != nil {
 		return nil, err
 	}
-	return ds.getOne(ctx, tx, compiler.String(), compiler.args...)
+	return ds.getOne(ctx, compiler.String(), compiler.args...)
 }
 
-func (ds deploymentStatements) getOne(ctx context.Context, client queryExecutor, query string, args ...any) (*domain.Deployment, error) {
-	rows, err := client.Query(ctx, query, args...)
+// NewestDeployment implements [service.DeploymentStatements].
+func (ds deploymentStatements) NewestDeployment(ctx context.Context, projectID, origin string) (*domain.Deployment, error) {
+	return ds.getOne(ctx, newestDeploymentStmt, projectID, origin)
+}
+
+// DeploymentAt implements [service.DeploymentStatements].
+func (ds deploymentStatements) DeploymentAt(ctx context.Context, projectID, origin string, at time.Time) (*domain.Deployment, error) {
+	return ds.getOne(ctx, deploymentAtStmt, projectID, origin, at)
+}
+
+func (ds deploymentStatements) getOne(ctx context.Context, query string, args ...any) (*domain.Deployment, error) {
+	rows, err := ds.client.Query(ctx, query, args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}
@@ -193,25 +130,10 @@ func (ds deploymentStatements) getOne(ctx context.Context, client queryExecutor,
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	if err := ds.attachTargets(ctx, client, entity.ProjectID, []*domain.Deployment{entity}, nil); err != nil {
+	if err := ds.attachTargets(ctx, entity.ProjectID, []*domain.Deployment{entity}, nil); err != nil {
 		return nil, err
 	}
 	return entity, nil
-}
-
-// GetDeploymentByID implements [service.DeploymentStatements].
-func (ds deploymentStatements) GetDeploymentByID(ctx context.Context, projectID, id string) (*domain.Deployment, error) {
-	return ds.getInTx(ctx, ds.client, projectID, id)
-}
-
-// NewestDeployment implements [service.DeploymentStatements].
-func (ds deploymentStatements) NewestDeployment(ctx context.Context, projectID, origin string) (*domain.Deployment, error) {
-	return ds.getOne(ctx, ds.client, newestDeploymentStmt, projectID, origin)
-}
-
-// DeploymentAt implements [service.DeploymentStatements].
-func (ds deploymentStatements) DeploymentAt(ctx context.Context, projectID, origin string, at time.Time) (*domain.Deployment, error) {
-	return ds.getOne(ctx, ds.client, deploymentAtStmt, projectID, origin, at)
 }
 
 // GetDeploymentsByIDs implements [service.DeploymentStatements].
@@ -229,7 +151,7 @@ func (ds deploymentStatements) GetDeploymentsByIDs(ctx context.Context, projectI
 	if err != nil {
 		return nil, err
 	}
-	if err := ds.attachTargets(ctx, ds.client, projectID, items, nil); err != nil {
+	if err := ds.attachTargets(ctx, projectID, items, nil); err != nil {
 		return nil, err
 	}
 	return items, nil
@@ -245,7 +167,7 @@ func (ds deploymentStatements) ListLiveDeployments(ctx context.Context, now time
 	return ds.list(ctx, filter, &now)
 }
 
-// list pages deployments and attaches their targets: every target, or with
+// list pages deployments and attaches their targets: all of them, or with
 // liveAt only those still serving then.
 func (ds deploymentStatements) list(ctx context.Context, filter *database.ListOptions[domain.DeploymentField], liveAt *time.Time) (*database.ListResult[*domain.Deployment], error) {
 	items, nextCursor, err := pagination.Page(filter.Pagination, deploymentSchema, func(limit uint32) ([]*domain.Deployment, error) {
@@ -260,7 +182,7 @@ func (ds deploymentStatements) list(ctx context.Context, filter *database.ListOp
 		return nil, err
 	}
 	if len(items) > 0 {
-		if err := ds.attachTargets(ctx, ds.client, items[0].ProjectID, items, liveAt); err != nil {
+		if err := ds.attachTargets(ctx, items[0].ProjectID, items, liveAt); err != nil {
 			return nil, err
 		}
 	}
@@ -279,18 +201,16 @@ func (ds deploymentStatements) collect(ctx context.Context, query string, args .
 	return items, nil
 }
 
-// attachTargets reads the target rows of items in one round trip: every row,
-// or with liveAt only the rows still serving then.
-func (ds deploymentStatements) attachTargets(ctx context.Context, client queryExecutor, projectID string, items []*domain.Deployment, liveAt *time.Time) error {
+func (ds deploymentStatements) attachTargets(ctx context.Context, projectID string, items []*domain.Deployment, liveAt *time.Time) error {
 	ids := deployment.DeploymentIDs(items)
 	var (
-		rows []deployment.TargetRow
+		rows []domain.TargetDeployment
 		err  error
 	)
 	if liveAt != nil {
-		rows, err = ds.collectTargets(ctx, client, liveTargetsStmt, projectID, ids, *liveAt)
+		rows, err = ds.collectTargets(ctx, ds.client, liveTargetsStmt, projectID, ids, *liveAt)
 	} else {
-		rows, err = ds.collectTargets(ctx, client, targetsQuery, projectID, ids)
+		rows, err = ds.collectTargets(ctx, ds.client, targetsQuery, projectID, ids)
 	}
 	if err != nil {
 		return err
@@ -299,14 +219,14 @@ func (ds deploymentStatements) attachTargets(ctx context.Context, client queryEx
 	return nil
 }
 
-func (ds deploymentStatements) collectTargets(ctx context.Context, client queryExecutor, query string, args ...any) ([]deployment.TargetRow, error) {
+func (ds deploymentStatements) collectTargets(ctx context.Context, client queryExecutor, query string, args ...any) ([]domain.TargetDeployment, error) {
 	rows, err := client.Query(ctx, query, args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (deployment.TargetRow, error) {
-		var scanned deployment.TargetRow
-		if err := row.Scan(&scanned.DeploymentID, &scanned.Origin, &scanned.ReleaseID, &scanned.DeployedAt); err != nil {
+	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.TargetDeployment, error) {
+		var scanned domain.TargetDeployment
+		if err := row.Scan(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &scanned.DeployedAt); err != nil {
 			return scanned, err
 		}
 		scanned.DeployedAt = scanned.DeployedAt.UTC()

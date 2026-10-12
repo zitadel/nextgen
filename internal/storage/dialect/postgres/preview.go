@@ -14,10 +14,11 @@ import (
 )
 
 const (
-	previewQuery      = `SELECT project_id, origin, expires_at, created_at FROM zitadel_nextgen.previews`
-	deletePreviewStmt = `DELETE FROM zitadel_nextgen.previews WHERE project_id = $1 AND origin = $2`
-	// Conditional on the expiry, so a renewal that committed after the sweep
-	// read the row keeps its preview.
+	upsertPreviewsStmt = `INSERT INTO zitadel_nextgen.previews (project_id, origin, expires_at, created_at)` +
+		` SELECT $1, origin, $2, $3 FROM unnest($4::text[]) AS origin` +
+		` ON CONFLICT (project_id, origin) DO UPDATE SET expires_at = EXCLUDED.expires_at`
+	previewQuery             = `SELECT project_id, origin, expires_at, created_at FROM zitadel_nextgen.previews`
+	deletePreviewStmt        = `DELETE FROM zitadel_nextgen.previews WHERE project_id = $1 AND origin = $2`
 	deleteExpiredPreviewStmt = deletePreviewStmt + ` AND expires_at <= $3`
 )
 
@@ -25,6 +26,12 @@ type previewStatements struct{ statement }
 
 func newPreviewStatements(client queryExecutor) previewStatements {
 	return previewStatements{statement: statement{client: client}}
+}
+
+// UpsertPreviews implements [service.PreviewStatements].
+func (ps previewStatements) UpsertPreviews(ctx context.Context, projectID string, origins []string, expiresAt, createdAt time.Time) error {
+	_, err := ps.client.Exec(ctx, upsertPreviewsStmt, projectID, expiresAt, createdAt, origins)
+	return wrapError(err)
 }
 
 // GetPreview implements [service.PreviewStatements].
@@ -54,8 +61,7 @@ func (ps previewStatements) ListPreviews(ctx context.Context, filter *database.L
 	items, nextCursor, err := pagination.Page(filter.Pagination, preview.Schema, func(limit uint32) ([]*domain.Preview, error) {
 		filter := filter.WithLimit(limit)
 		var compiler statementCompiler
-		// No resource-scope predicate: a preview has no id of its own, and
-		// access is the project's.
+		// No resource-scope predicate: a preview has no id of its own.
 		if err := compileList(ctx, &compiler, previewQuery, filter, preview.Schema, "", ""); err != nil {
 			return nil, err
 		}

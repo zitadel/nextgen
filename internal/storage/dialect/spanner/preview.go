@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	previewQuery      = `SELECT project_id, origin, expires_at, created_at FROM previews`
-	deletePreviewStmt = `DELETE FROM previews WHERE project_id = @p1 AND origin = @p2`
-	// See the postgres statement.
+	existingPreviewsQuery    = `SELECT origin FROM previews WHERE project_id = @p1 AND origin IN UNNEST(@p2)`
+	previewQuery             = `SELECT project_id, origin, expires_at, created_at FROM previews`
+	deletePreviewStmt        = `DELETE FROM previews WHERE project_id = @p1 AND origin = @p2`
 	deleteExpiredPreviewStmt = deletePreviewStmt + ` AND expires_at <= @p3`
 )
 
@@ -26,6 +26,38 @@ type previewStatements struct{ statement }
 
 func newPreviewStatements(db queryExecutor) previewStatements {
 	return previewStatements{statement: statement{db: db}}
+}
+
+// UpsertPreviews implements [service.PreviewStatements]. Existing rows only
+// get a new expiry.
+func (ps previewStatements) UpsertPreviews(ctx context.Context, projectID string, origins []string, expiresAt, createdAt time.Time) error {
+	return withTransaction(ctx, ps.db, func(ctx context.Context, tx queryExecutor) error {
+		present := make(map[string]bool, len(origins))
+		if err := tx.Query(ctx, buildStatement(existingPreviewsQuery, projectID, origins).statement(), func(iter *spanner.RowIterator) error {
+			_, err := collectRows(iter, func(row *spanner.Row) (struct{}, error) {
+				var origin string
+				if err := row.Columns(&origin); err != nil {
+					return struct{}{}, err
+				}
+				present[origin] = true
+				return struct{}{}, nil
+			})
+			return err
+		}); err != nil {
+			return err
+		}
+		mutations := make([]*spanner.Mutation, 0, len(origins))
+		for _, origin := range origins {
+			if present[origin] {
+				mutations = append(mutations, spanner.Update(previewTable,
+					[]string{"project_id", "origin", "expires_at"}, []any{projectID, origin, expiresAt}))
+				continue
+			}
+			mutations = append(mutations, spanner.Insert(previewTable, previewColumns,
+				[]any{projectID, origin, expiresAt, createdAt}))
+		}
+		return tx.BufferWrite(ctx, mutations)
+	})
 }
 
 // GetPreview implements [service.PreviewStatements].
@@ -42,8 +74,7 @@ func (ps previewStatements) ListPreviews(ctx context.Context, filter *database.L
 	items, nextCursor, err := pagination.Page(filter.Pagination, preview.Schema, func(limit uint32) ([]*domain.Preview, error) {
 		filter := filter.WithLimit(limit)
 		var compiler statementCompiler
-		// See the postgres statement for why there is no resource-scope
-		// predicate.
+		// No resource-scope predicate: a preview has no id of its own.
 		if err := compileList(ctx, &compiler, previewQuery, filter, preview.Schema, "", ""); err != nil {
 			return nil, err
 		}

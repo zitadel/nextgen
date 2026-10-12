@@ -1,6 +1,5 @@
 // Package deployment holds shared helpers for the deployments and
-// deployment_targets tables used by v2 dialect statements: list options, the
-// create-time guard, and the encoding of the metadata JSON column.
+// deployment_targets tables used by v2 dialect statements.
 package deployment
 
 import (
@@ -13,14 +12,8 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// metadata is the structure stored inside the metadata column: why the
-// release went live and who made it happen.
-//
-// deployed_at is deliberately absent. It orders the list and backs the keyset
-// cursor, so it earns a column of its own; everything here is written once
-// and handed back verbatim. Reason is persisted as its wire string rather
-// than its numeric value, so inserting a reason ahead of an existing one in
-// the enum cannot reinterpret rows already written.
+// metadata is the structure stored inside the metadata column. Reason is
+// stored as its wire string so reordering the enum cannot reinterpret rows.
 type metadata struct {
 	Reason         string  `json:"reason,omitempty"`
 	Message        *string `json:"message,omitempty"`
@@ -39,18 +32,8 @@ type Row struct {
 	DeployedAt time.Time
 }
 
-// TargetRow carries the scanned columns of one deployment_targets row.
-type TargetRow struct {
-	DeploymentID string
-	Origin       string
-	ReleaseID    string
-	DeployedAt   time.Time
-}
-
 // MarshalMetadata converts the deployment metadata into JSON for the metadata
-// column. Absent fields are omitted rather than written as null, so a plain
-// unannotated deploy by a machine principal stores little more than the
-// reason.
+// column, omitting absent fields.
 func MarshalMetadata(m domain.DeploymentMetadata) ([]byte, error) {
 	encoded := metadata{
 		Reason:     m.Reason.String(),
@@ -74,7 +57,6 @@ func ToDomain(row Row) (*domain.Deployment, error) {
 		}
 	}
 
-	// An absent reason is the zero value: a plain deploy.
 	reason := domain.DeploymentReasonDeploy
 	if encoded.Reason != "" {
 		parsed, err := domain.DeploymentReasonString(encoded.Reason)
@@ -112,8 +94,7 @@ func ToDomain(row Row) (*domain.Deployment, error) {
 }
 
 // AttachTargets sets each deployment's targets from rows, sorted by origin.
-// A deployment with no row in rows gets an empty set.
-func AttachTargets(items []*domain.Deployment, rows []TargetRow) {
+func AttachTargets(items []*domain.Deployment, rows []domain.TargetDeployment) {
 	byID := make(map[string][]domain.DeploymentTarget, len(items))
 	for _, row := range rows {
 		byID[row.DeploymentID] = append(byID[row.DeploymentID], domain.DeploymentTarget{Origin: row.Origin})
@@ -132,4 +113,14 @@ func DeploymentIDs(items []*domain.Deployment) []string {
 		ids[i] = item.ID
 	}
 	return ids
+}
+
+// Stamp is the later of now and notBefore, truncated to the microsecond every
+// dialect keeps.
+func Stamp(now time.Time, notBefore *time.Time) time.Time {
+	now = now.UTC().Truncate(time.Microsecond)
+	if notBefore != nil && notBefore.After(now) {
+		return notBefore.UTC()
+	}
+	return now
 }

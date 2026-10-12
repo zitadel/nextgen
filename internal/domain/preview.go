@@ -3,9 +3,7 @@ package domain
 import "time"
 
 // Preview admits one exact URL as a deployment target until it expires. A
-// deployment to preview URLs creates or renews the preview of each of them in
-// the same operation, so a preview with nothing deployed to it cannot exist.
-// Removing or sweeping a preview leaves the deployments to its URL in place.
+// deployment to the URL creates or renews it.
 type Preview struct {
 	ProjectID string
 	Origin    string

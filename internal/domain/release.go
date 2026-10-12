@@ -65,23 +65,6 @@ func ErrReleaseRevisionUnpinnable(details any) Error {
 	return newError(PrefixRelease.ErrorCodePrefix("revision_unpinnable"), "release: pinned revision declares no handle", details, nil)
 }
 
-// ReleaseServedOrigin is one origin whose newest deployment uses a release.
-type ReleaseServedOrigin struct {
-	Origin       string `json:"origin"`
-	DeploymentID string `json:"deployment_id"`
-}
-
-// ReleaseInUseDetails is the payload of ErrReleaseInUse.
-type ReleaseInUseDetails struct {
-	Origins []ReleaseServedOrigin `json:"origins"`
-}
-
-// ErrReleaseInUse refuses to revoke a release that an origin still serves:
-// revoking never takes an origin down.
-func ErrReleaseInUse(details ReleaseInUseDetails) Error {
-	return newError(PrefixRelease.ErrorCodePrefix("in_use"), "release: still served by an origin", details, nil)
-}
-
 // ReleasePointer pins one revision of one resource. Handle names the resource
 // and RevisionID the revision of it, so two revisions of the same resource
 // share a handle and cannot both appear in a release.
@@ -107,9 +90,8 @@ type ReleaseMetadata struct {
 
 // Release is an immutable, project-scoped snapshot pinning one revision of
 // every resource it includes. It holds pointers and metadata, never content:
-// the per-kind tables stay the source of truth for resource bytes. The one
-// change it takes is revocation: RevokedAt is set by the first revoke and never
-// cleared.
+// the per-kind tables stay the source of truth for resource bytes. Only
+// RevokedAt changes, once, on the first revoke.
 type Release struct {
 	ProjectID   string
 	ID          string

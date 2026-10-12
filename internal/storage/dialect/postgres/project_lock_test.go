@@ -21,7 +21,7 @@ func TestLockProject_BlocksDeploysNotInsertsUnderTheProject(t *testing.T) {
 	deploy, err := testPool.pool.Begin(t.Context())
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = deploy.Rollback(context.Background()) })
-	require.NoError(t, lockProject(t.Context(), deploy, projectID))
+	require.NoError(t, newProjectStatements(deploy).LockProject(t.Context(), projectID))
 
 	insertCtx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
@@ -33,6 +33,6 @@ func TestLockProject_BlocksDeploysNotInsertsUnderTheProject(t *testing.T) {
 	t.Cleanup(func() { _ = second.Rollback(context.Background()) })
 	waitCtx, cancelWait := context.WithTimeout(t.Context(), 300*time.Millisecond)
 	defer cancelWait()
-	err = lockProject(waitCtx, second, projectID)
+	err = newProjectStatements(second).LockProject(waitCtx, projectID)
 	assert.Error(t, err, "a second deploy took the lock while the first held it")
 }

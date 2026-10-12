@@ -1,5 +1,4 @@
-// Package preview holds shared helpers for the previews table used by v2
-// dialect statements: the field schema and list options.
+// Package preview holds shared helpers for the previews table.
 package preview
 
 import (
@@ -33,9 +32,7 @@ var Schema = database.NewSchema(map[domain.PreviewField]database.FieldBinding[do
 	},
 })
 
-// LiveListOptions returns options for listing the previews of a project that
-// have not expired at now, newest first by creation, capped at limit. origin
-// breaks created_at ties: one deploy creates all its previews at once.
+// LiveListOptions lists the previews not expired at now, newest first.
 func LiveListOptions(projectID string, now time.Time, limit uint32) *database.ListOptions[domain.PreviewField] {
 	return &database.ListOptions[domain.PreviewField]{
 		Filter: database.And(
@@ -55,14 +52,12 @@ func LiveListOptions(projectID string, now time.Time, limit uint32) *database.Li
 	}
 }
 
-// ExpiredListOptions returns options for listing the previews of a project
-// that expired by now, longest expired first, capped at limit: the ones to
-// sweep.
+// ExpiredListOptions lists the previews expired by now, oldest expiry first.
 func ExpiredListOptions(projectID string, now time.Time, limit uint32) *database.ListOptions[domain.PreviewField] {
 	return &database.ListOptions[domain.PreviewField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.PreviewFieldProjectID), projectID),
-			// Not live is expires_at <= now; the filter vocabulary has no <=.
+			// expires_at <= now; the filter vocabulary has no <=.
 			database.Or(
 				database.LessThan(database.Col(domain.PreviewFieldExpiresAt), now),
 				database.Equal(database.Col(domain.PreviewFieldExpiresAt), now),

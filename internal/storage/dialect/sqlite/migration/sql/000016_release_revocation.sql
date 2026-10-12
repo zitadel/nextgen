@@ -1,6 +1,5 @@
 -- +goose Up
--- See the postgres migration. revoked_at is unix nanos stamped in Go, as
--- everywhere else in this dialect.
+-- See the postgres migration.
 -- +goose StatementBegin
 ALTER TABLE releases ADD COLUMN revoked_at INTEGER;
 -- +goose StatementEnd

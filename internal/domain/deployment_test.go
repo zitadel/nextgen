@@ -2,6 +2,7 @@ package domain
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -75,6 +76,58 @@ func TestNewDeploymentValidates(t *testing.T) {
 		_, err = NewDeployment("proj_1", "rel_1", DeploymentTargetKind(99), origins, DeploymentMetadata{})
 		assertDeploymentInvalid(t, err)
 	})
+}
+
+var t0 = time.Date(2026, 10, 2, 14, 52, 0, 0, time.UTC)
+
+func TestNewestTargetDeploymentBreaksTiesOnID(t *testing.T) {
+	assert.Nil(t, NewestTargetDeployment(nil))
+	newest := NewestTargetDeployment([]TargetDeployment{
+		{DeploymentID: "dep_a", DeployedAt: t0},
+		{DeploymentID: "dep_c", DeployedAt: t0.Add(-time.Second)},
+		{DeploymentID: "dep_b", DeployedAt: t0},
+	})
+	assert.Equal(t, "dep_b", newest.DeploymentID)
+}
+
+func TestDeploymentUnchanged(t *testing.T) {
+	origins := []string{"https://app.acme.com", "https://www.acme.com"}
+	serving := []TargetDeployment{
+		{Origin: "https://app.acme.com", ReleaseID: "rel_a"},
+		{Origin: "https://www.acme.com", ReleaseID: "rel_a"},
+	}
+	primary, err := NewDeployment("proj_1", "rel_a", DeploymentTargetKindPrimary, origins, DeploymentMetadata{})
+	require.NoError(t, err)
+	assert.True(t, primary.Unchanged(serving))
+	assert.False(t, primary.Unchanged(serving[:1]), "a target serving nothing is a change")
+
+	other, err := NewDeployment("proj_1", "rel_b", DeploymentTargetKindPrimary, origins, DeploymentMetadata{})
+	require.NoError(t, err)
+	assert.False(t, other.Unchanged(serving))
+
+	preview, err := NewDeployment("proj_1", "rel_a", DeploymentTargetKindPreview, origins, DeploymentMetadata{})
+	require.NoError(t, err)
+	assert.False(t, preview.Unchanged(serving), "a preview deploy renews, so it is always written")
+}
+
+func TestCheckExpectedDeployment(t *testing.T) {
+	current := &Deployment{ID: "dep_1"}
+	assert.NoError(t, CheckExpectedDeployment(current, nil))
+	assert.NoError(t, CheckExpectedDeployment(current, new("dep_1")))
+	assert.NoError(t, CheckExpectedDeployment(nil, nil))
+
+	err := CheckExpectedDeployment(current, new("dep_0"))
+	require.Error(t, err)
+	assert.Equal(t, DeploymentConflictDetails{Deployment: current}, err.(Error).Details)
+
+	err = CheckExpectedDeployment(nil, new("dep_0"))
+	require.Error(t, err)
+	assert.Equal(t, DeploymentConflictDetails{}, err.(Error).Details)
+}
+
+func TestDeployedNotBefore(t *testing.T) {
+	assert.Nil(t, DeployedNotBefore(nil))
+	assert.Equal(t, t0.Add(time.Microsecond), *DeployedNotBefore(&TargetDeployment{DeployedAt: t0}))
 }
 
 func assertDeploymentInvalid(t *testing.T, err error) {
