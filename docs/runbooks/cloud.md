@@ -11,23 +11,29 @@
 The hosted cloud is the current `main`, built by Vercel from the repository
 and run in Frankfurt (`fra1`) against PlanetScale Postgres in the same AWS
 region. **`main` is production:** every merge deploys. A branch that touches
-the server, the console or the login UI gets a preview deployment with a
-database of its own. Version tags and their npm packages remain the
+the server, the console, the login UI or the storybook gets a preview
+deployment with a database of its own. Version tags and their npm packages remain the
 self-hosted artifact; this cloud does not run them.
 
 ## Layout
 
-One Vercel deployment, two [services](https://vercel.com/docs/services):
+One Vercel deployment, three [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds, compiles `apps/cloud/launcher`, then migrates | every path except the console's, including `/console/runtime.json` and the login UI at `/ui/login/` |
+| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds, compiles `apps/cloud/launcher`, then migrates | every path except the console's and the storybook's, including `/console/runtime.json` and the login UI at `/ui/login/` |
 | `console` | Vite; the console build with `VITE_CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights | `/ui/console/*` (bare `/ui/console` redirects to the slash form) |
+| `storybook` | Storybook; `moon run storybook:build`, moved to `dist/storybook/` | `/storybook/*` (bare `/storybook` redirects to the slash form) |
 
 The console lives at the path the server would serve it from, on the same
 origin. The server's own console is switched off, and nothing else about
 the server changes: the session cookie, CSRF protection and the console
 links the server derives all work as in a self-hosted install.
+
+The storybook, the login surface's component workbench, is deployed only
+here. Its orchestrator stories mock the API in the browser with a service
+worker scoped to `/storybook/`, so the mock never answers for the console
+or the login UI on the same origin.
 
 The launcher pins what follows from this layout (listen address from
 `PORT`, console off at `/ui/console`, login UI on) and defaults the rest
