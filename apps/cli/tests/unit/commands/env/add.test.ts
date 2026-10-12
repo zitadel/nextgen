@@ -6,7 +6,7 @@ import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { parseJson, runCliForTest } from "../../../helpers/run-cli";
+import { parseJson, runCliForTest, stripAnsi } from "../../../helpers/run-cli";
 
 const SERVER = "https://api.zitadel.example";
 const server = setupServer();
@@ -174,6 +174,16 @@ describe("env add", () => {
       );
       expect(created).toEqual([]);
     });
+
+    it("records the normalized --app-url as ZITADEL_ISSUER", async () => {
+      const cwd = await makeProject();
+
+      await add(cwd, "--app-url", "https://app.acme.com/some/path");
+
+      expect(await readFile(join(cwd, ".env.production.local"), "utf8")).toContain(
+        "ZITADEL_ISSUER=https://app.acme.com\n",
+      );
+    });
   });
 
   describe("the project it creates", () => {
@@ -325,6 +335,27 @@ describe("env add", () => {
 
       expect(envelope.code).toBe("E_VALIDATION");
       expect(created).toEqual([]);
+    });
+
+    it("does not tell the user to copy a secret from a file that never received one", async () => {
+      const cwd = await makeProject("next");
+
+      const result = await runCliForTest([
+        "env",
+        "add",
+        "production",
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+        "--project",
+        "proj_existing",
+        "--non-interactive",
+      ]);
+
+      const out = stripAnsi(result.stdout);
+      expect(out).not.toContain("copy it from .env.production.local");
+      expect(out).toContain("copy it from wherever you got this project");
     });
   });
 
