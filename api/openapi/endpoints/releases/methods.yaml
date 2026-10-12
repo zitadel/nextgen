@@ -69,14 +69,15 @@ post:
             description: |
               The CLI's form: the schemas, flow definitions and branding as
               authored, the flow naming its schema by `objectType`. The
-              server reuses whichever revisions already match and allocates
-              the rest.
+              schema's `metaSchema` is the one the server publishes at
+              `/user-schema.json`. The server reuses whichever revisions
+              already match and allocates the rest.
             value:
               bundle:
                 schemas:
                   - $schema: https://json-schema.org/draft/2020-12/schema
                     kind: user-schema
-                    metaSchema: https://schemas.zitadel.com/user-schema/v1
+                    metaSchema: https://auth.acme.com/user-schema.json
                     objectType: human-user
                     x-auth-methods:
                       password:
@@ -105,7 +106,7 @@ post:
                         transitions:
                           submit: { target: authenticate }
                       - name: authenticate
-                        fields: [password]
+                        fields: ['x-auth-methods#password']
                         actions:
                           - name: submit
                             kind: submit
