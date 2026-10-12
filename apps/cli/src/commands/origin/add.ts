@@ -1,6 +1,7 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
+import { dryRunResult } from "../../lib/oclif/crud/shared";
 
 /** The two kinds an origin pattern can be, as the `--kind` flag accepts them. */
 const ORIGIN_KINDS = ["primary", "preview"] as const;
@@ -37,8 +38,16 @@ export default class OriginAdd extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(OriginAdd);
     await this.toMeta(flags);
-    const { client, projectId } = await this.connect();
     const kind = flags.kind as (typeof ORIGIN_KINDS)[number];
+
+    // A dry run makes no request, so it answers before the connection — the
+    // order the resource commands' `create` uses, which keeps
+    // `--dry-run --non-interactive` usable.
+    if (this.meta.dryRun) {
+      return this.emit(dryRunResult("add", "origin", args.pattern, { kind }));
+    }
+
+    const { client, projectId } = await this.connect();
 
     const added = await client.addOrigin(projectId, { pattern: args.pattern, kind });
 

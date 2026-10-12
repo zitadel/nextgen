@@ -391,20 +391,51 @@ describe("variable set", () => {
     expect(environment).toBeNull();
     expect(body).toEqual({ GOOGLE_CLIENT_SECRET: { value: "GOCSPX-abc", secret: true } });
     const json = parseJson(res.stdout) as { data: Record<string, unknown> };
-    expect(json.data).toEqual({
+    // The write targeted the `all` slot as a string; the slot state is read back
+    // separately (see the stored-state test), so the request-shaping assertion
+    // only checks what this write asked for.
+    expect(json.data).toMatchObject({
       name: "GOOGLE_CLIENT_SECRET",
-      secret: true,
       type: "string",
       applies_to: "all",
     });
   });
 
-  it("says on a terminal that the value was set on the project", async () => {
+  it("reports both slots' state read back from the store, never a secret's value", async () => {
+    // The output reflects what the store holds after the write, not the request
+    // flags: here the real mock persists, so the `all` slot reports the secret
+    // as held with no value, and the untouched `preview` slot reports not set.
     const cwd = await makeProject();
-    server.use(http.patch("*/variables", () => HttpResponse.json({})));
+
+    const res = await withStdin("GOCSPX-abc", () =>
+      runCliForTest([
+        "variable",
+        "set",
+        "GOOGLE_CLIENT_SECRET",
+        "--secret",
+        "--non-interactive",
+        ...base(cwd),
+      ]),
+    );
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).not.toContain("GOCSPX-abc");
+    const json = parseJson(res.stdout) as {
+      data: { all: Record<string, unknown>; preview: Record<string, unknown> };
+    };
+    expect(json.data.all).toEqual({ held: true, secret: true });
+    expect(json.data.all).not.toHaveProperty("value");
+    expect(json.data.preview).toEqual({ held: false });
+  });
+
+  it("says on a terminal what each slot holds after the write", async () => {
+    // Real mock, so the read-back after the write is honest: a plain value
+    // prints in the `all` slot, a secret prints its marker, and the untouched
+    // slot prints `(not set)`.
+    const cwd = await makeProject();
 
     const plain = await asTerminal(() =>
-      withStdin("v", () => runCliForTest(["variable", "set", "TOKEN", ...plainArgs(cwd)])),
+      withStdin("hello", () => runCliForTest(["variable", "set", "GREETING", ...plainArgs(cwd)])),
     );
     const secret = await asTerminal(() =>
       withStdin("v", () =>
@@ -412,9 +443,11 @@ describe("variable set", () => {
       ),
     );
 
-    expect(plain.stdout).toContain("Set TOKEN on the project");
-    expect(plain.stdout).not.toContain("(secret)");
-    expect(secret.stdout).toContain("Set TOKEN on the project (secret)");
+    expect(plain.stdout).toContain("Set GREETING on the project");
+    expect(plain.stdout).toMatch(/all\s+hello/);
+    expect(plain.stdout).toMatch(/preview\s+\(not set\)/);
+    expect(secret.stdout).toContain("Set TOKEN on the project");
+    expect(secret.stdout).toMatch(/all\s+\(secret\)/);
   });
 
   it("fails rather than blocking when a scripted run pipes nothing in", async () => {
@@ -1000,13 +1033,43 @@ describe("variable resolve", () => {
 
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as {
-      data: { deployment_id: string; variables: Array<Record<string, unknown>> };
+      data: { deployment_id: string; origins: string[]; variables: Array<Record<string, unknown>> };
     };
     expect(json.data.deployment_id).toBe("dep_1");
+    // The chosen origin is named in the output, so a bare resolve says which
+    // target the frozen map runs on (#1617).
+    expect(json.data.origins).toEqual(["https://app.acme.com"]);
     expect(json.data.variables).toEqual([
       { name: "API_URL", secret: false, value: "https://api.acme.com" },
       { name: "TOKEN", secret: true },
     ]);
+  });
+
+  it("refuses to guess when more than one deployment is live and no origin is given", async () => {
+    // Two deployments live on different origins have no single frozen map, so a
+    // bare resolve names the live origins and asks for --origin rather than
+    // reading an arbitrary one (#1617).
+    const cwd = await makeProject();
+    let variablesRequested = false;
+    server.use(
+      live([
+        { id: "dep_a", targets: [{ origin: "https://app.acme.com" }] },
+        { id: "dep_b", targets: [{ origin: "https://admin.acme.com" }] },
+      ]),
+      http.get("*/deployments/:id/variables", () => {
+        variablesRequested = true;
+        return HttpResponse.json({});
+      }),
+    );
+
+    const res = await runCliForTest(["variable", "resolve", ...base(cwd)]);
+
+    expect(res.exitCode).not.toBe(0);
+    expect(variablesRequested).toBe(false);
+    const json = parseJson(res.stdout) as { code: string; hint: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.hint).toContain("https://app.acme.com");
+    expect(json.hint).toContain("https://admin.acme.com");
   });
 
   it("asks the server only for the named origin's live deployment", async () => {

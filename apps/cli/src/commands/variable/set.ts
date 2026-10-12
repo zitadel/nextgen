@@ -1,14 +1,20 @@
 import { Args, Flags } from "@oclif/core";
 import { cancel, isCancel, password, text } from "@clack/prompts";
 
+import type { GetVariables200 } from "@zitadel/api/generated/model";
+
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
+import { renderDetail } from "../../lib/oclif/crud/table";
 import { ZitadelError } from "../../lib/errors";
 import {
   assertVariableName,
   parseVariableValue,
   readStdin,
+  toVariableRow,
   VARIABLE_TYPES,
+  variableCells,
+  type VariableRow,
   type VariableType,
   variableScope,
 } from "../../lib/variables";
@@ -146,12 +152,68 @@ export default class VariableSet extends EnvironmentCommand {
     await client.updateVariables({ [name]: { value, secret: flags.secret } }, scope);
     this.recordTelemetry({ is_secret: flags.secret });
 
+    // Report what the store now holds for the name, not what the request asked
+    // for: a write to one slot leaves the other standing, and the server decides
+    // what a read discloses. Both slots are read back so the output is the
+    // store's own answer — a secret says only that a value is held (ADR 062 §7),
+    // never the value itself.
+    const [allBucket, previewBucket] = await Promise.all([
+      client.getVariables({ project_id: projectId }),
+      client.getVariables({ project_id: projectId, applies_to: "preview" }),
+    ]);
+    const all = slotState(name, allBucket);
+    const preview = slotState(name, previewBucket);
+
     return this.emit({
       status: "ok",
-      data: { name, secret: flags.secret, type, applies_to: flags.preview ? "preview" : "all" },
-      pretty: `Set ${name} on the project${flags.secret ? " (secret)" : ""}${flags.preview ? " (preview)" : ""}`,
+      data: { name, type, applies_to: flags.preview ? "preview" : "all", all, preview },
+      pretty: renderDetail(`Set ${name} on the project`, ["all", "preview"], {
+        all: slotCell(all),
+        preview: slotCell(preview),
+      }),
     });
   }
+}
+
+/**
+ * What the store holds for one name in one slot, as a read reports it. A name
+ * the slot does not hold is `held: false` rather than omitted, so the output
+ * tells an empty value apart from a withdrawn one. A secret is `held` without a
+ * value: the platform never discloses one.
+ */
+type SlotState =
+  | { held: false }
+  | { held: true; secret: true }
+  | { held: true; secret: false; value: string | number | boolean };
+
+function slotState(name: string, bucket: GetVariables200): SlotState {
+  // A held name always carries a value — a scalar, or `{secret:true}` for a
+  // secret — so `undefined` is exactly the slot not holding the name.
+  const held = bucket[name];
+  if (held === undefined) {
+    return { held: false };
+  }
+  const row = toVariableRow(name, held);
+  return row.secret
+    ? { held: true, secret: true }
+    : { held: true, secret: false, value: row.value as string | number | boolean };
+}
+
+/**
+ * One slot rendered for a terminal. A held value goes through the same escaping
+ * the tables use — a stored value is attacker-influenceable — and a secret
+ * prints its marker rather than a value. A slot the name does not hold reads as
+ * `(not set)` so it is not mistaken for an empty value.
+ */
+function slotCell(slot: SlotState): string {
+  if (!slot.held) {
+    return "(not set)";
+  }
+  const row: VariableRow = slot.secret
+    ? { name: "", secret: true }
+    : { name: "", secret: false, value: slot.value };
+  const [cell] = variableCells([row]);
+  return cell === undefined || cell.value === "" ? '""' : cell.value;
 }
 
 /**

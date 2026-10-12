@@ -9,9 +9,13 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// RevokeRelease answers 501 until the release service can revoke. Without it
-// the generated stub's sentinel is not a domain error and maps to 500.
-func (h *Handler) RevokeRelease(context.Context, api.RevokeReleaseParams) (api.RevokeReleaseRes, error) {
+// RevokeRelease answers 501 until the release service can revoke. The access
+// check stays in front, like the deployment stubs, so a caller without the
+// permission learns that before it learns the operation is not served yet.
+func (h *Handler) RevokeRelease(ctx context.Context, params api.RevokeReleaseParams) (api.RevokeReleaseRes, error) {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), releaseAccess, opWrite); err != nil {
+		return nil, err
+	}
 	return nil, domain.ErrNotImplemented()
 }
 

@@ -1,9 +1,12 @@
-import { readdir, readFile } from "node:fs/promises";
+import { chmod, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 
+import { password, text } from "@clack/prompts";
+
 import { ZitadelError } from "./errors";
 import { hasZitadelSecret, readZitadelSecret } from "./project";
+import { bailOnCancel } from "./prompt-cancel";
 import { resolveServer, serverOrigin } from "./server";
 
 /**
@@ -219,6 +222,72 @@ export function requireValue(environment: Environment, key: EnvironmentKey): str
       consulted: environment.consulted.map((entry) => entry.source),
     },
   });
+}
+
+/** The values that grant access, prompted without echo and persisted at 0600. */
+const SECRET_KEYS: ReadonlySet<EnvironmentKey> = new Set([
+  "ZITADEL_PROJECT_SECRET",
+  "ZITADEL_PREVIEW_TOKEN",
+]);
+
+/**
+ * Like {@link requireValue}, but on an interactive terminal a missing value is
+ * asked for and persisted to `.env.<name>.local` before it is returned, so the
+ * next run resolves it from the file rather than asking again (#1313). A secret
+ * is asked for without echo and the file is written `0600`.
+ *
+ * Non-interactive runs never prompt: they throw exactly as {@link requireValue}
+ * does, naming every source the chain consulted, so a scripted caller stays
+ * deterministic. The prompt is gated by the caller passing `interactive`, which
+ * is already false under `--json`, `--non-interactive` and a non-TTY.
+ */
+export async function requireValueInteractive(
+  environment: Environment,
+  key: EnvironmentKey,
+  options: { cwd: string; interactive: boolean },
+): Promise<string> {
+  const resolved = environment.values[key];
+  if (resolved) {
+    return resolved.value;
+  }
+  if (!options.interactive) {
+    // Deterministic failure, identical to the non-interactive contract.
+    return requireValue(environment, key);
+  }
+  const name = environment.name.value;
+  const ask = SECRET_KEYS.has(key) ? password : text;
+  const answer = await ask({ message: `${key} for the ${name} environment` });
+  bailOnCancel(answer, `Resolving ${key}`);
+  const typed = String(answer).trim();
+  if (typed === "") {
+    // An empty answer is no answer; fall through to the same throw.
+    return requireValue(environment, key);
+  }
+  // Persist (and return) the normalized form, matching how the resolver stores
+  // a server value, so the file and this run agree with every later run.
+  const value = key === "ZITADEL_URL" ? serverOrigin(typed) : typed;
+  await persistEnvValue(join(options.cwd, `.env.${name}.local`), key, value);
+  return value;
+}
+
+/**
+ * Appends `key=value` to a `.env.<name>.local`, creating it if absent, and
+ * holds the file at `0600` because it may carry a secret. Newline-safe so a
+ * file without a trailing newline is not concatenated onto its last line.
+ */
+async function persistEnvValue(path: string, key: EnvironmentKey, value: string): Promise<void> {
+  let existing = "";
+  try {
+    existing = await readFile(path, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw error;
+    }
+  }
+  const next = `${existing}${existing && !existing.endsWith("\n") ? "\n" : ""}${key}=${value}\n`;
+  await writeFile(path, next, { mode: 0o600 });
+  // `writeFile`'s mode applies only on creation and is masked by the umask.
+  await chmod(path, 0o600).catch(() => undefined);
 }
 
 /**

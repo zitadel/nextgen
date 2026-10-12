@@ -301,6 +301,15 @@ async function mergeEnv(
   );
   const additions = Object.entries(entries).filter(([key]) => !present.has(key));
   if (additions.length === 0) {
+    // Nothing to add, but a secret-bearing target (`mode` set) must still have
+    // its permissions re-asserted: `writeFile`'s mode applied only when the
+    // file was first created and is masked by the umask, so a setup or
+    // `doctor --fix` rerun would otherwise leave an existing `.env.*.local` at
+    // whatever loose mode it drifted to. Matches how `env add` and
+    // `writeZitadelSecret` chmod unconditionally.
+    if (mode !== undefined && raw !== undefined && !dryRun) {
+      await chmod(path, mode).catch(() => undefined);
+    }
     result.filesSkipped.push(path);
     return;
   }
@@ -318,6 +327,12 @@ async function mergeEnv(
   }
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, next, { mode });
+  // `writeFile`'s mode is honoured only when it creates the file and is masked
+  // by the umask, so re-assert it when rewriting an existing secret-bearing
+  // target too (see the no-additions path above).
+  if (mode !== undefined) {
+    await chmod(path, mode).catch(() => undefined);
+  }
   record(result, path, "file", action);
 }
 

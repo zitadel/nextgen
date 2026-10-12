@@ -1919,6 +1919,135 @@ describe("api-mock releases and deployments", () => {
     expect(frozen).toEqual({ API_URL: "https://api.preview.acme.com", FLAG: "shared" });
   });
 
+  test("a variable change deploys afresh even when the release is unchanged", async () => {
+    // Idempotency is on what the target serves, which includes the frozen
+    // variables: the same release with a changed variable is a different thing
+    // to serve, so it writes a new deployment rather than deduping to the old.
+    const project = await newProject("deploy-var-idempotency");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    await setVars(project.id, "", { API_URL: "https://api.acme.com" });
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+
+    const first = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: ["primary"],
+      })
+    ).json()) as { id: string };
+
+    // Same release, same targets, unchanged variables: deduped to the first.
+    const same = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["primary"],
+    });
+    expect(same.status).toBe(200);
+    expect(((await same.json()) as { id: string }).id).toBe(first.id);
+
+    // The variable changes, the release does not. The next deploy must create a
+    // new deployment that freezes the new value.
+    await setVars(project.id, "", { API_URL: "https://api.changed.com" });
+    const afterChange = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["primary"],
+    });
+    expect(afterChange.status).toBe(201);
+    const next = (await afterChange.json()) as { id: string };
+    expect(next.id).not.toBe(first.id);
+    const frozen = (await (
+      await fetch(`${BASE}/deployments/${next.id}/variables?project_id=${project.id}`)
+    ).json()) as Record<string, unknown>;
+    expect(frozen).toEqual({ API_URL: "https://api.changed.com" });
+  });
+
+  test("a rollback restores the snapshot the reverted deployment froze", async () => {
+    // A rollback reruns what the earlier deployment served, variables included —
+    // not whatever the store holds now, which may have drifted since.
+    const project = await newProject("deploy-rollback-snapshot");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    await setVars(project.id, "", { API_URL: "https://api.v1.acme.com" });
+    const first = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const firstDeploy = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: first.id,
+        targets: ["primary"],
+      })
+    ).json()) as { id: string };
+
+    // A later deployment freezes a different value, and the store drifts again
+    // after it, so neither the current store nor the latest deployment holds
+    // what the first one froze.
+    await setVars(project.id, "", { API_URL: "https://api.v2.acme.com" });
+    const second = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
+      id: string;
+    };
+    await createDeployment(project.id, project.secret, {
+      release_id: second.id,
+      targets: ["primary"],
+    });
+    await setVars(project.id, "", { API_URL: "https://api.v3.acme.com" });
+
+    const rollback = (await (
+      await fetch(`${BASE}/deployments/${firstDeploy.id}/rollback?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({}),
+      })
+    ).json()) as { id: string };
+
+    const frozen = (await (
+      await fetch(`${BASE}/deployments/${rollback.id}/variables?project_id=${project.id}`)
+    ).json()) as Record<string, unknown>;
+    expect(frozen).toEqual({ API_URL: "https://api.v1.acme.com" });
+  });
+
+  test("warns when a preview deployment falls back to an all secret", async () => {
+    // A preview URL serving the production secret is allowed but flagged: there
+    // is no preview override for that name, so the deployment reports it.
+    const project = await newProject("deploy-preview-warn");
+    await fetch(`${BASE}/projects/${project.id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ pattern: "https://*-acme.vercel.app", kind: "preview" }),
+    });
+    await setVars(project.id, "", { API_TOKEN: { value: "prod-secret", secret: true } });
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+
+    const warned = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["https://pr-1-acme.vercel.app"],
+      ttl: "24h",
+    });
+    expect(warned.status).toBe(201);
+    const body = (await warned.json()) as {
+      warnings?: { code: string; variable: string; message: string }[];
+    };
+    expect(body.warnings).toHaveLength(1);
+    expect(body.warnings?.[0]).toMatchObject({
+      code: "variable.missing_preview_secret",
+      variable: "API_TOKEN",
+    });
+    expect(typeof body.warnings?.[0]?.message).toBe("string");
+
+    // A preview override for the same name silences the warning: the preview no
+    // longer serves the production secret.
+    await setVars(project.id, "&applies_to=preview", {
+      API_TOKEN: { value: "preview-secret", secret: true },
+    });
+    const quiet = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["https://pr-2-acme.vercel.app"],
+      ttl: "24h",
+    });
+    expect(quiet.status).toBe(201);
+    expect((await quiet.json()) as { warnings?: unknown }).not.toHaveProperty("warnings");
+  });
+
   test("answers dep.not_found for a deployment's variables under the wrong project", async () => {
     const owner = await newProject("deploy-vars-owner");
     const other = await newProject("deploy-vars-other");
