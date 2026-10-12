@@ -3,7 +3,7 @@
   "pages": [
     "index",
     "local-runtime",
-    "plan-apply",
+    "deploy",
     "customize-design",
     "customize-copy",
     "troubleshooting"

@@ -12,8 +12,8 @@ The CLI writes:
 - framework-specific app files
 - environment files such as `.env.local`, and `.env.development.local` for the values the CLI reads
 
-`zitadel plan` validates local configuration and previews the sync diff without mutating platform state.
+`zitadel deploy --dry-run` validates local configuration and shows the diff without mutating platform state.
 
-`zitadel apply` validates and uploads repo configuration.
+`zitadel deploy` builds a release from repo configuration and deploys it to the project.
 
 Local secrets and runtime-only state must stay out of source control. `.zitadel/local/**` is runtime data, not product configuration.

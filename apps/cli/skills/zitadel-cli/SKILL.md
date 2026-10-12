@@ -4,8 +4,8 @@ description: >-
   Set up and manage Zitadel authentication in a local project with the
   agent-friendly `zitadel` CLI. Use when the user wants to add login,
   registration, or session handling, create a Zitadel project, scaffold auth
-  for a Next.js, React, Vue, Angular, Nuxt, Solid, Svelte, or Qwik app, or plan and apply Zitadel
-  config changes from repo state.
+  for a Next.js, React, Vue, Angular, Nuxt, Solid, Svelte, or Qwik app, or build and deploy
+  Zitadel config changes from repo state.
 ---
 
 # Zitadel CLI
@@ -114,7 +114,7 @@ npx @zitadel/cli@alpha resources --json     # the resource surface in one call (
 
 `--help` groups the surface into project commands (create a project and scaffold
 auth), local-server commands (run a local Zitadel), configuration commands
-(`plan`/`apply` plus the config resources), and resource commands (the uniform
+(`deploy` plus the config resources), and resource commands (the uniform
 `<resource> <verb>` surface). Read the groups from `--help` rather than from
 memory, since they change as the CLI gains commands.
 
@@ -144,10 +144,10 @@ Each invocation prints one JSON object:
   success: a warning usually means a follow-up step is needed.
 - A `list` verb emits `data: { items, count, next_page_token }`; when a page
   remains, `data.next_commands` carries the exact command for the next page.
-- `plan` and `apply` emit `data.changes`: one row per touched resource
-  (`{kind, action, file, id?, previous_id?}`, action ∈ create/update/revision/
-  delete). Plan rows preview; apply rows report, with the resulting platform
-  ids. Use it to verify an edit did what you intended.
+- `deploy` emits `data.content_hash` (the release digest), `data.origins`
+  (the origins it went live on) and `data.resources` (how many it pinned). A
+  re-run on unchanged config returns the same digest. Use it to confirm what
+  went live.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 
@@ -209,13 +209,12 @@ invocation) or were explicitly told to just set it up.
 ## Answering the user
 
 Report what changed, in the user's terms — not how you drove the CLI. The
-flags, `--json`, the `plan`/`apply` split, exit codes, and the number of
+flags, `--json`, the deploy flow, exit codes, and the number of
 commands you ran are your internal business; the user asked for an outcome, not
 a transcript. Say what they got.
 
 - Good: "Added an optional phone number to your user schema and deployed it."
-- Avoid: "I ran `plan` and `apply`, both with `--non-interactive --json`, and
-  both returned ok."
+- Avoid: "I ran `deploy` with `--non-interactive --json` and it returned ok."
 
 Quote a command or flag only when the user asks *how* something works, or when
 they need to run something themselves. Otherwise keep the mechanics out of the
@@ -232,8 +231,7 @@ npx @zitadel/cli@alpha doctor --non-interactive --json
 npx @zitadel/cli@alpha start --non-interactive --json
 npx @zitadel/cli@alpha setup --framework next --server local --force --non-interactive --json
 npx @zitadel/cli@alpha doctor --non-interactive --json
-npx @zitadel/cli@alpha plan --non-interactive --json
-npx @zitadel/cli@alpha apply --non-interactive --json
+npx @zitadel/cli@alpha deploy --non-interactive --json
 ```
 
 `setup` scaffolds into an empty directory, or patches an existing app project
@@ -258,7 +256,7 @@ back in with the same email/password, and ending on the signed-in profile page.
 Do not treat a rendered login or registration form as completion.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
-then re-run `plan` and `apply`. See the reference below for driving the login UI
+then re-run `deploy`. See the reference below for driving the login UI
 and the config-sync details.
 
 ## Reference files
