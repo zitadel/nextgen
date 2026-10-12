@@ -14,6 +14,9 @@
 set -eu
 cd "$(dirname "$0")/../.."
 
+# The service's installCommand normally ran already; the Go preset is not
+# known to honour it, so install when nothing is there.
+[ -x node_modules/.bin/moon ] || corepack pnpm install --frozen-lockfile
 corepack pnpm exec moon run login-ui:build
 
 version="$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' apps/server/package.json | head -1)"
