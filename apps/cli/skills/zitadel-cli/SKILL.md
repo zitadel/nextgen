@@ -153,8 +153,9 @@ Each invocation prints one JSON object:
   build's preview URLs (from the platform, or `--origin`) for `--ttl` and emits
   `data.previews` plus `data.release_env` (the `NEXT_PUBLIC_ZITADEL_RELEASE`
   line to pin). It uses `ZITADEL_PREVIEW_TOKEN`, never the project secret, and
-  in a production build with no `--origin` it is a no-op. `preview list` and
-  `preview rm <url>` read and end live previews.
+  outside a preview or development build it is a no-op — even with an explicit
+  `--origin`, which selects targets but never authorizes a preview deploy.
+  `preview list` and `preview rm <url>` read and end live previews.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 

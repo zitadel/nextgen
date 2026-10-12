@@ -137,6 +137,12 @@ export abstract class EnvironmentCommand extends BaseCommand {
  * missing preview token fails and names the variable. The `preview` command
  * adds the `--origin`/`--ttl` flag bag itself; `preview list` and `preview rm`
  * extend this for the credential alone.
+ *
+ * The reach the preview credential carries — the release/deployment/preview
+ * operations these commands make — is granted and enforced by the server, not
+ * by the CLI: the CLI only chooses which token to present. Wiring the server's
+ * preview-deploy authorization to grant exactly those scopes is backend work
+ * on `@zitadel/server`, tracked there.
  */
 export abstract class PreviewCommand extends EnvironmentCommand {
   static override credential: CredentialKind = "preview";

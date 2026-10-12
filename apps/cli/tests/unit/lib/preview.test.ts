@@ -58,12 +58,15 @@ describe("detectPreviewUrls", () => {
     ]);
   });
 
-  it("derives the Cloudflare Pages branch alias from the deployment URL", () => {
+  it("reports the Cloudflare Pages deployment URL and the derived branch alias", () => {
     const detected = detectPreviewUrls({
       CF_PAGES_BRANCH: "sso/Feature_Branch",
       CF_PAGES_URL: "https://a1b2c3.acme.pages.dev",
     });
-    expect(detected.urls).toEqual(["https://sso-feature-branch.acme.pages.dev"]);
+    expect(detected.urls).toEqual([
+      "https://a1b2c3.acme.pages.dev",
+      "https://sso-feature-branch.acme.pages.dev",
+    ]);
   });
 
   it("finds nothing when no platform variable is set, but names them all", () => {

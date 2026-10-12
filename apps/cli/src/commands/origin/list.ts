@@ -40,7 +40,7 @@ export default class OriginList extends EnvironmentCommand {
     const plain = flags.plain || !process.stdout.isTTY;
     return this.emit({
       status: "ok",
-      data: { origins, count: origins.length },
+      data: { items: origins, count: origins.length, next_page_token: null },
       pretty: plain
         ? renderRows(COLUMNS, origins)
         : origins.length === 0

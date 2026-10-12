@@ -61,8 +61,9 @@ function ttlToWire(seconds: number): string {
  * platform that set none of its variables contributes nothing.
  *
  * Vercel exposes bare hosts, so a scheme is prepended; Netlify exposes full
- * URLs; Cloudflare Pages exposes the deployment URL and the branch, from which
- * the stable branch alias is derived (`<branch>.<project>.pages.dev`).
+ * URLs; Cloudflare Pages exposes the deployment URL and the branch, and both
+ * the deployment URL itself and the stable branch alias derived from them
+ * (`<branch>.<project>.pages.dev`) are reported.
  */
 const PREVIEW_PLATFORMS: ReadonlyArray<{
   variables: readonly string[];
@@ -82,7 +83,10 @@ const PREVIEW_PLATFORMS: ReadonlyArray<{
   },
   {
     variables: ["CF_PAGES_BRANCH", "CF_PAGES_URL"],
-    urls: (env) => cloudflareBranchAlias(env.CF_PAGES_BRANCH, env.CF_PAGES_URL),
+    urls: (env) =>
+      [env.CF_PAGES_URL, ...cloudflareBranchAlias(env.CF_PAGES_BRANCH, env.CF_PAGES_URL)].filter(
+        (url): url is string => Boolean(url),
+      ),
   },
 ];
 
