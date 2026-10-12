@@ -1605,7 +1605,7 @@ DESCRIPTION
 EXAMPLES
   $ zitadel origin add https://app.acme.com --kind primary
 
-  $ zitadel origin add https://*-acme.vercel.app --kind preview
+  $ zitadel origin add 'https://*-acme.vercel.app' --kind preview
 ```
 
 ## `zitadel origin list`
