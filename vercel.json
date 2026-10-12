@@ -1,0 +1,67 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "server": {
+      "root": ".",
+      "framework": "go",
+      "installCommand": "corepack pnpm install --frozen-lockfile",
+      "buildCommand": "sh apps/cloud/build.sh",
+      "ignoreCommand": "sh apps/cloud/ignore-build.sh"
+    },
+    "console": {
+      "root": "apps/console",
+      "framework": "vite",
+      "installCommand": "corepack pnpm install --frozen-lockfile",
+      "buildCommand": "cd ../.. && VITE_CONSOLE_VERCEL_INSIGHTS=1 corepack pnpm exec moon run console:build && rm -rf apps/console/dist && mkdir -p apps/console/dist/ui/console && cp -R internal/staticui/console/dist/. apps/console/dist/ui/console/",
+      "outputDirectory": "dist",
+      "ignoreCommand": "sh ../cloud/ignore-build.sh",
+      "rewrites": [
+        {
+          "source": "/ui/console/(.*)",
+          "destination": "/ui/console/index.html"
+        }
+      ]
+    },
+    "storybook": {
+      "root": "apps/storybook",
+      "framework": "storybook",
+      "installCommand": "corepack pnpm install --frozen-lockfile",
+      "buildCommand": "cd ../.. && corepack pnpm exec moon run storybook:build && cd apps/storybook && mv dist storybook && mkdir dist && mv storybook dist/",
+      "outputDirectory": "dist",
+      "ignoreCommand": "sh ../cloud/ignore-build.sh"
+    }
+  },
+  "redirects": [
+    {
+      "source": "/ui/console",
+      "destination": "/ui/console/",
+      "permanent": true
+    },
+    {
+      "source": "/storybook",
+      "destination": "/storybook/",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/ui/console/(.*)",
+      "destination": {
+        "service": "console"
+      }
+    },
+    {
+      "source": "/storybook/(.*)",
+      "destination": {
+        "service": "storybook"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "server"
+      }
+    }
+  ],
+  "regions": ["fra1"]
+}
