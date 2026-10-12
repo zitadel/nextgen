@@ -9,9 +9,11 @@ export type DeployTargets = ["primary"] | [string];
 
 /**
  * Make a release live. The release is named by id or by content digest, never
- * both, and the targets are `primary` (every primary origin) or one exact
- * origin. The server answers 201 when it wrote a deployment and 200 when every
- * target already served the release.
+ * both, and the targets are `primary` (every primary origin), one exact primary
+ * origin, or the preview URLs a pull-request build registers. `ttl` sets how
+ * long each preview stays live and is only valid with preview URLs. The server
+ * answers 201 when it wrote a deployment and 200 when every target already
+ * served the release.
  */
 export async function createDeployment(
   client: ZitadelClient,
@@ -21,6 +23,7 @@ export async function createDeployment(
     contentHash?: string;
     targets: string[];
     message?: string;
+    ttl?: string;
   },
 ): Promise<Deployment> {
   const result = await client.createDeployment(
@@ -29,6 +32,7 @@ export async function createDeployment(
       ...(input.contentHash === undefined ? {} : { content_hash: input.contentHash }),
       targets: input.targets,
       ...(input.message === undefined ? {} : { message: input.message }),
+      ...(input.ttl === undefined ? {} : { ttl: input.ttl }),
     },
     { project_id: projectId },
   );

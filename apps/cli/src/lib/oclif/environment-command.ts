@@ -98,3 +98,15 @@ export abstract class EnvironmentCommand extends BaseCommand {
     };
   }
 }
+
+/**
+ * A command that runs in a pull-request build and talks to the project with the
+ * narrower preview credential ({@link CREDENTIALS.preview}, read from
+ * `ZITADEL_PREVIEW_TOKEN`). It never falls back to the project secret, so a
+ * missing preview token fails and names the variable. The `preview` command
+ * adds the `--origin`/`--ttl` flag bag itself; `preview list` and `preview rm`
+ * extend this for the credential alone.
+ */
+export abstract class PreviewCommand extends EnvironmentCommand {
+  static override credential: CredentialKind = "preview";
+}

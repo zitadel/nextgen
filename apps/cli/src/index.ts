@@ -17,6 +17,9 @@ import Logs from "./commands/logs";
 import OriginAdd from "./commands/origin/add";
 import OriginList from "./commands/origin/list";
 import OriginRm from "./commands/origin/rm";
+import Preview from "./commands/preview/index";
+import PreviewList from "./commands/preview/list";
+import PreviewRm from "./commands/preview/rm";
 import ReleaseCreate from "./commands/release/create";
 import ReleaseRevoke from "./commands/release/revoke";
 import Reset from "./commands/reset";
@@ -49,6 +52,7 @@ export const COMMANDS: Record<string, typeof Command> = {
   eject: Eject,
   env: Env,
   logs: Logs,
+  preview: Preview,
   reset: Reset,
   resources: ResourcesList,
   setup: Setup,
@@ -65,6 +69,8 @@ export const COMMANDS: Record<string, typeof Command> = {
   "origin:add": OriginAdd,
   "origin:list": OriginList,
   "origin:rm": OriginRm,
+  "preview:list": PreviewList,
+  "preview:rm": PreviewRm,
   "release:create": ReleaseCreate,
   "release:revoke": ReleaseRevoke,
   "sso:enable": SsoEnable,
