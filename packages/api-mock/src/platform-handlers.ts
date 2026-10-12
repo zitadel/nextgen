@@ -572,18 +572,33 @@ function variableOwner(
 }
 
 /**
- * The project's variables as a deployment freezes them. A primary deployment
- * runs the `all` values alone; a preview deployment prefers each name's
- * `preview` override and falls back to the `all` value where none exists. The
- * result is a flat map — one value per name — so a deployment never has to
- * choose at read time.
+ * A non-fatal condition a deployment reports back in its response. The only one
+ * today: a preview deployment that froze an `all` secret because the name has
+ * no preview override, so the preview URL serves the production credential —
+ * allowed, but worth flagging (ADR 062 §7, #1617).
  */
-function freezeVariables(projectId: string, preview: boolean): Map<string, VariableRecord> {
+type DeploymentWarning = { code: string; message: string; variable: string };
+
+/**
+ * The project's variables as a deployment freezes them, and any warnings the
+ * freeze raised. A primary deployment runs the `all` values alone; a preview
+ * deployment prefers each name's `preview` override and falls back to the `all`
+ * value where none exists. The result is a flat map — one value per name — so a
+ * deployment never has to choose at read time.
+ *
+ * A preview fallback to an `all` secret is flagged: there is no preview-only
+ * override, so the preview URL would serve the production secret, which the
+ * operator should know even though it is not refused.
+ */
+function freezeVariables(
+  projectId: string,
+  preview: boolean,
+): { frozen: Map<string, VariableRecord>; warnings: DeploymentWarning[] } {
   const all =
     store.variables.get(variableOwner(projectId, undefined, "all")) ??
     new Map<string, VariableRecord>();
   if (!preview) {
-    return new Map(all);
+    return { frozen: new Map(all), warnings: [] };
   }
   const overrides =
     store.variables.get(variableOwner(projectId, undefined, "preview")) ??
@@ -592,7 +607,42 @@ function freezeVariables(projectId: string, preview: boolean): Map<string, Varia
   for (const [name, held] of overrides) {
     frozen.set(name, held);
   }
-  return frozen;
+  const warnings: DeploymentWarning[] = [];
+  for (const [name, held] of all) {
+    if (held.secret && !overrides.has(name)) {
+      warnings.push({
+        code: "variable.missing_preview_secret",
+        message: `preview deployment falls back to the all secret ${name}; set a preview override to avoid serving the production secret`,
+        variable: name,
+      });
+    }
+  }
+  // Sorted by name so the warning list is stable between runs, like the rest of
+  // the mock's collection output.
+  warnings.sort((a, b) => a.variable.localeCompare(b.variable));
+  return { frozen, warnings };
+}
+
+/**
+ * Whether two frozen variable snapshots are identical — same names, each with
+ * the same value and secret flag. A deployment is idempotent only when the
+ * release and this snapshot both match, so a variable-only change still writes
+ * a new deployment even when the release content is unchanged.
+ */
+function sameVariableSnapshot(
+  a: Map<string, VariableRecord>,
+  b: Map<string, VariableRecord>,
+): boolean {
+  if (a.size !== b.size) {
+    return false;
+  }
+  for (const [name, held] of a) {
+    const other = b.get(name);
+    if (other === undefined || other.secret !== held.secret || other.value !== held.value) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /** What a read of one owner says: a value, or that a secret is held. */
@@ -1720,17 +1770,30 @@ export function setupPlatformHandlers() {
         }
       }
 
-      // Idempotent on what is served: when every target already runs this
-      // release, the newest deployment to the targets is returned unchanged.
-      const alreadyServed = targets.every(
-        (origin) => newestDeploymentForOrigin(project.id, origin)?.releaseId === release.id,
-      );
+      // The snapshot this deployment would freeze, resolved now. It decides
+      // idempotency alongside the release: a variable-only change leaves the
+      // release untouched but must still create a new deployment.
+      const { frozen, warnings } = freezeVariables(project.id, sawPreview);
+
+      // Idempotent on what is served: a new deployment is skipped only when
+      // every target already runs this release *and* the same frozen variable
+      // snapshot. A later variable write changes the snapshot, so the same
+      // release deploys afresh rather than being deduped away.
+      const alreadyServed = targets.every((origin) => {
+        const newest = newestDeploymentForOrigin(project.id, origin);
+        return (
+          newest !== undefined &&
+          newest.releaseId === release.id &&
+          sameVariableSnapshot(newest.frozenVariables, frozen)
+        );
+      });
       if (targets.length > 0 && alreadyServed) {
         const newest = [...store.deployments.values()]
           .filter(
             (deployment) =>
               deployment.projectId === project.id &&
               deployment.releaseId === release.id &&
+              sameVariableSnapshot(deployment.frozenVariables, frozen) &&
               deployment.targets.some((target) => targets.includes(target.origin)),
           )
           .sort((a, b) => b.seq - a.seq)[0];
@@ -1753,10 +1816,16 @@ export function setupPlatformHandlers() {
         seq: ++store.lastSeq,
         // Frozen now: a later variable write never reaches a deployment already
         // made. A preview deployment prefers the preview overrides.
-        frozenVariables: freezeVariables(project.id, sawPreview),
+        frozenVariables: frozen,
       };
       store.deployments.set(id, record);
-      return HttpResponse.json(deploymentResponse(record), { status: 201 });
+      // Warnings ride the create response (a preview falling back to an `all`
+      // secret), surfaced only when there are any so the common case stays the
+      // bare deployment shape.
+      const response = deploymentResponse(record);
+      return HttpResponse.json(warnings.length > 0 ? { ...response, warnings } : response, {
+        status: 201,
+      });
     }),
 
     http.get("*/deployments", ({ request }) => {
@@ -1943,15 +2012,25 @@ export function setupPlatformHandlers() {
       }
 
       const origins = target.targets.map((row) => row.origin);
-      const alreadyServed = origins.every(
-        (origin) => newestDeploymentForOrigin(project.id, origin)?.releaseId === target.releaseId,
-      );
+      // A rollback re-applies the deployment being reverted to, so what it
+      // restores is that deployment's own frozen snapshot — not the project's
+      // current `all` bucket, which may have drifted since. Idempotent only
+      // when the newest already serves both this release and that snapshot.
+      const alreadyServed = origins.every((origin) => {
+        const newest = newestDeploymentForOrigin(project.id, origin);
+        return (
+          newest !== undefined &&
+          newest.releaseId === target.releaseId &&
+          sameVariableSnapshot(newest.frozenVariables, target.frozenVariables)
+        );
+      });
       if (alreadyServed) {
         const newest = [...store.deployments.values()]
           .filter(
             (deployment) =>
               deployment.projectId === project.id &&
               deployment.releaseId === target.releaseId &&
+              sameVariableSnapshot(deployment.frozenVariables, target.frozenVariables) &&
               deployment.targets.some((row) => origins.includes(row.origin)),
           )
           .sort((a, b) => b.seq - a.seq)[0];
@@ -1974,9 +2053,10 @@ export function setupPlatformHandlers() {
         rollbackTo: target.id,
         deployedAt: nowIso(),
         seq: ++store.lastSeq,
-        // A rollback only ever restores primary origins (a preview rollback is
-        // refused above), so it freezes the `all` values like any primary deploy.
-        frozenVariables: freezeVariables(project.id, false),
+        // Restores the snapshot the reverted deployment froze: a rollback reruns
+        // what that deployment served, variables included, so it copies that
+        // frozen map rather than re-reading the store it may no longer match.
+        frozenVariables: new Map(target.frozenVariables),
       };
       store.deployments.set(id, record);
       return HttpResponse.json(deploymentResponse(record), { status: 201 });
