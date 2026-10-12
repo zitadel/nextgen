@@ -19,6 +19,8 @@ gz() {
 }
 
 echo "=== cache report $(date -u +%H:%M:%S) go: $(go env GOROOT) | $(go env GOMODCACHE) | $(go env GOCACHE)"
+gc="$(readlink -f "$(go env GOCACHE)")"
+echo "go-build files: $(find "$gc" -type f -mmin -15 | wc -l) touched in the last 15 min, $(find "$gc" -type f -mmin +15 | wc -l) older; oldest $(find "$gc" -type f -printf '%TY-%Tm-%Td %TH:%TM\n' | sort | head -1); trim.txt $(cat "$gc/trim.txt" 2>/dev/null)"
 modules="$(find . -path ./.vercel -prune -o -name node_modules -type d -prune -print 2>/dev/null | sort)"
 echo "node_modules dirs: $(echo "$modules" | wc -l)"
 for d in $modules; do
