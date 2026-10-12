@@ -24,7 +24,9 @@ func TestOriginsAddRemove(t *testing.T) {
 
 	client, err := helpers.NewApiClient(h.URL)
 	require.NoError(t, err)
-	harness.SetScopedTokenOnApiClient(t, client, project, "origin.write", "origin.delete", "project.read")
+	// Management ops still require the project.write credential ceiling
+	// (ADR 037 / #420); OpenAPI's origin.* scopes are not a substitute yet.
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	t.Run("create round-trips origins", func(t *testing.T) {
 		unauth, err := helpers.NewApiClient(h.URL)
