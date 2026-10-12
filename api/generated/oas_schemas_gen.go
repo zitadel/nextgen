@@ -20889,10 +20889,9 @@ type FlowDefinitionStep struct {
 	// Runs after field validation passes, before the transition fires.
 	// - create_user: creates the user record (registration flows)
 	// - create_user_with_sso: creates the user record from the identity an
-	// external provider returned, linking it to that identity. Accepted by
-	// the API so an SSO flow can be authored and stored; the engine handler
-	// is not wired yet, and a step reaching it fails with a flow integrity
-	// error rather than creating anything.
+	// external provider returned and the values the step collected, and
+	// links it to that identity. A unique value another user holds binds
+	// that user and routes user_already_exists instead.
 	OnSuccess OptFlowDefinitionStepOnSuccess `json:"on_success"`
 	// Marks this as a terminal step. Tells the frontend what to do:
 	// - redirect: navigate to redirect_uri (OIDC/SAML callback done)
@@ -21049,10 +21048,9 @@ func (s *FlowDefinitionStepGates) init() FlowDefinitionStepGates {
 // Runs after field validation passes, before the transition fires.
 // - create_user: creates the user record (registration flows)
 // - create_user_with_sso: creates the user record from the identity an
-// external provider returned, linking it to that identity. Accepted by
-// the API so an SSO flow can be authored and stored; the engine handler
-// is not wired yet, and a step reaching it fails with a flow integrity
-// error rather than creating anything.
+// external provider returned and the values the step collected, and
+// links it to that identity. A unique value another user holds binds
+// that user and routes user_already_exists instead.
 type FlowDefinitionStepOnSuccess string
 
 const (
@@ -25351,7 +25349,11 @@ type GetFlowStepErrorResponse struct {
 	ReqInvalid                    ReqInvalid
 	EncKeyUnknownAlg              EncKeyUnknownAlg
 	UserAlreadyExists             UserAlreadyExists
+	UserConflict                  UserConflict
 	UserInvalid                   UserInvalid
+	UserNotFound                  UserNotFound
+	UserPasswordEmpty             UserPasswordEmpty
+	UserPasswordTooLong           UserPasswordTooLong
 }
 
 // GetFlowStepErrorResponseType is oneOf type of GetFlowStepErrorResponse.
@@ -25388,7 +25390,11 @@ const (
 	ReqInvalidGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "enc_key.unknown_alg"
 	UserAlreadyExistsGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "user.already_exists"
+	UserConflictGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "user.conflict"
 	UserInvalidGetFlowStepErrorResponse                   GetFlowStepErrorResponseType = "user.invalid"
+	UserNotFoundGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "user.not_found"
+	UserPasswordEmptyGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "user.password_empty"
+	UserPasswordTooLongGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "user.password_too_long"
 )
 
 // IsAttAlreadyHandedOff reports whether GetFlowStepErrorResponse is AttAlreadyHandedOff.
@@ -25536,9 +25542,29 @@ func (s GetFlowStepErrorResponse) IsUserAlreadyExists() bool {
 	return s.Type == UserAlreadyExistsGetFlowStepErrorResponse
 }
 
+// IsUserConflict reports whether GetFlowStepErrorResponse is UserConflict.
+func (s GetFlowStepErrorResponse) IsUserConflict() bool {
+	return s.Type == UserConflictGetFlowStepErrorResponse
+}
+
 // IsUserInvalid reports whether GetFlowStepErrorResponse is UserInvalid.
 func (s GetFlowStepErrorResponse) IsUserInvalid() bool {
 	return s.Type == UserInvalidGetFlowStepErrorResponse
+}
+
+// IsUserNotFound reports whether GetFlowStepErrorResponse is UserNotFound.
+func (s GetFlowStepErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundGetFlowStepErrorResponse
+}
+
+// IsUserPasswordEmpty reports whether GetFlowStepErrorResponse is UserPasswordEmpty.
+func (s GetFlowStepErrorResponse) IsUserPasswordEmpty() bool {
+	return s.Type == UserPasswordEmptyGetFlowStepErrorResponse
+}
+
+// IsUserPasswordTooLong reports whether GetFlowStepErrorResponse is UserPasswordTooLong.
+func (s GetFlowStepErrorResponse) IsUserPasswordTooLong() bool {
+	return s.Type == UserPasswordTooLongGetFlowStepErrorResponse
 }
 
 // SetAttAlreadyHandedOff sets GetFlowStepErrorResponse to AttAlreadyHandedOff.
@@ -26150,6 +26176,27 @@ func NewUserAlreadyExistsGetFlowStepErrorResponse(v UserAlreadyExists) GetFlowSt
 	return s
 }
 
+// SetUserConflict sets GetFlowStepErrorResponse to UserConflict.
+func (s *GetFlowStepErrorResponse) SetUserConflict(v UserConflict) {
+	s.Type = UserConflictGetFlowStepErrorResponse
+	s.UserConflict = v
+}
+
+// GetUserConflict returns UserConflict and true boolean if GetFlowStepErrorResponse is UserConflict.
+func (s GetFlowStepErrorResponse) GetUserConflict() (v UserConflict, ok bool) {
+	if !s.IsUserConflict() {
+		return v, false
+	}
+	return s.UserConflict, true
+}
+
+// NewUserConflictGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserConflict.
+func NewUserConflictGetFlowStepErrorResponse(v UserConflict) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUserConflict(v)
+	return s
+}
+
 // SetUserInvalid sets GetFlowStepErrorResponse to UserInvalid.
 func (s *GetFlowStepErrorResponse) SetUserInvalid(v UserInvalid) {
 	s.Type = UserInvalidGetFlowStepErrorResponse
@@ -26168,6 +26215,69 @@ func (s GetFlowStepErrorResponse) GetUserInvalid() (v UserInvalid, ok bool) {
 func NewUserInvalidGetFlowStepErrorResponse(v UserInvalid) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetUserInvalid(v)
+	return s
+}
+
+// SetUserNotFound sets GetFlowStepErrorResponse to UserNotFound.
+func (s *GetFlowStepErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundGetFlowStepErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if GetFlowStepErrorResponse is UserNotFound.
+func (s GetFlowStepErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserNotFound.
+func NewUserNotFoundGetFlowStepErrorResponse(v UserNotFound) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPasswordEmpty sets GetFlowStepErrorResponse to UserPasswordEmpty.
+func (s *GetFlowStepErrorResponse) SetUserPasswordEmpty(v UserPasswordEmpty) {
+	s.Type = UserPasswordEmptyGetFlowStepErrorResponse
+	s.UserPasswordEmpty = v
+}
+
+// GetUserPasswordEmpty returns UserPasswordEmpty and true boolean if GetFlowStepErrorResponse is UserPasswordEmpty.
+func (s GetFlowStepErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpty, ok bool) {
+	if !s.IsUserPasswordEmpty() {
+		return v, false
+	}
+	return s.UserPasswordEmpty, true
+}
+
+// NewUserPasswordEmptyGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserPasswordEmpty.
+func NewUserPasswordEmptyGetFlowStepErrorResponse(v UserPasswordEmpty) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordTooLong sets GetFlowStepErrorResponse to UserPasswordTooLong.
+func (s *GetFlowStepErrorResponse) SetUserPasswordTooLong(v UserPasswordTooLong) {
+	s.Type = UserPasswordTooLongGetFlowStepErrorResponse
+	s.UserPasswordTooLong = v
+}
+
+// GetUserPasswordTooLong returns UserPasswordTooLong and true boolean if GetFlowStepErrorResponse is UserPasswordTooLong.
+func (s GetFlowStepErrorResponse) GetUserPasswordTooLong() (v UserPasswordTooLong, ok bool) {
+	if !s.IsUserPasswordTooLong() {
+		return v, false
+	}
+	return s.UserPasswordTooLong, true
+}
+
+// NewUserPasswordTooLongGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserPasswordTooLong.
+func NewUserPasswordTooLongGetFlowStepErrorResponse(v UserPasswordTooLong) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUserPasswordTooLong(v)
 	return s
 }
 
@@ -61769,36 +61879,43 @@ func (*SubmitFlowStepBadRequest) submitFlowStepRes() {}
 
 // SubmitFlowStepErrorResponse represents sum type.
 type SubmitFlowStepErrorResponse struct {
-	Type                SubmitFlowStepErrorResponseType // switch on this field
-	AttAlreadyHandedOff AttAlreadyHandedOff
-	AttInvalidRequest   AttInvalidRequest
-	AttInvalidState     AttInvalidState
-	AttNotCompleted     AttNotCompleted
-	AttNotFound         AttNotFound
-	AttProofRejected    AttProofRejected
-	AttStaleChallenge   AttStaleChallenge
-	EncKeyDecryptFailed EncKeyDecryptFailed
-	EncKeyEncryptFailed EncKeyEncryptFailed
-	EncKeyNotFound      EncKeyNotFound
-	EvtInvalid          EvtInvalid
-	FlowCookieExpired   FlowCookieExpired
-	FlowCookieInvalid   FlowCookieInvalid
-	FlowIntegrity       FlowIntegrity
-	FlowInvalidAction   FlowInvalidAction
-	FlowNotFound        FlowNotFound
-	FlowRestartRequired FlowRestartRequired
-	FlowUnsupported     FlowUnsupported
-	Internal            Internal
-	TknInvalid          TknInvalid
-	NotImplemented      NotImplemented
-	ReqInvalid          ReqInvalid
-	EncKeyUnknownAlg    EncKeyUnknownAlg
-	Unavailable         Unavailable
-	UserAlreadyExists   UserAlreadyExists
-	UserInvalid         UserInvalid
-	UserNotFound        UserNotFound
-	UserPasswordEmpty   UserPasswordEmpty
-	UserPasswordTooLong UserPasswordTooLong
+	Type                          SubmitFlowStepErrorResponseType // switch on this field
+	AttAlreadyHandedOff           AttAlreadyHandedOff
+	AttInvalidRequest             AttInvalidRequest
+	AttInvalidState               AttInvalidState
+	AttNotCompleted               AttNotCompleted
+	AttNotFound                   AttNotFound
+	AttProofRejected              AttProofRejected
+	AttStaleChallenge             AttStaleChallenge
+	EncKeyDecryptFailed           EncKeyDecryptFailed
+	EncKeyEncryptFailed           EncKeyEncryptFailed
+	EncKeyNotFound                EncKeyNotFound
+	EvtInvalid                    EvtInvalid
+	FlowCookieExpired             FlowCookieExpired
+	FlowCookieInvalid             FlowCookieInvalid
+	FlowIntegrity                 FlowIntegrity
+	FlowInvalidAction             FlowInvalidAction
+	FlowNotFound                  FlowNotFound
+	FlowRestartRequired           FlowRestartRequired
+	FlowUnsupported               FlowUnsupported
+	IdpEndpointCleartext          IdpEndpointCleartext
+	IdpEndpointsPartial           IdpEndpointsPartial
+	IdpOAuth2Unsupported          IdpOAuth2Unsupported
+	IdpProtocolBlockMissing       IdpProtocolBlockMissing
+	IdpScopesMissingOpenid        IdpScopesMissingOpenid
+	IdpStrategyPointerUnsupported IdpStrategyPointerUnsupported
+	Internal                      Internal
+	TknInvalid                    TknInvalid
+	NotImplemented                NotImplemented
+	ReqInvalid                    ReqInvalid
+	EncKeyUnknownAlg              EncKeyUnknownAlg
+	Unavailable                   Unavailable
+	UserAlreadyExists             UserAlreadyExists
+	UserConflict                  UserConflict
+	UserInvalid                   UserInvalid
+	UserNotFound                  UserNotFound
+	UserPasswordEmpty             UserPasswordEmpty
+	UserPasswordTooLong           UserPasswordTooLong
 }
 
 // SubmitFlowStepErrorResponseType is oneOf type of SubmitFlowStepErrorResponse.
@@ -61806,35 +61923,42 @@ type SubmitFlowStepErrorResponseType string
 
 // Possible values for SubmitFlowStepErrorResponseType.
 const (
-	AttAlreadyHandedOffSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "att.already_handed_off"
-	AttInvalidRequestSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "att.invalid_request"
-	AttInvalidStateSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "att.invalid_state"
-	AttNotCompletedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "att.not_completed"
-	AttNotFoundSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "att.not_found"
-	AttProofRejectedSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "att.proof_rejected"
-	AttStaleChallengeSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "att.stale_challenge"
-	EncKeyDecryptFailedSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "enc_key.decrypt_failed"
-	EncKeyEncryptFailedSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "enc_key.encrypt_failed"
-	EncKeyNotFoundSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "enc_key.not_found"
-	EvtInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "evt.invalid"
-	FlowCookieExpiredSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.cookie_expired"
-	FlowCookieInvalidSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.cookie_invalid"
-	FlowIntegritySubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.integrity"
-	FlowInvalidActionSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.invalid_action"
-	FlowNotFoundSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "flow.not_found"
-	FlowRestartRequiredSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "flow.restart_required"
-	FlowUnsupportedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "flow.unsupported"
-	InternalSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "internal"
-	TknInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "tkn.invalid"
-	NotImplementedSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "not_implemented"
-	ReqInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
-	UnavailableSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "unavailable"
-	UserAlreadyExistsSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "user.already_exists"
-	UserInvalidSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "user.invalid"
-	UserNotFoundSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "user.not_found"
-	UserPasswordEmptySubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "user.password_empty"
-	UserPasswordTooLongSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "user.password_too_long"
+	AttAlreadyHandedOffSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "att.already_handed_off"
+	AttInvalidRequestSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "att.invalid_request"
+	AttInvalidStateSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "att.invalid_state"
+	AttNotCompletedSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "att.not_completed"
+	AttNotFoundSubmitFlowStepErrorResponse                   SubmitFlowStepErrorResponseType = "att.not_found"
+	AttProofRejectedSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "att.proof_rejected"
+	AttStaleChallengeSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "att.stale_challenge"
+	EncKeyDecryptFailedSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyEncryptFailedSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "enc_key.encrypt_failed"
+	EncKeyNotFoundSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "enc_key.not_found"
+	EvtInvalidSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "evt.invalid"
+	FlowCookieExpiredSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "flow.cookie_expired"
+	FlowCookieInvalidSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "flow.cookie_invalid"
+	FlowIntegritySubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "flow.integrity"
+	FlowInvalidActionSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "flow.invalid_action"
+	FlowNotFoundSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "flow.not_found"
+	FlowRestartRequiredSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "flow.restart_required"
+	FlowUnsupportedSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "flow.unsupported"
+	IdpEndpointCleartextSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "idp.endpoint_cleartext"
+	IdpEndpointsPartialSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "idp.endpoints_partial"
+	IdpOAuth2UnsupportedSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "idp.oauth2_unsupported"
+	IdpProtocolBlockMissingSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "idp.protocol_block_missing"
+	IdpScopesMissingOpenidSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "idp.scopes_missing_openid"
+	IdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "idp.strategy_pointer_unsupported"
+	InternalSubmitFlowStepErrorResponse                      SubmitFlowStepErrorResponseType = "internal"
+	TknInvalidSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "tkn.invalid"
+	NotImplementedSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "not_implemented"
+	ReqInvalidSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
+	UnavailableSubmitFlowStepErrorResponse                   SubmitFlowStepErrorResponseType = "unavailable"
+	UserAlreadyExistsSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "user.already_exists"
+	UserConflictSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "user.conflict"
+	UserInvalidSubmitFlowStepErrorResponse                   SubmitFlowStepErrorResponseType = "user.invalid"
+	UserNotFoundSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "user.not_found"
+	UserPasswordEmptySubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "user.password_empty"
+	UserPasswordTooLongSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "user.password_too_long"
 )
 
 // IsAttAlreadyHandedOff reports whether SubmitFlowStepErrorResponse is AttAlreadyHandedOff.
@@ -61927,6 +62051,36 @@ func (s SubmitFlowStepErrorResponse) IsFlowUnsupported() bool {
 	return s.Type == FlowUnsupportedSubmitFlowStepErrorResponse
 }
 
+// IsIdpEndpointCleartext reports whether SubmitFlowStepErrorResponse is IdpEndpointCleartext.
+func (s SubmitFlowStepErrorResponse) IsIdpEndpointCleartext() bool {
+	return s.Type == IdpEndpointCleartextSubmitFlowStepErrorResponse
+}
+
+// IsIdpEndpointsPartial reports whether SubmitFlowStepErrorResponse is IdpEndpointsPartial.
+func (s SubmitFlowStepErrorResponse) IsIdpEndpointsPartial() bool {
+	return s.Type == IdpEndpointsPartialSubmitFlowStepErrorResponse
+}
+
+// IsIdpOAuth2Unsupported reports whether SubmitFlowStepErrorResponse is IdpOAuth2Unsupported.
+func (s SubmitFlowStepErrorResponse) IsIdpOAuth2Unsupported() bool {
+	return s.Type == IdpOAuth2UnsupportedSubmitFlowStepErrorResponse
+}
+
+// IsIdpProtocolBlockMissing reports whether SubmitFlowStepErrorResponse is IdpProtocolBlockMissing.
+func (s SubmitFlowStepErrorResponse) IsIdpProtocolBlockMissing() bool {
+	return s.Type == IdpProtocolBlockMissingSubmitFlowStepErrorResponse
+}
+
+// IsIdpScopesMissingOpenid reports whether SubmitFlowStepErrorResponse is IdpScopesMissingOpenid.
+func (s SubmitFlowStepErrorResponse) IsIdpScopesMissingOpenid() bool {
+	return s.Type == IdpScopesMissingOpenidSubmitFlowStepErrorResponse
+}
+
+// IsIdpStrategyPointerUnsupported reports whether SubmitFlowStepErrorResponse is IdpStrategyPointerUnsupported.
+func (s SubmitFlowStepErrorResponse) IsIdpStrategyPointerUnsupported() bool {
+	return s.Type == IdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse
+}
+
 // IsInternal reports whether SubmitFlowStepErrorResponse is Internal.
 func (s SubmitFlowStepErrorResponse) IsInternal() bool {
 	return s.Type == InternalSubmitFlowStepErrorResponse
@@ -61960,6 +62114,11 @@ func (s SubmitFlowStepErrorResponse) IsUnavailable() bool {
 // IsUserAlreadyExists reports whether SubmitFlowStepErrorResponse is UserAlreadyExists.
 func (s SubmitFlowStepErrorResponse) IsUserAlreadyExists() bool {
 	return s.Type == UserAlreadyExistsSubmitFlowStepErrorResponse
+}
+
+// IsUserConflict reports whether SubmitFlowStepErrorResponse is UserConflict.
+func (s SubmitFlowStepErrorResponse) IsUserConflict() bool {
+	return s.Type == UserConflictSubmitFlowStepErrorResponse
 }
 
 // IsUserInvalid reports whether SubmitFlowStepErrorResponse is UserInvalid.
@@ -62360,6 +62519,132 @@ func NewFlowUnsupportedSubmitFlowStepErrorResponse(v FlowUnsupported) SubmitFlow
 	return s
 }
 
+// SetIdpEndpointCleartext sets SubmitFlowStepErrorResponse to IdpEndpointCleartext.
+func (s *SubmitFlowStepErrorResponse) SetIdpEndpointCleartext(v IdpEndpointCleartext) {
+	s.Type = IdpEndpointCleartextSubmitFlowStepErrorResponse
+	s.IdpEndpointCleartext = v
+}
+
+// GetIdpEndpointCleartext returns IdpEndpointCleartext and true boolean if SubmitFlowStepErrorResponse is IdpEndpointCleartext.
+func (s SubmitFlowStepErrorResponse) GetIdpEndpointCleartext() (v IdpEndpointCleartext, ok bool) {
+	if !s.IsIdpEndpointCleartext() {
+		return v, false
+	}
+	return s.IdpEndpointCleartext, true
+}
+
+// NewIdpEndpointCleartextSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from IdpEndpointCleartext.
+func NewIdpEndpointCleartextSubmitFlowStepErrorResponse(v IdpEndpointCleartext) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetIdpEndpointCleartext(v)
+	return s
+}
+
+// SetIdpEndpointsPartial sets SubmitFlowStepErrorResponse to IdpEndpointsPartial.
+func (s *SubmitFlowStepErrorResponse) SetIdpEndpointsPartial(v IdpEndpointsPartial) {
+	s.Type = IdpEndpointsPartialSubmitFlowStepErrorResponse
+	s.IdpEndpointsPartial = v
+}
+
+// GetIdpEndpointsPartial returns IdpEndpointsPartial and true boolean if SubmitFlowStepErrorResponse is IdpEndpointsPartial.
+func (s SubmitFlowStepErrorResponse) GetIdpEndpointsPartial() (v IdpEndpointsPartial, ok bool) {
+	if !s.IsIdpEndpointsPartial() {
+		return v, false
+	}
+	return s.IdpEndpointsPartial, true
+}
+
+// NewIdpEndpointsPartialSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from IdpEndpointsPartial.
+func NewIdpEndpointsPartialSubmitFlowStepErrorResponse(v IdpEndpointsPartial) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetIdpEndpointsPartial(v)
+	return s
+}
+
+// SetIdpOAuth2Unsupported sets SubmitFlowStepErrorResponse to IdpOAuth2Unsupported.
+func (s *SubmitFlowStepErrorResponse) SetIdpOAuth2Unsupported(v IdpOAuth2Unsupported) {
+	s.Type = IdpOAuth2UnsupportedSubmitFlowStepErrorResponse
+	s.IdpOAuth2Unsupported = v
+}
+
+// GetIdpOAuth2Unsupported returns IdpOAuth2Unsupported and true boolean if SubmitFlowStepErrorResponse is IdpOAuth2Unsupported.
+func (s SubmitFlowStepErrorResponse) GetIdpOAuth2Unsupported() (v IdpOAuth2Unsupported, ok bool) {
+	if !s.IsIdpOAuth2Unsupported() {
+		return v, false
+	}
+	return s.IdpOAuth2Unsupported, true
+}
+
+// NewIdpOAuth2UnsupportedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from IdpOAuth2Unsupported.
+func NewIdpOAuth2UnsupportedSubmitFlowStepErrorResponse(v IdpOAuth2Unsupported) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetIdpOAuth2Unsupported(v)
+	return s
+}
+
+// SetIdpProtocolBlockMissing sets SubmitFlowStepErrorResponse to IdpProtocolBlockMissing.
+func (s *SubmitFlowStepErrorResponse) SetIdpProtocolBlockMissing(v IdpProtocolBlockMissing) {
+	s.Type = IdpProtocolBlockMissingSubmitFlowStepErrorResponse
+	s.IdpProtocolBlockMissing = v
+}
+
+// GetIdpProtocolBlockMissing returns IdpProtocolBlockMissing and true boolean if SubmitFlowStepErrorResponse is IdpProtocolBlockMissing.
+func (s SubmitFlowStepErrorResponse) GetIdpProtocolBlockMissing() (v IdpProtocolBlockMissing, ok bool) {
+	if !s.IsIdpProtocolBlockMissing() {
+		return v, false
+	}
+	return s.IdpProtocolBlockMissing, true
+}
+
+// NewIdpProtocolBlockMissingSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from IdpProtocolBlockMissing.
+func NewIdpProtocolBlockMissingSubmitFlowStepErrorResponse(v IdpProtocolBlockMissing) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetIdpProtocolBlockMissing(v)
+	return s
+}
+
+// SetIdpScopesMissingOpenid sets SubmitFlowStepErrorResponse to IdpScopesMissingOpenid.
+func (s *SubmitFlowStepErrorResponse) SetIdpScopesMissingOpenid(v IdpScopesMissingOpenid) {
+	s.Type = IdpScopesMissingOpenidSubmitFlowStepErrorResponse
+	s.IdpScopesMissingOpenid = v
+}
+
+// GetIdpScopesMissingOpenid returns IdpScopesMissingOpenid and true boolean if SubmitFlowStepErrorResponse is IdpScopesMissingOpenid.
+func (s SubmitFlowStepErrorResponse) GetIdpScopesMissingOpenid() (v IdpScopesMissingOpenid, ok bool) {
+	if !s.IsIdpScopesMissingOpenid() {
+		return v, false
+	}
+	return s.IdpScopesMissingOpenid, true
+}
+
+// NewIdpScopesMissingOpenidSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from IdpScopesMissingOpenid.
+func NewIdpScopesMissingOpenidSubmitFlowStepErrorResponse(v IdpScopesMissingOpenid) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetIdpScopesMissingOpenid(v)
+	return s
+}
+
+// SetIdpStrategyPointerUnsupported sets SubmitFlowStepErrorResponse to IdpStrategyPointerUnsupported.
+func (s *SubmitFlowStepErrorResponse) SetIdpStrategyPointerUnsupported(v IdpStrategyPointerUnsupported) {
+	s.Type = IdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse
+	s.IdpStrategyPointerUnsupported = v
+}
+
+// GetIdpStrategyPointerUnsupported returns IdpStrategyPointerUnsupported and true boolean if SubmitFlowStepErrorResponse is IdpStrategyPointerUnsupported.
+func (s SubmitFlowStepErrorResponse) GetIdpStrategyPointerUnsupported() (v IdpStrategyPointerUnsupported, ok bool) {
+	if !s.IsIdpStrategyPointerUnsupported() {
+		return v, false
+	}
+	return s.IdpStrategyPointerUnsupported, true
+}
+
+// NewIdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from IdpStrategyPointerUnsupported.
+func NewIdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse(v IdpStrategyPointerUnsupported) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetIdpStrategyPointerUnsupported(v)
+	return s
+}
+
 // SetInternal sets SubmitFlowStepErrorResponse to Internal.
 func (s *SubmitFlowStepErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalSubmitFlowStepErrorResponse
@@ -62504,6 +62789,27 @@ func (s SubmitFlowStepErrorResponse) GetUserAlreadyExists() (v UserAlreadyExists
 func NewUserAlreadyExistsSubmitFlowStepErrorResponse(v UserAlreadyExists) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetUserAlreadyExists(v)
+	return s
+}
+
+// SetUserConflict sets SubmitFlowStepErrorResponse to UserConflict.
+func (s *SubmitFlowStepErrorResponse) SetUserConflict(v UserConflict) {
+	s.Type = UserConflictSubmitFlowStepErrorResponse
+	s.UserConflict = v
+}
+
+// GetUserConflict returns UserConflict and true boolean if SubmitFlowStepErrorResponse is UserConflict.
+func (s SubmitFlowStepErrorResponse) GetUserConflict() (v UserConflict, ok bool) {
+	if !s.IsUserConflict() {
+		return v, false
+	}
+	return s.UserConflict, true
+}
+
+// NewUserConflictSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from UserConflict.
+func NewUserConflictSubmitFlowStepErrorResponse(v UserConflict) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUserConflict(v)
 	return s
 }
 

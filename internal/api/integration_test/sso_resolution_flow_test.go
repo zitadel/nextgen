@@ -31,6 +31,9 @@ type ssoResolutionFixture struct {
 	idpFixture
 	team       *domain.Team
 	connection api.IdpResponse
+	// definitionName selects the definition flows start on; empty resolves
+	// by audience.
+	definitionName string
 }
 
 func newSSOResolutionFixture(t *testing.T, connection api.IdpConnection) *ssoResolutionFixture {
@@ -64,6 +67,9 @@ func (f *ssoResolutionFixture) startFlow(t *testing.T, sessionID string) ssoFlow
 	req := &api.CreateFlowRequest{ProjectID: f.projectID(), Purpose: api.CreateFlowRequestPurposeLogin}
 	if sessionID != "" {
 		req.SessionID = api.NewOptString(sessionID)
+	}
+	if f.definitionName != "" {
+		req.FlowDefinitionName = api.NewOptString(f.definitionName)
 	}
 	resp, err := f.client.CreateFlow(t.Context(), req)
 	require.NoError(t, err)
@@ -514,7 +520,7 @@ func TestSSOResolutionAutoCreateRollsBackOnLinkFailure(t *testing.T) {
 	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-taken", emailClaims(), map[string]bool{"email": true})
 	email := helpers.RandString(8) + "@example.com"
 	resolver := service.NewFlowSSOIdentityResolver(
-		harness.EnsureServiceDB(t), harness.EnsureIDPConnectionService(t), harness.EnsureUserService(t), harness.EnsureSchemaStore(t),
+		harness.EnsureServiceDB(t), harness.EnsureIDPConnectionService(t), harness.EnsureUserService(t), harness.EnsureSchemaStore(t), harness.EnsureProjectHashers(t),
 	)
 	parked, ok := f.attempt(t, flow).SSOCallback()
 	require.True(t, ok)
