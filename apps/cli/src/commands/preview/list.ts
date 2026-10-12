@@ -90,7 +90,7 @@ export default class PreviewList extends PreviewCommand {
               ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
               `--page-token ${next}`,
               "--json",
-            ].join(" "),
+            ].join(" ") + this.environmentSelector(),
             cliVersion,
           )
         : undefined;

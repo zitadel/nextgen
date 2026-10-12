@@ -48,7 +48,10 @@ export default class PreviewRm extends PreviewCommand {
 
     if (!force) {
       if (nonInteractive) {
-        const retry = publicCliCommand(`preview rm ${url} --force`, cliVersion);
+        const retry = publicCliCommand(
+          `preview rm ${url} --force${this.environmentSelector()}`,
+          cliVersion,
+        );
         throw new ZitadelError(
           "E_VALIDATION",
           "Removing a preview requires --force in non-interactive mode",
