@@ -1,13 +1,13 @@
 import { CommandGroups, type JsonEnvelope, PreviewCommand, previewFlags } from "../../lib/oclif";
 import {
   buildBundle,
-  configIsDirty,
   createDeployment,
   createReleaseFromBundle,
   headSha,
   runSteps,
   type StepContext,
   validateStep,
+  worktreeIsDirty,
 } from "../../lib/release";
 import { detectPreviewUrls, parseTtl } from "../../lib/preview";
 import { ZitadelError } from "../../lib/errors";
@@ -75,7 +75,7 @@ export default class Preview extends PreviewCommand {
     const ttl = parseTtl(flags.ttl);
     const { client, projectId } = await this.connect();
 
-    const { bundle } = await buildBundle(cwd);
+    const { bundle, brandingSources } = await buildBundle(cwd);
     const ctx: StepContext = {
       cwd,
       client,
@@ -86,6 +86,7 @@ export default class Preview extends PreviewCommand {
       json,
       color,
       bundle,
+      brandingSources,
     };
 
     // Validation only: the IdP sync step is deploy-only, so a pull-request build
@@ -94,7 +95,7 @@ export default class Preview extends PreviewCommand {
 
     const release = await createReleaseFromBundle(client, projectId, bundle, {
       gitSha: await headSha(cwd),
-      gitDirty: await configIsDirty(cwd),
+      gitDirty: await worktreeIsDirty(cwd),
     });
     const deployment = await createDeployment(client, projectId, {
       releaseId: release.id,
