@@ -100,6 +100,7 @@ Environment variables (add secrets with
 | `MASTER_KEY_ID` | Production, Preview | a stable id such as `cloud-2026-10`; rotation adds a new id |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Production; sensitive; optional | a platform admin document (below) |
 | `ENABLE_EXPERIMENTAL_COREPACK` | Production, Preview | `1`: the builds run package scripts that call `pnpm`, which must be the workspace's pinned version |
+| `CLOUD_PRODUCTION_BRANCH` | Production; only while testing a pull request as production | the branch production deploys from; unset means `main` (see Deploying) |
 
 Every other variable is a leftover; delete it. `NEXTGEN_*` variables
 override the launcher's defaults on purpose, so a stale one changes the
@@ -115,12 +116,20 @@ encoded. The server imports it on the next deploy and skips it afterwards.
 ## Deploying
 
 - **Production:** every push to `main`. The `server` build migrates the
-  production branch **before** the deployment goes live. The launcher
-  refuses to migrate production from any other branch, so promoting a
-  preview (which rebuilds with production variables) or a CLI
-  `vercel deploy --prod` from a feature branch fails its build instead of
-  changing the schema. A failed build leaves the previous deployment
-  serving.
+  production database **before** the deployment goes live. The launcher
+  refuses to migrate production from any branch but the production branch
+  (`CLOUD_PRODUCTION_BRANCH`, `main` when unset), so promoting a preview
+  (which rebuilds with production variables) or a CLI `vercel deploy --prod`
+  from a feature branch fails its build instead of changing the schema. A
+  failed build leaves the previous deployment serving.
+- **Testing a pull request as production** before it merges: point the
+  project's production branch (Settings → Environments → Production →
+  Branch Tracking) at the pull request's branch, set
+  `CLOUD_PRODUCTION_BRANCH` (Production) to the same branch, and push. Every
+  push then deploys production from that branch, **migrations included**:
+  only test migrations this way that `main` will receive unchanged.
+  Afterwards point the production branch back at `main` and delete
+  `CLOUD_PRODUCTION_BRANCH`.
 - **Previews:** every push to a branch, if
   [`ignore-build.sh`](../../apps/cloud/ignore-build.sh) finds a change to
   what the deployment runs since the branch's last preview, or since it

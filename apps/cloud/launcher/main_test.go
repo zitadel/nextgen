@@ -25,6 +25,7 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 	t.Helper()
 	for _, key := range []string{
 		"BOOTSTRAP_ADMIN_USER_JSON_B64",
+		"CLOUD_PRODUCTION_BRANCH",
 		"DATABASE_URL",
 		"DATABASE_URL_UNPOOLED",
 		"NEXTGEN_DATABASE_POSTGRES",
@@ -278,14 +279,14 @@ func TestPrepareMigrationUsesTheDirectURL(t *testing.T) {
 	assert.Equal(t, defaultDataDir, os.Getenv("NEXTGEN_SERVER_DATA_DIR"))
 }
 
-func TestPrepareMigrationMigratesProductionOnlyFromMain(t *testing.T) {
+func TestPrepareMigrationMigratesProductionOnlyFromItsBranch(t *testing.T) {
 	setLauncherEnv(t, t.TempDir())
 	t.Setenv("VERCEL_ENV", "production")
 	t.Setenv("DATABASE_URL_UNPOOLED", unpooledURL)
 
 	t.Setenv("VERCEL_GIT_COMMIT_REF", "feature")
 	_, err := prepareMigration(nil)
-	assert.ErrorContains(t, err, `refusing to migrate production from "feature"`)
+	assert.ErrorContains(t, err, `refusing to migrate production from "feature": production deploys from "main"`)
 
 	t.Setenv("VERCEL_GIT_COMMIT_REF", "")
 	_, err = prepareMigration(nil)
@@ -294,6 +295,21 @@ func TestPrepareMigrationMigratesProductionOnlyFromMain(t *testing.T) {
 	t.Setenv("VERCEL_GIT_COMMIT_REF", "main")
 	_, err = prepareMigration(nil)
 	assert.NoError(t, err)
+}
+
+func TestPrepareMigrationFollowsATestedProductionBranch(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("DATABASE_URL_UNPOOLED", unpooledURL)
+	t.Setenv("CLOUD_PRODUCTION_BRANCH", "feature")
+
+	t.Setenv("VERCEL_GIT_COMMIT_REF", "feature")
+	_, err := prepareMigration(nil)
+	assert.NoError(t, err, "the pull request under test deploys production")
+
+	t.Setenv("VERCEL_GIT_COMMIT_REF", "main")
+	_, err = prepareMigration(nil)
+	assert.ErrorContains(t, err, `production deploys from "feature"`, "only one branch migrates production at a time")
 }
 
 func TestPrepareMigrationNeedsTheDirectURLWhenDeployed(t *testing.T) {

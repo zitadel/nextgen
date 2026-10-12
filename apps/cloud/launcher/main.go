@@ -79,6 +79,17 @@ func main() {
 	}
 }
 
+// productionBranch is the branch production deploys from: main, unless
+// CLOUD_PRODUCTION_BRANCH names the pull request branch that is being tested
+// as production before it merges. Vercel does not tell a build which branch
+// the project tracks for production, hence the variable.
+func productionBranch() string {
+	if branch := os.Getenv("CLOUD_PRODUCTION_BRANCH"); branch != "" {
+		return branch
+	}
+	return "main"
+}
+
 // deployed reports whether the process runs in a Vercel deployment, where a
 // missing database URL is a misconfiguration and not a local run that may
 // fall back to the server's SQLite default.
@@ -89,13 +100,14 @@ func deployed(env string) bool {
 // prepareMigration is the deploy-time mode: it points the server's migrate
 // command at the direct URL of the deployment's database. Migrations hold a
 // session advisory lock, which a transaction pooler cannot keep. Production
-// migrates only from main, so a production build of any other branch (a
-// promoted preview, a CLI deploy) fails instead of changing the schema.
+// migrates only from its production branch, so a production build of any
+// other branch (a promoted preview, which Vercel rebuilds with production
+// variables, or a CLI deploy) fails instead of changing the schema.
 func prepareMigration(extra []string) ([]string, error) {
 	env := os.Getenv("VERCEL_ENV")
 	if env == "production" {
-		if ref := os.Getenv("VERCEL_GIT_COMMIT_REF"); ref != "main" {
-			return nil, fmt.Errorf("refusing to migrate production from %q: only main deploys to production", ref)
+		if ref, branch := os.Getenv("VERCEL_GIT_COMMIT_REF"), productionBranch(); ref != branch {
+			return nil, fmt.Errorf("refusing to migrate production from %q: production deploys from %q (CLOUD_PRODUCTION_BRANCH)", ref, branch)
 		}
 	}
 	dsn := os.Getenv("DATABASE_URL_UNPOOLED")
