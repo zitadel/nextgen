@@ -49,9 +49,21 @@ export default class Deploy extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Deploy);
     await this.toMeta(flags);
-    const { cwd, env, dryRun, isTTY } = this.meta;
+    const { cwd, env, dryRun, isTTY, nonInteractive } = this.meta;
     const json = this.jsonEnabled();
     const color = !json && isTTY && flags.color !== false && !process.env.NO_COLOR;
+
+    // A deploy records why it happened. Interactively the reason can be left
+    // off, but a non-interactive caller (CI) has no prompt to fall back on, so
+    // it must name one. Rejected here, before the pipeline writes anything, so
+    // a missing message never leaves a half-synced IdP behind. A dry run makes
+    // no release, so it is exempt.
+    const message = flags.message?.trim() ? flags.message.trim() : undefined;
+    if (nonInteractive && !dryRun && message === undefined) {
+      throw new ZitadelError("E_VALIDATION", "A deploy needs a message in non-interactive mode", {
+        hint: "Pass -m/--message with a short summary of what this release changes.",
+      });
+    }
 
     const { client, projectId } = await this.connect();
 
@@ -105,14 +117,14 @@ export default class Deploy extends EnvironmentCommand {
     }
 
     const release = await createReleaseFromBundle(client, projectId, bundle, {
-      message: flags.message,
+      message,
       gitSha: await headSha(cwd),
       gitDirty: await configIsDirty(cwd),
     });
     const deployment = await createDeployment(client, projectId, {
       releaseId: release.id,
       targets: origin ? [origin] : ["primary"],
-      message: flags.message,
+      message,
     });
 
     const servedOrigins = deployment.targets.map((target) => target.origin);

@@ -37,6 +37,15 @@ export interface Envelope<T = Record<string, unknown>> {
   readonly data: T;
 }
 
+/**
+ * A non-interactive `deploy` needs a `-m` message, so the helpers default one
+ * unless the spec already supplied its own.
+ */
+function withDeployMessage(extraArgs: readonly string[]): string[] {
+  const hasMessage = extraArgs.some((arg) => arg === "-m" || arg === "--message");
+  return hasMessage ? [...extraArgs] : ["-m", "test deploy", ...extraArgs];
+}
+
 /** The data a `deploy` envelope carries, for a deploy expected to succeed. */
 export interface DeployResult {
   readonly content_hash?: string;
@@ -299,7 +308,7 @@ export class ScaffoldedApp {
 
   /** Build a release from `.zitadel/` and deploy it to every primary origin. */
   deploy(extraArgs: string[] = []): Promise<CliResult> {
-    return this.cli(["deploy", "--non-interactive", "--json", ...extraArgs]);
+    return this.cli(["deploy", "--non-interactive", "--json", ...withDeployMessage(extraArgs)]);
   }
 
   /** The envelope data of a deploy expected to succeed (its content digest). */
@@ -316,7 +325,7 @@ export class ScaffoldedApp {
 
   /** `deploy` without `--json`, for a spec asserting what the developer reads. */
   deployRendered(extraArgs: string[] = []): Promise<CliResult> {
-    return this.cli(["deploy", "--non-interactive", ...extraArgs]);
+    return this.cli(["deploy", "--non-interactive", ...withDeployMessage(extraArgs)]);
   }
 
   run(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
