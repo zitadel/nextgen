@@ -43,7 +43,17 @@ configureZitadel({ proxyPath: window.location.origin, projectId: "storybook" });
 //
 // Starting it here costs the atom stories nothing: a worker with no matching
 // handler does not intercept, and the atoms make no requests at all.
-initialize({ onUnhandledRequest: "bypass" });
+//
+// The worker script follows Vite's base. `storybook build` emits a relocatable
+// site (base `./`), which the hosted cloud serves under `/storybook/`
+// (repo-root vercel.json): the worker loads from there and its scope stays
+// inside the prefix. The dev server and the Vitest browser runner have base
+// `/`, so they keep loading `/mockServiceWorker.js`.
+const viteBase = (import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/";
+initialize({
+  onUnhandledRequest: "bypass",
+  serviceWorker: { url: `${viteBase}mockServiceWorker.js` },
+});
 
 const preview: Preview = {
   parameters: {

@@ -27,6 +27,10 @@ moon run storybook:test    # run every story as a real-browser test
 `dev` has no build dependency: `.storybook/main.ts` aliases
 `@zitadel/components` to its source, so atom edits hot-reload.
 
+The hosted cloud serves the static build at `/storybook/`: production from
+`main`, and on the preview of every branch that touches the storybook or the
+packages it builds from ([runbook](../../docs/runbooks/cloud.md)).
+
 ## Coverage
 
 Each atom story file exports `Default` under `Atoms/<Name>`; the orchestrators
