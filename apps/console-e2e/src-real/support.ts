@@ -37,27 +37,75 @@ export async function signIn(
  * lists only the projects a person can act on (`GET /users/me/projects`,
  * #1237) — so without this the project pill and the Projects screen are
  * honestly empty. The grant is the same one a project's admins section creates.
- *
- * Written with the boot-captured project secret from the test process, never
- * from the page: the browser must not see it (see the credential-leak spec).
  */
 export async function grantProjectAdmin(handle: ProjectHandle, userId: string): Promise<void> {
+  await postWithProjectSecret(handle, "/grants", {
+    user: { user_id: userId },
+    relation: "admin",
+  });
+}
+
+/**
+ * Writes an identity provider connection to the instance's project. Writes
+ * stay secret-only (#998), so a spec arranges one here rather than through the
+ * read-only screen. The same slug again appends a revision, so a retried or
+ * parallel test reuses the connection instead of failing on it.
+ */
+export async function createIdpConnection(
+  handle: ProjectHandle,
+  idp: { slug: string; display_name: string; template?: string },
+): Promise<{ id: string }> {
+  return postWithProjectSecret(handle, "/idps", {
+    idp: {
+      ...idp,
+      protocol: "oidc",
+      oidc: {
+        issuer: "https://accounts.google.com",
+        client_id: "${{ E2E_CLIENT_ID }}",
+        client_secret: "${{ E2E_CLIENT_SECRET }}",
+        scopes: ["openid", "profile", "email"],
+      },
+    },
+  }) as Promise<{ id: string }>;
+}
+
+/**
+ * `POST <path>?project_id=…` with the boot-captured project secret, from the
+ * test process — the browser must not see it (see the credential-leak spec).
+ */
+async function postWithProjectSecret(
+  handle: ProjectHandle,
+  path: string,
+  body: unknown,
+): Promise<unknown> {
   const query = new URLSearchParams({ project_id: handle.projectId });
-  const response = await fetch(`${handle.baseUrl}/grants?${query.toString()}`, {
+  const response = await fetch(`${handle.baseUrl}${path}?${query.toString()}`, {
     method: "POST",
     headers: {
       authorization: `Bearer ${handle.projectSecret}`,
       "content-type": "application/json",
     },
-    body: JSON.stringify({ user: { user_id: userId }, relation: "admin" }),
+    body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(`POST /grants answered ${response.status}: ${await response.text()}`);
+    throw new Error(`POST ${path} answered ${response.status}: ${await response.text()}`);
   }
+  return response.json();
 }
 
-/** Copy the route error boundaries render; none of it should appear on a pass. */
-const ERROR_HEADINGS = ["Not authorized", "Something went wrong"];
+/**
+ * The titles the console's error states render (`components/boundaries.tsx`);
+ * none of them should appear on a pass. One list for every lane: a state left
+ * off it — "Console API not authorized" once was — lets a refused request
+ * pass as a loaded screen.
+ */
+const ERROR_STATES = [
+  /^Request failed \(\d+\)$/,
+  /^Not authorized$/,
+  /^Console API not authorized$/,
+  /^Something went wrong$/,
+  /^Not found$/,
+];
 
 /**
  * Asserts no error boundary rendered.
@@ -67,7 +115,7 @@ const ERROR_HEADINGS = ["Not authorized", "Something went wrong"];
  * whole route failed to load.
  */
 export async function expectNoErrorBoundary(page: Page): Promise<void> {
-  for (const heading of ERROR_HEADINGS) {
-    await expect(page.getByText(heading, { exact: true })).toHaveCount(0);
+  for (const title of ERROR_STATES) {
+    await expect(page.getByText(title)).toHaveCount(0);
   }
 }
