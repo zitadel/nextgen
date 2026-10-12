@@ -1,4 +1,4 @@
-import { rm } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import { intro, outro } from "@clack/prompts";
@@ -363,6 +363,22 @@ export default class Setup extends BaseCommand {
       preset: answers.preset,
       useCase: answers.useCase,
     };
+    // The patcher is about to merge this project's id and secrets into the
+    // credential env files. Snapshot each (its content, or null when absent) so
+    // a materialize failure below can restore it: `merge-env` only adds missing
+    // keys, so a leftover file would otherwise keep the abandoned project's
+    // `ZITADEL_PROJECT_ID` and a rerun would target it.
+    const credentialEnvFiles = [".env.local", ".env.development.local"];
+    const envSnapshots = new Map<string, string | null>(
+      await Promise.all(
+        credentialEnvFiles.map(
+          async (file): Promise<[string, string | null]> => [
+            file,
+            await readFile(join(cwd, file), "utf8").catch(() => null),
+          ],
+        ),
+      ),
+    );
     consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
     const result = await orca.patcherFor(framework.id).patch(ctx, { cwd, dryRun, force });
     for (const file of result.filesWritten) {
@@ -401,6 +417,18 @@ export default class Setup extends BaseCommand {
       // and setup neither writes over nor removes one.
       await rm(join(cwd, "zitadel.json"), { force: true });
       await rm(join(cwd, ".zitadel/secret"), { force: true });
+      // The patcher also merged this project's id and secrets into the
+      // credential env files. Restore each to its pre-patch state — its prior
+      // content, or removed when setup created it — so a rerun starts from
+      // clean credentials rather than inheriting the abandoned project's.
+      for (const [file, before] of envSnapshots) {
+        const target = join(cwd, file);
+        if (before === null) {
+          await rm(target, { force: true });
+        } else {
+          await writeFile(target, before);
+        }
+      }
       const cause = toZitadelError(error);
       throw new ZitadelError(cause.code, `Default resource setup failed: ${cause.message}`, {
         // The cause knows its own remedy when it has one -- a file setup

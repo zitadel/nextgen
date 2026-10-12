@@ -166,6 +166,18 @@ describe("setup", () => {
         expect(await app.hasBeenConfigured()).toBe(false);
       });
 
+      it("rolls back the credential env file a failed run created", async () => {
+        const app = await anApp();
+        platform.rejectsSchemaUploads();
+
+        expect(await app.setup()).toFail();
+
+        // setup created `.env.development.local` with the project it had to
+        // abandon; the rollback removes it so a rerun does not inherit the
+        // abandoned project's id (`merge-env` only adds missing keys).
+        await expect(app.readProjectFile(".env.development.local")).rejects.toThrow();
+      });
+
       it("lets a rerun finish what a failed run started", async () => {
         const app = await anApp();
         platform.rejectsSchemaUploads();
