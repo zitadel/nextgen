@@ -1,6 +1,5 @@
 ---
+"@zitadel/server": minor
 ---
 
-Store deployments over origin targets and the previews they create, and
-refuse to revoke a release an origin still serves. The deployment, preview and
-revoke endpoints still answer 501, so nothing ships.
+The database stores deployments over origin targets: each deployment records its release and the origins it covered, and what an origin serves is the newest deployment that named it. Preview URLs are held with their expiry, and a release can be marked revoked, which is refused while any origin still serves it. Existing deployment records are dropped by the migration. The deployment, preview and revoke operations still answer 501.
