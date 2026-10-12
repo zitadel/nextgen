@@ -54,6 +54,24 @@ describe("deploy", () => {
         expect(second.content_hash).toBe(first.content_hash);
       });
 
+      it("requires -m when non-interactive", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+
+        const result = await app.run(["deploy", "--non-interactive", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("rejects a blank -m when non-interactive", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+
+        const result = await app.run(["deploy", "--non-interactive", "--json", "-m", "   "]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("fails when the project has no primary origin", async () => {
         const app = await aSetUpApp();
 
