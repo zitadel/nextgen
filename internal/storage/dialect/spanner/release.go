@@ -9,6 +9,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/deployment"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	"github.com/zitadel/nextgen/internal/storage/release"
 )
@@ -165,15 +166,30 @@ func (rs releaseStatements) ListReleases(ctx context.Context, filter *database.L
 	return &database.ListResult[*domain.Release]{Items: items, NextCursor: nextCursor}, nil
 }
 
-// RevokeRelease implements [service.ReleaseStatements].
-func (rs releaseStatements) RevokeRelease(ctx context.Context, projectID, id string) (*domain.Release, error) {
-	stmt := buildStatement(revokeReleaseStmt, projectID, id).statement()
+// RevokeRelease implements [service.ReleaseStatements]. See the postgres
+// statement; the read-write transaction serializes it with deploys.
+func (rs releaseStatements) RevokeRelease(ctx context.Context, projectID, id string, now time.Time) (*domain.Release, error) {
 	var entity *domain.Release
-	if err := rs.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
-		var err error
-		entity, err = collectOneRow(iter, rs.scanRelease)
-		return err
-	}); err != nil {
+	err := withTransaction(ctx, rs.db, func(ctx context.Context, tx queryExecutor) error {
+		entity = nil
+		if err := lockProject(ctx, tx, projectID); err != nil {
+			return err
+		}
+		serving, err := newDeploymentStatements(tx).collectTargets(ctx, tx, servingTargetsStmt, projectID, id, now)
+		if err != nil {
+			return err
+		}
+		if len(serving) > 0 {
+			return domain.ErrReleaseInUse(deployment.InUseDetails(serving))
+		}
+		stmt := buildStatement(revokeReleaseStmt, projectID, id).statement()
+		return tx.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+			var err error
+			entity, err = collectOneRow(iter, rs.scanRelease)
+			return err
+		})
+	})
+	if err != nil {
 		return nil, err
 	}
 	return entity, nil

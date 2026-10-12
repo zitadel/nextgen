@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _DeploymentReasonName = "deploypromoterollback"
+const _DeploymentReasonName = "deployrollback"
 
-var _DeploymentReasonIndex = [...]uint8{0, 6, 13, 21}
+var _DeploymentReasonIndex = [...]uint8{0, 6, 14}
 
-const _DeploymentReasonLowerName = "deploypromoterollback"
+const _DeploymentReasonLowerName = "deployrollback"
 
 func (i DeploymentReason) String() string {
 	if i >= DeploymentReason(len(_DeploymentReasonIndex)-1) {
@@ -26,25 +26,21 @@ func (i DeploymentReason) String() string {
 func _DeploymentReasonNoOp() {
 	var x [1]struct{}
 	_ = x[DeploymentReasonDeploy-(0)]
-	_ = x[DeploymentReasonPromote-(1)]
-	_ = x[DeploymentReasonRollback-(2)]
+	_ = x[DeploymentReasonRollback-(1)]
 }
 
-var _DeploymentReasonValues = []DeploymentReason{DeploymentReasonDeploy, DeploymentReasonPromote, DeploymentReasonRollback}
+var _DeploymentReasonValues = []DeploymentReason{DeploymentReasonDeploy, DeploymentReasonRollback}
 
 var _DeploymentReasonNameToValueMap = map[string]DeploymentReason{
-	_DeploymentReasonName[0:6]:        DeploymentReasonDeploy,
-	_DeploymentReasonLowerName[0:6]:   DeploymentReasonDeploy,
-	_DeploymentReasonName[6:13]:       DeploymentReasonPromote,
-	_DeploymentReasonLowerName[6:13]:  DeploymentReasonPromote,
-	_DeploymentReasonName[13:21]:      DeploymentReasonRollback,
-	_DeploymentReasonLowerName[13:21]: DeploymentReasonRollback,
+	_DeploymentReasonName[0:6]:       DeploymentReasonDeploy,
+	_DeploymentReasonLowerName[0:6]:  DeploymentReasonDeploy,
+	_DeploymentReasonName[6:14]:      DeploymentReasonRollback,
+	_DeploymentReasonLowerName[6:14]: DeploymentReasonRollback,
 }
 
 var _DeploymentReasonNames = []string{
 	_DeploymentReasonName[0:6],
-	_DeploymentReasonName[6:13],
-	_DeploymentReasonName[13:21],
+	_DeploymentReasonName[6:14],
 }
 
 // DeploymentReasonString retrieves an enum value from the enum constants string name.

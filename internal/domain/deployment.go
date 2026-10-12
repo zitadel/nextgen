@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"slices"
 	"strings"
 	"time"
 )
@@ -9,17 +10,30 @@ const (
 	PrefixDeployment ResourcePrefix = "dep"
 )
 
-// DeploymentReason records why a deployment was created. All three are the
-// same operation — a new deployment pointing the environment at a release —
-// and the reason keeps the caller's intent on the record.
+// MaxDeploymentTargets caps the origins one deployment covers.
+const MaxDeploymentTargets = 50
+
+// DeploymentReason records why a deployment was created. Both are the same
+// operation — a new deployment pointing its targets at a release — and the
+// reason keeps the caller's intent on the record.
 //
 //go:generate go tool enumer -type DeploymentReason -transform snake -trimprefix DeploymentReason -sql
 type DeploymentReason uint8
 
 const (
 	DeploymentReasonDeploy DeploymentReason = iota
-	DeploymentReasonPromote
 	DeploymentReasonRollback
+)
+
+// DeploymentTargetKind says what the targets of a deployment are: primary
+// origins of the project, or preview URLs. One deployment never mixes them.
+//
+//go:generate go tool enumer -type DeploymentTargetKind -transform snake -trimprefix DeploymentTargetKind -sql
+type DeploymentTargetKind uint8
+
+const (
+	DeploymentTargetKindPrimary DeploymentTargetKind = iota
+	DeploymentTargetKindPreview
 )
 
 func ErrDeploymentInvalid(details any, parent error) Error {
@@ -34,26 +48,25 @@ func ErrDeploymentPermissionDenied() Error {
 	return newError(PrefixDeployment.ErrorCodePrefix("permission_denied"), "deployment: requires an operator-grade token bound to the project (project.write or a deployment.* scope)", nil, nil)
 }
 
-// DeploymentConflictDetails is the payload of ErrDeploymentConflict: what the
-// environment actually runs, so the caller can decide whether to retry on top
-// of it. Both fields are empty when the environment has no deployment yet.
+// DeploymentConflictDetails is the payload of ErrDeploymentConflict: the
+// newest deployment to any of the targets, so the caller can decide whether to
+// retry on top of it. Deployment is nil when nothing was ever deployed there.
 type DeploymentConflictDetails struct {
-	CurrentDeploymentID string `json:"current_deployment_id,omitempty"`
-	CurrentReleaseID    string `json:"current_release_id,omitempty"`
+	Deployment *Deployment `json:"deployment"`
 }
 
-// ErrDeploymentConflict reports a failed expected_current_deployment_id
-// check: the environment's current deployment is not the one the caller
-// expected, and nothing was changed.
+// ErrDeploymentConflict reports a failed expected_deployment_id check: the
+// newest deployment to the targets is not the one the caller expected, and
+// nothing was changed.
 func ErrDeploymentConflict(details DeploymentConflictDetails) Error {
-	return newError(PrefixDeployment.ErrorCodePrefix("conflict"), "deployment: the environment's current deployment does not match expected_current_deployment_id", details, nil)
+	return newError(PrefixDeployment.ErrorCodePrefix("conflict"), "deployment: the newest deployment to the targets does not match expected_deployment_id", details, nil)
 }
 
 // DeploymentMetadata records why the release went live and who made it
 // happen. Set at creation and never mutated. Everything here is enrichment —
-// the ids and timestamp on the deployment itself say what ran where and when
-// — which is why it lives in one document rather than in columns: nothing
-// filters or orders on it, and a new field costs no migration.
+// the ids, targets and timestamp on the deployment itself say what ran where
+// and when — which is why it lives in one document rather than in columns:
+// nothing filters or orders on it, and a new field costs no migration.
 //
 // DeployedBy and DeployedByType mirror the actor recording on releases: a
 // caller without a user identity (for example, a project secret used from CI)
@@ -62,31 +75,43 @@ type DeploymentMetadata struct {
 	Reason DeploymentReason
 	// Message is the caller's summary of why this deployment happened,
 	// analogous to a git commit message.
-	Message             *string
-	SourceEnvironmentID *string
-	// SourceEnvironmentName is the name the source environment had at
-	// deployment time — a snapshot for reading the history, never
-	// re-resolved. The id is the identity.
-	SourceEnvironmentName *string
-	DeployedBy            *string
-	DeployedByType        *EventActorType
+	Message *string
+	// RollbackTo names the deployment a rollback re-applied.
+	RollbackTo     *string
+	DeployedBy     *string
+	DeployedByType *EventActorType
+}
+
+// DeploymentTarget is one origin a deployment covered.
+type DeploymentTarget struct {
+	Origin string
 }
 
 // Deployment is an immutable, project-scoped record of a release being made
-// live on an environment. Rows are append-only: one is written when the
-// environment starts running the release and never changes afterwards.
+// live on a set of targets. Rows are append-only: one is written, with every
+// target, when the targets start serving the release, and never changes
+// afterwards. What a target serves is the newest deployment that names it.
 //
-// Environments are referenced by id. Names are resolved before the entity is
-// built, so renaming an environment later does not reattach its history, and
-// the metadata's SourceEnvironmentID may name an environment that has since
-// been deleted.
+// Targets are origin strings, not references: an origin keeps its history
+// after the pattern or preview that admitted it is gone. Targets are sorted by
+// origin.
 type Deployment struct {
-	ProjectID     string
-	ID            string
-	EnvironmentID string
-	ReleaseID     string
-	Metadata      DeploymentMetadata
-	DeployedAt    time.Time
+	ProjectID  string
+	ID         string
+	ReleaseID  string
+	TargetKind DeploymentTargetKind
+	Targets    []DeploymentTarget
+	Metadata   DeploymentMetadata
+	DeployedAt time.Time
+}
+
+// Origins returns the target origins in order.
+func (d *Deployment) Origins() []string {
+	origins := make([]string, len(d.Targets))
+	for i, target := range d.Targets {
+		origins[i] = target.Origin
+	}
+	return origins
 }
 
 // DeploymentField enumerates the fields of Deployment which can be used for
@@ -98,43 +123,68 @@ const (
 	DeploymentFieldUnspecified DeploymentField = iota
 	DeploymentFieldProjectID
 	DeploymentFieldID
-	DeploymentFieldEnvironmentID
 	DeploymentFieldReleaseID
 	DeploymentFieldDeployedAt
+	// DeploymentFieldOrigin matches the deployments that named an origin. It
+	// filters, never orders.
+	DeploymentFieldOrigin
+	// DeploymentFieldLive matches the deployments that some target still
+	// serves: the newest deployment to at least one of their targets. It
+	// filters, never orders.
+	DeploymentFieldLive
 )
 
-// NewDeployment validates the record. The ID is left empty for the dialect to
-// mint, and DeployedAt is stamped by the insert. The ids are already resolved
-// — the API edge turns environment names into ids before building the entity.
+// NewDeployment validates the record and puts its targets in canonical order.
+// The ID is left empty for the dialect to mint, and DeployedAt is stamped by
+// the insert. The release is already resolved to its id and the targets to
+// exact origins.
 //
 // A zero metadata is a plain deploy: DeploymentReasonDeploy is the zero value
 // of the enum, matching the wire default.
-func NewDeployment(projectID, environmentID, releaseID string, metadata DeploymentMetadata) (*Deployment, error) {
+func NewDeployment(projectID, releaseID string, kind DeploymentTargetKind, origins []string, metadata DeploymentMetadata) (*Deployment, error) {
 	if !metadata.Reason.IsADeploymentReason() {
 		return nil, ErrDeploymentInvalid("unknown reason", nil)
 	}
-	if strings.TrimSpace(environmentID) == "" {
-		return nil, ErrDeploymentInvalid("an environment is required", nil)
+	if !kind.IsADeploymentTargetKind() {
+		return nil, ErrDeploymentInvalid("unknown target kind", nil)
 	}
 	if strings.TrimSpace(releaseID) == "" {
 		return nil, ErrDeploymentInvalid("a release_id is required", nil)
 	}
-
-	// source_environment means "where the release was promoted from", so it
-	// is required exactly when there is a promotion to record and rejected
-	// otherwise rather than silently dropped.
-	if metadata.Reason == DeploymentReasonPromote {
-		if metadata.SourceEnvironmentID == nil || strings.TrimSpace(*metadata.SourceEnvironmentID) == "" {
-			return nil, ErrDeploymentInvalid("reason promote requires source_environment", nil)
+	if len(origins) == 0 {
+		return nil, ErrDeploymentInvalid("at least one target is required", nil)
+	}
+	for _, origin := range origins {
+		if strings.TrimSpace(origin) == "" {
+			return nil, ErrDeploymentInvalid("a target origin is empty", nil)
 		}
-	} else if metadata.SourceEnvironmentID != nil || metadata.SourceEnvironmentName != nil {
-		return nil, ErrDeploymentInvalid("source_environment is only valid with reason promote", nil)
+	}
+	// Sorts into a new slice: the caller's argument is not ours to reorder.
+	sorted := slices.Compact(slices.Sorted(slices.Values(origins)))
+	if len(sorted) > MaxDeploymentTargets {
+		return nil, ErrDeploymentInvalid("a deployment covers at most 50 targets", nil)
 	}
 
+	// rollback_to names what a rollback re-applied, so it is required exactly
+	// when there is a rollback to record and rejected otherwise rather than
+	// silently dropped.
+	if metadata.Reason == DeploymentReasonRollback {
+		if metadata.RollbackTo == nil || strings.TrimSpace(*metadata.RollbackTo) == "" {
+			return nil, ErrDeploymentInvalid("reason rollback requires rollback_to", nil)
+		}
+	} else if metadata.RollbackTo != nil {
+		return nil, ErrDeploymentInvalid("rollback_to is only valid with reason rollback", nil)
+	}
+
+	targets := make([]DeploymentTarget, len(sorted))
+	for i, origin := range sorted {
+		targets[i] = DeploymentTarget{Origin: origin}
+	}
 	return &Deployment{
-		ProjectID:     projectID,
-		EnvironmentID: environmentID,
-		ReleaseID:     releaseID,
-		Metadata:      metadata,
+		ProjectID:  projectID,
+		ReleaseID:  releaseID,
+		TargetKind: kind,
+		Targets:    targets,
+		Metadata:   metadata,
 	}, nil
 }

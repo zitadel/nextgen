@@ -33,6 +33,7 @@ type AllStatements interface {
 	IDPConnectionStatements
 	IDPIdentityLinkStatements
 	DeploymentStatements
+	PreviewStatements
 	TeamStatements
 	TeamMembershipStatements
 	TokenStatements
@@ -150,8 +151,12 @@ type ReleaseStatements interface {
 	GetReleasesByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Release, error)
 	ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error)
 	// RevokeRelease stamps revoked_at and returns the release. Revoking a
-	// revoked release changes nothing and returns the first stamp.
-	RevokeRelease(ctx context.Context, projectID, id string) (*domain.Release, error)
+	// revoked release changes nothing and returns the first stamp. While any
+	// origin still serves the release at now, nothing is written and
+	// domain.ErrReleaseInUse names those origins; the check is serialised
+	// with CreateDeployment, so no deploy can make the release live under a
+	// revoke.
+	RevokeRelease(ctx context.Context, projectID, id string, now time.Time) (*domain.Release, error)
 }
 
 // IDPConnectionStatements persists identity provider connections and their
@@ -217,23 +222,58 @@ type IDPIdentityLinkStatements interface {
 
 type DeploymentStatements interface {
 	Statements
-	// CreateDeployment inserts the deployment and points the environment's
-	// current_deployment_id at it, atomically. A non-nil
-	// expectedCurrentDeploymentID makes the swap conditional: when the
-	// environment's current deployment is not exactly that one, nothing is
-	// written and domain.ErrDeploymentConflict reports what actually runs.
-	// An environment that does not exist is a NoRowFoundError.
+	// CreateDeployment writes the deployment with every one of its targets,
+	// or nothing. Concurrent creates in one project are serialised, so the
+	// newer deployment is the one stamped later.
 	//
-	// Idempotent on the running release: when the environment's current
-	// deployment already points at entity's release, nothing is written,
-	// entity is overwritten with that existing record, and created is false.
-	CreateDeployment(ctx context.Context, entity *domain.Deployment, expectedCurrentDeploymentID *string) (created bool, err error)
+	// A non-nil expectedDeploymentID makes the write conditional: when the
+	// newest deployment to any of the targets is not exactly that one,
+	// nothing is written and domain.ErrDeploymentConflict carries the
+	// actual newest deployment. A project that does not exist is a
+	// NoRowFoundError.
+	//
+	// Idempotent on what the targets serve: when every target's newest
+	// deployment already uses entity's release, nothing is written, entity
+	// is overwritten with the newest deployment to the targets, and created
+	// is false.
+	//
+	// A deployment to preview URLs creates or renews the preview of each
+	// target, expiring previewTTL after deployed_at.
+	CreateDeployment(ctx context.Context, entity *domain.Deployment, expectedDeploymentID *string, previewTTL time.Duration) (created bool, err error)
 	GetDeploymentByID(ctx context.Context, projectID, id string) (*domain.Deployment, error)
-	// GetDeploymentsByIDs reads the named deployments in one round trip, for
-	// hydrating current_deployment on environment reads. Unknown ids are
-	// simply absent from the result, not an error.
+	// GetDeploymentsByIDs reads the named deployments in one round trip.
+	// Unknown ids are simply absent from the result, not an error.
 	GetDeploymentsByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Deployment, error)
+	// ListDeployments lists deployments with every target they named. With
+	// the origin filter it is that origin's history, newest first.
 	ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
+	// ListLiveDeployments is the live view at now, built with
+	// deployment.LiveListOptions: the deployments some target still serves,
+	// each narrowed to the targets it serves.
+	ListLiveDeployments(ctx context.Context, now time.Time, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
+	// NewestDeployment is the deployment origin serves: the newest that named
+	// it. Nothing deployed there is a NoRowFoundError.
+	NewestDeployment(ctx context.Context, projectID, origin string) (*domain.Deployment, error)
+	// DeploymentAt is the deployment origin served at an instant: the newest
+	// that named it no later than at. Nothing deployed there by then is a
+	// NoRowFoundError.
+	DeploymentAt(ctx context.Context, projectID, origin string, at time.Time) (*domain.Deployment, error)
+}
+
+// PreviewStatements persists previews. Deployments create and renew them
+// (see DeploymentStatements.CreateDeployment); these read and remove them.
+type PreviewStatements interface {
+	Statements
+	GetPreview(ctx context.Context, projectID, origin string) (*domain.Preview, error)
+	// ListPreviews lists with preview.LiveListOptions or
+	// preview.ExpiredListOptions.
+	ListPreviews(ctx context.Context, filter *database.ListOptions[domain.PreviewField]) (*database.ListResult[*domain.Preview], error)
+	// DeletePreview removes a preview early. Removing one that is gone is not
+	// an error; deleted reports whether a row went.
+	DeletePreview(ctx context.Context, projectID, origin string) (deleted bool, err error)
+	// DeleteExpiredPreview sweeps a preview only if it expired by now, so a
+	// renewal racing the sweep survives it.
+	DeleteExpiredPreview(ctx context.Context, projectID, origin string, now time.Time) (deleted bool, err error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

@@ -3,10 +3,12 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/deployment"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	"github.com/zitadel/nextgen/internal/storage/release"
 )
@@ -142,18 +144,33 @@ func (rs releaseStatements) ListReleases(ctx context.Context, filter *database.L
 	return &database.ListResult[*domain.Release]{Items: items, NextCursor: nextCursor}, nil
 }
 
-// RevokeRelease implements [service.ReleaseStatements].
-func (rs releaseStatements) RevokeRelease(ctx context.Context, projectID, id string) (*domain.Release, error) {
-	rows, err := rs.client.Query(ctx, revokeReleaseStmt, nowUnixNano(), projectID, id)
+// RevokeRelease implements [service.ReleaseStatements]. See the postgres
+// statement.
+func (rs releaseStatements) RevokeRelease(ctx context.Context, projectID, id string, now time.Time) (*domain.Release, error) {
+	var entity *domain.Release
+	err := withTransaction(ctx, rs.client, func(ctx context.Context, tx queryExecutor) error {
+		if err := lockProject(ctx, tx, projectID); err != nil {
+			return err
+		}
+		serving, err := newDeploymentStatements(tx).collectTargets(ctx, tx, servingTargetsStmt, projectID, id, now.UnixNano())
+		if err != nil {
+			return err
+		}
+		if len(serving) > 0 {
+			return domain.ErrReleaseInUse(deployment.InUseDetails(serving))
+		}
+		rows, err := tx.Query(ctx, revokeReleaseStmt, nowUnixNano(), projectID, id)
+		if err != nil {
+			return wrapError(err)
+		}
+		defer rows.Close()
+		entity, err = collectExactlyOneRow(rows, scanRelease)
+		return wrapError(err)
+	})
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, err
 	}
-	defer rows.Close()
-	item, err := collectExactlyOneRow(rows, scanRelease)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	return item, nil
+	return entity, nil
 }
 
 func scanRelease(rows *sql.Rows) (*domain.Release, error) {

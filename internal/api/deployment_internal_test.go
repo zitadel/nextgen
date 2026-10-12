@@ -31,19 +31,15 @@ func TestDeploymentErrorResponseStatuses(t *testing.T) {
 // The 409 exists so the caller can retry on top of what actually runs, which
 // only works if the conflict's payload survives into the response envelope.
 func TestDeploymentConflictCarriesDetails(t *testing.T) {
-	details := domain.DeploymentConflictDetails{
-		CurrentDeploymentID: "dep_current",
-		CurrentReleaseID:    "rel_current",
-	}
-	resp := deploymentErrorResponse(domain.ErrDeploymentConflict(details))
+	// Nothing deployed to the targets yet: the payload says so with a null
+	// deployment rather than dropping the key.
+	resp := deploymentErrorResponse(domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}))
 	require.Equal(t, http.StatusConflict, resp.StatusCode)
 	// Producer-attached details ride the legacy details.details slot
 	// (ADR 030).
 	raw, ok := resp.Response.Details.Value["details"]
 	require.True(t, ok, "conflict payload missing from details.details")
-	assert.JSONEq(t,
-		`{"current_deployment_id":"dep_current","current_release_id":"rel_current"}`,
-		string(raw))
+	assert.JSONEq(t, `{"deployment":null}`, string(raw))
 }
 
 // Pins the deployment resource-flavored answers through the resolver gate,

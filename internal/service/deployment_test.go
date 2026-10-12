@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,16 +36,17 @@ func newMockedDeploymentService(t *testing.T) (*service.DeploymentService, *serv
 
 func deploymentInput() service.CreateDeploymentInput {
 	return service.CreateDeploymentInput{
-		ProjectID:     "proj_1",
-		EnvironmentID: "env_1",
-		ReleaseID:     "rel_1",
-		Reason:        domain.DeploymentReasonDeploy,
+		ProjectID:  "proj_1",
+		ReleaseID:  "rel_1",
+		TargetKind: domain.DeploymentTargetKindPrimary,
+		Origins:    []string{"https://app.acme.com"},
+		Reason:     domain.DeploymentReasonDeploy,
 	}
 }
 
 func TestDeploymentServiceCreateRecordsActor(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
-	statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Nil()).Return(true, nil)
+	statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Nil(), gomock.Any()).Return(true, nil)
 
 	ctx := audit.WithActorContext(t.Context(), audit.ActorContext{
 		ActorID:   new("user_1"),
@@ -61,7 +63,7 @@ func TestDeploymentServiceCreateRecordsActor(t *testing.T) {
 // records neither field, rather than falling back to a placeholder identity.
 func TestDeploymentServiceCreateWithoutActor(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
-	statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Nil()).Return(true, nil)
+	statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Nil(), gomock.Any()).Return(true, nil)
 
 	result, err := svc.Create(t.Context(), deploymentInput())
 	require.NoError(t, err)
@@ -69,35 +71,37 @@ func TestDeploymentServiceCreateWithoutActor(t *testing.T) {
 	assert.Nil(t, result.Deployment.Metadata.DeployedByType)
 }
 
-// The guard rides through to the statement untouched and unpersisted.
-func TestDeploymentServiceCreatePassesExpectedCurrent(t *testing.T) {
+// The guard and the preview ttl ride through to the statement untouched and
+// unpersisted.
+func TestDeploymentServiceCreatePassesGuardAndTTL(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
 	expected := "dep_current"
 	statements.EXPECT().
-		CreateDeployment(gomock.Any(), gomock.Any(), &expected).
+		CreateDeployment(gomock.Any(), gomock.Any(), &expected, 168*time.Hour).
 		Return(true, nil)
 
 	input := deploymentInput()
-	input.ExpectedCurrentDeploymentID = &expected
+	input.ExpectedDeploymentID = &expected
+	input.PreviewTTL = 168 * time.Hour
 	_, err := svc.Create(t.Context(), input)
 	require.NoError(t, err)
 }
 
 func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
-	t.Run("environment missing", func(t *testing.T) {
+	t.Run("project missing", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		statements.EXPECT().
-			CreateDeployment(gomock.Any(), gomock.Any(), gomock.Nil()).
+			CreateDeployment(gomock.Any(), gomock.Any(), gomock.Nil(), gomock.Any()).
 			Return(false, new(database.NoRowFoundError))
 
 		_, err := svc.Create(t.Context(), deploymentInput())
-		assertServiceDomainCode(t, err, domain.ErrEnvironmentNotFound().Code)
+		assertServiceDomainCode(t, err, domain.ErrProjectNotFound().Code)
 	})
 
 	t.Run("release missing", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		statements.EXPECT().
-			CreateDeployment(gomock.Any(), gomock.Any(), gomock.Nil()).
+			CreateDeployment(gomock.Any(), gomock.Any(), gomock.Nil(), gomock.Any()).
 			Return(false, new(database.ForeignKeyError))
 
 		_, err := svc.Create(t.Context(), deploymentInput())
@@ -109,11 +113,10 @@ func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
 	t.Run("conflict passes through", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		conflict := domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{
-			CurrentDeploymentID: "dep_actual",
-			CurrentReleaseID:    "rel_actual",
+			Deployment: &domain.Deployment{ProjectID: "proj_1", ID: "dep_actual", ReleaseID: "rel_actual"},
 		})
 		statements.EXPECT().
-			CreateDeployment(gomock.Any(), gomock.Any(), gomock.Nil()).
+			CreateDeployment(gomock.Any(), gomock.Any(), gomock.Nil(), gomock.Any()).
 			Return(false, conflict)
 
 		_, err := svc.Create(t.Context(), deploymentInput())
@@ -123,12 +126,12 @@ func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
 		assert.Equal(t, conflict.Details, de.Details)
 	})
 
-	// Validation fails before any statement runs: promote without a source
+	// Validation fails before any statement runs: a rollback naming nothing
 	// never reaches storage.
 	t.Run("invalid input never reaches storage", func(t *testing.T) {
 		svc, _ := newMockedDeploymentService(t)
 		input := deploymentInput()
-		input.Reason = domain.DeploymentReasonPromote
+		input.Reason = domain.DeploymentReasonRollback
 		_, err := svc.Create(t.Context(), input)
 		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid(nil, nil).Code)
 	})
@@ -187,11 +190,11 @@ func TestDeploymentServiceListWithoutExpand(t *testing.T) {
 }
 
 // The idempotent answer reports Created false, so the handler can answer 200
-// with the deployment that made the release live.
+// with the newest deployment to the targets.
 func TestDeploymentServiceCreateReportsReuse(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
 	statements.EXPECT().
-		CreateDeployment(gomock.Any(), gomock.Any(), gomock.Nil()).
+		CreateDeployment(gomock.Any(), gomock.Any(), gomock.Nil(), gomock.Any()).
 		Return(false, nil)
 
 	result, err := svc.Create(t.Context(), deploymentInput())

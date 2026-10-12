@@ -241,16 +241,15 @@ func ReleasePayloadSnapshot(rel *Release) ReleasePayload {
 	return payload
 }
 
-// DeploymentPayload records what went live where. It carries ids, not names:
-// the ids survive environment renames and, unlike the deployments table, this
-// event has no foreign key — so the audit trail of a deleted environment
-// lives on here (ADR 061).
+// DeploymentPayload records what went live where. It carries ids and
+// origins, not names, and this event has no foreign key, so the audit trail
+// outlives whatever the targets named (ADR 061).
 type DeploymentPayload struct {
-	EnvironmentID       string `json:"environment_id,omitempty"`
-	ReleaseID           string `json:"release_id,omitempty"`
-	Reason              string `json:"reason,omitempty"`
-	Message             string `json:"message,omitempty"`
-	SourceEnvironmentID string `json:"source_environment_id,omitempty"`
+	ReleaseID  string   `json:"release_id,omitempty"`
+	Targets    []string `json:"targets,omitempty"`
+	Reason     string   `json:"reason,omitempty"`
+	Message    string   `json:"message,omitempty"`
+	RollbackTo string   `json:"rollback_to,omitempty"`
 }
 
 type DeploymentCreatedPayload = DeploymentPayload
@@ -262,15 +261,15 @@ func DeploymentPayloadSnapshot(dep *Deployment) DeploymentPayload {
 		return DeploymentPayload{}
 	}
 	payload := DeploymentPayload{
-		EnvironmentID: dep.EnvironmentID,
-		ReleaseID:     dep.ReleaseID,
-		Reason:        dep.Metadata.Reason.String(),
+		ReleaseID: dep.ReleaseID,
+		Targets:   dep.Origins(),
+		Reason:    dep.Metadata.Reason.String(),
 	}
 	if dep.Metadata.Message != nil {
 		payload.Message = *dep.Metadata.Message
 	}
-	if dep.Metadata.SourceEnvironmentID != nil {
-		payload.SourceEnvironmentID = *dep.Metadata.SourceEnvironmentID
+	if dep.Metadata.RollbackTo != nil {
+		payload.RollbackTo = *dep.Metadata.RollbackTo
 	}
 	return payload
 }

@@ -2,12 +2,14 @@ package postgres
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/deployment"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	"github.com/zitadel/nextgen/internal/storage/release"
 )
@@ -144,14 +146,31 @@ func (rs releaseStatements) ListReleases(ctx context.Context, filter *database.L
 }
 
 // RevokeRelease implements [service.ReleaseStatements].
-func (rs releaseStatements) RevokeRelease(ctx context.Context, projectID, id string) (*domain.Release, error) {
-	rows, err := rs.client.Query(ctx, revokeReleaseStmt, projectID, id)
+//
+// Under the project lock a deploy takes too, so the release cannot go live
+// between the in-use check and the stamp.
+func (rs releaseStatements) RevokeRelease(ctx context.Context, projectID, id string, now time.Time) (*domain.Release, error) {
+	var entity *domain.Release
+	err := withTransaction(ctx, rs.client, func(ctx context.Context, tx queryExecutor) error {
+		if err := lockProject(ctx, tx, projectID); err != nil {
+			return err
+		}
+		serving, err := newDeploymentStatements(tx).collectTargets(ctx, tx, servingTargetsStmt, projectID, id, now)
+		if err != nil {
+			return err
+		}
+		if len(serving) > 0 {
+			return domain.ErrReleaseInUse(deployment.InUseDetails(serving))
+		}
+		rows, err := tx.Query(ctx, revokeReleaseStmt, projectID, id)
+		if err != nil {
+			return wrapError(err)
+		}
+		entity, err = pgx.CollectExactlyOneRow(rows, scanRelease)
+		return wrapError(err)
+	})
 	if err != nil {
-		return nil, wrapError(err)
-	}
-	entity, err := pgx.CollectExactlyOneRow(rows, scanRelease)
-	if err != nil {
-		return nil, wrapError(err)
+		return nil, err
 	}
 	return entity, nil
 }

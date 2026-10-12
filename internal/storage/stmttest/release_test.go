@@ -253,7 +253,7 @@ func TestReleaseStatements_Revoke(t *testing.T) {
 		entity := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{Message: new("first")})
 		assert.Nil(t, entity.RevokedAt)
 
-		revoked, err := d.stmts.RevokeRelease(t.Context(), projectID, entity.ID)
+		revoked, err := d.stmts.RevokeRelease(t.Context(), projectID, entity.ID, time.Now())
 		require.NoError(t, err)
 		require.NotNil(t, revoked.RevokedAt)
 		assert.WithinDuration(t, time.Now(), *revoked.RevokedAt, 5*time.Second)
@@ -289,11 +289,11 @@ func TestReleaseStatements_RevokeTwiceKeepsFirstStamp(t *testing.T) {
 		projectID := ensureReleaseProject(t, d.stmts)
 		entity := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
 
-		first, err := d.stmts.RevokeRelease(t.Context(), projectID, entity.ID)
+		first, err := d.stmts.RevokeRelease(t.Context(), projectID, entity.ID, time.Now())
 		require.NoError(t, err)
 		require.NotNil(t, first.RevokedAt)
 
-		second, err := d.stmts.RevokeRelease(t.Context(), projectID, entity.ID)
+		second, err := d.stmts.RevokeRelease(t.Context(), projectID, entity.ID, time.Now())
 		require.NoError(t, err)
 		require.NotNil(t, second.RevokedAt)
 		assert.True(t, first.RevokedAt.Equal(*second.RevokedAt),
@@ -308,7 +308,7 @@ func TestReleaseStatements_RevokeTouchesOnlyTheNamedRelease(t *testing.T) {
 		target := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
 		sibling := createRelease(t, d.stmts, projectID, "0002", domain.ReleaseMetadata{})
 
-		_, err := d.stmts.RevokeRelease(t.Context(), projectID, target.ID)
+		_, err := d.stmts.RevokeRelease(t.Context(), projectID, target.ID, time.Now())
 		require.NoError(t, err)
 
 		got, err := d.stmts.GetReleaseByID(t.Context(), projectID, sibling.ID)
@@ -325,10 +325,10 @@ func TestReleaseStatements_RevokeUnknownIsNoRowFound(t *testing.T) {
 		otherProject := ensureReleaseProject(t, d.stmts)
 		foreign := createRelease(t, d.stmts, otherProject, "0001", domain.ReleaseMetadata{})
 
-		_, err := d.stmts.RevokeRelease(t.Context(), projectID, "rel_does_not_exist")
+		_, err := d.stmts.RevokeRelease(t.Context(), projectID, "rel_does_not_exist", time.Now())
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
-		_, err = d.stmts.RevokeRelease(t.Context(), projectID, foreign.ID)
+		_, err = d.stmts.RevokeRelease(t.Context(), projectID, foreign.ID, time.Now())
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
 		got, err := d.stmts.GetReleaseByID(t.Context(), otherProject, foreign.ID)
