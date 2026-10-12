@@ -38,6 +38,37 @@ type Invoker interface {
 	//
 	// POST /users/{user_id}/passkeys/registrations
 	BeginUserPasskeyRegistration(ctx context.Context, request *BeginUserPasskeyRegistrationRequest, params BeginUserPasskeyRegistrationParams) (BeginUserPasskeyRegistrationRes, error)
+	// BuildRelease invokes buildRelease operation.
+	//
+	// Builds a release from the resources of `.zitadel/` as authored on disk,
+	// grouped by kind, in one transaction: a failure anywhere leaves no
+	// revision and no release. The caller records nothing.
+	// If the project already holds a release with the same content, the same
+	// `content_hash`, the request answers `200` with that release and
+	// allocates nothing, however long ago it was built. Otherwise every resource is compared against the
+	// project's newest revision of the same handle: unchanged content reuses
+	// that revision, changed content allocates a new one, and the request
+	// answers `201` with the new release. Metadata is excluded from the
+	// comparison, so the same content under a different `message` is the same
+	// release.
+	// A structurally malformed request is refused while decoding with
+	// `req.invalid`, naming the offending fields. A well-formed bundle is then
+	// checked resource by resource, as each kind's create endpoint checks it,
+	// and every failure is reported at once: the request answers `400` with
+	// `rel.invalid`, and `details.resources` lists each resource that failed.
+	// A handle that resolves neither in the bundle nor in the project answers
+	// `rel.unresolved_reference`, naming the pointer and the handle.
+	// Building writes revisions, so besides `release.write` it needs the write
+	// scope of every kind the bundle carries a resource of: `schema.write`,
+	// `flow_definition.write`, `branding.write` and `idp.write`, as the
+	// per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
+	// naming the kind. An empty kind needs no scope.
+	// Building a release does not deploy it. A release is not tied to an
+	// origin, and the same release can later be deployed to any number of
+	// origins unchanged.
+	//
+	// POST /releases/build
+	BuildRelease(ctx context.Context, request *BuildReleaseRequest, params BuildReleaseParams) (BuildReleaseRes, error)
 	// CompleteClaim invokes completeClaim operation.
 	//
 	// Called by the browser after the developer authenticates on the claim page.
@@ -188,18 +219,29 @@ type Invoker interface {
 	CreateProject(ctx context.Context, request *CreateProjectRequest) (CreateProjectRes, error)
 	// CreateRelease invokes createRelease operation.
 	//
-	// Bundles a release from revisions that already exist, supplied as
-	// `(kind, revision_id)` pairs. No new revisions are allocated — use the
-	// per-kind create endpoints for that, then pin the ids here.
-	// Every referenced `revision_id` must exist in the project. Each one's handle
-	// is read from the revision itself and recorded on the release, so a resource
-	// is always pinned under the identity it declares.
-	// Creating a release does not deploy it. A release is environment-agnostic
-	// and the same release can later be deployed to any number of environments
-	// unchanged.
-	// Idempotent on the pinned set: metadata is excluded from the comparison, so
-	// re-submitting the same revisions with a different `message` returns the
-	// release that already pins them rather than creating a second one.
+	// Assembles a release from revisions that already exist, supplied as
+	// `(kind, revision_id)` pairs. No new revisions are allocated: to build a
+	// release from the files on disk, use `POST /releases/build`, which
+	// allocates them.
+	// Every referenced `revision_id` must exist in the project. Each one's
+	// handle is read from the revision itself and recorded on the release, so a
+	// resource is always pinned under the identity it declares.
+	// Every handle a pinned resource references, such as a flow definition's
+	// `user_schema` naming a schema by `objectType`, or a flow step's
+	// `sso_providers` naming IDP connections by `slug`, must be pinned by the
+	// same release. A handle the release does not pin refuses the request with
+	// `rel.unresolved_reference`. The message names the pointer and the handle
+	// that did not resolve, for example
+	// `flow_definition default-login: user_schema human-user not found`,
+	// because a release pins many and the code alone does not say which one
+	// failed.
+	// Idempotent on the pinned set: metadata is excluded from the comparison,
+	// so re-submitting the same revisions with a different `message` answers
+	// `200` with the release that already pins them rather than creating a
+	// second one. A release the project did not hold before answers `201`.
+	// Creating a release does not deploy it. A release is not tied to an
+	// origin, and the same release can later be deployed to any number of
+	// origins unchanged.
 	//
 	// POST /releases
 	CreateRelease(ctx context.Context, request *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error)
@@ -285,10 +327,8 @@ type Invoker interface {
 	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)
 	// DeleteVariable invokes deleteVariable operation.
 	//
-	// Removes the variable this owner entered under this name.
-	// A variable is deletable only by the owner that entered it. Deleting a name
-	// another owner of the same project holds answers `var.not_found` and leaves
-	// that owner's value standing.
+	// Removes the project's variable under this name. Deleting a name the
+	// project does not hold answers `var.not_found`.
 	//
 	// DELETE /variables/{variable_name}
 	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
@@ -372,14 +412,6 @@ type Invoker interface {
 	//
 	// GET /deployments/{deployment_id}
 	GetDeploymentById(ctx context.Context, params GetDeploymentByIdParams) (GetDeploymentByIdRes, error)
-	// GetEnvironmentByName invokes getEnvironmentByName operation.
-	//
-	// Reads one environment of the project by its name.
-	// The lookup is scoped to the project in `project_id`: a name that exists in
-	// another project answers `env.not_found` exactly as an unused name does.
-	//
-	// GET /environments/{name}
-	GetEnvironmentByName(ctx context.Context, params GetEnvironmentByNameParams) (GetEnvironmentByNameRes, error)
 	// GetEvent invokes getEvent operation.
 	//
 	// Loads a single event by `(project_id, id)`. Requires `events.read`.
@@ -492,8 +524,10 @@ type Invoker interface {
 	GetReady(ctx context.Context) (GetReadyRes, error)
 	// GetReleaseById invokes getReleaseById operation.
 	//
-	// Reads one release: its metadata and the `(kind, handle, revision_id)`
-	// tuples it pins.
+	// Reads one release: its digest, its metadata, whether it was revoked, and
+	// the `(kind, handle, revision_id)` tuples it pins.
+	// The path takes the `rel_` id only. To find a release from its digest,
+	// list with the `content_hash` filter and read the matched entry's `id`.
 	// Does not embed resource content. Resolve each `revision_id` through the
 	// per-kind read endpoints when the bytes are needed.
 	// The lookup is scoped to the project in `project_id`: a release id belonging
@@ -541,23 +575,15 @@ type Invoker interface {
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
 	// GetVariable invokes getVariable operation.
 	//
-	// Reads one variable by name from the owner this request addresses — one
-	// environment of the project with `environment_name`, the project level
-	// itself without it.
-	// A name that owner has not entered answers `var.not_found`, even when
-	// another owner of the same project holds it: nothing is inherited. A secret
-	// is found but not disclosed: the response is `{"secret": true}`.
+	// Reads one of the project's variables by name. A name the project has not
+	// entered answers `var.not_found`. A secret is found but not disclosed: the
+	// response is `{"secret": true}`.
 	//
 	// GET /variables/{variable_name}
 	GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error)
 	// GetVariables invokes getVariables operation.
 	//
-	// Returns the variables entered at the owner this request addresses, keyed by
-	// name — one environment of the project with `environment_name`, the project
-	// level itself without it.
-	// Owners are separate, not a ladder: an environment does not inherit the
-	// project's variables and the project does not see its environments'. Reading
-	// everything a project holds therefore means reading each owner in turn.
+	// Returns the project's variables, keyed by name.
 	// Secret values are not returned. A secret appears as `{"secret": true}`,
 	// which says a value is held without disclosing it.
 	//
@@ -607,12 +633,6 @@ type Invoker interface {
 	//
 	// GET /deployments
 	ListDeployments(ctx context.Context, params ListDeploymentsParams) (ListDeploymentsRes, error)
-	// ListEnvironments invokes listEnvironments operation.
-	//
-	// Lists the project's environments ordered by name.
-	//
-	// GET /environments
-	ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (ListEnvironmentsRes, error)
 	// ListEvents invokes listEvents operation.
 	//
 	// Returns project-scoped audit events, newest-first by keyset on
@@ -657,8 +677,14 @@ type Invoker interface {
 	// ListReleases invokes listReleases operation.
 	//
 	// Lists the project's releases, newest first.
-	// Entries carry metadata only — the pinned set is omitted. Read one release
-	// with `GET /releases/{release_id}` to get its pointers.
+	// Entries carry the digest, the metadata and `revoked_at` — the pinned set
+	// is omitted.
+	// Read one release with `GET /releases/{release_id}` to get its pointers.
+	// `content_hash` looks a release up by its content, as the CLI does when a
+	// person types the digest a transcript printed. The project holds at most
+	// one release per digest, so the filtered list has one entry or none, and
+	// an unknown digest is an empty list rather than an error. Paths take the
+	// `rel_` id only; the matched entry's `id` is what to use there.
 	//
 	// GET /releases
 	ListReleases(ctx context.Context, params ListReleasesParams) (ListReleasesRes, error)
@@ -777,6 +803,27 @@ type Invoker interface {
 	//
 	// DELETE /sessions/me
 	RevokeMySession(ctx context.Context) (RevokeMySessionRes, error)
+	// RevokeRelease invokes revokeRelease operation.
+	//
+	// Marks the release revoked, so that its content is never served again.
+	// From then on the release cannot be deployed and is refused on every path
+	// that would serve it, including to a build that pins its digest, with
+	// `rel.revoked`.
+	// A release that any origin still serves cannot be revoked. An origin
+	// serves the release of the newest deployment to it, so the call answers
+	// `409` with `rel.in_use`, naming each such origin and that deployment.
+	// Deploy another release there or roll back first, then revoke. Revoking
+	// therefore never takes an origin down. Deployments that named the release
+	// earlier stay in the history.
+	// Idempotent: revoking a release that is already revoked answers `200`
+	// with the release unchanged, `revoked_at` still naming the first
+	// revocation. There is no un-revoke; build a new release instead.
+	// Takes no body. The lookup is scoped to the project in `project_id`, so a
+	// release id of another project answers not found exactly as an unknown id
+	// does.
+	//
+	// POST /releases/{release_id}/revoke
+	RevokeRelease(ctx context.Context, params RevokeReleaseParams) (RevokeReleaseRes, error)
 	// RevokeSession invokes revokeSession operation.
 	//
 	// Permanently deletes the session, terminating it immediately.
@@ -846,20 +893,16 @@ type Invoker interface {
 	UpdateTeam(ctx context.Context, request *UpdateTeamRequest, params UpdateTeamParams) (UpdateTeamRes, error)
 	// UpdateVariables invokes updateVariables operation.
 	//
-	// Enters, replaces and removes variables at the owner this request
-	// addresses.
-	// Every name in the body is applied at exactly that owner — the project, or
-	// the environment named by `environment_name` — and reaches no other. Names
-	// not in the body are untouched.
+	// Enters, replaces and removes the project's variables. Names not in the
+	// body are untouched.
 	// A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 	// stores the value encrypted under the project's active `secret` key, after
-	// which it can be referenced but not read back. `null` removes the name from
-	// this owner (RFC 7386), which is how several variables are removed in one
-	// request; removing a name this owner does not hold is a no-op rather than an
-	// error.
+	// which it can be referenced but not read back. `null` removes the name
+	// (RFC 7386), which is how several variables are removed in one request;
+	// removing a name the project does not hold is a no-op rather than an error.
 	// The body is applied whole or not at all, so a rejected request leaves the
-	// owner exactly as it was. Writing the same name and owner twice replaces the
-	// value rather than duplicating it, which makes a retry safe.
+	// project's variables exactly as they were. Writing the same name twice
+	// replaces the value rather than duplicating it, which makes a retry safe.
 	//
 	// PATCH /variables
 	UpdateVariables(ctx context.Context, request UpdateVariablesRequest, params UpdateVariablesParams) (UpdateVariablesRes, error)
@@ -1057,6 +1100,171 @@ func (c *Client) sendBeginUserPasskeyRegistration(ctx context.Context, request *
 
 	stage = "DecodeResponse"
 	result, err := decodeBeginUserPasskeyRegistrationResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// BuildRelease invokes buildRelease operation.
+//
+// Builds a release from the resources of `.zitadel/` as authored on disk,
+// grouped by kind, in one transaction: a failure anywhere leaves no
+// revision and no release. The caller records nothing.
+// If the project already holds a release with the same content, the same
+// `content_hash`, the request answers `200` with that release and
+// allocates nothing, however long ago it was built. Otherwise every resource is compared against the
+// project's newest revision of the same handle: unchanged content reuses
+// that revision, changed content allocates a new one, and the request
+// answers `201` with the new release. Metadata is excluded from the
+// comparison, so the same content under a different `message` is the same
+// release.
+// A structurally malformed request is refused while decoding with
+// `req.invalid`, naming the offending fields. A well-formed bundle is then
+// checked resource by resource, as each kind's create endpoint checks it,
+// and every failure is reported at once: the request answers `400` with
+// `rel.invalid`, and `details.resources` lists each resource that failed.
+// A handle that resolves neither in the bundle nor in the project answers
+// `rel.unresolved_reference`, naming the pointer and the handle.
+// Building writes revisions, so besides `release.write` it needs the write
+// scope of every kind the bundle carries a resource of: `schema.write`,
+// `flow_definition.write`, `branding.write` and `idp.write`, as the
+// per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
+// naming the kind. An empty kind needs no scope.
+// Building a release does not deploy it. A release is not tied to an
+// origin, and the same release can later be deployed to any number of
+// origins unchanged.
+//
+// POST /releases/build
+func (c *Client) BuildRelease(ctx context.Context, request *BuildReleaseRequest, params BuildReleaseParams) (BuildReleaseRes, error) {
+	res, err := c.sendBuildRelease(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendBuildRelease(ctx context.Context, request *BuildReleaseRequest, params BuildReleaseParams) (res BuildReleaseRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("buildRelease"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/releases/build"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, BuildReleaseOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/releases/build"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeBuildReleaseRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, BuildReleaseOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeBuildReleaseResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -2414,18 +2622,29 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 
 // CreateRelease invokes createRelease operation.
 //
-// Bundles a release from revisions that already exist, supplied as
-// `(kind, revision_id)` pairs. No new revisions are allocated — use the
-// per-kind create endpoints for that, then pin the ids here.
-// Every referenced `revision_id` must exist in the project. Each one's handle
-// is read from the revision itself and recorded on the release, so a resource
-// is always pinned under the identity it declares.
-// Creating a release does not deploy it. A release is environment-agnostic
-// and the same release can later be deployed to any number of environments
-// unchanged.
-// Idempotent on the pinned set: metadata is excluded from the comparison, so
-// re-submitting the same revisions with a different `message` returns the
-// release that already pins them rather than creating a second one.
+// Assembles a release from revisions that already exist, supplied as
+// `(kind, revision_id)` pairs. No new revisions are allocated: to build a
+// release from the files on disk, use `POST /releases/build`, which
+// allocates them.
+// Every referenced `revision_id` must exist in the project. Each one's
+// handle is read from the revision itself and recorded on the release, so a
+// resource is always pinned under the identity it declares.
+// Every handle a pinned resource references, such as a flow definition's
+// `user_schema` naming a schema by `objectType`, or a flow step's
+// `sso_providers` naming IDP connections by `slug`, must be pinned by the
+// same release. A handle the release does not pin refuses the request with
+// `rel.unresolved_reference`. The message names the pointer and the handle
+// that did not resolve, for example
+// `flow_definition default-login: user_schema human-user not found`,
+// because a release pins many and the code alone does not say which one
+// failed.
+// Idempotent on the pinned set: metadata is excluded from the comparison,
+// so re-submitting the same revisions with a different `message` answers
+// `200` with the release that already pins them rather than creating a
+// second one. A release the project did not hold before answers `201`.
+// Creating a release does not deploy it. A release is not tied to an
+// origin, and the same release can later be deployed to any number of
+// origins unchanged.
 //
 // POST /releases
 func (c *Client) CreateRelease(ctx context.Context, request *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error) {
@@ -3632,10 +3851,8 @@ func (c *Client) sendDeleteUserByID(ctx context.Context, params DeleteUserByIDPa
 
 // DeleteVariable invokes deleteVariable operation.
 //
-// Removes the variable this owner entered under this name.
-// A variable is deletable only by the owner that entered it. Deleting a name
-// another owner of the same project holds answers `var.not_found` and leaves
-// that owner's value standing.
+// Removes the project's variable under this name. Deleting a name the
+// project does not hold answers `var.not_found`.
 //
 // DELETE /variables/{variable_name}
 func (c *Client) DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error) {
@@ -4819,157 +5036,6 @@ func (c *Client) sendGetDeploymentById(ctx context.Context, params GetDeployment
 	return result, nil
 }
 
-// GetEnvironmentByName invokes getEnvironmentByName operation.
-//
-// Reads one environment of the project by its name.
-// The lookup is scoped to the project in `project_id`: a name that exists in
-// another project answers `env.not_found` exactly as an unused name does.
-//
-// GET /environments/{name}
-func (c *Client) GetEnvironmentByName(ctx context.Context, params GetEnvironmentByNameParams) (GetEnvironmentByNameRes, error) {
-	res, err := c.sendGetEnvironmentByName(ctx, params)
-	return res, err
-}
-
-func (c *Client) sendGetEnvironmentByName(ctx context.Context, params GetEnvironmentByNameParams) (res GetEnvironmentByNameRes, err error) {
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getEnvironmentByName"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/environments/{name}"),
-	}
-	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		elapsedDuration := time.Since(startTime)
-		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
-	}()
-
-	// Increment request counter.
-	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-
-	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, GetEnvironmentByNameOperation,
-		trace.WithAttributes(otelAttrs...),
-		clientSpanKind,
-	)
-	// Track stage for error reporting.
-	var stage string
-	defer func() {
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, stage)
-			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-		}
-		span.End()
-	}()
-
-	stage = "BuildURL"
-	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [2]string
-	pathParts[0] = "/environments/"
-	{
-		// Encode "name" parameter.
-		e := uri.NewPathEncoder(uri.PathEncoderConfig{
-			Param:   "name",
-			Style:   uri.PathStyleSimple,
-			Explode: false,
-		})
-		if err := func() error {
-			if unwrapped := string(params.Name); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
-			}
-			return nil
-		}(); err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		encoded, err := e.Result()
-		if err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		pathParts[1] = encoded
-	}
-	uri.AddPathParts(u, pathParts[:]...)
-
-	stage = "EncodeQueryParams"
-	q := uri.NewQueryEncoder()
-	{
-		// Encode "project_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	u.RawQuery = q.Values().Encode()
-
-	stage = "EncodeRequest"
-	r, err := ht.NewRequest(ctx, "GET", u)
-	if err != nil {
-		return res, errors.Wrap(err, "create request")
-	}
-
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, GetEnvironmentByNameOperation, r); {
-			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
-			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
-				// Skip this security.
-			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
-		}
-	}
-
-	stage = "SendRequest"
-	resp, err := c.cfg.Client.Do(r)
-	if err != nil {
-		return res, errors.Wrap(err, "do request")
-	}
-	body := resp.Body
-	defer body.Close()
-
-	stage = "DecodeResponse"
-	result, err := decodeGetEnvironmentByNameResponse(resp)
-	if err != nil {
-		return res, errors.Wrap(err, "decode response")
-	}
-
-	return result, nil
-}
-
 // GetEvent invokes getEvent operation.
 //
 // Loads a single event by `(project_id, id)`. Requires `events.read`.
@@ -5749,11 +5815,23 @@ func (c *Client) sendGetIdpById(ctx context.Context, params GetIdpByIdParams) (r
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, GetIdpByIdOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -6554,8 +6632,10 @@ func (c *Client) sendGetReady(ctx context.Context) (res GetReadyRes, err error) 
 
 // GetReleaseById invokes getReleaseById operation.
 //
-// Reads one release: its metadata and the `(kind, handle, revision_id)`
-// tuples it pins.
+// Reads one release: its digest, its metadata, whether it was revoked, and
+// the `(kind, handle, revision_id)` tuples it pins.
+// The path takes the `rel_` id only. To find a release from its digest,
+// list with the `content_hash` filter and read the matched entry's `id`.
 // Does not embed resource content. Resolve each `revision_id` through the
 // per-kind read endpoints when the bytes are needed.
 // The lookup is scoped to the project in `project_id`: a release id belonging
@@ -7335,12 +7415,9 @@ func (c *Client) sendGetUserByID(ctx context.Context, params GetUserByIDParams) 
 
 // GetVariable invokes getVariable operation.
 //
-// Reads one variable by name from the owner this request addresses — one
-// environment of the project with `environment_name`, the project level
-// itself without it.
-// A name that owner has not entered answers `var.not_found`, even when
-// another owner of the same project holds it: nothing is inherited. A secret
-// is found but not disclosed: the response is `{"secret": true}`.
+// Reads one of the project's variables by name. A name the project has not
+// entered answers `var.not_found`. A secret is found but not disclosed: the
+// response is `{"secret": true}`.
 //
 // GET /variables/{variable_name}
 func (c *Client) GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error) {
@@ -7509,12 +7586,7 @@ func (c *Client) sendGetVariable(ctx context.Context, params GetVariableParams) 
 
 // GetVariables invokes getVariables operation.
 //
-// Returns the variables entered at the owner this request addresses, keyed by
-// name — one environment of the project with `environment_name`, the project
-// level itself without it.
-// Owners are separate, not a ladder: an environment does not inherit the
-// project's variables and the project does not see its environments'. Reading
-// everything a project holds therefore means reading each owner in turn.
+// Returns the project's variables, keyed by name.
 // Secret values are not returned. A secret appears as `{"secret": true}`,
 // which says a value is held without disclosing it.
 //
@@ -8299,174 +8371,6 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 
 	stage = "DecodeResponse"
 	result, err := decodeListDeploymentsResponse(resp)
-	if err != nil {
-		return res, errors.Wrap(err, "decode response")
-	}
-
-	return result, nil
-}
-
-// ListEnvironments invokes listEnvironments operation.
-//
-// Lists the project's environments ordered by name.
-//
-// GET /environments
-func (c *Client) ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (ListEnvironmentsRes, error) {
-	res, err := c.sendListEnvironments(ctx, params)
-	return res, err
-}
-
-func (c *Client) sendListEnvironments(ctx context.Context, params ListEnvironmentsParams) (res ListEnvironmentsRes, err error) {
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("listEnvironments"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/environments"),
-	}
-	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		elapsedDuration := time.Since(startTime)
-		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
-	}()
-
-	// Increment request counter.
-	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-
-	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, ListEnvironmentsOperation,
-		trace.WithAttributes(otelAttrs...),
-		clientSpanKind,
-	)
-	// Track stage for error reporting.
-	var stage string
-	defer func() {
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, stage)
-			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-		}
-		span.End()
-	}()
-
-	stage = "BuildURL"
-	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [1]string
-	pathParts[0] = "/environments"
-	uri.AddPathParts(u, pathParts[:]...)
-
-	stage = "EncodeQueryParams"
-	q := uri.NewQueryEncoder()
-	{
-		// Encode "project_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	{
-		// Encode "limit" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "limit",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.Limit.Get(); ok {
-				if unwrapped := int(val); true {
-					return e.EncodeValue(conv.IntToString(unwrapped))
-				}
-				return nil
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	{
-		// Encode "page_token" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "page_token",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.PageToken.Get(); ok {
-				if unwrapped := string(val); true {
-					return e.EncodeValue(conv.StringToString(unwrapped))
-				}
-				return nil
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	u.RawQuery = q.Values().Encode()
-
-	stage = "EncodeRequest"
-	r, err := ht.NewRequest(ctx, "GET", u)
-	if err != nil {
-		return res, errors.Wrap(err, "create request")
-	}
-
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, ListEnvironmentsOperation, r); {
-			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
-			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
-				// Skip this security.
-			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
-		}
-	}
-
-	stage = "SendRequest"
-	resp, err := c.cfg.Client.Do(r)
-	if err != nil {
-		return res, errors.Wrap(err, "do request")
-	}
-	body := resp.Body
-	defer body.Close()
-
-	stage = "DecodeResponse"
-	result, err := decodeListEnvironmentsResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -9513,8 +9417,14 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 // ListReleases invokes listReleases operation.
 //
 // Lists the project's releases, newest first.
-// Entries carry metadata only — the pinned set is omitted. Read one release
-// with `GET /releases/{release_id}` to get its pointers.
+// Entries carry the digest, the metadata and `revoked_at` — the pinned set
+// is omitted.
+// Read one release with `GET /releases/{release_id}` to get its pointers.
+// `content_hash` looks a release up by its content, as the CLI does when a
+// person types the digest a transcript printed. The project holds at most
+// one release per digest, so the filtered list has one entry or none, and
+// an unknown digest is an empty list rather than an error. Paths take the
+// `rel_` id only; the matched entry's `id` is what to use there.
 //
 // GET /releases
 func (c *Client) ListReleases(ctx context.Context, params ListReleasesParams) (ListReleasesRes, error) {
@@ -9576,6 +9486,26 @@ func (c *Client) sendListReleases(ctx context.Context, params ListReleasesParams
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if unwrapped := string(params.ProjectID); true {
 				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "content_hash" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "content_hash",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ContentHash.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
 			}
 			return nil
 		}); err != nil {
@@ -10962,11 +10892,23 @@ func (c *Client) sendQueryIdps(ctx context.Context, request *QueryIdpsRequest, p
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, QueryIdpsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -11682,6 +11624,171 @@ func (c *Client) sendRevokeMySession(ctx context.Context) (res RevokeMySessionRe
 	return result, nil
 }
 
+// RevokeRelease invokes revokeRelease operation.
+//
+// Marks the release revoked, so that its content is never served again.
+// From then on the release cannot be deployed and is refused on every path
+// that would serve it, including to a build that pins its digest, with
+// `rel.revoked`.
+// A release that any origin still serves cannot be revoked. An origin
+// serves the release of the newest deployment to it, so the call answers
+// `409` with `rel.in_use`, naming each such origin and that deployment.
+// Deploy another release there or roll back first, then revoke. Revoking
+// therefore never takes an origin down. Deployments that named the release
+// earlier stay in the history.
+// Idempotent: revoking a release that is already revoked answers `200`
+// with the release unchanged, `revoked_at` still naming the first
+// revocation. There is no un-revoke; build a new release instead.
+// Takes no body. The lookup is scoped to the project in `project_id`, so a
+// release id of another project answers not found exactly as an unknown id
+// does.
+//
+// POST /releases/{release_id}/revoke
+func (c *Client) RevokeRelease(ctx context.Context, params RevokeReleaseParams) (RevokeReleaseRes, error) {
+	res, err := c.sendRevokeRelease(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendRevokeRelease(ctx context.Context, params RevokeReleaseParams) (res RevokeReleaseRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("revokeRelease"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/releases/{release_id}/revoke"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, RevokeReleaseOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/releases/"
+	{
+		// Encode "release_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "release_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.ReleaseID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/revoke"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, RevokeReleaseOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeRevokeReleaseResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // RevokeSession invokes revokeSession operation.
 //
 // Permanently deletes the session, terminating it immediately.
@@ -12277,20 +12384,16 @@ func (c *Client) sendUpdateTeam(ctx context.Context, request *UpdateTeamRequest,
 
 // UpdateVariables invokes updateVariables operation.
 //
-// Enters, replaces and removes variables at the owner this request
-// addresses.
-// Every name in the body is applied at exactly that owner — the project, or
-// the environment named by `environment_name` — and reaches no other. Names
-// not in the body are untouched.
+// Enters, replaces and removes the project's variables. Names not in the
+// body are untouched.
 // A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 // stores the value encrypted under the project's active `secret` key, after
-// which it can be referenced but not read back. `null` removes the name from
-// this owner (RFC 7386), which is how several variables are removed in one
-// request; removing a name this owner does not hold is a no-op rather than an
-// error.
+// which it can be referenced but not read back. `null` removes the name
+// (RFC 7386), which is how several variables are removed in one request;
+// removing a name the project does not hold is a no-op rather than an error.
 // The body is applied whole or not at all, so a rejected request leaves the
-// owner exactly as it was. Writing the same name and owner twice replaces the
-// value rather than duplicating it, which makes a retry safe.
+// project's variables exactly as they were. Writing the same name twice
+// replaces the value rather than duplicating it, which makes a retry safe.
 //
 // PATCH /variables
 func (c *Client) UpdateVariables(ctx context.Context, request UpdateVariablesRequest, params UpdateVariablesParams) (UpdateVariablesRes, error) {

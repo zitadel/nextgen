@@ -1,10 +1,10 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { formatDate } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
+import { server } from "@/test/msw";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -13,8 +13,6 @@ vi.mock("@/auth/session", async (importOriginal) => {
   const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
-
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 const SCHEMAS_URL = "http://localhost/api/schemas";
 
@@ -57,15 +55,6 @@ const DEEP = {
     },
   },
 };
-
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => {
-  server.close();
-  vi.unstubAllEnvs();
-});
 
 const CREATED_AT = "2026-07-12T16:59:04Z";
 
@@ -132,6 +121,21 @@ describe("user schemas list", () => {
     serveList(envelope("sch_both", both));
     await renderAt("/schemas");
     expect(await screen.findByText("Passkey + Password")).toBeInTheDocument();
+  });
+
+  it("names the SSO providers a schema lists in its sign-in methods", async () => {
+    const withSso = {
+      ...BUSINESS,
+      "x-auth-methods": {
+        ...BUSINESS["x-auth-methods"],
+        sso: { enabled: true, providers: ["google", "github"] },
+      },
+    };
+    serveList(envelope("sch_sso", withSso), envelope("sch_business", BUSINESS));
+    await renderAt("/schemas");
+    expect(await screen.findByText("Passkey + SSO (google, github)")).toBeInTheDocument();
+    // No `sso` at all: no provider list.
+    expect(screen.getByText("Passkey")).toBeInTheDocument();
   });
 
   it("lays the directory out as a resource table with a created column (D17)", async () => {
@@ -350,6 +354,9 @@ describe("user schema detail", () => {
     // same `$id` everywhere), so the id alone could resolve in the caller's own.
     const projects: (string | null)[] = [];
     server.use(
+      http.get("*/api/projects/proj_other", () =>
+        HttpResponse.json({ id: "proj_other", name: "Other project" }),
+      ),
       http.get(`${SCHEMAS_URL}/sch_business`, ({ request }) => {
         projects.push(new URL(request.url).searchParams.get("project_id"));
         return HttpResponse.json(envelope("sch_business", BUSINESS));
@@ -405,6 +412,53 @@ describe("user schema detail", () => {
     // Same stable alphabetical order as the list chip, for the same reason.
     const text = screen.getByRole("tabpanel").textContent ?? "";
     expect(text.indexOf("Passkey")).toBeLessThan(text.indexOf("Password"));
+  });
+
+  it("lists the SSO provider slugs next to the SSO state", async () => {
+    const withSso = {
+      ...BUSINESS,
+      "x-auth-methods": {
+        ...BUSINESS["x-auth-methods"],
+        sso: { enabled: true, providers: ["google", "github"] },
+      },
+    };
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json(envelope("sch_business", withSso)),
+      ),
+    );
+    await renderAt("/schemas/sch_business");
+    await screen.findByRole("heading", { name: "Business" });
+    await userEvent.click(screen.getByRole("tab", { name: "Authentication" }));
+
+    const sso = within(await screen.findByRole("tabpanel")).getByText("SSO").nextSibling;
+    expect(sso).toHaveTextContent("google");
+    expect(sso).toHaveTextContent("github");
+    expect(sso).toHaveTextContent("Enabled");
+  });
+
+  it("lists no providers for a disabled SSO method", async () => {
+    // `providers` on a disabled method is forbidden by the meta-schema; a
+    // stray one describes nothing a user can sign in with.
+    const disabled = {
+      ...BUSINESS,
+      "x-auth-methods": {
+        ...BUSINESS["x-auth-methods"],
+        sso: { enabled: false, providers: ["google"] },
+      },
+    };
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json(envelope("sch_business", disabled)),
+      ),
+    );
+    await renderAt("/schemas/sch_business");
+    await screen.findByRole("heading", { name: "Business" });
+    await userEvent.click(screen.getByRole("tab", { name: "Authentication" }));
+
+    const sso = within(await screen.findByRole("tabpanel")).getByText("SSO").nextSibling;
+    expect(sso).toHaveTextContent("Disabled");
+    expect(sso).not.toHaveTextContent("google");
   });
 
   it("renders the document as JSON and as YAML", async () => {

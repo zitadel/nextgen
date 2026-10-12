@@ -14,7 +14,6 @@ import { _resetConfigForTesting } from "@zitadel/api/config";
  */
 describe("apiBase", () => {
   afterEach(() => {
-    vi.unstubAllEnvs();
     vi.resetModules();
     _resetConfigForTesting();
   });

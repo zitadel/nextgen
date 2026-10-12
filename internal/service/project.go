@@ -170,10 +170,6 @@ func (s *projectService) create(ctx context.Context, project *domain.Project, se
 			return err
 		}
 
-		if err := seedDefaultEnvironments(ctx, tx.Statements(), project.ID); err != nil {
-			return err
-		}
-
 		if !seedDefaults {
 			return emitProjectCreated(ctx, tx.Statements(), project)
 		}

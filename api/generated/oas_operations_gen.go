@@ -7,6 +7,7 @@ type OperationName = string
 
 const (
 	BeginUserPasskeyRegistrationOperation  OperationName = "BeginUserPasskeyRegistration"
+	BuildReleaseOperation                  OperationName = "BuildRelease"
 	CompleteClaimOperation                 OperationName = "CompleteClaim"
 	CreateAuthAttemptOperation             OperationName = "CreateAuthAttempt"
 	CreateBrandingOperation                OperationName = "CreateBranding"
@@ -33,7 +34,6 @@ const (
 	GetClaimStatusOperation                OperationName = "GetClaimStatus"
 	GetClaimWindowOperation                OperationName = "GetClaimWindow"
 	GetDeploymentByIdOperation             OperationName = "GetDeploymentById"
-	GetEnvironmentByNameOperation          OperationName = "GetEnvironmentByName"
 	GetEventOperation                      OperationName = "GetEvent"
 	GetFlowDefinitionOperation             OperationName = "GetFlowDefinition"
 	GetFlowStepOperation                   OperationName = "GetFlowStep"
@@ -58,7 +58,6 @@ const (
 	IssueChallengeOperation                OperationName = "IssueChallenge"
 	ListBrandingOperation                  OperationName = "ListBranding"
 	ListDeploymentsOperation               OperationName = "ListDeployments"
-	ListEnvironmentsOperation              OperationName = "ListEnvironments"
 	ListEventsOperation                    OperationName = "ListEvents"
 	ListFlowDefinitionsOperation           OperationName = "ListFlowDefinitions"
 	ListIdpRevisionsOperation              OperationName = "ListIdpRevisions"
@@ -77,6 +76,7 @@ const (
 	QueryTeamsOperation                    OperationName = "QueryTeams"
 	QueryUsersOperation                    OperationName = "QueryUsers"
 	RevokeMySessionOperation               OperationName = "RevokeMySession"
+	RevokeReleaseOperation                 OperationName = "RevokeRelease"
 	RevokeSessionOperation                 OperationName = "RevokeSession"
 	SetUserPasswordOperation               OperationName = "SetUserPassword"
 	SubmitFlowStepOperation                OperationName = "SubmitFlowStep"
