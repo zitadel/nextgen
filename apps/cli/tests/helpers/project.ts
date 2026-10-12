@@ -76,6 +76,11 @@ export interface ProjectVariable {
   readonly secret?: boolean;
 }
 
+export interface ProjectOrigin {
+  readonly pattern: string;
+  readonly kind: string;
+}
+
 export interface RegisteredIdp {
   readonly id: string;
   readonly slug: string;
@@ -330,6 +335,23 @@ export class ScaffoldedApp {
 
   getVariable(name: string): Promise<CliResult> {
     return this.cli(["variables", "get", name, "--project-level", "--json"]);
+  }
+
+  /** Adds one origin pattern to the project. */
+  addOrigin(pattern: string, kind: "primary" | "preview"): Promise<CliResult> {
+    return this.cli(["origin", "add", pattern, "--kind", kind, "--json"]);
+  }
+
+  /** Removes one origin pattern, non-interactively. */
+  removeOrigin(pattern: string): Promise<CliResult> {
+    return this.cli(["origin", "rm", pattern, "--force", "--json"]);
+  }
+
+  /** The origin patterns the project admits, read back through `origin list`. */
+  async projectOrigins(): Promise<ProjectOrigin[]> {
+    const result = await this.cli(["origin", "list", "--json"]);
+    expect(result, "origin list should have succeeded").toSucceed();
+    return this.envelopeOf<{ origins: ProjectOrigin[] }>(result).data.origins;
   }
 
   deleteVariable(name: string): Promise<CliResult> {

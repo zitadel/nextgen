@@ -74,6 +74,9 @@
       },
       "sso": {
         "description": "Manage the identity providers users can sign in with."
+      },
+      "origin": {
+        "description": "Manage the origin patterns the project admits."
       }
     }
   },

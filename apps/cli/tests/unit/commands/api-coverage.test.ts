@@ -171,6 +171,10 @@ const REFS = ["ID", "sch_1", "flowdef_1", "https://example.com/schema.json"] as 
  */
 const STANDALONE: Readonly<Record<string, readonly string[]>> = {
   variables: ["variables/list", "variables/get", "variables/set", "variables/delete"],
+  // Origins are nested under a project rather than a root collection, so they
+  // have no `/origins/query` grammar; the hand-written commands add, list (off
+  // the project) and remove one pattern at a time.
+  origin: ["origin/add", "origin/list", "origin/rm"],
 };
 
 /**
