@@ -226,8 +226,9 @@ export default class EnvAdd extends BaseCommand {
         project_id: projectId,
         keys: Object.keys(values),
         platform,
-        // A freshly bound project serves no origin until one is allowed, so the
-        // first step is to restrict it — `origin add` — before anything ships.
+        // A freshly bound project admits every origin until the first pattern
+        // closes it, so the first step is to add one and restrict the project —
+        // `origin add` — before anything ships.
         next_commands: [
           `zitadel origin add ${issuer ?? "<your-app-url>"} --kind primary --env ${name}`,
           `zitadel env --env ${name}`,
