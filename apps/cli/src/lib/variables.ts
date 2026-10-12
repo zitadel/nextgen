@@ -4,6 +4,19 @@ import { escapeControlCharacters } from "./api-client";
 import { ZitadelError } from "./errors";
 
 /**
+ * The query the variables endpoints take: the project, and which value of a
+ * name a request addresses. `applies_to` is omitted for the `all` value the
+ * endpoints default to, and set to `preview` for the override a preview deploy
+ * prefers — the two are separate values of one name, never merged.
+ */
+export type VariableScope = { project_id: string; applies_to?: "preview" };
+
+/** The scope a variable command addresses, from the project and `--preview`. */
+export function variableScope(projectId: string, preview: boolean): VariableScope {
+  return preview ? { project_id: projectId, applies_to: "preview" } : { project_id: projectId };
+}
+
+/**
  * A variable as the platform reports it. A non-secret carries its value; a
  * secret carries none, because a read answers `{"secret": true}` and never
  * discloses what is stored (ADR 062 §7).
@@ -156,7 +169,7 @@ export function parseVariableValue(raw: string, type: VariableType): string | nu
 
 /**
  * Read a value from stdin, for the non-interactive path
- * (`variables set NAME --project-level --secret < secret.txt`).
+ * (`variable set NAME --secret < secret.txt`).
  *
  * A single trailing newline is stripped — a here-doc or `echo` adds one and it
  * is not part of the credential — but nothing else is trimmed, because

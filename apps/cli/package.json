@@ -83,6 +83,9 @@
       },
       "deployment": {
         "description": "Make releases live and read the deployment history."
+      },
+      "variable": {
+        "description": "Manage the project's variables and their preview overrides."
       }
     }
   },

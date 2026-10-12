@@ -5,7 +5,6 @@
  */
 export { BaseCommand } from "./base";
 export { EnvironmentCommand, type Connection } from "./environment-command";
-export { OwnerCommand } from "./owner-command";
 export { CommandGroups, type CommandGroup } from "./groups";
 export { nonBlankArg, nonBlankString } from "./flags";
 export type {
