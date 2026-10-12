@@ -39,6 +39,7 @@ to be a fast answer to "can I build flow X right now?"
 - Schema-driven `fields`: type, validation, `required`, uniqueness scope, challenge mapping from the `x-unique` annotation on user properties, or — for credential fields — the reserved `x-auth-methods#<method>` field name resolved against the schema's `x-auth-methods`.
 - `actions` — user-selectable, surfaced on the capability payload. `passkey` and `passkey_register` are recognized action names that drive the passkey ceremony.
 - `on_success: create_user` — hashes the password (argon2id) and applies user creation, password persistence, and the attempt's verified user + password factors in one transaction, so the new user counts as verified for the terminal handoff and the exchanged session carries real factors.
+- `on_success: create_user_with_sso` — on the step an unlinked identity is collected into: prefills the provider's claims, then creates the user from the submitted values and the claims the step does not show, and links the identity, in one transaction with the attempt's user and sso factors. A submitted unique value another user holds binds that user and routes `user_already_exists` instead ([area 3](../idp/3-social-login-flow.md#engine-rules-for-prefill--confirmation)).
 - `complete: redirect` and `complete: show` — terminal step classifiers.
 - Implicit identifier resolution from any identifier-shaped field; routes via `user_not_found` (login flows) or `user_already_exists` (register flows) when wired, errors otherwise. The engine flips `CurrentPurpose` on the matching outcome to switch sub-flows.
 - Implicit password verification when a password-shaped field is present and `on_success` is not `create_user`.
@@ -97,7 +98,7 @@ Not implemented at any layer:
 ### On-success handlers
 
 - `create_user` exists today; the passkey-register verify leg creates its provisional user inside the attempt service's verify transaction instead of an on_success mutation.
-- `reset_credential`, `enroll_factor`, `create_user_with_sso`, `link_sso` are referenced in design docs but unimplemented.
+- `reset_credential`, `enroll_factor`, `link_sso` are referenced in design docs but unimplemented.
 - The dispatch carve-out for credential establishment is `OnSuccess == create_user`; the writer-manifest generalization is open (ADR 017).
 
 ### Resolution
