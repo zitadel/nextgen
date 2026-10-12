@@ -81,7 +81,9 @@ describe("validate step", () => {
     };
 
     await expect(
-      validateStep.run(ctx(bundle, { env: { PRESENT_VAR: "v1" }, brandingSources: [validBranding] })),
+      validateStep.run(
+        ctx(bundle, { env: { PRESENT_VAR: "v1" }, brandingSources: [validBranding] }),
+      ),
     ).resolves.toBeUndefined();
   });
 

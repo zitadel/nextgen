@@ -45,7 +45,8 @@ function validateBundleShapes(ctx: StepContext): void {
   ctx.bundle.schemas.forEach((schema, index) => {
     const result = schemaConfigSchema.safeParse(schema);
     if (!result.success) {
-      const handle = typeof schema.objectType === "string" ? schema.objectType : `schema #${index + 1}`;
+      const handle =
+        typeof schema.objectType === "string" ? schema.objectType : `schema #${index + 1}`;
       for (const issue of result.error.issues) {
         failures.push(`${handle}: ${issue.path.join(".") || "(root)"} ${issue.message}`);
       }
