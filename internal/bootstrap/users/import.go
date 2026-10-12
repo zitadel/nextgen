@@ -54,16 +54,13 @@ func importFile(
 		return err
 	}
 
-	_, err = v2Pool.Statements().GetUser(ctx, database.And(
-		database.Equal(database.Col(domain.UserFieldProjectID), doc.Header.ProjectID),
-		database.Equal(database.Col(domain.UserFieldID), doc.Header.ID),
-	), service.UserQueryOptions{})
-	if err == nil {
+	exists, err := userExists(ctx, v2Pool.Statements(), doc.Header)
+	if err != nil {
+		return fmt.Errorf("check existing user: %w", err)
+	}
+	if exists {
 		slog.Info("bootstrap user: skipped user because they already exists)", slog.String("path", path), slog.String("id", doc.Header.ID))
 		return nil
-	}
-	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
-		return fmt.Errorf("check existing user: %w", err)
 	}
 
 	schema, err := loadUserSchema(ctx, v2Pool.Statements(), doc.Header)
@@ -100,12 +97,39 @@ func importFile(
 		}
 		return nil
 	}); err != nil {
+		// Several replicas starting at once (a serverless platform brings up
+		// one process per request from cold, all reading the same document)
+		// can each pass the lookup above and race the insert. A unique
+		// violation that left the user in place is the other replica's import
+		// of this same document, not a conflict to report; one on another
+		// index, with the user still missing, is.
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			if exists, checkErr := userExists(ctx, v2Pool.Statements(), doc.Header); checkErr == nil && exists {
+				slog.Info("bootstrap user: skipped user because another replica imported them first", slog.String("path", path), slog.String("id", doc.Header.ID))
+				return nil
+			}
+		}
 		return err
 	}
 
 	slog.Info("bootstrap user: loaded user", slog.String("path", path), slog.String("id", doc.Header.ID))
 
 	return nil
+}
+
+// userExists reports whether the document's user is already in the database.
+func userExists(ctx context.Context, stmts service.AllStatements, h Header) (bool, error) {
+	_, err := stmts.GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), h.ProjectID),
+		database.Equal(database.Col(domain.UserFieldID), h.ID),
+	), service.UserQueryOptions{})
+	if err == nil {
+		return true, nil
+	}
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		return false, nil
+	}
+	return false, err
 }
 
 // buildCreateAttributes registers each attribute's uniqueness the way user
