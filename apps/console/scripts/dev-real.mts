@@ -233,8 +233,8 @@ if (!claimMode && devUser && !(await grantDevUserAdmin(devUser.id))) {
  * An identity provider connection and the schemas around it, so the
  * Authentication screen renders against real data: a `google` connection, a
  * `Customer users` schema that lists it, and an `Employees` schema that lists
- * no provider — the Sign-in tab then shows the same connection Enabled for one
- * schema and Disabled for the other, and the connection's "Used by" names one.
+ * no provider. The Sign-in methods tab then shows Google allowed by one schema
+ * and the plain methods by several, and the connection's "Used by" names one.
  *
  * Both schemas are the bootstrapped one with their own type, title and methods,
  * so they carry the properties the seeded users already validate against. The

@@ -11,16 +11,10 @@ import { EYEBROW } from "@/components/typography";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Separator } from "@/components/ui/separator";
 import { formatDate } from "@/lib/date";
-import { flowDisplayName } from "@/lib/flow-definition";
-import {
-  fetchAllFlows,
-  fetchAllSchemas,
-  flowsUsingIdp,
-  type IdpReference,
-  idpClientId,
-  schemasUsingIdp,
-} from "@/lib/idp";
+import { fetchAllFlows, flowDisplayName } from "@/lib/flow-definition";
+import { flowsUsingIdp, type IdpReference, idpClientId, schemasUsingIdp } from "@/lib/idp";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
+import { fetchAllSchemas } from "@/lib/schema";
 
 export const Route = createFileRoute("/_authed/authentication/idps/$idpId")({
   staticData: { scope: "project" },

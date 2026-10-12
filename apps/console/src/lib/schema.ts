@@ -1,3 +1,5 @@
+import { api } from "@/api/zitadel";
+import { readAllPages } from "./paging";
 import { field } from "./record";
 
 /**
@@ -9,6 +11,32 @@ import { field } from "./record";
  * the same defensive posture `lib/user.ts` takes for users themselves.
  */
 export type UserSchema = Record<string, unknown>;
+
+/** A user schema at its latest revision, with that revision's created date. */
+export interface SchemaEntry {
+  id: string;
+  schema: UserSchema;
+  createdAt: string;
+}
+
+/** Every user schema in the project, at its latest revision. */
+export async function fetchAllSchemas(projectId: string): Promise<SchemaEntry[]> {
+  const entries = await readAllPages(async (pageToken) => {
+    const page = await api.listSchemas({
+      project_id: projectId,
+      kind: "user-schema",
+      revisions: "latest",
+      limit: 100,
+      page_token: pageToken,
+    });
+    return { items: page.schemas, next: page.next_page_token };
+  });
+  return entries.map((entry) => ({
+    id: entry.id,
+    schema: entry.schema as UserSchema,
+    createdAt: entry.metadata.created_at,
+  }));
+}
 
 /** One rendered form control, derived from a single schema property. */
 export interface SchemaField {

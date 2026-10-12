@@ -6,8 +6,9 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { api } from "@/api/zitadel";
 import type { FlowDefinitionEntry } from "./flow-definition";
+import { readAllPages } from "./paging";
 import {
-  type UserSchema,
+  type SchemaEntry,
   schemaAuthMethods,
   schemaDisplayName,
   schemaSsoProviders,
@@ -28,30 +29,10 @@ export type IdpConnection = QueryIdps200IdpsItem;
 /** The stored connection document. */
 export type IdpDefinition = QueryIdps200IdpsItemDefinition;
 
-/** One page of the list screen. */
-export const IDP_PAGE_SIZE = 25;
-
 /**
- * Newest first. The API sorts ascending by default, and a cursor only pages
- * the sort that issued it, so every page of the list sends this.
- */
-export const IDP_LIST_SORTING = { field: "created_at", direction: "desc" } as const;
-
-/** One page of connections, newest first. */
-export async function fetchIdpPage(
-  projectId: string,
-  pageToken?: string,
-): Promise<{ idps: IdpConnection[]; nextPageToken?: string }> {
-  const page = await api.queryIdps(
-    { limit: IDP_PAGE_SIZE, page_token: pageToken, sorting: IDP_LIST_SORTING },
-    { project_id: projectId },
-  );
-  return { idps: page.idps, nextPageToken: page.next_page_token ?? undefined };
-}
-
-/**
- * Every connection in the project, for resolving the slugs schemas and flows
- * reference — or `null` when the caller may not read them.
+ * Every connection in the project, newest first: the Identity providers list
+ * as shown, and the slugs schemas and flows reference resolved from it. Or
+ * `null` when the caller may not read them.
  *
  * `null` is the screen's only signal for `idp.read`: the console has no
  * effective-permissions read, so the refusal itself is the answer (the same
@@ -61,9 +42,10 @@ export async function fetchIdpPage(
  */
 export async function fetchAllIdps(projectId: string): Promise<IdpConnection[] | null> {
   try {
-    return await walk(async (pageToken) => {
+    return await readAllPages(async (pageToken) => {
+      // The API sorts ascending by default.
       const page = await api.queryIdps(
-        { limit: 100, page_token: pageToken, sorting: { field: "slug", direction: "asc" } },
+        { limit: 100, page_token: pageToken, sorting: { field: "created_at", direction: "desc" } },
         { project_id: projectId },
       );
       return { items: page.idps, next: page.next_page_token };
@@ -72,63 +54,6 @@ export async function fetchAllIdps(projectId: string): Promise<IdpConnection[] |
     if (cause instanceof ApiError && cause.status === 403) return null;
     throw cause;
   }
-}
-
-/** A user schema at its latest revision, with that revision's created date. */
-export interface SchemaEntry {
-  id: string;
-  schema: UserSchema;
-  createdAt: string;
-}
-
-/** Every user schema in the project, at its latest revision. */
-export async function fetchAllSchemas(projectId: string): Promise<SchemaEntry[]> {
-  const entries = await walk(async (pageToken) => {
-    const page = await api.listSchemas({
-      project_id: projectId,
-      kind: "user-schema",
-      revisions: "latest",
-      limit: 100,
-      page_token: pageToken,
-    });
-    return { items: page.schemas, next: page.next_page_token };
-  });
-  return entries.map((entry) => ({
-    id: entry.id,
-    schema: entry.schema as UserSchema,
-    createdAt: entry.metadata.created_at,
-  }));
-}
-
-/** Every login flow in the project, at its latest revision. */
-export async function fetchAllFlows(projectId: string): Promise<FlowDefinitionEntry[]> {
-  return walk(async (pageToken) => {
-    const page = await api.listFlowDefinitions({
-      project_id: projectId,
-      revisions: "latest",
-      limit: 100,
-      page_token: pageToken,
-    });
-    return { items: page.flow_definitions, next: page.next_page_token };
-  });
-}
-
-/**
- * Follow a cursor to the end. The screens that need a whole collection —
- * resolving slugs, computing "Used by" — have no API that answers them
- * directly, so they read it all; projects carry a handful of each.
- */
-async function walk<T>(
-  fetchPage: (pageToken?: string) => Promise<{ items: T[]; next?: string | null }>,
-): Promise<T[]> {
-  const items: T[] = [];
-  let pageToken: string | undefined;
-  do {
-    const page = await fetchPage(pageToken);
-    items.push(...page.items);
-    pageToken = page.next ?? undefined;
-  } while (pageToken);
-  return items;
 }
 
 /**
@@ -154,17 +79,32 @@ export interface IdpReference {
 }
 
 /**
- * The schemas whose latest revision lists `slug` in `sso.providers`, by name.
- * No API answers this, so it is computed from the schema list.
+ * The schemas whose latest revision lists each slug in `sso.providers`, by
+ * name. No API answers this, so it is computed from the schema list, once for
+ * every connection a list shows.
  */
+export function schemasBySsoProvider(
+  schemas: Array<Pick<SchemaEntry, "id" | "schema">>,
+): Map<string, IdpReference[]> {
+  const bySlug = new Map<string, IdpReference[]>();
+  for (const { id, schema } of schemas) {
+    const reference = { id, name: schemaDisplayName(schema, id) };
+    for (const slug of schemaSsoProviders(schema)) {
+      const users = bySlug.get(slug) ?? [];
+      users.push(reference);
+      bySlug.set(slug, users);
+    }
+  }
+  for (const users of bySlug.values()) users.sort(byName);
+  return bySlug;
+}
+
+/** The schemas whose latest revision lists `slug` in `sso.providers`, by name. */
 export function schemasUsingIdp(
   slug: string,
   schemas: Array<Pick<SchemaEntry, "id" | "schema">>,
 ): IdpReference[] {
-  return schemas
-    .filter(({ schema }) => schemaSsoProviders(schema).includes(slug))
-    .map(({ id, schema }) => ({ id, name: schemaDisplayName(schema, id) }))
-    .sort(byName);
+  return schemasBySsoProvider(schemas).get(slug) ?? [];
 }
 
 /** The flows whose latest revision has a step listing `slug` in `sso_providers`. */

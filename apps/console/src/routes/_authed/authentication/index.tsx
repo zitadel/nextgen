@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Shield, Users } from "lucide-react";
+import { useEffect } from "react";
 
 import {
-  LoadMore,
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
   RESOURCE_ROW_ICON,
@@ -23,25 +23,18 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { InlineCode } from "@/components/ui/inline-code";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useLoadMore } from "@/hooks/use-load-more";
 import { formatDate } from "@/lib/date";
 import {
   fetchAllIdps,
-  fetchAllSchemas,
-  fetchIdpPage,
   type IdpConnection,
   type IdpReference,
   nameSummary,
-  type SchemaEntry,
-  schemasUsingIdp,
+  schemasBySsoProvider,
   type SignInMethodRow,
   signInMethodRows,
 } from "@/lib/idp";
-import {
-  projectScopeDeps,
-  requireProjectScope,
-  useRequiredProjectScope,
-} from "@/lib/project-scope";
+import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
+import { fetchAllSchemas, type SchemaEntry } from "@/lib/schema";
 
 /**
  * Authentication — the sign-in methods in use across the project's user
@@ -66,30 +59,22 @@ export const Route = createFileRoute("/_authed/authentication/")({
   loader: async ({ deps }): Promise<Loaded> => {
     const projectId = requireProjectScope(deps.project);
     // The whole project's schemas and connections: both tabs join the two on
-    // the slug, and no API answers that join directly.
+    // the slug, and no API answers that join directly. The connections are
+    // also the Identity providers list, so it is not paged.
     const [schemas, idps] = await Promise.all([
       fetchAllSchemas(projectId),
       fetchAllIdps(projectId),
     ]);
-    // The list's own first page, newest first. Skipped without `idp.read`,
-    // where the tab does not render and the request would only be refused.
-    const page = idps ? await fetchIdpPage(projectId) : undefined;
-    return {
-      schemas,
-      idps,
-      list: page ? { idps: page.idps, nextPageToken: page.nextPageToken } : undefined,
-    };
+    return { schemas, idps };
   },
   component: AuthenticationScreen,
 });
 
-/** What the loader hands the tabs. Exported because the route tree names it. */
-export interface Loaded {
+/** What the loader hands the tabs. */
+interface Loaded {
   schemas: SchemaEntry[];
   /** `null` without `idp.read`. */
   idps: IdpConnection[] | null;
-  /** The list tab's first page; absent without `idp.read`. */
-  list?: { idps: IdpConnection[]; nextPageToken?: string };
 }
 
 function AuthenticationScreen() {
@@ -98,8 +83,13 @@ function AuthenticationScreen() {
   const navigate = useNavigate({ from: Route.fullPath });
 
   // Without `idp.read` the tab does not exist, so a link to it opens Sign-in
-  // methods rather than an empty strip.
-  const canReadIdps = loaded.list !== undefined;
+  // methods rather than an empty strip, and the URL drops the tab it cannot
+  // show.
+  const canReadIdps = loaded.idps !== null;
+  const staleTab = !canReadIdps && search.tab !== undefined;
+  useEffect(() => {
+    if (staleTab) void navigate({ search: {}, replace: true });
+  }, [staleTab, navigate]);
   const tab = canReadIdps && search.tab === "identity-providers" ? search.tab : "sign-in";
 
   return (
@@ -132,9 +122,9 @@ function AuthenticationScreen() {
           <SignInMethods loaded={loaded} />
         </TabsContent>
 
-        {loaded.list && (
+        {loaded.idps && (
           <TabsContent value="identity-providers">
-            <IdentityProviders first={loaded.list} schemas={loaded.schemas} />
+            <IdentityProviders idps={loaded.idps} schemas={loaded.schemas} />
           </TabsContent>
         )}
       </Tabs>
@@ -230,59 +220,39 @@ function SchemaNames({ items }: { items: IdpReference[] }) {
 }
 
 /**
- * The project's connections, newest first, paged with `Load more`, each with
- * the user schemas that list its slug.
+ * The project's connections, newest first, each with the user schemas that
+ * list its slug.
  */
-function IdentityProviders({
-  first,
-  schemas,
-}: {
-  first: { idps: IdpConnection[]; nextPageToken?: string };
-  schemas: SchemaEntry[];
-}) {
-  const projectId = useRequiredProjectScope();
-  const paging = useLoadMore(
-    first,
-    async (pageToken) => {
-      // `fetchIdpPage` sends the same `sorting` as the first page: a cursor
-      // only pages the order that issued it.
-      const page = await fetchIdpPage(projectId, pageToken);
-      return { items: page.idps, nextPageToken: page.nextPageToken };
-    },
-    "Could not load more identity providers.",
-  );
-  const idps = [...first.idps, ...paging.extra];
+function IdentityProviders({ idps, schemas }: { idps: IdpConnection[]; schemas: SchemaEntry[] }) {
+  const users = schemasBySsoProvider(schemas);
 
   return (
-    <>
-      <div className={RESOURCE_TABLE_WRAP}>
-        <Table className={RESOURCE_TABLE_FIXED}>
-          <TableHeader>
-            <ResourceHeaderRow>
-              <ResourceHeadCell className={COLUMN}>Provider</ResourceHeadCell>
-              <ResourceHeadCell>User schema</ResourceHeadCell>
-              <ResourceHeadCell className="w-[18%]">Last change</ResourceHeadCell>
-              <ResourceMenuHead className="w-[7%]" />
-            </ResourceHeaderRow>
-          </TableHeader>
-          <TableBody>
-            {idps.length === 0 ? (
-              <ResourceEmptyRow colSpan={4}>
-                This project has no identity providers. Add one with{" "}
-                <InlineCode>zitadel sso enable</InlineCode>.
-              </ResourceEmptyRow>
-            ) : (
-              idps.map((idp) => <IdpRow key={idp.id} idp={idp} schemas={schemas} />)
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      <LoadMore paging={paging} />
-    </>
+    <div className={RESOURCE_TABLE_WRAP}>
+      <Table className={RESOURCE_TABLE_FIXED}>
+        <TableHeader>
+          <ResourceHeaderRow>
+            <ResourceHeadCell className={COLUMN}>Provider</ResourceHeadCell>
+            <ResourceHeadCell>User schema</ResourceHeadCell>
+            <ResourceHeadCell className="w-[18%]">Last change</ResourceHeadCell>
+            <ResourceMenuHead className="w-[7%]" />
+          </ResourceHeaderRow>
+        </TableHeader>
+        <TableBody>
+          {idps.length === 0 ? (
+            <ResourceEmptyRow colSpan={4}>
+              This project has no identity providers. Add one with{" "}
+              <InlineCode>zitadel sso enable</InlineCode>.
+            </ResourceEmptyRow>
+          ) : (
+            idps.map((idp) => <IdpRow key={idp.id} idp={idp} users={users.get(idp.slug) ?? []} />)
+          )}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 
-function IdpRow({ idp, schemas }: { idp: IdpConnection; schemas: SchemaEntry[] }) {
+function IdpRow({ idp, users }: { idp: IdpConnection; users: IdpReference[] }) {
   const navigate = useNavigate();
   const name = idp.definition.display_name;
 
@@ -301,7 +271,7 @@ function IdpRow({ idp, schemas }: { idp: IdpConnection; schemas: SchemaEntry[] }
         </Link>
       </TableCell>
       <TableCell className={RESOURCE_CELL_MUTED}>
-        <SchemaNames items={schemasUsingIdp(idp.slug, schemas)} />
+        <SchemaNames items={users} />
       </TableCell>
       {/* `updated_at` is when the newest revision was created: the last
           change to the connection. */}

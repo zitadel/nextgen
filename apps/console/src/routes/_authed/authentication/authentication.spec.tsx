@@ -89,12 +89,10 @@ function serve({
   idps = [GOOGLE, GITHUB] as unknown[] | 403,
   schemas = [CUSTOMERS, EMPLOYEES],
   flows = [LOGIN_FLOW],
-  nextPageToken,
 }: {
   idps?: unknown[] | 403;
   schemas?: unknown[];
   flows?: unknown[];
-  nextPageToken?: string;
 } = {}) {
   const bodies: Array<Record<string, unknown>> = [];
   server.use(
@@ -104,13 +102,7 @@ function serve({
       if (idps === 403) {
         return HttpResponse.json({ code: "idp.permission_denied", message: "no" }, { status: 403 });
       }
-      const sorting = body.sorting as { field: string } | undefined;
-      // Only the list's newest-first query pages; the slug lookup reads all.
-      const paged = sorting?.field === "created_at" && nextPageToken && !body.page_token;
-      return HttpResponse.json({
-        idps: body.page_token ? [connection("idp_older", "older", "Older")] : idps,
-        ...(paged ? { next_page_token: nextPageToken } : {}),
-      });
+      return HttpResponse.json({ idps });
     }),
     http.get(SCHEMAS, () => HttpResponse.json({ schemas })),
     http.get(FLOWS, () => HttpResponse.json({ flow_definitions: flows })),
@@ -213,27 +205,33 @@ describe("authentication screen", () => {
     expect(row("Passkey").getByText("Alpha, Beta ... +2")).toBeInTheDocument();
   });
 
-  it("keeps the selected tab in the URL", async () => {
+  it("puts the selected tab in the URL", async () => {
     serve();
     const router = await renderAt("/authentication");
     await userEvent.click(await screen.findByRole("tab", { name: "Identity providers" }));
     await waitFor(() =>
       expect(router.state.location.search).toMatchObject({ tab: "identity-providers" }),
     );
+  });
 
-    // A reload of that URL opens the same tab.
+  it("opens the tab a shared link names", async () => {
     serve();
     await renderAt("/authentication?tab=identity-providers");
-    const tabs = await screen.findAllByRole("tab", { name: "Identity providers" });
-    expect(tabs.at(-1)).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByRole("tab", { name: "Identity providers" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   it("without idp.read, hides the Identity providers tab and shows raw slugs", async () => {
     serve({ idps: 403 });
-    await renderAt("/authentication?tab=identity-providers");
+    const router = await renderAt("/authentication?tab=identity-providers");
 
     await screen.findByRole("table");
     expect(screen.queryByRole("tab", { name: "Identity providers" })).not.toBeInTheDocument();
+    // The URL drops the tab it cannot show, and keeps the project.
+    await waitFor(() => expect(router.state.location.search).not.toHaveProperty("tab"));
+    expect(router.state.location.search).toMatchObject({ project: "proj_test" });
     expect(screen.getByText("google")).toBeInTheDocument();
     expect(screen.getByText("okta")).toBeInTheDocument();
     // Whether a slug has a connection is not something this caller can see.
@@ -241,8 +239,8 @@ describe("authentication screen", () => {
     expect(screen.queryByRole("link", { name: "google" })).not.toBeInTheDocument();
   });
 
-  it("lists every connection newest first with its schemas, and pages with the same sorting", async () => {
-    const bodies = serve({ nextPageToken: "tok_2" });
+  it("lists every connection newest first with its schemas", async () => {
+    const bodies = serve();
     await renderAt("/authentication?tab=identity-providers");
 
     const table = within(await screen.findByRole("table"));
@@ -253,17 +251,9 @@ describe("authentication screen", () => {
     expect(row("GitHub").getByText("Not used")).toBeInTheDocument();
     expect(table.getAllByText(formatDate(UPDATED_AT))).toHaveLength(2);
 
-    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
-    expect(await table.findByRole("link", { name: "Older" })).toBeInTheDocument();
-
-    const listQueries = bodies.filter(
-      (body) => (body.sorting as { field: string } | undefined)?.field === "created_at",
-    );
-    expect(listQueries).toHaveLength(2);
-    for (const body of listQueries) {
-      expect(body.sorting).toEqual({ field: "created_at", direction: "desc" });
-    }
-    expect(listQueries[1]?.page_token).toBe("tok_2");
+    // One read serves both tabs, newest first: the API sorts ascending by default.
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]?.sorting).toEqual({ field: "created_at", direction: "desc" });
   });
 
   it("points to the CLI when the project has no connections", async () => {
