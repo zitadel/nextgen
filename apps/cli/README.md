@@ -113,6 +113,8 @@ and agent UIs may display stderr package-manager progress together with stdout.
 - `zitadel schemas list`: list the project's user schemas
 - `zitadel variables list|get|set|delete`: manage the project's variables and
   secrets (`--project-level`)
+- `zitadel origin add|list|rm`: manage the origin patterns the project admits
+  (`--kind primary|preview`)
 - `zitadel eject`: remove what setup wrote (alias: `zitadel uninstall`)
 - `zitadel start|stop|logs|reset`: manage the local runtime
 
@@ -152,6 +154,9 @@ which ships in this package.
 * [`zitadel idps get ID`](#zitadel-idps-get-id)
 * [`zitadel idps list`](#zitadel-idps-list)
 * [`zitadel logs`](#zitadel-logs)
+* [`zitadel origin add PATTERN`](#zitadel-origin-add-pattern)
+* [`zitadel origin list`](#zitadel-origin-list)
+* [`zitadel origin rm PATTERN`](#zitadel-origin-rm-pattern)
 * [`zitadel plan`](#zitadel-plan)
 * [`zitadel projects get ID`](#zitadel-projects-get-id)
 * [`zitadel projects list`](#zitadel-projects-list)
@@ -1357,6 +1362,135 @@ GLOBAL FLAGS
 
 DESCRIPTION
   Show local Zitadel server logs.
+```
+
+## `zitadel origin add PATTERN`
+
+Add an origin pattern to the project.
+
+```
+USAGE
+  $ zitadel origin add PATTERN --kind primary|preview [--json] [-c
+    <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+    [--telemetry] [-e <value>] [--env-file <value>]
+
+ARGUMENTS
+  PATTERN  The origin pattern to add.
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then development.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
+      --kind=<option>     (required) What the pattern is for.
+                          <options: primary|preview>
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Add an origin pattern to the project.
+
+EXAMPLES
+  $ zitadel origin add https://app.acme.com --kind primary
+
+  $ zitadel origin add https://*-acme.vercel.app --kind preview
+```
+
+## `zitadel origin list`
+
+List the origin patterns on the project.
+
+```
+USAGE
+  $ zitadel origin list [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--plain]
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then development.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
+      --plain             Tab-separated rows with no header, for piping. Implied
+                          when stdout is not a terminal.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List the origin patterns on the project.
+
+EXAMPLES
+  $ zitadel origin list
+
+  $ zitadel origin list --plain
+```
+
+## `zitadel origin rm PATTERN`
+
+Remove an origin pattern from the project.
+
+```
+USAGE
+  $ zitadel origin rm PATTERN [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [-f]
+
+ARGUMENTS
+  PATTERN  The origin pattern to remove.
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then development.
+  -f, --force             Remove the pattern without the confirmation prompt.
+                          Required when non-interactive.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Remove an origin pattern from the project.
+
+EXAMPLES
+  $ zitadel origin rm https://app.acme.com
+
+  $ zitadel origin rm https://app.acme.com --force
 ```
 
 ## `zitadel plan`
