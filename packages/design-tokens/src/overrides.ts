@@ -9,14 +9,11 @@
  * only until Figma publishes its equivalent — then delete it and let the sync
  * surface it (as `container` already does).
  *
- * Mode handling (current PR):
+ * Mode handling:
  *   - The default surface is dark mode, applied at `:root` and mirrored on
- *     `[data-theme="dark"]` (orchestrator sets `data-theme="dark"` on
- *     `<html>` so a tenant page that already sets `data-theme="light"`
- *     doesn't accidentally inherit dark colours).
- *   - `[data-theme="light"]` is reserved as an empty selector — same shape
- *     of overrides will be appended here once Figma publishes a light mode.
- *     Consumers don't change.
+ *     `:root[data-theme="dark"]`.
+ *   - `:root[data-theme="light"]` carries the values that differ in light.
+ *     The orchestrators stamp the resolved mode on their own host element.
  */
 
 /** Categories the build script emits as `--zl-*` CSS variables and `tokens.*` typed exports. */

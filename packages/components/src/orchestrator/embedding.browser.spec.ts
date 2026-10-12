@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
 
 import "./zitadel-login.js";
-import minimalTemplate from "../../../config/defaults/branding/minimal/login.liquid";
+import minimalTemplate from "@zitadel/config/defaults/branding/minimal/login.liquid";
 // Raw imports via the liquidRaw Vite plugin — @zitadel/config/defaults reads
 // files with node:fs at call time, which cannot run inside Chromium. The
 // split/hero designs are retired (#1039); their fixtures stand in for

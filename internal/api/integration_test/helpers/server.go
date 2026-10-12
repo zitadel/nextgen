@@ -1,14 +1,40 @@
 package helpers
 
 import (
+	"bytes"
+	"log/slog"
+	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	generated "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 )
+
+// serverLog is a concurrency-safe sink for the test server's request logs.
+type serverLog struct {
+	mutex sync.Mutex
+	buf   bytes.Buffer
+}
+
+func (l *serverLog) Write(p []byte) (int, error) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	return l.buf.Write(p)
+}
+
+// ServerLog is everything the server under test has logged so far. Tests use
+// it above all negatively: a secret, a code or a state in here is a leak.
+func (h *Harness) ServerLog() string {
+	h.serverLog.mutex.Lock()
+	defer h.serverLog.mutex.Unlock()
+	return h.serverLog.buf.String()
+}
 
 func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
@@ -16,11 +42,35 @@ func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
 	defer h.testServer.mutex.Unlock()
 
 	if h.testServer.value == nil {
-		h.testServer.value = httptest.NewServer(
-			api.WithSessionStateNoStore(api.WithCSRFRequest(h.EnsureGeneratedServer(t))),
-		)
+		callback := h.withServerLog(api.NewIDPCallbackHandler(service.NewFlowSSOCallback(
+			h.EnsureIDPConnectionService(t),
+			h.EnsureAuthAttemptService(t),
+			h.EnsureKeyService(t),
+			h.EnsureVariableService(t),
+			h.EnsureHttpClient(t),
+		)), "code", "state")
+		// The same paths as the production mux (buildHTTPMux), not its
+		// middleware chain: the callback on both its spellings, ahead of the
+		// API catch-all.
+		mux := http.NewServeMux()
+		mux.Handle(api.IDPCallbackPath, callback)
+		mux.Handle(api.IDPCallbackUpstreamPath, callback)
+		mux.Handle("/", h.withServerLog(api.WithSessionStateNoStore(api.WithCSRFRequest(h.EnsureGeneratedServer(t)))))
+		h.testServer.value = httptest.NewServer(mux)
 	}
 	return h.testServer.value
+}
+
+// withServerLog hands every request a logger collecting into the harness, the
+// way the production middleware hands one writing to the process log, and runs
+// the production request logging on top so the buffer holds real log lines.
+// redactQuery is the mount's opt-in, as in production.
+func (h *Harness) withServerLog(next http.Handler, redactQuery ...string) http.Handler {
+	logger := slog.New(slog.NewTextHandler(&h.serverLog, nil))
+	logging := middleware.WithLogging(next, redactQuery...)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logging.ServeHTTP(w, r.WithContext(zlog.WithLoggingContext(r.Context(), logger)))
+	})
 }
 
 func (h *Harness) EnsureGeneratedServer(t *testing.T) *generated.Server {

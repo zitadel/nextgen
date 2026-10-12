@@ -1,13 +1,14 @@
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import type { ZitadelProject } from "@zitadel/api/config";
 
-import { getSession, revokeSession } from "./api-client.js";
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
-import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
+import { resolveApi } from "./resolve-api.js";
+import { SessionController } from "./session-controller.js";
+import { ZitadelConfigured, stampTheme } from "./surface.js";
 import { ThemeController, type ThemeMode } from "./theme-controller.js";
-import { emit } from "../internal/emit.js";
 import { baseHostStyles, focusVisibleStyles, t } from "../styles/index.js";
+
+import "../atoms/zl-icon.js";
 
 /**
  * `<zitadel-logout>` — orchestrator-tier element that lets the signed-in user
@@ -37,11 +38,10 @@ import { baseHostStyles, focusVisibleStyles, t } from "../styles/index.js";
  * placeholder `<nextgen-logout>`'s contract so existing markup keeps working.
  *
  * Default styles consume the `--zl-*` design tokens so tenant branding
- * applies automatically — there is no hardcoded brand colour, radius, or
- * shadow.
+ * applies automatically.
  */
 @customElement("zitadel-logout")
-export class ZitadelLogout extends LitElement {
+export class ZitadelLogout extends ZitadelConfigured {
   static override styles = [
     baseHostStyles,
     css`
@@ -55,11 +55,11 @@ export class ZitadelLogout extends LitElement {
         cursor: pointer;
         width: 2.5rem;
         height: 2.5rem;
-        border-radius: 9999px;
+        border-radius: ${t.radius.full};
         background: ${t.theme.primary};
         color: ${t.theme.primaryForeground};
-        font-size: 0.875rem;
-        font-weight: 600;
+        font-size: ${t.text.sm.size};
+        font-weight: ${t.font.weight.semibold};
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -82,7 +82,7 @@ export class ZitadelLogout extends LitElement {
         background: ${t.theme.popover};
         border: 1px solid ${t.theme.border};
         border-radius: ${t.radius.lg};
-        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+        box-shadow: ${t.shadow.lg};
         z-index: 9999;
         overflow: hidden;
       }
@@ -98,11 +98,11 @@ export class ZitadelLogout extends LitElement {
         flex-shrink: 0;
         width: 2.5rem;
         height: 2.5rem;
-        border-radius: 9999px;
+        border-radius: ${t.radius.full};
         background: ${t.theme.primary};
         color: ${t.theme.primaryForeground};
-        font-size: 0.875rem;
-        font-weight: 600;
+        font-size: ${t.text.sm.size};
+        font-weight: ${t.font.weight.semibold};
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -112,20 +112,20 @@ export class ZitadelLogout extends LitElement {
         flex: 1;
       }
       .preview-name {
-        font-size: 0.875rem;
-        font-weight: 600;
+        font-size: ${t.text.sm.size};
+        font-weight: ${t.font.weight.semibold};
         color: ${t.theme.foreground};
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
       }
       .preview-email {
-        font-size: 0.75rem;
+        font-size: ${t.text.xs.size};
         color: ${t.theme.mutedForeground};
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        margin-top: 2px;
+        margin-top: ${t.spacing["0-5"]};
       }
 
       .actions {
@@ -141,8 +141,8 @@ export class ZitadelLogout extends LitElement {
         padding: ${t.spacing["2"]} ${t.spacing["4"]};
         border-radius: ${t.radius.md};
         color: ${t.theme.destructive};
-        font-size: 0.875rem;
-        font-weight: 500;
+        font-size: ${t.text.sm.size};
+        font-weight: ${t.font.weight.medium};
         box-sizing: border-box;
       }
       .signout-btn:hover:not([disabled]) {
@@ -153,62 +153,21 @@ export class ZitadelLogout extends LitElement {
       }
       .signout-btn[disabled] {
         cursor: not-allowed;
-        opacity: 0.6;
+        opacity: 0.5;
       }
       .signout-btn svg {
         flex-shrink: 0;
       }
 
-      .spinner {
-        width: 1em;
-        height: 1em;
-        border-radius: 9999px;
-        border: 2px solid currentColor;
-        border-top-color: transparent;
-        animation: zl-logout-spin 600ms linear infinite;
-      }
-      @keyframes zl-logout-spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
-
       .error-bar {
         padding: ${t.spacing["2"]} ${t.spacing["4"]};
-        font-size: 0.75rem;
+        font-size: ${t.text.xs.size};
         color: ${t.theme.destructive};
         background: color-mix(in srgb, ${t.theme.destructive} 12%, transparent);
         border-top: 1px solid ${t.theme.border};
       }
     `,
   ];
-
-  /**
-   * SDK project handle returned by `configureZitadel()`. Set from JS (or a
-   * framework binding). When set, takes precedence over both the
-   * `project-id`/`proxy-path`/`url` attributes and the global singleton from
-   * `getZitadelConfig()`.
-   */
-  @property({ attribute: false }) accessor project: ZitadelProject | undefined;
-
-  /**
-   * Project ID, set declaratively in HTML. Lets the component be configured on
-   * a plain page without JS or `configureZitadel()`. Ignored when the `project`
-   * property or a `configureZitadel()` global is set.
-   */
-  @property({ type: String, attribute: "project-id" }) accessor projectId = "";
-
-  /**
-   * Proxy path for API requests (e.g. `/__nextgen`), set declaratively in HTML.
-   * Defaults to `/__nextgen` when omitted, matching `configureZitadel()`.
-   */
-  @property({ type: String, attribute: "proxy-path" }) accessor proxyPath = "";
-
-  /**
-   * Full URL of the Zitadel auth backend, set declaratively in HTML. Optional —
-   * not needed in client-only setups.
-   */
-  @property({ type: String }) accessor url = "";
 
   /** URL to navigate to after a successful sign-out. */
   @property({ type: String, attribute: "post-sign-out-url" }) accessor postSignOutUrl = "";
@@ -222,17 +181,7 @@ export class ZitadelLogout extends LitElement {
    */
   @property({ type: String }) accessor theme: "" | ThemeMode = "";
 
-  @state() private accessor userDisplay = "";
-
-  @state() private accessor userIdentifier = "";
-
-  @state() private accessor userId = "";
-
   @state() private accessor open = false;
-
-  @state() private accessor loading = false;
-
-  @state() private accessor errorMessage = "";
 
   // Set once in `connectedCallback` based on whether a `<template>` child is
   // present. Not reactive — switching modes mid-life would require re-running
@@ -246,12 +195,14 @@ export class ZitadelLogout extends LitElement {
 
   private projectedContainer: HTMLElement | null = null;
 
-  // Guards the one-shot identity fetch so it runs once config is resolvable,
-  // whether that's at connect time (global config / declarative attributes) or
-  // after a framework assigns the `project` property post-mount.
-  private identityRequested = false;
-
   private readonly themeController = new ThemeController(this);
+
+  // Re-projects once identity settles so template-mode markup shows it.
+  private readonly session = new SessionController(
+    this,
+    () => resolveApi(this.project, this.projectAttrs, "<zitadel-logout>").api,
+    () => this.projectTemplate(),
+  );
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -267,8 +218,6 @@ export class ZitadelLogout extends LitElement {
 
     document.addEventListener("click", this.handleDocumentClick);
     document.addEventListener("keydown", this.handleDocumentKeydown);
-
-    this.maybeLoadIdentity();
   }
 
   override disconnectedCallback(): void {
@@ -287,57 +236,11 @@ export class ZitadelLogout extends LitElement {
       applyBaseTokens(root);
       applyBrandingTokens(root, undefined);
     }
-    this.dataset.theme = this.themeController.theme;
-    this.toggleAttribute("data-theme-dark", this.themeController.theme === "dark");
-  }
-
-  override updated(): void {
-    // Retry once config becomes resolvable (e.g. a framework set `project`
-    // after mount). No-ops after the first successful request.
-    this.maybeLoadIdentity();
-  }
-
-  /** Declarative config read from this element's attributes. */
-  private get projectAttrs(): ProjectAttrs {
-    return { projectId: this.projectId, proxyPath: this.proxyPath, url: this.url };
-  }
-
-  /**
-   * Fetches the signed-in identity from `GET /sessions/me` once a project is
-   * resolvable. No-ops until then (and on repeat calls) so framework property
-   * timing doesn't matter and we never fire the request twice. A pending
-   * `<template>` is already projected in `connectedCallback`, so when no config
-   * is available yet the logout control still renders; it is re-projected with
-   * the real identity once a later request succeeds.
-   */
-  private maybeLoadIdentity(): void {
-    if (this.identityRequested) return;
-    let api: ReturnType<typeof resolveApi>["api"];
-    try {
-      ({ api } = resolveApi(this.project, this.projectAttrs, "<zitadel-logout>"));
-    } catch {
-      return;
-    }
-    this.identityRequested = true;
-    void this.loadIdentity(api);
-  }
-
-  private async loadIdentity(api: ReturnType<typeof resolveApi>["api"]): Promise<void> {
-    try {
-      const session = await getSession(api);
-      this.userDisplay = session.user?.display ?? "";
-      this.userIdentifier = session.user?.identifier ?? "";
-      this.userId = session.user_id ?? "";
-    } catch {
-      // No active session — render the control without identity.
-    } finally {
-      // Re-project so template-mode markup reflects the resolved identity.
-      this.projectTemplate();
-    }
+    stampTheme(this, this.themeController);
   }
 
   private get initial(): string {
-    const source = this.userDisplay || this.userIdentifier || this.userId;
+    const source = this.session.label;
     return source ? source.charAt(0).toUpperCase() : "?";
   }
 
@@ -356,7 +259,7 @@ export class ZitadelLogout extends LitElement {
     if (!this.templateMode || !this.pendingTemplate) return;
 
     const clone = this.pendingTemplate.content.cloneNode(true) as DocumentFragment;
-    fillTemplateTokens(clone, this.userDisplay, this.userIdentifier, this.initial);
+    fillTemplateTokens(clone, this.session.display, this.session.identifier, this.initial);
 
     const container = document.createElement("span");
     container.appendChild(clone);
@@ -388,34 +291,15 @@ export class ZitadelLogout extends LitElement {
 
   private toggleOpen(): void {
     this.open = !this.open;
-    this.errorMessage = "";
+    this.session.clearError();
   }
 
-  /**
-   * Calls `DELETE /sessions/me` (`revokeMySession`) with `credentials: "include"`.
-   * The server validates the `__nextgen_session` cookie, deletes the session, and
-   * clears the cookie via `Set-Cookie: Max-Age=0`. On success this element fires
-   * `zitadel-signout` and optionally navigates to `postSignOutUrl`.
-   */
+  /** Signs out, closes the menu, then optionally navigates to `postSignOutUrl`. */
   private async doLogout(): Promise<void> {
-    this.loading = true;
-    this.errorMessage = "";
-
-    try {
-      const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-logout>");
-      await revokeSession(api);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "";
-      this.errorMessage = message || "Sign-out failed. Please try again.";
-      this.loading = false;
-      return;
-    }
-
-    this.open = false;
-    this.loading = false;
-
-    emit(this, "zitadel-signout", { display: this.userDisplay, identifier: this.userIdentifier });
-
+    const closeMenu = () => {
+      this.open = false;
+    };
+    if (!(await this.session.signOut(closeMenu))) return;
     if (this.postSignOutUrl && typeof window !== "undefined") {
       window.location.href = this.postSignOutUrl;
     }
@@ -453,12 +337,10 @@ export class ZitadelLogout extends LitElement {
               <div class="preview">
                 <div class="preview-avatar" aria-hidden="true">${this.initial}</div>
                 <div class="preview-info">
-                  <div class="preview-name">
-                    ${this.userDisplay || this.userIdentifier || this.userId}
-                  </div>
+                  <div class="preview-name">${this.session.label}</div>
                   ${
-                    this.userDisplay && this.userIdentifier
-                      ? html`<div class="preview-email">${this.userIdentifier}</div>`
+                    this.session.display && this.session.identifier
+                      ? html`<div class="preview-email">${this.session.identifier}</div>`
                       : nothing
                   }
                 </div>
@@ -468,12 +350,12 @@ export class ZitadelLogout extends LitElement {
                 <button
                   class="signout-btn"
                   type="button"
-                  ?disabled=${this.loading}
+                  ?disabled=${this.session.loading}
                   @click=${this.handleSignOutClick}
                 >
                   ${
-                    this.loading
-                      ? html`<span class="spinner" aria-hidden="true"></span>`
+                    this.session.loading
+                      ? html`<zl-icon name="spinner" size="16" spin decorative></zl-icon>`
                       : html`
                         <svg
                           width="14"
@@ -492,13 +374,13 @@ export class ZitadelLogout extends LitElement {
                         </svg>
                       `
                   }
-                  <span>${this.loading ? "Signing out…" : "Sign out"}</span>
+                  <span>${this.session.loading ? "Signing out…" : "Sign out"}</span>
                 </button>
               </div>
 
               ${
-                this.errorMessage
-                  ? html`<div class="error-bar" role="alert">${this.errorMessage}</div>`
+                this.session.errorMessage
+                  ? html`<div class="error-bar" role="alert">${this.session.errorMessage}</div>`
                   : nothing
               }
             </div>

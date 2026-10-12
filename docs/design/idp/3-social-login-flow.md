@@ -35,8 +35,7 @@ Because external identity providers require exact-match redirect URIs, the path
 carries no flow ID.
 All correlation is handled dynamically via the `state` parameter.
 
-While the shape is finalized, both structural halves depend on pending
-architecture:
+The shape is finalized; its two structural halves:
 
 - **Origin Resolution:** The origin is the environment's declared issuer
   ([`configuration-surface.md`, Environments](../platform/configuration-surface.md#environments)).
@@ -46,11 +45,12 @@ architecture:
   [#534](https://github.com/zitadel/nextgen/issues/534) (part of the
   [#529](https://github.com/zitadel/nextgen/issues/529) releases epic); deriving
   a callback origin per environment depends on it.
-- **Server Routing:** The route does not exist yet.
-  The `/__nextgen` path serves as a client-side proxy prefix, but the server
-  currently mounts no handlers under it.
-  The callback requires the proxy to forward the path and a dedicated server
-  route to receive it, alongside any necessary prefix-rewriting logic.
+- **Server Routing:** The server mounts the handler on two spellings of the
+  route. `/__nextgen/idp/callback` is the published shape, served when the
+  instance is the browser's origin. A scaffolded app's SDK proxy strips its
+  `proxyPath` prefix before forwarding, so the instance receives the same
+  request as `/idp/callback`, which is mounted alongside; the path is reserved
+  for it in the API namespace.
 
 ### The `state` Record
 
@@ -126,12 +126,16 @@ the engine anyway it drops the configured value and keeps its own.
 The callback phase executes six sequential steps in order; an error at any step
 ends the attempt:
 
-1. **State:** An unknown, expired, or already-consumed `state` parameter
-   triggers a flow-level error with a restart route (bypassing step transitions,
-   as the originating flow session may no longer exist).
+1. **State:** An unknown, expired, or already-consumed `state` parameter is
+   refused with the callback route's own static error page: without the record
+   there is no return target, so the route cannot send the browser anywhere
+   else. Every invalid shape is answered with the same page.
 2. **Code Exchange:** Performed at the connection's token endpoint and
    authenticated per `token_endpoint_auth_method`.
-   *(Note: Resolving the secret value remains an open dependency).*
+   The secret is resolved from the project's secret variables through the
+   connection's whole-value `${{ NAME }}` reference
+   ([area 1](1-resource-model.md#the-connection-schema)); a plain variable is
+   refused.
 3. **ID Token Validation (OIDC):**
     - **Signature:** verified with keys from discovery metadata or the
       connection's `jwks_uri`; fails if neither yields keys.
@@ -495,8 +499,8 @@ transition.
 Failures never trigger a step transition, keeping the outcome vocabulary
 strictly bounded.
 Most surface as errors on the originating step; state and binding-cookie
-failures surface as a flow-level error with a restart route, since the
-originating flow session may no longer exist.
+failures are answered by the callback route itself with a uniform static error
+page, since without a valid record it has no return target.
 Per the epic's security and UX principles, failures provide a clear explanation
 and recovery route without exposing internal technical details to the end user.
 
@@ -504,9 +508,10 @@ and recovery route without exposing internal technical details to the end user.
 | :--- | :--- | :--- |
 | **User cancels / provider denies (`access_denied`)** | Originating step with a localized `text_key` error. | The step remains rendered, allowing the user to retry or select another offered authentication method. |
 | **Provider configuration error (invalid client, bad scope)** | Originating step with a generic `text_key` error. | Details are written to the server log; tenant-side misconfigurations are hidden from the end user. |
-| **State expired, unknown, or reused** | Flow-level error with a restart route. | Restarts the flow entirely, as the originating flow session may no longer exist. |
-| **Binding cookie absent or mismatched** | Flow-level error with a restart route. | The `state` is **not** consumed: a request without the right cookie cannot finish the ceremony, so the record stays pending for the user's own tab and the state expires with the attempt. The user restarts from the flow. |
+| **State expired, unknown, or reused** | The callback route's uniform error page. | The page asks the user to return to the application and try again. Every invalid state shape is answered with the same bytes, so the response confirms nothing about what exists. |
+| **Binding cookie absent or mismatched** | The callback route's uniform error page, indistinguishable from an invalid state. | The `state` is **not** consumed: a request without the right cookie cannot finish the ceremony, so the record stays pending for the user's own tab and the state expires with the attempt. The user retries from the page the sign-in started on. |
 | **Code exchange / `userinfo` failure** | Originating step with a generic error. | The user can retry; detailed error diagnostics are written to server logs. |
+| **Server-side failure after the `state` is consumed** | Originating step with a generic error. | The step shows the generic sign-in failure and its methods again, so the user can start a new sign-in; the cause is logged as an error. The callback route answers its uniform error page only when the error key cannot be stored. |
 | **Unknown subject under `creation: disabled`** | Originating step with a localized `text_key` error. | The provider signs in existing users only. The step remains rendered; the user signs in with an existing account or picks another offered method. |
 | **Verification shortfall** | Handled via normal resolution branches. | Handled automatically by resolution rules; the user never sees technical errors referencing claims. |
 

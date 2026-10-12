@@ -1,29 +1,24 @@
-import { Ellipsis, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 
 import { AddAdminDialog } from "@/components/add-admin-dialog";
-import { EYEBROW } from "@/components/detail-meta";
+import { DetailSection } from "@/components/detail-page";
 import { RemoveAdminDialog } from "@/components/remove-admin-dialog";
-import { RESOURCE_CELL, ResourceHeadCell } from "@/components/resource-list";
+import {
+  RESOURCE_CELL,
+  RESOURCE_CELL_MUTED,
+  ResourceEmptyRow,
+  ResourceHeadCell,
+  ResourceHeaderRow,
+  ResourceMenuHead,
+  ResourceRow,
+  RowMenu,
+} from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Separator } from "@/components/ui/separator";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 
-import type { api } from "../api/zitadel";
+import type { api } from "@/api/zitadel";
 
 type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
 
@@ -73,64 +68,60 @@ export function ProjectAdmins({
   const viaOwningTeam = !grants.some((grant) => grant.user?.user_id === viewerUserId);
   return (
     // Labelled so the section is a landmark assistive tech can jump to.
-    <Card className="mt-8 gap-0 rounded-xl py-0" role="region" aria-labelledby="project-admins">
-      <CardContent className="flex flex-col gap-4 px-6 py-5">
-        <div className="flex items-center justify-between gap-4">
-          <span id="project-admins" className={EYEBROW}>
-            Admins
-          </span>
-          <AddAdminDialog projectId={projectId} onAdded={onChanged}>
-            {/* Primary and the list screens' size: it is the section's one
-                action, and it reads like the Add on Users and Teams. */}
-            <Button className="shrink-0 gap-1.5 px-2.5!">
-              <Plus aria-hidden />
-              Add admin
-            </Button>
-          </AddAdminDialog>
-        </div>
-        {viaOwningTeam && (
+    <DetailSection
+      title="Admins"
+      titleId="project-admins"
+      className="mt-8"
+      note={
+        viaOwningTeam && (
           <p className="text-muted-foreground text-sm">
             You have admin access as a member of this Project’s owning Team.
           </p>
-        )}
-        <Separator />
-        <Table className="text-xs">
-          <TableHeader>
-            <TableRow className="border-border border-b hover:bg-transparent">
-              <ResourceHeadCell>Email</ResourceHeadCell>
-              {/* The design's `Status` column is not here: a grant has no status
-                  field, so every row would read `Active` and the column would
-                  say nothing about any of them. */}
-              <ResourceHeadCell>Level</ResourceHeadCell>
-              <TableHead className="h-14 w-[60px] px-6" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
-              <TableRow className="border-0 hover:bg-transparent">
-                <TableCell colSpan={3} className="text-muted-foreground h-24 text-center">
-                  No additional admins have been added.
+        )
+      }
+      role="region"
+      aria-labelledby="project-admins"
+      action={
+        <AddAdminDialog projectId={projectId} onAdded={onChanged}>
+          {/* Primary and the list screens' size: it is the section's one
+              action, and it reads like the Add on Users and Teams. */}
+          <Button className="shrink-0 gap-1.5 px-2.5!">
+            <Plus aria-hidden />
+            Add admin
+          </Button>
+        </AddAdminDialog>
+      }
+    >
+      <Table className="text-xs">
+        <TableHeader>
+          <ResourceHeaderRow>
+            <ResourceHeadCell>Email</ResourceHeadCell>
+            {/* The design's `Status` column is not here: a grant has no status
+                field, so every row would read `Active` and the column would
+                say nothing about any of them. */}
+            <ResourceHeadCell>Level</ResourceHeadCell>
+            <ResourceMenuHead className="w-15" />
+          </ResourceHeaderRow>
+        </TableHeader>
+        <TableBody>
+          {rows.length === 0 ? (
+            <ResourceEmptyRow colSpan={3}>No additional admins have been added.</ResourceEmptyRow>
+          ) : (
+            rows.map((row) => (
+              <ResourceRow key={row.id}>
+                <TableCell className={`${RESOURCE_CELL} text-foreground truncate text-sm`}>
+                  {row.name}
                 </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((row) => (
-                <TableRow key={row.id} className="hover:bg-muted/40 border-0">
-                  <TableCell className={`${RESOURCE_CELL} text-foreground truncate text-sm`}>
-                    {row.name}
-                  </TableCell>
-                  <TableCell className={`${RESOURCE_CELL} text-muted-foreground text-sm`}>
-                    {row.level}
-                  </TableCell>
-                  <TableCell className={RESOURCE_CELL}>
-                    <RowActions projectId={projectId} row={row} onRemoved={onChanged} />
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+                <TableCell className={RESOURCE_CELL_MUTED}>{row.level}</TableCell>
+                <TableCell className={RESOURCE_CELL}>
+                  <RowActions projectId={projectId} row={row} onRemoved={onChanged} />
+                </TableCell>
+              </ResourceRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </DetailSection>
   );
 }
 
@@ -197,20 +188,11 @@ function RowActions({
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label={`Actions for ${row.name}`}>
-            {/* Horizontal dots, as this frame draws them. The portal tables
-                use the vertical glyph; the two surfaces differ in the design. */}
-            <Ellipsis aria-hidden />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem variant="destructive" onSelect={() => setRemoveOpen(true)}>
-            {action}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <RowMenu name={row.name} contentClassName="w-auto">
+        <DropdownMenuItem variant="destructive" onSelect={() => setRemoveOpen(true)}>
+          {action}
+        </DropdownMenuItem>
+      </RowMenu>
 
       <RemoveAdminDialog
         projectId={projectId}

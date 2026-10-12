@@ -1,8 +1,9 @@
 {
   "compilerOptions": {
-    "composite": true,
-    "declarationMap": true,
-    "emitDeclarationOnly": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "customConditions": ["@zitadel/source"],
+    "erasableSyntaxOnly": true,
     "importHelpers": true,
     "isolatedModules": true,
     "lib": ["ES2022"],
@@ -12,11 +13,14 @@
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
     "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+    "noUncheckedSideEffectImports": true,
     "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
     "target": "es2022",
-    "customConditions": ["@zitadel/source"],
-    "noUncheckedIndexedAccess": true
+    "verbatimModuleSyntax": true
   }
 }

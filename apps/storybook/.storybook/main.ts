@@ -84,6 +84,13 @@ const config: StorybookConfig = {
     // `dist` project references. Alias it to source here instead — a Storybook-
     // bundler-only override that keeps the Lit shadow CSS (`?inline`) and atom
     // logic hot, without changing how the rest of the workspace resolves it.
+    //
+    // Known exception to "use a package through its exports": this alias also
+    // applies to `storybook build` and the Vitest stories, not only `dev`.
+    // Caching stays correct because every storybook task depends on
+    // `components:build`, whose hash covers this source. Consuming the built
+    // `dist` instead would drop the alias, the `liquidRaw` path import above
+    // and the watcher below, at the cost of instant hot reload.
     const componentsSrc = resolve(packagesDir, "components/src");
     const componentsAlias = [
       {

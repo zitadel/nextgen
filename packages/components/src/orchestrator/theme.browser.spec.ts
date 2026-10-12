@@ -11,10 +11,8 @@ import type { ZitadelLogin } from "./zitadel-login.js";
  *
  * The base token sheet ships both modes (`:host` / `:host([data-theme=…])`
  * after the selector rewrite in `branding-to-tokens`), and the orchestrator
- * stamps the resolved mode on its own host element. Regression guard: the
- * atom-facing tokens once lived only in the dark block, so
- * `data-theme="light"` resolved correctly while every surface stayed dark —
- * asserting the attribute alone would not have caught that.
+ * stamps the resolved mode on its own host element. Asserts painted pixels:
+ * the attribute alone can resolve while surfaces stay in the other mode.
  */
 
 const identifierStep: CreateFlow201 = {
@@ -256,10 +254,8 @@ describe("<zitadel-login> theming (chromium)", () => {
       const pageBg = luminance(getComputedStyle(page).backgroundColor);
 
       // Direction, not distance: the edge has to step *away* from the page —
-      // darker on a light page, lighter on a dark one. A distance check would
-      // have passed the regression, whose white border sat 11 points off a
-      // near-white page. Dark mode hid the bug because the card's surface and
-      // border tokens happen to share a value there (#252528).
+      // darker on a light page, lighter on a dark one. A white border on a
+      // near-white page passes a distance check.
       const separation = theme === "light" ? pageBg - border : border - pageBg;
       expect(
         separation,

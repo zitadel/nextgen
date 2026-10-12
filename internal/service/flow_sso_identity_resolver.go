@@ -68,6 +68,13 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 	}
 	result := check.Result
 
+	// An error result carries no identity, so none of the reads below apply.
+	// The row stays parked, like creation disabled, until the attempt expires
+	// or the next ceremony replaces it.
+	if result.IsError() {
+		return &domain.FlowSSOParkedIdentity{CheckID: check.ID, ErrorKey: result.ErrorKey, AttemptUserID: attemptUserID}, nil
+	}
+
 	// The pinned revision, not the newest: the result was produced under it.
 	connection, err := r.connections.GetRevision(ctx, in.ProjectID, result.ConnectionRevisionID)
 	if errors.Is(err, domain.ErrIDPConnectionNotFound()) {

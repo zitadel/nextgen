@@ -29,10 +29,13 @@ interface Harness {
  * ladder — the widget's documented automation-hook contract.
  */
 class FakeLocator {
-  constructor(
-    private readonly harness: Harness,
-    readonly desc: string,
-  ) {}
+  private readonly harness: Harness;
+  readonly desc: string;
+
+  constructor(harness: Harness, desc: string) {
+    this.harness = harness;
+    this.desc = desc;
+  }
   or(other: Locator): FakeLocator {
     return new FakeLocator(this.harness, `${this.desc}|${(other as unknown as FakeLocator).desc}`);
   }

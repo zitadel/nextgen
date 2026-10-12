@@ -49,7 +49,7 @@ describe("<zl-button> rendering (jsdom)", () => {
   it("shows a spinner and sets aria-busy while loading", async () => {
     const el = mount(`<zl-button label="Save" loading></zl-button>`);
     await el.updateComplete;
-    expect(el.shadowRoot?.querySelector(".spinner")).toBeTruthy();
+    expect(el.shadowRoot?.querySelector(".zr-btn__spinner")).toBeTruthy();
     expect(el.shadowRoot?.querySelector("button")?.getAttribute("aria-busy")).toBe("true");
   });
 

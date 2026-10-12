@@ -5,10 +5,9 @@ import { SHIPPED_ICON_NAMES } from "./zl-icon.js";
 import type { ZlIcon } from "./zl-icon.js";
 
 /**
- * `<zl-icon>` renders a curated Lucide glyph. The key invariant the code
- * comment promises ("keep playgrounds and parity tests in sync") is that
- * every name in `SHIPPED_ICON_NAMES` maps to a real glyph — asserted here so
- * a name added to the union without a node entry fails the build.
+ * `<zl-icon>` renders a curated Lucide glyph. Every name in
+ * `SHIPPED_ICON_NAMES` maps to a real glyph — asserted here so a name added
+ * to the union without a node entry fails the build.
  */
 describe("<zl-icon>", () => {
   let host: HTMLDivElement;

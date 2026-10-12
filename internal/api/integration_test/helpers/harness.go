@@ -21,6 +21,10 @@ type Harness struct {
 
 	DB *service.DB
 
+	// serverLog collects what the server under test logs; tests assert above
+	// all what it must not contain (see Harness.ServerLog).
+	serverLog serverLog
+
 	httpClient      dependency[*http.Client]
 	testServer      dependency[*httptest.Server]
 	hasherFactory   dependency[*crypto.HasherFactory]

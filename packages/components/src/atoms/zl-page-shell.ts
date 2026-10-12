@@ -3,6 +3,7 @@ import { customElement } from "lit/decorators.js";
 
 import pageShellStyles from "./zl-page-shell.css?inline";
 
+import { lightDomSlotFilled } from "../internal/slot-filled.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
 
@@ -12,7 +13,7 @@ import { baseHostStyles, surfaceStyles } from "../styles/index.js";
  * dark background, vertical centring, responsive padding, and footer
  * attribution slot.
  *
- * Figma values, from the sign-in / sign-up / passkey-upsell frames:
+ * Values:
  *
  *   background  --zl-background
  *   color       --zl-foreground, inherited
@@ -34,8 +35,8 @@ export class ZlPageShell extends LitElement {
   static override styles = [baseHostStyles, ...surfaceStyles(pageShellStyles)];
 
   override render() {
-    const hasHeader = this.lightDomSlotFilled("header");
-    const hasFooter = this.lightDomSlotFilled("footer");
+    const hasHeader = lightDomSlotFilled(this, "header");
+    const hasFooter = lightDomSlotFilled(this, "footer");
     const headerClass = hasHeader
       ? "zr-page-shell__header"
       : "zr-page-shell__header zr-page-shell__region--empty";
@@ -65,13 +66,6 @@ export class ZlPageShell extends LitElement {
   private onSlotChange = (): void => {
     this.requestUpdate();
   };
-
-  private lightDomSlotFilled(slot: string): boolean {
-    for (const child of this.children) {
-      if (child.getAttribute("slot") === slot) return true;
-    }
-    return false;
-  }
 }
 
 export const zlPageShellManifest: AtomManifest = {

@@ -171,6 +171,13 @@ func ErrIDPOAuth2Unsupported() Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("oauth2_unsupported"), "identity provider connection: the oauth2 protocol is not supported yet", nil, nil)
 }
 
+// ErrIDPStrategyPointerUnsupported refuses an oidc connection whose
+// verified_claims entries point at the supplementary_fetch strategy: only the
+// oauth2 block selects one. properties are the verified_claims keys.
+func ErrIDPStrategyPointerUnsupported(properties []string) Error {
+	return newError(PrefixIDPConnection.ErrorCodePrefix("strategy_pointer_unsupported"), "identity provider connection: an oidc connection cannot verify a property by strategy", map[string]any{"properties": properties}, fmt.Errorf("verified by a strategy: %s", strings.Join(properties, ", ")))
+}
+
 // ErrIDPExchangeFailed reports that the code exchange yielded no token. One
 // code covers the whole step, as discovery_failed does: the token endpoint
 // answered with an error such as invalid_grant or with a non-conformant

@@ -13,7 +13,7 @@ const CALLBACK = `${APP}/__nextgen/idp/callback?code=abc`;
 
 describe("filterResponseHeaders", () => {
   it("forwards a redirect that already points at this app", () => {
-    // The identity-provider callback answers `302` back to the page the
+    // The identity-provider callback answers `303` back to the page the
     // sign-in started on. It is a top-level navigation with no JavaScript in
     // the loop, so dropping this header leaves the browser on an empty page.
     const filtered = filterResponseHeaders(

@@ -2,8 +2,8 @@ import { type LoginPreviewState, loginPreviewStatesFor } from "@zitadel/componen
 import { ZitadelLogin, type ZitadelProject } from "@zitadel/sdk-react";
 import { useMemo } from "react";
 
-import { apiBase } from "../../api/zitadel";
-import { useRequiredProjectScope } from "../../lib/project-scope";
+import { apiBase } from "@/api/zitadel";
+import { useRequiredProjectScope } from "@/lib/project-scope";
 
 export type PreviewJourney = "register" | "login";
 

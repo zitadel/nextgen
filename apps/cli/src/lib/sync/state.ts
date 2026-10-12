@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import type { ResourceEntry, ScaffoldManifest, ZitadelState } from "./types.js";
 
+export type { ZitadelState } from "./types.js";
+
 /**
  * Read and parse `.zitadel/state.json`. Throws if the file is
  * missing or malformed; callers run `zitadel setup` first to bring

@@ -4,6 +4,8 @@
  * barrel side-effect-registers the elements.
  */
 
+import "../internal/lit-dev-mode.js";
+
 import "./zitadel-login.js";
 import "./zitadel-logout.js";
 import "./zitadel-session.js";

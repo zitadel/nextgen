@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -239,6 +240,17 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 		require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
 		require.ErrorIs(t, err, context.Canceled)
 		assert.Empty(t, logs.String())
+	})
+
+	t.Run("a request past its deadline is unavailable with a provider warning", func(t *testing.T) {
+		t.Parallel()
+		var logs bytes.Buffer
+		ctx, cancel := context.WithDeadline(zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logs, nil))), time.Now().Add(-time.Second))
+		defer cancel()
+
+		_, err := ssoIssuer(t, []byte(ssoDiscoveryDocument), &fakeAuthAttempts{}, nil, nil, nil).Issue(ctx, ssoIssueInput)
+		require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
+		assert.Contains(t, logs.String(), "sso provider unavailable")
 	})
 
 	t.Run("attempt error passes through", func(t *testing.T) {

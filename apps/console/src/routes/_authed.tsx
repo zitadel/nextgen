@@ -6,14 +6,15 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 
-import { fetchSession, signOut } from "../auth/session";
-import { AppShell } from "../components/app-shell/AppShell";
+import { fetchSession, signOut } from "@/auth/session";
+import { AppShell } from "@/components/app-shell/app-shell";
+import { routerRelativeHref } from "@/lib/base-path";
 import {
   PROJECT_SCOPE_PARAM,
   resolveDefaultProjectScope,
   validateProjectScopeSearch,
   withoutTrailingSlash,
-} from "../lib/project-scope";
+} from "@/lib/project-scope";
 
 /**
  * Pathless layout route owning console authentication (Console ADR 0003).
@@ -68,20 +69,6 @@ export const Route = createFileRoute("/_authed")({
   },
   component: AuthedLayout,
 });
-
-/**
- * `location.href` is the raw history path, which includes the deployment
- * prefix (`/ui/console` in production builds). Strip the Vite `BASE_URL`
- * prefix so `next` is a router-relative path that both the router redirect
- * and the login screen's `postSignInUrl` (which re-joins the base) agree on.
- */
-function routerRelativeHref(href: string): string | undefined {
-  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
-  const relative = base && href.startsWith(base) ? href.slice(base.length) : href;
-  const normalized = relative.startsWith("/") ? relative : `/${relative}`;
-  // The root is the login screen's default target; omit it to keep the URL clean.
-  return normalized === "/" ? undefined : normalized;
-}
 
 function AuthedLayout() {
   const { session } = Route.useRouteContext();

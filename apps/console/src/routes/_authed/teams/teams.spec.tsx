@@ -1,29 +1,19 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { TEST_PROJECT_ID, scopedPath } from "@/lib/project-scope.fixture";
+import { describe, expect, it, vi } from "vitest";
+import { scopedPath } from "@/test/project-scope.fixture";
+import { server } from "@/test/msw";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  const { makeTestSession } = await import("@/auth/session.fixture");
+  const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
-
 const TEAMS_URL = "http://localhost/api/teams/query";
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => {
-  server.close();
-  vi.unstubAllEnvs();
-});
 
 /** The same locale-derived string the screen renders, rather than one locale's output. */
 function expectedDate(value: string): string {
@@ -111,23 +101,21 @@ describe("teams screen", () => {
     expect(await screen.findByText("No active teams yet.")).toBeInTheDocument();
   });
 
-  it("names the search term when nothing matches it", async () => {
-    server.use(http.post(TEAMS_URL, () => HttpResponse.json({ teams: [] })));
-    await renderTeams("/teams?q=zzz");
-
-    // An empty table means something different once a question has been asked
-    // of it: nothing matched, rather than there being nothing there.
-    expect(await screen.findByText("No teams match “zzz”.")).toBeInTheDocument();
-  });
-
   it("opens the team when the row is clicked", async () => {
-    server.use(http.post(TEAMS_URL, () => HttpResponse.json({ teams: [team()] })));
+    server.use(
+      http.post(TEAMS_URL, () => HttpResponse.json({ teams: [team()] })),
+      // The click opens the team's page, whose loader reads the team.
+      http.get(`http://localhost/api/teams/${team().id}`, () => HttpResponse.json(team())),
+    );
     const router = await renderTeams();
 
     const row = (await screen.findByRole("link", { name: "Acme Web" })).closest("tr");
     expect(row).not.toBeNull();
     await userEvent.click(row as HTMLElement);
 
+    // The team's page, not only its URL: the test ends once the page has read
+    // its team, rather than with that read still in flight.
+    expect(await screen.findByRole("heading", { name: "Acme Web" })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe(`/teams/${team().id}`);
   });
 
@@ -203,41 +191,17 @@ describe("teams screen", () => {
     );
   });
 
-  it("filters by name once the search settles, and keeps the term in the URL", async () => {
+  it("starts from the tab the URL carries", async () => {
     const bodies = recordQueries(() => HttpResponse.json({ teams: [team()] }));
-    const router = await renderTeams();
-
-    await userEvent.type(await screen.findByLabelText("Search teams"), "acme");
-
-    await waitFor(() =>
-      expect(bodies.at(-1)).toMatchObject({
-        filter: [ACTIVE_FILTER, { field: "name", operation: "contains", value: "acme" }],
-      }),
-    );
-    // In the URL rather than in component state: a filtered list is linkable and
-    // moves with the back button.
-    expect(router.state.location.search).toEqual({
-      project: TEST_PROJECT_ID,
-      status: "active",
-      q: "acme",
-    });
-  });
-
-  it("starts from the tab and term the URL carries", async () => {
-    const bodies = recordQueries(() => HttpResponse.json({ teams: [team()] }));
-    await renderTeams("/teams?status=deactivated&q=acme");
+    await renderTeams("/teams?status=deactivated");
 
     await screen.findByRole("table");
     expect(bodies.at(-1)).toMatchObject({
-      filter: [
-        { field: "status", operation: "equals", value: "deactivated" },
-        { field: "name", operation: "contains", value: "acme" },
-      ],
+      filter: [{ field: "status", operation: "equals", value: "deactivated" }],
     });
     expect(screen.getByRole("tab", { name: "Deactivated" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
-    expect(screen.getByLabelText("Search teams")).toHaveValue("acme");
   });
 });

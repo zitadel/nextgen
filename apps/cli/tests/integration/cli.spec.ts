@@ -39,7 +39,7 @@ async function suggestedCommandIds(): Promise<Set<string>> {
   for (const file of await typescriptFiles(join(import.meta.dirname, "../../src"))) {
     const source = await readFile(file, "utf8");
     for (const match of source.matchAll(/publicCliCommand\(\s*(["`])([^"`$]*)/g)) {
-      const id = commandIdFromArgs(match[2]);
+      const id = commandIdFromArgs(match[2]!);
       if (id) commands.add(id);
     }
     for (const match of source.matchAll(/["`]zitadel\s+([^"`]*)/g)) {

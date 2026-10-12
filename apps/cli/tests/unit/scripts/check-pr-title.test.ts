@@ -27,6 +27,7 @@ type CheckPrTitleModule = {
 };
 
 const load = async (): Promise<CheckPrTitleModule> =>
+  // @ts-expect-error -- the script is a plain .mjs with no declaration file
   (await import("../../../../../scripts/check-pr-title.mjs")) as unknown as CheckPrTitleModule;
 
 const config = {

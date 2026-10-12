@@ -21,9 +21,9 @@ import (
 // Every test creates a project, a connection and users; the Spanner emulator
 // starves when that setup runs in parallel, so these tests run sequentially.
 
-// The callback route is not built yet, so these tests park the provider's
-// result on the attempt through the same statements the callback will use,
-// then drive the resolution through GET /flow/{id}.
+// These tests park the provider's result on the attempt through the same
+// statements the callback route uses, then drive the resolution through
+// GET /flow/{id}. The route itself is covered in sso_callback_flow_test.go.
 
 // ssoResolutionFixture is a project with the sso login flow definition, one
 // connection, and a team users can be created in.
@@ -130,7 +130,7 @@ func (f *ssoResolutionFixture) attempt(t *testing.T, flow ssoFlow) *domain.AuthA
 func parkSSOResult(t *testing.T, projectID, attemptID, revisionID, subject string, claims map[string]any, verified map[string]bool) {
 	t.Helper()
 	stmts := harness.EnsureServiceDB(t).Statements()
-	sso, err := domain.NewSSOState("google", revisionID, "https://auth.example.com/__nextgen/idp/callback", "/after-login", nil)
+	sso, err := domain.NewSSOState(projectID, "google", revisionID, "https://auth.example.com/__nextgen/idp/callback", "/after-login", nil)
 	require.NoError(t, err)
 	require.NoError(t, stmts.IssueSSOState(t.Context(), projectID, attemptID, sso.Check))
 	_, err = stmts.ConsumeSSOState(t.Context(), projectID, sso.Check.StateHash, sso.BindingNonce)

@@ -77,7 +77,7 @@ function reviseBranding(content: object): SyncAction[] {
 
 function warningsOf(actions: SyncAction[]): ReadonlyArray<{ rule: string; message: string }> {
   const action = actions[0];
-  return action.kind === "revise" ? (action.warnings ?? []) : [];
+  return action!.kind === "revise" ? (action!.warnings ?? []) : [];
 }
 
 describe("annotateAssetWarnings", () => {
@@ -125,9 +125,9 @@ describe("annotateAssetWarnings", () => {
     await annotateAssetWarnings(actions);
 
     expect(warningsOf(actions)).toHaveLength(1);
-    expect(warningsOf(actions)[0].rule).toBe("warn/asset-unreachable");
-    expect(warningsOf(actions)[0].message).toContain("logo_url https://cdn.example.com/logo.svg");
-    expect(warningsOf(actions)[0].message).toContain("HTTP 404");
+    expect(warningsOf!(actions)[0]!.rule).toBe("warn/asset-unreachable");
+    expect(warningsOf!(actions)[0]!.message).toContain("logo_url https://cdn.example.com/logo.svg");
+    expect(warningsOf!(actions)[0]!.message).toContain("HTTP 404");
   });
 
   it("warns when the host cannot be reached at all", async () => {
@@ -136,11 +136,11 @@ describe("annotateAssetWarnings", () => {
 
     await annotateAssetWarnings(actions);
 
-    expect(warningsOf(actions)[0].rule).toBe("warn/asset-unreachable");
-    expect(warningsOf(actions)[0].message).toContain("could not be reached");
+    expect(warningsOf!(actions)[0]!.rule).toBe("warn/asset-unreachable");
+    expect(warningsOf!(actions)[0]!.message).toContain("could not be reached");
     // The probe host is not necessarily the render host, so the warning has
     // to name its own escape hatch.
-    expect(warningsOf(actions)[0].message).toContain("ZITADEL_SKIP_ASSET_PROBE");
+    expect(warningsOf!(actions)[0]!.message).toContain("ZITADEL_SKIP_ASSET_PROBE");
   });
 
   it("warns when the URL serves a page instead of an image", async () => {
@@ -153,8 +153,8 @@ describe("annotateAssetWarnings", () => {
 
     await annotateAssetWarnings(actions);
 
-    expect(warningsOf(actions)[0].rule).toBe("warn/asset-content-type");
-    expect(warningsOf(actions)[0].message).toContain('content-type "text/html"');
+    expect(warningsOf!(actions)[0]!.rule).toBe("warn/asset-content-type");
+    expect(warningsOf!(actions)[0]!.message).toContain('content-type "text/html"');
   });
 
   it("warns when a successful response is explicitly bodyless", async () => {
@@ -165,8 +165,8 @@ describe("annotateAssetWarnings", () => {
 
     await annotateAssetWarnings(actions);
 
-    expect(warningsOf(actions)[0].rule).toBe("warn/asset-unreachable");
-    expect(warningsOf(actions)[0].message).toContain("HTTP 204 with no representation");
+    expect(warningsOf!(actions)[0]!.rule).toBe("warn/asset-unreachable");
+    expect(warningsOf!(actions)[0]!.message).toContain("HTTP 204 with no representation");
   });
 
   it("stays quiet when the origin refuses HEAD — that says nothing about the asset", async () => {
@@ -276,7 +276,7 @@ describe("annotateAssetWarnings", () => {
     await annotateAssetWarnings(actions);
 
     expect(warningsOf(actions)).toEqual([]);
-    expect(actions[1].kind === "create" && actions[1].warnings).toBeUndefined();
+    expect(actions[1]!.kind === "create" && actions[1]!.warnings).toBeUndefined();
   });
 
   it("keeps warnings an earlier pass already attached", async () => {

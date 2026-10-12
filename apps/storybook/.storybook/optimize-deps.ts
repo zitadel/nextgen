@@ -28,6 +28,7 @@ export const optimizeDepsExclude = [
 export const optimizeDepsInclude = [
   "lit",
   "lit/decorators.js",
+  "lit/directive-helpers.js",
   "lit/directives/class-map.js",
   "lit/directives/if-defined.js",
   "lit/directives/keyed.js",

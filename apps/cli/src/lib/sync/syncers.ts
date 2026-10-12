@@ -34,6 +34,8 @@ import { ZitadelError } from "../errors";
 import { FatalFetchError } from "./types.js";
 import type { ResourceSyncer } from "./types.js";
 
+export type { ResourceSyncer } from "./types.js";
+
 /** Runtime environment lookup used to resolve `${VAR}` / `*_env` references. */
 type EnvLookup = Record<string, string | undefined>;
 
@@ -54,7 +56,7 @@ export function makeSyncers(opts: {
    * when inlining templates for hashing and upload.
    */
   cwd: string;
-}): ReadonlyArray<ResourceSyncer> {
+}): readonly [SchemaSyncer, IdpConnectionSyncer, FlowDefinitionSyncer, BrandingSyncer] {
   return [
     new SchemaSyncer(opts.client, opts.projectId, opts.env),
     // Before flows: a flow step naming a connection slug is only valid once
@@ -130,10 +132,13 @@ class IdpConnectionSyncer implements ResourceSyncer {
   readonly mutable = true;
   readonly revisioned = false;
 
-  constructor(
-    private readonly client: ZitadelClient,
-    private readonly projectId: string,
-  ) {}
+  private readonly client: ZitadelClient;
+  private readonly projectId: string;
+
+  constructor(client: ZitadelClient, projectId: string) {
+    this.client = client;
+    this.projectId = projectId;
+  }
 
   /**
    * Parse against the generated `CreateIdpBody.idp` Zod, the orval-emitted
@@ -248,11 +253,15 @@ class SchemaSyncer implements ResourceSyncer {
   // would drop them from the next published revision. Canonical schema
   // bodies are written back as-is; `normalize` is comparison-only.
 
-  constructor(
-    private readonly client: ZitadelClient,
-    private readonly projectId: string,
-    private readonly env: EnvLookup,
-  ) {}
+  private readonly client: ZitadelClient;
+  private readonly projectId: string;
+  private readonly env: EnvLookup;
+
+  constructor(client: ZitadelClient, projectId: string, env: EnvLookup) {
+    this.client = client;
+    this.projectId = projectId;
+    this.env = env;
+  }
 
   /**
    * Parse against the generated `CreateSchemaBody` Zod (the orval-emitted
@@ -336,11 +345,15 @@ class FlowDefinitionSyncer implements ResourceSyncer {
   // strips (envelope keys, the empty `audience` echo) is transport noise.
   readonly normalizeWrite = normalizeFlowBody;
 
-  constructor(
-    private readonly client: ZitadelClient,
-    private readonly projectId: string,
-    private readonly env: EnvLookup,
-  ) {}
+  private readonly client: ZitadelClient;
+  private readonly projectId: string;
+  private readonly env: EnvLookup;
+
+  constructor(client: ZitadelClient, projectId: string, env: EnvLookup) {
+    this.client = client;
+    this.projectId = projectId;
+    this.env = env;
+  }
 
   /**
    * Validates one flow file against the canonical `flowConfigSchema` (the
@@ -416,12 +429,17 @@ class BrandingSyncer implements ResourceSyncer {
   /** One project, one branding descriptor — extra .json files fail the scan. */
   readonly singletonFile = "branding.json";
 
-  constructor(
-    private readonly client: ZitadelClient,
-    private readonly projectId: string,
-    private readonly env: EnvLookup,
-    private readonly cwd: string,
-  ) {}
+  private readonly client: ZitadelClient;
+  private readonly projectId: string;
+  private readonly env: EnvLookup;
+  private readonly cwd: string;
+
+  constructor(client: ZitadelClient, projectId: string, env: EnvLookup, cwd: string) {
+    this.client = client;
+    this.projectId = projectId;
+    this.env = env;
+    this.cwd = cwd;
+  }
 
   /**
    * The comparison form is the wire body with the template inlined, so an

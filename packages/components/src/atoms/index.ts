@@ -1,12 +1,16 @@
+import "../internal/lit-dev-mode.js";
+
 export { ZlAlert, zlAlertManifest } from "./zl-alert.js";
+export type { ZlSubmitDetail } from "./events.js";
 export { ZlButton, zlButtonManifest } from "./zl-button.js";
 export { ZlCard, zlCardManifest } from "./zl-card.js";
 export { ZlCheckbox, zlCheckboxManifest, type ZlCheckboxChangeDetail } from "./zl-checkbox.js";
-export { ZlField, zlFieldManifest, type ZlFieldType } from "./zl-field.js";
+export { ZlField, zlFieldManifest, type ZlFieldInputDetail, type ZlFieldType } from "./zl-field.js";
 export {
   ZlIcon,
   zlIconManifest,
   SHIPPED_BRAND_ICON_NAMES,
+  SHIPPED_ICON_NAMES,
   type BrandIconName,
   type IconName,
   type IconSize,
@@ -16,8 +20,9 @@ export { ZlPageShell, zlPageShellManifest } from "./zl-page-shell.js";
 export {
   ZlPasskey,
   zlPasskeyManifest,
-  type ZlPasskeyResultDetail,
   type ZlPasskeyErrorDetail,
+  type ZlPasskeyResultDetail,
+  type ZlPasskeyStartedDetail,
 } from "./zl-passkey.js";
 export { ZlPill, zlPillManifest } from "./zl-pill.js";
 export {

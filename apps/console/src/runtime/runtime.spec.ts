@@ -23,14 +23,10 @@ beforeEach(() => {
   _resetRuntimeForTesting();
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
-  // Re-applied per test: `unstubAllEnvs` below drops `test-setup.ts`'s
-  // hermetic defaults along with each test's own stubs.
-  vi.stubEnv("VITE_CONSOLE_RUNTIME_FALLBACK", "");
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 

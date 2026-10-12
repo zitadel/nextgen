@@ -1,19 +1,17 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { scopedPath } from "@/lib/project-scope.fixture";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { scopedPath } from "@/test/project-scope.fixture";
+import { server } from "@/test/msw";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  const { makeTestSession } = await import("@/auth/session.fixture");
+  const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
-
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 const USERS_URL = "http://localhost/api/users";
 const USERS_QUERY_URL = `${USERS_URL}/query`;
@@ -27,14 +25,16 @@ const USER = {
   identifier_property: "email",
   attributes: { givenName: "Maya", familyName: "Patel", email: "maya@acme.com" },
 };
-const server = setupServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => {
-  server.close();
-  vi.unstubAllEnvs();
-});
+// The list resolves each row's schema to label its columns; an empty schema
+// keeps these tests about the dialog.
+beforeEach(() =>
+  server.use(
+    http.get("http://localhost/api/schemas/:id", () =>
+      HttpResponse.json({ schema: { type: "object", properties: {} } }),
+    ),
+  ),
+);
 
 /**
  * Opens the dialog the way an operator does — through the list row's menu —
@@ -58,9 +58,7 @@ async function openDialog() {
 
 describe("delete user dialog", () => {
   it("offers only actions that reach the API", async () => {
-    // The menu used to list Edit user, Reset password and Deactivate, none of
-    // which had an endpoint behind them. A menu of dead controls is worse than
-    // a short menu — it reads as a feature that is broken rather than absent.
+    // Every menu item reaches an endpoint.
     server.use(http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [USER] })));
     const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
       import("@tanstack/react-router"),
@@ -134,9 +132,8 @@ describe("delete user dialog", () => {
   });
 
   it("cancels without deleting, even with the confirmation typed", async () => {
-    // Regression: the Radix Cancel primitive renders a bare `<button>`, which
-    // inside a `<form>` defaults to `type="submit"` — so Cancel submitted the
-    // form and deleted the user. Caught by the real-instance e2e, pinned here.
+    // Radix Cancel renders a bare `<button>`, which defaults to `type=submit`
+    // inside a form; Cancel must not submit.
     let deleteCalls = 0;
     server.use(
       http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [USER] })),

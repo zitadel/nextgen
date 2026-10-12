@@ -43,6 +43,66 @@ func attrString(t *testing.T, r slog.Record, key string) (string, bool) {
 	return value, found
 }
 
+func TestWithLogging_redactsTheNamedQueryValues(t *testing.T) {
+	var handler recordHandler
+	logger := slog.New(&handler)
+	ctx := zlog.WithLoggingContext(context.Background(), logger)
+
+	mw := middleware.WithLogging(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}), "code", "state")
+
+	req := httptest.NewRequest(http.MethodGet, "/__nextgen/idp/callback?code=the-code&state=proj-1.the-state&error=x", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+	mw.ServeHTTP(rec, req)
+
+	var handling *slog.Record
+	for i := range handler.records {
+		if handler.records[i].Message == "handling request" {
+			handling = &handler.records[i]
+			break
+		}
+	}
+	require.NotNil(t, handling)
+	for _, key := range []string{"url", "uri"} {
+		value, ok := attrString(t, *handling, key)
+		require.True(t, ok)
+		assert.NotContains(t, value, "the-code", key)
+		assert.NotContains(t, value, "the-state", key)
+		assert.Contains(t, value, "code=redacted", key)
+		assert.Contains(t, value, "state=redacted", key)
+		assert.Contains(t, value, "error=x", key, "params that carry no secret stay readable")
+	}
+}
+
+// Without names a URL is logged as received, a state param included: only a
+// route that opts in hides it.
+func TestWithLogging_logsUnnamedQueryValues(t *testing.T) {
+	var handler recordHandler
+	logger := slog.New(&handler)
+	ctx := zlog.WithLoggingContext(context.Background(), logger)
+
+	mw := middleware.WithLogging(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/users?limit=10&state=active", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+	mw.ServeHTTP(rec, req)
+
+	var handling *slog.Record
+	for i := range handler.records {
+		if handler.records[i].Message == "handling request" {
+			handling = &handler.records[i]
+			break
+		}
+	}
+	require.NotNil(t, handling)
+	uri, ok := attrString(t, *handling, "uri")
+	require.True(t, ok)
+	assert.Equal(t, "/users?limit=10&state=active", uri)
+}
+
 func TestWithLogging_clientErrorLogsWarnWithoutBody(t *testing.T) {
 	var handler recordHandler
 	logger := slog.New(&handler)

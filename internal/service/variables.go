@@ -72,7 +72,7 @@ func (s *variableService) GetDecryptedVariables(ctx context.Context, owner domai
 			continue
 		}
 		if decrypter == nil {
-			decrypter = s.decrypterOfWritingKey(ctx)
+			decrypter = decrypterOfWritingKey(ctx, s.keys)
 		}
 		value, err := variable.GetDecryptedValue(decrypter)
 		if err != nil {
@@ -236,7 +236,7 @@ func (s *variableService) ReplaceVariablesInPlace(ctx context.Context, owner dom
 	}
 
 	if containsSecrets {
-		varMap, err = domain.Variables(varMap).DecryptAll(s.decrypterOfWritingKey(ctx))
+		varMap, err = domain.Variables(varMap).DecryptAll(decrypterOfWritingKey(ctx, s.keys))
 		if err != nil {
 			return err
 		}
@@ -249,18 +249,22 @@ func (s *variableService) ReplaceVariablesInPlace(ctx context.Context, owner dom
 	return nil
 }
 
-func (s *variableService) decrypterOfWritingKey(ctx context.Context) crypto.Decrypter {
+// decrypterOfWritingKey decrypts with the key each ciphertext names in its JWE
+// header, not the owner's currently active key, so a value written before a
+// rotation still decrypts. Variables and the SSO callback's PKCE verifier both
+// decrypt through this.
+func decrypterOfWritingKey(ctx context.Context, keys KeyService) crypto.Decrypter {
 	crypters := make(map[string]crypto.Decrypter)
 
 	return crypto.DecrypterFn(func(encrypted string) (string, error) {
 		header, err := domain.DecodeJWEHeader(encrypted)
 		if err != nil {
-			return "", domain.ErrInternal(err).WithMessage("failed to decode the header of an encrypted variable")
+			return "", domain.ErrInternal(err).WithMessage("failed to decode the header of an encrypted value")
 		}
 
 		crypter, ok := crypters[header.KeyID]
 		if !ok {
-			crypter, err = s.keys.GetCrypter(ctx, header.KeyID, header.EncryptionAlgorithm)
+			crypter, err = keys.GetCrypter(ctx, header.KeyID, header.EncryptionAlgorithm)
 			if err != nil {
 				return "", err
 			}
