@@ -4,9 +4,9 @@
 #
 # Production (main) always deploys, so every merge reaches it. A preview
 # builds only when its branch touches what this deployment runs: the server,
-# the login UI, the console and the docs site with the packages they build
-# from, and the deployment wiring. SDK-only branches get no preview build.
-# Whenever the answer is unclear, the preview builds.
+# the login UI, the console, the storybook and the docs site with the
+# packages they build from, and the deployment wiring. SDK-only branches get
+# no preview build. Whenever the answer is unclear, the preview builds.
 #
 # Each service of vercel.json runs it from its own root; the paths below are
 # the repository's.
@@ -25,6 +25,7 @@ apps/cloud
 apps/console
 apps/docs
 apps/login-ui
+apps/storybook
 cmd
 docs/design/api/events-catalog.md
 go.mod
@@ -33,6 +34,7 @@ internal
 main.go
 package.json
 packages/api
+packages/api-mock
 packages/components
 packages/config
 packages/design-tokens

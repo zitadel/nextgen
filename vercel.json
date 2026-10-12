@@ -22,6 +22,14 @@
         }
       ]
     },
+    "storybook": {
+      "root": "apps/storybook",
+      "framework": "storybook",
+      "installCommand": "corepack pnpm install --frozen-lockfile",
+      "buildCommand": "cd ../.. && corepack pnpm exec moon run storybook:build && cd apps/storybook && mv dist storybook && mkdir dist && mv storybook dist/",
+      "outputDirectory": "dist",
+      "ignoreCommand": "sh ../cloud/ignore-build.sh"
+    },
     "docs": {
       "root": "apps/docs",
       "framework": "nextjs",
@@ -35,6 +43,11 @@
       "source": "/ui/console",
       "destination": "/ui/console/",
       "permanent": true
+    },
+    {
+      "source": "/storybook",
+      "destination": "/storybook/",
+      "permanent": true
     }
   ],
   "rewrites": [
@@ -42,6 +55,12 @@
       "source": "/ui/console/(.*)",
       "destination": {
         "service": "console"
+      }
+    },
+    {
+      "source": "/storybook/(.*)",
+      "destination": {
+        "service": "storybook"
       }
     },
     {
