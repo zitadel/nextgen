@@ -76,11 +76,20 @@ jobs:
           fi
           grep -nE "isolate: (true|false)" apps/storybook/vitest.config.ts
 
-      - name: Reproduce under CPU/IO starvation
+      # Match main: #1504 disables IPv6 on new interfaces so Docker veths get no
+      # link-local address. We reproduce the CURRENT state (post-#1504), so the
+      # question is whether the flake survives that mitigation.
+      - name: Disable IPv6 on new interfaces (match ci.yml)
+        run: sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+
+      - name: Pre-pull churn image
+        run: docker pull postgres:16-alpine
+
+      - name: Reproduce under CPU/IO starvation + container churn
         run: |
           set -u
           NPROC="$(nproc)"
-          echo "cores: $NPROC — oversubscribing to starve the Vite event loop"
+          echo "cores: $NPROC — oversubscribing + churning containers"
 
           # Oversubscribe CPU 2x so the single-threaded Vite server is
           # frequently descheduled while Chromium keeps firing module requests.
@@ -89,6 +98,18 @@ jobs:
           for _ in 1 2 3 4; do
             ( while true; do dd if=/dev/zero of=".ioload.$_" bs=1M count=128 \
                 oflag=direct 2>/dev/null; rm -f ".ioload.$_"; done ) &
+          done
+          # THE identified trigger (#1503/#1504): the Go integration suites start
+          # and stop testcontainers in the same graph; every container adds and
+          # removes a host veth and forks a process storm. Recreate it — several
+          # postgres containers churned continuously alongside the browser run.
+          for n in 1 2 3 4; do
+            ( while true; do
+                cid=$(docker run -d --rm postgres:16-alpine 2>/dev/null) || true
+                sleep 0.4
+                [ -n "${cid:-}" ] && docker rm -f "$cid" >/dev/null 2>&1 || true
+                sleep 0.2
+              done ) &
           done
 
           fails=0
