@@ -66,7 +66,8 @@ The CLI requires Node.js 24+.
   `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET`, each from the
   first source that has it: `--server` (the URL only), `--env-file <path>`, the
   process environment, `.env.<env>.local`, `.env.local`, `.env.<env>`, `.env`,
-  then `.zitadel/secret`. `<env>` is `--env`, else `ZITADEL_ENV`, else
+  then `.zitadel/secret`. `<env>` is `--env`, else `ZITADEL_ENV`, else a
+  hosting platform's own signal (`VERCEL_ENV`, or Netlify's `CONTEXT`), else
   `development`. A missing value fails with `E_VALIDATION` naming the variable
   and the files it looked in; there is no cloud default outside `setup`, and
   `zitadel.json` names no server. `zitadel env` shows what resolved and where
