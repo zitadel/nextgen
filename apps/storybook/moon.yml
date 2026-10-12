@@ -46,10 +46,14 @@ tasks:
       # Vite server runs at a time; concurrent servers starve under moon's CI
       # graph and drop module fetches. (#1490)
       mutex: "browser-tests"
-      # Retry a failed browser suite in CI. The flake is a cold-start race:
-      # the first attempt warms the Vite dep cache, so a retry runs warm and
-      # clears the "Failed to fetch dynamically imported module" failure. (#1490)
-      retryCount: 3
+      # No retry. The "Failed to fetch dynamically imported module" flake came
+      # from the browser orchestrator re-importing the addon-vitest setup chain
+      # once per story file (fresh iframe per file), so under CI load any one of
+      # those ~dozen imports could be dropped. `vitest.config.ts` now runs the
+      # files in one shared iframe (`isolate: false`), importing that chain once,
+      # so the repeated operation that flaked is gone — the retry was masking it,
+      # not fixing it. (#1490)
+      retryCount: 0
 
   # Loads the same packages as build.
   dev:

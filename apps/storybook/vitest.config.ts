@@ -28,8 +28,8 @@ export default defineConfig({
     // fixes the re-optimization cause of the CI "Failed to fetch dynamically
     // imported module" flake, but parallel Chromium contexts still overwhelm
     // the Vitest Vite server under the full `moon ci` load (vitest-dev/vitest#9509).
-    // Serializing the files keeps the server serving one importer at a time;
-    // per-file isolation stays on (this is not `isolate: false`).
+    // Serializing the files keeps the server serving one importer at a time.
+    // Per-file iframe isolation is also off — see `isolate: false` below.
     fileParallelism: false,
     projects: [
       {
@@ -61,6 +61,24 @@ export default defineConfig({
         },
         test: {
           name: "storybook",
+          // The residual CI flake (#1490) — "Failed to fetch dynamically
+          // imported module … setup-file-with-project-annotations.js" — is not a
+          // cold-cache race (it strikes an arbitrary story file mid-run, after
+          // other files have already imported the same warm setup module). With
+          // `isolate: true` the browser orchestrator creates a FRESH iframe per
+          // story file, and each iframe re-imports the addon-vitest setup file
+          // over HTTP; under the full `moon ci` load any one of those ~dozen
+          // repeated imports can be dropped (vitest-dev/vitest#9509). Running the
+          // files in one shared iframe imports that setup chain ONCE instead of
+          // once per file, so the operation that flakes no longer repeats — this
+          // removes the failure rather than retrying through it.
+          //
+          // Safe here because the preview is already written for a single shared
+          // context: one MSW worker for the whole preview, an idempotent
+          // `customElements.define`, and a `keyed()` remount that tears down each
+          // story's subtree between renders (see `.storybook/preview.ts`). The
+          // stateful orchestrator stories are excluded via the `no-test` tag.
+          isolate: false,
           browser: {
             enabled: true,
             provider: playwright(),
