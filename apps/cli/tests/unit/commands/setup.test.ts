@@ -241,6 +241,34 @@ describe("setup command", () => {
     );
   });
 
+  // A scripted `--sso` run without `--json` shows no prompt, so the summary
+  // box is the only place the developer reads the URI to register.
+  it("names the connection's redirect URI in the summary of a scripted --sso run", async () => {
+    const cwd = await makeNextProject();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--server",
+      "https://api.zitadel.cloud",
+      "--non-interactive",
+      "--dry-run",
+      "--skip-install",
+      "--framework",
+      "next",
+      "--sso",
+      "google",
+      "--sso-client-id",
+      "1234-abc.apps.googleusercontent.com",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const output = `${res.stdout}${res.stderr}`;
+    expect(output).toContain("Redirect URI");
+    expect(output).toMatch(/http:\/\/localhost:\d+\/__nextgen\/idp\/google\/callback/);
+  });
+
   // No provider is an empty list, not a missing key or null: a consumer can
   // iterate the field without checking which of three shapes it holds.
   it("reports an empty list when no provider was enabled", async () => {

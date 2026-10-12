@@ -106,8 +106,6 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 
 	var conn *idp.Connection
 	if in.Issuer != "" {
-		// access_denied is the person saying no and gets its own key. Every
-		// other code is the provider failing.
 		pinned, err := c.pinnedConnection(ctx, projectID, pending)
 		if err != nil {
 			return c.fail(ctx, projectID, check, err, refusedEventType(in))
@@ -118,6 +116,8 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 		conn = &pinned
 	}
 	if in.Error != "" {
+		// access_denied is the person saying no and gets its own key. Every
+		// other code is the provider failing.
 		key := domain.FlowStepErrorSSOFailed
 		if in.Error == oauthErrorAccessDenied {
 			key = domain.FlowStepErrorSSOCancelled
