@@ -110,6 +110,19 @@ export default class Deploy extends EnvironmentCommand {
           nextCommands: ["zitadel origin list"],
         });
       }
+    } else {
+      // With no --origin the deploy goes to every primary origin, so the
+      // project must have at least one. Checked here, before the bundle is
+      // built and the IdP connections are synced, so a project with no primary
+      // origin fails before the IdP step does a partial write rather than
+      // after it, when the final deploy would report the missing origin.
+      const origins = (await client.getProject(projectId)).origins ?? [];
+      if (!origins.some((entry) => entry.kind === "primary")) {
+        throw new ZitadelError("E_VALIDATION", "The project has no primary origin to deploy to", {
+          hint: "Add one with `zitadel origin add <url> --kind primary`, then deploy.",
+          nextCommands: ["zitadel origin list"],
+        });
+      }
     }
 
     const { bundle, resourceCount, brandingSources } = await buildBundle(cwd);

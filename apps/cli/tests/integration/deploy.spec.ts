@@ -1,3 +1,6 @@
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
@@ -78,6 +81,38 @@ describe("deploy", () => {
         const result = await app.deploy();
 
         expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("checks for a primary origin before syncing IdP connections", async () => {
+        const app = await aSetUpApp();
+        // A connection the IdP step would create — were it reached. The project
+        // has no primary origin, so the deploy must fail before the IdP step
+        // writes anything, leaving no connection behind.
+        await mkdir(join(app.path, ".zitadel/idps"), { recursive: true });
+        await app.writeProjectFile(
+          ".zitadel/idps/google.json",
+          `${JSON.stringify(
+            {
+              slug: "google",
+              protocol: "oidc",
+              template: "google",
+              display_name: "Google",
+              oidc: {
+                issuer: "https://accounts.google.com",
+                client_id: "111.apps.googleusercontent.com",
+                client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+                scopes: ["openid"],
+              },
+            },
+            null,
+            2,
+          )}\n`,
+        );
+
+        const result = await app.deploy();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(await app.registeredIdps()).toEqual([]);
       });
 
       it("refuses an --origin a preview wildcard covers as a preview", async () => {
