@@ -2,8 +2,7 @@
 
 The deployment wrapper that runs `main` as a hosted, production-like cloud on
 Vercel with PlanetScale Postgres in Frankfurt. Every merge to `main` deploys
-to production; every branch that touches the server, the console, the
-login UI, the storybook or the docs gets a preview with a database of its own.
+to production; every other branch gets a preview with a database of its own.
 
 The repo-root [`vercel.json`](../../vercel.json) defines the Vercel
 deployment as four [services](https://vercel.com/docs/services):
@@ -24,7 +23,6 @@ under `/docs` ([`apps/docs/AGENTS.md`](../docs/AGENTS.md)).
 |---|---|
 | [`launcher/`](launcher/) | the function binary: maps `CLOUD_DATABASE_URL` / `CLOUD_MIGRATOR_DATABASE_URL`, the master key and Vercel's `PORT` onto the server's configuration; at build time it creates a preview's database, checks the function's configuration and migrates |
 | [`build.sh`](build.sh) | the `server` service's build: login UI, launcher, migrations |
-| [`ignore-build.sh`](ignore-build.sh) | the Ignored Build Step: production always deploys, a preview only when its branch touches what the deployment runs |
 | [`setup-secrets.sh`](setup-secrets.sh) | mints an environment's master key and root admin (with [`admin-document.mjs`](admin-document.mjs)) and sets them on the Vercel project; the originals go to 1Password |
 
 Every deployment is tested once it is built:
