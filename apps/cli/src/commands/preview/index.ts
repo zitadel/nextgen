@@ -24,9 +24,10 @@ import { ZitadelError } from "../../lib/errors";
  *
  * It authenticates with the narrower preview credential, so it fails naming
  * `ZITADEL_PREVIEW_TOKEN` when that is not set and never falls back to the
- * project secret. In a production environment with no `--origin` there is
- * nothing to preview, so it says so and exits cleanly. The last line it prints
- * is the release digest as `NEXT_PUBLIC_ZITADEL_RELEASE`, for the build to pin.
+ * project secret. Outside a preview or development environment there is nothing
+ * to preview — even with an explicit `--origin` — so it says so and exits
+ * cleanly without writing. The last line it prints is the release digest as
+ * `NEXT_PUBLIC_ZITADEL_RELEASE`, for the build to pin.
  */
 export default class Preview extends PreviewCommand {
   static override description =
@@ -47,12 +48,14 @@ export default class Preview extends PreviewCommand {
     const json = this.jsonEnabled();
     const color = !json && isTTY && flags.color !== false && !process.env.NO_COLOR;
 
-    // `--origin` forces a preview deploy in any environment. Without it, only a
-    // preview or development build has anything to preview: a production build
-    // serves the deployed release, published by `zitadel deploy` after merge.
+    // Only a preview or development build has anything to preview: a production
+    // (or any other non-preview) build serves the deployed release, published by
+    // `zitadel deploy` after merge. The environment gates this, not `--origin`:
+    // an explicit origin only selects which targets to preview, it never
+    // authorizes a preview deploy into an environment that must not take writes.
     const requested = flags.origin ?? [];
     const envName = this.environment.name.value;
-    if (requested.length === 0 && envName !== "preview" && envName !== "development") {
+    if (envName !== "preview" && envName !== "development") {
       return this.emit({
         status: "skipped",
         reason: "nothing-to-preview",

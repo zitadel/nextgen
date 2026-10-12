@@ -78,17 +78,38 @@ describe("preview", () => {
         expect(result).toBeSkipped();
       });
 
+      it("says there is nothing to preview in production even with an origin", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
+
+        // An explicit origin selects targets; it never authorizes a preview
+        // deploy into production, which `zitadel deploy` owns. The command must
+        // skip without writing, so the project has no preview afterwards.
+        const result = await app.run([
+          "preview",
+          "--env",
+          "production",
+          "--origin",
+          PREVIEW_URL,
+          "--json",
+        ]);
+
+        expect(result).toBeSkipped();
+        const listed = await app.run(["preview", "list", "--json"]);
+        expect(app.envelopeOf<{ items: unknown[] }>(listed).data.items).toEqual([]);
+      });
+
       it("fails naming ZITADEL_PREVIEW_TOKEN when it is not set", async () => {
         const app = await anApp();
-        await app.bindEnvironment("staging", {
-          ZITADEL_PROJECT_ID: "proj_staging",
+        await app.bindEnvironment("preview", {
+          ZITADEL_PROJECT_ID: "proj_preview",
           ZITADEL_PROJECT_SECRET: "sk",
         });
 
         const result = await app.run([
           "preview",
           "--env",
-          "staging",
+          "preview",
           "--origin",
           PREVIEW_URL,
           "--json",
