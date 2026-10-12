@@ -234,6 +234,9 @@ catalogs:
     react-server-dom-webpack:
       specifier: 19.2.8
       version: 19.2.8
+    rosie-skills:
+      specifier: ^0.8.5
+      version: 0.8.5
     safe-stable-stringify:
       specifier: ^2.5.0
       version: 2.5.0
@@ -436,6 +439,9 @@ importers:
       picocolors:
         specifier: ^1.1.1
         version: 1.1.1
+      rosie-skills:
+        specifier: 'catalog:'
+        version: 0.8.5
       safe-stable-stringify:
         specifier: 'catalog:'
         version: 2.5.0
@@ -11508,6 +11514,10 @@ packages:
   mocked-exports@0.1.1:
     resolution: {integrity: sha512-aF7yRQr/Q0O2/4pIXm6PZ5G+jAd7QS4Yu8m+WEeEHGnbo+7mE36CbLSDQiXYV8bVL3NfmdeqPJct0tUlnjVSnA==}
 
+  modern-tar@0.7.7:
+    resolution: {integrity: sha512-t9VmxaqrmANnEOBhpSDI6HD192Ge48k8vmWqQQL7hSFEqHEYwZbbsu49+aKLWZeRvFs3j1pMhXOqqF4kPlvjkQ==}
+    engines: {node: '>=18.0.0'}
+
   motion-dom@12.40.0:
     resolution: {integrity: sha512-HxU3ZaBwNPVQUBQf1xxgq+7JrPNZvjLVxgbpEZL7RrWJnsxOf0/OM+yrHG9ogLQ31Do/r57Oz2gQWPK+6q62mg==}
 
@@ -12911,6 +12921,11 @@ packages:
   rollup@4.62.2:
     resolution: {integrity: sha512-RFnrW4lhXA3s3eqHDZvN654g8OTjzRfqpIRJYczCGB6HzphckVAi/Qh4tbPUbRuDi7s1Llv8g/NspLkttY3gTA==}
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
+    hasBin: true
+
+  rosie-skills@0.8.5:
+    resolution: {integrity: sha512-Ho/mkbnaSr8VFSJdfoExrka9/lE+1vHZjBou5gEEebcDWpWEsDAKAy/hxZ1ayDPaacCIyFiTp5L6bZp82haabQ==}
+    engines: {node: '>=18'}
     hasBin: true
 
   rou3@0.9.2:
@@ -26136,6 +26151,8 @@ snapshots:
 
   mocked-exports@0.1.1: {}
 
+  modern-tar@0.7.7: {}
+
   motion-dom@12.40.0:
     dependencies:
       motion-utils: 12.39.0
@@ -28344,6 +28361,10 @@ snapshots:
       '@rollup/rollup-win32-x64-gnu': 4.62.2
       '@rollup/rollup-win32-x64-msvc': 4.62.2
       fsevents: 2.3.3
+
+  rosie-skills@0.8.5:
+    dependencies:
+      modern-tar: 0.7.7
 
   rou3@0.9.2: {}
 

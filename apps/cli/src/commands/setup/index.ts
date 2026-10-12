@@ -80,6 +80,7 @@ import {
   type Row,
   type Section,
 } from "./summary";
+import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
 
 /**
@@ -180,6 +181,7 @@ export default class Setup extends BaseCommand {
       throw localSetupHint(error, retryOptionsFromFlags(flags), this.config.version);
     }
     const { cwd, nonInteractive, dryRun, force } = this.meta;
+    await showSkillsHint({ env: process.env, interactive: !nonInteractive });
 
     if (await hasZitadelConfig(cwd)) {
       return this.emit({ status: "skipped", reason: "already-initialized" });
