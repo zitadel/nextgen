@@ -46285,11 +46285,75 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserConflictGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.conflict")
+		{
+			s := s.UserConflict
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserInvalidGetFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.invalid")
 		{
 			s := s.UserInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserNotFoundGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.not_found")
+		{
+			s := s.UserNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserPasswordEmptyGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_empty")
+		{
+			s := s.UserPasswordEmpty
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserPasswordTooLongGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_too_long")
+		{
+			s := s.UserPasswordTooLong
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -46414,8 +46478,20 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "user.already_exists":
 					s.Type = UserAlreadyExistsGetFlowStepErrorResponse
 					found = true
+				case "user.conflict":
+					s.Type = UserConflictGetFlowStepErrorResponse
+					found = true
 				case "user.invalid":
 					s.Type = UserInvalidGetFlowStepErrorResponse
+					found = true
+				case "user.not_found":
+					s.Type = UserNotFoundGetFlowStepErrorResponse
+					found = true
+				case "user.password_empty":
+					s.Type = UserPasswordEmptyGetFlowStepErrorResponse
+					found = true
+				case "user.password_too_long":
+					s.Type = UserPasswordTooLongGetFlowStepErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -46547,8 +46623,24 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.UserAlreadyExists.Decode(d); err != nil {
 			return err
 		}
+	case UserConflictGetFlowStepErrorResponse:
+		if err := s.UserConflict.Decode(d); err != nil {
+			return err
+		}
 	case UserInvalidGetFlowStepErrorResponse:
 		if err := s.UserInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UserNotFoundGetFlowStepErrorResponse:
+		if err := s.UserNotFound.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordEmptyGetFlowStepErrorResponse:
+		if err := s.UserPasswordEmpty.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordTooLongGetFlowStepErrorResponse:
+		if err := s.UserPasswordTooLong.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -96728,6 +96820,22 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserConflictSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.conflict")
+		{
+			s := s.UserConflict
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserInvalidSubmitFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.invalid")
@@ -96914,6 +97022,9 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "user.already_exists":
 					s.Type = UserAlreadyExistsSubmitFlowStepErrorResponse
 					found = true
+				case "user.conflict":
+					s.Type = UserConflictSubmitFlowStepErrorResponse
+					found = true
 				case "user.invalid":
 					s.Type = UserInvalidSubmitFlowStepErrorResponse
 					found = true
@@ -97066,6 +97177,10 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UserAlreadyExistsSubmitFlowStepErrorResponse:
 		if err := s.UserAlreadyExists.Decode(d); err != nil {
+			return err
+		}
+	case UserConflictSubmitFlowStepErrorResponse:
+		if err := s.UserConflict.Decode(d); err != nil {
 			return err
 		}
 	case UserInvalidSubmitFlowStepErrorResponse:

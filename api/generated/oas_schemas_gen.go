@@ -25670,7 +25670,11 @@ type GetFlowStepErrorResponse struct {
 	ReqInvalid                    ReqInvalid
 	EncKeyUnknownAlg              EncKeyUnknownAlg
 	UserAlreadyExists             UserAlreadyExists
+	UserConflict                  UserConflict
 	UserInvalid                   UserInvalid
+	UserNotFound                  UserNotFound
+	UserPasswordEmpty             UserPasswordEmpty
+	UserPasswordTooLong           UserPasswordTooLong
 }
 
 // GetFlowStepErrorResponseType is oneOf type of GetFlowStepErrorResponse.
@@ -25707,7 +25711,11 @@ const (
 	ReqInvalidGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "enc_key.unknown_alg"
 	UserAlreadyExistsGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "user.already_exists"
+	UserConflictGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "user.conflict"
 	UserInvalidGetFlowStepErrorResponse                   GetFlowStepErrorResponseType = "user.invalid"
+	UserNotFoundGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "user.not_found"
+	UserPasswordEmptyGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "user.password_empty"
+	UserPasswordTooLongGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "user.password_too_long"
 )
 
 // IsAttAlreadyHandedOff reports whether GetFlowStepErrorResponse is AttAlreadyHandedOff.
@@ -25855,9 +25863,29 @@ func (s GetFlowStepErrorResponse) IsUserAlreadyExists() bool {
 	return s.Type == UserAlreadyExistsGetFlowStepErrorResponse
 }
 
+// IsUserConflict reports whether GetFlowStepErrorResponse is UserConflict.
+func (s GetFlowStepErrorResponse) IsUserConflict() bool {
+	return s.Type == UserConflictGetFlowStepErrorResponse
+}
+
 // IsUserInvalid reports whether GetFlowStepErrorResponse is UserInvalid.
 func (s GetFlowStepErrorResponse) IsUserInvalid() bool {
 	return s.Type == UserInvalidGetFlowStepErrorResponse
+}
+
+// IsUserNotFound reports whether GetFlowStepErrorResponse is UserNotFound.
+func (s GetFlowStepErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundGetFlowStepErrorResponse
+}
+
+// IsUserPasswordEmpty reports whether GetFlowStepErrorResponse is UserPasswordEmpty.
+func (s GetFlowStepErrorResponse) IsUserPasswordEmpty() bool {
+	return s.Type == UserPasswordEmptyGetFlowStepErrorResponse
+}
+
+// IsUserPasswordTooLong reports whether GetFlowStepErrorResponse is UserPasswordTooLong.
+func (s GetFlowStepErrorResponse) IsUserPasswordTooLong() bool {
+	return s.Type == UserPasswordTooLongGetFlowStepErrorResponse
 }
 
 // SetAttAlreadyHandedOff sets GetFlowStepErrorResponse to AttAlreadyHandedOff.
@@ -26469,6 +26497,27 @@ func NewUserAlreadyExistsGetFlowStepErrorResponse(v UserAlreadyExists) GetFlowSt
 	return s
 }
 
+// SetUserConflict sets GetFlowStepErrorResponse to UserConflict.
+func (s *GetFlowStepErrorResponse) SetUserConflict(v UserConflict) {
+	s.Type = UserConflictGetFlowStepErrorResponse
+	s.UserConflict = v
+}
+
+// GetUserConflict returns UserConflict and true boolean if GetFlowStepErrorResponse is UserConflict.
+func (s GetFlowStepErrorResponse) GetUserConflict() (v UserConflict, ok bool) {
+	if !s.IsUserConflict() {
+		return v, false
+	}
+	return s.UserConflict, true
+}
+
+// NewUserConflictGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserConflict.
+func NewUserConflictGetFlowStepErrorResponse(v UserConflict) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUserConflict(v)
+	return s
+}
+
 // SetUserInvalid sets GetFlowStepErrorResponse to UserInvalid.
 func (s *GetFlowStepErrorResponse) SetUserInvalid(v UserInvalid) {
 	s.Type = UserInvalidGetFlowStepErrorResponse
@@ -26487,6 +26536,69 @@ func (s GetFlowStepErrorResponse) GetUserInvalid() (v UserInvalid, ok bool) {
 func NewUserInvalidGetFlowStepErrorResponse(v UserInvalid) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetUserInvalid(v)
+	return s
+}
+
+// SetUserNotFound sets GetFlowStepErrorResponse to UserNotFound.
+func (s *GetFlowStepErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundGetFlowStepErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if GetFlowStepErrorResponse is UserNotFound.
+func (s GetFlowStepErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserNotFound.
+func NewUserNotFoundGetFlowStepErrorResponse(v UserNotFound) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPasswordEmpty sets GetFlowStepErrorResponse to UserPasswordEmpty.
+func (s *GetFlowStepErrorResponse) SetUserPasswordEmpty(v UserPasswordEmpty) {
+	s.Type = UserPasswordEmptyGetFlowStepErrorResponse
+	s.UserPasswordEmpty = v
+}
+
+// GetUserPasswordEmpty returns UserPasswordEmpty and true boolean if GetFlowStepErrorResponse is UserPasswordEmpty.
+func (s GetFlowStepErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpty, ok bool) {
+	if !s.IsUserPasswordEmpty() {
+		return v, false
+	}
+	return s.UserPasswordEmpty, true
+}
+
+// NewUserPasswordEmptyGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserPasswordEmpty.
+func NewUserPasswordEmptyGetFlowStepErrorResponse(v UserPasswordEmpty) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordTooLong sets GetFlowStepErrorResponse to UserPasswordTooLong.
+func (s *GetFlowStepErrorResponse) SetUserPasswordTooLong(v UserPasswordTooLong) {
+	s.Type = UserPasswordTooLongGetFlowStepErrorResponse
+	s.UserPasswordTooLong = v
+}
+
+// GetUserPasswordTooLong returns UserPasswordTooLong and true boolean if GetFlowStepErrorResponse is UserPasswordTooLong.
+func (s GetFlowStepErrorResponse) GetUserPasswordTooLong() (v UserPasswordTooLong, ok bool) {
+	if !s.IsUserPasswordTooLong() {
+		return v, false
+	}
+	return s.UserPasswordTooLong, true
+}
+
+// NewUserPasswordTooLongGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserPasswordTooLong.
+func NewUserPasswordTooLongGetFlowStepErrorResponse(v UserPasswordTooLong) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUserPasswordTooLong(v)
 	return s
 }
 
@@ -62167,6 +62279,7 @@ type SubmitFlowStepErrorResponse struct {
 	EncKeyUnknownAlg              EncKeyUnknownAlg
 	Unavailable                   Unavailable
 	UserAlreadyExists             UserAlreadyExists
+	UserConflict                  UserConflict
 	UserInvalid                   UserInvalid
 	UserNotFound                  UserNotFound
 	UserPasswordEmpty             UserPasswordEmpty
@@ -62210,6 +62323,7 @@ const (
 	EncKeyUnknownAlgSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
 	UnavailableSubmitFlowStepErrorResponse                   SubmitFlowStepErrorResponseType = "unavailable"
 	UserAlreadyExistsSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "user.already_exists"
+	UserConflictSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "user.conflict"
 	UserInvalidSubmitFlowStepErrorResponse                   SubmitFlowStepErrorResponseType = "user.invalid"
 	UserNotFoundSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "user.not_found"
 	UserPasswordEmptySubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "user.password_empty"
@@ -62374,6 +62488,11 @@ func (s SubmitFlowStepErrorResponse) IsUnavailable() bool {
 // IsUserAlreadyExists reports whether SubmitFlowStepErrorResponse is UserAlreadyExists.
 func (s SubmitFlowStepErrorResponse) IsUserAlreadyExists() bool {
 	return s.Type == UserAlreadyExistsSubmitFlowStepErrorResponse
+}
+
+// IsUserConflict reports whether SubmitFlowStepErrorResponse is UserConflict.
+func (s SubmitFlowStepErrorResponse) IsUserConflict() bool {
+	return s.Type == UserConflictSubmitFlowStepErrorResponse
 }
 
 // IsUserInvalid reports whether SubmitFlowStepErrorResponse is UserInvalid.
@@ -63065,6 +63184,27 @@ func (s SubmitFlowStepErrorResponse) GetUserAlreadyExists() (v UserAlreadyExists
 func NewUserAlreadyExistsSubmitFlowStepErrorResponse(v UserAlreadyExists) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetUserAlreadyExists(v)
+	return s
+}
+
+// SetUserConflict sets SubmitFlowStepErrorResponse to UserConflict.
+func (s *SubmitFlowStepErrorResponse) SetUserConflict(v UserConflict) {
+	s.Type = UserConflictSubmitFlowStepErrorResponse
+	s.UserConflict = v
+}
+
+// GetUserConflict returns UserConflict and true boolean if SubmitFlowStepErrorResponse is UserConflict.
+func (s SubmitFlowStepErrorResponse) GetUserConflict() (v UserConflict, ok bool) {
+	if !s.IsUserConflict() {
+		return v, false
+	}
+	return s.UserConflict, true
+}
+
+// NewUserConflictSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from UserConflict.
+func NewUserConflictSubmitFlowStepErrorResponse(v UserConflict) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUserConflict(v)
 	return s
 }
 
