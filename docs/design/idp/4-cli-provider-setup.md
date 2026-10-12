@@ -281,7 +281,7 @@ resolving `${{ NAME }}` in the client id.
   back.
 * **CLI Safety:** Secret values are never exposed in process arguments (`argv`)
   — no `--client-secret` flag exists, and none will. The secret is prompted for
-  on a TTY and read from stdin on a non-interactive run, as `variables set`
+  on a TTY and read from stdin on a non-interactive run, as `variable set`
   does, so it reaches neither shell history nor a process listing nor a CI log.
 * **Required, not deferrable:** Once a provider is chosen the secret is
   mandatory. A connection scaffolded without one produces a sign-in button that
@@ -312,7 +312,7 @@ Missing credentials fall into two distinct execution states:
 - **A publish that did not land is reported, with the command that fixes it.**
   The result says whether the project received each credential (`stored`,
   `deferred`, `failed`); anything other than `stored` names the
-  `variables set <NAME> --project-level` command that completes the job, in the
+  `variable set <NAME>` command that completes the job, in the
   terminal warning and in `next_commands` — the latter matters because `--json`
   prints no warnings at all.
 - **`plan`/`apply` do not check the value.** A connection's `${{ NAME }}` is
@@ -510,7 +510,7 @@ never presented as proof that sign-in works.
 * **`scaffoldedFrom` Provenance:** Pending Area 1's specification for recording
   provenance data on generated connection resources.
 * **Secret Rotation UX:** Defining explicit rotation workflows. Replacing a
-  secret works today — `variables set <NAME> --project-level --secret`, which is
+  secret works today — `variable set <NAME> --secret`, which is
   also what a failed publish reports — but rotating one without a sign-in
   interruption is unspecified (deferred to Area 1's secret-store spec).
 
