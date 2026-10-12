@@ -48,9 +48,9 @@ func ListOptions(projectID string, origin *string, limit uint32) *database.ListO
 	}
 }
 
-// LiveFilter narrows the live view to one origin or one release.
+// LiveFilter narrows the live view to one release. One origin's live
+// deployment is DeploymentStatements.LiveDeployment.
 type LiveFilter struct {
-	Origin    *string
 	ReleaseID *string
 }
 
@@ -60,9 +60,6 @@ func LiveListOptions(projectID string, now time.Time, filter LiveFilter, limit u
 	filters := []database.Filter[domain.DeploymentField]{
 		database.Equal(database.Col(domain.DeploymentFieldProjectID), projectID),
 		database.CorrelatedEqual(database.Col(domain.DeploymentFieldLive), now),
-	}
-	if filter.Origin != nil {
-		filters = append(filters, database.CorrelatedEqual(database.Col(domain.DeploymentFieldOrigin), *filter.Origin))
 	}
 	if filter.ReleaseID != nil {
 		filters = append(filters, database.Equal(database.Col(domain.DeploymentFieldReleaseID), *filter.ReleaseID))

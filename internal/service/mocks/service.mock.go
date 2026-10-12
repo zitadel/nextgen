@@ -5198,6 +5198,45 @@ func (c *MockAllStatementsListUsersCall) DoAndReturn(f func(context.Context, *da
 	return c
 }
 
+// LiveDeployment mocks base method.
+func (m *MockAllStatements) LiveDeployment(ctx context.Context, projectID, origin string, now time.Time) (*domain.Deployment, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LiveDeployment", ctx, projectID, origin, now)
+	ret0, _ := ret[0].(*domain.Deployment)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LiveDeployment indicates an expected call of LiveDeployment.
+func (mr *MockAllStatementsMockRecorder) LiveDeployment(ctx, projectID, origin, now any) *MockAllStatementsLiveDeploymentCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LiveDeployment", reflect.TypeOf((*MockAllStatements)(nil).LiveDeployment), ctx, projectID, origin, now)
+	return &MockAllStatementsLiveDeploymentCall{Call: call}
+}
+
+// MockAllStatementsLiveDeploymentCall wrap *gomock.Call
+type MockAllStatementsLiveDeploymentCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsLiveDeploymentCall) Return(arg0 *domain.Deployment, arg1 error) *MockAllStatementsLiveDeploymentCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsLiveDeploymentCall) Do(f func(context.Context, string, string, time.Time) (*domain.Deployment, error)) *MockAllStatementsLiveDeploymentCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsLiveDeploymentCall) DoAndReturn(f func(context.Context, string, string, time.Time) (*domain.Deployment, error)) *MockAllStatementsLiveDeploymentCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // LoadCatalogMutations mocks base method.
 func (m *MockAllStatements) LoadCatalogMutations(ctx context.Context, catalogID string) (compiler.PersistedCatalog, error) {
 	m.ctrl.T.Helper()

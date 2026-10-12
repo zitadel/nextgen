@@ -118,7 +118,7 @@ func TestCheckExpectedDeployment(t *testing.T) {
 
 	err := CheckExpectedDeployment(current, new("dep_0"))
 	require.Error(t, err)
-	assert.Equal(t, DeploymentConflictDetails{Deployment: current}, err.(Error).Details)
+	assert.Equal(t, NewDeploymentConflictDetails(current), err.(Error).Details)
 
 	err = CheckExpectedDeployment(nil, new("dep_0"))
 	require.Error(t, err)

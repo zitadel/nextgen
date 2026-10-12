@@ -45,6 +45,12 @@ var (
 		` JOIN zitadel_nextgen.deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
 		` WHERE t.project_id = $1 AND t.deployment_id = ANY($2) AND NOT ` + deployment.NewerTargetExists(targetsTable) +
 		` AND ` + deployment.TargetServesAt("d", previewsTable) + `$3))`
+	// The origin's newest row, checked as serving on that same row.
+	liveDeploymentStmt = deploymentQuery + ` WHERE project_id = $1 AND id = (` +
+		`SELECT t.deployment_id FROM zitadel_nextgen.deployment_targets t` +
+		` JOIN zitadel_nextgen.deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
+		` WHERE t.project_id = $1 AND t.origin = $2 AND NOT ` + deployment.NewerTargetExists(targetsTable) +
+		` AND ` + deployment.TargetServesAt("d", previewsTable) + `$3)))`
 )
 
 type deploymentStatements struct{ statement }
@@ -106,6 +112,22 @@ func (ds deploymentStatements) GetDeploymentByID(ctx context.Context, projectID,
 		return nil, err
 	}
 	return ds.getOne(ctx, compiler.String(), compiler.args...)
+}
+
+// LiveDeployment implements [service.DeploymentStatements].
+func (ds deploymentStatements) LiveDeployment(ctx context.Context, projectID, origin string, now time.Time) (*domain.Deployment, error) {
+	rows, err := ds.client.Query(ctx, liveDeploymentStmt, projectID, origin, now)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	entity, err := pgx.CollectExactlyOneRow(rows, scanDeployment)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	if err := ds.attachTargets(ctx, projectID, []*domain.Deployment{entity}, &now); err != nil {
+		return nil, err
+	}
+	return entity, nil
 }
 
 // NewestDeployment implements [service.DeploymentStatements].

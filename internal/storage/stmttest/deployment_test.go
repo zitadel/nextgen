@@ -287,7 +287,6 @@ func TestDeploymentStatements_LiveView(t *testing.T) {
 		assert.Equal(t, []string{gitOrigin, shaOrigin}, got[1].Origins())
 		assert.Equal(t, []string{wwwOrigin}, got[2].Origins())
 
-		assert.Equal(t, []string{primaries.ID}, deploymentIDs(live(t, d.stmts, projectID, now, deployment.LiveFilter{Origin: new(wwwOrigin)})))
 		assert.Equal(t, []string{appOnly.ID, previews.ID}, deploymentIDs(live(t, d.stmts, projectID, now, deployment.LiveFilter{ReleaseID: new(relB.ID)})))
 
 		later := now.Add(2 * time.Hour)
@@ -299,6 +298,46 @@ func TestDeploymentStatements_LiveView(t *testing.T) {
 		}
 		assert.Equal(t, []string{appOnly.ID, primaries.ID}, deploymentIDs(live(t, d.stmts, projectID, now, deployment.LiveFilter{})))
 		assert.Equal(t, []string{previews.ID}, deploymentIDs(history(t, d.stmts, projectID, gitOrigin)))
+	})
+}
+
+// LiveDeployment checks the origin and its liveness on the same target row:
+// a deployment superseded on app but still live on www is what www serves,
+// not what app serves.
+func TestDeploymentStatements_LiveDeploymentOfOneOrigin(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		relA := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+		relB := createRelease(t, d.stmts, projectID, "0002", domain.ReleaseMetadata{})
+
+		both := deploy(t, d.stmts, projectID, relA.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
+		appOnly := deploy(t, d.stmts, projectID, relB.ID, []string{appOrigin}, deployArgs{})
+		previews := deploy(t, d.stmts, projectID, relA.ID, []string{gitOrigin, shaOrigin}, previewDeploy(time.Hour))
+		now := time.Now()
+
+		got, err := d.stmts.LiveDeployment(t.Context(), projectID, appOrigin, now)
+		require.NoError(t, err)
+		assert.Equal(t, appOnly.ID, got.ID)
+
+		got, err = d.stmts.LiveDeployment(t.Context(), projectID, wwwOrigin, now)
+		require.NoError(t, err)
+		assert.Equal(t, both.ID, got.ID)
+		assert.Equal(t, []string{wwwOrigin}, got.Origins(), "narrowed to the targets it still serves")
+
+		got, err = d.stmts.LiveDeployment(t.Context(), projectID, gitOrigin, now)
+		require.NoError(t, err)
+		assert.Equal(t, previews.ID, got.ID)
+
+		// An expired preview serves nothing, even while its sibling lives.
+		require.NoError(t, d.stmts.UpsertPreviews(t.Context(), projectID, []string{gitOrigin}, now.Add(-time.Minute), previews.DeployedAt))
+		_, err = d.stmts.LiveDeployment(t.Context(), projectID, gitOrigin, now)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		got, err = d.stmts.LiveDeployment(t.Context(), projectID, shaOrigin, now)
+		require.NoError(t, err)
+		assert.Equal(t, []string{shaOrigin}, got.Origins())
+
+		_, err = d.stmts.LiveDeployment(t.Context(), projectID, "https://nothing.acme.com", now)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }
 

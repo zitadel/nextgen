@@ -41,6 +41,12 @@ var (
 		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
 		` WHERE t.project_id = @p1 AND t.deployment_id IN UNNEST(@p2) AND NOT ` + deployment.NewerTargetExists(targetsTable) +
 		` AND ` + deployment.TargetServesAt("d", previewTable) + `@p3))`
+	// See the postgres statement.
+	liveDeploymentStmt = deploymentQuery + ` WHERE project_id = @p1 AND id = (` +
+		`SELECT t.deployment_id FROM deployment_targets t` +
+		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
+		` WHERE t.project_id = @p1 AND t.origin = @p2 AND NOT ` + deployment.NewerTargetExists(targetsTable) +
+		` AND ` + deployment.TargetServesAt("d", previewTable) + `@p3)))`
 )
 
 type deploymentStatements struct{ statement }
@@ -104,6 +110,22 @@ func (ds deploymentStatements) GetDeploymentByID(ctx context.Context, projectID,
 		return nil, err
 	}
 	if err := ds.attachTargets(ctx, projectID, []*domain.Deployment{entity}, nil); err != nil {
+		return nil, err
+	}
+	return entity, nil
+}
+
+// LiveDeployment implements [service.DeploymentStatements].
+func (ds deploymentStatements) LiveDeployment(ctx context.Context, projectID, origin string, now time.Time) (*domain.Deployment, error) {
+	var entity *domain.Deployment
+	if err := ds.db.Query(ctx, buildStatement(liveDeploymentStmt, projectID, origin, now).statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		entity, err = collectOneRow(iter, scanDeployment)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	if err := ds.attachTargets(ctx, projectID, []*domain.Deployment{entity}, &now); err != nil {
 		return nil, err
 	}
 	return entity, nil

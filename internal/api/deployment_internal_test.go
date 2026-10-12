@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,6 +41,33 @@ func TestDeploymentConflictCarriesDetails(t *testing.T) {
 	raw, ok := resp.Response.Details.Value["details"]
 	require.True(t, ok, "conflict payload missing from details.details")
 	assert.JSONEq(t, `{"deployment":null}`, string(raw))
+}
+
+// A conflict with a deployment renders it in the wire shape: snake_case keys
+// and string enums.
+func TestDeploymentConflictRendersTheDeployment(t *testing.T) {
+	newest := &domain.Deployment{
+		ProjectID:  "proj_1",
+		ID:         "dep_1",
+		ReleaseID:  "rel_1",
+		TargetKind: domain.DeploymentTargetKindPrimary,
+		Targets:    []domain.DeploymentTarget{{Origin: "https://app.acme.com"}},
+		DeployedAt: time.Date(2026, 10, 2, 14, 52, 0, 0, time.UTC),
+		Metadata: domain.DeploymentMetadata{
+			Reason:         domain.DeploymentReasonRollback,
+			RollbackTo:     new("dep_0"),
+			DeployedByType: new(domain.EventActorTypeService),
+		},
+	}
+	resp := deploymentErrorResponse(domain.ErrDeploymentConflict(domain.NewDeploymentConflictDetails(newest)))
+	raw, ok := resp.Response.Details.Value["details"]
+	require.True(t, ok)
+	assert.JSONEq(t, `{"deployment":{
+		"id":"dep_1","project_id":"proj_1","release_id":"rel_1",
+		"targets":[{"origin":"https://app.acme.com"}],
+		"deployed_at":"2026-10-02T14:52:00Z",
+		"metadata":{"reason":"rollback","message":null,"rollback_to":"dep_0","deployed_by":null,"deployed_by_type":"service"}
+	}}`, string(raw))
 }
 
 // Pins the deployment resource-flavored answers through the resolver gate,

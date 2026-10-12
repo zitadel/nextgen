@@ -118,7 +118,7 @@ func (s *DeploymentService) contended(ctx context.Context, entity *domain.Deploy
 			return domain.ErrInternal(err).WithMessage("failed to read the newest deployment")
 		}
 	}
-	return domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{Deployment: current})
+	return domain.ErrDeploymentConflict(domain.NewDeploymentConflictDetails(current))
 }
 
 // create is one attempt of Create, in one transaction.

@@ -234,6 +234,10 @@ type DeploymentStatements interface {
 	// ListLiveDeployments takes deployment.LiveListOptions and narrows each
 	// deployment to the targets it still serves at now.
 	ListLiveDeployments(ctx context.Context, now time.Time, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
+	// LiveDeployment is the deployment origin serves at now, narrowed to the
+	// targets it still serves; a NoRowFoundError when it serves nothing,
+	// including after its preview expired.
+	LiveDeployment(ctx context.Context, projectID, origin string, now time.Time) (*domain.Deployment, error)
 	// NewestDeployment is the deployment origin serves.
 	NewestDeployment(ctx context.Context, projectID, origin string) (*domain.Deployment, error)
 	// DeploymentAt is the deployment origin served at an instant.
