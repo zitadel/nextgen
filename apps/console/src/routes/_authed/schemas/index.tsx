@@ -29,7 +29,7 @@ import {
   requireProjectScope,
   useRequiredProjectScope,
 } from "@/lib/project-scope";
-import { type UserSchema, schemaAuthMethods, schemaDisplayName } from "@/lib/schema";
+import { type UserSchema, schemaDisplayName, schemaSignInSummary } from "@/lib/schema";
 
 export const Route = createFileRoute("/_authed/schemas/")({
   staticData: { scope: "project", nav: { label: "User schemas", order: 1, parent: "/users" } },
@@ -153,10 +153,7 @@ function SchemaRow({
   // "Passkey + Password" reads off the document's own `x-auth-methods`. The
   // annotation says which methods the user type supports; the order they are
   // offered in belongs to the flow, not to the schema.
-  const signIn = schemaAuthMethods(schema)
-    .filter((method) => method.enabled)
-    .map((method) => method.label)
-    .join(" + ");
+  const signIn = schemaSignInSummary(schema);
 
   return (
     <ResourceRow
