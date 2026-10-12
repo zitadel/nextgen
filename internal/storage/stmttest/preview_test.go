@@ -58,6 +58,26 @@ func TestPreviewStatements_DeployCreatesAndRenews(t *testing.T) {
 	})
 }
 
+// Re-running a preview deploy of the release the URLs already serve is still
+// written: that record is the renewal, so the expiry moves.
+func TestPreviewStatements_RedeployOfTheSameReleaseRenews(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+
+		first, _ := deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin, shaOrigin}, previewDeploy(time.Hour))
+		again, created := deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin, shaOrigin}, previewDeploy(168*time.Hour))
+		assert.True(t, created)
+		assert.NotEqual(t, first.ID, again.ID)
+
+		renewed, err := d.stmts.GetPreview(t.Context(), projectID, gitOrigin)
+		require.NoError(t, err)
+		assert.True(t, renewed.CreatedAt.Equal(first.DeployedAt))
+		assert.True(t, renewed.ExpiresAt.Equal(again.DeployedAt.Add(168*time.Hour)))
+		assert.Equal(t, []string{again.ID, first.ID}, deploymentIDs(history(t, d.stmts, projectID, gitOrigin)))
+	})
+}
+
 // A deploy to preview URLs has to say how long they live.
 func TestPreviewStatements_DeployNeedsTTL(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {

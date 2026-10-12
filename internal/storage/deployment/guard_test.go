@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 var t0 = time.Date(2026, 10, 2, 14, 52, 0, 0, time.UTC)
@@ -30,6 +32,18 @@ func TestAllServe(t *testing.T) {
 	assert.False(t, AllServe(newest, []string{"https://app.acme.com"}, "rel_b"))
 	assert.False(t, AllServe(newest, []string{"https://app.acme.com", "https://new.acme.com"}, "rel_a"),
 		"a target that serves nothing is not served")
+}
+
+func TestUnchangedOnlyForPrimaryTargets(t *testing.T) {
+	newest := []TargetRow{{Origin: "https://app.acme.com", ReleaseID: "rel_a"}}
+
+	primary, err := domain.NewDeployment("proj_1", "rel_a", domain.DeploymentTargetKindPrimary, []string{"https://app.acme.com"}, domain.DeploymentMetadata{})
+	require.NoError(t, err)
+	assert.True(t, Unchanged(primary, newest))
+
+	preview, err := domain.NewDeployment("proj_1", "rel_a", domain.DeploymentTargetKindPreview, []string{"https://app.acme.com"}, domain.DeploymentMetadata{})
+	require.NoError(t, err)
+	assert.False(t, Unchanged(preview, newest), "a preview deploy renews, so it is always written")
 }
 
 // A clock that stepped back behind the newest deployment still stamps after

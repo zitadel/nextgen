@@ -121,7 +121,7 @@ func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *dom
 		if err := deployment.CheckExpected(current, expectedDeploymentID); err != nil {
 			return err
 		}
-		if deployment.AllServe(newest, origins, entity.ReleaseID) {
+		if deployment.Unchanged(entity, newest) {
 			existing = current
 			return nil
 		}

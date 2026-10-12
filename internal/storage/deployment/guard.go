@@ -21,8 +21,17 @@ func Newest(rows []TargetRow) *TargetRow {
 	return newest
 }
 
+// Unchanged reports whether writing entity would change nothing, so nothing is
+// written: its targets are primary origins and each one's newest row, among
+// newest, already serves its release. A deployment to preview URLs is never
+// unchanged, because writing it renews their previews.
+func Unchanged(entity *domain.Deployment, newest []TargetRow) bool {
+	return entity.TargetKind == domain.DeploymentTargetKindPrimary &&
+		AllServe(newest, entity.Origins(), entity.ReleaseID)
+}
+
 // AllServe reports whether every origin's newest row, among newest, already
-// serves releaseID. Deploying then changes nothing, so nothing is written.
+// serves releaseID.
 func AllServe(newest []TargetRow, origins []string, releaseID string) bool {
 	serving := make(map[string]string, len(newest))
 	for _, row := range newest {

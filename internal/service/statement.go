@@ -232,13 +232,14 @@ type DeploymentStatements interface {
 	// actual newest deployment. A project that does not exist is a
 	// NoRowFoundError.
 	//
-	// Idempotent on what the targets serve: when every target's newest
-	// deployment already uses entity's release, nothing is written, entity
-	// is overwritten with the newest deployment to the targets, and created
-	// is false.
+	// A deployment to primary origins is idempotent on what they serve: when
+	// every target's newest deployment already uses entity's release,
+	// nothing is written, entity is overwritten with the newest deployment
+	// to the targets, and created is false.
 	//
-	// A deployment to preview URLs creates or renews the preview of each
-	// target, expiring previewTTL after deployed_at.
+	// A deployment to preview URLs is always written: it creates or renews
+	// the preview of each target, expiring previewTTL after deployed_at, and
+	// that record is the renewal.
 	CreateDeployment(ctx context.Context, entity *domain.Deployment, expectedDeploymentID *string, previewTTL time.Duration) (created bool, err error)
 	GetDeploymentByID(ctx context.Context, projectID, id string) (*domain.Deployment, error)
 	// GetDeploymentsByIDs reads the named deployments in one round trip.
