@@ -278,6 +278,35 @@ describe("scaffold - merge-env", () => {
     );
     expect(result.filesSkipped).toEqual([join(dir, ".env.local")]);
   });
+
+  it("re-asserts the mode when rewriting an existing secret-bearing file at a loose mode", async () => {
+    await writeFile(join(dir, ".env.development.local"), "FOO=1\n", { mode: 0o644 });
+    await scaffold(
+      plan({
+        kind: "merge-env",
+        path: ".env.development.local",
+        entries: { BAR: "2" },
+        mode: 0o600,
+      }),
+      { cwd: dir, dryRun: false, force: false },
+    );
+    expect((await stat(join(dir, ".env.development.local"))).mode & 0o777).toBe(0o600);
+  });
+
+  it("re-asserts the mode even when there is nothing to add", async () => {
+    await writeFile(join(dir, ".env.development.local"), "FOO=1\n", { mode: 0o644 });
+    const result = await scaffold(
+      plan({
+        kind: "merge-env",
+        path: ".env.development.local",
+        entries: { FOO: "1" },
+        mode: 0o600,
+      }),
+      { cwd: dir, dryRun: false, force: false },
+    );
+    expect(result.filesSkipped).toEqual([join(dir, ".env.development.local")]);
+    expect((await stat(join(dir, ".env.development.local"))).mode & 0o777).toBe(0o600);
+  });
 });
 
 describe("scaffold - merge-json", () => {

@@ -1,14 +1,24 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   readBoundEnvironments,
   requireValue,
+  requireValueInteractive,
   resolveEnvironment,
 } from "../../../src/lib/environment";
+
+/** The answer the mocked clack prompt returns; set per test. */
+const promptAnswer: { value: string | symbol } = { value: "" };
+vi.mock("@clack/prompts", () => ({
+  text: vi.fn(async () => promptAnswer.value),
+  password: vi.fn(async () => promptAnswer.value),
+  isCancel: (value: unknown) => typeof value === "symbol",
+  cancel: vi.fn(),
+}));
 
 let dir: string;
 
@@ -324,6 +334,33 @@ describe("requireValue", () => {
     await write(".env.development.local", { ZITADEL_PROJECT_ID: "proj_file" });
 
     expect(requireValue(await resolve(), "ZITADEL_PROJECT_ID")).toBe("proj_file");
+  });
+});
+
+describe("requireValueInteractive", () => {
+  it("throws without prompting when non-interactive", async () => {
+    const { text } = await import("@clack/prompts");
+    const environment = await resolve({ envName: "production" });
+
+    await expect(
+      requireValueInteractive(environment, "ZITADEL_PROJECT_ID", { cwd: dir, interactive: false }),
+    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+    expect(text).not.toHaveBeenCalled();
+  });
+
+  it("prompts for a missing value and persists it to .env.<name>.local", async () => {
+    promptAnswer.value = "proj_prompted";
+    const environment = await resolve({ envName: "production" });
+
+    const value = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", {
+      cwd: dir,
+      interactive: true,
+    });
+
+    expect(value).toBe("proj_prompted");
+    expect(await readFile(join(dir, ".env.production.local"), "utf8")).toContain(
+      "ZITADEL_PROJECT_ID=proj_prompted",
+    );
   });
 });
 

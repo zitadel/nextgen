@@ -151,6 +151,9 @@ export default class EnvAdd extends BaseCommand {
       ZITADEL_PROJECT_ID: projectId,
       ...(projectSecret === undefined ? {} : { ZITADEL_PROJECT_SECRET: projectSecret }),
       ...(previewToken === undefined ? {} : { ZITADEL_PREVIEW_TOKEN: previewToken }),
+      // The origin the app serves from, so a CLI run against this environment
+      // resolves the same ZITADEL_ISSUER the deployed app registers.
+      ...(issuer === undefined ? {} : { ZITADEL_ISSUER: issuer }),
       ...(publicVariable === undefined ? {} : { [publicVariable]: projectId }),
     };
     await writeFile(
@@ -198,10 +201,18 @@ export default class EnvAdd extends BaseCommand {
         { name: "ZITADEL_PROJECT_SECRET", secret: true },
       ],
     };
+    // Only a secret actually written to the file can be copied from it. When
+    // `--project` binds an id with no ZITADEL_PROJECT_SECRET / PREVIEW_TOKEN in
+    // the process environment, the file holds neither, so "copy it from <file>"
+    // would send the user to a value that is not there — point them at the
+    // project's own secret instead.
+    const writtenKeys = new Set(Object.keys(values));
     const render = (variables: PlatformVariable[]): string[] =>
       variables.map((variable) =>
         variable.secret
-          ? `  ${variable.name}  (secret, copy it from ${file})`
+          ? writtenKeys.has(variable.name)
+            ? `  ${variable.name}  (secret, copy it from ${file})`
+            : `  ${variable.name}  (secret, copy it from wherever you got this project)`
           : `  ${variable.name}=${variable.value}`,
       );
 

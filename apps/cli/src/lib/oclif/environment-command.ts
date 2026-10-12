@@ -1,7 +1,7 @@
 import { consola } from "consola";
 
 import { createZitadelClient, type ZitadelClient } from "../api-client";
-import { type Environment, requireValue, resolveEnvironment } from "../environment";
+import { type Environment, requireValueInteractive, resolveEnvironment } from "../environment";
 import { resolveCwd } from "../paths";
 import { BaseCommand } from "./base";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
@@ -83,9 +83,13 @@ export abstract class EnvironmentCommand extends BaseCommand {
     // Recorded before anything is required, so a run stopped for a missing
     // value still says which credential it was after.
     this.recordTelemetry({ credential, has_env_file: environment.envFile !== undefined });
-    const server = requireValue(environment, "ZITADEL_URL");
-    const projectId = requireValue(environment, "ZITADEL_PROJECT_ID");
-    const token = requireValue(environment, CREDENTIALS[credential]);
+    // On a terminal a missing value is prompted for and persisted to
+    // `.env.<name>.local` (#1313); non-interactively each still throws, naming
+    // the sources consulted, so a scripted run stays deterministic.
+    const ask = { cwd: this.meta.cwd, interactive: !this.meta.nonInteractive };
+    const server = await requireValueInteractive(environment, "ZITADEL_URL", ask);
+    const projectId = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", ask);
+    const token = await requireValueInteractive(environment, CREDENTIALS[credential], ask);
     if (process.stdout.isTTY && !options.quiet) {
       consola.info(`Project   ${projectId}`);
       consola.info(`Server    ${server}`);

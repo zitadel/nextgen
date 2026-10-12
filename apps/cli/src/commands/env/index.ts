@@ -2,11 +2,18 @@ import { ENVIRONMENT_KEYS, type EnvironmentKey } from "../../lib/environment";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
 import { renderTable } from "../../lib/oclif/crud/table";
 
-/** The values that grant access, shown by their first characters only. */
+/** The values that grant access, never printed — only named and masked. */
 const SECRET_KEYS: ReadonlySet<EnvironmentKey> = new Set([
   "ZITADEL_PROJECT_SECRET",
   "ZITADEL_PREVIEW_TOKEN",
 ]);
+
+/**
+ * A fixed, length-independent mask for a secret's value. A prefix of the real
+ * value would leak a short secret whole and narrow the search space of a long
+ * one, so the output never derives from the secret at all.
+ */
+const REDACTED = "••••••••";
 
 /**
  * `zitadel env` — what this directory resolves to for the environment in use,
@@ -34,7 +41,7 @@ export default class Env extends EnvironmentCommand {
       if (!entry) {
         return [];
       }
-      const shown = SECRET_KEYS.has(key) ? `${entry.value.slice(0, 8)}…` : entry.value;
+      const shown = SECRET_KEYS.has(key) ? REDACTED : entry.value;
       return [{ variable: key, value: shown, source: entry.source }];
     });
     const lookups = consulted.map(({ source, present, supplied }) => ({

@@ -70,6 +70,7 @@ export default class Status extends EnvironmentCommand {
     const project = await projectStatus(
       this.meta.cwd,
       this.environment.values.ZITADEL_ISSUER?.value,
+      this.environment.values.ZITADEL_PROJECT_ID?.value,
     );
     const users =
       project.lifecycle === "configured"
@@ -157,7 +158,17 @@ type ProjectStatus =
       claim?: ClaimState;
     };
 
-async function projectStatus(cwd: string, issuer: string | undefined): Promise<ProjectStatus> {
+/**
+ * `resolvedProjectId` is the project the environment resolved to — the same one
+ * {@link detectUserPresence} probes through `connect()`. The displayed project
+ * must be that one, not the id in `zitadel.json`, or `status --env` would name
+ * one project while reporting another's users.
+ */
+async function projectStatus(
+  cwd: string,
+  issuer: string | undefined,
+  resolvedProjectId: string | undefined,
+): Promise<ProjectStatus> {
   if (!(await hasZitadelConfig(cwd))) {
     return {
       lifecycle: "not-configured",
@@ -175,13 +186,21 @@ async function projectStatus(cwd: string, issuer: string | undefined): Promise<P
   }
 
   const secret = await readZitadelSecret(cwd);
-  // Gated on the server recorded in `zitadel.json`, not `this.meta.source`:
-  // `status --server local` rewrites the source for the health probe, but it
-  // does not move the project, so the source would answer the wrong question.
-  const claim = claimState({ secret, server: readProjectServer(config) });
+  const projectId = resolvedProjectId ?? String(config.project ?? secret.project_id ?? "");
+  // The claim record lives in `.zitadel/secret`, which belongs to the local
+  // project. It describes `projectId` only when the resolved environment points
+  // at that same project; a `--env` aimed at another project has no local claim
+  // record to show, so the block is omitted rather than shown against the wrong
+  // project. Gated on the server in `zitadel.json`, not `this.meta.source`:
+  // `status --server local` rewrites the source for the health probe but does
+  // not move the project, so the source would answer the wrong question.
+  const claim =
+    projectId === secret.project_id
+      ? claimState({ secret, server: readProjectServer(config) })
+      : ({ kind: "not-applicable" } as const);
   return {
     lifecycle: "configured",
-    project_id: String(config.project ?? secret.project_id ?? ""),
+    project_id: projectId,
     issuer,
     ...(claim.kind === "not-applicable" ? {} : { claim }),
   };
