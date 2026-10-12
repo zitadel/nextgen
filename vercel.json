@@ -21,12 +21,25 @@
           "destination": "/ui/console/index.html"
         }
       ]
+    },
+    "storybook": {
+      "root": "apps/storybook",
+      "framework": "storybook",
+      "installCommand": "corepack pnpm install --frozen-lockfile",
+      "buildCommand": "cd ../.. && corepack pnpm exec moon run storybook:build && cd apps/storybook && mv dist storybook && mkdir dist && mv storybook dist/",
+      "outputDirectory": "dist",
+      "ignoreCommand": "sh ../cloud/ignore-build.sh"
     }
   },
   "redirects": [
     {
       "source": "/ui/console",
       "destination": "/ui/console/",
+      "permanent": true
+    },
+    {
+      "source": "/storybook",
+      "destination": "/storybook/",
       "permanent": true
     }
   ],
@@ -35,6 +48,12 @@
       "source": "/ui/console/(.*)",
       "destination": {
         "service": "console"
+      }
+    },
+    {
+      "source": "/storybook/(.*)",
+      "destination": {
+        "service": "storybook"
       }
     },
     {
