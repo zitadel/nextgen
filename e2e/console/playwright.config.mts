@@ -29,8 +29,10 @@ export default defineConfig({
   },
   /* Run your local dev server before starting the tests */
   webServer: {
-    command:
-      "corepack pnpm --filter @zitadel/console run build && corepack pnpm --filter @zitadel/console run preview",
+    // Preview only — the console dist is already built by the `console:build`
+    // moon dependency. Building again here would rewrite the dist that the
+    // real/embedded lanes' server:build embeds, racing those writers.
+    command: "corepack pnpm --filter @zitadel/console run preview",
     url: "http://localhost:4173",
     reuseExistingServer: true,
     cwd: workspaceRoot,

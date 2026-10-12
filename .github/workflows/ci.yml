@@ -114,7 +114,7 @@ jobs:
       # (forbidden — see packages/testing/AGENTS.md) and race the dist-rewriting
       # build tasks. `release:*` are runInCI:false, so unset CI to run them.
       - name: Build release snapshot for the journey
-        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
         run: |
           env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container
           version="$(node -p "require('./apps/server/package.json').version")"
