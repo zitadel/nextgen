@@ -106,4 +106,20 @@ describe("origin add", () => {
     expect(result.exitCode).not.toBe(0);
     expect(requests).toEqual([]);
   });
+
+  it("makes no request on a dry run", async () => {
+    const cwd = await anAppDir();
+
+    const { result, envelope } = await add(
+      cwd,
+      "https://app.acme.com",
+      "--kind",
+      "primary",
+      "--dry-run",
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(requests).toEqual([]);
+    expect(envelope.data).toMatchObject({ dry_run: true, verb: "add", topic: "origin" });
+  });
 });
