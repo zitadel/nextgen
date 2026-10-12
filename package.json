@@ -2,6 +2,7 @@
   "name": "@zitadel/source",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "license": "AGPL-3.0-only",
   "scripts": {
     "doctor": "node scripts/doctor.mjs",
@@ -37,19 +38,6 @@
       "esbuild",
       "sharp"
     ],
-    "supportedArchitectures": {
-      "os": [
-        "current",
-        "darwin",
-        "linux",
-        "win32"
-      ],
-      "cpu": [
-        "current",
-        "x64",
-        "arm64"
-      ]
-    },
     "overrides": {
       "@types/react": "^19.2.14",
       "@types/node": "catalog:",

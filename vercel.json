@@ -4,17 +4,15 @@
     "server": {
       "root": ".",
       "framework": "go",
-      "installCommand": "corepack pnpm install --frozen-lockfile",
-      "buildCommand": "sh apps/cloud/build.sh",
-      "ignoreCommand": "sh apps/cloud/ignore-build.sh"
+      "installCommand": "sh apps/cloud/install.sh",
+      "buildCommand": "sh apps/cloud/build.sh"
     },
     "console": {
       "root": "apps/console",
       "framework": "vite",
-      "installCommand": "corepack pnpm install --frozen-lockfile",
+      "installCommand": "sh ../cloud/install.sh",
       "buildCommand": "cd ../.. && VITE_CONSOLE_VERCEL_INSIGHTS=1 corepack pnpm exec moon run console:build && rm -rf apps/console/dist && mkdir -p apps/console/dist/ui/console && cp -R internal/staticui/console/dist/. apps/console/dist/ui/console/",
       "outputDirectory": "dist",
-      "ignoreCommand": "sh ../cloud/ignore-build.sh",
       "rewrites": [
         {
           "source": "/ui/console/(.*)",
@@ -25,10 +23,15 @@
     "storybook": {
       "root": "apps/storybook",
       "framework": "storybook",
-      "installCommand": "corepack pnpm install --frozen-lockfile",
+      "installCommand": "sh ../cloud/install.sh",
       "buildCommand": "cd ../.. && corepack pnpm exec moon run storybook:build && cd apps/storybook && mv dist storybook && mkdir dist && mv storybook dist/",
-      "outputDirectory": "dist",
-      "ignoreCommand": "sh ../cloud/ignore-build.sh"
+      "outputDirectory": "dist"
+    },
+    "docs": {
+      "root": "apps/docs",
+      "framework": "nextjs",
+      "installCommand": "sh ../cloud/install.sh",
+      "buildCommand": "corepack pnpm run build"
     }
   },
   "redirects": [
@@ -54,6 +57,18 @@
       "source": "/storybook/(.*)",
       "destination": {
         "service": "storybook"
+      }
+    },
+    {
+      "source": "/docs",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/docs/(.*)",
+      "destination": {
+        "service": "docs"
       }
     },
     {
