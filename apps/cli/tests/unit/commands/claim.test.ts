@@ -70,7 +70,7 @@ async function makeProject(overrides: Record<string, unknown> = {}): Promise<{
   const response = await fetch(`${SERVER}/projects`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "demo", preview_origins: [] }),
+    body: JSON.stringify({ name: "demo", origins: [] }),
   });
   const project = (await response.json()) as Project;
   // Fail loudly rather than writing `undefined` into the secret: a renamed

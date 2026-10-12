@@ -20,7 +20,7 @@ import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
  *
  * The header card carries `PROJECT ID` and `CREATED`. The design draws a third
  * cell, `ISSUER` — the project's issuer origin — but nothing carries it:
- * `project-response` is `id`, `name`, `preview_origins`, `created_at` and
+ * `project-response` is `id`, `name`, `origins`, `created_at` and
  * `updated_at`, and `issuer` appears nowhere in the spec, the console or the
  * domain layer. The cell is left out rather than shown empty, and returns as one
  * more `MetaValue` when the field lands.

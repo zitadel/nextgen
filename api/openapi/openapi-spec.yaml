@@ -137,6 +137,10 @@ paths:
     $ref: endpoints/projects/by_id/claim/complete/methods.yaml
   /projects/{project_id}/claim/window:
     $ref: endpoints/projects/by_id/claim/window/methods.yaml
+  /projects/{project_id}/origins:
+    $ref: endpoints/projects/by_id/origins/methods.yaml
+  /projects/{project_id}/origins/remove:
+    $ref: endpoints/projects/by_id/origins/remove/methods.yaml
   /sessions:
     $ref: endpoints/sessions/methods.yaml
   /sessions/query:

@@ -79,7 +79,7 @@ func uniqueProjectID(t *testing.T) string {
 }
 
 // newTestProject builds a persistable project. Origins is a non-nil empty
-// slice because the projects table declares preview_origins NOT NULL.
+// slice because the projects table declares origins NOT NULL.
 func newTestProject(id string) *domain.Project {
 	return &domain.Project{ID: id, Name: "project-" + rand.Text(), Origins: []domain.Origin{}}
 }

@@ -23,9 +23,11 @@
 import { randomBytes, randomUUID } from "node:crypto";
 
 import type {
+  AddOrigin201,
   CompleteClaim200,
   CreateFlowDefinition201,
   CreateProject201,
+  CreateProject201OriginsItem,
   CreateSchema201,
   GetClaimWindow200,
   GetClaimStatus200,
@@ -38,6 +40,9 @@ import type {
   ListSchemas200,
 } from "@zitadel/api/generated/model";
 import {
+  AddOriginBody,
+  AddOriginParams,
+  AddOriginResponse,
   CompleteClaimResponse,
   CreateFlowDefinitionBody,
   CreateIdpBody,
@@ -76,6 +81,8 @@ import {
   QueryIdpsQueryParams,
   QueryIdpsResponse,
   QueryUsersBody,
+  RemoveOriginBody,
+  RemoveOriginParams,
   UpdateVariablesBody,
   UpdateVariablesQueryParams,
   UpdateVariablesResponse,
@@ -181,7 +188,7 @@ type ProjectRecord = {
   name: string;
   projectSecret: string;
   previewSecret: string;
-  previewOrigins: string[];
+  origins: CreateProject201OriginsItem[];
   createdAt: string;
   updatedAt: string;
 };
@@ -755,7 +762,7 @@ export function setupPlatformHandlers() {
         name: body.data.name,
         projectSecret: `sk_proj_${id.replaceAll("-", "")}_full`,
         previewSecret: `sk_proj_${id.replaceAll("-", "")}_preview`,
-        previewOrigins: body.data.preview_origins ?? [],
+        origins: body.data.origins ?? [],
         createdAt,
         updatedAt: createdAt,
       };
@@ -768,7 +775,7 @@ export function setupPlatformHandlers() {
         name: project.name,
         project_secret: project.projectSecret,
         preview_secret: project.previewSecret,
-        preview_origins: project.previewOrigins,
+        origins: project.origins,
         created_at: project.createdAt,
       };
       return HttpResponse.json(responseBody, { status: 201 });
@@ -787,6 +794,7 @@ export function setupPlatformHandlers() {
       const responseBody: GetProject200 = {
         id: project.id,
         name: project.name,
+        origins: project.origins,
         created_at: project.createdAt,
         updated_at: project.updatedAt,
       };
@@ -795,6 +803,85 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data);
+    }),
+
+    // POST /projects/:project_id/origins/remove — drop one pattern. Missing
+    // project is 404; removing an already-absent pattern is idempotent 204.
+    http.post("*/projects/:project_id/origins/remove", async ({ params, request }) => {
+      const path = parse(RemoveOriginParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(RemoveOriginBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
+      const project = store.projects.get(path.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+      }
+
+      const next = project.origins.filter((o) => o.pattern !== body.data.pattern);
+      if (next.length !== project.origins.length) {
+        project.origins = next;
+        project.updatedAt = nowIso();
+      }
+      return new HttpResponse(null, { status: 204 });
+    }),
+
+    // POST /projects/:project_id/origins — add one {pattern, kind}. Same
+    // pattern+kind is idempotent 201; same pattern with a different kind is
+    // origin.kind_conflict. No check/warning field on the response.
+    http.post("*/projects/:project_id/origins", async ({ params, request }) => {
+      const path = parse(AddOriginParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(AddOriginBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
+      const project = store.projects.get(path.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+      }
+
+      const existing = project.origins.find((o) => o.pattern === body.data.pattern);
+      if (existing && existing.kind !== body.data.kind) {
+        return HttpResponse.json(
+          errorBody(
+            "origin.kind_conflict",
+            "origin: the pattern is already stored with a different kind",
+          ),
+          { status: 400 },
+        );
+      }
+
+      const origin: CreateProject201OriginsItem = {
+        pattern: body.data.pattern,
+        kind: body.data.kind,
+      };
+      if (!existing) {
+        project.origins = [...project.origins, origin];
+        project.updatedAt = nowIso();
+      }
+
+      const responseBody: AddOrigin201 = existing ?? origin;
+      const out = parse(AddOriginResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 201 });
     }),
 
     // POST /projects/:project_id/claim/init — mint a claim challenge. Auth

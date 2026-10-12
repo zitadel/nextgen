@@ -22,12 +22,18 @@ type Fixture struct {
 	User    FixtureUser    `json:"user"`
 }
 
-// FixtureProject is the project to create. The first preview origin is the
+// FixtureProject is the project to create. The first origin pattern is the
 // Origin header the flow requests carry.
 type FixtureProject struct {
-	Name           string   `json:"name"`
-	PreviewOrigins []string `json:"preview_origins"`
-	SeedDefaults   bool     `json:"seed_defaults"`
+	Name         string          `json:"name"`
+	Origins      []FixtureOrigin `json:"origins"`
+	SeedDefaults bool            `json:"seed_defaults"`
+}
+
+// FixtureOrigin is one {pattern, kind} entry on a project.
+type FixtureOrigin struct {
+	Pattern string `json:"pattern"`
+	Kind    string `json:"kind"`
 }
 
 // FixtureUser is the user to create. Schema defaults to the server's built-in
@@ -56,8 +62,8 @@ func LoadFixture(path string) (Fixture, error) {
 	if fx.Project.Name == "" {
 		errs = errors.Join(errs, errors.New("project.name is required"))
 	}
-	if len(fx.Project.PreviewOrigins) == 0 {
-		errs = errors.Join(errs, errors.New("project.preview_origins needs at least one origin: the flow requests send it"))
+	if len(fx.Project.Origins) == 0 {
+		errs = errors.Join(errs, errors.New("project.origins needs at least one origin: the flow requests send it"))
 	}
 	if fx.User.Email == "" || fx.User.Password == "" {
 		errs = errors.Join(errs, errors.New("user.email and user.password are required"))
@@ -76,18 +82,33 @@ func LoadFixture(path string) (Fixture, error) {
 // password — and proves the result by walking one login journey and one user
 // read before returning the target. A fixture that cannot be driven is
 // reported here, not as a wall of failed iterations later.
+func originsToAPI(in []FixtureOrigin) []api.Origin {
+	out := make([]api.Origin, len(in))
+	for i, o := range in {
+		kind := o.Kind
+		if kind == "" {
+			kind = string(api.OriginKindPreview)
+		}
+		out[i] = api.Origin{
+			Pattern: o.Pattern,
+			Kind:    api.OriginKind(kind),
+		}
+	}
+	return out
+}
+
 func Bootstrap(ctx context.Context, base, lane string, fx Fixture) (Target, error) {
 	creds := NewCredentials("")
 	//egress:allow benchmark harness provisioning the server under test
-	c, err := api.NewClient(base, creds, api.WithClient(originDoer{origin: fx.Project.PreviewOrigins[0], client: &http.Client{Timeout: 30 * time.Second}}))
+	c, err := api.NewClient(base, creds, api.WithClient(originDoer{origin: fx.Project.Origins[0].Pattern, client: &http.Client{Timeout: 30 * time.Second}}))
 	if err != nil {
 		return Target{}, err
 	}
 
 	created, err := c.CreateProject(ctx, &api.CreateProjectRequest{
-		Name:           fx.Project.Name,
-		PreviewOrigins: fx.Project.PreviewOrigins,
-		SeedDefaults:   api.NewOptBool(fx.Project.SeedDefaults),
+		Name:         fx.Project.Name,
+		Origins:      originsToAPI(fx.Project.Origins),
+		SeedDefaults: api.NewOptBool(fx.Project.SeedDefaults),
 	})
 	if err != nil {
 		return Target{}, fmt.Errorf("create project: %w", err)
@@ -127,7 +148,7 @@ func Bootstrap(ctx context.Context, base, lane string, fx Fixture) (Target, erro
 		Lane:          lane,
 		ProjectID:     project.ID,
 		ProjectSecret: project.ProjectSecret,
-		Origin:        fx.Project.PreviewOrigins[0],
+		Origin:        fx.Project.Origins[0].Pattern,
 		UserID:        string(user.ID),
 		Email:         fx.User.Email,
 		Password:      fx.User.Password,
