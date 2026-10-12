@@ -376,8 +376,9 @@ describe("SocialSignInPrompt", () => {
   });
 
   it("never asks on a released build", async () => {
-    // The gate is the build stamp, not a flag: someone who installed the CLI
-    // is configuring the real vendor and must not meet this question.
+    // Gated on the ZITADEL_CLI_DEV opt-in, which a published CLI never sets:
+    // someone who installed it is configuring the real vendor and must not
+    // meet this question.
     vi.mocked(multiselect).mockResolvedValueOnce(["google"] as never);
     vi.mocked(text).mockResolvedValueOnce("client-id" as never);
     vi.mocked(password).mockResolvedValueOnce("the-secret" as never);

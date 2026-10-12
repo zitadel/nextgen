@@ -17,7 +17,7 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.lib.json",
+    "build": "tsdown",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "test:all": "pnpm run test"
@@ -25,23 +25,23 @@
   "exports": {
     ".": {
       "@zitadel/source": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
     },
     "./types": {
       "@zitadel/source": "./src/types.ts",
-      "types": "./dist/types.d.ts",
-      "import": "./dist/types.js"
+      "types": "./dist/types.d.mts",
+      "import": "./dist/types.mjs"
     },
     "./jwt": {
       "@zitadel/source": "./src/jwt.ts",
-      "types": "./dist/jwt.d.ts",
-      "import": "./dist/jwt.js"
+      "types": "./dist/jwt.d.mts",
+      "import": "./dist/jwt.mjs"
     },
     "./middleware": {
       "@zitadel/source": "./src/middleware.ts",
-      "types": "./dist/middleware.d.ts",
-      "import": "./dist/middleware.js"
+      "types": "./dist/middleware.d.mts",
+      "import": "./dist/middleware.mjs"
     }
   },
   "publishConfig": {
@@ -54,6 +54,7 @@
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/components": "workspace:*",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"

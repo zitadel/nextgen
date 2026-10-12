@@ -36,8 +36,12 @@ tasks:
       # release step instead of the normal `moon ci` build/test graph.
       runInCI: false
 
+  # The same deps as build: components has no `@zitadel/source` entry, so the
+  # dev server loads its dist.
   dev:
     command: "corepack pnpm run dev"
+    deps:
+      - "components:build"
     options:
       persistent: true
       runInCI: false

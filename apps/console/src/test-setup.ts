@@ -1,18 +1,20 @@
 import { format } from "node:util";
 
 import { cleanup, configure } from "@testing-library/react";
-import { afterEach, beforeEach } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach } from "vitest";
 import { _resetConfigForTesting } from "@zitadel/api/config";
 import "@testing-library/jest-dom/vitest";
 
 import { clearSessionCaches } from "./lib/session-cache";
 import { _resetRuntimeForTesting } from "./runtime/runtime";
+import { server } from "./test/msw";
 
 // Console screens render after a router load, an API fetch and component
-// effects. On a cold or loaded CI runner that first render can exceed RTL's
-// default 1s findBy/waitFor window, which flaked the suite. Give the async
-// queries more headroom for every console spec.
-configure({ asyncUtilTimeout: 5000 });
+// effects, so `findBy*`/`waitFor` need more than RTL's 1s default to settle —
+// but not much more once requests are mocked (the earlier flake was a screen
+// that never finished because a request was unmocked, not a slow one). 5s is
+// the give-up window; a real failure still reports in ~5s, not a minute.
+configure({ asyncUtilTimeout: 5_000 });
 
 // configureZitadel is write-once on globalThis so duplicate module copies
 // share one slot. That slot also survives Vitest's per-file isolate, and
@@ -28,6 +30,14 @@ afterEach(_resetConfigForTesting);
 // Reads cached for the signed-in person (`GET /users/me/projects`) would
 // otherwise carry one test's mocked answer into the next.
 beforeEach(clearSessionCaches);
+
+// Every spec answers requests from the one server (`src/test/msw.ts`), and a
+// request no handler answers fails the test that made it rather than reaching
+// the network. Registered before the console guard below, so its reset runs
+// after the guard's cleanup: handlers still answer while the tree unmounts.
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
 
 // A test that writes to console.error or console.warn fails. React reports a
 // state update outside act(), a failed loader and a missing key there and then
@@ -109,13 +119,6 @@ if (typeof Element !== "undefined") {
   Element.prototype.setPointerCapture ??= () => undefined;
   Element.prototype.scrollIntoView ??= () => undefined;
 }
-
-// Hermetic env: Vitest (via Vite) loads `.env.local`, so without this stub a
-// local VITE_CONSOLE_RUNTIME_FALLBACK would turn runtime-discovery failures
-// back into the standalone fallback (Console ADR 0004 §3), making outcomes
-// depend on a gitignored local file. Specs that need a value stub their own
-// (vi.stubEnv wins over this default).
-vi.stubEnv("VITE_CONSOLE_RUNTIME_FALLBACK", "");
 
 // Every spec starts with no runtime document, so no sign-in project. One that
 // needs a project sets it with `_setRuntimeForTesting`, as the server would.

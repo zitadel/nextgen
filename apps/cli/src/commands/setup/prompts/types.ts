@@ -32,8 +32,8 @@ export type SsoAnswer = {
   readonly secret: string;
   /**
    * Where the connection points, when not at the vendor. Asked for only on a
-   * development build, whose one job is standing the provider up locally —
-   * see {@link import("./social-sign-in").SocialSignInPrompt}.
+   * development run (ZITADEL_CLI_DEV), whose one job is standing the provider
+   * up locally — see {@link import("./social-sign-in").SocialSignInPrompt}.
    */
   readonly endpoints?: ConnectionEndpoints;
 };
@@ -106,8 +106,8 @@ export type PromptContext = {
    */
   readonly ssoFromFlag?: boolean;
   /**
-   * Whether this CLI was built from source rather than released. Only a
-   * development build asks where a provider's endpoints are — see
+   * Whether this is a development run (the ZITADEL_CLI_DEV opt-in). Only a
+   * development run asks where a provider's endpoints are — see
    * {@link import("./social-sign-in").SocialSignInPrompt}. Passed in rather
    * than read from the bundle so a test can drive both answers.
    */

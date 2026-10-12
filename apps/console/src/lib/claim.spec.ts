@@ -1,22 +1,17 @@
 import { CSRF_HEADER } from "@zitadel/api/runtime/fetch";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { _resetSessionForTesting, fetchSession, sessionPage } from "../auth/session";
 import { makeTestSession } from "@/test/session.fixture";
 import { completeProjectClaim } from "./claim";
+import { server } from "@/test/msw";
 
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
 beforeEach(() => {
   _resetSessionForTesting();
   vi.spyOn(sessionPage, "reload").mockImplementation(() => undefined);
 });
 afterEach(() => {
-  server.resetHandlers();
   vi.restoreAllMocks();
 });
 
