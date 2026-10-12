@@ -80,13 +80,29 @@ describe("deploy", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
-      it("refuses an --origin that is a preview origin", async () => {
+      it("refuses an --origin a preview wildcard covers as a preview", async () => {
         const app = await aSetUpApp();
         await app.addOrigin("https://*-acme.vercel.app", "preview");
 
+        // The concrete URL is covered by the preview wildcard, not equal to it.
+        // An exact-match check would miss it and mislabel it "not an origin";
+        // it must be recognised as the preview it is.
         const result = await app.deploy(["--origin", "https://x-acme.vercel.app"]);
 
         expect(result).toFailWith("E_VALIDATION");
+        expect(result).toExplain("is a preview origin");
+      });
+
+      it("accepts a primary --origin even when a preview wildcard also covers it", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin("https://*-acme.vercel.app", "preview");
+        await app.addPrimaryOrigin("https://app-acme.vercel.app");
+
+        // A literal beats a wildcard: the exact primary is a primary target
+        // although the preview wildcard would match it too.
+        const data = await app.deployData(["--origin", "https://app-acme.vercel.app"]);
+
+        expect(data.origins).toEqual(["https://app-acme.vercel.app"]);
       });
 
       it("passes the observed deployment and re-deploys unchanged content", async () => {
