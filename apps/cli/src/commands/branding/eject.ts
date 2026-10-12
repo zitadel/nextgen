@@ -37,7 +37,7 @@ import {
  * Scaffolds `.zitadel/branding/` from a shipped design: the `branding.json`
  * descriptor, the `login.liquid` template it references, a README, and the
  * branding dialect meta-schema (for projects set up before it existed).
- * Purely local — nothing is uploaded; the first `zitadel apply` publishes
+ * Purely local — nothing is uploaded; the first `zitadel deploy` publishes
  * revision 1. Ejecting the template is the last rung of the branding
  * override ladder (docs/design/branding/override-ladder.md); unrelated to
  * `zitadel eject`, which removes the Zitadel integration.
@@ -129,11 +129,11 @@ export default class BrandingEject extends BaseCommand {
         files_written: filesWritten,
         next_actions: [
           `Edit ${DEFAULT_BRANDING_TEMPLATE_PATH} — the login UI is yours now.`,
-          "Plan validates the template and shows the pending revision; apply publishes it.",
+          "Deploy --dry-run validates the template and shows the diff; deploy publishes it.",
         ],
         next_commands: [
-          publicCliCommand("plan", this.meta.cliVersion),
-          publicCliCommand("apply", this.meta.cliVersion),
+          publicCliCommand("deploy --dry-run", this.meta.cliVersion),
+          publicCliCommand("deploy", this.meta.cliVersion),
         ],
       },
     });

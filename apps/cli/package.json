@@ -77,6 +77,12 @@
       },
       "origin": {
         "description": "Manage the origin patterns the project admits."
+      },
+      "release": {
+        "description": "Build and revoke the project's configuration releases."
+      },
+      "deployment": {
+        "description": "Make releases live and read the deployment history."
       }
     }
   },

@@ -57,7 +57,7 @@ describe("the cli", () => {
         const app = await anApp();
         platform.isNotZitadel();
 
-        const result = await app.apply();
+        const result = await app.deploy();
 
         expect(result).toFailWith("E_VALIDATION");
       });
@@ -68,7 +68,7 @@ describe("the cli", () => {
         const app = await anApp();
         platform.isUnavailable();
 
-        const result = await app.apply();
+        const result = await app.deploy();
 
         expect(result).toFailWith("E_VALIDATION");
       });
@@ -79,7 +79,7 @@ describe("the cli", () => {
         const app = await anApp();
         platform.refusesConnections();
 
-        const result = await app.apply();
+        const result = await app.deploy();
 
         expect(result).toFailWith("E_VALIDATION");
       });
@@ -91,7 +91,7 @@ describe("the cli", () => {
       it("names the failure when run before setup", async () => {
         const app = await anApp();
 
-        const result = await app.apply();
+        const result = await app.deploy();
 
         expect(result).toFailWith("E_VALIDATION");
       });
@@ -99,7 +99,7 @@ describe("the cli", () => {
       it("points at setup as the way out", async () => {
         const app = await anApp();
 
-        const result = await app.apply();
+        const result = await app.deploy();
 
         expect(result).toSuggest(expectedPublicCliCommand("setup"));
       });
@@ -148,7 +148,7 @@ describe("the cli", () => {
 
         const suggested = await suggestedCommandIds();
 
-        expect([...suggested].sort()).toEqual(expect.arrayContaining(["apply", "doctor", "setup"]));
+        expect([...suggested].sort()).toEqual(expect.arrayContaining(["deploy", "doctor", "setup"]));
         for (const command of suggested) {
           expect(visible, `${command} is suggested but not a visible command`).toContain(command);
         }

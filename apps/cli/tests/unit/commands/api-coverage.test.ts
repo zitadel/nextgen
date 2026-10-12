@@ -47,11 +47,6 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   readyz: "readiness probe, not a resource",
   flow: "the runtime login flow protocol, driven by the login UI and the SDKs",
   auth_attempts: "the runtime authentication protocol, driven by the login UI and the SDKs",
-  // Deployments are acts, not files: creating one is `zitadel deploy`'s
-  // orchestration (build the release, then make it live — ADR 035), and the
-  // history is that command's to read. Registry CRUD would offer a `create`
-  // that skips the release construction the command exists to do.
-  deployments: "created and read through `zitadel deploy` orchestration, not registry CRUD (#529)",
   // An environment is a name on the developer's machine now, resolved from env
   // files (`zitadel env`), not something the server holds.
   environments: "an environment is an env file on the developer's machine, not a server resource",
@@ -74,16 +69,13 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   completeClaim: "part of the claim flow, but currently called by no command — unresolved",
   getClaimWindow: "part of the claim flow, but currently called by no command — unresolved",
 
-  // Configuration is written declaratively (ADR 035), never imperatively here.
-  createSchema: "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
-  createBranding:
-    "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
-  createRelease: "a release is constructed by `zitadel deploy` (ADR 035)",
-  createDeployment: "a release goes live through `zitadel deploy` orchestration (ADR 035, #529)",
-  getDeploymentById: "deployment history reads arrive with the `zitadel deploy` surface (#529)",
-  listDeployments: "deployment history reads arrive with the `zitadel deploy` surface (#529)",
+  // Individual resource writes are not made here: `deploy` sends the whole
+  // `.zitadel/` as one release bundle (ADR 035), so the per-kind create
+  // endpoints are never called by the CLI.
+  createSchema: "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
+  createBranding: "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
   createFlowDefinition:
-    "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
+    "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
 
   // The environment API stays in the spec until its removal lands; the CLI no
   // longer reads it.
@@ -175,7 +167,34 @@ const STANDALONE: Readonly<Record<string, readonly string[]>> = {
   // have no `/origins/query` grammar; the hand-written commands add, list (off
   // the project) and remove one pattern at a time.
   origin: ["origin/add", "origin/list", "origin/rm"],
+  // A release is built from `.zitadel/` and posted as one bundle (`deploy`,
+  // `release create`), looked up and revoked by id. The registry serves
+  // `releases list`/`get`; the acts of building and revoking are these.
+  releases: ["deploy", "release/create", "release/revoke"],
+  // A deployment is an act, not a file: `deploy` and `deployment create` make a
+  // release live, `deployment list`/`get` read the history, `deployment
+  // rollback` re-applies one. The operations live in the `lib/release` wrappers
+  // these commands call, which {@link standaloneOperations} scans too.
+  deployments: [
+    "deployment/create",
+    "deployment/list",
+    "deployment/get",
+    "deployment/rollback",
+  ],
 };
+
+/**
+ * The publish-pipeline modules the deploy/release/deployment commands call into.
+ * Their `client.<operation>(` call sites are the evidence those commands reach
+ * the release and deployment operations, the same way a command's own call site
+ * is for the registry.
+ */
+const PIPELINE_SOURCES: readonly string[] = [
+  "lib/release/release.ts",
+  "lib/release/deployment.ts",
+  "lib/release/steps/diff.ts",
+  "lib/release/steps/idp-connections.ts",
+];
 
 /**
  * The client operations the standalone commands call, read from their sources.
@@ -184,12 +203,14 @@ const STANDALONE: Readonly<Record<string, readonly string[]>> = {
  * calling an operation leaves that operation unaccounted and this test fails.
  */
 const standaloneOperations = async (): Promise<ReadonlySet<string>> => {
+  const commandSources = Object.values(STANDALONE)
+    .flat()
+    .map((command) => join(import.meta.dirname, "../../../src/commands", `${command}.ts`));
+  const pipelineSources = PIPELINE_SOURCES.map((file) =>
+    join(import.meta.dirname, "../../../src", file),
+  );
   const sources = await Promise.all(
-    Object.values(STANDALONE)
-      .flat()
-      .map((command) =>
-        readFile(join(import.meta.dirname, "../../../src/commands", `${command}.ts`), "utf8"),
-      ),
+    [...commandSources, ...pipelineSources].map((path) => readFile(path, "utf8")),
   );
   return new Set(
     sources.flatMap((source) =>

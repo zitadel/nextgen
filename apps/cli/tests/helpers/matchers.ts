@@ -26,13 +26,6 @@ function suggestionsIn(envelope: Envelope): string[] {
   return envelope.next_commands ?? envelope.data?.next_commands ?? [];
 }
 
-interface PlanTotals {
-  creates: number;
-  updates: number;
-  deletes: number;
-  total: number;
-}
-
 function envelopeOf(result: CliResult): Envelope {
   try {
     return parseJson(result.stdout) as Envelope;
@@ -191,17 +184,6 @@ expect.extend({
     };
   },
 
-  toReportNothingToDo(received: PlanTotals) {
-    const pending = received.creates + received.updates + received.deletes;
-    const pass = pending === 0 && received.total === 0;
-    return {
-      pass,
-      message: () =>
-        pass
-          ? `expected something left to reconcile, but the plan was empty`
-          : `expected nothing left to reconcile, but the plan has ${received.creates} creates, ${received.updates} updates, ${received.deletes} deletes (total ${received.total})`,
-    };
-  },
 });
 
 declare module "vitest" {
@@ -232,7 +214,5 @@ declare module "vitest" {
     toPrintNoJson(): T;
     /** The output, stdout or stderr, contains this text. */
     toSay(text: string): T;
-    /** Plan totals that are all zero. */
-    toReportNothingToDo(): T;
   }
 }

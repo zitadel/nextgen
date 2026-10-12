@@ -306,13 +306,13 @@ function nextCommandsFor(
     }
     if (users === "none") {
       // Staged like next_actions: before the first login is proven in a
-      // browser, publishing is premature — `plan` previews safely and the
-      // verify mission lives in next_actions. `apply` joins once users
-      // exist ("some") or when the probe can't tell ("unknown" keeps the
-      // lifecycle-only behavior rather than withholding on no signal).
-      commands.push(publicCliCommand("plan", cliVersion));
+      // browser, publishing is premature — `deploy --dry-run` previews safely
+      // and the verify mission lives in next_actions. A full `deploy` joins
+      // once users exist ("some") or when the probe can't tell ("unknown"
+      // keeps the lifecycle-only behavior rather than withholding on no signal).
+      commands.push(publicCliCommand("deploy --dry-run", cliVersion));
     } else {
-      commands.push(publicCliCommand("apply", cliVersion));
+      commands.push(publicCliCommand("deploy", cliVersion));
     }
   }
   return commands;

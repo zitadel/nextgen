@@ -302,8 +302,8 @@ describe("status command", () => {
     expect(actions).not.toContain(".zitadel/schemas/");
     // next_commands is staged in lockstep: preview is fine, publishing
     // waits for the first proven login.
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("plan"));
-    expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("apply"));
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("deploy --dry-run"));
+    expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("deploy"));
   });
 
   it("switches to customize/publish guidance once users exist", async () => {
@@ -320,11 +320,11 @@ describe("status command", () => {
     expect(actions).toContain("Customize what you ask for and how people sign in");
     expect(actions).toContain(".zitadel/schemas/");
     expect(actions).toContain(
-      `See your changes before they go live: ${expectedPublicCliCommand("plan")} to preview, ` +
-        `then ${expectedPublicCliCommand("apply")} to publish.`,
+      `See your changes before they go live: ${expectedPublicCliCommand("deploy --dry-run")} to ` +
+        `preview, then ${expectedPublicCliCommand("deploy")} to publish.`,
     );
     expect(actions).not.toContain("register a user");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("apply"));
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("deploy"));
   });
 
   it("keeps lifecycle-only output when the platform is unreachable", async () => {
@@ -344,7 +344,7 @@ describe("status command", () => {
     expect(actions).not.toContain("register a user");
     expect(actions).not.toContain("Customize what you ask for");
     expect(actions).toContain("temporary and its data may be lost");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("apply"));
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("deploy"));
   });
 });
 

@@ -311,8 +311,8 @@ export default class SsoEnable extends EnvironmentCommand {
             ],
             this.meta.cliVersion,
           ),
-          publicCliCommand("plan", this.meta.cliVersion),
-          publicCliCommand("apply", this.meta.cliVersion),
+          publicCliCommand("deploy --dry-run", this.meta.cliVersion),
+          publicCliCommand("deploy", this.meta.cliVersion),
         ],
       },
       pretty: `Enabled ${entry.displayName} for ${schema.name}`,
@@ -582,7 +582,7 @@ async function publishedIdOf(cwd: string, path: string): Promise<string | undefi
       {
         hint:
           "The file records which platform resource each local file was synced as. " +
-          "Fix or remove it and run `zitadel apply`, then run this command again.",
+          "Fix or remove it and run `zitadel deploy`, then run this command again.",
         details: { file: ".zitadel/state.json" },
       },
     );
