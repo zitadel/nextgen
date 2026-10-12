@@ -1,0 +1,124 @@
+# SPIKE / repro harness for #1490 — NOT FOR MERGE. Delete before this ships.
+#
+# Reproduces the addon-vitest browser flake "Failed to fetch dynamically
+# imported module ... setup-file-with-project-annotations.js" on CI, where it
+# actually happens (it does not reproduce on a fast unloaded Mac).
+#
+# Mechanism (confirmed from run 38319299823): with per-file iframe isolation the
+# browser orchestrator re-imports the setup chain over HTTP once PER story file,
+# so under a starved Vite event loop any one of those ~dozen in-flight imports
+# can be dropped. This loops the suite cold under heavy CPU/IO oversubscription,
+# with `retryCount: 0` (vitest run directly, no moon retry), so a single cold
+# attempt's failure is visible.
+#
+#   variant=flaky  -> isolate: true  (the old behaviour; expected to FAIL)
+#   variant=fixed  -> isolate: false (the PR fix;        expected to STAY GREEN)
+#
+# Re-run from the Actions tab ("Re-run all jobs") to accumulate attempts.
+name: repro-storybook-flake
+
+on:
+  push:
+    branches:
+      - fix/storybook-vitest-browser-flake
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  repro:
+    runs-on: depot-ubuntu-24.04-16
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { variant: flaky, shard: 1 }
+          - { variant: flaky, shard: 2 }
+          - { variant: flaky, shard: 3 }
+          - { variant: flaky, shard: 4 }
+          - { variant: fixed, shard: 1 }
+          - { variant: fixed, shard: 2 }
+    env:
+      DO_NOT_TRACK: "1"
+      ITERS: "20"
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: corepack pnpm --filter @zitadel/storybook exec playwright install chromium
+
+      - name: Build storybook test deps
+        run: |
+          echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+          node_modules/.bin/moon run api-mock:build components:build
+
+      # The committed config is the fix (isolate: false). For the flaky variant,
+      # flip it back to the pre-fix behaviour so the harness reproduces #1490.
+      - name: Select variant
+        run: |
+          if [ "${{ matrix.variant }}" = "flaky" ]; then
+            sed -i 's/          isolate: false,/          isolate: true,/' \
+              apps/storybook/vitest.config.ts
+          fi
+          grep -nE "isolate: (true|false)" apps/storybook/vitest.config.ts
+
+      - name: Reproduce under CPU/IO starvation
+        run: |
+          set -u
+          NPROC="$(nproc)"
+          echo "cores: $NPROC — oversubscribing to starve the Vite event loop"
+
+          # Oversubscribe CPU 2x so the single-threaded Vite server is
+          # frequently descheduled while Chromium keeps firing module requests.
+          for _ in $(seq 1 $((NPROC * 2))); do yes > /dev/null & done
+          # Parallel IO churn.
+          for _ in 1 2 3 4; do
+            ( while true; do dd if=/dev/zero of=".ioload.$_" bs=1M count=128 \
+                oflag=direct 2>/dev/null; rm -f ".ioload.$_"; done ) &
+          done
+
+          fails=0
+          for i in $(seq 1 "${ITERS}"); do
+            rm -rf node_modules/.vite apps/storybook/node_modules/.vite
+            echo "::group::${{ matrix.variant }} shard ${{ matrix.shard }} attempt $i"
+            if ( cd apps/storybook && corepack pnpm exec vitest run --project=storybook ) \
+                 > "attempt-$i.log" 2>&1; then
+              echo "attempt $i: PASS"
+            else
+              fails=$((fails + 1))
+              echo "attempt $i: FAIL"
+              grep -iE "Failed to fetch dynamically|dynamically imported|Failed to import test file|ERR_|504|ECONN|reset" \
+                "attempt-$i.log" | head -20 || true
+            fi
+            echo "::endgroup::"
+          done
+
+          echo "=============================================="
+          echo "RESULT ${{ matrix.variant }} shard ${{ matrix.shard }}: $fails / ${ITERS} attempts FAILED"
+          echo "=============================================="
+          # flaky: surface the reproduction as a job failure so it is obvious.
+          # fixed: must stay green.
+          test "$fails" -eq 0
+
+      - name: Upload attempt logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: repro-${{ matrix.variant }}-shard-${{ matrix.shard }}
+          path: apps/storybook/attempt-*.log
+          if-no-files-found: ignore
+          retention-days: 5
