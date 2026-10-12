@@ -228,6 +228,38 @@ func TestOgenErrorHandlerQueryUsersSecurityStaysCredentialNeutral(t *testing.T) 
 	})
 }
 
+// dualSchemeRequests is one request per operation that accepts either the
+// session cookie or a bearer, for the tests pinning that a bad or anonymous
+// cookie on them stays a credential-neutral 401.
+var dualSchemeRequests = []struct {
+	name   string
+	method string
+	path   string
+	body   string
+}{
+	{"grant create", http.MethodPost, "/grants?project_id=proj_1", `{"principal_type":"user","principal_id":"user_1","relation":"viewer"}`},
+	{"grant get", http.MethodGet, "/grants/asgn_1?project_id=proj_1", ""},
+	{"grant delete", http.MethodDelete, "/grants/asgn_1?project_id=proj_1", ""},
+	{"grant query", http.MethodPost, "/grants/query?project_id=proj_1", `{}`},
+	{"users query", http.MethodPost, "/users/query", `{}`},
+	{"teams query", http.MethodPost, "/teams/query?project_id=proj_1", `{}`},
+	{"team get", http.MethodGet, "/teams/team_1", ""},
+	{"user create", http.MethodPost, "/users?project_id=proj_1", `{}`},
+	{"user get", http.MethodGet, "/users/user_1", ""},
+	{"user passkeys", http.MethodGet, "/users/user_1/passkeys", ""},
+	{"user delete", http.MethodDelete, "/users/user_1", ""},
+	{"team create", http.MethodPost, "/teams?project_id=proj_1", `{"name":"x"}`},
+	{"team update", http.MethodPatch, "/teams/team_1", `{"name":"x"}`},
+	{"schemas list", http.MethodGet, "/schemas?project_id=proj_1", ""},
+	{"schema get", http.MethodGet, "/schemas/schema_1?project_id=proj_1", ""},
+	{"flow definitions list", http.MethodGet, "/flow_definitions?project_id=proj_1", ""},
+	{"flow definition get", http.MethodGet, "/flow_definitions/fdef_1?project_id=proj_1", ""},
+	{"branding list", http.MethodGet, "/branding?project_id=proj_1", ""},
+	{"branding get", http.MethodGet, "/branding/brand_1?project_id=proj_1", ""},
+	{"idps query", http.MethodPost, "/idps/query?project_id=proj_1", `{}`},
+	{"idp get", http.MethodGet, "/idps/idp_1?project_id=proj_1", ""},
+}
+
 func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testing.T) {
 	t.Parallel()
 
@@ -251,37 +283,13 @@ func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testin
 		api.GetFlowDefinitionOperation,
 		api.ListBrandingOperation,
 		api.GetBrandingByIdOperation,
+		api.QueryIdpsOperation,
+		api.GetIdpByIdOperation,
 	} {
 		require.False(t, sessionCookieOperations[op], "%s must stay off the session-only 401 rewrite", op)
 	}
 
-	tests := []struct {
-		name   string
-		method string
-		path   string
-		body   string
-	}{
-		{"grant create", http.MethodPost, "/grants?project_id=proj_1", `{"principal_type":"user","principal_id":"user_1","relation":"viewer"}`},
-		{"grant get", http.MethodGet, "/grants/asgn_1?project_id=proj_1", ""},
-		{"grant delete", http.MethodDelete, "/grants/asgn_1?project_id=proj_1", ""},
-		{"grant query", http.MethodPost, "/grants/query?project_id=proj_1", `{}`},
-		{"users query", http.MethodPost, "/users/query", `{}`},
-		{"teams query", http.MethodPost, "/teams/query?project_id=proj_1", `{}`},
-		{"team get", http.MethodGet, "/teams/team_1", ""},
-		{"user create", http.MethodPost, "/users?project_id=proj_1", `{}`},
-		{"user get", http.MethodGet, "/users/user_1", ""},
-		{"user passkeys", http.MethodGet, "/users/user_1/passkeys", ""},
-		{"user delete", http.MethodDelete, "/users/user_1", ""},
-		{"team create", http.MethodPost, "/teams?project_id=proj_1", `{"name":"x"}`},
-		{"team update", http.MethodPatch, "/teams/team_1", `{"name":"x"}`},
-		{"schemas list", http.MethodGet, "/schemas?project_id=proj_1", ""},
-		{"schema get", http.MethodGet, "/schemas/schema_1?project_id=proj_1", ""},
-		{"flow definitions list", http.MethodGet, "/flow_definitions?project_id=proj_1", ""},
-		{"flow definition get", http.MethodGet, "/flow_definitions/fdef_1?project_id=proj_1", ""},
-		{"branding list", http.MethodGet, "/branding?project_id=proj_1", ""},
-		{"branding get", http.MethodGet, "/branding/brand_1?project_id=proj_1", ""},
-	}
-	for _, tc := range tests {
+	for _, tc := range dualSchemeRequests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			mock := gomock.NewController(t)
@@ -308,33 +316,7 @@ func TestOgenErrorHandlerAnonymousSessionOnDualSchemeStays401(t *testing.T) {
 
 	const want = `{"code":"auth.unauthorized","message":"The request lacks valid authentication credentials."}`
 
-	tests := []struct {
-		name   string
-		method string
-		path   string
-		body   string
-	}{
-		{"grant create", http.MethodPost, "/grants?project_id=proj_1", `{"principal_type":"user","principal_id":"user_1","relation":"viewer"}`},
-		{"grant get", http.MethodGet, "/grants/asgn_1?project_id=proj_1", ""},
-		{"grant delete", http.MethodDelete, "/grants/asgn_1?project_id=proj_1", ""},
-		{"grant query", http.MethodPost, "/grants/query?project_id=proj_1", `{}`},
-		{"users query", http.MethodPost, "/users/query", `{}`},
-		{"teams query", http.MethodPost, "/teams/query?project_id=proj_1", `{}`},
-		{"team get", http.MethodGet, "/teams/team_1", ""},
-		{"user create", http.MethodPost, "/users?project_id=proj_1", `{}`},
-		{"user get", http.MethodGet, "/users/user_1", ""},
-		{"user passkeys", http.MethodGet, "/users/user_1/passkeys", ""},
-		{"user delete", http.MethodDelete, "/users/user_1", ""},
-		{"team create", http.MethodPost, "/teams?project_id=proj_1", `{"name":"x"}`},
-		{"team update", http.MethodPatch, "/teams/team_1", `{"name":"x"}`},
-		{"schemas list", http.MethodGet, "/schemas?project_id=proj_1", ""},
-		{"schema get", http.MethodGet, "/schemas/schema_1?project_id=proj_1", ""},
-		{"flow definitions list", http.MethodGet, "/flow_definitions?project_id=proj_1", ""},
-		{"flow definition get", http.MethodGet, "/flow_definitions/fdef_1?project_id=proj_1", ""},
-		{"branding list", http.MethodGet, "/branding?project_id=proj_1", ""},
-		{"branding get", http.MethodGet, "/branding/brand_1?project_id=proj_1", ""},
-	}
-	for _, tc := range tests {
+	for _, tc := range dualSchemeRequests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			token := &domain.Token{
