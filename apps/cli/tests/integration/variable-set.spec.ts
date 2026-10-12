@@ -69,12 +69,31 @@ describe("variable set", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
-      it("says a secret is held as a secret", async () => {
+      it("reads the secret back from the store as held without a value", async () => {
         const app = await aSetUpApp();
 
         const result = await app.setVariable("TOKEN", "s3cret", { secret: true });
 
-        expect(app.envelopeOf<{ secret: boolean }>(result).data.secret).toBe(true);
+        // The state comes from reading the variable back, not the request flag:
+        // the `all` slot holds the secret, with no value disclosed.
+        const { all } = app.envelopeOf<{ all: { held: boolean; secret?: boolean } }>(result).data;
+        expect(all).toEqual({ held: true, secret: true });
+      });
+
+      it("reports a preview write back in the preview slot, leaving the all slot standing", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("API_URL", "https://api.acme.com")).toSucceed();
+
+        const result = await app.setVariable("API_URL", "https://preview.acme.com", {
+          preview: true,
+        });
+
+        const { all, preview } = app.envelopeOf<{
+          all: Record<string, unknown>;
+          preview: Record<string, unknown>;
+        }>(result).data;
+        expect(all).toEqual({ held: true, secret: false, value: "https://api.acme.com" });
+        expect(preview).toEqual({ held: true, secret: false, value: "https://preview.acme.com" });
       });
 
       it("writes the preview override into its own bucket", async () => {
