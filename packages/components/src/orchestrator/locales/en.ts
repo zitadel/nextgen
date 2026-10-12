@@ -203,6 +203,12 @@ export const en: Record<string, string> = {
     "The new passkey could not be verified. Please try registering it again.",
   "error.sso_unavailable":
     "This sign-in provider is not available right now. Please try another way to sign in.",
+  "error.sso_verified_unique_value_changed":
+    "Your sign-in provider confirmed this value, so it can't be changed here.",
+  "error.sso_user_invalid": "Some details don't fit together. Please check them and try again.",
+  "error.sso_user_cannot_be_created":
+    "We can't create your account with this sign-in method. Please contact support.",
+  "error.user_already_exists": "An account with these details already exists.",
 
   // --- Field / form errors ---
   "error.email_required": "Please enter an email address",
