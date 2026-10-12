@@ -86,6 +86,22 @@ describe("preview", () => {
         );
       });
 
+      it("surfaces a missing-preview-secret warning from the deployment", async () => {
+        // An `all` secret with no preview override means the preview URL serves
+        // the production credential: the server flags it on the create response,
+        // and preview must relay that to the caller.
+        const app = await aSetUpApp();
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
+        await app.setVariable("API_TOKEN", "prod-secret", { secret: true });
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+
+        expect(result).toSucceed();
+        expect(result).toSay("API_TOKEN");
+        const warnings = (JSON.parse(result.stdout) as { warnings?: string[] }).warnings;
+        expect(warnings).toEqual([expect.stringContaining("API_TOKEN")]);
+      });
+
       it("writes nothing on --dry-run", async () => {
         const app = await aSetUpApp();
         await app.addOrigin(PREVIEW_PATTERN, "preview");
