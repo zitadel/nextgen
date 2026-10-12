@@ -23,8 +23,9 @@ Three apps are **exceptions**, for reasons that are not a style choice:
   The output path is dictated by the embed, not by this convention. The
   hosted cloud's `console` service (repo-root [`vercel.json`](../vercel.json))
   copies that build to `dist/ui/console/` and serves `dist`.
-- **`docs`** is a Next.js app: Next builds into `.next/`, which Vercel's
-  Next.js preset reads, so there is no output directory to set.
+- **`docs`** is a Next.js app, deployed only as the hosted cloud's `docs`
+  service: Next builds into `.next/`, which Vercel's Next.js preset reads, so
+  there is no output directory to set.
 - **`mock-zitadel`** is a Vercel **Function** deploy, not a static site: it
   bundles into `api/` and rewrites `/(.*) → /api`, so it has no static
   `outputDirectory` to standardise.

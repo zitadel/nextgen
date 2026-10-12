@@ -10,7 +10,8 @@ const config = {
   // (repo-root vercel.json).
   assetPrefix: "/docs",
   async redirects() {
-    // The root serves nothing; on the docs' own deployment it opens the docs.
+    // The root serves nothing; locally (next dev, next start) it opens the
+    // docs. On the cloud's host the root belongs to the server.
     return [{ source: "/", destination: "/docs", permanent: false }];
   },
 };
