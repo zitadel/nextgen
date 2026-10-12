@@ -3897,10 +3897,8 @@ func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w
 
 // handleDeleteVariableRequest handles deleteVariable operation.
 //
-// Removes the variable this owner entered under this name.
-// A variable is deletable only by the owner that entered it. Deleting a name
-// another owner of the same project holds answers `var.not_found` and leaves
-// that owner's value standing.
+// Removes the project's variable under this name. Deleting a name the
+// project does not hold answers `var.not_found`.
 //
 // DELETE /variables/{variable_name}
 func (s *Server) handleDeleteVariableRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -5456,199 +5454,6 @@ func (s *Server) handleGetDeploymentByIdRequest(args [1]string, argsEscaped bool
 	}
 
 	if err := encodeGetDeploymentByIdResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
-// handleGetEnvironmentByNameRequest handles getEnvironmentByName operation.
-//
-// Reads one environment of the project by its name.
-// The lookup is scoped to the project in `project_id`: a name that exists in
-// another project answers `env.not_found` exactly as an unused name does.
-//
-// GET /environments/{name}
-func (s *Server) handleGetEnvironmentByNameRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getEnvironmentByName"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/environments/{name}"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), GetEnvironmentByNameOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(codeAttr)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: GetEnvironmentByNameOperation,
-			ID:   "getEnvironmentByName",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, GetEnvironmentByNameOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-	params, err := decodeGetEnvironmentByNameParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-
-	var response GetEnvironmentByNameRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    GetEnvironmentByNameOperation,
-			OperationSummary: "Get an environment by name",
-			OperationID:      "getEnvironmentByName",
-			Body:             nil,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
-				{
-					Name: "name",
-					In:   "path",
-				}: params.Name,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = struct{}
-			Params   = GetEnvironmentByNameParams
-			Response = GetEnvironmentByNameRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackGetEnvironmentByNameParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetEnvironmentByName(ctx, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.GetEnvironmentByName(ctx, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeGetEnvironmentByNameResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -8946,12 +8751,9 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 
 // handleGetVariableRequest handles getVariable operation.
 //
-// Reads one variable by name from the owner this request addresses — one
-// environment of the project with `environment_name`, the project level
-// itself without it.
-// A name that owner has not entered answers `var.not_found`, even when
-// another owner of the same project holds it: nothing is inherited. A secret
-// is found but not disclosed: the response is `{"secret": true}`.
+// Reads one of the project's variables by name. A name the project has not
+// entered answers `var.not_found`. A secret is found but not disclosed: the
+// response is `{"secret": true}`.
 //
 // GET /variables/{variable_name}
 func (s *Server) handleGetVariableRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -9146,12 +8948,7 @@ func (s *Server) handleGetVariableRequest(args [1]string, argsEscaped bool, w ht
 
 // handleGetVariablesRequest handles getVariables operation.
 //
-// Returns the variables entered at the owner this request addresses, keyed by
-// name — one environment of the project with `environment_name`, the project
-// level itself without it.
-// Owners are separate, not a ladder: an environment does not inherit the
-// project's variables and the project does not see its environments'. Reading
-// everything a project holds therefore means reading each owner in turn.
+// Returns the project's variables, keyed by name.
 // Secret values are not returned. A secret appears as `{"secret": true}`,
 // which says a value is held without disclosing it.
 //
@@ -10151,201 +9948,6 @@ func (s *Server) handleListDeploymentsRequest(args [0]string, argsEscaped bool, 
 	}
 
 	if err := encodeListDeploymentsResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
-// handleListEnvironmentsRequest handles listEnvironments operation.
-//
-// Lists the project's environments ordered by name.
-//
-// GET /environments
-func (s *Server) handleListEnvironmentsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("listEnvironments"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/environments"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), ListEnvironmentsOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(codeAttr)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: ListEnvironmentsOperation,
-			ID:   "listEnvironments",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOAuth2(ctx, ListEnvironmentsOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "OAuth2",
-					Err:              err,
-				}
-				defer recordError("Security:OAuth2", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-	params, err := decodeListEnvironmentsParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-
-	var response ListEnvironmentsRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    ListEnvironmentsOperation,
-			OperationSummary: "List environments",
-			OperationID:      "listEnvironments",
-			Body:             nil,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
-				{
-					Name: "limit",
-					In:   "query",
-				}: params.Limit,
-				{
-					Name: "page_token",
-					In:   "query",
-				}: params.PageToken,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = struct{}
-			Params   = ListEnvironmentsParams
-			Response = ListEnvironmentsRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackListEnvironmentsParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.ListEnvironments(ctx, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.ListEnvironments(ctx, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeListEnvironmentsResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -14960,20 +14562,16 @@ func (s *Server) handleUpdateTeamRequest(args [1]string, argsEscaped bool, w htt
 
 // handleUpdateVariablesRequest handles updateVariables operation.
 //
-// Enters, replaces and removes variables at the owner this request
-// addresses.
-// Every name in the body is applied at exactly that owner — the project, or
-// the environment named by `environment_name` — and reaches no other. Names
-// not in the body are untouched.
+// Enters, replaces and removes the project's variables. Names not in the
+// body are untouched.
 // A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 // stores the value encrypted under the project's active `secret` key, after
-// which it can be referenced but not read back. `null` removes the name from
-// this owner (RFC 7386), which is how several variables are removed in one
-// request; removing a name this owner does not hold is a no-op rather than an
-// error.
+// which it can be referenced but not read back. `null` removes the name
+// (RFC 7386), which is how several variables are removed in one request;
+// removing a name the project does not hold is a no-op rather than an error.
 // The body is applied whole or not at all, so a rejected request leaves the
-// owner exactly as it was. Writing the same name and owner twice replaces the
-// value rather than duplicating it, which makes a retry safe.
+// project's variables exactly as they were. Writing the same name twice
+// replaces the value rather than duplicating it, which makes a retry safe.
 //
 // PATCH /variables
 func (s *Server) handleUpdateVariablesRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

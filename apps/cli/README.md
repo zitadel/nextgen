@@ -136,8 +136,6 @@ which ships in this package.
 * [`zitadel console`](#zitadel-console)
 * [`zitadel doctor`](#zitadel-doctor)
 * [`zitadel eject`](#zitadel-eject)
-* [`zitadel environments get NAME`](#zitadel-environments-get-name)
-* [`zitadel environments list`](#zitadel-environments-list)
 * [`zitadel events get ID`](#zitadel-events-get-id)
 * [`zitadel events list`](#zitadel-events-list)
 * [`zitadel flow-definitions get FLOW`](#zitadel-flow-definitions-get-flow)
@@ -535,88 +533,6 @@ DESCRIPTION
 
 ALIASES
   $ zitadel uninstall
-```
-
-## `zitadel environments get NAME`
-
-Get one environment by id.
-
-```
-USAGE
-  $ zitadel environments get NAME [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fields <value>]
-
-ARGUMENTS
-  NAME  environment name
-
-FLAGS
-  -c, --cwd=<value>      Project directory to operate on.
-  -n, --non-interactive  Disable prompts. Required when scripting or running as
-                         an agent.
-  -s, --server=<value>   Override the resolved server URL.
-  -v, --verbose          Verbose logging.
-      --[no-]color       Colorize human output. Disable with --no-color;
-                         NO_COLOR and FORCE_COLOR are honored too.
-      --debug            Debug logging.
-      --dry-run          Preview without mutating files or the platform.
-      --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
-                         the resource's own; `--json` is unaffected.
-      --[no-]telemetry   Send anonymous usage analytics. Disable with
-                         --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Get one environment by id.
-
-EXAMPLES
-  $ zitadel environments get <id>
-
-  $ zitadel environments get <id> --json
-```
-
-## `zitadel environments list`
-
-List environments.
-
-```
-USAGE
-  $ zitadel environments list [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--limit <value>] [-a |
-    --page-token <value>] [--fields <value>] [--plain]
-
-FLAGS
-  -a, --all                 Fetch every page instead of one.
-  -c, --cwd=<value>         Project directory to operate on.
-  -n, --non-interactive     Disable prompts. Required when scripting or running
-                            as an agent.
-  -s, --server=<value>      Override the resolved server URL.
-  -v, --verbose             Verbose logging.
-      --[no-]color          Colorize human output. Disable with --no-color;
-                            NO_COLOR and FORCE_COLOR are honored too.
-      --debug               Debug logging.
-      --dry-run             Preview without mutating files or the platform.
-      --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
-                            id,attributes.email). Defaults to the resource's own
-                            columns; `--json` is unaffected.
-      --limit=<value>       Page size (server default 20, max 100).
-      --page-token=<value>  Continue from a previous page's next_page_token.
-      --plain               Tab-separated rows with no header, for piping.
-                            Implied when stdout is not a terminal.
-      --[no-]telemetry      Send anonymous usage analytics. Disable with
-                            --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  List environments.
-
-EXAMPLES
-  $ zitadel environments list --json
-
-  $ zitadel environments list --all --json
 ```
 
 ## `zitadel events get ID`
