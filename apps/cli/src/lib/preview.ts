@@ -4,10 +4,9 @@
  * environment and returns the preview URLs it finds, already normalised; a
  * platform that set none of its variables contributes nothing.
  *
- * Vercel exposes bare hosts, so a scheme is prepended; Netlify exposes full
- * URLs; Cloudflare Pages exposes the deployment URL and the branch, and both
- * the deployment URL itself and the stable branch alias derived from them
- * (`<branch>.<project>.pages.dev`) are reported.
+ * Vercel exposes bare hosts, so a scheme is prepended; Netlify and Cloudflare
+ * Pages expose the full deployment URL, which is used as-is. (Cloudflare's
+ * stable per-branch alias is not reconstructed here — see #1692.)
  */
 const PREVIEW_PLATFORMS: ReadonlyArray<{
   variables: readonly string[];
@@ -26,37 +25,10 @@ const PREVIEW_PLATFORMS: ReadonlyArray<{
       [env.DEPLOY_PRIME_URL, env.DEPLOY_URL].filter((url): url is string => Boolean(url)),
   },
   {
-    variables: ["CF_PAGES_BRANCH", "CF_PAGES_URL"],
-    urls: (env) =>
-      [env.CF_PAGES_URL, ...cloudflareBranchAlias(env.CF_PAGES_BRANCH, env.CF_PAGES_URL)].filter(
-        (url): url is string => Boolean(url),
-      ),
+    variables: ["CF_PAGES_URL"],
+    urls: (env) => [env.CF_PAGES_URL].filter((url): url is string => Boolean(url)),
   },
 ];
-
-/**
- * Cloudflare Pages' stable per-branch alias, `<branch>.<project>.pages.dev`.
- * The project is the deployment URL's host with its first label (the
- * per-deploy hash) dropped, and the branch is sanitised the way Cloudflare
- * does: lower-cased, non-alphanumerics folded to a dash, capped at 28
- * characters. Returns nothing when either variable is absent.
- */
-function cloudflareBranchAlias(branch?: string, deploymentUrl?: string): string[] {
-  if (!branch || !deploymentUrl) {
-    return [];
-  }
-  const host = deploymentUrl.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-  const project = host.slice(host.indexOf(".") + 1);
-  const alias = branch
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 28);
-  if (alias === "" || project === "" || !project.includes(".")) {
-    return [];
-  }
-  return [`https://${alias}.${project}`];
-}
 
 /** What {@link detectPreviewUrls} resolved from the environment. */
 export type DetectedPreviews = Readonly<{
