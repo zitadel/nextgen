@@ -6,9 +6,11 @@
 
 ## Short answer
 
-Turbo could replace moon for the TypeScript packages, but not as a drop-in
-swap, and it does not help with the Go server yet. It is not faster at
-building. Where it is clearly better is on Vercel.
+The reason to look was moon's long-term support, and that worry is fair (see
+[Long-term support](#long-term-support)). Turbo could replace moon for the
+TypeScript packages, but not as a drop-in swap, and it does not help with
+the Go server yet. It is not faster at building. Where it is clearly better
+is on Vercel.
 
 - **Go:** turbo 2.11's Go support is experimental and refuses our layout. It
   reads modules from a `go.work`, and a module at the repository root (ours)
@@ -129,6 +131,20 @@ installs, the docs' `next build` (about 40 s) and the Go compile (about
    against Depot and runs uncached: the variable `.moon/workspace.yml` expects
    is not set there, and moon still tries.
 
+## Long-term support
+
+| | moon | Turborepo |
+|---|---|---|
+| Owner | moonrepo, a two-founder startup (Y Combinator, winter 2023, about $0.5 M). YC now lists it as inactive. Its paid product, moonbase, shut down in March 2025 | Vercel, since 2021. Vercel builds its own monorepos with it and sells its remote cache |
+| Last 12 months | 436 commits by people, 87 % by its founder, Miles Johnson. v2.0 in February 2026, six minor releases since, about one release a week | 2,083 commits by people, 88 % by one Vercel engineer. 2.11 in September 2026 |
+| License | MIT | MIT |
+
+Both are, in practice, one main developer. The difference is who pays for
+that developer: turbo is part of Vercel's product, moon no longer has a
+visible business behind it. It is a slow risk, not an urgent one: moon ships
+steadily, and the pinned version keeps working if development stops. What
+we would lose is fixes for new Node, pnpm or Go versions.
+
 ## What a full switch would take
 
 Roughly two to three weeks, most of it CI and scripts:
@@ -156,26 +172,28 @@ Roughly two to three weeks, most of it CI and scripts:
 
 ## Recommendation
 
-Do not replace moon now. A full switch is weeks of CI and script work, buys
-no build speed, and leaves the Go server exactly where it is today.
+Do not replace moon now. A full switch is weeks of CI and script work and
+buys no build speed. Hedge instead, so that a switch stays a few weeks of
+mechanical work whenever it is needed:
 
-For the Vercel builds turbo is a small, real win: about 35 s per deployment
-whenever the TypeScript packages did not change. Two ways to go from here:
+1. **Keep the pilot as a foothold.** It is a few small changes, saves about
+   35 s per deployment whenever the TypeScript packages did not change, and
+   keeps turbo working in this repository. Make preview builds read-only on
+   the remote cache (`TURBO_CACHE=local:rw,remote:r`), so production never
+   restores something a branch build uploaded. The cost: `turbo.json` and the
+   moon configs describe the same builds twice, though turbo takes most of
+   its edges from `package.json`.
+2. **Keep the moon configuration portable.** Every task runs a
+   `package.json` script or a script file (19 tasks still run inline
+   scripts); prefer tool-neutral features where they exist (Vitest's own
+   retry rather than moon's `retryCount`); keep moon edges equal to
+   `package.json` edges, as `workspace:check-moon-graph` already enforces.
+3. **Switch when one of these happens:** moon goes three months without a
+   release, its maintainer steps back, a moon bug blocks us with no fix in
+   sight, or turbo's Go support is stable and accepts a module at the
+   repository root.
 
-1. **Keep the pilot.** It is a few small changes and easy to remove. If kept,
-   make preview builds read-only on the remote cache
-   (`TURBO_CACHE=local:rw,remote:r`), so production never restores something
-   a branch build uploaded, and accept that `turbo.json` and the moon
-   configs describe the same builds twice.
-2. **Drop it and stay on moon,** and stop moon's failing remote cache calls
-   on Vercel, or give those builds access to the Depot cache CI already
-   fills.
-
-Either way, the bigger saving is Vercel's build cache: bring it under the
-1.5 GB limit and every deployment stops installing all packages and
-compiling Go from scratch.
-
-Look at a full switch again when turbo's Go support is stable and accepts a
-module at the repository root, or if the Go module moves into a
-subdirectory for other reasons. The docs service is the next candidate for
+Separately, the bigger saving on Vercel is its build cache: bring it under
+the 1.5 GB limit and every deployment stops installing all packages and
+compiling Go from scratch. The docs service is the next candidate for
 turbo's cache, after a test of the two risks named above.
