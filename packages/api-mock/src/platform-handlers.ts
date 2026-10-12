@@ -1888,7 +1888,10 @@ export function setupPlatformHandlers() {
           );
           // The create-deployment response wraps the deployment with the
           // non-blocking `warnings` it raised; this mock raises none.
-          return HttpResponse.json({ ...deploymentResponse(newest, rows), warnings: [] }, { status: 200 });
+          return HttpResponse.json(
+            { ...deploymentResponse(newest, rows), warnings: [] },
+            { status: 200 },
+          );
         }
       }
 
