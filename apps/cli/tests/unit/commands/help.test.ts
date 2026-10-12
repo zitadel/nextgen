@@ -50,9 +50,9 @@ Configuration commands
   origin list:           List the origin patterns on the project
   origin rm:             Remove an origin pattern from the project
   release create:        Build a release from .zitadel/ without deploying it
+  release get:           Get one release by id
+  release list:          List release
   release revoke:        Revoke a release so its content is never served again
-  releases get:          Get one release by id
-  releases list:         List releases
   schemas get:           Get one schema by id
   schemas list:          List schemas
   sso enable:            Enable an identity provider for a user schema
