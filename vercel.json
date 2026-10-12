@@ -26,6 +26,12 @@
       "installCommand": "corepack pnpm install --frozen-lockfile",
       "buildCommand": "cd ../.. && corepack pnpm exec moon run storybook:build && cd apps/storybook && mv dist storybook && mkdir dist && mv storybook dist/",
       "outputDirectory": "dist"
+    },
+    "docs": {
+      "root": "apps/docs",
+      "framework": "nextjs",
+      "installCommand": "corepack pnpm install --frozen-lockfile",
+      "buildCommand": "corepack pnpm run build"
     }
   },
   "redirects": [
@@ -51,6 +57,18 @@
       "source": "/storybook/(.*)",
       "destination": {
         "service": "storybook"
+      }
+    },
+    {
+      "source": "/docs",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/docs/(.*)",
+      "destination": {
+        "service": "docs"
       }
     },
     {
