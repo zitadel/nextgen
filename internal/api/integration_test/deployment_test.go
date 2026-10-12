@@ -22,7 +22,7 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 	t.Parallel()
 
 	fixture := newReleaseFixture(t)
-	created := fixture.create(t, &api.CreateReleaseFromPointers{Pointers: fixture.pointers()})
+	created := fixture.create(t, &api.CreateReleaseRequest{Pointers: fixture.pointers()})
 	require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
 	releaseID := created.(*api.CreateReleaseCreated).ID
 	project := api.ProjectID(fixture.project)
