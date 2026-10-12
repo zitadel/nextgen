@@ -48,7 +48,7 @@ In a fresh directory, setup asks which framework to scaffold. Scripted runs shou
 
 Setup also asks how users should sign in and scaffolds the matching schema and login flow: `--preset password-first` (the default: email + password, passkey optional during registration) or `--preset passkey-first` (a one-tap passkey up front, with an email + password fallback). The preset only picks the starting point — everything under `.zitadel/` stays editable.
 
-Setup writes the app files, `.env.local`, `zitadel.json`, and `.zitadel/**`, then installs dependencies with the detected package manager unless `--skip-install` is passed.
+Setup writes the app files, `.env.local` (read by your app), `.env.development.local` (read by the CLI: the server, project and credentials), `zitadel.json`, and `.zitadel/**`, then installs dependencies with the detected package manager unless `--skip-install` is passed.
 
 Against a local server, setup by default also attaches the project to the local admin's team and prints `Project owned by admin@zitadel.localhost (team ...)`. The project is owned from the start, so there is nothing to claim: `zitadel claim` reports it as already owned.
 

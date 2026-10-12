@@ -191,6 +191,7 @@ since `started` fires before the command body runs):
 - **doctor** — `runtime`, `checks_total`, `checks_failed`, `checks_warn`, `failed_checks` (failing check **names**, never messages).
 - **start** — `runtime` (`binary` / `docker`).
 - **variables** — `is_secret`, `variable_count`. Deliberately *not* recorded: the variable's name or value — a name is free text, and a value is the credential itself. There is no owner dimension: the project level is the only owner the commands can address.
+- **any command that connects to a project** (`EnvironmentCommand.connect`, so every one but `setup`, `doctor` and the local-server commands) — `credential` (`project` / `preview`), `has_env_file` (whether `--env-file` was given). Deliberately *not* recorded: the environment's name, the env file's path, the server, the project id, or any resolved value — every one of them is a name, a URL, an id or a secret.
 - **claim** — `claim_outcome` (`completed` / `already_claimed` / `expired` / `window_expired` / `timeout` / `dry_run`), `poll_count`, `browser_opened`. Deliberately *not* recorded: `challenge_id`, `team_id`, `claim_url`, `dashboard_url` — every one of them is an id or a URL.
 
 ### Naming conventions
