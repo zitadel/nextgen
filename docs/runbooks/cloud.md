@@ -196,12 +196,13 @@ or garbled fails the build and the serving deployment stays.
 
 Every deployment is tested once Vercel built it, on its own URL
 (`cloud-<hash>-zitadel.vercel.app`, never a production alias):
-[`deployment.yml`](../../.github/workflows/deployment.yml) runs on the
+[`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) runs on the
 `deployment_status` event Vercel posts to GitHub and runs each service's
 contract suite against the deployment, today the docs'
 (`moon run docs:e2e-deployment`, [`apps/docs/AGENTS.md`](../../apps/docs/AGENTS.md)).
-The check lands on the deployed commit: on the pull request for a preview,
-on `main` for production.
+The check lands on the deployed commit, named after what it tested:
+`deployment-checks / docs (Preview)` on the pull request,
+`deployment-checks / docs (Production)` on `main`.
 
 - The suites reach the protected deployment with the project's Protection
   Bypass for Automation secret, which the workflow expects as the repository
@@ -216,14 +217,20 @@ on `main` for production.
 
   Regenerating the secret in the project settings invalidates it: set it
   again.
+- **Reading a red check**, in this order: the check's name says the service
+  and the environment; its annotations name the failing contract (the test's
+  title) and list every URL that failed; the run's summary names the
+  deployment and the command that reproduces the run; the
+  `docs-deployment-report` artifact holds the Playwright report and the
+  traces.
 - By hand, against any deployment:
   `DOCS_BASE_URL=https://cloud-….vercel.app VERCEL_AUTOMATION_BYPASS_SECRET=… moon run docs:e2e-deployment`,
-  or `gh workflow run deployment.yml --ref <branch> -f url=https://cloud-….vercel.app`,
+  or `gh workflow run deployment-checks.yml --ref <branch> -f url=https://cloud-….vercel.app`,
   which is also how to try a change to the workflow before it is on `main`.
 - Production is not held back by the check yet: a red run on `main` shows on
   the commit while the deployment already serves. To gate it, enable
   Deployment Checks in the project's Build & Deployment settings and select
-  the `docs` check: Vercel then assigns the production domain only once the
+  the `docs (Production)` check: Vercel then assigns the production domain only once the
   check passes, so a red deployment never replaces the one serving (Force
   Promote on the deployment's page bypasses it).
 

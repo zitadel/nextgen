@@ -71,7 +71,8 @@ tasks:
 
   # The same suite against a deployment of the hosted cloud, which
   # DOCS_BASE_URL names (VERCEL_AUTOMATION_BYPASS_SECRET opens its
-  # protection); .github/workflows/deployment.yml runs it for every deployment.
+  # protection); .github/workflows/deployment-checks.yml runs it for every
+  # deployment.
   e2e-deployment:
     script: |
       [ -n "${DOCS_BASE_URL:-}" ] || { echo "DOCS_BASE_URL names the deployment to test" >&2; exit 1; }

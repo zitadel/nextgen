@@ -1,4 +1,4 @@
-name: deployment
+name: deployment-checks
 
 # Tests a deployment of the Vercel project `cloud` once Vercel built it: a
 # preview for a branch, production for main. Vercel posts a GitHub deployment
@@ -11,6 +11,11 @@ name: deployment
 # service runs it locally, but against the deployment's URL instead of a local
 # server (`docs:e2e-deployment`): what is checked is the artifact Vercel built,
 # routed by the repo-root vercel.json, behind Vercel's protection.
+#
+# What broke is read in this order: the check's name says the service and the
+# environment; the annotations on it name the failing contract (the test's
+# title) and every URL that failed; the run's summary names the deployment and
+# the command that reproduces the run; the uploaded report holds the traces.
 #
 # `workflow_dispatch` runs the same job against any deployment URL from any
 # branch: the way to try a change to this file before it is on main.
@@ -27,11 +32,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: deployment-${{ inputs.url || github.event.deployment_status.environment_url }}
+  group: deployment-checks-${{ inputs.url || github.event.deployment_status.environment_url }}
   cancel-in-progress: true
 
 jobs:
   docs:
+    # Reads "deployment-checks / docs (Preview)" on a pull request and
+    # "docs (Production)" on main: the name says what was tested, and stays
+    # the same within an environment, which Vercel's Deployment Checks and
+    # branch protection match on.
+    name: docs (${{ github.event.deployment.environment || 'dispatch' }})
     # Only a deployment of `cloud` that is ready: Vercel posts a status per
     # state. The URL is the deployment's own (cloud-<hash>-zitadel.vercel.app),
     # never a production alias, so production is tested before it is promoted
@@ -52,6 +62,17 @@ jobs:
       MOON_SUMMARY: detailed
       DO_NOT_TRACK: "1"
     steps:
+      - name: Name the deployment in the run's summary
+        env:
+          ENVIRONMENT: ${{ github.event.deployment.environment || 'dispatch' }}
+          COMMIT: ${{ github.event.deployment.sha || github.sha }}
+        run: |
+          {
+            echo "- Deployment: $DOCS_BASE_URL ($ENVIRONMENT, commit ${COMMIT:0:8})"
+            echo "- Reproduce: \`DOCS_BASE_URL=$DOCS_BASE_URL VERCEL_AUTOMATION_BYPASS_SECRET=… moon run docs:e2e-deployment\`"
+            echo "- On a failure the annotations name the contract and the URLs; the \`docs-deployment-report\` artifact holds the Playwright report and the traces."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/checkout@v6
         with:
           # The deployed commit; a dispatch takes the ref it was started from.
@@ -91,7 +112,8 @@ jobs:
           }
 
       # `env -u CI`: the lane is `runInCI: false` to stay out of `moon ci`'s
-      # selection, which also makes moon skip it under CI (see ci.yml).
+      # selection, which also makes moon skip it under CI (see ci.yml). The
+      # Playwright config recognises GitHub by GITHUB_RUN_ID instead.
       - name: Run the docs suite against the deployment
         run: env -u CI -u GITHUB_ACTIONS moon run docs:e2e-deployment
 

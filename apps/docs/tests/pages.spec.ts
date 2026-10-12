@@ -44,7 +44,10 @@ test("the index lists every section, each page once, under /docs", async ({ requ
   expect(urls).toEqual(
     expect.arrayContaining(["/docs", "/docs/get-started/quickstart", "/docs/cli"]),
   );
-  expect(urls.filter((url) => url !== "/docs" && !url.startsWith("/docs/"))).toEqual([]);
+  expect(
+    urls.filter((url) => url !== "/docs" && !url.startsWith("/docs/")),
+    "index entries outside /docs",
+  ).toEqual([]);
   expect(new Set(urls).size).toBe(urls.length);
 });
 
@@ -62,7 +65,7 @@ test("every page answers as HTML, titled", async ({ request }) => {
     if (!html.includes(expected)) return `${url}: no ${expected}`;
     return null;
   });
-  expect(failures(results)).toEqual([]);
+  expect(failures(results), "pages whose HTML is wrong").toEqual([]);
 });
 
 test("every page has a Markdown twin whose links resolve", async ({ request }) => {
@@ -83,14 +86,14 @@ test("every page has a Markdown twin whose links resolve", async ({ request }) =
     if (!markdown.startsWith(heading)) return `${twin}: does not open with "${heading}"`;
     return null;
   });
-  expect(failures(results)).toEqual([]);
+  expect(failures(results), "pages whose Markdown twin is wrong").toEqual([]);
 
   // A link to a page the index does not list is a page that moved, or a typo.
   const unlisted = [...links].filter((link) => !listed.has(link));
   const dead = await mapLimit(unlisted, concurrency, async (link) =>
     (await request.get(link)).status() === 200 ? null : link,
   );
-  expect(failures(dead)).toEqual([]);
+  expect(failures(dead), "links to pages that do not answer").toEqual([]);
 });
 
 test("every page negotiates Markdown through Accept", async ({ request }) => {
@@ -110,7 +113,7 @@ test("every page negotiates Markdown through Accept", async ({ request }) => {
       return `${url}: does not open with "${heading}"`;
     return null;
   });
-  expect(failures(results)).toEqual([]);
+  expect(failures(results), "pages that do not negotiate Markdown").toEqual([]);
 });
 
 test("a page that does not exist is a 404, as HTML and as Markdown", async ({ request }) => {
@@ -136,11 +139,12 @@ test("llms-full.txt carries every page but the API operations", async ({ request
     .filter((page) => !operation.test(page.url))
     .filter((page) => !full.includes(`# ${page.title} (${page.url})`))
     .map((page) => page.url);
-  expect(missing).toEqual([]);
+  expect(missing, "pages missing from llms-full.txt").toEqual([]);
   const operations = pages.filter((page) => operation.test(page.url));
   expect(operations.length).toBeGreaterThan(0);
   expect(
     operations.filter((page) => full.includes(`(${page.url})`)).map((page) => page.url),
+    "API operations in llms-full.txt",
   ).toEqual([]);
   expect(full.length).toBeLessThan(500_000);
 });
@@ -158,7 +162,10 @@ test("scripts and styles load from /docs/_next/", async ({ request }) => {
   const next = assets.filter((asset) => asset.includes("/_next/"));
   expect(next.length).toBeGreaterThan(0);
   // On the cloud only /docs reaches this service (assetPrefix in next.config.mjs).
-  expect(next.filter((asset) => !asset.startsWith("/docs/_next/"))).toEqual([]);
+  expect(
+    next.filter((asset) => !asset.startsWith("/docs/_next/")),
+    "assets outside /docs/_next/",
+  ).toEqual([]);
 
   const results = await mapLimit(next, concurrency, async (asset) => {
     const response = await request.get(asset);
@@ -170,5 +177,5 @@ test("scripts and styles load from /docs/_next/", async ({ request }) => {
     if (!cache.includes("immutable")) return `${asset}: cache-control "${cache}"`;
     return null;
   });
-  expect(failures(results)).toEqual([]);
+  expect(failures(results), "assets that do not load as built").toEqual([]);
 });

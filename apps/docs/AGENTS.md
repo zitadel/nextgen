@@ -61,7 +61,7 @@ written against a URL rather than the code. `moon run docs:e2e` runs it
 against the local build on port 3003; `DOCS_BASE_URL=https://cloud-….vercel.app
 moon run docs:e2e-deployment` against a deployment of the hosted cloud, with
 `VERCEL_AUTOMATION_BYPASS_SECRET` for its protection, which
-[`deployment.yml`](../../.github/workflows/deployment.yml) does for every
+[`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) does for every
 deployment. The specs use paths only, so one spec proves both.
 
 - `/docs/llms.txt` is the suite's page list: every page it names is fetched as

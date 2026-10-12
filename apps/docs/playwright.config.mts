@@ -17,14 +17,18 @@ import { defineConfig, devices } from "@playwright/test";
 const deployment = process.env.DOCS_BASE_URL;
 const localOrigin = "http://localhost:3003";
 const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+// GitHub Actions (deployment-checks.yml): annotations on the check that name
+// the failing test and its assertion, and the HTML report for the artifact.
+// CI itself is unset there, for moon's sake, so GitHub is recognised by this.
+const onGitHub = !!process.env.GITHUB_RUN_ID;
 
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,
-  forbidOnly: !!process.env.CI,
+  forbidOnly: onGitHub,
   // A deployment answers from cold the first time; one more try there.
   retries: deployment ? 1 : 0,
-  reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
+  reporter: onGitHub ? [["list"], ["github"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: deployment ?? localOrigin,
     trace: "on-first-retry",
