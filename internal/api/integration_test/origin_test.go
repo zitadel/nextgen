@@ -23,7 +23,9 @@ func TestOriginsNotImplemented(t *testing.T) {
 	require.NoError(t, err)
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	harness.SetScopedTokenOnApiClient(t, client, project, "origin.write", "origin.delete")
+	// Management ops still require the project.write credential ceiling
+	// (ADR 037 / #420); OpenAPI's origin.* scopes are not a substitute yet.
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	expectNotImplemented := func(t *testing.T, resp any) {
 		t.Helper()
