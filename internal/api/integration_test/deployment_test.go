@@ -22,7 +22,7 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 	t.Parallel()
 
 	fixture := newReleaseFixture(t)
-	created := fixture.create(t, &api.CreateReleaseRequest{Pointers: fixture.pointers()})
+	created := fixture.create(t, &api.CreateReleaseFromPointers{Pointers: fixture.pointers()})
 	require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
 	releaseID := created.(*api.CreateReleaseCreated).ID
 	project := api.ProjectID(fixture.project)
@@ -94,7 +94,7 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 	t.Run("list the live view of one origin", func(t *testing.T) {
 		resp, err := fixture.client.ListDeployments(t.Context(), api.ListDeploymentsParams{
 			ProjectID: project,
-			Origin:    api.NewOptOrigin("https://app.acme.com"),
+			Origin:    api.NewOptDeploymentOrigin("https://app.acme.com"),
 			Live:      api.NewOptBool(true),
 		})
 		require.NoError(t, err)
