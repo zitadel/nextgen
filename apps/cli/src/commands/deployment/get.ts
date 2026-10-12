@@ -13,8 +13,8 @@ export default class DeploymentGet extends EnvironmentCommand {
   };
 
   async run(): Promise<JsonEnvelope> {
-    const { args } = await this.parse(DeploymentGet);
-    await this.toMeta({});
+    const { args, flags } = await this.parse(DeploymentGet);
+    await this.toMeta(flags);
     const { client, projectId } = await this.connect();
 
     const deployment = await client.getDeploymentById(args.deployment_id, {

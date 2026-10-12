@@ -187,7 +187,7 @@ each lifecycle event emitted *after* recording — typically `completed`/`failed
 since `started` fires before the command body runs):
 
 - **setup** — `framework`, `renderer`, `package_manager`, `scaffolded_skeleton`, `skip_install`, `dev_port_explicit`, `preset`, `use_case`, `sso` (an `IDP_PROVIDERS` slug, `none`, or `multiple` when setup enabled several), `design` (a `BRANDING_DESIGNS` value or `built-in`), `files_written_count`, `step` (`framework_resolved` → `project_created` → `files_patched` → `dependencies_installed`).
-- **plan / apply** — `creates`, `updates`, `deletes`, `revisions`, `total` (diff *counts* only).
+- **deploy** — `resources` (how many the bundle pinned) and `origin_count` (how many origins it went live on). Counts only; never a handle, a digest, or an origin.
 - **doctor** — `runtime`, `checks_total`, `checks_failed`, `checks_warn`, `failed_checks` (failing check **names**, never messages).
 - **start** — `runtime` (`binary` / `docker`).
 - **variables** — `is_secret`, `variable_count`. Deliberately *not* recorded: the variable's name or value — a name is free text, and a value is the credential itself. There is no owner dimension: the project level is the only owner the commands can address.

@@ -75,6 +75,7 @@ export default class Deploy extends EnvironmentCommand {
     }
 
     const { bundle, resourceCount } = await buildBundle(cwd);
+    this.recordTelemetry({ resources: resourceCount });
     const ctx: StepContext = {
       cwd,
       client,
@@ -115,6 +116,7 @@ export default class Deploy extends EnvironmentCommand {
     });
 
     const servedOrigins = deployment.targets.map((target) => target.origin);
+    this.recordTelemetry({ origin_count: servedOrigins.length });
     return this.emit({
       status: "ok",
       data: {
