@@ -31,9 +31,9 @@
     },
     "user_schema": {
       "type": "string",
-      "description": "Server-assigned identifier of the user schema this flow operates on,\nas returned by `POST /schemas`. Opaque to the client — the shape is a\nserver implementation detail. Step `fields` reference properties\ndefined in the resolved schema; the engine resolves field types, validation, and\nimplicit outcomes from schema annotations at runtime.\n",
+      "description": "The user schema this flow operates on, named by its `objectType`. The\nflow runs against the project's newest revision of that schema, so\npublishing a schema revision needs no change to the flow. A schema id\nas returned by `POST /schemas` is also accepted and is stored as that\nschema's `objectType`; reading the definition back returns the\n`objectType`. A value naming no schema of the project is refused with\n`flowdef.invalid`. Step `fields` reference properties defined in the\nresolved schema; the engine resolves field types, validation, and\nimplicit outcomes from schema annotations at runtime.\n",
       "examples": [
-        "sch_01KWHF18816ZQESRCS7Z2STJ05"
+        "human-user"
       ]
     },
     "purposes": {
