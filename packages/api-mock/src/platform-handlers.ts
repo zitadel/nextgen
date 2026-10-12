@@ -1687,7 +1687,9 @@ export function setupPlatformHandlers() {
           )
           .sort((a, b) => b.seq - a.seq)[0];
         if (newest) {
-          return HttpResponse.json(deploymentResponse(newest), { status: 200 });
+          // The create-deployment response wraps the deployment with the
+          // non-blocking `warnings` it raised; this mock raises none.
+          return HttpResponse.json({ ...deploymentResponse(newest), warnings: [] }, { status: 200 });
         }
       }
 
@@ -1705,7 +1707,7 @@ export function setupPlatformHandlers() {
         seq: ++store.lastSeq,
       };
       store.deployments.set(id, record);
-      return HttpResponse.json(deploymentResponse(record), { status: 201 });
+      return HttpResponse.json({ ...deploymentResponse(record), warnings: [] }, { status: 201 });
     }),
 
     http.get("*/deployments", ({ request }) => {

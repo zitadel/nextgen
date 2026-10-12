@@ -10112,7 +10112,7 @@ func (s *CreateAuthAttemptRequest) SetSessionID(val OptNilSessionID) {
 	s.SessionID = val
 }
 
-type CreateDeploymentCreated Deployment
+type CreateDeploymentCreated CreateDeploymentResponse
 
 func (*CreateDeploymentCreated) createDeploymentRes() {}
 
@@ -10352,7 +10352,7 @@ func (s *CreateDeploymentErrorResponseStatusCode) SetResponse(val CreateDeployme
 
 func (*CreateDeploymentErrorResponseStatusCode) createDeploymentRes() {}
 
-type CreateDeploymentOK Deployment
+type CreateDeploymentOK CreateDeploymentResponse
 
 func (*CreateDeploymentOK) createDeploymentRes() {}
 
@@ -10462,6 +10462,139 @@ func (s *CreateDeploymentRequest) SetMessage(val OptString) {
 // SetExpectedDeploymentID sets the value of ExpectedDeploymentID.
 func (s *CreateDeploymentRequest) SetExpectedDeploymentID(val OptDeploymentID) {
 	s.ExpectedDeploymentID = val
+}
+
+// Merged schema.
+// Ref: #
+type CreateDeploymentResponse struct {
+	// The opaque, immutable resource id, assigned at creation.
+	ID DeploymentID `json:"id"`
+	// The project this deployment belongs to.
+	ProjectID ProjectID `json:"project_id"`
+	// The release this deployment made live. Always the release id, also
+	// when the request named the release by `content_hash`.
+	ReleaseID ReleaseID `json:"release_id"`
+	// The origins this deployment made the release live on, as resolved when
+	// it was created: `primary` appears here as the origins it expanded to.
+	// Sorted by origin.
+	Targets []DeploymentTarget `json:"targets"`
+	// When the deployment was created.
+	DeployedAt time.Time          `json:"deployed_at"`
+	Metadata   DeploymentMetadata `json:"metadata"`
+	// The release named by `release_id`, present only when the request asked
+	// for it with `expand: ["release"]` — the same representation
+	// `GET /releases/{release_id}` serves. Absent means it was not requested.
+	Release OptRelease `json:"release"`
+	// Non-blocking advisories raised while deploying. Absent or empty
+	// when there were none; present ones did not stop the deploy.
+	Warnings []CreateDeploymentResponseWarningsItem `json:"warnings"`
+}
+
+// GetID returns the value of ID.
+func (s *CreateDeploymentResponse) GetID() DeploymentID {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *CreateDeploymentResponse) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetReleaseID returns the value of ReleaseID.
+func (s *CreateDeploymentResponse) GetReleaseID() ReleaseID {
+	return s.ReleaseID
+}
+
+// GetTargets returns the value of Targets.
+func (s *CreateDeploymentResponse) GetTargets() []DeploymentTarget {
+	return s.Targets
+}
+
+// GetDeployedAt returns the value of DeployedAt.
+func (s *CreateDeploymentResponse) GetDeployedAt() time.Time {
+	return s.DeployedAt
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *CreateDeploymentResponse) GetMetadata() DeploymentMetadata {
+	return s.Metadata
+}
+
+// GetRelease returns the value of Release.
+func (s *CreateDeploymentResponse) GetRelease() OptRelease {
+	return s.Release
+}
+
+// GetWarnings returns the value of Warnings.
+func (s *CreateDeploymentResponse) GetWarnings() []CreateDeploymentResponseWarningsItem {
+	return s.Warnings
+}
+
+// SetID sets the value of ID.
+func (s *CreateDeploymentResponse) SetID(val DeploymentID) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *CreateDeploymentResponse) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetReleaseID sets the value of ReleaseID.
+func (s *CreateDeploymentResponse) SetReleaseID(val ReleaseID) {
+	s.ReleaseID = val
+}
+
+// SetTargets sets the value of Targets.
+func (s *CreateDeploymentResponse) SetTargets(val []DeploymentTarget) {
+	s.Targets = val
+}
+
+// SetDeployedAt sets the value of DeployedAt.
+func (s *CreateDeploymentResponse) SetDeployedAt(val time.Time) {
+	s.DeployedAt = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *CreateDeploymentResponse) SetMetadata(val DeploymentMetadata) {
+	s.Metadata = val
+}
+
+// SetRelease sets the value of Release.
+func (s *CreateDeploymentResponse) SetRelease(val OptRelease) {
+	s.Release = val
+}
+
+// SetWarnings sets the value of Warnings.
+func (s *CreateDeploymentResponse) SetWarnings(val []CreateDeploymentResponseWarningsItem) {
+	s.Warnings = val
+}
+
+type CreateDeploymentResponseWarningsItem struct {
+	// A stable, machine-readable identifier for the advisory.
+	Code string `json:"code"`
+	// A human-readable description of the advisory.
+	Message string `json:"message"`
+}
+
+// GetCode returns the value of Code.
+func (s *CreateDeploymentResponseWarningsItem) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *CreateDeploymentResponseWarningsItem) GetMessage() string {
+	return s.Message
+}
+
+// SetCode sets the value of Code.
+func (s *CreateDeploymentResponseWarningsItem) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *CreateDeploymentResponseWarningsItem) SetMessage(val string) {
+	s.Message = val
 }
 
 // CreateFlowDefinitionErrorResponse represents sum type.

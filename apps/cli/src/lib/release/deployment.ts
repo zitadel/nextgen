@@ -1,8 +1,17 @@
 import type { ZitadelClient } from "@zitadel/api/client";
-import type { CreateDeployment201, RollbackDeployment201 } from "@zitadel/api/generated/model";
+import type {
+  CreateDeployment200,
+  CreateDeployment201,
+  RollbackDeployment201,
+} from "@zitadel/api/generated/model";
 
-/** A deployment, as create and rollback return it (the 200/201 shapes match). */
-export type Deployment = CreateDeployment201;
+/**
+ * A deployment, as create returns it: the deployment record plus the
+ * `warnings` the create response carries (the 200 and 201 shapes match). The
+ * field is part of the generated model now, so callers read it directly rather
+ * than casting a warnings shape onto a plain deployment.
+ */
+export type Deployment = CreateDeployment200 | CreateDeployment201;
 
 /** What target a deploy goes to: every primary origin, or one exact origin. */
 export type DeployTargets = ["primary"] | [string];
@@ -41,7 +50,7 @@ export async function createDeployment(
     },
     { project_id: projectId },
   );
-  return result as Deployment;
+  return result;
 }
 
 /**
