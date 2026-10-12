@@ -1,9 +1,12 @@
 -- +goose Up
 -- See the postgres migration. SQLite drops neither a key column nor a foreign
--- key in place, so variables and deployments are rebuilt without their
--- reference to environments before that table goes.
+-- key in place, and nothing stored is kept, so variables and deployments are
+-- recreated without their reference to environments before that table goes.
 -- +goose StatementBegin
-CREATE TABLE variables_new (
+DROP TABLE variables;
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE TABLE variables (
     name         TEXT    NOT NULL CHECK (name <> ''),
     project_id   TEXT    NOT NULL CHECK (project_id <> ''),
     value        TEXT    NOT NULL,
@@ -15,22 +18,14 @@ CREATE TABLE variables_new (
 );
 -- +goose StatementEnd
 -- +goose StatementBegin
-INSERT INTO variables_new (name, project_id, value, is_secret, created_at, modified_at)
-SELECT name, project_id, value, is_secret, created_at, modified_at FROM variables
-WHERE environment_id = '';
--- +goose StatementEnd
--- +goose StatementBegin
-DROP TABLE variables;
--- +goose StatementEnd
--- +goose StatementBegin
-ALTER TABLE variables_new RENAME TO variables;
--- +goose StatementEnd
--- +goose StatementBegin
 CREATE INDEX idx_variables_project_name ON variables (project_id, name);
 -- +goose StatementEnd
 
 -- +goose StatementBegin
-CREATE TABLE deployments_new (
+DROP TABLE deployments;
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE TABLE deployments (
     project_id              TEXT    NOT NULL,
     id                      TEXT    NOT NULL,
     environment_id          TEXT    NOT NULL,
@@ -46,16 +41,6 @@ CREATE TABLE deployments_new (
 );
 -- +goose StatementEnd
 -- +goose StatementBegin
-INSERT INTO deployments_new (project_id, id, environment_id, release_id, metadata, deployed_at)
-SELECT project_id, id, environment_id, release_id, metadata, deployed_at FROM deployments;
--- +goose StatementEnd
--- +goose StatementBegin
-DROP TABLE deployments;
--- +goose StatementEnd
--- +goose StatementBegin
-ALTER TABLE deployments_new RENAME TO deployments;
--- +goose StatementEnd
--- +goose StatementBegin
 CREATE INDEX idx_deployments_project_env_deployed_at
     ON deployments (project_id, environment_id, deployed_at DESC, id DESC);
 -- +goose StatementEnd
@@ -64,9 +49,6 @@ CREATE INDEX idx_deployments_project_deployed_at
     ON deployments (project_id, deployed_at DESC, id DESC);
 -- +goose StatementEnd
 
--- +goose StatementBegin
-DROP INDEX IF EXISTS uq_environments_project_name;
--- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE environments;
 -- +goose StatementEnd
@@ -89,7 +71,6 @@ CREATE TABLE environments (
 CREATE UNIQUE INDEX uq_environments_project_name ON environments (project_id, name);
 -- +goose StatementEnd
 
--- No environment survives the round trip, so neither does a deployment to one.
 -- +goose StatementBegin
 DROP TABLE deployments;
 -- +goose StatementEnd
@@ -122,7 +103,10 @@ CREATE INDEX idx_deployments_project_deployed_at
 -- +goose StatementEnd
 
 -- +goose StatementBegin
-CREATE TABLE variables_old (
+DROP TABLE variables;
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE TABLE variables (
     name             TEXT    NOT NULL CHECK (name <> ''),
     project_id       TEXT    NOT NULL CHECK (project_id <> ''),
     environment_id   TEXT    NOT NULL DEFAULT '',
@@ -136,16 +120,6 @@ CREATE TABLE variables_old (
     FOREIGN KEY (project_id, environment_ref)
         REFERENCES environments (project_id, id) ON DELETE CASCADE
 );
--- +goose StatementEnd
--- +goose StatementBegin
-INSERT INTO variables_old (name, project_id, value, is_secret, created_at, modified_at)
-SELECT name, project_id, value, is_secret, created_at, modified_at FROM variables;
--- +goose StatementEnd
--- +goose StatementBegin
-DROP TABLE variables;
--- +goose StatementEnd
--- +goose StatementBegin
-ALTER TABLE variables_old RENAME TO variables;
 -- +goose StatementEnd
 -- +goose StatementBegin
 CREATE INDEX idx_variables_project_name ON variables (project_id, name);

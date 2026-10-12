@@ -1,21 +1,7 @@
 -- +goose NO TRANSACTION
 -- +goose Up
--- See the postgres migration. Spanner cannot change a primary key in place, so
--- variables is rebuilt through a staging table and copied back.
--- +goose StatementBegin
-CREATE TABLE variables_project (
-    name             STRING(MAX) NOT NULL,
-    project_id       STRING(MAX) NOT NULL,
-    value            JSON        NOT NULL,
-    is_secret        BOOL        NOT NULL,
-    created_at       TIMESTAMP   NOT NULL,
-    modified_at      TIMESTAMP   NOT NULL,
-) PRIMARY KEY (name, project_id)
--- +goose StatementEnd
--- +goose StatementBegin
-INSERT INTO variables_project (name, project_id, value, is_secret, created_at, modified_at)
-SELECT name, project_id, value, is_secret, created_at, modified_at FROM variables WHERE environment_id = ''
--- +goose StatementEnd
+-- See the postgres migration. Spanner cannot change a primary key in place,
+-- and nothing stored is kept, so variables is recreated.
 -- +goose StatementBegin
 DROP TABLE variables
 -- +goose StatementEnd
@@ -34,13 +20,6 @@ CREATE TABLE variables (
         REFERENCES projects (id)
         ON DELETE CASCADE
 ) PRIMARY KEY (name, project_id)
--- +goose StatementEnd
--- +goose StatementBegin
-INSERT INTO variables (name, project_id, value, is_secret, created_at, modified_at)
-SELECT name, project_id, value, is_secret, created_at, modified_at FROM variables_project
--- +goose StatementEnd
--- +goose StatementBegin
-DROP TABLE variables_project
 -- +goose StatementEnd
 -- +goose StatementBegin
 ALTER TABLE deployments DROP CONSTRAINT fk_deployments_environment
@@ -81,20 +60,6 @@ ALTER TABLE deployments ADD CONSTRAINT fk_deployments_environment
     ON DELETE CASCADE
 -- +goose StatementEnd
 -- +goose StatementBegin
-CREATE TABLE variables_project (
-    name             STRING(MAX) NOT NULL,
-    project_id       STRING(MAX) NOT NULL,
-    value            JSON        NOT NULL,
-    is_secret        BOOL        NOT NULL,
-    created_at       TIMESTAMP   NOT NULL,
-    modified_at      TIMESTAMP   NOT NULL,
-) PRIMARY KEY (name, project_id)
--- +goose StatementEnd
--- +goose StatementBegin
-INSERT INTO variables_project (name, project_id, value, is_secret, created_at, modified_at)
-SELECT name, project_id, value, is_secret, created_at, modified_at FROM variables
--- +goose StatementEnd
--- +goose StatementBegin
 DROP TABLE variables
 -- +goose StatementEnd
 -- +goose StatementBegin
@@ -118,11 +83,4 @@ CREATE TABLE variables (
         REFERENCES environments (project_id, id)
         ON DELETE CASCADE
 ) PRIMARY KEY (name, project_id, environment_id)
--- +goose StatementEnd
--- +goose StatementBegin
-INSERT INTO variables (name, project_id, value, is_secret, created_at, modified_at)
-SELECT name, project_id, value, is_secret, created_at, modified_at FROM variables_project
--- +goose StatementEnd
--- +goose StatementBegin
-DROP TABLE variables_project
 -- +goose StatementEnd
