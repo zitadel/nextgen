@@ -47178,11 +47178,75 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserConflictGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.conflict")
+		{
+			s := s.UserConflict
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserInvalidGetFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.invalid")
 		{
 			s := s.UserInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserNotFoundGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.not_found")
+		{
+			s := s.UserNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserPasswordEmptyGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_empty")
+		{
+			s := s.UserPasswordEmpty
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserPasswordTooLongGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_too_long")
+		{
+			s := s.UserPasswordTooLong
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -47307,8 +47371,20 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "user.already_exists":
 					s.Type = UserAlreadyExistsGetFlowStepErrorResponse
 					found = true
+				case "user.conflict":
+					s.Type = UserConflictGetFlowStepErrorResponse
+					found = true
 				case "user.invalid":
 					s.Type = UserInvalidGetFlowStepErrorResponse
+					found = true
+				case "user.not_found":
+					s.Type = UserNotFoundGetFlowStepErrorResponse
+					found = true
+				case "user.password_empty":
+					s.Type = UserPasswordEmptyGetFlowStepErrorResponse
+					found = true
+				case "user.password_too_long":
+					s.Type = UserPasswordTooLongGetFlowStepErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -47440,8 +47516,24 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.UserAlreadyExists.Decode(d); err != nil {
 			return err
 		}
+	case UserConflictGetFlowStepErrorResponse:
+		if err := s.UserConflict.Decode(d); err != nil {
+			return err
+		}
 	case UserInvalidGetFlowStepErrorResponse:
 		if err := s.UserInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UserNotFoundGetFlowStepErrorResponse:
+		if err := s.UserNotFound.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordEmptyGetFlowStepErrorResponse:
+		if err := s.UserPasswordEmpty.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordTooLongGetFlowStepErrorResponse:
+		if err := s.UserPasswordTooLong.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -100456,6 +100548,102 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case IdpEndpointCleartextSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.endpoint_cleartext")
+		{
+			s := s.IdpEndpointCleartext
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpEndpointsPartialSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.endpoints_partial")
+		{
+			s := s.IdpEndpointsPartial
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpOAuth2UnsupportedSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.oauth2_unsupported")
+		{
+			s := s.IdpOAuth2Unsupported
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpProtocolBlockMissingSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.protocol_block_missing")
+		{
+			s := s.IdpProtocolBlockMissing
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpScopesMissingOpenidSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.scopes_missing_openid")
+		{
+			s := s.IdpScopesMissingOpenid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case IdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.strategy_pointer_unsupported")
+		{
+			s := s.IdpStrategyPointerUnsupported
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalSubmitFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -100557,6 +100745,22 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("user.already_exists")
 		{
 			s := s.UserAlreadyExists
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserConflictSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.conflict")
+		{
+			s := s.UserConflict
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -100712,6 +100916,24 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "flow.unsupported":
 					s.Type = FlowUnsupportedSubmitFlowStepErrorResponse
 					found = true
+				case "idp.endpoint_cleartext":
+					s.Type = IdpEndpointCleartextSubmitFlowStepErrorResponse
+					found = true
+				case "idp.endpoints_partial":
+					s.Type = IdpEndpointsPartialSubmitFlowStepErrorResponse
+					found = true
+				case "idp.oauth2_unsupported":
+					s.Type = IdpOAuth2UnsupportedSubmitFlowStepErrorResponse
+					found = true
+				case "idp.protocol_block_missing":
+					s.Type = IdpProtocolBlockMissingSubmitFlowStepErrorResponse
+					found = true
+				case "idp.scopes_missing_openid":
+					s.Type = IdpScopesMissingOpenidSubmitFlowStepErrorResponse
+					found = true
+				case "idp.strategy_pointer_unsupported":
+					s.Type = IdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalSubmitFlowStepErrorResponse
 					found = true
@@ -100732,6 +100954,9 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "user.already_exists":
 					s.Type = UserAlreadyExistsSubmitFlowStepErrorResponse
+					found = true
+				case "user.conflict":
+					s.Type = UserConflictSubmitFlowStepErrorResponse
 					found = true
 				case "user.invalid":
 					s.Type = UserInvalidSubmitFlowStepErrorResponse
@@ -100831,6 +101056,30 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.FlowUnsupported.Decode(d); err != nil {
 			return err
 		}
+	case IdpEndpointCleartextSubmitFlowStepErrorResponse:
+		if err := s.IdpEndpointCleartext.Decode(d); err != nil {
+			return err
+		}
+	case IdpEndpointsPartialSubmitFlowStepErrorResponse:
+		if err := s.IdpEndpointsPartial.Decode(d); err != nil {
+			return err
+		}
+	case IdpOAuth2UnsupportedSubmitFlowStepErrorResponse:
+		if err := s.IdpOAuth2Unsupported.Decode(d); err != nil {
+			return err
+		}
+	case IdpProtocolBlockMissingSubmitFlowStepErrorResponse:
+		if err := s.IdpProtocolBlockMissing.Decode(d); err != nil {
+			return err
+		}
+	case IdpScopesMissingOpenidSubmitFlowStepErrorResponse:
+		if err := s.IdpScopesMissingOpenid.Decode(d); err != nil {
+			return err
+		}
+	case IdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse:
+		if err := s.IdpStrategyPointerUnsupported.Decode(d); err != nil {
+			return err
+		}
 	case InternalSubmitFlowStepErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
@@ -100857,6 +101106,10 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UserAlreadyExistsSubmitFlowStepErrorResponse:
 		if err := s.UserAlreadyExists.Decode(d); err != nil {
+			return err
+		}
+	case UserConflictSubmitFlowStepErrorResponse:
+		if err := s.UserConflict.Decode(d); err != nil {
 			return err
 		}
 	case UserInvalidSubmitFlowStepErrorResponse:
