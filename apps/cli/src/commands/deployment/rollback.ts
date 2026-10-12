@@ -114,6 +114,21 @@ export default class DeploymentRollback extends EnvironmentCommand {
       });
     }
 
+    // The deployment the caller currently sees live on the targets. Read
+    // before the confirmation gate and passed through as the optimistic
+    // guard, so a deploy that lands while the prompt is open (or between this
+    // read and the write in non-interactive mode) makes the server answer 409
+    // rather than letting the rollback overwrite a change the caller never
+    // saw. Omitted when nothing is live, which an optional id cannot stand in
+    // for.
+    const expectedDeploymentId = (
+      await client.listDeployments({
+        project_id: projectId,
+        live: true,
+        ...(flags.origin === undefined ? {} : { origin: flags.origin }),
+      })
+    ).deployments[0]?.id;
+
     if (!force) {
       if (nonInteractive) {
         throw new ZitadelError(
@@ -135,7 +150,9 @@ export default class DeploymentRollback extends EnvironmentCommand {
       }
     }
 
-    const deployment = await rollbackDeployment(client, projectId, targetId);
+    const deployment = await rollbackDeployment(client, projectId, targetId, {
+      ...(expectedDeploymentId === undefined ? {} : { expectedDeploymentId }),
+    });
 
     const origins = deployment.targets.map((target) => target.origin);
     return this.emit({
