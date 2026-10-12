@@ -1463,6 +1463,21 @@ describe("api-mock project origins", () => {
     ]);
   });
 
+  test("stores an otherwise-valid pattern with its submitted casing", async () => {
+    const project = await newProject("origins-case");
+
+    const res = await addOrigin(project.id, project.projectSecret, {
+      pattern: "https://App.Acme.com",
+      kind: "primary",
+    });
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({ pattern: "https://App.Acme.com", kind: "primary" });
+    expect(await projectOrigins(project.id)).toEqual([
+      { pattern: "https://App.Acme.com", kind: "primary" },
+    ]);
+  });
+
   test("accepts a preview wildcard bounded by a tenant label", async () => {
     const project = await newProject("origins-bounded");
 
