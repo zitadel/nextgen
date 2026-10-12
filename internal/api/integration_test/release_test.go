@@ -175,11 +175,11 @@ func TestCreateRelease(t *testing.T) {
 				{Kind: api.ReleasePointerKindFlowDefinition, RevisionID: "flowdef_does_not_exist"},
 			},
 		})
-		status, code, message, ok := errorResponseParts(t, resp)
-		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, resp))
-		assert.Equal(t, http.StatusBadRequest, status)
-		assert.Equal(t, domain.ErrReleaseRevisionNotFound(nil).Code, code)
-		assert.NotEmpty(t, message)
+		// createRelease declares 400, so the type is the status assertion.
+		require.IsType(t, &api.CreateReleaseBadRequest{}, resp, "unexpected response: %s", helpers.MustMarshal(t, resp))
+		bad := resp.(*api.CreateReleaseBadRequest)
+		assert.Equal(t, api.ErrorCode(domain.ErrReleaseRevisionNotFound(nil).Code), bad.Code)
+		assert.NotEmpty(t, bad.Message)
 	})
 
 	// A release describes one state of the project, so it cannot hold two
@@ -195,10 +195,8 @@ func TestCreateRelease(t *testing.T) {
 				{Kind: api.ReleasePointerKindBranding, RevisionID: second},
 			},
 		})
-		status, code, _, ok := errorResponseParts(t, resp)
-		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, resp))
-		assert.Equal(t, http.StatusBadRequest, status)
-		assert.Equal(t, domain.ErrReleaseInvalid(nil, nil).Code, code)
+		require.IsType(t, &api.CreateReleaseBadRequest{}, resp, "unexpected response: %s", helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode(domain.ErrReleaseInvalid(nil, nil).Code), resp.(*api.CreateReleaseBadRequest).Code)
 	})
 
 	// Both size bounds are sent raw rather than through the generated client,
@@ -263,10 +261,8 @@ func TestCreateReleaseCannotPinAnotherProjectsRevision(t *testing.T) {
 			{Kind: api.ReleasePointerKindBranding, RevisionID: theirs.brandingID},
 		},
 	})
-	status, code, _, ok := errorResponseParts(t, resp)
-	require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, resp))
-	assert.Equal(t, http.StatusBadRequest, status)
-	assert.Equal(t, domain.ErrReleaseRevisionNotFound(nil).Code, code)
+	require.IsType(t, &api.CreateReleaseBadRequest{}, resp, "unexpected response: %s", helpers.MustMarshal(t, resp))
+	assert.Equal(t, api.ErrorCode(domain.ErrReleaseRevisionNotFound(nil).Code), resp.(*api.CreateReleaseBadRequest).Code)
 }
 
 func TestCreateReleaseUnauthenticated(t *testing.T) {
