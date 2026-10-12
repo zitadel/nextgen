@@ -12,7 +12,7 @@ properties:
   index:
     type: integer
     minimum: 0
-    description: The resource's position in its kind's array in the bundle.
+    description: The resource's position in its kind's array in the bundle; `0` for the branding.
   handle:
     type: string
     description: The resource's handle, when it declares one.

@@ -8611,7 +8611,7 @@ func (s *BrandingTypography) SetScale(val OptFloat64) {
 // Ref: #
 type BundleResourceError struct {
 	Kind ReleasePointerKind `json:"kind"`
-	// The resource's position in its kind's array in the bundle.
+	// The resource's position in its kind's array in the bundle; `0` for the branding.
 	Index int `json:"index"`
 	// The resource's handle, when it declares one.
 	Handle OptString `json:"handle"`
@@ -9720,8 +9720,8 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 // handle that neither holds refuses the release, naming the pointer and the
 // handle. A bundle that references only resources it carries builds the
 // same release on any project.
-// Each kind is optional and may be empty: a project that never ejected its
-// branding sends none. Across all kinds the bundle carries at least one
+// Each kind is optional, and the arrays may be empty: a project that never
+// ejected its branding omits `branding`. Across all kinds the bundle carries at least one
 // resource and at most 50, the most a release pins; the server refuses
 // anything outside that with `rel.invalid`. Unknown keys are refused. More
 // kinds join as they become release kinds.
@@ -9736,8 +9736,8 @@ type ConfigurationBundle struct {
 	FlowDefinitions []FlowDefinition `json:"flow_definitions"`
 	// The descriptor from `.zitadel/branding/branding.json` with its template
 	// inlined, exactly as `POST /branding` takes it. A project has one
-	// branding, so at most one entry.
-	Brandings []Branding `json:"brandings"`
+	// branding, so this is a single object.
+	Branding OptBranding `json:"branding"`
 }
 
 // GetSchemas returns the value of Schemas.
@@ -9750,9 +9750,9 @@ func (s *ConfigurationBundle) GetFlowDefinitions() []FlowDefinition {
 	return s.FlowDefinitions
 }
 
-// GetBrandings returns the value of Brandings.
-func (s *ConfigurationBundle) GetBrandings() []Branding {
-	return s.Brandings
+// GetBranding returns the value of Branding.
+func (s *ConfigurationBundle) GetBranding() OptBranding {
+	return s.Branding
 }
 
 // SetSchemas sets the value of Schemas.
@@ -9765,9 +9765,9 @@ func (s *ConfigurationBundle) SetFlowDefinitions(val []FlowDefinition) {
 	s.FlowDefinitions = val
 }
 
-// SetBrandings sets the value of Brandings.
-func (s *ConfigurationBundle) SetBrandings(val []Branding) {
-	s.Brandings = val
+// SetBranding sets the value of Branding.
+func (s *ConfigurationBundle) SetBranding(val OptBranding) {
+	s.Branding = val
 }
 
 // CreateAuthAttemptErrorResponse represents sum type.

@@ -15945,13 +15945,9 @@ func (s *ConfigurationBundle) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.Brandings != nil {
-			e.FieldStart("brandings")
-			e.ArrStart()
-			for _, elem := range s.Brandings {
-				elem.Encode(e)
-			}
-			e.ArrEnd()
+		if s.Branding.Set {
+			e.FieldStart("branding")
+			s.Branding.Encode(e)
 		}
 	}
 }
@@ -15959,7 +15955,7 @@ func (s *ConfigurationBundle) encodeFields(e *jx.Encoder) {
 var jsonFieldsNameOfConfigurationBundle = [3]string{
 	0: "schemas",
 	1: "flow_definitions",
-	2: "brandings",
+	2: "branding",
 }
 
 // Decode decodes ConfigurationBundle from json.
@@ -16004,22 +16000,15 @@ func (s *ConfigurationBundle) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_definitions\"")
 			}
-		case "brandings":
+		case "branding":
 			if err := func() error {
-				s.Brandings = make([]Branding, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem Branding
-					if err := elem.Decode(d); err != nil {
-						return err
-					}
-					s.Brandings = append(s.Brandings, elem)
-					return nil
-				}); err != nil {
+				s.Branding.Reset()
+				if err := s.Branding.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"brandings\"")
+				return errors.Wrap(err, "decode field \"branding\"")
 			}
 		default:
 			return errors.Errorf("unexpected field %q", k)

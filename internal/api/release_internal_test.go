@@ -94,14 +94,13 @@ func TestCreateReleaseRequestShape(t *testing.T) {
 			want: api.CreateReleaseFromPointersCreateReleaseRequest,
 		},
 		"bundle": {
-			body: `{"bundle":{"brandings":[{}]}}`,
+			body: `{"bundle":{"branding":{}}}`,
 			want: api.CreateReleaseFromBundleCreateReleaseRequest,
 		},
-		// Every kind is optional, and a project that never ejected its
-		// branding sends it empty. An empty bundle as a whole is the
-		// server's to refuse, not the decoder's.
+		// Every kind is optional, and a kind's array may be empty. An empty
+		// bundle as a whole is the server's to refuse, not the decoder's.
 		"bundle with an empty kind": {
-			body: `{"bundle":{"flow_definitions":[],"brandings":[]}}`,
+			body: `{"bundle":{"schemas":[],"flow_definitions":[]}}`,
 			want: api.CreateReleaseFromBundleCreateReleaseRequest,
 		},
 	}
@@ -115,10 +114,13 @@ func TestCreateReleaseRequestShape(t *testing.T) {
 	}
 
 	refused := map[string]string{
-		"both":               `{"pointers":[{"kind":"schema","revision_id":"sch_1"}],"bundle":{"brandings":[{}]}}`,
+		"both":               `{"pointers":[{"kind":"schema","revision_id":"sch_1"}],"bundle":{"branding":{}}}`,
 		"neither":            `{"message":"no content"}`,
 		"unknown bundle key": `{"bundle":{"flowDefinitions":[{}]}}`,
 		"empty pointers":     `{"pointers":[]}`,
+		// A project has one branding: an array of them is refused at
+		// decoding, before it can be materialised element by element.
+		"branding as an array": `{"bundle":{"branding":[{},{}]}}`,
 	}
 	for name, body := range refused {
 		t.Run(name, func(t *testing.T) {
