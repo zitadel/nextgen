@@ -1789,7 +1789,18 @@ export function setupPlatformHandlers() {
           deploymentResponse(deployment, deployment.targets, { release: expandRelease }),
         );
       }
-      return HttpResponse.json({ deployments: items });
+      // The real cursor is opaque; the mock's is the next start index, like the
+      // schemas list. A target beyond the first page is only reachable by
+      // following the cursor, so a caller that needs the whole history pages
+      // through it rather than reading the first page alone.
+      const start = query.data.page_token === undefined ? 0 : Number(query.data.page_token);
+      if (!Number.isInteger(start) || start < 0) {
+        return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
+      }
+      const page = items.slice(start, start + query.data.limit);
+      const next =
+        start + query.data.limit < items.length ? String(start + query.data.limit) : undefined;
+      return HttpResponse.json({ deployments: page, next_page_token: next });
     }),
 
     http.get("*/deployments/:deployment_id", ({ params, request }) => {

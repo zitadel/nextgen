@@ -81,6 +81,40 @@ describe("deployment rollback", () => {
         );
       });
 
+      it("finds a prior deployment beyond the server's first page", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://a.example.com");
+        await app.addPrimaryOrigin("https://b.example.com");
+
+        // a: R1. Then enough deploys to b that a's own prior deployment sits
+        // past the 20-per-page default. Then a again: undoing it must restore a
+        // to R1, which is only reachable by paging through the whole history.
+        const firstA = await app.deployData(["--origin", "https://a.example.com"]);
+        for (let i = 0; i < 21; i += 1) {
+          await app.editUserSchema((schema) => {
+            schema.properties[`field_${i}`] = { type: "string" };
+          });
+          await app.deployData(["--origin", "https://b.example.com"]);
+        }
+        await app.editUserSchema((schema) => {
+          schema.properties.last = { type: "string" };
+        });
+        await app.deployData(["--origin", "https://a.example.com"]);
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toSucceed();
+        expect(app.envelopeOf<{ release_id: string }>(result).data.release_id).toBe(
+          firstA.release_id,
+        );
+      });
+
       it("refuses a bare rollback when the latest deploy's origins diverge", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin("https://a.example.com");

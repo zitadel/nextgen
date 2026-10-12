@@ -1,7 +1,9 @@
 import { Flags } from "@oclif/core";
 import { cancel, confirm, isCancel } from "@clack/prompts";
+import type { ListDeployments200DeploymentsItem } from "@zitadel/api/generated/model";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
+import { collectPages } from "../../lib/oclif/crud/paging";
 import { rollbackDeployment } from "../../lib/release";
 import { ZitadelError } from "../../lib/errors";
 import { publicCliCommand } from "../../lib/public-cli";
@@ -49,10 +51,20 @@ export default class DeploymentRollback extends EnvironmentCommand {
     // before it. With an id, re-apply exactly that one.
     let targetId = args.deployment_id as string | undefined;
     if (targetId === undefined) {
-      const { deployments } = await client.listDeployments({
-        project_id: projectId,
-        ...(flags.origin === undefined ? {} : { origin: flags.origin }),
-      });
+      // The prior deployment of a long-lived origin can sit beyond the
+      // server's first page, so the whole history is drained rather than the
+      // default page searched — otherwise a bare rollback would miss a target
+      // further back and refuse a rollback it should resolve.
+      const { items } = await collectPages(
+        (token) =>
+          client.listDeployments({
+            project_id: projectId,
+            ...(flags.origin === undefined ? {} : { origin: flags.origin }),
+            ...(token === undefined ? {} : { page_token: token }),
+          }),
+        { items: "deployments", all: true, nextPageToken: "next_page_token" },
+      );
+      const deployments = items as ListDeployments200DeploymentsItem[];
       const latest = deployments[0];
       if (!latest) {
         throw new ZitadelError("E_VALIDATION", "There is no deployment to roll back", {
