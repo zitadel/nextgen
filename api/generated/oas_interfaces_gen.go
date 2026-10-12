@@ -225,6 +225,10 @@ type ListMyProjectsRes interface {
 	listMyProjectsRes()
 }
 
+type ListPreviewsRes interface {
+	listPreviewsRes()
+}
+
 type ListReleasesRes interface {
 	listReleasesRes()
 }
@@ -275,6 +279,10 @@ type QueryTeamsRes interface {
 
 type QueryUsersRes interface {
 	queryUsersRes()
+}
+
+type RemovePreviewRes interface {
+	removePreviewRes()
 }
 
 type RevokeMySessionRes interface {

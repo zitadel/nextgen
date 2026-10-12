@@ -62,6 +62,11 @@ tags:
       A release's content never changes. If it must never be served again,
       revoke it. A release can't be revoked while any origin still serves
       it.
+  - name: Previews
+    description: |
+      Preview URLs that are live. A deployment to a URL matching one of the
+      project's preview patterns creates or renews its preview; list them
+      here and remove one before it expires.
   - name: Grants
     description: |
       Collaboration grants that bind a user or team to project.viewer,
@@ -145,6 +150,10 @@ paths:
     $ref: endpoints/projects/by_id/claim/complete/methods.yaml
   /projects/{project_id}/claim/window:
     $ref: endpoints/projects/by_id/claim/window/methods.yaml
+  /projects/{project_id}/previews:
+    $ref: endpoints/projects/by_id/previews/methods.yaml
+  /projects/{project_id}/previews/remove:
+    $ref: endpoints/projects/by_id/previews/remove/methods.yaml
   /sessions:
     $ref: endpoints/sessions/methods.yaml
   /sessions/query:

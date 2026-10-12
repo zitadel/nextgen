@@ -41,6 +41,23 @@ func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeployment
 	return nil, domain.ErrNotImplemented()
 }
 
+// The preview operations answer 501 like the deployment ones: a preview
+// exists only through a deployment to it.
+
+func (h *Handler) ListPreviews(ctx context.Context, params api.ListPreviewsParams) (api.ListPreviewsRes, error) {
+	if _, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), deploymentAccess, domain.ResourceKindDeployment); err != nil {
+		return nil, err
+	}
+	return nil, domain.ErrNotImplemented()
+}
+
+func (h *Handler) RemovePreview(ctx context.Context, _ *api.RemovePreviewRequest, params api.RemovePreviewParams) (api.RemovePreviewRes, error) {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opWrite); err != nil {
+		return nil, err
+	}
+	return nil, domain.ErrNotImplemented()
+}
+
 // deploymentErrorResponse maps the deployment error codes onto statuses.
 // dep.conflict is the failed expected_deployment_id check: the 409 details
 // carry the actual newest deployment to the targets.
