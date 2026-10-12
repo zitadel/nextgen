@@ -12,11 +12,9 @@
 
 The hosted cloud is the current `main`, built by Vercel from the repository
 and run in Frankfurt (`fra1`) against PlanetScale Postgres in the same AWS
-region. **`main` is production:** every merge deploys. A branch that touches
-the server, the console, the login UI, the storybook or the docs gets a
-preview deployment with a database of its own. Version tags and their npm
-packages remain the
-self-hosted artifact; this cloud does not run them.
+region. **`main` is production:** every merge deploys. Every other branch
+gets a preview deployment with a database of its own. Version tags and their
+npm packages remain the self-hosted artifact; this cloud does not run them.
 
 ## Layout
 
@@ -182,11 +180,10 @@ or garbled fails the build and the serving deployment stays.
   `--build-env VERCEL_GIT_COMMIT_REF=<branch> --build-env VERCEL_GIT_COMMIT_SHA=<sha>`.
   The branch picks a preview's database and must match the production
   branch for a `--prod` deployment.
-- **Previews:** every push to a branch, if
-  [`ignore-build.sh`](../../apps/cloud/ignore-build.sh) finds a change to
-  what the deployment runs since the branch's last preview, or since it
-  left `main`. A docs-only branch gets one too, database included, because
-  the docs are a service of the deployment; SDK-only branches get none.
+- **Previews:** every push to any other branch, docs-only and SDK-only
+  branches included. There is no skip step: Vercel does not run a
+  service's `ignoreCommand`, and most branches touch something the
+  deployment builds from anyway.
 - **Migrations must be expand/contract.** The previous deployment serves on
   the new schema until the new one is live, and Instant Rollback promotes
   an older deployment without touching the schema.
