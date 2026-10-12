@@ -197,7 +197,7 @@ post:
       content:
         application/json:
           schema:
-            $ref: create-deployment-conflict.yaml
+            $ref: deployment-conflict.yaml
           examples:
             conflict:
               summary: Another deployment reached the target first

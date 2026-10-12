@@ -19,6 +19,13 @@ func (h *Handler) CreateDeployment(ctx context.Context, _ *api.CreateDeploymentR
 	return nil, domain.ErrNotImplemented()
 }
 
+func (h *Handler) RollbackDeployment(ctx context.Context, _ api.OptRollbackDeploymentRequest, params api.RollbackDeploymentParams) (api.RollbackDeploymentRes, error) {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opWrite); err != nil {
+		return nil, err
+	}
+	return nil, domain.ErrNotImplemented()
+}
+
 func (h *Handler) GetDeploymentById(ctx context.Context, params api.GetDeploymentByIdParams) (api.GetDeploymentByIdRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opRead); err != nil {
 		return nil, err

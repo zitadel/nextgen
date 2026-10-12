@@ -10541,81 +10541,6 @@ func (s *CreateDeploymentBadRequestDetailsKind) UnmarshalText(data []byte) error
 	}
 }
 
-// The deployment conflicts with the state of the project, told apart by
-// `code`: `dep.conflict` when `expected_deployment_id` did not match,
-// carrying the actual newest deployment, or `rel.revoked` when the release
-// is revoked.
-// Ref: #
-// CreateDeploymentConflict represents sum type.
-type CreateDeploymentConflict struct {
-	Type                    CreateDeploymentConflictType // switch on this field
-	DeploymentGuardConflict DeploymentGuardConflict
-	ReleaseRevokedConflict  ReleaseRevokedConflict
-}
-
-// CreateDeploymentConflictType is oneOf type of CreateDeploymentConflict.
-type CreateDeploymentConflictType string
-
-// Possible values for CreateDeploymentConflictType.
-const (
-	DeploymentGuardConflictCreateDeploymentConflict CreateDeploymentConflictType = "dep.conflict"
-	ReleaseRevokedConflictCreateDeploymentConflict  CreateDeploymentConflictType = "rel.revoked"
-)
-
-// IsDeploymentGuardConflict reports whether CreateDeploymentConflict is DeploymentGuardConflict.
-func (s CreateDeploymentConflict) IsDeploymentGuardConflict() bool {
-	return s.Type == DeploymentGuardConflictCreateDeploymentConflict
-}
-
-// IsReleaseRevokedConflict reports whether CreateDeploymentConflict is ReleaseRevokedConflict.
-func (s CreateDeploymentConflict) IsReleaseRevokedConflict() bool {
-	return s.Type == ReleaseRevokedConflictCreateDeploymentConflict
-}
-
-// SetDeploymentGuardConflict sets CreateDeploymentConflict to DeploymentGuardConflict.
-func (s *CreateDeploymentConflict) SetDeploymentGuardConflict(v DeploymentGuardConflict) {
-	s.Type = DeploymentGuardConflictCreateDeploymentConflict
-	s.DeploymentGuardConflict = v
-}
-
-// GetDeploymentGuardConflict returns DeploymentGuardConflict and true boolean if CreateDeploymentConflict is DeploymentGuardConflict.
-func (s CreateDeploymentConflict) GetDeploymentGuardConflict() (v DeploymentGuardConflict, ok bool) {
-	if !s.IsDeploymentGuardConflict() {
-		return v, false
-	}
-	return s.DeploymentGuardConflict, true
-}
-
-// NewDeploymentGuardConflictCreateDeploymentConflict returns new CreateDeploymentConflict from DeploymentGuardConflict.
-func NewDeploymentGuardConflictCreateDeploymentConflict(v DeploymentGuardConflict) CreateDeploymentConflict {
-	var s CreateDeploymentConflict
-	s.SetDeploymentGuardConflict(v)
-	return s
-}
-
-// SetReleaseRevokedConflict sets CreateDeploymentConflict to ReleaseRevokedConflict.
-func (s *CreateDeploymentConflict) SetReleaseRevokedConflict(v ReleaseRevokedConflict) {
-	s.Type = ReleaseRevokedConflictCreateDeploymentConflict
-	s.ReleaseRevokedConflict = v
-}
-
-// GetReleaseRevokedConflict returns ReleaseRevokedConflict and true boolean if CreateDeploymentConflict is ReleaseRevokedConflict.
-func (s CreateDeploymentConflict) GetReleaseRevokedConflict() (v ReleaseRevokedConflict, ok bool) {
-	if !s.IsReleaseRevokedConflict() {
-		return v, false
-	}
-	return s.ReleaseRevokedConflict, true
-}
-
-// NewReleaseRevokedConflictCreateDeploymentConflict returns new CreateDeploymentConflict from ReleaseRevokedConflict.
-func NewReleaseRevokedConflictCreateDeploymentConflict(v ReleaseRevokedConflict) CreateDeploymentConflict {
-	var s CreateDeploymentConflict
-	s.SetReleaseRevokedConflict(v)
-	return s
-}
-
-func (*CreateDeploymentConflict) createDeploymentRes() {}
-
 type CreateDeploymentCreated Deployment
 
 func (*CreateDeploymentCreated) createDeploymentRes() {}
@@ -16220,6 +16145,82 @@ func (s *Deployment) SetRelease(val OptRelease) {
 
 func (*Deployment) getDeploymentByIdRes() {}
 
+// The deployment conflicts with the state of the project, told apart by
+// `code`: `dep.conflict` when `expected_deployment_id` did not match,
+// carrying the actual newest deployment, or `rel.revoked` when the release
+// is revoked.
+// Ref: #
+// DeploymentConflict represents sum type.
+type DeploymentConflict struct {
+	Type                    DeploymentConflictType // switch on this field
+	DeploymentGuardConflict DeploymentGuardConflict
+	ReleaseRevokedConflict  ReleaseRevokedConflict
+}
+
+// DeploymentConflictType is oneOf type of DeploymentConflict.
+type DeploymentConflictType string
+
+// Possible values for DeploymentConflictType.
+const (
+	DeploymentGuardConflictDeploymentConflict DeploymentConflictType = "dep.conflict"
+	ReleaseRevokedConflictDeploymentConflict  DeploymentConflictType = "rel.revoked"
+)
+
+// IsDeploymentGuardConflict reports whether DeploymentConflict is DeploymentGuardConflict.
+func (s DeploymentConflict) IsDeploymentGuardConflict() bool {
+	return s.Type == DeploymentGuardConflictDeploymentConflict
+}
+
+// IsReleaseRevokedConflict reports whether DeploymentConflict is ReleaseRevokedConflict.
+func (s DeploymentConflict) IsReleaseRevokedConflict() bool {
+	return s.Type == ReleaseRevokedConflictDeploymentConflict
+}
+
+// SetDeploymentGuardConflict sets DeploymentConflict to DeploymentGuardConflict.
+func (s *DeploymentConflict) SetDeploymentGuardConflict(v DeploymentGuardConflict) {
+	s.Type = DeploymentGuardConflictDeploymentConflict
+	s.DeploymentGuardConflict = v
+}
+
+// GetDeploymentGuardConflict returns DeploymentGuardConflict and true boolean if DeploymentConflict is DeploymentGuardConflict.
+func (s DeploymentConflict) GetDeploymentGuardConflict() (v DeploymentGuardConflict, ok bool) {
+	if !s.IsDeploymentGuardConflict() {
+		return v, false
+	}
+	return s.DeploymentGuardConflict, true
+}
+
+// NewDeploymentGuardConflictDeploymentConflict returns new DeploymentConflict from DeploymentGuardConflict.
+func NewDeploymentGuardConflictDeploymentConflict(v DeploymentGuardConflict) DeploymentConflict {
+	var s DeploymentConflict
+	s.SetDeploymentGuardConflict(v)
+	return s
+}
+
+// SetReleaseRevokedConflict sets DeploymentConflict to ReleaseRevokedConflict.
+func (s *DeploymentConflict) SetReleaseRevokedConflict(v ReleaseRevokedConflict) {
+	s.Type = ReleaseRevokedConflictDeploymentConflict
+	s.ReleaseRevokedConflict = v
+}
+
+// GetReleaseRevokedConflict returns ReleaseRevokedConflict and true boolean if DeploymentConflict is ReleaseRevokedConflict.
+func (s DeploymentConflict) GetReleaseRevokedConflict() (v ReleaseRevokedConflict, ok bool) {
+	if !s.IsReleaseRevokedConflict() {
+		return v, false
+	}
+	return s.ReleaseRevokedConflict, true
+}
+
+// NewReleaseRevokedConflictDeploymentConflict returns new DeploymentConflict from ReleaseRevokedConflict.
+func NewReleaseRevokedConflictDeploymentConflict(v ReleaseRevokedConflict) DeploymentConflict {
+	var s DeploymentConflict
+	s.SetReleaseRevokedConflict(v)
+	return s
+}
+
+func (*DeploymentConflict) createDeploymentRes()   {}
+func (*DeploymentConflict) rollbackDeploymentRes() {}
+
 // Merged schema.
 // Ref: #
 type DeploymentCreatedEvent struct {
@@ -16838,9 +16839,10 @@ type DeploymentMetadata struct {
 	// The caller-supplied summary of why this deployment happened, analogous
 	// to a git commit message.
 	Message OptNilString `json:"message"`
-	// The earlier deployment this one re-applied, with its release and its
-	// targets. Null or absent for every other deployment, including one
-	// created with `reason: rollback` by naming a release directly.
+	// The deployment `POST /deployments/{deployment_id}/rollback` re-applied,
+	// with its release and its targets. Null or absent for every other
+	// deployment, including one created by `POST /deployments` with
+	// `reason: rollback`.
 	RollbackTo OptNilDeploymentID `json:"rollback_to"`
 	// The identity that created the deployment. Absent when the caller is a
 	// machine principal carrying no user identity, which is the common case
@@ -16960,6 +16962,8 @@ func (s *DeploymentMetadataDeployedByType) UnmarshalText(data []byte) error {
 // the caller's intent:
 // - `deploy` — a release goes live on the targets.
 // - `rollback` — a release the targets served earlier goes live again.
+// `POST /deployments/{deployment_id}/rollback` records it, and so may
+// `POST /deployments` when the caller picks the earlier release itself.
 // Ref: #
 type DeploymentReason string
 
@@ -47395,6 +47399,52 @@ func (o OptRequestAPIEventDelegationType) Or(d RequestAPIEventDelegationType) Re
 	return d
 }
 
+// NewOptRollbackDeploymentRequest returns new OptRollbackDeploymentRequest with value set to v.
+func NewOptRollbackDeploymentRequest(v RollbackDeploymentRequest) OptRollbackDeploymentRequest {
+	return OptRollbackDeploymentRequest{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRollbackDeploymentRequest is optional RollbackDeploymentRequest.
+type OptRollbackDeploymentRequest struct {
+	Value RollbackDeploymentRequest
+	Set   bool
+}
+
+// IsSet returns true if OptRollbackDeploymentRequest was set.
+func (o OptRollbackDeploymentRequest) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRollbackDeploymentRequest) Reset() {
+	var v RollbackDeploymentRequest
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRollbackDeploymentRequest) SetTo(v RollbackDeploymentRequest) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRollbackDeploymentRequest) Get() (v RollbackDeploymentRequest, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRollbackDeploymentRequest) Or(d RollbackDeploymentRequest) RollbackDeploymentRequest {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptSSOAuthMethod returns new OptSSOAuthMethod with value set to v.
 func NewOptSSOAuthMethod(v SSOAuthMethod) OptSSOAuthMethod {
 	return OptSSOAuthMethod{
@@ -59499,6 +59549,293 @@ func (*RevokeSessionNoContent) revokeSessionRes() {}
 type RevokeSessionUnauthorized ErrorDetails
 
 func (*RevokeSessionUnauthorized) revokeSessionRes() {}
+
+type RollbackDeploymentBadRequest ErrorDetails
+
+func (*RollbackDeploymentBadRequest) rollbackDeploymentRes() {}
+
+type RollbackDeploymentCreated Deployment
+
+func (*RollbackDeploymentCreated) rollbackDeploymentRes() {}
+
+// RollbackDeploymentErrorResponse represents sum type.
+type RollbackDeploymentErrorResponse struct {
+	Type                RollbackDeploymentErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	DepNotFound         DepNotFound
+	DepPermissionDenied DepPermissionDenied
+	EnvProjectNotFound  EnvProjectNotFound
+	Internal            Internal
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+}
+
+// RollbackDeploymentErrorResponseType is oneOf type of RollbackDeploymentErrorResponse.
+type RollbackDeploymentErrorResponseType string
+
+// Possible values for RollbackDeploymentErrorResponseType.
+const (
+	AuthUnauthorizedRollbackDeploymentErrorResponse    RollbackDeploymentErrorResponseType = "auth.unauthorized"
+	DepNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.not_found"
+	DepPermissionDeniedRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "dep.permission_denied"
+	EnvProjectNotFoundRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "env.project_not_found"
+	InternalRollbackDeploymentErrorResponse            RollbackDeploymentErrorResponseType = "internal"
+	NotImplementedRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "not_implemented"
+	ReqInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether RollbackDeploymentErrorResponse is AuthUnauthorized.
+func (s RollbackDeploymentErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedRollbackDeploymentErrorResponse
+}
+
+// IsDepNotFound reports whether RollbackDeploymentErrorResponse is DepNotFound.
+func (s RollbackDeploymentErrorResponse) IsDepNotFound() bool {
+	return s.Type == DepNotFoundRollbackDeploymentErrorResponse
+}
+
+// IsDepPermissionDenied reports whether RollbackDeploymentErrorResponse is DepPermissionDenied.
+func (s RollbackDeploymentErrorResponse) IsDepPermissionDenied() bool {
+	return s.Type == DepPermissionDeniedRollbackDeploymentErrorResponse
+}
+
+// IsEnvProjectNotFound reports whether RollbackDeploymentErrorResponse is EnvProjectNotFound.
+func (s RollbackDeploymentErrorResponse) IsEnvProjectNotFound() bool {
+	return s.Type == EnvProjectNotFoundRollbackDeploymentErrorResponse
+}
+
+// IsInternal reports whether RollbackDeploymentErrorResponse is Internal.
+func (s RollbackDeploymentErrorResponse) IsInternal() bool {
+	return s.Type == InternalRollbackDeploymentErrorResponse
+}
+
+// IsNotImplemented reports whether RollbackDeploymentErrorResponse is NotImplemented.
+func (s RollbackDeploymentErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedRollbackDeploymentErrorResponse
+}
+
+// IsReqInvalid reports whether RollbackDeploymentErrorResponse is ReqInvalid.
+func (s RollbackDeploymentErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidRollbackDeploymentErrorResponse
+}
+
+// SetAuthUnauthorized sets RollbackDeploymentErrorResponse to AuthUnauthorized.
+func (s *RollbackDeploymentErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedRollbackDeploymentErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if RollbackDeploymentErrorResponse is AuthUnauthorized.
+func (s RollbackDeploymentErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedRollbackDeploymentErrorResponse(v AuthUnauthorized) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetDepNotFound sets RollbackDeploymentErrorResponse to DepNotFound.
+func (s *RollbackDeploymentErrorResponse) SetDepNotFound(v DepNotFound) {
+	s.Type = DepNotFoundRollbackDeploymentErrorResponse
+	s.DepNotFound = v
+}
+
+// GetDepNotFound returns DepNotFound and true boolean if RollbackDeploymentErrorResponse is DepNotFound.
+func (s RollbackDeploymentErrorResponse) GetDepNotFound() (v DepNotFound, ok bool) {
+	if !s.IsDepNotFound() {
+		return v, false
+	}
+	return s.DepNotFound, true
+}
+
+// NewDepNotFoundRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from DepNotFound.
+func NewDepNotFoundRollbackDeploymentErrorResponse(v DepNotFound) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetDepNotFound(v)
+	return s
+}
+
+// SetDepPermissionDenied sets RollbackDeploymentErrorResponse to DepPermissionDenied.
+func (s *RollbackDeploymentErrorResponse) SetDepPermissionDenied(v DepPermissionDenied) {
+	s.Type = DepPermissionDeniedRollbackDeploymentErrorResponse
+	s.DepPermissionDenied = v
+}
+
+// GetDepPermissionDenied returns DepPermissionDenied and true boolean if RollbackDeploymentErrorResponse is DepPermissionDenied.
+func (s RollbackDeploymentErrorResponse) GetDepPermissionDenied() (v DepPermissionDenied, ok bool) {
+	if !s.IsDepPermissionDenied() {
+		return v, false
+	}
+	return s.DepPermissionDenied, true
+}
+
+// NewDepPermissionDeniedRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from DepPermissionDenied.
+func NewDepPermissionDeniedRollbackDeploymentErrorResponse(v DepPermissionDenied) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetDepPermissionDenied(v)
+	return s
+}
+
+// SetEnvProjectNotFound sets RollbackDeploymentErrorResponse to EnvProjectNotFound.
+func (s *RollbackDeploymentErrorResponse) SetEnvProjectNotFound(v EnvProjectNotFound) {
+	s.Type = EnvProjectNotFoundRollbackDeploymentErrorResponse
+	s.EnvProjectNotFound = v
+}
+
+// GetEnvProjectNotFound returns EnvProjectNotFound and true boolean if RollbackDeploymentErrorResponse is EnvProjectNotFound.
+func (s RollbackDeploymentErrorResponse) GetEnvProjectNotFound() (v EnvProjectNotFound, ok bool) {
+	if !s.IsEnvProjectNotFound() {
+		return v, false
+	}
+	return s.EnvProjectNotFound, true
+}
+
+// NewEnvProjectNotFoundRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from EnvProjectNotFound.
+func NewEnvProjectNotFoundRollbackDeploymentErrorResponse(v EnvProjectNotFound) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetEnvProjectNotFound(v)
+	return s
+}
+
+// SetInternal sets RollbackDeploymentErrorResponse to Internal.
+func (s *RollbackDeploymentErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalRollbackDeploymentErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if RollbackDeploymentErrorResponse is Internal.
+func (s RollbackDeploymentErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from Internal.
+func NewInternalRollbackDeploymentErrorResponse(v Internal) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets RollbackDeploymentErrorResponse to NotImplemented.
+func (s *RollbackDeploymentErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedRollbackDeploymentErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if RollbackDeploymentErrorResponse is NotImplemented.
+func (s RollbackDeploymentErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from NotImplemented.
+func NewNotImplementedRollbackDeploymentErrorResponse(v NotImplemented) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets RollbackDeploymentErrorResponse to ReqInvalid.
+func (s *RollbackDeploymentErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidRollbackDeploymentErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if RollbackDeploymentErrorResponse is ReqInvalid.
+func (s RollbackDeploymentErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from ReqInvalid.
+func NewReqInvalidRollbackDeploymentErrorResponse(v ReqInvalid) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// RollbackDeploymentErrorResponseStatusCode wraps RollbackDeploymentErrorResponse with StatusCode.
+type RollbackDeploymentErrorResponseStatusCode struct {
+	StatusCode int
+	Response   RollbackDeploymentErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *RollbackDeploymentErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *RollbackDeploymentErrorResponseStatusCode) GetResponse() RollbackDeploymentErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *RollbackDeploymentErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *RollbackDeploymentErrorResponseStatusCode) SetResponse(val RollbackDeploymentErrorResponse) {
+	s.Response = val
+}
+
+func (*RollbackDeploymentErrorResponseStatusCode) rollbackDeploymentRes() {}
+
+type RollbackDeploymentForbidden ErrorDetails
+
+func (*RollbackDeploymentForbidden) rollbackDeploymentRes() {}
+
+type RollbackDeploymentOK Deployment
+
+func (*RollbackDeploymentOK) rollbackDeploymentRes() {}
+
+// What to record alongside the rollback. The release and the targets come
+// from the deployment named in the path and cannot be changed here.
+// Ref: #
+type RollbackDeploymentRequest struct {
+	// A short free-form summary of why the rollback happened. Recorded on
+	// the new deployment's metadata.
+	Message OptString `json:"message"`
+	// An optimistic-concurrency guard: the deployment the caller believes is
+	// the newest one to any of the targets. When present, the rollback only
+	// happens if it still is; otherwise the request answers `409` with
+	// `dep.conflict`, carrying the actual newest deployment, and nothing
+	// changes.
+	ExpectedDeploymentID OptDeploymentID `json:"expected_deployment_id"`
+}
+
+// GetMessage returns the value of Message.
+func (s *RollbackDeploymentRequest) GetMessage() OptString {
+	return s.Message
+}
+
+// GetExpectedDeploymentID returns the value of ExpectedDeploymentID.
+func (s *RollbackDeploymentRequest) GetExpectedDeploymentID() OptDeploymentID {
+	return s.ExpectedDeploymentID
+}
+
+// SetMessage sets the value of Message.
+func (s *RollbackDeploymentRequest) SetMessage(val OptString) {
+	s.Message = val
+}
+
+// SetExpectedDeploymentID sets the value of ExpectedDeploymentID.
+func (s *RollbackDeploymentRequest) SetExpectedDeploymentID(val OptDeploymentID) {
+	s.ExpectedDeploymentID = val
+}
 
 // Ref: #
 type SSOAuthMethod struct {

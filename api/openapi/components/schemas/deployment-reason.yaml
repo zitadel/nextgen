@@ -7,6 +7,8 @@ description: |
 
   - `deploy` — a release goes live on the targets.
   - `rollback` — a release the targets served earlier goes live again.
+    `POST /deployments/{deployment_id}/rollback` records it, and so may
+    `POST /deployments` when the caller picks the earlier release itself.
 enum:
   - deploy
   - rollback
