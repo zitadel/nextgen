@@ -165,12 +165,15 @@ func (s *variableService) SetVariables(ctx context.Context, owner domain.Variabl
 	return nil
 }
 
-// setVariableError keeps a domain error as it is. The project reference is
-// resolved from the request before a variable is built, so a write that trips
-// it is a server fault rather than something the caller can act on.
+// setVariableError keeps a domain error as it is. The project reference is the
+// one foreign key a write can trip: the project was resolved from the request,
+// so it was deleted between the access check and the write.
 func setVariableError(err error) error {
 	if de, ok := errors.AsType[domain.Error](err); ok {
 		return de
+	}
+	if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
+		return domain.ErrProjectNotFound().WithParent(err)
 	}
 	return domain.ErrInternal(err).WithMessage("failed to write variable to database")
 }

@@ -1344,8 +1344,8 @@ type DeleteVariableParams struct {
 	ProjectID ProjectID
 	// The name of the variable.
 	VariableName VariableName
-	// No environment exists, so any value answers `env.not_found`. Omit it to
-	// address the project's variables.
+	// No environment exists, so any well-formed value answers `env.not_found`.
+	// Omit it to address the project's variables.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
 }
 
@@ -3938,8 +3938,8 @@ type GetVariableParams struct {
 	ProjectID ProjectID
 	// The name of the variable.
 	VariableName VariableName
-	// No environment exists, so any value answers `env.not_found`. Omit it to
-	// address the project's variables.
+	// No environment exists, so any well-formed value answers `env.not_found`.
+	// Omit it to address the project's variables.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
 }
 
@@ -4153,8 +4153,8 @@ func decodeGetVariableParams(args [1]string, argsEscaped bool, r *http.Request) 
 type GetVariablesParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// No environment exists, so any value answers `env.not_found`. Omit it to
-	// address the project's variables.
+	// No environment exists, so any well-formed value answers `env.not_found`.
+	// Omit it to address the project's variables.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
 }
 
@@ -8897,8 +8897,8 @@ func decodeUpdateTeamParams(args [1]string, argsEscaped bool, r *http.Request) (
 type UpdateVariablesParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// No environment exists, so any value answers `env.not_found`. Omit it to
-	// address the project's variables.
+	// No environment exists, so any well-formed value answers `env.not_found`.
+	// Omit it to address the project's variables.
 	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
 }
 

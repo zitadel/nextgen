@@ -97437,6 +97437,22 @@ func (s UpdateVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjNotFoundUpdateVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.not_found")
+		{
+			s := s.ProjNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidUpdateVariablesErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -97554,6 +97570,9 @@ func (s *UpdateVariablesErrorResponse) Decode(d *jx.Decoder) error {
 				case "var.no_project_id":
 					s.Type = VarNoProjectIDUpdateVariablesErrorResponse
 					found = true
+				case "proj.not_found":
+					s.Type = ProjNotFoundUpdateVariablesErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidUpdateVariablesErrorResponse
 					found = true
@@ -97614,6 +97633,10 @@ func (s *UpdateVariablesErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case VarNoProjectIDUpdateVariablesErrorResponse:
 		if err := s.VarNoProjectID.Decode(d); err != nil {
+			return err
+		}
+	case ProjNotFoundUpdateVariablesErrorResponse:
+		if err := s.ProjNotFound.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidUpdateVariablesErrorResponse:

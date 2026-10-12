@@ -62922,6 +62922,7 @@ type UpdateVariablesErrorResponse struct {
 	VarInvalidName      VarInvalidName
 	VarInvalidValue     VarInvalidValue
 	VarNoProjectID      VarNoProjectID
+	ProjNotFound        ProjNotFound
 	ReqInvalid          ReqInvalid
 	EncKeyUnknownAlg    EncKeyUnknownAlg
 	VarNotFound         VarNotFound
@@ -62942,6 +62943,7 @@ const (
 	VarInvalidNameUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "var.invalid_name"
 	VarInvalidValueUpdateVariablesErrorResponse     UpdateVariablesErrorResponseType = "var.invalid_value"
 	VarNoProjectIDUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "var.no_project_id"
+	ProjNotFoundUpdateVariablesErrorResponse        UpdateVariablesErrorResponseType = "proj.not_found"
 	ReqInvalidUpdateVariablesErrorResponse          UpdateVariablesErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgUpdateVariablesErrorResponse    UpdateVariablesErrorResponseType = "enc_key.unknown_alg"
 	VarNotFoundUpdateVariablesErrorResponse         UpdateVariablesErrorResponseType = "var.not_found"
@@ -62991,6 +62993,11 @@ func (s UpdateVariablesErrorResponse) IsVarInvalidValue() bool {
 // IsVarNoProjectID reports whether UpdateVariablesErrorResponse is VarNoProjectID.
 func (s UpdateVariablesErrorResponse) IsVarNoProjectID() bool {
 	return s.Type == VarNoProjectIDUpdateVariablesErrorResponse
+}
+
+// IsProjNotFound reports whether UpdateVariablesErrorResponse is ProjNotFound.
+func (s UpdateVariablesErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundUpdateVariablesErrorResponse
 }
 
 // IsReqInvalid reports whether UpdateVariablesErrorResponse is ReqInvalid.
@@ -63199,6 +63206,27 @@ func (s UpdateVariablesErrorResponse) GetVarNoProjectID() (v VarNoProjectID, ok 
 func NewVarNoProjectIDUpdateVariablesErrorResponse(v VarNoProjectID) UpdateVariablesErrorResponse {
 	var s UpdateVariablesErrorResponse
 	s.SetVarNoProjectID(v)
+	return s
+}
+
+// SetProjNotFound sets UpdateVariablesErrorResponse to ProjNotFound.
+func (s *UpdateVariablesErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundUpdateVariablesErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if UpdateVariablesErrorResponse is ProjNotFound.
+func (s UpdateVariablesErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from ProjNotFound.
+func NewProjNotFoundUpdateVariablesErrorResponse(v ProjNotFound) UpdateVariablesErrorResponse {
+	var s UpdateVariablesErrorResponse
+	s.SetProjNotFound(v)
 	return s
 }
 

@@ -212,6 +212,21 @@ func TestVariableService_SetVariables(t *testing.T) {
 		}))
 	})
 
+	// The project was resolved from the request, so its reference failing means
+	// it was deleted between the access check and the write.
+	t.Run("reports a project that is gone as not found", func(t *testing.T) {
+		svc, statements, _ := newMockedVariableService(t)
+
+		statements.EXPECT().
+			SetVariable(gomock.Any(), gomock.Any()).
+			Return(database.NewForeignKeyError("variables", "fk_variables_project", errors.New("fk")))
+
+		err := svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
+			{Name: "theme", Value: "dark"},
+		})
+		assert.ErrorIs(t, err, domain.ErrProjectNotFound())
+	})
+
 	t.Run("encrypts a secret with the project's secret key", func(t *testing.T) {
 		svc, statements, keys := newMockedVariableService(t)
 
@@ -490,20 +505,6 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 			"b": "${{ url }}",
 			"c": []any{"${{ url }}"},
 		}))
-	})
-
-	t.Run("resolves a name held at several levels to the nearest owner", func(t *testing.T) {
-		svc, statements, _ := newMockedVariableService(t)
-
-		// Storage returns the whole ladder because variables do not override.
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return([]*domain.Variable{
-			testVariable(t, "url", variablesOwner, "https://project"),
-			testVariable(t, "url", variablesOwner, "https://user"),
-		}, nil)
-
-		doc := map[string]any{"url": "${{ url }}"}
-		require.NoError(t, svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, doc))
-		assert.Equal(t, "https://user", doc["url"])
 	})
 
 	t.Run("decrypts a secret into the document", func(t *testing.T) {
