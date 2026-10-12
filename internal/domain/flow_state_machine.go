@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/ianlancetaylor/jsonschema"
-	"github.com/ianlancetaylor/jsonschema/types"
 
 	"github.com/zitadel/nextgen/internal/maputil"
 )
@@ -1507,16 +1506,8 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 		// requires the same way, without the condition, so that one is treated
 		// as required too. anyOf and oneOf report no location, so their
 		// failures stay sso_user_invalid.
-		var failed []*types.ValidationError
-		var many *types.ValidationErrors
-		var one *types.ValidationError
-		if errors.As(err, &many) {
-			failed = many.Errs
-		} else if errors.As(err, &one) {
-			failed = append(failed, one)
-		}
 	failures:
-		for _, ve := range failed {
+		for _, ve := range ValidationFailures(err) {
 			if ve.Loc == nil || len(*ve.Loc) == 0 || !strings.HasPrefix((*ve.Loc)[len(*ve.Loc)-1], "required/") {
 				continue
 			}
