@@ -9,6 +9,13 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
+// BuildRelease answers 501 until the release service can build from a
+// bundle. Without it the generated stub's sentinel is not a domain error and
+// maps to 500.
+func (h *Handler) BuildRelease(context.Context, *api.BuildReleaseRequest, api.BuildReleaseParams) (api.BuildReleaseRes, error) {
+	return nil, domain.ErrNotImplemented()
+}
+
 func (h *Handler) CreateRelease(ctx context.Context, req *api.CreateReleaseRequest, params api.CreateReleaseParams) (api.CreateReleaseRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), releaseAccess, opWrite); err != nil {
 		return nil, err
@@ -18,8 +25,9 @@ func (h *Handler) CreateRelease(ctx context.Context, req *api.CreateReleaseReque
 	for _, pointer := range req.Pointers {
 		kind, err := domain.ReleasePointerKindString(string(pointer.Kind))
 		if err != nil {
-			// Unreachable over HTTP — the wire enum is closed and the decoder
-			// rejects anything else with req.invalid first.
+			// The decoder rejects kinds outside the wire enum with req.invalid,
+			// so this is reached only by a kind the contract admits before the
+			// service resolves it: idp, until the release service learns it.
 			return nil, domain.ErrReleaseInvalid("unknown pointer kind", err)
 		}
 		pointers = append(pointers, service.CreateReleasePointer{

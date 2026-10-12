@@ -8,8 +8,8 @@ description: |
   `revision_id` through the per-kind read endpoints (`GET /schemas/{id}`,
   `GET /flow_definitions/{id}`, …).
 
-  A release exists on its own and is not tied to an environment. Deploying it
-  is a separate call.
+  A release exists on its own and is not tied to an origin. Deploying it is a
+  separate call.
 type: object
 required:
   - id

@@ -105,6 +105,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	BeginUserPasskeyRegistrationOperation: []string{
 		"user.write",
 	},
+	BuildReleaseOperation: []string{
+		"release.write",
+	},
 	CreateAuthAttemptOperation: []string{
 		"auth_attempt.write",
 	},
