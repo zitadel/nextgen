@@ -1166,7 +1166,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
               ],
               actions: [{ name: "submit", text_key: "submit.signin", primary: true }],
               gates: {},
-              error: "user_not_found",
+              error: "not_a_key",
             },
             branding: {},
           },
@@ -1184,7 +1184,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
     const alert = await waitFor(() => {
       const candidate = element.shadowRoot?.querySelector("zl-alert");
-      return candidate?.textContent?.includes("user_not_found") ? candidate : null;
+      return candidate?.textContent?.includes("not_a_key") ? candidate : null;
     });
     expect(alert).toBeTruthy();
   });

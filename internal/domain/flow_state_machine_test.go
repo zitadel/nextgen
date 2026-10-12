@@ -1652,17 +1652,6 @@ func loginNoUserNotFoundDefinition() *domain.FlowDefinition {
 	}
 }
 
-// registerNoUserAlreadyExistsDefinition is a register-only flow whose
-// identifier step does NOT wire a user_already_exists transition.
-func registerNoUserAlreadyExistsDefinition() *domain.FlowDefinition {
-	def := loginNoUserNotFoundDefinition()
-	def.ID = "def-register-no-uae"
-	def.Purposes = map[domain.FlowDefinitionPurpose]string{
-		domain.FlowDefinitionPurposeRegister: "credentials",
-	}
-	return def
-}
-
 // TestFlowStateMachine_FlipTable_OutcomeWithoutTransition_DoesNotFlip
 // pins the invariant that CurrentPurpose flips only when a flip outcome
 // is actually routed. Dispatch returns the flip outcome but the step has
@@ -1674,26 +1663,31 @@ func TestFlowStateMachine_FlipTable_OutcomeWithoutTransition_DoesNotFlip(t *test
 	const attemptID = "attempt-1"
 
 	tests := []struct {
-		name      string
-		def       *domain.FlowDefinition
-		purpose   domain.FlowDefinitionPurpose
-		userID    string
-		submitErr error
-		wantError string
+		name        string
+		def         *domain.FlowDefinition
+		purpose     domain.FlowDefinitionPurpose
+		userID      string
+		submitErr   error
+		wantError   string
+		wantAttempt string
 	}{
 		{
-			name:      "login-only flow with an unknown identifier",
-			def:       loginNoUserNotFoundDefinition(),
-			purpose:   domain.FlowDefinitionPurposeLogin,
-			submitErr: domain.ErrAuthAttemptProofRejected(nil),
-			wantError: domain.FlowStepErrorUserNotFound,
+			name:        "login-only flow with an unknown identifier",
+			def:         loginNoUserNotFoundDefinition(),
+			purpose:     domain.FlowDefinitionPurposeLogin,
+			submitErr:   domain.ErrAuthAttemptProofRejected(nil),
+			wantError:   domain.FlowStepErrorUserNotFound,
+			wantAttempt: attemptID,
 		},
 		{
-			name:      "register-only flow with a known identifier",
-			def:       registerNoUserAlreadyExistsDefinition(),
-			purpose:   domain.FlowDefinitionPurposeRegister,
-			userID:    "user_alice",
-			wantError: domain.FlowStepErrorUserAlreadyExists,
+			// The attempt holds the found user, so a corrected identifier
+			// needs a new one.
+			name:        "register-only flow with a known identifier",
+			def:         signupDefinition(),
+			purpose:     domain.FlowDefinitionPurposeRegister,
+			userID:      "user_alice",
+			wantError:   domain.FlowStepErrorUserAlreadyExists,
+			wantAttempt: "attempt-2",
 		},
 	}
 	for _, tt := range tests {
@@ -1702,6 +1696,9 @@ func TestFlowStateMachine_FlipTable_OutcomeWithoutTransition_DoesNotFlip(t *test
 			w := newFlowTestWorld(t)
 
 			w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return(attemptID, nil)
+			if tt.wantAttempt != attemptID {
+				w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return(tt.wantAttempt, nil)
+			}
 			w.schemaResolver.EXPECT().
 				Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
 				Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
@@ -1729,6 +1726,8 @@ func TestFlowStateMachine_FlipTable_OutcomeWithoutTransition_DoesNotFlip(t *test
 			}
 			assert.Equal(t, tt.purpose, result.State.CurrentPurpose,
 				"CurrentPurpose must not flip when the routed outcome had no transition wired")
+			assert.Empty(t, result.State.CollectedData.UserID)
+			assert.Equal(t, tt.wantAttempt, result.State.AuthAttemptID)
 		})
 	}
 }
@@ -2670,6 +2669,92 @@ func TestFlowStateMachine_Process_PasskeyRegisterConflictPinsExistingUser(t *tes
 	assert.Nil(t, conflicted.State.PendingChallenge)
 }
 
+// TestFlowStateMachine_Process_PasskeyRegisterConflictUnrouted covers a
+// register step without a user_already_exists transition. The conflict shows
+// the error and drops the existing user, so a retried ceremony cannot
+// register a passkey on that user.
+func TestFlowStateMachine_Process_PasskeyRegisterConflictUnrouted(t *testing.T) {
+	t.Parallel()
+	const email = "alice@example.com"
+	const registrationOpts = `{"rp":{"id":"example.com"}}`
+	w := newFlowTestWorld(t)
+	def := passkeyRegisterAfterIdentifierDefinition()
+	rp := &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}}
+
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-2", nil)
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("", domain.ErrAuthAttemptProofRejected(nil))
+	w.authAttemptService.EXPECT().
+		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Any()).
+		Return(domain.FlowPasskeyRegistrationChallengeOutput{
+			ChallengeID: "reg-1",
+			UserID:      "user_prov01",
+			Options:     []byte(registrationOpts),
+		}, nil)
+	w.authAttemptService.EXPECT().
+		SubmitPasskeyRegistration(gomock.Any(), gomock.Any()).
+		Return(domain.ErrUserAlreadyExists())
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("user_existing01", nil)
+	// The retry runs on the new attempt with no user.
+	w.authAttemptService.EXPECT().
+		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyRegistrationChallengeInput) bool {
+			return in.AttemptID == "attempt-2" && in.UserID == ""
+		})).
+		Return(domain.FlowPasskeyRegistrationChallengeOutput{
+			ChallengeID: "reg-2",
+			UserID:      "user_prov02",
+			Options:     []byte(registrationOpts),
+		}, nil)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	registerStep, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": email},
+	})
+	require.NoError(t, err)
+	issued, err := w.sm.Process(t.Context(), def, registerStep.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskeyRegister,
+		PasskeyRP: rp,
+	})
+	require.NoError(t, err)
+
+	conflicted, err := w.sm.Process(t.Context(), def, issued.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionPasskeyRegister,
+		ChallengeResponse: &domain.FlowChallengeResponse{
+			ChallengeID: "reg-1",
+			Method:      domain.FlowChallengeMethodPasskeyRegister,
+			Proof:       []byte(`{"attestation":"conflicting"}`),
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "register", conflicted.State.CurrentStep)
+	if assert.NotNil(t, conflicted.Step.Error) {
+		assert.Equal(t, domain.FlowStepErrorUserAlreadyExists, *conflicted.Step.Error)
+	}
+	assert.Empty(t, conflicted.State.CollectedData.UserID)
+	assert.Equal(t, "attempt-2", conflicted.State.AuthAttemptID)
+
+	_, err = w.sm.Process(t.Context(), def, conflicted.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskeyRegister,
+		PasskeyRP: rp,
+	})
+	require.NoError(t, err)
+}
+
 // TestFlowStateMachine_Process_PasskeyRegisterConflictOnSecondUniqueField
 // covers a multi-unique schema losing the race on a non-identifier attribute:
 // the sign-up email is fresh but the username is taken. Re-resolution must try
@@ -3582,8 +3667,8 @@ func TestFlowStateMachine_Back_DropsPendingChallenge(t *testing.T) {
 // `step.Error` and pins the client contract: a localizable `error.*`
 // text key. The scenario tests above prove each value is emitted where
 // expected; this gate is what fails when a new emission value (a
-// step-error const, an unwired implicit outcome, a validation rule)
-// breaks the dialect /login localizes.
+// step-error const, an implicit outcome without its own key, a
+// validation rule) breaks the dialect /login localizes.
 func TestFlowStepErrorContract(t *testing.T) {
 	t.Parallel()
 
@@ -3618,14 +3703,10 @@ func TestFlowStepErrorContract(t *testing.T) {
 	}
 	for _, challenge := range challenges {
 		for _, outcome := range domain.ImplicitOutcomesForChallenge(challenge) {
-			// An unwired transition surfaces the outcome's step error.
-			assert.True(t, domain.FlowStepErrorAllowed(domain.UnwiredOutcomeError(outcome)),
-				"implicit outcome %q of challenge %q must map to a text key", outcome, challenge)
+			assert.NotEqual(t, domain.FlowStepErrorOutcomeUnhandled, domain.UnwiredOutcomeError(outcome),
+				"implicit outcome %q of challenge %q needs its own step error key", outcome, challenge)
 		}
 	}
-	assert.Equal(t, domain.FlowStepErrorUserNotFound, domain.UnwiredOutcomeError(domain.FlowImplicitOutcomeUserNotFound))
-	assert.Equal(t, domain.FlowStepErrorUserAlreadyExists, domain.UnwiredOutcomeError(domain.FlowImplicitOutcomeUserAlreadyExists))
-	assert.Equal(t, domain.FlowStepErrorSSOUserNotFound, domain.UnwiredOutcomeError(domain.FlowImplicitOutcomeSSOUserNotFound))
 	assert.Equal(t, domain.FlowStepErrorOutcomeUnhandled, domain.UnwiredOutcomeError("some_new_outcome"))
 
 	rules := []domain.FlowFieldValidationRule{

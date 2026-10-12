@@ -20894,9 +20894,9 @@ type FlowStep struct {
 	// Field names appear verbatim, so clients localise unknown keys via
 	// the generic `error.field_<rule>` catalog entries. Other engine
 	// failures carry `error.*` catalog keys as well (e.g.
-	// `error.invalid_credentials`, `error.passkey_invalid`); a
-	// non-`error.` payload is an outcome token (e.g. `user_not_found`)
-	// that clients keep verbatim.
+	// `error.invalid_credentials`, `error.passkey_invalid`, and
+	// `error.user_not_found` when the step has no `user_not_found`
+	// transition).
 	Error OptNilString `json:"error"`
 	// Present only on terminal steps. Tells the frontend what to do:
 	// - redirect: navigate to redirect_uri immediately (OIDC/SAML done)

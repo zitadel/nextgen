@@ -1234,6 +1234,13 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 	transition, ok := pc.currentStep.Transitions[outcome]
 	if !ok {
 		if outcome != pc.in.Action {
+			// The found user is already on the attempt. Keeping it would block
+			// a corrected identifier and let a passkey register on that user.
+			if outcome == FlowImplicitOutcomeUserAlreadyExists {
+				if err := r.dropResolvedUser(pc, "unrouted collision"); err != nil {
+					return FlowStepResult{}, err
+				}
+			}
 			return r.renderStepError(pc, resolved, new(UnwiredOutcomeError(outcome)))
 		}
 		return FlowStepResult{}, fmt.Errorf("%w: %q on step %q", ErrFlowInvalidAction(), pc.in.Action, pc.currentStep.Name)
