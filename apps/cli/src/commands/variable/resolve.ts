@@ -13,9 +13,11 @@ const COLUMNS = ["name", "value"] as const;
  *
  * Not the store's current values but the map frozen onto the deployment that is
  * live on the target: what a later `variable set` has not reached. `--origin`
- * names one of the project's origins; without it the newest live deployment is
- * read, which is the default target a plain `deploy` serves. A target with
- * nothing deployed is a miss.
+ * names one of the project's origins. Without it, resolving is unambiguous only
+ * when a single deployment is live across the project; when several are — a
+ * different release or frozen map on each origin — the live origins are named
+ * and `--origin` is required rather than resolving from an arbitrary one
+ * (#1617). A target with nothing deployed is a miss.
  */
 export default class VariableResolve extends EnvironmentCommand {
   static override description = "Show the variables the live deployment froze for a target.";
@@ -39,14 +41,34 @@ export default class VariableResolve extends EnvironmentCommand {
     const { client, projectId } = await this.connect();
     const origin = flags.origin;
 
-    // The live deployments the target serves, newest first. `--origin` narrows
-    // it to one origin; without it the newest live deployment stands in for the
-    // default target.
+    // Every deployment live on the target now, newest first. `--origin` narrows
+    // the read to one origin; without it the whole project's live set comes
+    // back, so an ambiguous project can be named rather than resolved from an
+    // arbitrary deployment.
     const { deployments } = await client.listDeployments({
       project_id: projectId,
       live: true,
       ...(origin === undefined ? {} : { origin }),
     });
+
+    // Without `--origin`, more than one live deployment means there is no single
+    // frozen map to show: each origin may run a different one. The live origins
+    // are named so the reader can pick one, rather than silently reading the
+    // first (#1617).
+    if (origin === undefined && deployments.length > 1) {
+      const origins = [
+        ...new Set(deployments.flatMap((deployment) => deployment.targets.map((t) => t.origin))),
+      ].sort();
+      throw new ZitadelError(
+        "E_VALIDATION",
+        "More than one deployment is live; name which origin to resolve with --origin.",
+        {
+          hint: `Live origins: ${origins.join(", ")}.`,
+          nextCommands: origins.map((o) => `zitadel variable resolve --origin ${o}`),
+        },
+      );
+    }
+
     const live = deployments[0];
     if (live === undefined) {
       const where = origin === undefined ? "the project" : origin;
@@ -55,6 +77,11 @@ export default class VariableResolve extends EnvironmentCommand {
         nextCommands: ["zitadel deploy"],
       });
     }
+    // The live list narrows each deployment to the origins it still serves, so
+    // this names exactly what the resolved map runs on — the chosen origin,
+    // stated in the output.
+    const servedOrigins = live.targets.map((target) => target.origin).sort();
+    const where = servedOrigins.join(", ");
 
     const rows = toVariableRows(
       await client.getDeploymentVariables(live.id, { project_id: projectId }),
@@ -67,15 +94,15 @@ export default class VariableResolve extends EnvironmentCommand {
     const plain = flags.plain || !process.stdout.isTTY;
     return this.emit({
       status: "ok",
-      data: { deployment_id: live.id, variables: rows, count: rows.length },
+      data: { deployment_id: live.id, origins: servedOrigins, variables: rows, count: rows.length },
       pretty: plain
         ? renderRows(COLUMNS, cells)
         : rows.length === 0
-          ? `${live.id} froze no variables.`
+          ? `${live.id} froze no variables for ${where}.`
           : [
               renderTable(COLUMNS, cells),
               "",
-              `${rows.length} ${rows.length === 1 ? "variable" : "variables"} frozen by ${live.id}`,
+              `${rows.length} ${rows.length === 1 ? "variable" : "variables"} frozen by ${live.id} for ${where}`,
             ].join("\n"),
     });
   }
