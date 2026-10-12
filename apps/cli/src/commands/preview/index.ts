@@ -11,7 +11,8 @@ import {
   validateStep,
   worktreeIsDirty,
 } from "../../lib/release";
-import { detectPreviewUrls, parseTtl } from "../../lib/preview";
+import { detectPreviewUrls } from "../../lib/preview";
+import { parseTtl } from "../../lib/ttl";
 import { ZitadelError } from "../../lib/errors";
 import { reportWarning } from "../../lib/warnings";
 
@@ -114,6 +115,13 @@ export default class Preview extends PreviewCommand {
     // `--ttl` is optional: omitted, nothing is sent and the server applies the
     // project's default, rather than the CLI pinning a lifetime of its own.
     const ttl = flags.ttl === undefined ? undefined : parseTtl(flags.ttl);
+    // A preview lives a minute at least and thirty days at most — the product
+    // rule, applied here rather than in the generic TTL parser.
+    if (ttl !== undefined && (ttl.ms < 60 * 1000 || ttl.ms > 30 * 24 * 60 * 60 * 1000)) {
+      throw new ZitadelError("E_VALIDATION", `${flags.ttl} is outside the allowed range`, {
+        hint: "A preview lives between 60s and 30d.",
+      });
+    }
     const { client, projectId } = await this.connect();
 
     const { bundle, brandingSources } = await buildBundle(cwd);
@@ -158,7 +166,7 @@ export default class Preview extends PreviewCommand {
     const deployment = await createDeployment(client, projectId, {
       releaseId: release.id,
       targets: urls,
-      ...(ttl === undefined ? {} : { ttl: ttl.wire }),
+      ...(ttl === undefined ? {} : { ttl: ttl.canonical }),
     });
 
     // The create response carries non-fatal warnings — a preview deploy that

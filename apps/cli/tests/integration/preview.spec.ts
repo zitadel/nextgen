@@ -55,6 +55,24 @@ describe("preview", () => {
         expect(data.release_env).toBe(`NEXT_PUBLIC_ZITADEL_RELEASE=${data.content_hash}`);
       });
 
+      it("refuses a ttl outside the 60s..30d range", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
+
+        for (const ttl of ["30s", "31d"]) {
+          const result = await app.run([
+            "preview",
+            "--origin",
+            PREVIEW_URL,
+            "--ttl",
+            ttl,
+            "--json",
+          ]);
+          expect(result).toFail();
+          expect(app.envelopeOf<{ code: string }>(result).code).toBe("E_VALIDATION");
+        }
+      });
+
       it("lists the preview it deployed", async () => {
         const app = await aSetUpApp();
         await app.addOrigin(PREVIEW_PATTERN, "preview");
