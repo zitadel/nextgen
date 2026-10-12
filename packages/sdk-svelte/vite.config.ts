@@ -1,7 +1,7 @@
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig } from "vite";
 
-import { svelteTypes } from "./vite-plugin-svelte-types";
+import { svelteTypes } from "./vite-plugin-svelte-types.ts";
 
 // Svelte library build. vite-plugin-svelte compiles the components to JS;
 // svelteTypes() emits the `.d.ts` via svelte2tsx (the engine svelte-package
