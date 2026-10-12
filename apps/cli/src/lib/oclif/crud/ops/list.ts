@@ -4,6 +4,7 @@ import { Flags } from "@oclif/core";
 import { nonBlankString } from "../../flags";
 
 import { publicCliCommand } from "../../../public-cli";
+import { shellArg } from "../../../shell";
 import type { CommandResult, GlobalOptions } from "../../types";
 import { collectPages } from "../paging";
 import { wireOf } from "../wire";
@@ -264,10 +265,6 @@ const repeatedFlags = (flags: Json): readonly string[] => {
   );
   return [...limit, ...sort, ...filters];
 };
-
-/** Quote a value that a shell would otherwise split or interpret. */
-const shellArg = (value: string): string =>
-  /^[A-Za-z0-9_.:@/=+-]+$/.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
 
 /**
  * Parsed filters as the flat query parameters a GET list expects. A field

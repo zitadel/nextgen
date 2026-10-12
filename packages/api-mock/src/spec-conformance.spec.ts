@@ -1964,6 +1964,24 @@ describe("api-mock releases and deployments", () => {
     });
     expect(typeof body.warnings?.[0]?.message).toBe("string");
 
+    // Re-deploying the same preview target with unchanged config is idempotent
+    // (200), but the fallback to the production secret is still in effect, so
+    // the warning rides the retry response too rather than being dropped.
+    const retry = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["https://pr-1-acme.vercel.app"],
+      ttl: "24h",
+    });
+    expect(retry.status).toBe(200);
+    const retryBody = (await retry.json()) as {
+      warnings?: { code: string; variable: string }[];
+    };
+    expect(retryBody.warnings).toHaveLength(1);
+    expect(retryBody.warnings?.[0]).toMatchObject({
+      code: "variable.missing_preview_secret",
+      variable: "API_TOKEN",
+    });
+
     // A preview override for the same name silences the warning: the preview no
     // longer serves the production secret.
     await setVars(project.id, "&applies_to=preview", {

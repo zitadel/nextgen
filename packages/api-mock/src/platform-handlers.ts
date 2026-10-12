@@ -1807,11 +1807,15 @@ export function setupPlatformHandlers() {
           .sort((a, b) => b.seq - a.seq)[0];
         if (newest) {
           // The create-deployment response wraps the deployment with the
-          // non-blocking `warnings` it raised; this mock raises none.
-          return HttpResponse.json(
-            { ...deploymentResponse(newest), warnings: [] },
-            { status: 200 },
-          );
+          // non-blocking `warnings` it raised. Re-deploying an unchanged preview
+          // that still falls back to an `all` secret keeps raising
+          // `variable.missing_preview_secret`, so the idempotent 200 carries the
+          // renewed warnings rather than dropping them — the preview consumer
+          // surfaces the safety warning on every retry, not only the first.
+          const base = deploymentResponse(newest);
+          return HttpResponse.json(warnings.length > 0 ? { ...base, warnings } : base, {
+            status: 200,
+          });
         }
       }
 

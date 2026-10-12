@@ -3,6 +3,7 @@ import { Flags } from "@oclif/core";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
 import { renderRows, renderTable } from "../../lib/oclif/crud/table";
 import { ZitadelError } from "../../lib/errors";
+import { shellArg } from "../../lib/shell";
 import { toVariableRows, variableCells } from "../../lib/variables";
 
 /** The columns `resolve` renders, in order. */
@@ -64,7 +65,7 @@ export default class VariableResolve extends EnvironmentCommand {
         "More than one deployment is live; name which origin to resolve with --origin.",
         {
           hint: `Live origins: ${origins.join(", ")}.`,
-          nextCommands: origins.map((o) => `zitadel variable resolve --origin ${o}`),
+          nextCommands: origins.map((o) => `zitadel variable resolve --origin ${shellArg(o)}`),
         },
       );
     }
