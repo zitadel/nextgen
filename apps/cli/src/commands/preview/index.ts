@@ -58,7 +58,7 @@ export default class Preview extends PreviewCommand {
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Preview);
     await this.toMeta(flags);
-    const { cwd, env, isTTY } = this.meta;
+    const { cwd, env, isTTY, dryRun } = this.meta;
     const json = this.jsonEnabled();
     const color = !json && isTTY && flags.color !== false && !process.env.NO_COLOR;
 
@@ -123,7 +123,7 @@ export default class Preview extends PreviewCommand {
       projectId,
       env,
       mode: "preview",
-      dryRun: false,
+      dryRun,
       json,
       color,
       bundle,
@@ -133,6 +133,23 @@ export default class Preview extends PreviewCommand {
     // Validation only: the IdP sync step is deploy-only, so a pull-request build
     // never reconfigures the connections a merged deploy owns.
     await runSteps([validateStep], ctx);
+
+    // A dry run validates and resolves the targets but writes nothing — no
+    // release, no deployment, no preview registration — so a pull-request build
+    // can check its `.zitadel/` without publishing, as `deploy --dry-run` does.
+    if (dryRun) {
+      return this.emit({
+        status: "ok",
+        data: {
+          dry_run: true,
+          targets: urls,
+        },
+        pretty: [
+          `Validated the preview for ${urls.length} URL${urls.length === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
+          ...urls.map((url) => `  - ${url}`),
+        ].join("\n"),
+      });
+    }
 
     const release = await createReleaseFromBundle(client, projectId, bundle, {
       gitSha: await headSha(cwd),

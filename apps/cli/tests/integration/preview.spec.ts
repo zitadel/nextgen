@@ -86,6 +86,19 @@ describe("preview", () => {
         );
       });
 
+      it("writes nothing on --dry-run", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--dry-run", "--json"]);
+
+        expect(result).toSucceed();
+        expect(app.envelopeOf<{ dry_run: boolean }>(result).data.dry_run).toBe(true);
+        // A dry run registers no preview, so the project has none afterwards.
+        const listed = await app.run(["preview", "list", "--json"]);
+        expect(app.envelopeOf<{ items: unknown[] }>(listed).data.items).toEqual([]);
+      });
+
       it("says there is nothing to preview in production without an origin", async () => {
         const app = await aSetUpApp();
 
