@@ -4,7 +4,6 @@ package stmttest
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -35,8 +34,8 @@ func previewDeploy(ttl time.Duration) deployArgs {
 	return deployArgs{kind: domain.DeploymentTargetKindPreview, ttl: ttl}
 }
 
-// deploy writes a deployment the way the service does: stamped after what its
-// targets serve, and renewing previews for a preview deploy.
+// deploy writes a deployment the way the service does: against what its
+// targets serve, renewing previews for a preview deploy.
 func deploy(t *testing.T, stmts service.AllStatements, projectID, releaseID string, origins []string, args deployArgs) *domain.Deployment {
 	t.Helper()
 	entity, err := tryDeploy(t, stmts, projectID, releaseID, origins, args)
@@ -50,7 +49,7 @@ func tryDeploy(t *testing.T, stmts service.AllStatements, projectID, releaseID s
 	require.NoError(t, err)
 	serving, err := stmts.NewestTargets(t.Context(), projectID, entity.Origins())
 	require.NoError(t, err)
-	if err := stmts.InsertDeployment(t.Context(), entity, domain.DeployedNotBefore(domain.NewestTargetDeployment(serving))); err != nil {
+	if err := stmts.InsertDeployment(t.Context(), entity, serving); err != nil {
 		return entity, err
 	}
 	if args.kind == domain.DeploymentTargetKindPreview {
@@ -224,94 +223,48 @@ func TestDeploymentStatements_DeploymentAt(t *testing.T) {
 	})
 }
 
-// A stamp is never earlier than notBefore, whatever the clock says.
-func TestDeploymentStatements_InsertHonorsNotBefore(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID := ensureReleaseProject(t, d.stmts)
-		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
-		entity, err := domain.NewDeployment(projectID, rel.ID, domain.DeploymentTargetKindPrimary, []string{appOrigin}, domain.DeploymentMetadata{})
-		require.NoError(t, err)
-
-		notBefore := time.Now().Add(time.Hour).UTC().Truncate(time.Microsecond)
-		require.NoError(t, d.stmts.InsertDeployment(t.Context(), entity, &notBefore))
-		assert.True(t, notBefore.Equal(entity.DeployedAt))
-
-		got, err := d.stmts.GetDeploymentByID(t.Context(), projectID, entity.ID)
-		require.NoError(t, err)
-		assert.True(t, notBefore.Equal(got.DeployedAt))
-	})
-}
-
-// Under LockProject, racing deploys guarded on the same deployment serialize:
-// exactly one writes and every other reads the winner as newest.
-func TestDeploymentStatements_LockProjectSerializesDeploys(t *testing.T) {
+// The optimistic lock: deploys that insert against the same read all take
+// the same seq, so exactly one writes and the others fail with a UniqueError,
+// leaving no partial rows.
+func TestDeploymentStatements_OptimisticLockAdmitsOneDeploy(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureReleaseProject(t, d.stmts)
 		base := createRelease(t, d.stmts, projectID, "base", domain.ReleaseMetadata{})
-		start := deploy(t, d.stmts, projectID, base.ID, []string{appOrigin}, deployArgs{})
+		deploy(t, d.stmts, projectID, base.ID, []string{appOrigin}, deployArgs{})
+		read, err := d.stmts.NewestTargets(t.Context(), projectID, []string{appOrigin})
+		require.NoError(t, err)
 
 		const racers = 4
 		releases := make([]*domain.Release, racers)
 		for i := range racers {
 			releases[i] = createRelease(t, d.stmts, projectID, string(rune('a'+i)), domain.ReleaseMetadata{})
 		}
-
-		written := make([]*domain.Deployment, racers)
 		errs := make([]error, racers)
 		var wg sync.WaitGroup
 		for i := range racers {
 			wg.Go(func() {
-				errs[i] = d.pool.Transaction(context.Background(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
-					written[i] = nil
-					stmts := tx.Statements()
-					if err := stmts.LockProject(ctx, projectID); err != nil {
-						return err
-					}
-					serving, err := stmts.NewestTargets(ctx, projectID, []string{appOrigin})
-					if err != nil {
-						return err
-					}
-					newest := domain.NewestTargetDeployment(serving)
-					current, err := stmts.GetDeploymentByID(ctx, projectID, newest.DeploymentID)
-					if err != nil {
-						return err
-					}
-					if err := domain.CheckExpectedDeployment(current, new(start.ID)); err != nil {
-						return err
-					}
-					entity, err := domain.NewDeployment(projectID, releases[i].ID, domain.DeploymentTargetKindPrimary, []string{appOrigin}, domain.DeploymentMetadata{})
-					if err != nil {
-						return err
-					}
-					if err := stmts.InsertDeployment(ctx, entity, domain.DeployedNotBefore(newest)); err != nil {
-						return err
-					}
-					written[i] = entity
-					return nil
-				})
+				// wwwOrigin is new to every racer, appOrigin is contended:
+				// a loser must not leave its www row behind.
+				entity, err := domain.NewDeployment(projectID, releases[i].ID, domain.DeploymentTargetKindPrimary, []string{appOrigin, wwwOrigin}, domain.DeploymentMetadata{})
+				if err == nil {
+					err = d.stmts.InsertDeployment(context.Background(), entity, read)
+				}
+				errs[i] = err
 			})
 		}
 		wg.Wait()
 
-		var winner *domain.Deployment
-		for i := range racers {
-			if errs[i] == nil {
-				require.Nil(t, winner, "two racers wrote")
-				winner = written[i]
-			}
-		}
-		require.NotNil(t, winner, "no racer wrote")
-		for i := range racers {
-			if errs[i] == nil {
+		won := 0
+		for _, err := range errs {
+			if err == nil {
+				won++
 				continue
 			}
-			de, ok := errors.AsType[domain.Error](errs[i])
-			require.True(t, ok, "racer %d: %v", i, errs[i])
-			details := de.Details.(domain.DeploymentConflictDetails)
-			require.NotNil(t, details.Deployment)
-			assert.Equal(t, winner.ID, details.Deployment.ID)
+			assert.ErrorIs(t, err, new(database.UniqueError))
 		}
+		assert.Equal(t, 1, won)
 		assert.Len(t, history(t, d.stmts, projectID, appOrigin), 2)
+		assert.Len(t, history(t, d.stmts, projectID, wwwOrigin), 1)
 	})
 }
 
@@ -410,8 +363,8 @@ func TestDeploymentStatements_GetByIDs(t *testing.T) {
 	})
 }
 
-// An unknown release trips the insert's foreign key and writes nothing; an
-// unknown project fails the lock.
+// An unknown release or project trips the insert's foreign keys and writes
+// nothing.
 func TestDeploymentStatements_References(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureReleaseProject(t, d.stmts)
@@ -420,8 +373,8 @@ func TestDeploymentStatements_References(t *testing.T) {
 		assert.ErrorIs(t, err, new(database.ForeignKeyError))
 		assert.Empty(t, history(t, d.stmts, projectID, appOrigin))
 
-		assert.ErrorIs(t, d.stmts.LockProject(t.Context(), "proj_does_not_exist"), new(database.NoRowFoundError))
-		require.NoError(t, d.stmts.LockProject(t.Context(), projectID))
+		_, err = tryDeploy(t, d.stmts, "proj_does_not_exist", "rel_does_not_exist", []string{appOrigin}, deployArgs{})
+		assert.ErrorIs(t, err, new(database.ForeignKeyError))
 	})
 }
 

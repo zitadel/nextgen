@@ -40,7 +40,9 @@ CREATE TABLE deployment_targets (
     origin         STRING(MAX) NOT NULL,
     release_id     STRING(MAX) NOT NULL,
     deployed_at    TIMESTAMP   NOT NULL,
+    seq            INT64       NOT NULL,
     CONSTRAINT chk_deployment_targets_origin CHECK (origin <> ''),
+    CONSTRAINT chk_deployment_targets_seq CHECK (seq > 0),
     CONSTRAINT fk_deployment_targets_deployment
         FOREIGN KEY (project_id, deployment_id)
         REFERENCES deployments (project_id, id)
@@ -48,8 +50,8 @@ CREATE TABLE deployment_targets (
 ) PRIMARY KEY (project_id, deployment_id, origin)
 -- +goose StatementEnd
 -- +goose StatementBegin
-CREATE INDEX idx_deployment_targets_origin_newest
-    ON deployment_targets (project_id, origin, deployed_at DESC, deployment_id DESC)
+CREATE UNIQUE INDEX uq_deployment_targets_origin_seq
+    ON deployment_targets (project_id, origin, seq)
 -- +goose StatementEnd
 -- +goose StatementBegin
 CREATE TABLE previews (
@@ -85,7 +87,7 @@ DROP INDEX IF EXISTS idx_previews_project_created_at
 DROP TABLE IF EXISTS previews
 -- +goose StatementEnd
 -- +goose StatementBegin
-DROP INDEX IF EXISTS idx_deployment_targets_origin_newest
+DROP INDEX IF EXISTS uq_deployment_targets_origin_seq
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS deployment_targets

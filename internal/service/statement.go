@@ -75,10 +75,6 @@ type ProjectStatements interface {
 	ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 	// DeleteProjectByID removes the project. changed is false when no row matched.
 	DeleteProjectByID(ctx context.Context, id string) (changed bool, err error)
-	// LockProject holds the project row until the transaction ends, so
-	// deploys and revokes of one project serialize. It does not block inserts
-	// under the project. A missing project is a NoRowFoundError.
-	LockProject(ctx context.Context, projectID string) error
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -225,10 +221,11 @@ type DeploymentStatements interface {
 	// NewestTargets returns, for each of origins that has one, the newest
 	// deployment to it.
 	NewestTargets(ctx context.Context, projectID string, origins []string) ([]domain.TargetDeployment, error)
-	// InsertDeployment writes the deployment with every target, stamping
-	// deployed_at no earlier than notBefore. Run it under LockProject so
-	// concurrent deploys serialize.
-	InsertDeployment(ctx context.Context, entity *domain.Deployment, notBefore *time.Time) error
+	// InsertDeployment writes the deployment with every target, under an
+	// optimistic lock: read is what NewestTargets returned for its origins,
+	// and when another deploy wrote to one of them since, nothing is written
+	// and it fails with a UniqueError. The caller re-reads and retries.
+	InsertDeployment(ctx context.Context, entity *domain.Deployment, read []domain.TargetDeployment) error
 	GetDeploymentByID(ctx context.Context, projectID, id string) (*domain.Deployment, error)
 	// GetDeploymentsByIDs skips unknown ids.
 	GetDeploymentsByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Deployment, error)

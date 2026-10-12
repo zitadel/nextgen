@@ -2,17 +2,13 @@ package deployment
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// A clock behind notBefore still stamps at notBefore.
-func TestStamp(t *testing.T) {
-	t0 := time.Date(2026, 10, 2, 14, 52, 0, 0, time.UTC)
-	notBefore := t0.Add(time.Microsecond)
-
-	assert.Equal(t, notBefore, Stamp(t0.Add(-time.Hour), &notBefore))
-	assert.Equal(t, t0.Add(time.Minute), Stamp(t0.Add(time.Minute+time.Nanosecond), &notBefore))
-	assert.Equal(t, t0, Stamp(t0, nil))
+func TestNextSeqs(t *testing.T) {
+	read := []domain.TargetDeployment{{Origin: "https://app.acme.com", Seq: 7}}
+	assert.Equal(t, []int64{8, 1}, NextSeqs([]string{"https://app.acme.com", "https://www.acme.com"}, read))
 }

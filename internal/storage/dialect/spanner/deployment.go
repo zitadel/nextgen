@@ -19,27 +19,25 @@ const (
 	previewTable    = "previews"
 
 	deploymentQuery = `SELECT project_id, id, release_id, target_kind, metadata, deployed_at FROM deployments`
-	targetsQuery    = `SELECT origin, deployment_id, release_id, deployed_at FROM deployment_targets` +
+	targetsQuery    = `SELECT origin, deployment_id, release_id, deployed_at, seq FROM deployment_targets` +
 		` WHERE project_id = @p1 AND deployment_id IN UNNEST(@p2)`
 	newestDeploymentStmt = deploymentQuery + ` WHERE project_id = @p1 AND id = (` +
 		`SELECT t.deployment_id FROM deployment_targets t` +
-		` WHERE t.project_id = @p1 AND t.origin = @p2` +
-		` ORDER BY t.deployed_at DESC, t.deployment_id DESC LIMIT 1)`
+		` WHERE t.project_id = @p1 AND t.origin = @p2 ORDER BY t.seq DESC LIMIT 1)`
 	deploymentAtStmt = deploymentQuery + ` WHERE project_id = @p1 AND id = (` +
 		`SELECT t.deployment_id FROM deployment_targets t` +
-		` WHERE t.project_id = @p1 AND t.origin = @p2 AND t.deployed_at <= @p3` +
-		` ORDER BY t.deployed_at DESC, t.deployment_id DESC LIMIT 1)`
+		` WHERE t.project_id = @p1 AND t.origin = @p2 AND t.deployed_at <= @p3 ORDER BY t.seq DESC LIMIT 1)`
 )
 
 var (
 	deploymentSchema = deployment.NewSchema(deploymentTable, targetsTable, previewTable)
 
 	deploymentColumns = []string{"project_id", "id", "release_id", "target_kind", "metadata", "deployed_at"}
-	targetColumns     = []string{"project_id", "deployment_id", "origin", "release_id", "deployed_at"}
+	targetColumns     = []string{"project_id", "deployment_id", "origin", "release_id", "deployed_at", "seq"}
 
-	newestTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at FROM deployment_targets t` +
+	newestTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at, t.seq FROM deployment_targets t` +
 		` WHERE t.project_id = @p1 AND t.origin IN UNNEST(@p2) AND NOT ` + deployment.NewerTargetExists(targetsTable)
-	liveTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at FROM deployment_targets t` +
+	liveTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at, t.seq FROM deployment_targets t` +
 		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
 		` WHERE t.project_id = @p1 AND t.deployment_id IN UNNEST(@p2) AND NOT ` + deployment.NewerTargetExists(targetsTable) +
 		` AND ` + deployment.TargetServesAt("d", previewTable) + `@p3))`
@@ -57,7 +55,7 @@ func (ds deploymentStatements) NewestTargets(ctx context.Context, projectID stri
 }
 
 // InsertDeployment implements [service.DeploymentStatements].
-func (ds deploymentStatements) InsertDeployment(ctx context.Context, entity *domain.Deployment, notBefore *time.Time) error {
+func (ds deploymentStatements) InsertDeployment(ctx context.Context, entity *domain.Deployment, read []domain.TargetDeployment) error {
 	if err := ensureManagedID(&entity.ID, domain.PrefixDeployment); err != nil {
 		return err
 	}
@@ -71,15 +69,16 @@ func (ds deploymentStatements) InsertDeployment(ctx context.Context, entity *dom
 	}
 	var deployedAt time.Time
 	err = withTransaction(ctx, ds.db, func(ctx context.Context, tx queryExecutor) error {
-		deployedAt = deployment.Stamp(time.Now(), notBefore)
+		deployedAt = deployment.Stamp(time.Now())
 		mutations := []*spanner.Mutation{
 			spanner.Insert(deploymentTable, deploymentColumns, []any{
 				entity.ProjectID, entity.ID, entity.ReleaseID, entity.TargetKind.String(), metadata, deployedAt,
 			}),
 		}
-		for _, origin := range entity.Origins() {
+		origins := entity.Origins()
+		for i, seq := range deployment.NextSeqs(origins, read) {
 			mutations = append(mutations, spanner.Insert(targetsTable, targetColumns,
-				[]any{entity.ProjectID, entity.ID, origin, entity.ReleaseID, deployedAt}))
+				[]any{entity.ProjectID, entity.ID, origins[i], entity.ReleaseID, deployedAt, seq}))
 		}
 		if err := tx.BufferWrite(ctx, mutations); err != nil {
 			return err
@@ -222,7 +221,7 @@ func (ds deploymentStatements) collectTargets(ctx context.Context, query string,
 		var err error
 		items, err = collectRows(iter, func(row *spanner.Row) (domain.TargetDeployment, error) {
 			var scanned domain.TargetDeployment
-			if err := row.Columns(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &scanned.DeployedAt); err != nil {
+			if err := row.Columns(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &scanned.DeployedAt, &scanned.Seq); err != nil {
 				return scanned, err
 			}
 			scanned.DeployedAt = scanned.DeployedAt.UTC()

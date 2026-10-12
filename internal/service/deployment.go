@@ -62,8 +62,14 @@ func NewDeploymentService(v2Pool *DB) *DeploymentService {
 	return &DeploymentService{v2Pool: v2Pool}
 }
 
-// Create deploys a release to its targets under the project lock, so
-// concurrent deploys to the project serialize.
+// maxDeployAttempts bounds the retries of a deploy that lost the optimistic
+// lock to a concurrent deploy to one of its origins.
+const maxDeployAttempts = 3
+
+// Create deploys a release to its targets with optimistic locking: it reads
+// what each target serves and writes without holding a lock. A concurrent
+// deploy to one of the origins makes the write fail, and Create retries on
+// what that deploy left, where expected_deployment_id then answers a conflict.
 func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentInput) (*CreateDeploymentOutput, error) {
 	actor, _ := audit.ActorFromContext(ctx)
 	entity, err := domain.NewDeployment(input.ProjectID, input.ReleaseID, input.TargetKind, input.Origins, domain.DeploymentMetadata{
@@ -80,23 +86,59 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 		return nil, domain.ErrDeploymentInvalid("a deployment to preview URLs needs a ttl", nil)
 	}
 
+	for attempt := 1; ; attempt++ {
+		output, err := s.create(ctx, entity, input)
+		if _, lost := errors.AsType[*database.UniqueError](err); lost {
+			if attempt < maxDeployAttempts {
+				continue
+			}
+			return nil, s.contended(ctx, entity)
+		}
+		if err != nil {
+			if de, ok := errors.AsType[domain.Error](err); ok {
+				return nil, de
+			}
+			return nil, domain.ErrInternal(err).WithMessage("failed to create deployment")
+		}
+		return output, nil
+	}
+}
+
+// contended answers a deploy that kept losing the optimistic lock with a
+// conflict carrying the newest deployment to its targets.
+func (s *DeploymentService) contended(ctx context.Context, entity *domain.Deployment) error {
+	stmts := s.v2Pool.Statements()
+	read, err := stmts.NewestTargets(ctx, entity.ProjectID, entity.Origins())
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to read the targets")
+	}
+	var current *domain.Deployment
+	if newest := domain.NewestTargetDeployment(read); newest != nil {
+		if current, err = stmts.GetDeploymentByID(ctx, entity.ProjectID, newest.DeploymentID); err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to read the newest deployment")
+		}
+	}
+	return domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{Deployment: current})
+}
+
+// create is one attempt of Create, in one transaction.
+func (s *DeploymentService) create(ctx context.Context, entity *domain.Deployment, input CreateDeploymentInput) (*CreateDeploymentOutput, error) {
 	var output *CreateDeploymentOutput
-	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		output = nil
 		stmts := tx.Statements()
-		if err := stmts.LockProject(ctx, entity.ProjectID); err != nil {
+		if _, err := stmts.GetReleaseByID(ctx, entity.ProjectID, entity.ReleaseID); err != nil {
 			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-				return domain.ErrProjectNotFound()
+				return domain.ErrReleaseNotFound()
 			}
 			return err
 		}
-		serving, err := stmts.NewestTargets(ctx, entity.ProjectID, entity.Origins())
+		read, err := stmts.NewestTargets(ctx, entity.ProjectID, entity.Origins())
 		if err != nil {
 			return err
 		}
-		newest := domain.NewestTargetDeployment(serving)
 		var current *domain.Deployment
-		if newest != nil {
+		if newest := domain.NewestTargetDeployment(read); newest != nil {
 			if current, err = stmts.GetDeploymentByID(ctx, entity.ProjectID, newest.DeploymentID); err != nil {
 				return err
 			}
@@ -104,16 +146,18 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 		if err := domain.CheckExpectedDeployment(current, input.ExpectedDeploymentID); err != nil {
 			return err
 		}
-		if entity.Unchanged(serving) {
+		if entity.Unchanged(read) {
 			output = &CreateDeploymentOutput{Deployment: current}
 			return nil
 		}
 
-		// A copy per attempt: a retried transaction mints and stamps afresh.
+		// A copy per attempt: each one mints its own id and stamp.
 		written := *entity
-		if err := stmts.InsertDeployment(ctx, &written, domain.DeployedNotBefore(newest)); err != nil {
+		if err := stmts.InsertDeployment(ctx, &written, read); err != nil {
+			// The release was read above, so the only reference left to
+			// trip is the project.
 			if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
-				return domain.ErrReleaseNotFound()
+				return domain.ErrProjectNotFound()
 			}
 			return err
 		}
@@ -129,13 +173,7 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 		output = &CreateDeploymentOutput{Deployment: &written, Created: true}
 		return nil
 	})
-	if err != nil {
-		if de, ok := errors.AsType[domain.Error](err); ok {
-			return nil, de
-		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to create deployment")
-	}
-	return output, nil
+	return output, err
 }
 
 func emitDeploymentCreated(ctx context.Context, stmts EventStatements, entity *domain.Deployment) error {

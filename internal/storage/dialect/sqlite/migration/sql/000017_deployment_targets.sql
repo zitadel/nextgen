@@ -33,15 +33,17 @@ CREATE TABLE deployment_targets (
     origin         TEXT    NOT NULL,
     release_id     TEXT    NOT NULL,
     deployed_at    INTEGER NOT NULL,
+    seq            INTEGER NOT NULL,
     PRIMARY KEY (project_id, deployment_id, origin),
+    CONSTRAINT chk_deployment_targets_seq CHECK (seq > 0),
     CONSTRAINT chk_deployment_targets_origin CHECK (origin <> ''),
     CONSTRAINT fk_deployment_targets_deployment
         FOREIGN KEY (project_id, deployment_id) REFERENCES deployments (project_id, id) ON DELETE CASCADE
 );
 -- +goose StatementEnd
 -- +goose StatementBegin
-CREATE INDEX idx_deployment_targets_origin_newest
-    ON deployment_targets (project_id, origin, deployed_at DESC, deployment_id DESC);
+CREATE UNIQUE INDEX uq_deployment_targets_origin_seq
+    ON deployment_targets (project_id, origin, seq);
 -- +goose StatementEnd
 
 -- +goose StatementBegin

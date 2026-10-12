@@ -125,11 +125,6 @@ func TestCheckExpectedDeployment(t *testing.T) {
 	assert.Equal(t, DeploymentConflictDetails{}, err.(Error).Details)
 }
 
-func TestDeployedNotBefore(t *testing.T) {
-	assert.Nil(t, DeployedNotBefore(nil))
-	assert.Equal(t, t0.Add(time.Microsecond), *DeployedNotBefore(&TargetDeployment{DeployedAt: t0}))
-}
-
 func assertDeploymentInvalid(t *testing.T, err error) {
 	t.Helper()
 	require.Error(t, err)

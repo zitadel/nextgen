@@ -47,23 +47,25 @@ func deploymentInput() service.CreateDeploymentInput {
 	}
 }
 
-// expectServing sets up the lock and what appOrigin serves: nothing when
-// serving is nil, else that deployment.
-func expectServing(statements *servicemocks.MockAllStatements, serving *domain.Deployment) {
-	statements.EXPECT().LockProject(gomock.Any(), "proj_1").Return(nil)
+// expectServing sets up the reads of one attempt: the release, and what
+// appOrigin serves (nothing when serving is nil). It returns what was read.
+func expectServing(statements *servicemocks.MockAllStatements, serving *domain.Deployment) []domain.TargetDeployment {
+	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{ID: "rel_1"}, nil)
 	if serving == nil {
 		statements.EXPECT().NewestTargets(gomock.Any(), "proj_1", []string{appOrigin}).Return(nil, nil)
-		return
+		return nil
 	}
-	statements.EXPECT().NewestTargets(gomock.Any(), "proj_1", []string{appOrigin}).Return([]domain.TargetDeployment{{
-		Origin: appOrigin, DeploymentID: serving.ID, ReleaseID: serving.ReleaseID, DeployedAt: serving.DeployedAt,
-	}}, nil)
+	read := []domain.TargetDeployment{{
+		Origin: appOrigin, DeploymentID: serving.ID, ReleaseID: serving.ReleaseID, DeployedAt: serving.DeployedAt, Seq: 7,
+	}}
+	statements.EXPECT().NewestTargets(gomock.Any(), "proj_1", []string{appOrigin}).Return(read, nil)
 	statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", serving.ID).Return(serving, nil)
+	return read
 }
 
-func expectInsert(statements *servicemocks.MockAllStatements, notBefore *time.Time) {
-	statements.EXPECT().InsertDeployment(gomock.Any(), gomock.Any(), notBefore).
-		DoAndReturn(func(_ context.Context, entity *domain.Deployment, _ *time.Time) error {
+func expectInsert(statements *servicemocks.MockAllStatements, read []domain.TargetDeployment) {
+	statements.EXPECT().InsertDeployment(gomock.Any(), gomock.Any(), read).
+		DoAndReturn(func(_ context.Context, entity *domain.Deployment, _ []domain.TargetDeployment) error {
 			entity.ID = "dep_new"
 			entity.DeployedAt = deployedAt
 			return nil
@@ -81,8 +83,7 @@ func servingDeployment(releaseID string) *domain.Deployment {
 
 func TestDeploymentServiceCreateRecordsActor(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
-	expectServing(statements, nil)
-	expectInsert(statements, nil)
+	expectInsert(statements, expectServing(statements, nil))
 
 	ctx := audit.WithActorContext(t.Context(), audit.ActorContext{
 		ActorID:   new("user_1"),
@@ -98,8 +99,7 @@ func TestDeploymentServiceCreateRecordsActor(t *testing.T) {
 
 func TestDeploymentServiceCreateWithoutActor(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
-	expectServing(statements, nil)
-	expectInsert(statements, nil)
+	expectInsert(statements, expectServing(statements, nil))
 
 	result, err := svc.Create(t.Context(), deploymentInput())
 	require.NoError(t, err)
@@ -107,16 +107,63 @@ func TestDeploymentServiceCreateWithoutActor(t *testing.T) {
 	assert.Nil(t, result.Deployment.Metadata.DeployedByType)
 }
 
-// The new deployment is stamped after the one it supersedes.
-func TestDeploymentServiceCreateStampsAfterTheServingDeployment(t *testing.T) {
+// The insert gets what was read: that is the optimistic lock.
+func TestDeploymentServiceCreateInsertsAgainstWhatItRead(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
-	serving := servingDeployment("rel_0")
-	expectServing(statements, serving)
-	expectInsert(statements, new(serving.DeployedAt.Add(time.Microsecond)))
+	read := expectServing(statements, servingDeployment("rel_0"))
+	expectInsert(statements, read)
 
 	result, err := svc.Create(t.Context(), deploymentInput())
 	require.NoError(t, err)
 	assert.True(t, result.Created)
+}
+
+// Losing the optimistic lock retries on what the winner left.
+func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
+	t.Run("unguarded deploy writes on the retry", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		expectServing(statements, nil)
+		statements.EXPECT().InsertDeployment(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
+		read := expectServing(statements, servingDeployment("rel_0"))
+		expectInsert(statements, read)
+
+		result, err := svc.Create(t.Context(), deploymentInput())
+		require.NoError(t, err)
+		assert.True(t, result.Created)
+	})
+
+	t.Run("guarded deploy answers a conflict on the retry", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		before := servingDeployment("rel_0")
+		before.ID = "dep_before"
+		expectServing(statements, before)
+		statements.EXPECT().InsertDeployment(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
+		winner := servingDeployment("rel_0")
+		expectServing(statements, winner)
+
+		input := deploymentInput()
+		input.ExpectedDeploymentID = new("dep_before")
+		_, err := svc.Create(t.Context(), input)
+		de := assertServiceDomainCode(t, err, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code)
+		assert.Equal(t, domain.DeploymentConflictDetails{Deployment: winner}, de.Details)
+	})
+
+	t.Run("gives up with a conflict", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		for range 3 {
+			expectServing(statements, nil)
+			statements.EXPECT().InsertDeployment(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
+		}
+		winner := servingDeployment("rel_0")
+		statements.EXPECT().NewestTargets(gomock.Any(), "proj_1", []string{appOrigin}).Return([]domain.TargetDeployment{{
+			Origin: appOrigin, DeploymentID: winner.ID, DeployedAt: winner.DeployedAt, Seq: 9,
+		}}, nil)
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", winner.ID).Return(winner, nil)
+
+		_, err := svc.Create(t.Context(), deploymentInput())
+		de := assertServiceDomainCode(t, err, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code)
+		assert.Equal(t, domain.DeploymentConflictDetails{Deployment: winner}, de.Details)
+	})
 }
 
 // Deploying to primary origins that all serve the release writes nothing and
@@ -137,8 +184,8 @@ func TestDeploymentServiceCreatePreviewAlwaysRenews(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
 	serving := servingDeployment("rel_1")
 	serving.TargetKind = domain.DeploymentTargetKindPreview
-	expectServing(statements, serving)
-	expectInsert(statements, new(serving.DeployedAt.Add(time.Microsecond)))
+	read := expectServing(statements, serving)
+	expectInsert(statements, read)
 	statements.EXPECT().UpsertPreviews(gomock.Any(), "proj_1", []string{appOrigin}, deployedAt.Add(168*time.Hour), deployedAt).Return(nil)
 
 	input := deploymentInput()
@@ -153,8 +200,7 @@ func TestDeploymentServiceCreateGuard(t *testing.T) {
 	t.Run("matching", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		serving := servingDeployment("rel_0")
-		expectServing(statements, serving)
-		expectInsert(statements, new(serving.DeployedAt.Add(time.Microsecond)))
+		expectInsert(statements, expectServing(statements, serving))
 
 		input := deploymentInput()
 		input.ExpectedDeploymentID = new(serving.ID)
@@ -198,21 +244,23 @@ func TestDeploymentServiceCreateGuard(t *testing.T) {
 }
 
 func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
-	t.Run("project missing", func(t *testing.T) {
+	t.Run("release missing", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
-		statements.EXPECT().LockProject(gomock.Any(), "proj_1").Return(new(database.NoRowFoundError))
+		statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(nil, new(database.NoRowFoundError))
 
 		_, err := svc.Create(t.Context(), deploymentInput())
-		assertServiceDomainCode(t, err, domain.ErrProjectNotFound().Code)
+		assertServiceDomainCode(t, err, domain.ErrReleaseNotFound().Code)
 	})
 
-	t.Run("release missing", func(t *testing.T) {
+	// The release was read first, so a foreign key failing on insert is the
+	// project.
+	t.Run("project missing", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		expectServing(statements, nil)
 		statements.EXPECT().InsertDeployment(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.ForeignKeyError))
 
 		_, err := svc.Create(t.Context(), deploymentInput())
-		assertServiceDomainCode(t, err, domain.ErrReleaseNotFound().Code)
+		assertServiceDomainCode(t, err, domain.ErrProjectNotFound().Code)
 	})
 
 	t.Run("invalid input never reaches storage", func(t *testing.T) {

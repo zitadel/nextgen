@@ -30,14 +30,18 @@ CREATE TABLE zitadel_nextgen.deployment_targets (
     , origin TEXT COLLATE "C" NOT NULL CHECK (origin <> '')
     , release_id TEXT COLLATE "C" NOT NULL
     , deployed_at TIMESTAMPTZ NOT NULL
+    -- Counts the deployments to the origin; the newest has the highest.
+    , seq BIGINT NOT NULL CHECK (seq > 0)
 
     , PRIMARY KEY (project_id, deployment_id, origin)
     , FOREIGN KEY (project_id, deployment_id)
         REFERENCES zitadel_nextgen.deployments (project_id, id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_deployment_targets_origin_newest
-    ON zitadel_nextgen.deployment_targets (project_id, origin, deployed_at DESC, deployment_id DESC);
+-- The optimistic lock: two deploys that read the same newest row both write
+-- seq + 1, and this index rejects the second.
+CREATE UNIQUE INDEX uq_deployment_targets_origin_seq
+    ON zitadel_nextgen.deployment_targets (project_id, origin, seq);
 
 -- One row per preview URL; primary origins have none.
 CREATE TABLE zitadel_nextgen.previews (

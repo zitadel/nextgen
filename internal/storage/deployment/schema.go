@@ -5,14 +5,12 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// NewerTargetExists holds when another row of the same origin is newer than
-// the deployment_targets row aliased t. Its negation picks what each origin
+// NewerTargetExists holds when the origin of the deployment_targets row
+// aliased t has a row with a higher seq. Its negation picks what each origin
 // serves.
 func NewerTargetExists(targetsTable string) string {
 	return `EXISTS (SELECT 1 FROM ` + targetsTable + ` newer` +
-		` WHERE newer.project_id = t.project_id AND newer.origin = t.origin` +
-		` AND (newer.deployed_at > t.deployed_at` +
-		` OR (newer.deployed_at = t.deployed_at AND newer.deployment_id > t.deployment_id)))`
+		` WHERE newer.project_id = t.project_id AND newer.origin = t.origin AND newer.seq > t.seq)`
 }
 
 // TargetServesAt holds while the target row t of deployment d admits its

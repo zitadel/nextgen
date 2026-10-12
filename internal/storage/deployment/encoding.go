@@ -115,12 +115,23 @@ func DeploymentIDs(items []*domain.Deployment) []string {
 	return ids
 }
 
-// Stamp is the later of now and notBefore, truncated to the microsecond every
-// dialect keeps.
-func Stamp(now time.Time, notBefore *time.Time) time.Time {
-	now = now.UTC().Truncate(time.Microsecond)
-	if notBefore != nil && notBefore.After(now) {
-		return notBefore.UTC()
+// Stamp truncates now to the microsecond every dialect keeps.
+func Stamp(now time.Time) time.Time {
+	return now.UTC().Truncate(time.Microsecond)
+}
+
+// NextSeqs returns the seq each origin's new target row takes: one past the
+// newest read, or 1 for an origin with nothing deployed. Inserting it is the
+// optimistic lock: a concurrent deploy that read the same rows takes the same
+// seq, and the unique index rejects whichever commits second.
+func NextSeqs(origins []string, read []domain.TargetDeployment) []int64 {
+	newest := make(map[string]int64, len(read))
+	for _, r := range read {
+		newest[r.Origin] = r.Seq
 	}
-	return now
+	seqs := make([]int64, len(origins))
+	for i, origin := range origins {
+		seqs[i] = newest[origin] + 1
+	}
+	return seqs
 }

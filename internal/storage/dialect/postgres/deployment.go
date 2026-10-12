@@ -18,33 +18,30 @@ const (
 	targetsTable     = "zitadel_nextgen.deployment_targets"
 	previewsTable    = "zitadel_nextgen.previews"
 
-	// clock_timestamp, not now(): a deploy that waited on the project lock
-	// has to stamp after the one it waited for.
+	// clock_timestamp, not now(), which is the transaction's start.
 	clockStmt            = `SELECT clock_timestamp()`
 	createDeploymentStmt = `INSERT INTO zitadel_nextgen.deployments` +
 		` (project_id, id, release_id, target_kind, metadata, deployed_at) VALUES ($1, $2, $3, $4, $5, $6)`
 	createDeploymentTargetsStmt = `INSERT INTO zitadel_nextgen.deployment_targets` +
-		` (project_id, deployment_id, origin, release_id, deployed_at)` +
-		` SELECT $1, $2, origin, $3, $4 FROM unnest($5::text[]) AS origin`
+		` (project_id, deployment_id, origin, release_id, deployed_at, seq)` +
+		` SELECT $1, $2, o.origin, $3, $4, o.seq FROM unnest($5::text[], $6::bigint[]) AS o(origin, seq)`
 	deploymentQuery = `SELECT project_id, id, release_id, target_kind, metadata, deployed_at FROM zitadel_nextgen.deployments`
-	targetsQuery    = `SELECT origin, deployment_id, release_id, deployed_at FROM zitadel_nextgen.deployment_targets` +
+	targetsQuery    = `SELECT origin, deployment_id, release_id, deployed_at, seq FROM zitadel_nextgen.deployment_targets` +
 		` WHERE project_id = $1 AND deployment_id = ANY($2)`
 	newestDeploymentStmt = deploymentQuery + ` WHERE project_id = $1 AND id = (` +
 		`SELECT t.deployment_id FROM zitadel_nextgen.deployment_targets t` +
-		` WHERE t.project_id = $1 AND t.origin = $2` +
-		` ORDER BY t.deployed_at DESC, t.deployment_id DESC LIMIT 1)`
+		` WHERE t.project_id = $1 AND t.origin = $2 ORDER BY t.seq DESC LIMIT 1)`
 	deploymentAtStmt = deploymentQuery + ` WHERE project_id = $1 AND id = (` +
 		`SELECT t.deployment_id FROM zitadel_nextgen.deployment_targets t` +
-		` WHERE t.project_id = $1 AND t.origin = $2 AND t.deployed_at <= $3` +
-		` ORDER BY t.deployed_at DESC, t.deployment_id DESC LIMIT 1)`
+		` WHERE t.project_id = $1 AND t.origin = $2 AND t.deployed_at <= $3 ORDER BY t.seq DESC LIMIT 1)`
 )
 
 var (
 	deploymentSchema = deployment.NewSchema(deploymentsTable, targetsTable, previewsTable)
 
-	newestTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at FROM zitadel_nextgen.deployment_targets t` +
+	newestTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at, t.seq FROM zitadel_nextgen.deployment_targets t` +
 		` WHERE t.project_id = $1 AND t.origin = ANY($2) AND NOT ` + deployment.NewerTargetExists(targetsTable)
-	liveTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at FROM zitadel_nextgen.deployment_targets t` +
+	liveTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at, t.seq FROM zitadel_nextgen.deployment_targets t` +
 		` JOIN zitadel_nextgen.deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
 		` WHERE t.project_id = $1 AND t.deployment_id = ANY($2) AND NOT ` + deployment.NewerTargetExists(targetsTable) +
 		` AND ` + deployment.TargetServesAt("d", previewsTable) + `$3))`
@@ -62,7 +59,7 @@ func (ds deploymentStatements) NewestTargets(ctx context.Context, projectID stri
 }
 
 // InsertDeployment implements [service.DeploymentStatements].
-func (ds deploymentStatements) InsertDeployment(ctx context.Context, entity *domain.Deployment, notBefore *time.Time) error {
+func (ds deploymentStatements) InsertDeployment(ctx context.Context, entity *domain.Deployment, read []domain.TargetDeployment) error {
 	if err := ensureManagedID(&entity.ID, domain.PrefixDeployment); err != nil {
 		return err
 	}
@@ -76,14 +73,14 @@ func (ds deploymentStatements) InsertDeployment(ctx context.Context, entity *dom
 		if err := tx.QueryRow(ctx, clockStmt).Scan(&now); err != nil {
 			return wrapError(err)
 		}
-		deployedAt = deployment.Stamp(now, notBefore)
+		deployedAt = deployment.Stamp(now)
 		if _, err := tx.Exec(ctx, createDeploymentStmt,
 			entity.ProjectID, entity.ID, entity.ReleaseID, entity.TargetKind.String(), metadata, deployedAt,
 		); err != nil {
 			return wrapError(err)
 		}
 		if _, err := tx.Exec(ctx, createDeploymentTargetsStmt,
-			entity.ProjectID, entity.ID, entity.ReleaseID, deployedAt, entity.Origins(),
+			entity.ProjectID, entity.ID, entity.ReleaseID, deployedAt, entity.Origins(), deployment.NextSeqs(entity.Origins(), read),
 		); err != nil {
 			return wrapError(err)
 		}
@@ -226,7 +223,7 @@ func (ds deploymentStatements) collectTargets(ctx context.Context, client queryE
 	}
 	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.TargetDeployment, error) {
 		var scanned domain.TargetDeployment
-		if err := row.Scan(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &scanned.DeployedAt); err != nil {
+		if err := row.Scan(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &scanned.DeployedAt, &scanned.Seq); err != nil {
 			return scanned, err
 		}
 		scanned.DeployedAt = scanned.DeployedAt.UTC()

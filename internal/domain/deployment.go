@@ -95,12 +95,14 @@ func (d *Deployment) Origins() []string {
 	return origins
 }
 
-// TargetDeployment is one deployment to one origin.
+// TargetDeployment is one deployment to one origin. Seq counts the
+// deployments to the origin; the newest has the highest.
 type TargetDeployment struct {
 	Origin       string
 	DeploymentID string
 	ReleaseID    string
 	DeployedAt   time.Time
+	Seq          int64
 }
 
 // NewestTargetDeployment returns the newest of deployments, ordered by
@@ -143,16 +145,6 @@ func CheckExpectedDeployment(current *Deployment, expected *string) error {
 		return nil
 	}
 	return ErrDeploymentConflict(DeploymentConflictDetails{Deployment: current})
-}
-
-// DeployedNotBefore is the earliest deployed_at a deployment superseding
-// newest may take, so it stays newer even if the clock went back. Nil when
-// nothing was deployed.
-func DeployedNotBefore(newest *TargetDeployment) *time.Time {
-	if newest == nil {
-		return nil
-	}
-	return new(newest.DeployedAt.Add(time.Microsecond))
 }
 
 // DeploymentField enumerates the fields of Deployment which can be used for

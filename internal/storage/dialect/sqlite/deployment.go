@@ -22,27 +22,25 @@ const (
 		` (project_id, id, release_id, target_kind, metadata, deployed_at) VALUES (?, ?, ?, ?, ?, ?)`
 	// Sets bind as one JSON array, read back by json_each.
 	createDeploymentTargetsStmt = `INSERT INTO deployment_targets` +
-		` (project_id, deployment_id, origin, release_id, deployed_at)` +
-		` SELECT ?, ?, value, ?, ? FROM json_each(?)`
+		` (project_id, deployment_id, origin, release_id, deployed_at, seq)` +
+		` SELECT ?, ?, json_extract(value, '$.origin'), ?, ?, json_extract(value, '$.seq') FROM json_each(?)`
 	deploymentQuery = `SELECT project_id, id, release_id, target_kind, metadata, deployed_at FROM deployments`
-	targetsQuery    = `SELECT origin, deployment_id, release_id, deployed_at FROM deployment_targets` +
+	targetsQuery    = `SELECT origin, deployment_id, release_id, deployed_at, seq FROM deployment_targets` +
 		` WHERE project_id = ? AND deployment_id IN (SELECT value FROM json_each(?))`
 	newestDeploymentStmt = deploymentQuery + ` WHERE project_id = ?1 AND id = (` +
 		`SELECT t.deployment_id FROM deployment_targets t` +
-		` WHERE t.project_id = ?1 AND t.origin = ?2` +
-		` ORDER BY t.deployed_at DESC, t.deployment_id DESC LIMIT 1)`
+		` WHERE t.project_id = ?1 AND t.origin = ?2 ORDER BY t.seq DESC LIMIT 1)`
 	deploymentAtStmt = deploymentQuery + ` WHERE project_id = ?1 AND id = (` +
 		`SELECT t.deployment_id FROM deployment_targets t` +
-		` WHERE t.project_id = ?1 AND t.origin = ?2 AND t.deployed_at <= ?3` +
-		` ORDER BY t.deployed_at DESC, t.deployment_id DESC LIMIT 1)`
+		` WHERE t.project_id = ?1 AND t.origin = ?2 AND t.deployed_at <= ?3 ORDER BY t.seq DESC LIMIT 1)`
 )
 
 var (
 	deploymentSchema = deployment.NewSchema(deploymentsTable, targetsTable, previewsTable)
 
-	newestTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at FROM deployment_targets t` +
+	newestTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at, t.seq FROM deployment_targets t` +
 		` WHERE t.project_id = ? AND t.origin IN (SELECT value FROM json_each(?)) AND NOT ` + deployment.NewerTargetExists(targetsTable)
-	liveTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at FROM deployment_targets t` +
+	liveTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at, t.seq FROM deployment_targets t` +
 		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
 		` WHERE t.project_id = ? AND t.deployment_id IN (SELECT value FROM json_each(?)) AND NOT ` + deployment.NewerTargetExists(targetsTable) +
 		` AND ` + deployment.TargetServesAt("d", previewsTable) + `?))`
@@ -59,6 +57,19 @@ func jsonArray(values []string) (string, error) {
 	return string(encoded), err
 }
 
+func targetsJSON(origins []string, seqs []int64) (string, error) {
+	type target struct {
+		Origin string `json:"origin"`
+		Seq    int64  `json:"seq"`
+	}
+	targets := make([]target, len(origins))
+	for i, origin := range origins {
+		targets[i] = target{Origin: origin, Seq: seqs[i]}
+	}
+	encoded, err := json.Marshal(targets)
+	return string(encoded), err
+}
+
 // NewestTargets implements [service.DeploymentStatements].
 func (ds deploymentStatements) NewestTargets(ctx context.Context, projectID string, origins []string) ([]domain.TargetDeployment, error) {
 	encoded, err := jsonArray(origins)
@@ -69,7 +80,7 @@ func (ds deploymentStatements) NewestTargets(ctx context.Context, projectID stri
 }
 
 // InsertDeployment implements [service.DeploymentStatements].
-func (ds deploymentStatements) InsertDeployment(ctx context.Context, entity *domain.Deployment, notBefore *time.Time) error {
+func (ds deploymentStatements) InsertDeployment(ctx context.Context, entity *domain.Deployment, read []domain.TargetDeployment) error {
 	if err := ensureManagedID(&entity.ID, domain.PrefixDeployment); err != nil {
 		return err
 	}
@@ -77,21 +88,20 @@ func (ds deploymentStatements) InsertDeployment(ctx context.Context, entity *dom
 	if err != nil {
 		return err
 	}
-	origins, err := jsonArray(entity.Origins())
+	targets, err := targetsJSON(entity.Origins(), deployment.NextSeqs(entity.Origins(), read))
 	if err != nil {
 		return err
 	}
-	// Stamped inside the write transaction, after any deploy it waited on.
 	var deployedAt time.Time
 	err = withTransaction(ctx, ds.client, func(ctx context.Context, tx queryExecutor) error {
-		deployedAt = deployment.Stamp(time.Now(), notBefore)
+		deployedAt = deployment.Stamp(time.Now())
 		if _, err := tx.Exec(ctx, createDeploymentStmt,
 			entity.ProjectID, entity.ID, entity.ReleaseID, entity.TargetKind.String(), string(metadata), deployedAt.UnixNano(),
 		); err != nil {
 			return wrapError(err)
 		}
 		if _, err := tx.Exec(ctx, createDeploymentTargetsStmt,
-			entity.ProjectID, entity.ID, entity.ReleaseID, deployedAt.UnixNano(), origins,
+			entity.ProjectID, entity.ID, entity.ReleaseID, deployedAt.UnixNano(), targets,
 		); err != nil {
 			return wrapError(err)
 		}
@@ -239,7 +249,7 @@ func (ds deploymentStatements) collectTargets(ctx context.Context, query string,
 			scanned      domain.TargetDeployment
 			deployedNano int64
 		)
-		if err := rows.Scan(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &deployedNano); err != nil {
+		if err := rows.Scan(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &deployedNano, &scanned.Seq); err != nil {
 			return scanned, err
 		}
 		scanned.DeployedAt = timeFromUnixNano(deployedNano)
