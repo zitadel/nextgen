@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { worktreeIsDirty } from "../../../../src/lib/release/git";
+import { diffConfigAgainst, worktreeIsDirty } from "../../../../src/lib/release/git";
 
 const run = promisify(execFile);
 
@@ -55,5 +55,39 @@ describe("worktreeIsDirty", () => {
     dir = cwd;
 
     expect(await worktreeIsDirty(cwd)).toBe(false);
+  });
+});
+
+describe("diffConfigAgainst", () => {
+  it("shows an untracked .zitadel/ file as an addition", async () => {
+    const cwd = await cleanRepo();
+    const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();
+
+    // A brand-new resource is untracked; the release bundle would include it,
+    // so the diff must too, though plain `git diff` would omit it.
+    await writeFile(join(cwd, ".zitadel", "new.json"), '{ "added": true }\n');
+
+    const diff = await diffConfigAgainst(cwd, sha, false);
+
+    expect(diff).toContain("new.json");
+    expect(diff).toContain("added");
+  });
+
+  it("still shows a tracked change, leaving files outside .zitadel/ out", async () => {
+    const cwd = await cleanRepo();
+    const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();
+    await writeFile(join(cwd, ".zitadel", "marker.json"), '{ "edited": true }\n');
+    await writeFile(join(cwd, "README.md"), "# app\n\nedited\n");
+
+    const diff = await diffConfigAgainst(cwd, sha, false);
+
+    expect(diff).toContain("marker.json");
+    expect(diff).not.toContain("README.md");
+  });
+
+  it("returns null when the commit is not in this repository's history", async () => {
+    const cwd = await cleanRepo();
+
+    expect(await diffConfigAgainst(cwd, "0".repeat(40), false)).toBeNull();
   });
 });
