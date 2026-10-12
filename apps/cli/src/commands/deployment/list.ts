@@ -114,7 +114,7 @@ export default class DeploymentList extends EnvironmentCommand {
               // text or break the suggestion.
               `--page-token ${shellArg(next)}`,
               "--json",
-            ].join(" "),
+            ].join(" ") + this.environmentSelector(),
             cliVersion,
           )
         : undefined;

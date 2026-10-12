@@ -55,7 +55,12 @@ export default class ReleaseRevoke extends EnvironmentCommand {
           "Revoking a release requires --force in non-interactive mode",
           {
             hint: `Pass --force to revoke ${releaseId}.`,
-            nextCommands: [publicCliCommand(`release revoke ${releaseId} --force`, cliVersion)],
+            nextCommands: [
+              publicCliCommand(
+                `release revoke ${releaseId} --force${this.environmentSelector()}`,
+                cliVersion,
+              ),
+            ],
           },
         );
       }

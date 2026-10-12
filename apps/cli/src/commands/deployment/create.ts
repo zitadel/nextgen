@@ -59,7 +59,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
         deployment_id: deployment.id,
         release_id: deployment.release_id,
         origins,
-        next_commands: ["zitadel deployment list"],
+        next_commands: [`zitadel deployment list${this.environmentSelector()}`],
       },
       pretty: [
         `Deployed ${deployment.release_id} to ${origins.length} origin${origins.length === 1 ? "" : "s"}`,
