@@ -21,6 +21,13 @@
           "destination": "/ui/console/index.html"
         }
       ]
+    },
+    "docs": {
+      "root": "apps/docs",
+      "framework": "nextjs",
+      "installCommand": "corepack pnpm install --frozen-lockfile",
+      "buildCommand": "corepack pnpm run build",
+      "ignoreCommand": "sh ../cloud/ignore-build.sh"
     }
   },
   "redirects": [
@@ -35,6 +42,18 @@
       "source": "/ui/console/(.*)",
       "destination": {
         "service": "console"
+      }
+    },
+    {
+      "source": "/docs",
+      "destination": {
+        "service": "docs"
+      }
+    },
+    {
+      "source": "/docs/(.*)",
+      "destination": {
+        "service": "docs"
       }
     },
     {

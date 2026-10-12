@@ -4,8 +4,8 @@
 #
 # Production (main) always deploys, so every merge reaches it. A preview
 # builds only when its branch touches what this deployment runs: the server,
-# the login UI and the console with the packages they build from, and the
-# deployment wiring. Docs-only and SDK-only branches get no preview build.
+# the login UI, the console and the docs site with the packages they build
+# from, and the deployment wiring. SDK-only branches get no preview build.
 # Whenever the answer is unclear, the preview builds.
 #
 # Each service of vercel.json runs it from its own root; the paths below are
@@ -23,6 +23,7 @@ paths="
 api
 apps/cloud
 apps/console
+apps/docs
 apps/login-ui
 cmd
 docs/design/api/events-catalog.md
@@ -39,6 +40,7 @@ packages/sdk-core
 packages/sdk-react
 pnpm-lock.yaml
 pnpm-workspace.yaml
+redocly.yaml
 vercel.json
 "
 
