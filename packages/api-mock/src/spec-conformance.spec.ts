@@ -1402,6 +1402,60 @@ describe("api-mock idp and variable contract details", () => {
     const body = (await second.json()) as Record<string, unknown>;
     expect(body).toEqual({ FIRST: "a", SECOND: "b" });
   });
+
+  test("keeps the preview override in its own bucket, not merged with all", async () => {
+    // applies_to is a second dimension of the key: a preview read returns only
+    // the names that hold a preview override, never the all values alongside.
+    const projectId = await newProject("vars-applies-to");
+    const write = (query: string, payload: object) =>
+      fetch(`${BASE}/variables?${query}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    await write(`project_id=${projectId}`, { API_URL: "https://api.acme.com" });
+    await write(`project_id=${projectId}&applies_to=preview`, {
+      API_URL: "https://api.preview.acme.com",
+    });
+
+    const atAll = (await (
+      await fetch(`${BASE}/variables?project_id=${projectId}`)
+    ).json()) as Record<string, unknown>;
+    const atPreview = (await (
+      await fetch(`${BASE}/variables?project_id=${projectId}&applies_to=preview`)
+    ).json()) as Record<string, unknown>;
+
+    expect(atAll.API_URL).toBe("https://api.acme.com");
+    expect(atPreview.API_URL).toBe("https://api.preview.acme.com");
+  });
+
+  test("deletes the preview override and leaves the all value standing", async () => {
+    const projectId = await newProject("vars-applies-to-delete");
+    const write = (query: string, payload: object) =>
+      fetch(`${BASE}/variables?${query}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    await write(`project_id=${projectId}`, { API_URL: "https://api.acme.com" });
+    await write(`project_id=${projectId}&applies_to=preview`, {
+      API_URL: "https://api.preview.acme.com",
+    });
+
+    const removed = await fetch(
+      `${BASE}/variables/API_URL?project_id=${projectId}&applies_to=preview`,
+      { method: "DELETE" },
+    );
+    expect(removed.status).toBe(204);
+
+    expect(
+      (await fetch(`${BASE}/variables/API_URL?project_id=${projectId}&applies_to=preview`)).status,
+    ).toBe(404);
+    const atAll = (await (
+      await fetch(`${BASE}/variables/API_URL?project_id=${projectId}`)
+    ).json()) as unknown;
+    expect(atAll).toBe("https://api.acme.com");
+  });
 });
 
 /**
@@ -1721,6 +1775,84 @@ describe("api-mock releases and deployments", () => {
     ).json()) as { deployments: { release_id: string }[] };
     expect(live.deployments).toHaveLength(1);
     expect(live.deployments[0].release_id).toBe(first.id);
+  });
+
+  const setVars = (id: string, query: string, payload: object) =>
+    fetch(`${BASE}/variables?project_id=${id}${query}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+  test("freezes the all values onto a deployment and serves them unchanged", async () => {
+    // What the target serves is frozen when the deployment is written: a later
+    // write to the store never reaches a deployment already made.
+    const project = await newProject("deploy-freeze");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    await setVars(project.id, "", { API_URL: "https://api.acme.com" });
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const deployment = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: ["primary"],
+      })
+    ).json()) as { id: string };
+
+    await setVars(project.id, "", { API_URL: "https://api.changed.com" });
+
+    const frozen = (await (
+      await fetch(`${BASE}/deployments/${deployment.id}/variables?project_id=${project.id}`)
+    ).json()) as Record<string, unknown>;
+    expect(frozen).toEqual({ API_URL: "https://api.acme.com" });
+  });
+
+  test("a preview deployment prefers the preview override and falls back to all", async () => {
+    const project = await newProject("deploy-freeze-preview");
+    await fetch(`${BASE}/projects/${project.id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ pattern: "https://*-acme.vercel.app", kind: "preview" }),
+    });
+    await setVars(project.id, "", { API_URL: "https://api.acme.com", FLAG: "shared" });
+    await setVars(project.id, "&applies_to=preview", { API_URL: "https://api.preview.acme.com" });
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const deployment = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: ["https://pr-1-acme.vercel.app"],
+        ttl: "24h",
+      })
+    ).json()) as { id: string };
+
+    const frozen = (await (
+      await fetch(`${BASE}/deployments/${deployment.id}/variables?project_id=${project.id}`)
+    ).json()) as Record<string, unknown>;
+    expect(frozen).toEqual({ API_URL: "https://api.preview.acme.com", FLAG: "shared" });
+  });
+
+  test("answers dep.not_found for a deployment's variables under the wrong project", async () => {
+    const owner = await newProject("deploy-vars-owner");
+    const other = await newProject("deploy-vars-other");
+    await addPrimary(owner.id, owner.secret, "https://app.acme.com");
+    const release = (await (await createRelease(owner.id, owner.secret, rel1)).json()) as {
+      id: string;
+    };
+    const deployment = (await (
+      await createDeployment(owner.id, owner.secret, {
+        release_id: release.id,
+        targets: ["primary"],
+      })
+    ).json()) as { id: string };
+
+    const res = await fetch(
+      `${BASE}/deployments/${deployment.id}/variables?project_id=${other.id}`,
+    );
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { code: string }).code).toBe("dep.not_found");
   });
 
   test("refuses to revoke a release an origin still serves, then allows it", async () => {
