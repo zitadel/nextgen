@@ -2,28 +2,32 @@
 
 > **Code:** [`apps/cloud/`](../../apps/cloud/) and the repo-root
 > [`vercel.json`](../../vercel.json)
-> **Vercel project:** `zitadel/cloud` (renamed from `nextgen-preview-cloud`;
-> its production URL stays `nextgen-preview-cloud.vercel.app` until a domain
-> is attached)
+> **Vercel project:** `zitadel/cloud` (renamed from `nextgen-preview-cloud`).
+> Production answers at `nextgen-preview-cloud.vercel.app` and at
+> `nextgen-docs-zitadel.vercel.app`, the docs' address that
+> [`skills/zitadel/SKILL.md`](../../skills/zitadel/SKILL.md) gives agents,
+> until a domain of our own is attached
 > **PlanetScale:** organization `zitadel`, Postgres databases `production`
 > and `preview`, both in AWS `eu-central-1`
 
 The hosted cloud is the current `main`, built by Vercel from the repository
 and run in Frankfurt (`fra1`) against PlanetScale Postgres in the same AWS
 region. **`main` is production:** every merge deploys. A branch that touches
-the server, the console, the login UI or the storybook gets a preview
-deployment with a database of its own. Version tags and their npm packages remain the
+the server, the console, the login UI, the storybook or the docs gets a
+preview deployment with a database of its own. Version tags and their npm
+packages remain the
 self-hosted artifact; this cloud does not run them.
 
 ## Layout
 
-One Vercel deployment, three [services](https://vercel.com/docs/services):
+One Vercel deployment, four [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds, compiles `apps/cloud/launcher`, then migrates | every path except the console's and the storybook's, including `/console/runtime.json` and the login UI at `/ui/login/` |
+| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds, compiles `apps/cloud/launcher`, then migrates | every path except the console's, the storybook's and the docs', including `/console/runtime.json` and the login UI at `/ui/login/` |
 | `console` | Vite; the console build with `VITE_CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights | `/ui/console/*` (bare `/ui/console` redirects to the slash form) |
 | `storybook` | Storybook; `moon run storybook:build`, moved to `dist/storybook/` | `/storybook/*` (bare `/storybook` redirects to the slash form) |
+| `docs` | Next.js; `apps/docs`' own `pnpm run build`, never moon (moon cannot archive the symlinks Vercel's Next.js adapter writes) | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
 
 The console lives at the path the server would serve it from, on the same
 origin. The server's own console is switched off, and nothing else about
@@ -181,7 +185,8 @@ or garbled fails the build and the serving deployment stays.
 - **Previews:** every push to a branch, if
   [`ignore-build.sh`](../../apps/cloud/ignore-build.sh) finds a change to
   what the deployment runs since the branch's last preview, or since it
-  left `main`. Docs-only branches get no preview.
+  left `main`. A docs-only branch gets one too, database included, because
+  the docs are a service of the deployment; SDK-only branches get none.
 - **Migrations must be expand/contract.** The previous deployment serves on
   the new schema until the new one is live, and Instant Rollback promotes
   an older deployment without touching the schema.
@@ -232,8 +237,8 @@ project and imports the root admin.
   previews can be busy at the same time. Raise it (Parameters tab, needs a
   restart) before raising the pool size.
 - **Analytics:** the console reports page views and Web Vitals per route
-  pattern (`/ui/console/users/$userId`) to the project's Analytics and Speed
-  Insights tabs.
+  pattern (`/ui/console/users/$userId`), the docs per page, to the project's
+  Analytics and Speed Insights tabs.
 - **Signing in:** `/ui/console/` with the environment's root admin from
   1Password (production and preview have different passwords). Anyone else
   registers through the login UI.
