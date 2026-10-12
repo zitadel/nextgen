@@ -1,0 +1,34 @@
+post:
+  operationId: removeOrigin
+  summary: Remove an origin pattern
+  description: |
+    Removes one pattern from the project's origins. Requests from URLs only
+    that pattern admitted are refused from now on; live previews and
+    deployment history are untouched.
+  tags:
+    - Projects
+  parameters:
+    - name: project_id
+      in: path
+      required: true
+      schema:
+        $ref: ../../../../../components/schemas/project-id.yaml
+  security:
+    - oauth2:
+        - origin.delete
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+            - pattern
+          properties:
+            pattern:
+              type: string
+  responses:
+    '204':
+      description: The pattern was removed.
+    default:
+      $ref: removeOrigin-error-response.yaml

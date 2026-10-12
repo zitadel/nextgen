@@ -13,6 +13,20 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
+// AddOrigin implements addOrigin operation.
+//
+// Adds one `{pattern, kind}` to the project's origins. A `primary` pattern
+// must be an exact URL with no wildcard; a `preview` pattern may carry a
+// wildcard but a wildcard on a shared host needs a literal label of your own
+// beside the host. A malformed pattern, a wildcard primary and an unbounded
+// preview wildcard are each rejected; a host the server has no rule for is
+// stored as written.
+//
+// POST /projects/{project_id}/origins
+func (UnimplementedHandler) AddOrigin(ctx context.Context, req *Origin, params AddOriginParams) (r AddOriginRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // BeginUserPasskeyRegistration implements beginUserPasskeyRegistration operation.
 //
 // Starts a WebAuthn registration ceremony for the user and returns the
@@ -959,6 +973,17 @@ func (UnimplementedHandler) QueryTeams(ctx context.Context, req *QueryTeamsReque
 //
 // POST /users/query
 func (UnimplementedHandler) QueryUsers(ctx context.Context, req *QueryUsersRequest, params QueryUsersParams) (r QueryUsersRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// RemoveOrigin implements removeOrigin operation.
+//
+// Removes one pattern from the project's origins. Requests from URLs only
+// that pattern admitted are refused from now on; live previews and
+// deployment history are untouched.
+//
+// POST /projects/{project_id}/origins/remove
+func (UnimplementedHandler) RemoveOrigin(ctx context.Context, req *RemoveOriginReq, params RemoveOriginParams) (r RemoveOriginRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
