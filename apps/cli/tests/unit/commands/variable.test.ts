@@ -60,7 +60,7 @@ async function asTerminal<T>(run: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Run with `value` on stdin, the way a scripted `zitadel variables set NAME <
+ * Run with `value` on stdin, the way a scripted `zitadel variable set NAME <
  * value.txt` supplies it. `runCliForTest` runs in-process, so the stream is
  * swapped for the duration of the call and restored afterwards.
  */
