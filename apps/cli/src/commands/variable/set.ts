@@ -125,7 +125,14 @@ export default class VariableSet extends EnvironmentCommand {
       // A terminal on stdin means nothing was piped: fail rather than block on a
       // read that would never end.
       if (nonInteractive && process.stdin.isTTY) {
-        const retry = pipeHint(name, flags.secret, type, flags.preview, cliVersion);
+        const retry = pipeHint(
+          name,
+          flags.secret,
+          type,
+          flags.preview,
+          cliVersion,
+          this.environmentSelector(),
+        );
         throw new ZitadelError("E_VALIDATION", `No value supplied for ${name}.`, {
           hint: `Pipe the value in: ${retry}`,
           nextCommands: [retry],
@@ -229,6 +236,7 @@ function pipeHint(
   type: VariableType,
   preview: boolean,
   cliVersion: string,
+  selector: string,
 ): string {
   const args = [
     "variable",
@@ -238,5 +246,7 @@ function pipeHint(
     ...(type === "string" ? [] : ["--as", type]),
     ...(preview ? ["--preview"] : []),
   ].join(" ");
-  return `${publicCliCommand(args, cliVersion)} < value.txt`;
+  // The selector carries this invocation's --env/--env-file/--server so the
+  // retry writes to the same project, and it must precede the stdin redirection.
+  return `${publicCliCommand(`${args}${selector}`, cliVersion)} < value.txt`;
 }
