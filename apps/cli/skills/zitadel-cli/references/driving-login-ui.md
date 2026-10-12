@@ -38,7 +38,8 @@ exercises fresh-app setup plus registration, logout, and login across the
 supported frameworks.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
-then re-run `plan` and `apply`. Schema and flow files are synced from
+then re-run `deploy` (or `deploy --dry-run` to validate and preview the diff
+without publishing). Schema and flow files are synced from
 `.zitadel/schemas/*.json` and `.zitadel/flows/*.json`. Login templates
 (branding) are synced from `.zitadel/branding/`: a single `branding.json`
 descriptor (layout, asset URLs) plus a sibling `login.liquid` LiquidJS
@@ -46,18 +47,19 @@ template referenced as `"liquid_template": { "$file": "./login.liquid" }`. Scaff
 `branding eject` command (`--design centered|minimal`,
 interactive picker on a TTY); setup never scaffolds them. Branding is
 revisioned and immutable: every edit — including a `.liquid`-only edit —
-plans as a `revise` and `apply` publishes a new revision; the login serves
-the newest one. `plan` validates templates with the authoritative LiquidJS
-validator (`E_VALIDATION` lists rule ids such as `no-script-tag` and
+is published as part of the next release when you `deploy`, and the login
+serves the newest release. `deploy` validates templates with the authoritative
+LiquidJS validator (and `deploy --dry-run` runs the same validation without
+publishing; `E_VALIDATION` lists rule ids such as `no-script-tag` and
 `mandatory-gates`; every template must keep a trailing
 `{% mandatory_gates %}` tag). `font_url` is not writable yet; asset URLs
 must be absolute `https://`. Keep exactly one descriptor in
 `.zitadel/branding/` — extra `*.json` files there fail the scan.
 Server-provisioned defaults remain a fallback for non-CLI project
 creation, but CLI-created projects are authored from local files first. Flows are
-revisioned like branding: an edit plans as a `revise` and `apply` publishes a new
-immutable flow revision; a schema revise re-publishes the flows pinned to it with
-the new `user_schema` in the same run. A login pinned by `flow-name` serves that
+revisioned like branding: an edit is published as a new immutable flow revision
+in the next `deploy`; a schema change re-publishes the flows pinned to it with
+the new `user_schema` in the same release. A login pinned by `flow-name` serves that
 flow's newest revision; an unpinned login serves the newest active unscoped flow
 in the project, whatever its name. Removing a flow file does not retire the
 flow. Managed files carry a marker comment; `eject` removes only
