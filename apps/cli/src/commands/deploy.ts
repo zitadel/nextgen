@@ -30,6 +30,18 @@ import { reportWarning } from "../lib/warnings";
  * It replaces `plan` and `apply`: a release is published as one immutable unit
  * and deployed, rather than each resource being synced in place.
  */
+
+/**
+ * Whether an origin pattern covers a concrete origin URL, matching the server's
+ * glob rule: a `*` stands for one or more characters, none of them a dot, so
+ * `https://*.preview.acme.com` covers `https://pr-7.preview.acme.com` but not a
+ * deeper label. A pattern with no `*` matches only its exact self.
+ */
+function originMatchesPattern(pattern: string, origin: string): boolean {
+  const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, (ch) => (ch === "*" ? "\0" : `\\${ch}`));
+  return new RegExp(`^${escaped.replaceAll("\0", "[^.]+")}$`).test(origin);
+}
+
 export default class Deploy extends EnvironmentCommand {
   static override description = "Build a release from .zitadel/ and deploy it to the project.";
   static override group = CommandGroups.configuration;
@@ -71,20 +83,31 @@ export default class Deploy extends EnvironmentCommand {
     const { client, projectId } = await this.connect();
 
     // --origin narrows the deploy to one primary origin. A preview origin is
-    // deployed from a pull-request build, not here, so it is refused by name.
+    // deployed from a pull-request build, not here, so it is refused. A primary
+    // pattern is an exact URL, so a literal match is a primary target — and a
+    // literal beats a wildcard. A preview pattern may be a wildcard, so it is
+    // matched by glob, not string equality: a concrete URL covered by a preview
+    // wildcard (say `https://pr-7.preview.acme.com` under
+    // `https://*.preview.acme.com`) is still a preview and must be refused here,
+    // not slip through as a primary target.
     const origin = flags.origin;
     if (origin !== undefined) {
       const origins = (await client.getProject(projectId)).origins ?? [];
-      const match = origins.find((entry) => entry.pattern === origin);
-      if (!match) {
+      const isPrimary = origins.some(
+        (entry) => entry.kind === "primary" && entry.pattern === origin,
+      );
+      if (!isPrimary) {
+        const isPreview = origins.some(
+          (entry) => entry.kind === "preview" && originMatchesPattern(entry.pattern, origin),
+        );
+        if (isPreview) {
+          throw new ZitadelError("E_VALIDATION", `${origin} is a preview origin`, {
+            hint: "Pass a primary origin; preview origins are served by pull-request builds.",
+          });
+        }
         throw new ZitadelError("E_VALIDATION", `${origin} is not an origin of the project`, {
           hint: "Pass a primary origin, or add it first with `zitadel origin add`.",
           nextCommands: ["zitadel origin list"],
-        });
-      }
-      if (match.kind === "preview") {
-        throw new ZitadelError("E_VALIDATION", `${origin} is a preview origin`, {
-          hint: "Pass a primary origin; preview origins are served by pull-request builds.",
         });
       }
     }
