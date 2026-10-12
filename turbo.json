@@ -1,0 +1,59 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  // Pilot: Turborepo runs only the builds of the hosted cloud (the root
+  // vercel.json services). Moon still owns CI, local dev and releases. See
+  // docs/design/build/turborepo-pilot.md.
+  //
+  // Without this, turbo writes its own block into the root AGENTS.md whenever
+  // it detects an AI agent running it.
+  "agentGuidance": false,
+  "globalDependencies": [".nvmrc", ".npmrc", "pnpm-workspace.yaml", "tsconfig.base.json"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build", "generate", "sync-schemas"],
+      "outputs": ["dist/**"]
+    },
+    "generate": {
+      "outputs": ["src/generated/**"]
+    },
+    "sync-schemas": {
+      "outputs": ["meta-schemas/*.json"]
+    },
+
+    // Code generation reads the OpenAPI source outside the package.
+    "@zitadel/api#generate": {
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/api/openapi/**/*.yaml"],
+      "outputs": ["src/generated/**"]
+    },
+    "@zitadel/config#sync-schemas": {
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json"],
+      "outputs": ["meta-schemas/*.json"]
+    },
+    // The Figma export is the input; the rest is generated (and committed).
+    "@zitadel/design-tokens#generate": {
+      "outputs": [
+        "src/generated/tokens.css",
+        "src/generated/tokens.ts",
+        "src/generated/tailwind.css",
+        "src/generated/shadcn.css"
+      ]
+    },
+
+    // The two SPAs build into the server's embed directories, outside their
+    // packages. The console's VITE_* variables (VITE_CONSOLE_VERCEL_INSIGHTS)
+    // join its hash through Vite framework inference.
+    //
+    // The console names its one built dependency instead of `^build`: `^build`
+    // follows devDependencies too, and the console's @zitadel/testing (used by
+    // dev-real only) would pull the CLI and sdk-next builds into every deploy.
+    // The other workspace packages it imports resolve from source.
+    "@zitadel/console#build": {
+      "dependsOn": ["@zitadel/sdk-react#build"],
+      "outputs": ["$TURBO_ROOT$/internal/staticui/console/dist/**"]
+    },
+    "@zitadel/login-ui#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["$TURBO_ROOT$/internal/staticui/login/dist/**"]
+    }
+  }
+}

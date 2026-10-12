@@ -26,6 +26,7 @@
     "@vitest/coverage-v8": "catalog:",
     "sharp": "catalog:",
     "tsx": "catalog:",
+    "turbo": "catalog:",
     "typescript": "catalog:",
     "verdaccio": "6.7.4",
     "vite": "catalog:",
