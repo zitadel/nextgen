@@ -195,14 +195,19 @@ or garbled fails the build and the serving deployment stays.
 
 Every deployment is tested once Vercel built it, on its own URL
 (`cloud-<hash>-zitadel.vercel.app`, never a production alias):
-[`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) runs on the
-`deployment_status` event Vercel posts to GitHub and runs each service's
-contract suite against the deployment, today the docs'
+[`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) runs each
+service's contract suite against the deployment, today the docs'
 (`moon run docs:e2e-deployment`, [`apps/docs/AGENTS.md`](../../apps/docs/AGENTS.md)).
-The check lands on the deployed commit, named after what it tested:
-`deployment-checks / docs (Preview)` on the pull request,
-`deployment-checks / docs (Production)` on `main`.
+What starts it, and where the result lands, depends on the environment:
 
+- **A preview:** the `deployment_status` event Vercel posts to GitHub. The
+  check lands on the pull request: `deployment-checks / docs (Preview)`.
+- **Production:** [`production-checks.yml`](../../.github/workflows/production-checks.yml),
+  on the `vercel.deployment.ready` dispatch Vercel sends once the deployment
+  is built, before its Deployment Checks run. It calls the same job and sets
+  the commit status `docs (Production)` on the deployed commit. A dispatch
+  runs the workflow as it is on `main`: a change to it takes effect once
+  merged.
 - The suites reach the protected deployment with the project's Protection
   Bypass for Automation secret, which the workflow expects as the repository
   secret `VERCEL_AUTOMATION_BYPASS_SECRET`. To set it from the project's
@@ -217,23 +222,27 @@ The check lands on the deployed commit, named after what it tested:
   Regenerating the secret in the project settings invalidates it: set it
   again.
 - **Reading a red check**, in this order: the check's name says the service
-  and the environment; its annotations name the failing contract (the test's
-  title) and list every URL that failed; the run's summary names the
-  deployment and the command that reproduces the run; the
-  `docs-deployment-report` artifact holds the Playwright report and the
-  traces.
+  and the environment (production's status links its run); its annotations
+  name the failing contract (the test's title) and list every URL that
+  failed; the run's summary names the deployment and the command that
+  reproduces the run; the `docs-deployment-report` artifact holds the
+  Playwright report and the traces. A flaky production run is run again
+  from that run's page: it reports on the same commit again.
 - By hand, against any deployment:
   `DOCS_BASE_URL=https://cloud-….vercel.app VERCEL_AUTOMATION_BYPASS_SECRET=… moon run docs:e2e-deployment`,
   or `gh workflow run deployment-checks.yml --ref <branch> -f url=https://cloud-….vercel.app`
-  for a run without a new deployment. A change to the workflow needs no
+  for a run without a new deployment; it reports `docs (dispatch)`, never
+  production's status. A change to `deployment-checks.yml` needs no
   dispatch: a `deployment_status` run uses the file as it is on the deployed
   commit, so the branch's own preview checks it.
-- Production is not held back by the check yet: a red run on `main` shows on
-  the commit while the deployment already serves. To gate it, enable
-  Deployment Checks in the project's Build & Deployment settings and select
-  the `docs (Production)` check: Vercel then assigns the production domain only once the
-  check passes, so a red deployment never replaces the one serving (Force
-  Promote on the deployment's page bypasses it).
+- **Holding production back on it:** in the project's Build & Deployment
+  settings, Deployment Checks, add the GitHub check `docs (Production)` and
+  let it block. Vercel then assigns the production domains only once the
+  status passes, so a red deployment never replaces the one serving (Force
+  Promote on the deployment's page bypasses it). Until then a red status
+  only shows on the commit while the deployment already serves. A check
+  added there has to come from `production-checks.yml`: one that starts on
+  `deployment_status` waits for the very domains it holds back.
 
 ## Rotating the master key
 
