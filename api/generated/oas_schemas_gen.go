@@ -12929,15 +12929,13 @@ func (s *CreateProjectResponse) SetCreatedAt(val time.Time) {
 
 func (*CreateProjectResponse) createProjectRes() {}
 
-// The request cannot build a release. `code` says why; for a bundle whose
-// resources fail validation it is `rel.invalid`, and `details.resources`
-// lists every resource that failed.
+// Merged schema.
 // Ref: #
 type CreateReleaseBadRequest struct {
 	Code ErrorCode `json:"code"`
 	// Human-readable explanation of the error.
 	Message string `json:"message"`
-	// Additional error-specific context.
+	// Merged property.
 	Details OptCreateReleaseBadRequestDetails `json:"details"`
 }
 
@@ -12973,10 +12971,9 @@ func (s *CreateReleaseBadRequest) SetDetails(val OptCreateReleaseBadRequestDetai
 
 func (*CreateReleaseBadRequest) createReleaseRes() {}
 
-// Additional error-specific context.
+// Merged schema.
 type CreateReleaseBadRequestDetails struct {
-	// Every bundle resource that failed validation, each with the code
-	// and message its kind's create endpoint would have answered.
+	// Every bundle resource that failed validation.
 	Resources       []BundleResourceError `json:"resources"`
 	AdditionalProps CreateReleaseBadRequestDetailsAdditional
 }
