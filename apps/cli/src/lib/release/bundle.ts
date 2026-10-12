@@ -53,6 +53,20 @@ export async function buildBundle(cwd: string): Promise<BuiltBundle> {
   const brandingSources = (await readJsonDir(join(cwd, BRANDING_DIR))).map((descriptor) => ({
     ...descriptor,
   }));
+  // A project has one branding, so the wire bundle caps `brandings` at one
+  // (ADR: `configuration-bundle`). The total-resource cap below would not catch
+  // a second descriptor, so it is refused here — before `$file` inlining and
+  // before anything is sent — with the same message the server would answer.
+  if (brandingSources.length > 1) {
+    throw new ZitadelError(
+      "E_VALIDATION",
+      `A release carries at most one branding, but .zitadel/branding/ holds ${brandingSources.length}`,
+      {
+        hint: "A project has a single branding; keep one descriptor under .zitadel/branding/.",
+      },
+    );
+  }
+
   const brandings = brandingSources.map(
     (descriptor) => toBrandingWireBody(cwd, descriptor) as Record<string, unknown>,
   );

@@ -54,6 +54,27 @@ describe("deployment create", () => {
         expect(data.origins).toEqual(["https://app.acme.com"]);
       });
 
+      it("writes no deployment on a dry run", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://app.acme.com");
+        const releaseId = await aRelease(app);
+
+        const result = await app.run([
+          "deployment",
+          "create",
+          "--release",
+          releaseId,
+          "--dry-run",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toSucceed();
+        expect(app.envelopeOf<{ dry_run: boolean }>(result).data.dry_run).toBe(true);
+        const listed = await app.run(["deployment", "list", "--json"]);
+        expect(app.envelopeOf<{ count: number }>(listed).data.count).toBe(0);
+      });
+
       it("fails with no primary origin to deploy to", async () => {
         const app = await aSetUpApp();
         const releaseId = await aRelease(app);

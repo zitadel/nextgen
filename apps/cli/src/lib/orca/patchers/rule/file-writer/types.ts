@@ -26,7 +26,13 @@ export type FileOp =
       readonly kind: "merge-env";
       readonly path: string;
       readonly entries: Readonly<Record<string, string>>;
-      /** Permission bits for a file this op creates; an existing file keeps its own. */
+      /**
+       * Permission bits for this op's target. On create they set the file's
+       * mode; on an existing file a set `mode` is re-asserted (chmod), because
+       * a secret-bearing `.env.*.local` must not be left at a looser mode it
+       * drifted to — `writeFile`'s mode applies only on creation and is masked
+       * by the umask.
+       */
       readonly mode?: number;
       /**
        * Lines written as `# ` comments above the entries the first time any of

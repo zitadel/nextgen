@@ -85,6 +85,22 @@ describe("idp-connections step", () => {
     expect(createIdp).not.toHaveBeenCalled();
   });
 
+  it("creates no connection when a later file is malformed", async () => {
+    // Lexical order: `a-google.json` is read before `b-bad.json`, so a
+    // validate-then-create loop would create the first before the second
+    // failed. Validating the whole set first must leave none created.
+    const cwd = await project({
+      "a-google.json": googleBody(),
+      "b-bad.json": { slug: "bad", protocol: "oidc" },
+    });
+    const createIdp = vi.fn().mockResolvedValue({ id: "idp_1" });
+
+    await expect(
+      idpConnectionsStep.run(ctx(cwd, { client: { createIdp } as never })),
+    ).rejects.toThrow();
+    expect(createIdp).not.toHaveBeenCalled();
+  });
+
   it("creates each connection on a real run", async () => {
     const cwd = await project({ "google.json": googleBody() });
     const createIdp = vi.fn().mockResolvedValue({ id: "idp_1" });

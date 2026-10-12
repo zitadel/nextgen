@@ -48,7 +48,10 @@ export default class OriginRm extends EnvironmentCommand {
 
     if (!force) {
       if (nonInteractive) {
-        const retry = publicCliCommand(`origin rm ${pattern} --force`, cliVersion);
+        const retry = publicCliCommand(
+          `origin rm ${pattern} --force${this.environmentSelector()}`,
+          cliVersion,
+        );
         throw new ZitadelError(
           "E_VALIDATION",
           "Removing an origin requires --force in non-interactive mode",

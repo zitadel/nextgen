@@ -34,8 +34,19 @@ export default class ReleaseRevoke extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(ReleaseRevoke);
     await this.toMeta(flags);
-    const { nonInteractive, force, cliVersion } = this.meta;
+    const { nonInteractive, dryRun, force, cliVersion } = this.meta;
     const releaseId = args.release_id;
+
+    // A dry run makes no request, so it answers before the connection and
+    // before the destructive-confirm gate: revoking cannot be undone, and a
+    // dry run must revoke nothing and so needs no confirmation.
+    if (dryRun) {
+      return this.emit({
+        status: "ok",
+        data: { dry_run: true, release_id: releaseId },
+        pretty: `Would revoke ${releaseId}. Nothing was revoked (dry run).`,
+      });
+    }
 
     if (!force) {
       if (nonInteractive) {

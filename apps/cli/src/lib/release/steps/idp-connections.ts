@@ -29,10 +29,15 @@ export const idpConnectionsStep: Step = {
   // reports what it would sync without a bad file slipping past validation.
   async run(ctx: StepContext): Promise<void> {
     const connections = await readJsonDir(join(ctx.cwd, IDPS_DIR));
+    // Validate every file before creating any. `POST /idps` writes one
+    // connection at a time, so a malformed file partway through would leave the
+    // earlier ones already created — a partial write. Checking the whole set
+    // first means a bad file stops the deploy before any connection is written.
+    // A dry run surfaces the same failures, which is why it validates here too.
     for (const connection of connections) {
-      // Validation runs on every deploy, dry or not: a dry run must surface a
-      // malformed file (or a literal client_secret) rather than defer it.
       validateConnection(connection);
+    }
+    for (const connection of connections) {
       if (ctx.dryRun) {
         // A dry run writes nothing; it only reports what the real deploy would
         // sync. Withheld under `--json` so the envelope travels alone on stdout.
