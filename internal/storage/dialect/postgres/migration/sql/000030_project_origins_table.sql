@@ -1,3 +1,4 @@
+-- +goose Up
 -- Move origins off the projects JSONB column into a natural-key child table.
 CREATE TABLE zitadel_nextgen.project_origins (
     project_id TEXT COLLATE "C" NOT NULL
@@ -24,3 +25,22 @@ WHERE jsonb_typeof(p.origins) = 'array'
 
 ALTER TABLE zitadel_nextgen.projects
     DROP COLUMN origins;
+
+-- +goose Down
+ALTER TABLE zitadel_nextgen.projects
+    ADD COLUMN origins JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+UPDATE zitadel_nextgen.projects p
+SET origins = COALESCE(
+    (
+        SELECT jsonb_agg(
+            jsonb_build_object('pattern', o.pattern, 'kind', o.kind)
+            ORDER BY o.created_at, o.pattern
+        )
+        FROM zitadel_nextgen.project_origins o
+        WHERE o.project_id = p.id
+    ),
+    '[]'::jsonb
+);
+
+DROP TABLE zitadel_nextgen.project_origins;
