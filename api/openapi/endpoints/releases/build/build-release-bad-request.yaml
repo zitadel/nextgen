@@ -1,0 +1,24 @@
+title: BuildReleaseBadRequest
+description: |
+  The bundle cannot build a release. `code` says why. A structurally
+  malformed request, such as a wrong type, a missing required field, an
+  unknown key or a kind over its cap, is refused while decoding with
+  `req.invalid`, naming the offending fields. A well-formed bundle whose
+  resources fail the checks their kinds' create endpoints run answers
+  `rel.invalid`, and `details.resources` lists every resource that failed.
+
+  The handler returns this response directly, with `resources` at the top
+  of `details`, rather than through the shared error path, which would nest
+  a producer's payload under `details.details`.
+allOf:
+  - $ref: ../../../components/error-details.yaml
+  - type: object
+    properties:
+      details:
+        type: object
+        properties:
+          resources:
+            type: array
+            description: Every bundle resource that failed validation.
+            items:
+              $ref: bundle-resource-error.yaml

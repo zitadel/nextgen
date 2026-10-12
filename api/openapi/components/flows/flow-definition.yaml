@@ -83,7 +83,7 @@ properties:
           submit: { target: authenticate }
           user_not_found: { target: register, action: switch }
       - name: authenticate
-        fields: [ password ]
+        fields: [ 'x-auth-methods#password' ]
         actions:
           - name: submit 
             kind: submit
