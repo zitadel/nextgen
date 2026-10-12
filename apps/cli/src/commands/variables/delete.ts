@@ -11,10 +11,9 @@ import { publicCliCommand } from "../../lib/public-cli";
  * The `variables delete` topic command — remove one variable from the project
  * level.
  *
- * A variable is removable only by the owner that entered it: deleting a name an
- * environment of the same project holds answers `var.not_found` and leaves that
- * owner's value standing (ADR 062 §4). Destructive, so it takes the same
- * `--force`-or-confirm gate the resource commands' `delete` uses.
+ * Deleting a name the project does not hold answers `var.not_found`.
+ * Destructive, so it takes the same `--force`-or-confirm gate the resource
+ * commands' `delete` uses.
  */
 export default class VariablesDelete extends OwnerCommand {
   static override description = "Delete one variable from the project.";
