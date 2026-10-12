@@ -22,10 +22,10 @@ type stubProjectService struct {
 	created *domain.Project
 }
 
-func (s stubProjectService) Create(context.Context, string, []string, bool) (*domain.Project, error) {
+func (s stubProjectService) Create(context.Context, string, []domain.Origin, bool) (*domain.Project, error) {
 	return s.created, nil
 }
-func (s stubProjectService) CreateWithID(context.Context, string, string, []string, bool) (*domain.Project, error) {
+func (s stubProjectService) CreateWithID(context.Context, string, string, []domain.Origin, bool) (*domain.Project, error) {
 	return s.created, nil
 }
 func (stubProjectService) Get(context.Context, string) (*domain.Project, error) {

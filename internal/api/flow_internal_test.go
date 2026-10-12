@@ -166,7 +166,7 @@ func TestValidateOriginAgainstProject(t *testing.T) {
 	tests := []struct {
 		name        string
 		origin      string
-		allowed     []string
+		allowed     []domain.Origin
 		wantErr     bool
 		wantInError []string
 	}{
@@ -178,12 +178,15 @@ func TestValidateOriginAgainstProject(t *testing.T) {
 		{
 			name:    "exact match allows",
 			origin:  "http://localhost:3000",
-			allowed: []string{"http://localhost:3000"},
+			allowed: []domain.Origin{{Pattern: "http://localhost:3000", Kind: domain.OriginKindPrimary}},
 		},
 		{
-			name:    "loopback spellings are not aliased",
-			origin:  "http://127.0.0.1:3000",
-			allowed: []string{"http://localhost:3000", "https://app.example.com"},
+			name:   "loopback spellings are not aliased",
+			origin: "http://127.0.0.1:3000",
+			allowed: []domain.Origin{
+				{Pattern: "http://localhost:3000", Kind: domain.OriginKindPrimary},
+				{Pattern: "https://app.example.com", Kind: domain.OriginKindPrimary},
+			},
 			wantErr: true,
 			wantInError: []string{
 				`"http://127.0.0.1:3000"`,
@@ -193,7 +196,7 @@ func TestValidateOriginAgainstProject(t *testing.T) {
 		{
 			name:    "ipv6 loopback is not aliased",
 			origin:  "http://[::1]:3000",
-			allowed: []string{"http://localhost:3000"},
+			allowed: []domain.Origin{{Pattern: "http://localhost:3000", Kind: domain.OriginKindPrimary}},
 			wantErr: true,
 			wantInError: []string{
 				`"http://[::1]:3000"`,
@@ -203,7 +206,7 @@ func TestValidateOriginAgainstProject(t *testing.T) {
 		{
 			name:    "ipv6 exact match allows",
 			origin:  "http://[::1]:3000",
-			allowed: []string{"http://[::1]:3000"},
+			allowed: []domain.Origin{{Pattern: "http://[::1]:3000", Kind: domain.OriginKindPrimary}},
 		},
 	}
 
@@ -211,7 +214,7 @@ func TestValidateOriginAgainstProject(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := validateOriginAgainstProject(tc.origin, &domain.Project{PreviewOrigins: tc.allowed})
+			err := validateOriginAgainstProject(tc.origin, &domain.Project{Origins: tc.allowed})
 
 			if !tc.wantErr {
 				require.NoError(t, err)

@@ -65,7 +65,7 @@ func TestCompileArrayContainsUsesJSONEach(t *testing.T) {
 	t.Parallel()
 
 	sql, args := compileProjectRead(t, &database.ListOptions[domain.ProjectField]{
-		Filter: database.ArrayContains(database.Col(domain.ProjectFieldPreviewOrigins), "https://app.example"),
+		Filter: database.ArrayContains(database.Col(domain.ProjectFieldOrigins), "https://app.example"),
 	})
 
 	assert.Equal(t,

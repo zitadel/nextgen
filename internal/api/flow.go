@@ -443,7 +443,7 @@ func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 }
 
 // validateOriginAgainstProject returns an error if the origin is not in the
-// project's PreviewOrigins allowlist. An empty allowlist means allow all
+// project's Origins allowlist. An empty allowlist means allow all
 // (development/test mode).
 //
 // Matching is deliberately exact — no loopback aliasing between localhost,
@@ -452,16 +452,18 @@ func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 // can never assert under another; aliasing here would replace this clear 400
 // with a confusing "no passkey found" during the ceremony.
 func validateOriginAgainstProject(originStr string, project *domain.Project) error {
-	if len(project.PreviewOrigins) == 0 {
+	if len(project.Origins) == 0 {
 		return nil
 	}
-	for _, allowed := range project.PreviewOrigins {
-		if allowed == originStr {
+	patterns := make([]string, len(project.Origins))
+	for i, allowed := range project.Origins {
+		if allowed.Pattern == originStr {
 			return nil
 		}
+		patterns[i] = allowed.Pattern
 	}
 	return fmt.Errorf("origin %q is not allowed for this project (allowed: %s)",
-		originStr, strings.Join(project.PreviewOrigins, ", "))
+		originStr, strings.Join(patterns, ", "))
 }
 
 // passkeyRPFromOrigin derives the WebAuthn relying-party id (the origin host,

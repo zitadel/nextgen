@@ -19,8 +19,8 @@ import (
 func TestNewProject(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		name           string
-		previewOrigins []string
+		name    string
+		origins []domain.Origin
 	}
 	tests := []struct {
 		name    string
@@ -67,7 +67,7 @@ func TestNewProject(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := domain.NewProject(tt.args.name, tt.args.previewOrigins)
+			got, err := domain.NewProject(tt.args.name, tt.args.origins)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 				assert.Nil(t, got)

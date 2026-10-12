@@ -89,9 +89,9 @@ func TestImport_teamPlaceholderNameTaken(t *testing.T) {
 	teamID := "team_" + suffix
 
 	require.NoError(t, stmts.CreateProject(ctx, &domain.Project{
-		ID:             projectID,
-		Name:           "project-" + projectID,
-		PreviewOrigins: []string{},
+		ID:      projectID,
+		Name:    "project-" + projectID,
+		Origins: []domain.Origin{},
 	}))
 	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), projectID) })
 
@@ -125,9 +125,9 @@ func TestImport_uniqueAttributesFollowSchema(t *testing.T) {
 	projectID := "proj_" + suffix
 	userID := "user_" + suffix
 	require.NoError(t, stmts.CreateProject(ctx, &domain.Project{
-		ID:             projectID,
-		Name:           "project-" + projectID,
-		PreviewOrigins: []string{},
+		ID:      projectID,
+		Name:    "project-" + projectID,
+		Origins: []domain.Origin{},
 	}))
 	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), projectID) })
 
