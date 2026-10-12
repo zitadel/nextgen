@@ -113,6 +113,10 @@ type GetDeploymentByIdRes interface {
 	getDeploymentByIdRes()
 }
 
+type GetDeploymentVariablesRes interface {
+	getDeploymentVariablesRes()
+}
+
 type GetEnvironmentByNameRes interface {
 	getEnvironmentByNameRes()
 }

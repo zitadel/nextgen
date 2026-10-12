@@ -222,6 +222,8 @@ paths:
     $ref: endpoints/deployments/methods.yaml
   /deployments/{deployment_id}:
     $ref: endpoints/deployments/by_id/methods.yaml
+  /deployments/{deployment_id}/variables:
+    $ref: endpoints/deployments/by_id/variables/methods.yaml
   /deployments/{deployment_id}/rollback:
     $ref: endpoints/deployments/by_id/rollback/methods.yaml
 
