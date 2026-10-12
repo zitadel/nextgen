@@ -28,12 +28,34 @@ describe("deployment list", () => {
         expect(app.envelopeOf<{ count: number }>(result).data.count).toBe(0);
       });
 
-      it("lists the deployment after a deploy", async () => {
+      it("emits the canonical list envelope", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const deployed = await app.deployData();
+
+        const result = await app.run(["deployment", "list", "--json"]);
+
+        expect(result).toSucceed();
+        // The envelope carries `items` (not `deployments`), a `count`, and a
+        // `next_page_token` that is null on the last page — the same shape the
+        // shared list commands emit.
+        const { data } = app.envelopeOf<{
+          items: { id: string; release_id: string }[];
+          count: number;
+          next_page_token: string | null;
+        }>(result);
+        expect(data.count).toBe(1);
+        expect(data.items).toHaveLength(1);
+        expect(data.items[0]?.release_id).toBe(deployed.release_id);
+        expect(data.next_page_token).toBeNull();
+      });
+
+      it("drains the history with --all", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
         await app.deployData();
 
-        const result = await app.run(["deployment", "list", "--json"]);
+        const result = await app.run(["deployment", "list", "--all", "--limit", "1", "--json"]);
 
         expect(result).toSucceed();
         expect(app.envelopeOf<{ count: number }>(result).data.count).toBe(1);
