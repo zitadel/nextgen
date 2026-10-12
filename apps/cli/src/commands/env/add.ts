@@ -7,6 +7,7 @@ import { consola } from "consola";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { ZitadelError } from "../../lib/errors";
+import { isEnvironmentName } from "../../lib/environment";
 import { isObject } from "../../lib/json";
 import {
   BaseCommand,
@@ -64,9 +65,9 @@ export default class EnvAdd extends BaseCommand {
     await this.toMeta(flags, { resolveServer: false });
     const { cwd, env, nonInteractive, dryRun, serverFlag } = this.meta;
     const name = args.name;
-    if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(name)) {
+    if (!isEnvironmentName(name)) {
       throw new ZitadelError("E_VALIDATION", `"${name}" is not a usable environment name`, {
-        hint: "Use letters, digits, - and _, e.g. production.",
+        hint: 'Use letters, digits, dot, dash and underscore, and no "..", e.g. production.',
       });
     }
     const file = `.env.${name}.local`;

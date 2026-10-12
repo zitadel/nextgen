@@ -102,8 +102,17 @@ function environmentName(env: NodeJS.ProcessEnv, flag?: string): Resolved {
  */
 const ENVIRONMENT_NAME = /^[A-Za-z0-9._-]+$/;
 
+/**
+ * Whether a value is usable as an environment name: the rule the
+ * `.env.<name>.local` paths require, shared with `env add` so a name `--env`
+ * resolves can also be bound.
+ */
+export function isEnvironmentName(value: string): boolean {
+  return ENVIRONMENT_NAME.test(value) && !value.includes("..");
+}
+
 function assertEnvironmentName(name: Resolved): void {
-  if (ENVIRONMENT_NAME.test(name.value) && !name.value.includes("..")) {
+  if (isEnvironmentName(name.value)) {
     return;
   }
   throw new ZitadelError("E_VALIDATION", `${name.value} is not a valid environment name`, {
