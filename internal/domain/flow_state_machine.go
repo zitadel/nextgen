@@ -17,9 +17,8 @@ import (
 
 // Step error text keys the state machine emits when an auth-attempt
 // proof is rejected. Every engine-emitted step error must be a
-// localizable `error.*` catalog key or a reserved outcome token:
-// /login localizes only `error.*`-prefixed step errors and treats
-// outcome tokens as routing, so anything else renders verbatim (see
+// localizable `error.*` catalog key: /login localizes only
+// `error.*`-prefixed step errors, so anything else renders verbatim (see
 // `localiseFlowErrorKeys` in
 // packages/components/src/orchestrator/liquid.ts). New emission sites
 // add a const here; [FlowStepErrorAllowed] and its contract test keep
@@ -67,9 +66,27 @@ const (
 	FlowStepErrorSSOUserCannotBeCreated = "error.sso_user_cannot_be_created"
 	// FlowStepErrorUserAlreadyExists reports a unique value another user
 	// holds where the engine cannot bind that user, so it cannot route
-	// user_already_exists: a user of another schema.
+	// user_already_exists: a user of another schema. Also what an unwired
+	// user_already_exists outcome renders.
 	FlowStepErrorUserAlreadyExists = "error.user_already_exists"
+	// FlowStepErrorUserNotFound reports an unknown identifier on a step
+	// that does not wire user_not_found.
+	FlowStepErrorUserNotFound = "error.user_not_found"
+	// FlowStepErrorSSOUserNotFound reports a provider identity with no
+	// account on a step that does not wire sso_user_not_found.
+	FlowStepErrorSSOUserNotFound = "error.sso_user_not_found"
+	// FlowStepErrorOutcomeUnhandled reports an unwired outcome with no
+	// key of its own.
+	FlowStepErrorOutcomeUnhandled = "error.outcome_unhandled"
 )
+
+// unwiredOutcomeErrors maps an implicit outcome the current step does not
+// route to the step error it renders instead.
+var unwiredOutcomeErrors = map[string]string{
+	FlowImplicitOutcomeUserNotFound:      FlowStepErrorUserNotFound,
+	FlowImplicitOutcomeUserAlreadyExists: FlowStepErrorUserAlreadyExists,
+	FlowImplicitOutcomeSSOUserNotFound:   FlowStepErrorSSOUserNotFound,
+}
 
 // errSSOClaimRejected reports a verified unique claim that fails its own
 // property. The user may not change a verified value, and the account cannot
@@ -77,14 +94,17 @@ const (
 var errSSOClaimRejected = errors.New("flow state machine: the user schema rejects a verified unique claim")
 
 // FlowStepErrorAllowed reports whether a step error value honors the
-// client contract: a localizable `error.*` text key or a reserved
-// outcome token (reservedOutcomes in flow_definition_validator.go).
+// client contract: a localizable `error.*` text key.
 func FlowStepErrorAllowed(key string) bool {
-	if strings.HasPrefix(key, "error.") {
-		return true
+	return strings.HasPrefix(key, "error.")
+}
+
+// UnwiredOutcomeError returns the step error an unwired outcome renders.
+func UnwiredOutcomeError(outcome string) string {
+	if key, ok := unwiredOutcomeErrors[outcome]; ok {
+		return key
 	}
-	_, ok := reservedOutcomes[key]
-	return ok
+	return FlowStepErrorOutcomeUnhandled
 }
 
 // FlowStateMachine drives a flow definition forward in response to
@@ -1208,14 +1228,13 @@ func (r *FlowStateMachineRuntime) renderStepError(pc *processCtx, resolved FlowR
 // renders (or terminates on a terminal step). When outcome differs
 // from the user-submitted action it came from a handler diversion
 // (e.g. user_not_found); a missing transition in that case degrades
-// to a step error instead of ErrFlowInvalidAction. If irreversible,
-// BackStack is dropped after advance.
+// to the outcome's step error instead of ErrFlowInvalidAction. If
+// irreversible, BackStack is dropped after advance.
 func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowResolvedFields, outcome string, irreversible bool) (FlowStepResult, error) {
 	transition, ok := pc.currentStep.Transitions[outcome]
 	if !ok {
 		if outcome != pc.in.Action {
-			msg := outcome
-			return r.renderStepError(pc, resolved, &msg)
+			return r.renderStepError(pc, resolved, new(UnwiredOutcomeError(outcome)))
 		}
 		return FlowStepResult{}, fmt.Errorf("%w: %q on step %q", ErrFlowInvalidAction(), pc.in.Action, pc.currentStep.Name)
 	}

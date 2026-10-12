@@ -1652,47 +1652,85 @@ func loginNoUserNotFoundDefinition() *domain.FlowDefinition {
 	}
 }
 
+// registerNoUserAlreadyExistsDefinition is a register-only flow whose
+// identifier step does NOT wire a user_already_exists transition.
+func registerNoUserAlreadyExistsDefinition() *domain.FlowDefinition {
+	def := loginNoUserNotFoundDefinition()
+	def.ID = "def-register-no-uae"
+	def.Purposes = map[domain.FlowDefinitionPurpose]string{
+		domain.FlowDefinitionPurposeRegister: "credentials",
+	}
+	return def
+}
+
 // TestFlowStateMachine_FlipTable_OutcomeWithoutTransition_DoesNotFlip
 // pins the invariant that CurrentPurpose flips only when a flip outcome
-// is actually routed. Dispatch returns user_not_found but the step has
-// no transition for it; the engine surfaces a step error and the mode
-// must stay at login so the next submit doesn't silently dispatch as
-// register.
+// is actually routed. Dispatch returns the flip outcome but the step has
+// no transition for it; the engine re-renders the step with the outcome's
+// localized error and the mode must stay put so the next submit doesn't
+// silently dispatch as the partner purpose.
 func TestFlowStateMachine_FlipTable_OutcomeWithoutTransition_DoesNotFlip(t *testing.T) {
 	t.Parallel()
 	const attemptID = "attempt-1"
 
-	w := newFlowTestWorld(t)
-	def := loginNoUserNotFoundDefinition()
-
-	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return(attemptID, nil)
-	w.schemaResolver.EXPECT().
-		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
-		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
-		AnyTimes()
-	w.authAttemptService.EXPECT().
-		SubmitIdentifier(gomock.Any(), gomock.Any()).
-		Return("", domain.ErrAuthAttemptProofRejected(nil))
-
-	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
-		Definition:    def,
-		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
-		UserSchemaURL: defaultSchemaURL,
-	})
-	require.NoError(t, err)
-
-	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
-		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{"email": "ghost@example.com", "x-auth-methods#password": "irrelevant"},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "credentials", result.State.CurrentStep, "no transition for user_not_found keeps the user on the current step")
-	if assert.NotNil(t, result.Step.Error) {
-		assert.Equal(t, domain.FlowImplicitOutcomeUserNotFound, *result.Step.Error)
+	tests := []struct {
+		name      string
+		def       *domain.FlowDefinition
+		purpose   domain.FlowDefinitionPurpose
+		userID    string
+		submitErr error
+		wantError string
+	}{
+		{
+			name:      "login-only flow with an unknown identifier",
+			def:       loginNoUserNotFoundDefinition(),
+			purpose:   domain.FlowDefinitionPurposeLogin,
+			submitErr: domain.ErrAuthAttemptProofRejected(nil),
+			wantError: domain.FlowStepErrorUserNotFound,
+		},
+		{
+			name:      "register-only flow with a known identifier",
+			def:       registerNoUserAlreadyExistsDefinition(),
+			purpose:   domain.FlowDefinitionPurposeRegister,
+			userID:    "user_alice",
+			wantError: domain.FlowStepErrorUserAlreadyExists,
+		},
 	}
-	assert.Equal(t, domain.FlowDefinitionPurposeLogin, result.State.CurrentPurpose,
-		"CurrentPurpose must not flip when the routed outcome had no transition wired")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			w := newFlowTestWorld(t)
+
+			w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return(attemptID, nil)
+			w.schemaResolver.EXPECT().
+				Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+				Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+				AnyTimes()
+			w.authAttemptService.EXPECT().
+				SubmitIdentifier(gomock.Any(), gomock.Any()).
+				Return(tt.userID, tt.submitErr)
+
+			start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+				Definition:    tt.def,
+				Purpose:       tt.purpose,
+				Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+				UserSchemaURL: defaultSchemaURL,
+			})
+			require.NoError(t, err)
+
+			result, err := w.sm.Process(t.Context(), tt.def, start.State, domain.FlowSubmitInput{
+				Action: domain.FlowActionSubmit,
+				Fields: map[string]any{"email": "alice@example.com", "x-auth-methods#password": "irrelevant"},
+			})
+			require.NoError(t, err)
+			assert.Equal(t, "credentials", result.State.CurrentStep, "an unwired outcome keeps the user on the current step")
+			if assert.NotNil(t, result.Step.Error) {
+				assert.Equal(t, tt.wantError, *result.Step.Error)
+			}
+			assert.Equal(t, tt.purpose, result.State.CurrentPurpose,
+				"CurrentPurpose must not flip when the routed outcome had no transition wired")
+		})
+	}
 }
 
 // TestFlowStateMachine_FlipTable_LoginTypoThenCorrectEmail_StillSignsIn
@@ -3542,10 +3580,10 @@ func TestFlowStateMachine_Back_DropsPendingChallenge(t *testing.T) {
 
 // TestFlowStepErrorContract sweeps every value the engine can emit as
 // `step.Error` and pins the client contract: a localizable `error.*`
-// text key or a reserved outcome token. The scenario tests above prove
-// each value is emitted where expected; this gate is what fails when a
-// new emission value (a step-error const, an implicit outcome, a
-// validation rule) breaks the dialect /login localizes.
+// text key. The scenario tests above prove each value is emitted where
+// expected; this gate is what fails when a new emission value (a
+// step-error const, an unwired implicit outcome, a validation rule)
+// breaks the dialect /login localizes.
 func TestFlowStepErrorContract(t *testing.T) {
 	t.Parallel()
 
@@ -3561,6 +3599,9 @@ func TestFlowStepErrorContract(t *testing.T) {
 		domain.FlowStepErrorSSOUserInvalid,
 		domain.FlowStepErrorSSOUserCannotBeCreated,
 		domain.FlowStepErrorUserAlreadyExists,
+		domain.FlowStepErrorUserNotFound,
+		domain.FlowStepErrorSSOUserNotFound,
+		domain.FlowStepErrorOutcomeUnhandled,
 	}
 	for _, key := range stepErrorConsts {
 		assert.True(t, domain.FlowStepErrorAllowed(key), "step-error const %q must honor the contract", key)
@@ -3577,14 +3618,15 @@ func TestFlowStepErrorContract(t *testing.T) {
 	}
 	for _, challenge := range challenges {
 		for _, outcome := range domain.ImplicitOutcomesForChallenge(challenge) {
-			// Unwired transitions surface the outcome token verbatim as
-			// step.Error, so every implicit outcome must stay reserved.
-			assert.True(t, domain.FlowStepErrorAllowed(outcome),
-				"implicit outcome %q of challenge %q must be a reserved token", outcome, challenge)
+			// An unwired transition surfaces the outcome's step error.
+			assert.True(t, domain.FlowStepErrorAllowed(domain.UnwiredOutcomeError(outcome)),
+				"implicit outcome %q of challenge %q must map to a text key", outcome, challenge)
 		}
 	}
-	assert.True(t, domain.FlowStepErrorAllowed(domain.FlowImplicitOutcomeUserNotFound))
-	assert.True(t, domain.FlowStepErrorAllowed(domain.FlowImplicitOutcomeUserAlreadyExists))
+	assert.Equal(t, domain.FlowStepErrorUserNotFound, domain.UnwiredOutcomeError(domain.FlowImplicitOutcomeUserNotFound))
+	assert.Equal(t, domain.FlowStepErrorUserAlreadyExists, domain.UnwiredOutcomeError(domain.FlowImplicitOutcomeUserAlreadyExists))
+	assert.Equal(t, domain.FlowStepErrorSSOUserNotFound, domain.UnwiredOutcomeError(domain.FlowImplicitOutcomeSSOUserNotFound))
+	assert.Equal(t, domain.FlowStepErrorOutcomeUnhandled, domain.UnwiredOutcomeError("some_new_outcome"))
 
 	rules := []domain.FlowFieldValidationRule{
 		domain.FlowFieldValidationRuleRequired,
@@ -3603,7 +3645,7 @@ func TestFlowStepErrorContract(t *testing.T) {
 		}
 	}
 
-	for _, key := range []string{"auth_attempt.password_invalid", "password_invalid", ""} {
+	for _, key := range []string{"auth_attempt.password_invalid", "password_invalid", domain.FlowImplicitOutcomeUserNotFound, ""} {
 		assert.False(t, domain.FlowStepErrorAllowed(key), "%q must not pass the contract", key)
 	}
 }
@@ -5239,9 +5281,9 @@ func TestFlowStateMachine_Render_SSOTeamUniqueClaimBindsOwnerWithoutTeam(t *test
 	assert.Equal(t, "user-9", result.State.CollectedData.UserID)
 }
 
-// A step that does not route the outcome re-renders with the outcome as its
-// error, as a handler diversion does.
-func TestFlowStateMachine_Render_SSOOutcomeUnwiredRendersOutcomeToken(t *testing.T) {
+// A step that does not route the outcome re-renders with the outcome's
+// localized error, as a handler diversion does.
+func TestFlowStateMachine_Render_SSOOutcomeUnwiredRendersStepError(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
 	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, nil), nil)
@@ -5251,7 +5293,7 @@ func TestFlowStateMachine_Render_SSOOutcomeUnwiredRendersOutcomeToken(t *testing
 	require.NoError(t, err)
 	assert.Equal(t, "credentials", result.Step.Name)
 	require.NotNil(t, result.Step.Error)
-	assert.Equal(t, domain.FlowImplicitOutcomeSSOUserNotFound, *result.Step.Error)
+	assert.Equal(t, domain.FlowStepErrorSSOUserNotFound, *result.Step.Error)
 	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
 }
 
