@@ -25,8 +25,9 @@ func (h *Handler) CreateRelease(ctx context.Context, req *api.CreateReleaseReque
 	for _, pointer := range req.Pointers {
 		kind, err := domain.ReleasePointerKindString(string(pointer.Kind))
 		if err != nil {
-			// Unreachable over HTTP — the wire enum is closed and the decoder
-			// rejects anything else with req.invalid first.
+			// The decoder rejects kinds outside the wire enum with req.invalid,
+			// so this is reached only by a kind the contract admits before the
+			// service resolves it: idp, until the release service learns it.
 			return nil, domain.ErrReleaseInvalid("unknown pointer kind", err)
 		}
 		pointers = append(pointers, service.CreateReleasePointer{
