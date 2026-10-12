@@ -255,6 +255,11 @@ upward**. When deciding where a new test belongs:
    and `cli-journey-e2e` (the framework matrix across all 8 SDKs).
    Middleware-owning SDKs get their own e2e project because
    the proxy and route-protection layers are framework-specific.
+   The docs site's suite is the one that lives beside its app,
+   `apps/docs/tests/`: written against a URL, it runs on the local build
+   (`docs:e2e`) and on every deployment of the hosted cloud
+   (`docs:e2e-deployment`, see
+   [docs/runbooks/cloud.md](docs/runbooks/cloud.md#deployment-checks)).
 
 The consumer journey suite is the exception to the checked-in demo ownership
 rule: it belongs in `apps/cli-journey-e2e/` and must exercise a freshly
