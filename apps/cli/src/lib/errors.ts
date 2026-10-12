@@ -160,7 +160,7 @@ export function toZitadelError(error: unknown): ZitadelError {
       hint:
         error.reason === "timeout"
           ? "The server accepted the connection but did not answer in time. Check that it is healthy, then retry."
-          : "Check your connection, ZITADEL_API_BASE, or the configured server URL.",
+          : "Check your connection and the server URL (ZITADEL_URL or --server).",
       details: { url: error.url, reason: error.reason },
     });
   }

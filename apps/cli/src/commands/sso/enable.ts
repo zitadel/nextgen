@@ -7,7 +7,7 @@ import { consola } from "consola";
 
 import { credentialVariables, idpProvider, IDP_PROVIDERS } from "@zitadel/config/idp";
 
-import { createZitadelClient } from "../../lib/api-client";
+import type { ZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
 import { isErrno, ZitadelError } from "../../lib/errors";
 import { publicCliCommand } from "../../lib/public-cli";
@@ -42,13 +42,12 @@ import {
   type SecretOutcome,
   type SecretPublisher,
 } from "../../lib/idp";
-import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import {
-  readDevelopmentIssuer,
-  readZitadelConfig,
-  readZitadelSecret,
-  type ZitadelSecret,
-} from "../../lib/project";
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+  nonBlankString,
+} from "../../lib/oclif";
 import { readState } from "../../lib/sync/state";
 import { readStdin } from "../../lib/variables";
 import { reportWarning } from "../../lib/warnings";
@@ -65,7 +64,7 @@ import { reportWarning } from "../../lib/warnings";
  * prompted for, or read from stdin when scripting, so it cannot land in shell
  * history, a process listing, or CI logs.
  */
-export default class SsoEnable extends BaseCommand {
+export default class SsoEnable extends EnvironmentCommand {
   static override description = "Enable an identity provider for a user schema.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -107,12 +106,11 @@ export default class SsoEnable extends BaseCommand {
 
     // The Project is read before anything is asked for: being turned away
     // after typing a secret would mean typing it again.
-    const config = await readZitadelConfig(cwd);
-    const secretFile = await readZitadelSecret(cwd);
-    const issuer = readDevelopmentIssuer(config);
+    const { client, projectId } = await this.connect({ quiet: true });
+    const issuer = this.environment.values.ZITADEL_ISSUER?.value;
     if (issuer === undefined) {
       throw new ZitadelError("E_VALIDATION", "This Project has no development issuer", {
-        hint: "Run `zitadel setup` first, or add environments.development.issuer to zitadel.json.",
+        hint: "Run `zitadel setup` first, or set ZITADEL_ISSUER to the origin your app serves from.",
       });
     }
     const callbackUri = callbackUriFor(issuer);
@@ -147,7 +145,7 @@ export default class SsoEnable extends BaseCommand {
     // "would create" for a run that cannot succeed.
     const flows = await this.targetFlows(cwd, schema);
 
-    consola.info(`Project   ${secretFile.project_id}`);
+    consola.info(`Project   ${projectId}`);
     consola.info(
       `Schema    ${schema.path}${schema.methods.length > 0 ? ` (${schema.methods.join(", ")})` : ""}`,
     );
@@ -157,7 +155,7 @@ export default class SsoEnable extends BaseCommand {
         status: "skipped",
         reason: "dry-run",
         data: this.payload({
-          projectId: secretFile.project_id,
+          projectId: projectId,
           provider,
           schema: schema.name,
           plan,
@@ -187,7 +185,7 @@ export default class SsoEnable extends BaseCommand {
       // rerunning with a changed client id now takes effect instead of being
       // silently ignored. Nothing is prompted for: an unattended rerun should
       // not start asking for credentials the project already has.
-      const publish = this.publisher(secretFile);
+      const publish = this.publisher(client, projectId);
       if (clientIdFlag !== undefined) {
         if (idVariable === undefined) {
           reportWarning(
@@ -229,7 +227,7 @@ export default class SsoEnable extends BaseCommand {
       const clientId = clientIdFlag ?? (await this.askClientId(entry.displayName, nonInteractive));
       const secretValue = await this.askClientSecret(scaffolded.clientSecret, nonInteractive);
 
-      const publish = this.publisher(secretFile);
+      const publish = this.publisher(client, projectId);
       const connection = entry.connection({
         slug: plan.slug,
         schemaProperties: schema.properties,
@@ -288,7 +286,7 @@ export default class SsoEnable extends BaseCommand {
       status: "ok",
       data: {
         ...this.payload({
-          projectId: secretFile.project_id,
+          projectId: projectId,
           provider,
           schema: schema.name,
           plan,
@@ -324,21 +322,16 @@ export default class SsoEnable extends BaseCommand {
   /**
    * How the connection's credentials reach the project, or `undefined` when there is
    * no project behind this run: `--source mock` answers from fixtures and has
-   * no variables to write. The connection is built here rather than taken from
+   * no variables to write. It publishes through the connection rather than
    * `OwnerCommand.connect` because this command addresses the local Project it
    * was pointed at, not an owner the developer named.
    */
-  private publisher(secret: ZitadelSecret): SecretPublisher | undefined {
-    const { source } = this.meta;
-    if (source === "mock") {
+  private publisher(client: ZitadelClient, projectId: string): SecretPublisher | undefined {
+    if (this.meta.source === "mock") {
       return undefined;
     }
-    const client = createZitadelClient({ baseUrl: source, token: secret.project_secret });
-    return async (name, value, { secret: isSecret }) => {
-      await client.updateVariables(
-        { [name]: { value, secret: isSecret } },
-        { project_id: secret.project_id },
-      );
+    return async (name, value, { secret }) => {
+      await client.updateVariables({ [name]: { value, secret } }, { project_id: projectId });
     };
   }
 

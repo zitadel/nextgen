@@ -112,7 +112,7 @@ abstract class WriteOperation<
       return dryRunResult(this.verb, topic, id, body);
     }
 
-    const result = await this.send(await this.connect(meta), body, id);
+    const result = await this.send(await this.context(), body, id);
     const resultId = isObject(result) ? result[resource.idField] : undefined;
     const nextCommands =
       typeof resultId === "string" && resource.get

@@ -52,6 +52,9 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // history is that command's to read. Registry CRUD would offer a `create`
   // that skips the release construction the command exists to do.
   deployments: "created and read through `zitadel deploy` orchestration, not registry CRUD (#529)",
+  // An environment is a name on the developer's machine now, resolved from env
+  // files (`zitadel env`), not something the server holds.
+  environments: "an environment is an env file on the developer's machine, not a server resource",
 };
 
 /**
@@ -62,7 +65,7 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
 const NOT_CALLED: Readonly<Record<string, string>> = {
   // Bootstrap and the claim flow belong to their own commands.
   createProject:
-    "unauthenticated bootstrap minting secrets into .zitadel/secret; `zitadel setup` owns it",
+    "unauthenticated bootstrap minting secrets; `zitadel setup` and `zitadel env add` own it",
   initClaim: "the browser claim flow; `zitadel claim` calls it",
   getClaimStatus: "the browser claim flow; `zitadel claim` calls it",
   // These two are reached by nothing in the CLI at all — not the registry, not
@@ -81,6 +84,11 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   listDeployments: "deployment history reads arrive with the `zitadel deploy` surface (#529)",
   createFlowDefinition:
     "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
+
+  // The environment API stays in the spec until its removal lands; the CLI no
+  // longer reads it.
+  listEnvironments: "the environment API is pending removal; environments are env files now",
+  getEnvironmentByName: "the environment API is pending removal; environments are env files now",
 
   // End-user self-service, authenticated as that user. The CLI holds an
   // operator credential (ADR 036), so these are not its to call.

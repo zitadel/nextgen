@@ -4,13 +4,13 @@ import { Flags } from "@oclif/core";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import consola from "consola";
 
-import { createZitadelClient } from "../lib/api-client";
+import type { ZitadelClient } from "../lib/api-client";
 import { wrapForBox } from "../lib/box";
 import { openInBrowser } from "../lib/browser";
 import { CLAIM_WINDOW_DAYS, isAttached } from "../lib/claim-state";
 import { ZitadelError } from "../lib/errors";
 import { isObject } from "../lib/json";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
 import { readZitadelSecret, writeZitadelSecret, type ZitadelSecret } from "../lib/project";
 import { reportWarning } from "../lib/warnings";
 
@@ -71,7 +71,7 @@ export function claimDeadline(input: {
  * the issuer, users, and applications keep working exactly as before, so this
  * is purely additive.
  */
-export default class Claim extends BaseCommand {
+export default class Claim extends EnvironmentCommand {
   static override description =
     "Claim this project to make it permanent. Opens a browser to create an account or sign in.";
   static override group = CommandGroups.project;
@@ -133,10 +133,7 @@ export default class Claim extends BaseCommand {
       });
     }
 
-    const client = createZitadelClient({
-      baseUrl: this.meta.source,
-      token: secret.project_secret,
-    });
+    const { client } = await this.connect();
 
     let challenge: Awaited<ReturnType<typeof client.initClaim>>;
     try {
@@ -238,7 +235,7 @@ export default class Claim extends BaseCommand {
    * we stopped waiting first.
    */
   private async poll(
-    client: ReturnType<typeof createZitadelClient>,
+    client: ZitadelClient,
     projectId: string,
     challengeId: string,
     deadline: number,

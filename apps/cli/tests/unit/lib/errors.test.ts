@@ -102,9 +102,7 @@ describe("toZitadelError", () => {
     expect(result.code).toBe("E_NETWORK");
     expect(result.exitCode).toBe(4);
     expect(result.message).toBe("GET http://localhost:8080/idps got no response (ECONNREFUSED)");
-    expect(result.hint).toBe(
-      "Check your connection, ZITADEL_API_BASE, or the configured server URL.",
-    );
+    expect(result.hint).toBe("Check your connection and the server URL (ZITADEL_URL or --server).");
     expect(result.details).toEqual({ url: "http://localhost:8080/idps", reason: "unreachable" });
   });
 

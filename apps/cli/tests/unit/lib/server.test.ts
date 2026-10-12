@@ -23,69 +23,30 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-async function writeConfig(config: unknown): Promise<void> {
-  await writeFile(join(dir, "zitadel.json"), JSON.stringify(config), "utf8");
-}
-
 describe("resolveServer", () => {
-  it("falls back to DEFAULT_SERVER when nothing resolves and no config exists", async () => {
-    const resolved = await resolveServer({ cwd: dir, env: {} });
+  it("falls back to DEFAULT_SERVER when no flag is given", async () => {
+    const resolved = await resolveServer({ cwd: dir });
     expect(resolved).toEqual({ value: DEFAULT_SERVER, origin: "default" });
   });
 
-  it("prefers the --server flag above all other sources", async () => {
-    await writeConfig({ server: "https://config.example.com" });
-    const resolved = await resolveServer({
-      cwd: dir,
-      env: { ZITADEL_API_BASE: "https://env.example.com" },
-      serverFlag: "https://flag.example.com",
-    });
+  it("ignores the server in zitadel.json", async () => {
+    await writeFile(
+      join(dir, "zitadel.json"),
+      JSON.stringify({ server: "https://config.example.com" }),
+      "utf8",
+    );
+    const resolved = await resolveServer({ cwd: dir });
+    expect(resolved).toEqual({ value: DEFAULT_SERVER, origin: "default" });
+  });
+
+  it("uses the --server flag", async () => {
+    const resolved = await resolveServer({ cwd: dir, serverFlag: "https://flag.example.com" });
     expect(resolved).toEqual({ value: "https://flag.example.com", origin: "flag" });
-  });
-
-  it("uses ZITADEL_API_BASE env when no flag is given", async () => {
-    await writeConfig({ server: "https://config.example.com" });
-    const resolved = await resolveServer({
-      cwd: dir,
-      env: { ZITADEL_API_BASE: "https://env.example.com" },
-    });
-    expect(resolved).toEqual({ value: "https://env.example.com", origin: "env" });
-  });
-
-  it("uses the top-level server from zitadel.json", async () => {
-    await writeConfig({ server: "https://top.example.com" });
-    const resolved = await resolveServer({ cwd: dir, env: {} });
-    expect(resolved).toEqual({ value: "https://top.example.com", origin: "config-top" });
-  });
-
-  it("ignores a per-environment server block in zitadel.json", async () => {
-    await writeConfig({
-      server: "https://top.example.com",
-      environments: { production: { server: "https://prod.example.com" } },
-    });
-    const resolved = await resolveServer({ cwd: dir, env: {} });
-    expect(resolved).toEqual({ value: "https://top.example.com", origin: "config-top" });
-  });
-
-  it("falls back to DEFAULT_SERVER when the config has no server field", async () => {
-    await writeConfig({ environments: { production: { server: "https://prod.example.com" } } });
-    const resolved = await resolveServer({ cwd: dir, env: {} });
-    expect(resolved).toEqual({ value: DEFAULT_SERVER, origin: "default" });
-  });
-
-  it("ignores the environment that used to be the default, `development`", async () => {
-    // Every command without `--environment` once resolved as though it had been
-    // given `development`, so this block silently became the target. Nothing
-    // reads it now, and a project holding one falls through to the default.
-    await writeConfig({ environments: { development: { server: "https://dev.example.com" } } });
-    const resolved = await resolveServer({ cwd: dir, env: {} });
-    expect(resolved).toEqual({ value: DEFAULT_SERVER, origin: "default" });
   });
 
   it("normalises a resolved URL down to its origin", async () => {
     const resolved = await resolveServer({
       cwd: dir,
-      env: {},
       serverFlag: "https://flag.example.com/some/path?q=1",
     });
     expect(resolved).toEqual({ value: "https://flag.example.com", origin: "flag" });
@@ -93,21 +54,21 @@ describe("resolveServer", () => {
 
   it("rejects a non-http(s) URL with E_VALIDATION", async () => {
     await expect(
-      resolveServer({ cwd: dir, env: {}, serverFlag: "ftp://flag.example.com" }),
+      resolveServer({ cwd: dir, serverFlag: "ftp://flag.example.com" }),
     ).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 
   it("rejects an unparseable URL with E_VALIDATION", async () => {
-    await expect(
-      resolveServer({ cwd: dir, env: {}, serverFlag: "not a url" }),
-    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+    await expect(resolveServer({ cwd: dir, serverFlag: "not a url" })).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
   });
 
   it("resolves --server local from healthy local runtime metadata", async () => {
     const serverUrl = await startHealthServer();
     await writeLocalRuntime(serverUrl);
 
-    const resolved = await resolveServer({ cwd: dir, env: {}, serverFlag: "local" });
+    const resolved = await resolveServer({ cwd: dir, serverFlag: "local" });
 
     expect(resolved).toEqual({ value: serverUrl, origin: "local" });
   });
@@ -115,7 +76,7 @@ describe("resolveServer", () => {
   it("fails --server local when runtime metadata points at an unhealthy server", async () => {
     await writeLocalRuntime("http://localhost:9");
 
-    await expect(resolveServer({ cwd: dir, env: {}, serverFlag: "local" })).rejects.toMatchObject({
+    await expect(resolveServer({ cwd: dir, serverFlag: "local" })).rejects.toMatchObject({
       code: "E_LOCAL_SERVER_NOT_RUNNING",
     });
   });

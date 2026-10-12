@@ -13,7 +13,6 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import {
   GetBrandingByIdResponse,
-  GetEnvironmentByNameResponse,
   GetFlowDefinitionResponse,
   CreateIdpBody,
   GetGrantResponse,
@@ -25,7 +24,6 @@ import {
   GetTeamResponse,
   GetUserByIDResponse,
   ListBrandingResponse,
-  ListEnvironmentsResponse,
   ListEventsResponse,
   ListFlowDefinitionsResponse,
   ListReleasesResponse,
@@ -39,9 +37,8 @@ import {
   QueryUsersResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { ApiError } from "@zitadel/api/runtime/fetch";
-import { consola } from "consola";
 
-import { createZitadelClient, type ZitadelClient } from "../lib/api-client";
+import type { ZitadelClient } from "../lib/api-client";
 import { CommandGroups } from "../lib/oclif/groups";
 import { ZitadelError } from "../lib/errors";
 import {
@@ -52,12 +49,11 @@ import {
   type Schema,
   type UpdateSpec,
 } from "../lib/oclif/crud";
-import { readZitadelSecret } from "../lib/project";
 
 /**
  * The platform connection every resource verb calls through: the typed
- * client bound to the resolved server, plus the project the credential in
- * `.zitadel/secret` belongs to. Endpoints that scope by `project_id` read it
+ * client bound to the resolved server, plus the project the credential
+ * belongs to. Endpoints that scope by `project_id` read it
  * from here; the flag surface never exposes it.
  */
 export type Platform = Readonly<{ client: ZitadelClient; projectId: string }>;
@@ -409,29 +405,6 @@ export const RESOURCES = {
     },
   },
 
-  environments: {
-    group: CommandGroups.configuration,
-    singular: "environment",
-    idField: "id",
-    // Addressed by its public handle: `GET /environments/{name}`, and the name
-    // is what a deploy target is called everywhere else in the CLI.
-    idArg: "name",
-    columns: ["name", "id", "created_at"],
-    heading: "name",
-    detail: ["name", "id", "project_id", "created_at"],
-    list: {
-      items: "environments",
-      response: ListEnvironmentsResponse,
-      call: ({ client, projectId }, params) =>
-        client.listEnvironments({ ...params, project_id: projectId }),
-    },
-    get: {
-      call: ({ client, projectId }, name) =>
-        client.getEnvironmentByName(name, { project_id: projectId }),
-      response: GetEnvironmentByNameResponse,
-    },
-  },
-
   releases: {
     group: CommandGroups.configuration,
     singular: "release",
@@ -530,28 +503,14 @@ export const RESOURCES = {
 } satisfies ResourceRegistry<Platform>;
 
 /**
- * The `<resource> <verb>` commands, ready for the explicit command table.
- * Connecting mirrors `schemas list` and `apply`: the project secret from
- * `.zitadel/secret` becomes the bearer, so a missing secret fails the same
- * way (`E_VALIDATION` pointing at `zitadel setup`).
+ * The `<resource> <verb>` commands, ready for the explicit command table. They
+ * connect like every command that talks to a project (see
+ * `EnvironmentCommand`), so they take `--env` and `--env-file` too.
  */
 export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
   operations: FILTER_OPERATIONS,
-  connect: async ({ cwd, source }) => {
-    const secret = await readZitadelSecret(cwd);
-    // Which project and server a verb is about is worth stating to a human, and
-    // is the "make boundary-crossing visible" rule from the CLI guidelines. It
-    // shares stdout with the result, though, so a piped run would feed those
-    // lines to whatever consumes the output — a piped `users list` would have
-    // them counted as rows by `wc -l`. On a pipe the result travels alone;
-    // `--json` silences them either way.
-    if (process.stdout.isTTY) {
-      consola.info(`Project   ${secret.project_id}`);
-      consola.info(`Server    ${source}`);
-    }
-    return {
-      client: createZitadelClient({ baseUrl: source, token: secret.project_secret }),
-      projectId: secret.project_id,
-    };
+  connect: async (open) => {
+    const { client, projectId } = await open();
+    return { client, projectId };
   },
 });

@@ -1,7 +1,7 @@
+import { resolveEnvironment } from "../../lib/environment";
 import { issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import {
-  readDevelopmentIssuer,
   readPreset,
   readRendererId,
   readUseCase,
@@ -33,7 +33,7 @@ export async function loadPatchContext(
   return {
     framework,
     rendererId: readRendererId(config),
-    issuer: await resolveIssuer(cwd, config, framework),
+    issuer: await resolveIssuer(cwd, framework),
     server: typeof config.server === "string" ? config.server : "",
     cliVersion,
     scaffoldedFramework: scaffold?.scaffolded_framework,
@@ -53,14 +53,10 @@ export async function loadPatchContext(
   };
 }
 
-async function resolveIssuer(
-  cwd: string,
-  config: Record<string, unknown>,
-  facts: FrameworkFacts,
-): Promise<string> {
-  const fromConfig = readDevelopmentIssuer(config);
-  if (fromConfig && fromConfig.length > 0) {
-    return fromConfig;
+async function resolveIssuer(cwd: string, facts: FrameworkFacts): Promise<string> {
+  const { values } = await resolveEnvironment({ cwd, env: process.env });
+  if (values.ZITADEL_ISSUER) {
+    return values.ZITADEL_ISSUER.value;
   }
   const scaffold = await readScaffoldManifest(cwd);
   if (typeof scaffold?.dev_port === "number") {

@@ -174,18 +174,26 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, ".zitadel/flows/default.json")).toBeUndefined();
   });
 
-  it("writes preview issuer_pattern as the raw origins, not a doubled scheme", () => {
-    const base = ctxFor("app");
-    const ctx = {
-      ...base,
-      project: { ...base.project, preview_origins: ["https://nextgen.dev.mrida.ng"] },
-    };
+  it("records no environments in zitadel.json", () => {
     const zitadelJson = JSON.parse(
-      writeContents(new NextPatcher().plan(ctx), "zitadel.json") ?? "{}",
+      writeContents(new NextPatcher().plan(ctxFor("app")), "zitadel.json") ?? "{}",
     );
-    expect(zitadelJson.environments.preview.issuer_pattern).toEqual([
-      "https://nextgen.dev.mrida.ng",
-    ]);
+    expect(zitadelJson).not.toHaveProperty("environments");
+  });
+
+  it("writes the values the CLI reads to a private .env.development.local", () => {
+    const plan = new NextPatcher().plan(ctxFor("app"));
+    const op = plan.ops.find(
+      (candidate): candidate is Extract<FileOp, { kind: "merge-env" }> =>
+        candidate.kind === "merge-env" && candidate.path === ".env.development.local",
+    );
+    expect(op?.mode).toBe(0o600);
+    expect(op?.entries).toEqual({
+      ZITADEL_URL: "https://api.zitadel.cloud",
+      ZITADEL_PROJECT_ID: "proj-1",
+      ZITADEL_PROJECT_SECRET: "sk_proj_full",
+      ZITADEL_PREVIEW_TOKEN: "sk_proj_preview",
+    });
   });
 
   it("honors the src/app directory", () => {

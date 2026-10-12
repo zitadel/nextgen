@@ -186,20 +186,16 @@ describe("variables list", () => {
     expect(res.stdout).toContain("No variables on the project.");
   });
 
-  it("no longer resolves as though `development` had been named", async () => {
+  it("refuses to guess a server when nothing names one", async () => {
     const cwd = await makeProject();
-    // A command with no `--environment` once resolved as though it had been
-    // given `development`, so this block became the server. With no top-level
-    // `server` the run now falls through to the default, which is what the
-    // handler below answers on.
-    await writeConfig(cwd, {
-      project: "proj_test",
-      environments: { development: { server: "https://dev.example" } },
-    });
-    let hit = "";
+    // `zitadel.json` once named the server, and a command without `--server`
+    // fell back to the cloud. Neither is a source now: the server is the
+    // environment's `ZITADEL_URL`, or it is missing.
+    await writeConfig(cwd, { project: "proj_test", server: "https://elsewhere.example" });
+    let requested = false;
     server.use(
-      http.get("*/variables", ({ request }) => {
-        hit = new URL(request.url).origin;
+      http.get("*/variables", () => {
+        requested = true;
         return HttpResponse.json({});
       }),
     );
@@ -213,8 +209,11 @@ describe("variables list", () => {
       "--json",
     ]);
 
-    expect(res.exitCode).toBe(0);
-    expect(hit).toBe(SERVER);
+    expect(res.exitCode).not.toBe(0);
+    expect(requested).toBe(false);
+    const json = parseJson(res.stdout) as { code: string; message: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("ZITADEL_URL");
   });
 
   it("prints the project and the server on a terminal, and neither on a pipe", async () => {
@@ -236,17 +235,10 @@ describe("variables list", () => {
     expect(terminal.stdout).toContain(SERVER);
   });
 
-  it("ignores a per-environment server block in zitadel.json", async () => {
+  it("takes the server from ZITADEL_URL, not from zitadel.json", async () => {
     const cwd = await makeProject();
-    // `zitadel.json` names one server for the project and another under an
-    // environment. Nothing reads the per-environment entry, so the project's
-    // own server serves the request. No `--server` here: that flag
-    // short-circuits resolution and would hide it.
-    await writeConfig(cwd, {
-      project: "proj_test",
-      server: SERVER,
-      environments: { prod: { server: "https://elsewhere.example" } },
-    });
+    await writeConfig(cwd, { project: "proj_test", server: "https://elsewhere.example" });
+    await writeFile(join(cwd, ".env.local"), `ZITADEL_URL=${SERVER}\n`);
     let hit = "";
     server.use(
       http.get("*/variables", ({ request }) => {
@@ -1020,7 +1012,7 @@ describe("naming the owner", () => {
       expect(json.message).toContain("--project-level");
       // The refusal has to say why there is nothing else to name, or it reads
       // as a flag someone forgot rather than the only owner there is.
-      expect(json.hint).toContain("--environment");
+      expect(json.hint).toContain("only owner");
     }
   });
 
@@ -1053,26 +1045,23 @@ describe("naming the owner", () => {
     }
   });
 
-  it.each(["-e", "--environment", "--env"])(
-    "no longer accepts %s, which named an environment",
-    async (flag) => {
-      const cwd = await makeProject();
+  it("no longer accepts --environment, which named an environment", async () => {
+    const cwd = await makeProject();
 
-      const res = await runCliForTest([
-        "variables",
-        "list",
-        flag,
-        "prod",
-        "--project-level",
-        ...base(cwd),
-      ]);
+    const res = await runCliForTest([
+      "variables",
+      "list",
+      "--environment",
+      "prod",
+      "--project-level",
+      ...base(cwd),
+    ]);
 
-      expect(res.exitCode).not.toBe(0);
-      const json = parseJson(res.stdout) as { code: string; message: string };
-      expect(json.code).toBe("E_VALIDATION");
-      expect(json.message).toContain("Nonexistent flag");
-    },
-  );
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { code: string; message: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("Nonexistent flag");
+  });
 
   // Every command inherits the owner flag from one base class, so each one has
   // to refuse: a command that quietly resolved an owner would write where the

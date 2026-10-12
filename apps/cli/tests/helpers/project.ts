@@ -494,6 +494,17 @@ export class ScaffoldedApp {
     );
   }
 
+  /** Writes `.env.<name>.local`, the file that binds an environment to a project. */
+  bindEnvironment(name: string, values: Record<string, string>): Promise<void> {
+    return this.writeProjectFile(`.env.${name}.local`, dotenv(values));
+  }
+
+  /** Writes a dotenv file the developer keeps anywhere, returning the path `--env-file` takes. */
+  async writeEnvFile(fileName: string, values: Record<string, string>): Promise<string> {
+    await this.writeProjectFile(fileName, dotenv(values));
+    return join(this.path, fileName);
+  }
+
   private async editDocument<T>(relativePath: string, edit: (document: T) => void): Promise<void> {
     const contents = await readFile(join(this.path, relativePath), "utf8");
     const document = JSON.parse(contents) as T;
@@ -607,6 +618,12 @@ async function hashTree(root: string, prefix = ""): Promise<Map<string, string>>
     }
   }
   return files;
+}
+
+function dotenv(values: Record<string, string>): string {
+  return `${Object.entries(values)
+    .map(([key, value]) => `${key}=${value}`)
+    .join("\n")}\n`;
 }
 
 function only<T>(items: T[], what: string): T {

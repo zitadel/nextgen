@@ -110,7 +110,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // typo fails without contacting the server at all.
     const shape = fieldPaths(itemSchemaOf(spec.response, spec.items));
     const early = shape ? chosenColumns(flags.fields, resource.columns, [], shape) : undefined;
-    const ctx = await this.connect(meta);
+    const ctx = await this.context();
     // An unpaged endpoint has no cursor flags to read and would reject the
     // parameters anyway, so nothing is sent and one request is the whole list.
     const paged = spec.paged !== false;

@@ -96,7 +96,13 @@ async function applyOp(
       await appendText(abs(opts.cwd, op.path), op.contents, op.ifMissing, opts.dryRun, result);
       break;
     case "merge-env":
-      await mergeEnv(abs(opts.cwd, op.path), op.entries, op.comment ?? [], opts.dryRun, result);
+      await mergeEnv(
+        abs(opts.cwd, op.path),
+        op.entries,
+        { comment: op.comment ?? [], mode: op.mode },
+        opts.dryRun,
+        result,
+      );
       break;
     case "merge-json":
       await mergeJson(abs(opts.cwd, op.path), op.patch, opts.dryRun, result);
@@ -281,7 +287,7 @@ async function appendText(
 async function mergeEnv(
   path: string,
   entries: Readonly<Record<string, string>>,
-  comment: ReadonlyArray<string>,
+  { comment, mode }: { comment: ReadonlyArray<string>; mode?: number },
   dryRun: boolean,
   result: ScaffoldAccumulator,
 ): Promise<void> {
@@ -311,7 +317,7 @@ async function mergeEnv(
     return;
   }
   await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, next);
+  await writeFile(path, next, { mode });
   record(result, path, "file", action);
 }
 

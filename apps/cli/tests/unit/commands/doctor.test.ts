@@ -71,9 +71,9 @@ async function makeHealthyProject(): Promise<string> {
       project: "proj-001",
       server: "https://api.zitadel.cloud",
       framework: { id: "next" },
-      environments: { development: { issuer: "http://localhost:3000" } },
     }),
   );
+  await writeFile(join(cwd, ".env.local"), "ZITADEL_ISSUER=http://localhost:3000\n");
   await writeFile(
     join(cwd, ".zitadel/secret"),
     JSON.stringify({
@@ -246,7 +246,6 @@ describe("doctor command", () => {
         project: "proj-001",
         server: "http://localhost:8080",
         framework: { id: "next" },
-        environments: { development: { issuer: "http://localhost:3000" } },
       }),
     );
 

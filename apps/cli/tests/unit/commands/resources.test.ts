@@ -8,7 +8,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { type Platform, RESOURCES } from "../../../src/commands/resources";
 import { COMMANDS } from "../../../src/index";
-import { parseFilter, parseSort, type ResourceDescriptor } from "../../../src/lib/oclif/crud";
+import {
+  definitionOf,
+  parseFilter,
+  parseSort,
+  type ResourceDescriptor,
+} from "../../../src/lib/oclif/crud";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
 const SERVER = "https://api.zitadel.cloud";
@@ -68,23 +73,49 @@ describe("resource registry", () => {
     }
   });
 
-  it("gives no generated command an --environment flag, since none addresses one", () => {
-    const generated = Object.entries(COMMANDS).filter(([id]) => id!.split(":")[0]! in RESOURCES);
+  it("gives every generated command --env and --env-file, and no --environment flag", () => {
+    const generated = Object.entries(COMMANDS).filter(
+      ([, command]) => definitionOf(command) !== undefined,
+    );
     expect(generated.length).toBeGreaterThan(0);
     for (const [id, command] of generated) {
       const flags = { ...command.baseFlags, ...command.flags };
+      expect(Object.keys(flags), id).toEqual(expect.arrayContaining(["env", "env-file"]));
       expect(Object.keys(flags), id).not.toContain("environment");
       expect(
-        Object.values(flags).map((flag) => flag.char),
+        Object.entries(flags)
+          .filter(([, flag]) => flag.char === "e")
+          .map(([name]) => name),
         id,
-      ).not.toContain("e");
+      ).toEqual(["env"]);
     }
+  });
+
+  it("reads the project and credential of --env-file", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-resources-env-"));
+    const file = join(cwd, "staging.env");
+    await writeFile(file, "ZITADEL_PROJECT_ID=proj_staging\nZITADEL_PROJECT_SECRET=sk_staging\n");
+    let seen: { project?: string | null; authorization?: string | null } = {};
+    server.use(
+      http.post(`${SERVER}/teams/query`, ({ request }) => {
+        seen = {
+          project: new URL(request.url).searchParams.get("project_id"),
+          authorization: request.headers.get("authorization"),
+        };
+        return HttpResponse.json({ teams: [] });
+      }),
+    );
+
+    const res = await run(cwd, ["teams", "list", "--env-file", file]);
+
+    expect(res.exitCode).toBe(0);
+    expect(seen).toEqual({ project: "proj_staging", authorization: "Bearer sk_staging" });
   });
 
   // A read and a write verb, since the flag reached both through the generated
   // command's own flags and the base flags it inherits.
   it.each([
-    ["a read verb", ["users", "list", "-e", "prod"]],
+    ["a read verb", ["users", "list", "--environment", "prod"]],
     ["a write verb", ["teams", "create", "--name", "t", "--environment", "production"]],
   ])("refuses the environment flag on %s before any request", async (_case, argv) => {
     const cwd = await makeProject();
@@ -1142,7 +1173,7 @@ describe("other resources", () => {
 
 describe("configuration resources are read-only", () => {
   it("exposes only list and get for every configuration topic", () => {
-    for (const topic of ["schemas", "environments", "releases", "flow-definitions", "branding"]) {
+    for (const topic of ["schemas", "releases", "flow-definitions", "branding"]) {
       const resource = RESOURCES[topic as keyof typeof RESOURCES];
       expect(resource, topic).toBeDefined();
       expect(Object.keys(resource!), topic).toEqual(
@@ -1186,26 +1217,6 @@ describe("configuration resources are read-only", () => {
     expect(url?.searchParams.get("limit")).toBe("5");
     const json = parseJson(res.stdout) as { data: { items: Array<{ id: string }> } };
     expect(json.data.items.map((s) => s.id)).toEqual(["sch_1"]);
-  });
-
-  it("addresses an environment by name rather than by id", async () => {
-    const cwd = await makeProject();
-    server.use(
-      http.get(`${SERVER}/environments/staging`, () =>
-        HttpResponse.json({
-          id: "env_1",
-          project_id: "proj_test",
-          name: "staging",
-          created_at: "2026-01-01T00:00:00Z",
-        }),
-      ),
-    );
-
-    const res = await run(cwd, ["environments", "get", "staging"]);
-
-    expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { data: { name: string } };
-    expect(json.data.name).toBe("staging");
   });
 
   it("offers no paging flags for an unpaginated collection and reads the bare array", async () => {

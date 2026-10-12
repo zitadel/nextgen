@@ -59,7 +59,7 @@ export default class BrandingEject extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(BrandingEject);
-    await this.toMeta(flags);
+    await this.toMeta(flags, { resolveServer: false });
     const { cwd, force, nonInteractive } = this.meta;
     const flagDesign =
       flags.design === undefined

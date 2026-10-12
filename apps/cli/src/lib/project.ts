@@ -173,15 +173,6 @@ export function readProjectServer(config: Record<string, unknown>): string {
   return typeof config.server === "string" ? config.server : DEFAULT_SERVER;
 }
 
-/** Reads `environments.development.issuer` from a parsed `zitadel.json`, if present. */
-export function readDevelopmentIssuer(config: Record<string, unknown>): string | undefined {
-  if (isObject(config.environments) && isObject(config.environments.development)) {
-    const issuer = config.environments.development.issuer;
-    return typeof issuer === "string" ? issuer : undefined;
-  }
-  return undefined;
-}
-
 function isNotFound(error: unknown): boolean {
   return (
     typeof error === "object" &&

@@ -1,7 +1,7 @@
 import type { Interfaces } from "@oclif/core";
 
 import type { CommandGroup } from "../groups";
-import type { GlobalOptions } from "../types";
+import type { Connection } from "../environment-command";
 
 /**
  * Contract between a resource registry and the CRUD factory. Everything is
@@ -223,8 +223,11 @@ export type QueryParts = Readonly<{
 }>;
 
 export type ResourceCommandOptions<Ctx> = Readonly<{
-  /** Opens the platform connection every verb calls through; runs after flag parsing. */
-  connect: (meta: GlobalOptions) => Promise<Ctx>;
+  /**
+   * Shapes the platform connection every verb calls through. It receives the
+   * command's own `connect`, so nothing connects until a verb needs it.
+   */
+  connect: (open: () => Promise<Connection>) => Promise<Ctx>;
   /** Filter operations the query endpoints accept (`equals`, `contains`, …). */
   operations: readonly string[];
   /** Extra flags added to every generated command. */

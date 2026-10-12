@@ -15,9 +15,10 @@ async function makeProject(schemas: Record<string, unknown> = {}): Promise<strin
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-sso-enable-"));
   tempDirs.push(cwd);
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
+  await writeFile(join(cwd, "zitadel.json"), `${JSON.stringify({ version: "0.0.1" })}\n`);
   await writeFile(
-    join(cwd, "zitadel.json"),
-    `${JSON.stringify({ version: "0.0.1", environments: { development: { issuer: "http://localhost:3000" } } })}\n`,
+    join(cwd, ".env.local"),
+    "ZITADEL_URL=https://api.zitadel.cloud\nZITADEL_ISSUER=http://localhost:3000\n",
   );
   await writeFile(
     join(cwd, ".zitadel/secret"),
@@ -377,7 +378,7 @@ describe("sso enable secret handling", () => {
     expect(result.exitCode).toBe(0);
     // Nothing is written to disk: the secret goes to the project's variables
     // and nowhere else, so there is no copy in the working tree to leak.
-    await expect(readFile(join(cwd, ".env.local"), "utf8")).rejects.toThrow();
+    expect(await readFile(join(cwd, ".env.local"), "utf8")).not.toContain("piped-secret");
     expect(result.stdout).not.toContain("piped-secret");
     expect(result.stderr).not.toContain("piped-secret");
   });
