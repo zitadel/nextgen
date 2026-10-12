@@ -179,10 +179,13 @@ or garbled fails the build and the serving deployment stays.
 
 ## Replacing the secrets
 
-A new master key cannot unwrap what the old one wrapped, and the server
-cannot re-wrap yet, so replacing an environment's key means starting that
-environment's data over. Nothing production holds today is worth keeping;
-once it is, key rotation needs the server to re-wrap the project keys first.
+A new master key cannot unwrap what the old one wrapped. The server re-wraps
+every project key to the newest configured master key at startup
+(`MigrateToLatestMasterKey`), but only while the previous key is still
+configured for decryption, and the launcher renders exactly one key. Until
+it renders the previous key as well, replacing an environment's key means
+starting that environment's data over. Nothing production holds today is
+worth keeping; once it is, add that support before the next rotation.
 
 1. `sh apps/cloud/setup-secrets.sh --force <environment>`: new key, new root
    admin, the previous files kept under `replaced-<time>/`, the variables
