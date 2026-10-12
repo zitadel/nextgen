@@ -191,12 +191,6 @@ type BrandingPayload struct {
 // BrandingCreatedPayload is an alias for branding.created.
 type BrandingCreatedPayload = BrandingPayload
 
-type EnvironmentPayload struct {
-	Name string `json:"name,omitempty"`
-}
-
-type EnvironmentCreatedPayload = EnvironmentPayload
-
 // ReleasePayload records what a release pinned, so the audit stream answers
 // "what changed" without a join back to the releases table. ContentHash
 // identifies the pinned set; Pointers spell it out.
