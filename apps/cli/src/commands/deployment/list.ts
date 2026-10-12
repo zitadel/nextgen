@@ -1,6 +1,11 @@
 import { Flags } from "@oclif/core";
 
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
+import {
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+  nonBlankString,
+} from "../../lib/oclif";
 import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderRows, renderTable } from "../../lib/oclif/crud/table";
 import { publicCliCommand } from "../../lib/public-cli";
@@ -38,7 +43,11 @@ export default class DeploymentList extends EnvironmentCommand {
   static override flags = {
     origin: Flags.string({ description: "Only deployments that targeted this origin." }),
     live: Flags.boolean({ description: "What each target serves now, not the full history." }),
-    limit: Flags.integer({ description: "Page size (server default 20, max 100).", min: 1, max: 100 }),
+    limit: Flags.integer({
+      description: "Page size (server default 20, max 100).",
+      min: 1,
+      max: 100,
+    }),
     "page-token": nonBlankString({
       description: "Continue from a previous page's next_page_token.",
     }),
