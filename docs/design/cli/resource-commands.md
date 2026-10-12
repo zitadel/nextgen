@@ -55,7 +55,7 @@ holds and never writes them here:
 | `flow-definitions`  | list, get | `GET /flow_definitions`, `GET /flow_definitions/{id}` |
 | `branding`          | list, get | `GET /branding`, `GET /branding/{id}`                |
 
-Three of these behave differently underneath, and the registry says so rather
+Two of these behave differently underneath, and the registry says so rather
 than the caller having to learn it. `schemas list` and `flow-definitions list` send
 `revisions=latest`, so they show the current schemas and flows rather than
 every revision ever written; `--filter revisions=all` gives the history. `branding list` has no paging
