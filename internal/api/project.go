@@ -148,23 +148,34 @@ func (h *Handler) ListMyProjects(ctx context.Context, params api.ListMyProjectsP
 	}, nil
 }
 
-// AddOrigin is a stub until the origins service lands. Authz runs first so a
-// caller without origin.write learns that before the 501.
-func (h *Handler) AddOrigin(ctx context.Context, _ *api.Origin, params api.AddOriginParams) (api.AddOriginRes, error) {
+// AddOrigin stores one origin pattern on the project. Authz runs first.
+func (h *Handler) AddOrigin(ctx context.Context, req *api.Origin, params api.AddOriginParams) (api.AddOriginRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), originAccess, opWrite); err != nil {
 		return nil, err
 	}
-	return nil, domain.ErrNotImplemented()
+	origin, err := h.projectService.AddOrigin(ctx, string(params.ProjectID), domain.Origin{
+		Pattern: req.Pattern,
+		Kind:    domain.OriginKind(req.Kind),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &api.AddOriginResponse{
+		Pattern: origin.Pattern,
+		Kind:    api.AddOriginResponseKind(origin.Kind),
+	}, nil
 }
 
-// RemoveOrigin is a stub until the origins service lands. Authz runs first so a
-// caller without origin.delete learns that before the 501. opDelete maps to the
-// project.admin relation, matching other delete-shaped management ops.
-func (h *Handler) RemoveOrigin(ctx context.Context, _ *api.RemoveOriginReq, params api.RemoveOriginParams) (api.RemoveOriginRes, error) {
+// RemoveOrigin deletes one origin pattern. Authz runs first. opDelete maps to
+// the project.admin relation, matching other delete-shaped management ops.
+func (h *Handler) RemoveOrigin(ctx context.Context, req *api.RemoveOriginReq, params api.RemoveOriginParams) (api.RemoveOriginRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), originAccess, opDelete); err != nil {
 		return nil, err
 	}
-	return nil, domain.ErrNotImplemented()
+	if err := h.projectService.RemoveOrigin(ctx, string(params.ProjectID), req.Pattern); err != nil {
+		return nil, err
+	}
+	return &api.RemoveOriginNoContent{}, nil
 }
 
 // ------------------ Converters ---------------
