@@ -76,7 +76,13 @@ export default class Status extends EnvironmentCommand {
       project.lifecycle === "configured"
         ? await detectUserPresence(() => this.connect({ quiet: true }))
         : "unknown";
-    const nextCommands = nextCommandsFor(serverLifecycle, project, users, this.meta.cliVersion);
+    const nextCommands = nextCommandsFor(
+      serverLifecycle,
+      project,
+      users,
+      this.meta.cliVersion,
+      this.environmentSelector(),
+    );
     const nextActions = nextActionsFor(project, users, this.meta.cliVersion);
 
     return this.emit({
@@ -289,6 +295,11 @@ function nextCommandsFor(
   project: ProjectStatus,
   users: UserPresence,
   cliVersion: string,
+  // The `--env`/`--env-file`/`--server` suffix this run was invoked with (empty
+  // for the default environment). Carried into every project-scoped follow-up so
+  // an agent running them stays on the environment `status` reported, rather than
+  // silently falling back to the default development project.
+  selector: string,
 ): string[] {
   const commands: string[] = [];
   if (serverLifecycle !== "running") {
@@ -299,16 +310,16 @@ function nextCommandsFor(
   } else if (project.lifecycle === "orphaned-config") {
     commands.push(
       publicCliCommand("setup --force", cliVersion),
-      publicCliCommand("doctor --fix", cliVersion),
+      publicCliCommand(`doctor --fix${selector}`, cliVersion),
     );
   } else {
-    commands.push(publicCliCommand("doctor", cliVersion));
+    commands.push(publicCliCommand(`doctor${selector}`, cliVersion));
     // Suggested even when the local record says the window has closed: the
     // record can be stale (claimed from another machine reads detached), and
     // `claim` is the safe reconciliation — the server checks the grant
     // before the window, so an attached project answers with a clean skip.
     if (project.claim?.kind === "detached") {
-      commands.push(claimCommand(cliVersion));
+      commands.push(`${claimCommand(cliVersion)}${selector}`);
     }
     if (users === "none") {
       // Staged like next_actions: before the first login is proven in a
@@ -316,9 +327,9 @@ function nextCommandsFor(
       // verify mission lives in next_actions. `apply` joins once users
       // exist ("some") or when the probe can't tell ("unknown" keeps the
       // lifecycle-only behavior rather than withholding on no signal).
-      commands.push(publicCliCommand("plan", cliVersion));
+      commands.push(publicCliCommand(`plan${selector}`, cliVersion));
     } else {
-      commands.push(publicCliCommand("apply", cliVersion));
+      commands.push(publicCliCommand(`apply${selector}`, cliVersion));
     }
   }
   return commands;
