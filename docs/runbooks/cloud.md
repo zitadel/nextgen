@@ -12,11 +12,9 @@
 
 The hosted cloud is the current `main`, built by Vercel from the repository
 and run in Frankfurt (`fra1`) against PlanetScale Postgres in the same AWS
-region. **`main` is production:** every merge deploys. A branch that touches
-the server, the console, the login UI, the storybook or the docs gets a
-preview deployment with a database of its own. Version tags and their npm
-packages remain the
-self-hosted artifact; this cloud does not run them.
+region. **`main` is production:** every merge deploys. Every other branch
+gets a preview deployment with a database of its own. Version tags and their
+npm packages remain the self-hosted artifact; this cloud does not run them.
 
 ## Layout
 
@@ -140,6 +138,8 @@ Environment variables (add secrets with
 | `MASTER_KEY_ID` | Preview | preview's `master-key.id`, `cloud-preview-<year>-<month>` |
 | `MASTER_KEY_PREVIOUS_PEM_B64` | Production or Preview; sensitive; only during a rotation | the key being rotated out, which `setup-secrets.sh --force` sets |
 | `MASTER_KEY_PREVIOUS_ID` | Production or Preview; only during a rotation | its id |
+| `CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE` | Production or Preview; optional | the share of console page loads that send Speed Insights, `0` to `1`; unset sends every one |
+| `DOCS_SPEED_INSIGHTS_SAMPLE_RATE` | Production or Preview; optional | the same for the docs |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Production; sensitive | production's `admin-user.b64`: the root admin document |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Preview; sensitive | preview's `admin-user.b64` |
 | `ENABLE_EXPERIMENTAL_COREPACK` | Production, Preview | `1`: the builds run package scripts that call `pnpm`, which must be the workspace's pinned version |
@@ -182,11 +182,10 @@ or garbled fails the build and the serving deployment stays.
   `--build-env VERCEL_GIT_COMMIT_REF=<branch> --build-env VERCEL_GIT_COMMIT_SHA=<sha>`.
   The branch picks a preview's database and must match the production
   branch for a `--prod` deployment.
-- **Previews:** every push to a branch, if
-  [`ignore-build.sh`](../../apps/cloud/ignore-build.sh) finds a change to
-  what the deployment runs since the branch's last preview, or since it
-  left `main`. A docs-only branch gets one too, database included, because
-  the docs are a service of the deployment; SDK-only branches get none.
+- **Previews:** every push to any other branch, docs-only and SDK-only
+  branches included. There is no skip step: Vercel does not run a
+  service's `ignoreCommand`, and most branches touch something the
+  deployment builds from anyway.
 - **Migrations must be expand/contract.** The previous deployment serves on
   the new schema until the new one is live, and Instant Rollback promotes
   an older deployment without touching the schema.
@@ -238,7 +237,10 @@ project and imports the root admin.
   restart) before raising the pool size.
 - **Analytics:** the console reports page views and Web Vitals per route
   pattern (`/ui/console/users/$userId`), the docs per page, to the project's
-  Analytics and Speed Insights tabs.
+  Analytics and Speed Insights tabs. Speed Insights samples by the two
+  `*_SPEED_INSIGHTS_SAMPLE_RATE` variables, read at build time, so a new rate
+  takes a redeploy; `0` turns it off. Web Analytics has no sampling and counts
+  every page view.
 - **Signing in:** `/ui/console/` with the environment's root admin from
   1Password (production and preview have different passwords). Anyone else
   registers through the login UI.
