@@ -1,0 +1,23 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // The journey spec imports the kit's Playwright entry.
+    "typecheck": {
+      "dependsOn": ["@zitadel/testing#build"]
+    },
+    // The harness drives the real CLI binary and imports the kit's
+    // virtual-passkey helper. The scripts set ZITADEL_TELEMETRY=0.
+    "e2e": {
+      "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build"]
+    },
+    "e2e-local": {
+      "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build"]
+    },
+    // Customer-configuration proof for @zitadel/testing: scaffold a fresh next
+    // app, install the kit from the journey registry, run its suite.
+    "e2e-testkit": {
+      "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build"]
+    }
+  }
+}

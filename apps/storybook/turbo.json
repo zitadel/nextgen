@@ -1,0 +1,25 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // Resolves workspace packages from source via the `@zitadel/source`
+    // condition; these build deps (through api:build) keep the generated api
+    // client present.
+    "typecheck": {
+      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/components#build"]
+    },
+    "build": {
+      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/components#build"]
+    },
+    // The component gate: addon-vitest runs every story as a real-browser
+    // test. The script serialises the browser suites across packages
+    // (`browser-tests` lock) and retries the cold-start flake (#1490).
+    "test": {
+      "dependsOn": ["install-browsers", "@zitadel/api-mock#build", "@zitadel/components#build"]
+    },
+    // .storybook/main.ts imports @zitadel/api-mock/public-dir under Node.
+    "dev": {
+      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/components#build"]
+    }
+  }
+}

@@ -1,59 +1,229 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
-  // Pilot: Turborepo runs only the builds of the hosted cloud (the root
-  // vercel.json services). Moon still owns CI, local dev and releases. See
-  // docs/design/build/turborepo-pilot.md.
+  // Prototype of the moon → Turborepo migration (docs/design/build/
+  // turborepo-migration.md). Every moon task has a turbo task: the shared ones
+  // here, the rest in each package's turbo.json ("extends": ["//"]), which
+  // mirrors that package's moon.yml edge for edge. Both runners run the same
+  // package.json scripts. Moon stays the runner of record (CI, local docs)
+  // until the cutover; the hosted cloud (vercel.json, apps/cloud/build.sh)
+  // builds with turbo since the pilot.
   //
   // Without this, turbo writes its own block into the root AGENTS.md whenever
   // it detects an AI agent running it.
   "agentGuidance": false,
-  "globalDependencies": [".nvmrc", ".npmrc", "pnpm-workspace.yaml", "tsconfig.base.json"],
+  // Tasks see only the variables listed on them, turbo's built-in list (PATH,
+  // HOME, SHELL, CI, TERM, GITHUB_ACTIONS, ...) and what framework inference
+  // adds (VITE_* for Vite packages, NEXT_* for Next.js, ...).
+  "envMode": "strict",
+  "globalPassThroughEnv": [
+    // Where Go keeps its toolchain, module and build caches; their contents
+    // are keyed by Go itself. GOFLAGS and the target platform change outputs,
+    // so the Go tasks list those as hashed `env` instead.
+    "GOPATH",
+    "GOCACHE",
+    "GOMODCACHE",
+    "GOTMPDIR",
+    "GOTOOLCHAIN",
+    "GOPROXY",
+    "GOSUMDB",
+    "GONOSUMDB",
+    "GONOSUMCHECK",
+    "GOPRIVATE",
+    "GONOPROXY",
+    "GOINSECURE",
+    // Telemetry opt-outs honoured by the CLI, Playwright, Next.js, Nuxt and
+    // Storybook (CI sets DO_NOT_TRACK).
+    "DO_NOT_TRACK",
+    "ZITADEL_TELEMETRY",
+    "NEXT_TELEMETRY_DISABLED",
+    "NUXT_TELEMETRY_DISABLED",
+    "STORYBOOK_DISABLE_TELEMETRY",
+    // Playwright's browser store and the temp dir the test harnesses use.
+    "PLAYWRIGHT_BROWSERS_PATH",
+    "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD",
+    "TMPDIR",
+    "LC_ALL"
+  ],
+  // The root files moon's .moon/tasks/*.yml list as implicitInputs: a change
+  // to any of them re-runs every task. Turbo hashes each package's slice of
+  // pnpm-lock.yaml on its own, so the lockfile is not listed.
+  "globalDependencies": [
+    ".nvmrc",
+    ".npmrc",
+    "package.json",
+    "pnpm-workspace.yaml",
+    "devbox.json",
+    "devbox.lock",
+    "tsconfig.base.json",
+    "biome.json",
+    "vitest.shared.mjs",
+    "vitest.shared.d.mts"
+  ],
   "tasks": {
+    // ---- The standard tasks of every TypeScript package (.moon/tasks/
+    // typescript.yml). Dependencies are per package; `^build` is deliberately
+    // not used: it follows devDependencies too, and the console's
+    // @zitadel/testing (dev-real only) would pull the CLI and the server
+    // build into every console build (pilot finding 2).
+    "lint": {},
+    "typecheck": {},
     "build": {
-      "dependsOn": ["^build", "generate", "sync-schemas"],
       "outputs": ["dist/**"]
+    },
+    "test": {},
+
+    // ---- Task shapes several packages share. Release builds clean and
+    // rewrite dist in one script (scripts/release-clean.mjs), never cached.
+    "build-release": {
+      "cache": false,
+      "outputs": ["dist/**"]
+    },
+    // Chromium for the browser-mode Vitest projects; the `test` task of those
+    // packages depends on it so the test gate provisions it in CI.
+    "install-browsers": {
+      "cache": false
     },
     "generate": {
       "outputs": ["src/generated/**"]
     },
-    "sync-schemas": {
-      "outputs": ["meta-schemas/*.json"]
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "start": {
+      "cache": false,
+      "persistent": true
+    },
+    "preview": {
+      "cache": false,
+      "persistent": true
+    },
+    // The e2e lanes boot real servers and browsers: never cached, and they
+    // see the harness, server and Docker variables a developer or CI sets.
+    // The values moon's task `env` blocks used to set live in the package.json
+    // scripts now (e.g. NEXTGEN_SERVER_CONSOLE_ENABLED=false).
+    "e2e": {
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+    },
+    "e2e-real": {
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+    },
+    "e2e-embedded": {
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+    },
+    "e2e-platform": {
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+    },
+    "e2e-local": {
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+    },
+    "e2e-testkit": {
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
 
-    // Code generation reads the OpenAPI source outside the package.
-    "@zitadel/api#generate": {
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/api/openapi/**/*.yaml"],
-      "outputs": ["src/generated/**"]
-    },
-    "@zitadel/config#sync-schemas": {
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json"],
-      "outputs": ["meta-schemas/*.json"]
-    },
-    // The Figma export is the input; the rest is generated (and committed).
-    "@zitadel/design-tokens#generate": {
-      "outputs": [
-        "src/generated/tokens.css",
-        "src/generated/tokens.ts",
-        "src/generated/tailwind.css",
-        "src/generated/shadcn.css"
+    // ---- The root project (moon's `workspace`): the scripts/*.mjs
+    // orchestration. The root package's default inputs are every file no
+    // other package owns, so the cached tasks list theirs as moon.yml does.
+    "//#lint": {},
+    "//#test": {
+      "inputs": [
+        "scripts/ci-mode.mjs",
+        "scripts/ci-mode.test.mjs",
+        "scripts/dev-process.mjs",
+        "scripts/generate-meta-schemas.ts",
+        "scripts/generate-meta-schemas.test.ts",
+        "scripts/release-artifacts.mjs",
+        "scripts/release-github.mjs",
+        "scripts/release-github.test.mjs",
+        "scripts/release-manifest.mjs",
+        "scripts/assert-file.mjs",
+        "vitest.config.ts"
       ]
     },
-
-    // The two SPAs build into the server's embed directories, outside their
-    // packages. The console's VITE_* variables (VITE_CONSOLE_VERCEL_INSIGHTS)
-    // join its hash through Vite framework inference.
-    //
-    // The console names its one built dependency instead of `^build`: `^build`
-    // follows devDependencies too, and the console's @zitadel/testing (used by
-    // dev-real only) would pull the CLI and sdk-next builds into every deploy.
-    // The other workspace packages it imports resolve from source.
-    "@zitadel/console#build": {
-      "dependsOn": ["@zitadel/sdk-react#build"],
-      "outputs": ["$TURBO_ROOT$/internal/staticui/console/dist/**"]
+    "//#check-typecheck": {
+      "inputs": [
+        "scripts/check-typecheck-programs.mjs",
+        "scripts/check-typecheck-programs.test.mjs",
+        "scripts/assert-file.mjs",
+        "apps/*/moon.yml",
+        "packages/*/moon.yml",
+        "apps/*/package.json",
+        "packages/*/package.json",
+        "apps/*/tsconfig*.json",
+        "packages/*/tsconfig*.json",
+        "vitest.config.ts"
+      ]
     },
-    "@zitadel/login-ui#build": {
-      "dependsOn": ["^build"],
-      "outputs": ["$TURBO_ROOT$/internal/staticui/login/dist/**"]
+    "//#check-openapi-rules": {
+      "inputs": [
+        "scripts/openapi-casing-rules.test.mjs",
+        "scripts/assert-file.mjs",
+        "scripts/testdata/openapi-casing/**",
+        "redocly.yaml",
+        ".redocly.lint-ignore.yaml",
+        "vitest.config.ts"
+      ]
+    },
+    // Checks the moon graph against .moon/AGENTS.md; kept while both runners
+    // are configured. Turbo takes its package graph from package.json, so the
+    // rule "the moon edge and the npm dependency go together" has no turbo
+    // counterpart to check.
+    "//#check-moon-graph": {
+      "inputs": [
+        "scripts/check-moon-graph.mjs",
+        "moon.yml",
+        "apps/*/moon.yml",
+        "packages/*/moon.yml",
+        "tools/*/moon.yml",
+        "apps/*/package.json",
+        "packages/*/package.json"
+      ]
+    },
+    "//#check-adrs": {
+      "inputs": ["docs/adrs/**/*.md", "scripts/check-adrs-index.mjs", "scripts/dev-process.mjs"]
+    },
+    "//#doctor": {
+      "cache": false
+    },
+    // `workspace:cli` is not a turbo task: it is interactive, which turbo only
+    // supports inside its terminal UI. Run `pnpm run cli -- ...` directly.
+    "//#server": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["@zitadel/console#build", "@zitadel/login-ui#build"],
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
+    },
+    "//#server-debug": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["@zitadel/console#build", "@zitadel/login-ui#build"],
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
+    },
+    "//#journey": {
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "PLAYWRIGHT_*", "DOCKER_*"]
+    },
+    // The local runtime image: the server cross-compiled for linux with both
+    // UI dists embedded. Needs Docker, so it stays out of CI.
+    "//#build-local-image": {
+      "cache": false,
+      "dependsOn": ["@zitadel/console#build", "@zitadel/login-ui#build"],
+      "passThroughEnv": ["ZITADEL_*", "DOCKER_*", "GOFLAGS"]
+    },
+    "//#smoke-container": {
+      "cache": false,
+      "dependsOn": ["//#build-local-image"],
+      "passThroughEnv": ["ZITADEL_*", "DOCKER_*"]
+    },
+    "//#check": {
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "DOCKER_*", "TESTCONTAINERS_*", "GOFLAGS"]
     }
   }
 }

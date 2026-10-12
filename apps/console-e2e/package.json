@@ -3,7 +3,12 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "biome check .",
+    "e2e": "playwright test",
+    "e2e-real": "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false NEXTGEN_SERVER_CONSOLE_ENABLED=false playwright test --config playwright.real.config.mts",
+    "e2e-embedded": "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false playwright test --config playwright.embedded.config.mts",
+    "e2e-platform": "playwright test --config playwright.platform.config.mts"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

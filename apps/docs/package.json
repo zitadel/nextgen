@@ -12,7 +12,8 @@
     "dev": "pnpm run generate && next dev --port 3003",
     "build": "pnpm run generate && next build",
     "start": "next start --port 3003",
-    "typecheck": "next typegen && tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json"
+    "typecheck": "next typegen && tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
+    "lint": "biome check ."
   },
   "dependencies": {
     "@modelcontextprotocol/server": "catalog:",

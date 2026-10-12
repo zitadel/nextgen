@@ -47,11 +47,13 @@
   "scripts": {
     "start": "tsx bin/start.ts",
     "dev": "tsx watch bin/start.ts",
-    "test": "vitest run --project unit",
+    "test": "node ../../scripts/task-guard.mjs --mutex browser-tests --retries 3 -- vitest run",
     "test:browser": "vitest run --project browser",
     "test:all": "vitest run",
     "build": "tsdown",
-    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json"
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
+    "lint": "biome check .",
+    "test:unit": "vitest run --project unit"
   },
   "dependencies": {
     "@mswjs/http-middleware": "catalog:",

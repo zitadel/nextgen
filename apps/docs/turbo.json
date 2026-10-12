@@ -1,0 +1,27 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // Bundles api/openapi into .generated/, which lib/openapi.ts imports,
+    // applying the repo's Redocly config.
+    "generate": {
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/api/openapi/**/*.yaml", "$TURBO_ROOT$/redocly.yaml"],
+      "outputs": [".generated/openapi.mjs", ".generated/openapi.d.mts"]
+    },
+    "typecheck": {
+      "dependsOn": ["generate"]
+    },
+    // The build script bundles again before `next build`, because the
+    // hosted cloud's docs service runs the script without a task runner.
+    "build": {
+      "dependsOn": ["generate"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
+    "dev": {
+      "dependsOn": ["generate"]
+    },
+    "start": {
+      "dependsOn": ["build"]
+    }
+  }
+}
