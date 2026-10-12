@@ -115,7 +115,10 @@ describe("preview", () => {
         expect(app.envelopeOf<{ items: unknown[] }>(listed).data.items).toEqual([]);
       });
 
-      it("fails naming ZITADEL_PREVIEW_TOKEN when it is not set", async () => {
+      it("warns and exits cleanly when ZITADEL_PREVIEW_TOKEN is not set", async () => {
+        // A fork pull-request build cannot read the preview secret, so a missing
+        // token skips the preview rather than failing the build (#1312). The
+        // project secret is present but is never a stand-in.
         const app = await anApp();
         await app.bindEnvironment("preview", {
           ZITADEL_PROJECT_ID: "proj_preview",
@@ -128,6 +131,31 @@ describe("preview", () => {
           "preview",
           "--origin",
           PREVIEW_URL,
+          "--json",
+        ]);
+
+        expect(result).toBeSkipped();
+        // The warning rides the skipped envelope's `warnings`, so an agent
+        // reading --json still sees why nothing was deployed.
+        expect(result).toSay("ZITADEL_PREVIEW_TOKEN");
+        const warnings = (JSON.parse(result.stdout) as { warnings?: string[] }).warnings;
+        expect(warnings).toEqual([expect.stringContaining("ZITADEL_PREVIEW_TOKEN")]);
+      });
+
+      it("fails naming ZITADEL_PREVIEW_TOKEN under --strict when it is not set", async () => {
+        const app = await anApp();
+        await app.bindEnvironment("preview", {
+          ZITADEL_PROJECT_ID: "proj_preview",
+          ZITADEL_PROJECT_SECRET: "sk",
+        });
+
+        const result = await app.run([
+          "preview",
+          "--env",
+          "preview",
+          "--origin",
+          PREVIEW_URL,
+          "--strict",
           "--json",
         ]);
 

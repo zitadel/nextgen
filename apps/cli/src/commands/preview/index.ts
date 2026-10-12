@@ -1,3 +1,5 @@
+import { Flags } from "@oclif/core";
+
 import { CommandGroups, type JsonEnvelope, PreviewCommand, previewFlags } from "../../lib/oclif";
 import {
   buildBundle,
@@ -11,6 +13,7 @@ import {
 } from "../../lib/release";
 import { detectPreviewUrls, parseTtl } from "../../lib/preview";
 import { ZitadelError } from "../../lib/errors";
+import { reportWarning } from "../../lib/warnings";
 
 /**
  * `zitadel preview` — publish `.zitadel/` to a pull-request build's preview URLs.
@@ -22,12 +25,15 @@ import { ZitadelError } from "../../lib/errors";
  * primary origins. The URLs come from `--origin` or, failing that, from the
  * hosting platform's own build variables (Vercel, Netlify, Cloudflare Pages).
  *
- * It authenticates with the narrower preview credential, so it fails naming
- * `ZITADEL_PREVIEW_TOKEN` when that is not set and never falls back to the
- * project secret. Outside a preview or development environment there is nothing
- * to preview — even with an explicit `--origin` — so it says so and exits
- * cleanly without writing. The last line it prints is the release digest as
- * `NEXT_PUBLIC_ZITADEL_RELEASE`, for the build to pin.
+ * It authenticates with the narrower preview credential and never falls back
+ * to the project secret. A fork pull-request build has no `ZITADEL_PREVIEW_TOKEN`
+ * — the secret is not shared with forks — so a missing one warns and exits
+ * cleanly rather than failing the build (#1312); `--strict` turns that warning
+ * into a failure for a trusted build that expects the token. Outside a preview
+ * or development environment there is nothing to preview — even with an explicit
+ * `--origin` — so it says so and exits cleanly without writing. The last line it
+ * prints is the release digest as `NEXT_PUBLIC_ZITADEL_RELEASE`, for the build
+ * to pin.
  */
 export default class Preview extends PreviewCommand {
   static override description =
@@ -39,7 +45,15 @@ export default class Preview extends PreviewCommand {
     "<%= config.bin %> preview --origin https://acme-git-sso-acmeinc.vercel.app",
     "<%= config.bin %> preview --ttl 24h",
   ];
-  static override flags = { ...previewFlags };
+  static override flags = {
+    ...previewFlags,
+    // Preview-only: `preview list` and `preview rm` share the credential but
+    // have no deploy to make strict, so this lives here, not in `previewFlags`.
+    strict: Flags.boolean({
+      description:
+        "Fail instead of warning when no preview credential (ZITADEL_PREVIEW_TOKEN) is set.",
+    }),
+  };
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Preview);
@@ -60,6 +74,28 @@ export default class Preview extends PreviewCommand {
         status: "skipped",
         reason: "nothing-to-preview",
         pretty: "nothing to preview — production is deployed by `zitadel deploy`, after merge",
+      });
+    }
+
+    // A fork pull-request build cannot read the preview credential — a secret
+    // is never exposed to a fork — so a missing `ZITADEL_PREVIEW_TOKEN` is not
+    // a build failure: the preview is skipped and the build carries on (#1312).
+    // `--strict` is for a trusted build that expects the token, where a missing
+    // one is a misconfiguration worth failing on. The project secret is never a
+    // stand-in, so its presence does not satisfy this.
+    if (this.environment.values.ZITADEL_PREVIEW_TOKEN === undefined) {
+      if (flags.strict) {
+        throw new ZitadelError("E_VALIDATION", "ZITADEL_PREVIEW_TOKEN is not set", {
+          hint: "Set ZITADEL_PREVIEW_TOKEN for this build, or drop --strict to skip the preview when it is absent.",
+        });
+      }
+      reportWarning(
+        "No preview credential (ZITADEL_PREVIEW_TOKEN) is set, so the preview is skipped; a fork pull-request build cannot read it. Pass --strict to fail instead.",
+      );
+      return this.emit({
+        status: "skipped",
+        reason: "no-preview-credential",
+        pretty: "no preview credential (ZITADEL_PREVIEW_TOKEN) — preview skipped",
       });
     }
 
