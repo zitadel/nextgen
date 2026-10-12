@@ -64,6 +64,9 @@ import {
   GetClaimWindowResponse,
   GetDeploymentByIdParams,
   GetDeploymentByIdQueryParams,
+  GetDeploymentVariablesParams,
+  GetDeploymentVariablesQueryParams,
+  GetDeploymentVariablesResponse,
   GetFlowDefinitionParams,
   GetFlowDefinitionResponse,
   GetIdpByIdParams,
@@ -341,6 +344,13 @@ type DeploymentRecord = {
   rollbackTo: string | null;
   deployedAt: string;
   seq: number;
+  /**
+   * The project's variables as this deployment resolved them, frozen when it was
+   * written. A preview deployment prefers each name's `preview` override and
+   * falls back to its `all` value; a primary deployment runs only the `all`
+   * values. What the target serves, not what the store holds now.
+   */
+  frozenVariables: Map<string, VariableRecord>;
 };
 
 type Store = {
@@ -539,14 +549,50 @@ function immutableFieldClash(
   return undefined;
 }
 
+/** Which value of a variable a request addresses. */
+type AppliesTo = "all" | "preview";
+
 /**
  * The owner a variables request addresses. An absent environment is the project
  * level, which is a different owner from any environment under it.
+ *
+ * `applies_to` is a further dimension of the same key, not a merge: the `all`
+ * value a deploy freezes and the `preview` override a preview deploy prefers
+ * live in separate buckets, so a `preview` read returns only the names that
+ * hold a preview override and a `preview` write never touches the `all` value.
  */
-function variableOwner(projectId: string, environmentName?: string): string {
-  return environmentName === undefined
-    ? `project:${projectId}`
-    : `env:${projectId}/${environmentName}`;
+function variableOwner(
+  projectId: string,
+  environmentName?: string,
+  appliesTo: AppliesTo = "all",
+): string {
+  const base =
+    environmentName === undefined ? `project:${projectId}` : `env:${projectId}/${environmentName}`;
+  return `${base}#${appliesTo}`;
+}
+
+/**
+ * The project's variables as a deployment freezes them. A primary deployment
+ * runs the `all` values alone; a preview deployment prefers each name's
+ * `preview` override and falls back to the `all` value where none exists. The
+ * result is a flat map — one value per name — so a deployment never has to
+ * choose at read time.
+ */
+function freezeVariables(projectId: string, preview: boolean): Map<string, VariableRecord> {
+  const all =
+    store.variables.get(variableOwner(projectId, undefined, "all")) ??
+    new Map<string, VariableRecord>();
+  if (!preview) {
+    return new Map(all);
+  }
+  const overrides =
+    store.variables.get(variableOwner(projectId, undefined, "preview")) ??
+    new Map<string, VariableRecord>();
+  const frozen = new Map(all);
+  for (const [name, held] of overrides) {
+    frozen.set(name, held);
+  }
+  return frozen;
 }
 
 /** What a read of one owner says: a value, or that a secret is held. */
@@ -705,7 +751,9 @@ export function snapshotPlatformStore(): PlatformStoreSnapshot {
     deploymentIds: [...store.deployments.values()]
       .sort((a, b) => b.seq - a.seq)
       .map((deployment) => deployment.id),
-    variableNames: [...store.variables.values()].flatMap((owned) => [...owned.keys()]),
+    variableNames: [
+      ...new Set([...store.variables.values()].flatMap((owned) => [...owned.keys()])),
+    ],
     originPatterns: [...store.projects.values()].flatMap((project) =>
       project.origins.map((origin) => origin.pattern),
     ),
@@ -1703,6 +1751,9 @@ export function setupPlatformHandlers() {
         rollbackTo: null,
         deployedAt: nowIso(),
         seq: ++store.lastSeq,
+        // Frozen now: a later variable write never reaches a deployment already
+        // made. A preview deployment prefers the preview overrides.
+        frozenVariables: freezeVariables(project.id, sawPreview),
       };
       store.deployments.set(id, record);
       return HttpResponse.json(deploymentResponse(record), { status: 201 });
@@ -1808,6 +1859,35 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(deploymentResponse(deployment));
     }),
 
+    // The variables a deployment runs: the map frozen onto it when it was
+    // written, which `variable resolve` reads. What the target serves, not what
+    // the store holds now.
+    http.get("*/deployments/:deployment_id/variables", ({ params, request }) => {
+      const path = parse(GetDeploymentVariablesParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetDeploymentVariablesQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const deployment = store.deployments.get(path.data.deployment_id);
+      if (!deployment || deployment.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("dep.not_found", "deployment: not found"), {
+          status: 404,
+        });
+      }
+      const out = parse(
+        GetDeploymentVariablesResponse,
+        variablesResponse(deployment.frozenVariables),
+        "mock_response_invalid",
+      );
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
     http.post("*/deployments/:deployment_id/rollback", async ({ params, request }) => {
       const path = parse(RollbackDeploymentParams, params, "invalid_request");
       if (!path.ok) {
@@ -1894,6 +1974,9 @@ export function setupPlatformHandlers() {
         rollbackTo: target.id,
         deployedAt: nowIso(),
         seq: ++store.lastSeq,
+        // A rollback only ever restores primary origins (a preview rollback is
+        // refused above), so it freezes the `all` values like any primary deploy.
+        frozenVariables: freezeVariables(project.id, false),
       };
       store.deployments.set(id, record);
       return HttpResponse.json(deploymentResponse(record), { status: 201 });
@@ -2450,7 +2533,11 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
-      const owner = variableOwner(query.data.project_id, query.data.environment_name);
+      const owner = variableOwner(
+        query.data.project_id,
+        query.data.environment_name,
+        query.data.applies_to,
+      );
       const owned = store.variables.get(owner) ?? new Map<string, VariableRecord>();
       const out = parse(GetVariablesResponse, variablesResponse(owned), "mock_response_invalid");
       if (!out.ok) {
@@ -2476,7 +2563,11 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
-      const owner = variableOwner(query.data.project_id, query.data.environment_name);
+      const owner = variableOwner(
+        query.data.project_id,
+        query.data.environment_name,
+        query.data.applies_to,
+      );
       const held = store.variables.get(owner)?.get(path.data.variable_name);
       if (held === undefined) {
         return HttpResponse.json(errorBody("var.not_found", "variable not found"), { status: 404 });
@@ -2502,7 +2593,11 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
-      const owner = variableOwner(query.data.project_id, query.data.environment_name);
+      const owner = variableOwner(
+        query.data.project_id,
+        query.data.environment_name,
+        query.data.applies_to,
+      );
       const owned = store.variables.get(owner);
       const name = path.data.variable_name;
       if (owned?.has(name) !== true) {
@@ -2527,7 +2622,11 @@ export function setupPlatformHandlers() {
         return body.response;
       }
 
-      const owner = variableOwner(query.data.project_id, query.data.environment_name);
+      const owner = variableOwner(
+        query.data.project_id,
+        query.data.environment_name,
+        query.data.applies_to,
+      );
       const owned = store.variables.get(owner) ?? new Map<string, VariableRecord>();
       // RFC 7386: a name present is written, `null` removes it, and a name
       // absent is left alone.
