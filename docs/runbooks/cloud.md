@@ -46,10 +46,10 @@ Any `NEXTGEN_*` variable overrides a default.
   branch was created.
 - **Previews share production's data and master key.** Decided 2026-10-12
   for simplicity: a copied branch is only readable with the key that
-  encrypted it. Anyone who can open a pull request can therefore read
-  production data from a preview. Keep production to team and test
-  accounts until previews start from an empty branch with a key of their
-  own.
+  encrypted it. Previews stay within the team: their URLs sit behind
+  Vercel Authentication, and a pull request from a fork deploys only after
+  a team member approves it. A preview still runs its branch's code against
+  a copy of production's data.
 - **Cleanup:** `.github/workflows/neon-preview-cleanup.yml` deletes
   `preview/<branch>` when the pull request closes or the branch is deleted.
   Without it Neon only deletes the branch once Vercel deletes the
@@ -61,8 +61,11 @@ Any `NEXTGEN_*` variable overrides a default.
 
 In Vercel → Storage → `nextgen`:
 
-1. **Plan:** Launch. The free plan caps the project at 10 branches and 100
-   compute hours a month, shared by production and every preview.
+1. **Plan:** the free plan to start. It caps the project at 10 branches
+   (production plus nine previews at a time) and 100 compute hours a month
+   shared by production and every preview; when the hours run out, the
+   computes stay suspended until the month resets. Move to Launch (usage
+   based) once either limit bites.
 2. **Connect the project** `nextgen-preview-cloud` for Production and
    Preview. Under Advanced Options → Deployments Configuration turn on
    **Required → Preview** and **Resource must be active before
