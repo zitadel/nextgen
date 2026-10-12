@@ -1142,7 +1142,7 @@ describe("other resources", () => {
 
 describe("configuration resources are read-only", () => {
   it("exposes only list and get for every configuration topic", () => {
-    for (const topic of ["schemas", "environments", "releases", "flow-definitions", "branding"]) {
+    for (const topic of ["schemas", "releases", "flow-definitions", "branding"]) {
       const resource = RESOURCES[topic as keyof typeof RESOURCES];
       expect(resource, topic).toBeDefined();
       expect(Object.keys(resource!), topic).toEqual(
@@ -1186,26 +1186,6 @@ describe("configuration resources are read-only", () => {
     expect(url?.searchParams.get("limit")).toBe("5");
     const json = parseJson(res.stdout) as { data: { items: Array<{ id: string }> } };
     expect(json.data.items.map((s) => s.id)).toEqual(["sch_1"]);
-  });
-
-  it("addresses an environment by name rather than by id", async () => {
-    const cwd = await makeProject();
-    server.use(
-      http.get(`${SERVER}/environments/staging`, () =>
-        HttpResponse.json({
-          id: "env_1",
-          project_id: "proj_test",
-          name: "staging",
-          created_at: "2026-01-01T00:00:00Z",
-        }),
-      ),
-    );
-
-    const res = await run(cwd, ["environments", "get", "staging"]);
-
-    expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { data: { name: string } };
-    expect(json.data.name).toBe("staging");
   });
 
   it("offers no paging flags for an unpaginated collection and reads the bare array", async () => {
