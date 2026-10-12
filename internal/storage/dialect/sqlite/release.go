@@ -14,7 +14,11 @@ import (
 const (
 	createReleaseStmt = `INSERT INTO releases (project_id, id, content_hash, pointers, metadata, created_at)` +
 		` VALUES (?, ?, ?, ?, ?, ?) RETURNING created_at`
-	releaseQuery = `SELECT project_id, id, content_hash, pointers, metadata, created_at FROM releases`
+	releaseQuery = `SELECT project_id, id, content_hash, pointers, metadata, created_at, revoked_at FROM releases`
+	// See the postgres statement.
+	revokeReleaseStmt = `UPDATE releases SET revoked_at = COALESCE(revoked_at, ?)` +
+		` WHERE project_id = ? AND id = ?` +
+		` RETURNING project_id, id, content_hash, pointers, metadata, created_at, revoked_at`
 )
 
 type releaseStatements struct{ statement }
@@ -138,12 +142,27 @@ func (rs releaseStatements) ListReleases(ctx context.Context, filter *database.L
 	return &database.ListResult[*domain.Release]{Items: items, NextCursor: nextCursor}, nil
 }
 
+// RevokeRelease implements [service.ReleaseStatements].
+func (rs releaseStatements) RevokeRelease(ctx context.Context, projectID, id string) (*domain.Release, error) {
+	rows, err := rs.client.Query(ctx, revokeReleaseStmt, nowUnixNano(), projectID, id)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	item, err := collectExactlyOneRow(rows, scanRelease)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return item, nil
+}
+
 func scanRelease(rows *sql.Rows) (*domain.Release, error) {
 	var (
 		scanned     release.Row
 		pointers    sql.NullString
 		metadata    sql.NullString
 		createdNano int64
+		revokedNano sql.NullInt64
 	)
 	if err := rows.Scan(
 		&scanned.ProjectID,
@@ -152,6 +171,7 @@ func scanRelease(rows *sql.Rows) (*domain.Release, error) {
 		&pointers,
 		&metadata,
 		&createdNano,
+		&revokedNano,
 	); err != nil {
 		return nil, err
 	}
@@ -162,6 +182,9 @@ func scanRelease(rows *sql.Rows) (*domain.Release, error) {
 		scanned.Metadata = []byte(metadata.String)
 	}
 	scanned.CreatedAt = timeFromUnixNano(createdNano)
+	if revokedNano.Valid {
+		scanned.RevokedAt = new(timeFromUnixNano(revokedNano.Int64))
+	}
 	return release.ToDomain(scanned)
 }
 

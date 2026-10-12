@@ -149,6 +149,9 @@ type ReleaseStatements interface {
 	// absent from the result, not an error.
 	GetReleasesByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Release, error)
 	ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error)
+	// RevokeRelease stamps revoked_at and returns the release. Revoking a
+	// revoked release changes nothing and returns the first stamp.
+	RevokeRelease(ctx context.Context, projectID, id string) (*domain.Release, error)
 }
 
 // IDPConnectionStatements persists identity provider connections and their

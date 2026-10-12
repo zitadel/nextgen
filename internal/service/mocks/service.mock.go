@@ -5309,6 +5309,45 @@ func (c *MockAllStatementsRevokeAuthzAssignmentCall) DoAndReturn(f func(context.
 	return c
 }
 
+// RevokeRelease mocks base method.
+func (m *MockAllStatements) RevokeRelease(ctx context.Context, projectID, id string) (*domain.Release, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RevokeRelease", ctx, projectID, id)
+	ret0, _ := ret[0].(*domain.Release)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RevokeRelease indicates an expected call of RevokeRelease.
+func (mr *MockAllStatementsMockRecorder) RevokeRelease(ctx, projectID, id any) *MockAllStatementsRevokeReleaseCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeRelease", reflect.TypeOf((*MockAllStatements)(nil).RevokeRelease), ctx, projectID, id)
+	return &MockAllStatementsRevokeReleaseCall{Call: call}
+}
+
+// MockAllStatementsRevokeReleaseCall wrap *gomock.Call
+type MockAllStatementsRevokeReleaseCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsRevokeReleaseCall) Return(arg0 *domain.Release, arg1 error) *MockAllStatementsRevokeReleaseCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsRevokeReleaseCall) Do(f func(context.Context, string, string) (*domain.Release, error)) *MockAllStatementsRevokeReleaseCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsRevokeReleaseCall) DoAndReturn(f func(context.Context, string, string) (*domain.Release, error)) *MockAllStatementsRevokeReleaseCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // SetAuthAttemptChallenge mocks base method.
 func (m *MockAllStatements) SetAuthAttemptChallenge(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error {
 	m.ctrl.T.Helper()
