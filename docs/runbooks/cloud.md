@@ -2,7 +2,9 @@
 
 > **Code:** [`apps/cloud/`](../../apps/cloud/) and the repo-root
 > [`vercel.json`](../../vercel.json)
-> **Vercel project:** `zitadel/nextgen-preview-cloud`
+> **Vercel project:** `zitadel/cloud` (renamed from `nextgen-preview-cloud`;
+> its production URL stays `nextgen-preview-cloud.vercel.app` until a domain
+> is attached)
 > **PlanetScale:** organization `zitadel`, Postgres databases `production`
 > and `preview`, both in AWS `eu-central-1`
 
