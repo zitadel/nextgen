@@ -201,6 +201,7 @@ export const de: Locale = {
   "error.sso_user_cannot_be_created":
     "Mit dieser Anmeldemethode können wir dein Konto nicht erstellen. Bitte wende dich an den Support.",
   "error.user_already_exists": "Ein Konto mit diesen Angaben existiert bereits.",
+  "error.sign_in_first": "Bitte melde dich zuerst bei deinem Konto an.",
 
   // --- Feld- / Formularfehler ---
   "error.email_required": "Bitte gib eine E-Mail-Adresse ein",

@@ -5,7 +5,6 @@ package integration_test
 import (
 	"testing"
 
-	"github.com/go-faster/jx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -122,16 +121,12 @@ func (f *ssoCollectionFixture) collect(t *testing.T, subject string) (ssoFlow, a
 
 func (f *ssoCollectionFixture) submit(t *testing.T, flow ssoFlow, fields map[string]string) api.SubmitFlowStepRes {
 	t.Helper()
-	raw := api.FlowSubmitRequestFields{}
-	for name, value := range fields {
-		raw[name] = jx.Raw(`"` + value + `"`)
+	// submitAction omits the field set when fields is nil; the collection
+	// step always posts one, empty or not.
+	if fields == nil {
+		fields = map[string]string{}
 	}
-	resp, err := f.client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
-		Action: "submit",
-		Fields: api.NewOptFlowSubmitRequestFields(raw),
-	}, api.SubmitFlowStepParams{ID: flow.id, Zflow: flow.zflow})
-	require.NoError(t, err)
-	return resp
+	return f.submitAction(t, flow, "submit", fields)
 }
 
 // requireStepError asserts the submit kept the flow on register-sso with

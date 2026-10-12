@@ -446,11 +446,12 @@ export function ssoConflictStep(input: StepFixtureInput): CreateFlow201 {
     texts: { title_key: "sso-conflict.title", description_key: "sso-conflict.description" },
     fields: [
       {
-        name: "password",
+        name: PASSWORD_FIELD,
         type: "password",
-        text_key: "password.field.password",
+        text_key: "sso-conflict.field.password",
         autocomplete: "current-password",
         required: true,
+        validation: { min_length: 8 },
       },
     ],
     actions: [

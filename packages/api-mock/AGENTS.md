@@ -40,7 +40,8 @@ properties it fixes, both of which this mock got wrong until they were corrected
   so the orchestrator's tests, the Storybook story, and both demo e2e suites were
   all walking a screen the server never emits.
 - **Credential fields are keyed by the schema pointer** `x-auth-methods#password`
-  (exported as `PASSWORD_FIELD`), on both `password` and `register-password`. The
+  (exported as `PASSWORD_FIELD`), on `password`, `register-password` and
+  `sso-conflict`. The
   server answers `req.invalid` to a submit keyed on plain `password`, so the short
   name let the orchestrator send a key the real backend refuses — invisible to
   every mock-backed test.

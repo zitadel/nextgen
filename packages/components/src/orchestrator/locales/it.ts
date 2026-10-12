@@ -195,6 +195,7 @@ export const it: Locale = {
   "error.sso_user_cannot_be_created":
     "Non possiamo creare il tuo account con questo metodo di accesso. Contatta l'assistenza.",
   "error.user_already_exists": "Esiste già un account con questi dati.",
+  "error.sign_in_first": "Accedi prima al tuo account.",
 
   // --- Errori campo / modulo ---
   "error.email_required": "Inserisci un indirizzo e-mail",

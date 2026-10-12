@@ -209,6 +209,7 @@ export const en: Record<string, string> = {
   "error.sso_user_cannot_be_created":
     "We can't create your account with this sign-in method. Please contact support.",
   "error.user_already_exists": "An account with these details already exists.",
+  "error.sign_in_first": "Please sign in to your account first.",
 
   // --- Field / form errors ---
   "error.email_required": "Please enter an email address",
