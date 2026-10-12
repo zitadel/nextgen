@@ -164,6 +164,10 @@ func NewDeployment(projectID, releaseID string, kind DeploymentTargetKind, origi
 	if len(sorted) > MaxDeploymentTargets {
 		return nil, ErrDeploymentInvalid("a deployment covers at most 50 targets", nil)
 	}
+	targets := make([]DeploymentTarget, len(sorted))
+	for i, origin := range sorted {
+		targets[i] = DeploymentTarget{Origin: origin}
+	}
 
 	// rollback_to names what a rollback re-applied, so it is required exactly
 	// when there is a rollback to record and rejected otherwise rather than
@@ -176,10 +180,6 @@ func NewDeployment(projectID, releaseID string, kind DeploymentTargetKind, origi
 		return nil, ErrDeploymentInvalid("rollback_to is only valid with reason rollback", nil)
 	}
 
-	targets := make([]DeploymentTarget, len(sorted))
-	for i, origin := range sorted {
-		targets[i] = DeploymentTarget{Origin: origin}
-	}
 	return &Deployment{
 		ProjectID:  projectID,
 		ReleaseID:  releaseID,
