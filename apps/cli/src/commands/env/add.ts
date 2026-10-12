@@ -226,11 +226,17 @@ export default class EnvAdd extends BaseCommand {
         project_id: projectId,
         keys: Object.keys(values),
         platform,
-        next_commands: [`zitadel env --env ${name}`],
+        // A freshly bound project serves no origin until one is allowed, so the
+        // first step is to restrict it — `origin add` — before anything ships.
+        next_commands: [
+          `zitadel origin add ${issuer ?? "<your-app-url>"} --kind primary --env ${name}`,
+          `zitadel env --env ${name}`,
+        ],
       },
       pretty: [
         `Wrote ${file} with ${Object.keys(values).join(", ")}`,
         "",
+        `Allow this project's origin: zitadel origin add ${issuer ?? "<your-app-url>"} --kind primary --env ${name}`,
         `Check what resolves: zitadel env --env ${name}`,
         "",
         "The deployed app never reads that file. Set these where it is built and run.",
