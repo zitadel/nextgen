@@ -41,7 +41,7 @@ describe("preview list", () => {
         const result = await app.run(["preview", "list", "--json"]);
 
         expect(result).toSucceed();
-        expect(app.envelopeOf<{ previews: unknown[] }>(result).data.previews).toEqual([]);
+        expect(app.envelopeOf<{ items: unknown[] }>(result).data.items).toEqual([]);
       });
 
       it("shows a preview that was deployed", async () => {
@@ -54,9 +54,28 @@ describe("preview list", () => {
         expect(result).toSucceed();
         expect(
           app
-            .envelopeOf<{ previews: { origin: string }[] }>(result)
-            .data.previews.map((preview) => preview.origin),
+            .envelopeOf<{ items: { origin: string }[] }>(result)
+            .data.items.map((preview) => preview.origin),
         ).toEqual([PREVIEW_URL]);
+      });
+
+      it("reports the canonical list envelope and drains pages with --all", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
+        await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+
+        const result = await app.run(["preview", "list", "--all", "--json"]);
+
+        expect(result).toSucceed();
+        const data = app.envelopeOf<{
+          items: { origin: string }[];
+          count: number;
+          next_page_token: string | null;
+        }>(result).data;
+        expect(data.items.map((preview) => preview.origin)).toEqual([PREVIEW_URL]);
+        expect(data.count).toBe(1);
+        // `--all` drains every page, so no continuation token is reported.
+        expect(data.next_page_token).toBeNull();
       });
     });
   });

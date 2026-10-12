@@ -65,8 +65,8 @@ describe("preview", () => {
         expect(listed).toSucceed();
         expect(
           app
-            .envelopeOf<{ previews: { origin: string }[] }>(listed)
-            .data.previews.map((preview) => preview.origin),
+            .envelopeOf<{ items: { origin: string }[] }>(listed)
+            .data.items.map((preview) => preview.origin),
         ).toEqual([PREVIEW_URL]);
       });
 

@@ -50,7 +50,7 @@ describe("preview rm", () => {
 
         expect(result).toSucceed();
         const listed = await app.run(["preview", "list", "--json"]);
-        expect(app.envelopeOf<{ previews: unknown[] }>(listed).data.previews).toEqual([]);
+        expect(app.envelopeOf<{ items: unknown[] }>(listed).data.items).toEqual([]);
       });
 
       it("succeeds when the preview is already gone", async () => {
