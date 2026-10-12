@@ -594,6 +594,33 @@ describe("passkey overlay", () => {
     expect(login.step.challenge?.method).toBe("passkey");
   });
 
+  test("the password step also offers passkey and routes to passkey-login", async () => {
+    applyPasskey(true);
+
+    // Reach the password step: a known email whose account has a password.
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const password = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: { email: "alice@acme.com" },
+    });
+    expect(password.step.name).toBe("password");
+
+    // The overlay adds exactly one passkey action, with the password step's key.
+    const offered = (password.step.actions ?? []).filter((a) => a.name === "passkey");
+    expect(offered).toHaveLength(1);
+    expect(offered[0]?.kind).toBe("passkey");
+    expect(offered[0]?.text_key).toBe("password.action.passkey");
+
+    // Choosing it drives the flow to the dedicated passkey-login step.
+    const login = await submitFlowStep(password.id, {
+      session_token: password.session_token,
+      action: "passkey",
+    });
+    expect(login.step.name).toBe("passkey-login");
+    expect(login.step.challenge?.method).toBe("passkey");
+  });
+
   test("clearPasskey removes the action again", async () => {
     applyPasskey(true);
     clearPasskey();
