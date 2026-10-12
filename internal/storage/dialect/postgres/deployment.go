@@ -18,11 +18,16 @@ const (
 	targetsTable     = "zitadel_nextgen.deployment_targets"
 	previewsTable    = "zitadel_nextgen.previews"
 
-	// FOR UPDATE serializes the writes that decide what a project's targets
-	// serve: deploys, and revokes, which must not race a deploy of the
-	// release they refuse. The second waits for the first and then reads its
-	// rows.
-	lockProjectStmt = `SELECT id FROM zitadel_nextgen.projects WHERE id = $1 FOR UPDATE`
+	// Serializes the writes that decide what a project's targets serve:
+	// deploys, and revokes, which must not race a deploy of the release they
+	// refuse. The second waits for the first and then reads its rows.
+	//
+	// FOR NO KEY UPDATE, not FOR UPDATE: inserting any row that references
+	// the project takes FOR KEY SHARE on it, which FOR UPDATE would block for
+	// as long as the deploy runs — every sign-in of the project included.
+	// FOR NO KEY UPDATE still conflicts with itself, so deploys and revokes
+	// still queue.
+	lockProjectStmt = `SELECT id FROM zitadel_nextgen.projects WHERE id = $1 FOR NO KEY UPDATE`
 	// clock_timestamp, not now(): now() is the transaction's start, and a
 	// deploy that waited on the lock has to stamp after the one it waited for.
 	clockStmt            = `SELECT clock_timestamp()`
