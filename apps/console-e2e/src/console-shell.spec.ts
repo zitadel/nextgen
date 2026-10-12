@@ -6,7 +6,7 @@
  * lives in Storybook (`@storybook/addon-vitest`, which runs in CI). The console
  * is the real settings app behind an auth guard (Console ADR 0003), so this
  * spec proves the built SPA mounts under its embed base (`/ui/console/`,
- * exercising the `vite preview` base config in `apps/console/vite.config.mts`)
+ * exercising the `vite preview` base config in `apps/console/vite.config.ts`)
  * and that boot behaves against a backend-less preview.
  *
  * `vite preview` proxies nothing, so every test here stubs
