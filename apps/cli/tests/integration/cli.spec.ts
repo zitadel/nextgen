@@ -42,7 +42,7 @@ async function suggestedCommandIds(): Promise<Set<string>> {
       const id = commandIdFromArgs(match[2]!);
       if (id) commands.add(id);
     }
-    for (const match of source.matchAll(/["`]zitadel\s+([^"`]*)/g)) {
+    for (const match of source.matchAll(/["`]zitadel\s+([^"`$]*)/g)) {
       const id = commandIdFromArgs(match[1] ?? "");
       if (id) commands.add(id);
     }

@@ -96,7 +96,7 @@ export default class DeploymentRollback extends EnvironmentCommand {
           "The last deployment's origins have different histories, so one rollback can't undo it",
           {
             hint: "Name the deployment to re-apply, or roll back one origin at a time with --origin.",
-            nextCommands: ["zitadel deployment list"],
+            nextCommands: [`zitadel deployment list${this.environmentSelector()}`],
           },
         );
       }
@@ -136,7 +136,12 @@ export default class DeploymentRollback extends EnvironmentCommand {
           "Rolling back requires --force in non-interactive mode",
           {
             hint: `Pass --force to re-apply ${targetId}.`,
-            nextCommands: [publicCliCommand(`deployment rollback ${targetId} --force`, cliVersion)],
+            nextCommands: [
+              publicCliCommand(
+                `deployment rollback ${targetId} --force${this.environmentSelector()}`,
+                cliVersion,
+              ),
+            ],
           },
         );
       }
