@@ -1,0 +1,47 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "ignoreCommand": "sh apps/cloud/ignore-build.sh",
+  "services": {
+    "server": {
+      "root": ".",
+      "framework": "go",
+      "installCommand": "corepack pnpm install --frozen-lockfile",
+      "buildCommand": "sh apps/cloud/build.sh"
+    },
+    "console": {
+      "root": "apps/console",
+      "framework": "vite",
+      "installCommand": "corepack pnpm install --frozen-lockfile",
+      "buildCommand": "cd ../.. && VITE_CONSOLE_VERCEL_INSIGHTS=1 corepack pnpm exec moon run console:build && rm -rf apps/console/dist && mkdir -p apps/console/dist/ui/console && cp -R internal/staticui/console/dist/. apps/console/dist/ui/console/",
+      "outputDirectory": "dist",
+      "rewrites": [
+        {
+          "source": "/ui/console/(.*)",
+          "destination": "/ui/console/index.html"
+        }
+      ]
+    }
+  },
+  "redirects": [
+    {
+      "source": "/ui/console",
+      "destination": "/ui/console/",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/ui/console/(.*)",
+      "destination": {
+        "service": "console"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "server"
+      }
+    }
+  ],
+  "regions": ["fra1"]
+}

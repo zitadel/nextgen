@@ -1,0 +1,158 @@
+# Runbook: hosted cloud (Vercel + Neon)
+
+> **Code:** [`apps/cloud/`](../../apps/cloud/) and the repo-root
+> [`vercel.json`](../../vercel.json)
+> **Vercel project:** `zitadel/nextgen-preview-cloud`
+> **Neon project:** `nextgen` (organization "Vercel: zitadel", AWS
+> `eu-central-1`)
+
+The hosted cloud is the current `main`, built by Vercel from the repository
+and run in Frankfurt (`fra1`) against a Neon Postgres database in the same
+AWS region. **`main` is production:** every merge deploys. A pull request
+that touches the server, the console or the login UI gets a preview
+deployment with its own copy of the database. Version tags and their npm
+packages remain the self-hosted artifact; this cloud does not run them.
+
+## Layout
+
+One Vercel deployment, two [services](https://vercel.com/docs/services):
+
+| Service | Built by | Serves |
+|---|---|---|
+| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds, compiles `apps/cloud/launcher`, then migrates | every path except the console's, including `/console/runtime.json` and the login UI at `/ui/login/` |
+| `console` | Vite; the console build with `VITE_CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights | `/ui/console/*` (bare `/ui/console` redirects to the slash form) |
+
+The console lives at the path the server would serve it from, on the same
+origin. The server's own console is switched off, and nothing else about
+the server changes: the session cookie, CSRF protection and the console
+links the server derives all work as in a self-hosted install.
+
+The launcher pins what follows from this layout (listen address from
+`PORT`, console off at `/ui/console`, login UI on) and defaults the rest
+(platform project bootstrapped, JSON logs, public base from Vercel's URL).
+Any `NEXTGEN_*` variable overrides a default.
+
+## Database
+
+- **Production** is the Neon `main` branch. The server serves from the
+  pooled URL (`DATABASE_URL`, PgBouncer in transaction mode) with at most
+  four connections per function instance, because Vercel starts one
+  instance per concurrent request from cold. Migrations use the direct URL
+  (`DATABASE_URL_UNPOOLED`): they hold a session advisory lock.
+- **Previews** get a Neon branch `preview/<git branch>`, created by the
+  integration from `main` on the branch's first preview deployment, with
+  its URLs injected into that deployment only. The build migrates the
+  branch; the database is otherwise production's data at the moment the
+  branch was created.
+- **Previews share production's data and master key.** Decided 2026-10-12
+  for simplicity: a copied branch is only readable with the key that
+  encrypted it. Anyone who can open a pull request can therefore read
+  production data from a preview. Keep production to team and test
+  accounts until previews start from an empty branch with a key of their
+  own.
+- **Cleanup:** `.github/workflows/neon-preview-cleanup.yml` deletes
+  `preview/<branch>` when the pull request closes or the branch is deleted.
+  Without it Neon only deletes the branch once Vercel deletes the
+  deployment, which its retention policy delays by months.
+
+## One-time setup
+
+### 1. Neon
+
+In Vercel → Storage → `nextgen`:
+
+1. **Plan:** Launch. The free plan caps the project at 10 branches and 100
+   compute hours a month, shared by production and every preview.
+2. **Connect the project** `nextgen-preview-cloud` for Production and
+   Preview. Under Advanced Options → Deployments Configuration turn on
+   **Required → Preview** and **Resource must be active before
+   deployment**. That is what creates a branch per preview.
+3. **Cleanup credentials:** create an organization API key in the Neon
+   console (organization "Vercel: zitadel" → Settings → API keys). In
+   GitHub, add it as the repository secret `NEON_API_KEY` and the project id
+   `spring-sound-94380481` as the repository variable `NEON_PROJECT_ID`.
+
+### 2. Master key
+
+```sh
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out master-key.pem
+base64 < master-key.pem | tr -d '\n' > master-key.b64
+```
+
+Keep `master-key.pem` in the team password manager. Losing it makes every
+project's key-encryption key unwrappable ([ADR 029](../adrs/029-cryptography-secrets-and-key-lifecycle.md)).
+
+### 3. Vercel project
+
+Settings: no Root Directory (the repository root holds `vercel.json`),
+Node.js 24, production branch `main`, preview deployments on, Web Analytics
+and Speed Insights enabled (their tabs in the project). Deployment
+Protection stays on Vercel Authentication.
+
+Environment variables (add secrets with
+`vercel env add NAME production,preview --sensitive --yes`, value on stdin):
+
+| Name | Target | Value |
+|---|---|---|
+| `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `PG*`, `POSTGRES_*` | Production (previews get theirs per deployment) | set by the Neon integration; do not edit |
+| `MASTER_KEY_PEM_B64` | Production, Preview; sensitive | contents of `master-key.b64`, the same key in both (see Database) |
+| `MASTER_KEY_ID` | Production, Preview | a stable id such as `cloud-2026-10`; rotation adds a new id |
+| `BOOTSTRAP_ADMIN_USER_JSON_B64` | Production; sensitive; optional | a platform admin document (below) |
+| `ENABLE_EXPERIMENTAL_COREPACK` | Production, Preview | `1`: the builds run package scripts that call `pnpm`, which must be the workspace's pinned version |
+
+Every other variable is a leftover; delete it. `NEXTGEN_*` variables
+override the launcher's defaults on purpose, so a stale one changes the
+deployment.
+
+**Platform admin.** The platform project has no users until someone signs
+up or a bootstrap document seeds one. Mint the document the way
+`zitadel start` writes its local admin
+([`admin-credential.ts`](../../apps/cli/src/lib/local-server/admin-credential.ts)),
+set its ids, username and email to the cloud admin's, and add it base64
+encoded. The server imports it on the next deploy and skips it afterwards.
+
+## Deploying
+
+- **Production:** every push to `main`. The `server` build migrates the
+  production branch **before** the deployment goes live. The launcher
+  refuses to migrate production from any other branch, so promoting a
+  preview (which rebuilds with production variables) or a CLI
+  `vercel deploy --prod` from a feature branch fails its build instead of
+  changing the schema. A failed build leaves the previous deployment
+  serving.
+- **Previews:** every push to a branch, if
+  [`ignore-build.sh`](../../apps/cloud/ignore-build.sh) finds a change to
+  what the deployment runs since the branch's last preview, or since it
+  left `main`. Docs-only branches get no preview.
+- **Migrations must be expand/contract.** The previous deployment serves on
+  the new schema until the new one is live, and Instant Rollback promotes
+  an older deployment without touching the schema.
+- **Startup never migrates:** the serving function refuses `--migrate`.
+
+## Operating
+
+- **Logs:** Vercel runtime logs of the `server` function (JSON). Add a log
+  drain for retention.
+- **Cold starts:** a Go instance boots in about a second. Neon suspends an
+  idle compute after five minutes; the first query afterwards wakes it,
+  which adds a few hundred milliseconds.
+- **Connections:** four per instance through Neon's PgBouncer. A 0.25 CU
+  compute allows 104 connections, of which the pooler uses up to 90 %.
+  Raise the compute size before raising the pool size.
+- **Analytics:** the console reports page views and Web Vitals per route
+  pattern (`/ui/console/users/$userId`) to the project's Analytics and Speed
+  Insights tabs.
+
+## Later: read replicas in other regions
+
+- Neon read replicas run in the primary's region only. A replica elsewhere
+  means a second Neon project in that region fed by logical replication,
+  which does not carry schema changes: migrations would have to run on
+  both.
+- The server has no read/write split yet; reads in another region need one
+  before a replica helps.
+- Vercel's Go preset ignores per-function regions. Pinning functions to a
+  second region needs the Build Output API, as tried in the research PR
+  [zitadel/nextgen#1518](https://github.com/zitadel/nextgen/pull/1518).
+- Writes stay in Frankfurt. Nothing in this setup has to change to add a
+  read path later.

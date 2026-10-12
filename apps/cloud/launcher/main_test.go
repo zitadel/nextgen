@@ -1,0 +1,312 @@
+package main
+
+import (
+	"encoding/base64"
+	"net/url"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+const testPEM = "-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu\n-----END RSA PRIVATE KEY-----\n"
+
+const (
+	pooledURL   = "postgresql://neondb_owner:secret@ep-quiet-sun-123456-pooler.c-8.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+	unpooledURL = "postgresql://neondb_owner:secret@ep-quiet-sun-123456.c-8.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+)
+
+// setLauncherEnv gives every variable the launcher reads or writes a known
+// value; t.Setenv restores the original after the test, including the ones
+// the launcher sets itself.
+func setLauncherEnv(t *testing.T, dataDir string) {
+	t.Helper()
+	for _, key := range []string{
+		"BOOTSTRAP_ADMIN_USER_JSON_B64",
+		"DATABASE_URL",
+		"DATABASE_URL_UNPOOLED",
+		"NEXTGEN_DATABASE_POSTGRES",
+		"NEXTGEN_INSTRUMENTATION_LOG_FORMAT",
+		"NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT",
+		"NEXTGEN_SERVER_ADDRESS",
+		"NEXTGEN_SERVER_CONSOLE_ENABLED",
+		"NEXTGEN_SERVER_CONSOLE_PATH",
+		"NEXTGEN_SERVER_LOGIN_ENABLED",
+		"NEXTGEN_SERVER_PUBLIC_BASE",
+		"PORT",
+		"VERCEL_BRANCH_URL",
+		"VERCEL_ENV",
+		"VERCEL_GIT_COMMIT_REF",
+		"VERCEL_PROJECT_PRODUCTION_URL",
+		"VERCEL_URL",
+	} {
+		t.Setenv(key, "")
+	}
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
+	t.Setenv("MASTER_KEY_PEM_B64", base64.StdEncoding.EncodeToString([]byte(testPEM)))
+	t.Setenv("MASTER_KEY_ID", "cloud-2026-10")
+}
+
+func TestPrepareServerRendersTheMasterKeyIntoTheConfig(t *testing.T) {
+	dataDir := t.TempDir()
+	setLauncherEnv(t, dataDir)
+	t.Setenv("PORT", "9090")
+
+	args, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	configPath := filepath.Join(dataDir, "nextgen.yaml")
+	assert.Equal(t, []string{"server", "--config", configPath}, args)
+
+	config, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, "server:\n"+
+		"  generate_master_key: false\n"+
+		"  master_keys:\n"+
+		"    cloud-2026-10:\n"+
+		"      use_for_encryption: true\n"+
+		"      private_key: |\n"+
+		"        -----BEGIN RSA PRIVATE KEY-----\n"+
+		"        MIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu\n"+
+		"        -----END RSA PRIVATE KEY-----\n", string(config))
+	info, err := os.Stat(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+
+	assert.Equal(t, ":9090", os.Getenv("NEXTGEN_SERVER_ADDRESS"), "the listen address follows Vercel's PORT")
+	assert.Empty(t, os.Getenv("MASTER_KEY_PEM_B64"), "the secret leaves the environment once it is on disk")
+	assert.NoDirExists(t, filepath.Join(dataDir, "master-keys"), "nothing is written where the server adopts keys from")
+}
+
+func TestPrepareServerNormalizesThePEM(t *testing.T) {
+	dataDir := t.TempDir()
+	setLauncherEnv(t, dataDir)
+	// Pasted keys arrive with carriage returns, blank lines and indentation.
+	t.Setenv("MASTER_KEY_PEM_B64", base64.StdEncoding.EncodeToString([]byte(
+		"  -----BEGIN RSA PRIVATE KEY-----\r\n\r\n   MIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu\r\n-----END RSA PRIVATE KEY-----\r\n")))
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	config, err := os.ReadFile(filepath.Join(dataDir, "nextgen.yaml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(config), "        -----BEGIN RSA PRIVATE KEY-----\n        MIIBOg")
+	assert.NotContains(t, string(config), "\r")
+	assert.Equal(t, ":8080", os.Getenv("NEXTGEN_SERVER_ADDRESS"), "PORT defaults to 8080")
+}
+
+func TestPrepareServerServesFromThePooledURL(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "preview")
+	t.Setenv("DATABASE_URL", pooledURL)
+	t.Setenv("DATABASE_URL_UNPOOLED", unpooledURL)
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	served, err := url.Parse(os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
+	require.NoError(t, err)
+	assert.Equal(t, "ep-quiet-sun-123456-pooler.c-8.eu-central-1.aws.neon.tech", served.Host, "the pooled host, never the direct one")
+	assert.Equal(t, "neondb_owner", served.User.Username())
+	assert.Equal(t, "/neondb", served.Path)
+	assert.Equal(t, url.Values{
+		"sslmode":                 {"require"},
+		"channel_binding":         {"require"},
+		"pool_max_conns":          {"4"},
+		"default_query_exec_mode": {"cache_describe"},
+	}, served.Query())
+}
+
+func TestWithParamsKeepsWhatTheURLAlreadySets(t *testing.T) {
+	dsn, err := withParams("postgres://u:p@host/db?pool_max_conns=10&sslmode=verify-full", servingParams)
+	require.NoError(t, err)
+
+	parsed, err := url.Parse(dsn)
+	require.NoError(t, err)
+	assert.Equal(t, "10", parsed.Query().Get("pool_max_conns"), "an explicit pool size wins")
+	assert.Equal(t, "verify-full", parsed.Query().Get("sslmode"))
+	assert.Equal(t, "cache_describe", parsed.Query().Get("default_query_exec_mode"))
+}
+
+func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("DATABASE_URL", pooledURL)
+	t.Setenv("VERCEL_PROJECT_PRODUCTION_URL", "nextgen-preview-cloud.vercel.app")
+	// Leftovers from an earlier layout must not move the console or the login.
+	t.Setenv("NEXTGEN_SERVER_CONSOLE_ENABLED", "true")
+	t.Setenv("NEXTGEN_SERVER_CONSOLE_PATH", "/console")
+	t.Setenv("NEXTGEN_SERVER_LOGIN_ENABLED", "false")
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, "false", os.Getenv("NEXTGEN_SERVER_CONSOLE_ENABLED"), "the console is a service of its own")
+	assert.Equal(t, "/ui/console", os.Getenv("NEXTGEN_SERVER_CONSOLE_PATH"), "where vercel.json mounts the console")
+	assert.Equal(t, "true", os.Getenv("NEXTGEN_SERVER_LOGIN_ENABLED"), "keeps /console/runtime.json mounted")
+	assert.Equal(t, "true", os.Getenv("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"))
+	assert.Equal(t, "json", os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_FORMAT"))
+	assert.Equal(t, "https://nextgen-preview-cloud.vercel.app", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
+}
+
+func TestPrepareServerKeepsExplicitDefaults(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("DATABASE_URL", pooledURL)
+	t.Setenv("VERCEL_PROJECT_PRODUCTION_URL", "nextgen-preview-cloud.vercel.app")
+	t.Setenv("NEXTGEN_SERVER_PUBLIC_BASE", "https://cloud.example.com")
+	t.Setenv("NEXTGEN_INSTRUMENTATION_LOG_FORMAT", "text")
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, "https://cloud.example.com", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
+	assert.Equal(t, "text", os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_FORMAT"))
+}
+
+func TestPublicBase(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_PROJECT_PRODUCTION_URL", "nextgen-preview-cloud.vercel.app")
+	t.Setenv("VERCEL_BRANCH_URL", "nextgen-preview-cloud-git-feature-zitadel.vercel.app")
+	t.Setenv("VERCEL_URL", "nextgen-preview-cloud-abc123-zitadel.vercel.app")
+
+	assert.Equal(t, "https://nextgen-preview-cloud.vercel.app", publicBase("production"))
+	assert.Equal(t, "https://nextgen-preview-cloud-git-feature-zitadel.vercel.app", publicBase("preview"), "a preview keeps its branch's stable URL")
+	assert.Equal(t, "https://nextgen-preview-cloud-abc123-zitadel.vercel.app", publicBase("development"))
+
+	t.Setenv("VERCEL_BRANCH_URL", "")
+	assert.Equal(t, "https://nextgen-preview-cloud-abc123-zitadel.vercel.app", publicBase("preview"))
+
+	t.Setenv("VERCEL_URL", "")
+	assert.Empty(t, publicBase(""), "a local run keeps the server's default")
+}
+
+func TestPrepareServerRendersTheBootstrapAdminDocument(t *testing.T) {
+	dataDir := t.TempDir()
+	setLauncherEnv(t, dataDir)
+	doc := `{"header":{"version":1},"authenticators":[]}`
+	t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(doc)))
+
+	args, err := prepareServer([]string{"--disable-master-key-generation"})
+	require.NoError(t, err)
+
+	adminPath := filepath.Join(dataDir, "admin-user.json")
+	assert.Equal(t, []string{"server", "--config", filepath.Join(dataDir, "nextgen.yaml"), "--user-file", adminPath, "--disable-master-key-generation"}, args)
+	written, err := os.ReadFile(adminPath)
+	require.NoError(t, err)
+	assert.Equal(t, doc, string(written))
+	assert.Empty(t, os.Getenv("BOOTSTRAP_ADMIN_USER_JSON_B64"))
+}
+
+func TestPrepareServerLocallyKeepsTheConfiguredDatabase(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("NEXTGEN_DATABASE_POSTGRES", "postgres://local/db")
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, "postgres://local/db", os.Getenv("NEXTGEN_DATABASE_POSTGRES"), "without DATABASE_URL a local run keeps its own database")
+}
+
+func TestPrepareServerRefusesBadInput(t *testing.T) {
+	cases := map[string]func(t *testing.T){
+		"--migrate so a serving function can never change the schema": func(t *testing.T) {
+			_, err := prepareServer([]string{"--migrate"})
+			assert.ErrorContains(t, err, "refusing --migrate")
+			_, err = prepareServer([]string{"--migrate=true"})
+			assert.ErrorContains(t, err, "refusing --migrate")
+		},
+		"a missing master key": func(t *testing.T) {
+			t.Setenv("MASTER_KEY_PEM_B64", "")
+			_, err := prepareServer(nil)
+			assert.ErrorContains(t, err, "MASTER_KEY_PEM_B64 must be set")
+		},
+		"a key that is not a PEM block": func(t *testing.T) {
+			t.Setenv("MASTER_KEY_PEM_B64", base64.StdEncoding.EncodeToString([]byte("not a key")))
+			_, err := prepareServer(nil)
+			assert.ErrorContains(t, err, "does not decode to a PEM block")
+		},
+		"a missing key id, which would orphan the wrapped keys on the next change": func(t *testing.T) {
+			t.Setenv("MASTER_KEY_ID", "")
+			_, err := prepareServer(nil)
+			assert.ErrorContains(t, err, "MASTER_KEY_ID must be set")
+		},
+		"a key id that cannot be written into YAML unquoted": func(t *testing.T) {
+			t.Setenv("MASTER_KEY_ID", "bad id:")
+			_, err := prepareServer(nil)
+			assert.ErrorContains(t, err, "MASTER_KEY_ID must be set and match")
+		},
+		"a deployment without a database, which would silently serve from SQLite in /tmp": func(t *testing.T) {
+			for _, env := range []string{"production", "preview"} {
+				t.Setenv("VERCEL_ENV", env)
+				_, err := prepareServer(nil)
+				assert.ErrorContains(t, err, "DATABASE_URL must be set for a "+env+" deployment")
+			}
+		},
+		"a database URL that is not a postgres URL": func(t *testing.T) {
+			t.Setenv("DATABASE_URL", "host=db user=u")
+			_, err := prepareServer(nil)
+			assert.ErrorContains(t, err, "must be a postgres:// or postgresql:// URL")
+		},
+		"a bootstrap document that is not one": func(t *testing.T) {
+			t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(`{"user":"x"}`)))
+			_, err := prepareServer(nil)
+			assert.ErrorContains(t, err, "does not decode to a bootstrap user document")
+		},
+	}
+	for name, check := range cases {
+		t.Run(name, func(t *testing.T) {
+			setLauncherEnv(t, t.TempDir())
+			check(t)
+		})
+	}
+}
+
+func TestPrepareMigrationUsesTheDirectURL(t *testing.T) {
+	setLauncherEnv(t, "")
+	t.Setenv("VERCEL_ENV", "preview")
+	t.Setenv("DATABASE_URL", pooledURL)
+	t.Setenv("DATABASE_URL_UNPOOLED", unpooledURL)
+
+	args, err := prepareMigration(nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"migrate"}, args)
+	assert.Equal(t, unpooledURL, os.Getenv("NEXTGEN_DATABASE_POSTGRES"), "the migration lock needs a session, which the pooler cannot hold")
+	assert.Equal(t, defaultDataDir, os.Getenv("NEXTGEN_SERVER_DATA_DIR"))
+}
+
+func TestPrepareMigrationMigratesProductionOnlyFromMain(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("DATABASE_URL_UNPOOLED", unpooledURL)
+
+	t.Setenv("VERCEL_GIT_COMMIT_REF", "feature")
+	_, err := prepareMigration(nil)
+	assert.ErrorContains(t, err, `refusing to migrate production from "feature"`)
+
+	t.Setenv("VERCEL_GIT_COMMIT_REF", "")
+	_, err = prepareMigration(nil)
+	assert.ErrorContains(t, err, "refusing to migrate production", "a CLI deploy carries no branch")
+
+	t.Setenv("VERCEL_GIT_COMMIT_REF", "main")
+	_, err = prepareMigration(nil)
+	assert.NoError(t, err)
+}
+
+func TestPrepareMigrationNeedsTheDirectURLWhenDeployed(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "preview")
+	t.Setenv("DATABASE_URL", pooledURL)
+
+	_, err := prepareMigration(nil)
+	assert.ErrorContains(t, err, "DATABASE_URL_UNPOOLED must be set for a preview deployment")
+
+	t.Setenv("VERCEL_ENV", "")
+	t.Setenv("NEXTGEN_DATABASE_POSTGRES", "postgres://local/db")
+	_, err = prepareMigration(nil)
+	require.NoError(t, err, "a local run migrates whatever it is configured with")
+	assert.Equal(t, "postgres://local/db", os.Getenv("NEXTGEN_DATABASE_POSTGRES"))
+}

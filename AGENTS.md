@@ -72,6 +72,10 @@ Development and test surfaces (`apps/`):
   temporary registry).
 - `apps/mock-zitadel/` — thin deployment wrapper that serves
   `packages/api-mock` as a live per-PR preview endpoint.
+- `apps/cloud/` — deployment wrapper of the hosted cloud: `main` on Vercel
+  with a Neon database, a preview with its own Neon branch per pull request.
+  The repo-root `vercel.json` defines its services; operations live in
+  [docs/runbooks/cloud.md](docs/runbooks/cloud.md).
 
 Published libraries (`packages/`):
 

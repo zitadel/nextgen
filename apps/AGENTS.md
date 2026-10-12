@@ -19,7 +19,9 @@ Two apps are **exceptions**, for reasons that are not a style choice:
 - **`console`** emits to `internal/staticui/console/dist` because the Go server
   `go:embed`s that exact tree to serve the console itself
   ([`internal/staticui/console/embed.go`](../internal/staticui/console/embed.go)).
-  The output path is dictated by the embed, not by this convention.
+  The output path is dictated by the embed, not by this convention. The
+  hosted cloud's `console` service (repo-root [`vercel.json`](../vercel.json))
+  copies that build to `dist/ui/console/` and serves `dist`.
 - **`mock-zitadel`** is a Vercel **Function** deploy, not a static site: it
   bundles into `api/` and rewrites `/(.*) → /api`, so it has no static
   `outputDirectory` to standardise.
