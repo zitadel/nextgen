@@ -376,16 +376,39 @@ multiple identity providers.
   manually completed by the user.
 * **Optional Fields:** An omitted optional provider claim is silently skipped
   and does not block the step.
-* **User Edits:** Prefilled fields are editable.
+* **User Edits:** Prefilled fields are editable, except a unique value the
+  provider verified.
+  A submit that changes it is refused with
+  `error.sso_verified_unique_value_changed`: an edited, unregistered address
+  would otherwise get an account linked to the editor's provider subject.
   `x-editable` was removed in
-  [#901](https://github.com/zitadel/nextgen/pull/901) and returns with the
-  collection-step implementation; until then editability is uniform.
-* **Verification Loss on Edit:** Editing a prefilled value immediately revokes
-  its verified status.
+  [#901](https://github.com/zitadel/nextgen/pull/901); the wire has no
+  attribute to render the refused field read-only.
+* **Verification Loss on Edit:** Editing any other prefilled value revokes its
+  verified status.
   Because the provider only vouches for its own returned data, modified inputs
   must re-enter the standard verification pipeline (`x-verify`).
   This prevents users from replacing a verified prefilled email with an
   arbitrary address while retaining the verified flag.
+
+* **Stored Attributes:** The user is created from what the steps collected,
+  with this submit's values, and each schema claim the step does not show.
+  A claim replaces a value an earlier step collected, so a typed identifier
+  cannot override the provider.
+  A hidden claim that fails its property's validation is dropped, because the
+  user cannot see it to fix it.
+* **Password:** A password field on the step is optional for the flow author.
+  When the step has one, the password is stored with the user, in the same
+  transaction as the user and the link, so the user can also sign in with it
+  later.
+  The provider is still the proof for this sign-in, so the session records no
+  password factor.
+* **Step Errors:** A required property that no field on the step supplies
+  gives `error.sso_user_cannot_be_created`; nothing on the step can fix it.
+  Values that fail the schema only together give `error.sso_user_invalid`.
+  A taken value whose owner the engine cannot look up gives
+  `error.user_already_exists`
+  ([Trigger Points](#trigger-points)).
 
 * **No Wire Change:** `api/openapi/components/flows/field.yaml` already defines
   `value` for prefilled fields. After a successful callback the engine fills it
@@ -466,9 +489,11 @@ and the flow must route both:
 
 1. **Callback Resolution:** Triggered when provider-supplied values collide with
    an existing user record.
-2. **Collection Step Submission:** Triggered when a user edits a prefilled field
-   into a conflicting value (matching standard registration submission
-   semantics).
+2. **Collection Step Submission:** Triggered when a submitted value collides
+   with an existing user record.
+   The engine binds that user, as at callback resolution.
+   A team-scoped value, an object or an array has no owner lookup, so its
+   collision shows `error.user_already_exists` on the step instead.
 
 Both the entry step and the collection step carry the `user_already_exists`
 transition.
