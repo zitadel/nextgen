@@ -38,7 +38,10 @@ func newSSOCollectionFixture(t *testing.T) *ssoCollectionFixture {
 		"kind": "user-schema",
 		"type": "object",
 		"x-identifier": "email",
-		"x-auth-methods": {"password": {"enabled": true}},
+		"x-auth-methods": {
+			"password": {"enabled": true},
+			"sso":      {"enabled": true, "providers": ["google"]}
+		},
 		"required": ["email", "username"],
 		"properties": {
 			"email":      {"type": "string", "format": "email", "x-unique": "project"},
