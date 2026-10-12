@@ -500,10 +500,12 @@ Verify local runtime and project state.
 USAGE
   $ zitadel doctor [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fix] [--image <value>]
-    [--port <value>] [--runtime binary|docker]
+    [--port <value>] [--runtime binary|docker] [-e <value>] [--env-file <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -512,6 +514,8 @@ FLAGS
                           NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
       --fix               Repair missing files and stale managed wiring.
       --image=<value>     Container image to check.
       --port=<value>      [default: 8080] Local HTTP port.

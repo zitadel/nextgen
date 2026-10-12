@@ -20,7 +20,6 @@ type statements struct {
 	flowDefinitionStatements
 	cryptoKeyStatements
 	jsonSchemaStatements
-	environmentStatements
 	releaseStatements
 	idpConnectionStatements
 	idpIdentityLinkStatements
@@ -59,7 +58,6 @@ func newStatements(client queryExecutor) statements {
 		flowDefinitionStatements:      newFlowDefinitionStatements(client),
 		cryptoKeyStatements:           newCryptoKeyStatements(client),
 		jsonSchemaStatements:          newJSONSchemaStatements(client),
-		environmentStatements:         newEnvironmentStatements(client),
 		releaseStatements:             newReleaseStatements(client),
 		idpConnectionStatements:       newIDPConnectionStatements(client),
 		idpIdentityLinkStatements:     newIDPIdentityLinkStatements(client),
