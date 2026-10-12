@@ -1152,7 +1152,9 @@ func (r *FlowStateMachineRuntime) prefillStep(ctx context.Context, state *FlowSt
 		prefillFromCollected(resolved, collected.Claims)
 		for i := range resolved.Fields {
 			f := &resolved.Fields[i]
-			if f.Unique == AttributeUniquenessUnspecified || !collected.Verified[f.Name] {
+			// The provider verifies a top-level claim, so a nested leaf takes
+			// its object's status.
+			if f.Unique == AttributeUniquenessUnspecified || !collected.Verified[AttributeKey(f.Name).Nodes()[0]] {
 				continue
 			}
 			// The submit refuses any value but this claim, so lock the field

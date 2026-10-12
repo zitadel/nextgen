@@ -6196,15 +6196,21 @@ func TestFlowStateMachine_Render_SSOCollectionStepWithoutParkedRowRendersEmpty(t
 func TestFlowStateMachine_Render_SSOCollectionStepReadOnlyFields(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name      string
-		parked    *domain.FlowSSOParkedIdentity
-		collected map[string]any
-		want      []string
+		name   string
+		fields []domain.Field
+		parked *domain.FlowSSOParkedIdentity
+		want   []string
 	}{
 		{
 			name:   "verified unique claim",
 			parked: unlinkedParked(map[string]any{"email": "alice@example.com"}, map[string]bool{"email": true}),
 			want:   []string{"email"},
+		},
+		{
+			name:   "verified unique leaf of a claim object",
+			fields: []domain.Field{"email", "account.handle"},
+			parked: unlinkedParked(map[string]any{"account": map[string]any{"handle": "ali"}}, map[string]bool{"account": true}),
+			want:   []string{"account.handle"},
 		},
 		{
 			name:   "unverified unique claim",
@@ -6215,20 +6221,18 @@ func TestFlowStateMachine_Render_SSOCollectionStepReadOnlyFields(t *testing.T) {
 			parked: unlinkedParked(map[string]any{"given_name": "Alice"}, map[string]bool{"given_name": true}),
 		},
 		{
-			name:      "verified unique claim that is not a string",
-			parked:    unlinkedParked(map[string]any{"username": 42}, map[string]bool{"username": true}),
-			collected: map[string]any{"username": "typed"},
-		},
-		{
-			name:      "no parked row",
-			collected: map[string]any{"email": "typed@example.com"},
+			name:   "verified unique claim that is not a string",
+			fields: []domain.Field{"email", "employee_id"},
+			parked: unlinkedParked(map[string]any{"employee_id": 42}, map[string]bool{"employee_id": true}),
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			w, def, state := collectionStepWorld(t)
-			state.CollectedData.UserData = tc.collected
+			if tc.fields != nil {
+				def.Steps[len(def.Steps)-1].Fields = tc.fields
+			}
 			w.expectCollected(tc.parked, nil)
 
 			result, err := w.sm.Render(t.Context(), def, state)
