@@ -10,6 +10,10 @@ import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderRows, renderTable } from "../../lib/oclif/crud/table";
 import { publicCliCommand } from "../../lib/public-cli";
 
+/** Single-quote a value for a suggested shell command, matching the shared list builder. */
+const shellArg = (value: string): string =>
+  /^[A-Za-z0-9_.:@/=+-]+$/.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
+
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
 
@@ -102,10 +106,13 @@ export default class DeploymentList extends EnvironmentCommand {
         ? publicCliCommand(
             [
               "deployment list",
-              ...(flags.origin === undefined ? [] : [`--origin ${flags.origin}`]),
+              ...(flags.origin === undefined ? [] : [`--origin ${shellArg(flags.origin)}`]),
               ...(flags.live ? ["--live"] : []),
               ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
-              `--page-token ${next}`,
+              // `next` is an opaque server cursor: quote it so whitespace or shell
+              // metacharacters in a copied command cannot execute as server-controlled
+              // text or break the suggestion.
+              `--page-token ${shellArg(next)}`,
               "--json",
             ].join(" "),
             cliVersion,
