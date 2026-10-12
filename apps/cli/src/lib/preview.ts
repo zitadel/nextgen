@@ -7,6 +7,12 @@
  * Vercel exposes bare hosts, so a scheme is prepended; Netlify and Cloudflare
  * Pages expose the full deployment URL, which is used as-is. (Cloudflare's
  * stable per-branch alias is not reconstructed here — see #1692.)
+ *
+ * Only a build's preview / per-deploy URLs belong here: a platform's
+ * production or canonical-site variable (e.g. `VERCEL_PROJECT_PRODUCTION_URL`,
+ * Netlify's `URL`, `CI_PAGES_URL`) is deliberately excluded, since `preview`
+ * must never target a production origin. Anything not detected is passed with
+ * `--origin`.
  */
 const PREVIEW_PLATFORMS: ReadonlyArray<{
   variables: readonly string[];
