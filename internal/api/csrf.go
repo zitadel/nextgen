@@ -38,6 +38,7 @@ var csrfTokenExemptOperations = map[api.OperationName]bool{
 	api.QueryUsersOperation:      true,
 	api.QueryTeamsOperation:      true,
 	api.QueryGrantsOperation:     true,
+	api.QueryIdpsOperation:       true,
 }
 
 type csrfRequestKey struct{}
