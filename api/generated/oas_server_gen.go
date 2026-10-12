@@ -416,14 +416,6 @@ type Handler interface {
 	//
 	// GET /deployments/{deployment_id}/variables
 	GetDeploymentVariables(ctx context.Context, params GetDeploymentVariablesParams) (GetDeploymentVariablesRes, error)
-	// GetEnvironmentByName implements getEnvironmentByName operation.
-	//
-	// Reads one environment of the project by its name.
-	// The lookup is scoped to the project in `project_id`: a name that exists in
-	// another project answers `env.not_found` exactly as an unused name does.
-	//
-	// GET /environments/{name}
-	GetEnvironmentByName(ctx context.Context, params GetEnvironmentByNameParams) (GetEnvironmentByNameRes, error)
 	// GetEvent implements getEvent operation.
 	//
 	// Loads a single event by `(project_id, id)`. Requires `events.read`.
@@ -666,12 +658,6 @@ type Handler interface {
 	//
 	// GET /deployments
 	ListDeployments(ctx context.Context, params ListDeploymentsParams) (ListDeploymentsRes, error)
-	// ListEnvironments implements listEnvironments operation.
-	//
-	// Lists the project's environments ordered by name.
-	//
-	// GET /environments
-	ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (ListEnvironmentsRes, error)
 	// ListEvents implements listEvents operation.
 	//
 	// Returns project-scoped audit events, newest-first by keyset on

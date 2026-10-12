@@ -185,10 +185,6 @@ paths:
     $ref: endpoints/teams/query/methods.yaml
   /teams/{team_id}:
     $ref: endpoints/teams/by_id/methods.yaml
-  /environments:
-    $ref: endpoints/environments/methods.yaml
-  /environments/{name}:
-    $ref: endpoints/environments/by_name/methods.yaml
   /branding:
     $ref: endpoints/branding/methods.yaml
   /branding/{id}:
