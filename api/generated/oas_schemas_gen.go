@@ -478,59 +478,6 @@ func (s *AttProofRejectedDetails) init() AttProofRejectedDetails {
 
 // Merged schema.
 // Ref: #
-type AttSSOStateInvalid struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptAttSSOStateInvalidDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *AttSSOStateInvalid) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *AttSSOStateInvalid) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *AttSSOStateInvalid) GetDetails() OptAttSSOStateInvalidDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *AttSSOStateInvalid) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *AttSSOStateInvalid) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *AttSSOStateInvalid) SetDetails(val OptAttSSOStateInvalidDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type AttSSOStateInvalidDetails map[string]jx.Raw
-
-func (s *AttSSOStateInvalidDetails) init() AttSSOStateInvalidDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-// Merged schema.
-// Ref: #
 type AttStaleChallenge struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -10707,30 +10654,21 @@ func (s *CreateFlowDefinitionRequest) SetFlowDefinition(val FlowDefinition) {
 
 // CreateFlowErrorResponse represents sum type.
 type CreateFlowErrorResponse struct {
-	Type                          CreateFlowErrorResponseType // switch on this field
-	AttInvalidRequest             AttInvalidRequest
-	AttNotFound                   AttNotFound
-	EncKeyDecryptFailed           EncKeyDecryptFailed
-	EncKeyEncryptFailed           EncKeyEncryptFailed
-	EncKeyNotFound                EncKeyNotFound
-	EvtInvalid                    EvtInvalid
-	FlowdefNotFound               FlowdefNotFound
-	FlowdefPurposeMismatch        FlowdefPurposeMismatch
-	FlowIntegrity                 FlowIntegrity
-	FlowInvalidPurpose            FlowInvalidPurpose
-	FlowRestartRequired           FlowRestartRequired
-	IdpNotFound                   IdpNotFound
-	IdpEndpointCleartext          IdpEndpointCleartext
-	IdpEndpointsPartial           IdpEndpointsPartial
-	IdpOAuth2Unsupported          IdpOAuth2Unsupported
-	IdpProtocolBlockMissing       IdpProtocolBlockMissing
-	IdpScopesMissingOpenid        IdpScopesMissingOpenid
-	IdpStrategyPointerUnsupported IdpStrategyPointerUnsupported
-	Internal                      Internal
-	TknInvalid                    TknInvalid
-	TknInvalidTknid               TknInvalidTknid
-	ReqInvalid                    ReqInvalid
-	EncKeyUnknownAlg              EncKeyUnknownAlg
+	Type                   CreateFlowErrorResponseType // switch on this field
+	AttInvalidRequest      AttInvalidRequest
+	EncKeyDecryptFailed    EncKeyDecryptFailed
+	EncKeyEncryptFailed    EncKeyEncryptFailed
+	EncKeyNotFound         EncKeyNotFound
+	EvtInvalid             EvtInvalid
+	FlowdefNotFound        FlowdefNotFound
+	FlowdefPurposeMismatch FlowdefPurposeMismatch
+	FlowIntegrity          FlowIntegrity
+	FlowInvalidPurpose     FlowInvalidPurpose
+	Internal               Internal
+	TknInvalid             TknInvalid
+	TknInvalidTknid        TknInvalidTknid
+	ReqInvalid             ReqInvalid
+	EncKeyUnknownAlg       EncKeyUnknownAlg
 }
 
 // CreateFlowErrorResponseType is oneOf type of CreateFlowErrorResponse.
@@ -10738,39 +10676,25 @@ type CreateFlowErrorResponseType string
 
 // Possible values for CreateFlowErrorResponseType.
 const (
-	AttInvalidRequestCreateFlowErrorResponse             CreateFlowErrorResponseType = "att.invalid_request"
-	AttNotFoundCreateFlowErrorResponse                   CreateFlowErrorResponseType = "att.not_found"
-	EncKeyDecryptFailedCreateFlowErrorResponse           CreateFlowErrorResponseType = "enc_key.decrypt_failed"
-	EncKeyEncryptFailedCreateFlowErrorResponse           CreateFlowErrorResponseType = "enc_key.encrypt_failed"
-	EncKeyNotFoundCreateFlowErrorResponse                CreateFlowErrorResponseType = "enc_key.not_found"
-	EvtInvalidCreateFlowErrorResponse                    CreateFlowErrorResponseType = "evt.invalid"
-	FlowdefNotFoundCreateFlowErrorResponse               CreateFlowErrorResponseType = "flowdef.not_found"
-	FlowdefPurposeMismatchCreateFlowErrorResponse        CreateFlowErrorResponseType = "flowdef.purpose_mismatch"
-	FlowIntegrityCreateFlowErrorResponse                 CreateFlowErrorResponseType = "flow.integrity"
-	FlowInvalidPurposeCreateFlowErrorResponse            CreateFlowErrorResponseType = "flow.invalid_purpose"
-	FlowRestartRequiredCreateFlowErrorResponse           CreateFlowErrorResponseType = "flow.restart_required"
-	IdpNotFoundCreateFlowErrorResponse                   CreateFlowErrorResponseType = "idp.not_found"
-	IdpEndpointCleartextCreateFlowErrorResponse          CreateFlowErrorResponseType = "idp.endpoint_cleartext"
-	IdpEndpointsPartialCreateFlowErrorResponse           CreateFlowErrorResponseType = "idp.endpoints_partial"
-	IdpOAuth2UnsupportedCreateFlowErrorResponse          CreateFlowErrorResponseType = "idp.oauth2_unsupported"
-	IdpProtocolBlockMissingCreateFlowErrorResponse       CreateFlowErrorResponseType = "idp.protocol_block_missing"
-	IdpScopesMissingOpenidCreateFlowErrorResponse        CreateFlowErrorResponseType = "idp.scopes_missing_openid"
-	IdpStrategyPointerUnsupportedCreateFlowErrorResponse CreateFlowErrorResponseType = "idp.strategy_pointer_unsupported"
-	InternalCreateFlowErrorResponse                      CreateFlowErrorResponseType = "internal"
-	TknInvalidCreateFlowErrorResponse                    CreateFlowErrorResponseType = "tkn.invalid"
-	TknInvalidTknidCreateFlowErrorResponse               CreateFlowErrorResponseType = "tkn.invalid_tknid"
-	ReqInvalidCreateFlowErrorResponse                    CreateFlowErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgCreateFlowErrorResponse              CreateFlowErrorResponseType = "enc_key.unknown_alg"
+	AttInvalidRequestCreateFlowErrorResponse      CreateFlowErrorResponseType = "att.invalid_request"
+	EncKeyDecryptFailedCreateFlowErrorResponse    CreateFlowErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyEncryptFailedCreateFlowErrorResponse    CreateFlowErrorResponseType = "enc_key.encrypt_failed"
+	EncKeyNotFoundCreateFlowErrorResponse         CreateFlowErrorResponseType = "enc_key.not_found"
+	EvtInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "evt.invalid"
+	FlowdefNotFoundCreateFlowErrorResponse        CreateFlowErrorResponseType = "flowdef.not_found"
+	FlowdefPurposeMismatchCreateFlowErrorResponse CreateFlowErrorResponseType = "flowdef.purpose_mismatch"
+	FlowIntegrityCreateFlowErrorResponse          CreateFlowErrorResponseType = "flow.integrity"
+	FlowInvalidPurposeCreateFlowErrorResponse     CreateFlowErrorResponseType = "flow.invalid_purpose"
+	InternalCreateFlowErrorResponse               CreateFlowErrorResponseType = "internal"
+	TknInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "tkn.invalid"
+	TknInvalidTknidCreateFlowErrorResponse        CreateFlowErrorResponseType = "tkn.invalid_tknid"
+	ReqInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgCreateFlowErrorResponse       CreateFlowErrorResponseType = "enc_key.unknown_alg"
 )
 
 // IsAttInvalidRequest reports whether CreateFlowErrorResponse is AttInvalidRequest.
 func (s CreateFlowErrorResponse) IsAttInvalidRequest() bool {
 	return s.Type == AttInvalidRequestCreateFlowErrorResponse
-}
-
-// IsAttNotFound reports whether CreateFlowErrorResponse is AttNotFound.
-func (s CreateFlowErrorResponse) IsAttNotFound() bool {
-	return s.Type == AttNotFoundCreateFlowErrorResponse
 }
 
 // IsEncKeyDecryptFailed reports whether CreateFlowErrorResponse is EncKeyDecryptFailed.
@@ -10811,46 +10735,6 @@ func (s CreateFlowErrorResponse) IsFlowIntegrity() bool {
 // IsFlowInvalidPurpose reports whether CreateFlowErrorResponse is FlowInvalidPurpose.
 func (s CreateFlowErrorResponse) IsFlowInvalidPurpose() bool {
 	return s.Type == FlowInvalidPurposeCreateFlowErrorResponse
-}
-
-// IsFlowRestartRequired reports whether CreateFlowErrorResponse is FlowRestartRequired.
-func (s CreateFlowErrorResponse) IsFlowRestartRequired() bool {
-	return s.Type == FlowRestartRequiredCreateFlowErrorResponse
-}
-
-// IsIdpNotFound reports whether CreateFlowErrorResponse is IdpNotFound.
-func (s CreateFlowErrorResponse) IsIdpNotFound() bool {
-	return s.Type == IdpNotFoundCreateFlowErrorResponse
-}
-
-// IsIdpEndpointCleartext reports whether CreateFlowErrorResponse is IdpEndpointCleartext.
-func (s CreateFlowErrorResponse) IsIdpEndpointCleartext() bool {
-	return s.Type == IdpEndpointCleartextCreateFlowErrorResponse
-}
-
-// IsIdpEndpointsPartial reports whether CreateFlowErrorResponse is IdpEndpointsPartial.
-func (s CreateFlowErrorResponse) IsIdpEndpointsPartial() bool {
-	return s.Type == IdpEndpointsPartialCreateFlowErrorResponse
-}
-
-// IsIdpOAuth2Unsupported reports whether CreateFlowErrorResponse is IdpOAuth2Unsupported.
-func (s CreateFlowErrorResponse) IsIdpOAuth2Unsupported() bool {
-	return s.Type == IdpOAuth2UnsupportedCreateFlowErrorResponse
-}
-
-// IsIdpProtocolBlockMissing reports whether CreateFlowErrorResponse is IdpProtocolBlockMissing.
-func (s CreateFlowErrorResponse) IsIdpProtocolBlockMissing() bool {
-	return s.Type == IdpProtocolBlockMissingCreateFlowErrorResponse
-}
-
-// IsIdpScopesMissingOpenid reports whether CreateFlowErrorResponse is IdpScopesMissingOpenid.
-func (s CreateFlowErrorResponse) IsIdpScopesMissingOpenid() bool {
-	return s.Type == IdpScopesMissingOpenidCreateFlowErrorResponse
-}
-
-// IsIdpStrategyPointerUnsupported reports whether CreateFlowErrorResponse is IdpStrategyPointerUnsupported.
-func (s CreateFlowErrorResponse) IsIdpStrategyPointerUnsupported() bool {
-	return s.Type == IdpStrategyPointerUnsupportedCreateFlowErrorResponse
 }
 
 // IsInternal reports whether CreateFlowErrorResponse is Internal.
@@ -10894,27 +10778,6 @@ func (s CreateFlowErrorResponse) GetAttInvalidRequest() (v AttInvalidRequest, ok
 func NewAttInvalidRequestCreateFlowErrorResponse(v AttInvalidRequest) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetAttInvalidRequest(v)
-	return s
-}
-
-// SetAttNotFound sets CreateFlowErrorResponse to AttNotFound.
-func (s *CreateFlowErrorResponse) SetAttNotFound(v AttNotFound) {
-	s.Type = AttNotFoundCreateFlowErrorResponse
-	s.AttNotFound = v
-}
-
-// GetAttNotFound returns AttNotFound and true boolean if CreateFlowErrorResponse is AttNotFound.
-func (s CreateFlowErrorResponse) GetAttNotFound() (v AttNotFound, ok bool) {
-	if !s.IsAttNotFound() {
-		return v, false
-	}
-	return s.AttNotFound, true
-}
-
-// NewAttNotFoundCreateFlowErrorResponse returns new CreateFlowErrorResponse from AttNotFound.
-func NewAttNotFoundCreateFlowErrorResponse(v AttNotFound) CreateFlowErrorResponse {
-	var s CreateFlowErrorResponse
-	s.SetAttNotFound(v)
 	return s
 }
 
@@ -11083,174 +10946,6 @@ func (s CreateFlowErrorResponse) GetFlowInvalidPurpose() (v FlowInvalidPurpose, 
 func NewFlowInvalidPurposeCreateFlowErrorResponse(v FlowInvalidPurpose) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetFlowInvalidPurpose(v)
-	return s
-}
-
-// SetFlowRestartRequired sets CreateFlowErrorResponse to FlowRestartRequired.
-func (s *CreateFlowErrorResponse) SetFlowRestartRequired(v FlowRestartRequired) {
-	s.Type = FlowRestartRequiredCreateFlowErrorResponse
-	s.FlowRestartRequired = v
-}
-
-// GetFlowRestartRequired returns FlowRestartRequired and true boolean if CreateFlowErrorResponse is FlowRestartRequired.
-func (s CreateFlowErrorResponse) GetFlowRestartRequired() (v FlowRestartRequired, ok bool) {
-	if !s.IsFlowRestartRequired() {
-		return v, false
-	}
-	return s.FlowRestartRequired, true
-}
-
-// NewFlowRestartRequiredCreateFlowErrorResponse returns new CreateFlowErrorResponse from FlowRestartRequired.
-func NewFlowRestartRequiredCreateFlowErrorResponse(v FlowRestartRequired) CreateFlowErrorResponse {
-	var s CreateFlowErrorResponse
-	s.SetFlowRestartRequired(v)
-	return s
-}
-
-// SetIdpNotFound sets CreateFlowErrorResponse to IdpNotFound.
-func (s *CreateFlowErrorResponse) SetIdpNotFound(v IdpNotFound) {
-	s.Type = IdpNotFoundCreateFlowErrorResponse
-	s.IdpNotFound = v
-}
-
-// GetIdpNotFound returns IdpNotFound and true boolean if CreateFlowErrorResponse is IdpNotFound.
-func (s CreateFlowErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
-	if !s.IsIdpNotFound() {
-		return v, false
-	}
-	return s.IdpNotFound, true
-}
-
-// NewIdpNotFoundCreateFlowErrorResponse returns new CreateFlowErrorResponse from IdpNotFound.
-func NewIdpNotFoundCreateFlowErrorResponse(v IdpNotFound) CreateFlowErrorResponse {
-	var s CreateFlowErrorResponse
-	s.SetIdpNotFound(v)
-	return s
-}
-
-// SetIdpEndpointCleartext sets CreateFlowErrorResponse to IdpEndpointCleartext.
-func (s *CreateFlowErrorResponse) SetIdpEndpointCleartext(v IdpEndpointCleartext) {
-	s.Type = IdpEndpointCleartextCreateFlowErrorResponse
-	s.IdpEndpointCleartext = v
-}
-
-// GetIdpEndpointCleartext returns IdpEndpointCleartext and true boolean if CreateFlowErrorResponse is IdpEndpointCleartext.
-func (s CreateFlowErrorResponse) GetIdpEndpointCleartext() (v IdpEndpointCleartext, ok bool) {
-	if !s.IsIdpEndpointCleartext() {
-		return v, false
-	}
-	return s.IdpEndpointCleartext, true
-}
-
-// NewIdpEndpointCleartextCreateFlowErrorResponse returns new CreateFlowErrorResponse from IdpEndpointCleartext.
-func NewIdpEndpointCleartextCreateFlowErrorResponse(v IdpEndpointCleartext) CreateFlowErrorResponse {
-	var s CreateFlowErrorResponse
-	s.SetIdpEndpointCleartext(v)
-	return s
-}
-
-// SetIdpEndpointsPartial sets CreateFlowErrorResponse to IdpEndpointsPartial.
-func (s *CreateFlowErrorResponse) SetIdpEndpointsPartial(v IdpEndpointsPartial) {
-	s.Type = IdpEndpointsPartialCreateFlowErrorResponse
-	s.IdpEndpointsPartial = v
-}
-
-// GetIdpEndpointsPartial returns IdpEndpointsPartial and true boolean if CreateFlowErrorResponse is IdpEndpointsPartial.
-func (s CreateFlowErrorResponse) GetIdpEndpointsPartial() (v IdpEndpointsPartial, ok bool) {
-	if !s.IsIdpEndpointsPartial() {
-		return v, false
-	}
-	return s.IdpEndpointsPartial, true
-}
-
-// NewIdpEndpointsPartialCreateFlowErrorResponse returns new CreateFlowErrorResponse from IdpEndpointsPartial.
-func NewIdpEndpointsPartialCreateFlowErrorResponse(v IdpEndpointsPartial) CreateFlowErrorResponse {
-	var s CreateFlowErrorResponse
-	s.SetIdpEndpointsPartial(v)
-	return s
-}
-
-// SetIdpOAuth2Unsupported sets CreateFlowErrorResponse to IdpOAuth2Unsupported.
-func (s *CreateFlowErrorResponse) SetIdpOAuth2Unsupported(v IdpOAuth2Unsupported) {
-	s.Type = IdpOAuth2UnsupportedCreateFlowErrorResponse
-	s.IdpOAuth2Unsupported = v
-}
-
-// GetIdpOAuth2Unsupported returns IdpOAuth2Unsupported and true boolean if CreateFlowErrorResponse is IdpOAuth2Unsupported.
-func (s CreateFlowErrorResponse) GetIdpOAuth2Unsupported() (v IdpOAuth2Unsupported, ok bool) {
-	if !s.IsIdpOAuth2Unsupported() {
-		return v, false
-	}
-	return s.IdpOAuth2Unsupported, true
-}
-
-// NewIdpOAuth2UnsupportedCreateFlowErrorResponse returns new CreateFlowErrorResponse from IdpOAuth2Unsupported.
-func NewIdpOAuth2UnsupportedCreateFlowErrorResponse(v IdpOAuth2Unsupported) CreateFlowErrorResponse {
-	var s CreateFlowErrorResponse
-	s.SetIdpOAuth2Unsupported(v)
-	return s
-}
-
-// SetIdpProtocolBlockMissing sets CreateFlowErrorResponse to IdpProtocolBlockMissing.
-func (s *CreateFlowErrorResponse) SetIdpProtocolBlockMissing(v IdpProtocolBlockMissing) {
-	s.Type = IdpProtocolBlockMissingCreateFlowErrorResponse
-	s.IdpProtocolBlockMissing = v
-}
-
-// GetIdpProtocolBlockMissing returns IdpProtocolBlockMissing and true boolean if CreateFlowErrorResponse is IdpProtocolBlockMissing.
-func (s CreateFlowErrorResponse) GetIdpProtocolBlockMissing() (v IdpProtocolBlockMissing, ok bool) {
-	if !s.IsIdpProtocolBlockMissing() {
-		return v, false
-	}
-	return s.IdpProtocolBlockMissing, true
-}
-
-// NewIdpProtocolBlockMissingCreateFlowErrorResponse returns new CreateFlowErrorResponse from IdpProtocolBlockMissing.
-func NewIdpProtocolBlockMissingCreateFlowErrorResponse(v IdpProtocolBlockMissing) CreateFlowErrorResponse {
-	var s CreateFlowErrorResponse
-	s.SetIdpProtocolBlockMissing(v)
-	return s
-}
-
-// SetIdpScopesMissingOpenid sets CreateFlowErrorResponse to IdpScopesMissingOpenid.
-func (s *CreateFlowErrorResponse) SetIdpScopesMissingOpenid(v IdpScopesMissingOpenid) {
-	s.Type = IdpScopesMissingOpenidCreateFlowErrorResponse
-	s.IdpScopesMissingOpenid = v
-}
-
-// GetIdpScopesMissingOpenid returns IdpScopesMissingOpenid and true boolean if CreateFlowErrorResponse is IdpScopesMissingOpenid.
-func (s CreateFlowErrorResponse) GetIdpScopesMissingOpenid() (v IdpScopesMissingOpenid, ok bool) {
-	if !s.IsIdpScopesMissingOpenid() {
-		return v, false
-	}
-	return s.IdpScopesMissingOpenid, true
-}
-
-// NewIdpScopesMissingOpenidCreateFlowErrorResponse returns new CreateFlowErrorResponse from IdpScopesMissingOpenid.
-func NewIdpScopesMissingOpenidCreateFlowErrorResponse(v IdpScopesMissingOpenid) CreateFlowErrorResponse {
-	var s CreateFlowErrorResponse
-	s.SetIdpScopesMissingOpenid(v)
-	return s
-}
-
-// SetIdpStrategyPointerUnsupported sets CreateFlowErrorResponse to IdpStrategyPointerUnsupported.
-func (s *CreateFlowErrorResponse) SetIdpStrategyPointerUnsupported(v IdpStrategyPointerUnsupported) {
-	s.Type = IdpStrategyPointerUnsupportedCreateFlowErrorResponse
-	s.IdpStrategyPointerUnsupported = v
-}
-
-// GetIdpStrategyPointerUnsupported returns IdpStrategyPointerUnsupported and true boolean if CreateFlowErrorResponse is IdpStrategyPointerUnsupported.
-func (s CreateFlowErrorResponse) GetIdpStrategyPointerUnsupported() (v IdpStrategyPointerUnsupported, ok bool) {
-	if !s.IsIdpStrategyPointerUnsupported() {
-		return v, false
-	}
-	return s.IdpStrategyPointerUnsupported, true
-}
-
-// NewIdpStrategyPointerUnsupportedCreateFlowErrorResponse returns new CreateFlowErrorResponse from IdpStrategyPointerUnsupported.
-func NewIdpStrategyPointerUnsupportedCreateFlowErrorResponse(v IdpStrategyPointerUnsupported) CreateFlowErrorResponse {
-	var s CreateFlowErrorResponse
-	s.SetIdpStrategyPointerUnsupported(v)
 	return s
 }
 
@@ -36234,52 +35929,6 @@ func (o OptAttProofRejectedDetails) Get() (v AttProofRejectedDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptAttProofRejectedDetails) Or(d AttProofRejectedDetails) AttProofRejectedDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptAttSSOStateInvalidDetails returns new OptAttSSOStateInvalidDetails with value set to v.
-func NewOptAttSSOStateInvalidDetails(v AttSSOStateInvalidDetails) OptAttSSOStateInvalidDetails {
-	return OptAttSSOStateInvalidDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptAttSSOStateInvalidDetails is optional AttSSOStateInvalidDetails.
-type OptAttSSOStateInvalidDetails struct {
-	Value AttSSOStateInvalidDetails
-	Set   bool
-}
-
-// IsSet returns true if OptAttSSOStateInvalidDetails was set.
-func (o OptAttSSOStateInvalidDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptAttSSOStateInvalidDetails) Reset() {
-	var v AttSSOStateInvalidDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptAttSSOStateInvalidDetails) SetTo(v AttSSOStateInvalidDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptAttSSOStateInvalidDetails) Get() (v AttSSOStateInvalidDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptAttSSOStateInvalidDetails) Or(d AttSSOStateInvalidDetails) AttSSOStateInvalidDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -62259,7 +61908,6 @@ type SubmitFlowStepErrorResponse struct {
 	TknInvalid                    TknInvalid
 	NotImplemented                NotImplemented
 	ReqInvalid                    ReqInvalid
-	AttSSOStateInvalid            AttSSOStateInvalid
 	EncKeyUnknownAlg              EncKeyUnknownAlg
 	Unavailable                   Unavailable
 	UserAlreadyExists             UserAlreadyExists
@@ -62303,7 +61951,6 @@ const (
 	TknInvalidSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "not_implemented"
 	ReqInvalidSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "req.invalid"
-	AttSSOStateInvalidSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "att.sso_state_invalid"
 	EncKeyUnknownAlgSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
 	UnavailableSubmitFlowStepErrorResponse                   SubmitFlowStepErrorResponseType = "unavailable"
 	UserAlreadyExistsSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "user.already_exists"
@@ -62452,11 +62099,6 @@ func (s SubmitFlowStepErrorResponse) IsNotImplemented() bool {
 // IsReqInvalid reports whether SubmitFlowStepErrorResponse is ReqInvalid.
 func (s SubmitFlowStepErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidSubmitFlowStepErrorResponse
-}
-
-// IsAttSSOStateInvalid reports whether SubmitFlowStepErrorResponse is AttSSOStateInvalid.
-func (s SubmitFlowStepErrorResponse) IsAttSSOStateInvalid() bool {
-	return s.Type == AttSSOStateInvalidSubmitFlowStepErrorResponse
 }
 
 // IsEncKeyUnknownAlg reports whether SubmitFlowStepErrorResponse is EncKeyUnknownAlg.
@@ -63084,27 +62726,6 @@ func (s SubmitFlowStepErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidSubmitFlowStepErrorResponse(v ReqInvalid) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetReqInvalid(v)
-	return s
-}
-
-// SetAttSSOStateInvalid sets SubmitFlowStepErrorResponse to AttSSOStateInvalid.
-func (s *SubmitFlowStepErrorResponse) SetAttSSOStateInvalid(v AttSSOStateInvalid) {
-	s.Type = AttSSOStateInvalidSubmitFlowStepErrorResponse
-	s.AttSSOStateInvalid = v
-}
-
-// GetAttSSOStateInvalid returns AttSSOStateInvalid and true boolean if SubmitFlowStepErrorResponse is AttSSOStateInvalid.
-func (s SubmitFlowStepErrorResponse) GetAttSSOStateInvalid() (v AttSSOStateInvalid, ok bool) {
-	if !s.IsAttSSOStateInvalid() {
-		return v, false
-	}
-	return s.AttSSOStateInvalid, true
-}
-
-// NewAttSSOStateInvalidSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from AttSSOStateInvalid.
-func NewAttSSOStateInvalidSubmitFlowStepErrorResponse(v AttSSOStateInvalid) SubmitFlowStepErrorResponse {
-	var s SubmitFlowStepErrorResponse
-	s.SetAttSSOStateInvalid(v)
 	return s
 }
 

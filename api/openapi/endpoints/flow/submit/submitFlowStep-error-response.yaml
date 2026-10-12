@@ -32,7 +32,6 @@ content:
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
-        - $ref: '../../../components/schemas/errors/att-sso_state_invalid.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
         - $ref: '../../../components/schemas/errors/unavailable.yaml'
         - $ref: '../../../components/schemas/errors/user-already_exists.yaml'
@@ -72,7 +71,6 @@ content:
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
-          att.sso_state_invalid: '../../../components/schemas/errors/att-sso_state_invalid.yaml'
           enc_key.unknown_alg: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
           unavailable: '../../../components/schemas/errors/unavailable.yaml'
           user.already_exists: '../../../components/schemas/errors/user-already_exists.yaml'
@@ -222,11 +220,6 @@ content:
         value:
           code: req.invalid
           message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
-      att.sso_state_invalid:
-        summary: att.sso_state_invalid
-        value:
-          code: att.sso_state_invalid
-          message: 'The SSO state is not valid.'
       enc_key.unknown_alg:
         summary: enc_key.unknown_alg
         value:
