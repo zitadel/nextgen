@@ -5,7 +5,9 @@ description: |
   grouped by kind.
 
   Resources reference each other by handle: a flow definition's
-  `user_schema` names a schema by its `objectType`. A reference resolves to
+  `user_schema` names a schema by its `objectType`, and a flow step's
+  `sso_providers`, like a schema's `x-auth-methods.sso.providers`, name IDP
+  connections by `slug`. A reference resolves to
   the resource with that handle in this bundle; failing that, to the
   project's newest revision of it, which the release then pins as well. A
   handle that neither holds refuses the release, naming the pointer and the
@@ -13,8 +15,9 @@ description: |
   same release on any project.
 
   A handle names one resource of its kind in a bundle. Two schemas with the
-  same `objectType`, two flow definitions with the same `name`, or a schema
-  without an `objectType` refuse the release with `rel.invalid`, with an
+  same `objectType`, two flow definitions with the same `name`, two IDP
+  connections with the same `slug`, or a schema without an `objectType`
+  refuse the release with `rel.invalid`, with an
   entry for each such resource.
 
   Each kind is optional, and the arrays may be empty: a project that never
@@ -56,6 +59,16 @@ properties:
     description: Flow definitions, one per `.zitadel/flows/*.json`.
     items:
       $ref: ../../../components/flows/flow-definition.yaml
+  idps:
+    type: array
+    maxItems: 50
+    description: |
+      IDP connections, one per `.zitadel/idps/<slug>.json`, each the
+      connection document `POST /idps` takes as `idp`. Secrets appear only
+      as `${{ NAME }}` references to variables, never as values, so a bundle
+      carries no credentials.
+    items:
+      $ref: ../../idps/idp-connection.yaml
   branding:
     $ref: ../../../components/flows/branding.yaml
     description: |

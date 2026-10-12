@@ -60,8 +60,8 @@ type Invoker interface {
 	// `rel.unresolved_reference`, naming the pointer and the handle.
 	// Building writes revisions, so besides `release.write` it needs the write
 	// scope of every kind the bundle carries a resource of: `schema.write`,
-	// `flow_definition.write` and `branding.write`, as the per-kind create
-	// endpoints do. A missing scope answers `403` with `rel.permission_denied`,
+	// `flow_definition.write`, `branding.write` and `idp.write`, as the
+	// per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
 	// naming the kind. An empty kind needs no scope.
 	// Building a release does not deploy it. A release is not tied to an
 	// origin, and the same release can later be deployed to any number of
@@ -227,8 +227,9 @@ type Invoker interface {
 	// handle is read from the revision itself and recorded on the release, so a
 	// resource is always pinned under the identity it declares.
 	// Every handle a pinned resource references, such as a flow definition's
-	// `user_schema` naming a schema by `objectType`, must be pinned by the same
-	// release. A handle the release does not pin refuses the request with
+	// `user_schema` naming a schema by `objectType`, or a flow step's
+	// `sso_providers` naming IDP connections by `slug`, must be pinned by the
+	// same release. A handle the release does not pin refuses the request with
 	// `rel.unresolved_reference`. The message names the pointer and the handle
 	// that did not resolve, for example
 	// `flow_definition default-login: user_schema human-user not found`,
@@ -1127,8 +1128,8 @@ func (c *Client) sendBeginUserPasskeyRegistration(ctx context.Context, request *
 // `rel.unresolved_reference`, naming the pointer and the handle.
 // Building writes revisions, so besides `release.write` it needs the write
 // scope of every kind the bundle carries a resource of: `schema.write`,
-// `flow_definition.write` and `branding.write`, as the per-kind create
-// endpoints do. A missing scope answers `403` with `rel.permission_denied`,
+// `flow_definition.write`, `branding.write` and `idp.write`, as the
+// per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
 // naming the kind. An empty kind needs no scope.
 // Building a release does not deploy it. A release is not tied to an
 // origin, and the same release can later be deployed to any number of
@@ -2628,8 +2629,9 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 // handle is read from the revision itself and recorded on the release, so a
 // resource is always pinned under the identity it declares.
 // Every handle a pinned resource references, such as a flow definition's
-// `user_schema` naming a schema by `objectType`, must be pinned by the same
-// release. A handle the release does not pin refuses the request with
+// `user_schema` naming a schema by `objectType`, or a flow step's
+// `sso_providers` naming IDP connections by `slug`, must be pinned by the
+// same release. A handle the release does not pin refuses the request with
 // `rel.unresolved_reference`. The message names the pointer and the handle
 // that did not resolve, for example
 // `flow_definition default-login: user_schema human-user not found`,

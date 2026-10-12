@@ -10031,15 +10031,18 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 // The resources of a project's `.zitadel/` directory as authored on disk,
 // grouped by kind.
 // Resources reference each other by handle: a flow definition's
-// `user_schema` names a schema by its `objectType`. A reference resolves to
+// `user_schema` names a schema by its `objectType`, and a flow step's
+// `sso_providers`, like a schema's `x-auth-methods.sso.providers`, name IDP
+// connections by `slug`. A reference resolves to
 // the resource with that handle in this bundle; failing that, to the
 // project's newest revision of it, which the release then pins as well. A
 // handle that neither holds refuses the release, naming the pointer and the
 // handle. A bundle that references only resources it carries builds the
 // same release on any project.
 // A handle names one resource of its kind in a bundle. Two schemas with the
-// same `objectType`, two flow definitions with the same `name`, or a schema
-// without an `objectType` refuse the release with `rel.invalid`, with an
+// same `objectType`, two flow definitions with the same `name`, two IDP
+// connections with the same `slug`, or a schema without an `objectType`
+// refuse the release with `rel.invalid`, with an
 // entry for each such resource.
 // Each kind is optional, and the arrays may be empty: a project that never
 // ejected its branding omits `branding`. The bundle carries at least one
@@ -10062,6 +10065,11 @@ type ConfigurationBundle struct {
 	Schemas []ConfigurationBundleSchemasItem `json:"schemas"`
 	// Flow definitions, one per `.zitadel/flows/*.json`.
 	FlowDefinitions []FlowDefinition `json:"flow_definitions"`
+	// IDP connections, one per `.zitadel/idps/<slug>.json`, each the
+	// connection document `POST /idps` takes as `idp`. Secrets appear only
+	// as `${{ NAME }}` references to variables, never as values, so a bundle
+	// carries no credentials.
+	Idps []IdpConnection `json:"idps"`
 	// The descriptor from `.zitadel/branding/branding.json` with its template
 	// inlined, exactly as `POST /branding` takes it. A project has one
 	// branding, so this is a single object.
@@ -10078,6 +10086,11 @@ func (s *ConfigurationBundle) GetFlowDefinitions() []FlowDefinition {
 	return s.FlowDefinitions
 }
 
+// GetIdps returns the value of Idps.
+func (s *ConfigurationBundle) GetIdps() []IdpConnection {
+	return s.Idps
+}
+
 // GetBranding returns the value of Branding.
 func (s *ConfigurationBundle) GetBranding() OptBranding {
 	return s.Branding
@@ -10091,6 +10104,11 @@ func (s *ConfigurationBundle) SetSchemas(val []ConfigurationBundleSchemasItem) {
 // SetFlowDefinitions sets the value of FlowDefinitions.
 func (s *ConfigurationBundle) SetFlowDefinitions(val []FlowDefinition) {
 	s.FlowDefinitions = val
+}
+
+// SetIdps sets the value of Idps.
+func (s *ConfigurationBundle) SetIdps(val []IdpConnection) {
+	s.Idps = val
 }
 
 // SetBranding sets the value of Branding.
@@ -57551,6 +57569,8 @@ type ReleasePointer struct {
 	// - `branding` — always `default`. A project has one branding, so there is
 	// nothing to distinguish; it is revisioned like everything else, and
 	// `revision_id` is what varies between releases.
+	// - `idp` — the connection's `slug`, so `google` and `github` are
+	// separate resources a release pins separately
 	// Resources inside a release reference each other by handle rather than by
 	// revision id, so the same handle names the same resource in every release.
 	Handle string `json:"handle"`
@@ -57604,6 +57624,7 @@ const (
 	ReleasePointerKindSchema         ReleasePointerKind = "schema"
 	ReleasePointerKindFlowDefinition ReleasePointerKind = "flow_definition"
 	ReleasePointerKindBranding       ReleasePointerKind = "branding"
+	ReleasePointerKindIdp            ReleasePointerKind = "idp"
 )
 
 // AllValues returns all ReleasePointerKind values.
@@ -57612,6 +57633,7 @@ func (ReleasePointerKind) AllValues() []ReleasePointerKind {
 		ReleasePointerKindSchema,
 		ReleasePointerKindFlowDefinition,
 		ReleasePointerKindBranding,
+		ReleasePointerKindIdp,
 	}
 }
 
@@ -57623,6 +57645,8 @@ func (s ReleasePointerKind) MarshalText() ([]byte, error) {
 	case ReleasePointerKindFlowDefinition:
 		return []byte(s), nil
 	case ReleasePointerKindBranding:
+		return []byte(s), nil
+	case ReleasePointerKindIdp:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -57640,6 +57664,9 @@ func (s *ReleasePointerKind) UnmarshalText(data []byte) error {
 		return nil
 	case ReleasePointerKindBranding:
 		*s = ReleasePointerKindBranding
+		return nil
+	case ReleasePointerKindIdp:
+		*s = ReleasePointerKindIdp
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)

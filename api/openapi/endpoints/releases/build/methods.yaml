@@ -25,8 +25,8 @@ post:
 
     Building writes revisions, so besides `release.write` it needs the write
     scope of every kind the bundle carries a resource of: `schema.write`,
-    `flow_definition.write` and `branding.write`, as the per-kind create
-    endpoints do. A missing scope answers `403` with `rel.permission_denied`,
+    `flow_definition.write`, `branding.write` and `idp.write`, as the
+    per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
     naming the kind. An empty kind needs no scope.
 
     Building a release does not deploy it. A release is not tied to an
@@ -97,6 +97,21 @@ post:
                           submit: { target: done }
                       - name: done
                         complete: redirect
+                idps:
+                  - slug: google
+                    protocol: oidc
+                    template: google
+                    display_name: Google
+                    subject_claim: sub
+                    claim_mapping:
+                      email: email
+                    oidc:
+                      issuer: https://accounts.google.com
+                      client_id: '${{ GOOGLE_CLIENT_ID }}'
+                      client_secret: '${{ GOOGLE_CLIENT_SECRET }}'
+                      scopes:
+                        - openid
+                        - email
                 branding:
                   layout: centered
                   liquid_template: '<main>{{ step.name }}</main>'
@@ -152,8 +167,8 @@ post:
               description: |
                 Each pointer carries the handle the server read from the
                 resource — `objectType` for a schema, `name` for a flow
-                definition, and `default` for branding — and the revision it
-                reused or allocated for it.
+                definition, `default` for branding and `slug` for an IDP
+                connection — and the revision it reused or allocated for it.
               value:
                 id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
                 project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
@@ -174,6 +189,9 @@ post:
                   - kind: branding
                     handle: default
                     revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
+                  - kind: idp
+                    handle: google
+                    revision_id: idprev_01KWHF2XY6RN7F0N9WD3P2E4YM
     '400':
       description: |
         The bundle cannot build a release. A bundle whose resources fail

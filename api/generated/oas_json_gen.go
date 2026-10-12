@@ -16681,6 +16681,16 @@ func (s *ConfigurationBundle) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.Idps != nil {
+			e.FieldStart("idps")
+			e.ArrStart()
+			for _, elem := range s.Idps {
+				elem.Encode(e)
+			}
+			e.ArrEnd()
+		}
+	}
+	{
 		if s.Branding.Set {
 			e.FieldStart("branding")
 			s.Branding.Encode(e)
@@ -16688,10 +16698,11 @@ func (s *ConfigurationBundle) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfConfigurationBundle = [3]string{
+var jsonFieldsNameOfConfigurationBundle = [4]string{
 	0: "schemas",
 	1: "flow_definitions",
-	2: "branding",
+	2: "idps",
+	3: "branding",
 }
 
 // Decode decodes ConfigurationBundle from json.
@@ -16735,6 +16746,23 @@ func (s *ConfigurationBundle) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_definitions\"")
+			}
+		case "idps":
+			if err := func() error {
+				s.Idps = make([]IdpConnection, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem IdpConnection
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Idps = append(s.Idps, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"idps\"")
 			}
 		case "branding":
 			if err := func() error {
@@ -87677,6 +87705,8 @@ func (s *ReleasePointerKind) Decode(d *jx.Decoder) error {
 		*s = ReleasePointerKindFlowDefinition
 	case ReleasePointerKindBranding:
 		*s = ReleasePointerKindBranding
+	case ReleasePointerKindIdp:
+		*s = ReleasePointerKindIdp
 	default:
 		*s = ReleasePointerKind(v)
 	}
