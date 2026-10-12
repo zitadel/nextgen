@@ -1,4 +1,4 @@
-import { buildStampedChannel } from "../build-channel";
+import { ciFlag } from "./dimensions/ci-flag";
 
 /**
  * Resolves the Mixpanel ingestion token and API host for a CLI invocation.
@@ -10,12 +10,12 @@ import { buildStampedChannel } from "../build-channel";
  * (we cannot ask end users to supply one). It is intentionally not a secret.
  *
  * Dev and prod are separate Mixpanel projects (the skill's Phase 2 rule: never
- * track dev traffic into the production project). By default the channel comes
- * from a build-time stamp (see {@link resolveChannel}), so the published CLI
- * routes real user traffic to production without any per-user env var while
- * source/test runs stay on dev — but a runtime `ZITADEL_TELEMETRY_ENV` or
- * `ZITADEL_TELEMETRY_BUILD_CHANNEL` overrides the stamp, and
- * `ZITADEL_TELEMETRY_TOKEN` overrides the token outright.
+ * track dev traffic into the production project). The CLI ships as one generic
+ * build with no channel stamp, so by default events go to production (see
+ * {@link resolveChannel}); development/CI/test runs stay out of prod by opting
+ * out entirely (`DO_NOT_TRACK` / `ZITADEL_TELEMETRY=0`) or by selecting the dev
+ * project with `ZITADEL_TELEMETRY_ENV=development`. `ZITADEL_TELEMETRY_TOKEN`
+ * overrides the token outright.
  */
 
 /**
@@ -25,9 +25,9 @@ import { buildStampedChannel } from "../build-channel";
 const DEV_TELEMETRY_TOKEN = "0fb432b08a9797b87b0eebcbee11706e";
 
 /**
- * Production project token. Used by the published CLI (the build stamps the
- * production channel) and any `ZITADEL_TELEMETRY_ENV=production` run. Write-only
- * ingestion key, like the dev token — safe to commit.
+ * Production project token. The default for any run that has not opted out or
+ * selected the dev project, so the published CLI uses it with no per-user env.
+ * Write-only ingestion key, like the dev token — safe to commit.
  */
 const PROD_TELEMETRY_TOKEN = "f56fd7315ccd614fba8eecb2a8966152";
 
@@ -40,23 +40,33 @@ const HOSTS = {
 export type TelemetryRegion = keyof typeof HOSTS;
 
 /**
- * Decide which project the events belong to. Precedence: an explicit
- * `ZITADEL_TELEMETRY_ENV`, then a `ZITADEL_TELEMETRY_BUILD_CHANNEL` env override
- * (handy for CI/release), then the build-time channel stamp. The default —
- * source/dev/test — is the dev project. Ambient `NODE_ENV` is deliberately NOT
- * consulted: a source build with `NODE_ENV=production` must not route dev
- * traffic to prod, nor a published run with `NODE_ENV=development` to dev.
+ * Decide which project the events belong to.
+ *
+ * `ZITADEL_TELEMETRY_ENV` selects `development` or `production` explicitly and
+ * wins outright. With no explicit selection the default is `production`, so the
+ * single generic build (no channel stamp) routes real user traffic to prod with
+ * no per-user env — EXCEPT that an unattended CI/automation run routes to the
+ * dev project instead. CI runs normally opt out entirely (`DO_NOT_TRACK` /
+ * `ZITADEL_TELEMETRY=0`, which our own CI sets); the CI check is a belt-and-
+ * braces guard so that if telemetry is somehow left on in an automated
+ * environment, it can never pollute the production project.
+ *
+ * Ambient `NODE_ENV` is deliberately NOT consulted: a run with
+ * `NODE_ENV=development` must not silently switch projects.
  */
 function resolveChannel(env: NodeJS.ProcessEnv): "development" | "production" {
   const explicit = (env.ZITADEL_TELEMETRY_ENV ?? "").trim().toLowerCase();
-  if (explicit === "production") {
-    return "production";
-  }
   if (explicit === "development") {
     return "development";
   }
-  const stamp = (env.ZITADEL_TELEMETRY_BUILD_CHANNEL ?? buildStampedChannel()).trim().toLowerCase();
-  return stamp === "production" ? "production" : "development";
+  if (explicit === "production") {
+    return "production";
+  }
+  // Never let an unattended CI/automation run reach the prod project.
+  if (ciFlag.value(env)) {
+    return "development";
+  }
+  return "production";
 }
 
 /**

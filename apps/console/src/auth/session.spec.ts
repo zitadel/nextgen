@@ -4,8 +4,7 @@ import {
   setApiCsrfToken,
 } from "@zitadel/api/runtime/auth";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   _resetSessionForTesting,
@@ -14,17 +13,13 @@ import {
   sessionPage,
 } from "./session";
 import { makeTestSession } from "@/test/session.fixture";
+import { server } from "@/test/msw";
 
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
 beforeEach(() => {
   _resetSessionForTesting();
   vi.spyOn(sessionPage, "reload").mockImplementation(() => undefined);
 });
 afterEach(() => {
-  server.resetHandlers();
   setApiCsrfToken(undefined);
   vi.useRealTimers();
   vi.restoreAllMocks();

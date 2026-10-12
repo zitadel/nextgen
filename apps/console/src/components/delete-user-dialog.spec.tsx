@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
+import { server } from "@/test/msw";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -12,8 +12,6 @@ vi.mock("@/auth/session", async (importOriginal) => {
   const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
-
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 const USERS_URL = "http://localhost/api/users";
 const USERS_QUERY_URL = `${USERS_URL}/query`;
@@ -27,14 +25,16 @@ const USER = {
   identifier_property: "email",
   attributes: { givenName: "Maya", familyName: "Patel", email: "maya@acme.com" },
 };
-const server = setupServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => {
-  server.close();
-  vi.unstubAllEnvs();
-});
+// The list resolves each row's schema to label its columns; an empty schema
+// keeps these tests about the dialog.
+beforeEach(() =>
+  server.use(
+    http.get("http://localhost/api/schemas/:id", () =>
+      HttpResponse.json({ schema: { type: "object", properties: {} } }),
+    ),
+  ),
+);
 
 /**
  * Opens the dialog the way an operator does — through the list row's menu —
