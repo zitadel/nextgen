@@ -1844,12 +1844,17 @@ export function setupPlatformHandlers() {
         for (const origin of targets) {
           const key = previewKey(project.id, origin);
           const existing = store.previews.get(key);
+          // Renew a still-live preview in place (keep its creation time and
+          // order); but an expired one is gone, so redeploying it is a new
+          // preview and gets a fresh createdAt/seq rather than resurrecting
+          // stale metadata that would missort it in `preview list`.
+          const live = previewIsLive(existing);
           store.previews.set(key, {
             projectId: project.id,
             origin,
             expiresAt,
-            createdAt: existing?.createdAt ?? nowIso(),
-            seq: existing?.seq ?? ++store.lastSeq,
+            createdAt: live ? existing.createdAt : nowIso(),
+            seq: live ? existing.seq : ++store.lastSeq,
           });
         }
       }
@@ -1887,9 +1892,11 @@ export function setupPlatformHandlers() {
               : row,
           );
           // The create-deployment response wraps the deployment with the
-          // non-blocking `warnings` it raised; this mock raises none.
+          // non-blocking `warnings` it raised. A re-deploy that still falls back
+          // to a production secret must keep warning, so the idempotent 200
+          // carries the freshly computed warnings rather than dropping them.
           return HttpResponse.json(
-            { ...deploymentResponse(newest, rows), warnings: [] },
+            { ...deploymentResponse(newest, rows), warnings },
             { status: 200 },
           );
         }
@@ -1963,7 +1970,6 @@ export function setupPlatformHandlers() {
         // What each target serves now: the newest deployment per origin, each
         // carrying only the targets it still serves.
         const serving = new Map<string, DeploymentTargetRow[]>();
-        const now = Date.now();
         const liveOrigins = new Set(
           deployments.flatMap((deployment) => deployment.targets.map((target) => target.origin)),
         );
@@ -1971,15 +1977,18 @@ export function setupPlatformHandlers() {
           if (origin !== undefined && target !== origin) {
             continue;
           }
-          const newest = newestDeploymentForOrigin(query.data.project_id, target);
+          // Pick the newest deployment targeting this origin by sequence,
+          // without applying the target's frozen historical expiry: a renewed
+          // preview extends its own row's clock (checked below), so filtering on
+          // the deployment's stale expiry here would wrongly drop a live preview.
+          const newest = [...store.deployments.values()]
+            .filter((deployment) => deployment.projectId === query.data.project_id)
+            .filter((deployment) => deployment.targets.some((t) => t.origin === target))
+            .sort((a, b) => b.seq - a.seq)[0];
           if (!newest) {
             continue;
           }
-          const row = newest.targets.find(
-            (candidate) =>
-              candidate.origin === target &&
-              (candidate.expiresAt === null || new Date(candidate.expiresAt).getTime() > now),
-          );
+          const row = newest.targets.find((candidate) => candidate.origin === target);
           if (!row) {
             continue;
           }
