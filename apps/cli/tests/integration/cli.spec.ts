@@ -148,7 +148,9 @@ describe("the cli", () => {
 
         const suggested = await suggestedCommandIds();
 
-        expect([...suggested].sort()).toEqual(expect.arrayContaining(["deploy", "doctor", "setup"]));
+        expect([...suggested].sort()).toEqual(
+          expect.arrayContaining(["deploy", "doctor", "setup"]),
+        );
         for (const command of suggested) {
           expect(visible, `${command} is suggested but not a visible command`).toContain(command);
         }
