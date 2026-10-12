@@ -60,7 +60,7 @@ function CommandDialog({
 /**
  * `variant="boxed"` renders the search field as a bordered `Input` inset in the
  * popover, with no leading search glyph — the shape the Zitadel design system
- * uses for its Combobox (Figma `Combobox / Combobox List`). `"underline"` is the
+ * uses for its Combobox. `"underline"` is the
  * stock shadcn treatment and stays the default so other call sites are
  * unaffected.
  */

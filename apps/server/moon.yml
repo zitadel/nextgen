@@ -13,6 +13,11 @@ fileGroups:
     - "/go.sum"
     - "/api/**/*.yaml"
     - "/api/**/*.json"
+    # Also compiled in through //go:embed or read by tests: the config defaults
+    # (incl. presets), the integration-test fixtures and the events catalog.
+    - "/packages/config/defaults/**/*"
+    - "/internal/**/*.json"
+    - "/docs/design/api/events-catalog.md"
     - "/api/.ogen.yaml"
     - "/scripts/check-go-generate.mjs"
     - "/scripts/generate-meta-schemas.ts"
@@ -159,6 +164,8 @@ tasks:
       - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
+      # The Biome config the launcher check runs against.
+      - "/biome.json"
     options:
       runFromWorkspaceRoot: true
 
@@ -173,13 +180,11 @@ tasks:
     deps:
       - "openapi"
       - "format"
-      - "check-generate"
       - "vet"
       - "lint"
-      # Order UI builds before go test so a batched moon graph cannot compile
-      # //go:embed all:dist while vite emptyOutDir has cleared .gitkeep.
-      # Intentionally deps-only (not inputs): UI-only changes must not invalidate
-      # the Go test cache — see build.inputs note below.
+      # The test binary embeds both UI dists (//go:embed all:dist). Listed here
+      # and not only reached through vet: vet has no outputs, so moon would not
+      # hash these builds through it and a UI change would replay a cached run.
       - "console:build"
       - "login-ui:build"
     inputs:

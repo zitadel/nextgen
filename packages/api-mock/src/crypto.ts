@@ -77,13 +77,12 @@ export type HandoffErrorKind =
   | "not_yet_valid";
 
 export class HandoffError extends Error {
-  constructor(
-    public readonly kind: HandoffErrorKind,
-    message: string,
-    options?: ErrorOptions,
-  ) {
+  public readonly kind: HandoffErrorKind;
+
+  constructor(kind: HandoffErrorKind, message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = "HandoffError";
+    this.kind = kind;
   }
 }
 

@@ -241,9 +241,9 @@ export function applySsoToSchema(schema: object, slug: string): SsoResult<object
  * property it defines, including ones the project deliberately does not ask
  * about.
  *
- * Credential fields are dropped. `create_user_with_sso` mints an account whose
- * proof is the provider, so a password box on this step would be asking for a
- * credential the mutation never stores.
+ * Credential fields are dropped. The provider is the proof for an account
+ * `create_user_with_sso` creates, so the scaffold asks for no password. An
+ * author who adds a password field gets it stored with the user.
  *
  * Falls back to the identifier-collecting step, and then to nothing, so a flow
  * shaped unlike the shipped one still produces a step that can collect the one

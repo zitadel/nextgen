@@ -100,9 +100,12 @@ export type ZitadelState = {
  * does not say which it is.
  */
 export class FatalFetchError extends Error {
-  constructor(readonly reason: Error) {
+  readonly reason: Error;
+
+  constructor(reason: Error) {
     super(reason.message);
     this.name = "FatalFetchError";
+    this.reason = reason;
   }
 }
 

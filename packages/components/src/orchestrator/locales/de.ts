@@ -8,8 +8,6 @@
  *   - Step descriptions: `<step>.description`
  *   - Field labels:      `<step>.field.<field>`
  *   - Action labels:     `<step>.action.<action>`
- *
- * Copy aligned to Figma screens file `xkvBjkOJ8ENuHdTGZHXezK` (May 2026).
  */
 import type { Locale } from "./en.js";
 

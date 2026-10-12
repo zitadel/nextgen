@@ -1,18 +1,28 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Ellipsis, LogIn, Workflow } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Workflow } from "lucide-react";
 
-import { EYEBROW } from "@/components/detail-meta";
-import { StatusBadge } from "@/components/status-badge";
-import { RESOURCE_HEADER, RESOURCE_PAGE } from "@/components/resource-list";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { api } from "@/api/zitadel";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  RESOURCE_CELL,
+  RESOURCE_CELL_MUTED,
+  RESOURCE_ROW_ICON,
+  RESOURCE_ROW_LINK,
+  RESOURCE_TABLE_FIXED,
+  RESOURCE_TABLE_TOP,
+  RESOURCE_TABLE_WRAP,
+  ResourceEmptyRow,
+  ResourceHeadCell,
+  ResourceHeaderRow,
+  ResourceMenuHead,
+  ResourcePage,
+  ResourceRow,
+  ResourceTitle,
+  RowMenu,
+} from "@/components/resource-list";
+import { StatusBadge } from "@/components/status-badge";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { InlineCode } from "@/components/ui/inline-code";
+import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { formatDate } from "@/lib/date";
 import {
   type FlowDefinition,
@@ -21,10 +31,8 @@ import {
   flowPurposeSummary,
   flowStepNames,
 } from "@/lib/flow-definition";
+import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { schemaDisplayName } from "@/lib/schema";
-
-import { api } from "../../../api/zitadel";
-import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scope";
 
 export const Route = createFileRoute("/_authed/flow-definitions/")({
   // Order 4: Users sits at 3.
@@ -74,122 +82,98 @@ function LoginFlowsScreen() {
   const { flows } = Route.useLoaderData();
 
   return (
-    <div className={`${RESOURCE_PAGE} pt-4`}>
-      <div className={`${RESOURCE_HEADER} flex h-9 items-center`}>
-        <h1 className="font-serif text-2xl leading-6 tracking-tight text-foreground">
-          Login flows
-        </h1>
-      </div>
+    <ResourcePage>
+      <ResourceTitle>Login flows</ResourceTitle>
 
-      {/* Rows carry their own `px-6`, so the dividers are full-bleed. */}
-      <Card className="mt-3 gap-0 overflow-hidden border-foreground/10 py-0 shadow-xs">
-        {flows.length === 0 ? (
-          <p className="px-6 py-8 text-center text-sm text-muted-foreground">
-            This project has no login flows.
-          </p>
-        ) : (
-          flows.map((flow) => <FlowRowItem key={flow.id} {...flow} />)
-        )}
-      </Card>
-    </div>
+      <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
+        {/* The same resource table as the other directories (D17). Six columns
+            need more room than four, so the table's own minimum width is wider
+            than the shared one; the step chips wrap within their column, so a
+            flow with many steps grows its row rather than the table. */}
+        <Table className={`${RESOURCE_TABLE_FIXED} min-w-[52rem]`}>
+          <TableHeader>
+            <ResourceHeaderRow>
+              <ResourceHeadCell className="w-[20%]">Name</ResourceHeadCell>
+              <ResourceHeadCell className="w-[16%]">Purposes</ResourceHeadCell>
+              <ResourceHeadCell className="w-[30%]">Steps</ResourceHeadCell>
+              <ResourceHeadCell className="w-[14%]">User schema</ResourceHeadCell>
+              <ResourceHeadCell className="w-[11%]">Last change</ResourceHeadCell>
+              <ResourceMenuHead className="w-[9%]" />
+            </ResourceHeaderRow>
+          </TableHeader>
+          <TableBody>
+            {flows.length === 0 ? (
+              <ResourceEmptyRow colSpan={6}>This project has no login flows.</ResourceEmptyRow>
+            ) : (
+              flows.map((flow) => <FlowRowItem key={flow.id} {...flow} />)
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </ResourcePage>
   );
 }
 
-/**
- * One row of the flows directory.
- *
- * The name's stretched link makes the whole row the click target while keeping
- * one focusable control, so anything else interactive has to sit above it.
- */
+/** One row of the flows directory. The whole row opens the flow. */
 function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRow) {
+  const navigate = useNavigate();
   const name = flowDisplayName(definition);
   const purposes = flowPurposeSummary(definition);
   const steps = flowStepNames(definition);
 
   return (
-    <div className="group relative flex flex-col gap-4 border-b border-border px-6 py-3.5 last:border-b-0 hover:bg-accent lg:flex-row lg:items-center lg:gap-6">
-      <div className="flex shrink-0 flex-col gap-1 lg:min-w-[220px]">
-        <div className="flex items-center gap-2">
+    <ResourceRow
+      onOpen={() =>
+        void navigate({ to: "/flow-definitions/$definitionId", params: { definitionId: id } })
+      }
+    >
+      <TableCell className={`${RESOURCE_CELL} truncate`}>
+        <div className="flex min-w-0 items-center gap-2">
           <Link
             to="/flow-definitions/$definitionId"
             params={{ definitionId: id }}
-            className="font-serif text-base leading-6 text-foreground opacity-90 group-hover:opacity-100 after:absolute after:inset-0 after:content-['']"
+            className={RESOURCE_ROW_LINK}
           >
+            <Workflow aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
             {name}
           </Link>
-          {/* Drafts only: the engine never selects one, and the frames draw
+          {/* Drafts only: the engine never selects one, and the design draws
               only active flows. */}
           {definition.status === "draft" && <StatusBadge status={definition.status} />}
         </div>
-        {purposes && (
-          <span className="flex items-center gap-1 text-xs leading-4 font-medium text-muted-foreground">
-            <LogIn className="size-3" aria-hidden />
-            {purposes}
-          </span>
-        )}
-      </div>
-
-      <div className="flex min-w-0 flex-1 flex-wrap items-start gap-1.5">
-        {steps.map((step) => (
-          <InlineCode key={step} className={CHIP}>
-            {step}
-          </InlineCode>
-        ))}
-      </div>
-
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        {schemaName && (
-          <>
-            <span className={EYEBROW}>User schema</span>
-            {/* Above the row's stretched link, or it swallows the click. */}
-            {schemaId ? (
-              <Link
-                to="/schemas/$schemaId"
-                params={{ schemaId }}
-                className="relative z-10 w-fit truncate text-xs leading-4 font-medium text-foreground hover:underline"
-              >
-                {schemaName}
-              </Link>
-            ) : (
-              <span className="truncate text-xs leading-4 font-medium text-foreground">
-                {schemaName}
-              </span>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Baseline, not `items-start`: two faces sit differently in one line box. */}
-      <dl className="flex shrink-0 items-baseline gap-1 text-xs leading-4">
-        <dt className={EYEBROW}>Last change</dt>
-        <dd className="font-medium text-foreground">{formatDate(updatedAt)}</dd>
-      </dl>
-
-      {/* Above the stretched link, or it swallows the menu's clicks. */}
-      <div className="absolute top-3.5 right-4 lg:relative lg:top-auto lg:right-auto">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={`Actions for ${name}`}
-              className="relative z-10 opacity-50 group-hover:opacity-100"
+      </TableCell>
+      <TableCell className={RESOURCE_CELL_MUTED}>{purposes}</TableCell>
+      <TableCell className={RESOURCE_CELL}>
+        <div className="flex flex-wrap gap-1.5">
+          {steps.map((step) => (
+            <InlineCode key={step}>{step}</InlineCode>
+          ))}
+        </div>
+      </TableCell>
+      <TableCell className={`${RESOURCE_CELL} truncate text-sm`}>
+        {schemaName &&
+          (schemaId ? (
+            <Link
+              to="/schemas/$schemaId"
+              params={{ schemaId }}
+              className="text-foreground font-medium underline-offset-2 hover:underline"
             >
-              <Ellipsis aria-hidden />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuItem asChild>
-              <Link to="/flow-definitions/$definitionId" params={{ definitionId: id }}>
-                View flow
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </div>
+              {schemaName}
+            </Link>
+          ) : (
+            <span className="text-foreground font-medium">{schemaName}</span>
+          ))}
+      </TableCell>
+      <TableCell className={RESOURCE_CELL_MUTED}>{formatDate(updatedAt)}</TableCell>
+      <TableCell className={`${RESOURCE_CELL} text-right`}>
+        <RowMenu name={name}>
+          <DropdownMenuItem asChild>
+            <Link to="/flow-definitions/$definitionId" params={{ definitionId: id }}>
+              View flow
+            </Link>
+          </DropdownMenuItem>
+        </RowMenu>
+      </TableCell>
+    </ResourceRow>
   );
 }
-
-/** `InlineCode` rests on `muted`, which equals the row's `accent` hover in light. */
-const CHIP = "group-hover:bg-card";

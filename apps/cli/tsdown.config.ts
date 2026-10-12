@@ -26,6 +26,7 @@ export default defineConfig({
     "lib/oclif/help": "src/lib/oclif/help.ts",
   },
   outDir: "dist",
+  tsconfig: "tsconfig.app.json",
   format: ["esm"],
   failOnWarn: true,
   dts: false,

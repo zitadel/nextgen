@@ -1,6 +1,6 @@
 import { useRouter, useSearch } from "@tanstack/react-router";
 
-import { api } from "../api/zitadel";
+import { api } from "@/api/zitadel";
 import { sessionCached } from "./session-cache";
 
 /**

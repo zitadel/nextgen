@@ -7,8 +7,6 @@ inheritedBy:
   language: "javascript"
 
 implicitInputs:
-  # Moon's automatic config input only covers `.moon/*.yml`, not this directory.
-  - "/.moon/tasks/**/*.yml"
   # The shared Biome config the lint task runs against.
   - "/biome.json"
 

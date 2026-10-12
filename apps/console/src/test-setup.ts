@@ -1,4 +1,6 @@
-import { configure } from "@testing-library/react";
+import { format } from "node:util";
+
+import { cleanup, configure } from "@testing-library/react";
 import { afterEach, beforeEach } from "vitest";
 import { _resetConfigForTesting } from "@zitadel/api/config";
 import "@testing-library/jest-dom/vitest";
@@ -27,8 +29,33 @@ afterEach(_resetConfigForTesting);
 // otherwise carry one test's mocked answer into the next.
 beforeEach(clearSessionCaches);
 
-// @ts-expect-error Needed for tests
-global.IS_REACT_ACT_ENVIRONMENT = true;
+// A test that writes to console.error or console.warn fails. React reports a
+// state update outside act(), a failed loader and a missing key there and then
+// carries on, so the test passes and only CI's stderr shows it. A test that
+// expects the output says so by mocking it:
+// `vi.spyOn(console, "error").mockImplementation(() => undefined)`.
+// Cleanup runs first so output from the unmount, or from an update that lands
+// after the last assertion, counts against the test that caused it.
+for (const method of ["error", "warn"] as const) {
+  const original = console[method];
+  const calls: string[] = [];
+  beforeEach(() => {
+    calls.length = 0;
+    console[method] = (...args: unknown[]) => {
+      calls.push(format(...args));
+    };
+  });
+  afterEach(() => {
+    cleanup();
+    console[method] = original;
+    if (calls.length > 0) {
+      throw new Error(
+        `Expected the test not to call console.${method}(), but it did ${calls.length} ` +
+          `time(s). The first call:\n\n${calls[0]}`,
+      );
+    }
+  });
+}
 
 // jsdom has no matchMedia; the theme hook (src/theme.ts) reads it. Default to
 // dark (no light-scheme match) and provide the add/removeEventListener surface.

@@ -1,4 +1,4 @@
-import type { ConsoleSession } from "./session";
+import type { ConsoleSession } from "@/auth/session";
 
 /**
  * Test fixture: a minimal `active` session as `GET /sessions/me` returns it.

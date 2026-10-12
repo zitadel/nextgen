@@ -54,6 +54,13 @@ let runtimeImage: BuildLocalRuntimeImageModule;
 
 const noop = async (): Promise<void> => undefined;
 
+/** Signature of the injected process runner, so `run.mock.calls` is typed. */
+type RunSpawn = (
+  execPath: string,
+  args: string[],
+  options: { cwd: string; env: NodeJS.ProcessEnv },
+) => Promise<void>;
+
 beforeAll(async () => {
   runCli = (await import(
     new URL("../../../../../scripts/run-cli.mjs", import.meta.url).href
@@ -274,7 +281,7 @@ describe("run-cli wrapper", () => {
       path: "/repo/dist/server/nextgen",
       version: "dev+abcdef123456",
     }));
-    const run = vi.fn(noop);
+    const run = vi.fn<RunSpawn>(noop);
 
     await runCli.main({
       args: ["start", "--image", "custom:tag"],
@@ -289,7 +296,7 @@ describe("run-cli wrapper", () => {
     expect(buildLocalServerBinary).not.toHaveBeenCalled();
     expect(buildLocalRuntimeImage).not.toHaveBeenCalled();
     expect(run).toHaveBeenCalledOnce();
-    expect(run.mock.calls[0]?.[2].env).not.toHaveProperty("ZITADEL_LOCAL_IMAGE");
+    expect(run!.mock.calls[0]?.[2].env).not.toHaveProperty("ZITADEL_LOCAL_IMAGE");
   });
 
   it("skips the builder when ZITADEL_LOCAL_IMAGE is set", async () => {
@@ -298,7 +305,7 @@ describe("run-cli wrapper", () => {
       path: "/repo/dist/server/nextgen",
       version: "dev+abcdef123456",
     }));
-    const run = vi.fn(noop);
+    const run = vi.fn<RunSpawn>(noop);
 
     await runCli.main({
       args: ["start"],
@@ -313,7 +320,7 @@ describe("run-cli wrapper", () => {
     expect(buildLocalServerBinary).not.toHaveBeenCalled();
     expect(buildLocalRuntimeImage).not.toHaveBeenCalled();
     expect(run).toHaveBeenCalledOnce();
-    expect(run.mock.calls[0]?.[2].env.ZITADEL_LOCAL_IMAGE).toBe("custom:tag");
+    expect(run!.mock.calls[0]?.[2].env.ZITADEL_LOCAL_IMAGE).toBe("custom:tag");
   });
 
   it("preserves an explicit local server binary override for binary start", async () => {
@@ -321,7 +328,7 @@ describe("run-cli wrapper", () => {
       path: "/repo/dist/server/nextgen",
       version: "dev+abcdef123456",
     }));
-    const run = vi.fn(noop);
+    const run = vi.fn<RunSpawn>(noop);
 
     await runCli.main({
       args: ["start", "--runtime", "binary"],
@@ -335,7 +342,7 @@ describe("run-cli wrapper", () => {
 
     expect(buildLocalServerBinary).not.toHaveBeenCalled();
     expect(run).toHaveBeenCalledOnce();
-    expect(run.mock.calls[0]?.[2].env.ZITADEL_SERVER_BINARY).toBe("/tmp/custom-nextgen");
+    expect(run!.mock.calls[0]?.[2].env.ZITADEL_SERVER_BINARY).toBe("/tmp/custom-nextgen");
   });
 
   it("skips the local server binary build for dry-run start", async () => {
@@ -379,7 +386,7 @@ describe("run-cli wrapper", () => {
   });
 
   it("runs the CLI from the original invocation directory", async () => {
-    const run = vi.fn(noop);
+    const run = vi.fn<RunSpawn>(noop);
 
     await runCli.main({
       args: ["setup", "--server", "local", "--skip-install"],
@@ -391,14 +398,14 @@ describe("run-cli wrapper", () => {
     });
 
     expect(run).toHaveBeenCalledOnce();
-    expect(run.mock.calls[0]?.[1][0]).toMatch(/apps\/cli\/bin\/run\.js$/);
-    expect(run.mock.calls[0]?.[1].slice(1)).toEqual([
+    expect(run!.mock.calls[0]?.[1][0]).toMatch(/apps\/cli\/bin\/run\.js$/);
+    expect(run!.mock.calls[0]?.[1].slice(1)).toEqual([
       "setup",
       "--server",
       "local",
       "--skip-install",
     ]);
-    expect(run.mock.calls[0]?.[2].cwd).toBe("/tmp/myapp");
+    expect(run!.mock.calls[0]?.[2].cwd).toBe("/tmp/myapp");
   });
 
   it("prepares a local package registry for setup and forwards npm env to the CLI", async () => {
@@ -416,7 +423,7 @@ describe("run-cli wrapper", () => {
         },
       };
     });
-    const run = vi.fn(noop);
+    const run = vi.fn<RunSpawn>(noop);
 
     await runCli.main({
       args: ["setup", "--server", "local"],
@@ -430,8 +437,8 @@ describe("run-cli wrapper", () => {
 
     expect(prepareLocalRegistry).toHaveBeenCalledOnce();
     expect(run).toHaveBeenCalledOnce();
-    expect(run.mock.calls[0]?.[2].cwd).toBe("/tmp/myapp");
-    expect(run.mock.calls[0]?.[2].env).toMatchObject({
+    expect(run!.mock.calls[0]?.[2].cwd).toBe("/tmp/myapp");
+    expect(run!.mock.calls[0]?.[2].env).toMatchObject({
       INIT_CWD: "/tmp/myapp",
       NPM_CONFIG_USERCONFIG: "/tmp/local-registry/verdaccio.npmrc",
       PATH: "/bin",

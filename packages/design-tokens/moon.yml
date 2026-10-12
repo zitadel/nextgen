@@ -4,9 +4,12 @@ layer: "library"
 stack: "frontend"
 
 tasks:
+  # Pulls the live tokens from the Figma API. Nothing in the repo says when
+  # they changed, so a cache hit would skip the fetch and report success.
   sync:
     command: "corepack pnpm run sync"
     options:
+      cache: false
       runInCI: false
 
   sync-export:
@@ -21,19 +24,13 @@ tasks:
       - "src/generated/shadcn.css"
 
   typecheck:
-    command: "corepack pnpm exec tsc --build tsconfig.json"
     deps:
       - "generate"
 
   build:
-    command: "corepack pnpm run build"
     deps:
       - "generate"
-    outputs:
-      - "dist/**/*"
 
   test:
-    command: "corepack pnpm run test:all"
     deps:
       - "generate"
-

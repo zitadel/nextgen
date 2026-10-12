@@ -1,14 +1,34 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "dist",
-    "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo",
-    "jsx": "react-jsx",
-    "lib": ["ES2022", "dom", "DOM.Iterable"],
-    "types": ["node", "vite/client"],
     "rootDir": "src",
-    "paths": { "@/*": ["./src/*"] }
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "node",
+      "vite/client"
+    ],
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    }
   },
-  "exclude": ["out-tsc", "dist", "src/**/*.spec.ts", "src/**/*.spec.tsx", "src/test-setup.ts"],
-  "include": ["src/**/*.ts", "src/**/*.tsx"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
+  "exclude": [
+    "src/**/*.spec.ts",
+    "src/**/*.spec.tsx",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**",
+    "src/test-setup.ts",
+    "src/test"
+  ]
 }

@@ -11,7 +11,7 @@ import { _setRuntimeForTesting } from "../runtime/runtime";
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  const { makeTestSession } = await import("@/auth/session.fixture");
+  const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
@@ -91,6 +91,16 @@ describe("landing routes", () => {
     server.use(
       http.get("http://localhost/api/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme"), project("proj_2", "Globex")] }),
+      ),
+      // The link's own screen, once it is reached.
+      http.get("http://localhost/api/users/usr_1", () =>
+        HttpResponse.json({ id: "usr_1", schema: "sch_1", attributes: {}, metadata: {} }),
+      ),
+      http.get("http://localhost/api/users/usr_1/passkeys", () =>
+        HttpResponse.json({ passkeys: [] }),
+      ),
+      http.get("http://localhost/api/schemas/sch_1", () =>
+        HttpResponse.json({ id: "sch_1", schema: { properties: {} }, metadata: {} }),
       ),
     );
     const router = await renderAt("/users/usr_1");

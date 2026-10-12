@@ -15,13 +15,13 @@
     "directory": "apps/mock-zitadel"
   },
   "scripts": {
-    "dev": "tsx scripts/local-server.ts",
+    "dev": "tsx --conditions=@zitadel/source scripts/local-server.ts",
     "build": "tsdown",
-    "build:vercel": "corepack pnpm --filter @zitadel/api run generate && corepack pnpm --filter @zitadel/api run build && corepack pnpm --filter @zitadel/config run sync-schemas && corepack pnpm --filter @zitadel/config run build && corepack pnpm run build && corepack pnpm exec tsx scripts/generate-wellknown.ts",
+    "build:vercel": "corepack pnpm --filter @zitadel/api run generate && corepack pnpm --filter @zitadel/api run build && corepack pnpm --filter @zitadel/config run sync-schemas && corepack pnpm --filter @zitadel/config run build && corepack pnpm --filter @zitadel/api-mock run build && corepack pnpm run build && corepack pnpm exec tsx scripts/generate-wellknown.ts",
     "test": "vitest run",
     "test:all": "pnpm run test",
     "test:watch": "vitest --watch",
-    "typecheck": "corepack pnpm --filter @zitadel/api run generate && tsc --noEmit"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json"
   },
   "dependencies": {
     "@zitadel/api-mock": "workspace:*"

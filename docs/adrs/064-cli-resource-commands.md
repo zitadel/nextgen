@@ -4,6 +4,13 @@
 > **Date:** 2026-09-14
 > **Context:** [ADR 007](007-gitops-configuration-surface.md) left runtime resources to server APIs and the [CLI design overview](../design/cli/README.md) reserved "a planned one-shot imperative CLI surface" for them; this ADR is that surface
 > **Relates to:** [ADR 004](004-agent-contract-and-agents-md.md), [ADR 027](027-cursor-based-pagination.md), [ADR 030](030-error-model-mapping-and-reporting.md), [ADR 031](031-openapi-querying.md), [ADR 035](035-configuration-environments.md), [ADR 036](036-api-credential-planes.md)
+>
+> **Amendment (2026-10-07):** §2's *plural* is superseded. Resources are
+> spelled singular (`zitadel user create`), and `deploy`, `preview` and
+> `rollback` stay top-level as the release loop. §3's `environments` question
+> is settled as `env`, which is singular under the same rule. Rationale and the
+> noun list: [`docs/design/glossary.md` §11](../design/glossary.md#11-cli-grammar).
+> The shipped commands are renamed without a deprecation window (alpha).
 
 Reference documentation for the surface lives in
 [`docs/design/cli/resource-commands.md`](../design/cli/resource-commands.md).
@@ -30,6 +37,9 @@ rather than by this rule.
 
 Resource first, plural, then the verb. `zitadel users create`, not `zitadel
 create user` and not `zitadel user create`.
+
+> Amended 2026-10-07: the noun is singular, `zitadel user create`. See the
+> header amendment and [glossary §11](../design/glossary.md#11-cli-grammar).
 
 - **Resource before verb** because it groups: everything about users is one
   `--help` page and one tab-completion prefix, and a new verb can never collide
@@ -69,6 +79,8 @@ environments get <name>`. Two spellings for one thing is worse than either.
 Either this surface adopts `env`, or ADR 035 is amended to the plural —
 recorded below rather than decided here, because it is a public command
 contract someone else already wrote down.
+
+> Amended 2026-10-07: settled as `env`, which is singular under the amended §2.
 
 Configuration resources are readable but never writable here. They are authored
 as files and shipped through a release (§1), so a write verb would be a second
@@ -389,7 +401,8 @@ Recorded here because §14 makes them the API's problem, not the CLI's:
   entry — `gh variable set` is the shape to copy if we want it.
 - `zitadel environments list` versus ADR 035's `zitadel env list` (§3). The
   accepted ADR names the command; this one produces a different spelling for
-  the same data. It needs one owner's decision, not two documents.
+  the same data. It needs one owner's decision, not two documents. *Settled
+  2026-10-07: `env`.*
 - Three filter operations are advertised by the query contract but answer 501.
   The CLI offers them because the contract does, so they fail at the server
   rather than locally — the one place §11's "nothing `--help` offers can fail"

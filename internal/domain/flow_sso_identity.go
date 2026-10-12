@@ -1,6 +1,14 @@
 package domain
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+// ErrSSOOwnerOtherSchema reports a unique value held by a user of another
+// schema than the flow's. A provider's claim cannot be changed, so the
+// callback restarts the flow; a typed value can, so the step shows it taken.
+var ErrSSOOwnerOtherSchema = errors.New("sso: unique value is owned by a user of another schema")
 
 // FlowSSOIdentityService reads and settles the external identity an SSO
 // callback parked on the flow's auth attempt. The domain cannot parse a
@@ -34,12 +42,12 @@ type FlowSSOIdentityService interface {
 	// gone and ErrFlowRestartRequired when the attempt carries another user or
 	// is expired or handed off.
 	BindCollision(ctx context.Context, in FlowSSOBindInput) error
-	// FindUniqueOwner returns the user owning value in the unique attribute,
-	// or "" with a nil error when nobody does. It only reads: unlike an
-	// identifier submission it records nothing on the attempt. It returns
-	// ErrFlowRestartRequired when the owner is a user of another schema than
-	// the flow's.
-	FindUniqueOwner(ctx context.Context, projectID, userSchemaURL, attribute, value string) (userID string, err error)
+	// FindUniqueOwner returns the user whose value at the attribute path
+	// would collide with a new user with no team, or "" with a nil error
+	// when nobody's does. It only reads: unlike an identifier submission it
+	// records nothing on the attempt. It returns ErrSSOOwnerOtherSchema when
+	// the owner is a user of another schema than the flow's.
+	FindUniqueOwner(ctx context.Context, projectID, userSchemaURL, attribute string, value any) (userID string, err error)
 	// CreateLinked creates the user, its identity link and the attempt
 	// factors in one transaction, and returns the new user's id.
 	CreateLinked(ctx context.Context, in FlowSSOCreateInput) (userID string, err error)
@@ -100,4 +108,6 @@ type FlowSSOBindInput struct{ ProjectID, AttemptID, CheckID, UserID, ConnectionI
 type FlowSSOCreateInput struct {
 	ProjectID, AttemptID, CheckID, UserSchemaURL, ConnectionID, Subject string
 	Attributes                                                          map[string]any
+	// Password is empty unless the definition collects one on the way.
+	Password string
 }

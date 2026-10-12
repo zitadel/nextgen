@@ -6,15 +6,17 @@ dependsOn:
   - "cli"
   - "testing"
 
+workspace:
+  inheritedTasks:
+    # An e2e suite: nothing to build; its specs run through `test` and `e2e`.
+    exclude:
+      - "build"
+
 tasks:
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
       # The journey spec imports the kit's Playwright entry.
       - "testing:build"
-
-  test:
-    command: "corepack pnpm run test:all"
 
   e2e:
     command: "corepack pnpm run e2e"

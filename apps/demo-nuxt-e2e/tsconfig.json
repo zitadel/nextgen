@@ -2,12 +2,18 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "allowJs": true,
-    "outDir": "out-tsc/playwright",
-    "sourceMap": false,
-    "types": ["node"]
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "noEmit": true,
+    "types": [
+      "node"
+    ]
   },
-  // No project references — same reasoning as demo-next-e2e: nothing here
-  // imports api-mock types, and a reference would redirect any transitive
-  // workspace import onto stale out-tsc declaration outputs.
-  "include": ["playwright*.config.mts", "src/**/*.ts"]
+  "include": [
+    "playwright*.config.mts",
+    "src/**/*.ts"
+  ]
 }

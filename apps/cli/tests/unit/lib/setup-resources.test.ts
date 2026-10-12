@@ -218,7 +218,7 @@ describe("materializeSetupResources", () => {
 
     // The composed schema field set reaches the uploaded body and the written
     // file — this is the one seam the config-package matrix can't cover.
-    const schemaBody = vi.mocked(client.createSchema).mock.calls[0]?.[0] as {
+    const schemaBody = vi.mocked(client.createSchema).mock.calls[0]?.[0] as unknown as {
       properties: Record<string, unknown>;
       required: string[];
     };

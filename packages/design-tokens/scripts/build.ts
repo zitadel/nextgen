@@ -7,12 +7,11 @@
  *
  * Emits four files into `src/generated/`:
  *
- *   tokens.css      — :root + [data-theme="dark"] + reserved
- *                     [data-theme="light"] selectors with `--zl-*` variables.
+ *   tokens.css      — :root + [data-theme="dark"] and [data-theme="light"]
+ *                     selectors with `--zl-*` variables.
  *   tokens.ts       — typed `tokens` const + named groups for JS consumers.
  *   tailwind.css    — Tailwind v4 `@theme` block aliasing `--color-zl-*`,
- *                     `--spacing-zl-*` etc. so React consumers can write
- *                     `text-zl-text-primary` and `bg-zl-surface-black`.
+ *                     `--spacing-zl-*` etc. onto the `--zl-*` variables.
  *   shadcn.css      — Tailwind v4 `@theme inline` mapping the standard shadcn
  *                     utility names (`bg-background`, `rounded-md`, `font-serif`)
  *                     onto `--zl-*`, so shadcn/ui components drop into the console.
@@ -142,9 +141,7 @@ function build(): BuildResult {
   const cssVars: Array<[string, string]> = [];
   /** [zl-var-name, resolved CSS value] tuples that differ under `[data-theme="light"]`. */
   const lightVars: Array<[string, string]> = [];
-  // `theme.*` holds the new shadcn semantic colours; `color.*` stays the legacy
-  // grouped surface so the two never collide (e.g. legacy `color.border.*`
-  // group vs the new flat `theme.border`).
+  // `theme.*` holds the shadcn semantic colours; `color` is emitted empty.
   /** Mirror structure for the typed TS `tokens` export (resolved dark values). */
   const tsTree: Record<string, unknown> = {
     color: {},
@@ -241,9 +238,7 @@ function build(): BuildResult {
   }
 
   // ---- corner radius (in rem) ----
-  // One scale, the Figma one. The old `s`/`m`/`l` names are gone rather than
-  // aliased: they were sized against a scale the design system no longer draws
-  // with, and two live radius vocabularies is how the two drift apart.
+  // One radius scale, Figma's.
   for (const [name, px] of Object.entries(shadcn.radius)) {
     push(cssVarName("radius", name), pxToRem(px), ["radius", toCamel(name)]);
   }

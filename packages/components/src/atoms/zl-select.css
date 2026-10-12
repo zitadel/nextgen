@@ -1,6 +1,5 @@
 /* Styles for `<zl-select>` — shadow host rules first, then the painted surface. */
 
-/* Lit-only: <zl-select> host box model. Surface rules live in select.css. */
 :host {
   display: block;
 }
@@ -8,13 +7,11 @@
   cursor: not-allowed;
 }
 
-/* Shared surface for `<zl-select>` / `<Select>`. Lit-only rules: lit/select-host.css */
 /*
- * A select-only combobox: a button trigger (`.zr-select__trigger`) that opens a
- * `role="listbox"` popup (`.zr-select__listbox`). The trigger mirrors the text
- * field box (border, radius, 40px, hover/focus border tokens); the popup options
- * use the Figma "Items" states — hover/keyboard-active paint the 10% white wash,
- * the chosen row gets the `surface/default-primary-gray` fill plus a check glyph.
+ * A styled trigger (`.zr-select__trigger`) that opens a pointer-only popup
+ * (`.zr-select__listbox`) over the native `<select>`. In the popup, hover and
+ * keyboard-active paint the accent wash; the chosen row is filled with a check
+ * glyph.
  */
 .zr-select {
   display: flex;
@@ -118,7 +115,7 @@
   border-color: var(--zl-ring);
   background-color: color-mix(in srgb, var(--zl-foreground) 10%, transparent);
 }
-/* Focus / open — single white border, no outer ring (Figma Focused). Focus
+/* Focus / open — the border takes `--zl-ring`, no outer ring. Focus
  * lives on the visually-hidden native control, so paint the trigger via the
  * field's :focus-within rather than the trigger's own :focus. */
 .zr-select:not(.zr-select--disabled) .zr-select__field:focus-within .zr-select__trigger,
@@ -141,13 +138,6 @@
   border-color: var(--zl-destructive);
 }
 
-/* Inline error message under the field (mirrors .zr-field__error). */
-.zr-select__error {
-  font-size: var(--zl-text-sm-size);
-  line-height: var(--zl-text-sm-leading);
-  color: var(--zl-destructive);
-}
-
 .zr-select__listbox {
   position: absolute;
   top: calc(100% + var(--zl-spacing-2));
@@ -157,7 +147,7 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  max-height: 15rem;
+  max-height: var(--zl-spacing-60);
   overflow-y: auto;
   border-radius: var(--zl-radius-sm);
   border: 1px solid var(--zl-input);
@@ -193,14 +183,14 @@
   opacity: 0;
 }
 
-/* Hover / pointer-active — 10% white wash (Figma "Hovered"). The styled popup
+/* Hover / pointer-active — 10% foreground wash. The styled popup
  * is a pointer-only visual layer (`aria-hidden`), so its option state lives on
  * `data-*` hooks, not ARIA (the native <select> owns the real a11y state). */
 .zr-select__option:not([data-disabled]):hover,
 .zr-select__option[data-active]:not([data-disabled]) {
   background-color: color-mix(in srgb, var(--zl-foreground) 10%, transparent);
 }
-/* Selected — solid fill + visible check (Figma "Selected"). */
+/* Selected — solid fill + visible check. */
 .zr-select__option[data-selected] {
   background-color: var(--zl-popover);
 }

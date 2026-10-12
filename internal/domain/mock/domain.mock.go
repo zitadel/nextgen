@@ -921,7 +921,7 @@ func (c *MockFlowSSOIdentityServiceCreateLinkedCall) DoAndReturn(f func(context.
 }
 
 // FindUniqueOwner mocks base method.
-func (m *MockFlowSSOIdentityService) FindUniqueOwner(ctx context.Context, projectID, userSchemaURL, attribute, value string) (string, error) {
+func (m *MockFlowSSOIdentityService) FindUniqueOwner(ctx context.Context, projectID, userSchemaURL, attribute string, value any) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindUniqueOwner", ctx, projectID, userSchemaURL, attribute, value)
 	ret0, _ := ret[0].(string)
@@ -948,13 +948,13 @@ func (c *MockFlowSSOIdentityServiceFindUniqueOwnerCall) Return(userID string, er
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockFlowSSOIdentityServiceFindUniqueOwnerCall) Do(f func(context.Context, string, string, string, string) (string, error)) *MockFlowSSOIdentityServiceFindUniqueOwnerCall {
+func (c *MockFlowSSOIdentityServiceFindUniqueOwnerCall) Do(f func(context.Context, string, string, string, any) (string, error)) *MockFlowSSOIdentityServiceFindUniqueOwnerCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockFlowSSOIdentityServiceFindUniqueOwnerCall) DoAndReturn(f func(context.Context, string, string, string, string) (string, error)) *MockFlowSSOIdentityServiceFindUniqueOwnerCall {
+func (c *MockFlowSSOIdentityServiceFindUniqueOwnerCall) DoAndReturn(f func(context.Context, string, string, string, any) (string, error)) *MockFlowSSOIdentityServiceFindUniqueOwnerCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

@@ -1,21 +1,18 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "out-tsc/app",
-    "tsBuildInfoFile": "out-tsc/app/tsconfig.app.tsbuildinfo",
     "rootDir": "src"
   },
-  "exclude": ["out-tsc", "dist", "src/**/*.spec.ts"],
-  "include": ["src/**/*.ts"],
-  "references": [
-    {
-      "path": "../../packages/api/tsconfig.lib.json"
-    },
-    {
-      "path": "../../packages/sdk-next/tsconfig.lib.json"
-    },
-    {
-      "path": "../../packages/api-mock/tsconfig.lib.json"
-    }
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
+  "exclude": [
+    "src/**/*.spec.ts",
+    "src/**/*.spec.tsx",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**",
+    "src/test-setup.ts"
   ]
 }

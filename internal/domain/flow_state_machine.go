@@ -60,15 +60,21 @@ const (
 	// only together, such as a rule across fields. The user can still edit
 	// them on the step.
 	FlowStepErrorSSOUserInvalid = "error.sso_user_invalid"
-	// FlowStepErrorSSOUserCannotBeCreated reports a required property that
-	// neither the step nor the provider supplies. No edit on the step can
-	// fix it; the flow definition must collect it.
+	// FlowStepErrorSSOUserCannotBeCreated reports what no edit on the step
+	// can fix: a required property that neither the step nor the provider
+	// supplies, which the flow definition must collect, or a verified unique
+	// claim the user schema rejects, which the schema must accept.
 	FlowStepErrorSSOUserCannotBeCreated = "error.sso_user_cannot_be_created"
 	// FlowStepErrorUserAlreadyExists reports a unique value another user
-	// holds where the engine cannot find that user, so it cannot route
-	// user_already_exists: a team-scoped value, or an object or array.
+	// holds where the engine cannot bind that user, so it cannot route
+	// user_already_exists: a user of another schema.
 	FlowStepErrorUserAlreadyExists = "error.user_already_exists"
 )
+
+// errSSOClaimRejected reports a verified unique claim that fails its own
+// property. The user may not change a verified value, and the account cannot
+// hold this one, so nothing is created and no step is shown to collect it.
+var errSSOClaimRejected = errors.New("flow state machine: the user schema rejects a verified unique claim")
 
 // FlowStepErrorAllowed reports whether a step error value honors the
 // client contract: a localizable `error.*` text key or a reserved
@@ -489,7 +495,10 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		}
 		state.SSOResolvedCheckID = parked.CheckID
 		recordResolvedUser(state, parked.CollisionUserID)
-		result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeUserAlreadyExists, false)
+		// The marker replaced the row a collection step creates from, so that
+		// step cannot be shown again. An entry step can: it starts a new ceremony.
+		collection := currentStep.OnSuccess != nil && *currentStep.OnSuccess == FlowOnSuccessCreateUserWithSso
+		result, err := r.routeOutcome(pc, resolvedFields, FlowImplicitOutcomeUserAlreadyExists, collection)
 		return result, true, err
 	}
 	if parked == nil {
@@ -529,6 +538,14 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		if errors.Is(err, errSSOUnroutable) {
 			msg := FlowStepErrorSSOUnavailable
 			result, err := r.renderStepError(pc, resolvedFields, &msg)
+			return result, true, err
+		}
+		if errors.Is(err, ErrSSOOwnerOtherSchema) {
+			return FlowStepResult{}, false, ErrFlowRestartRequired().WithParent(err)
+		}
+		if errors.Is(err, errSSOClaimRejected) {
+			// The row stays parked, as under creation disabled.
+			result, err := r.renderStepError(pc, resolvedFields, new(FlowStepErrorSSOUserCannotBeCreated))
 			return result, true, err
 		}
 		if err != nil {
@@ -594,6 +611,9 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	if ssoBoundUser(state, parked) != "" {
 		return "", ErrFlowRestartRequired()
 	}
+	if ssoVerifiedClaimRejected(schema, parked.Verified, claims) {
+		return "", errSSOClaimRejected
+	}
 	if !ssoClaimsComplete(schema, parked, claims, uniqueClaims) {
 		return FlowImplicitOutcomeSSOUserNotFound, nil
 	}
@@ -628,8 +648,8 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 		return FlowImplicitOutcomeSSOUserNotFound, nil
 	}
 	if errors.Is(err, ErrUserInvalid()) {
-		// A claim fails the schema (too long, bad format): collect it so the
-		// user can fix it.
+		// A claim the user may edit fails the schema (too long, bad format):
+		// collect it so the user can fix it.
 		return FlowImplicitOutcomeSSOUserNotFound, nil
 	}
 	if err != nil {
@@ -649,6 +669,90 @@ func ssoBoundUser(state *FlowState, parked *FlowSSOParkedIdentity) string {
 	return parked.AttemptUserID
 }
 
+// ssoHiddenClaim returns the part of a claim at path that the step does not
+// show and that satisfies its own property, whatever its type. The user cannot
+// see a hidden value to fix it, so an invalid one is left out. A shown field
+// keeps the typed value. An object is checked key by key, and keys the schema
+// does not define are left out. An object with no shown field below it must
+// also satisfy its own property, so an optional object the provider sent
+// incomplete is left out instead of blocking the creation.
+func ssoHiddenClaim(prop schemaReader, path AttributeKey, value any, fields []FlowField) (any, bool) {
+	var shown, below bool
+	for _, f := range fields {
+		shown = shown || f.Name == string(path)
+		below = below || strings.HasPrefix(f.Name, string(path)+".")
+	}
+	if shown {
+		return nil, false
+	}
+	object, ok := value.(map[string]any)
+	if !ok || !prop.HasProperties() {
+		// A shown field below a value that is no object: the claim does not
+		// have the shape the step collects.
+		if below || prop.s.Validate(value) != nil {
+			return nil, false
+		}
+		return value, true
+	}
+	kept := map[string]any{}
+	for key, v := range object {
+		sub, ok := prop.Property(key)
+		if !ok {
+			continue
+		}
+		if v, ok := ssoHiddenClaim(sub, path.AppendNode(key), v, fields); ok {
+			kept[key] = v
+		}
+	}
+	if len(kept) == 0 || (!below && prop.s.Validate(kept) != nil) {
+		return nil, false
+	}
+	return kept, true
+}
+
+// mergeSSOClaim merges the kept part of a claim over the value collected for
+// it, so the typed leaves of an object stay beside the hidden ones. It copies
+// every map it changes: the collected value is the flow state's.
+func mergeSSOClaim(collected, kept any) any {
+	keptObject, ok := kept.(map[string]any)
+	collectedObject, isObject := collected.(map[string]any)
+	if !ok || !isObject {
+		return kept
+	}
+	out := maps.Clone(collectedObject)
+	for key, value := range keptObject {
+		out[key] = mergeSSOClaim(collectedObject[key], value)
+	}
+	return out
+}
+
+// ssoVerifiedClaimRejected reports whether a unique leaf of a verified claim
+// fails its own property. A leaf is unique by its own x-unique, as the
+// registry reads it ([CreateAttributes]). Keys the schema does not define are
+// skipped: the collection step leaves them out.
+func ssoVerifiedClaimRejected(schema *jsonschema.Schema, verified map[string]bool, claims map[string]any) bool {
+	var rejected func(prop schemaReader, value any) bool
+	rejected = func(prop schemaReader, value any) bool {
+		object, ok := value.(map[string]any)
+		if !ok {
+			return deriveUnique(prop) != AttributeUniquenessUnspecified && prop.s.Validate(value) != nil
+		}
+		for key, v := range object {
+			if sub, ok := prop.Property(key); ok && rejected(sub, v) {
+				return true
+			}
+		}
+		return false
+	}
+	root := newSchemaReader(schema)
+	for name, value := range claims {
+		if prop, ok := root.Property(name); ok && verified[name] && rejected(prop, value) {
+			return true
+		}
+	}
+	return false
+}
+
 // ssoSchemaClaims keeps the claims whose name is a top-level property of the
 // schema and drops the rest.
 func ssoSchemaClaims(schema *jsonschema.Schema, claims map[string]any) map[string]any {
@@ -663,34 +767,46 @@ func ssoSchemaClaims(schema *jsonschema.Schema, claims map[string]any) map[strin
 }
 
 // ssoUniqueClaims returns the claim names whose top-level schema property
-// carries an x-unique scope (unique), and the project-scoped subset the
-// collision check probes (probe), both sorted so the probe order is stable.
-// Team scope is not probed, because the probe only asks the project-scoped
-// registry; a team-scoped collision is still refused at creation and falls
-// back to collection. An object or array property is unique like any other
-// (the registry stores it), so it is in unique, but it is not probed: the
-// lookup takes a single value. The annotation is read directly, so a claim
-// whose property no flow step could render (a type union) is no error; a
-// claim the schema does not know is skipped.
+// carries an x-unique scope (unique), and the dotted path of each unique leaf
+// the collision check probes (probe), both sorted so the probe order is
+// stable. The annotation is read directly, so a claim whose property no flow
+// step could render (a type union) is no error; a claim the schema does not
+// know is skipped.
 func ssoUniqueClaims(schema *jsonschema.Schema, claims map[string]any) (probe, unique []string) {
 	root := newSchemaReader(schema)
 	for name := range claims {
-		prop, ok := root.Property(name)
-		if !ok {
-			continue
-		}
-		scope := deriveUnique(prop)
-		if scope == AttributeUniquenessUnspecified {
-			continue
-		}
-		unique = append(unique, name)
-		if t, _ := prop.JSONType(); scope == AttributeUniquenessProject && t != "object" && t != "array" {
-			probe = append(probe, name)
+		if prop, ok := root.Property(name); ok && deriveUnique(prop) != AttributeUniquenessUnspecified {
+			unique = append(unique, name)
 		}
 	}
+	probe = ssoUniqueLeaves(root, "", claims)
 	slices.Sort(probe)
 	slices.Sort(unique)
 	return probe, unique
+}
+
+// ssoUniqueLeaves returns the path of each value the creation would record in
+// the unique registry, walked as [CreateAttributes] flattens a user: an object
+// descends, and any other value is a leaf, an array included. The new user
+// has no team, so each of its registry rows has team scope "", whatever the
+// leaf's x-unique scope, and collides with any row of the same scope.
+func ssoUniqueLeaves(parent schemaReader, prefix AttributeKey, values map[string]any) []string {
+	var out []string
+	for name, value := range values {
+		prop, ok := parent.Property(name)
+		if !ok {
+			continue
+		}
+		path := prefix.AppendNode(name)
+		if nested, ok := value.(map[string]any); ok {
+			out = append(out, ssoUniqueLeaves(prop, path, nested)...)
+			continue
+		}
+		if deriveUnique(prop) != AttributeUniquenessUnspecified {
+			out = append(out, string(path))
+		}
+	}
+	return out
 }
 
 // errSSOUnroutable reports a collision or a creation on a step that cannot
@@ -698,7 +814,7 @@ func ssoUniqueClaims(schema *jsonschema.Schema, claims map[string]any) (probe, u
 // unavailable, as for a linked identity.
 var errSSOUnroutable = errors.New("flow state machine: sso outcome cannot route on this step")
 
-// bindSSOCollision looks up the value of each project-unique claim in values,
+// bindSSOCollision looks up the value at each unique leaf path in values,
 // verified or not, until one names an existing user, then binds that user by
 // id. Like a typed identifier it only binds the user: no link, no sso factor.
 // The bind checks the exact parked row first and replaces it by a marker of
@@ -708,8 +824,8 @@ var errSSOUnroutable = errors.New("flow state machine: sso outcome cannot route 
 // user_already_exists.
 func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, step *FlowDefinitionStep, parked *FlowSSOParkedIdentity, probeClaims []string, values map[string]any) (bool, error) {
 	for _, name := range probeClaims {
-		value, _ := values[name].(string)
-		if value == "" {
+		value, ok := maputil.GetNested[any](values, AttributeKey(name).Nodes())
+		if !ok || value == nil || value == "" {
 			continue
 		}
 		// A read-only lookup: an identifier submission that misses records a
@@ -1306,35 +1422,45 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 		return FlowStepResult{}, fmt.Errorf("flow state machine: load user schema for sso identity: %w", err)
 	}
 	claims := ssoSchemaClaims(schema, collected.Claims)
-	// What the steps collected, this submit's values merged in, and each claim
+	// What the steps collected, this submit's values merged in, and the claims
 	// the step does not show. A claim replaces what an earlier step collected,
-	// so a typed identifier cannot override the provider. A hidden claim that
-	// fails its property is dropped: the user cannot see it to fix it.
+	// so a typed identifier cannot override the provider.
 	attributes := maps.Clone(state.CollectedData.UserData)
 	if attributes == nil {
 		attributes = map[string]any{}
 	}
+	root := newSchemaReader(schema)
 	for name, value := range claims {
-		shown := slices.ContainsFunc(resolved.Fields, func(f FlowField) bool {
-			return f.Name == name || strings.HasPrefix(f.Name, name+".")
-		})
-		if shown {
-			continue
+		prop, _ := root.Property(name)
+		if kept, ok := ssoHiddenClaim(prop, AttributeKey(name), value, resolved.Fields); ok {
+			attributes[name] = mergeSSOClaim(attributes[name], kept)
 		}
-		hidden, err := r.fields.Resolve(schema, step.Name, []Field{Field(name)})
-		if err != nil {
-			continue
-		}
-		if err := r.fields.Validate(hidden, map[string]any{name: value}); err != nil {
-			continue
-		}
-		attributes[name] = value
 	}
 
-	_, uniqueClaims := ssoUniqueClaims(schema, claims)
-	for _, name := range uniqueClaims {
-		value, ok := attributes[name]
-		if collected.Verified[name] && ok && !reflect.DeepEqual(value, claims[name]) {
+	// The callback refuses such a claim before the step; the schema may have
+	// changed since.
+	if ssoVerifiedClaimRejected(schema, collected.Verified, claims) {
+		return r.renderStepError(pc, resolved, new(FlowStepErrorSSOUserCannotBeCreated))
+	}
+	// A shown unique leaf of a verified claim must keep the claimed value. The
+	// step prefills only strings, so any value typed for a number claim is
+	// refused.
+	for _, f := range resolved.Fields {
+		path := AttributeKey(f.Name).Nodes()
+		claim, ok := maputil.GetNested[any](claims, path)
+		if !ok || !collected.Verified[path[0]] {
+			continue
+		}
+		prop, defined := root, true
+		for _, node := range path {
+			if prop, defined = prop.Property(node); !defined {
+				break
+			}
+		}
+		if !defined || deriveUnique(prop) == AttributeUniquenessUnspecified {
+			continue
+		}
+		if value, ok := maputil.GetNested[any](attributes, path); ok && !reflect.DeepEqual(value, claim) {
 			return r.renderStepError(pc, resolved, new(FlowStepErrorSSOVerifiedUniqueValueChanged))
 		}
 	}
@@ -1372,12 +1498,12 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 		ConnectionID:  collected.ConnectionID,
 		Subject:       collected.Subject,
 		Attributes:    attributes,
+		Password:      state.CollectedData.AuthMethods.Password,
 	})
 	switch {
 	case errors.Is(err, ErrUserAlreadyExists()):
-		// Another flow took a unique value since the probe: whoever took a
-		// probed value is bound. The probe cannot find an owner of a
-		// team-scoped value, or of an object or array.
+		// Another flow took a unique value since the probe: whoever took it
+		// is bound.
 		bound, err := r.bindSSOCollision(pc.ctx, state, step, collected, probe, attributes)
 		if result, handled, err := r.ssoCollectionBindResult(pc, resolved, loadInput, bound, err); handled {
 			return result, err
@@ -1411,10 +1537,17 @@ func (r *FlowStateMachineRuntime) ssoCollectionBindResult(pc *processCtx, resolv
 	case errors.Is(err, errSSOUnroutable):
 		result, err := r.renderStepError(pc, resolved, new(FlowStepErrorSSOUnavailable))
 		return result, true, err
+	case errors.Is(err, ErrSSOOwnerOtherSchema):
+		// The user typed the value and can change it, so it shows taken, as
+		// for any other taken value. Only the log names the other schema.
+		result, err := r.renderStepError(pc, resolved, new(FlowStepErrorUserAlreadyExists))
+		return result, true, err
 	case err != nil:
 		return FlowStepResult{}, true, err
 	case bound:
-		result, err := r.routeOutcome(pc, resolved, FlowImplicitOutcomeUserAlreadyExists, false)
+		// The bind replaced the row this step creates from, so back to it
+		// could not create a user.
+		result, err := r.routeOutcome(pc, resolved, FlowImplicitOutcomeUserAlreadyExists, true)
 		return result, true, err
 	}
 	return FlowStepResult{}, false, nil

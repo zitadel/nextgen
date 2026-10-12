@@ -1,11 +1,9 @@
 import { css, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
-import type { ZitadelProject } from "@zitadel/api/config";
+import { customElement, property } from "lit/decorators.js";
 
-import { getSession, revokeSession } from "./api-client.js";
-import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
+import { resolveApi } from "./resolve-api.js";
+import { SessionController } from "./session-controller.js";
 import { ZitadelSurface } from "./surface.js";
-import { emit } from "../internal/emit.js";
 import { baseHostStyles, t } from "../styles/index.js";
 
 import "../atoms/index.js";
@@ -58,30 +56,31 @@ export class ZitadelSession extends ZitadelSurface {
         display: block;
         width: 100%;
       }
+      /* The same title as the sign-in card's: xl, medium, on a single line
+         whose gap to the identity line does the separating. */
       .title {
         margin: 0;
         font-family: ${t.font.family.heading};
-        font-size: 2rem;
-        font-weight: 700;
-        line-height: 2.5rem;
-        letter-spacing: -0.02em;
+        font-size: var(--zl-text-xl-size);
+        font-weight: var(--zl-font-weight-medium);
+        line-height: 1;
         color: ${t.theme.foreground};
         text-align: left;
       }
       .identity {
         margin: 0;
         font-family: ${t.font.family.sans};
-        font-size: 0.875rem;
-        line-height: 1.25rem;
-        font-weight: 400;
+        font-size: ${t.text.sm.size};
+        line-height: ${t.text.sm.leading};
+        font-weight: ${t.font.weight.normal};
         color: ${t.theme.mutedForeground};
         text-align: left;
         overflow-wrap: anywhere;
       }
       .error {
         margin: 0;
-        font-size: 0.875rem;
-        line-height: 1.25rem;
+        font-size: ${t.text.sm.size};
+        line-height: ${t.text.sm.leading};
         color: ${t.theme.destructive};
       }
       /* suppress-header: visually hidden, kept in the accessibility tree. */
@@ -99,22 +98,6 @@ export class ZitadelSession extends ZitadelSurface {
     `,
   ];
 
-  /**
-   * SDK project handle returned by `configureZitadel()`. Set from JS (or a
-   * framework binding). Takes precedence over the
-   * `project-id`/`proxy-path`/`url` attributes and the global singleton.
-   */
-  @property({ attribute: false }) accessor project: ZitadelProject | undefined;
-
-  /** Project ID, set declaratively in HTML for no-JS configuration. */
-  @property({ type: String, attribute: "project-id" }) accessor projectId = "";
-
-  /** Proxy path for API requests (e.g. `/__nextgen`), set declaratively in HTML. */
-  @property({ type: String, attribute: "proxy-path" }) accessor proxyPath = "";
-
-  /** Full URL of the Zitadel auth backend, set declaratively in HTML. */
-  @property({ type: String }) accessor url = "";
-
   /** URL to navigate to after a successful sign-out. */
   @property({ type: String, attribute: "post-sign-out-url" }) accessor postSignOutUrl = "";
 
@@ -124,30 +107,10 @@ export class ZitadelSession extends ZitadelSurface {
   /** Sign-out action label. */
   @property({ type: String, attribute: "logout-label" }) accessor logoutLabel = "Sign out";
 
-  @state() private accessor userDisplay = "";
-
-  @state() private accessor userIdentifier = "";
-
-  @state() private accessor userId = "";
-
-  @state() private accessor loading = false;
-
-  @state() private accessor errorMessage = "";
-
-  // Guards the one-shot identity fetch so it runs once config is resolvable,
-  // whether that's at connect time (global config / declarative attributes) or
-  // after a framework assigns the `project` property post-mount.
-  private identityRequested = false;
-
-  override connectedCallback(): void {
-    super.connectedCallback();
-    this.maybeLoadIdentity();
-  }
-
-  /** Single identity line: human-readable name, then email, then user_id. */
-  private get identityLabel(): string {
-    return this.userDisplay || this.userIdentifier || this.userId;
-  }
+  private readonly session = new SessionController(
+    this,
+    () => resolveApi(this.project, this.projectAttrs, "<zitadel-session>").api,
+  );
 
   override willUpdate(): void {
     // No tenant branding payload on this surface (yet) — the theme resolves
@@ -155,65 +118,9 @@ export class ZitadelSession extends ZitadelSurface {
     this.applySurfaceTheme(undefined);
   }
 
-  override updated(): void {
-    this.maybeLoadIdentity();
-  }
-
-  /** Declarative config read from this element's attributes. */
-  private get projectAttrs(): ProjectAttrs {
-    return { projectId: this.projectId, proxyPath: this.proxyPath, url: this.url };
-  }
-
-  /**
-   * Fetches the signed-in identity from `GET /sessions/me` once a project is
-   * resolvable. No-ops until then (and on repeat calls) so framework property
-   * timing doesn't matter and we never fire the request twice.
-   */
-  private maybeLoadIdentity(): void {
-    if (this.identityRequested) return;
-    let api: ReturnType<typeof resolveApi>["api"];
-    try {
-      ({ api } = resolveApi(this.project, this.projectAttrs, "<zitadel-session>"));
-    } catch {
-      return;
-    }
-    this.identityRequested = true;
-    void this.fetchIdentity(api);
-  }
-
-  private async fetchIdentity(api: ReturnType<typeof resolveApi>["api"]): Promise<void> {
-    try {
-      const session = await getSession(api);
-      this.userDisplay = session.user?.display ?? "";
-      this.userIdentifier = session.user?.identifier ?? "";
-      this.userId = session.user_id ?? "";
-    } catch {
-      // No active session, or not configured — render without an identity line.
-    }
-  }
-
-  /**
-   * Calls `DELETE /sessions/me` (`revokeMySession`) with credentials. On
-   * success fires `zitadel-signout` and optionally navigates to
-   * `postSignOutUrl`; on failure surfaces an inline error and stays put.
-   */
+  /** Signs out, then optionally navigates to `postSignOutUrl`; a failure stays put. */
   private async doLogout(): Promise<void> {
-    this.loading = true;
-    this.errorMessage = "";
-
-    try {
-      const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-session>");
-      await revokeSession(api);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "";
-      this.errorMessage = message || "Sign-out failed. Please try again.";
-      this.loading = false;
-      return;
-    }
-
-    this.loading = false;
-    emit(this, "zitadel-signout", { display: this.userDisplay, identifier: this.userIdentifier });
-
+    if (!(await this.session.signOut())) return;
     if (this.postSignOutUrl && typeof window !== "undefined") {
       window.location.assign(this.postSignOutUrl);
     }
@@ -235,9 +142,9 @@ export class ZitadelSession extends ZitadelSurface {
             ${this.heading}
           </h1>
           ${
-            this.identityLabel
+            this.session.label
               ? html`<p slot=${this.suppressHeader ? nothing : "header"} class="identity">
-                ${this.identityLabel}
+                ${this.session.label}
               </p>`
               : nothing
           }
@@ -246,15 +153,15 @@ export class ZitadelSession extends ZitadelSurface {
             hierarchy="primary"
             size="medium"
             block
-            ?loading=${this.loading}
+            ?loading=${this.session.loading}
             data-testid="zitadel-session-logout"
             label=${this.logoutLabel}
             @zl-submit=${this.handleLogout}
           ></zl-button>
 
           ${
-            this.errorMessage
-              ? html`<p class="error" role="alert">${this.errorMessage}</p>`
+            this.session.errorMessage
+              ? html`<p class="error" role="alert">${this.session.errorMessage}</p>`
               : nothing
           }
         </zl-card>

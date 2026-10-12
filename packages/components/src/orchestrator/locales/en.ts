@@ -10,9 +10,6 @@
  *   - Step descriptions: `<step>.description`
  *   - Field labels:      `<step>.field.<field>`
  *   - Action labels:     `<step>.action.<action>`
- *
- * Copy aligned to Figma screens file `xkvBjkOJ8ENuHdTGZHXezK` (May 2026).
- * MVP only — multi-locale support is deferred.
  */
 export const en: Record<string, string> = {
   // ═══════════════════════════════════════════════════════════════════════════
@@ -213,7 +210,7 @@ export const en: Record<string, string> = {
     "We can't create your account with this sign-in method. Please contact support.",
   "error.user_already_exists": "An account with these details already exists.",
 
-  // --- Field / form errors (Figma field annotations) ---
+  // --- Field / form errors ---
   "error.email_required": "Please enter an email address",
   "error.email_invalid": "Please enter a valid email",
   "error.password_required": "Please enter a password",
