@@ -51,6 +51,15 @@ describe("buildBundle", () => {
     await expect(buildBundle(cwd)).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 
+  it("refuses more than one branding descriptor", async () => {
+    const cwd = await project({
+      ".zitadel/branding/one.json": { name: "one" },
+      ".zitadel/branding/two.json": { name: "two" },
+    });
+
+    await expect(buildBundle(cwd)).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+
   it("refuses a bundle over the fifty-resource cap", async () => {
     const files: Record<string, unknown> = {};
     for (let i = 0; i < 51; i += 1) {
