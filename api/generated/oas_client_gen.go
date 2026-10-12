@@ -43,9 +43,9 @@ type Invoker interface {
 	// Builds a release from the resources of `.zitadel/` as authored on disk,
 	// grouped by kind, in one transaction: a failure anywhere leaves no
 	// revision and no release. The caller records nothing.
-	// If the project already holds a release with the same content, the
-	// request answers `200` with that release and allocates nothing, however
-	// long ago it was built. Otherwise every resource is compared against the
+	// If the project already holds a release with the same content, the same
+	// `content_hash`, the request answers `200` with that release and
+	// allocates nothing, however long ago it was built. Otherwise every resource is compared against the
 	// project's newest revision of the same handle: unchanged content reuses
 	// that revision, changed content allocates a new one, and the request
 	// answers `201` with the new release. Metadata is excluded from the
@@ -524,8 +524,10 @@ type Invoker interface {
 	GetReady(ctx context.Context) (GetReadyRes, error)
 	// GetReleaseById invokes getReleaseById operation.
 	//
-	// Reads one release: its metadata and the `(kind, handle, revision_id)`
-	// tuples it pins.
+	// Reads one release: its digest, its metadata and the
+	// `(kind, handle, revision_id)` tuples it pins.
+	// The path takes the `rel_` id only. To find a release from its digest,
+	// list with the `content_hash` filter and read the matched entry's `id`.
 	// Does not embed resource content. Resolve each `revision_id` through the
 	// per-kind read endpoints when the bytes are needed.
 	// The lookup is scoped to the project in `project_id`: a release id belonging
@@ -675,8 +677,13 @@ type Invoker interface {
 	// ListReleases invokes listReleases operation.
 	//
 	// Lists the project's releases, newest first.
-	// Entries carry metadata only — the pinned set is omitted. Read one release
-	// with `GET /releases/{release_id}` to get its pointers.
+	// Entries carry the digest and the metadata — the pinned set is omitted.
+	// Read one release with `GET /releases/{release_id}` to get its pointers.
+	// `content_hash` looks a release up by its content, as the CLI does when a
+	// person types the digest a transcript printed. The project holds at most
+	// one release per digest, so the filtered list has one entry or none, and
+	// an unknown digest is an empty list rather than an error. Paths take the
+	// `rel_` id only; the matched entry's `id` is what to use there.
 	//
 	// GET /releases
 	ListReleases(ctx context.Context, params ListReleasesParams) (ListReleasesRes, error)
@@ -1083,9 +1090,9 @@ func (c *Client) sendBeginUserPasskeyRegistration(ctx context.Context, request *
 // Builds a release from the resources of `.zitadel/` as authored on disk,
 // grouped by kind, in one transaction: a failure anywhere leaves no
 // revision and no release. The caller records nothing.
-// If the project already holds a release with the same content, the
-// request answers `200` with that release and allocates nothing, however
-// long ago it was built. Otherwise every resource is compared against the
+// If the project already holds a release with the same content, the same
+// `content_hash`, the request answers `200` with that release and
+// allocates nothing, however long ago it was built. Otherwise every resource is compared against the
 // project's newest revision of the same handle: unchanged content reuses
 // that revision, changed content allocates a new one, and the request
 // answers `201` with the new release. Metadata is excluded from the
@@ -6603,8 +6610,10 @@ func (c *Client) sendGetReady(ctx context.Context) (res GetReadyRes, err error) 
 
 // GetReleaseById invokes getReleaseById operation.
 //
-// Reads one release: its metadata and the `(kind, handle, revision_id)`
-// tuples it pins.
+// Reads one release: its digest, its metadata and the
+// `(kind, handle, revision_id)` tuples it pins.
+// The path takes the `rel_` id only. To find a release from its digest,
+// list with the `content_hash` filter and read the matched entry's `id`.
 // Does not embed resource content. Resolve each `revision_id` through the
 // per-kind read endpoints when the bytes are needed.
 // The lookup is scoped to the project in `project_id`: a release id belonging
@@ -9386,8 +9395,13 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 // ListReleases invokes listReleases operation.
 //
 // Lists the project's releases, newest first.
-// Entries carry metadata only — the pinned set is omitted. Read one release
-// with `GET /releases/{release_id}` to get its pointers.
+// Entries carry the digest and the metadata — the pinned set is omitted.
+// Read one release with `GET /releases/{release_id}` to get its pointers.
+// `content_hash` looks a release up by its content, as the CLI does when a
+// person types the digest a transcript printed. The project holds at most
+// one release per digest, so the filtered list has one entry or none, and
+// an unknown digest is an empty list rather than an error. Paths take the
+// `rel_` id only; the matched entry's `id` is what to use there.
 //
 // GET /releases
 func (c *Client) ListReleases(ctx context.Context, params ListReleasesParams) (ListReleasesRes, error) {
@@ -9449,6 +9463,26 @@ func (c *Client) sendListReleases(ctx context.Context, params ListReleasesParams
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if unwrapped := string(params.ProjectID); true {
 				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "content_hash" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "content_hash",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ContentHash.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
 			}
 			return nil
 		}); err != nil {
