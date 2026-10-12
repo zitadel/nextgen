@@ -16,6 +16,14 @@ interface ImportMetaEnv {
    * serves. Never set for the build the Go server embeds.
    */
   readonly VITE_CONSOLE_VERCEL_INSIGHTS?: string;
+  /**
+   * The share of page loads that send Speed Insights in the hosted cloud's
+   * build, from `0` (none) to `1` (every one, the default when empty); set
+   * per environment on Vercel. Not VITE_-prefixed: vite.config.ts inlines it
+   * through `define`, an empty string when unset. Web Analytics has no
+   * sampling.
+   */
+  readonly CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE: string;
 }
 
 interface ImportMeta {
