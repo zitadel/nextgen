@@ -56,10 +56,11 @@ Configuration commands
   schemas get:           Get one schema by id
   schemas list:          List schemas
   sso enable:            Enable an identity provider for a user schema
-  variables delete:      Delete one variable from the project
-  variables get:         Get one variable from the project
-  variables list:        List the variables entered on the project
-  variables set:         Set one variable on the project
+  variable get:          Get one variable from the project
+  variable list:         List the variables entered on the project
+  variable resolve:      Show the variables the live deployment froze for a target
+  variable rm:           Remove one variable from the project
+  variable set:          Set one variable on the project
 
 Resource commands
   resources:             List the resources this CLI manages and what can be done to each
