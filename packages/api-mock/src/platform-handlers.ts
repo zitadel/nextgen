@@ -1970,8 +1970,22 @@ export function setupPlatformHandlers() {
           if (!row) {
             continue;
           }
+          // A preview-origin target (one with an expiry) is admitted by its
+          // preview row, not by the expiry frozen onto the deployment: removing
+          // the preview drops the URL from this live view without the historical
+          // deployment being rewritten, and a renewed preview is reported on the
+          // clock it now runs on. A primary target has no preview row and stands
+          // on the deployment alone.
+          let served = row;
+          if (row.expiresAt !== null) {
+            const preview = store.previews.get(previewKey(query.data.project_id, target));
+            if (!previewIsLive(preview)) {
+              continue;
+            }
+            served = { origin: row.origin, expiresAt: preview.expiresAt };
+          }
           const rows = serving.get(newest.id) ?? [];
-          rows.push(row);
+          rows.push(served);
           serving.set(newest.id, rows);
         }
         items = [...serving.entries()]
@@ -2213,21 +2227,13 @@ export function setupPlatformHandlers() {
         return body.response;
       }
 
-      // Idempotent: a URL with no live preview answers 204 too. Removing the
-      // preview also expires the deployment rows that served it, so the live
-      // deployments view stops listing a deployment whose previews are all gone.
+      // Idempotent: a URL with no live preview answers 204 too. The preview row
+      // is what admits the URL, so deleting it is the whole removal: the live
+      // previews list and the live deployments view both stop showing the URL
+      // because its preview is gone. The deployments that served it keep their
+      // real target timestamps — removing a preview ends it, it does not rewrite
+      // the history of what ran where and when.
       store.previews.delete(previewKey(query.data.project_id, body.data.origin));
-      const past = new Date(Date.now() - 1000).toISOString();
-      for (const deployment of store.deployments.values()) {
-        if (deployment.projectId !== query.data.project_id) {
-          continue;
-        }
-        for (const target of deployment.targets) {
-          if (target.origin === body.data.origin && target.expiresAt !== null) {
-            target.expiresAt = past;
-          }
-        }
-      }
       return new HttpResponse(null, { status: 204 });
     }),
 

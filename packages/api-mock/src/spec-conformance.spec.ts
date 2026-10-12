@@ -1954,6 +1954,52 @@ describe("api-mock releases and deployments", () => {
     expect(bad.status).toBe(400);
   });
 
+  test("a preview removal leaves deployment history untouched", async () => {
+    const project = await newProject("preview-remove-history");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const url = "https://acme-git-sso-acmeinc.vercel.app";
+    const deployed = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: [url],
+        ttl: "168h",
+      })
+    ).json()) as { id: string; deployed_at: string; targets: { expires_at: string }[] };
+    const historyBefore = (await (
+      await fetch(`${BASE}/deployments/${deployed.id}?project_id=${project.id}`)
+    ).json()) as { deployed_at: string; targets: { origin: string; expires_at: string }[] };
+
+    const removed = await fetch(`${BASE}/previews/remove?project_id=${project.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ origin: url }),
+    });
+    expect(removed.status).toBe(204);
+
+    // The live preview list no longer admits the URL — its preview is gone.
+    const listed = (await (await fetch(`${BASE}/previews?project_id=${project.id}`)).json()) as {
+      previews: unknown[];
+    };
+    expect(listed.previews).toHaveLength(0);
+    // Nor does the live deployments view.
+    const liveDeployments = (await (
+      await fetch(`${BASE}/deployments?project_id=${project.id}&live=true`)
+    ).json()) as { deployments: unknown[] };
+    expect(liveDeployments.deployments).toHaveLength(0);
+
+    // But the deployment that served it keeps its real timestamps — removal
+    // ends the preview, it does not rewrite history.
+    const historyAfter = (await (
+      await fetch(`${BASE}/deployments/${deployed.id}?project_id=${project.id}`)
+    ).json()) as { deployed_at: string; targets: { origin: string; expires_at: string }[] };
+    expect(historyAfter.deployed_at).toBe(historyBefore.deployed_at);
+    expect(historyAfter.targets).toEqual(historyBefore.targets);
+    expect(historyAfter.targets[0]?.expires_at).toBe(deployed.targets[0]?.expires_at);
+  });
+
   const setVars = (id: string, query: string, payload: object) =>
     fetch(`${BASE}/variables?project_id=${id}${query}`, {
       method: "PATCH",
