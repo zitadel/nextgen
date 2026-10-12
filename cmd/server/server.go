@@ -246,6 +246,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		schemaValidator,
 		keyService,
 		hasherFactory,
+		cfg.Origins.SharedHosts,
 	)
 
 	// Bootstrap runs here rather than straight after the migrations because it
@@ -566,6 +567,7 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("httpclient.allow_https_downgrade", false)
 	v.SetDefault("httpclient.deny_list", httputil.DefaultDenyList)
 	v.SetDefault("httpclient.allow_list", []string{})
+	v.SetDefault("origins.shared_hosts", domain.DefaultSharedHosts)
 	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)
 	v.SetDefault("session.max_ttl", 720*time.Hour)
 	// Empty means "the deployment's first-created non-platform project is the

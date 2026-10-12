@@ -28,6 +28,14 @@ type Config struct {
 	// HTTPClient configures the hardened egress client used for every fetch
 	// of a URL a platform user can inject (see the egress-policy ADR).
 	HTTPClient httputil.ClientConfig `mapstructure:"httpclient"`
+	// Origins configures write validation for project origin patterns.
+	Origins OriginsConfig `mapstructure:"origins"`
+}
+
+// OriginsConfig is the instance-level origins policy. SharedHosts replaces the
+// built-in default list entirely when set (including to empty).
+type OriginsConfig struct {
+	SharedHosts []string `mapstructure:"shared_hosts"`
 }
 
 // EventsConfig configures audit event retention and deployment export sinks.

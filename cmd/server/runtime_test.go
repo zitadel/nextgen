@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/httputil"
 )
 
@@ -432,10 +433,25 @@ func TestLoadConfigHTTPClientDefaultsAndEnvOverride(t *testing.T) {
 	assert.Equal(t, []string{"localhost", "127.0.0.0/8"}, cfg.HTTPClient.AllowList,
 		"comma-separated env override must split into entries")
 	assert.Equal(t, 30*time.Second, cfg.Schema.ResolveTimeout)
+	assert.Equal(t, domain.DefaultSharedHosts, cfg.Origins.SharedHosts)
 
 	client, err := cfg.HTTPClient.NewClient()
 	require.NoError(t, err)
 	require.NotNil(t, client)
+}
+
+func TestLoadConfigOriginsSharedHostsReplace(t *testing.T) {
+	dataDir := t.TempDir()
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
+	t.Setenv("NEXTGEN_ORIGINS_SHARED_HOSTS", "pages.dev")
+
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"pages.dev"}, cfg.Origins.SharedHosts,
+		"origins.shared_hosts replaces the default list rather than merging")
 }
 
 func TestLoadConfigRejectsMalformedDenyListEntry(t *testing.T) {
