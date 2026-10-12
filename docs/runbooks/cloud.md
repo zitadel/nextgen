@@ -125,9 +125,12 @@ encoded. The server imports it on the next deploy and skips it afterwards.
 - **Testing a pull request as production** before it merges: point the
   project's production branch (Settings → Environments → Production →
   Branch Tracking) at the pull request's branch, set
-  `CLOUD_PRODUCTION_BRANCH` (Production) to the same branch, and push. Every
-  push then deploys production from that branch, **migrations included**:
-  only test migrations this way that `main` will receive unchanged.
+  `CLOUD_PRODUCTION_BRANCH` (Production) to the same branch, and push a
+  commit that changes a file: the project skips deployments of commits
+  that change nothing ("Skip deployments when there are no changes to the
+  root directory"), so an empty commit deploys nothing. Every push then
+  deploys production from that branch, **migrations included**: only test
+  migrations this way that `main` will receive unchanged.
   Afterwards point the production branch back at `main` and delete
   `CLOUD_PRODUCTION_BRANCH`.
 - **Previews:** every push to a branch, if
