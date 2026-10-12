@@ -288,6 +288,22 @@ project and imports the root admin.
 - **Signing in:** `/ui/console/` with the environment's root admin from
   1Password (production and preview have different passwords). Anyone else
   registers through the login UI.
+- **Build cache:** Vercel keeps one per branch (a branch's first build
+  starts from production's) and restores it before the installs: every
+  `node_modules`, the docs' `.next/cache`, and `.vercel/cache/golang`, the
+  Go toolchain with its module and build caches. Compressed, it must stay
+  under 1.5 GB, the limit of the project's Standard build machines. A
+  bigger one is still created after the deployment, minutes of build
+  machine time, then dropped ("Build cache size … exceeds limit"), and the
+  next build installs every package and compiles the server from scratch.
+  So the services install with
+  [`apps/cloud/install.sh`](../../apps/cloud/install.sh), which leaves out
+  the other platforms' native packages that the workspace installs
+  everywhere else (`supportedArchitectures` in `pnpm-workspace.yaml`). That
+  took the cache from 1.52 GB to 0.86 GB, a little over half of it the Go
+  caches. Go would keep each rebuild's compiled packages for five days, so
+  `build.sh` drops those no build used in the last two hours. Each build
+  log ends with the cache's size: `Uploading build cache [...]`.
 
 ## Later: read replicas in other regions
 
