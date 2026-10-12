@@ -1915,6 +1915,45 @@ describe("api-mock releases and deployments", () => {
     expect(renewedBody.targets[0]?.expires_at).toBe(expiresAgain);
   });
 
+  test("pages the previews list with limit and next_page_token", async () => {
+    const project = await newProject("preview-paging");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const urls = [
+      "https://a-acmeinc.vercel.app",
+      "https://b-acmeinc.vercel.app",
+      "https://c-acmeinc.vercel.app",
+    ];
+    await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: urls,
+      ttl: "168h",
+    });
+
+    const first = (await (
+      await fetch(`${BASE}/previews?project_id=${project.id}&limit=2`)
+    ).json()) as { previews: { origin: string }[]; next_page_token?: string | null };
+    expect(first.previews).toHaveLength(2);
+    const token = first.next_page_token;
+    expect(typeof token).toBe("string");
+
+    const second = (await (
+      await fetch(`${BASE}/previews?project_id=${project.id}&limit=2&page_token=${token}`)
+    ).json()) as { previews: { origin: string }[]; next_page_token?: string | null };
+    expect(second.previews).toHaveLength(1);
+    expect(second.next_page_token ?? null).toBeNull();
+
+    // Every URL appears exactly once across the two pages.
+    const seen = [...first.previews, ...second.previews].map((preview) => preview.origin).sort();
+    expect(seen).toEqual([...urls].sort());
+
+    // A token the mock never minted is rejected, like the real server.
+    const bad = await fetch(`${BASE}/previews?project_id=${project.id}&page_token=not-a-cursor`);
+    expect(bad.status).toBe(400);
+  });
+
   const setVars = (id: string, query: string, payload: object) =>
     fetch(`${BASE}/variables?project_id=${id}${query}`, {
       method: "PATCH",

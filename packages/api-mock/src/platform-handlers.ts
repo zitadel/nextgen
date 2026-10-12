@@ -2168,7 +2168,7 @@ export function setupPlatformHandlers() {
         return query.response;
       }
 
-      const previews = [...store.previews.values()]
+      const live = [...store.previews.values()]
         .filter((preview) => preview.projectId === query.data.project_id && previewIsLive(preview))
         .sort(compareNewestFirst)
         .map((preview) => ({
@@ -2177,11 +2177,20 @@ export function setupPlatformHandlers() {
           created_at: preview.createdAt,
         }));
 
-      // Pagination is specced but, as with the deployments list, the mock
-      // returns the whole set in one page: the CLI reads it in full.
+      // Offset paging, like the schemas list: the opaque real cursor is the next
+      // start index here, a page is `limit` rows from it, and a token the mock
+      // never minted is rejected with req.invalid. `next_page_token` is the next
+      // start when more rows remain, else null.
+      const start = query.data.page_token === undefined ? 0 : Number(query.data.page_token);
+      if (!Number.isInteger(start) || start < 0) {
+        return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
+      }
+      const previews = live.slice(start, start + query.data.limit);
+      const nextPageToken =
+        start + query.data.limit < live.length ? String(start + query.data.limit) : null;
       const out = parse(
         ListPreviewsResponse,
-        { previews, next_page_token: null },
+        { previews, next_page_token: nextPageToken },
         "mock_response_invalid",
       );
       if (!out.ok) {
