@@ -79,74 +79,66 @@ func TestReleaseAccessRow(t *testing.T) {
 	})
 }
 
-// Pins the request contract of POST /releases at the decoder: exactly one of
-// pointers and bundle, and a bundle that refuses unknown keys. A generator or
-// schema change that loosens either fails here rather than reaching the
-// handler.
-func TestCreateReleaseRequestShape(t *testing.T) {
+// Pins the request contract of POST /releases/build at the decoder: a closed
+// bundle with a single branding. A generator or schema change that loosens it
+// fails here rather than reaching the handler.
+func TestBuildReleaseRequestShape(t *testing.T) {
 	t.Parallel()
 
-	accepted := map[string]struct {
-		body string
-		want api.CreateReleaseRequestType
-	}{
-		"pointers": {
-			body: `{"pointers":[{"kind":"schema","revision_id":"sch_1"}]}`,
-			want: api.CreateReleaseFromPointersCreateReleaseRequest,
-		},
-		"bundle": {
-			body: `{"bundle":{"brandings":[{}]}}`,
-			want: api.CreateReleaseFromBundleCreateReleaseRequest,
-		},
-		// Every kind is optional, and a project that never ejected its
-		// branding sends it empty. An empty bundle as a whole is the
-		// server's to refuse, not the decoder's.
-		"bundle with an empty kind": {
-			body: `{"bundle":{"flow_definitions":[],"brandings":[]}}`,
-			want: api.CreateReleaseFromBundleCreateReleaseRequest,
-		},
+	accepted := map[string]string{
+		"branding only": `{"bundle":{"branding":{}}}`,
+		// Every kind is optional, and a kind's array may be empty. An empty
+		// bundle as a whole is the server's to refuse, not the decoder's.
+		"empty kinds": `{"bundle":{"schemas":[],"flow_definitions":[]}}`,
+		"schema url":  `{"bundle":{"schemas":[{"kind":"schema-url","url":"https://acme.example/human.json"}]}}`,
 	}
-	for name, tc := range accepted {
+	for name, body := range accepted {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			req, err := decodeCreateReleaseRequest(tc.body)
+			_, err := decodeBuildReleaseRequest(body)
 			require.NoError(t, err)
-			assert.Equal(t, tc.want, req.Type)
 		})
 	}
 
 	refused := map[string]string{
-		"both":               `{"pointers":[{"kind":"schema","revision_id":"sch_1"}],"bundle":{"brandings":[{}]}}`,
-		"neither":            `{"message":"no content"}`,
+		"no bundle":          `{"message":"no content"}`,
+		"pointers":           `{"pointers":[{"kind":"schema","revision_id":"sch_1"}],"bundle":{"branding":{}}}`,
 		"unknown bundle key": `{"bundle":{"flowDefinitions":[{}]}}`,
-		"empty pointers":     `{"pointers":[]}`,
+		// A project has one branding: an array of them is refused at
+		// decoding, before it can be materialised element by element.
+		"branding as an array": `{"bundle":{"branding":[{},{}]}}`,
 	}
 	for name, body := range refused {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			_, err := decodeCreateReleaseRequest(body)
+			_, err := decodeBuildReleaseRequest(body)
 			assert.Error(t, err)
 		})
 	}
 }
 
-// decodeCreateReleaseRequest runs what the server runs on a request body:
+// decodeBuildReleaseRequest runs what the server runs on a request body:
 // decode, then validate.
-func decodeCreateReleaseRequest(body string) (api.CreateReleaseRequest, error) {
-	var req api.CreateReleaseRequest
+func decodeBuildReleaseRequest(body string) (api.BuildReleaseRequest, error) {
+	var req api.BuildReleaseRequest
 	if err := req.Decode(jx.DecodeStr(body)); err != nil {
 		return req, err
 	}
 	return req, req.Validate()
 }
 
-// The access check runs before the not-implemented stub: an unconfigured
-// handler is stopped by the gate (500) and never reaches the 501 the stub
-// would return, so a caller without the permission never learns the operation
-// is unimplemented. A real authorized caller's 501 is pinned in the
-// integration test.
-func TestRevokeReleaseRunsAccessCheckBeforeStub(t *testing.T) {
+// Pins revoke's answer until the service can revoke: 501, not the 500 the
+// generated stub's sentinel would map to.
+func TestRevokeReleaseNotImplemented(t *testing.T) {
 	_, err := (&Handler{}).RevokeRelease(t.Context(), api.RevokeReleaseParams{})
 	require.Error(t, err)
-	assert.NotEqual(t, http.StatusNotImplemented, errorResponse(err).StatusCode)
+	assert.Equal(t, http.StatusNotImplemented, errorResponse(err).StatusCode)
+}
+
+// Pins build's answer until the service can build: 501, not the 500 the
+// generated stub's sentinel would map to.
+func TestBuildReleaseNotImplemented(t *testing.T) {
+	_, err := (&Handler{}).BuildRelease(t.Context(), &api.BuildReleaseRequest{}, api.BuildReleaseParams{})
+	require.Error(t, err)
+	assert.Equal(t, http.StatusNotImplemented, errorResponse(err).StatusCode)
 }

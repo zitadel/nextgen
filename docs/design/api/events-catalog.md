@@ -159,6 +159,17 @@ every supported deployment; that removal is its own breaking change.
 | `flowdef.deleted` | [#530](https://github.com/zitadel/nextgen/issues/530): no delete endpoint | with retirement under releases ([#536](https://github.com/zitadel/nextgen/issues/536)) |
 | `release.revoked` | revoke is specified but `RevokeRelease` still answers 501, so nothing emits it yet | when the release service can revoke |
 
+## Contracted
+
+Types whose API contract is published before their producer lands. Each has
+a `domain.EventType` constant and an events API schema, so clients can be
+built against it, but nothing emits it yet. A type moves to Path B with its
+producer.
+
+| `event_type` | Payload | Producer |
+|--------------|---------|----------|
+| `release.revoked` | `content_hash` | ReleaseService revoke ([#1574](https://github.com/zitadel/nextgen/issues/1574)) |
+
 ## Deferred
 
 Types planned but not yet emitted by a live producer. Follow-up issues:

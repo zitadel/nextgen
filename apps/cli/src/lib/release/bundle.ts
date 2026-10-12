@@ -7,7 +7,7 @@ import { readJsonDir } from "../json-dir";
 import { SCHEMAS_DIR } from "../user-schema";
 
 /**
- * The resources of `.zitadel/` as `POST /releases` takes them, grouped by
+ * The resources of `.zitadel/` as `POST /releases/build` takes them, grouped by
  * kind: the schemas and flow definitions as authored, and the branding
  * descriptor with its `$file` template inlined. The editor-only `$schema`
  * affordance is stripped from each so it never reaches the wire.
@@ -30,7 +30,7 @@ export type BuiltBundle = {
   brandingSources: Record<string, unknown>[];
 };
 
-/** The most resources a release may pin — the cap `POST /releases` enforces. */
+/** The most resources a release may pin — the cap `POST /releases/build` enforces. */
 const MAX_BUNDLE_RESOURCES = 50;
 
 /** Drop the editor-only `$schema` pointer; the server never echoes it. */

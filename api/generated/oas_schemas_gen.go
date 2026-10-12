@@ -8729,17 +8729,331 @@ func (s *BrandingTypography) SetScale(val OptFloat64) {
 	s.Scale = val
 }
 
-// One bundle resource that failed validation.
+// Merged schema.
+// Ref: #
+type BuildReleaseBadRequest struct {
+	Code ErrorCode `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Merged property.
+	Details OptBuildReleaseBadRequestDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *BuildReleaseBadRequest) GetCode() ErrorCode {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *BuildReleaseBadRequest) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *BuildReleaseBadRequest) GetDetails() OptBuildReleaseBadRequestDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *BuildReleaseBadRequest) SetCode(val ErrorCode) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *BuildReleaseBadRequest) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *BuildReleaseBadRequest) SetDetails(val OptBuildReleaseBadRequestDetails) {
+	s.Details = val
+}
+
+func (*BuildReleaseBadRequest) buildReleaseRes() {}
+
+// Merged schema.
+type BuildReleaseBadRequestDetails struct {
+	// Every bundle resource that failed validation.
+	Resources       []BundleResourceError `json:"resources"`
+	AdditionalProps BuildReleaseBadRequestDetailsAdditional
+}
+
+// GetResources returns the value of Resources.
+func (s *BuildReleaseBadRequestDetails) GetResources() []BundleResourceError {
+	return s.Resources
+}
+
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *BuildReleaseBadRequestDetails) GetAdditionalProps() BuildReleaseBadRequestDetailsAdditional {
+	return s.AdditionalProps
+}
+
+// SetResources sets the value of Resources.
+func (s *BuildReleaseBadRequestDetails) SetResources(val []BundleResourceError) {
+	s.Resources = val
+}
+
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *BuildReleaseBadRequestDetails) SetAdditionalProps(val BuildReleaseBadRequestDetailsAdditional) {
+	s.AdditionalProps = val
+}
+
+type BuildReleaseBadRequestDetailsAdditional map[string]jx.Raw
+
+func (s *BuildReleaseBadRequestDetailsAdditional) init() BuildReleaseBadRequestDetailsAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+type BuildReleaseCreated Release
+
+func (*BuildReleaseCreated) buildReleaseRes() {}
+
+// BuildReleaseErrorResponse represents sum type.
+type BuildReleaseErrorResponse struct {
+	Type             BuildReleaseErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	NotImplemented   NotImplemented
+	ReqInvalid       ReqInvalid
+}
+
+// BuildReleaseErrorResponseType is oneOf type of BuildReleaseErrorResponse.
+type BuildReleaseErrorResponseType string
+
+// Possible values for BuildReleaseErrorResponseType.
+const (
+	AuthUnauthorizedBuildReleaseErrorResponse BuildReleaseErrorResponseType = "auth.unauthorized"
+	InternalBuildReleaseErrorResponse         BuildReleaseErrorResponseType = "internal"
+	NotImplementedBuildReleaseErrorResponse   BuildReleaseErrorResponseType = "not_implemented"
+	ReqInvalidBuildReleaseErrorResponse       BuildReleaseErrorResponseType = "req.invalid"
+)
+
+// IsAuthUnauthorized reports whether BuildReleaseErrorResponse is AuthUnauthorized.
+func (s BuildReleaseErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedBuildReleaseErrorResponse
+}
+
+// IsInternal reports whether BuildReleaseErrorResponse is Internal.
+func (s BuildReleaseErrorResponse) IsInternal() bool {
+	return s.Type == InternalBuildReleaseErrorResponse
+}
+
+// IsNotImplemented reports whether BuildReleaseErrorResponse is NotImplemented.
+func (s BuildReleaseErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedBuildReleaseErrorResponse
+}
+
+// IsReqInvalid reports whether BuildReleaseErrorResponse is ReqInvalid.
+func (s BuildReleaseErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidBuildReleaseErrorResponse
+}
+
+// SetAuthUnauthorized sets BuildReleaseErrorResponse to AuthUnauthorized.
+func (s *BuildReleaseErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedBuildReleaseErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if BuildReleaseErrorResponse is AuthUnauthorized.
+func (s BuildReleaseErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedBuildReleaseErrorResponse(v AuthUnauthorized) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets BuildReleaseErrorResponse to Internal.
+func (s *BuildReleaseErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalBuildReleaseErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if BuildReleaseErrorResponse is Internal.
+func (s BuildReleaseErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from Internal.
+func NewInternalBuildReleaseErrorResponse(v Internal) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets BuildReleaseErrorResponse to NotImplemented.
+func (s *BuildReleaseErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedBuildReleaseErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if BuildReleaseErrorResponse is NotImplemented.
+func (s BuildReleaseErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from NotImplemented.
+func NewNotImplementedBuildReleaseErrorResponse(v NotImplemented) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets BuildReleaseErrorResponse to ReqInvalid.
+func (s *BuildReleaseErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidBuildReleaseErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if BuildReleaseErrorResponse is ReqInvalid.
+func (s BuildReleaseErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from ReqInvalid.
+func NewReqInvalidBuildReleaseErrorResponse(v ReqInvalid) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// BuildReleaseErrorResponseStatusCode wraps BuildReleaseErrorResponse with StatusCode.
+type BuildReleaseErrorResponseStatusCode struct {
+	StatusCode int
+	Response   BuildReleaseErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *BuildReleaseErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *BuildReleaseErrorResponseStatusCode) GetResponse() BuildReleaseErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *BuildReleaseErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *BuildReleaseErrorResponseStatusCode) SetResponse(val BuildReleaseErrorResponse) {
+	s.Response = val
+}
+
+func (*BuildReleaseErrorResponseStatusCode) buildReleaseRes() {}
+
+type BuildReleaseOK Release
+
+func (*BuildReleaseOK) buildReleaseRes() {}
+
+// The resources to build a release from, plus the metadata to record
+// alongside it.
+// `created_at` and `created_by` are derived server-side from the caller's
+// authentication context and are not accepted here.
+// Ref: #
+type BuildReleaseRequest struct {
+	Bundle ConfigurationBundle `json:"bundle"`
+	// A short summary of what the release changes, analogous to a git commit
+	// message. Recorded on the release and shown when listing releases.
+	Message OptString `json:"message"`
+	// The source commit the caller was operating from.
+	GitSha OptString `json:"git_sha"`
+	// Set when the working tree had uncommitted changes, so the release content
+	// does not correspond exactly to `git_sha`.
+	GitDirty OptBool `json:"git_dirty"`
+}
+
+// GetBundle returns the value of Bundle.
+func (s *BuildReleaseRequest) GetBundle() ConfigurationBundle {
+	return s.Bundle
+}
+
+// GetMessage returns the value of Message.
+func (s *BuildReleaseRequest) GetMessage() OptString {
+	return s.Message
+}
+
+// GetGitSha returns the value of GitSha.
+func (s *BuildReleaseRequest) GetGitSha() OptString {
+	return s.GitSha
+}
+
+// GetGitDirty returns the value of GitDirty.
+func (s *BuildReleaseRequest) GetGitDirty() OptBool {
+	return s.GitDirty
+}
+
+// SetBundle sets the value of Bundle.
+func (s *BuildReleaseRequest) SetBundle(val ConfigurationBundle) {
+	s.Bundle = val
+}
+
+// SetMessage sets the value of Message.
+func (s *BuildReleaseRequest) SetMessage(val OptString) {
+	s.Message = val
+}
+
+// SetGitSha sets the value of GitSha.
+func (s *BuildReleaseRequest) SetGitSha(val OptString) {
+	s.GitSha = val
+}
+
+// SetGitDirty sets the value of GitDirty.
+func (s *BuildReleaseRequest) SetGitDirty(val OptBool) {
+	s.GitDirty = val
+}
+
+// Merged schema.
 // Ref: #
 type BundleResourceError struct {
-	Kind ReleasePointerKind `json:"kind"`
-	// The resource's position in its kind's array in the bundle.
+	Code ErrorCode `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptBundleResourceErrorDetails `json:"details"`
+	Kind    ReleasePointerKind            `json:"kind"`
+	// The resource's position in its kind's array in the bundle; `0` for the branding.
 	Index int `json:"index"`
 	// The resource's handle, when it declares one.
 	Handle OptString `json:"handle"`
-	Code   ErrorCode `json:"code"`
-	// What the kind's create endpoint would have answered.
-	Message string `json:"message"`
+}
+
+// GetCode returns the value of Code.
+func (s *BundleResourceError) GetCode() ErrorCode {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *BundleResourceError) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *BundleResourceError) GetDetails() OptBundleResourceErrorDetails {
+	return s.Details
 }
 
 // GetKind returns the value of Kind.
@@ -8757,14 +9071,19 @@ func (s *BundleResourceError) GetHandle() OptString {
 	return s.Handle
 }
 
-// GetCode returns the value of Code.
-func (s *BundleResourceError) GetCode() ErrorCode {
-	return s.Code
+// SetCode sets the value of Code.
+func (s *BundleResourceError) SetCode(val ErrorCode) {
+	s.Code = val
 }
 
-// GetMessage returns the value of Message.
-func (s *BundleResourceError) GetMessage() string {
-	return s.Message
+// SetMessage sets the value of Message.
+func (s *BundleResourceError) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *BundleResourceError) SetDetails(val OptBundleResourceErrorDetails) {
+	s.Details = val
 }
 
 // SetKind sets the value of Kind.
@@ -8782,14 +9101,16 @@ func (s *BundleResourceError) SetHandle(val OptString) {
 	s.Handle = val
 }
 
-// SetCode sets the value of Code.
-func (s *BundleResourceError) SetCode(val ErrorCode) {
-	s.Code = val
-}
+// Additional error-specific context.
+type BundleResourceErrorDetails map[string]jx.Raw
 
-// SetMessage sets the value of Message.
-func (s *BundleResourceError) SetMessage(val string) {
-	s.Message = val
+func (s *BundleResourceErrorDetails) init() BundleResourceErrorDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
 type ChallengeID string
@@ -9830,40 +10151,55 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 }
 
 // The resources of a project's `.zitadel/` directory as authored on disk,
-// grouped by kind. The server turns the bundle into a release in one
-// transaction: for every resource it compares the content against the
-// project's newest revision of the same handle, reuses that revision when the
-// content matches and allocates a new one otherwise. The caller keeps no
-// state.
+// grouped by kind.
 // Resources reference each other by handle: a flow definition's
-// `user_schema` names a schema by its `objectType`. A reference resolves to
+// `user_schema` names a schema by its `objectType`, and a flow step's
+// `sso_providers`, like a schema's `x-auth-methods.sso.providers`, name IDP
+// connections by `slug`. A reference resolves to
 // the resource with that handle in this bundle; failing that, to the
 // project's newest revision of it, which the release then pins as well. A
 // handle that neither holds refuses the release, naming the pointer and the
 // handle. A bundle that references only resources it carries builds the
 // same release on any project.
-// Each kind is optional and may be empty: a project that never ejected its
-// branding sends none. Across all kinds the bundle carries at least one
-// resource and at most 50, the most a release pins; the server refuses
-// anything outside that with `rel.invalid`. Unknown keys are refused. More
-// kinds join as they become release kinds.
-// Each resource is validated as its kind's create endpoint validates it,
-// and every failing resource is reported in one `rel.invalid`. Sending a
-// resource needs that kind's write scope, as creating it directly does.
+// A handle names one resource of its kind in a bundle. Two schemas with the
+// same `objectType`, two flow definitions with the same `name`, two IDP
+// connections with the same `slug`, or a schema without an `objectType`
+// refuse the release with `rel.invalid`, with an
+// entry for each such resource.
+// Each kind is optional, and the arrays may be empty: a project that never
+// ejected its branding omits `branding`. The bundle carries at least one
+// resource, and the release it builds pins at most 50, the most a release
+// pins: the resources the bundle carries plus those resolved from the
+// project. The server refuses anything outside that with `rel.invalid`.
+// Unknown keys are refused. More kinds join as they become release kinds.
 // Ref: #
 type ConfigurationBundle struct {
-	// User schemas, one per `.zitadel/schemas/*.json`.
-	Schemas []UserSchema `json:"schemas"`
+	// User schemas, one per `.zitadel/schemas/*.json`, in either form
+	// `POST /schemas` takes.
+	// An inline `user-schema` must not declare `$id`: a schema's `$id` is
+	// its revision's identity, so a changed schema under the same `$id`
+	// could never become a new revision. Such a schema gets a `rel.invalid`
+	// entry.
+	// A `schema-url` entry's handle is the `objectType` of the document the
+	// URL serves. Its revision is identified by the URL, so the release
+	// reuses the project's revision for a URL the project already holds and
+	// fetches the document only for a URL it does not.
+	Schemas []ConfigurationBundleSchemasItem `json:"schemas"`
 	// Flow definitions, one per `.zitadel/flows/*.json`.
 	FlowDefinitions []FlowDefinition `json:"flow_definitions"`
+	// IDP connections, one per `.zitadel/idps/<slug>.json`, each the
+	// connection document `POST /idps` takes as `idp`. Secrets appear only
+	// as `${{ NAME }}` references to variables, never as values, so a bundle
+	// carries no credentials.
+	Idps []IdpConnection `json:"idps"`
 	// The descriptor from `.zitadel/branding/branding.json` with its template
 	// inlined, exactly as `POST /branding` takes it. A project has one
-	// branding, so at most one entry.
-	Brandings []Branding `json:"brandings"`
+	// branding, so this is a single object.
+	Branding OptBranding `json:"branding"`
 }
 
 // GetSchemas returns the value of Schemas.
-func (s *ConfigurationBundle) GetSchemas() []UserSchema {
+func (s *ConfigurationBundle) GetSchemas() []ConfigurationBundleSchemasItem {
 	return s.Schemas
 }
 
@@ -9872,13 +10208,18 @@ func (s *ConfigurationBundle) GetFlowDefinitions() []FlowDefinition {
 	return s.FlowDefinitions
 }
 
-// GetBrandings returns the value of Brandings.
-func (s *ConfigurationBundle) GetBrandings() []Branding {
-	return s.Brandings
+// GetIdps returns the value of Idps.
+func (s *ConfigurationBundle) GetIdps() []IdpConnection {
+	return s.Idps
+}
+
+// GetBranding returns the value of Branding.
+func (s *ConfigurationBundle) GetBranding() OptBranding {
+	return s.Branding
 }
 
 // SetSchemas sets the value of Schemas.
-func (s *ConfigurationBundle) SetSchemas(val []UserSchema) {
+func (s *ConfigurationBundle) SetSchemas(val []ConfigurationBundleSchemasItem) {
 	s.Schemas = val
 }
 
@@ -9887,9 +10228,82 @@ func (s *ConfigurationBundle) SetFlowDefinitions(val []FlowDefinition) {
 	s.FlowDefinitions = val
 }
 
-// SetBrandings sets the value of Brandings.
-func (s *ConfigurationBundle) SetBrandings(val []Branding) {
-	s.Brandings = val
+// SetIdps sets the value of Idps.
+func (s *ConfigurationBundle) SetIdps(val []IdpConnection) {
+	s.Idps = val
+}
+
+// SetBranding sets the value of Branding.
+func (s *ConfigurationBundle) SetBranding(val OptBranding) {
+	s.Branding = val
+}
+
+// ConfigurationBundleSchemasItem represents sum type.
+type ConfigurationBundleSchemasItem struct {
+	Type       ConfigurationBundleSchemasItemType // switch on this field
+	UserSchema UserSchema
+	SchemaURL  SchemaURL
+}
+
+// ConfigurationBundleSchemasItemType is oneOf type of ConfigurationBundleSchemasItem.
+type ConfigurationBundleSchemasItemType string
+
+// Possible values for ConfigurationBundleSchemasItemType.
+const (
+	UserSchemaConfigurationBundleSchemasItem ConfigurationBundleSchemasItemType = "user-schema"
+	SchemaURLConfigurationBundleSchemasItem  ConfigurationBundleSchemasItemType = "schema-url"
+)
+
+// IsUserSchema reports whether ConfigurationBundleSchemasItem is UserSchema.
+func (s ConfigurationBundleSchemasItem) IsUserSchema() bool {
+	return s.Type == UserSchemaConfigurationBundleSchemasItem
+}
+
+// IsSchemaURL reports whether ConfigurationBundleSchemasItem is SchemaURL.
+func (s ConfigurationBundleSchemasItem) IsSchemaURL() bool {
+	return s.Type == SchemaURLConfigurationBundleSchemasItem
+}
+
+// SetUserSchema sets ConfigurationBundleSchemasItem to UserSchema.
+func (s *ConfigurationBundleSchemasItem) SetUserSchema(v UserSchema) {
+	s.Type = UserSchemaConfigurationBundleSchemasItem
+	s.UserSchema = v
+}
+
+// GetUserSchema returns UserSchema and true boolean if ConfigurationBundleSchemasItem is UserSchema.
+func (s ConfigurationBundleSchemasItem) GetUserSchema() (v UserSchema, ok bool) {
+	if !s.IsUserSchema() {
+		return v, false
+	}
+	return s.UserSchema, true
+}
+
+// NewUserSchemaConfigurationBundleSchemasItem returns new ConfigurationBundleSchemasItem from UserSchema.
+func NewUserSchemaConfigurationBundleSchemasItem(v UserSchema) ConfigurationBundleSchemasItem {
+	var s ConfigurationBundleSchemasItem
+	s.SetUserSchema(v)
+	return s
+}
+
+// SetSchemaURL sets ConfigurationBundleSchemasItem to SchemaURL.
+func (s *ConfigurationBundleSchemasItem) SetSchemaURL(v SchemaURL) {
+	s.Type = SchemaURLConfigurationBundleSchemasItem
+	s.SchemaURL = v
+}
+
+// GetSchemaURL returns SchemaURL and true boolean if ConfigurationBundleSchemasItem is SchemaURL.
+func (s ConfigurationBundleSchemasItem) GetSchemaURL() (v SchemaURL, ok bool) {
+	if !s.IsSchemaURL() {
+		return v, false
+	}
+	return s.SchemaURL, true
+}
+
+// NewSchemaURLConfigurationBundleSchemasItem returns new ConfigurationBundleSchemasItem from SchemaURL.
+func NewSchemaURLConfigurationBundleSchemasItem(v SchemaURL) ConfigurationBundleSchemasItem {
+	var s ConfigurationBundleSchemasItem
+	s.SetSchemaURL(v)
+	return s
 }
 
 // CreateAuthAttemptErrorResponse represents sum type.
@@ -13108,89 +13522,6 @@ func (s *CreateProjectResponse) SetCreatedAt(val time.Time) {
 
 func (*CreateProjectResponse) createProjectRes() {}
 
-// The request cannot build a release. `code` says why; for a bundle whose
-// resources fail validation it is `rel.invalid`, and `details.resources`
-// lists every resource that failed.
-// Ref: #
-type CreateReleaseBadRequest struct {
-	Code ErrorCode `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptCreateReleaseBadRequestDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *CreateReleaseBadRequest) GetCode() ErrorCode {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *CreateReleaseBadRequest) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *CreateReleaseBadRequest) GetDetails() OptCreateReleaseBadRequestDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *CreateReleaseBadRequest) SetCode(val ErrorCode) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *CreateReleaseBadRequest) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *CreateReleaseBadRequest) SetDetails(val OptCreateReleaseBadRequestDetails) {
-	s.Details = val
-}
-
-func (*CreateReleaseBadRequest) createReleaseRes() {}
-
-// Additional error-specific context.
-type CreateReleaseBadRequestDetails struct {
-	// Every bundle resource that failed validation, each with the code
-	// and message its kind's create endpoint would have answered.
-	Resources       []BundleResourceError `json:"resources"`
-	AdditionalProps CreateReleaseBadRequestDetailsAdditional
-}
-
-// GetResources returns the value of Resources.
-func (s *CreateReleaseBadRequestDetails) GetResources() []BundleResourceError {
-	return s.Resources
-}
-
-// GetAdditionalProps returns the value of AdditionalProps.
-func (s *CreateReleaseBadRequestDetails) GetAdditionalProps() CreateReleaseBadRequestDetailsAdditional {
-	return s.AdditionalProps
-}
-
-// SetResources sets the value of Resources.
-func (s *CreateReleaseBadRequestDetails) SetResources(val []BundleResourceError) {
-	s.Resources = val
-}
-
-// SetAdditionalProps sets the value of AdditionalProps.
-func (s *CreateReleaseBadRequestDetails) SetAdditionalProps(val CreateReleaseBadRequestDetailsAdditional) {
-	s.AdditionalProps = val
-}
-
-type CreateReleaseBadRequestDetailsAdditional map[string]jx.Raw
-
-func (s *CreateReleaseBadRequestDetailsAdditional) init() CreateReleaseBadRequestDetailsAdditional {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 type CreateReleaseCreated Release
 
 func (*CreateReleaseCreated) createReleaseRes() {}
@@ -13515,128 +13846,6 @@ func (s *CreateReleaseErrorResponseStatusCode) SetResponse(val CreateReleaseErro
 
 func (*CreateReleaseErrorResponseStatusCode) createReleaseRes() {}
 
-// A release built from the resources as authored on disk. Carries no
-// `pointers`.
-// Ref: #
-type CreateReleaseFromBundle struct {
-	Bundle ConfigurationBundle `json:"bundle"`
-	// A short summary of what the release changes, analogous to a git commit
-	// message. Recorded on the release and shown when listing releases.
-	Message OptString `json:"message"`
-	// The source commit the caller was operating from.
-	GitSha OptString `json:"git_sha"`
-	// Set when the working tree had uncommitted changes, so the release content
-	// does not correspond exactly to `git_sha`.
-	GitDirty OptBool `json:"git_dirty"`
-}
-
-// GetBundle returns the value of Bundle.
-func (s *CreateReleaseFromBundle) GetBundle() ConfigurationBundle {
-	return s.Bundle
-}
-
-// GetMessage returns the value of Message.
-func (s *CreateReleaseFromBundle) GetMessage() OptString {
-	return s.Message
-}
-
-// GetGitSha returns the value of GitSha.
-func (s *CreateReleaseFromBundle) GetGitSha() OptString {
-	return s.GitSha
-}
-
-// GetGitDirty returns the value of GitDirty.
-func (s *CreateReleaseFromBundle) GetGitDirty() OptBool {
-	return s.GitDirty
-}
-
-// SetBundle sets the value of Bundle.
-func (s *CreateReleaseFromBundle) SetBundle(val ConfigurationBundle) {
-	s.Bundle = val
-}
-
-// SetMessage sets the value of Message.
-func (s *CreateReleaseFromBundle) SetMessage(val OptString) {
-	s.Message = val
-}
-
-// SetGitSha sets the value of GitSha.
-func (s *CreateReleaseFromBundle) SetGitSha(val OptString) {
-	s.GitSha = val
-}
-
-// SetGitDirty sets the value of GitDirty.
-func (s *CreateReleaseFromBundle) SetGitDirty(val OptBool) {
-	s.GitDirty = val
-}
-
-// A release pinning revisions that already exist. Carries no `bundle`.
-// Ref: #
-type CreateReleaseFromPointers struct {
-	// The revisions to pin. Must not be empty.
-	// A kind usually appears more than once: a project has several user schemas
-	// and several flow definitions, and each is pinned on its own. What it
-	// cannot do is
-	// pin two revisions of the *same* resource — a second revision of the
-	// `human-user` schema is rejected rather than ordered, since a release
-	// describes one state of the project.
-	// The upper bound counts *resources*, not revisions — one release pins at
-	// most one revision of each — so it is a limit on how much a project
-	// configures, not on how often it changes. It keeps the server's
-	// per-pointer revision lookups bounded by the contract rather than by the
-	// request, and is set conservatively: raising it is a spec change, and
-	// widening a bound breaks no client that was already inside it.
-	Pointers []CreateReleasePointer `json:"pointers"`
-	// A short summary of what the release changes, analogous to a git commit
-	// message. Recorded on the release and shown when listing releases.
-	Message OptString `json:"message"`
-	// The source commit the caller was operating from.
-	GitSha OptString `json:"git_sha"`
-	// Set when the working tree had uncommitted changes, so the release content
-	// does not correspond exactly to `git_sha`.
-	GitDirty OptBool `json:"git_dirty"`
-}
-
-// GetPointers returns the value of Pointers.
-func (s *CreateReleaseFromPointers) GetPointers() []CreateReleasePointer {
-	return s.Pointers
-}
-
-// GetMessage returns the value of Message.
-func (s *CreateReleaseFromPointers) GetMessage() OptString {
-	return s.Message
-}
-
-// GetGitSha returns the value of GitSha.
-func (s *CreateReleaseFromPointers) GetGitSha() OptString {
-	return s.GitSha
-}
-
-// GetGitDirty returns the value of GitDirty.
-func (s *CreateReleaseFromPointers) GetGitDirty() OptBool {
-	return s.GitDirty
-}
-
-// SetPointers sets the value of Pointers.
-func (s *CreateReleaseFromPointers) SetPointers(val []CreateReleasePointer) {
-	s.Pointers = val
-}
-
-// SetMessage sets the value of Message.
-func (s *CreateReleaseFromPointers) SetMessage(val OptString) {
-	s.Message = val
-}
-
-// SetGitSha sets the value of GitSha.
-func (s *CreateReleaseFromPointers) SetGitSha(val OptString) {
-	s.GitSha = val
-}
-
-// SetGitDirty sets the value of GitDirty.
-func (s *CreateReleaseFromPointers) SetGitDirty(val OptBool) {
-	s.GitDirty = val
-}
-
 type CreateReleaseOK Release
 
 func (*CreateReleaseOK) createReleaseRes() {}
@@ -13675,85 +13884,74 @@ func (s *CreateReleasePointer) SetRevisionID(val string) {
 	s.RevisionID = val
 }
 
-// What goes into the release, plus the metadata to record alongside it.
-// Exactly one of two forms: `pointers` or `bundle`, never both and never
-// neither.
-// `pointers` names revisions that already exist, as `(kind, revision_id)`
-// pairs; nothing is allocated. `bundle` carries the resources as authored on
-// disk; the server reuses the project's newest revision of each handle when
-// the content matches and allocates a new revision otherwise. Either way the
-// result is a release pinning one revision per resource, and the same
-// closure rule applies: every handle a pinned resource references must be
-// pinned by the same release.
+// The set of revisions to bundle into a release, plus the metadata to record
+// alongside it.
 // `created_at` and `created_by` are derived server-side from the caller's
 // authentication context and are not accepted here.
 // Ref: #
-// CreateReleaseRequest represents sum type.
 type CreateReleaseRequest struct {
-	Type                      CreateReleaseRequestType // switch on this field
-	CreateReleaseFromPointers CreateReleaseFromPointers
-	CreateReleaseFromBundle   CreateReleaseFromBundle
+	// The revisions to pin. Must not be empty.
+	// A kind usually appears more than once: a project has several user schemas
+	// and several flow definitions, and each is pinned on its own. What it
+	// cannot do is
+	// pin two revisions of the *same* resource — a second revision of the
+	// `human-user` schema is rejected rather than ordered, since a release
+	// describes one state of the project.
+	// The upper bound counts *resources*, not revisions — one release pins at
+	// most one revision of each — so it is a limit on how much a project
+	// configures, not on how often it changes. It keeps the server's
+	// per-pointer revision lookups bounded by the contract rather than by the
+	// request, and is set conservatively: raising it is a spec change, and
+	// widening a bound breaks no client that was already inside it.
+	Pointers []CreateReleasePointer `json:"pointers"`
+	// A short summary of what the release changes, analogous to a git commit
+	// message. Recorded on the release and shown when listing releases.
+	Message OptString `json:"message"`
+	// The source commit the caller was operating from.
+	GitSha OptString `json:"git_sha"`
+	// Set when the working tree had uncommitted changes, so the release content
+	// does not correspond exactly to `git_sha`.
+	GitDirty OptBool `json:"git_dirty"`
 }
 
-// CreateReleaseRequestType is oneOf type of CreateReleaseRequest.
-type CreateReleaseRequestType string
-
-// Possible values for CreateReleaseRequestType.
-const (
-	CreateReleaseFromPointersCreateReleaseRequest CreateReleaseRequestType = "CreateReleaseFromPointers"
-	CreateReleaseFromBundleCreateReleaseRequest   CreateReleaseRequestType = "CreateReleaseFromBundle"
-)
-
-// IsCreateReleaseFromPointers reports whether CreateReleaseRequest is CreateReleaseFromPointers.
-func (s CreateReleaseRequest) IsCreateReleaseFromPointers() bool {
-	return s.Type == CreateReleaseFromPointersCreateReleaseRequest
+// GetPointers returns the value of Pointers.
+func (s *CreateReleaseRequest) GetPointers() []CreateReleasePointer {
+	return s.Pointers
 }
 
-// IsCreateReleaseFromBundle reports whether CreateReleaseRequest is CreateReleaseFromBundle.
-func (s CreateReleaseRequest) IsCreateReleaseFromBundle() bool {
-	return s.Type == CreateReleaseFromBundleCreateReleaseRequest
+// GetMessage returns the value of Message.
+func (s *CreateReleaseRequest) GetMessage() OptString {
+	return s.Message
 }
 
-// SetCreateReleaseFromPointers sets CreateReleaseRequest to CreateReleaseFromPointers.
-func (s *CreateReleaseRequest) SetCreateReleaseFromPointers(v CreateReleaseFromPointers) {
-	s.Type = CreateReleaseFromPointersCreateReleaseRequest
-	s.CreateReleaseFromPointers = v
+// GetGitSha returns the value of GitSha.
+func (s *CreateReleaseRequest) GetGitSha() OptString {
+	return s.GitSha
 }
 
-// GetCreateReleaseFromPointers returns CreateReleaseFromPointers and true boolean if CreateReleaseRequest is CreateReleaseFromPointers.
-func (s CreateReleaseRequest) GetCreateReleaseFromPointers() (v CreateReleaseFromPointers, ok bool) {
-	if !s.IsCreateReleaseFromPointers() {
-		return v, false
-	}
-	return s.CreateReleaseFromPointers, true
+// GetGitDirty returns the value of GitDirty.
+func (s *CreateReleaseRequest) GetGitDirty() OptBool {
+	return s.GitDirty
 }
 
-// NewCreateReleaseFromPointersCreateReleaseRequest returns new CreateReleaseRequest from CreateReleaseFromPointers.
-func NewCreateReleaseFromPointersCreateReleaseRequest(v CreateReleaseFromPointers) CreateReleaseRequest {
-	var s CreateReleaseRequest
-	s.SetCreateReleaseFromPointers(v)
-	return s
+// SetPointers sets the value of Pointers.
+func (s *CreateReleaseRequest) SetPointers(val []CreateReleasePointer) {
+	s.Pointers = val
 }
 
-// SetCreateReleaseFromBundle sets CreateReleaseRequest to CreateReleaseFromBundle.
-func (s *CreateReleaseRequest) SetCreateReleaseFromBundle(v CreateReleaseFromBundle) {
-	s.Type = CreateReleaseFromBundleCreateReleaseRequest
-	s.CreateReleaseFromBundle = v
+// SetMessage sets the value of Message.
+func (s *CreateReleaseRequest) SetMessage(val OptString) {
+	s.Message = val
 }
 
-// GetCreateReleaseFromBundle returns CreateReleaseFromBundle and true boolean if CreateReleaseRequest is CreateReleaseFromBundle.
-func (s CreateReleaseRequest) GetCreateReleaseFromBundle() (v CreateReleaseFromBundle, ok bool) {
-	if !s.IsCreateReleaseFromBundle() {
-		return v, false
-	}
-	return s.CreateReleaseFromBundle, true
+// SetGitSha sets the value of GitSha.
+func (s *CreateReleaseRequest) SetGitSha(val OptString) {
+	s.GitSha = val
 }
 
-// NewCreateReleaseFromBundleCreateReleaseRequest returns new CreateReleaseRequest from CreateReleaseFromBundle.
-func NewCreateReleaseFromBundleCreateReleaseRequest(v CreateReleaseFromBundle) CreateReleaseRequest {
-	var s CreateReleaseRequest
-	s.SetCreateReleaseFromBundle(v)
-	return s
+// SetGitDirty sets the value of GitDirty.
+func (s *CreateReleaseRequest) SetGitDirty(val OptBool) {
+	s.GitDirty = val
 }
 
 // CreateSchemaErrorResponse represents sum type.
@@ -36842,6 +37040,98 @@ func (o OptBrandingTypography) Or(d BrandingTypography) BrandingTypography {
 	return d
 }
 
+// NewOptBuildReleaseBadRequestDetails returns new OptBuildReleaseBadRequestDetails with value set to v.
+func NewOptBuildReleaseBadRequestDetails(v BuildReleaseBadRequestDetails) OptBuildReleaseBadRequestDetails {
+	return OptBuildReleaseBadRequestDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBuildReleaseBadRequestDetails is optional BuildReleaseBadRequestDetails.
+type OptBuildReleaseBadRequestDetails struct {
+	Value BuildReleaseBadRequestDetails
+	Set   bool
+}
+
+// IsSet returns true if OptBuildReleaseBadRequestDetails was set.
+func (o OptBuildReleaseBadRequestDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBuildReleaseBadRequestDetails) Reset() {
+	var v BuildReleaseBadRequestDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBuildReleaseBadRequestDetails) SetTo(v BuildReleaseBadRequestDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBuildReleaseBadRequestDetails) Get() (v BuildReleaseBadRequestDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBuildReleaseBadRequestDetails) Or(d BuildReleaseBadRequestDetails) BuildReleaseBadRequestDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptBundleResourceErrorDetails returns new OptBundleResourceErrorDetails with value set to v.
+func NewOptBundleResourceErrorDetails(v BundleResourceErrorDetails) OptBundleResourceErrorDetails {
+	return OptBundleResourceErrorDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBundleResourceErrorDetails is optional BundleResourceErrorDetails.
+type OptBundleResourceErrorDetails struct {
+	Value BundleResourceErrorDetails
+	Set   bool
+}
+
+// IsSet returns true if OptBundleResourceErrorDetails was set.
+func (o OptBundleResourceErrorDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBundleResourceErrorDetails) Reset() {
+	var v BundleResourceErrorDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBundleResourceErrorDetails) SetTo(v BundleResourceErrorDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBundleResourceErrorDetails) Get() (v BundleResourceErrorDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBundleResourceErrorDetails) Or(d BundleResourceErrorDetails) BundleResourceErrorDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptChallengeNonce returns new OptChallengeNonce with value set to v.
 func NewOptChallengeNonce(v ChallengeNonce) OptChallengeNonce {
 	return OptChallengeNonce{
@@ -37066,52 +37356,6 @@ func (o OptCompletedFactorPayload) Get() (v CompletedFactorPayload, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptCompletedFactorPayload) Or(d CompletedFactorPayload) CompletedFactorPayload {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptCreateReleaseBadRequestDetails returns new OptCreateReleaseBadRequestDetails with value set to v.
-func NewOptCreateReleaseBadRequestDetails(v CreateReleaseBadRequestDetails) OptCreateReleaseBadRequestDetails {
-	return OptCreateReleaseBadRequestDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptCreateReleaseBadRequestDetails is optional CreateReleaseBadRequestDetails.
-type OptCreateReleaseBadRequestDetails struct {
-	Value CreateReleaseBadRequestDetails
-	Set   bool
-}
-
-// IsSet returns true if OptCreateReleaseBadRequestDetails was set.
-func (o OptCreateReleaseBadRequestDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptCreateReleaseBadRequestDetails) Reset() {
-	var v CreateReleaseBadRequestDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptCreateReleaseBadRequestDetails) SetTo(v CreateReleaseBadRequestDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptCreateReleaseBadRequestDetails) Get() (v CreateReleaseBadRequestDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptCreateReleaseBadRequestDetails) Or(d CreateReleaseBadRequestDetails) CreateReleaseBadRequestDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -56894,6 +57138,8 @@ type ReleasePointer struct {
 	// - `branding` — always `default`. A project has one branding, so there is
 	// nothing to distinguish; it is revisioned like everything else, and
 	// `revision_id` is what varies between releases.
+	// - `idp` — the connection's `slug`, so `google` and `github` are
+	// separate resources a release pins separately
 	// Resources inside a release reference each other by handle rather than by
 	// revision id, so the same handle names the same resource in every release.
 	Handle string `json:"handle"`
@@ -56947,6 +57193,7 @@ const (
 	ReleasePointerKindSchema         ReleasePointerKind = "schema"
 	ReleasePointerKindFlowDefinition ReleasePointerKind = "flow_definition"
 	ReleasePointerKindBranding       ReleasePointerKind = "branding"
+	ReleasePointerKindIdp            ReleasePointerKind = "idp"
 )
 
 // AllValues returns all ReleasePointerKind values.
@@ -56955,6 +57202,7 @@ func (ReleasePointerKind) AllValues() []ReleasePointerKind {
 		ReleasePointerKindSchema,
 		ReleasePointerKindFlowDefinition,
 		ReleasePointerKindBranding,
+		ReleasePointerKindIdp,
 	}
 }
 
@@ -56966,6 +57214,8 @@ func (s ReleasePointerKind) MarshalText() ([]byte, error) {
 	case ReleasePointerKindFlowDefinition:
 		return []byte(s), nil
 	case ReleasePointerKindBranding:
+		return []byte(s), nil
+	case ReleasePointerKindIdp:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -56983,6 +57233,9 @@ func (s *ReleasePointerKind) UnmarshalText(data []byte) error {
 		return nil
 	case ReleasePointerKindBranding:
 		*s = ReleasePointerKindBranding
+		return nil
+	case ReleasePointerKindIdp:
+		*s = ReleasePointerKindIdp
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -58608,14 +58861,11 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) SetDeploymentID(val Deployment
 
 // RevokeReleaseErrorResponse represents sum type.
 type RevokeReleaseErrorResponse struct {
-	Type                RevokeReleaseErrorResponseType // switch on this field
-	AuthUnauthorized    AuthUnauthorized
-	Internal            Internal
-	NotImplemented      NotImplemented
-	RelNotFound         RelNotFound
-	RelPermissionDenied RelPermissionDenied
-	RelProjectNotFound  RelProjectNotFound
-	ReqInvalid          ReqInvalid
+	Type             RevokeReleaseErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	NotImplemented   NotImplemented
+	ReqInvalid       ReqInvalid
 }
 
 // RevokeReleaseErrorResponseType is oneOf type of RevokeReleaseErrorResponse.
@@ -58623,13 +58873,10 @@ type RevokeReleaseErrorResponseType string
 
 // Possible values for RevokeReleaseErrorResponseType.
 const (
-	AuthUnauthorizedRevokeReleaseErrorResponse    RevokeReleaseErrorResponseType = "auth.unauthorized"
-	InternalRevokeReleaseErrorResponse            RevokeReleaseErrorResponseType = "internal"
-	NotImplementedRevokeReleaseErrorResponse      RevokeReleaseErrorResponseType = "not_implemented"
-	RelNotFoundRevokeReleaseErrorResponse         RevokeReleaseErrorResponseType = "rel.not_found"
-	RelPermissionDeniedRevokeReleaseErrorResponse RevokeReleaseErrorResponseType = "rel.permission_denied"
-	RelProjectNotFoundRevokeReleaseErrorResponse  RevokeReleaseErrorResponseType = "rel.project_not_found"
-	ReqInvalidRevokeReleaseErrorResponse          RevokeReleaseErrorResponseType = "req.invalid"
+	AuthUnauthorizedRevokeReleaseErrorResponse RevokeReleaseErrorResponseType = "auth.unauthorized"
+	InternalRevokeReleaseErrorResponse         RevokeReleaseErrorResponseType = "internal"
+	NotImplementedRevokeReleaseErrorResponse   RevokeReleaseErrorResponseType = "not_implemented"
+	ReqInvalidRevokeReleaseErrorResponse       RevokeReleaseErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether RevokeReleaseErrorResponse is AuthUnauthorized.
@@ -58645,21 +58892,6 @@ func (s RevokeReleaseErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether RevokeReleaseErrorResponse is NotImplemented.
 func (s RevokeReleaseErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedRevokeReleaseErrorResponse
-}
-
-// IsRelNotFound reports whether RevokeReleaseErrorResponse is RelNotFound.
-func (s RevokeReleaseErrorResponse) IsRelNotFound() bool {
-	return s.Type == RelNotFoundRevokeReleaseErrorResponse
-}
-
-// IsRelPermissionDenied reports whether RevokeReleaseErrorResponse is RelPermissionDenied.
-func (s RevokeReleaseErrorResponse) IsRelPermissionDenied() bool {
-	return s.Type == RelPermissionDeniedRevokeReleaseErrorResponse
-}
-
-// IsRelProjectNotFound reports whether RevokeReleaseErrorResponse is RelProjectNotFound.
-func (s RevokeReleaseErrorResponse) IsRelProjectNotFound() bool {
-	return s.Type == RelProjectNotFoundRevokeReleaseErrorResponse
 }
 
 // IsReqInvalid reports whether RevokeReleaseErrorResponse is ReqInvalid.
@@ -58727,69 +58959,6 @@ func (s RevokeReleaseErrorResponse) GetNotImplemented() (v NotImplemented, ok bo
 func NewNotImplementedRevokeReleaseErrorResponse(v NotImplemented) RevokeReleaseErrorResponse {
 	var s RevokeReleaseErrorResponse
 	s.SetNotImplemented(v)
-	return s
-}
-
-// SetRelNotFound sets RevokeReleaseErrorResponse to RelNotFound.
-func (s *RevokeReleaseErrorResponse) SetRelNotFound(v RelNotFound) {
-	s.Type = RelNotFoundRevokeReleaseErrorResponse
-	s.RelNotFound = v
-}
-
-// GetRelNotFound returns RelNotFound and true boolean if RevokeReleaseErrorResponse is RelNotFound.
-func (s RevokeReleaseErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
-	if !s.IsRelNotFound() {
-		return v, false
-	}
-	return s.RelNotFound, true
-}
-
-// NewRelNotFoundRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from RelNotFound.
-func NewRelNotFoundRevokeReleaseErrorResponse(v RelNotFound) RevokeReleaseErrorResponse {
-	var s RevokeReleaseErrorResponse
-	s.SetRelNotFound(v)
-	return s
-}
-
-// SetRelPermissionDenied sets RevokeReleaseErrorResponse to RelPermissionDenied.
-func (s *RevokeReleaseErrorResponse) SetRelPermissionDenied(v RelPermissionDenied) {
-	s.Type = RelPermissionDeniedRevokeReleaseErrorResponse
-	s.RelPermissionDenied = v
-}
-
-// GetRelPermissionDenied returns RelPermissionDenied and true boolean if RevokeReleaseErrorResponse is RelPermissionDenied.
-func (s RevokeReleaseErrorResponse) GetRelPermissionDenied() (v RelPermissionDenied, ok bool) {
-	if !s.IsRelPermissionDenied() {
-		return v, false
-	}
-	return s.RelPermissionDenied, true
-}
-
-// NewRelPermissionDeniedRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from RelPermissionDenied.
-func NewRelPermissionDeniedRevokeReleaseErrorResponse(v RelPermissionDenied) RevokeReleaseErrorResponse {
-	var s RevokeReleaseErrorResponse
-	s.SetRelPermissionDenied(v)
-	return s
-}
-
-// SetRelProjectNotFound sets RevokeReleaseErrorResponse to RelProjectNotFound.
-func (s *RevokeReleaseErrorResponse) SetRelProjectNotFound(v RelProjectNotFound) {
-	s.Type = RelProjectNotFoundRevokeReleaseErrorResponse
-	s.RelProjectNotFound = v
-}
-
-// GetRelProjectNotFound returns RelProjectNotFound and true boolean if RevokeReleaseErrorResponse is RelProjectNotFound.
-func (s RevokeReleaseErrorResponse) GetRelProjectNotFound() (v RelProjectNotFound, ok bool) {
-	if !s.IsRelProjectNotFound() {
-		return v, false
-	}
-	return s.RelProjectNotFound, true
-}
-
-// NewRelProjectNotFoundRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from RelProjectNotFound.
-func NewRelProjectNotFoundRevokeReleaseErrorResponse(v RelProjectNotFound) RevokeReleaseErrorResponse {
-	var s RevokeReleaseErrorResponse
-	s.SetRelProjectNotFound(v)
 	return s
 }
 
