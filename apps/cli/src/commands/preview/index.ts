@@ -75,7 +75,9 @@ export default class Preview extends PreviewCommand {
       urls = [...detected.urls];
     }
 
-    const ttl = parseTtl(flags.ttl);
+    // `--ttl` is optional: omitted, nothing is sent and the server applies the
+    // project's default, rather than the CLI pinning a lifetime of its own.
+    const ttl = flags.ttl === undefined ? undefined : parseTtl(flags.ttl);
     const { client, projectId } = await this.connect();
 
     const { bundle, brandingSources } = await buildBundle(cwd);
@@ -103,7 +105,7 @@ export default class Preview extends PreviewCommand {
     const deployment = await createDeployment(client, projectId, {
       releaseId: release.id,
       targets: urls,
-      ttl: ttl.wire,
+      ...(ttl === undefined ? {} : { ttl: ttl.wire }),
     });
 
     const previews = deployment.targets.map((target) => ({

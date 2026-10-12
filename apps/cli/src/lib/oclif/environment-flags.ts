@@ -31,7 +31,7 @@ export const previewFlags = {
     multiple: true,
   }),
   ttl: nonBlankString({
-    description: "How long each preview stays live, e.g. 7d, 12h or 90m. Between 60s and 30d.",
-    default: "7d",
+    description:
+      "How long each preview stays live, e.g. 7d, 12h or 90m. Between 60s and 30d. Omitted, the project's default applies.",
   }),
 };

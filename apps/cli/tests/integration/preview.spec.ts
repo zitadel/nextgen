@@ -70,6 +70,22 @@ describe("preview", () => {
         ).toEqual([PREVIEW_URL]);
       });
 
+      it("defaults the ttl the server applies when --ttl is omitted", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+
+        expect(result).toSucceed();
+        // Omitting --ttl leaves it to the server default, which still gives the
+        // written preview a future expiry.
+        const data = app.envelopeOf<{ previews: { expires_at: string | null }[] }>(result).data;
+        expect(data.previews[0]?.expires_at).not.toBeNull();
+        expect(new Date(data.previews[0]?.expires_at as string).getTime()).toBeGreaterThan(
+          Date.now(),
+        );
+      });
+
       it("says there is nothing to preview in production without an origin", async () => {
         const app = await aSetUpApp();
 
