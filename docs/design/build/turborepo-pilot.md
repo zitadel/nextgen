@@ -3,6 +3,9 @@
 > **Status:** research, 2026-10-12. Turborepo 2.11.7 against moon 2.6.1.
 > **Pilot:** this branch builds the hosted cloud's console, storybook and
 > login UI with turbo on Vercel. Moon still owns CI, local dev and releases.
+> **Next step:** the full migration was prototyped and planned in
+> [turborepo-migration.md](turborepo-migration.md) (task mapping, feature
+> replacements, script ports, CI, remote cache, rollout, effort, decisions).
 
 ## Short answer
 
@@ -147,7 +150,8 @@ we would lose is fixes for new Node, pnpm or Go versions.
 
 ## What a full switch would take
 
-Roughly two to three weeks, most of it CI and scripts:
+Roughly two to three weeks, most of it CI and scripts (worked out in detail,
+with a prototype, in [turborepo-migration.md](turborepo-migration.md)):
 
 - Rewrite the 33 `moon.yml` files and `.moon/tasks` as `turbo.json` (root
   plus a package configuration where a package differs).

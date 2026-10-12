@@ -71,7 +71,53 @@ Verified in the prototype, 2026-10-12:
 
 ## Results
 
-<!-- results: filled from the measurement in scratchpad/parity once it finishes -->
+The default gate, both runners, on the prototype branch (Apple M4, 10 cores,
+clean environment: `env -i HOME TERM PATH`, with the pnpm shim, an arm64 Go
+1.26 and a `docker` stub that reports the daemon down on `PATH`; Docker
+Desktop is not installed on that machine). Cold = both tools' caches deleted
+and `go clean -cache`; warm = the same command again with nothing changed. Two
+rounds each, alternating.
+
+| | moon (`moon ci :lint :typecheck :build :test`) | turbo (`turbo run lint typecheck build test`) |
+|---|---|---|
+| tasks run | 123: the 119 shared ones, `release:lint`, and the three database lanes `server:test-postgres`, `test-sqlite`, `test-spanner` (`runInCI: true` tasks, which `moon ci` runs whether or not the targets name them); `workspace:lint` was not selected | 120: the 119 shared ones and `//#lint` (`release:lint` has no files and no script) |
+| cold, round 1 | 5 m 59 s | 3 m 47 s |
+| cold, round 2 | 4 m 17 s | 3 m 51 s |
+| warm, round 1 | 2 m 36 s (the failed `cli:test` and `console:test` re-ran) | 6 s (116 hits; the four `install-browsers` are `cache: false`) |
+| warm, round 2 | 1 m 07 s (the failed `cli:test` re-ran) | 7 s |
+| results | 119 shared tasks: all passed except `cli:test` in both cold rounds (two time-sensitive tests: `claim.test.ts` waits 5 s for the CLI to call `claim/init`; `local-runtime.test.ts` expects `doctor` to see an occupied port) and `console:test` in round 1; `components:test` passed on moon's retry in round 1. The two Docker lanes failed on the stub; `test-sqlite` passed. | all 120 passed in both rounds; the guard's locks were taken (`generated-sources` and `browser-tests` waits appear in the log) and no retry was needed |
+| the same `cli:test` alone, or in the warm round with little else running | passes (1,864 tests) | passes |
+
+Read the wall times with the caveat that moon did more work: the three
+database lanes add two Go compiles with build tags and a three-minute SQLite
+suite, and because they are `cache: false` they ran in the warm rounds too.
+That load is also the reason the CLI and console tests failed only under
+moon: every failure is a 20–25 s timeout or a missed 5 s deadline, the same
+suites pass alone and under turbo's lighter graph, and the worst round (warm
+1, 15 CLI and 21 console failures) is the one where only those two suites and
+the three Go lanes were running. The comparable number is round 2, 4 m 17 s
+against 3 m 51 s, with the same tasks at the top of both lists: the storybook
+and Qwik browser suites (about 100 s each, serialised by the lock), `cli:test`
+(75–87 s), the server's analyzers and build (80–90 s) and the console tests
+(60–70 s). The sum of task durations was 2,356 s under moon and 1,464 s under
+turbo in round 1, which is the extra lanes plus the contention they cause, not
+a per-task speed difference: the pilot measured the same builds at the same
+speed under both tools.
+
+One e2e lane was also run under turbo in the same environment:
+`turbo run test:integration --filter=@zitadel/testing` (the kit's
+real-instance suite, 17 tasks including the server build) passed, which
+exercises the strict environment mode and the variables the scripts now set.
+
+Two side findings about today's CI from these runs: `moon ci` runs the
+`runInCI: true` database lanes inside the gate step even though ci.yml names
+`:test`, so on a Depot runner they run there and again in their explicit steps
+(`cache: false`), and `moon ci` did not select `workspace:lint` in either
+round, so the root `scripts/*.mjs` are linted only through package lint tasks
+that happen to reach them. Both are worth a look in a real CI log.
+
+Not measured here: the e2e lanes and the release graph under load (see the
+dual-run phase), and the remote cache, which the pilot covered on Vercel.
 
 ## Task mapping
 
