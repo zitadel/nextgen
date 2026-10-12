@@ -89,7 +89,7 @@ export default class Deploy extends EnvironmentCommand {
       }
     }
 
-    const { bundle, resourceCount } = await buildBundle(cwd);
+    const { bundle, resourceCount, brandingSources } = await buildBundle(cwd);
     this.recordTelemetry({ resources: resourceCount });
     const ctx: StepContext = {
       cwd,
@@ -102,6 +102,7 @@ export default class Deploy extends EnvironmentCommand {
       color,
       origin,
       bundle,
+      brandingSources,
     };
 
     // Before-release steps: validate, sync IdPs (skipped on a dry run), diff.
