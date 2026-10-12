@@ -89,6 +89,42 @@ describe("deploy", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
+      it("passes the observed deployment and re-deploys unchanged content", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const first = await app.deployData();
+
+        // The second deploy observes the first as the live deployment and
+        // sends it as expected_deployment_id; nothing changed, so the server
+        // answers with the same release rather than a conflict.
+        const second = await app.deployData();
+
+        expect(second.content_hash).toBe(first.content_hash);
+      });
+
+      it("fails with a conflict when the targets drifted since inspection", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://a.example.com");
+        await app.addPrimaryOrigin("https://b.example.com");
+        await app.deployData();
+
+        // Deploying to one origin leaves the other behind, so the two primary
+        // origins no longer serve the same deployment.
+        await app.editUserSchema((schema) => {
+          schema.properties.one = { type: "string" };
+        });
+        await app.deployData(["--origin", "https://a.example.com"]);
+
+        // A deploy to every primary now finds the origins out of sync with the
+        // single deployment it observed, so the optimistic guard rejects it.
+        await app.editUserSchema((schema) => {
+          schema.properties.two = { type: "string" };
+        });
+        const result = await app.deploy();
+
+        expect(result).toFailWith("E_CONFLICT");
+      });
+
       it("validates and writes nothing on a dry run", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

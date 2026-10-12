@@ -21,6 +21,12 @@ export async function createDeployment(
     contentHash?: string;
     targets: string[];
     message?: string;
+    /**
+     * Optimistic-concurrency guard: the deployment the caller believes is the
+     * newest one to the targets. The server answers 409 (`dep.conflict`) when
+     * another deploy raced in, so nothing is overwritten unseen.
+     */
+    expectedDeploymentId?: string;
   },
 ): Promise<Deployment> {
   const result = await client.createDeployment(
@@ -29,6 +35,9 @@ export async function createDeployment(
       ...(input.contentHash === undefined ? {} : { content_hash: input.contentHash }),
       targets: input.targets,
       ...(input.message === undefined ? {} : { message: input.message }),
+      ...(input.expectedDeploymentId === undefined
+        ? {}
+        : { expected_deployment_id: input.expectedDeploymentId }),
     },
     { project_id: projectId },
   );
