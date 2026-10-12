@@ -7,7 +7,11 @@
 # the login UI and the console with the packages they build from, and the
 # deployment wiring. Docs-only and SDK-only branches get no preview build.
 # Whenever the answer is unclear, the preview builds.
+#
+# Each service of vercel.json runs it from its own root; the paths below are
+# the repository's.
 set -u
+cd "$(dirname "$0")/../.." || exit 1
 
 if [ "${VERCEL_ENV:-}" = "production" ]; then
   echo "ignore-build: production always deploys"
