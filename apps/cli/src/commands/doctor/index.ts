@@ -26,7 +26,7 @@ import {
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
-import { environmentFlags } from "../../lib/oclif/environment-flags";
+import { environmentFlags, environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
 import { createOrca } from "../../lib/orca";
 import { hasZitadelConfig } from "../../lib/project";
 import { listenersForPort } from "../../lib/prober/ports";
@@ -123,7 +123,15 @@ export default class Doctor extends BaseCommand {
     const checks = [...runtimeChecks, ...projectChecks, ...environmentChecks];
     const failed = checks.filter((check) => check.status === "fail");
     const warnings = checks.filter((check) => check.status === "warn");
-    const warningAdvice = advisoryForWarnings(warnings, this.meta.cliVersion);
+    // `doctor` is not an EnvironmentCommand but honours --env/--env-file/--server
+    // to check a chosen environment, so a suggested `claim` has to carry that
+    // same selection or it would reconcile the default project instead.
+    const selector = environmentSelectorSuffix({
+      envFile: typeof flags["env-file"] === "string" ? flags["env-file"] : undefined,
+      envName: typeof flags.env === "string" ? flags.env : undefined,
+      server: typeof flags.server === "string" ? flags.server : undefined,
+    });
+    const warningAdvice = advisoryForWarnings(warnings, this.meta.cliVersion, selector);
     this.recordTelemetry({
       runtime: runtimeBackend,
       checks_total: checks.length,
@@ -274,6 +282,7 @@ function failureAdvice(
 function advisoryForWarnings(
   warnings: CheckOutcome[],
   cliVersion: string,
+  selector: string,
 ): { nextActions: string[]; nextCommands: string[] } | undefined {
   const nextActions: string[] = [];
   const nextCommands: string[] = [];
@@ -293,10 +302,10 @@ function advisoryForWarnings(
     // authoritatively.
     nextActions.push(
       claimWindowClosed(claimWarning)
-        ? claimWindowClosedAction(cliVersion)
-        : claimAction(cliVersion),
+        ? claimWindowClosedAction(cliVersion, selector)
+        : claimAction(cliVersion, undefined, selector),
     );
-    nextCommands.push(claimCommand(cliVersion));
+    nextCommands.push(claimCommand(cliVersion, selector));
   }
 
   const managedRuntimeWarning = warnings.find(
