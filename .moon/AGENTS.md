@@ -24,8 +24,6 @@ Where the two differ on purpose:
 - The Go `format` and `lint` tasks keep their inline scripts here; turbo
   runs file copies of them (`scripts/go-format-check.mjs`,
   `scripts/go-lint.mjs`). A change to one goes into the other.
-- Turbo's `bench` `vet` waits for the server's `check-generate`; moon's
-  `bench:vet` does not.
 - `scripts/task-guard.mjs` also sits in two scripts moon runs (api `generate`,
   config `sync-schemas`), but it acts only when turbo runs the task; under
   moon it runs the command once, unchanged.
