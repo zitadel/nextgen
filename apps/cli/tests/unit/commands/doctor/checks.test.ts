@@ -29,9 +29,10 @@ import type { ScaffoldManifest } from "../../../../src/lib/sync/types";
 const tempDirs: string[] = [];
 
 // Matches the generated `CreateSchemaBody` zod (the `user-schema` branch):
-// required keys are `kind`, `metaSchema`, `x-auth-methods`.
+// required keys are `kind`, `metaSchema`, `objectType`, `x-auth-methods`.
 const VALID_USER_SCHEMA = {
   kind: "user-schema",
+  objectType: "human-user",
   metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
   "x-auth-methods": { passkey: { enabled: true } },
   properties: { email: { type: "string" } },

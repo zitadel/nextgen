@@ -1,0 +1,14 @@
+title: DeploymentConflict
+description: |
+  The deployment conflicts with the state of the project, told apart by
+  `code`: `dep.conflict` when `expected_deployment_id` did not match,
+  carrying the actual newest deployment, or `rel.revoked` when the release
+  is revoked.
+oneOf:
+  - $ref: deployment-guard-conflict.yaml
+  - $ref: release-revoked-conflict.yaml
+discriminator:
+  propertyName: code
+  mapping:
+    dep.conflict: deployment-guard-conflict.yaml
+    rel.revoked: release-revoked-conflict.yaml

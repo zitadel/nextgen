@@ -21,7 +21,8 @@ name: deployment-checks
 # What broke is read in this order: the check's name says the service and the
 # environment; the annotations on it name the failing contract (the test's
 # title) and every URL that failed; the run's summary names the deployment and
-# the command that reproduces the run; the uploaded report holds the traces.
+# the command that reproduces the run; a failed browser test's screenshots are
+# the run's artifact. There are no traces (see the upload step for why).
 on:
   deployment_status:
   workflow_dispatch:
@@ -92,7 +93,7 @@ jobs:
           {
             echo "- Deployment: $DOCS_BASE_URL ($ENVIRONMENT, commit ${COMMIT:0:8})"
             echo "- Reproduce: \`DOCS_BASE_URL=$DOCS_BASE_URL VERCEL_AUTOMATION_BYPASS_SECRET=… moon run docs:e2e-deployment\`"
-            echo "- On a failure the annotations name the contract and the URLs; the \`docs-deployment-report\` artifact holds the Playwright report and the traces."
+            echo "- On a failure the annotations name the contract and the URLs; a failed browser test's screenshots are the \`docs-deployment-screenshots\` artifact."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/checkout@v6
@@ -139,13 +140,19 @@ jobs:
       - name: Run the docs suite against the deployment
         run: env -u CI -u GITHUB_ACTIONS moon run docs:e2e-deployment
 
-      - name: Upload the Playwright report
+      # The screenshots and nothing else: the repository is public, so anyone
+      # signed in to GitHub can download the artifact, and every other file
+      # Playwright writes can hold the bypass secret. A trace records each
+      # request's headers (the suite records none against a deployment), and
+      # the error of a request that failed lists them, which error-context.md
+      # keeps. The errors reach the log and the annotations, where GitHub masks
+      # the secret. A suite added here follows the same rule
+      # (docs/runbooks/cloud.md, "Deployment checks").
+      - name: Upload the screenshots
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: docs-deployment-report
-          path: |
-            apps/docs/playwright-report
-            apps/docs/test-results
+          name: docs-deployment-screenshots
+          path: apps/docs/test-results/**/*.png
           if-no-files-found: ignore
           retention-days: 7

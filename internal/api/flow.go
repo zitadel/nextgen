@@ -509,6 +509,9 @@ func toFlowField(f domain.FlowField) api.Field {
 	if f.Value != nil {
 		out.Value = jx.Raw(jsonQuoted(*f.Value))
 	}
+	if f.ReadOnly {
+		out.ReadOnly = api.NewOptBool(true)
+	}
 	if v := toFlowFieldValidation(f.Validation); v != nil {
 		out.Validation = api.NewOptFieldValidation(*v)
 	}

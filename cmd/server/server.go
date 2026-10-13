@@ -265,7 +265,6 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		serviceDBPool,
-		schemaService,
 		schemaValidator,
 		nil,
 	)

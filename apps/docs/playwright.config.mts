@@ -18,8 +18,8 @@ const deployment = process.env.DOCS_BASE_URL;
 const localOrigin = "http://localhost:3003";
 const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 // GitHub Actions (deployment-checks.yml): annotations on the check that name
-// the failing test and its assertion, and the HTML report for the artifact.
-// CI itself is unset there, for moon's sake, so GitHub is recognised by this.
+// the failing test and its assertion. CI itself is unset there, for moon's
+// sake, so GitHub is recognised by this.
 const onGitHub = !!process.env.GITHUB_RUN_ID;
 
 export default defineConfig({
@@ -28,10 +28,18 @@ export default defineConfig({
   forbidOnly: onGitHub,
   // A deployment answers from cold the first time; one more try there.
   retries: deployment ? 1 : 0,
-  reporter: onGitHub ? [["list"], ["github"], ["html", { open: "never" }]] : "list",
+  // No HTML report: it keeps every error, and the error of a request that
+  // failed lists the request's headers, the bypass secret among them.
+  reporter: onGitHub ? [["list"], ["github"]] : "list",
   use: {
     baseURL: deployment ?? localOrigin,
-    trace: "on-first-retry",
+    // The repository is public: anyone signed in to GitHub can download what
+    // deployment-checks.yml uploads, so against a deployment nothing uploaded
+    // may hold the bypass secret. A trace records every request's headers, so
+    // there is none; a screenshot shows only the page, and is all the workflow
+    // uploads.
+    trace: deployment ? "off" : "on-first-retry",
+    screenshot: "only-on-failure",
     // Every request the suite makes, from the request fixture and from the
     // browser, carries the bypass; a deployment without protection ignores it.
     extraHTTPHeaders: bypassSecret ? { "x-vercel-protection-bypass": bypassSecret } : {},

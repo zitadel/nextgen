@@ -10,8 +10,10 @@
     "prepare-app": "node scripts/prepare-app.mjs",
     "publish-tarballs": "node scripts/publish-tarballs.mjs",
     "verify-tarballs": "node scripts/verify-tarballs.mjs",
-    "e2e-local": "node scripts/run-local.mjs",
-    "e2e": "playwright test"
+    "e2e-local": "ZITADEL_TELEMETRY=${ZITADEL_TELEMETRY-0} node scripts/run-local.mjs",
+    "e2e": "ZITADEL_TELEMETRY=${ZITADEL_TELEMETRY-0} playwright test",
+    "lint": "biome check .",
+    "e2e-testkit": "ZITADEL_TELEMETRY=${ZITADEL_TELEMETRY-0} node scripts/run-local.mjs --suite testkit"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

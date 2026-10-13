@@ -56,8 +56,9 @@ must be absolute `https://`. Keep exactly one descriptor in
 Server-provisioned defaults remain a fallback for non-CLI project
 creation, but CLI-created projects are authored from local files first. Flows are
 revisioned like branding: an edit plans as a `revise` and `apply` publishes a new
-immutable flow revision; a schema revise re-publishes the flows pinned to it with
-the new `user_schema` in the same run. A login pinned by `flow-name` serves that
+immutable flow revision. A flow names its schema by `objectType` in
+`user_schema` and runs against the schema's newest revision, so a schema revise
+leaves flow files alone. A login pinned by `flow-name` serves that
 flow's newest revision; an unpinned login serves the newest active unscoped flow
 in the project, whatever its name. Removing a flow file does not retire the
 flow. Managed files carry a marker comment; `eject` removes only
