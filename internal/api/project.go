@@ -169,7 +169,6 @@ func (h *Handler) RemoveOrigin(ctx context.Context, _ *api.RemoveOriginReq, para
 
 // ------------------ Converters ---------------
 
-// apiOriginsToDomain converts wire origins into the domain allowlist shape.
 func apiOriginsToDomain(in []api.Origin) []domain.Origin {
 	if in == nil {
 		return nil
