@@ -10,6 +10,7 @@ import {
   IDPS_DIR,
   credentialVariablesOf,
   planConnection,
+  planCustomConnection,
   readConnectionFiles,
 } from "../../../../src/lib/idp";
 
@@ -287,5 +288,173 @@ describe("planConnection", () => {
       action: "reuse",
       slug: "google",
     });
+  });
+});
+
+describe("planCustomConnection", () => {
+  const acme = {
+    slug: "acme-sso",
+    displayName: "Acme SSO",
+    issuer: "https://sso.acme.example",
+  };
+  const acmeBody = (over: Record<string, unknown> = {}) => ({
+    slug: "acme-sso",
+    protocol: "oidc",
+    display_name: "Acme SSO",
+    oidc: {
+      issuer: "https://sso.acme.example",
+      client_id: "${{ ACME_SSO_CLIENT_ID }}",
+      client_secret: "${{ ACME_SSO_CLIENT_SECRET }}",
+      scopes: ["openid"],
+    },
+    ...over,
+  });
+
+  it("creates a file named after the slug when nothing holds it", () => {
+    expect(planCustomConnection({ input: acme, files: [] })).toEqual({
+      action: "create",
+      name: "acme-sso.json",
+      path: `${IDPS_DIR}/acme-sso.json`,
+      slug: "acme-sso",
+    });
+  });
+
+  it("creates a second connection to an issuer another connection already uses", () => {
+    const existing = file(
+      "acme-staff.json",
+      acmeBody({
+        slug: "acme-staff",
+        oidc: {
+          ...acmeBody().oidc,
+          client_id: "${{ ACME_STAFF_CLIENT_ID }}",
+          client_secret: "${{ ACME_STAFF_CLIENT_SECRET }}",
+        },
+      }),
+    );
+
+    expect(planCustomConnection({ input: acme, files: [existing] })).toMatchObject({
+      action: "create",
+      slug: "acme-sso",
+    });
+  });
+
+  it("is not confused by a catalog connection to the same issuer", () => {
+    const google = file("google.json", googleBody());
+    const input = { ...acme, issuer: "https://accounts.google.com" };
+
+    expect(planCustomConnection({ input, files: [google] })).toMatchObject({
+      action: "create",
+      slug: "acme-sso",
+    });
+  });
+
+  it("reuses the connection that already has this slug and issuer", () => {
+    const existing = file("acme-sso.json", acmeBody());
+
+    expect(planCustomConnection({ input: acme, files: [existing] })).toEqual({
+      action: "reuse",
+      file: existing,
+      slug: "acme-sso",
+    });
+  });
+
+  it("finds the connection by its slug even when the file was renamed", () => {
+    const existing = file("sso.json", acmeBody());
+
+    expect(planCustomConnection({ input: acme, files: [existing] })).toMatchObject({
+      action: "reuse",
+      slug: "acme-sso",
+    });
+  });
+
+  it("does not take a trailing slash for a different issuer", () => {
+    const existing = file("acme-sso.json", acmeBody());
+    const input = { ...acme, issuer: "https://sso.acme.example/" };
+
+    expect(planCustomConnection({ input, files: [existing] })).toMatchObject({ action: "reuse" });
+  });
+
+  it("stops when the slug belongs to a connection to another issuer", () => {
+    const existing = file("acme-sso.json", acmeBody());
+    const input = { ...acme, issuer: "https://sso.other.example" };
+
+    expect(() => planCustomConnection({ input, files: [existing] })).toThrow(
+      /already named acme-sso and connects to https:\/\/sso\.acme\.example/,
+    );
+  });
+
+  it("stops when the slug belongs to a connection that is not OIDC", () => {
+    const existing = file("acme-sso.json", { slug: "acme-sso", protocol: "oauth2" });
+
+    expect(() => planCustomConnection({ input: acme, files: [existing] })).toThrow(
+      /not an OIDC connection/,
+    );
+  });
+
+  it("refuses an unrelated file already sitting where the connection would go", () => {
+    const occupied = file("acme-sso.json", acmeBody({ slug: "something-else" }));
+
+    expect(() => planCustomConnection({ input: acme, files: [occupied] })).toThrow(
+      /acme-sso\.json already exists and is not the acme-sso connection/,
+    );
+  });
+
+  it("stops when two files claim the slug", () => {
+    const files = [file("a.json", acmeBody()), file("b.json", acmeBody())];
+
+    expect(() => planCustomConnection({ input: acme, files })).toThrow(
+      /More than one connection is named acme-sso/,
+    );
+  });
+
+  it("stops when the supplied client id is not the literal one already configured", () => {
+    const existing = file(
+      "acme-sso.json",
+      acmeBody({ oidc: { ...acmeBody().oidc, client_id: "literal-id" } }),
+    );
+
+    expect(() =>
+      planCustomConnection({ input: acme, files: [existing], clientId: "another-id" }),
+    ).toThrow(/already uses client id literal-id/);
+  });
+
+  it("refuses a new slug whose credentials would land in a variable another connection uses", () => {
+    // `acme_sso` and `acme-sso` both derive ACME_SSO_CLIENT_ID.
+    const existing = file("acme_sso.json", acmeBody({ slug: "acme_sso" }));
+
+    expect(() => planCustomConnection({ input: acme, files: [existing] })).toThrow(
+      /both use ACME_SSO_CLIENT_ID/,
+    );
+  });
+
+  it("refuses to take over a variable a hand-edited connection points at", () => {
+    const existing = file(
+      "okta.json",
+      acmeBody({
+        slug: "okta",
+        oidc: {
+          ...acmeBody().oidc,
+          client_id: "${{ OKTA_CLIENT_ID }}",
+          client_secret: "${{ ACME_SSO_CLIENT_SECRET }}",
+        },
+      }),
+    );
+
+    expect(() => planCustomConnection({ input: acme, files: [existing] })).toThrow(
+      /okta\.json and acme-sso both use ACME_SSO_CLIENT_SECRET/,
+    );
+  });
+
+  it("reads the credentials a reused connection actually references", () => {
+    const existing = file(
+      "acme-sso.json",
+      acmeBody({ oidc: { ...acmeBody().oidc, client_secret: "${{ ACME_SECRET }}" } }),
+    );
+    const plan = planCustomConnection({ input: acme, files: [existing] });
+
+    expect(plan.action).toBe("reuse");
+    if (plan.action === "reuse") {
+      expect(credentialVariablesOf(plan.file, plan.slug).clientSecret).toBe("ACME_SECRET");
+    }
   });
 });

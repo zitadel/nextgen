@@ -42,14 +42,20 @@ export interface IdpProvider {
   /**
    * Written to the connection as `template`. Keys vendor knowledge only —
    * glyphs, button branding, the setup scan — and carries no protocol
-   * behaviour.
+   * behaviour. A custom connection has none, and the field is left out of its
+   * document: the login UI then shows a text-only button.
    */
-  readonly template: string;
-  /** Where the developer registers the application. */
-  readonly consoleUrl: string;
-  /** The vendor's own integration documentation. */
-  readonly docsUrl: string;
-  readonly callbackGuidance: CallbackGuidance;
+  readonly template: string | undefined;
+  /**
+   * Where the developer registers the application. `undefined` for a provider
+   * the catalog knows nothing about: a custom connection points at the
+   * developer's own provider, so there is no console to send them to.
+   */
+  readonly consoleUrl: string | undefined;
+  /** The vendor's own integration documentation, when there is one. */
+  readonly docsUrl: string | undefined;
+  /** `undefined` when nothing is known about how the provider takes redirect URIs. */
+  readonly callbackGuidance: CallbackGuidance | undefined;
   /** The issuer the vendor publishes, and the default when one is asked for. */
   readonly issuer: string;
   /**

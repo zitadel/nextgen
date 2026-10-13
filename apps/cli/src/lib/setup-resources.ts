@@ -23,7 +23,11 @@ import {
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
-import { type ConnectionEndpoints, idpProvider } from "@zitadel/config/idp";
+import {
+  type ConnectionEndpoints,
+  type CustomOidcInput,
+  idpProviderFor,
+} from "@zitadel/config/idp";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
 import { FLOWS_DIR } from "./flows";
@@ -75,7 +79,12 @@ export async function materializeSetupResources(opts: {
    * The providers to enable, in the order they were chosen. One connection is
    * created per entry, and every slug is added to the schema and the flow.
    */
-  sso?: readonly { provider: string; clientId: string; endpoints?: ConnectionEndpoints }[];
+  sso?: readonly {
+    provider: string;
+    custom?: CustomOidcInput;
+    clientId: string;
+    endpoints?: ConnectionEndpoints;
+  }[];
   /**
    * CLI version used to render `zitadel …` command mentions in the scaffolded
    * READMEs as runnable `npx @zitadel/cli@<version> …` commands — the CLI is
@@ -110,7 +119,7 @@ export async function materializeSetupResources(opts: {
   // clear it. One pass to build and refuse, a second to create.
   const planned: Array<{ slug: string; connectionPath: string; connection: object }> = [];
   for (const chosen of opts.sso ?? []) {
-    const connection = idpProvider(chosen.provider).connection({
+    const connection = idpProviderFor(chosen.provider, chosen.custom).connection({
       endpoints: chosen.endpoints,
       schemaProperties: Object.keys((schemaTemplate.properties as object | undefined) ?? {}),
       schemaRef: CONNECTION_SCHEMA_REF,

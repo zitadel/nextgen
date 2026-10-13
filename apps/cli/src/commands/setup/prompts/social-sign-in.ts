@@ -2,16 +2,32 @@ import { multiselect, note, password, text } from "@clack/prompts";
 
 import {
   credentialVariables,
+  CUSTOM_PROVIDER,
+  type CustomOidcInput,
+  DEFAULT_CUSTOM_SCOPES,
+  displayNameProblem,
   idpProvider,
   IDP_PROVIDERS,
   type IdpProvider,
+  ISSUER_REQUIREMENT,
+  isSupportedIssuer,
+  parseScopes,
+  scopesProblem,
+  slugProblem,
 } from "@zitadel/config/idp";
 
 import { askConnectionEndpoints, callbackUriFor } from "../../../lib/idp";
 import { issuerFromPort } from "../../../lib/orca";
 
 import { bail } from "./cancel";
-import type { PromptContext, SetupAnswers, SetupPrompt, SsoAnswer } from "./types";
+import {
+  type PromptContext,
+  type SetupAnswers,
+  type SetupPrompt,
+  type SsoAnswer,
+  ssoProvider,
+  ssoSlug,
+} from "./types";
 
 /**
  * "Add social sign-in providers?" — the one onboarding question that needs
@@ -46,16 +62,23 @@ export class SocialSignInPrompt implements SetupPrompt {
     const collected: SsoAnswer[] = [];
     for (const provider of chosen) {
       const flagged = answers.sso.find((answer) => answer.provider === provider);
-      const entry = idpProvider(provider);
+      // A custom connection is described before anything else about it can be
+      // said: the announcement names its issuer, and its slug names the secret.
+      const custom =
+        provider === CUSTOM_PROVIDER ? (flagged?.custom ?? (await this.askCustom())) : undefined;
+      const entry = ssoProvider({ provider, custom, clientId: "", secret: "" });
       // Before the announcement, which names the vendor's console: on a
-      // development run (ZITADEL_CLI_DEV) the provider may not be the vendor at all.
+      // development run (ZITADEL_CLI_DEV) the provider may not be the vendor at
+      // all. Not asked of a custom connection, whose issuer was just given.
       const endpoints =
-        flagged?.endpoints ??
-        (await askConnectionEndpoints({
-          provider,
-          developmentBuild: ctx.developmentBuild === true,
-          command: "Setup",
-        }));
+        custom !== undefined
+          ? undefined
+          : (flagged?.endpoints ??
+            (await askConnectionEndpoints({
+              provider,
+              developmentBuild: ctx.developmentBuild === true,
+              command: "Setup",
+            })));
       this.announce(entry, answers.devPort, endpoints?.issuer);
 
       const clientId =
@@ -65,8 +88,8 @@ export class SocialSignInPrompt implements SetupPrompt {
       const secret =
         flagged?.secret !== undefined && flagged.secret !== ""
           ? flagged.secret
-          : await this.askSecret(provider);
-      collected.push({ provider, clientId, secret, endpoints });
+          : await this.askSecret(ssoSlug({ provider, custom, clientId: "", secret: "" }));
+      collected.push({ provider, ...(custom ? { custom } : {}), clientId, secret, endpoints });
     }
     return { ...answers, sso: collected };
   }
@@ -85,11 +108,18 @@ export class SocialSignInPrompt implements SetupPrompt {
       // Nothing preselected, and declining costs nothing: `sso enable`
       // performs this journey on an existing Project later.
       required: false,
-      options: IDP_PROVIDERS.map((provider) => ({
-        value: provider,
-        label: `Continue with ${idpProvider(provider).displayName}`,
-        hint: "needs an OAuth app you register with the provider",
-      })),
+      options: [
+        ...IDP_PROVIDERS.map((provider) => ({
+          value: provider,
+          label: `Continue with ${idpProvider(provider).displayName}`,
+          hint: "needs an OAuth app you register with the provider",
+        })),
+        {
+          value: CUSTOM_PROVIDER,
+          label: "Continue with another OpenID Connect provider",
+          hint: "you name it and give its issuer",
+        },
+      ],
     });
     bail(chosen);
     return Array.isArray(chosen) ? chosen.map(String) : [];
@@ -108,7 +138,12 @@ export class SocialSignInPrompt implements SetupPrompt {
         // developer at the vendor's console when the connection runs against
         // their own stand-in would be worse than saying nothing.
         ...(issuer === undefined
-          ? ["Register an OAuth application at:", entry.consoleUrl]
+          ? [
+              entry.consoleUrl === undefined
+                ? `Register a client at ${entry.issuer}, as an OAuth application:`
+                : "Register an OAuth application at:",
+              ...(entry.consoleUrl === undefined ? [] : [entry.consoleUrl]),
+            ]
           : ["Register a client with the provider at:", issuer]),
         "",
         "Redirect URI:",
@@ -116,6 +151,43 @@ export class SocialSignInPrompt implements SetupPrompt {
       ].join("\n"),
       `${entry.displayName} sign-in`,
     );
+  }
+
+  /**
+   * Describe a custom connection: what the developer calls it, what the button
+   * says, where the provider is, and what to ask it for. Each answer is checked
+   * against the contract the server enforces on apply, so a name or issuer it
+   * would refuse is refused here, where it was typed.
+   */
+  private async askCustom(): Promise<CustomOidcInput> {
+    const slug = await text({
+      message: "Name for this connection (used in your configuration, e.g. acme-sso)",
+      validate: (value) => slugProblem(String(value ?? "").trim(), IDP_PROVIDERS),
+    });
+    bail(slug);
+    const displayName = await text({
+      message: "Name shown on the sign-in button (e.g. Acme SSO)",
+      validate: (value) => displayNameProblem(String(value ?? "")),
+    });
+    bail(displayName);
+    const issuer = await text({
+      message: "Issuer URL of the provider",
+      validate: (value) =>
+        isSupportedIssuer(String(value ?? "")) ? undefined : ISSUER_REQUIREMENT,
+    });
+    bail(issuer);
+    const scopes = await text({
+      message: "Scopes to request",
+      initialValue: DEFAULT_CUSTOM_SCOPES.join(" "),
+      validate: (value) => scopesProblem(parseScopes(String(value ?? ""))),
+    });
+    bail(scopes);
+    return {
+      slug: String(slug).trim(),
+      displayName: String(displayName).trim(),
+      issuer: String(issuer).trim(),
+      scopes: parseScopes(String(scopes)),
+    };
   }
 
   private async askClientId(entry: IdpProvider): Promise<string> {
@@ -141,9 +213,9 @@ export class SocialSignInPrompt implements SetupPrompt {
    * goes: the connection references it as `${{ NAME }}`, the engine resolves
    * that from the project's variables, and nothing is written to disk.
    */
-  private async askSecret(provider: string): Promise<string> {
+  private async askSecret(slug: string): Promise<string> {
     const answer = await password({
-      message: `Client secret (published to the project as ${credentialVariables(provider).clientSecret})`,
+      message: `Client secret (published to the project as ${credentialVariables(slug).clientSecret})`,
       // Vendors format these differently, so only emptiness can be checked.
       validate: (value) => ((value ?? "").trim() === "" ? "Enter the client secret." : undefined),
     });

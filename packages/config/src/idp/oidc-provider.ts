@@ -17,10 +17,10 @@ import {
 export abstract class OidcProvider implements IdpProvider {
   abstract readonly slug: string;
   abstract readonly displayName: string;
-  abstract readonly template: string;
-  abstract readonly consoleUrl: string;
-  abstract readonly docsUrl: string;
-  abstract readonly callbackGuidance: CallbackGuidance;
+  abstract readonly template: string | undefined;
+  abstract readonly consoleUrl: string | undefined;
+  abstract readonly docsUrl: string | undefined;
+  abstract readonly callbackGuidance: CallbackGuidance | undefined;
   abstract readonly issuer: string;
 
   /**
@@ -86,7 +86,7 @@ export abstract class OidcProvider implements IdpProvider {
       ...(options.schemaRef ? { $schema: options.schemaRef } : {}),
       slug,
       protocol: "oidc",
-      template: this.template,
+      ...(this.template !== undefined ? { template: this.template } : {}),
       display_name: this.displayName,
       subject_claim: this.subjectClaim,
       ...(Object.keys(verifiedClaims).length > 0 ? { verified_claims: verifiedClaims } : {}),

@@ -229,6 +229,119 @@ describe("setup command", () => {
     });
   });
 
+  describe("a custom provider", () => {
+    const ACME = [
+      "--sso",
+      "custom",
+      "--sso-slug",
+      "acme-sso",
+      "--sso-display-name",
+      "Acme SSO",
+      "--sso-issuer",
+      "https://sso.acme.example",
+    ];
+
+    it("is reported under the slug the developer gave it", async () => {
+      const cwd = await makeNextProject();
+
+      const res = await setup(cwd, [
+        "--dry-run",
+        "--framework",
+        "next",
+        ...ACME,
+        "--sso-client-id",
+        "acme-client-id",
+      ]);
+
+      expect(res.exitCode).toBe(0);
+      const json = parseJson(res.stdout) as {
+        data: { sso: Array<Record<string, unknown>> };
+      };
+      expect(json.data.sso).toHaveLength(1);
+      expect(json.data.sso[0]).toMatchObject({
+        provider: "custom",
+        slug: "acme-sso",
+        client_id: "acme-client-id",
+        connection: ".zitadel/idps/acme-sso.json",
+      });
+    });
+
+    it("must be described completely, before anything is created", async () => {
+      const cwd = await makeNextProject();
+
+      const res = await setup(cwd, [
+        "--framework",
+        "next",
+        "--sso",
+        "custom",
+        "--sso-slug",
+        "acme-sso",
+        "--sso-client-id",
+        "acme-client-id",
+      ]);
+
+      expect(res.exitCode).not.toBe(0);
+      const json = parseJson(res.stdout) as { code: string; message: string };
+      expect(json.code).toBe("E_VALIDATION");
+      expect(json.message).toBe("A custom connection needs --sso-display-name, --sso-issuer");
+    });
+
+    it("refuses a name belonging to a built-in provider", async () => {
+      const cwd = await makeNextProject();
+
+      const res = await setup(cwd, [
+        "--dry-run",
+        "--framework",
+        "next",
+        "--sso",
+        "custom",
+        "--sso-slug",
+        "google",
+        "--sso-display-name",
+        "Mine",
+        "--sso-issuer",
+        "https://sso.acme.example",
+        "--sso-client-id",
+        "id",
+      ]);
+
+      expect(res.exitCode).not.toBe(0);
+      expect((parseJson(res.stdout) as { message: string }).message).toContain("built-in provider");
+    });
+
+    it("refuses the --sso-* description for a provider the catalog describes", async () => {
+      const cwd = await makeNextProject();
+
+      const res = await setup(cwd, [
+        "--dry-run",
+        "--framework",
+        "next",
+        "--sso",
+        "google",
+        "--sso-issuer",
+        "https://sso.acme.example",
+        "--sso-client-id",
+        "id",
+      ]);
+
+      expect(res.exitCode).not.toBe(0);
+      expect((parseJson(res.stdout) as { message: string }).message).toBe(
+        "--sso-issuer only applies to a custom connection",
+      );
+    });
+
+    it("refuses a description with no --sso to attach it to", async () => {
+      const cwd = await makeNextProject();
+
+      const res = await setup(cwd, ["--dry-run", "--framework", "next", "--sso-slug", "acme-sso"]);
+
+      expect(res.exitCode).not.toBe(0);
+      expect((parseJson(res.stdout) as { message: string }).message).toBe(
+        "--sso-slug needs --sso custom",
+      );
+    });
+  });
+
   // No provider is an empty list, not a missing key or null: a consumer can
   // iterate the field without checking which of three shapes it holds.
   it("reports an empty list when no provider was enabled", async () => {

@@ -23,6 +23,7 @@ export {
   credentialVariablesOf,
   type StoredVariables,
   planConnection,
+  planCustomConnection,
   refuseResolvedSecret,
   readConnectionFiles,
 } from "./connections";
@@ -35,6 +36,14 @@ export {
   type SsoResult,
   type SsoSkipped,
 } from "./documents";
+
+export {
+  customConnectionFromFlags,
+  customFlagText,
+  refuseCustomFlagsWithoutCustom,
+  type CustomFlagNames,
+  type CustomFlagValues,
+} from "./custom";
 
 export { callbackUriFor } from "./callback";
 

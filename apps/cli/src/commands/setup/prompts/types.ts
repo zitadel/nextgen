@@ -1,5 +1,10 @@
 import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
-import type { ConnectionEndpoints } from "@zitadel/config/idp";
+import {
+  type ConnectionEndpoints,
+  type CustomOidcInput,
+  idpProviderFor,
+  type IdpProvider,
+} from "@zitadel/config/idp";
 
 import type { FrameworkFacts } from "../../../lib/orca";
 
@@ -28,6 +33,12 @@ import type { FrameworkFacts } from "../../../lib/orca";
  */
 export type SsoAnswer = {
   readonly provider: string;
+  /**
+   * The connection the developer described, when `provider` is `custom`. A
+   * custom provider is not in the catalog, so what makes it this connection and
+   * not another travels with the answer.
+   */
+  readonly custom?: CustomOidcInput;
   readonly clientId: string;
   readonly secret: string;
   /**
@@ -37,6 +48,19 @@ export type SsoAnswer = {
    */
   readonly endpoints?: ConnectionEndpoints;
 };
+
+/**
+ * The slug a provider's connection is written under. A catalog provider is
+ * named by what it is; a custom one by what the developer called it.
+ */
+export function ssoSlug(answer: SsoAnswer): string {
+  return answer.custom?.slug ?? answer.provider;
+}
+
+/** The provider an answer names, catalog entry or custom connection alike. */
+export function ssoProvider(answer: SsoAnswer): IdpProvider {
+  return idpProviderFor(answer.provider, answer.custom);
+}
 
 export type SetupAnswers = {
   server: string;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type ScaffoldedApp } from "../helpers/project";
+import { aSetUpApp, type CustomConnection, type ScaffoldedApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -21,6 +21,21 @@ async function anAppWithGoogle(): Promise<ScaffoldedApp> {
 /** The same, with the edit published. */
 async function anAppServingGoogle(): Promise<ScaffoldedApp> {
   const app = await anAppWithGoogle();
+  expect(await app.apply()).toSucceed();
+  return app;
+}
+
+const ACME: CustomConnection = {
+  slug: "acme-sso",
+  displayName: "Acme SSO",
+  issuer: "https://sso.acme.example",
+};
+const ACME_CREDENTIALS = { clientId: "acme-client-id", secret: "acme-client-secret" };
+
+/** A set-up project serving a custom connection. */
+async function anAppServingAcme(): Promise<ScaffoldedApp> {
+  const app = await aSetUpApp();
+  expect(await app.enableCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
   expect(await app.apply()).toSucceed();
   return app;
 }
@@ -197,6 +212,214 @@ describe("sso enable", () => {
 
           expect(await app.plan()).toReportNothingToDo();
         });
+      });
+    });
+
+    describe("a custom connection", () => {
+      it("registers the connection under the name the developer gave it", async () => {
+        const app = await anAppServingAcme();
+
+        const registered = await app.registeredIdps();
+
+        expect(registered.map((idp) => idp.slug)).toEqual([ACME.slug]);
+      });
+
+      it("shows the developer's display name and issuer, and no template", async () => {
+        const app = await aSetUpApp();
+        expect(await app.enableCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
+
+        const connection = await app.committed.idpDocument(ACME.slug);
+
+        expect(connection).toMatchObject({
+          slug: "acme-sso",
+          display_name: "Acme SSO",
+          oidc: { issuer: "https://sso.acme.example", scopes: ["openid", "profile", "email"] },
+        });
+        expect(connection).not.toHaveProperty("template");
+      });
+
+      it("requests the scopes the developer named", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.enableCustomSso(
+          { ...ACME, scopes: "openid, groups" },
+          ACME_CREDENTIALS,
+        );
+
+        expect(result).toSucceed();
+        expect(await app.committed.idpDocument(ACME.slug)).toMatchObject({
+          oidc: { scopes: ["openid", "groups"] },
+        });
+      });
+
+      it("maps the standard claims, and trusts the email only as the provider verifies it", async () => {
+        const app = await aSetUpApp();
+        expect(await app.enableCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
+
+        const connection = await app.committed.idpDocument(ACME.slug);
+
+        expect(connection).toMatchObject({
+          claim_mapping: { email: "email" },
+          verified_claims: { email: "email_verified" },
+        });
+      });
+
+      it("keeps the credentials in variables named after the connection", async () => {
+        const app = await aSetUpApp();
+        expect(await app.enableCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
+
+        const connection = await app.committed.idpConnection(ACME.slug);
+        const published = await app.projectVariables();
+
+        expect(connection.oidc.client_id).toBe("${{ ACME_SSO_CLIENT_ID }}");
+        expect(connection.oidc.client_secret).toBe("${{ ACME_SSO_CLIENT_SECRET }}");
+        expect(published).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ name: "ACME_SSO_CLIENT_ID", value: "acme-client-id" }),
+          ]),
+        );
+        expect(await app.filesContaining(ACME_CREDENTIALS.secret)).toEqual([]);
+      });
+
+      it("names the connection among the published auth methods and the steps offering it", async () => {
+        const app = await anAppServingAcme();
+
+        const { schema } = await app.publishedSchema();
+        const offering = await app.stepsOfferingSso();
+
+        expect(schema["x-auth-methods"]?.sso).toEqual({ enabled: true, providers: ["acme-sso"] });
+        expect(offering.map((step) => step.name)).toEqual(
+          expect.arrayContaining(["identifier", "register"]),
+        );
+        for (const step of offering) {
+          expect(step.sso_providers, step.name).toEqual(["acme-sso"]);
+        }
+      });
+
+      it("changes nothing when the same connection is enabled again", async () => {
+        const app = await anAppServingAcme();
+        const files = await app.snapshot();
+        const before = {
+          variables: await app.projectVariables(),
+          connection: await app.committed.idpDocument(ACME.slug),
+          schema: await app.publishedSchema(),
+        };
+
+        expect(await app.enableCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
+
+        expect(await app.projectVariables()).toEqual(before.variables);
+        expect(await app.committed.idpDocument(ACME.slug)).toEqual(before.connection);
+        expect(await app.publishedSchema()).toEqual(before.schema);
+        expect(await app.plan()).toReportNothingToDo();
+        expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+      });
+
+      it("allows a second connection to the same issuer under another name", async () => {
+        const app = await anAppServingAcme();
+        const staff = { ...ACME, slug: "acme-staff", displayName: "Acme staff" };
+
+        const result = await app.enableCustomSso(staff, {
+          clientId: "staff-client-id",
+          secret: "staff-client-secret",
+        });
+
+        expect(result).toSucceed();
+        expect(await app.apply()).toSucceed();
+        expect((await app.registeredIdps()).map((idp) => idp.slug).sort()).toEqual([
+          "acme-sso",
+          "acme-staff",
+        ]);
+        const { schema } = await app.publishedSchema();
+        expect(schema["x-auth-methods"]?.sso?.providers).toEqual(["acme-sso", "acme-staff"]);
+        const offering = await app.stepsOfferingSso();
+        expect(offering.map((step) => step.name)).toContain("sso-conflict");
+        for (const step of offering) {
+          expect(step.sso_providers, step.name).toEqual(["acme-sso", "acme-staff"]);
+        }
+      });
+
+      it("offers a custom connection beside Google without disturbing it", async () => {
+        const app = await anAppServingGoogle();
+
+        expect(await app.enableCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
+        expect(await app.apply()).toSucceed();
+
+        const { schema } = await app.publishedSchema();
+        expect(schema["x-auth-methods"]?.sso?.providers).toEqual([GOOGLE, "acme-sso"]);
+        for (const step of await app.stepsOfferingSso()) {
+          expect(step.sso_providers, step.name).toEqual([GOOGLE, "acme-sso"]);
+        }
+      });
+
+      it("stops when the name belongs to a connection to another provider", async () => {
+        const app = await anAppServingAcme();
+
+        const result = await app.enableCustomSso(
+          { ...ACME, issuer: "https://sso.other.example" },
+          ACME_CREDENTIALS,
+        );
+
+        expect(result).toFail();
+        expect(result).toPrint("already named acme-sso");
+      });
+
+      it("refuses the name of a built-in provider", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.enableCustomSso({ ...ACME, slug: "google" }, ACME_CREDENTIALS);
+
+        expect(result).toFail();
+        expect(result).toPrint("built-in provider");
+        expect(await app.filesContaining("Acme SSO")).toEqual([]);
+      });
+
+      it("refuses scopes without openid", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.enableCustomSso(
+          { ...ACME, scopes: "profile email" },
+          ACME_CREDENTIALS,
+        );
+
+        expect(result).toFail();
+        expect(result).toPrint("must include openid");
+      });
+
+      it("refuses an issuer the server would refuse", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.enableCustomSso(
+          { ...ACME, issuer: "http://sso.acme.example" },
+          ACME_CREDENTIALS,
+        );
+
+        expect(result).toFail();
+        expect(result).toPrint("https://");
+      });
+
+      it("needs the name, display name and issuer", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.enableSsoWith(["--provider", "custom"]);
+
+        expect(result).toFail();
+        expect(result).toPrint("--slug, --display-name, --issuer");
+      });
+
+      it("refuses the custom flags for a provider the catalog describes", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.enableSsoWith([
+          "--provider",
+          "google",
+          "--issuer",
+          "https://sso.acme.example",
+          "--client-id",
+          CREDENTIALS.clientId,
+        ]);
+
+        expect(result).toFail();
+        expect(result).toPrint("only applies to a custom connection");
       });
     });
 

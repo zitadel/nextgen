@@ -588,19 +588,21 @@ describe("materializeSetupResources with several providers", () => {
     const google = actual.idpProvider("google");
     // Two providers differing only in slug and display name: enough for the
     // loops, and the connection body stays a real one the contract accepts.
+    const fake = (slug: string) => ({
+      ...google,
+      slug,
+      displayName: slug === "acme" ? "Acme SSO" : "Google",
+      connection: (input: Parameters<typeof google.connection>[0]) => ({
+        ...(google.connection(input) as Record<string, unknown>),
+        slug,
+        display_name: slug === "acme" ? "Acme SSO" : "Google",
+      }),
+    });
     vi.doMock("@zitadel/config/idp", () => ({
       ...actual,
       IDP_PROVIDERS: ["google", "acme"],
-      idpProvider: (slug: string) => ({
-        ...google,
-        slug,
-        displayName: slug === "acme" ? "Acme SSO" : "Google",
-        connection: (input: Parameters<typeof google.connection>[0]) => ({
-          ...(google.connection(input) as Record<string, unknown>),
-          slug,
-          display_name: slug === "acme" ? "Acme SSO" : "Google",
-        }),
-      }),
+      idpProvider: fake,
+      idpProviderFor: fake,
     }));
 
     const { materializeSetupResources: materialize } = await import(

@@ -164,6 +164,11 @@ class CommittedFiles {
     }>;
   }
 
+  /** A connection exactly as committed, whatever else it carries. */
+  idpDocument(slug: string): Promise<Record<string, unknown>> {
+    return this.read(`.zitadel/idps/${slug}.json`);
+  }
+
   /** The ejected branding descriptor. */
   brandingDescriptor(): Promise<Record<string, unknown>> {
     return this.read(".zitadel/branding/branding.json");
@@ -185,6 +190,27 @@ class CommittedFiles {
       unknown
     >;
   }
+}
+
+/** What a developer says about a connection the catalog does not list. */
+export type CustomConnection = {
+  slug: string;
+  displayName: string;
+  issuer: string;
+  scopes?: string;
+};
+
+/** The flags describing a connection, under `--` for `sso enable` or `--sso-` for `setup`. */
+function customFlags(connection: CustomConnection, prefix: string): string[] {
+  return [
+    `${prefix}slug`,
+    connection.slug,
+    `${prefix}display-name`,
+    connection.displayName,
+    `${prefix}issuer`,
+    connection.issuer,
+    ...(connection.scopes === undefined ? [] : [`${prefix}scopes`, connection.scopes]),
+  ];
 }
 
 /**
@@ -257,6 +283,50 @@ export class ScaffoldedApp {
         "--provider",
         provider,
         "--client-id",
+        credentials.clientId,
+      ]),
+    );
+  }
+
+  /** `sso enable` for a connection the developer describes, secret piped as a script would. */
+  enableCustomSso(
+    connection: CustomConnection,
+    credentials: Credentials,
+    extraArgs: string[] = [],
+  ): Promise<CliResult> {
+    return this.pipingSecret(credentials.secret, () =>
+      this.cli([
+        "sso",
+        "enable",
+        "--non-interactive",
+        "--json",
+        "--provider",
+        "custom",
+        ...customFlags(connection, "--"),
+        "--client-id",
+        credentials.clientId,
+        ...extraArgs,
+      ]),
+    );
+  }
+
+  /** `sso enable` with exactly these flags, for a spec asserting how it refuses. */
+  enableSsoWith(args: string[], secret = "a-client-secret"): Promise<CliResult> {
+    return this.pipingSecret(secret, () =>
+      this.cli(["sso", "enable", "--non-interactive", "--json", ...args]),
+    );
+  }
+
+  /** `setup` with a custom connection described on the command line. */
+  setupWithCustomSso(connection: CustomConnection, credentials: Credentials): Promise<CliResult> {
+    return this.pipingSecret(credentials.secret, () =>
+      this.setup([
+        "--framework",
+        "next",
+        "--sso",
+        "custom",
+        ...customFlags(connection, "--sso-"),
+        "--sso-client-id",
         credentials.clientId,
       ]),
     );

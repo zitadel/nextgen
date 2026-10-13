@@ -7,6 +7,7 @@
  * request to read an email, a claim the vendor does not emit — differ in
  * behaviour. Holding that in the provider keeps it out of the callers.
  */
+import { CUSTOM_PROVIDER, CustomOidcProvider, type CustomOidcInput } from "./custom.js";
 import { GoogleProvider } from "./google.js";
 import type { IdpProvider } from "./provider.js";
 
@@ -38,8 +39,36 @@ export function idpProvider(slug: string): IdpProvider {
   return provider;
 }
 
+/**
+ * The provider a setup or enable answer names: a catalog entry, or a custom
+ * connection built from what the developer supplied.
+ *
+ * Both callers hold the same two things — the `--provider` value and, for
+ * `custom`, its settings — so the choice lives here once.
+ */
+export function idpProviderFor(provider: string, custom?: CustomOidcInput): IdpProvider {
+  return provider === CUSTOM_PROVIDER ? customProvider(custom) : idpProvider(provider);
+}
+
+function customProvider(custom: CustomOidcInput | undefined): IdpProvider {
+  if (custom === undefined) {
+    throw new Error(`provider ${JSON.stringify(CUSTOM_PROVIDER)} needs its connection settings`);
+  }
+  return new CustomOidcProvider(custom);
+}
+
 export { ISSUER_REQUIREMENT, isSupportedIssuer } from "./issuer.js";
 
+export {
+  CUSTOM_PROVIDER,
+  CustomOidcProvider,
+  DEFAULT_CUSTOM_SCOPES,
+  displayNameProblem,
+  parseScopes,
+  scopesProblem,
+  slugProblem,
+  type CustomOidcInput,
+} from "./custom.js";
 export { GoogleProvider } from "./google.js";
 export { OidcProvider } from "./oidc-provider.js";
 export {

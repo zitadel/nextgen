@@ -123,6 +123,44 @@ After claim, the same sub-journey runs behind the Sign-in methods journey.
 * **Skip destination:** a provider skipped during setup is added later through
   this journey.
 
+## Custom OpenID Connect Connections
+
+A provider the catalog does not list is not an entry in it.
+The developer describes the connection instead, and the same sub-journey
+announces, collects credentials, scaffolds and writes it
+(`sso enable --provider custom`, and the "another OpenID Connect provider"
+option in `zitadel setup`, `--sso custom`).
+
+| Input | Rule |
+| :--- | :--- |
+| **Slug** | Names the connection; schemas and flows reference it by this. Must match the connection contract (`^[a-z0-9][a-z0-9_-]*$`, 64 characters at most) and must not be a catalog slug such as `google`. |
+| **Display name** | Shown on the sign-in button. |
+| **Issuer** | The provider's issuer URL, checked against the same pattern the server enforces. Endpoints come from OIDC discovery; none are written. |
+| **Scopes** | Space or comma separated; `openid` is required. Defaults to `openid profile email`. |
+
+What is different from a catalog provider:
+
+* **Identified by slug, never by issuer.** A Project may hold several
+  connections to one issuer, with different credentials or mappings, so the
+  slug is the only thing that says "the same connection". A slug already in use
+  is reused when it names a connection to the same issuer (rerunning changes
+  nothing) and refused when it names a connection to somewhere else, since
+  replacing it would repoint every schema and flow that references it.
+* **No vendor knowledge.** No console URL to open, no `template` written (the
+  login UI shows a text-only button), and no callback guidance.
+  The announce step names the issuer as the place to register the client.
+* **Standard claims only.** The connection maps the claims the `profile` and
+  `email` scopes define, narrowed to the properties the schema has
+  (`email → email`, `givenName → given_name`, `familyName → family_name`), and
+  trusts `email` only when the provider returns `email_verified: true`.
+  That is the OpenID Connect standard, not Google's behaviour.
+  Any other attribute (`contactEmail → mail`) is mapped by editing the file;
+  explicit inputs for those mappings and for `verified_claims` come later.
+* **Credential variables follow the slug**: `ACME_SSO_CLIENT_ID` and
+  `ACME_SSO_CLIENT_SECRET` for `acme-sso`, exactly as for a catalog provider.
+* **`setup` takes one custom connection.** The wizard offers the option once;
+  further connections are added with `sso enable`.
+
 ## Callback URIs
 
 The callback URI follows Area 3's exact specification

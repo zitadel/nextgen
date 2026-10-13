@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import {
   credentialVariables,
+  type CustomOidcInput,
   idpProvider,
   isVariableReference,
   referencedVariable,
@@ -284,27 +285,7 @@ export function planConnection(options: {
 
   const [match] = matches;
   if (match !== undefined) {
-    const existing = clientIdOf(match);
-    // A scaffolded connection stores `${{ NAME }}`, not an id, so there is no
-    // identity in the file to disagree with and the command stays idempotent.
-    // A hand-written connection may still hold a literal, and that one is
-    // worth refusing: rerunning with a different id would otherwise reuse a
-    // file configured for another client.
-    const literal = existing !== undefined && !isVariableReference(existing);
-    if (options.clientId !== undefined && literal && existing !== options.clientId) {
-      throw new ZitadelError(
-        "E_VALIDATION",
-        `${match.path} already uses client id ${existing}, not ${options.clientId}`,
-        {
-          hint: "Edit the connection file to change its client id, or run the command without one to reuse it.",
-          details: {
-            file: match.path,
-            stored_client_id: existing,
-            supplied_client_id: options.clientId,
-          },
-        },
-      );
-    }
+    refuseDifferentClientId(match, options.clientId);
     // A file can match on template or issuer while carrying no slug of its
     // own. Inventing the provider's would point the schema and every flow at
     // an identity the connection does not declare, and the server rejects the
@@ -346,4 +327,111 @@ export function planConnection(options: {
   }
   refuseCollidingVariables(credentialVariables(slug), slug, options.files);
   return { action: "create", name, path, slug };
+}
+
+/**
+ * Stop when the developer names a client id other than the one a connection
+ * already holds.
+ *
+ * A scaffolded connection stores `${{ NAME }}`, not an id, so there is no
+ * identity in the file to disagree with and the command stays idempotent.
+ * A hand-written connection may still hold a literal, and that one is
+ * worth refusing: rerunning with a different id would otherwise reuse a
+ * file configured for another client.
+ */
+function refuseDifferentClientId(match: ConnectionFile, clientId: string | undefined): void {
+  const existing = clientIdOf(match);
+  const literal = existing !== undefined && !isVariableReference(existing);
+  if (clientId !== undefined && literal && existing !== clientId) {
+    throw new ZitadelError(
+      "E_VALIDATION",
+      `${match.path} already uses client id ${existing}, not ${clientId}`,
+      {
+        hint: "Edit the connection file to change its client id, or run the command without one to reuse it.",
+        details: {
+          file: match.path,
+          stored_client_id: existing,
+          supplied_client_id: clientId,
+        },
+      },
+    );
+  }
+}
+
+/** An issuer compared as the provider publishes it: a trailing slash is not a difference. */
+function sameIssuer(a: string, b: string): boolean {
+  return a.trim().replace(/\/+$/, "") === b.trim().replace(/\/+$/, "");
+}
+
+/**
+ * Decide what to do with a custom connection, identified by the slug the
+ * developer supplied.
+ *
+ * Unlike {@link planConnection} this never looks at the template or the
+ * issuer to find a connection: a Project may hold several connections to one
+ * issuer, with different credentials or mappings, and what tells them apart
+ * is the name. The slug is also what schemas and flows reference, so it is
+ * the only thing that can say "the same connection".
+ *
+ * A slug already in use is reused only when it is the same provider — the
+ * same issuer — so that repeating a command changes nothing. The same name on
+ * a connection to somewhere else is somebody else's, and replacing it would
+ * repoint every schema and flow that names it.
+ */
+export function planCustomConnection(options: {
+  readonly input: CustomOidcInput;
+  readonly files: readonly ConnectionFile[];
+  readonly clientId?: string;
+}): ConnectionPlan {
+  const { slug, issuer } = options.input;
+  const name = `${slug}.json`;
+  const path = `${IDPS_DIR}/${name}`;
+  const holders = options.files.filter((file) => file.body.slug === slug);
+
+  if (holders.length > 1) {
+    throw new ZitadelError(
+      "E_CONFLICT",
+      `More than one connection is named ${slug}: ${holders.map((h) => h.path).join(", ")}`,
+      {
+        hint: "A slug names one connection. Remove or rename all but one, then run the command again.",
+        details: { slug, files: holders.map((h) => h.path) },
+      },
+    );
+  }
+
+  const [match] = holders;
+  if (match === undefined) {
+    // Nothing declares the slug, but the file name is where this one would go.
+    if (options.files.some((file) => file.name === name)) {
+      throw new ZitadelError(
+        "E_CONFLICT",
+        `${path} already exists and is not the ${slug} connection`,
+        {
+          hint: "Rename or remove that file, or choose another --slug, then run the command again.",
+          details: { file: path, slug },
+        },
+      );
+    }
+    refuseCollidingVariables(credentialVariables(slug), slug, options.files);
+    return { action: "create", name, path, slug };
+  }
+
+  const oidc = match.body.oidc;
+  const existingIssuer =
+    isObject(oidc) && typeof oidc.issuer === "string" ? oidc.issuer : undefined;
+  if (existingIssuer === undefined || !sameIssuer(existingIssuer, issuer)) {
+    throw new ZitadelError(
+      "E_CONFLICT",
+      existingIssuer === undefined
+        ? `${match.path} is already named ${slug} and is not an OIDC connection to ${issuer}`
+        : `${match.path} is already named ${slug} and connects to ${existingIssuer}, not ${issuer}`,
+      {
+        hint: "Choose another --slug for this connection, or edit that file if it is the one you mean.",
+        details: { file: match.path, slug, issuer, existing_issuer: existingIssuer ?? null },
+      },
+    );
+  }
+  refuseDifferentClientId(match, options.clientId);
+  refuseCollidingVariables(credentialVariablesOf(match, slug), slug, options.files, match);
+  return { action: "reuse", file: match, slug };
 }

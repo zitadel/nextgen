@@ -297,6 +297,112 @@ describe("setup", () => {
 
         expect(await app.plan()).toReportNothingToDo();
       });
+
+      describe("with a custom OpenID Connect provider", () => {
+        const ACME = {
+          slug: "acme-sso",
+          displayName: "Acme SSO",
+          issuer: "https://sso.acme.example",
+        };
+        const ACME_CREDENTIALS = { clientId: "acme-client-id", secret: "acme-client-secret" };
+
+        it("registers the connection under the name the developer gave it", async () => {
+          const app = await anApp();
+
+          const result = await app.setupWithCustomSso(ACME, ACME_CREDENTIALS);
+
+          expect(result).toSucceed();
+          expect((await app.registeredIdps()).map((idp) => idp.slug)).toEqual(["acme-sso"]);
+        });
+
+        it("commits the developer's own settings, with references to its credentials", async () => {
+          const app = await anApp();
+          expect(await app.setupWithCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
+
+          const connection = await app.committed.idpDocument("acme-sso");
+
+          expect(connection).toMatchObject({
+            slug: "acme-sso",
+            display_name: "Acme SSO",
+            oidc: {
+              issuer: "https://sso.acme.example",
+              client_id: "${{ ACME_SSO_CLIENT_ID }}",
+              client_secret: "${{ ACME_SSO_CLIENT_SECRET }}",
+            },
+          });
+          expect(connection).not.toHaveProperty("template");
+        });
+
+        it("publishes the credentials under names taken from the connection", async () => {
+          const app = await anApp();
+          expect(await app.setupWithCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
+
+          const published = await app.projectVariables();
+
+          expect(published).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({ name: "ACME_SSO_CLIENT_ID", value: "acme-client-id" }),
+            ]),
+          );
+          const held = published.find((variable) => variable.name === "ACME_SSO_CLIENT_SECRET");
+          expect(held).toMatchObject({ secret: true });
+          expect(held).not.toHaveProperty("value");
+        });
+
+        it("keeps its credentials out of every file in the project", async () => {
+          const app = await anApp();
+          expect(await app.setupWithCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
+
+          expect(await app.filesContaining(ACME_CREDENTIALS.secret)).toEqual([]);
+          expect(await app.filesContaining(ACME_CREDENTIALS.clientId)).toEqual([]);
+        });
+
+        it("offers the connection by its slug on the published schema and steps", async () => {
+          const app = await anApp();
+          expect(await app.setupWithCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
+
+          const { schema } = await app.publishedSchema();
+          const offering = await app.stepsOfferingSso();
+
+          expect(schema["x-auth-methods"]?.sso).toEqual({
+            enabled: true,
+            providers: ["acme-sso"],
+          });
+          expect(offering.map((step) => step.name)).toEqual(
+            expect.arrayContaining(["identifier", "register", "sso-conflict"]),
+          );
+          for (const step of offering) {
+            expect(step.sso_providers, step.name).toEqual(["acme-sso"]);
+          }
+        });
+
+        it("leaves nothing to reconcile", async () => {
+          const app = await anApp();
+          expect(await app.setupWithCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
+
+          expect(await app.plan()).toReportNothingToDo();
+        });
+
+        it("lets a second connection to the same issuer be added afterwards", async () => {
+          const app = await anApp();
+          expect(await app.setupWithCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
+
+          const second = await app.enableCustomSso(
+            { ...ACME, slug: "acme-staff", displayName: "Acme staff" },
+            { clientId: "staff-client-id", secret: "staff-client-secret" },
+          );
+
+          expect(second).toSucceed();
+          expect(await app.apply()).toSucceed();
+          expect((await app.registeredIdps()).map((idp) => idp.slug).sort()).toEqual([
+            "acme-sso",
+            "acme-staff",
+          ]);
+          for (const step of await app.stepsOfferingSso()) {
+            expect(step.sso_providers, step.name).toEqual(["acme-sso", "acme-staff"]);
+          }
+        });
+      });
     });
   });
 });

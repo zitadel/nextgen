@@ -5,7 +5,12 @@ import { Flags } from "@oclif/core";
 import { password, text } from "@clack/prompts";
 import { consola } from "consola";
 
-import { credentialVariables, idpProvider, IDP_PROVIDERS } from "@zitadel/config/idp";
+import {
+  credentialVariables,
+  CUSTOM_PROVIDER,
+  idpProviderFor,
+  IDP_PROVIDERS,
+} from "@zitadel/config/idp";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
@@ -19,16 +24,19 @@ import {
   askConnectionEndpoints,
   callbackUriFor,
   CONNECTION_SCHEMA_REF,
+  customConnectionFromFlags,
   enabledMethods,
   type FlowFile,
   IDPS_DIR,
   credentialVariablesOf,
   planConnection,
+  planCustomConnection,
   publishClientId,
   type PublishState,
   readConnectionFiles,
   readFlowFiles,
   readSchemaFiles,
+  refuseCustomFlagsWithoutCustom,
   reportClientIdOutcome,
   type StoredVariables,
   republishCommands,
@@ -72,14 +80,29 @@ export default class SsoEnable extends BaseCommand {
     "<%= config.bin %> sso enable --provider google",
     "<%= config.bin %> sso enable --provider google --schema customers",
     "<%= config.bin %> sso enable --provider google --client-id 1234-abc.apps.googleusercontent.com --non-interactive < secret.txt",
+    "<%= config.bin %> sso enable --provider custom --slug acme-sso --display-name 'Acme SSO' --issuer https://sso.acme.example",
+    "<%= config.bin %> sso enable --provider custom --slug acme-sso --display-name 'Acme SSO' --issuer https://sso.acme.example --scopes 'openid profile email groups' --client-id abc123 --non-interactive < secret.txt",
   ];
   static override flags = {
     // Not `required`: oclif's own "Missing required flag provider" is the one
     // refusal in this command that would carry no hint, and every other error
     // here names the next move. The check below does that instead.
     provider: Flags.string({
-      options: [...IDP_PROVIDERS],
-      description: "Identity provider to enable.",
+      options: [...IDP_PROVIDERS, CUSTOM_PROVIDER],
+      description: `Identity provider to enable, or "${CUSTOM_PROVIDER}" for any other OpenID Connect provider.`,
+    }),
+    slug: nonBlankString({
+      description: "Name of the custom connection. Schemas and flows refer to it by this.",
+    }),
+    "display-name": nonBlankString({
+      description: "Name shown on the custom connection's sign-in button.",
+    }),
+    issuer: nonBlankString({
+      description: "Issuer URL of the custom provider. Its endpoints are found by OIDC discovery.",
+    }),
+    scopes: nonBlankString({
+      description:
+        "Scopes the custom connection requests, separated by spaces or commas. Must include openid. Default: openid profile email.",
     }),
     schema: nonBlankString({
       description: "User schema to change. Required when the Project has more than one.",
@@ -103,7 +126,31 @@ export default class SsoEnable extends BaseCommand {
         hint: `Pass --provider, e.g. --provider ${IDP_PROVIDERS[0]}.`,
       });
     }
-    const entry = idpProvider(provider);
+    const customFlags = {
+      slug: flags.slug,
+      displayName: flags["display-name"],
+      issuer: flags.issuer,
+      scopes: flags.scopes,
+    };
+    const flagNames = {
+      provider: "--provider",
+      slug: "--slug",
+      displayName: "--display-name",
+      issuer: "--issuer",
+      scopes: "--scopes",
+    };
+    refuseCustomFlagsWithoutCustom(customFlags, flagNames, provider);
+    // Checked before the Project is read, like the provider itself: a name or
+    // issuer the server would refuse on apply is refused here, where it was typed.
+    const custom =
+      provider === CUSTOM_PROVIDER
+        ? customConnectionFromFlags(
+            customFlags,
+            flagNames,
+            "--provider custom --slug acme-sso --display-name 'Acme SSO' --issuer https://sso.acme.example",
+          )
+        : undefined;
+    const entry = idpProviderFor(provider, custom);
 
     // The Project is read before anything is asked for: being turned away
     // after typing a secret would mean typing it again.
@@ -121,7 +168,12 @@ export default class SsoEnable extends BaseCommand {
     const connections = await readConnectionFiles(cwd);
     // `nonBlankString` has already refused a blank one and trimmed the rest.
     const clientIdFlag = flags["client-id"];
-    const plan = planConnection({ provider, files: connections, clientId: clientIdFlag });
+    // A custom connection is found by the slug the developer gave it. A catalog
+    // provider has one connection, found by what it is.
+    const plan =
+      custom === undefined
+        ? planConnection({ provider, files: connections, clientId: clientIdFlag })
+        : planCustomConnection({ input: custom, files: connections, clientId: clientIdFlag });
 
     const reusing = plan.action === "reuse";
     // A reused connection may name its own variables — it is an editable file
@@ -216,16 +268,26 @@ export default class SsoEnable extends BaseCommand {
     } else {
       consola.info(`${entry.displayName} needs an OAuth application.`);
       consola.info(`Callback URI   ${callbackUri}`);
-      consola.info(`Create it at   ${entry.consoleUrl}`);
+      // A custom provider has no console to send the developer to: it is
+      // theirs, and the issuer they gave is the only address known.
+      consola.info(
+        entry.consoleUrl === undefined
+          ? `Register it as a client at ${entry.issuer}, with the callback URI above.`
+          : `Create it at   ${entry.consoleUrl}`,
+      );
 
       // Before the credentials: on a development run (ZITADEL_CLI_DEV) the
       // provider may be a local stand-in, and the client is registered with
-      // whatever answers.
-      const endpoints = await askConnectionEndpoints({
-        provider,
-        developmentBuild: isDevelopmentBuild() && !nonInteractive,
-        command: "Enable",
-      });
+      // whatever answers. Not asked of a custom connection, whose issuer the
+      // developer has already given.
+      const endpoints =
+        custom === undefined
+          ? await askConnectionEndpoints({
+              provider,
+              developmentBuild: isDevelopmentBuild() && !nonInteractive,
+              command: "Enable",
+            })
+          : undefined;
       const clientId = clientIdFlag ?? (await this.askClientId(entry.displayName, nonInteractive));
       const secretValue = await this.askClientSecret(scaffolded.clientSecret, nonInteractive);
 

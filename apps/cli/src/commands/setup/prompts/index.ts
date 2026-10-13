@@ -18,6 +18,7 @@ import type { SetupPrompt } from "./types";
 import { UseCasePrompt } from "./use-case";
 
 export type { PromptContext, SetupAnswers, SetupPrompt, SsoAnswer } from "./types";
+export { ssoProvider, ssoSlug } from "./types";
 export { bail } from "./cancel";
 export { DevPortPrompt } from "./dev-port";
 export { FrameworkConfirmPrompt } from "./framework-confirm";

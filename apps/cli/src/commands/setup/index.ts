@@ -12,7 +12,12 @@ import {
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
-import { credentialVariables, idpProvider, IDP_PROVIDERS } from "@zitadel/config/idp";
+import {
+  credentialVariables,
+  CUSTOM_PROVIDER,
+  type CustomOidcInput,
+  IDP_PROVIDERS,
+} from "@zitadel/config/idp";
 import { consola } from "consola";
 
 import { createZitadelClient } from "../../lib/api-client";
@@ -28,8 +33,11 @@ import {
 } from "../../lib/claim-state";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import {
+  customConnectionFromFlags,
+  customFlagText,
   publishClientId,
   type PublishState,
+  refuseCustomFlagsWithoutCustom,
   reportClientIdOutcome,
   reportSecretOutcome,
   republishCommands,
@@ -67,7 +75,14 @@ import {
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
 import { installDependenciesForSetup } from "./install";
-import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers, type SsoAnswer } from "./prompts";
+import {
+  PickFrameworkPrompt,
+  SETUP_PROMPTS,
+  type SetupAnswers,
+  type SsoAnswer,
+  ssoProvider,
+  ssoSlug,
+} from "./prompts";
 import {
   detectProjectFacts,
   fileNameOf,
@@ -161,10 +176,24 @@ export default class Setup extends BaseCommand {
     sso: Flags.string({
       description:
         "Social sign-in provider to enable while scaffolding, e.g. google. Skips the wizard's provider question; needs --sso-client-id, and the OAuth application must already be registered with the provider. Pipe the client secret in on stdin; never pass it as a flag.",
-      options: [...IDP_PROVIDERS],
+      options: [...IDP_PROVIDERS, CUSTOM_PROVIDER],
     }),
     "sso-client-id": nonBlankString({
       description: "Client id of the OAuth application registered with the --sso provider.",
+    }),
+    "sso-slug": nonBlankString({
+      description: "With --sso custom: the name of the connection. Schemas and flows refer to it.",
+    }),
+    "sso-display-name": nonBlankString({
+      description: "With --sso custom: the name shown on the sign-in button.",
+    }),
+    "sso-issuer": nonBlankString({
+      description:
+        "With --sso custom: the provider's issuer URL. Its endpoints come from OIDC discovery.",
+    }),
+    "sso-scopes": nonBlankString({
+      description:
+        "With --sso custom: the scopes to request, separated by spaces or commas. Must include openid. Default: openid profile email.",
     }),
   };
 
@@ -341,6 +370,7 @@ export default class Setup extends BaseCommand {
             devPort: answers.devPort,
             sso: answers.sso.map((answer) => ({
               provider: answer.provider,
+              custom: answer.custom,
               clientId: answer.clientId,
             })),
           },
@@ -447,21 +477,21 @@ export default class Setup extends BaseCommand {
     if (answers.sso.length > 0 && !dryRun) {
       const publish = ssoCredentialPublisher(answers.server, project);
       for (const answer of answers.sso) {
-        const idVariable = credentialVariables(answer.provider).clientId;
-        const variable = credentialVariables(answer.provider).clientSecret;
+        const idVariable = credentialVariables(ssoSlug(answer)).clientId;
+        const variable = credentialVariables(ssoSlug(answer)).clientSecret;
         const clientId = await publishClientId({
           name: idVariable,
           value: answer.clientId,
           publish,
         });
         const secret = await storeClientSecret({ name: variable, value: answer.secret, publish });
-        ssoOutcomes.set(answer.provider, { clientId, secret });
+        ssoOutcomes.set(ssoSlug(answer), { clientId, secret });
         if (answer.endpoints?.issuer !== undefined) {
           // Said out loud: a connection pointing somewhere other than the
           // vendor is not what the developer will want in the end, and nothing
           // else in the summary would show it.
           reportWarning(
-            `${idpProvider(answer.provider).displayName} points at ` +
+            `${ssoProvider(answer).displayName} points at ` +
               `${answer.endpoints.issuer}, not the provider`,
           );
         }
@@ -686,14 +716,15 @@ export default class Setup extends BaseCommand {
         // when none was. An agent reading this needs to know which provider a
         // deferred publish belongs to, so the outcomes stay per entry.
         sso: answers.sso.map((answer) => {
-          const outcome = ssoOutcomes.get(answer.provider);
+          const outcome = ssoOutcomes.get(ssoSlug(answer));
           return {
             provider: answer.provider,
+            slug: ssoSlug(answer),
             client_id: answer.clientId,
-            connection: `.zitadel/idps/${answer.provider}.json`,
+            connection: `.zitadel/idps/${ssoSlug(answer)}.json`,
             client_id_variable: outcome
               ? {
-                  variable: credentialVariables(answer.provider).clientId,
+                  variable: credentialVariables(ssoSlug(answer)).clientId,
                   published: outcome.clientId,
                 }
               : null,
@@ -716,10 +747,10 @@ export default class Setup extends BaseCommand {
         next_commands: [
           ...republishCommands(
             answers.sso.flatMap((answer) => {
-              const outcome = ssoOutcomes.get(answer.provider);
+              const outcome = ssoOutcomes.get(ssoSlug(answer));
               return [
                 {
-                  name: credentialVariables(answer.provider).clientId,
+                  name: credentialVariables(ssoSlug(answer)).clientId,
                   secret: false,
                   published: outcome?.clientId,
                 },
@@ -821,44 +852,91 @@ function dryRunProject(issuer: string): CreateProject201 {
  * on stdin means nothing was piped, and reading it would block forever, so
  * that case is treated as "not supplied".
  */
+/** The `--sso-*` flags that describe a custom connection, as the shared checks name them. */
+const SSO_FLAG_NAMES = {
+  provider: "--sso",
+  slug: "--sso-slug",
+  displayName: "--sso-display-name",
+  issuer: "--sso-issuer",
+  scopes: "--sso-scopes",
+} as const;
+
 async function ssoFromFlags(
   flags: {
     sso?: string;
     "sso-client-id"?: string;
+    "sso-slug"?: string;
+    "sso-display-name"?: string;
+    "sso-issuer"?: string;
+    "sso-scopes"?: string;
   },
   nonInteractive: boolean,
   dryRun: boolean,
 ): Promise<SsoAnswer | undefined> {
+  const customValues = {
+    slug: flags["sso-slug"],
+    displayName: flags["sso-display-name"],
+    issuer: flags["sso-issuer"],
+    scopes: flags["sso-scopes"],
+  };
   if (flags.sso === undefined) {
     if (flags["sso-client-id"] !== undefined) {
       throw new ZitadelError("E_VALIDATION", "--sso-client-id needs --sso", {
         hint: "Name the provider with --sso, e.g. --sso google.",
       });
     }
+    const given = Object.entries(SSO_FLAG_NAMES)
+      .filter(
+        ([key]) =>
+          key !== "provider" && customValues[key as keyof typeof customValues] !== undefined,
+      )
+      .map(([, name]) => name);
+    if (given.length > 0) {
+      throw new ZitadelError("E_VALIDATION", `${given.join(", ")} needs --sso ${CUSTOM_PROVIDER}`, {
+        hint: `Name the provider with --sso ${CUSTOM_PROVIDER}.`,
+      });
+    }
     return undefined;
   }
+  refuseCustomFlagsWithoutCustom(customValues, SSO_FLAG_NAMES, flags.sso);
+  // Described before the credentials are asked for, and before a Project is
+  // created: a name or issuer the server would refuse is a mistake in the
+  // command line.
+  const custom =
+    flags.sso === CUSTOM_PROVIDER
+      ? customConnectionFromFlags(
+          customValues,
+          SSO_FLAG_NAMES,
+          "--sso custom --sso-slug acme-sso --sso-display-name 'Acme SSO' --sso-issuer https://sso.acme.example",
+        )
+      : undefined;
+  const withCustom = custom === undefined ? {} : { custom };
   const clientId = flags["sso-client-id"]?.trim();
   if (clientId === undefined || clientId === "") {
     // Interactively the wizard asks for it — `--sso` skips the question it
     // answers and no other, the way `--preset` does. Only a scripted run has
     // nobody to ask.
     if (!nonInteractive) {
-      return { provider: flags.sso, clientId: "", secret: "" };
+      return { provider: flags.sso, ...withCustom, clientId: "", secret: "" };
     }
+    const where = ssoProvider({ provider: flags.sso, custom, clientId: "", secret: "" });
     throw new ZitadelError("E_VALIDATION", `--sso ${flags.sso} needs --sso-client-id`, {
-      hint: `Register an OAuth application at ${idpProvider(flags.sso).consoleUrl} and pass its client id.`,
+      hint:
+        where.consoleUrl === undefined
+          ? `Register a client at ${where.issuer} and pass its client id.`
+          : `Register an OAuth application at ${where.consoleUrl} and pass its client id.`,
     });
   }
   if (!nonInteractive) {
     // The wizard asks for the secret, the way it asks for a client id that
     // `--sso-client-id` did not answer.
-    return { provider: flags.sso, clientId, secret: "" };
+    return { provider: flags.sso, ...withCustom, clientId, secret: "" };
   }
   if (dryRun) {
     // A preview publishes nothing and materialises nothing, so demanding a
     // real credential to see what setup would do is a toll for no reason --
     // and `sso enable --dry-run` returns before asking for one at all.
-    return { provider: flags.sso, clientId, secret: "" };
+    return { provider: flags.sso, ...withCustom, clientId, secret: "" };
   }
   const piped = process.stdin.isTTY ? "" : (await readStdin(process.stdin)).trim();
   if (piped === "") {
@@ -870,10 +948,10 @@ async function ssoFromFlags(
       // The client id is the developer's own, already on their command line,
       // so the example names the flag rather than echoing the value back into
       // a line they may paste somewhere else.
-      hint: `Pipe it in, e.g. \`printf '%s' "$GOOGLE_CLIENT_SECRET" | zitadel setup --sso ${flags.sso} --sso-client-id <id> ...\`.`,
+      hint: `Pipe it in, e.g. \`printf '%s' "$CLIENT_SECRET" | zitadel setup --sso ${flags.sso} --sso-client-id <id> ...\`.`,
     });
   }
-  return { provider: flags.sso, clientId, secret: piped };
+  return { provider: flags.sso, ...withCustom, clientId, secret: piped };
 }
 
 /**
@@ -905,7 +983,7 @@ type SetupRetryOptions = {
    * goes to the project's variables, which is where the engine resolves the
    * connection's `${{ NAME }}` from.
    */
-  sso?: readonly { provider: string; clientId: string }[];
+  sso?: readonly { provider: string; custom?: CustomOidcInput; clientId: string }[];
 };
 
 /**
@@ -942,6 +1020,11 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
     // accepted on emptiness alone into a command run verbatim, and nothing
     // here escapes it for a shell. The rerun asks for the id.
     parts.push(`--sso ${firstSso.provider}`);
+    // A custom connection is nothing without its description, and none of it is
+    // a credential, so unlike the client id it travels in the command.
+    if (firstSso.custom !== undefined) {
+      parts.push(customFlagText(firstSso.custom, SSO_FLAG_NAMES));
+    }
   }
   // `--non-interactive` is dropped when a provider is being configured: that
   // combination reads the client secret from stdin, and a command handed over
@@ -971,6 +1054,10 @@ function retryOptionsFromFlags(flags: {
   "non-interactive"?: boolean;
   sso?: string;
   "sso-client-id"?: string;
+  "sso-slug"?: string;
+  "sso-display-name"?: string;
+  "sso-issuer"?: string;
+  "sso-scopes"?: string;
 }): SetupRetryOptions {
   return {
     framework: flags.framework,
@@ -988,9 +1075,50 @@ function retryOptionsFromFlags(flags: {
     // means "ask for it", which is what the wizard does with it.
     sso:
       flags.sso !== undefined
-        ? [{ provider: flags.sso, clientId: flags["sso-client-id"] ?? "" }]
+        ? [
+            {
+              provider: flags.sso,
+              // The description, not the credentials: whatever was typed is
+              // restated as typed, and a retry that fails the same way names
+              // the same problem. An incomplete one is not restated -- it was
+              // refused, and a retry carrying half of it would be refused again.
+              custom: retryCustom(flags),
+              clientId: flags["sso-client-id"] ?? "",
+            },
+          ]
         : undefined,
   };
+}
+
+/**
+ * The custom connection the command line described, when it described one
+ * completely. A retry suggestion must be runnable, so a description the checks
+ * would refuse is left out rather than repeated.
+ */
+function retryCustom(flags: {
+  sso?: string;
+  "sso-slug"?: string;
+  "sso-display-name"?: string;
+  "sso-issuer"?: string;
+  "sso-scopes"?: string;
+}): CustomOidcInput | undefined {
+  if (flags.sso !== CUSTOM_PROVIDER) {
+    return undefined;
+  }
+  try {
+    return customConnectionFromFlags(
+      {
+        slug: flags["sso-slug"],
+        displayName: flags["sso-display-name"],
+        issuer: flags["sso-issuer"],
+        scopes: flags["sso-scopes"],
+      },
+      SSO_FLAG_NAMES,
+      "",
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -1041,7 +1169,7 @@ function ssoRecovery(
   }
   return {
     hint:
-      `The rerun configures ${chosen[0]?.provider ?? ""} only; add the rest with the sso enable ` +
+      `The rerun configures ${chosen[0]?.custom?.slug ?? chosen[0]?.provider ?? ""} only; add the rest with the sso enable ` +
       "commands below, which ask for each client id. ",
     // The client id is not interpolated into the command. These strings are
     // run verbatim, especially by agents, and nothing escapes them for a
@@ -1058,7 +1186,20 @@ function ssoRecovery(
     // somewhere nobody asked for. Both callers of this are local-server
     // failures, so `local` is the server meant in every case.
     commands: remaining.map((provider) =>
-      publicCliCommand(`sso enable --provider ${provider.provider} --server local`, cliVersion),
+      publicCliCommand(
+        `sso enable --provider ${provider.provider}${
+          provider.custom === undefined
+            ? ""
+            : ` ${customFlagText(provider.custom, {
+                provider: "--provider",
+                slug: "--slug",
+                displayName: "--display-name",
+                issuer: "--issuer",
+                scopes: "--scopes",
+              })}`
+        } --server local`,
+        cliVersion,
+      ),
     ),
   };
 }
@@ -1293,8 +1434,8 @@ function buildSummary(opts: {
   for (const answer of sso) {
     customizeRows.push({
       label: "Social sign-in",
-      value: idpProvider(answer.provider).displayName,
-      secondary: stylePath(`.zitadel/idps/${answer.provider}.json`),
+      value: ssoProvider(answer).displayName,
+      secondary: stylePath(`.zitadel/idps/${ssoSlug(answer)}.json`),
     });
   }
 

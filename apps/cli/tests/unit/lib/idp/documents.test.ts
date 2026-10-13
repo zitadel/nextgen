@@ -736,4 +736,85 @@ describe("refusing a document the editors would overwrite", () => {
       "x-auth-methods.sso.providers is not a list",
     );
   });
+
+  it("still gains a second provider after the server dropped its default primary: false", () => {
+    // What a real `apply` writes back: the conflict step's non-primary actions
+    // no longer say `primary: false`. Without this the step read as hand-edited
+    // and a second connection never reached it.
+    const first = applySsoToFlow(shippedFlow(), "google", { password: true, passkey: true });
+    const written = JSON.parse(JSON.stringify(first.document)) as {
+      steps: { name: string; actions?: Record<string, unknown>[] }[];
+    };
+    for (const step of written.steps) {
+      for (const action of step.actions ?? []) {
+        if (action.primary === false) {
+          delete action.primary;
+        }
+      }
+    }
+    const conflict = written.steps.find((step) => step.name === "sso-conflict");
+    expect(conflict?.actions?.some((action) => action.primary === false)).toBe(false);
+
+    const { document, skipped } = applySsoToFlow(written, "acme-sso", {
+      password: true,
+      passkey: true,
+    });
+    const steps = (document as { steps: { name: string; sso_providers?: unknown[] }[] }).steps;
+
+    expect(skipped).toEqual([]);
+    expect(steps.find((step) => step.name === "sso-conflict")?.sso_providers).toEqual([
+      "google",
+      "acme-sso",
+    ]);
+  });
+
+  it("still reports a step whose actions really were edited", () => {
+    const first = applySsoToFlow(shippedFlow(), "google", { password: true, passkey: true });
+    const written = JSON.parse(JSON.stringify(first.document)) as {
+      steps: { name: string; actions?: Record<string, unknown>[] }[];
+    };
+    const conflict = written.steps.find((step) => step.name === "sso-conflict");
+    // `primary: true` is not the default, so removing the generator's `false`
+    // elsewhere must not make this one invisible.
+    const passkey = conflict?.actions?.find((action) => action.name === "passkey");
+    if (passkey) {
+      passkey.primary = true;
+    }
+
+    const { skipped } = applySsoToFlow(written, "acme-sso", { password: true, passkey: true });
+
+    expect(skipped.map((entry) => entry.region)).toContain("steps.sso-conflict");
+  });
+
+  it("still gains a second provider after the platform filled in its empty defaults", () => {
+    // `apply` writes the canonical definition back, and the API always states
+    // `gates` and `sso_providers`. The step is the generator's own output
+    // however it is spelled, so a second provider must still reach it.
+    const first = applySsoToFlow(shippedFlow(), "google", { password: true, passkey: true });
+    const written = JSON.parse(JSON.stringify(first.document)) as {
+      steps: Record<string, unknown>[];
+    };
+    for (const step of written.steps) {
+      step.gates ??= {};
+      if (step.name === "register-sso") {
+        step.sso_providers ??= [];
+      }
+    }
+
+    const { document, skipped } = applySsoToFlow(written, "acme-sso", {
+      password: true,
+      passkey: true,
+    });
+    const steps = (document as { steps: { name: string; sso_providers?: unknown[] }[] }).steps;
+
+    expect(skipped).toEqual([]);
+    expect(steps.find((step) => step.name === "sso-conflict")?.sso_providers).toEqual([
+      "google",
+      "acme-sso",
+    ]);
+    expect(steps.find((step) => step.name === "identifier")?.sso_providers).toEqual([
+      "google",
+      "acme-sso",
+    ]);
+  });
 });
