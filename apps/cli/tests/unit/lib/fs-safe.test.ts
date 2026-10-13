@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { ZitadelError } from "../../../src/lib/errors";
-import { appendManagedEnvValue, writeManagedEnvFile } from "../../../src/lib/fs-safe";
+import { appendManagedEnvValue, enforceMode, writeManagedEnvFile } from "../../../src/lib/fs-safe";
+import { takeReportedWarnings } from "../../../src/lib/warnings";
 
 async function tmpFile(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "zitadel-fs-safe-"));
@@ -42,5 +43,16 @@ describe("fs-safe managed env writers", () => {
     await expect(
       writeManagedEnvFile(path, { ZITADEL_PROJECT_SECRET: "line\rbreak" }),
     ).rejects.toBeInstanceOf(ZitadelError);
+  });
+
+  it("enforceMode warns instead of throwing when the mode cannot be applied", async () => {
+    takeReportedWarnings();
+    const missing = join(await mkdtemp(join(tmpdir(), "zitadel-fs-safe-")), "gone");
+
+    await expect(enforceMode(missing, 0o600)).resolves.toBeUndefined();
+
+    expect(takeReportedWarnings()).toEqual([
+      expect.stringContaining("could not set it to 0600 (ENOENT)"),
+    ]);
   });
 });

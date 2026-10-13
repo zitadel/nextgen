@@ -40,19 +40,26 @@ Scope pointers first — this file's own body covers **telemetry only**:
   fails in that command's own spec whether or not the helper was used. The guard
   does not police a collection surfaced under a domain key by a non-`list`
   command (e.g. `variable resolve`'s `variables`), so build those with `listData`
-  too unless the non-canonical shape is deliberate and documented.
-- Managed env files (`.env.<name>.local`, which may carry a credential) are
-  written **only** through `writeManagedEnvFile` / `appendManagedEnvValue` in
-  `src/lib/fs-safe.ts`. Never call `node:fs` `writeFile`/`chmod` on one
-  directly. The utility is the single owner of three decisions that must not
-  drift between write sites: the `0600` mode; the chmod-failure policy (re-assert
-  the mode, but downgrade a failure to `reportWarning` and proceed — the value is
+  too unless the non-canonical shape is deliberate and documented. A Biome
+  GritQL rule (`biome-plugins/no-removed-key.grit`) also rejects a literal
+  `removed: true` at lint time, before a spec runs.
+- Files that may carry a credential are written through `src/lib/fs-safe.ts`:
+  `.env.<name>.local` through `writeManagedEnvFile` / `appendManagedEnvValue`,
+  and any other write that must hold a mode (`.zitadel/secret`, the local admin
+  credential, the scaffold file-writer) through `enforceMode`, which re-asserts
+  the mode after the write. The utility owns the decisions that must not drift
+  between write sites: the `0600` mode; the chmod-failure policy (re-assert the
+  mode, but downgrade a failure to `reportWarning` and proceed — the content is
   already on disk, so a throw would be one confusing failure followed by a next
-  run that reads it back and silently succeeds); and the line-break guard (a
-  `\n`/`\r` in a value is refused as a typed `E_VALIDATION`, because one `.env`
-  line per key means a newline would split or inject keys the next read
-  misparses). This is why there is no second hand-rolled env writer — `env add`
-  and the interactive `persistEnvValue` both go through it.
+  run that reads it back and silently succeeds); and, for `.env` files, the
+  line-break guard (a `\n`/`\r` in a value is refused as a typed `E_VALIDATION`,
+  because one `.env` line per key means a newline would split or inject keys the
+  next read misparses). Never write `chmod(...).catch(() => undefined)`: it hides
+  a mode we could not apply from the user and from the JSON envelope. A Biome
+  GritQL rule (`biome-plugins/no-swallowed-chmod.grit`) rejects that pattern, so
+  a new write site cannot reintroduce it. The rules are registered under
+  `plugins` in the root `biome.json`; add a new `.grit` file there for the next
+  pattern that a type or a spec cannot catch.
 - The flag surface deliberately tracks the [WebCLI spec](https://webcli.com/) so
   an agent can drive the CLI from conventions it already knows. That is the
   rationale; the canonical flag list, output-channel rules and the two
