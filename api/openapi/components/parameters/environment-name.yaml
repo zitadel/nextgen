@@ -1,6 +1,0 @@
-name: name
-in: path
-required: true
-description: The name of the environment, unique within the project.
-schema:
-  $ref: '../schemas/environment-name.yaml'

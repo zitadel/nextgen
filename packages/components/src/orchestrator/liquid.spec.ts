@@ -835,11 +835,11 @@ describe("localiseFlowErrorKeys", () => {
   });
 
   it("returns null for anything that is not an error.* key payload", () => {
-    // Outcome tokens stay verbatim with the caller.
-    expect(localiseFlowErrorKeys("user_not_found", ctx)).toBeNull();
+    // Any other payload stays verbatim with the caller.
+    expect(localiseFlowErrorKeys("not_a_key", ctx)).toBeNull();
     expect(localiseFlowErrorKeys("", ctx)).toBeNull();
     // A single non-key segment rejects the whole payload.
-    expect(localiseFlowErrorKeys("error.email_required; user_not_found", ctx)).toBeNull();
+    expect(localiseFlowErrorKeys("error.email_required; not_a_key", ctx)).toBeNull();
   });
 
   it("survives a locale without the generic keys via the hardcoded fallback", () => {

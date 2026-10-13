@@ -358,7 +358,7 @@ describe("users screen", () => {
       const router = await renderUsers();
 
       expect(await screen.findByText("Console API not authorized")).toBeInTheDocument();
-      expect(router.state.location.pathname).toBe("/users");
+      await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
     } finally {
       errorSpy.mockRestore();
       warnSpy.mockRestore();

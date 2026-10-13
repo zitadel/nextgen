@@ -1015,7 +1015,7 @@ export class ZitadelLogin extends ZitadelSurface {
     // `error.*` keys — the server's validation dialect
     // (`error.<field>_<rule>`, one key per violation, "; "-joined) —
     // localise via the catalog with generic per-rule fallbacks; anything
-    // else (outcome names, diagnostics) stays verbatim.
+    // else stays verbatim.
     const rawErrors: FlowError[] = step.error
       ? (localiseFlowErrorKeys(step.error, {
           locale: this.resolveLocale(),

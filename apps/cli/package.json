@@ -86,7 +86,9 @@
     "test:all": "pnpm run test",
     "readme": "oclif readme",
     "prepack": "tsdown && oclif manifest",
-    "postpack": "rm -f oclif.manifest.json"
+    "postpack": "rm -f oclif.manifest.json",
+    "lint": "biome check .",
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build"
   },
   "dependencies": {
     "@clack/prompts": "catalog:",
@@ -110,7 +112,8 @@
     "undici": "^7.24.7",
     "wrap-ansi": "^7.0.0",
     "zod": "catalog:",
-    "picocolors": "^1.1.1"
+    "picocolors": "^1.1.1",
+    "rosie-skills": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

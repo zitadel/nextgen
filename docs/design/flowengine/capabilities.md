@@ -39,8 +39,9 @@ to be a fast answer to "can I build flow X right now?"
 - Schema-driven `fields`: type, validation, `required`, uniqueness scope, challenge mapping from the `x-unique` annotation on user properties, or — for credential fields — the reserved `x-auth-methods#<method>` field name resolved against the schema's `x-auth-methods`.
 - `actions` — user-selectable, surfaced on the capability payload. `passkey` and `passkey_register` are recognized action names that drive the passkey ceremony.
 - `on_success: create_user` — hashes the password (argon2id) and applies user creation, password persistence, and the attempt's verified user + password factors in one transaction, so the new user counts as verified for the terminal handoff and the exchanged session carries real factors.
+- `on_success: create_user_with_sso` — on the step an unlinked identity is collected into: prefills the provider's claims, then creates the user from the submitted values and the claims the step does not show, and links the identity, in one transaction with the attempt's user and sso factors. A submitted unique value another user holds binds that user and routes `user_already_exists` instead ([area 3](../idp/3-social-login-flow.md#engine-rules-for-prefill--confirmation)).
 - `complete: redirect` and `complete: show` — terminal step classifiers.
-- Implicit identifier resolution from any identifier-shaped field; routes via `user_not_found` (login flows) or `user_already_exists` (register flows) when wired, errors otherwise. The engine flips `CurrentPurpose` on the matching outcome to switch sub-flows.
+- Implicit identifier resolution from any identifier-shaped field; routes via `user_not_found` (login flows) or `user_already_exists` (register flows) when wired, errors otherwise. The engine flips `CurrentPurpose` on the matching outcome to switch sub-flows. On an unwired `user_already_exists` the engine also drops the found user and starts a new auth attempt. The collected password stays, since it belongs to the account being created.
 - Implicit password verification when a password-shaped field is present and `on_success` is not `create_user`.
 - Step error path: validation failures and password rejection re-render the current step with `Error` set; the state machine does **not** advance.
 - Terminal-step handoff: when a user has been resolved, calls `auth-attempt.Handoff` and returns the token + expiry on `FlowStepResult`.
@@ -49,7 +50,7 @@ to be a fast answer to "can I build flow X right now?"
 ### SSO redirect
 
 - `{action: "sso", sso_provider_id, return_target}` on a step that offers `sso_providers` pins the connection at its newest revision, issues a single-use state record on the auth attempt and emits the `sso-redirect` step with the provider's authorize URL. The flow state stays on the step the provider was picked from; the response re-seals `_zflow` and adds the browser-binding cookie ([area 3](../idp/3-social-login-flow.md#the-binding-cookie)).
-- A provider the engine cannot start a sign-in with re-renders the step with `error.sso_unavailable`. So does a returned identity that would bind, create or link a user when the step cannot route the outcome: `sso_authenticated` for a linked or new user (a stored definition that was never validated), or `user_already_exists` on a collision (the validator does not require it). The check runs before the write, which cannot be undone, so nothing is written. A collision an earlier render bound re-renders the same way when the current step cannot route `user_already_exists`, and the user is not recorded. An unwired `sso_user_not_found` writes nothing and re-renders with the outcome as its error, like any unwired outcome.
+- A provider the engine cannot start a sign-in with re-renders the step with `error.sso_unavailable`. So does a returned identity that would bind, create or link a user when the step cannot route the outcome: `sso_authenticated` for a linked or new user (a stored definition that was never validated), or `user_already_exists` on a collision (the validator does not require it). The check runs before the write, which cannot be undone, so nothing is written. A collision an earlier render bound re-renders the same way when the current step cannot route `user_already_exists`, and the user is not recorded. An unwired `sso_user_not_found` writes nothing and re-renders with `error.sso_user_not_found`. Any other unwired outcome re-renders the same way. `user_not_found` shows `error.user_not_found`, `user_already_exists` shows `error.user_already_exists`, and an outcome without a key of its own shows `error.outcome_unhandled`.
 
 ### Passkey ceremony (two-phase)
 
@@ -61,7 +62,8 @@ to be a fast answer to "can I build flow X right now?"
 ### Step response shape
 
 - `name`, `texts` (`title_key`, `description_key`), optional `error`, optional `complete`.
-- `fields` **ordered array** of entries carrying `name`, `type`, `text_key`, `required`, optional `value`, optional `validation` ([ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md)).
+- `fields` **ordered array** of entries carrying `name`, `type`, `text_key`, `required`, optional `value`, optional `read_only`, optional `validation` ([ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md)).
+- `read_only` is set on a `create_user_with_sso` step for a field prefilled from a verified unique claim, since the submit refuses a changed value. Only string claims are prefilled and locked. A verified unique number claim renders empty, and the submit refuses any typed value ([#779](https://github.com/zitadel/nextgen/issues/779)).
 - `actions` **ordered array** of entries carrying `name`, `kind`, `text_key`, and a `primary` flag. The LiquidJS template iterates the arrays in order and builds name-keyed indexes locally for lookup.
 - `challenge` populated on the issue leg of a two-phase ceremony (passkey today): `method`, `challenge_id`, ceremony-specific `options`.
 - `sso_providers` carries `{id, name, template}` per connection the step names, resolved on every render.
@@ -97,7 +99,7 @@ Not implemented at any layer:
 ### On-success handlers
 
 - `create_user` exists today; the passkey-register verify leg creates its provisional user inside the attempt service's verify transaction instead of an on_success mutation.
-- `reset_credential`, `enroll_factor`, `create_user_with_sso`, `link_sso` are referenced in design docs but unimplemented.
+- `reset_credential`, `enroll_factor`, `link_sso` are referenced in design docs but unimplemented.
 - The dispatch carve-out for credential establishment is `OnSuccess == create_user`; the writer-manifest generalization is open (ADR 017).
 
 ### Resolution

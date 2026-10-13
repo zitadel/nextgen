@@ -273,8 +273,7 @@ const FLOW_ERROR_CATCH_ALL_KEY = "error.field_invalid";
  * field-validation violations and general engine failures (e.g.
  * `error.invalid_credentials`, `error.passkey_invalid`) alike.
  * Returns `null` unless EVERY `"; "`-joined segment is an `error.*` key
- * — the caller keeps other payloads (outcome tokens such as
- * `user_not_found`) verbatim.
+ * — the caller keeps any other payload verbatim.
  *
  * Keys the locale knows pass through as `text_key` entries: the template
  * localises them via `| t`, and `fieldErrorKeys` routes the known ones

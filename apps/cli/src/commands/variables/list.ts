@@ -11,9 +11,8 @@ const COLUMNS = ["name", "value"] as const;
  * The `variables list` topic command — show the variables entered at the
  * project level.
  *
- * Owners are separate, not a ladder (ADR 062 §4), so this is the project's own
- * set and not a merge of anything an environment holds. A secret is reported as
- * held without its value, because the platform never discloses one.
+ * A secret is reported as held without its value, because the platform never
+ * discloses one.
  */
 export default class VariablesList extends OwnerCommand {
   static override description = "List the variables entered on the project.";
