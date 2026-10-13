@@ -1,16 +1,24 @@
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
-import { Arimo } from "next/font/google";
+import { Arimo, Azeret_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 
 // The website's faces: Arimo for text, APK Futural (a licensed webfont) for
-// headings. next/font serves both from /_next/, like every asset of this app.
+// headings, Azeret Mono for code. next/font serves them from /_next/, like
+// every asset of this app.
 const arimo = Arimo({
   variable: "--font-arimo",
   subsets: ["latin"],
   weight: ["400", "600"],
+  display: "swap",
+});
+
+const azeretMono = Azeret_Mono({
+  variable: "--font-azeret-mono",
+  subsets: ["latin"],
+  weight: "500",
   display: "swap",
 });
 
@@ -62,7 +70,7 @@ const speedInsightsSampleRate = Number(process.env.WEBSITE_SPEED_INSIGHTS_SAMPLE
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${arimo.variable} ${apkFutural.variable}`}>
+    <html lang="en" className={`${arimo.variable} ${apkFutural.variable} ${azeretMono.variable}`}>
       <body className="bg-background text-foreground antialiased">
         {children}
         <Analytics />
