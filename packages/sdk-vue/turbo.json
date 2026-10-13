@@ -1,0 +1,19 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "typecheck": {
+      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/components#build", "@zitadel/sdk-core#build"]
+    },
+    "build": {
+      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
+    },
+    "build-release": {
+      "dependsOn": ["@zitadel/components#build-release", "@zitadel/sdk-core#build-release", "@zitadel/sdk-react#build-release"]
+    },
+    // api-mock serves the Flow API to the specs (test-setup.ts).
+    "test": {
+      "dependsOn": ["@zitadel/api-mock#build", "build"]
+    }
+  }
+}
