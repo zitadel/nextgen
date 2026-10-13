@@ -17,8 +17,8 @@ import { useRequiredProjectScope } from "@/lib/project-scope";
 //   type ProjectOption,
 // } from "./project-access";
 import {
+  fetchAllSchemas,
   type SchemaField,
-  type UserSchema,
   schemaDisplayName,
   schemaFieldSummary,
   schemaFields,
@@ -84,31 +84,16 @@ function AddUserForm({
       try {
         // One option per schema, not per edit: a superseded revision is not
         // something a new user should be created against, and offering the
-        // same schema once per revision reads as duplicates. The picker needs
-        // every one of them, so it drains the cursor-paginated list rather
-        // than showing whatever fits in one page.
-        const listed: Awaited<ReturnType<typeof api.listSchemas>>["schemas"] = [];
-        let pageToken: string | undefined;
-        do {
-          const page = await api.listSchemas({
-            project_id: projectId,
-            kind: "user-schema",
-            revisions: "latest",
-            limit: 100,
-            page_token: pageToken,
-          });
-          listed.push(...page.schemas);
-          pageToken = page.next_page_token ?? undefined;
-        } while (pageToken);
-        const options = listed.map((entry) => {
-          const schema = entry.schema as UserSchema;
-          return {
-            id: entry.id,
-            schema,
-            name: schemaDisplayName(schema, entry.id),
-            summary: schemaFieldSummary(schema),
-          } satisfies SchemaOption;
-        });
+        // same schema once per revision reads as duplicates.
+        const options = (await fetchAllSchemas(projectId)).map(
+          ({ id, schema }) =>
+            ({
+              id,
+              schema,
+              name: schemaDisplayName(schema, id),
+              summary: schemaFieldSummary(schema),
+            }) satisfies SchemaOption,
+        );
         if (cancelled) return;
         setSchemas(options);
         // Projects are a secondary concern: a failure here must not block user

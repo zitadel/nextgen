@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { forwardedArgs, run } from "./dev-process.mjs";
+import { runnerCommand, workspaceCommand } from "./task-runner.mjs";
 
 const phases = new Map([
   ["openapi", phaseOpenApi],
@@ -27,7 +28,7 @@ for (const phase of selected) {
   } catch (error) {
     console.error(`\nfailed phase: ${phase}`);
     console.error(error.message);
-    console.error(`rerun: moon run workspace:check -- --only ${phase}`);
+    console.error(`rerun: pnpm run check -- --only ${phase}`);
     process.exit(error.code ?? 1);
   }
 }
@@ -70,7 +71,7 @@ function usage(error) {
     console.error(error);
     console.error("");
   }
-  console.log(`usage: moon run workspace:check -- [--fast | --full | --only <phase>]
+  console.log(`usage: pnpm run check -- [--fast | --full | --only <phase>]
 
 Default is --fast.
 
@@ -83,26 +84,34 @@ Explicit-only phases:
   process.exit(error ? 1 : 0);
 }
 
+// Each phase runs its targets through the selected task runner
+// (scripts/task-runner.mjs), so the same phases mirror CI under moon and turbo.
+async function runTargets(...targets) {
+  const { command, args } = runnerCommand(targets);
+  await run(command, args);
+}
+
 async function phaseOpenApi() {
-  await run("moon", ["run", "server:openapi"]);
+  await runTargets("server:openapi");
 }
 
 async function phaseGo() {
-  await run("moon", ["run", "server:check-generate"]);
-  await run("moon", ["run", "server:test"]);
+  await runTargets("server:check-generate");
+  await runTargets("server:test");
 }
 
 async function phaseGoPostgres() {
-  await run("moon", ["run", "server:test-postgres"]);
+  await runTargets("server:test-postgres");
 }
 
 async function phaseGoSpanner() {
-  await run("moon", ["run", "server:test-spanner"]);
+  await runTargets("server:test-spanner");
 }
 
 async function phaseNode() {
   await run("corepack", ["pnpm", "install", "--frozen-lockfile"]);
-  await run("moon", ["ci", ":lint", ":typecheck", ":build", ":test"]);
+  const gate = workspaceCommand(["lint", "typecheck", "build", "test"]);
+  await run(gate.command, gate.args);
 }
 
 async function phaseNodeE2e() {
@@ -115,16 +124,21 @@ async function phaseNodeE2e() {
     "install",
     "chromium",
   ]);
-  await run("moon", ["run", "demo-next-e2e:e2e"]);
-  await run("moon", ["run", "demo-nuxt-e2e:e2e"]);
+  await runTargets("demo-next-e2e:e2e");
+  await runTargets("demo-nuxt-e2e:e2e");
 }
 
 async function phasePack() {
-  await run("moon", ["run", "release:pack"]);
+  await runTargets("release:pack");
 }
 
 async function phaseRelease() {
-  await run("moon", ["run", "release:snapshot", "--", "--skip-container"]);
+  // Not `-- --skip-container`: turbo would put the argument into the cache
+  // key of every task in the run and rebuild the whole release graph.
+  const snapshot = runnerCommand(["release:snapshot"]);
+  await run(snapshot.command, snapshot.args, {
+    env: { ...process.env, RELEASE_SKIP_CONTAINER: "1" },
+  });
 }
 
 async function phaseJourney() {

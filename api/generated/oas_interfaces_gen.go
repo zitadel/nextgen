@@ -9,6 +9,10 @@ type BeginUserPasskeyRegistrationRes interface {
 	beginUserPasskeyRegistrationRes()
 }
 
+type BuildReleaseRes interface {
+	buildReleaseRes()
+}
+
 type CompleteClaimRes interface {
 	completeClaimRes()
 }
@@ -283,6 +287,10 @@ type RemoveOriginRes interface {
 
 type RevokeMySessionRes interface {
 	revokeMySessionRes()
+}
+
+type RevokeReleaseRes interface {
+	revokeReleaseRes()
 }
 
 type RevokeSessionRes interface {

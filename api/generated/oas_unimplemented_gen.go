@@ -40,6 +40,40 @@ func (UnimplementedHandler) BeginUserPasskeyRegistration(ctx context.Context, re
 	return r, ht.ErrNotImplemented
 }
 
+// BuildRelease implements buildRelease operation.
+//
+// Builds a release from the resources of `.zitadel/` as authored on disk,
+// grouped by kind, in one transaction: a failure anywhere leaves no
+// revision and no release. The caller records nothing.
+// If the project already holds a release with the same content, the same
+// `content_hash`, the request answers `200` with that release and
+// allocates nothing, however long ago it was built. Otherwise every resource is compared against the
+// project's newest revision of the same handle: unchanged content reuses
+// that revision, changed content allocates a new one, and the request
+// answers `201` with the new release. Metadata is excluded from the
+// comparison, so the same content under a different `message` is the same
+// release.
+// A structurally malformed request is refused while decoding with
+// `req.invalid`, naming the offending fields. A well-formed bundle is then
+// checked resource by resource, as each kind's create endpoint checks it,
+// and every failure is reported at once: the request answers `400` with
+// `rel.invalid`, and `details.resources` lists each resource that failed.
+// A handle that resolves neither in the bundle nor in the project answers
+// `rel.unresolved_reference`, naming the pointer and the handle.
+// Building writes revisions, so besides `release.write` it needs the write
+// scope of every kind the bundle carries a resource of: `schema.write`,
+// `flow_definition.write`, `branding.write` and `idp.write`, as the
+// per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
+// naming the kind. An empty kind needs no scope.
+// Building a release does not deploy it. A release is not tied to an
+// origin, and the same release can later be deployed to any number of
+// origins unchanged.
+//
+// POST /releases/build
+func (UnimplementedHandler) BuildRelease(ctx context.Context, req *BuildReleaseRequest, params BuildReleaseParams) (r BuildReleaseRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CompleteClaim implements completeClaim operation.
 //
 // Called by the browser after the developer authenticates on the claim page.
@@ -220,18 +254,29 @@ func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjec
 
 // CreateRelease implements createRelease operation.
 //
-// Bundles a release from revisions that already exist, supplied as
-// `(kind, revision_id)` pairs. No new revisions are allocated — use the
-// per-kind create endpoints for that, then pin the ids here.
-// Every referenced `revision_id` must exist in the project. Each one's handle
-// is read from the revision itself and recorded on the release, so a resource
-// is always pinned under the identity it declares.
-// Creating a release does not deploy it. A release is environment-agnostic
-// and the same release can later be deployed to any number of environments
-// unchanged.
-// Idempotent on the pinned set: metadata is excluded from the comparison, so
-// re-submitting the same revisions with a different `message` returns the
-// release that already pins them rather than creating a second one.
+// Assembles a release from revisions that already exist, supplied as
+// `(kind, revision_id)` pairs. No new revisions are allocated: to build a
+// release from the files on disk, use `POST /releases/build`, which
+// allocates them.
+// Every referenced `revision_id` must exist in the project. Each one's
+// handle is read from the revision itself and recorded on the release, so a
+// resource is always pinned under the identity it declares.
+// Every handle a pinned resource references, such as a flow definition's
+// `user_schema` naming a schema by `objectType`, or a flow step's
+// `sso_providers` naming IDP connections by `slug`, must be pinned by the
+// same release. A handle the release does not pin refuses the request with
+// `rel.unresolved_reference`. The message names the pointer and the handle
+// that did not resolve, for example
+// `flow_definition default-login: user_schema human-user not found`,
+// because a release pins many and the code alone does not say which one
+// failed.
+// Idempotent on the pinned set: metadata is excluded from the comparison,
+// so re-submitting the same revisions with a different `message` answers
+// `200` with the release that already pins them rather than creating a
+// second one. A release the project did not hold before answers `201`.
+// Creating a release does not deploy it. A release is not tied to an
+// origin, and the same release can later be deployed to any number of
+// origins unchanged.
 //
 // POST /releases
 func (UnimplementedHandler) CreateRelease(ctx context.Context, req *CreateReleaseRequest, params CreateReleaseParams) (r CreateReleaseRes, _ error) {
@@ -601,8 +646,10 @@ func (UnimplementedHandler) GetReady(ctx context.Context) (r GetReadyRes, _ erro
 
 // GetReleaseById implements getReleaseById operation.
 //
-// Reads one release: its metadata and the `(kind, handle, revision_id)`
-// tuples it pins.
+// Reads one release: its digest, its metadata, whether it was revoked, and
+// the `(kind, handle, revision_id)` tuples it pins.
+// The path takes the `rel_` id only. To find a release from its digest,
+// list with the `content_hash` filter and read the matched entry's `id`.
 // Does not embed resource content. Resolve each `revision_id` through the
 // per-kind read endpoints when the bytes are needed.
 // The lookup is scoped to the project in `project_id`: a release id belonging
@@ -797,8 +844,14 @@ func (UnimplementedHandler) ListMyProjects(ctx context.Context, params ListMyPro
 // ListReleases implements listReleases operation.
 //
 // Lists the project's releases, newest first.
-// Entries carry metadata only — the pinned set is omitted. Read one release
-// with `GET /releases/{release_id}` to get its pointers.
+// Entries carry the digest, the metadata and `revoked_at` — the pinned set
+// is omitted.
+// Read one release with `GET /releases/{release_id}` to get its pointers.
+// `content_hash` looks a release up by its content, as the CLI does when a
+// person types the digest a transcript printed. The project holds at most
+// one release per digest, so the filtered list has one entry or none, and
+// an unknown digest is an empty list rather than an error. Paths take the
+// `rel_` id only; the matched entry's `id` is what to use there.
 //
 // GET /releases
 func (UnimplementedHandler) ListReleases(ctx context.Context, params ListReleasesParams) (r ListReleasesRes, _ error) {
@@ -968,6 +1021,30 @@ func (UnimplementedHandler) RemoveOrigin(ctx context.Context, req *RemoveOriginR
 //
 // DELETE /sessions/me
 func (UnimplementedHandler) RevokeMySession(ctx context.Context) (r RevokeMySessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// RevokeRelease implements revokeRelease operation.
+//
+// Marks the release revoked, so that its content is never served again.
+// From then on the release cannot be deployed and is refused on every path
+// that would serve it, including to a build that pins its digest, with
+// `rel.revoked`.
+// A release that any origin still serves cannot be revoked. An origin
+// serves the release of the newest deployment to it, so the call answers
+// `409` with `rel.in_use`, naming each such origin and that deployment.
+// Deploy another release there or roll back first, then revoke. Revoking
+// therefore never takes an origin down. Deployments that named the release
+// earlier stay in the history.
+// Idempotent: revoking a release that is already revoked answers `200`
+// with the release unchanged, `revoked_at` still naming the first
+// revocation. There is no un-revoke; build a new release instead.
+// Takes no body. The lookup is scoped to the project in `project_id`, so a
+// release id of another project answers not found exactly as an unknown id
+// does.
+//
+// POST /releases/{release_id}/revoke
+func (UnimplementedHandler) RevokeRelease(ctx context.Context, params RevokeReleaseParams) (r RevokeReleaseRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

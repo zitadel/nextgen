@@ -203,7 +203,7 @@ embed base path.
 
 | Variable | Where | Purpose |
 | --- | --- | --- |
-| `CONSOLE_BACKEND_URL` | Node (dev proxy) | Upstream API origin (defaults in `vite.config.mts`) |
+| `CONSOLE_BACKEND_URL` | Node (dev proxy) | Upstream API origin (defaults in `vite.config.ts`) |
 | `CONSOLE_DEV_PROXY_LOG` | Node (dev proxy) | Set to `1` to print each proxied request — for a screen that answers 401/403/404 when it is not obvious what the server was asked |
 | `VITE_CONSOLE_API_BASE` | Client | Same-origin API base the SDK calls (default `/api` under the dev server, the origin root in a build) |
 | `VITE_CONSOLE_RUNTIME_FALLBACK` | Client (build/dev time) | Opt-in for runs with no `/console/runtime.json` (`vite preview`): failed discovery resolves to `standalone` instead of the connectivity error. Never set it for the embedded build |
