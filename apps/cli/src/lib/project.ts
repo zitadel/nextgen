@@ -1,7 +1,8 @@
-import { chmod, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { readFile, rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ZitadelError } from "./errors";
+import { enforceMode } from "./fs-safe";
 import { isObject, parseJsonObject, stableStringify } from "./json";
 import { DEFAULT_SERVER } from "./server";
 
@@ -124,7 +125,7 @@ export async function writeZitadelSecret(cwd: string, secret: ZitadelSecret): Pr
   const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
   await writeFile(tmp, `${stableStringify(secret)}\n`, { mode: 0o600 });
   // `writeFile`'s mode is masked by the process umask, so re-assert it.
-  await chmod(tmp, 0o600).catch(() => undefined);
+  await enforceMode(tmp, 0o600);
   await rename(tmp, path);
 }
 

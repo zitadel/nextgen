@@ -38,20 +38,27 @@ function envLine(key: string, value: string): string {
 
 /**
  * `writeFile`'s `mode` applies only when it creates the file and is masked by
- * the umask, so re-assert 0600 after every write. A filesystem that cannot chmod
- * (FAT/exFAT, some bind mounts) must not fail the write — the value is already
- * on disk and the next run would read it back without re-prompting, so a throw
- * would be one confusing failure followed by silent success with the same file.
- * Warn once that it could not be locked down, and proceed.
+ * the umask, so re-assert the intended mode after every write. A filesystem that
+ * cannot chmod (FAT/exFAT, some bind mounts) must not fail the write — the
+ * content is already on disk and the next run would read it back without
+ * re-prompting, so a throw would be one confusing failure followed by silent
+ * success with the same file. Warn once that it could not be locked down, and
+ * proceed. This is the only place the CLI calls `chmod` after a write: a bare
+ * `chmod(...).catch(() => undefined)` hides the failure from the user and the
+ * JSON envelope, and a lint rule (`no-swallowed-chmod`) rejects it.
  */
-async function enforceSecretMode(path: string): Promise<void> {
+export async function enforceMode(path: string, mode: number): Promise<void> {
   try {
-    await chmod(path, SECRET_MODE);
+    await chmod(path, mode);
   } catch (error) {
     reportWarning(
-      `Wrote ${path} but could not set it to 0600 (${(error as NodeJS.ErrnoException).code ?? "unknown"}); its permissions may be broader than intended.`,
+      `Wrote ${path} but could not set it to ${mode.toString(8).padStart(4, "0")} (${(error as NodeJS.ErrnoException).code ?? "unknown"}); its permissions may be broader than intended.`,
     );
   }
+}
+
+function enforceSecretMode(path: string): Promise<void> {
+  return enforceMode(path, SECRET_MODE);
 }
 
 /**
