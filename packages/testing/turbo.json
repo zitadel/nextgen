@@ -1,0 +1,29 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "typecheck": {
+      "dependsOn": ["@zitadel/config#build"]
+    },
+    "build": {
+      "dependsOn": ["@zitadel/config#build"]
+    },
+    // The last of the release builds (tools/release/turbo.json). tsdown
+    // bundles api and config's release dist into the CJS entries.
+    "build-release": {
+      "dependsOn": ["@zitadel/config#build-release", "@zitadel/sdk-qwik#build-release"]
+    },
+    "test": {
+      "dependsOn": ["build"]
+    },
+    // Boots a real local server (binary runtime + SQLite by default): never
+    // cached. The script sets ZITADEL_SERVER_BINARY to the server build and
+    // keeps the server-hosted UI surfaces off — these tests drive the API and
+    // the app-embedded login, not /ui/*.
+    "test:integration": {
+      "cache": false,
+      "dependsOn": ["build", "@zitadel/cli#build", "@zitadel/server#build"],
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "PLAYWRIGHT_*", "DEBUG", "RUNNER_TEMP", "GITHUB_*"]
+    }
+  }
+}

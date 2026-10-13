@@ -1,0 +1,66 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  // The release graph. Moon ran its dependencies one after the other
+  // (runDepsInParallel: false on every entry point), because each
+  // build-release cleans and rewrites the dist directory the dev builds and
+  // tests of the same graph read. Turbo has no serial option, so the same
+  // order is written as edges: the public packages' release builds form a
+  // chain in the order below (each package's turbo.json names its
+  // predecessor), starting after cli's tests, and the two UI release builds
+  // wait for the whole chain. What remains unordered: the server's tests run
+  // alongside the chain in `snapshot`, and the console release build rewrites
+  // the embedded dist they compiled — see the migration plan.
+  "tasks": {
+    "changesets": {
+      "cache": false
+    },
+    "check-graph": {
+      "cache": false
+    },
+    "build-public-packages": {
+      "cache": false,
+      "dependsOn": [
+        "check-graph",
+        "@zitadel/cli#build-release",
+        "@zitadel/api#build-release",
+        "@zitadel/config#build-release",
+        "@zitadel/components#build-release",
+        "@zitadel/sdk-core#build-release",
+        "@zitadel/sdk-next#build-release",
+        "@zitadel/sdk-nuxt#build-release",
+        "@zitadel/sdk-react#build-release",
+        "@zitadel/sdk-vue#build-release",
+        "@zitadel/sdk-angular#build-release",
+        "@zitadel/sdk-solid#build-release",
+        "@zitadel/sdk-svelte#build-release",
+        "@zitadel/sdk-qwik#build-release",
+        "@zitadel/testing#build-release"
+      ]
+    },
+    "version": {
+      "cache": false,
+      "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA"]
+    },
+    "pack": {
+      "cache": false,
+      "dependsOn": ["build-public-packages", "@zitadel/console#build-release", "@zitadel/login-ui#build-release"],
+      "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA", "ZITADEL_*"]
+    },
+    "snapshot": {
+      "cache": false,
+      "dependsOn": [
+        "@zitadel/server#test",
+        "build-public-packages",
+        "@zitadel/console#build-release",
+        "@zitadel/login-ui#build-release"
+      ],
+      "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA", "ZITADEL_*", "DOCKER_*", "GOFLAGS", "RELEASE_SKIP_CONTAINER"]
+    },
+    "publish": {
+      "cache": false,
+      "dependsOn": ["build-public-packages", "@zitadel/console#build-release", "@zitadel/login-ui#build-release"],
+      "passThroughEnv": ["GITHUB_*", "NPM_*", "NODE_AUTH_TOKEN", "BASE_SHA", "RECOVER_VERSION", "ZITADEL_*", "DOCKER_*", "GOFLAGS", "ACTIONS_*"]
+    }
+  }
+}

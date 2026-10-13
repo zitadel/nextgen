@@ -16,13 +16,13 @@ import {
   stopLocalRegistry,
   waitForHttp,
 } from "./local-registry.mjs";
-import { parseLocalJourneyArgs } from "./run-options.mjs";
+import { journeyArgsFromEnv, parseLocalJourneyArgs } from "./run-options.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, "..");
 const repoRoot = resolve(projectRoot, "../..");
 
-const options = parseArgsOrExit(process.argv.slice(2));
+const options = parseArgsOrExit([...journeyArgsFromEnv(process.env), ...process.argv.slice(2)]);
 if (options.help) {
   printUsage();
   process.exit(0);
@@ -61,7 +61,7 @@ const registryUrl = `http://127.0.0.1:${registryPort}`;
 const cliPackage = await packageName(repoRoot, "apps/cli");
 const childProcesses = new Set();
 const journeyContexts = [];
-const prebuiltTarballsDir = options.tarballsDir || process.env.JOURNEY_TARBALLS_DIR || "";
+const prebuiltTarballsDir = options.tarballsDir;
 let registryProcess;
 let registryLogsCollected = false;
 let cleanupStarted = false;
@@ -178,6 +178,13 @@ Options:
   --tarballs-dir <path>    Use prebuilt release npm tarballs
   --keep                   Keep the temp work directory after success
   --work-dir <path>        Use an explicit work directory
+
+Environment (the command line's arguments win):
+  JOURNEY_CI=1             --ci
+  JOURNEY_MATRIX           --matrix
+  JOURNEY_RUNTIME          --runtime
+  JOURNEY_TARBALLS_DIR     --tarballs-dir
+  JOURNEY_WORK_DIR         --work-dir
 `);
 }
 
