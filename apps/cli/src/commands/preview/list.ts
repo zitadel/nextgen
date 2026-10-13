@@ -2,7 +2,8 @@ import { Flags } from "@oclif/core";
 
 import { CommandGroups, type JsonEnvelope, nonBlankString, PreviewCommand } from "../../lib/oclif";
 import { collectPages } from "../../lib/oclif/crud/paging";
-import { renderRows, renderTable } from "../../lib/oclif/crud/table";
+import { renderList } from "../../lib/oclif/crud/table";
+import { listData } from "../../lib/oclif/envelope";
 import { publicCliCommand } from "../../lib/public-cli";
 import { shellArg } from "../../lib/shell";
 
@@ -99,22 +100,16 @@ export default class PreviewList extends PreviewCommand {
     const plain = flags.plain || !process.stdout.isTTY;
     return this.emit({
       status: "ok",
-      data: {
-        items: previews,
-        count: previews.length,
-        next_page_token: next,
-        ...(nextCommand === undefined ? {} : { next_commands: [nextCommand] }),
-      },
-      pretty: plain
-        ? renderRows(COLUMNS, rows)
-        : rows.length === 0
-          ? "No live previews."
-          : [
-              renderTable(COLUMNS, rows),
-              "",
-              `${rows.length} ${rows.length === 1 ? "preview" : "previews"}`,
-              ...(next ? [`More available: --page-token ${shellArg(next)} (or --all)`] : []),
-            ].join("\n"),
+      data: listData(previews, {
+        nextPageToken: next,
+        nextCommands: nextCommand === undefined ? undefined : [nextCommand],
+      }),
+      pretty: renderList(COLUMNS, rows, {
+        plain,
+        singular: "preview",
+        empty: "No live previews.",
+        footer: next ? [`More available: --page-token ${shellArg(next)} (or --all)`] : [],
+      }),
     });
   }
 }
