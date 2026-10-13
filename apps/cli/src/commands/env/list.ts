@@ -1,6 +1,12 @@
+import { Flags } from "@oclif/core";
+
 import { readBoundEnvironments } from "../../lib/environment";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { renderTable } from "../../lib/oclif/crud/table";
+import { renderList } from "../../lib/oclif/crud/table";
+import { listData } from "../../lib/oclif/envelope";
+
+/** The columns `list` renders, in order. */
+const COLUMNS = ["name", "source", "server", "project_id", "resolved"] as const;
 
 /**
  * `zitadel env list` — the environments this machine can reach: one per
@@ -12,7 +18,13 @@ export default class EnvList extends EnvironmentCommand {
   static override description = "List the environments bound in this directory's .env files.";
   static override group = CommandGroups.project;
   static override groupOrder = 6;
-  static override examples = ["<%= config.bin %> env list"];
+  static override examples = ["<%= config.bin %> env list", "<%= config.bin %> env list --plain"];
+  static override flags = {
+    plain: Flags.boolean({
+      description:
+        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+    }),
+  };
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(EnvList);
@@ -20,7 +32,7 @@ export default class EnvList extends EnvironmentCommand {
     const { name, values } = this.environment;
 
     const bound = await readBoundEnvironments(cwd);
-    const environments = [
+    const items = [
       ...bound.map((entry) => ({
         name: entry.name,
         source: entry.file,
@@ -42,23 +54,22 @@ export default class EnvList extends EnvironmentCommand {
       resolved: entry.source === values.ZITADEL_PROJECT_ID?.source,
     }));
 
+    const plain = flags.plain || !process.stdout.isTTY;
     return this.emit({
       status: "ok",
-      data: { environments, resolved: { name: name.value, source: name.source } },
-      pretty:
-        environments.length === 0
-          ? "No environments are bound here. Run `zitadel env add <name>` to bind one."
-          : [
-              renderTable(
-                ["name", "source", "server", "project_id", "resolved"],
-                environments.map((entry) => ({
-                  ...entry,
-                  resolved: entry.resolved ? "yes" : "",
-                })),
-              ),
-              "",
-              `Resolved now: ${name.value} (from ${name.source})`,
-            ].join("\n"),
+      // The canonical list envelope, plus `resolved` naming which environment
+      // this run resolves to (each item also carries its own `resolved` flag).
+      data: { ...listData(items), resolved: { name: name.value, source: name.source } },
+      pretty: renderList(
+        COLUMNS,
+        items.map((entry) => ({ ...entry, resolved: entry.resolved ? "yes" : "" })),
+        {
+          plain,
+          singular: "environment",
+          empty: "No environments are bound here. Run `zitadel env add <name>` to bind one.",
+          footer: [`Resolved now: ${name.value} (from ${name.source})`],
+        },
+      ),
     });
   }
 }
