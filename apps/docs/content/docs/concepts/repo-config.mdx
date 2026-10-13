@@ -17,4 +17,4 @@ The CLI writes:
 
 `zitadel apply` validates and uploads repo configuration.
 
-Local secrets and runtime-only state must stay out of source control: `.env.local`, `.zitadel/secret` (the project secret), and `.zitadel/local/**` (runtime data, not product configuration). Setup and `start` add them to `.gitignore`.
+Local secrets and runtime-only state must stay out of source control: `.env.local`, `.zitadel/secret` (the project secret), and `.zitadel/local/**` (runtime data, not product configuration). Setup adds `.zitadel/secret` and `.env*` (all but `.env.example`) to `.gitignore`; `start` adds `.zitadel/local/`.

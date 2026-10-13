@@ -248,9 +248,10 @@ engine names a credential field `x-auth-methods#<method>` — the `name`
 attribute keeps that raw form key, only the `data-testid` hooks are normalised
 (`hookName` in `src/internal/hook-name.ts`). For sign-out, `<zitadel-session>`'s
 button carries `zitadel-session-logout`, and its native button
-`zitadel-session-logout-button`. `<zitadel-logout>` has no hook: open its avatar
-menu ("Open user menu"), then target the `.signout-btn` button in its shadow
-root.
+`zitadel-session-logout-button`. `<zitadel-logout>` has no hook. By default it
+shows an avatar menu: open it ("Open user menu"), then target the `.signout-btn`
+button in its shadow root. Given a `<template>` child, it shows that markup
+instead, and the element marked `data-action="logout"` signs out.
 
 A tenant Liquid template can already be supplied through the branding
 payload's `liquid_template` field; a dedicated declarative `template`

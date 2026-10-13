@@ -5,10 +5,11 @@ description: OpenAPI operations for configuration releases.
 
 import { Card, Cards } from "fumadocs-ui/components/card";
 
-A release is an immutable snapshot of a project's configuration: one revision of
-each resource, plus who made it, when, and from which commit. Creating a release
-does not deploy it. Building a release from files and revoking one answer
-`501 Not Implemented` today.
+A release is an immutable set of pinned revisions: at most one revision of each
+schema, flow definition, and branding, plus who made it, when, and from which
+commit. Identity provider connections and variables can't be pinned yet.
+Creating a release does not deploy it. Building a release from files and
+revoking one answer `501 Not Implemented` today.
 
 <Cards>
   <Card title="Create a release" href="/docs/reference/api/releases/createRelease" />

@@ -42,9 +42,11 @@ It exposes:
 The package has no root export; import from its subpaths:
 
 - `@zitadel/api/client` — `createZitadelClient`, a typed client bound to a base URL and an optional bearer token.
-- `@zitadel/api/config` — `configureZitadel` and `getApi`, the shared browser configuration the components and SDKs use.
+- `@zitadel/api/config` — `configureZitadel` and `getApi`, the shared browser configuration the components read. Every SDK except Angular uses it; the Angular SDK has its own `configureZitadel`.
 - `@zitadel/api/generated/model` — request and response types.
-- `@zitadel/api/generated/endpoints/zitadelNextGen` — the endpoint functions behind the client, with `.zod` and `.msw` variants for the Zod schemas and MSW handlers. Call the endpoints through `createZitadelClient`: on their own they read a base URL and token shared across the process, which only the client sets. The MSW handlers need the optional peers `msw` and `@faker-js/faker`.
+- `@zitadel/api/generated/endpoints/zitadelNextGen` — the endpoint functions behind the client, with `.zod` and `.msw` variants for the Zod schemas and MSW handlers. Call the endpoints through `createZitadelClient`: on their own they use one base URL and token for the whole process, and the client sets both before each call. The MSW handlers need the optional peers `msw` and `@faker-js/faker`.
+- `@zitadel/api/runtime/fetch` — `ApiError` and `NetworkError`, which a call throws when the request fails.
+- `@zitadel/api/runtime/base-url` and `@zitadel/api/runtime/auth` — low-level settings, such as the base URL and the token the client sets for you.
 
 Call the API from server-side code:
 

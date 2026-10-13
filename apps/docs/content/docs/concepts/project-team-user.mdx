@@ -5,7 +5,7 @@ description: Core resource vocabulary for the preview.
 
 ## Project
 
-A project is the top-level tenant and the data boundary. Users, sessions, credentials, teams, audit events, and variables belong to one project, as does its configuration: schemas, flows, branding, identity providers, and releases. Data that must stay separate, such as a staging user base, belongs in a second project.
+A project is the top-level tenant and the data boundary. Every user, session, credential, team, audit event, and variable is stored in exactly one project, as is its configuration: schemas, flows, branding, identity providers, and releases. Data that must stay separate, such as a staging user base, belongs in a second project. Only access crosses projects: a user or team can hold a role on another project, and one team can own several projects.
 
 ## Team
 

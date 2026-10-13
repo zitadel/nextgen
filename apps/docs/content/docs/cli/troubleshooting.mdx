@@ -5,7 +5,7 @@ description: Common CLI errors and first checks.
 
 ## Local server is not running
 
-`setup --server local`, `console`, and any other command run with `--server local` report `E_LOCAL_SERVER_NOT_RUNNING` when the local runtime is stopped. `plan` and `apply` use the server URL setup wrote into `zitadel.json` instead, so against a stopped local server `apply` fails with `E_NETWORK` (`ECONNREFUSED`), and `plan` runs without the server's current state. In each case, start the local runtime:
+`console` reports `E_LOCAL_SERVER_NOT_RUNNING` when the local runtime is stopped, and so do the commands that call the platform, such as `setup`, `plan`, `apply`, or `variables`, when run with `--server local`. Without the flag, `plan` and `apply` use the server URL setup wrote into `zitadel.json`, so against a stopped local server `apply` fails with `E_NETWORK` (`ECONNREFUSED`) as soon as it has a change to upload, and `plan` still runs but shows no field diff. In each case, start the local runtime again from the directory you first ran `start` in (the one with `.zitadel/local/`):
 
 ```sh
 npx @zitadel/cli@alpha start

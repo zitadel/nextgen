@@ -36,8 +36,9 @@ click its `zitadel-session-logout` host, or the native button inside it,
 `zitadel-session-logout-button`. An app that renders `<zitadel-logout>` instead
 hides sign-out behind an avatar menu: click the "Open user menu" button, then
 pierce to `.signout-btn` (Playwright: `zitadel-logout .signout-btn`), which
-carries no hook. The canonical component hook list lives in
-`packages/components/README.md`.
+carries no hook. A `<zitadel-logout>` with a `<template>` child shows no menu:
+click the app's own element marked `data-action="logout"`. The canonical
+component hook list lives in `packages/components/README.md`.
 
 The checked-in automated regression path is `moon run workspace:journey`, which
 exercises fresh-app setup plus registration, logout, and login across the
@@ -55,21 +56,27 @@ revisioned and immutable: every edit — including a `.liquid`-only edit —
 plans as a `revise` and `apply` publishes a new revision; the login serves
 the newest one. `plan` validates templates with the authoritative LiquidJS
 validator (`E_VALIDATION` lists rule ids such as `no-script-tag` and
-`mandatory-gates`; every template must keep a trailing
-`{% mandatory_gates %}` tag). Asset URLs must be absolute `https://`; images
-may use `http://` on loopback hosts during development. `typography.font_url`
-needs a `typography.font_family`, is always `https://`, and is loaded only when
-the login runs as `variant="page"`, which setup generates only for a freshly
-scaffolded Next.js or Nuxt app. Keep exactly one descriptor in
+`mandatory-gates`; every template must keep a `{% mandatory_gates %}` tag,
+where the login adds any required field and the primary action the template
+left out). Asset URLs must be absolute `https://`; during development, images
+may use `http://` on `localhost`, `127.x.x.x`, or `[::1]` (not `*.localhost`).
+`typography.font_url` needs a `typography.font_family`, is always `https://`,
+and is loaded only when the login runs as `variant="page"`, which setup
+generates only when it creates a Next.js or Nuxt app itself, in an empty
+directory. Keep exactly one descriptor in
 `.zitadel/branding/` — extra `*.json` files there fail the scan.
 Server-provisioned defaults remain a fallback for non-CLI project
 creation, but CLI-created projects are authored from local files first. Flows are
 revisioned like branding: an edit plans as a `revise` and `apply` publishes a new
 immutable flow revision. A flow names its schema by `objectType` in
 `user_schema` and runs against the schema's newest revision, so a schema revise
-leaves flow files alone. A login pinned by `flow-name` serves that
-flow's newest revision; an unpinned login serves the newest active unscoped flow
-in the project, whatever its name. Removing a flow file does not retire the
+needs no change to `user_schema`; one that removes or renames a property a step
+collects needs that step's `fields` updated, and `plan` checks only the flows it
+uploads. A login pinned by `flow-name` serves that flow's newest active
+revision; an unpinned login serves the newest active unscoped revision for its
+purpose in the project, whatever its flow's name. Older revisions stay active,
+so an `audience` added after a flow was applied without one doesn't take that
+earlier revision out of the running. Removing a flow file does not retire the
 flow. Managed files carry a marker comment; `eject` removes only
 files that still carry it, preserving anything the user replaced. For app-local
 development, `--server local` resolves through `.zitadel/local/runtime.json` and

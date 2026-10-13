@@ -49,7 +49,7 @@ All packages ship on the `@alpha` dist-tag and move together as one release trai
 
 | Framework | Package | Rendering | Same-origin `/__nextgen/*` proxy | CLI scaffolds |
 | --------- | ------- | --------- | -------------------------------- | ------------- |
-| Next.js | `@zitadel/sdk-next` | Server (App Router) | Built into the SDK middleware | routes + `proxy.ts` (`middleware.ts` on Next 15) |
+| Next.js | `@zitadel/sdk-next` | Server (App Router) | Built into the SDK middleware | routes + `proxy.ts` (or `middleware.ts`, by the Next version in `package.json`) |
 | Nuxt | `@zitadel/sdk-nuxt` | Server (Nitro) | Nitro server middleware | pages + plugins + module in `nuxt.config` |
 | React | `@zitadel/sdk-react` | SPA | Vite dev proxy / your deploy proxy | Vite proxy + auth UI |
 | Vue | `@zitadel/sdk-vue` | SPA | Vite dev proxy / your deploy proxy | Vite proxy + auth UI |

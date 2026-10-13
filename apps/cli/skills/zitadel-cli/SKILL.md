@@ -114,8 +114,9 @@ once — every resource, its verbs, each verb's `create_fields` / `update_fields
 (flag name, kind, `required`, any closed value set), its `filter_fields` /
 `sort_fields`, and the `delete_outcome` a destructive verb returns — so prefer it
 over reading `<resource> --help` one at a time. A `list` verb's envelope carries
-`data.count`, so a "how many …?" question is one `list --json` call: read the
-count, do not page and tally.
+`data.count`, the number of items it returned. A list returns one page unless
+you pass `--all`, so a "how many …?" question is one `list --all --json` call:
+read the count, do not page and tally.
 
 ## Reading the envelope
 
@@ -124,7 +125,8 @@ Each invocation prints one JSON object:
 - `status`: `ok` | `skipped` | `error`.
 - `cli_version`, `command`, `source`: always present.
 - On success: `data` with the command-specific payload.
-- On a no-op: `reason` (e.g. `no-framework-detected`, `orphaned-config`).
+- On a no-op: `reason` (e.g. `already-initialized`, `already-claimed`,
+  `nothing-to-eject`).
 - On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_NOT_FOUND`,
   `E_CONFLICT`) and `message`, usually with a `hint`, and `details` when there
   is structured context.

@@ -38,7 +38,7 @@ The Next.js SDK wires App Router applications through one server-side middleware
 
 <Tabs items={["CLI generated", "Manual"]}>
   <Tab>
-    The CLI adds the SDK package, creates auth routes, writes a profile page, and adds the request boundary that runs `nextgenMiddleware`: `proxy.ts` on Next 16 and later, `middleware.ts` on Next 15. With a `src/app` directory, the pages, the request boundary, and `custom-elements.d.ts` go under `src/`; the `.env` files and `package.json` stay at the project root.
+    The CLI adds the SDK package, creates auth routes, writes a profile page, and adds the request boundary that runs `nextgenMiddleware`: `proxy.ts` when the `next` version in `package.json` is 16 or later, otherwise `middleware.ts` (also for a tag such as `latest`). With a `src/app` directory, the pages, the request boundary, and `custom-elements.d.ts` go under `src/`; the `.env` files and `package.json` stay at the project root.
 
     <Files>
       <File name="app/login/page.tsx" />
@@ -50,6 +50,8 @@ The Next.js SDK wires App Router applications through one server-side middleware
       <File name=".env.example" />
       <File name="package.json" />
     </Files>
+
+    Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`. When setup created the app itself, it also replaces `app/page.tsx` with a redirect to `/login`.
   </Tab>
   <Tab>
     Create `proxy.ts` next to your `app` directory (at the project root, or in `src/` when you use `src/app`) and call the middleware. On Next 15, name the file `middleware.ts` and the function `middleware`.

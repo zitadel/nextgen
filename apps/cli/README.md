@@ -69,9 +69,9 @@ For a reproducible tester report, use the exact alpha train from the GitHub
 Release:
 
 ```sh
-npx @zitadel/cli@0.1.0-alpha.N doctor
-npx @zitadel/cli@0.1.0-alpha.N start
-npx @zitadel/cli@0.1.0-alpha.N setup --server local
+npx @zitadel/cli@1.0.0-alpha.N doctor
+npx @zitadel/cli@1.0.0-alpha.N start
+npx @zitadel/cli@1.0.0-alpha.N setup --server local
 ```
 
 The default project flow supports password registration/login, passkey

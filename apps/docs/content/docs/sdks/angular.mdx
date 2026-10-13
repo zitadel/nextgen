@@ -38,7 +38,7 @@ The Angular SDK exposes standalone components that wrap the shared Zitadel auth 
 
 <Tabs items={["CLI generated", "Manual"]}>
   <Tab>
-    The CLI writes the root component, adds a proxy config, wires `angular.json`, and installs the SDK.
+    The CLI writes the root component, adds auth routes and a proxy config, wires `angular.json`, adds environment files, and installs the SDK.
 
     <Files>
       <File name="src/app/app.ts" />
@@ -46,8 +46,12 @@ The Angular SDK exposes standalone components that wrap the shared Zitadel auth 
       <File name="src/app/app.routes.ts" />
       <File name="proxy.conf.cjs" />
       <File name="angular.json" />
+      <File name=".env.local" />
+      <File name=".env.example" />
       <File name="package.json" />
     </Files>
+
+    Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`.
   </Tab>
   <Tab>
     Configure Zitadel once and pass the handle to the standalone component:
@@ -75,12 +79,12 @@ The Angular SDK exposes standalone components that wrap the shared Zitadel auth 
 <Steps>
   <Step>The Angular wrapper renders the underlying custom element.</Step>
   <Step>The generated dev proxy forwards `/__nextgen/*` and adds the project secret to the session exchange, and to no other call.</Step>
-  <Step>In production, you supply the same-origin proxy yourself. Until the browser-safe credential lands it must add the project secret to the session exchange, which a plain rewrite cannot (see [SDK proxy](/docs/concepts/sdk-proxy#spas-in-production)).</Step>
+  <Step>In production, you supply the same-origin proxy yourself. The generated app sends no credential, so that proxy must add the project secret to the session exchange, and to no other call. A plain rewrite cannot do that (see [SDK proxy](/docs/concepts/sdk-proxy#spas-in-production)).</Step>
 </Steps>
 
 ## Verify
 
-- Run the generated Angular dev script.
+- Run `npm run dev`. Setup adds a `dev` script (`ng serve`) if your `package.json` has none.
 - Register or sign in through the widget.
 - Confirm sign-out works from the session card the generated profile renders (`zitadel-auth-session`).
 - Remember that the wrapper selectors are `zitadel-auth-login`, `zitadel-auth-session`, and `zitadel-auth-logout`; the underlying custom elements are `zitadel-login`, `zitadel-session`, and `zitadel-logout`.

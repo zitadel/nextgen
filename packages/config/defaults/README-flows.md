@@ -32,9 +32,10 @@ The common workflow:
 3. Run `zitadel apply` to publish it.
 
 Every apply of an edited flow publishes a new immutable revision. Earlier
-revisions stay readable by id. A login that pins the flow's name serves its
-newest revision. A login without a pin serves the project's newest active
-unscoped flow, whatever its name, so revising a flow can make it the default.
+revisions stay readable by id, and stay active. A login that pins the flow's
+name serves its newest active revision. A login without a pin serves the
+project's newest active unscoped revision for its purpose, whatever its flow's
+name, so revising a flow can make it the default.
 
 Typical edits:
 
@@ -77,7 +78,9 @@ one flow per sign-in. Which one:
   whatever its `audience`; an unknown name or wrong purpose surfaces as
   a startup error in the widget.
 - **By default** — without `flowName`, the platform serves the newest
-  active flow that serves the requested purpose and has no `audience`.
+  active revision that serves the requested purpose and has no `audience`.
+  Older revisions count too, so adding an `audience` to a flow you already
+  applied without one doesn't take that earlier revision out of the running.
 
 `audience.app_ids` / `audience.team_ids` select a flow only for callers
 of the flow API that send a matching `hint` (app match beats team
@@ -85,12 +88,13 @@ match). `<zitadel-login>` sends no hint, so for the widget an
 `audience` does one thing: it keeps the flow out of the default. A
 scoped flow is still served when no unscoped flow serves the purpose.
 
-The flip side: a **new active flow without an `audience` becomes the
-newest unscoped definition, i.e. the default**, the moment it applies.
-`plan` calls this out with a `# warning:` line on the create so an
-experiment can't silently take over `/login` — give it an `audience`
-and select it by `flowName`, or pin `flow-name` on the pages that
-should keep the current flow, if that isn't the intent.
+The flip side: a **new active flow without an `audience`, or a new
+revision of one, becomes the newest unscoped definition, i.e. the default
+for the purposes it serves**, the moment it applies. `plan` calls this out
+with a `# warning:` line on that create or revision so an experiment can't
+silently take over `/login`. If that isn't the intent, give the flow an
+`audience` before its first `apply` and select it by `flowName`, or pin
+`flow-name` on the pages that should keep the current flow.
 
 ## Presets
 

@@ -51,6 +51,8 @@ The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zita
       <File name=".env.example" />
       <File name="package.json" />
     </Files>
+
+    Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`. When setup created the app itself, it also writes `app/app.vue` and an `app/pages/index.vue` that redirects to `/login`.
   </Tab>
   <Tab>
     Register the SDK's Nuxt module and configure it under `nextgen`. The module adds the server middleware and the plugin that exposes auth state.
@@ -79,7 +81,7 @@ The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zita
     });
     ```
 
-    Nuxt loads `.env`, not the `.env.local` that setup writes: put `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET`, and `NUXT_PUBLIC_ZITADEL_PROJECT_ID` in `.env` and keep it out of git, or start the dev server with `nuxt dev --dotenv .env.local`. The module reads the URL and the secret when `nuxt dev` or `nuxt build` runs. For a built server, set `NUXT_NEXTGEN_URL` and `NUXT_NEXTGEN_PROJECT_SECRET` in its runtime environment instead, and keep the secret out of the build environment so it isn't written into `.output/`.
+    Nuxt loads `.env`, not the `.env.local` that setup writes. Put `ZITADEL_URL` and `NUXT_PUBLIC_ZITADEL_PROJECT_ID` in `.env` and keep it out of git, or start the dev server with `nuxt dev --dotenv .env.local`. The module finds `ZITADEL_PROJECT_SECRET` in `.env.local` on its own. It reads the URL and the secret when `nuxt dev` or `nuxt build` runs. For a built server, set `NUXT_NEXTGEN_URL` and `NUXT_NEXTGEN_PROJECT_SECRET` in its runtime environment instead, and build without the secret, in the environment and in files: the module also reads `.env.local`, Nuxt reads `.env`, and whatever the build finds is written into `.output/`.
 
     Register the web components on the client only, in `app/plugins/zitadel-components.client.ts` (`plugins/` in a project without an `app/` directory):
 
@@ -96,7 +98,7 @@ The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zita
 <Steps>
   <Step>Register Nitro middleware for same-origin `/__nextgen/*` proxying.</Step>
   <Step>Validate the session token and attach auth state to the request event.</Step>
-  <Step>Use a server plugin to make auth state available to pages.</Step>
+  <Step>Copy the auth state into Nuxt state during server rendering, so pages read it with `useAuth()`.</Step>
 </Steps>
 
 ## Verify

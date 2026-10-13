@@ -47,6 +47,8 @@ The Solid SDK is the SPA wrapper for the shared Zitadel login and logout widgets
       <File name=".env.example" />
       <File name="package.json" />
     </Files>
+
+    In an existing app, the CLI edits the `vite.config.*` you already have. Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`.
   </Tab>
   <Tab>
     Configure Zitadel once, then render login and logout widgets:
@@ -77,7 +79,7 @@ The Solid SDK is the SPA wrapper for the shared Zitadel login and logout widgets
 <Steps>
   <Step>The widgets call the configured proxy path on the same origin.</Step>
   <Step>In local Vite development, the generated proxy forwards `/__nextgen/*` to Zitadel and adds the project secret to the session exchange, and to no other call.</Step>
-  <Step>In production, you supply the same-origin proxy yourself. Until the browser-safe credential lands it must add the project secret to the session exchange, which a plain rewrite cannot (see [SDK proxy](/docs/concepts/sdk-proxy#spas-in-production)).</Step>
+  <Step>In production, you supply the same-origin proxy yourself. The generated app sends no credential, so that proxy must add the project secret to the session exchange, and to no other call. A plain rewrite cannot do that (see [SDK proxy](/docs/concepts/sdk-proxy#spas-in-production)).</Step>
 </Steps>
 
 ## Verify
