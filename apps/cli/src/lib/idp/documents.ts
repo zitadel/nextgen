@@ -13,7 +13,6 @@
  */
 
 import { getDefaultLoginFlow, SETUP_PRESETS } from "@zitadel/config/defaults";
-import { withoutFlowStepDefaults } from "@zitadel/config/normalize";
 
 import { ZitadelError } from "../errors";
 
@@ -111,6 +110,8 @@ type Step = Json & { name?: unknown };
 
 /** What a generator left alone, so the caller can say so. */
 export type SsoSkipped = {
+  /** The step that was left alone, e.g. `sso-conflict`. */
+  readonly step: string;
   /** File-relative description, e.g. `steps.sso-conflict`. */
   readonly region: string;
   readonly reason: "hand-edited";
@@ -360,7 +361,39 @@ function ssoConflictStep(
  * output as hand-edited.
  */
 function matches(step: Step, expected: Step): boolean {
-  return canonical(step) === canonical(expected);
+  return canonical(withoutServerDefaults(step)) === canonical(withoutServerDefaults(expected));
+}
+
+/**
+ * A step without what the platform leaves out when it answers.
+ *
+ * `apply` writes the canonical definition back into the file, and the server
+ * omits an action's `primary: false` (a default), an empty `fields` list, and
+ * an empty `gates` map, so the step in the file is not byte for byte what this
+ * generator wrote though it is the same step. Reading it as hand-edited would
+ * skip the step on the next provider.
+ */
+function withoutServerDefaults(step: Step): Step {
+  const copy: Step = { ...step };
+  for (const key of ["fields", "gates"]) {
+    const value = copy[key];
+    const empty = Array.isArray(value)
+      ? value.length === 0
+      : isObject(value) && Object.keys(value).length === 0;
+    if (empty) {
+      delete copy[key];
+    }
+  }
+  if (Array.isArray(copy.actions)) {
+    copy.actions = copy.actions.map((action) => {
+      if (!isObject(action) || action.primary !== false) {
+        return action;
+      }
+      const { primary: _default, ...rest } = action;
+      return rest;
+    });
+  }
+  return copy;
 }
 
 let shippedPasswordForms: string[] | undefined;
@@ -385,19 +418,14 @@ function shippedPasswordSteps(): string[] {
  * list, and the routes this generator writes for what comes back from one.
  *
  * A route that goes somewhere else is the developer's and stays, which is what
- * makes the step read as edited. The platform's own rewrite is not an edit:
- * `apply` writes the canonical definition back, which omits an action's
- * `primary: false` and may state `gates` and `sso_providers` empty.
+ * makes the step read as edited. The platform's own rewrite is not an edit
+ * ({@link withoutServerDefaults}).
  */
 function withoutSsoRoutes(step: Step, terminal: string): Step {
-  const copy: Step = { ...withoutFlowStepDefaults(step) };
+  const copy: Step = { ...withoutServerDefaults(step) };
   delete copy.sso_providers;
   if (isObject(copy.transitions)) {
-    const written: Record<string, string> = {
-      sso_authenticated: terminal,
-      sso_user_not_found: REGISTER_SSO,
-      user_already_exists: PASSWORD_STEP,
-    };
+    const written = providerOutcomes(terminal);
     copy.transitions = Object.fromEntries(
       Object.entries(copy.transitions).filter(
         ([outcome, route]) =>
@@ -411,6 +439,21 @@ function withoutSsoRoutes(step: Step, terminal: string): Step {
     );
   }
   return copy;
+}
+
+/**
+ * Whether a password step already lists the provider and carries the routes the
+ * generator writes, whatever else it has been edited to say.
+ */
+function offersAlready(step: Step, slug: string, terminal: string): boolean {
+  if (!Array.isArray(step.sso_providers) || !step.sso_providers.includes(slug)) {
+    return false;
+  }
+  const transitions = isObject(step.transitions) ? step.transitions : {};
+  return Object.entries(providerOutcomes(terminal)).every(([outcome, target]) => {
+    const route = transitions[outcome];
+    return isObject(route) && route.target === target;
+  });
 }
 
 /** The provider list a step should end up with: what it has, plus this slug. */
@@ -610,8 +653,11 @@ export function applySsoToFlow(
   // they recognise.
   const password = stepNamed(document, PASSWORD_STEP);
   if (password !== undefined && !providerSteps(document).includes(PASSWORD_STEP)) {
-    if (!shippedPasswordSteps().includes(canonical(withoutSsoRoutes(password, terminal)))) {
-      skipped.push({ region: `steps.${PASSWORD_STEP}`, reason: "hand-edited" });
+    if (offersAlready(password, slug, terminal)) {
+      // Edited by hand and already carrying the provider and its routes, which
+      // is what the warning asks for: there is nothing left to say.
+    } else if (!shippedPasswordSteps().includes(canonical(withoutSsoRoutes(password, terminal)))) {
+      skipped.push({ step: PASSWORD_STEP, region: `steps.${PASSWORD_STEP}`, reason: "hand-edited" });
     } else {
       // Every provider the entry steps carry, not only the one named: a project
       // enabled before the password step offered providers has several to catch up.
@@ -627,14 +673,11 @@ export function applySsoToFlow(
         }
       }
       const transitions = isObject(password.transitions) ? { ...password.transitions } : {};
-      // The conflict step is for someone who arrived by provider with an email
-      // that has an account. Here the account is already identified, so the
-      // answer to "it already exists" is the step they are on.
-      const routes: Record<string, string> = {
-        ...providerOutcomes(terminal),
-        user_already_exists: PASSWORD_STEP,
-      };
-      for (const [outcome, target] of Object.entries(routes)) {
+      // The same routes as the entry steps. A collision here binds to the
+      // identified user either way, and the conflict step says why they are
+      // back and offers the other ways in; sending them to this step again
+      // would show an unchanged form and a Back that shows it twice.
+      for (const [outcome, target] of Object.entries(providerOutcomes(terminal))) {
         const current = transitions[outcome];
         if (!isObject(current) || current.target !== target) {
           transitions[outcome] = { target };
@@ -691,7 +734,7 @@ export function applySsoToFlow(
     // report promises it did not do.
     const candidate = merged === undefined ? existing : { ...existing, sso_providers: merged };
     if (!matches(candidate, expected)) {
-      skipped.push({ region: `steps.${name}`, reason: "hand-edited" });
+      skipped.push({ step: name, region: `steps.${name}`, reason: "hand-edited" });
     } else if (merged !== undefined && addProvider(existing, slug)) {
       changed = true;
     }

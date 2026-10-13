@@ -376,10 +376,13 @@ The `password` step carries the providers too. Someone who signed up with a
 provider has no password, and if they type their email instead of clicking the
 button the `identifier` step sends them there: a step with only a password
 field is a dead end for them. The step routes what comes back from a provider
-like the entry steps do, with one difference: `user_already_exists` targets the
-step itself, not `sso-conflict`, because the account is already identified.
-When the provider account is someone else's, or unknown, the engine restarts
-the flow rather than creating a user.
+like the entry steps do, including `user_already_exists` to `sso-conflict`: the
+collision binds to the identified user either way, and the conflict step says
+why they are back and offers the other ways in, where the step itself would
+show an unchanged form and put itself on the back stack twice. Under
+`creation: auto`, when the provider account is someone else's, or unknown, the
+engine restarts the flow rather than creating a user; under `creation:
+disabled` an unknown account shows `error.sso_creation_disabled` on the step.
 The step is edited only when the generator recognises it: the shipped step of
 either preset, once the providers and the routes it writes are set aside. A
 hand-edited one, including one whose provider routes were pointed elsewhere, is
@@ -442,9 +445,9 @@ The engine binds the attempt to the colliding account.
     three-outcome rule:
     *   `sso_authenticated` routes to `done`: the user signed in with a
         provider already linked to that account.
-    *   `user_already_exists` targets the step itself: clicking the colliding
-        provider again re-runs the ceremony and resolves identically, so the
-        step re-renders with the same options.
+    *   `user_already_exists` targets `sso-conflict`: the account the provider
+        returned is the one already identified, and the conflict step explains
+        that and offers the password, passkey and providers.
     *   `sso_user_not_found` routes to `register-sso`: reachable only if the
         provider returns a different, unknown subject (the user switched
         provider accounts mid-loop).

@@ -565,9 +565,7 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
     const password = flow.steps.find((s) => s.name === "password")!;
 
     expect(password.sso_providers).toEqual(["google"]);
-    // The account is already identified, so "it already exists" is this step,
-    // not the conflict step an unknown arrival is sent to.
-    expect(password.transitions!.user_already_exists).toEqual({ target: "password" });
+    expect(password.transitions!.user_already_exists).toEqual({ target: "sso-conflict" });
     expect(password.transitions!.sso_authenticated).toEqual({ target: "done" });
   });
 

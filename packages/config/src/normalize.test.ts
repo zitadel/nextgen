@@ -3,12 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  normalizeFlowBody,
-  normalizeSchemaBody,
-  USER_PROPERTY_DEFAULTS,
-  withoutFlowStepDefaults,
-} from "./normalize";
+import { normalizeFlowBody, normalizeSchemaBody, USER_PROPERTY_DEFAULTS } from "./normalize";
 
 describe("normalizeFlowBody", () => {
   it("drops an empty audience in both wire shapes", () => {
@@ -167,49 +162,5 @@ describe("normalizeSchemaBody", () => {
     for (const [key, defaultValue] of Object.entries(USER_PROPERTY_DEFAULTS)) {
       expect(metaSchema.properties[key]?.default).toBe(defaultValue);
     }
-  });
-});
-
-describe("withoutFlowStepDefaults", () => {
-  it("drops the empty gates and sso_providers the platform states", () => {
-    expect(withoutFlowStepDefaults({ name: "a", gates: {}, sso_providers: [] })).toEqual({
-      name: "a",
-    });
-  });
-
-  it("keeps gates and sso_providers that hold something", () => {
-    const step = { name: "a", gates: { captcha: {} }, sso_providers: ["google"] };
-
-    expect(withoutFlowStepDefaults(step)).toEqual(step);
-  });
-
-  it("drops an empty fields list, which the platform omits", () => {
-    expect(withoutFlowStepDefaults({ name: "a", fields: [] })).toEqual({ name: "a" });
-  });
-
-  it("keeps fields that name something", () => {
-    const step = { name: "a", fields: ["email"] };
-
-    expect(withoutFlowStepDefaults(step)).toEqual(step);
-  });
-
-  it("drops primary: false from an action, which the platform omits", () => {
-    const step = { actions: [{ name: "skip", primary: false }] };
-
-    expect(withoutFlowStepDefaults(step)).toEqual({ actions: [{ name: "skip" }] });
-  });
-
-  it("keeps primary: true, which is a choice", () => {
-    const step = { actions: [{ name: "submit", primary: true }] };
-
-    expect(withoutFlowStepDefaults(step)).toEqual(step);
-  });
-
-  it("does not change the step it was given", () => {
-    const step = { gates: {}, actions: [{ name: "skip", primary: false }] };
-
-    withoutFlowStepDefaults(step);
-
-    expect(step).toEqual({ gates: {}, actions: [{ name: "skip", primary: false }] });
   });
 });

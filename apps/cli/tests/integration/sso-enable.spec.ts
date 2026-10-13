@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type ScaffoldedApp } from "../helpers/project";
+import { aSetUpApp, type FlowDocument, type ScaffoldedApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
 const GOOGLE = "google";
+const PRESETS = ["passkey-first", "password-first"] as const;
 const CREDENTIALS = {
   clientId: "1234-abc.apps.googleusercontent.com",
   secret: "the-client-secret",
@@ -152,86 +153,112 @@ describe("sso enable", () => {
         expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
       });
 
-      it("offers the provider on the password step", async () => {
-        const app = await anAppServingGoogle();
-
-        const offering = await app.stepsOfferingSso();
-
-        expect(offering.map((step) => step.name)).toContain("password");
-      });
-
-      it("adds the provider to an existing project's untouched password step", async () => {
-        const app = await anAppWithGoogle();
-        await app.editPasswordStep((step) => {
-          delete step.sso_providers;
-          step.transitions = { submit: { target: "done" } };
-        });
-
-        expect(await app.enableSso(GOOGLE, CREDENTIALS)).toSucceed();
-        expect(await app.apply()).toSucceed();
-
-        expect((await app.stepsOfferingSso()).map((step) => step.name)).toContain("password");
-      });
-
-      it("leaves nothing to reconcile after adding it to an existing project", async () => {
-        const app = await anAppWithGoogle();
-        await app.editPasswordStep((step) => {
-          delete step.sso_providers;
-          step.transitions = { submit: { target: "done" } };
-        });
-        expect(await app.enableSso(GOOGLE, CREDENTIALS)).toSucceed();
-        expect(await app.apply()).toSucceed();
-
-        expect(await app.plan()).toReportNothingToDo();
-      });
-
-      describe("a password step the developer edited by hand", () => {
-        async function anAppWithAnEditedPasswordStep(): Promise<ScaffoldedApp> {
-          const app = await aSetUpApp();
-          await app.editPasswordStep((step) => {
-            const [action] = step.actions ?? [];
-            if (action !== undefined) {
-              action.text_key = "my.own.copy";
-            }
-          });
-          return app;
-        }
-
-        it("is told what to add to it", async () => {
-          const app = await anAppWithAnEditedPasswordStep();
-
-          const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
-
-          expect(result).toSay("sso_providers");
-        });
-
-        it("does not get the provider", async () => {
-          const app = await anAppWithAnEditedPasswordStep();
-          expect(await app.enableSso(GOOGLE, CREDENTIALS)).toSucceed();
-          expect(await app.apply()).toSucceed();
-
-          expect((await app.stepsOfferingSso()).map((step) => step.name)).not.toContain("password");
-        });
-      });
-
-      describe("on the passkey-first preset", () => {
-        async function aPasskeyFirstAppServingGoogle(): Promise<ScaffoldedApp> {
-          const app = await aSetUpApp(["--preset", "passkey-first"]);
-          expect(await app.enableSso(GOOGLE, CREDENTIALS)).toSucceed();
-          expect(await app.apply()).toSucceed();
+      describe.each(PRESETS)("on the %s preset", (preset) => {
+        /** A project set up with the preset, serving Google, with the password step changed by `edit` first. */
+        async function aPresetAppServingGoogle(
+          edit?: (step: FlowDocument["steps"][number]) => void,
+        ): Promise<ScaffoldedApp> {
+          const app = await aSetUpApp(["--preset", preset]);
+          if (edit !== undefined) {
+            await app.editPasswordStep(edit);
+          }
+          await app.enableSso(GOOGLE, CREDENTIALS);
+          await app.apply();
           return app;
         }
 
         it("offers the provider on the password step", async () => {
-          const app = await aPasskeyFirstAppServingGoogle();
+          const app = await aPresetAppServingGoogle();
 
-          expect((await app.stepsOfferingSso()).map((step) => step.name)).toContain("password");
+          const offering = await app.stepsOfferingSso();
+
+          expect(offering.map((step) => step.name)).toContain("password");
         });
 
         it("leaves nothing to reconcile", async () => {
-          const app = await aPasskeyFirstAppServingGoogle();
+          const app = await aPresetAppServingGoogle();
 
           expect(await app.plan()).toReportNothingToDo();
+        });
+
+        it("reports no step as edited when enabled again after apply", async () => {
+          const app = await aPresetAppServingGoogle();
+
+          const result = await app.enableSso(GOOGLE, CREDENTIALS);
+
+          expect(app.envelopeOf<{ untouched: string[] }>(result).data.untouched).toEqual([]);
+        });
+
+        it("catches a password step from before it offered providers up", async () => {
+          const app = await aSetUpApp(["--preset", preset]);
+          await app.enableSso(GOOGLE, CREDENTIALS);
+          await app.editPasswordStep((step) => {
+            delete step.sso_providers;
+            step.transitions = Object.fromEntries(
+              Object.entries(step.transitions ?? {}).filter(
+                ([outcome]) => !outcome.startsWith("sso_") && outcome !== "user_already_exists",
+              ),
+            );
+          });
+          await app.enableSso(GOOGLE, CREDENTIALS);
+          await app.apply();
+
+          const offering = await app.stepsOfferingSso();
+
+          expect(offering.map((step) => step.name)).toContain("password");
+        });
+      });
+
+      describe("a password step the developer edited by hand", () => {
+        const copy = (step: FlowDocument["steps"][number]) => {
+          const [action] = step.actions ?? [];
+          if (action !== undefined) {
+            action.text_key = "my.own.copy";
+          }
+        };
+
+        /** A set-up project whose password step says something of its own, with Google enabled and applied. */
+        async function anAppServingGoogleWithAnEditedPasswordStep(): Promise<ScaffoldedApp> {
+          const app = await aSetUpApp();
+          await app.editPasswordStep(copy);
+          await app.enableSso(GOOGLE, CREDENTIALS);
+          await app.apply();
+          return app;
+        }
+
+        it("does not get the provider", async () => {
+          const app = await anAppServingGoogleWithAnEditedPasswordStep();
+
+          const offering = await app.stepsOfferingSso();
+
+          expect(offering.map((step) => step.name)).not.toContain("password");
+        });
+
+        it("is reported as left alone", async () => {
+          const app = await aSetUpApp();
+          await app.editPasswordStep(copy);
+
+          const result = await app.enableSso(GOOGLE, CREDENTIALS);
+
+          expect(app.envelopeOf<{ untouched: string[] }>(result).data.untouched).toHaveLength(1);
+        });
+
+        it("is not reported again once the developer has added the provider and its routes", async () => {
+          const app = await aSetUpApp();
+          await app.editPasswordStep((step) => {
+            copy(step);
+            step.sso_providers = [GOOGLE];
+            step.transitions = {
+              submit: { target: "done" },
+              sso_authenticated: { target: "done" },
+              sso_user_not_found: { target: "register-sso" },
+              user_already_exists: { target: "sso-conflict" },
+            };
+          });
+
+          const result = await app.enableSso(GOOGLE, CREDENTIALS);
+
+          expect(app.envelopeOf<{ untouched: string[] }>(result).data.untouched).toEqual([]);
         });
       });
 

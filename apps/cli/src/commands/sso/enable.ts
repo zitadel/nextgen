@@ -268,11 +268,12 @@ export default class SsoEnable extends BaseCommand {
       consola.success(`Updated ${file}`);
     }
     for (const skipped of edits.skipped) {
-      const toDo = skipped.region.endsWith(" steps.password")
-        ? `Add ${entry.displayName} to its sso_providers, and route sso_authenticated to the step a sign-in ends on, sso_user_not_found to register-sso and user_already_exists to password.`
-        : skipped.region.endsWith(" steps.sso-conflict")
-          ? `Add ${entry.displayName} to its sso_providers.`
-          : "Update it yourself.";
+      const toDo =
+        skipped.step === "password"
+          ? `Add ${plan.slug} to its sso_providers, and route sso_authenticated to the step a sign-in ends on, sso_user_not_found to register-sso and user_already_exists to sso-conflict.`
+          : skipped.step === "sso-conflict"
+            ? `Add ${plan.slug} to its sso_providers.`
+            : "Update it yourself.";
       reportWarning(`Left ${skipped.region} alone: it has been edited by hand. ${toDo}`);
     }
     if (edits.written.length === 0 && edits.skipped.length === 0) {

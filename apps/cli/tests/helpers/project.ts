@@ -49,7 +49,6 @@ export interface FlowStep {
   readonly sso_providers?: string[];
   readonly transitions?: Record<string, unknown>;
   readonly fields?: string[];
-  readonly actions?: ReadonlyArray<{ readonly name: string }>;
 }
 
 export interface PublishedSchema {
