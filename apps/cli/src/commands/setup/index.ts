@@ -493,10 +493,12 @@ export default class Setup extends BaseCommand {
               `${answer.endpoints.issuer}, not the provider`,
           );
         }
-        reportClientIdOutcome(idVariable, clientId, this.meta.cliVersion);
+        // setup binds the default environment, so its recovery commands carry
+        // no selector (an empty string appends nothing).
+        reportClientIdOutcome(idVariable, clientId, this.meta.cliVersion, "");
         // The wizard refuses an empty secret, so a deferred publish here only
         // ever means there was no project to publish to.
-        reportSecretOutcome(secret, this.meta.cliVersion, false);
+        reportSecretOutcome(secret, this.meta.cliVersion, false, "");
       }
     }
 
@@ -759,6 +761,7 @@ export default class Setup extends BaseCommand {
               ];
             }),
             this.meta.cliVersion,
+            "",
           ),
           ...installOutcome.nextCommands,
           ...consoleStep.commands,

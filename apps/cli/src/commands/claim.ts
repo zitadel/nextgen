@@ -144,7 +144,7 @@ export default class Claim extends EnvironmentCommand {
             ? "Open a browser to claim this project, then record the owning team in .zitadel/secret."
             : "Open a browser to claim this project.",
         },
-        nextCommands: ["zitadel claim"],
+        nextCommands: [`zitadel claim${this.environmentSelector()}`],
       });
     }
 
@@ -280,7 +280,10 @@ export default class Claim extends EnvironmentCommand {
         }
         if (error instanceof ApiError && error.status === 410) {
           this.recordTelemetry({ claim_outcome: "expired", poll_count: polls });
-          throw expiredError("The link expired before the browser step finished.");
+          throw expiredError(
+            "The link expired before the browser step finished.",
+            this.environmentSelector(),
+          );
         }
         if (error instanceof ApiError && error.status === 429) {
           // Polled too eagerly. Back off to the ceiling immediately rather
@@ -303,7 +306,10 @@ export default class Claim extends EnvironmentCommand {
     }
 
     this.recordTelemetry({ claim_outcome: "timeout", poll_count: polls });
-    throw expiredError("Stopped waiting for the browser step to finish.");
+    throw expiredError(
+      "Stopped waiting for the browser step to finish.",
+      this.environmentSelector(),
+    );
   }
 
   /**
@@ -364,10 +370,10 @@ function isClaimWindowExpired(error: unknown): boolean {
   );
 }
 
-function expiredError(message: string): ZitadelError {
+function expiredError(message: string, selector: string): ZitadelError {
   return new ZitadelError("E_VALIDATION", message, {
     hint: "Links are valid for 10 minutes. Start a new one.",
-    nextCommands: ["zitadel claim"],
+    nextCommands: [`zitadel claim${selector}`],
   });
 }
 
