@@ -29,9 +29,17 @@ export async function runCliForTest(
   const originalErr = process.stderr.write.bind(process.stderr);
   const originalLog = console.log;
   const originalConsoleError = console.error;
-  const overlaid = Object.keys(env);
+  // Force colour on for `--json` runs so the no-colour contract (assertEnvelope)
+  // is a real guard rather than passing for free: `--json` silences the human
+  // narration, so the only stdout is the envelope, which must stay colourless
+  // even with colour forced on. A caller's explicit colour choice still wins.
+  const effectiveEnv =
+    argv.includes("--json") && env.FORCE_COLOR === undefined && env.NO_COLOR === undefined
+      ? { ...env, FORCE_COLOR: "1" }
+      : env;
+  const overlaid = Object.keys(effectiveEnv);
   const previous = new Map(overlaid.map((key) => [key, process.env[key]]));
-  Object.assign(process.env, env);
+  Object.assign(process.env, effectiveEnv);
 
   // Capture both direct stream writes (e.g. consola) and oclif's `ux.stdout`/
   // `ux.stderr`, which go through `console.log`/`console.error`.

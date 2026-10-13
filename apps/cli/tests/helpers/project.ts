@@ -664,6 +664,12 @@ function only<T>(items: T[], what: string): T {
  */
 export function assertEnvelope(result: CliResult, args: string[] = []): void {
   const where = `\`${args.filter((arg) => !arg.startsWith("-")).join(" ")}\` --json`;
+  // A JSON envelope must never carry an ANSI colour code: one byte of it breaks
+  // `JSON.parse` and `jq` for every consumer. `cli()` runs `--json` with colour
+  // forced on (FORCE_COLOR), so this catches a command — or a future oclif theme
+  // — that lets colour leak onto the structured stream. Checked on every spec's
+  // `--json` run rather than in a suite of its own.
+  expect(result.stdout, `${where}: JSON output contains ANSI colour codes`).not.toContain("\u001B");
   let envelope: Envelope;
   try {
     envelope = parseJson(result.stdout) as Envelope;
