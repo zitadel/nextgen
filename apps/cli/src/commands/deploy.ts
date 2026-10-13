@@ -106,7 +106,7 @@ export default class Deploy extends EnvironmentCommand {
           });
         }
         throw new ZitadelError("E_VALIDATION", `${origin} is not an origin of the project`, {
-          hint: "Pass a primary origin, or add it first with `zitadel origin add`.",
+          hint: `Pass a primary origin, or add it first with \`zitadel origin add${this.environmentSelector()}\`.`,
           nextCommands: [`zitadel origin list${this.environmentSelector()}`],
         });
       }
@@ -121,7 +121,7 @@ export default class Deploy extends EnvironmentCommand {
       const origins = (await client.getProject(projectId)).origins ?? [];
       if (!origins.some((entry) => entry.kind === "primary")) {
         throw new ZitadelError("E_VALIDATION", "The project has no primary origin to deploy to", {
-          hint: "Add one with `zitadel origin add <url> --kind primary`, then deploy.",
+          hint: `Add one with \`zitadel origin add <url> --kind primary${this.environmentSelector()}\`, then deploy.`,
           nextCommands: [`zitadel origin list${this.environmentSelector()}`],
         });
       }
