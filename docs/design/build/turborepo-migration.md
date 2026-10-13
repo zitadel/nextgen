@@ -399,17 +399,21 @@ Two workable setups; the prototype's draft uses the first.
 
 | | Vercel Remote Cache (OIDC) | Depot's turbo cache |
 |---|---|---|
-| Setup | a repository variable `TURBO_TEAM=zitadel`, `id-token: write` on the job, `vercel/setup-turborepo-remote-cache-action@v1.0.0` before the first `turbo`, `TURBO_API=https://vercel.com` on Depot runners (they inject Depot's `TURBO_API`), and a **Turborepo CLI OIDC policy** in the Vercel team settings (Build and Deployment → OIDC Policies for CLI Access, select GitHub, repository `zitadel/nextgen`; optionally restrict to the workflow) | nothing on Depot runners: `TURBO_API`, `TURBO_TOKEN`, `TURBO_TEAM` are injected |
+| Setup | a repository variable `TURBO_TEAM=zitadel`, `id-token: write` on the job, `vercel/setup-turborepo-remote-cache-action@v1.1.0` before the first `turbo` (with `policy:` set to the policy's ID only if more than one of the team's Turborepo policies matches the token: Vercel then refuses the exchange), `TURBO_API=https://vercel.com` on Depot runners (they inject Depot's `TURBO_API`), and a **Turborepo CLI OIDC policy** in the Vercel team settings (Build and Deployment → OIDC Policies for CLI Access → Turborepo CLI Policies, not a VCR policy; select GitHub, repository `zitadel/nextgen`; optionally restrict to a workflow or branch) | nothing on Depot runners: `TURBO_API`, `TURBO_TOKEN`, `TURBO_TEAM` are injected |
 | Shared with | the cloud deployments (same team cache): a build CI did is a hit on Vercel and the reverse | CI only |
 | Cost | free on the Pro plan; 1 TB/month upload; artifacts expire after 7 days | part of the Depot plan (as moon's cache today) |
 | Forks | no token, local cache only | same |
-| Write policy | `TURBO_CACHE=local:rw,remote:r` on pull requests, `remote:rw` on the merge queue; on Vercel, preview builds should be read-only too (project env `TURBO_CACHE=local:rw,remote:r` for the Preview environment — a Vercel setting, not set by the prototype) | same flags |
+| Write policy | `TURBO_CACHE=local:rw,remote:r` on pull requests, `remote:rw` on the merge queue; on Vercel, `apps/cloud/turbo-build.sh` sets `remote:r` for previews and `remote:w` for production (see "Who may write to the cache") | same flags |
 
 Recommendation: Vercel's, for the one shared cache and because the cloud
-deployments use it already. Steps for Florian, in order: create the OIDC
-policy, `gh variable set TURBO_TEAM --body zitadel`, run `ci-turbo.yml` once
-by hand and check for "Remote caching enabled" in its log. If the policy is
-not wanted, delete the `TURBO_API` line and the cache step from the draft and
+deployments use it already. Set up on 2026-10-12: the variable
+`TURBO_TEAM=zitadel` and a Turborepo CLI policy for any workflow and branch of
+`zitadel/nextgen`. The first exchanges after the policy was created
+answered HTTP 400, one job got 400 and 200 for identical requests a third of
+a second apart, and every exchange since has succeeded: a new policy
+probably takes a while to apply everywhere. To check a run,
+look for "Remote caching enabled" in turbo's output. If the policy is not
+wanted, delete the `TURBO_API` line and the cache step from the workflow and
 Depot's cache is used with no further setup.
 
 ### Who may write to the cache
@@ -429,12 +433,17 @@ sets them up:
   read-only by their own choice, which keeps the cache tidy but protects
   nothing. Cost: production deployments lose the pilot's ~35 s of cache
   hits.
-- **GitHub Actions on pull requests** run the pull request's code. The OIDC
-  policy on the Vercel side should match only trusted refs — `main` and the
-  merge queue's `gh-readonly-queue/*` branches — so a pull-request run gets no
-  token and runs with the local cache only (the cache step is allowed to
-  fail for that reason). Merge-queue runs execute reviewed code and may read
-  and write.
+- **GitHub Actions on pull requests** run the pull request's code, and the
+  OIDC policy gives every run of this repository a token that can write
+  (Vercel's docs describe no read-only policy; forks get no token).
+  Restricting the policy to trusted refs (the merge queue's
+  `gh-readonly-queue/*` branches) would take the remote cache away from pull
+  requests without narrowing who can write: anyone who can push a branch
+  can write through that branch's Vercel preview build. So pull requests
+  read (`remote:r`, their own choice, as on previews), and the boundary is
+  the one above: nothing that ships restores from the cache. Merge-queue
+  runs read and write, so a poisoned artifact could make a merge-queue run
+  pass for code that fails; the signatures below close that.
 - **Later, to let production read again:** turbo's artifact signatures
   (`remoteCache.signature: true` with `TURBO_REMOTE_CACHE_SIGNATURE_KEY`).
   Production and trusted CI get the real key (a Vercel Production-only env
@@ -542,9 +551,10 @@ the release graph.
    the pilot's triggers (moon unmaintained for three months, a blocking bug,
    turbo's Go support accepting a root module) are no longer the gate.
 2. **Remote cache: Vercel over OIDC.** The repository variable `TURBO_TEAM`
-   is set; the "Turborepo CLI" OIDC policy in the Vercel team settings is
-   the remaining step, and until it exists `ci-turbo` runs with the local
-   cache only.
+   and the "Turborepo CLI" OIDC policy (any workflow and branch of
+   `zitadel/nextgen`) are set up and `ci-turbo` gets a token (see "Remote
+   cache"). When the exchange fails, `ci-turbo` runs with the local cache
+   only.
 3. **Production never restores from the cache; previews read it.** Vercel
    builds upload their results to the team cache by default, previews
    included, and a branch controls its own build, so a production build
