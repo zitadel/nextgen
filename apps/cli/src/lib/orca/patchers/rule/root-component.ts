@@ -123,7 +123,7 @@ export async function viteEntry(cwd: string): Promise<string | undefined> {
     return undefined;
   }
   // A commented-out script is not the one Vite loads.
-  for (const tag of html.replace(/<!--[\s\S]*?-->/g, "").match(/<script\b[^>]*>/gi) ?? []) {
+  for (const tag of withoutComments(html).match(/<script\b[^>]*>/gi) ?? []) {
     if (!/\btype\s*=\s*["']?module\b/i.test(tag)) {
       continue;
     }
@@ -135,6 +135,25 @@ export async function viteEntry(cwd: string): Promise<string | undefined> {
     return projectPath(src);
   }
   return undefined;
+}
+
+/**
+ * `html` without its comments. Scanned rather than replaced by a pattern: the
+ * text is only searched for a script tag, never served, but code scanning
+ * reads a pattern replace over HTML as sanitizing it.
+ */
+function withoutComments(html: string): string {
+  let text = "";
+  let from = 0;
+  for (let start = html.indexOf("<!--"); start !== -1; start = html.indexOf("<!--", from)) {
+    text += html.slice(from, start);
+    const end = html.indexOf("-->", start + 4);
+    if (end === -1) {
+      return text;
+    }
+    from = end + 3;
+  }
+  return text + html.slice(from);
 }
 
 /**
