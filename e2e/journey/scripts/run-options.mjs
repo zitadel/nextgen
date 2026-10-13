@@ -41,6 +41,7 @@ export function parseLocalJourneyArgs(args) {
     matrix: "full",
     preexistingApp: false,
     preset: "",
+    remote: false,
     runtime: "binary",
     suite: "frameworks",
     tarballsDir: "",
@@ -115,6 +116,10 @@ export function parseLocalJourneyArgs(args) {
         parsed.preexistingApp = true;
         break;
       }
+      case "--remote": {
+        parsed.remote = true;
+        break;
+      }
       case "--keep": {
         parsed.keep = true;
         break;
@@ -138,13 +143,14 @@ export function parseLocalJourneyArgs(args) {
   }
   if (parsed.ci) {
     // --ci runs a fixed set of variants (fresh-app matrix, passkey preset,
-    // pre-existing app, testkit) in one process, so the flags that pick a
-    // single variant's shape have no meaning alongside it.
+    // pre-existing app, testkit, remote https) in one process, so the flags
+    // that pick a single variant's shape have no meaning alongside it.
     const conflicting = [
       explicitFramework && "--framework",
       explicitSuite && "--suite",
       explicitPreset && "--preset",
       parsed.preexistingApp && "--preexisting-app",
+      parsed.remote && "--remote",
     ].filter(Boolean);
     if (conflicting.length > 0) {
       throw new Error(
@@ -167,6 +173,11 @@ export function parseLocalJourneyArgs(args) {
     if (parsed.preexistingApp) {
       throw new Error(
         "--preexisting-app applies to the frameworks suite only; the testkit suite always scaffolds fresh",
+      );
+    }
+    if (parsed.remote) {
+      throw new Error(
+        "--remote applies to the frameworks suite only; the testkit suite boots its own instance",
       );
     }
     // The testkit consumer journey scaffolds one next app and runs the

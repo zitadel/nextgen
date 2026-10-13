@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 
 import { frameworkForId, frameworkIds } from "./frameworks.mjs";
+import { remoteHostEnv, startHttpsEdge } from "./https-edge.mjs";
 import { canListen, createJourneyPortAllocator } from "./ports.mjs";
 import {
   localRegistryPaths,
@@ -31,8 +32,8 @@ if (options.help) {
 // A "journey variant" is one unit of work: a suite/preset/pre-existing-app
 // posture and the frameworks it runs. Non-CI derives a single variant from the
 // parsed options; `--ci` runs the fixed CI set (fresh-app matrix, passkey
-// preset, pre-existing app, testkit) in this one process so they share the
-// module-level `usedPorts` and never need cross-process port juggling.
+// preset, pre-existing app, testkit, remote https) in this one process so they
+// share the module-level `usedPorts` and never need cross-process port juggling.
 const journeyVariants = buildJourneyVariants();
 const plannedRuns = journeyVariants.flatMap((variant) =>
   variant.frameworkIds.map((id) => ({ variant, framework: frameworkForId(id) })),
@@ -165,8 +166,9 @@ Options:
                            install @zitadel/testing from the journey registry, and
                            run the checked-in consumer suite inside it
   --ci                     Run the full CI journey set (fresh-app matrix,
-                           passkey preset, pre-existing app, testkit) in one
-                           process; incompatible with --framework/--suite/--preset/--preexisting-app
+                           passkey preset, pre-existing app, testkit, remote
+                           https) in one process; incompatible with
+                           --framework/--suite/--preset/--preexisting-app/--remote
   --matrix <single|full>   Fresh-app framework scope under --ci (default: full)
   --concurrency <n>        Number of framework journeys to run in parallel (default: 5)
   --runtime <binary|docker> Local runtime backend (default: binary)
@@ -175,6 +177,11 @@ Options:
   --preexisting-app        Seed a minimal pre-existing app before setup so the
                            scaffolded pages take the widget posture (ADR 044);
                            defaults the matrix to next and nuxt
+  --remote                 Set up against a local https edge for zitadel.test
+                           (scripts/https-edge.mjs) in front of the local
+                           runtime, instead of --server local: the generated
+                           app then reaches its server the way it reaches a
+                           hosted deployment
   --tarballs-dir <path>    Use prebuilt release npm tarballs
   --keep                   Keep the temp work directory after success
   --work-dir <path>        Use an explicit work directory
@@ -196,6 +203,7 @@ function buildJourneyVariants() {
         suite: options.suite,
         preset: options.preset,
         preexistingApp: options.preexistingApp,
+        remote: options.remote,
         frameworkIds: options.frameworkIds,
       },
     ];
@@ -206,6 +214,7 @@ function buildJourneyVariants() {
       suite: "frameworks",
       preset: "",
       preexistingApp: false,
+      remote: false,
       frameworkIds: options.matrix === "single" ? ["next"] : [...frameworkIds],
     },
     {
@@ -213,6 +222,7 @@ function buildJourneyVariants() {
       suite: "frameworks",
       preset: "passkey-first",
       preexistingApp: false,
+      remote: false,
       frameworkIds: ["next"],
     },
     {
@@ -220,6 +230,7 @@ function buildJourneyVariants() {
       suite: "frameworks",
       preset: "",
       preexistingApp: true,
+      remote: false,
       frameworkIds: ["next", "nuxt"],
     },
     {
@@ -227,14 +238,27 @@ function buildJourneyVariants() {
       suite: "testkit",
       preset: "",
       preexistingApp: false,
+      remote: false,
       frameworkIds: ["next"],
+    },
+    // The scaffolded dev proxy against an https server that answers only to
+    // its own name, as the hosted cloud does. React stands for the shared
+    // Vite proxy; passkey-first because the passkey ceremony depends most on
+    // the server seeing the app's origin.
+    {
+      id: "remote",
+      suite: "frameworks",
+      preset: "passkey-first",
+      preexistingApp: false,
+      remote: true,
+      frameworkIds: ["react"],
     },
   ];
 }
 
 function assertMatrixPortsAreDynamic(runsToRun) {
   if (runsToRun.length <= 1) return;
-  const fixedPorts = ["JOURNEY_APP_PORT", "JOURNEY_ZITADEL_PORT"].filter(
+  const fixedPorts = ["JOURNEY_APP_PORT", "JOURNEY_ZITADEL_PORT", "JOURNEY_EDGE_PORT"].filter(
     (name) => process.env[name],
   );
   if (fixedPorts.length === 0) return;
@@ -262,6 +286,7 @@ async function createJourneyContext(variant, framework) {
     variant.suite === "testkit" ? undefined : 3000,
   );
   const zitadelPort = await resolveFrameworkPort("JOURNEY_ZITADEL_PORT");
+  const edgePort = variant.remote ? await resolveFrameworkPort("JOURNEY_EDGE_PORT") : undefined;
   const appUrl = `http://localhost:${appPort}`;
   const appDir = join(frameworkWorkDir, "myapp");
   const playwrightRoot = join(projectRoot, "test-output", "playwright", variant.id, framework.id);
@@ -270,6 +295,7 @@ async function createJourneyContext(variant, framework) {
     appPort,
     appUrl,
     diagnosticsDir: contextDiagnosticsDir,
+    edgePort,
     framework,
     frameworkWorkDir,
     logPath: join(contextDiagnosticsDir, `${framework.id}-app.log`),
@@ -277,6 +303,7 @@ async function createJourneyContext(variant, framework) {
     playwrightReportDir: join(playwrightRoot, "report"),
     preexistingApp: variant.preexistingApp,
     preset: variant.preset,
+    remote: variant.remote,
     suite: variant.suite,
     variantId: variant.id,
     zitadelPort,
@@ -309,10 +336,13 @@ async function runFrameworkJourney(context) {
   const prefix = `${context.variantId}/${framework.id}`;
   try {
     await mkdir(context.diagnosticsDir, { recursive: true });
+    const edge = context.remote ? await startLaneEdge(context, prefix) : undefined;
     log(`[${prefix}] preparing fresh ${framework.displayName} app`);
     await run("node", ["e2e/journey/scripts/prepare-app.mjs"], {
       env: {
         ...process.env,
+        // The CLI reaches the edge by name: preloaded resolver, trusted cert.
+        ...edge?.env,
         // Pin every JOURNEY_* variable prepare-app reads: a preceding CI
         // journey step exports its final values through GITHUB_ENV, so the
         // inherited process.env may carry another run's (deleted) app dir
@@ -324,6 +354,9 @@ async function runFrameworkJourney(context) {
         // leak-proofing as JOURNEY_PRESET above.
         JOURNEY_PREEXISTING_APP: context.preexistingApp ? "1" : "",
         JOURNEY_PRESET: context.preset,
+        // What setup's --server points at: the local runtime, or the remote
+        // lane's https edge in front of it.
+        JOURNEY_SETUP_SERVER: edge?.url ?? "local",
         JOURNEY_ZITADEL_PORT: String(context.zitadelPort),
         JOURNEY_REGISTRY_URL: registryUrl,
         JOURNEY_RUNTIME: options.runtime,
@@ -342,7 +375,8 @@ async function runFrameworkJourney(context) {
     log(`[${prefix}] starting generated app at ${context.appUrl}`);
     const appProcess = startChild("npm", framework.devServerArgs(context.appPort), {
       cwd: context.appDir,
-      env: process.env,
+      // The app's dev proxy reaches the edge by name, like the CLI did.
+      env: edge ? { ...process.env, ...edge.env } : process.env,
       logFile: context.logPath,
     });
     context.appProcess = appProcess;
@@ -390,6 +424,30 @@ async function runFrameworkJourney(context) {
     await collectDiagnostics(context);
     throw new Error(`${prefix}: ${errorMessage(error)}`, { cause: error });
   }
+}
+
+/**
+ * Starts the remote lane's https edge in front of the lane's local runtime,
+ * which `zitadel start` brings up during prepare-app; until then the edge
+ * answers 502. The edge logs to the lane's diagnostics; teardownJourney
+ * closes it.
+ */
+async function startLaneEdge(context, prefix) {
+  await mkdir(context.frameworkWorkDir, { recursive: true });
+  const edge = await startHttpsEdge({
+    port: context.edgePort,
+    upstreamPort: context.zitadelPort,
+    dir: context.frameworkWorkDir,
+    logPath: join(context.diagnosticsDir, "edge.log"),
+  });
+  context.edge = edge;
+  log(
+    `[${prefix}] https edge ${edge.url} in front of the local runtime on :${context.zitadelPort}`,
+  );
+  return {
+    url: edge.url,
+    env: remoteHostEnv({ certPath: edge.certPath, dir: context.frameworkWorkDir }),
+  };
 }
 
 /**
@@ -826,6 +884,9 @@ async function teardownJourney(context) {
   context.toreDown = true;
   if (context.appProcess) {
     await stopChild(context.appProcess);
+  }
+  if (context.edge) {
+    await context.edge.close();
   }
   await resetLocalRuntime(context);
 }

@@ -41,6 +41,7 @@ moon run e2e:journey -- --work-dir /tmp/zitadel-journey
 moon run e2e:journey -- --runtime docker --image nextgen:local
 moon run e2e:journey -- --framework next
 moon run e2e:journey -- --preexisting-app
+moon run e2e:journey -- --framework vue --remote
 moon run e2e:journey -- --concurrency 2
 moon run e2e:journey -- --tarballs-dir dist/release/<version>/npm
 ```
@@ -55,6 +56,13 @@ moon run e2e:journey -- --tarballs-dir dist/release/<version>/npm
   pages take the `variant="widget"` posture inside the host app's own shell
   (ADR 044). Defaults the matrix to `next` and `nuxt` — the posture is scoped
   to the route-based frameworks.
+- `--remote` runs setup with `--server https://zitadel.test:<port>`, a local
+  https edge (`scripts/https-edge.mjs`) in front of the same local runtime,
+  instead of `--server local`. The edge behaves like Vercel's: it completes
+  TLS only for `zitadel.test`, routes by `Host`, and overwrites
+  `X-Forwarded-*`. So the generated app reaches its server the way it reaches a
+  hosted deployment, and a dev proxy that only works over plain http fails.
+  Needs `openssl` on the PATH to mint the edge's certificate.
 - `--concurrency <n>` controls local framework parallelism. The default is `5`.
 - `--runtime binary|docker` selects the local runtime backend. The default is
   `binary`.
@@ -70,6 +78,7 @@ Useful environment overrides:
 - `JOURNEY_REGISTRY_PORT`
 - `JOURNEY_APP_PORT` for single-framework runs only
 - `JOURNEY_ZITADEL_PORT` for single-framework runs only
+- `JOURNEY_EDGE_PORT` for single-framework `--remote` runs only
 - `JOURNEY_TARBALLS_DIR` to use prebuilt release npm tarballs
 - `JOURNEY_CI=1`, `JOURNEY_MATRIX`, `JOURNEY_RUNTIME` and `JOURNEY_WORK_DIR`
   for `--ci`, `--matrix`, `--runtime` and `--work-dir`. Arguments on the
@@ -117,3 +126,9 @@ runs execute framework suites in parallel.
   `posture` in the scaffold manifest, keeps the host's own homepage and shell,
   and the same register/logout/login journeys run through the widget-posture
   pages inside the host layout (ADR 044).
+- Remote https lane (`--remote`; in CI: React, `--preset passkey-first`): the
+  passkey journey runs through the generated dev proxy against the local https
+  edge. The edge answers only to `zitadel.test` and replaces the forwarded
+  headers, as the hosted cloud does, so this lane proves the proxy addresses
+  the server by its own name. It also proves the server still binds passkeys
+  and cookies to the app on `localhost`.

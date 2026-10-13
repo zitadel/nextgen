@@ -10,7 +10,7 @@ gate, not as a demo-app e2e suite. The canonical contract is
 tarball packing (`moon run release:pack`), the `PUBLIC_RELEASE_PACKAGES`
 manifest + `verify-tarballs.mjs` enforcement, the 8-framework matrix, the
 single `--ci` runner invocation that runs all journey variants (fresh-app,
-passkey, pre-existing app, testkit) concurrently with `--matrix single|full`
+passkey, pre-existing app, testkit, remote https) concurrently with `--matrix single|full`
 collapsing the framework set, port doctrine, and WebAuthn/`localhost` rules
 all live there. Review pointers
 on top of it:
@@ -22,7 +22,8 @@ on top of it:
 - The journey exercises the customer path through `npx`: `doctor`, `start`,
   then `setup --framework <one of the 8> --server local` with
   `--non-interactive --json`, generated apps outside the repo, `npm` inside
-  the generated app.
+  the generated app. The remote https lane alone points `--server` at the
+  local https edge (`scripts/https-edge.mjs`) in front of the same runtime.
 - Keep Verdaccio proxying npmjs for third-party dependencies while publishing
   Zitadel tarballs under both `alpha` and `latest`.
 - Preserve the CLI setup JSON contract: `--non-interactive --json` must parse
