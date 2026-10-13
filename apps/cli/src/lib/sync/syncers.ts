@@ -200,7 +200,7 @@ class IdpConnectionSyncer implements ResourceSyncer {
         : "Connection file is not a valid identity provider connection",
       {
         hint: literalSecret
-          ? 'Use "client_secret": "${{ NAME }}" and publish the value with `variables set NAME --secret`.'
+          ? 'Use "client_secret": "${{ NAME }}" and publish the value with `variables set NAME --project-level --secret`.'
           : undefined,
         details: { issues: result.error.issues },
       },
@@ -278,12 +278,20 @@ class IdpConnectionSyncer implements ResourceSyncer {
    * `client_secret` naming a variable the project does not hold would
    * publish a connection that cannot sign anyone in.
    */
-  async preflight(path: string, data: object, old: object | null): Promise<void> {
+  async preflight(
+    path: string,
+    data: object,
+    old: object | null,
+    removed: readonly object[],
+  ): Promise<void> {
     const next = data as ConnectionBody;
-    if (old !== null) {
-      const stored = old as ConnectionBody;
+    const previous =
+      old ?? removed.find((body) => (body as ConnectionBody).slug === next.slug) ?? null;
+    if (previous !== null) {
+      const stored = previous as ConnectionBody;
       const changed = IDENTITY_FIELDS.filter(
-        ({ read }) => read(stored) !== undefined && read(stored) !== read(next),
+        ({ read }) =>
+          read(stored) !== undefined && read(next) !== undefined && read(stored) !== read(next),
       );
       if (changed.length > 0) {
         throw new ZitadelError(
@@ -330,7 +338,7 @@ class IdpConnectionSyncer implements ResourceSyncer {
         "E_CREDENTIAL_MISSING",
         `${path}: ${missing.field} names the variable ${missing.name}, which the project does not have`,
         {
-          hint: `Publish it with \`variables set ${missing.name}\` (add --secret for a secret), then re-run.`,
+          hint: `Publish it with \`variables set ${missing.name} --project-level\` (add --secret for a secret), then re-run.`,
           details: { variable: missing.name, field: missing.field, file: path },
         },
       );

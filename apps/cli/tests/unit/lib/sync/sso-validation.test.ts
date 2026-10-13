@@ -129,6 +129,7 @@ describe("validatePlannedSso", () => {
             kind: "skip",
             path: CONNECTION,
             reason: "unsupported-deletion",
+            id: "idp_1",
             syncer: syncer("idp"),
           },
         ],

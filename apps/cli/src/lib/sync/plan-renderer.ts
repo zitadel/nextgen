@@ -121,7 +121,7 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
   const unsupportedNote = unsupported.map((a) =>
     paint(
       `# ${a.path} was removed, but deleting ${a.syncer.kind} resources is not supported yet (#1013): ` +
-        `apply will not delete it on the platform. Restore the file to clear this.`,
+        `apply will not delete it on the platform. Restore the file if you did not mean to remove it.`,
       A.yellow,
       tty,
     ),

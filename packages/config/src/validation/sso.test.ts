@@ -27,6 +27,7 @@ type Connection = {
   claim_mapping?: Record<string, string>;
   verified_claims?: Record<string, string>;
   provisioning?: { creation: "auto" | "disabled" };
+  oidc?: { client_id: string; client_secret: string };
 };
 type Project = {
   schemas: Record<string, Schema>;
@@ -181,6 +182,28 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
         rule: "sso/duplicate-slug",
         file: "copy.json",
         says: ["google", GOOGLE, "one connection"],
+      },
+    ],
+  },
+  {
+    name: "two connection files name the same variable",
+    edit: (p) => {
+      connectionOf(p).oidc = {
+        client_id: "${{ SHARED_ID }}",
+        client_secret: "${{ SHARED_SECRET }}",
+      };
+      p.connections["other.json"] = { ...structuredClone(connectionOf(p)), slug: "other" };
+    },
+    expect: [
+      {
+        rule: "sso/shared-variable",
+        file: "other.json",
+        says: ["client_id", "also uses", "own variable"],
+      },
+      {
+        rule: "sso/shared-variable",
+        file: "other.json",
+        says: ["client_secret", "also uses", "own variable"],
       },
     ],
   },
@@ -503,6 +526,25 @@ describe("how the rules read the project", () => {
       "sso/connection-resolves",
       "sso/provider-id",
     ]);
+  });
+
+  it("does not ask for a claim_mapping row where verified_claims reads no claim", () => {
+    const issues = validate((p) => {
+      connectionOf(p).verified_claims = { email: "$supplementary_fetch" };
+      connectionOf(p).claim_mapping = {};
+    });
+
+    expect(issues.map((issue) => issue.rule)).not.toContain("sso/unmapped-verification-key");
+  });
+
+  it("names a verified_claims key that no schema has once, not twice", () => {
+    const issues = validate((p) => {
+      connectionOf(p).verified_claims = { typo: "email_verified" };
+    });
+
+    expect(
+      issues.map((issue) => issue.rule).filter((rule) => rule.includes("verification")),
+    ).toEqual(["sso/orphaned-verification-key"]);
   });
 
   it("does not take prototype keys for mapped properties", () => {

@@ -181,7 +181,13 @@ describe("renderPlan — no changes", () => {
 
     expect(
       collectPlanWarnings([
-        { kind: "skip", path: ".zitadel/idps/a.json", reason: "unsupported-deletion", syncer: idp },
+        {
+          kind: "skip",
+          path: ".zitadel/idps/a.json",
+          reason: "unsupported-deletion",
+          id: "idp_1",
+          syncer: idp,
+        },
       ]),
     ).toEqual([
       expect.objectContaining({ path: ".zitadel/idps/a.json", rule: "unsupported-deletion" }),
@@ -196,6 +202,7 @@ describe("renderPlan — no changes", () => {
           kind: "skip",
           path: ".zitadel/idps/google.json",
           reason: "unsupported-deletion",
+          id: "idp_1",
           syncer: idp,
         },
       ],

@@ -18,6 +18,7 @@
  * edits, missing variables) live in the connection syncer, which can read it.
  */
 
+import { referencedVariable } from "../idp/provider.js";
 import type { ProjectRuleId } from "./rules.js";
 import type { ProjectIssue, ProjectTree } from "./types.js";
 
@@ -132,6 +133,31 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
         file: path,
         message: `connection slug ${q(slug)} is also used by ${first.path}. A slug names one connection: change the slug here, or delete one of the two files.`,
       });
+    }
+  }
+
+  // Two connections that name the same project variable would share a
+  // credential, and publishing one overwrites the other.
+  const variableOwner = new Map<string, string>();
+  for (const [path, body] of [...tree.connections].sort(([a], [b]) => a.localeCompare(b))) {
+    for (const block of [(body as Json).oidc, (body as Json).oauth2]) {
+      for (const field of ["client_id", "client_secret"] as const) {
+        const value = isObject(block) ? block[field] : undefined;
+        const name = typeof value === "string" ? referencedVariable(value) : undefined;
+        if (name === undefined) {
+          continue;
+        }
+        const owner = variableOwner.get(name);
+        if (owner === undefined) {
+          variableOwner.set(name, path);
+        } else if (owner !== path) {
+          add({
+            rule: "sso/shared-variable",
+            file: path,
+            message: `${field} names the variable ${name}, which ${owner} also uses. Give each connection its own variable so one cannot overwrite the other.`,
+          });
+        }
+      }
     }
   }
 
@@ -273,8 +299,13 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
     if (referencing.length === 0 && !offered.has(slug)) {
       continue;
     }
+    const unreadable = (key: string) =>
+      referencing.length > 0 && !referencing.some((schema) => hasProperty(schema, key));
+    const verifiedByValue = isObject(body.verified_claims) ? body.verified_claims : {};
     for (const key of verified) {
-      if (!mapping.includes(key)) {
+      const value = verifiedByValue[key];
+      const readsNoClaim = value === true || value === "$supplementary_fetch";
+      if (!mapping.includes(key) && !readsNoClaim && !unreadable(key)) {
         add({
           rule: "sso/unmapped-verification-key",
           file: path,

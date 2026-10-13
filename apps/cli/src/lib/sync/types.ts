@@ -158,10 +158,15 @@ export interface ResourceSyncer {
   readonly deletion?: "unsupported";
   /**
    * Checks that need the platform, run for every create and update before any
-   * mutation, given the file `path`. `old` is the stored body of an update (null for a create, or
+   * mutation, given the file `path`. `removed` holds the stored bodies of files this plan declines to delete, so a renamed file is judged against what it replaces. `old` is the stored body of an update (null for a create, or
    * when it could not be read). Throws to stop the plan.
    */
-  preflight?(path: string, data: object, old: object | null): Promise<void>;
+  preflight?(
+    path: string,
+    data: object,
+    old: object | null,
+    removed: readonly object[],
+  ): Promise<void>;
   fetch?(id: string): Promise<object>;
   /**
    * Reduce a body to its canonical comparison form: strip server-echoed
@@ -260,4 +265,10 @@ export type SyncAction =
     }
   | { kind: "delete"; path: string; syncer: ResourceSyncer; id: string; oldContent: object | null }
   | { kind: "skip"; path: string; reason: "immutable" | "no-change" }
-  | { kind: "skip"; path: string; reason: "unsupported-deletion"; syncer: ResourceSyncer };
+  | {
+      kind: "skip";
+      path: string;
+      reason: "unsupported-deletion";
+      syncer: ResourceSyncer;
+      id: string;
+    };

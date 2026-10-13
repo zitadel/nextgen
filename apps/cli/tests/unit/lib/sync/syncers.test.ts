@@ -943,7 +943,7 @@ describe("IdpConnectionSyncer", () => {
       withVariables(["OTHER"]);
 
       const error = await idpSyncer()
-        .preflight?.(file, connection, null)
+        .preflight?.(file, connection, null, [])
         .catch((err: unknown) => err);
 
       expect(error).toMatchObject({ code: "E_CREDENTIAL_MISSING" });
@@ -959,7 +959,7 @@ describe("IdpConnectionSyncer", () => {
       };
 
       const error = await idpSyncer()
-        .preflight?.(file, withVariable, null)
+        .preflight?.(file, withVariable, null, [])
         .catch((err: unknown) => err);
 
       expect(error).toMatchObject({ code: "E_CREDENTIAL_MISSING" });
@@ -969,13 +969,15 @@ describe("IdpConnectionSyncer", () => {
     it("accepts a client_secret variable the project holds", async () => {
       withVariables(["GOOGLE_CLIENT_SECRET"]);
 
-      await expect(idpSyncer().preflight?.(file, connection, connection)).resolves.toBeUndefined();
+      await expect(
+        idpSyncer().preflight?.(file, connection, connection, []),
+      ).resolves.toBeUndefined();
     });
 
     it("leaves a platform it cannot read to the write that follows", async () => {
       server.use(http.get(`${BASE}/variables`, () => HttpResponse.error()));
 
-      await expect(idpSyncer().preflight?.(file, connection, null)).resolves.toBeUndefined();
+      await expect(idpSyncer().preflight?.(file, connection, null, [])).resolves.toBeUndefined();
     });
 
     it.each([
@@ -991,7 +993,7 @@ describe("IdpConnectionSyncer", () => {
       const next = field === "subject_claim" ? edited : { ...edited, subject_claim: "sub" };
 
       const error = await idpSyncer()
-        .preflight?.(file, next, stored)
+        .preflight?.(file, next, stored, [])
         .catch((err: unknown) => err);
 
       expect(error).toMatchObject({ code: "E_VALIDATION" });
@@ -999,11 +1001,72 @@ describe("IdpConnectionSyncer", () => {
       expect((error as ZitadelError).message).toContain(file);
     });
 
+    describe("a connection over OAuth2", () => {
+      const stored = {
+        slug: "acme",
+        protocol: "oauth2",
+        subject_claim: "id",
+        oauth2: {
+          authorization_endpoint: "https://acme.test/authorize",
+          token_endpoint: "https://acme.test/token",
+          userinfo_endpoint: "https://acme.test/me",
+          client_id: "id",
+          client_secret: "${{ ACME_CLIENT_SECRET }}",
+        },
+      };
+
+      it.each([
+        ["oauth2.token_endpoint", { token_endpoint: "https://other.test/token" }],
+        ["oauth2.userinfo_endpoint", { userinfo_endpoint: "https://other.test/me" }],
+      ])("refuses an edit of %s", async (field, over) => {
+        const error = await idpSyncer()
+          .preflight?.(file, { ...stored, oauth2: { ...stored.oauth2, ...over } }, stored, [])
+          .catch((err: unknown) => err);
+
+        expect(error).toMatchObject({ code: "E_VALIDATION" });
+        expect((error as ZitadelError).message).toContain(field);
+      });
+    });
+
+    it("does not read a subject_claim the file leaves out as an edit", async () => {
+      withVariables(["GOOGLE_CLIENT_SECRET"]);
+      const { subject_claim: _omitted, ...local } = { ...connection, subject_claim: "sub" };
+
+      await expect(
+        idpSyncer().preflight?.(file, local, { ...connection, subject_claim: "sub" }, []),
+      ).resolves.toBeUndefined();
+    });
+
+    it("judges a new file against the removed file it replaces", async () => {
+      const removed = { ...connection };
+      const renamed = { ...connection, oidc: { ...connection.oidc, issuer: "https://other.test" } };
+
+      const error = await idpSyncer()
+        .preflight?.(".zitadel/idps/google-main.json", renamed, null, [removed])
+        .catch((err: unknown) => err);
+
+      expect(error).toMatchObject({ code: "E_VALIDATION" });
+      expect((error as ZitadelError).message).toContain("oidc.issuer");
+    });
+
+    it("lets a new file with a slug of its own through", async () => {
+      withVariables(["GOOGLE_CLIENT_SECRET"]);
+
+      await expect(
+        idpSyncer().preflight?.(
+          ".zitadel/idps/other.json",
+          { ...connection, slug: "other" },
+          null,
+          [connection],
+        ),
+      ).resolves.toBeUndefined();
+    });
+
     it("allows an edit of a field that does not identify the connection", async () => {
       withVariables(["GOOGLE_CLIENT_SECRET"]);
 
       await expect(
-        idpSyncer().preflight?.(file, { ...connection, display_name: "Workspace" }, connection),
+        idpSyncer().preflight?.(file, { ...connection, display_name: "Workspace" }, connection, []),
       ).resolves.toBeUndefined();
     });
   });

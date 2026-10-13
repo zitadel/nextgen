@@ -1715,9 +1715,12 @@ describe("a syncer's preflight", () => {
         syncer({ preflight, fetch: vi.fn().mockResolvedValue({ slug: "acme" }) }),
       ]);
 
-      expect(preflight).toHaveBeenCalledWith(`${IDPS}/acme.json`, expect.anything(), {
-        slug: "acme",
-      });
+      expect(preflight).toHaveBeenCalledWith(
+        `${IDPS}/acme.json`,
+        expect.anything(),
+        { slug: "acme" },
+        [],
+      );
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
@@ -1732,7 +1735,28 @@ describe("a syncer's preflight", () => {
 
       await buildSyncPlan(cwd, [syncer({ preflight })]);
 
-      expect(preflight).toHaveBeenCalledWith(`${IDPS}/acme.json`, expect.anything(), null);
+      expect(preflight).toHaveBeenCalledWith(`${IDPS}/acme.json`, expect.anything(), null, []);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("is given the stored body of a file the plan declines to delete", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: { [`${IDPS}/old.json`]: { id: "idp_1", hash: "abc" } },
+      });
+      await writeResource(cwd, IDPS, "renamed.json", { slug: "acme" });
+      const preflight = vi.fn().mockResolvedValue(undefined);
+      const fetch = vi.fn().mockResolvedValue({ slug: "acme", stored: true });
+
+      await buildSyncPlan(cwd, [syncer({ preflight, fetch, deletion: "unsupported" })]);
+
+      expect(preflight).toHaveBeenCalledWith(`${IDPS}/renamed.json`, expect.anything(), null, [
+        { slug: "acme", stored: true },
+      ]);
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
@@ -1763,7 +1787,7 @@ describe("a syncer's preflight", () => {
 
       await buildSyncPlan(cwd, [syncer({ preflight, fetch: gone })]);
 
-      expect(preflight).toHaveBeenCalledWith(`${IDPS}/acme.json`, expect.anything(), null);
+      expect(preflight).toHaveBeenCalledWith(`${IDPS}/acme.json`, expect.anything(), null, []);
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }

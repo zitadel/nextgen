@@ -109,7 +109,13 @@ export async function buildSyncPlan(
       }
 
       if (syncer.deletion === "unsupported") {
-        actions.push({ kind: "skip", path: filePath, reason: "unsupported-deletion", syncer });
+        actions.push({
+          kind: "skip",
+          path: filePath,
+          reason: "unsupported-deletion",
+          syncer,
+          id: entry.id,
+        });
         continue;
       }
 
@@ -224,20 +230,22 @@ export async function buildSyncPlan(
     }
   }
 
-  // What only the platform can answer, for every connection this plan writes.
-  for (const action of actions) {
-    if ((action.kind === "create" || action.kind === "update") && action.syncer.preflight) {
-      const old = action.kind === "update" ? await storedBody(action) : null;
-      await action.syncer.preflight(action.path, action.content, old);
-    }
-  }
-
   // Semantic pre-flight over every flow this plan uploads — the rules the
   // server would otherwise enforce mid-apply, after the schema revision
   // already published. Throws E_VALIDATION before any mutation.
   validatePlannedFlows({ actions, scannedContents, stateResources: state.resources });
   // The rules that read schemas, flows and connections together.
   validatePlannedSso({ actions, scannedContents, stateResources: state.resources });
+
+  // What only the platform can answer, for every file this plan writes. After
+  // the local checks, so a mistake that needs no request is never hidden behind one.
+  for (const action of actions) {
+    if ((action.kind === "create" || action.kind === "update") && action.syncer.preflight) {
+      const old = action.kind === "update" ? await storedBody(action) : null;
+      const removed = await removedBodies(action.syncer, actions);
+      await action.syncer.preflight(action.path, action.content, old, removed);
+    }
+  }
 
   // Reachability pre-flight for branding asset URLs. Annotates warnings only:
   // the machine planning is not necessarily the machine rendering the login
@@ -450,7 +458,7 @@ export async function runSyncLoop(
         if (action.reason === "unsupported-deletion") {
           reportWarning(
             `${action.path} was removed but deleting ${action.syncer.kind} resources is not supported yet ` +
-              `(#1013); nothing was deleted on the platform. Restore the file to clear this.`,
+              `(#1013), so nothing was deleted on the platform. Restore the file if you did not mean to remove it.`,
           );
         }
         consola.debug(`Skipped ${action.path} (${action.reason})`);
@@ -585,6 +593,27 @@ async function storedBody(action: Extract<SyncAction, { kind: "update" }>): Prom
     }
     throw err;
   }
+}
+
+/** The stored bodies of the files this plan declines to delete, for a syncer that can read them. */
+async function removedBodies(
+  syncer: ResourceSyncer,
+  actions: ReadonlyArray<SyncAction>,
+): Promise<object[]> {
+  const bodies: object[] = [];
+  for (const action of actions) {
+    if (
+      action.kind === "skip" &&
+      action.reason === "unsupported-deletion" &&
+      action.syncer === syncer
+    ) {
+      const body = await syncer.fetch?.(action.id).catch(() => null);
+      if (body) {
+        bodies.push(body);
+      }
+    }
+  }
+  return bodies;
 }
 
 async function fetchOldIfAsked(

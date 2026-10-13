@@ -134,11 +134,6 @@ describe("plan", () => {
       });
     });
 
-    /**
-     * Mistakes that only show when the schema, the flow and the connection are
-     * read together. Each stops `plan` before anything is sent and names the
-     * file or the name at fault; the wording is the validator's own tests'.
-     */
     describe("SSO configuration across files", () => {
       async function anAppWithGoogle(): Promise<ScaffoldedApp> {
         const app = await aSetUpApp();
@@ -279,6 +274,36 @@ describe("plan", () => {
           const result = await app.planRendered();
 
           expect(result).toPrint(app.connectionFile("spare"));
+        });
+
+        it("stops on an edited issuer even when the file was renamed in the same change", async () => {
+          const app = await anAppServingGoogle();
+          await app.renameConnection("google", "google-main");
+          await app.editConnection("google-main", (connection) => {
+            connection.oidc.issuer = "https://other.test";
+          });
+
+          expect(await app.planAttempt()).toFailWith("E_VALIDATION");
+        });
+
+        it("reports a mistake in the files before one that needs the platform", async () => {
+          const app = await anAppWithGoogle();
+          expect(await app.deleteVariable("GOOGLE_CLIENT_SECRET")).toSucceed();
+          await app.editUserSchema((schema) => {
+            ssoOf(schema).providers = ["okta"];
+          });
+
+          expect(await app.planAttempt()).toFailWith("E_VALIDATION");
+        });
+
+        it("stops on two connections that share a variable", async () => {
+          const app = await anAppWithGoogle();
+          await app.copyConnection("google", "spare");
+          await app.editConnection("spare", (connection) => {
+            connection.slug = "spare";
+          });
+
+          expect(await app.planAttempt()).toFailWith("E_VALIDATION");
         });
 
         it("stops on a removed connection file a schema still lists", async () => {

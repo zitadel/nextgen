@@ -626,9 +626,10 @@ its own bullet says where it now belongs.
   ([#534](https://github.com/zitadel/nextgen/issues/534)).
   Until then, a missing secret is first seen when a sign-in reaches the token
   exchange.
-  The validator rules adopt this split: `E_CREDENTIAL_MISSING` stays an error
-  inside interactive journeys and the test command's local check, and
-  batch `plan` warns.
+  The validator rules adopt this split: `E_CREDENTIAL_MISSING` is an error
+  for a connection `plan` or `apply` is about to write, and a connection that
+  has not changed is not re-checked, so a pipeline that only reads need not hold
+  the secret.
 - **Encryption minimums** — *met.* Stating "encrypted at rest" is insufficient;
   the architecture must guarantee per-tenant envelope keys, engine-only
   decryption, and a strictly write-only external API surface. ADR 062 §7 gives

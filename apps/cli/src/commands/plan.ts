@@ -60,7 +60,7 @@ export default class Plan extends BaseCommand {
         `${summary.updates} update${summary.updates === 1 ? "" : "s"}, ` +
         `${summary.revisions} new revision${summary.revisions === 1 ? "" : "s"}, ` +
         `${summary.deletes} delete${summary.deletes === 1 ? "" : "s"}, ` +
-        `${plan.length - summary.total} unchanged`,
+        `${plan.filter((action) => action.kind === "skip" && action.reason !== "unsupported-deletion").length} unchanged`,
     );
     return this.emit({
       status: "ok",
