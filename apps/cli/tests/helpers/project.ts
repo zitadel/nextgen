@@ -522,6 +522,12 @@ export class ScaffoldedApp {
     }
   }
 
+  /** Writes a connection file that is not valid JSON, as a bad paste would leave it. */
+  async writeBrokenConnection(name: string, contents: string): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/idps"), { recursive: true });
+    await this.writeProjectFile(`.zitadel/idps/${name}.json`, contents);
+  }
+
   /** Edits the committed user schema, as the developer owning it would. */
   editUserSchema(edit: (schema: UserSchemaDocument) => void): Promise<void> {
     return this.editDocument(SCHEMA_FILE, edit);
