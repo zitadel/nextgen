@@ -38,11 +38,14 @@ jobs:
           - { variant: flaky, shard: 2 }
           - { variant: flaky, shard: 3 }
           - { variant: flaky, shard: 4 }
+          - { variant: flaky, shard: 5 }
+          - { variant: flaky, shard: 6 }
+          - { variant: flaky, shard: 7 }
+          - { variant: flaky, shard: 8 }
           - { variant: fixed, shard: 1 }
-          - { variant: fixed, shard: 2 }
     env:
       DO_NOT_TRACK: "1"
-      ITERS: "20"
+      ITERS: "40"
     steps:
       - uses: actions/checkout@v6
 
