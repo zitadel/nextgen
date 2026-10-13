@@ -400,7 +400,7 @@ collisions ([decision 5](#5-retargeting-registration-collisions)).
     user reaches the collection step after one ceremony whether they started
     on the sign-in or the register page. The `password` step carries the route
     only because the rule requires it: the attempt there is already bound to the
-    identified user, so an unknown provider account restarts the flow instead
+    identified user, so under `creation: auto` an unknown provider account restarts the flow instead
     ([area 3](3-social-login-flow.md#resolution-branches)).
     The engine flips `CurrentPurpose` to `register` on the way.
 *   **`user_not_found` is untouched.**

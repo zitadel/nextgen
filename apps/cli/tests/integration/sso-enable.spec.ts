@@ -197,6 +197,14 @@ describe("sso enable", () => {
           return app;
         }
 
+        it("is told what to add to it", async () => {
+          const app = await anAppWithAnEditedPasswordStep();
+
+          const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
+
+          expect(result).toSay("sso_providers");
+        });
+
         it("does not get the provider", async () => {
           const app = await anAppWithAnEditedPasswordStep();
           expect(await app.enableSso(GOOGLE, CREDENTIALS)).toSucceed();
