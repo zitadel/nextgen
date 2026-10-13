@@ -495,9 +495,11 @@ export class ZitadelLogin extends ZitadelSurface {
     // Compared, not passed through: an unset framework prop arrives as
     // `undefined`, which must keep the default (toggle shown).
     const enabled = this.suppressPasswordToggle !== true;
+    // Every built-in dictionary carries both keys, and a custom one can only
+    // override them, so the guards below only satisfy the index type.
     const locale = this.resolveLocale();
-    const show = locale["action.show_password"] ?? en["action.show_password"];
-    const hide = locale["action.hide_password"] ?? en["action.hide_password"];
+    const show = locale["action.show_password"];
+    const hide = locale["action.hide_password"];
     for (const field of root.querySelectorAll("zl-field")) {
       field.passwordToggle = enabled;
       if (show) field.showPasswordLabel = show;

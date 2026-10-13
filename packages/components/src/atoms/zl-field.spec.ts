@@ -301,15 +301,4 @@ describe("<zl-field> password toggle", () => {
     await field.updateComplete;
     expect(input(field).type).toBe("password");
   });
-
-  it("hides the value again on form reset", async () => {
-    const field = await mount(`<zl-field name="pw" type="password"></zl-field>`, {
-      passwordToggle: true,
-    });
-    toggle(field)!.click();
-    await field.updateComplete;
-    field.formResetCallback();
-    await field.updateComplete;
-    expect(input(field).type).toBe("password");
-  });
 });

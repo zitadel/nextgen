@@ -121,7 +121,7 @@ export class ZlField extends FormAtom {
     }
     // Whenever the button is not drawn there is no way to hide the value
     // again, so it must not stay revealed.
-    if (this.revealed && (!this.hasPasswordToggle || this.hasSuffixSlot || this.isDisabled)) {
+    if (this.revealed && !this.toggleShown) {
       this.revealed = false;
     }
   }
@@ -157,8 +157,17 @@ export class ZlField extends FormAtom {
     super.formResetCallback();
   }
 
-  private get hasPasswordToggle(): boolean {
-    return this.passwordToggle === true && this.type === "password";
+  /**
+   * Whether the show/hide button is drawn. It lives in the trailing slot, so
+   * a filled `suffix` or a disabled field leaves it out.
+   */
+  private get toggleShown(): boolean {
+    return (
+      this.passwordToggle === true &&
+      this.type === "password" &&
+      !this.hasSuffixSlot &&
+      !this.isDisabled
+    );
   }
 
   override focus(options?: FocusOptions): void {
@@ -199,28 +208,24 @@ export class ZlField extends FormAtom {
       "zr-field--disabled": this.isDisabled,
       "zr-field--readonly": this.readOnly,
     });
-    const passwordToggle = this.hasPasswordToggle;
+    // A revealed password is a `type="text"` input, which browsers hand to
+    // spellcheck and autocorrect — and "enhanced" spellcheck sends the text to
+    // a cloud service. Opting out whenever the toggle is drawn covers that.
+    const toggleShown = this.toggleShown;
     // A read-only field keeps the error and success icons but not the clear
     // button, which would change the value. The password toggle stays: it
     // only changes what is shown, not what is submitted.
     const showDefaultTrailing =
-      !this.hasSuffixSlot &&
-      !this.isDisabled &&
-      (passwordToggle ||
-        (this.trailingIcon && (!this.readOnly || this.invalid || showError || showSuccess)));
-    // The toggle lives in the trailing slot, so a filled `suffix` (or a
-    // disabled field) means it is not drawn. Everything that assumes our
-    // button — the revealed type, hiding Edge's own reveal — keys off this.
-    const toggleShown = passwordToggle && showDefaultTrailing;
-    const trailing = !showDefaultTrailing
-      ? null
-      : toggleShown
-        ? this.renderPasswordToggle(this.label ? labelId : undefined)
-        : this.renderTrailingIcon();
-    // A revealed password is a `type="text"` input, which browsers hand to
-    // spellcheck and autocorrect — and "enhanced" spellcheck sends the text to
-    // a cloud service. Opting out up front covers the revealed state.
-    const revealed = toggleShown && this.revealed;
+      toggleShown ||
+      (this.trailingIcon &&
+        !this.hasSuffixSlot &&
+        !this.isDisabled &&
+        (!this.readOnly || this.invalid || showError || showSuccess));
+    const trailing = toggleShown
+      ? this.renderPasswordToggle(this.label ? labelId : undefined)
+      : showDefaultTrailing
+        ? this.renderTrailingIcon()
+        : null;
     const wrapClass = classMap({
       "zr-field__wrap": true,
       "zr-field__wrap--trailing": showDefaultTrailing,
@@ -238,7 +243,7 @@ export class ZlField extends FormAtom {
             id=${this.inputId}
             data-testid=${ifDefined(this.nativeInputTestId())}
             name=${this.name}
-            type=${revealed ? "text" : this.type}
+            type=${this.revealed ? "text" : this.type}
             spellcheck=${ifDefined(toggleShown ? "false" : undefined)}
             autocapitalize=${ifDefined(toggleShown ? "off" : undefined)}
             autocorrect=${ifDefined(toggleShown ? "off" : undefined)}
@@ -376,8 +381,10 @@ export class ZlField extends FormAtom {
 
   private handlePasswordToggle = async (): Promise<void> => {
     const input = this.inputEl;
-    // Chrome puts the caret at 0 when the input's `type` attribute changes,
-    // which is how Lit applies the new type, so carry the selection across.
+    // Chrome drops the caret to 0 when a focused input's type changes while
+    // the click that caused it is still being handled — which is always the
+    // case here, since Lit renders in a microtask of this click. So carry the
+    // selection across the change.
     const start = input?.selectionStart ?? null;
     const end = input?.selectionEnd ?? null;
     const direction = input?.selectionDirection ?? undefined;
@@ -387,9 +394,9 @@ export class ZlField extends FormAtom {
     input?.focus();
     await this.updateComplete;
     if (input && start !== null && end !== null) {
-      // The reset is lazy: Chrome rebuilds the input's inner editor on the
-      // next layout and only then drops the caret. Forcing that layout first
-      // makes the restore stick, without a frame where the caret sits at 0.
+      // The reset is lazy: Chrome applies it when it next lays the input out.
+      // Forcing that layout first makes the restore stick, without a frame
+      // where the caret sits at 0.
       void input.offsetWidth;
       input.setSelectionRange(start, end, direction);
     }
