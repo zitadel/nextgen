@@ -40,7 +40,14 @@ export default class OriginList extends EnvironmentCommand {
     const plain = flags.plain || !process.stdout.isTTY;
     return this.emit({
       status: "ok",
-      data: { origins, count: origins.length },
+      data: {
+        // The canonical list envelope every list command emits, so an agent
+        // can read any of them through `{ items, count, next_page_token }`. The
+        // project returns its whole origin set in one page, so the token is null.
+        items: origins,
+        count: origins.length,
+        next_page_token: null,
+      },
       pretty: plain
         ? renderRows(COLUMNS, origins)
         : origins.length === 0
