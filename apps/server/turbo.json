@@ -158,8 +158,8 @@
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts"
       ]
     },
-    // The custom go/analysis checks (scripts/go-lint.mjs) and the Biome lint
-    // of the JavaScript launcher in bin/.
+    // The custom go/analysis checks and the Biome lint of the JavaScript
+    // launcher in bin/: scripts/go-lint.mjs, a copy of moon's inline script.
     "lint": {
       "dependsOn": ["check-generate", "@zitadel/console#build", "@zitadel/login-ui#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],

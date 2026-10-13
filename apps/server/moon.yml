@@ -37,14 +37,17 @@ tasks:
     options:
       runFromWorkspaceRoot: true
 
-  # gofmt over the Go files git tracks. A script file rather than an inline
-  # script, so the task is the same command under every task runner (the
-  # `format` script in package.json runs it for turbo).
   format:
-    command: "node scripts/go-format-check.mjs"
+    script: |
+      unformatted="$(git ls-files -z -- '*.go' | xargs -0 gofmt -l)"
+      if [ -n "$unformatted" ]; then
+        echo "error: gofmt would rewrite the following files:" >&2
+        printf '%s\n' "$unformatted" >&2
+        echo "hint: run gofmt -w on those paths, then re-check with moon run server:format" >&2
+        exit 1
+      fi
     inputs:
       - "@group(serverInputs)"
-      - "/scripts/go-format-check.mjs"
     options:
       runFromWorkspaceRoot: true
 
@@ -144,22 +147,24 @@ tasks:
   # Runs once per build configuration: the default set, then each integration
   # tag on its own, because the tagged files are invisible to the default run
   # and the tags cannot be combined (each lane defines its own TestMain).
-  #
-  # The script also lints the JavaScript launcher (bin/zitadel-server.js) with
-  # Biome: this is a Go project, so it inherits no Biome lint task, and
-  # `bin/**` is in serverInputs so the task is selected when the launcher
-  # changes. A script file rather than an inline script, so the task is the
-  # same command under every task runner (the `lint` script in package.json
-  # runs it for turbo).
   lint:
-    command: "node scripts/go-lint.mjs"
+    script: |
+      set -e
+      go run ./tools/analyzers/cmd/analyzers ./...
+      for tag in postgres_integration spanner_integration sqlite_integration; do
+        GOFLAGS="-tags=$tag" go run ./tools/analyzers/cmd/analyzers ./...
+      done
+      # This is a Go project, so it inherits no Biome lint task, but it owns a
+      # JavaScript launcher (bin/zitadel-server.js). Lint it here so a change to
+      # it cannot bypass Biome. `bin/**` is already in serverInputs, so this
+      # task is selected when the launcher changes.
+      corepack pnpm exec biome check apps/server/bin --no-errors-on-unmatched
     deps:
       - "check-generate"
       - "console:build"
       - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
-      - "/scripts/go-lint.mjs"
       # The Biome config the launcher check runs against.
       - "/biome.json"
     options:

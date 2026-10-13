@@ -10,14 +10,22 @@ tasks, one per package for the rest — described in
 [docs/design/build/turborepo.md](../docs/design/build/turborepo.md). Until the
 cutover in [docs/design/build/turborepo-migration.md](../docs/design/build/turborepo-migration.md),
 a change to a task's command, dependencies, inputs or outputs goes into both
-files, and the command is a `package.json` script both runners run. CI runs
-the turbo version as the non-required `ci-turbo` job.
+files. CI runs the turbo version as the non-required `ci-turbo` job. Moon
+stays the runner of record, and the migration's first phase leaves its
+configuration exactly as on main.
 
-One exception keeps moon's behaviour unchanged: moon's `test` task runs each
-package's `test:all` script, turbo runs `test`. In the four browser-test
-packages (`api-mock`, `components`, `sdk-qwik`, `storybook`) `test` wraps
-`scripts/task-guard.mjs` for turbo's lock and retries, and `test:all` calls
-Vitest directly, because moon has its own `mutex` and `retryCount` there.
+Where the two differ on purpose:
+
+- Moon's `test` task runs each package's `test:all` script, turbo runs
+  `test`. In the four browser-test packages (`api-mock`, `components`,
+  `sdk-qwik`, `storybook`) `test` wraps `scripts/task-guard.mjs` for turbo's
+  lock and retries, and `test:all` calls Vitest directly, because moon has
+  its own `mutex` and `retryCount` there.
+- The Go `format` and `lint` tasks keep their inline scripts here; turbo
+  runs file copies of them (`scripts/go-format-check.mjs`,
+  `scripts/go-lint.mjs`). A change to one goes into the other.
+- Turbo's `bench` `vet` waits for the server's `check-generate`; moon's
+  `bench:vet` does not.
 
 ## Shared tasks live in `.moon/tasks`
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
  * The server's custom go/analysis checks plus the Biome lint of its JavaScript
- * launcher — a file version of the inline script behind `server:lint` in
- * apps/server/moon.yml, so the task is the same command under every task
- * runner.
+ * launcher: turbo's version of the inline script behind `server:lint` in
+ * apps/server/moon.yml. Moon keeps its own until the cutover, so a change to
+ * the checks goes into both.
  *
  * The analyzers (today egresslint, ADR 061) run directly rather than through
  * `go vet`, so the built-in vet analyzers keep running alongside (the `vet`

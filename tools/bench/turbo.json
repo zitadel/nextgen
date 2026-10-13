@@ -13,7 +13,8 @@
     // Compiles the root module's generated Go (api/generated, the enumer and
     // mock files) through the replace directive, which the server's
     // generation rewrites mid-graph; the edge keeps vet behind it, as the
-    // server's own vet is. build and test are ordered through vet.
+    // server's own vet is. build and test are ordered through vet. Only turbo
+    // has this edge: moon's bench:vet stays as on main.
     "vet": {
       "dependsOn": ["@zitadel/server#check-generate"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],

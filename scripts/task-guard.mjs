@@ -5,11 +5,12 @@
  *   node scripts/task-guard.mjs [--mutex <name>] [--retries <n>] -- <command> [args...]
  *
  * These are the two task options moon provides natively (`mutex`,
- * `retryCount`) and Turborepo does not. Keeping them inside the task's own
- * command makes a task mean the same thing under either runner, which is what
- * the dual-run period in docs/design/build/turborepo-migration.md needs. A
- * task that moon already guards is guarded twice while both runners are
- * configured; the inner guard is uncontended then and costs nothing.
+ * `retryCount`) and Turborepo does not; turbo's tasks get them from here.
+ * Moon keeps its own: its browser-test tasks run each package's `test:all`
+ * script, which calls Vitest without this guard. The generation scripts
+ * (`generate`, `sync-schemas`) run under both runners, so under moon they
+ * take this lock inside moon's own mutex, where it is uncontended and costs
+ * nothing.
  *
  * The lock is a directory under the OS temp dir, keyed by the repository
  * root, so two checkouts never block each other. The holder's pid is written

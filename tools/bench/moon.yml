@@ -24,23 +24,21 @@ fileGroups:
     - "/packages/config/defaults/**/*"
 
 tasks:
-  # Tracked Go files below this directory only, as the server project checks
-  # its own. The same script file as the server's task, so the task is the
-  # same command under every task runner.
+  # Tracked Go files only, as the server project checks them.
   format:
-    command: "node ../../scripts/go-format-check.mjs"
+    script: |
+      unformatted="$(git ls-files -z -- '*.go' | xargs -0 gofmt -l)"
+      if [ -n "$unformatted" ]; then
+        echo "error: gofmt would rewrite the following files:" >&2
+        printf '%s\n' "$unformatted" >&2
+        echo "hint: run gofmt -w on those paths, then re-check with moon run bench:format" >&2
+        exit 1
+      fi
     inputs:
       - "**/*.go"
-      - "/scripts/go-format-check.mjs"
 
-  # Compiles the root module's generated Go (api/generated, the enumer and
-  # mock files) through the replace directive, which server:generate and its
-  # checks rewrite mid-graph; the dep keeps vet behind them, as server:vet is.
-  # build and test are ordered through vet.
   vet:
     command: "go vet ./..."
-    deps:
-      - "server:check-generate"
     inputs:
       - "@group(benchInputs)"
 

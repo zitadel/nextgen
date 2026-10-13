@@ -4,9 +4,10 @@
  *
  * Checks the Go files git tracks below the current directory, so it serves
  * both Go modules: run from the repository root for the server, from
- * tools/bench for the benchmark harness. A file version of the inline script
- * the `format` tasks in apps/server/moon.yml and tools/bench/moon.yml carry,
- * so the task is the same command under every task runner.
+ * tools/bench for the benchmark harness. Turbo's version of the inline script
+ * the `format` tasks in apps/server/moon.yml and tools/bench/moon.yml run;
+ * moon keeps its own until the cutover, so a change to the check goes into
+ * both.
  */
 import { execFileSync } from "node:child_process";
 

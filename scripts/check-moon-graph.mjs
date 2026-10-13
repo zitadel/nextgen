@@ -27,7 +27,6 @@ function artifactEdge(project, target) {
   if (project === "release") return true; // packages and publishes everything
   if (project === "server") return target === "console" || target === "login-ui"; // //go:embed of the UI dists
   if (project === "testing") return target === "server"; // integration tests boot the binary
-  if (project === "bench") return target === "server"; // compiles the generated Go the server's generation writes
   if (project === "console") return target === "cli"; // dev-real boots an instance through the built CLI
   if (project === "workspace") return target === "console" || target === "login-ui"; // the local image embeds the UI builds
   // e2e suites run built apps and the server binary; demo-next's dev server

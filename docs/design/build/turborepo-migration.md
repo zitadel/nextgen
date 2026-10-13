@@ -36,7 +36,7 @@ workflow, not the task graph.
 | Scripts as the task contract | 30 `package.json` files | Every task runs a `package.json` script: `lint` scripts for the 26 TypeScript packages, the Go server's 13 tasks as scripts in `apps/server/package.json`, 16 `build-release` scripts, the e2e lanes with the environment moon used to set. |
 | Tool packages | `tools/bench/package.json`, `tools/release/package.json`, `pnpm-workspace.yaml` (`tools/*`) | Moon's `bench` and `release` projects become private workspace packages (`@zitadel/bench`, `@zitadel/release`) so turbo can address their tasks. |
 | Mutex and retry | `scripts/task-guard.mjs` | `--mutex <name>` (a lock directory in the OS temp dir, keyed by repository root, stale holders reclaimed) and `--retries <n>`. Used by the four browser-mode test scripts and the six generated-sources tasks. |
-| Inline scripts | `scripts/go-format-check.mjs`, `scripts/go-lint.mjs` | File versions of the `format` and `lint` inline scripts of the two Go projects. |
+| Inline scripts | `scripts/go-format-check.mjs`, `scripts/go-lint.mjs` | Turbo's versions of the `format` and `lint` inline scripts of the two Go projects; moon keeps its inline scripts until the cutover. |
 | Runner selection | `scripts/task-runner.mjs` (+ `.d.mts`) | `NEXTGEN_TASK_RUNNER=moon\|turbo` picks the runner the contributor scripts build through; maps `project:task` to turbo tasks and back. |
 | Ported scripts | `ci-mode.mjs`, `check.mjs`, `run-server.mjs`, `run-server-debug.mjs`, `run-cli.mjs`, `apps/console/scripts/dev-real.mts`, `apps/cli-journey-e2e/scripts/local-registry.mjs`, new `report-turbo-failures.mjs` | Work under either runner; tests added for the turbo paths. |
 | CI | `.github/workflows/ci-turbo.yml` | The turbo version of ci.yml's moon steps, run on every pull request and merge-group entry as a non-required job for the parity period. |
@@ -195,7 +195,7 @@ as they were.
 | storybook | `test` (mutex, retry) | `#test` | guarded script |
 | storybook | `dev` | `#dev` | existing |
 | server | `openapi`, `format`, `generate`, `clean-generated`, `check-generate`, `check-generate-pruned`, `vet`, `lint`, `test`, `test-postgres`, `test-spanner`, `test-sqlite`, `build` | `@zitadel/server#…` | **new** scripts in `apps/server/package.json`, each `cd ../.. && …`; `format` and `lint` run the new script files; the generation tasks hold the guard's lock; `serverInputs` repeated as `inputs` per task |
-| bench | `format`, `vet`, `lint`, `build`, `test`, `sweep`, `summarize` | `@zitadel/bench#…` | **new** `tools/bench/package.json`; `benchInputs` repeated. `vet` now depends on `server:check-generate` in both configs: the first `ci-turbo` run caught it compiling `api/generated` while the server's generation rewrote it, a race moon's order had hidden |
+| bench | `format`, `vet`, `lint`, `build`, `test`, `sweep`, `summarize` | `@zitadel/bench#…` | **new** `tools/bench/package.json`; `benchInputs` repeated. `vet` depends on `@zitadel/server#check-generate` in turbo: the first `ci-turbo` run caught it compiling `api/generated` while the server's generation rewrote it, a race moon's order has hidden so far. Moon's `bench:vet` stays as on main; giving it the same dependency is a separate change |
 | release | `changesets`, `check-graph`, `build-public-packages`, `version`, `pack`, `snapshot`, `publish` | `@zitadel/release#…` | **new** `tools/release/package.json` (`cd ../.. && node scripts/release.mjs …`) |
 | workspace | `test`, `check-typecheck`, `check-openapi-rules`, `check-moon-graph`, `check-adrs` | `//#…` | root scripts (**new** for the four checks), explicit inputs as in moon.yml |
 | workspace | `doctor`, `server`, `server-debug`, `journey`, `build-local-image`, `smoke-container`, `check` | `//#…` | root scripts (**new** `server-debug`, `build-local-image`, `smoke-container`) |
@@ -246,8 +246,9 @@ dance in the workflows goes away.
 | 14 × `build-release` (`release-clean.mjs local-dist` then build) | `package.json` scripts: `node ../../scripts/release-clean.mjs local-dist && pnpm run build` (+ the standalone check for components) |
 | workspace `check-typecheck`, `check-openapi-rules` | root `package.json` scripts, same commands |
 
-Moon can run the same files (`command: node scripts/go-lint.mjs`), which the
-dual-run phase does so both runners execute identical code.
+Moon could run the same files (`command: node scripts/go-lint.mjs`), but
+phase 1 leaves moon's configuration exactly as on main, so until the cutover
+the inline scripts and the files are kept in step by hand.
 
 ### `runFromWorkspaceRoot` (20 uses)
 
@@ -466,10 +467,11 @@ recommendation was to hedge and wait for a trigger.
 
 ### Phase 1: dual run (2 to 4 weeks)
 
-Land the prototype as is, plus: moon's `format`/`lint` tasks switched to the
-script files (moon keeps its `retryCount`: its `test:all` scripts bypass the
-guard); `check-release-graph.mjs`, `release-manifest`,
-`check-typecheck-programs` and `doctor` ported behind the runner switch. Wire
+Land the prototype with moon's configuration exactly as on main: no
+`moon.yml` or `.moon/tasks` change. Moon's `test` runs `test:all`, which
+bypasses the guard, and its Go `format`/`lint` keep their inline scripts.
+Then port `check-release-graph.mjs`, `release-manifest`,
+`check-typecheck-programs` and `doctor` behind the runner switch. Wire
 `ci-turbo.yml` to `pull_request` and `merge_group` as a non-required check,
 and to pushes to main, which run the gate alone to fill the remote cache; set
 up the remote cache. Every PR then runs both. What to compare, weekly:

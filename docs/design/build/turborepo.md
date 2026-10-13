@@ -4,7 +4,8 @@ How the turbo task graph is laid out and the rules for changing it. Read this
 before editing a `turbo.json`. While both runners are configured (the dual-run
 phase of [turborepo-migration.md](turborepo-migration.md)), every task exists
 twice — in `moon.yml` ([.moon/AGENTS.md](../../../.moon/AGENTS.md)) and in a
-`turbo.json` — and a change goes into both. Moon is the runner of record; the
+`turbo.json` — and a change goes into both (where the two differ on purpose
+is listed in `.moon/AGENTS.md`). Moon is the runner of record; the
 turbo version runs in CI as the non-required `ci-turbo` job, on Vercel for the
 hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
 
