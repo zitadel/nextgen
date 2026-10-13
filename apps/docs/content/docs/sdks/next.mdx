@@ -38,7 +38,7 @@ The Next.js SDK wires App Router applications through one server-side middleware
 
 <Tabs items={["CLI generated", "Manual"]}>
   <Tab>
-    The CLI adds the SDK package, creates auth routes, writes a profile page, and adds the request boundary that runs `nextgenMiddleware`: `proxy.ts` on Next 16 and later, `middleware.ts` on Next 15. With a `src/app` directory, the files go under `src/`.
+    The CLI adds the SDK package, creates auth routes, writes a profile page, and adds the request boundary that runs `nextgenMiddleware`: `proxy.ts` on Next 16 and later, `middleware.ts` on Next 15. With a `src/app` directory, the pages, the request boundary, and `custom-elements.d.ts` go under `src/`; the `.env` files and `package.json` stay at the project root.
 
     <Files>
       <File name="app/login/page.tsx" />
@@ -79,7 +79,7 @@ The Next.js SDK wires App Router applications through one server-side middleware
 
 <Steps>
   <Step>Proxy `/__nextgen/*` requests to the Zitadel backend.</Step>
-  <Step>Validate the session token: a signed JWT locally against the server's keys, the encrypted tokens Zitadel issues today against `GET /sessions/me`.</Step>
+  <Step>Validate the encrypted session token against `GET /sessions/me`.</Step>
   <Step>Redirect unauthenticated users from protected routes to `loginPath`.</Step>
 </Steps>
 

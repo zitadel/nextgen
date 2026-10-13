@@ -9,16 +9,18 @@ Zitadel v4 remains maintained while this preview evolves. The preview is pre-rel
 
 ## Current shipped boundary
 
-The current shipped path is local auth setup through the `@zitadel/cli` alpha package:
+The current shipped path is local auth setup through the `@zitadel/cli` alpha package, in a new, empty directory:
 
 ```sh
+mkdir myapp
+cd myapp
 npx @zitadel/cli@alpha doctor
 npx @zitadel/cli@alpha start
 npx @zitadel/cli@alpha setup --server local --force
 npx @zitadel/cli@alpha console
 ```
 
-`--force` is there because `start` has already written `.zitadel/local/` into the directory, and setup only scaffolds into an empty one without it. In an existing app, leave it off: setup patches the app instead.
+`--force` lets setup scaffold into the directory after `start` has written `.zitadel/local/` into it. Anywhere but a new, empty directory it would replace your files, so for an app you already have, follow [Add Zitadel to an existing app](/docs/get-started/quickstart#add-zitadel-to-an-existing-app).
 
 `zitadel start` runs the released `@zitadel/server` npm binary by default. It does not require Docker, Go, Moon, or a source checkout. The binary runtime defaults to SQLite. Docker is still available explicitly with `zitadel start --runtime docker`. It also creates a local admin, `admin@zitadel.localhost`, and `zitadel console` prints a one-time link that signs you in to the management console as that admin.
 

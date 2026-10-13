@@ -1,4 +1,10 @@
 {
   "title": "Deployments",
-  "pages": ["createDeployment", "listDeployments", "getDeploymentById", "..."]
+  "pages": [
+    "createDeployment",
+    "listDeployments",
+    "getDeploymentById",
+    "rollbackDeployment",
+    "..."
+  ]
 }

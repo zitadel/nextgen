@@ -30,12 +30,14 @@ Every JSON envelope includes:
 - `source`
 - `status`: `ok`, `skipped`, or `error`
 
-`ok` responses include command-specific `data` and a `warnings` list. `skipped` is a deliberate no-op, not a failure, with a stable `reason` such as `already-claimed`. `error` responses include `code`, `message`, and usually a `hint`. Agents should prefer `next_commands` over prose hints: it sits inside `data` on `ok` responses and at the top level on `skipped` and `error` responses.
+`ok` responses include command-specific `data` and a `warnings` list. `skipped` is a deliberate no-op, not a failure, with a stable `reason` such as `already-claimed`. `error` responses include `code`, `message`, and usually a `hint`. Agents should prefer `next_commands` over prose hints: it sits inside `data` on `ok` responses and at the top level on `skipped` and `error` responses. One exception: in a new directory, `start` suggests `setup --server local` without `--force`, which fails there because `start` has already written `.zitadel/local/` into it. Run setup as in step 3 of the prompt below instead.
 
 ## Agent prompt
 
 ```text
-Create or use an empty local app directory. Run:
+Create a new, empty local app directory and run these in it. Pass --force to setup
+only there: in a directory with files of its own, setup replaces those that collide
+with the new app's.
 
 1. npx @zitadel/cli@alpha doctor --non-interactive --json
 2. npx @zitadel/cli@alpha start --non-interactive --json
@@ -62,4 +64,4 @@ The hooks are `data-testid` values. Useful ones include:
 - `zitadel-action-submit` (the submit button element)
 - `zitadel-action-submit-button` (the native button inside it)
 
-For sign-out, the generated profile page renders `<zitadel-session>`: target `[data-testid="zitadel-session-logout"]`.
+For sign-out, the generated profile page renders `<zitadel-session>`: target `[data-testid="zitadel-session-logout"]`. An app that renders `<zitadel-logout>` instead, as the SDK pages' manual samples do, has no test id there: target its `.signout-btn` button.

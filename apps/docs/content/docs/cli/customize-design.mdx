@@ -47,7 +47,7 @@ Brand assets live in `branding.json` and must be hosted `https://` URLs (images 
 
 Only some designs render each asset (see the table above); a URL configured for a design that does not use it is simply ignored.
 
-`typography.font_family` sets the typeface for body and headings; include a generic family as a fallback. `typography.font_url` is a stylesheet that loads the face. It needs a `font_family`, must be `https://`, and is loaded only when the login runs as `variant="page"`, as the sign-in pages setup generates do. With `variant="widget"`, load the font from your own page.
+`typography.font_family` sets the typeface for body and headings; include a generic family as a fallback. `typography.font_url` is a stylesheet that loads the face. It needs a `font_family`, must be `https://`, and is loaded only when the login runs as `variant="page"`. Setup generates page-variant sign-in pages only for a freshly scaffolded Next.js or Nuxt app; in an existing Next.js or Nuxt app and in every SPA template the login runs as a widget, so load the font from your own page there.
 
 ## Publish and iterate
 

@@ -7,16 +7,20 @@ The `@zitadel/cli` package scaffolds auth into Next.js, Nuxt, React, Vue, Angula
 
 ## Golden path
 
+In a new, empty directory:
+
 ```sh
+mkdir myapp
+cd myapp
 npx @zitadel/cli@alpha doctor
 npx @zitadel/cli@alpha start
 npx @zitadel/cli@alpha setup --server local --force
 npm run dev
 ```
 
-`--force` lets setup scaffold into the directory `start` has already written `.zitadel/local/` into. In an existing app, leave it off.
+`--force` lets setup scaffold into the directory after `start` has written `.zitadel/local/` into it. Anywhere but a new, empty directory it would replace your files, so for an app you already have, follow [Add Zitadel to an existing app](/docs/get-started/quickstart#add-zitadel-to-an-existing-app).
 
-For automation:
+For automation, in the same new, empty directory:
 
 ```sh
 npx @zitadel/cli@alpha setup --framework next --server local --force --non-interactive --json

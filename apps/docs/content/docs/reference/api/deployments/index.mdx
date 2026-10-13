@@ -5,11 +5,13 @@ description: OpenAPI operations for deployments.
 
 import { Card, Cards } from "fumadocs-ui/components/card";
 
-A deployment makes a release live and records what ran where, and when.
-Deploying, promoting, and rolling back are all the same call.
+A deployment will record which release goes live on which targets, and when.
+These operations are specified but answer `501 Not Implemented` today; until
+they ship, the server serves each resource's newest revision.
 
 <Cards>
   <Card title="Create a deployment" href="/docs/reference/api/deployments/createDeployment" />
   <Card title="List deployments" href="/docs/reference/api/deployments/listDeployments" />
   <Card title="Get a deployment by id" href="/docs/reference/api/deployments/getDeploymentById" />
+  <Card title="Roll back to a deployment" href="/docs/reference/api/deployments/rollbackDeployment" />
 </Cards>

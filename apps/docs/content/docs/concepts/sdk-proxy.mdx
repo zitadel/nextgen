@@ -5,7 +5,7 @@ description: Why framework SDKs proxy Zitadel requests through the app origin.
 
 Framework SDKs keep auth traffic same-origin where possible.
 
-For Next.js and Nuxt, the SDK middleware proxies `/__nextgen/*` requests to the Zitadel backend, validates the session token, and redirects unauthenticated users away from protected routes. A signed JWT is checked locally against the server's keys; the encrypted session tokens Zitadel issues today are checked against `GET /sessions/me`.
+For Next.js and Nuxt, the SDK middleware proxies `/__nextgen/*` requests to the Zitadel backend, validates the session token, and redirects unauthenticated users away from protected routes. Zitadel issues encrypted session tokens, so the middleware checks each one against `GET /sessions/me`.
 
 This keeps the app in control of browser-visible routes and cookies while Zitadel remains the backend API.
 
