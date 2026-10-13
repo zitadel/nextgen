@@ -28,7 +28,7 @@ function RootComponent() {
       <Toaster />
       {/* Only Vercel serves these scripts: the hosted cloud's build opts in,
           the console the Go server embeds leaves them out. */}
-      {import.meta.env.VITE_CONSOLE_VERCEL_INSIGHTS === "1" && <VercelInsights />}
+      {import.meta.env.CONSOLE_VERCEL_INSIGHTS === "1" && <VercelInsights />}
       {import.meta.env.DEV && import.meta.env.MODE !== "test" && (
         // Bottom-left: right-anchored surfaces (the Add user drawer, and any
         // sheet after it) put their primary action in the bottom-right corner,

@@ -13,9 +13,11 @@ interface ImportMetaEnv {
   /**
    * `1` in the hosted cloud's build (repo-root `vercel.json`): the console
    * then sends Vercel Web Analytics and Speed Insights, which only Vercel
-   * serves. Never set for the build the Go server embeds.
+   * serves. Never set for the build the Go server embeds. Not VITE_-prefixed
+   * (vite.config.ts says why) and inlined there through `define`, an empty
+   * string when unset.
    */
-  readonly VITE_CONSOLE_VERCEL_INSIGHTS?: string;
+  readonly CONSOLE_VERCEL_INSIGHTS: string;
   /**
    * The share of page loads that send Speed Insights in the hosted cloud's
    * build, from `0` (none) to `1` (every one, the default when empty); set
