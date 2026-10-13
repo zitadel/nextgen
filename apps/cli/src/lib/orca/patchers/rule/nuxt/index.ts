@@ -25,7 +25,7 @@ const NUXT_CONFIG_PATHS = configCandidates("nuxt.config");
  * Rule-based patcher for a Nuxt app. Like Next.js, Nuxt proxies the backend and
  * verifies the session through server middleware — here the `@zitadel/sdk-nuxt`
  * module, registered via a non-destructive `nuxt.config.*` edit. Contributes
- * the login/register/profile pages (the raw `<zitadel-login>`/`<zitadel-logout>`
+ * the login/register/profile pages (the raw `<zitadel-login>`/`<zitadel-session>`
  * elements), the client/server plugins, the `app.vue` router, and the SDK dep.
  */
 export class NuxtPatcher extends AbstractRulePatcher {

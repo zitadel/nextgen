@@ -1386,6 +1386,10 @@ describe("plan-time flow validation", () => {
         expect(created.warnings?.at(-1)?.message).toContain(
           "becomes the new default for login and register",
         );
+        expect(created.warnings?.at(-1)?.message).toContain(
+          'give the flow an "audience" before its first apply and select it by flowName, ' +
+            "or pin flow-name on the pages that should keep the current flow.",
+        );
       }
       expect(actions.find((a) => a.path === FLOW_PATH)?.kind).toBe("skip");
     } finally {

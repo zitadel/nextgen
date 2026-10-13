@@ -158,7 +158,8 @@ function defaultSwapWarning(
     message:
       `once applied, ${subject} for ${humanList(purposes)}: ` +
       `pages that do not explicitly set flow-name on <zitadel-login> will start rendering it. ` +
-      `If that is not intended, scope it with "audience" or set flow-name on the pages that should use it.`,
+      `If that is not intended, give the flow an "audience" before its first apply and select it by flowName, ` +
+      `or pin flow-name on the pages that should keep the current flow.`,
   };
 }
 
