@@ -18,6 +18,8 @@ VALUES (?, ?, ?, ?, ?) RETURNING id, created_at, updated_at`
 
 	deleteByIDProjectStmt = `DELETE FROM projects WHERE id = ?`
 
+	projectExistsStmt = `SELECT EXISTS (SELECT 1 FROM projects WHERE id = ?)`
+
 	updateProjectStmt = `UPDATE projects SET name = ?, updated_at = ? WHERE id = ?
 RETURNING id, name, password_hash_policy, created_at, updated_at`
 
@@ -79,6 +81,15 @@ func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) (b
 		return false, wrapError(err)
 	}
 	return n > 0, nil
+}
+
+// ProjectExists implements [service.ProjectStatements].
+func (ps projectStatements) ProjectExists(ctx context.Context, id string) (bool, error) {
+	var exists bool
+	if err := ps.client.QueryRow(ctx, projectExistsStmt, id).Scan(&exists); err != nil {
+		return false, wrapError(err)
+	}
+	return exists, nil
 }
 
 // GetProjectByID implements [service.ProjectStatements].
@@ -175,38 +186,15 @@ func (ps projectStatements) hydrateOrigins(ctx context.Context, projects ...*dom
 	if len(projects) == 0 {
 		return nil
 	}
-	filters := make([]database.Filter[domain.OriginField], len(projects))
+	ids := make([]string, len(projects))
 	for i, p := range projects {
-		filters[i] = database.Equal(database.Col(domain.OriginFieldProjectID), p.ID)
+		ids[i] = p.ID
 	}
-	listed, err := newOriginStatements(ps.client).ListOrigins(ctx, &database.ListOptions[domain.OriginField]{
-		Filter: database.Or(filters...),
-		Pagination: database.Page[domain.OriginField]{
-			OrderBy: database.OrderBy[domain.OriginField]{
-				Columns: []database.Column[domain.OriginField]{
-					database.Col(domain.OriginFieldCreatedAt),
-					database.Col(domain.OriginFieldPattern),
-				},
-			},
-		},
-	})
+	listed, err := newOriginStatements(ps.client).ListOrigins(ctx, storageproject.ListOriginsOptions(ids))
 	if err != nil {
 		return err
 	}
-	byProject := make(map[string][]domain.Origin, len(projects))
-	for _, o := range listed.Items {
-		byProject[o.ProjectID] = append(byProject[o.ProjectID], domain.Origin{
-			Pattern: o.Pattern,
-			Kind:    o.Kind,
-		})
-	}
-	for _, p := range projects {
-		origins := byProject[p.ID]
-		if origins == nil {
-			origins = []domain.Origin{}
-		}
-		p.Origins = origins
-	}
+	storageproject.AssignOrigins(projects, listed.Items)
 	return nil
 }
 

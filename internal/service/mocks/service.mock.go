@@ -5390,6 +5390,45 @@ func (c *MockAllStatementsPersistCatalogVersionCall) DoAndReturn(f func(context.
 	return c
 }
 
+// ProjectExists mocks base method.
+func (m *MockAllStatements) ProjectExists(ctx context.Context, id string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProjectExists", ctx, id)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ProjectExists indicates an expected call of ProjectExists.
+func (mr *MockAllStatementsMockRecorder) ProjectExists(ctx, id any) *MockAllStatementsProjectExistsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProjectExists", reflect.TypeOf((*MockAllStatements)(nil).ProjectExists), ctx, id)
+	return &MockAllStatementsProjectExistsCall{Call: call}
+}
+
+// MockAllStatementsProjectExistsCall wrap *gomock.Call
+type MockAllStatementsProjectExistsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsProjectExistsCall) Return(arg0 bool, arg1 error) *MockAllStatementsProjectExistsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsProjectExistsCall) Do(f func(context.Context, string) (bool, error)) *MockAllStatementsProjectExistsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsProjectExistsCall) DoAndReturn(f func(context.Context, string) (bool, error)) *MockAllStatementsProjectExistsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ReviseIDPConnection mocks base method.
 func (m *MockAllStatements) ReviseIDPConnection(ctx context.Context, entity *domain.IDPConnection) error {
 	m.ctrl.T.Helper()
@@ -6340,6 +6379,45 @@ func (c *MockProjectStatementsListProjectsCall) Do(f func(context.Context, *data
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockProjectStatementsListProjectsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)) *MockProjectStatementsListProjectsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ProjectExists mocks base method.
+func (m *MockProjectStatements) ProjectExists(ctx context.Context, id string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProjectExists", ctx, id)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ProjectExists indicates an expected call of ProjectExists.
+func (mr *MockProjectStatementsMockRecorder) ProjectExists(ctx, id any) *MockProjectStatementsProjectExistsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProjectExists", reflect.TypeOf((*MockProjectStatements)(nil).ProjectExists), ctx, id)
+	return &MockProjectStatementsProjectExistsCall{Call: call}
+}
+
+// MockProjectStatementsProjectExistsCall wrap *gomock.Call
+type MockProjectStatementsProjectExistsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockProjectStatementsProjectExistsCall) Return(arg0 bool, arg1 error) *MockProjectStatementsProjectExistsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockProjectStatementsProjectExistsCall) Do(f func(context.Context, string) (bool, error)) *MockProjectStatementsProjectExistsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockProjectStatementsProjectExistsCall) DoAndReturn(f func(context.Context, string) (bool, error)) *MockProjectStatementsProjectExistsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

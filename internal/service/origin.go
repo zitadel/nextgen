@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -28,52 +27,37 @@ func (s *projectService) AddOrigin(ctx context.Context, projectID string, origin
 			return err
 		}
 
-		existing, err := tx.Statements().GetOrigin(ctx, database.And(
-			database.Equal(database.Col(domain.OriginFieldProjectID), projectID),
-			database.Equal(database.Col(domain.OriginFieldPattern), origin.Pattern),
-		))
-		if err == nil {
-			if existing.Kind != origin.Kind {
-				return domain.ErrOriginKindConflict()
-			}
-			stored = domain.Origin{Pattern: existing.Pattern, Kind: existing.Kind}
-			return nil
-		}
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
-			return domain.ErrInternal(err).WithMessage("failed to look up origin")
-		}
-
 		inserted, err := tx.Statements().InsertOrigin(ctx, projectID, origin)
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to insert origin")
 		}
-		if !inserted {
-			// Lost a race with another insert of the same pattern.
-			again, getErr := tx.Statements().GetOrigin(ctx, database.And(
-				database.Equal(database.Col(domain.OriginFieldProjectID), projectID),
-				database.Equal(database.Col(domain.OriginFieldPattern), origin.Pattern),
-			))
-			if getErr != nil {
-				return domain.ErrInternal(getErr).WithMessage("failed to re-read origin after conflict")
-			}
-			if again.Kind != origin.Kind {
-				return domain.ErrOriginKindConflict()
-			}
-			stored = domain.Origin{Pattern: again.Pattern, Kind: again.Kind}
-			return nil
+		if inserted {
+			stored = origin
+			return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+				Type:       domain.EventTypeOriginAdded,
+				Category:   domain.EventCategoryEntity,
+				ProjectID:  projectID,
+				EntityType: "origin",
+				EntityID:   origin.Pattern,
+				Payload: domain.OriginPayload{
+					Pattern: origin.Pattern,
+					Kind:    origin.Kind,
+				},
+			})
 		}
-		stored = origin
-		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
-			Type:       domain.EventTypeOriginAdded,
-			Category:   domain.EventCategoryEntity,
-			ProjectID:  projectID,
-			EntityType: "origin",
-			EntityID:   origin.Pattern,
-			Payload: domain.OriginPayload{
-				Pattern: origin.Pattern,
-				Kind:    origin.Kind,
-			},
-		})
+
+		existing, err := tx.Statements().GetOrigin(ctx, database.And(
+			database.Equal(database.Col(domain.OriginFieldProjectID), projectID),
+			database.Equal(database.Col(domain.OriginFieldPattern), origin.Pattern),
+		))
+		if err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to look up origin after conflict")
+		}
+		if existing.Kind != origin.Kind {
+			return domain.ErrOriginKindConflict()
+		}
+		stored = domain.Origin{Pattern: existing.Pattern, Kind: existing.Kind}
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -119,14 +103,15 @@ func (s *projectService) RemoveOrigin(ctx context.Context, projectID, pattern st
 }
 
 func requireProject(ctx context.Context, tx Statementer[AllStatements], projectID string) error {
-	if _, err := tx.Statements().GetProjectByID(ctx, projectID); err != nil {
+	exists, err := tx.Statements().ProjectExists(ctx, projectID)
+	if err != nil {
 		if mapped := mapStorageError(err); mapped != err {
 			return mapped
 		}
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return domain.ErrProjectNotFound()
-		}
 		return domain.ErrInternal(err).WithMessage("failed to load project")
+	}
+	if !exists {
+		return domain.ErrProjectNotFound()
 	}
 	return nil
 }

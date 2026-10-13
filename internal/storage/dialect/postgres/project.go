@@ -55,7 +55,11 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 	})
 }
 
-const deleteByIDProjectStmt = `DELETE FROM zitadel_nextgen.projects WHERE id = $1`
+const (
+	deleteByIDProjectStmt = `DELETE FROM zitadel_nextgen.projects WHERE id = $1`
+	projectExistsStmt     = `SELECT EXISTS (SELECT 1 FROM zitadel_nextgen.projects WHERE id = $1)`
+	projectQuery          = "SELECT id, name, password_hash_policy, created_at, updated_at FROM zitadel_nextgen.projects"
+)
 
 // DeleteProjectByID implements [service.ProjectStatements].
 // resource_scope_index rows for this project cascade via the project_id FK.
@@ -67,7 +71,18 @@ func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) (b
 	return tag.RowsAffected() > 0, nil
 }
 
-const projectQuery = "SELECT id, name, password_hash_policy, created_at, updated_at FROM zitadel_nextgen.projects"
+// ProjectExists implements [service.ProjectStatements].
+func (ps projectStatements) ProjectExists(ctx context.Context, id string) (bool, error) {
+	rows, err := ps.client.Query(ctx, projectExistsStmt, id)
+	if err != nil {
+		return false, wrapError(err)
+	}
+	exists, err := pgx.CollectExactlyOneRow(rows, pgx.RowTo[bool])
+	if err != nil {
+		return false, wrapError(err)
+	}
+	return exists, nil
+}
 
 // GetProjectByID implements [service.ProjectStatements].
 func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*domain.Project, error) {
@@ -92,9 +107,10 @@ func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*dom
 	return project, nil
 }
 
-const updateProjectStmt = `UPDATE zitadel_nextgen.projects SET name = $2, updated_at = now() WHERE id = $1 RETURNING id, name, password_hash_policy, created_at, updated_at`
-
-const setProjectPasswordHashPolicyStmt = `UPDATE zitadel_nextgen.projects SET password_hash_policy = $2, updated_at = now() WHERE id = $1 RETURNING updated_at`
+const (
+	updateProjectStmt                = `UPDATE zitadel_nextgen.projects SET name = $2, updated_at = now() WHERE id = $1 RETURNING id, name, password_hash_policy, created_at, updated_at`
+	setProjectPasswordHashPolicyStmt = `UPDATE zitadel_nextgen.projects SET password_hash_policy = $2, updated_at = now() WHERE id = $1 RETURNING updated_at`
+)
 
 // UpdateProject implements [service.ProjectStatements].
 // Only the name is updated; origins are left untouched. The whole row is
@@ -162,38 +178,15 @@ func (ps projectStatements) hydrateOrigins(ctx context.Context, projects ...*dom
 	if len(projects) == 0 {
 		return nil
 	}
-	filters := make([]database.Filter[domain.OriginField], len(projects))
+	ids := make([]string, len(projects))
 	for i, p := range projects {
-		filters[i] = database.Equal(database.Col(domain.OriginFieldProjectID), p.ID)
+		ids[i] = p.ID
 	}
-	listed, err := newOriginStatements(ps.client).ListOrigins(ctx, &database.ListOptions[domain.OriginField]{
-		Filter: database.Or(filters...),
-		Pagination: database.Page[domain.OriginField]{
-			OrderBy: database.OrderBy[domain.OriginField]{
-				Columns: []database.Column[domain.OriginField]{
-					database.Col(domain.OriginFieldCreatedAt),
-					database.Col(domain.OriginFieldPattern),
-				},
-			},
-		},
-	})
+	listed, err := newOriginStatements(ps.client).ListOrigins(ctx, storageproject.ListOriginsOptions(ids))
 	if err != nil {
 		return err
 	}
-	byProject := make(map[string][]domain.Origin, len(projects))
-	for _, o := range listed.Items {
-		byProject[o.ProjectID] = append(byProject[o.ProjectID], domain.Origin{
-			Pattern: o.Pattern,
-			Kind:    o.Kind,
-		})
-	}
-	for _, p := range projects {
-		origins := byProject[p.ID]
-		if origins == nil {
-			origins = []domain.Origin{}
-		}
-		p.Origins = origins
-	}
+	storageproject.AssignOrigins(projects, listed.Items)
 	return nil
 }
 

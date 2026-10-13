@@ -16,6 +16,7 @@ const (
 	createProjectStmt     = `INSERT INTO projects (id, name, password_hash_policy) VALUES (@p1, @p2, @p3) THEN RETURN id, created_at, updated_at`
 	updateProjectStmt     = `UPDATE projects SET name = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id, name, password_hash_policy, created_at, updated_at`
 	deleteByIDProjectStmt = `DELETE FROM projects WHERE id = @p1`
+	projectExistsStmt     = `SELECT EXISTS (SELECT 1 FROM projects WHERE id = @p1)`
 	projectQuery          = "SELECT id, name, password_hash_policy, created_at, updated_at FROM projects"
 
 	setProjectPasswordHashPolicyStmt = `UPDATE projects SET password_hash_policy = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id`
@@ -77,6 +78,24 @@ func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) (b
 		return false, err
 	}
 	return n > 0, nil
+}
+
+// ProjectExists implements [service.ProjectStatements].
+func (ps projectStatements) ProjectExists(ctx context.Context, id string) (bool, error) {
+	var exists bool
+	err := ps.db.Query(ctx, buildStatement(projectExistsStmt, id).statement(),
+		func(iter *spanner.RowIterator) error {
+			var qErr error
+			exists, qErr = collectOneRow(iter, func(row *spanner.Row) (bool, error) {
+				var found bool
+				return found, row.Columns(&found)
+			})
+			return qErr
+		})
+	if err != nil {
+		return false, wrapError(err)
+	}
+	return exists, nil
 }
 
 // GetProjectByID implements [service.ProjectStatements].
@@ -164,38 +183,15 @@ func (ps projectStatements) hydrateOrigins(ctx context.Context, projects ...*dom
 	if len(projects) == 0 {
 		return nil
 	}
-	filters := make([]database.Filter[domain.OriginField], len(projects))
+	ids := make([]string, len(projects))
 	for i, p := range projects {
-		filters[i] = database.Equal(database.Col(domain.OriginFieldProjectID), p.ID)
+		ids[i] = p.ID
 	}
-	listed, err := newOriginStatements(ps.db).ListOrigins(ctx, &database.ListOptions[domain.OriginField]{
-		Filter: database.Or(filters...),
-		Pagination: database.Page[domain.OriginField]{
-			OrderBy: database.OrderBy[domain.OriginField]{
-				Columns: []database.Column[domain.OriginField]{
-					database.Col(domain.OriginFieldCreatedAt),
-					database.Col(domain.OriginFieldPattern),
-				},
-			},
-		},
-	})
+	listed, err := newOriginStatements(ps.db).ListOrigins(ctx, storageproject.ListOriginsOptions(ids))
 	if err != nil {
 		return err
 	}
-	byProject := make(map[string][]domain.Origin, len(projects))
-	for _, o := range listed.Items {
-		byProject[o.ProjectID] = append(byProject[o.ProjectID], domain.Origin{
-			Pattern: o.Pattern,
-			Kind:    o.Kind,
-		})
-	}
-	for _, p := range projects {
-		origins := byProject[p.ID]
-		if origins == nil {
-			origins = []domain.Origin{}
-		}
-		p.Origins = origins
-	}
+	storageproject.AssignOrigins(projects, listed.Items)
 	return nil
 }
 

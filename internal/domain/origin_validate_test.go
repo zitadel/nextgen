@@ -170,4 +170,21 @@ func TestOriginValidator(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, domain.ErrOriginUnbounded().Code, err.(domain.Error).Code)
 	})
+
+	t.Run("duplicate patterns rejected", func(t *testing.T) {
+		t.Parallel()
+		err := v.ValidateAll([]domain.Origin{
+			{Pattern: "https://app.example.com", Kind: domain.OriginKindPrimary},
+			{Pattern: "https://app.example.com", Kind: domain.OriginKindPreview},
+		})
+		require.Error(t, err)
+		assert.Equal(t, domain.ErrOriginKindConflict().Code, err.(domain.Error).Code)
+
+		err = v.ValidateAll([]domain.Origin{
+			{Pattern: "https://app.example.com", Kind: domain.OriginKindPrimary},
+			{Pattern: "https://app.example.com", Kind: domain.OriginKindPrimary},
+		})
+		require.Error(t, err)
+		assert.Equal(t, domain.ErrOriginInvalid().Code, err.(domain.Error).Code)
+	})
 }

@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"fmt"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -22,10 +23,24 @@ var DefaultSharedHostPatterns = map[string]string{
 // the nil-config default applied after config load.
 var DefaultSharedHosts = mustCompileSharedHosts(DefaultSharedHostPatterns)
 
-func mustCompileSharedHosts(patterns map[string]string) map[string]*regexp.Regexp {
+// CompileSharedHosts compiles a host→pattern map. Bad patterns return a
+// descriptive error suitable for config load.
+func CompileSharedHosts(patterns map[string]string) (map[string]*regexp.Regexp, error) {
 	out := make(map[string]*regexp.Regexp, len(patterns))
 	for host, pattern := range patterns {
-		out[host] = regexp.MustCompile(pattern)
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			return nil, fmt.Errorf("%q: %w", host, err)
+		}
+		out[host] = re
+	}
+	return out, nil
+}
+
+func mustCompileSharedHosts(patterns map[string]string) map[string]*regexp.Regexp {
+	out, err := CompileSharedHosts(patterns)
+	if err != nil {
+		panic(err)
 	}
 	return out
 }
@@ -37,12 +52,23 @@ type OriginValidator struct {
 	SharedHosts map[string]*regexp.Regexp
 }
 
-// ValidateAll validates every origin; the first failure wins.
+// ValidateAll validates every origin; the first failure wins. Duplicate
+// patterns are rejected so create matches add (same pattern / different kind
+// → kind_conflict; same pattern twice → invalid).
 func (v OriginValidator) ValidateAll(origins []Origin) error {
+	seen := make(map[string]OriginKind, len(origins))
 	for _, o := range origins {
 		if err := v.Validate(o); err != nil {
 			return err
 		}
+		pattern := strings.TrimSpace(o.Pattern)
+		if prev, ok := seen[pattern]; ok {
+			if prev != o.Kind {
+				return ErrOriginKindConflict()
+			}
+			return ErrOriginInvalid()
+		}
+		seen[pattern] = o.Kind
 	}
 	return nil
 }

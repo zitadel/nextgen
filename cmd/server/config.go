@@ -2,7 +2,6 @@ package server
 
 import (
 	"fmt"
-	"regexp"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -34,9 +33,9 @@ type Config struct {
 }
 
 // OriginsConfig is the instance-level origins policy. SharedHosts is a
-// host→allow-regexp map; string values are compiled by the config decode hook.
+// host→allow-regexp string map compiled at the service boundary.
 type OriginsConfig struct {
-	SharedHosts map[string]*regexp.Regexp `mapstructure:"shared_hosts"`
+	SharedHosts map[string]string `mapstructure:"shared_hosts"`
 }
 
 // EventsConfig configures audit event retention and deployment export sinks.
@@ -113,10 +112,18 @@ func (c Config) Validate() error {
 		c.Platform.Validate,
 		c.HTTPClient.Validate,
 		c.Schema.Validate,
+		c.Origins.Validate,
 	} {
 		if err := validate(); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (c OriginsConfig) Validate() error {
+	if _, err := domain.CompileSharedHosts(c.SharedHosts); err != nil {
+		return fmt.Errorf("origins.shared_hosts: %w", err)
 	}
 	return nil
 }
