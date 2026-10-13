@@ -220,22 +220,26 @@ framework, sign-in preset, and profile-field options):
 ```sh
 npx @zitadel/cli@alpha doctor --non-interactive --json
 npx @zitadel/cli@alpha start --non-interactive --json
-npx @zitadel/cli@alpha setup --framework next --server local --force --non-interactive --json
+npx @zitadel/cli@alpha setup --framework next --server local --non-interactive --json
 npx @zitadel/cli@alpha doctor --non-interactive --json
 npx @zitadel/cli@alpha plan --non-interactive --json
 npx @zitadel/cli@alpha apply --non-interactive --json
 ```
 
 `setup` scaffolds into an empty directory, or patches an existing app project
-where it detects a framework. It stops on any other non-empty directory and
-asks for `--force` — which the golden path passes because `start` has already
-written `.zitadel/local` into the directory. If you run `setup` before `start`,
-in a truly empty directory, `--force` is not needed.
+where it detects a framework. What `start` leaves in a directory —
+`.zitadel/local/` and the `.gitignore` line that ignores it — still counts as
+empty, so the golden path runs `setup` right after `start` in the same
+directory. Any other non-empty directory stops setup with a hint to pass
+`--force`. Pass it only for a directory whose contents may be replaced: files
+the new app also has, such as `package.json`, are overwritten.
 
 The app may also live in a subdirectory of the one `start` ran in: `setup`,
 `console` and `--server local` read `.zitadel/local/` from the working
 directory or the nearest parent that has it (up to the home directory), so
-`mkdir my-app && cd my-app` after `start` works without `--force`. On a local
+`mkdir my-app && cd my-app` after `start` works too. `stop`, `reset`, `logs`,
+`status` and `doctor` read only the working directory's `.zitadel/local/`, so
+run them where `start` ran. On a local
 server that hosts the platform project, `setup` attaches the project to the
 local admin's team and ends `data.next_commands` with `console`; when it finds
 no local admin for that server on the way up, it says so in the envelope's
