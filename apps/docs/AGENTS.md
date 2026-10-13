@@ -34,6 +34,9 @@ So the template's root routes live under `/docs` here:
   `basePath`: the URLs in `llms.txt`, the Markdown and the MCP answers would
   lose their `/docs`.
 - A link in the content is the page's full path: `/docs/cli`, not `/cli`.
+- The favicons are the one exception: `app/layout.tsx` links the cloud's, which
+  the website serves at `/favicons/`
+  ([`apps/website/AGENTS.md`](../website/AGENTS.md#the-logo-and-the-favicons)).
 
 ## Content
 

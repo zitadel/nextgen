@@ -27,7 +27,7 @@ One Vercel deployment, five [services](https://vercel.com/docs/services):
 | `console` | Vite; `apps/cloud/turbo-build.sh` with `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights | `/ui/console/*` (bare `/ui/console` redirects to the slash form) |
 | `storybook` | Storybook; `apps/cloud/turbo-build.sh`, moved to `dist/storybook/` | `/storybook/*` (bare `/storybook` redirects to the slash form) |
 | `docs` | Next.js; `apps/docs`' own `pnpm run build`, without a task runner: moon cannot archive the symlinks Vercel's Next.js adapter writes, and turbo could never reuse a build, whose cache key holds the deployment's ID under Skew Protection | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
-| `website` | Next.js; `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the coming-soon page, and its assets at `/_next/*` |
+| `website` | Next.js; `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the coming-soon page, and its assets at `/_next/*`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
 
 The console lives at the path the server would serve it from, on the same
 origin. The server's own console is switched off, and nothing else about

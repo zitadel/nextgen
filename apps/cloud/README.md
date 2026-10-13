@@ -14,14 +14,16 @@ deployment as five [services](https://vercel.com/docs/services):
 | `console` | `apps/console` | the console SPA, built with Vercel Web Analytics and Speed Insights | `/ui/console/*` |
 | `storybook` | `apps/storybook` | the component workbench, a static build | `/storybook/*` |
 | `docs` | `apps/docs` | the docs site, Fumadocs on Next.js, with Vercel Web Analytics and Speed Insights | `/docs`, `/docs/*` |
-| `website` | `apps/website` | the coming-soon page, on Next.js, with Vercel Web Analytics and Speed Insights | `/`, `/_next/*` |
+| `website` | `apps/website` | the coming-soon page, on Next.js, with Vercel Web Analytics and Speed Insights | `/`, `/_next/*`, `/favicon.ico`, `/favicons/*` |
 
 The console is served at the path the server would serve it from, on the same
 origin, so the session cookie, CSRF and the server's console links work
 unchanged. Everything the docs serve, their scripts and their search, lives
 under `/docs` ([`apps/docs/AGENTS.md`](../docs/AGENTS.md)). The website's
 scripts, styles and fonts load from `/_next/`; a page of its own beyond `/`
-needs a rewrite of its own ([`apps/website/AGENTS.md`](../website/AGENTS.md)).
+needs a rewrite of its own. Its favicons are the host's: the console, the
+login UI and the docs link the same set at `/favicons/`
+([`apps/website/AGENTS.md`](../website/AGENTS.md)).
 
 | File | Role |
 |---|---|
