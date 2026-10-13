@@ -3976,12 +3976,19 @@ func (s *AuthCheckPayload) encodeFields(e *jx.Encoder) {
 			s.AuthAttemptID.Encode(e)
 		}
 	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
+		}
+	}
 }
 
-var jsonFieldsNameOfAuthCheckPayload = [3]string{
+var jsonFieldsNameOfAuthCheckPayload = [4]string{
 	0: "check_id",
 	1: "check_type",
 	2: "auth_attempt_id",
+	3: "user_id",
 }
 
 // Decode decodes AuthCheckPayload from json.
@@ -4024,6 +4031,16 @@ func (s *AuthCheckPayload) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"auth_attempt_id\"")
+			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
 			}
 		default:
 			return d.Skip()
@@ -34631,6 +34648,38 @@ func (s FinishUserPasskeyRegistrationErrorResponse) encodeFields(e *jx.Encoder) 
 				}
 			}
 		}
+	case UserPasswordInvalidFinishUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_invalid")
+		{
+			s := s.UserPasswordInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserPasswordRateLimitedFinishUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_rate_limited")
+		{
+			s := s.UserPasswordRateLimited
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.password_too_long")
@@ -34731,6 +34780,12 @@ func (s *FinishUserPasskeyRegistrationErrorResponse) Decode(d *jx.Decoder) error
 				case "user.password_empty":
 					s.Type = UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse
 					found = true
+				case "user.password_invalid":
+					s.Type = UserPasswordInvalidFinishUserPasskeyRegistrationErrorResponse
+					found = true
+				case "user.password_rate_limited":
+					s.Type = UserPasswordRateLimitedFinishUserPasskeyRegistrationErrorResponse
+					found = true
 				case "user.password_too_long":
 					s.Type = UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse
 					found = true
@@ -34805,6 +34860,14 @@ func (s *FinishUserPasskeyRegistrationErrorResponse) Decode(d *jx.Decoder) error
 		}
 	case UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse:
 		if err := s.UserPasswordEmpty.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordInvalidFinishUserPasskeyRegistrationErrorResponse:
+		if err := s.UserPasswordInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordRateLimitedFinishUserPasskeyRegistrationErrorResponse:
+		if err := s.UserPasswordRateLimited.Decode(d); err != nil {
 			return err
 		}
 	case UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse:
@@ -71073,6 +71136,74 @@ func (s *OptUserPasswordEmptyDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes UserPasswordInvalidDetails as json.
+func (o OptUserPasswordInvalidDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes UserPasswordInvalidDetails from json.
+func (o *OptUserPasswordInvalidDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptUserPasswordInvalidDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(UserPasswordInvalidDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptUserPasswordInvalidDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptUserPasswordInvalidDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UserPasswordRateLimitedDetails as json.
+func (o OptUserPasswordRateLimitedDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes UserPasswordRateLimitedDetails from json.
+func (o *OptUserPasswordRateLimitedDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptUserPasswordRateLimitedDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(UserPasswordRateLimitedDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptUserPasswordRateLimitedDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptUserPasswordRateLimitedDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes UserPasswordTooLongDetails as json.
 func (o OptUserPasswordTooLongDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -96888,6 +97019,38 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserPasswordInvalidSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_invalid")
+		{
+			s := s.UserPasswordInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserPasswordRateLimitedSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_rate_limited")
+		{
+			s := s.UserPasswordRateLimited
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserPasswordTooLongSubmitFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.password_too_long")
@@ -97034,6 +97197,12 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "user.password_empty":
 					s.Type = UserPasswordEmptySubmitFlowStepErrorResponse
+					found = true
+				case "user.password_invalid":
+					s.Type = UserPasswordInvalidSubmitFlowStepErrorResponse
+					found = true
+				case "user.password_rate_limited":
+					s.Type = UserPasswordRateLimitedSubmitFlowStepErrorResponse
 					found = true
 				case "user.password_too_long":
 					s.Type = UserPasswordTooLongSubmitFlowStepErrorResponse
@@ -97190,6 +97359,14 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UserPasswordEmptySubmitFlowStepErrorResponse:
 		if err := s.UserPasswordEmpty.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordInvalidSubmitFlowStepErrorResponse:
+		if err := s.UserPasswordInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordRateLimitedSubmitFlowStepErrorResponse:
+		if err := s.UserPasswordRateLimited.Decode(d); err != nil {
 			return err
 		}
 	case UserPasswordTooLongSubmitFlowStepErrorResponse:
@@ -104494,6 +104671,382 @@ func (s *UserPasswordEmptyDetails) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *UserPasswordInvalid) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *UserPasswordInvalid) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("user.password_invalid")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfUserPasswordInvalid = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes UserPasswordInvalid from json.
+func (s *UserPasswordInvalid) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserPasswordInvalid to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode UserPasswordInvalid")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfUserPasswordInvalid) {
+					name = jsonFieldsNameOfUserPasswordInvalid[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UserPasswordInvalid) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserPasswordInvalid) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s UserPasswordInvalidDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s UserPasswordInvalidDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes UserPasswordInvalidDetails from json.
+func (s *UserPasswordInvalidDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserPasswordInvalidDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode UserPasswordInvalidDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s UserPasswordInvalidDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserPasswordInvalidDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *UserPasswordRateLimited) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *UserPasswordRateLimited) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("user.password_rate_limited")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfUserPasswordRateLimited = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes UserPasswordRateLimited from json.
+func (s *UserPasswordRateLimited) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserPasswordRateLimited to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode UserPasswordRateLimited")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfUserPasswordRateLimited) {
+					name = jsonFieldsNameOfUserPasswordRateLimited[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UserPasswordRateLimited) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserPasswordRateLimited) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s UserPasswordRateLimitedDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s UserPasswordRateLimitedDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes UserPasswordRateLimitedDetails from json.
+func (s *UserPasswordRateLimitedDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserPasswordRateLimitedDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode UserPasswordRateLimitedDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s UserPasswordRateLimitedDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserPasswordRateLimitedDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *UserPasswordTooLong) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -108045,6 +108598,38 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserPasswordInvalidVerifyChallengeProofErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_invalid")
+		{
+			s := s.UserPasswordInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UserPasswordRateLimitedVerifyChallengeProofErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_rate_limited")
+		{
+			s := s.UserPasswordRateLimited
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserPasswordTooLongVerifyChallengeProofErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.password_too_long")
@@ -108132,6 +108717,12 @@ func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
 				case "user.password_empty":
 					s.Type = UserPasswordEmptyVerifyChallengeProofErrorResponse
 					found = true
+				case "user.password_invalid":
+					s.Type = UserPasswordInvalidVerifyChallengeProofErrorResponse
+					found = true
+				case "user.password_rate_limited":
+					s.Type = UserPasswordRateLimitedVerifyChallengeProofErrorResponse
+					found = true
 				case "user.password_too_long":
 					s.Type = UserPasswordTooLongVerifyChallengeProofErrorResponse
 					found = true
@@ -108207,6 +108798,14 @@ func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UserPasswordEmptyVerifyChallengeProofErrorResponse:
 		if err := s.UserPasswordEmpty.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordInvalidVerifyChallengeProofErrorResponse:
+		if err := s.UserPasswordInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordRateLimitedVerifyChallengeProofErrorResponse:
+		if err := s.UserPasswordRateLimited.Decode(d); err != nil {
 			return err
 		}
 	case UserPasswordTooLongVerifyChallengeProofErrorResponse:

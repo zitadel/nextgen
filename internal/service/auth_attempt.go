@@ -468,6 +468,7 @@ func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID
 				CheckID:       check.ID,
 				CheckType:     check.Type().String(),
 				AuthAttemptID: check.AuthAttemptID,
+				UserID:        attemptUserID(attempt),
 			},
 		})
 	})
@@ -580,6 +581,7 @@ func emitDirectAuthFactor(ctx context.Context, stmts EventStatements, attempt *d
 			CheckID:       checkID,
 			CheckType:     factor.Type().String(),
 			AuthAttemptID: attempt.ID,
+			UserID:        attemptUserID(attempt),
 		},
 	})
 }
@@ -600,8 +602,17 @@ func emitAuthCheck(ctx context.Context, stmts EventStatements, attempt *domain.A
 			CheckID:       challenge.GetID(),
 			CheckType:     challenge.Type().String(),
 			AuthAttemptID: attempt.ID,
+			UserID:        attemptUserID(attempt),
 		},
 	})
+}
+
+// attemptUserID is the user the attempt is pinned to, empty before one is.
+func attemptUserID(attempt *domain.AuthAttempt) string {
+	if user, ok := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser); ok {
+		return user.UserID
+	}
+	return ""
 }
 
 const passkeyRegistrationDefaultUsername = "Passkey account"
@@ -752,16 +763,15 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		password, err := s.stmts.Statements().GetUserPassword(ctx, database.And(
-			database.Equal(database.Col(domain.UserPasswordFieldProjectID), attempt.ProjectID),
-			database.Equal(database.Col(domain.UserPasswordFieldUserID), userFactor.UserID),
-		))
+		handled, err := s.checkPassword(ctx, attempt, passwordChallenge, userFactor.UserID, p.Password)
 		if err != nil {
+			if handled {
+				// No challenge keeps the caller from recording a failure.
+				passwordChallenge = nil
+			}
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
-		if err := password.Verify(p.Password, s.passwordVerifier); err != nil {
-			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
-		}
+		// The success event the caller emits ends the user's run of failures.
 		return passwordChallenge, attempt.SetPasswordFactor(), nil, nil
 
 	case PasskeyProof:
@@ -895,6 +905,90 @@ func (s *authAttemptService) recordProofFailure(ctx context.Context, attempt *do
 		}
 		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, false)
 	})
+}
+
+// checkPassword checks the user's password against the rate limit, which
+// counts the auth.check.failed events of password checks. The hash runs
+// between two transactions, as hashing is slow by design: a transaction held
+// across it would hold the lock on the user's password row as long, and on
+// the Spanner emulator, which serves one transaction at a time, it starves.
+//
+// The first transaction refuses a user who is already limited, so a lockout
+// costs no hash. The second takes the lock again and decides: it refuses the
+// check when failures recorded since then reached the limit, whatever the
+// hash said, and otherwise records a wrong password. Concurrent checks of one
+// user commit one at a time, so only the checks that commit under the limit
+// get an answer.
+//
+// A check refused by the rate limit is not recorded at all: no password was
+// tried, and counting refusals would keep a user locked out for as long as
+// someone keeps guessing. handled reports that the error needs no failure
+// recorded by the caller, for either reason.
+func (s *authAttemptService) checkPassword(ctx context.Context, attempt *domain.AuthAttempt, challenge domain.AuthChallenge, userID, plain string) (handled bool, err error) {
+	var (
+		password *domain.UserPassword
+		limited  error
+	)
+	err = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		pw, failures, err := lockUserPasswordFailures(ctx, tx.Statements(), attempt.ProjectID, userID)
+		if err != nil {
+			return err
+		}
+		password, limited = pw, failures.CheckRateLimit()
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+	if limited != nil {
+		return true, limited
+	}
+
+	verified := password.Verify(plain, s.passwordVerifier)
+	var wrong error
+	err = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		wrong = verified
+		stmts := tx.Statements()
+		current, failures, err := lockUserPasswordFailures(ctx, stmts, attempt.ProjectID, userID)
+		if err != nil {
+			return err
+		}
+		if limited = failures.CheckRateLimit(); limited != nil {
+			return nil
+		}
+		if current.ID != password.ID {
+			// Changed during the hash: the check was against the old one.
+			wrong = domain.ErrUserPasswordInvalid()
+		}
+		if wrong == nil {
+			return nil
+		}
+		if err := stmts.AuthAttemptChallengeFailed(ctx, attempt.ProjectID, attempt.ID, challenge); err != nil {
+			return err
+		}
+		return emitAuthCheck(ctx, stmts, attempt, challenge, false)
+	})
+	if err != nil {
+		return false, err
+	}
+	if limited != nil {
+		return true, limited
+	}
+	return wrong != nil, wrong
+}
+
+// lockUserPasswordFailures reads the user's password, locking its row, and
+// their password failures in the rate limit's window.
+func lockUserPasswordFailures(ctx context.Context, stmts AllStatements, projectID, userID string) (*domain.UserPassword, domain.UserPasswordFailures, error) {
+	password, err := stmts.LockUserPassword(ctx, projectID, userID)
+	if err != nil {
+		return nil, domain.UserPasswordFailures{}, err
+	}
+	failures, err := stmts.GetUserPasswordFailures(ctx, projectID, userID, domain.UserPasswordFailuresSince(time.Now()))
+	if err != nil {
+		return nil, domain.UserPasswordFailures{}, err
+	}
+	return password, failures, nil
 }
 
 // BeginPasskeyEnrollment starts a management-plane enrollment ceremony on an

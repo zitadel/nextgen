@@ -32,6 +32,12 @@ FROM user_passwords
 WHERE project_id = ? AND user_id = ?
 ORDER BY created_at DESC
 LIMIT ? OFFSET 1`
+
+	// SQLite has no row locks, and needs none: transactions begin IMMEDIATE
+	// on the one connection, so a read inside one already excludes every
+	// other writer until it ends.
+	lockUserPasswordStmt = userPasswordQuery + `
+WHERE project_id = ? AND user_id = ? AND ` + currentUserPassword
 )
 
 type userPasswordStatements struct{ statement }
@@ -106,6 +112,23 @@ func (ps userPasswordStatements) GetUserPasswordHistory(ctx context.Context, pro
 	defer rows.Close()
 	passwords, err := collectRows(rows, scanUserPassword)
 	return passwords, wrapError(err)
+}
+
+// LockUserPassword implements [service.UserPasswordStatements].
+func (ps userPasswordStatements) LockUserPassword(ctx context.Context, projectID, userID string) (*domain.UserPassword, error) {
+	rows, err := ps.client.Query(ctx, lockUserPasswordStmt, projectID, userID)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	passwords, err := collectRows(rows, scanUserPassword)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	if len(passwords) != 1 {
+		return nil, database.NewNoRowFoundError(nil)
+	}
+	return passwords[0], nil
 }
 
 func scanUserPassword(rows *sql.Rows) (*domain.UserPassword, error) {

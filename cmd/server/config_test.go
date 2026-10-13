@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -127,4 +129,14 @@ func TestPlatformConfigProvisioningProjectID(t *testing.T) {
 		t.Parallel()
 		assert.Empty(t, PlatformConfig{}.ProvisioningProjectID())
 	})
+}
+
+func TestEventsConfigValidate(t *testing.T) {
+	retention := func(enabled bool, window time.Duration) EventsConfig {
+		return EventsConfig{Retention: audit.RetentionConfig{Enabled: enabled, Retention: window}}
+	}
+	require.NoError(t, EventsConfig{}.Validate(), "unset falls back to the default")
+	require.NoError(t, retention(true, domain.UserPasswordFailureWindow).Validate())
+	require.NoError(t, retention(false, time.Hour).Validate(), "a disabled purge keeps everything")
+	require.ErrorContains(t, retention(true, time.Hour).Validate(), "events.retention.window")
 }

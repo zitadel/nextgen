@@ -2077,11 +2077,13 @@ func (s *AuthCheckFailedEventDelegationType) UnmarshalText(data []byte) error {
 // `auth.sso.authorization.failed`, and `auth.sso.exchange.failed` /
 // `auth.sso.exchange.succeeded`.
 // `auth_attempt_id` joins the check to its attempt for SIEM correlation.
+// `user_id` is the user the attempt is pinned to, when it is.
 // Ref: #
 type AuthCheckPayload struct {
 	CheckID       string    `json:"check_id"`
 	CheckType     OptString `json:"check_type"`
 	AuthAttemptID OptString `json:"auth_attempt_id"`
+	UserID        OptString `json:"user_id"`
 }
 
 // GetCheckID returns the value of CheckID.
@@ -2099,6 +2101,11 @@ func (s *AuthCheckPayload) GetAuthAttemptID() OptString {
 	return s.AuthAttemptID
 }
 
+// GetUserID returns the value of UserID.
+func (s *AuthCheckPayload) GetUserID() OptString {
+	return s.UserID
+}
+
 // SetCheckID sets the value of CheckID.
 func (s *AuthCheckPayload) SetCheckID(val string) {
 	s.CheckID = val
@@ -2112,6 +2119,11 @@ func (s *AuthCheckPayload) SetCheckType(val OptString) {
 // SetAuthAttemptID sets the value of AuthAttemptID.
 func (s *AuthCheckPayload) SetAuthAttemptID(val OptString) {
 	s.AuthAttemptID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthCheckPayload) SetUserID(val OptString) {
+	s.UserID = val
 }
 
 // Merged schema.
@@ -19477,23 +19489,25 @@ func (*FinishUserPasskeyRegistrationBadRequest) finishUserPasskeyRegistrationRes
 
 // FinishUserPasskeyRegistrationErrorResponse represents sum type.
 type FinishUserPasskeyRegistrationErrorResponse struct {
-	Type                 FinishUserPasskeyRegistrationErrorResponseType // switch on this field
-	AttAlreadyHandedOff  AttAlreadyHandedOff
-	AttInvalidProof      AttInvalidProof
-	AttInvalidRequest    AttInvalidRequest
-	AttInvalidState      AttInvalidState
-	AttNotFound          AttNotFound
-	AttProofRejected     AttProofRejected
-	AttStaleChallenge    AttStaleChallenge
-	AuthUnauthorized     AuthUnauthorized
-	EvtInvalid           EvtInvalid
-	Internal             Internal
-	ReqInvalid           ReqInvalid
-	UserInvalid          UserInvalid
-	UserNotFound         UserNotFound
-	UserPasswordEmpty    UserPasswordEmpty
-	UserPasswordTooLong  UserPasswordTooLong
-	UserPermissionDenied UserPermissionDenied
+	Type                    FinishUserPasskeyRegistrationErrorResponseType // switch on this field
+	AttAlreadyHandedOff     AttAlreadyHandedOff
+	AttInvalidProof         AttInvalidProof
+	AttInvalidRequest       AttInvalidRequest
+	AttInvalidState         AttInvalidState
+	AttNotFound             AttNotFound
+	AttProofRejected        AttProofRejected
+	AttStaleChallenge       AttStaleChallenge
+	AuthUnauthorized        AuthUnauthorized
+	EvtInvalid              EvtInvalid
+	Internal                Internal
+	ReqInvalid              ReqInvalid
+	UserInvalid             UserInvalid
+	UserNotFound            UserNotFound
+	UserPasswordEmpty       UserPasswordEmpty
+	UserPasswordInvalid     UserPasswordInvalid
+	UserPasswordRateLimited UserPasswordRateLimited
+	UserPasswordTooLong     UserPasswordTooLong
+	UserPermissionDenied    UserPermissionDenied
 }
 
 // FinishUserPasskeyRegistrationErrorResponseType is oneOf type of FinishUserPasskeyRegistrationErrorResponse.
@@ -19501,22 +19515,24 @@ type FinishUserPasskeyRegistrationErrorResponseType string
 
 // Possible values for FinishUserPasskeyRegistrationErrorResponseType.
 const (
-	AttAlreadyHandedOffFinishUserPasskeyRegistrationErrorResponse  FinishUserPasskeyRegistrationErrorResponseType = "att.already_handed_off"
-	AttInvalidProofFinishUserPasskeyRegistrationErrorResponse      FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_proof"
-	AttInvalidRequestFinishUserPasskeyRegistrationErrorResponse    FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_request"
-	AttInvalidStateFinishUserPasskeyRegistrationErrorResponse      FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_state"
-	AttNotFoundFinishUserPasskeyRegistrationErrorResponse          FinishUserPasskeyRegistrationErrorResponseType = "att.not_found"
-	AttProofRejectedFinishUserPasskeyRegistrationErrorResponse     FinishUserPasskeyRegistrationErrorResponseType = "att.proof_rejected"
-	AttStaleChallengeFinishUserPasskeyRegistrationErrorResponse    FinishUserPasskeyRegistrationErrorResponseType = "att.stale_challenge"
-	AuthUnauthorizedFinishUserPasskeyRegistrationErrorResponse     FinishUserPasskeyRegistrationErrorResponseType = "auth.unauthorized"
-	EvtInvalidFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "evt.invalid"
-	InternalFinishUserPasskeyRegistrationErrorResponse             FinishUserPasskeyRegistrationErrorResponseType = "internal"
-	ReqInvalidFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "req.invalid"
-	UserInvalidFinishUserPasskeyRegistrationErrorResponse          FinishUserPasskeyRegistrationErrorResponseType = "user.invalid"
-	UserNotFoundFinishUserPasskeyRegistrationErrorResponse         FinishUserPasskeyRegistrationErrorResponseType = "user.not_found"
-	UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse    FinishUserPasskeyRegistrationErrorResponseType = "user.password_empty"
-	UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse  FinishUserPasskeyRegistrationErrorResponseType = "user.password_too_long"
-	UserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse FinishUserPasskeyRegistrationErrorResponseType = "user.permission_denied"
+	AttAlreadyHandedOffFinishUserPasskeyRegistrationErrorResponse     FinishUserPasskeyRegistrationErrorResponseType = "att.already_handed_off"
+	AttInvalidProofFinishUserPasskeyRegistrationErrorResponse         FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_proof"
+	AttInvalidRequestFinishUserPasskeyRegistrationErrorResponse       FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_request"
+	AttInvalidStateFinishUserPasskeyRegistrationErrorResponse         FinishUserPasskeyRegistrationErrorResponseType = "att.invalid_state"
+	AttNotFoundFinishUserPasskeyRegistrationErrorResponse             FinishUserPasskeyRegistrationErrorResponseType = "att.not_found"
+	AttProofRejectedFinishUserPasskeyRegistrationErrorResponse        FinishUserPasskeyRegistrationErrorResponseType = "att.proof_rejected"
+	AttStaleChallengeFinishUserPasskeyRegistrationErrorResponse       FinishUserPasskeyRegistrationErrorResponseType = "att.stale_challenge"
+	AuthUnauthorizedFinishUserPasskeyRegistrationErrorResponse        FinishUserPasskeyRegistrationErrorResponseType = "auth.unauthorized"
+	EvtInvalidFinishUserPasskeyRegistrationErrorResponse              FinishUserPasskeyRegistrationErrorResponseType = "evt.invalid"
+	InternalFinishUserPasskeyRegistrationErrorResponse                FinishUserPasskeyRegistrationErrorResponseType = "internal"
+	ReqInvalidFinishUserPasskeyRegistrationErrorResponse              FinishUserPasskeyRegistrationErrorResponseType = "req.invalid"
+	UserInvalidFinishUserPasskeyRegistrationErrorResponse             FinishUserPasskeyRegistrationErrorResponseType = "user.invalid"
+	UserNotFoundFinishUserPasskeyRegistrationErrorResponse            FinishUserPasskeyRegistrationErrorResponseType = "user.not_found"
+	UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse       FinishUserPasskeyRegistrationErrorResponseType = "user.password_empty"
+	UserPasswordInvalidFinishUserPasskeyRegistrationErrorResponse     FinishUserPasskeyRegistrationErrorResponseType = "user.password_invalid"
+	UserPasswordRateLimitedFinishUserPasskeyRegistrationErrorResponse FinishUserPasskeyRegistrationErrorResponseType = "user.password_rate_limited"
+	UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse     FinishUserPasskeyRegistrationErrorResponseType = "user.password_too_long"
+	UserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse    FinishUserPasskeyRegistrationErrorResponseType = "user.permission_denied"
 )
 
 // IsAttAlreadyHandedOff reports whether FinishUserPasskeyRegistrationErrorResponse is AttAlreadyHandedOff.
@@ -19587,6 +19603,16 @@ func (s FinishUserPasskeyRegistrationErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordEmpty.
 func (s FinishUserPasskeyRegistrationErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsUserPasswordInvalid reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordInvalid.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsUserPasswordInvalid() bool {
+	return s.Type == UserPasswordInvalidFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsUserPasswordRateLimited reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordRateLimited.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsUserPasswordRateLimited() bool {
+	return s.Type == UserPasswordRateLimitedFinishUserPasskeyRegistrationErrorResponse
 }
 
 // IsUserPasswordTooLong reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordTooLong.
@@ -19890,6 +19916,48 @@ func (s FinishUserPasskeyRegistrationErrorResponse) GetUserPasswordEmpty() (v Us
 func NewUserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse(v UserPasswordEmpty) FinishUserPasskeyRegistrationErrorResponse {
 	var s FinishUserPasskeyRegistrationErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordInvalid sets FinishUserPasskeyRegistrationErrorResponse to UserPasswordInvalid.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetUserPasswordInvalid(v UserPasswordInvalid) {
+	s.Type = UserPasswordInvalidFinishUserPasskeyRegistrationErrorResponse
+	s.UserPasswordInvalid = v
+}
+
+// GetUserPasswordInvalid returns UserPasswordInvalid and true boolean if FinishUserPasskeyRegistrationErrorResponse is UserPasswordInvalid.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetUserPasswordInvalid() (v UserPasswordInvalid, ok bool) {
+	if !s.IsUserPasswordInvalid() {
+		return v, false
+	}
+	return s.UserPasswordInvalid, true
+}
+
+// NewUserPasswordInvalidFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from UserPasswordInvalid.
+func NewUserPasswordInvalidFinishUserPasskeyRegistrationErrorResponse(v UserPasswordInvalid) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetUserPasswordInvalid(v)
+	return s
+}
+
+// SetUserPasswordRateLimited sets FinishUserPasskeyRegistrationErrorResponse to UserPasswordRateLimited.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetUserPasswordRateLimited(v UserPasswordRateLimited) {
+	s.Type = UserPasswordRateLimitedFinishUserPasskeyRegistrationErrorResponse
+	s.UserPasswordRateLimited = v
+}
+
+// GetUserPasswordRateLimited returns UserPasswordRateLimited and true boolean if FinishUserPasskeyRegistrationErrorResponse is UserPasswordRateLimited.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetUserPasswordRateLimited() (v UserPasswordRateLimited, ok bool) {
+	if !s.IsUserPasswordRateLimited() {
+		return v, false
+	}
+	return s.UserPasswordRateLimited, true
+}
+
+// NewUserPasswordRateLimitedFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from UserPasswordRateLimited.
+func NewUserPasswordRateLimitedFinishUserPasskeyRegistrationErrorResponse(v UserPasswordRateLimited) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetUserPasswordRateLimited(v)
 	return s
 }
 
@@ -48865,6 +48933,98 @@ func (o OptUserPasswordEmptyDetails) Or(d UserPasswordEmptyDetails) UserPassword
 	return d
 }
 
+// NewOptUserPasswordInvalidDetails returns new OptUserPasswordInvalidDetails with value set to v.
+func NewOptUserPasswordInvalidDetails(v UserPasswordInvalidDetails) OptUserPasswordInvalidDetails {
+	return OptUserPasswordInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserPasswordInvalidDetails is optional UserPasswordInvalidDetails.
+type OptUserPasswordInvalidDetails struct {
+	Value UserPasswordInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUserPasswordInvalidDetails was set.
+func (o OptUserPasswordInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserPasswordInvalidDetails) Reset() {
+	var v UserPasswordInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserPasswordInvalidDetails) SetTo(v UserPasswordInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserPasswordInvalidDetails) Get() (v UserPasswordInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserPasswordInvalidDetails) Or(d UserPasswordInvalidDetails) UserPasswordInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUserPasswordRateLimitedDetails returns new OptUserPasswordRateLimitedDetails with value set to v.
+func NewOptUserPasswordRateLimitedDetails(v UserPasswordRateLimitedDetails) OptUserPasswordRateLimitedDetails {
+	return OptUserPasswordRateLimitedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserPasswordRateLimitedDetails is optional UserPasswordRateLimitedDetails.
+type OptUserPasswordRateLimitedDetails struct {
+	Value UserPasswordRateLimitedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUserPasswordRateLimitedDetails was set.
+func (o OptUserPasswordRateLimitedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserPasswordRateLimitedDetails) Reset() {
+	var v UserPasswordRateLimitedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserPasswordRateLimitedDetails) SetTo(v UserPasswordRateLimitedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserPasswordRateLimitedDetails) Get() (v UserPasswordRateLimitedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserPasswordRateLimitedDetails) Or(d UserPasswordRateLimitedDetails) UserPasswordRateLimitedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptUserPasswordTooLongDetails returns new OptUserPasswordTooLongDetails with value set to v.
 func NewOptUserPasswordTooLongDetails(v UserPasswordTooLongDetails) OptUserPasswordTooLongDetails {
 	return OptUserPasswordTooLongDetails{
@@ -62071,6 +62231,8 @@ type SubmitFlowStepErrorResponse struct {
 	UserInvalid                   UserInvalid
 	UserNotFound                  UserNotFound
 	UserPasswordEmpty             UserPasswordEmpty
+	UserPasswordInvalid           UserPasswordInvalid
+	UserPasswordRateLimited       UserPasswordRateLimited
 	UserPasswordTooLong           UserPasswordTooLong
 }
 
@@ -62114,6 +62276,8 @@ const (
 	UserInvalidSubmitFlowStepErrorResponse                   SubmitFlowStepErrorResponseType = "user.invalid"
 	UserNotFoundSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "user.not_found"
 	UserPasswordEmptySubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "user.password_empty"
+	UserPasswordInvalidSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "user.password_invalid"
+	UserPasswordRateLimitedSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "user.password_rate_limited"
 	UserPasswordTooLongSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "user.password_too_long"
 )
 
@@ -62290,6 +62454,16 @@ func (s SubmitFlowStepErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether SubmitFlowStepErrorResponse is UserPasswordEmpty.
 func (s SubmitFlowStepErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptySubmitFlowStepErrorResponse
+}
+
+// IsUserPasswordInvalid reports whether SubmitFlowStepErrorResponse is UserPasswordInvalid.
+func (s SubmitFlowStepErrorResponse) IsUserPasswordInvalid() bool {
+	return s.Type == UserPasswordInvalidSubmitFlowStepErrorResponse
+}
+
+// IsUserPasswordRateLimited reports whether SubmitFlowStepErrorResponse is UserPasswordRateLimited.
+func (s SubmitFlowStepErrorResponse) IsUserPasswordRateLimited() bool {
+	return s.Type == UserPasswordRateLimitedSubmitFlowStepErrorResponse
 }
 
 // IsUserPasswordTooLong reports whether SubmitFlowStepErrorResponse is UserPasswordTooLong.
@@ -63029,6 +63203,48 @@ func (s SubmitFlowStepErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpty
 func NewUserPasswordEmptySubmitFlowStepErrorResponse(v UserPasswordEmpty) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordInvalid sets SubmitFlowStepErrorResponse to UserPasswordInvalid.
+func (s *SubmitFlowStepErrorResponse) SetUserPasswordInvalid(v UserPasswordInvalid) {
+	s.Type = UserPasswordInvalidSubmitFlowStepErrorResponse
+	s.UserPasswordInvalid = v
+}
+
+// GetUserPasswordInvalid returns UserPasswordInvalid and true boolean if SubmitFlowStepErrorResponse is UserPasswordInvalid.
+func (s SubmitFlowStepErrorResponse) GetUserPasswordInvalid() (v UserPasswordInvalid, ok bool) {
+	if !s.IsUserPasswordInvalid() {
+		return v, false
+	}
+	return s.UserPasswordInvalid, true
+}
+
+// NewUserPasswordInvalidSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from UserPasswordInvalid.
+func NewUserPasswordInvalidSubmitFlowStepErrorResponse(v UserPasswordInvalid) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUserPasswordInvalid(v)
+	return s
+}
+
+// SetUserPasswordRateLimited sets SubmitFlowStepErrorResponse to UserPasswordRateLimited.
+func (s *SubmitFlowStepErrorResponse) SetUserPasswordRateLimited(v UserPasswordRateLimited) {
+	s.Type = UserPasswordRateLimitedSubmitFlowStepErrorResponse
+	s.UserPasswordRateLimited = v
+}
+
+// GetUserPasswordRateLimited returns UserPasswordRateLimited and true boolean if SubmitFlowStepErrorResponse is UserPasswordRateLimited.
+func (s SubmitFlowStepErrorResponse) GetUserPasswordRateLimited() (v UserPasswordRateLimited, ok bool) {
+	if !s.IsUserPasswordRateLimited() {
+		return v, false
+	}
+	return s.UserPasswordRateLimited, true
+}
+
+// NewUserPasswordRateLimitedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from UserPasswordRateLimited.
+func NewUserPasswordRateLimitedSubmitFlowStepErrorResponse(v UserPasswordRateLimited) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUserPasswordRateLimited(v)
 	return s
 }
 
@@ -67511,6 +67727,112 @@ func (s *UserPasswordEmptyDetails) init() UserPasswordEmptyDetails {
 
 // Merged schema.
 // Ref: #
+type UserPasswordInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUserPasswordInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UserPasswordInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UserPasswordInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UserPasswordInvalid) GetDetails() OptUserPasswordInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UserPasswordInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UserPasswordInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UserPasswordInvalid) SetDetails(val OptUserPasswordInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UserPasswordInvalidDetails map[string]jx.Raw
+
+func (s *UserPasswordInvalidDetails) init() UserPasswordInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type UserPasswordRateLimited struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUserPasswordRateLimitedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UserPasswordRateLimited) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UserPasswordRateLimited) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UserPasswordRateLimited) GetDetails() OptUserPasswordRateLimitedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UserPasswordRateLimited) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UserPasswordRateLimited) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UserPasswordRateLimited) SetDetails(val OptUserPasswordRateLimitedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UserPasswordRateLimitedDetails map[string]jx.Raw
+
+func (s *UserPasswordRateLimitedDetails) init() UserPasswordRateLimitedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type UserPasswordTooLong struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -69211,23 +69533,25 @@ func (*Variables) updateVariablesRes() {}
 
 // VerifyChallengeProofErrorResponse represents sum type.
 type VerifyChallengeProofErrorResponse struct {
-	Type                VerifyChallengeProofErrorResponseType // switch on this field
-	AttAlreadyHandedOff AttAlreadyHandedOff
-	AttInvalidProof     AttInvalidProof
-	AttInvalidRequest   AttInvalidRequest
-	AttInvalidState     AttInvalidState
-	AttNotFound         AttNotFound
-	AttProofRejected    AttProofRejected
-	AttStaleChallenge   AttStaleChallenge
-	AuthUnauthorized    AuthUnauthorized
-	EvtInvalid          EvtInvalid
-	Internal            Internal
-	ReqInvalid          ReqInvalid
-	UserAlreadyExists   UserAlreadyExists
-	UserInvalid         UserInvalid
-	UserNotFound        UserNotFound
-	UserPasswordEmpty   UserPasswordEmpty
-	UserPasswordTooLong UserPasswordTooLong
+	Type                    VerifyChallengeProofErrorResponseType // switch on this field
+	AttAlreadyHandedOff     AttAlreadyHandedOff
+	AttInvalidProof         AttInvalidProof
+	AttInvalidRequest       AttInvalidRequest
+	AttInvalidState         AttInvalidState
+	AttNotFound             AttNotFound
+	AttProofRejected        AttProofRejected
+	AttStaleChallenge       AttStaleChallenge
+	AuthUnauthorized        AuthUnauthorized
+	EvtInvalid              EvtInvalid
+	Internal                Internal
+	ReqInvalid              ReqInvalid
+	UserAlreadyExists       UserAlreadyExists
+	UserInvalid             UserInvalid
+	UserNotFound            UserNotFound
+	UserPasswordEmpty       UserPasswordEmpty
+	UserPasswordInvalid     UserPasswordInvalid
+	UserPasswordRateLimited UserPasswordRateLimited
+	UserPasswordTooLong     UserPasswordTooLong
 }
 
 // VerifyChallengeProofErrorResponseType is oneOf type of VerifyChallengeProofErrorResponse.
@@ -69235,22 +69559,24 @@ type VerifyChallengeProofErrorResponseType string
 
 // Possible values for VerifyChallengeProofErrorResponseType.
 const (
-	AttAlreadyHandedOffVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "att.already_handed_off"
-	AttInvalidProofVerifyChallengeProofErrorResponse     VerifyChallengeProofErrorResponseType = "att.invalid_proof"
-	AttInvalidRequestVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "att.invalid_request"
-	AttInvalidStateVerifyChallengeProofErrorResponse     VerifyChallengeProofErrorResponseType = "att.invalid_state"
-	AttNotFoundVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "att.not_found"
-	AttProofRejectedVerifyChallengeProofErrorResponse    VerifyChallengeProofErrorResponseType = "att.proof_rejected"
-	AttStaleChallengeVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "att.stale_challenge"
-	AuthUnauthorizedVerifyChallengeProofErrorResponse    VerifyChallengeProofErrorResponseType = "auth.unauthorized"
-	EvtInvalidVerifyChallengeProofErrorResponse          VerifyChallengeProofErrorResponseType = "evt.invalid"
-	InternalVerifyChallengeProofErrorResponse            VerifyChallengeProofErrorResponseType = "internal"
-	ReqInvalidVerifyChallengeProofErrorResponse          VerifyChallengeProofErrorResponseType = "req.invalid"
-	UserAlreadyExistsVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "user.already_exists"
-	UserInvalidVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "user.invalid"
-	UserNotFoundVerifyChallengeProofErrorResponse        VerifyChallengeProofErrorResponseType = "user.not_found"
-	UserPasswordEmptyVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "user.password_empty"
-	UserPasswordTooLongVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "user.password_too_long"
+	AttAlreadyHandedOffVerifyChallengeProofErrorResponse     VerifyChallengeProofErrorResponseType = "att.already_handed_off"
+	AttInvalidProofVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "att.invalid_proof"
+	AttInvalidRequestVerifyChallengeProofErrorResponse       VerifyChallengeProofErrorResponseType = "att.invalid_request"
+	AttInvalidStateVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "att.invalid_state"
+	AttNotFoundVerifyChallengeProofErrorResponse             VerifyChallengeProofErrorResponseType = "att.not_found"
+	AttProofRejectedVerifyChallengeProofErrorResponse        VerifyChallengeProofErrorResponseType = "att.proof_rejected"
+	AttStaleChallengeVerifyChallengeProofErrorResponse       VerifyChallengeProofErrorResponseType = "att.stale_challenge"
+	AuthUnauthorizedVerifyChallengeProofErrorResponse        VerifyChallengeProofErrorResponseType = "auth.unauthorized"
+	EvtInvalidVerifyChallengeProofErrorResponse              VerifyChallengeProofErrorResponseType = "evt.invalid"
+	InternalVerifyChallengeProofErrorResponse                VerifyChallengeProofErrorResponseType = "internal"
+	ReqInvalidVerifyChallengeProofErrorResponse              VerifyChallengeProofErrorResponseType = "req.invalid"
+	UserAlreadyExistsVerifyChallengeProofErrorResponse       VerifyChallengeProofErrorResponseType = "user.already_exists"
+	UserInvalidVerifyChallengeProofErrorResponse             VerifyChallengeProofErrorResponseType = "user.invalid"
+	UserNotFoundVerifyChallengeProofErrorResponse            VerifyChallengeProofErrorResponseType = "user.not_found"
+	UserPasswordEmptyVerifyChallengeProofErrorResponse       VerifyChallengeProofErrorResponseType = "user.password_empty"
+	UserPasswordInvalidVerifyChallengeProofErrorResponse     VerifyChallengeProofErrorResponseType = "user.password_invalid"
+	UserPasswordRateLimitedVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "user.password_rate_limited"
+	UserPasswordTooLongVerifyChallengeProofErrorResponse     VerifyChallengeProofErrorResponseType = "user.password_too_long"
 )
 
 // IsAttAlreadyHandedOff reports whether VerifyChallengeProofErrorResponse is AttAlreadyHandedOff.
@@ -69326,6 +69652,16 @@ func (s VerifyChallengeProofErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether VerifyChallengeProofErrorResponse is UserPasswordEmpty.
 func (s VerifyChallengeProofErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptyVerifyChallengeProofErrorResponse
+}
+
+// IsUserPasswordInvalid reports whether VerifyChallengeProofErrorResponse is UserPasswordInvalid.
+func (s VerifyChallengeProofErrorResponse) IsUserPasswordInvalid() bool {
+	return s.Type == UserPasswordInvalidVerifyChallengeProofErrorResponse
+}
+
+// IsUserPasswordRateLimited reports whether VerifyChallengeProofErrorResponse is UserPasswordRateLimited.
+func (s VerifyChallengeProofErrorResponse) IsUserPasswordRateLimited() bool {
+	return s.Type == UserPasswordRateLimitedVerifyChallengeProofErrorResponse
 }
 
 // IsUserPasswordTooLong reports whether VerifyChallengeProofErrorResponse is UserPasswordTooLong.
@@ -69645,6 +69981,48 @@ func (s VerifyChallengeProofErrorResponse) GetUserPasswordEmpty() (v UserPasswor
 func NewUserPasswordEmptyVerifyChallengeProofErrorResponse(v UserPasswordEmpty) VerifyChallengeProofErrorResponse {
 	var s VerifyChallengeProofErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordInvalid sets VerifyChallengeProofErrorResponse to UserPasswordInvalid.
+func (s *VerifyChallengeProofErrorResponse) SetUserPasswordInvalid(v UserPasswordInvalid) {
+	s.Type = UserPasswordInvalidVerifyChallengeProofErrorResponse
+	s.UserPasswordInvalid = v
+}
+
+// GetUserPasswordInvalid returns UserPasswordInvalid and true boolean if VerifyChallengeProofErrorResponse is UserPasswordInvalid.
+func (s VerifyChallengeProofErrorResponse) GetUserPasswordInvalid() (v UserPasswordInvalid, ok bool) {
+	if !s.IsUserPasswordInvalid() {
+		return v, false
+	}
+	return s.UserPasswordInvalid, true
+}
+
+// NewUserPasswordInvalidVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from UserPasswordInvalid.
+func NewUserPasswordInvalidVerifyChallengeProofErrorResponse(v UserPasswordInvalid) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetUserPasswordInvalid(v)
+	return s
+}
+
+// SetUserPasswordRateLimited sets VerifyChallengeProofErrorResponse to UserPasswordRateLimited.
+func (s *VerifyChallengeProofErrorResponse) SetUserPasswordRateLimited(v UserPasswordRateLimited) {
+	s.Type = UserPasswordRateLimitedVerifyChallengeProofErrorResponse
+	s.UserPasswordRateLimited = v
+}
+
+// GetUserPasswordRateLimited returns UserPasswordRateLimited and true boolean if VerifyChallengeProofErrorResponse is UserPasswordRateLimited.
+func (s VerifyChallengeProofErrorResponse) GetUserPasswordRateLimited() (v UserPasswordRateLimited, ok bool) {
+	if !s.IsUserPasswordRateLimited() {
+		return v, false
+	}
+	return s.UserPasswordRateLimited, true
+}
+
+// NewUserPasswordRateLimitedVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from UserPasswordRateLimited.
+func NewUserPasswordRateLimitedVerifyChallengeProofErrorResponse(v UserPasswordRateLimited) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetUserPasswordRateLimited(v)
 	return s
 }
 

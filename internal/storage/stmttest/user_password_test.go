@@ -4,6 +4,7 @@ package stmttest
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -261,5 +262,157 @@ func TestUserPasswordStatements_HistoryUnderConcurrentChanges(t *testing.T) {
 			got := append(userPasswordHistoryHashes(t, d, projectID, userID), currentUserPasswordHash(t, d, projectID, userID))
 			assert.ElementsMatch(t, want, got, "start %q", start)
 		}
+	})
+}
+
+// passwordCheckEvent is a check event as the auth attempt service emits it.
+func passwordCheckEvent(projectID, userID string, typ domain.EventType, checkType domain.AuthCheckType) *domain.Event {
+	entityType, entityID := "check", "chk_pw"
+	payload, _ := json.Marshal(domain.AuthCheckPayload{
+		CheckID: entityID, CheckType: checkType.String(), AuthAttemptID: "att_pw", UserID: userID,
+	})
+	return &domain.Event{
+		ProjectID:  projectID,
+		EventType:  typ,
+		Category:   domain.EventCategoryAuth,
+		EntityType: &entityType,
+		EntityID:   &entityID,
+		Payload:    payload,
+		Metadata:   json.RawMessage(`{}`),
+	}
+}
+
+// The rate limit's failures are the user's failed password checks since their
+// last successful one, read from the events.
+func TestEventStatements_GetUserPasswordFailures(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, _ := uniqueEventIDs(t)
+		ensureEventProject(t, d.stmts, projectID)
+		const userID, otherID = "user_pw_failures", "user_pw_failures_other"
+		longAgo := time.Now().Add(-time.Hour)
+
+		emit := func(userID string, typ domain.EventType, checkType domain.AuthCheckType) {
+			t.Helper()
+			require.NoError(t, d.stmts.InsertEvent(t.Context(), passwordCheckEvent(projectID, userID, typ, checkType)))
+		}
+		fail := func(userID string) { emit(userID, domain.EventTypeAuthCheckFailed, domain.AuthCheckTypePassword) }
+		succeed := func(userID string) { emit(userID, domain.EventTypeAuthCheckSucceeded, domain.AuthCheckTypePassword) }
+		failures := func(since time.Time) domain.UserPasswordFailures {
+			t.Helper()
+			got, err := d.stmts.GetUserPasswordFailures(t.Context(), projectID, userID, since)
+			require.NoError(t, err)
+			return got
+		}
+		// A point between two writes, clear of clock granularity.
+		mark := func() time.Time {
+			time.Sleep(5 * time.Millisecond)
+			defer time.Sleep(5 * time.Millisecond)
+			return time.Now()
+		}
+
+		got := failures(longAgo)
+		assert.Zero(t, got.Count, "no failures yet")
+		assert.True(t, got.LastFailedAt.IsZero())
+
+		before := mark()
+		for range 3 {
+			fail(userID)
+		}
+		fail(otherID)
+		emit(userID, domain.EventTypeAuthCheckFailed, domain.AuthCheckTypePasskey)
+		emit(userID, domain.EventTypeAuthCheckSucceeded, domain.AuthCheckTypePasskey)
+		got = failures(longAgo)
+		assert.Equal(t, 3, got.Count, "only the user's own password checks count")
+		assert.WithinRange(t, got.LastFailedAt, before, time.Now())
+
+		between := mark()
+		fail(userID)
+		assert.Equal(t, 1, failures(between).Count, "only failures after since count")
+		assert.Equal(t, 4, failures(longAgo).Count)
+
+		succeed(otherID)
+		assert.Equal(t, 4, failures(longAgo).Count, "another user's success does not reset")
+		succeed(userID)
+		got = failures(longAgo)
+		assert.Zero(t, got.Count, "a correct password ends the run")
+		assert.True(t, got.LastFailedAt.IsZero())
+
+		fail(userID)
+		assert.Equal(t, 1, failures(longAgo).Count, "failures after the success count again")
+		assert.Equal(t, 1, failures(between).Count, "a success inside the window outranks since")
+	})
+}
+
+func TestUserPasswordStatements_LockUserPassword(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		userID := "user_pw_lock"
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "pw-lock@example.com", "PW Lock")))
+
+		_, err := d.stmts.LockUserPassword(t.Context(), projectID, userID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError), "a user without a password has nothing to lock")
+
+		setTestUserPassword(t, d, projectID, userID, "hash-1")
+		setTestUserPassword(t, d, projectID, userID, "hash-2")
+		require.NoError(t, d.pool.Transaction(t.Context(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+			pw, err := tx.Statements().LockUserPassword(ctx, projectID, userID)
+			require.NoError(t, err)
+			assert.Equal(t, "hash-2", pw.EncodedHash, "the current password is the one locked")
+			return nil
+		}))
+	})
+}
+
+// A check reads the failures and records its own under the password row lock,
+// so concurrent checks see each other: of a burst, exactly as many get through
+// as the rule allows.
+func TestUserPasswordStatements_LockSerializesChecks(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		userID := "user_pw_lock_race"
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "pw-lock-race@example.com", "PW Lock Race")))
+		setTestUserPassword(t, d, projectID, userID, "hash-1")
+
+		const (
+			attempts = 10
+			admit    = 3
+		)
+		since := time.Now().Add(-time.Hour)
+		errRefused := errors.New("refused")
+		var wg sync.WaitGroup
+		results := make(chan error, attempts)
+		for range attempts {
+			wg.Go(func() {
+				results <- d.pool.Transaction(context.Background(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+					stmts := tx.Statements()
+					if _, err := stmts.LockUserPassword(ctx, projectID, userID); err != nil {
+						return err
+					}
+					failures, err := stmts.GetUserPasswordFailures(ctx, projectID, userID, since)
+					if err != nil {
+						return err
+					}
+					if failures.Count >= admit {
+						return errRefused
+					}
+					return stmts.InsertEvent(ctx, passwordCheckEvent(projectID, userID, domain.EventTypeAuthCheckFailed, domain.AuthCheckTypePassword))
+				})
+			})
+		}
+		wg.Wait()
+		close(results)
+		var admitted int
+		for err := range results {
+			if err == nil {
+				admitted++
+				continue
+			}
+			require.ErrorIs(t, err, errRefused)
+		}
+		assert.Equal(t, admit, admitted)
+
+		got, err := d.stmts.GetUserPasswordFailures(t.Context(), projectID, userID, since)
+		require.NoError(t, err)
+		assert.Equal(t, admit, got.Count)
 	})
 }

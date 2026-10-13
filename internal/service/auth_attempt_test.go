@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"net/url"
 	"testing"
@@ -693,34 +694,112 @@ func TestAuthAttemptService_VerifyProof_Password(t *testing.T) {
 		}
 	}
 
-	t.Run("loads password via stmts and persists success", func(t *testing.T) {
+	password := &domain.UserPassword{ID: "upw-1", ProjectID: "proj", UserID: "user-1", EncodedHash: "encoded"}
+
+	// checkEvent is an emitted check event, as far as the rate limit reads it.
+	type checkEvent struct {
+		Type    domain.EventType
+		Payload domain.AuthCheckPayload
+	}
+	// passwordCheck sets up a password challenge for user-1 and collects the
+	// events emitted. Each read of the user's recent failures returns the next
+	// of reads: one before the hash and, unless it refuses, one after.
+	passwordCheck := func(t *testing.T, reads ...domain.UserPasswordFailures) (*mocks.MockAllStatements, *cryptomock.MockHashVerifier, service.AuthAttemptService, *[]checkEvent) {
 		ctrl := gomock.NewController(t)
 		verifier := cryptomock.NewMockHashVerifier(ctrl)
-		var succeededFactor domain.AuthFactor
 		stmts := mocks.NewMockAllStatements(ctrl)
+		var events []checkEvent
+		// Ahead of the helper's catch-all, so this one sees the events.
+		stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, ev *domain.Event) error {
+			var payload domain.AuthCheckPayload
+			require.NoError(t, json.Unmarshal(ev.Payload, &payload))
+			events = append(events, checkEvent{Type: ev.EventType, Payload: payload})
+			return nil
+		}).AnyTimes()
 		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
 			return newPasswordChallengeAttempt(), nil
 		})
-		stmts.EXPECT().GetUserPassword(gomock.Any(), gomock.Any()).Return(&domain.UserPassword{
-			ProjectID:   "proj",
-			UserID:      "user-1",
-			EncodedHash: "encoded",
-		}, nil)
+		stmts.EXPECT().LockUserPassword(gomock.Any(), "proj", "user-1").Return(password, nil).Times(len(reads))
+		stmts.EXPECT().GetUserPasswordFailures(gomock.Any(), "proj", "user-1", gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, since time.Time) (domain.UserPasswordFailures, error) {
+			assert.WithinDuration(t, domain.UserPasswordFailuresSince(time.Now()), since, time.Minute)
+			failures := reads[0]
+			reads = reads[1:]
+			return failures, nil
+		}).Times(len(reads))
+		return stmts, verifier, newAuthAttemptSvcWithVerifier(ctrl, stmts, nil, nil, verifier), &events
+	}
+	submit := func(t *testing.T, svc service.AuthAttemptService, password string) (*domain.AuthAttempt, error) {
+		return svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-pass",
+			Proof: service.PasswordProof{Password: password},
+		})
+	}
+	passwordEvent := func(typ domain.EventType) checkEvent {
+		return checkEvent{Type: typ, Payload: domain.AuthCheckPayload{
+			CheckID: "ch-pass", CheckType: domain.AuthCheckTypePassword.String(), AuthAttemptID: "att-1", UserID: "user-1",
+		}}
+	}
+
+	t.Run("correct password succeeds and emits the success that ends the failures", func(t *testing.T) {
+		recent := domain.UserPasswordFailures{Count: 2, LastFailedAt: time.Now().Add(-time.Minute)}
+		stmts, verifier, svc, events := passwordCheck(t, recent, recent)
 		verifier.EXPECT().VerifyHash("encoded", "secret").Return(nil)
+		var succeededFactor domain.AuthFactor
 		stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, factor domain.AuthFactor, _ string) error {
 			succeededFactor = factor
 			return nil
 		})
 
-		svc := newAuthAttemptSvcWithVerifier(ctrl, stmts, nil, nil, verifier)
-		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
-			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-pass",
-			Proof: service.PasswordProof{Password: "secret"},
-		})
-
+		got, err := submit(t, svc, "secret")
 		require.NoError(t, err)
 		require.NotNil(t, got)
 		assert.IsType(t, &domain.AuthFactorPassword{}, succeededFactor)
+		assert.Equal(t, []checkEvent{passwordEvent(domain.EventTypeAuthCheckSucceeded)}, *events)
+	})
+
+	t.Run("wrong password records its failure once, for the user", func(t *testing.T) {
+		stmts, verifier, svc, events := passwordCheck(t, domain.UserPasswordFailures{}, domain.UserPasswordFailures{})
+		verifier.EXPECT().VerifyHash("encoded", "wrong").Return(errors.New("mismatch"))
+		stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), "proj", "att-1", gomock.Any()).Return(nil).Times(1)
+
+		_, err := submit(t, svc, "wrong")
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptProofRejected(nil))
+		assert.ErrorIs(t, err, domain.ErrUserPasswordInvalid())
+		assert.Equal(t, []checkEvent{passwordEvent(domain.EventTypeAuthCheckFailed)}, *events)
+	})
+
+	t.Run("rate limited password is rejected without being checked or recorded", func(t *testing.T) {
+		_, _, svc, events := passwordCheck(t, domain.UserPasswordFailures{
+			Count: domain.UserPasswordFreeFailures + 1, LastFailedAt: time.Now(),
+		})
+
+		_, err := submit(t, svc, "secret")
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptProofRejected(nil))
+		assert.ErrorIs(t, err, domain.ErrUserPasswordRateLimited())
+		assert.Empty(t, *events, "a refusal must not count as a failure")
+	})
+
+	t.Run("failures recorded during the hash refuse even a correct password", func(t *testing.T) {
+		_, verifier, svc, events := passwordCheck(t, domain.UserPasswordFailures{}, domain.UserPasswordFailures{
+			Count: domain.UserPasswordFreeFailures + 1, LastFailedAt: time.Now(),
+		})
+		verifier.EXPECT().VerifyHash("encoded", "secret").Return(nil)
+
+		_, err := submit(t, svc, "secret")
+		assert.ErrorIs(t, err, domain.ErrUserPasswordRateLimited())
+		assert.Empty(t, *events, "a refusal must not count as a failure")
+	})
+
+	t.Run("a failure that cannot be recorded with the check is recorded after it", func(t *testing.T) {
+		stmts, verifier, svc, _ := passwordCheck(t, domain.UserPasswordFailures{}, domain.UserPasswordFailures{})
+		verifier.EXPECT().VerifyHash("encoded", "wrong").Return(errors.New("mismatch"))
+		gomock.InOrder(
+			stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("write failed")),
+			stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil),
+		)
+
+		_, err := submit(t, svc, "wrong")
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptProofRejected(nil))
 	})
 
 	t.Run("missing password returns proof rejected and records failure", func(t *testing.T) {
@@ -730,21 +809,30 @@ func TestAuthAttemptService_VerifyProof_Password(t *testing.T) {
 		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
 			return newPasswordChallengeAttempt(), nil
 		})
-		stmts.EXPECT().GetUserPassword(gomock.Any(), gomock.Any()).Return(nil, lookupErr)
+		stmts.EXPECT().LockUserPassword(gomock.Any(), "proj", "user-1").Return(nil, lookupErr)
 		stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, c domain.AuthChallenge) error {
 			failedChallenge = c
 			return nil
 		})
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
-		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
-			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-pass",
-			Proof: service.PasswordProof{Password: "secret"},
-		})
-
+		got, err := submit(t, newAuthAttemptSvc(ctrl, stmts, nil, nil), "secret")
 		assert.Nil(t, got)
 		assert.ErrorIs(t, err, domain.ErrAuthAttemptProofRejected(lookupErr))
 		assert.IsType(t, &domain.AuthChallengePassword{}, failedChallenge)
+	})
+
+	t.Run("failures that cannot be read reject the check", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return newPasswordChallengeAttempt(), nil
+		})
+		stmts.EXPECT().LockUserPassword(gomock.Any(), gomock.Any(), gomock.Any()).Return(password, nil)
+		stmts.EXPECT().GetUserPasswordFailures(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(domain.UserPasswordFailures{}, errors.New("read failed"))
+		stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+
+		_, err := submit(t, newAuthAttemptSvc(ctrl, stmts, nil, nil), "secret")
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptProofRejected(nil))
 	})
 }
 

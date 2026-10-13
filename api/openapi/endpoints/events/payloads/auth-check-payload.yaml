@@ -5,6 +5,7 @@ description: |
   `auth.sso.authorization.failed`, and `auth.sso.exchange.failed` /
   `auth.sso.exchange.succeeded`.
   `auth_attempt_id` joins the check to its attempt for SIEM correlation.
+  `user_id` is the user the attempt is pinned to, when it is.
 required:
   - check_id
 properties:
@@ -13,4 +14,6 @@ properties:
   check_type:
     type: string
   auth_attempt_id:
+    type: string
+  user_id:
     type: string
