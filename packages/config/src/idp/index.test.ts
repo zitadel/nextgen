@@ -7,7 +7,6 @@ import {
   parseProviderSelection,
   providerOf,
   selectionName,
-  selectionSlug,
   type CatalogProviderId,
 } from "./index.js";
 import { displayName, issuer, slug } from "./test-support.js";
@@ -52,7 +51,7 @@ describe("a provider selection", () => {
 
     expect(selection).toEqual({ kind: "catalog", id: "google" });
     expect(selection && selectionName(selection)).toBe("google");
-    expect(selection && selectionSlug(selection)).toBe("google");
+    expect(selection && providerOf(selection).slug).toBe("google");
     expect(selection && providerOf(selection)).toBeInstanceOf(GoogleProvider);
   });
 
@@ -61,7 +60,7 @@ describe("a provider selection", () => {
 
     expect(selection).toEqual({ kind: "custom", connection: acme });
     expect(selection && selectionName(selection)).toBe("custom");
-    expect(selection && selectionSlug(selection)).toBe("acme-sso");
+    expect(selection && providerOf(selection).slug).toBe("acme-sso");
     expect(selection && providerOf(selection).displayName).toBe("Acme SSO");
   });
 

@@ -828,3 +828,25 @@ describe("refusing a document the editors would overwrite", () => {
     ]);
   });
 });
+
+describe("a step the server rewrote without its empty fields", () => {
+  it("is still the step the generator wrote, so the next provider reaches it", () => {
+    const methods = { password: false, passkey: true };
+    const first = applySsoToFlow(shippedFlow(), slug("google"), methods);
+    const written = JSON.parse(JSON.stringify(first.document)) as {
+      steps: { name: string; fields?: unknown[] }[];
+    };
+    const conflict = written.steps.find((step) => step.name === "sso-conflict");
+    if (conflict === undefined) {
+      throw new Error("the flow has no sso-conflict step");
+    }
+    if (Array.isArray(conflict.fields) && conflict.fields.length === 0) {
+      delete conflict.fields;
+    }
+
+    const { document, skipped } = applySsoToFlow(written, slug("acme-sso"), methods);
+
+    expect(skipped.map((entry) => entry.region)).not.toContain("steps.sso-conflict");
+    expect(stepNamed(document, "sso-conflict").sso_providers).toEqual(["google", "acme-sso"]);
+  });
+});

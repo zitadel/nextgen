@@ -44,6 +44,7 @@ import {
 import { detectHealthyLocalServer } from "../../../../src/lib/local-server/runtime";
 
 import {
+  askCustomSettings,
   DevPortPrompt,
   FrameworkConfirmPrompt,
   PickFrameworkPrompt,
@@ -623,6 +624,42 @@ describe("SocialSignInPrompt", () => {
 
     await expect(new SocialSignInPrompt().ask(baseAnswers(), ctx)).rejects.toMatchObject({
       code: "E_VALIDATION",
+    });
+  });
+});
+
+describe("askCustomSettings", () => {
+  beforeEach(() => {
+    vi.mocked(text).mockReset();
+  });
+
+  it("asks for nothing when every setting was given", async () => {
+    const given = {
+      slug: "acme-sso",
+      displayName: "Acme SSO",
+      issuer: "https://sso.acme.example",
+      scopes: "openid",
+    };
+
+    expect(await askCustomSettings(given)).toEqual(given);
+    expect(text).not.toHaveBeenCalled();
+  });
+
+  it("asks only for the settings that were left out", async () => {
+    vi.mocked(text).mockResolvedValueOnce("Acme SSO" as never);
+    vi.mocked(text).mockResolvedValueOnce("openid groups" as never);
+
+    const values = await askCustomSettings({
+      slug: "acme-sso",
+      issuer: "https://sso.acme.example",
+    });
+
+    expect(vi.mocked(text)).toHaveBeenCalledTimes(2);
+    expect(values).toEqual({
+      slug: "acme-sso",
+      displayName: "Acme SSO",
+      issuer: "https://sso.acme.example",
+      scopes: "openid groups",
     });
   });
 });

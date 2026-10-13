@@ -164,7 +164,6 @@ describe("sso enable", () => {
   });
 
   it("warns when the schema defines nothing the provider maps, so the connection has no mapping", async () => {
-    // plan refuses a connection that fills nothing; the developer should hear it here.
     const cwd = await makeProject({
       "default-human-user": {
         properties: { staffNumber: { type: "string" } },

@@ -141,24 +141,35 @@ function credentialOf(
  * slug-derived name would store the credential where the connection never
  * looks and report it as stored.
  */
-export function credentialVariablesOf(file: ConnectionFile, slug: ConnectionSlug): StoredVariables {
-  const scaffolded = credentialVariables(slug);
-  // A field absent from the file is where this command would have pointed it
-  // and will point it now. One holding a literal is the value itself: there is
-  // no variable behind it, and naming one would publish where the connection
-  // never looks. What a `client_id` field references is a client id's variable
-  // whatever it is called, which is what the brand records.
-  const stored = (field: "client_id" | "client_secret") => {
-    const value = credentialOf(file, field);
-    return value === undefined ? null : referencedVariable(value);
-  };
-  const id = stored("client_id");
-  const secret = stored("client_secret");
+export function credentialVariablesOf(
+  file: ConnectionFile,
+  slug: ConnectionSlug | undefined,
+): StoredVariables {
+  const scaffolded = slug === undefined ? undefined : credentialVariables(slug);
   return {
-    clientId: id === null ? scaffolded.clientId : (id as ClientIdVariable | undefined),
-    clientSecret:
-      secret === null ? scaffolded.clientSecret : (secret as ClientSecretVariable | undefined),
+    clientId: named(file, "client_id", scaffolded?.clientId),
+    clientSecret: named(file, "client_secret", scaffolded?.clientSecret),
   };
+}
+
+/**
+ * The variable a credential field names, as the type of its fallback.
+ *
+ * A field absent from the file is where this command would have pointed it and
+ * will point it now, so it reads as `fallback`, which is `undefined` when the
+ * caller has no slug to derive one from. A field holding a literal is the value
+ * itself: there is no variable behind it, and naming one would publish where
+ * the connection never looks. Whatever a `client_id` field references is a
+ * client id's variable, whatever it is called, which is what the brand records;
+ * the type parameter keeps the two credentials from being swapped.
+ */
+function named<V extends string>(
+  file: ConnectionFile,
+  field: "client_id" | "client_secret",
+  fallback: V | undefined,
+): V | undefined {
+  const value = credentialOf(file, field);
+  return value === undefined ? fallback : (referencedVariable(value) as V | undefined);
 }
 
 /**
@@ -243,13 +254,13 @@ function refuseCollidingVariables(
     );
   }
   for (const file of files) {
-    // A file with no usable slug is not one this command could have written,
-    // and its variables cannot be derived.
-    const theirSlug = parseConnectionSlug(String(file.body.slug ?? ""));
-    if (file === except || !theirSlug.ok) {
+    if (file === except) {
       continue;
     }
-    const theirs = credentialVariablesOf(file, theirSlug.value);
+    // A file with no usable slug has no derived names, but what it references
+    // explicitly is still read, however its slug reads.
+    const theirSlug = parseConnectionSlug(String(file.body.slug ?? ""));
+    const theirs = credentialVariablesOf(file, theirSlug.ok ? theirSlug.value : undefined);
     // A literal on either side names no variable, so it cannot collide.
     const shared = [ours.clientId, ours.clientSecret].find(
       (name) => name !== undefined && (name === theirs.clientId || name === theirs.clientSecret),
@@ -259,7 +270,12 @@ function refuseCollidingVariables(
     }
     throw new ZitadelError("E_CONFLICT", `${file.path} and ${slug} both use ${shared}`, {
       hint: "Point one of them at a variable of its own, then run the command again.",
-      details: { file: file.path, slug, other_slug: theirSlug.value, variable: shared },
+      details: {
+        file: file.path,
+        slug,
+        other_slug: theirSlug.ok ? theirSlug.value : String(file.body.slug ?? ""),
+        variable: shared,
+      },
     });
   }
 }
@@ -285,6 +301,8 @@ export type ConnectionPlan =
       readonly name: string;
       readonly path: string;
       readonly slug: ConnectionSlug;
+      /** Files that already connect to this provider's issuer under another slug. */
+      readonly alsoUsesIssuer?: readonly string[];
     };
 
 /**
@@ -356,15 +374,26 @@ function planCatalogConnection(options: {
   if (occupied !== undefined) {
     throw new ZitadelError(
       "E_CONFLICT",
-      `${path} already exists and is not a ${entry.displayName} connection`,
+      `${path} already exists and its slug is ${String(occupied.body.slug ?? "missing")}, not ${slug}`,
       {
-        hint: "Rename or remove that file, then run the command again.",
-        details: { file: path },
+        hint: `Rename or remove that file, or give it the slug ${slug} if it is the ${entry.displayName} connection, then run the command again.`,
+        details: { file: path, slug: occupied.body.slug ?? null },
       },
     );
   }
   refuseCollidingVariables(credentialVariables(slug), slug, options.files);
-  return { action: "create", name, path, slug };
+  // A hand-written connection to the same issuer under another slug is not
+  // claimed, so this adds a second button for the provider. Say so.
+  const alsoUsesIssuer = options.files
+    .filter((file) => isObject(file.body.oidc) && file.body.oidc.issuer === entry.issuer)
+    .map((file) => file.path);
+  return {
+    action: "create",
+    name,
+    path,
+    slug,
+    ...(alsoUsesIssuer.length > 0 ? { alsoUsesIssuer } : {}),
+  };
 }
 
 /**
@@ -453,16 +482,14 @@ function planCustomConnection(options: {
   const oidc = match.body.oidc;
   const existingIssuer =
     isObject(oidc) && typeof oidc.issuer === "string" ? oidc.issuer : undefined;
-  // A trailing slash is not a different provider.
-  const trimmed = (url: string) => url.trim().replace(/\/+$/, "");
-  if (existingIssuer === undefined || trimmed(existingIssuer) !== trimmed(issuer)) {
+  if (existingIssuer !== issuer) {
     throw new ZitadelError(
       "E_CONFLICT",
       existingIssuer === undefined
         ? `${match.path} is already named ${slug} and is not an OIDC connection to ${issuer}`
         : `${match.path} is already named ${slug} and connects to ${existingIssuer}, not ${issuer}`,
       {
-        hint: "Choose another --slug for this connection, or edit that file if it is the one you mean.",
+        hint: "An applied connection keeps its issuer, and the server compares it exactly, so even a trailing slash names another provider. Choose another --slug for this connection, then move the schemas and flows that name the old one to it.",
         details: { file: match.path, slug, issuer, existing_issuer: existingIssuer ?? null },
       },
     );

@@ -1,4 +1,4 @@
-import { multiselect, note, password, text } from "@clack/prompts";
+import { multiselect, note } from "@clack/prompts";
 
 import {
   credentialVariables,
@@ -22,15 +22,53 @@ import {
   type ProviderSelection,
   providerOf,
   selectionName,
-  selectionSlug,
   validated,
 } from "@zitadel/config/idp";
 
-import { askConnectionEndpoints, callbackUriFor } from "../../../lib/idp";
+import { askConnectionEndpoints, callbackUriFor, type CustomFlagValues } from "../../../lib/idp";
+import { askParsed } from "../../../lib/prompt-cancel";
 import { issuerFromPort } from "../../../lib/orca";
 
 import { bail } from "./cancel";
 import type { PromptContext, SetupAnswers, SetupPrompt, SsoDraft } from "./types";
+
+/** One setup question whose answer must parse. */
+function ask<T>(
+  message: string,
+  parse: (value: string) => Parsed<T>,
+  options: { readonly secret?: boolean; readonly initialValue?: string } = {},
+): Promise<T> {
+  return askParsed({ message, parse, command: "Setup", ...options });
+}
+
+/**
+ * The settings of a custom connection, asking only for the ones not already
+ * given — the way `--preset` skips its own question and no other. A value that
+ * was given is returned as it came, for the caller to check against the flag
+ * that carried it. Each answer is checked against the contract the server
+ * enforces on apply, so a name or issuer it would refuse is refused where it
+ * was typed.
+ */
+export async function askCustomSettings(
+  given: CustomFlagValues,
+): Promise<Required<CustomFlagValues>> {
+  return {
+    slug:
+      given.slug ??
+      (await ask("Name for this connection (used in your configuration, e.g. acme-sso)", (value) =>
+        parseConnectionSlug(value, RESERVED_SLUGS),
+      )),
+    displayName:
+      given.displayName ??
+      (await ask("Name shown on the sign-in button (e.g. Acme SSO)", parseDisplayName)),
+    issuer: given.issuer ?? (await ask("Issuer URL of the provider", parseIssuer)),
+    scopes:
+      given.scopes ??
+      (
+        await ask("Scopes to request", parseScopes, { initialValue: DEFAULT_SCOPES.join(" ") })
+      ).join(" "),
+  };
+}
 
 /**
  * "Add social sign-in providers?" — the one onboarding question that needs
@@ -92,11 +130,11 @@ export class SocialSignInPrompt implements SetupPrompt {
 
       const clientId =
         flagged?.credentials.clientId ??
-        (await this.prompt(`Client ID (${entry.displayName})`, parseClientId));
+        (await ask(`Client ID (${entry.displayName})`, parseClientId));
       const secret =
         flagged?.credentials.secret ??
-        (await this.prompt(
-          `Client secret (published to the project as ${credentialVariables(selectionSlug(selection)).clientSecret})`,
+        (await ask(
+          `Client secret (published to the project as ${credentialVariables(providerOf(selection).slug).clientSecret})`,
           parseClientSecret,
           { secret: true },
         ));
@@ -164,54 +202,14 @@ export class SocialSignInPrompt implements SetupPrompt {
     );
   }
 
-  /**
-   * Describe a custom connection: what the developer calls it, what the button
-   * says, where the provider is, and what to ask it for. Each answer is checked
-   * against the contract the server enforces on apply, so a name or issuer it
-   * would refuse is refused here, where it was typed.
-   */
+  /** Describe a custom connection from scratch: nothing was given on the command line. */
   private async askCustom(): Promise<CustomOidcInput> {
+    const values = await askCustomSettings({});
     return {
-      slug: await this.prompt(
-        "Name for this connection (used in your configuration, e.g. acme-sso)",
-        (value) => parseConnectionSlug(value, RESERVED_SLUGS),
-      ),
-      displayName: await this.prompt(
-        "Name shown on the sign-in button (e.g. Acme SSO)",
-        parseDisplayName,
-      ),
-      issuer: await this.prompt("Issuer URL of the provider", parseIssuer),
-      scopes: await this.prompt("Scopes to request", parseScopes, {
-        initialValue: DEFAULT_SCOPES.join(" "),
-      }),
+      slug: validated(parseConnectionSlug(values.slug, RESERVED_SLUGS)),
+      displayName: validated(parseDisplayName(values.displayName)),
+      issuer: validated(parseIssuer(values.issuer)),
+      scopes: validated(parseScopes(values.scopes)),
     };
-  }
-
-  /**
-   * One question whose answer must parse. The prompt shows what is wrong with
-   * an answer as it is typed and does not accept one that does not parse, so
-   * what comes back is the parsed value and not text to check again.
-   *
-   * Required, not skippable, which matters most for the credentials: by this
-   * point the developer has chosen a provider and registered an OAuth
-   * application for it, and a connection without the secret is a button that
-   * fails at the provider with `invalid_client`, long after setup reported
-   * success. "Not now" is answered by declining the provider, which costs
-   * nothing — `sso enable` adds it later.
-   */
-  private async prompt<T>(
-    message: string,
-    parse: (value: string) => Parsed<T>,
-    options: { readonly secret?: boolean; readonly initialValue?: string } = {},
-  ): Promise<T> {
-    const validate = (value: string | undefined) => {
-      const parsed = parse(value ?? "");
-      return parsed.ok ? undefined : parsed.problem;
-    };
-    const answer = options.secret
-      ? await password({ message, validate })
-      : await text({ message, validate, initialValue: options.initialValue });
-    bail(answer);
-    return validated(parse(String(answer)));
   }
 }

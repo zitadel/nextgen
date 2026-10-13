@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { ZitadelError } from "../../../../src/lib/errors";
-import { customFlagText, selectionFromFlags } from "../../../../src/lib/idp";
+import {
+  customFlagText,
+  customFlagValues,
+  ENABLE_FLAG_NAMES,
+  givenCustomFlags,
+  loopbackIssuerWarning,
+  SETUP_FLAG_NAMES,
+  selectionFromFlags,
+} from "../../../../src/lib/idp";
 import { displayName, issuer, slug } from "../../../helpers/idp-values";
 
 const flag = {
@@ -149,5 +157,62 @@ describe("customFlagText", () => {
     ).toBe(
       "--slug acme-sso --display-name 'Acme'\\''s SSO; rm -rf' --issuer https://sso.acme.example --scopes 'openid email'",
     );
+  });
+});
+
+describe("customFlagValues", () => {
+  it("reads the settings under either prefix", () => {
+    expect(
+      customFlagValues({ slug: "a", "display-name": "A", issuer: "https://a.example" }, ""),
+    ).toEqual({
+      slug: "a",
+      displayName: "A",
+      issuer: "https://a.example",
+      scopes: undefined,
+    });
+    expect(customFlagValues({ "sso-slug": "a", "sso-scopes": "openid" }, "sso-")).toEqual({
+      slug: "a",
+      displayName: undefined,
+      issuer: undefined,
+      scopes: "openid",
+    });
+  });
+
+  it("ignores a value that is not text", () => {
+    expect(customFlagValues({ slug: 3 }, "").slug).toBeUndefined();
+  });
+});
+
+describe("givenCustomFlags", () => {
+  it("names the settings that were given, as the command spells them", () => {
+    expect(givenCustomFlags({ slug: "a", scopes: "openid" }, SETUP_FLAG_NAMES)).toEqual([
+      "--sso-slug",
+      "--sso-scopes",
+    ]);
+  });
+
+  it("spells the same settings differently for the two commands", () => {
+    expect(ENABLE_FLAG_NAMES.issuer).toBe("--issuer");
+    expect(SETUP_FLAG_NAMES.issuer).toBe("--sso-issuer");
+  });
+});
+
+describe("loopbackIssuerWarning", () => {
+  it("warns about an issuer on this machine and names the allow list", () => {
+    const selection = selectionFromFlags(
+      "custom",
+      { ...valid, issuer: "http://localhost:9100" },
+      flag,
+      "e.g.",
+    );
+
+    expect(loopbackIssuerWarning(selection)).toContain("NEXTGEN_HTTPCLIENT_ALLOW_LIST");
+  });
+
+  it("says nothing about an issuer elsewhere or about a catalog provider", () => {
+    expect(
+      loopbackIssuerWarning(selectionFromFlags("custom", valid, flag, "e.g.")),
+    ).toBeUndefined();
+    expect(loopbackIssuerWarning(selectionFromFlags("google", {}, flag, "e.g."))).toBeUndefined();
   });
 });

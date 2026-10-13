@@ -494,6 +494,72 @@ describe("materializeSetupResources with a social provider", () => {
     expect(kept.mine).toBe(true);
   });
 
+  it("suggests enabling the provider that was chosen, not always Google", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, IDPS_DIR, "acme.json"),
+      JSON.stringify({ slug: "acme", oidc: { issuer: "https://sso.acme.example" } }),
+    );
+
+    const error = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: recordingClient(),
+      projectId: "project_123",
+      force: false,
+      sso: [{ selection: acmeSelection }],
+    }).catch((err: unknown) => err);
+
+    expect((error as { nextCommands?: string[] }).nextCommands?.[0]).toContain(
+      "--provider custom --slug acme",
+    );
+  });
+
+  it("refuses a connection another file already holds the slug of, before creating anything", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, IDPS_DIR, "elsewhere.json"),
+      JSON.stringify({ slug: "google", template: "google" }),
+    );
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: recordingClient(),
+        projectId: "project_123",
+        force: false,
+        sso: google,
+      }),
+    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+  });
+
+  it("refuses a custom connection whose variables another file would share", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, IDPS_DIR, "other.json"),
+      JSON.stringify({
+        slug: "other",
+        oidc: {
+          issuer: "https://other.example",
+          client_id: "${{ ACME_CLIENT_ID }}",
+          client_secret: "${{ OTHER_CLIENT_SECRET }}",
+        },
+      }),
+    );
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: recordingClient(),
+        projectId: "project_123",
+        force: false,
+        sso: [{ selection: acmeSelection }],
+      }),
+    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+  });
+
   it("creates the connection before the flow that names it", async () => {
     const client = recordingClient();
 

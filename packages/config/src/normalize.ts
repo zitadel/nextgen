@@ -57,14 +57,14 @@ function isEmptyAudience(value: unknown): boolean {
  * A flow step with what the platform fills in or drops on its way back
  * removed, so a step it rewrote reads as the one that was written.
  *
- * The server omits an action's `primary: false` (a default), and states
- * `gates` and `sso_providers` even when empty, which some builds write back as
- * `gates: {}` and `sso_providers: []`. Comparison only, like
+ * The server omits an action's `primary: false` (a default) and an empty
+ * `fields` list, and states `gates` and `sso_providers` even when empty, which
+ * some builds write back as `gates: {}` and `sso_providers: []`. Comparison only, like
  * {@link normalizeFlowBody}: the result is never uploaded or written to a file.
  */
 export function withoutFlowStepDefaults(step: object): object {
   const copy: Record<string, unknown> = { ...step };
-  for (const key of ["gates", "sso_providers"]) {
+  for (const key of ["fields", "gates", "sso_providers"]) {
     const value = copy[key];
     const empty = Array.isArray(value)
       ? value.length === 0

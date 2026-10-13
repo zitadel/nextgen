@@ -2,7 +2,6 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { Flags } from "@oclif/core";
-import { password, text } from "@clack/prompts";
 import { consola } from "consola";
 
 import {
@@ -26,7 +25,7 @@ import { createZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
 import { isErrno, ZitadelError } from "../../lib/errors";
 import { publicCliCommand } from "../../lib/public-cli";
-import { bailOnCancel } from "../../lib/prompt-cancel";
+import { askParsed } from "../../lib/prompt-cancel";
 import { stableStringify } from "../../lib/json";
 import {
   applySsoToFlow,
@@ -38,6 +37,9 @@ import {
   type ConnectionPlan,
   type FlowFile,
   credentialVariablesOf,
+  customFlagValues,
+  ENABLE_FLAG_NAMES,
+  loopbackIssuerWarning,
   planConnection,
   publishClientId,
   type PublishState,
@@ -134,28 +136,19 @@ export default class SsoEnable extends BaseCommand {
         hint: `Pass --provider, e.g. --provider ${IDP_PROVIDERS[0]}.`,
       });
     }
-    const customFlags = {
-      slug: flags.slug,
-      displayName: flags["display-name"],
-      issuer: flags.issuer,
-      scopes: flags.scopes,
-    };
-    const flagNames = {
-      provider: "--provider",
-      slug: "--slug",
-      displayName: "--display-name",
-      issuer: "--issuer",
-      scopes: "--scopes",
-    };
     // Checked before the Project is read, like the provider itself: a name or
     // issuer the server would refuse on apply is refused here, where it was typed.
     const selection = selectionFromFlags(
       provider,
-      customFlags,
-      flagNames,
+      customFlagValues(flags, ""),
+      ENABLE_FLAG_NAMES,
       "--provider custom --slug acme-sso --display-name 'Acme SSO' --issuer https://sso.acme.example",
     );
     const entry = providerOf(selection);
+    const loopback = loopbackIssuerWarning(selection);
+    if (loopback !== undefined) {
+      reportWarning(loopback);
+    }
 
     // The Project is read before anything is asked for: being turned away
     // after typing a secret would mean typing it again.
@@ -185,6 +178,11 @@ export default class SsoEnable extends BaseCommand {
     });
 
     const reusing = plan.action === "reuse";
+    if (plan.action === "create" && plan.alsoUsesIssuer !== undefined) {
+      reportWarning(
+        `${plan.alsoUsesIssuer.join(", ")} already connects to ${selectionName(selection)}'s issuer under another slug, so this adds a second ${selectionName(selection)} connection and button.`,
+      );
+    }
     if (plan.action === "reuse" && plan.notApplied !== undefined) {
       reportWarning(
         `${plan.file.path} already exists, so the ${plan.notApplied.join(" and ")} you gave ${plan.notApplied.length === 1 ? "was" : "were"} not applied. Edit the file to change ${plan.notApplied.length === 1 ? "it" : "them"}.`,
@@ -319,7 +317,7 @@ export default class SsoEnable extends BaseCommand {
       if (!("claim_mapping" in connection)) {
         reportWarning(
           `${schema.path} defines none of the properties ${entry.displayName} maps by default, so ${plan.path} has no claim_mapping ` +
-            `and no sign-in can fill a user. Add the properties your provider returns to claim_mapping in ${plan.path}; plan refuses the connection until then.`,
+            `and no sign-in can fill a user. Add the properties your provider returns to claim_mapping in ${plan.path}.`,
         );
       }
       if (endpoints?.issuer !== undefined && endpoints.issuer !== entry.issuer) {
@@ -548,15 +546,7 @@ export default class SsoEnable extends BaseCommand {
         hint: "Pass --client-id, or run without --non-interactive to be asked for it.",
       });
     }
-    const answer = await text({
-      message: "Client ID",
-      validate: (value) => {
-        const parsed = parseClientId(value ?? "");
-        return parsed.ok ? undefined : parsed.problem;
-      },
-    });
-    bailOnCancel(answer, "Enable");
-    return validated(parseClientId(String(answer)));
+    return askParsed({ message: "Client ID", parse: parseClientId, command: "Enable" });
   }
 
   /**
@@ -596,15 +586,12 @@ export default class SsoEnable extends BaseCommand {
       }
       return piped;
     }
-    const answer = await password({
+    return askParsed({
       message: `Client secret (published to the project as ${variable})`,
-      validate: (value) => {
-        const parsed = parseClientSecret(value ?? "");
-        return parsed.ok ? undefined : parsed.problem;
-      },
+      parse: parseClientSecret,
+      secret: true,
+      command: "Enable",
     });
-    bailOnCancel(answer, "Enable");
-    return validated(parseClientSecret(String(answer)));
   }
 }
 

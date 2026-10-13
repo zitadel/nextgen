@@ -2,6 +2,7 @@ import {
   CUSTOM_PROVIDER,
   type CustomOidcInput,
   IDP_PROVIDERS,
+  isLoopbackIssuer,
   RESERVED_SLUGS,
   parseConnectionSlug,
   parseDisplayName,
@@ -31,6 +32,60 @@ export type CustomFlagNames = {
   readonly scopes: string;
 };
 
+/** The flags on `sso enable`, which a failed setup suggests running instead. */
+export const ENABLE_FLAG_NAMES: CustomFlagNames = {
+  provider: "--provider",
+  slug: "--slug",
+  displayName: "--display-name",
+  issuer: "--issuer",
+  scopes: "--scopes",
+};
+
+/** The `--sso-*` flags on `setup` that describe the same settings. */
+export const SETUP_FLAG_NAMES: CustomFlagNames = {
+  provider: "--sso",
+  slug: "--sso-slug",
+  displayName: "--sso-display-name",
+  issuer: "--sso-issuer",
+  scopes: "--sso-scopes",
+};
+
+/** The warning a loopback issuer earns, or `undefined`: the server reaches only what its egress allow list permits. */
+export function loopbackIssuerWarning(selection: ProviderSelection): string | undefined {
+  return selection.kind === "custom" && isLoopbackIssuer(selection.connection.issuer)
+    ? `${selection.connection.issuer} is on this machine, and the server blocks requests to localhost unless NEXTGEN_HTTPCLIENT_ALLOW_LIST allows it, so sign-in will fail until it does.`
+    : undefined;
+}
+
+/** What a command's parsed flags say about a custom connection, whichever prefix they carry. */
+export function customFlagValues(
+  flags: Readonly<Record<string, unknown>>,
+  prefix: "" | "sso-",
+): CustomFlagValues {
+  const read = (name: string) => {
+    const value = flags[`${prefix}${name}`];
+    return typeof value === "string" ? value : undefined;
+  };
+  return {
+    slug: read("slug"),
+    displayName: read("display-name"),
+    issuer: read("issuer"),
+    scopes: read("scopes"),
+  };
+}
+
+/** The names of the custom settings that were given, as the command spells them. */
+export function givenCustomFlags(values: CustomFlagValues, flag: CustomFlagNames): string[] {
+  return [
+    [flag.slug, values.slug],
+    [flag.displayName, values.displayName],
+    [flag.issuer, values.issuer],
+    [flag.scopes, values.scopes],
+  ]
+    .filter(([, value]) => value !== undefined)
+    .map(([name]) => name as string);
+}
+
 /**
  * The provider a command line names, checked before anything else happens.
  *
@@ -48,14 +103,7 @@ export function selectionFromFlags(
   flag: CustomFlagNames,
   example: string,
 ): ProviderSelection {
-  const given = [
-    [flag.slug, values.slug],
-    [flag.displayName, values.displayName],
-    [flag.issuer, values.issuer],
-    [flag.scopes, values.scopes],
-  ]
-    .filter(([, value]) => value !== undefined)
-    .map(([name]) => name);
+  const given = givenCustomFlags(values, flag);
 
   if (provider !== CUSTOM_PROVIDER) {
     // A catalog provider knows its own name, issuer and scopes, so a setting

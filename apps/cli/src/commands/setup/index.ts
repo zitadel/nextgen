@@ -21,7 +21,6 @@ import {
   type ProviderSelection,
   providerOf,
   selectionName,
-  selectionSlug,
   type ConnectionSlug,
 } from "@zitadel/config/idp";
 import { consola } from "consola";
@@ -40,12 +39,17 @@ import {
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import {
   customFlagText,
+  customFlagValues,
+  ENABLE_FLAG_NAMES,
+  givenCustomFlags,
+  loopbackIssuerWarning,
   publishClientId,
   type PublishState,
   selectionFromFlags,
   reportClientIdOutcome,
   reportSecretOutcome,
   republishCommands,
+  SETUP_FLAG_NAMES,
   storeClientSecret,
   type SecretOutcome,
   type SecretPublisher,
@@ -81,6 +85,7 @@ import {
 } from "../../lib/setup-resources";
 import { installDependenciesForSetup } from "./install";
 import {
+  askCustomSettings,
   PickFrameworkPrompt,
   SETUP_PROMPTS,
   type SetupAnswers,
@@ -206,6 +211,21 @@ export default class Setup extends BaseCommand {
     // Before toMeta and before anything touches the server or the disk.
     if (flags.design !== undefined) {
       throw setupDesignRemovedError(this.config.version);
+    }
+    // The command line's own mistakes come before anything that can fail for
+    // another reason, so a slug the server would refuse is named even when the
+    // server is down. A custom connection whose settings the wizard will ask for
+    // is checked once they are all there.
+    const customValues = customFlagValues(flags, "sso-");
+    const settingsGiven =
+      customValues.slug !== undefined &&
+      customValues.displayName !== undefined &&
+      customValues.issuer !== undefined;
+    if (
+      flags.sso !== undefined &&
+      (flags.sso !== CUSTOM_PROVIDER || settingsGiven || flags["non-interactive"])
+    ) {
+      selectionFromFlags(flags.sso, customValues, SETUP_FLAG_NAMES, SSO_CUSTOM_EXAMPLE);
     }
     try {
       await this.toMeta(flags);
@@ -483,7 +503,7 @@ export default class Setup extends BaseCommand {
       const publish = ssoCredentialPublisher(answers.server, project);
       // Only here do both credentials have to exist, and the type says so.
       for (const answer of completeSso(answers.sso)) {
-        const slug = selectionSlug(answer.selection);
+        const slug = providerOf(answer.selection).slug;
         const { clientId: idVariable, clientSecret: variable } = credentialVariables(slug);
         const clientId = await publishClientId({
           name: idVariable,
@@ -726,7 +746,7 @@ export default class Setup extends BaseCommand {
         // when none was. An agent reading this needs to know which provider a
         // deferred publish belongs to, so the outcomes stay per entry.
         sso: answers.sso.map((answer) => {
-          const slug = selectionSlug(answer.selection);
+          const slug = providerOf(answer.selection).slug;
           const outcome = ssoOutcomes.get(slug);
           return {
             provider: selectionName(answer.selection),
@@ -755,7 +775,7 @@ export default class Setup extends BaseCommand {
         next_commands: [
           ...republishCommands(
             answers.sso.flatMap((answer) => {
-              const slug = selectionSlug(answer.selection);
+              const slug = providerOf(answer.selection).slug;
               const outcome = ssoOutcomes.get(slug);
               return [
                 {
@@ -846,23 +866,9 @@ function dryRunProject(issuer: string): CreateProject201 {
   };
 }
 
-/** The same flags on `sso enable`, for the commands a failed setup suggests running instead. */
-const ENABLE_FLAG_NAMES = {
-  provider: "--provider",
-  slug: "--slug",
-  displayName: "--display-name",
-  issuer: "--issuer",
-  scopes: "--scopes",
-} as const;
-
-/** The `--sso-*` flags that describe a custom connection, as the shared checks name them. */
-const SSO_FLAG_NAMES = {
-  provider: "--sso",
-  slug: "--sso-slug",
-  displayName: "--sso-display-name",
-  issuer: "--sso-issuer",
-  scopes: "--sso-scopes",
-} as const;
+/** What a command line describing a custom connection looks like, for an error to show. */
+const SSO_CUSTOM_EXAMPLE =
+  "--sso custom --sso-slug acme-sso --sso-display-name 'Acme SSO' --sso-issuer https://sso.acme.example";
 
 /**
  * The provider a scripted run asked for, or `undefined` when it asked for
@@ -891,26 +897,14 @@ async function ssoFromFlags(
   nonInteractive: boolean,
   dryRun: boolean,
 ): Promise<SsoDraft | undefined> {
-  const customValues = {
-    slug: flags["sso-slug"],
-    displayName: flags["sso-display-name"],
-    issuer: flags["sso-issuer"],
-    scopes: flags["sso-scopes"],
-  };
+  const customValues = customFlagValues(flags, "sso-");
   if (flags.sso === undefined) {
     if (flags["sso-client-id"] !== undefined) {
       throw new ZitadelError("E_VALIDATION", "--sso-client-id needs --sso", {
         hint: "Name the provider with --sso, e.g. --sso google.",
       });
     }
-    const given = [
-      [SSO_FLAG_NAMES.slug, customValues.slug],
-      [SSO_FLAG_NAMES.displayName, customValues.displayName],
-      [SSO_FLAG_NAMES.issuer, customValues.issuer],
-      [SSO_FLAG_NAMES.scopes, customValues.scopes],
-    ]
-      .filter(([, value]) => value !== undefined)
-      .map(([name]) => name);
+    const given = givenCustomFlags(customValues, SETUP_FLAG_NAMES);
     if (given.length > 0) {
       throw new ZitadelError("E_VALIDATION", `${given.join(", ")} needs --sso ${CUSTOM_PROVIDER}`, {
         hint: `Name the provider with --sso ${CUSTOM_PROVIDER}.`,
@@ -921,12 +915,20 @@ async function ssoFromFlags(
   // Described before the credentials are asked for, and before a Project is
   // created: a name or issuer the server would refuse is a mistake in the
   // command line.
+  // An interactive run asks for the custom settings it was not given, the way
+  // it asks for a client id: `--sso` skips the question it answers and no other.
   const selection = selectionFromFlags(
     flags.sso,
-    customValues,
-    SSO_FLAG_NAMES,
-    "--sso custom --sso-slug acme-sso --sso-display-name 'Acme SSO' --sso-issuer https://sso.acme.example",
+    flags.sso === CUSTOM_PROVIDER && !nonInteractive
+      ? await askCustomSettings(customValues)
+      : customValues,
+    SETUP_FLAG_NAMES,
+    SSO_CUSTOM_EXAMPLE,
   );
+  const loopback = loopbackIssuerWarning(selection);
+  if (loopback !== undefined) {
+    reportWarning(loopback);
+  }
   const clientId =
     flags["sso-client-id"] === undefined ? undefined : parseClientId(flags["sso-client-id"]);
   if (clientId === undefined || !clientId.ok) {
@@ -1037,7 +1039,7 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
     // A custom connection is nothing without its description, and none of it is
     // a credential, so unlike the client id it travels in the command.
     if (firstSso.kind === "custom") {
-      parts.push(customFlagText(firstSso.connection, SSO_FLAG_NAMES));
+      parts.push(customFlagText(firstSso.connection, SETUP_FLAG_NAMES));
     }
   }
   // `--non-interactive` is dropped when a provider is being configured: that
@@ -1088,13 +1090,8 @@ function retryOptionsFromFlags(flags: {
     try {
       selection = selectionFromFlags(
         flags.sso,
-        {
-          slug: flags["sso-slug"],
-          displayName: flags["sso-display-name"],
-          issuer: flags["sso-issuer"],
-          scopes: flags["sso-scopes"],
-        },
-        SSO_FLAG_NAMES,
+        customFlagValues(flags, "sso-"),
+        SETUP_FLAG_NAMES,
         "",
       );
     } catch {
@@ -1167,7 +1164,7 @@ function ssoRecovery(
   }
   return {
     hint:
-      `The rerun configures ${chosen[0] ? selectionSlug(chosen[0]) : ""} only; add the rest with the sso enable ` +
+      `The rerun configures ${chosen[0] ? providerOf(chosen[0]).slug : ""} only; add the rest with the sso enable ` +
       "commands below, which ask for each client id. ",
     // The client id is not interpolated into the command. These strings are
     // run verbatim, especially by agents, and nothing escapes them for a
@@ -1427,7 +1424,7 @@ function buildSummary(opts: {
     customizeRows.push({
       label: "Social sign-in",
       value: providerOf(answer.selection).displayName,
-      secondary: stylePath(`.zitadel/idps/${selectionSlug(answer.selection)}.json`),
+      secondary: stylePath(`.zitadel/idps/${providerOf(answer.selection).slug}.json`),
     });
   }
 

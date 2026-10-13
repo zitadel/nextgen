@@ -1,4 +1,5 @@
 import { ISSUER_REQUIREMENT, isSupportedIssuer } from "./issuer.js";
+import { connectionLimits } from "./meta.js";
 
 /**
  * The values a connection is made of, as types the compiler tells apart.
@@ -66,7 +67,9 @@ const ok = <T>(value: T): Parsed<T> => ({ ok: true, value });
 const refuse = <T>(problem: string): Parsed<T> => ({ ok: false, problem });
 
 /** The shape a slug must have, as `idp-connection.json` states it. */
-const SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
+const SLUG_PATTERN = new RegExp(connectionLimits.slug.pattern ?? "^$");
+const SLUG_MAX = connectionLimits.slug.maxLength ?? 0;
+const DISPLAY_NAME_MAX = connectionLimits.displayName.maxLength ?? 0;
 
 /**
  * A connection slug, or what is wrong with the text.
@@ -79,9 +82,9 @@ export function parseConnectionSlug(
   reserved: readonly string[] = [],
 ): Parsed<ConnectionSlug> {
   const trimmed = value.trim();
-  if (!SLUG_PATTERN.test(trimmed) || trimmed.length > 64) {
+  if (!SLUG_PATTERN.test(trimmed) || trimmed.length > SLUG_MAX) {
     return refuse(
-      'Use lowercase letters, digits, "-" and "_", starting with a letter or digit, at most 64 characters.',
+      `Use lowercase letters, digits, "-" and "_", starting with a letter or digit, at most ${SLUG_MAX} characters.`,
     );
   }
   if (reserved.includes(trimmed)) {
@@ -96,7 +99,9 @@ export function parseDisplayName(value: string): Parsed<DisplayName> {
   if (trimmed === "") {
     return refuse("Enter the name shown on the sign-in button.");
   }
-  return trimmed.length > 256 ? refuse("Use at most 256 characters.") : ok(trimmed as DisplayName);
+  return trimmed.length > DISPLAY_NAME_MAX
+    ? refuse(`Use at most ${DISPLAY_NAME_MAX} characters.`)
+    : ok(trimmed as DisplayName);
 }
 
 /** An issuer the server accepts: https anywhere, or http on loopback for a stand-in. */

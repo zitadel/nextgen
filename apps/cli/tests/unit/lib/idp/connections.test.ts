@@ -76,7 +76,68 @@ describe("readConnectionFiles with a file that is not JSON", () => {
   });
 });
 
+describe("credentialVariablesOf", () => {
+  it("reads what the file references, and derives nothing without a slug", () => {
+    const bare = file("x.json", { oidc: { issuer: "https://x.example" } });
+
+    expect(credentialVariablesOf(bare, undefined)).toEqual({
+      clientId: undefined,
+      clientSecret: undefined,
+    });
+  });
+
+  it("falls back to the derived names for a field the file leaves out", () => {
+    const bare = file("x.json", { oidc: { issuer: "https://x.example" } });
+
+    expect(credentialVariablesOf(bare, slug("acme"))).toEqual({
+      clientId: "ACME_CLIENT_ID",
+      clientSecret: "ACME_CLIENT_SECRET",
+    });
+  });
+});
+
 describe("planConnection", () => {
+  it("still checks the variables a file with an unusable slug references", () => {
+    const okta = file("okta.json", {
+      slug: "Okta",
+      oidc: {
+        issuer: "https://acme.okta.com",
+        client_id: "${{ OKTA_CLIENT_ID }}",
+        client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+      },
+    });
+
+    expect(() => planConnection({ selection: googleSelection, files: [okta] })).toThrow(
+      expect.objectContaining({ code: "E_CONFLICT" }),
+    );
+  });
+
+  it("says when a hand-written connection already uses the provider's issuer under another slug", () => {
+    const other = file(
+      "google-work.json",
+      googleBody({ slug: "google-work", template: undefined }),
+    );
+
+    expect(
+      planConnection({
+        selection: googleSelection,
+        files: [
+          {
+            ...other,
+            body: {
+              ...other.body,
+              oidc: {
+                issuer: "https://accounts.google.com",
+                client_id: "${{ WORK_CLIENT_ID }}",
+                client_secret: "${{ WORK_CLIENT_SECRET }}",
+              },
+            },
+          },
+        ],
+      }),
+    ).toMatchObject({ action: "create", alsoUsesIssuer: [`${IDPS_DIR}/google-work.json`] });
+  });
+
   it("creates google.json when the project has no google connection", () => {
     const plan = planConnection({ selection: googleSelection, files: [] });
     expect(plan).toEqual({
@@ -181,7 +242,7 @@ describe("planConnection", () => {
       expect.unreachable("should have thrown");
     } catch (error) {
       expect((error as ZitadelError).code).toBe("E_CONFLICT");
-      expect((error as ZitadelError).message).toContain("not a Google connection");
+      expect((error as ZitadelError).message).toContain("already exists");
     }
   });
 
@@ -440,13 +501,22 @@ describe("planConnection for a custom connection", () => {
     });
   });
 
-  it("does not take a trailing slash for a different issuer", () => {
+  it("takes a trailing slash for a different issuer, as the server does", () => {
     const existing = file("acme-sso.json", acmeBody());
     const input = { ...acme, issuer: issuer("https://sso.acme.example/") };
 
-    expect(planConnection({ selection: custom(input), files: [existing] })).toMatchObject({
-      action: "reuse",
-    });
+    expect(() => planConnection({ selection: custom(input), files: [existing] })).toThrow(
+      expect.objectContaining({ code: "E_CONFLICT" }),
+    );
+  });
+
+  it("points a refused issuer at a new slug, because an applied connection keeps its issuer", () => {
+    const existing = file("acme-sso.json", acmeBody());
+    const input = { ...acme, issuer: issuer("https://sso.other.example") };
+
+    expect(() => planConnection({ selection: custom(input), files: [existing] })).toThrow(
+      expect.objectContaining({ hint: expect.stringContaining("another --slug") }),
+    );
   });
 
   it("stops when the slug belongs to a connection to another issuer", () => {

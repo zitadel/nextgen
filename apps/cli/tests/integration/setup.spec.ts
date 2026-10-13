@@ -36,6 +36,29 @@ describe("setup", () => {
 
         expect(result).toFailWith("E_NETWORK");
       });
+
+      it("still names a custom connection flag that is wrong", async () => {
+        const app = await anApp();
+        platform.isUnavailable();
+
+        const result = await app.setupSsoWith(
+          [
+            "--sso",
+            "custom",
+            "--sso-slug",
+            "Acme",
+            "--sso-display-name",
+            "Acme SSO",
+            "--sso-issuer",
+            "https://sso.acme.example",
+            "--sso-client-id",
+            "acme-client-id",
+          ],
+          "acme-client-secret",
+        );
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
     });
 
     describe("that refuses connections", () => {

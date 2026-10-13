@@ -3,7 +3,7 @@ import {
   type ConnectionEndpoints,
   type Credentials,
   type ProviderSelection,
-  selectionSlug,
+  providerOf,
 } from "@zitadel/config/idp";
 
 import type { FrameworkFacts } from "../../../lib/orca";
@@ -63,7 +63,7 @@ export function completeSso(drafts: readonly SsoDraft[]): SsoAnswer[] {
   return drafts.map((draft) => {
     const { clientId, secret } = draft.credentials;
     if (clientId === undefined || secret === undefined) {
-      throw new Error(`no credentials were collected for ${selectionSlug(draft.selection)}`);
+      throw new Error(`no credentials were collected for ${providerOf(draft.selection).slug}`);
     }
     return { ...draft, credentials: { clientId, secret } };
   });

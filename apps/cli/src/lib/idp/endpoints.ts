@@ -1,14 +1,11 @@
-import { text } from "@clack/prompts";
-
 import {
   type CatalogProviderId,
   type ConnectionEndpoints,
   idpProvider,
   parseIssuer,
-  validated,
 } from "@zitadel/config/idp";
 
-import { bailOnCancel } from "../prompt-cancel";
+import { askParsed } from "../prompt-cancel";
 
 /**
  * Ask where a provider lives, on a development run only.
@@ -45,14 +42,12 @@ export async function askConnectionEndpoints(options: {
   // URL` accepts `http://idp.internal:9100` and `file:///tmp/idp`, which would
   // be written to a connection that then fails on apply. Refusing at the prompt
   // puts the complaint where the value was typed.
-  const answer = await text({
-    message: "Issuer",
-    initialValue: idpProvider(provider).issuer,
-    validate: (value) => {
-      const parsed = parseIssuer(String(value ?? ""));
-      return parsed.ok ? undefined : parsed.problem;
-    },
-  });
-  bailOnCancel(answer, command);
-  return { issuer: validated(parseIssuer(String(answer))) };
+  return {
+    issuer: await askParsed({
+      message: "Issuer",
+      parse: parseIssuer,
+      initialValue: idpProvider(provider).issuer,
+      command,
+    }),
+  };
 }

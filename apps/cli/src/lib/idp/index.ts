@@ -40,6 +40,11 @@ export {
   customFlagText,
   selectionFromFlags,
   type CustomFlagNames,
+  customFlagValues,
+  loopbackIssuerWarning,
+  ENABLE_FLAG_NAMES,
+  givenCustomFlags,
+  SETUP_FLAG_NAMES,
   type CustomFlagValues,
 } from "./custom";
 

@@ -16,7 +16,6 @@
 import { CUSTOM_PROVIDER, CustomOidcProvider, type CustomOidcInput } from "./custom.js";
 import { GoogleProvider } from "./google.js";
 import type { IdpProvider } from "./provider.js";
-import type { ConnectionSlug } from "./types.js";
 
 /** Every catalog provider's id. The `--provider` flag takes one, or `custom`. */
 export const IDP_PROVIDERS = Object.freeze(["google"] as const);
@@ -27,7 +26,10 @@ export const RESERVED_SLUGS: readonly string[] = [...IDP_PROVIDERS, CUSTOM_PROVI
 /** The id of a provider the catalog lists. */
 export type CatalogProviderId = (typeof IDP_PROVIDERS)[number];
 
-const REGISTRY: Readonly<Record<CatalogProviderId, IdpProvider>> = Object.freeze({
+/** A catalog entry always names the template it was scaffolded from; only a custom connection has none. */
+type CatalogProvider = IdpProvider & { readonly template: string };
+
+const REGISTRY: Readonly<Record<CatalogProviderId, CatalogProvider>> = Object.freeze({
   google: new GoogleProvider(),
 });
 
@@ -41,7 +43,7 @@ export type ProviderName = CatalogProviderId | typeof CUSTOM_PROVIDER;
  * {@link parseProviderSelection}, which says what to do with a name nothing
  * answers to.
  */
-export function idpProvider(id: CatalogProviderId): IdpProvider {
+export function idpProvider(id: CatalogProviderId): CatalogProvider {
   const provider = REGISTRY[id];
   if (provider === undefined || !Object.hasOwn(REGISTRY, id)) {
     throw new Error(
@@ -85,11 +87,6 @@ export function providerOf(selection: ProviderSelection): IdpProvider {
     : new CustomOidcProvider(selection.connection);
 }
 
-/** The slug the selection's connection is written and referenced under. */
-export function selectionSlug(selection: ProviderSelection): ConnectionSlug {
-  return selection.kind === "catalog" ? idpProvider(selection.id).slug : selection.connection.slug;
-}
-
 /** The selection's name, as a command line and a result say it: `google`, or `custom`. */
 export function selectionName(selection: ProviderSelection): ProviderName {
   return selection.kind === "catalog" ? selection.id : CUSTOM_PROVIDER;
@@ -101,6 +98,7 @@ export {
   type CustomOidcInput,
 } from "./custom.js";
 export { GoogleProvider } from "./google.js";
+export { isLoopbackIssuer } from "./issuer.js";
 export { OidcProvider } from "./oidc-provider.js";
 export {
   credentialVariable,

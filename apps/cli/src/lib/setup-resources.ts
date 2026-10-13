@@ -28,7 +28,7 @@ import {
   type ConnectionSlug,
   type ProviderSelection,
   providerOf,
-  selectionSlug,
+  selectionName,
 } from "@zitadel/config/idp";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
@@ -38,7 +38,11 @@ import {
   applySsoToSchema,
   authMethods,
   CONNECTION_SCHEMA_REF,
+  customFlagText,
+  ENABLE_FLAG_NAMES,
   IDPS_DIR,
+  planConnection,
+  readConnectionFiles,
   refuseResolvedSecret,
 } from "./idp";
 import { stableStringify } from "./json";
@@ -114,9 +118,15 @@ export async function materializeSetupResources(opts: {
   // setup does not remove a connection file it wrote -- so the retry would
   // then refuse on that file too, with nothing but the developer able to
   // clear it. One pass to build and refuse, a second to create.
-  const planned: Array<{ slug: ConnectionSlug; connectionPath: string; connection: object }> = [];
+  const planned: Array<{
+    slug: ConnectionSlug;
+    connectionPath: string;
+    connection: object;
+    selection: ProviderSelection;
+  }> = [];
+  const files = await readConnectionFiles(opts.cwd);
   for (const chosen of opts.sso ?? []) {
-    const slug = selectionSlug(chosen.selection);
+    const slug = providerOf(chosen.selection).slug;
     const connection = providerOf(chosen.selection).connection({
       endpoints: chosen.endpoints,
       schemaProperties: Object.keys((schemaTemplate.properties as object | undefined) ?? {}),
@@ -124,20 +134,26 @@ export async function materializeSetupResources(opts: {
     });
     const connectionPath = `${IDPS_DIR}/${slug}.json`;
     // Refused before anything is created, for two reasons: the file is the
-    // developer's (see {@link CONNECTION_EXISTS}), and finding out after the
+    // developer's (see {@link connectionExists}), and finding out after the
     // create would leave the project holding a connection no local file
     // tracks.
-    if (await exists(join(opts.cwd, connectionPath))) {
-      throw new ZitadelError("E_CONFLICT", `${connectionPath} already exists`, {
-        hint: CONNECTION_EXISTS.hint,
-        nextCommands: CONNECTION_EXISTS.nextCommands,
-      });
+    // The same questions `sso enable` asks: which file holds the slug, and whose
+    // variables would collide. A plan that throws names the conflict; one that
+    // says reuse means a connection file already holds this provider.
+    const existing = planConnection({ selection: chosen.selection, files });
+    if (existing.action === "reuse" || (await exists(join(opts.cwd, connectionPath)))) {
+      const { hint, nextCommands } = connectionExists(chosen.selection);
+      throw new ZitadelError(
+        "E_CONFLICT",
+        `${existing.action === "reuse" ? existing.file.path : connectionPath} already exists`,
+        { hint, nextCommands },
+      );
     }
-    planned.push({ slug, connectionPath, connection });
+    planned.push({ slug, connectionPath, connection, selection: chosen.selection });
   }
 
   const slugs = planned.map((entry) => entry.slug);
-  for (const { connectionPath, connection } of planned) {
+  for (const { connectionPath, connection, selection } of planned) {
     // The create comes before the file. Setup does not remove a connection
     // file it wrote -- that rule is what keeps a developer's own file safe --
     // so writing first would leave one behind on any failure here and the
@@ -155,7 +171,15 @@ export async function materializeSetupResources(opts: {
     await mkdir(join(opts.cwd, IDPS_DIR), { recursive: true });
     // Still `wx` rather than `opts.force`: the check above is the early
     // refusal, this is the one that cannot be raced.
-    if (await writeResourceFile(opts.cwd, connectionPath, connection, false, CONNECTION_EXISTS)) {
+    if (
+      await writeResourceFile(
+        opts.cwd,
+        connectionPath,
+        connection,
+        false,
+        connectionExists(selection),
+      )
+    ) {
       filesWritten.push(join(opts.cwd, connectionPath));
     }
     // The same guard the syncer applies: this write puts the canonical body
@@ -309,13 +333,21 @@ async function writeReadmeFile(cwd: string, relPath: string, content: string): P
  * tenant-owned. So the one rule is that setup does not write there, and the
  * developer decides what happens to the file.
  */
-const CONNECTION_EXISTS: { hint: string; nextCommands: string[] } = {
-  hint:
-    "A connection file is yours to keep, so setup never replaces or removes one. " +
-    "Remove it and run setup again to scaffold a fresh one, or keep it and enable the " +
-    "provider afterwards to reuse it.",
-  nextCommands: ["zitadel sso enable --provider google"],
-};
+function connectionExists(selection: ProviderSelection): { hint: string; nextCommands: string[] } {
+  return {
+    hint:
+      "A connection file is yours to keep, so setup never replaces or removes one. " +
+      "Remove it and run setup again to scaffold a fresh one, or keep it and enable the " +
+      "provider afterwards to reuse it.",
+    nextCommands: [
+      `zitadel sso enable --provider ${selectionName(selection)}${
+        selection.kind === "custom"
+          ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
+          : ""
+      }`,
+    ],
+  };
+}
 
 /** Whether a path is there, without caring why it is not. */
 async function exists(path: string): Promise<boolean> {
