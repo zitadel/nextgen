@@ -1,0 +1,11 @@
+title: RemovePreviewRequest
+type: object
+description: The preview to remove.
+required:
+  - origin
+additionalProperties: false
+properties:
+  origin:
+    description: The preview URL, exactly as
+      `GET /projects/{project_id}/previews` lists it.
+    $ref: ../../../../../components/schemas/origin.yaml

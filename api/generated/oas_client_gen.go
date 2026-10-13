@@ -112,19 +112,30 @@ type Invoker interface {
 	// unknown release id or digest answers `404` with `rel.not_found`, and a
 	// revoked release answers `409` with `rel.revoked`.
 	// `targets` lists `primary`, which expands to every primary origin of the
-	// project, and exact origins. An origin that is not a primary origin of
-	// the project answers `403` with `proj.origin_not_allowed`, and `primary`
-	// on a project with no primary origin answers `400` with `dep.invalid`.
-	// The deployment records the resolved origins, sorted, never the keyword.
-	// A deployment freezes the variable values the project stores for primary
-	// origins. A release that references a variable with no such value
-	// answers `400` with `dep.variables_missing`, naming the kind and every
-	// missing variable, and nothing is written.
-	// Idempotent on what is served: when every resolved target already serves
-	// the release with the same frozen variable values, nothing changes and
-	// the call answers `200` with the newest deployment to those targets, so a
-	// re-run of `zitadel deploy` on unchanged content is a no-op end to end.
-	// The same release with a changed variable value is a new deployment.
+	// project, and exact origins. An origin that is neither a primary origin
+	// of the project nor matches one of its preview patterns answers `403`
+	// with `proj.origin_not_allowed`, and `primary` on a project with no
+	// primary origin answers `400` with `dep.invalid`. The deployment records
+	// the resolved origins, sorted, never the keyword.
+	// A deployment to preview URLs creates the preview for each of them, or
+	// renews it when it exists, in the same transaction, with the expiry set
+	// from `ttl`; each target in the response carries that expiry. It always
+	// writes a new deployment, answering `201`, even when the URLs already
+	// serve the release: that record is the renewal. Primary origins and
+	// preview URLs cannot be mixed in one deployment: that answers `400` with
+	// `dep.invalid`.
+	// A deployment freezes the variable values the project stores for its
+	// kind: primary origins use the primary values, preview URLs the preview
+	// values, with no fallback from one to the other. A release that
+	// references a variable with no value for that kind answers `400` with
+	// `dep.variables_missing`, naming the kind and every missing variable, and
+	// nothing is written.
+	// A deployment to primary origins is idempotent on what is served: when
+	// every resolved target already serves the release with the same frozen
+	// variable values, nothing changes and the call answers `200` with the
+	// newest deployment to those targets, so a re-run of `zitadel deploy` on
+	// unchanged content is a no-op end to end. The same release with a
+	// changed variable value is a new deployment.
 	// Anything else writes a new record covering all of the resolved targets,
 	// including the same release returning after something else was served in
 	// between: the log is append-only, and each record is one act of making a
@@ -640,9 +651,12 @@ type Invoker interface {
 	// origin serves.
 	// With `live=true`, the list is what is served now: the newest deployment
 	// to each target, each carrying only the targets it still serves. A
-	// deployment every target of which has since been replaced does not
-	// appear. Combined with `origin`, the live view is the one deployment that
-	// origin serves, or empty.
+	// preview URL is served only while its preview is live, and its
+	// `expires_at` is the expiry its newest deployment set, which is the
+	// preview's current one. A deployment every target of which has since
+	// been replaced, or whose previews have all expired or been removed, does
+	// not appear. Combined with `origin`, the live view is the one deployment
+	// that origin serves, or empty.
 	// `expand: ["release"]` embeds the release each deployment made live, so a
 	// history renders with each entry's content without resolving `release_id`
 	// one by one. Expanding requires `release.read` and does not affect the
@@ -691,6 +705,14 @@ type Invoker interface {
 	//
 	// GET /users/me/projects
 	ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error)
+	// ListPreviews invokes listPreviews operation.
+	//
+	// Lists the project's live previews, newest first by `created_at`. An
+	// expired or removed preview is not listed; what was deployed to it stays
+	// in `GET /deployments`.
+	//
+	// GET /projects/{project_id}/previews
+	ListPreviews(ctx context.Context, params ListPreviewsParams) (ListPreviewsRes, error)
 	// ListReleases invokes listReleases operation.
 	//
 	// Lists the project's releases, newest first.
@@ -810,6 +832,18 @@ type Invoker interface {
 	//
 	// POST /users/query
 	QueryUsers(ctx context.Context, request *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
+	// RemovePreview invokes removePreview operation.
+	//
+	// Ends a preview before it expires: the URL stops being served at once.
+	// The deployments to it stay in the history.
+	// Idempotent: a URL with no live preview, including one that has already
+	// expired or was removed before, answers `204` too, so a cleanup that
+	// races the expiry still succeeds.
+	// The URL travels in the body rather than the path because an origin
+	// contains `/`.
+	//
+	// POST /projects/{project_id}/previews/remove
+	RemovePreview(ctx context.Context, request *RemovePreviewRequest, params RemovePreviewParams) (RemovePreviewRes, error)
 	// RevokeMySession invokes revokeMySession operation.
 	//
 	// Logs out by permanently deleting the session.
@@ -1714,19 +1748,30 @@ func (c *Client) sendCreateBranding(ctx context.Context, request *Branding, para
 // unknown release id or digest answers `404` with `rel.not_found`, and a
 // revoked release answers `409` with `rel.revoked`.
 // `targets` lists `primary`, which expands to every primary origin of the
-// project, and exact origins. An origin that is not a primary origin of
-// the project answers `403` with `proj.origin_not_allowed`, and `primary`
-// on a project with no primary origin answers `400` with `dep.invalid`.
-// The deployment records the resolved origins, sorted, never the keyword.
-// A deployment freezes the variable values the project stores for primary
-// origins. A release that references a variable with no such value
-// answers `400` with `dep.variables_missing`, naming the kind and every
-// missing variable, and nothing is written.
-// Idempotent on what is served: when every resolved target already serves
-// the release with the same frozen variable values, nothing changes and
-// the call answers `200` with the newest deployment to those targets, so a
-// re-run of `zitadel deploy` on unchanged content is a no-op end to end.
-// The same release with a changed variable value is a new deployment.
+// project, and exact origins. An origin that is neither a primary origin
+// of the project nor matches one of its preview patterns answers `403`
+// with `proj.origin_not_allowed`, and `primary` on a project with no
+// primary origin answers `400` with `dep.invalid`. The deployment records
+// the resolved origins, sorted, never the keyword.
+// A deployment to preview URLs creates the preview for each of them, or
+// renews it when it exists, in the same transaction, with the expiry set
+// from `ttl`; each target in the response carries that expiry. It always
+// writes a new deployment, answering `201`, even when the URLs already
+// serve the release: that record is the renewal. Primary origins and
+// preview URLs cannot be mixed in one deployment: that answers `400` with
+// `dep.invalid`.
+// A deployment freezes the variable values the project stores for its
+// kind: primary origins use the primary values, preview URLs the preview
+// values, with no fallback from one to the other. A release that
+// references a variable with no value for that kind answers `400` with
+// `dep.variables_missing`, naming the kind and every missing variable, and
+// nothing is written.
+// A deployment to primary origins is idempotent on what is served: when
+// every resolved target already serves the release with the same frozen
+// variable values, nothing changes and the call answers `200` with the
+// newest deployment to those targets, so a re-run of `zitadel deploy` on
+// unchanged content is a no-op end to end. The same release with a
+// changed variable value is a new deployment.
 // Anything else writes a new record covering all of the resolved targets,
 // including the same release returning after something else was served in
 // between: the log is append-only, and each record is one act of making a
@@ -8194,9 +8239,12 @@ func (c *Client) sendListBranding(ctx context.Context, params ListBrandingParams
 // origin serves.
 // With `live=true`, the list is what is served now: the newest deployment
 // to each target, each carrying only the targets it still serves. A
-// deployment every target of which has since been replaced does not
-// appear. Combined with `origin`, the live view is the one deployment that
-// origin serves, or empty.
+// preview URL is served only while its preview is live, and its
+// `expires_at` is the expiry its newest deployment set, which is the
+// preview's current one. A deployment every target of which has since
+// been replaced, or whose previews have all expired or been removed, does
+// not appear. Combined with `origin`, the live view is the one deployment
+// that origin serves, or empty.
 // `expand: ["release"]` embeds the release each deployment made live, so a
 // history renders with each entry's content without resolving `release_id`
 // one by one. Expanding requires `release.read` and does not affect the
@@ -9458,6 +9506,181 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 
 	stage = "DecodeResponse"
 	result, err := decodeListMyProjectsResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// ListPreviews invokes listPreviews operation.
+//
+// Lists the project's live previews, newest first by `created_at`. An
+// expired or removed preview is not listed; what was deployed to it stays
+// in `GET /deployments`.
+//
+// GET /projects/{project_id}/previews
+func (c *Client) ListPreviews(ctx context.Context, params ListPreviewsParams) (ListPreviewsRes, error) {
+	res, err := c.sendListPreviews(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListPreviews(ctx context.Context, params ListPreviewsParams) (res ListPreviewsRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listPreviews"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/projects/{project_id}/previews"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListPreviewsOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/projects/"
+	{
+		// Encode "project_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "project_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/previews"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "limit" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "limit",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Limit.Get(); ok {
+				if unwrapped := int(val); true {
+					return e.EncodeValue(conv.IntToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "page_token" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "page_token",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.PageToken.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, ListPreviewsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeListPreviewsResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -11557,6 +11780,153 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest,
 
 	stage = "DecodeResponse"
 	result, err := decodeQueryUsersResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// RemovePreview invokes removePreview operation.
+//
+// Ends a preview before it expires: the URL stops being served at once.
+// The deployments to it stay in the history.
+// Idempotent: a URL with no live preview, including one that has already
+// expired or was removed before, answers `204` too, so a cleanup that
+// races the expiry still succeeds.
+// The URL travels in the body rather than the path because an origin
+// contains `/`.
+//
+// POST /projects/{project_id}/previews/remove
+func (c *Client) RemovePreview(ctx context.Context, request *RemovePreviewRequest, params RemovePreviewParams) (RemovePreviewRes, error) {
+	res, err := c.sendRemovePreview(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendRemovePreview(ctx context.Context, request *RemovePreviewRequest, params RemovePreviewParams) (res RemovePreviewRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("removePreview"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/projects/{project_id}/previews/remove"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, RemovePreviewOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/projects/"
+	{
+		// Encode "project_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "project_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/previews/remove"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeRemovePreviewRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, RemovePreviewOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeRemovePreviewResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

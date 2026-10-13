@@ -24,6 +24,15 @@ properties:
     $ref: ../../components/schemas/release-content-hash.yaml
   targets:
     $ref: deployment-targets-request.yaml
+  ttl:
+    description: |
+      How long each preview URL in `targets` stays live, counted from this
+      deployment. Every preview it writes gets the same expiry, renewing a
+      preview that already exists. Omitted, the project's default applies; a
+      value above the project's maximum answers `400` with `dep.invalid`.
+      Only valid when the targets are preview URLs: with primary origins it
+      answers `400` with `dep.invalid`.
+    $ref: ../../components/schemas/preview-ttl.yaml
   reason:
     description: |
       Why this deployment happens. Omitted, the server records `deploy`.
