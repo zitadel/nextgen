@@ -19,14 +19,15 @@ packages remain the self-hosted artifact; this cloud does not run them.
 
 ## Layout
 
-One Vercel deployment, four [services](https://vercel.com/docs/services):
+One Vercel deployment, five [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds, compiles `apps/cloud/launcher`, then migrates | every path except the console's, the storybook's and the docs', including `/console/runtime.json` and the login UI at `/ui/login/` |
+| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds, compiles `apps/cloud/launcher`, then migrates | every path except the console's, the storybook's, the docs' and the website's, including `/console/runtime.json` and the login UI at `/ui/login/` |
 | `console` | Vite; the console build with `VITE_CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights | `/ui/console/*` (bare `/ui/console` redirects to the slash form) |
 | `storybook` | Storybook; `moon run storybook:build`, moved to `dist/storybook/` | `/storybook/*` (bare `/storybook` redirects to the slash form) |
 | `docs` | Next.js; `apps/docs`' own `pnpm run build`, never moon (moon cannot archive the symlinks Vercel's Next.js adapter writes) | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
+| `website` | Next.js; `apps/website`'s own `pnpm run build`, never moon, as the docs' | `/`, the coming-soon page with links to the docs, the console and the storybook, and its assets at `/_next/*` |
 
 The console lives at the path the server would serve it from, on the same
 origin. The server's own console is switched off, and nothing else about
@@ -313,18 +314,20 @@ project and imports the root admin.
   Analytics and Speed Insights tabs. Speed Insights samples by the two
   `*_SPEED_INSIGHTS_SAMPLE_RATE` variables, read at build time, so a new rate
   takes a redeploy; `0` turns it off. Web Analytics has no sampling and counts
-  every page view.
+  every page view. The website reports page views of its start page only, no
+  Speed Insights.
 - **Signing in:** `/ui/console/` with the environment's root admin from
   1Password (production and preview have different passwords). Anyone else
   registers through the login UI.
 - **Build cache:** Vercel keeps one per branch (a branch's first build
   starts from production's) and restores it before the installs: every
-  `node_modules`, the docs' `.next/cache`, and `.vercel/cache/golang`, the
-  Go toolchain with its module and build caches. Compressed, it must stay
-  under 1.5 GB, the limit of the project's Standard build machines. A
-  bigger one is still created after the deployment, minutes of build
-  machine time, then dropped ("Build cache size … exceeds limit"), and the
-  next build installs every package and compiles the server from scratch.
+  `node_modules`, the docs' and the website's `.next/cache`, and
+  `.vercel/cache/golang`, the Go toolchain with its module and build
+  caches. Compressed, it must stay under 1.5 GB, the limit of the
+  project's Standard build machines. A bigger one is still created after
+  the deployment, minutes of build machine time, then dropped ("Build
+  cache size … exceeds limit"), and the next build installs every package
+  and compiles the server from scratch.
   So the services install with
   [`apps/cloud/install.sh`](../../apps/cloud/install.sh), which leaves out
   the other platforms' native packages that the workspace installs
