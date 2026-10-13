@@ -139,8 +139,8 @@ func TestProjectService_Create(t *testing.T) {
 			name:        "ok — with preview origins",
 			projectName: "test",
 			origins: []domain.Origin{
-				{Pattern: "*.vercel.app", Kind: domain.OriginKindPreview},
-				{Pattern: "*.netlify.app", Kind: domain.OriginKindPreview},
+				{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview},
+				{Pattern: "https://*--acme.netlify.app", Kind: domain.OriginKindPreview},
 			},
 			seedDefaults: true,
 			setupMocks: func(masterKey *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
@@ -160,8 +160,8 @@ func TestProjectService_Create(t *testing.T) {
 				statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 			},
 			expectedOrigins: []domain.Origin{
-				{Pattern: "*.vercel.app", Kind: domain.OriginKindPreview},
-				{Pattern: "*.netlify.app", Kind: domain.OriginKindPreview},
+				{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview},
+				{Pattern: "https://*--acme.netlify.app", Kind: domain.OriginKindPreview},
 			},
 		},
 		{
@@ -234,7 +234,7 @@ func TestProjectService_Get(t *testing.T) {
 		Name:      "project aaa",
 		CreatedAt: now,
 		UpdatedAt: now,
-		Origins:   []domain.Origin{{Pattern: "myapp.example.com", Kind: domain.OriginKindPreview}},
+		Origins:   []domain.Origin{{Pattern: "https://myapp.example.com", Kind: domain.OriginKindPreview}},
 	}
 
 	tests := []struct {

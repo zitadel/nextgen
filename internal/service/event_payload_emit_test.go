@@ -64,7 +64,7 @@ func TestProjectCreate_EventPayloadIncludesOrigins(t *testing.T) {
 	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t))
 
 	ctx := middleware.WithRequestIDContext(t.Context(), "req_create")
-	got, err := svc.Create(ctx, "Acme", []domain.Origin{{Pattern: "*.vercel.app", Kind: domain.OriginKindPreview}}, true)
+	got, err := svc.Create(ctx, "Acme", []domain.Origin{{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview}}, true)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 
@@ -85,7 +85,7 @@ func TestProjectCreate_EventPayloadIncludesOrigins(t *testing.T) {
 	var payload domain.ProjectPayload
 	require.NoError(t, json.Unmarshal(created.Payload, &payload))
 	assert.Equal(t, "Acme", payload.Name)
-	assert.Equal(t, []domain.Origin{{Pattern: "*.vercel.app", Kind: domain.OriginKindPreview}}, payload.Origins)
+	assert.Equal(t, []domain.Origin{{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview}}, payload.Origins)
 }
 
 func TestProjectUpdate_EventPayloadNameDelta(t *testing.T) {

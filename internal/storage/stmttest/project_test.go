@@ -66,8 +66,8 @@ func TestProjectStatements_Update(t *testing.T) {
 		t.Run("updates name and refreshes updated_at", func(t *testing.T) {
 			project := newTestProject(uniqueProjectID(t))
 			project.Origins = []domain.Origin{
-				{Pattern: "*.example.com", Kind: domain.OriginKindPreview},
-				{Pattern: "localhost:3000", Kind: domain.OriginKindPreview},
+				{Pattern: "https://*.example.com", Kind: domain.OriginKindPreview},
+				{Pattern: "http://localhost:3000", Kind: domain.OriginKindPreview},
 			}
 			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
 			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
@@ -80,8 +80,8 @@ func TestProjectStatements_Update(t *testing.T) {
 			assert.True(t, project.UpdatedAt.After(createdUpdatedAt))
 			assert.Equal(t, createdAt.UTC(), project.CreatedAt.UTC())
 			assert.Equal(t, []domain.Origin{
-				{Pattern: "*.example.com", Kind: domain.OriginKindPreview},
-				{Pattern: "localhost:3000", Kind: domain.OriginKindPreview},
+				{Pattern: "https://*.example.com", Kind: domain.OriginKindPreview},
+				{Pattern: "http://localhost:3000", Kind: domain.OriginKindPreview},
 			}, project.Origins)
 
 			stored, err := d.stmts.GetProjectByID(t.Context(), project.ID)

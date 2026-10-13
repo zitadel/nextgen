@@ -125,8 +125,8 @@ func TestCreateProject(t *testing.T) {
 			req: &api.CreateProjectRequest{
 				Name: helpers.ProjectName(),
 				Origins: []api.ProjectOrigin{
-					{Pattern: "*.vercel.app", Kind: api.ProjectOriginKindPreview},
-					{Pattern: "*.netlify.app", Kind: api.ProjectOriginKindPreview},
+					{Pattern: "https://*-acme.vercel.app", Kind: api.ProjectOriginKindPreview},
+					{Pattern: "https://*--acme.netlify.app", Kind: api.ProjectOriginKindPreview},
 				},
 			},
 		},
@@ -260,8 +260,8 @@ func TestGetProject(t *testing.T) {
 	t.Parallel()
 
 	origins := []domain.Origin{
-		{Pattern: "*.example.com", Kind: domain.OriginKindPreview},
-		{Pattern: "localhost:3000", Kind: domain.OriginKindPreview},
+		{Pattern: "https://*.example.com", Kind: domain.OriginKindPreview},
+		{Pattern: "http://localhost:3000", Kind: domain.OriginKindPreview},
 	}
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), origins, true)
 	require.NoError(t, err)
@@ -281,8 +281,8 @@ func TestGetProject(t *testing.T) {
 		{
 			name: "ok",
 			want: &api.ProjectResponse{Name: project.Name, Origins: []api.ProjectOrigin{
-				{Pattern: "*.example.com", Kind: api.ProjectOriginKindPreview},
-				{Pattern: "localhost:3000", Kind: api.ProjectOriginKindPreview},
+				{Pattern: "https://*.example.com", Kind: api.ProjectOriginKindPreview},
+				{Pattern: "http://localhost:3000", Kind: api.ProjectOriginKindPreview},
 			}},
 		},
 		{
@@ -390,8 +390,8 @@ func TestPatchProject(t *testing.T) {
 		renamed     = helpers.ProjectName()
 		renamedKeep = helpers.ProjectName()
 		keptOrigins = []domain.Origin{
-			{Pattern: "*.example.com", Kind: domain.OriginKindPreview},
-			{Pattern: "localhost:3000", Kind: domain.OriginKindPreview},
+			{Pattern: "https://*.example.com", Kind: domain.OriginKindPreview},
+			{Pattern: "http://localhost:3000", Kind: domain.OriginKindPreview},
 		}
 		nameInvalid   = domain.ErrProjectNameInvalid()
 		notFound      = domain.ErrProjectNotFound()
@@ -415,8 +415,8 @@ func TestPatchProject(t *testing.T) {
 			origins: keptOrigins,
 			req:     &api.PatchProjectRequest{Name: api.NewOptNilString(renamedKeep)},
 			want: &api.ProjectResponse{Name: renamedKeep, Origins: []api.ProjectOrigin{
-				{Pattern: "*.example.com", Kind: api.ProjectOriginKindPreview},
-				{Pattern: "localhost:3000", Kind: api.ProjectOriginKindPreview},
+				{Pattern: "https://*.example.com", Kind: api.ProjectOriginKindPreview},
+				{Pattern: "http://localhost:3000", Kind: api.ProjectOriginKindPreview},
 			}},
 		},
 		{
@@ -651,8 +651,8 @@ func TestQueryProjects(t *testing.T) {
 	t.Parallel()
 
 	origins := []domain.Origin{
-		{Pattern: "*.example.com", Kind: domain.OriginKindPreview},
-		{Pattern: "localhost:3000", Kind: domain.OriginKindPreview},
+		{Pattern: "https://*.example.com", Kind: domain.OriginKindPreview},
+		{Pattern: "http://localhost:3000", Kind: domain.OriginKindPreview},
 	}
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), origins, true)
 	require.NoError(t, err)
@@ -663,8 +663,8 @@ func TestQueryProjects(t *testing.T) {
 
 	var (
 		own = api.ProjectResponse{Name: project.Name, Origins: []api.ProjectOrigin{
-			{Pattern: "*.example.com", Kind: api.ProjectOriginKindPreview},
-			{Pattern: "localhost:3000", Kind: api.ProjectOriginKindPreview},
+			{Pattern: "https://*.example.com", Kind: api.ProjectOriginKindPreview},
+			{Pattern: "http://localhost:3000", Kind: api.ProjectOriginKindPreview},
 		}}
 		requestInvalid = domain.ErrRequestInvalid()
 		// A minute of slack absorbs the whole-second truncation RFC3339 applies.
