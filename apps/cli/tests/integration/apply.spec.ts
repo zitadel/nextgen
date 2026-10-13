@@ -106,19 +106,32 @@ describe("apply", () => {
     });
 
     describe("a connection file removed after it was applied", () => {
-      it("says deletion is not supported and leaves the connection registered", async () => {
+      it("leaves the connection registered", async () => {
+        const app = await aSetUpApp();
+        expect(
+          await app.enableSso("google", { clientId: "1234-abc", secret: "the-client-secret" }),
+        ).toSucceed();
+        await app.addUnlistedConnection("spare");
+        expect(await app.apply()).toSucceed();
+        await app.removeConnection("spare");
+
+        expect(await app.apply()).toSucceed();
+
+        expect((await app.registeredIdps()).map((idp) => idp.slug)).toContain("spare");
+      });
+    });
+
+    describe("a connection file renamed after it was applied", () => {
+      it("leaves nothing to reconcile and nothing to warn about", async () => {
         const app = await aSetUpApp();
         expect(
           await app.enableSso("google", { clientId: "1234-abc", secret: "the-client-secret" }),
         ).toSucceed();
         expect(await app.apply()).toSucceed();
-        await app.deleteProjectFile(".zitadel/idps/google.json");
+        await app.renameConnection("google", "google-main");
+        expect(await app.apply()).toSucceed();
 
-        const result = await app.apply();
-
-        expect(result).toSucceed();
-        expect(result).toPrint("not supported yet");
-        expect((await app.registeredIdps()).map((idp) => idp.slug)).toEqual(["google"]);
+        expect(await app.plan()).toReportNothingToDo();
       });
     });
 

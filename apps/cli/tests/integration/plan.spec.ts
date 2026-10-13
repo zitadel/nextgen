@@ -156,8 +156,6 @@ describe("plan", () => {
       }
 
       describe("connection files", () => {
-        const CONNECTION = ".zitadel/idps/google.json";
-
         async function anAppServingGoogle(): Promise<ScaffoldedApp> {
           const app = await anAppWithGoogle();
           expect(await app.apply()).toSucceed();
@@ -166,15 +164,9 @@ describe("plan", () => {
 
         it("stops on two files that claim the same slug", async () => {
           const app = await anAppWithGoogle();
-          await app.writeProjectFile(
-            ".zitadel/idps/copy.json",
-            await app.readProjectFile(CONNECTION),
-          );
+          await app.copyConnection("google", "copy");
 
-          const result = await app.planAttempt();
-
-          expect(result).toFailWith("E_VALIDATION");
-          expect(result).toPrint("copy.json");
+          expect(await app.planAttempt()).toFailWith("E_VALIDATION");
         });
 
         it.each([
@@ -196,15 +188,17 @@ describe("plan", () => {
               c.subject_claim = "email";
             },
           ],
-        ])("refuses an edit of %s on a connection already applied", async (field, edit) => {
+          [
+            "protocol",
+            (c: ConnectionDocument) => {
+              c.protocol = "oauth2";
+            },
+          ],
+        ])("refuses an edit of %s on a connection already applied", async (_field, edit) => {
           const app = await anAppServingGoogle();
           await app.editConnection("google", edit);
 
-          const result = await app.planAttempt();
-
-          expect(result).toFailWith("E_VALIDATION");
-          expect(result).toPrint(field);
-          expect(result).toPrint(CONNECTION);
+          expect(await app.planAttempt()).toFailWith("E_VALIDATION");
         });
 
         it("plans an edit of a field that does not identify the connection", async () => {
@@ -216,26 +210,46 @@ describe("plan", () => {
           expect((await app.plan()).updates).toBe(1);
         });
 
-        it("stops on a client_secret variable the project does not hold", async () => {
-          const app = await anAppWithGoogle();
-          expect(await app.deleteVariable("GOOGLE_CLIENT_SECRET")).toSucceed();
+        it.each(["GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_ID"])(
+          "stops on a missing %s variable",
+          async (name) => {
+            const app = await anAppWithGoogle();
+            expect(await app.deleteVariable(name)).toSucceed();
 
-          const result = await app.planAttempt();
+            expect(await app.planAttempt()).toFailWith("E_CREDENTIAL_MISSING");
+          },
+        );
 
-          expect(result).toFailWith("E_CREDENTIAL_MISSING");
-          expect(result).toPrint("GOOGLE_CLIENT_SECRET");
-          expect(result).toPrint(CONNECTION);
+        async function anAppServingAnUnlistedConnection(): Promise<ScaffoldedApp> {
+          const app = await anAppServingGoogle();
+          await app.addUnlistedConnection("spare");
+          expect(await app.apply()).toSucceed();
+          return app;
+        }
+
+        it("plans no deletion for a removed connection file", async () => {
+          const app = await anAppServingAnUnlistedConnection();
+          await app.removeConnection("spare");
+
+          expect((await app.plan()).deletes).toBe(0);
         });
 
-        it("reports a removed connection file and plans no deletion", async () => {
+        it("names a removed connection file in the --json warnings", async () => {
+          const app = await anAppServingAnUnlistedConnection();
+          await app.removeConnection("spare");
+
+          const { data } = app.envelopeOf<{ warnings: Array<{ rule: string }> }>(
+            await app.planAttempt(),
+          );
+
+          expect(data.warnings.map(({ rule }) => rule)).toContain("unsupported-deletion");
+        });
+
+        it("stops on a removed connection file a schema still lists", async () => {
           const app = await anAppServingGoogle();
-          await app.deleteProjectFile(CONNECTION);
+          await app.removeConnection("google");
 
-          const result = await app.planRendered();
-
-          expect(result).toSucceed();
-          expect(result).toPrint("not supported yet");
-          expect((await app.plan()).deletes).toBe(0);
+          expect(await app.planAttempt()).toFailWith("E_VALIDATION");
         });
       });
 

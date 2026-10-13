@@ -951,6 +951,21 @@ describe("IdpConnectionSyncer", () => {
       expect((error as ZitadelError).message).toContain(file);
     });
 
+    it("reports a client_id variable the project does not hold", async () => {
+      withVariables(["GOOGLE_CLIENT_SECRET"]);
+      const withVariable = {
+        ...connection,
+        oidc: { ...connection.oidc, client_id: "${{ GOOGLE_CLIENT_ID }}" },
+      };
+
+      const error = await idpSyncer()
+        .preflight?.(file, withVariable, null)
+        .catch((err: unknown) => err);
+
+      expect(error).toMatchObject({ code: "E_CREDENTIAL_MISSING" });
+      expect((error as ZitadelError).message).toContain("GOOGLE_CLIENT_ID");
+    });
+
     it("accepts a client_secret variable the project holds", async () => {
       withVariables(["GOOGLE_CLIENT_SECRET"]);
 
@@ -970,6 +985,7 @@ describe("IdpConnectionSyncer", () => {
         { ...connection, oidc: { ...connection.oidc, issuer: "https://other.test" } },
       ],
       ["subject_claim", { ...connection, subject_claim: "email" }],
+      ["protocol", { ...connection, protocol: "oauth2" }],
     ])("refuses an edit of %s before anything is sent", async (field, edited) => {
       const stored = { ...connection, subject_claim: "sub" };
       const next = field === "subject_claim" ? edited : { ...edited, subject_claim: "sub" };

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
 import {
+  collectPlanWarnings,
   enumeratePlanResources,
   renderPlan,
   summarizePlan,
@@ -173,6 +174,18 @@ describe("renderPlan — no changes", () => {
 
   it("prints no-changes message for empty action list", () => {
     expect(renderPlan([], false)).toContain("No changes.");
+  });
+
+  it("reports a removed file whose resource cannot be deleted yet among the warnings", () => {
+    const idp = makeSyncer("idp", ".zitadel/idps", { mutable: true });
+
+    expect(
+      collectPlanWarnings([
+        { kind: "skip", path: ".zitadel/idps/a.json", reason: "unsupported-deletion", syncer: idp },
+      ]),
+    ).toEqual([
+      expect.objectContaining({ path: ".zitadel/idps/a.json", rule: "unsupported-deletion" }),
+    ]);
   });
 
   it("still names a removed file whose resource cannot be deleted yet", () => {

@@ -103,6 +103,7 @@ export interface UserSchemaDocument {
 /** A connection file as committed, which the developer owns and edits. */
 export interface ConnectionDocument {
   slug: string;
+  protocol?: string;
   display_name?: string;
   subject_claim?: string;
   oidc: { issuer: string };
@@ -465,6 +466,33 @@ export class ScaffoldedApp {
   /** Edits a committed connection file, as the developer owning it would. */
   editConnection(slug: string, edit: (connection: ConnectionDocument) => void): Promise<void> {
     return this.editDocument(`.zitadel/idps/${slug}.json`, edit);
+  }
+
+  /** Adds a second connection file that claims the same slug as an existing one. */
+  async copyConnection(slug: string, name: string): Promise<void> {
+    await this.writeProjectFile(
+      `.zitadel/idps/${name}.json`,
+      await this.readProjectFile(`.zitadel/idps/${slug}.json`),
+    );
+  }
+
+  /** Adds a connection no schema lists, so removing it breaks nothing else. */
+  async addUnlistedConnection(slug: string): Promise<void> {
+    await this.copyConnection("google", slug);
+    await this.editConnection(slug, (connection) => {
+      connection.slug = slug;
+    });
+  }
+
+  /** Removes a committed connection file, as the developer owning it would. */
+  removeConnection(slug: string): Promise<void> {
+    return this.deleteProjectFile(`.zitadel/idps/${slug}.json`);
+  }
+
+  /** Renames a committed connection file without touching its contents. */
+  async renameConnection(slug: string, name: string): Promise<void> {
+    await this.copyConnection(slug, name);
+    await this.removeConnection(slug);
   }
 
   /** Edits the committed login flow, as the developer owning it would. */

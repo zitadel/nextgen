@@ -126,11 +126,10 @@ describe("validatePlannedSso", () => {
       validatePlannedSso({
         actions: [
           {
-            kind: "delete",
+            kind: "skip",
             path: CONNECTION,
+            reason: "unsupported-deletion",
             syncer: syncer("idp"),
-            id: "idp_1",
-            oldContent: null,
           },
         ],
         scannedContents: contents(remaining),

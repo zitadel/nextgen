@@ -33,6 +33,13 @@ export function collectPlanWarnings(
     for (const warning of warningsOf(action)) {
       out.push({ path: action.path, rule: warning.rule, message: warning.message });
     }
+    if (action.kind === "skip" && action.reason === "unsupported-deletion") {
+      out.push({
+        path: action.path,
+        rule: "unsupported-deletion",
+        message: `deleting ${action.syncer.kind} resources is not supported yet (#1013); apply will not delete it on the platform`,
+      });
+    }
   }
   return out;
 }

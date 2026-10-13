@@ -21,8 +21,9 @@ import type { ResourceEntry, SyncAction } from "./types.js";
  * It runs only when this plan changes a schema, a flow or a connection, for the
  * same reason flow validation judges only the flows it uploads: an unchanged
  * project is never re-judged, so a rule added later cannot break one that was
- * already applied. Removing a file is a change: deleting a connection a schema
- * still lists is exactly the inconsistency this exists to stop.
+ * already applied. Removing a file is a change: dropping a connection a schema
+ * still lists is exactly the inconsistency this exists to stop, even though the
+ * platform keeps the connection (it cannot be deleted yet).
  */
 export function validatePlannedSso(opts: {
   actions: SyncAction[];
@@ -38,12 +39,13 @@ export function validatePlannedSso(opts: {
       action.kind === "create" ||
       action.kind === "update" ||
       action.kind === "revise" ||
-      action.kind === "delete",
+      action.kind === "delete" ||
+      (action.kind === "skip" && action.reason === "unsupported-deletion"),
   );
   if (!changes.some((action) => ["schema", "flow", "idp"].includes(action.syncer.kind))) {
     return;
   }
-  const writes = changes.filter((action) => action.kind !== "delete");
+  const writes = changes.filter((action) => action.kind !== "delete" && action.kind !== "skip");
 
   const inDir = (dir: string) =>
     new Map([...opts.scannedContents].filter(([path]) => path.startsWith(`${dir}/`)));

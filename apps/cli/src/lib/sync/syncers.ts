@@ -107,16 +107,32 @@ function assertEnvRefs(data: object, env: EnvLookup): void {
   }
 }
 
+type Endpoints = {
+  issuer?: string;
+  token_endpoint?: string;
+  userinfo_endpoint?: string;
+  client_id?: string;
+  client_secret?: string;
+};
+
 type ConnectionBody = {
   slug?: string;
+  protocol?: string;
   subject_claim?: string;
-  oidc?: { issuer?: string; client_secret?: string };
+  oidc?: Endpoints;
+  oauth2?: Endpoints;
 };
 
 /** The fields that make a connection the one its linked users came through. */
 const IDENTITY_FIELDS = [
   { name: "slug", read: (body: ConnectionBody) => body.slug },
+  { name: "protocol", read: (body: ConnectionBody) => body.protocol },
   { name: "oidc.issuer", read: (body: ConnectionBody) => body.oidc?.issuer },
+  { name: "oauth2.token_endpoint", read: (body: ConnectionBody) => body.oauth2?.token_endpoint },
+  {
+    name: "oauth2.userinfo_endpoint",
+    read: (body: ConnectionBody) => body.oauth2?.userinfo_endpoint,
+  },
   { name: "subject_claim", read: (body: ConnectionBody) => body.subject_claim },
 ] as const;
 
@@ -289,8 +305,14 @@ class IdpConnectionSyncer implements ResourceSyncer {
       }
     }
 
-    const name = referencedVariable(next.oidc?.client_secret ?? "");
-    if (name === undefined) {
+    const credentials = [
+      { field: "client_id", value: (next.oidc ?? next.oauth2)?.client_id },
+      { field: "client_secret", value: (next.oidc ?? next.oauth2)?.client_secret },
+    ].flatMap(({ field, value }) => {
+      const name = referencedVariable(value ?? "");
+      return name === undefined ? [] : [{ field, name }];
+    });
+    if (credentials.length === 0) {
       return;
     }
     this.variables ??= this.client
@@ -302,13 +324,14 @@ class IdpConnectionSyncer implements ResourceSyncer {
         return undefined;
       });
     const held = await this.variables;
-    if (held !== undefined && !held.has(name)) {
+    const missing = credentials.find(({ name }) => held !== undefined && !held.has(name));
+    if (missing !== undefined) {
       throw new ZitadelError(
         "E_CREDENTIAL_MISSING",
-        `${path}: client_secret names the variable ${name}, which the project does not have`,
+        `${path}: ${missing.field} names the variable ${missing.name}, which the project does not have`,
         {
-          hint: `Publish it with \`variables set ${name} --secret\`, then re-run.`,
-          details: { variable: name, file: path },
+          hint: `Publish it with \`variables set ${missing.name}\` (add --secret for a secret), then re-run.`,
+          details: { variable: missing.name, field: missing.field, file: path },
         },
       );
     }
