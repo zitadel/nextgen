@@ -90,6 +90,18 @@
       }
     },
     {
+      "source": "/favicon.ico",
+      "destination": {
+        "service": "website"
+      }
+    },
+    {
+      "source": "/favicons/(.*)",
+      "destination": {
+        "service": "website"
+      }
+    },
+    {
       "source": "/(.*)",
       "destination": {
         "service": "server"
