@@ -5,6 +5,7 @@ import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } fro
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { ZitadelError } from "../../lib/errors";
 import { publicCliCommand } from "../../lib/public-cli";
+import { shellArg } from "../../lib/shell";
 
 /**
  * `zitadel origin rm <pattern>` — remove one origin pattern from the project.
@@ -49,13 +50,10 @@ export default class OriginRm extends EnvironmentCommand {
     if (!force) {
       if (nonInteractive) {
         // A preview pattern can carry a `*`, so the retry is copy-pasteable only
-        // if the shell will not expand it: single-quote any pattern holding a
-        // glob or other special character before interpolating it.
-        const quoted = /[^A-Za-z0-9._:/@%+-]/.test(pattern)
-          ? `'${pattern.replaceAll("'", `'\\''`)}'`
-          : pattern;
+        // if the shell will not expand it: `shellArg` single-quotes any pattern
+        // holding a glob or other special character before interpolating it.
         const retry = publicCliCommand(
-          `origin rm ${quoted} --force${this.environmentSelector()}`,
+          `origin rm ${shellArg(pattern)} --force${this.environmentSelector()}`,
           cliVersion,
         );
         throw new ZitadelError(
