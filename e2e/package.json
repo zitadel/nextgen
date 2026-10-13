@@ -5,9 +5,19 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "biome check .",
     "test": "vitest run --config journey/vitest.config.ts",
     "test:all": "pnpm run test",
-    "e2e-local": "node journey/scripts/run-local.mjs"
+    "console-smoke": "playwright test --config console/playwright.config.mts",
+    "console-real": "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=${NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT-false} NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false} playwright test --config console/playwright.real.config.mts",
+    "console-embedded": "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=${NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT-false} playwright test --config console/playwright.embedded.config.mts",
+    "console-platform": "playwright test --config console/playwright.platform.config.mts",
+    "demo-next-mock": "playwright test --config demo-next/playwright.config.mts",
+    "demo-next-real": "NEXTGEN_SERVER_LOGIN_ENABLED=${NEXTGEN_SERVER_LOGIN_ENABLED-false} NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false} NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=${NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT-false} playwright test --config demo-next/playwright.real.config.mts",
+    "demo-nuxt-mock": "playwright test --config demo-nuxt/playwright.config.mts",
+    "e2e-local": "ZITADEL_TELEMETRY=${ZITADEL_TELEMETRY-0} node journey/scripts/run-local.mjs",
+    "journey": "ZITADEL_TELEMETRY=${ZITADEL_TELEMETRY-0} node journey/scripts/run-local.mjs",
+    "journey-local": "ZITADEL_TELEMETRY=${ZITADEL_TELEMETRY-0} node journey/scripts/run-local.mjs --ci --matrix full --runtime binary"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

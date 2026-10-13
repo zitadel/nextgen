@@ -1,0 +1,95 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // One package holds every end-to-end lane, so each lane has its own task
+    // name here and in moon.yml (the four packages it replaces each had an
+    // `e2e` / `e2e-real`, which no longer fit side by side). The lanes boot real
+    // servers and browsers, so none is cached and each passes through the
+    // switches the Playwright configs and the journey runner read — the same
+    // settings the root turbo.json gives its old e2e* tasks.
+    //
+    // Where this differs from moon.yml on purpose: moon's `test` depends on every
+    // lane, so `moon ci :test` runs the suite; turbo's `test` stays the journey
+    // harness unit tests, and ci-turbo.yml runs the lanes as explicit steps.
+    "typecheck": {
+      "dependsOn": ["@zitadel/testing#build"]
+    },
+    "console-smoke": {
+      "dependsOn": ["@zitadel/testing#build", "@zitadel/console#build"],
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+    },
+    // The three real-instance console lanes boot the server build (which embeds
+    // the working tree's UI dists) through the kit. The ports (8093, 8095,
+    // 8097) and the binary path are the Playwright configs' defaults; the
+    // scripts set the NEXTGEN_* switches each lane asserts.
+    "console-real": {
+      "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+    },
+    "console-embedded": {
+      "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+    },
+    "console-platform": {
+      "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+    },
+    // Mock lanes run api-mock's `start` and the demo's `dev`, so they need what
+    // those need rather than a production build of the demo.
+    "demo-next-mock": {
+      "dependsOn": ["@zitadel/testing#build", "@zitadel/api-mock#build", "@zitadel/sdk-next#build"],
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+    },
+    // The same journey against a real ephemeral instance seeded via
+    // @zitadel/testing. The script keeps the server-hosted UIs and the platform
+    // project off.
+    "demo-next-real": {
+      "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+    },
+    "demo-nuxt-mock": {
+      "dependsOn": ["@zitadel/testing#build", "@zitadel/api-mock#build", "@zitadel/sdk-nuxt#build"],
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+    },
+    // The journey harness drives the real CLI binary and imports the kit's
+    // virtual-passkey helper. The scripts default ZITADEL_TELEMETRY to 0.
+    // `e2e-local` is the runner with caller-supplied flags (ci-turbo.yml passes
+    // `--ci …`); `journey` is the by-hand alias; `journey-local` bakes in the
+    // `--ci` set and, like moon's lane of the same name, also depends on every
+    // framework SDK build so an SDK-only change selects it (sdk-next arrives via
+    // cli#build).
+    "e2e-local": {
+      "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build"],
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+    },
+    "journey": {
+      "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build"],
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+    },
+    "journey-local": {
+      "dependsOn": [
+        "@zitadel/cli#build",
+        "@zitadel/testing#build",
+        "@zitadel/sdk-nuxt#build",
+        "@zitadel/sdk-react#build",
+        "@zitadel/sdk-vue#build",
+        "@zitadel/sdk-angular#build",
+        "@zitadel/sdk-solid#build",
+        "@zitadel/sdk-svelte#build",
+        "@zitadel/sdk-qwik#build"
+      ],
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+    }
+  }
+}

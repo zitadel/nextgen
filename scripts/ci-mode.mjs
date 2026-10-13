@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import { appendFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { posix } from "node:path";
 
 import { isDirectRun } from "./dev-process.mjs";
+import { moonTargetOf, taskRunner } from "./task-runner.mjs";
 
 // Decides what the ci workflow runs, in three layers:
 //
@@ -206,7 +208,23 @@ export function resolveGates({ mode, files, targets }) {
   return { gates, matrix, reason: null };
 }
 
-export function queryAffectedTargets(base, spawn = spawnSync) {
+/**
+ * The affected task set as moon `project:task` targets, from whichever task
+ * runner is selected (scripts/task-runner.mjs): moon's own affected query, or
+ * the same walk over turbo's task graph. `files` is the diff, which only the
+ * turbo form needs. Returns null when the query failed — which fails open.
+ */
+export function queryAffectedTargets(
+  base,
+  spawn = spawnSync,
+  { runner = taskRunner(), files = [] } = {},
+) {
+  return runner === "turbo"
+    ? queryTurboAffectedTargets(files, spawn)
+    : queryMoonAffectedTargets(base, spawn);
+}
+
+function queryMoonAffectedTargets(base, spawn) {
   const result = spawn("moon", ["query", "tasks", "--affected", "--downstream", "deep"], {
     encoding: "utf8",
     env: { ...process.env, MOON_BASE: base },
@@ -236,6 +254,124 @@ export function queryAffectedTargets(base, spawn = spawnSync) {
   }
 }
 
+// Every non-persistent task name in turbo.json: a `--dry=json` over all of
+// them is the whole task graph, with each task's hashed inputs and dependents.
+const TURBO_GRAPH_TASKS = [
+  "lint",
+  "typecheck",
+  "build",
+  "test",
+  "build-release",
+  "install-browsers",
+  "generate",
+  "sync-schemas",
+  "sync",
+  "sync:export",
+  "readme",
+  "format",
+  "vet",
+  "openapi",
+  "check-generate",
+  "check-generate-pruned",
+  "clean-generated",
+  "test-postgres",
+  "test-sqlite",
+  "test-spanner",
+  "test:integration",
+  "e2e",
+  "e2e-real",
+  "e2e-embedded",
+  "e2e-platform",
+  "e2e-local",
+  "e2e-testkit",
+  "console-smoke",
+  "console-real",
+  "console-embedded",
+  "console-platform",
+  "demo-next-mock",
+  "demo-next-real",
+  "demo-nuxt-mock",
+  "journey",
+  "journey-local",
+  "changesets",
+  "check-graph",
+  "build-public-packages",
+  "version",
+  "pack",
+  "snapshot",
+  "publish",
+  "sweep",
+  "summarize",
+  "check-adrs",
+  "check-moon-graph",
+  "check-typecheck",
+  "check-openapi-rules",
+  "doctor",
+  "journey",
+  "build-local-image",
+  "smoke-container",
+  "check",
+];
+
+/**
+ * moon's `--affected --downstream deep` over turbo's graph: the tasks whose
+ * hashed inputs include a changed file are the roots, and everything that
+ * depends on a root, transitively, is affected. Dependencies of a root are
+ * not — `turbo query affectedTasks` lists them, but the gates key on upstream
+ * builds (`api:build`), so that answer would run every lane on every change.
+ * A changed global input (root manifests, the shared configs) affects every
+ * task, as moon's implicitInputs do.
+ */
+export function affectedTurboTargets(graph, files) {
+  if (!Array.isArray(graph?.tasks)) {
+    return null;
+  }
+  const changed = new Set(files);
+  const globalChanged = Object.keys(graph.globalCacheInputs?.files ?? {}).some((file) =>
+    changed.has(file),
+  );
+  const tasks = graph.tasks.filter((task) => task.command !== "<NONEXISTENT>");
+  const byId = new Map(tasks.map((task) => [task.taskId, task]));
+  const roots = tasks.filter(
+    (task) =>
+      globalChanged ||
+      Object.keys(task.inputs ?? {}).some((input) =>
+        changed.has(posix.normalize(posix.join(task.directory ?? "", input))),
+      ),
+  );
+  const affected = new Set();
+  const pending = roots.map((task) => task.taskId);
+  while (pending.length > 0) {
+    const id = pending.pop();
+    if (affected.has(id)) continue;
+    affected.add(id);
+    for (const dependent of byId.get(id)?.dependents ?? []) pending.push(dependent);
+  }
+  return [...affected].map((id) => {
+    const [packageName, taskName] = id.split("#");
+    return moonTargetOf(packageName, taskName);
+  });
+}
+
+function queryTurboAffectedTargets(files, spawn) {
+  const result = spawn("turbo", ["run", ...TURBO_GRAPH_TASKS, "--dry=json"], {
+    encoding: "utf8",
+    env: { ...process.env, TURBO_TELEMETRY_DISABLED: "1" },
+    maxBuffer: 256 * 1024 * 1024,
+  });
+  if (result.status !== 0) {
+    process.stderr.write(result.stderr ?? "");
+    console.error(`# turbo dry run failed (exit ${result.status})`);
+    return null;
+  }
+  try {
+    return affectedTurboTargets(JSON.parse(result.stdout), files);
+  } catch {
+    console.error(`# turbo returned non-JSON stdout: ${String(result.stdout).slice(0, 200)}`);
+    return null;
+  }
+}
+
 function isVersionOutputFile(file) {
   return (
     file === "pnpm-lock.yaml" ||
@@ -260,7 +396,7 @@ function main() {
   const mode = computeMode(files);
 
   const needsQuery = mode === "full" && forceFullReason(files) === null;
-  const targets = needsQuery ? queryAffectedTargets(base) : [];
+  const targets = needsQuery ? queryAffectedTargets(base, spawnSync, { files }) : [];
   const { gates, matrix, reason } = resolveGates({ mode, files, targets });
 
   const lines = [

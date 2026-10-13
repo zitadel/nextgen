@@ -13,7 +13,15 @@
     "test": "node scripts/assert-file.mjs scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts && vitest run scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts",
     "test:all": "pnpm run test",
     "release:snapshot": "moon run release:snapshot",
-    "release:publish": "moon run release:publish"
+    "release:publish": "moon run release:publish",
+    "lint": "biome check . --no-errors-on-unmatched",
+    "check-typecheck": "node scripts/assert-file.mjs scripts/check-typecheck-programs.test.mjs && vitest run scripts/check-typecheck-programs.test.mjs && node scripts/check-typecheck-programs.mjs",
+    "check-openapi-rules": "node scripts/assert-file.mjs scripts/openapi-casing-rules.test.mjs && vitest run scripts/openapi-casing-rules.test.mjs",
+    "check-moon-graph": "node scripts/check-moon-graph.mjs",
+    "check-adrs": "node scripts/check-adrs-index.mjs",
+    "server-debug": "node scripts/run-server-debug.mjs",
+    "build-local-image": "node scripts/build-local-runtime-image.mjs",
+    "smoke-container": "node scripts/smoke-container.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
@@ -25,6 +33,7 @@
     "@vitest/coverage-v8": "catalog:",
     "sharp": "catalog:",
     "tsx": "catalog:",
+    "turbo": "catalog:",
     "typescript": "catalog:",
     "verdaccio": "6.7.4",
     "vite": "catalog:",
