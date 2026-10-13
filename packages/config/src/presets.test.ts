@@ -7,7 +7,7 @@ import {
   SETUP_PRESETS,
 } from "./defaults.js";
 import { flowConfigSchema, schemaConfigSchema } from "./schemas.js";
-import { validateFlowDefinition } from "./validate.js";
+import { validateFlowDefinition } from "./validation/index.js";
 
 /**
  * Preset hygiene: every shipped bundle must be a flow the server would

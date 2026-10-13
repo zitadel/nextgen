@@ -9,52 +9,17 @@
  * every connection under `.zitadel/idps/`.
  *
  * Every rule here is an error, and every message names the file and, where it
- * applies, the step and the slug or key at fault. They are CLI-only for now:
- * the server mirror of the flow-to-schema rules is #1014, and the
- * connection-to-schema rules need the whole tree, which only the CLI has.
+ * applies, the steps and the slug or key at fault, and what to change. They are
+ * CLI-only for now: the server mirror of the flow-to-schema rules is #1014, and
+ * the connection-to-schema rules need the whole tree, which only the CLI has.
  *
  * Warning-grade rules (missing mapping targets in some schemas, typo guards,
  * provisioning pairings) are #1083. State-dependent rules (slug changes,
  * identity-critical revisions, missing variables, literal secrets) are #1043.
  */
 
-export type SsoRuleId =
-  | "sso/flow-enables-sso"
-  | "sso/provider-id"
-  | "sso/connection-resolves"
-  | "sso/outcome-routing"
-  | "sso/collection-conflict-routing"
-  | "sso/empty-claim-mapping"
-  | "sso/unmapped-verification-key"
-  | "sso/orphaned-mapping-target"
-  | "sso/orphaned-verification-key";
-
-export type SsoIssue = {
-  readonly rule: SsoRuleId;
-  /** Project-relative path of the file the issue is in. */
-  readonly file: string;
-  /**
-   * The flow steps the issue is about, when it is about steps. One issue covers
-   * every step with the same problem, so a mistake made on four steps is one
-   * line to read and one fix to make.
-   */
-  readonly steps?: readonly string[];
-  readonly message: string;
-};
-
-/** What the validator reads: the whole working tree, keyed by project-relative path. */
-export type SsoConfigurationTree = {
-  /** Every user schema. */
-  readonly schemas: ReadonlyMap<string, object>;
-  /**
-   * Every flow, with the path of the schema its `user_schema` pins when that
-   * could be worked out. A flow whose schema is unknown still gets the rules
-   * that need no schema.
-   */
-  readonly flows: ReadonlyMap<string, { readonly body: object; readonly schemaPath?: string }>;
-  /** Every connection under `.zitadel/idps/`. */
-  readonly connections: ReadonlyMap<string, object>;
-};
+import type { ProjectRuleId } from "./rules.js";
+import type { ProjectIssue, ProjectTree } from "./types.js";
 
 /** Outcomes a step offering providers must route. `sso_authenticated` is the one the engine also requires. */
 const SSO_OUTCOMES = ["sso_authenticated", "sso_user_not_found", "user_already_exists"] as const;
@@ -120,24 +85,25 @@ const stepsText = (steps: readonly string[]) =>
 const createsUsers = (connection: Json | undefined) =>
   !isObject(connection?.provisioning) || connection.provisioning.creation !== "disabled";
 
-/** Validate the SSO configuration across files. Pure: collects every issue, never throws. */
-export function validateSsoConfiguration(tree: SsoConfigurationTree): SsoIssue[] {
-  const issues: SsoIssue[] = [];
-  const add = (issue: SsoIssue) => issues.push(issue);
+/** The SSO rules: schemas, flows and connection files read together. */
+export function ssoRules(tree: ProjectTree): ProjectIssue[] {
+  const issues: ProjectIssue[] = [];
+  const add = (issue: Omit<ProjectIssue, "severity">) =>
+    issues.push({ severity: "error", ...issue });
 
   // A mistake made on several steps is one cause. Steps are gathered under the
   // rule, file and subject they share, and each group becomes one issue.
   const groups = new Map<
     string,
     {
-      rule: SsoRuleId;
+      rule: ProjectRuleId;
       file: string;
       steps: string[];
       message: (steps: readonly string[]) => string;
     }
   >();
   const onStep = (
-    rule: SsoRuleId,
+    rule: ProjectRuleId,
     file: string,
     subject: string,
     step: string,

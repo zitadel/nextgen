@@ -28,37 +28,8 @@
  * only until then.
  */
 
-export type FlowValidationSeverity = "error" | "warning";
-
-export type FlowValidationIssue = {
-  severity: FlowValidationSeverity;
-  /** Stable rule id from {@link FLOW_VALIDATION_RULES}. */
-  rule: FlowValidationRuleId;
-  /** Mirrors the Go `ErrFlowDefinitionInvalid` detail string where a Go rule exists. */
-  message: string;
-  /** Step the issue is anchored to, when applicable. */
-  step?: string;
-};
-
-/**
- * Rule registry: rule id → the Go function it ports. `goRef: null` marks
- * CLI-only guidance with no server counterpart.
- */
-export const FLOW_VALIDATION_RULES = {
-  "step-names": { goRef: "stepNamesMap" },
-  definition: { goRef: "validateDefinition" },
-  steps: { goRef: "validateSteps" },
-  graph: { goRef: "validateGraph" },
-  cycles: { goRef: "validateCycles" },
-  "flip-table": { goRef: "validateFlipTableCoverage" },
-  "schema/required-fields": { goRef: "validateRequiredUserSchemaFields" },
-  "schema/fields-resolve": { goRef: "resolveAllStepFields" },
-  "schema/passkey-actions": { goRef: "validatePasskeyActionsEnabled" },
-  "schema/on-success-manifest": { goRef: "validateOnSuccessManifests" },
-  "warn/password-without-identifier": { goRef: null },
-} as const;
-
-export type FlowValidationRuleId = keyof typeof FLOW_VALIDATION_RULES;
+import type { FlowRuleId } from "./rules.js";
+import type { FlowValidationIssue } from "./types.js";
 
 /** Mirrors `reservedOutcomes` in flow_definition_validator.go. */
 export const RESERVED_OUTCOMES = [
@@ -272,7 +243,7 @@ function q(value: string): string {
   return JSON.stringify(value);
 }
 
-function error(rule: FlowValidationRuleId, message: string, step?: string): FlowValidationIssue {
+function error(rule: FlowRuleId, message: string, step?: string): FlowValidationIssue {
   return step === undefined
     ? { severity: "error", rule, message }
     : { severity: "error", rule, message, step };
@@ -912,10 +883,3 @@ function validateAgainstSchema(def: FlowDef, schema: object): FlowValidationIssu
 
   return issues;
 }
-
-export {
-  validateSsoConfiguration,
-  type SsoConfigurationTree,
-  type SsoIssue,
-  type SsoRuleId,
-} from "./validate-sso.js";

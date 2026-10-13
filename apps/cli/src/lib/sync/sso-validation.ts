@@ -1,6 +1,6 @@
 import { basename } from "node:path";
 
-import { type SsoConfigurationTree, validateSsoConfiguration } from "@zitadel/config/validate";
+import { type ProjectTree, validateProject } from "@zitadel/config/validate";
 
 import { ZitadelError } from "../errors";
 import { FLOWS_DIR } from "../flows";
@@ -67,9 +67,9 @@ export function validatePlannedSso(opts: {
       return [path, { body, schemaPath }];
     }),
   );
-  const tree: SsoConfigurationTree = { schemas, flows, connections: inDir(IDPS_DIR) };
+  const tree: ProjectTree = { schemas, flows, connections: inDir(IDPS_DIR) };
 
-  const issues = validateSsoConfiguration(tree);
+  const issues = validateProject(tree);
   if (issues.length === 0) {
     return;
   }
