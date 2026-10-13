@@ -77,7 +77,7 @@ describe("origin rm", () => {
     expect(result.exitCode).toBe(0);
     expect(removed).toEqual([{ pattern: "https://app.acme.com" }]);
     expect(parseJson(result.stdout)).toMatchObject({
-      data: { pattern: "https://app.acme.com", removed: true },
+      data: { pattern: "https://app.acme.com", deleted: true },
     });
   });
 

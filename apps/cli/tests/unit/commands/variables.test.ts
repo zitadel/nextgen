@@ -96,11 +96,16 @@ describe("variables list", () => {
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as {
       status: string;
-      data: { count: number; variables: Array<Record<string, unknown>> };
+      data: {
+        count: number;
+        next_page_token: string | null;
+        items: Array<Record<string, unknown>>;
+      };
     };
     expect(json.status).toBe("ok");
     expect(json.data.count).toBe(2);
-    expect(json.data.variables).toEqual([
+    expect(json.data.next_page_token).toBeNull();
+    expect(json.data.items).toEqual([
       { name: "GOOGLE_CLIENT_ID", secret: false, value: "999-prod" },
       { name: "GOOGLE_CLIENT_SECRET", secret: true },
     ]);
@@ -115,8 +120,8 @@ describe("variables list", () => {
 
     const res = await runCliForTest(["variables", "list", "--project-level", ...base(cwd)]);
 
-    const json = parseJson(res.stdout) as { data: { variables: Array<Record<string, unknown>> } };
-    expect(json.data.variables[0]).not.toHaveProperty("value");
+    const json = parseJson(res.stdout) as { data: { items: Array<Record<string, unknown>> } };
+    expect(json.data.items[0]).not.toHaveProperty("value");
   });
 
   it("sends no environment_name, so the project level is the owner", async () => {

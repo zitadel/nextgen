@@ -88,8 +88,8 @@ describe("resources", () => {
 
         const result = await app.run(["resources", "--json"]);
 
-        const { data } = app.envelopeOf<{ resources: ResourceRow[] }>(result);
-        expect(data.resources.map((row) => row.topic)).toEqual(
+        const { data } = app.envelopeOf<{ items: ResourceRow[] }>(result);
+        expect(data.items.map((row) => row.topic)).toEqual(
           expect.arrayContaining(["users", "teams", "sessions", "idps", "schemas"]),
         );
       });
@@ -99,8 +99,8 @@ describe("resources", () => {
 
         const result = await app.run(["resources", "--json"]);
 
-        const { data } = app.envelopeOf<{ resources: ResourceRow[] }>(result);
-        for (const row of data.resources) {
+        const { data } = app.envelopeOf<{ items: ResourceRow[] }>(result);
+        for (const row of data.items) {
           expect(row.verbs ?? [], `${row.topic} lists no verbs`).not.toEqual([]);
         }
       });

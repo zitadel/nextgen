@@ -24,6 +24,18 @@ Scope pointers first — this file's own body covers **telemetry only**:
   `reportWarning` shows it in the terminal at once and adds it to the JSON
   envelope's `warnings`, and `emit` prints a result's `warnings` after its
   `pretty` text. A unit test fails on any other `consola.warn` call.
+- A command's JSON `data` has a fixed shape, built through the helpers in
+  `src/lib/oclif/envelope.ts`, never an object literal: a collection is
+  `listData(items)` → `{ items, count, next_page_token }` (single-page passes
+  `nextPageToken: null`); a delete is `deletedData(identifier)` → `{ …id,
+  deleted: true }`; a lifecycle mutation is `mutatedData(id, verb)`. The verb is
+  always `deleted`/`revoked`/`deactivated`, **never `removed`**. `assertEnvelope`
+  (in `tests/helpers/project.ts`) enforces this on every `--json` spec — a `list`
+  command that does not emit `items`, or any command that confirms with
+  `removed`, fails in its own spec — so the shapes cannot drift between commands
+  and an agent reads every command's output the same way. The terminal rendering
+  of a list goes through `renderList` (`src/lib/oclif/crud/table.ts`), which owns
+  the `--plain`/TTY/empty/footer logic so no list forgets `--plain`.
 - Managed env files (`.env.<name>.local`, which may carry a credential) are
   written **only** through `writeManagedEnvFile` / `appendManagedEnvValue` in
   `src/lib/fs-safe.ts`. Never call `node:fs` `writeFile`/`chmod` on one

@@ -1,7 +1,8 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, OwnerCommand, type JsonEnvelope } from "../../lib/oclif";
-import { renderRows, renderTable } from "../../lib/oclif/crud/table";
+import { renderList } from "../../lib/oclif/crud/table";
+import { listData } from "../../lib/oclif/envelope";
 import { toVariableRows, variableCells } from "../../lib/variables";
 
 /** The columns `list` renders, in order. */
@@ -43,19 +44,12 @@ export default class VariablesList extends OwnerCommand {
     const plain = flags.plain || !process.stdout.isTTY;
     return this.emit({
       status: "ok",
-      data: {
-        variables: rows,
-        count: rows.length,
-      },
-      pretty: plain
-        ? renderRows(COLUMNS, cells)
-        : rows.length === 0
-          ? "No variables on the project."
-          : [
-              renderTable(COLUMNS, cells),
-              "",
-              `${rows.length} ${rows.length === 1 ? "variable" : "variables"}`,
-            ].join("\n"),
+      data: listData(rows),
+      pretty: renderList(COLUMNS, cells, {
+        plain,
+        singular: "variable",
+        empty: "No variables on the project.",
+      }),
     });
   }
 }
