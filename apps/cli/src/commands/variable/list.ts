@@ -1,7 +1,8 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { renderRows, renderTable } from "../../lib/oclif/crud/table";
+import { renderList } from "../../lib/oclif/crud/table";
+import { listData } from "../../lib/oclif/envelope";
 import { toVariableRows, variableCells, variableScope } from "../../lib/variables";
 
 /** The columns `list` renders, in order. */
@@ -52,23 +53,12 @@ export default class VariableList extends EnvironmentCommand {
       : "No variables on the project.";
     return this.emit({
       status: "ok",
-      data: {
-        // The canonical list envelope every list command emits, so an agent can
-        // read any of them through `{ items, count, next_page_token }`. This
-        // endpoint returns the whole set in one page, so the token is null.
-        items: rows,
-        count: rows.length,
-        next_page_token: null,
-      },
-      pretty: plain
-        ? renderRows(COLUMNS, cells)
-        : rows.length === 0
-          ? empty
-          : [
-              renderTable(COLUMNS, cells),
-              "",
-              `${rows.length} ${rows.length === 1 ? "variable" : "variables"}`,
-            ].join("\n"),
+      data: listData(rows),
+      pretty: renderList(COLUMNS, cells, {
+        plain,
+        singular: "variable",
+        empty,
+      }),
     });
   }
 }

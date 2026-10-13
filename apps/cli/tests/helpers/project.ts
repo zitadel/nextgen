@@ -740,6 +740,64 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
   if (envelope.status === "error") {
     expect(envelope.code, `${where}: error envelope carries no code`).toBeTypeOf("string");
   }
+  assertDataShape(where, args, envelope);
+}
+
+/**
+ * The `data`-shape half of the contract, enforced on every command so an agent
+ * reads every command's output the same way. Classed off the command verb so it
+ * never false-positives on a non-list payload that happens to carry an array
+ * (e.g. `variable resolve`'s `origins`): a `list` command must use the canonical
+ * `{ items, count, next_page_token }` envelope (`listData`), and no command may
+ * confirm a delete with `removed` instead of `deleted` (`deletedData`). A
+ * divergent shape fails in that command's own spec, not a central list someone
+ * forgot to update.
+ */
+function assertDataShape(where: string, args: string[], envelope: Envelope): void {
+  if (envelope.status !== "ok") {
+    return;
+  }
+  const data = envelope.data as Record<string, unknown> | undefined;
+  if (!data || typeof data !== "object") {
+    return;
+  }
+  const words = args.filter((arg) => !arg.startsWith("-"));
+  const verb = words[words.length - 1];
+
+  if (verb === "list") {
+    expect(
+      Array.isArray(data.items),
+      `${where}: a \`list\` command must emit its rows under \`items\` (use listData())`,
+    ).toBe(true);
+  }
+  if (Array.isArray(data.items)) {
+    expect(typeof data.count, `${where}: a list envelope needs a numeric \`count\``).toBe("number");
+    const token = data.next_page_token;
+    expect(
+      token === null || typeof token === "string",
+      `${where}: a list envelope needs \`next_page_token\` (string or null), got ${JSON.stringify(token)}`,
+    ).toBe(true);
+  }
+  expect(
+    Object.hasOwn(data, "removed"),
+    `${where}: confirm a delete with \`deleted: true\`, never \`removed\` (use deletedData())`,
+  ).toBe(false);
+}
+
+/**
+ * Runs `fn` with stdout reporting as a terminal, so a list command renders its
+ * aligned table instead of the piped tab-separated rows it emits off a TTY.
+ * The in-process runner shares this process's `process.stdout`, so a terminal
+ * assertion must flip `isTTY` around the call.
+ */
+export async function onATerminal<T>(fn: () => Promise<T>): Promise<T> {
+  const original = process.stdout.isTTY;
+  process.stdout.isTTY = true;
+  try {
+    return await fn();
+  } finally {
+    process.stdout.isTTY = original;
+  }
 }
 
 /**

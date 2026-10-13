@@ -28,8 +28,8 @@ async function projectOf(app: ScaffoldedApp, name: string): Promise<string | und
 async function boundEnvironments(app: ScaffoldedApp): Promise<string[]> {
   const result = await app.run(["env", "list", "--json"]);
   return app
-    .envelopeOf<{ environments: Array<{ name: string }> }>(result)
-    .data.environments.map((entry) => entry.name);
+    .envelopeOf<{ items: Array<{ name: string }> }>(result)
+    .data.items.map((entry) => entry.name);
 }
 
 describe("env add", () => {
