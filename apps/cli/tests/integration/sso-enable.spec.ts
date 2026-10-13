@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import { usePlatformMock } from "../helpers/platform";
 import {
   aSetUpApp,
-  anApp,
   type CliResult,
   type CustomConnection,
   type ScaffoldedApp,
@@ -63,6 +62,13 @@ async function anAppServing(provider: Provider): Promise<ScaffoldedApp> {
   const app = await anAppWith(provider);
   await app.apply();
   return app;
+}
+
+/** Enables the provider on a project that already has it, failing loudly if that does not succeed. */
+async function enableAgain(provider: Provider, app: ScaffoldedApp): Promise<CliResult> {
+  const result = await provider.enable(app);
+  expect(result).toSucceed();
+  return result;
 }
 
 /** A set-up project with a custom connection enabled, not applied, for specs that only plan. */
@@ -216,11 +222,19 @@ describe("sso enable", () => {
           expect(await app.registeredIdps()).toEqual([]);
         });
 
+        it("succeeds when enabled again", async () => {
+          const app = await anAppServing(provider);
+
+          const result = await provider.enable(app);
+
+          expect(result).toSucceed();
+        });
+
         it("changes no file when enabled again", async () => {
           const app = await anAppServing(provider);
           const files = await app.snapshot();
 
-          await provider.enable(app);
+          await enableAgain(provider, app);
 
           expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
         });
@@ -228,7 +242,7 @@ describe("sso enable", () => {
         it("leaves nothing to reconcile when enabled again", async () => {
           const app = await anAppServing(provider);
 
-          await provider.enable(app);
+          await enableAgain(provider, app);
 
           expect(await app.plan()).toReportNothingToDo();
         });
@@ -237,7 +251,7 @@ describe("sso enable", () => {
           const app = await anAppServing(provider);
           const before = await app.projectVariables();
 
-          await provider.enable(app);
+          await enableAgain(provider, app);
 
           expect(await app.projectVariables()).toEqual(before);
         });
@@ -390,7 +404,7 @@ describe("sso enable", () => {
           const app = await aSetUpApp();
           await app.enableCustomSso({ ...ACME, scopes: "openid groups" }, ACME_CREDENTIALS);
 
-          const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS);
+          const result = await enableAgain(PROVIDERS[1] as Provider, app);
 
           expect(result).not.toSay("not applied");
         });
@@ -409,7 +423,7 @@ describe("sso enable", () => {
         it("does not warn when nothing differs", async () => {
           const app = await anAppWithAcme();
 
-          const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS);
+          const result = await enableAgain(PROVIDERS[1] as Provider, app);
 
           expect(result).not.toSay("not applied");
         });
@@ -442,12 +456,12 @@ describe("sso enable", () => {
       });
 
       describe("a custom connection the command refuses", () => {
-        it("stops before the project is read", async () => {
-          const app = await anApp();
+        it("names the slug flag to fix", async () => {
+          const app = await aSetUpApp();
 
           const result = await app.enableCustomSso({ ...ACME, slug: "google" }, ACME_CREDENTIALS);
 
-          expect(result).toFailWith("E_VALIDATION");
+          expect(result).toExplain("--slug");
         });
       });
 

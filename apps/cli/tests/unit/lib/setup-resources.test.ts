@@ -494,6 +494,40 @@ describe("materializeSetupResources with a social provider", () => {
     expect(kept.mine).toBe(true);
   });
 
+  it("does not read the connection files when no provider was chosen", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(join(cwd, IDPS_DIR, "draft.json"), "{not json");
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: recordingClient(),
+        projectId: "project_123",
+        force: false,
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  it("names setup's own slug flag when it refuses a connection to another issuer", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, IDPS_DIR, "acme.json"),
+      JSON.stringify({ slug: "acme", oidc: { issuer: "https://sso.other.example" } }),
+    );
+
+    const error = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: recordingClient(),
+      projectId: "project_123",
+      force: false,
+      sso: [{ selection: acmeSelection }],
+    }).catch((err: unknown) => err);
+
+    expect((error as { hint?: string }).hint).toContain("--sso-slug");
+  });
+
   it("suggests enabling the provider that was chosen, not always Google", async () => {
     await mkdir(join(cwd, IDPS_DIR), { recursive: true });
     await writeFile(

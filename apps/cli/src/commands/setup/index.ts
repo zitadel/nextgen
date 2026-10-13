@@ -39,7 +39,9 @@ import {
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import {
   customFlagText,
+  checkGivenCustomFlags,
   customFlagValues,
+  flagText,
   ENABLE_FLAG_NAMES,
   givenCustomFlags,
   loopbackIssuerWarning,
@@ -49,6 +51,7 @@ import {
   reportClientIdOutcome,
   reportSecretOutcome,
   republishCommands,
+  SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
   storeClientSecret,
   type SecretOutcome,
@@ -183,7 +186,7 @@ export default class Setup extends BaseCommand {
     // hidden so scripts and agents still passing it get a targeted error
     // pointing at `branding eject` instead of oclif's unknown-flag error.
     design: nonBlankString({ hidden: true }),
-    sso: Flags.string({
+    [SETUP_FLAG_KEYS.provider]: Flags.string({
       description:
         "Social sign-in provider to enable while scaffolding, e.g. google. Skips the wizard's provider question; needs --sso-client-id, and the OAuth application must already be registered with the provider. Pipe the client secret in on stdin; never pass it as a flag.",
       options: [...IDP_PROVIDERS, CUSTOM_PROVIDER],
@@ -191,17 +194,17 @@ export default class Setup extends BaseCommand {
     "sso-client-id": nonBlankString({
       description: "Client id of the OAuth application registered with the --sso provider.",
     }),
-    "sso-slug": nonBlankString({
+    [SETUP_FLAG_KEYS.slug]: nonBlankString({
       description: "With --sso custom: the name of the connection. Schemas and flows refer to it.",
     }),
-    "sso-display-name": nonBlankString({
+    [SETUP_FLAG_KEYS.displayName]: nonBlankString({
       description: "With --sso custom: the name shown on the sign-in button.",
     }),
-    "sso-issuer": nonBlankString({
+    [SETUP_FLAG_KEYS.issuer]: nonBlankString({
       description:
         "With --sso custom: the provider's issuer URL. Its endpoints come from OIDC discovery.",
     }),
-    "sso-scopes": nonBlankString({
+    [SETUP_FLAG_KEYS.scopes]: nonBlankString({
       description:
         "With --sso custom: the scopes to request, separated by spaces or commas. Must include openid. Default: openid profile email.",
     }),
@@ -226,15 +229,20 @@ export default class Setup extends BaseCommand {
     // another reason, so a slug the server would refuse is named even when the
     // server is down. A custom connection whose settings the wizard will ask for
     // is checked once they are all there.
-    const customValues = customFlagValues(flags, "sso-");
+    const customValues = customFlagValues(flags, SETUP_FLAG_KEYS);
     const settingsGiven =
       customValues.slug !== undefined &&
       customValues.displayName !== undefined &&
       customValues.issuer !== undefined;
-    if (
-      flags.sso !== undefined &&
-      (flags.sso !== CUSTOM_PROVIDER || settingsGiven || flags["non-interactive"])
-    ) {
+    // A run with no terminal, or asked for JSON, has nobody to ask for what is
+    // missing, so it is held to the full description.
+    const scripted = Boolean(
+      flags["non-interactive"] || this.jsonEnabled() || !process.stdin.isTTY,
+    );
+    if (flags.sso === CUSTOM_PROVIDER) {
+      checkGivenCustomFlags(customValues, SETUP_FLAG_NAMES);
+    }
+    if (flags.sso !== undefined && (flags.sso !== CUSTOM_PROVIDER || settingsGiven || scripted)) {
       selectionFromFlags(flags.sso, customValues, SETUP_FLAG_NAMES, SSO_CUSTOM_EXAMPLE);
     }
     try {
@@ -895,7 +903,7 @@ const SSO_CUSTOM_EXAMPLE =
  * on stdin means nothing was piped, and reading it would block forever, so
  * that case is treated as "not supplied".
  */
-async function ssoFromFlags(
+export async function ssoFromFlags(
   flags: {
     sso?: string;
     "sso-client-id"?: string;
@@ -907,7 +915,7 @@ async function ssoFromFlags(
   nonInteractive: boolean,
   dryRun: boolean,
 ): Promise<SsoDraft | undefined> {
-  const customValues = customFlagValues(flags, "sso-");
+  const customValues = customFlagValues(flags, SETUP_FLAG_KEYS);
   if (flags.sso === undefined) {
     if (flags["sso-client-id"] !== undefined) {
       throw new ZitadelError("E_VALIDATION", "--sso-client-id needs --sso", {
@@ -985,7 +993,7 @@ async function ssoFromFlags(
  * Suggested retries are followed verbatim (especially by agents), so dropping
  * a flag here silently changes what the retry scaffolds.
  */
-type SetupRetryOptions = {
+export type SetupRetryOptions = {
   /**
    * The directory setup was pointed at, when it was not the shell's own.
    * Named in the guidance rather than passed as `--cwd` in the command text:
@@ -1002,6 +1010,12 @@ type SetupRetryOptions = {
   devPort?: number;
   nonInteractive?: boolean;
   /**
+   * The `--sso` flags as typed, when they could not be resolved to a provider
+   * yet: a custom connection described in part, which the wizard completes.
+   * Dropping them would send the developer back without what they typed.
+   */
+  ssoTyped?: string;
+  /**
    * The social provider and its client id. The secret is deliberately absent:
    * a retry asks for it again, or takes it on stdin, because putting a
    * credential in suggested command text is exactly what piping the secret
@@ -1017,7 +1031,7 @@ type SetupRetryOptions = {
  * ending in `--server local`. Flags whose resolved value equals the default
  * are omitted — the retry reproduces the same outcome without them.
  */
-function setupRetryFlags(opts: SetupRetryOptions): string {
+export function setupRetryFlags(opts: SetupRetryOptions): string {
   const parts: string[] = [];
   if (opts.framework) {
     parts.push(`--framework ${opts.framework}`);
@@ -1041,6 +1055,9 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
   // `--sso` makes the rerun skip the multi-select, so a provider left out here
   // could not be reselected.
   const [firstSso] = opts.sso ?? [];
+  if (firstSso === undefined && opts.ssoTyped !== undefined) {
+    parts.push(opts.ssoTyped);
+  }
   if (firstSso) {
     // Provider only. `--sso-client-id` would interpolate a value the wizard
     // accepted on emptiness alone into a command run verbatim, and nothing
@@ -1058,19 +1075,23 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
   // fails the moment it is run. Interactively the rerun asks for the secret,
   // which is the one way a plain command can obtain it -- putting it in the
   // command text is never an option.
-  if (opts.nonInteractive && firstSso === undefined) {
+  if (opts.nonInteractive && firstSso === undefined && opts.ssoTyped === undefined) {
     parts.push("--non-interactive");
   }
   parts.push("--server local");
   return parts.join(" ");
 }
 
+/** Whether `--sso` names a provider this CLI offers. */
+const isKnownSsoName = (name: string): boolean =>
+  name === CUSTOM_PROVIDER || (IDP_PROVIDERS as readonly string[]).includes(name);
+
 /**
  * Retry options straight from parsed flags, for failures before the wizard
  * resolves answers. `--non-interactive` is echoed only when explicitly passed
  * — TTY/JSON-inferred non-interactivity re-infers itself on the retry.
  */
-function retryOptionsFromFlags(flags: {
+export function retryOptionsFromFlags(flags: {
   cwd?: string;
   framework?: string;
   preset?: string;
@@ -1100,7 +1121,7 @@ function retryOptionsFromFlags(flags: {
     try {
       selection = selectionFromFlags(
         flags.sso,
-        customFlagValues(flags, "sso-"),
+        customFlagValues(flags, SETUP_FLAG_KEYS),
         SETUP_FLAG_NAMES,
         "",
       );
@@ -1108,7 +1129,16 @@ function retryOptionsFromFlags(flags: {
       selection = undefined;
     }
   }
+  // What was typed for a provider this run knows, kept when it cannot become a
+  // selection yet, so a retry reproduces it.
+  const typed =
+    selection === undefined && flags.sso !== undefined && isKnownSsoName(flags.sso)
+      ? [`--sso ${flags.sso}`, flagText(customFlagValues(flags, SETUP_FLAG_KEYS), SETUP_FLAG_NAMES)]
+          .filter((part) => part !== "")
+          .join(" ")
+      : undefined;
   return {
+    ssoTyped: typed,
     framework: flags.framework,
     preset: flags.preset as SetupPreset | undefined,
     useCase: flags["use-case"] as SetupUseCase | undefined,

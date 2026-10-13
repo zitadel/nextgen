@@ -315,6 +315,8 @@ function planCatalogConnection(options: {
   readonly provider: IdpProvider;
   readonly files: readonly ConnectionFile[];
   readonly clientId?: ClientId;
+  /** How the calling command spells the slug flag, for the hints. */
+  readonly slugFlag: string;
 }): ConnectionPlan {
   const entry = options.provider;
   const slug = entry.slug;
@@ -365,11 +367,18 @@ function planCatalogConnection(options: {
   const path = `${IDPS_DIR}/${name}`;
   const occupied = options.files.find((file) => file.name === name);
   if (occupied !== undefined) {
+    const theirSlug = String(occupied.body.slug ?? "").trim();
+    // The same name on a connection to somewhere else is not the provider's.
     throw new ZitadelError(
       "E_CONFLICT",
-      `${path} already exists and its slug is ${String(occupied.body.slug ?? "missing")}, not ${slug}`,
+      theirSlug === slug
+        ? `${path} is a connection called ${slug}, but not to ${entry.displayName}: its issuer is not ${entry.issuer}`
+        : `${path} already exists and its slug is ${theirSlug === "" ? "missing" : theirSlug}, not ${slug}`,
       {
-        hint: `Rename or remove that file, or give it the slug ${slug} if it is the ${entry.displayName} connection, then run the command again.`,
+        hint:
+          theirSlug === slug
+            ? `Point it at ${entry.displayName} if it is that connection, or rename it and choose another ${options.slugFlag}, then run the command again.`
+            : `Rename or remove that file, or give it the slug ${slug} if it is the ${entry.displayName} connection, then run the command again.`,
         details: { file: path, slug: occupied.body.slug ?? null },
       },
     );
@@ -439,6 +448,8 @@ function planCustomConnection(options: {
   readonly clientId?: ClientId;
   /** Whether `--scopes` was passed: a default nobody asked for has not been contradicted. */
   readonly scopesGiven?: boolean;
+  /** How the calling command spells the slug flag, for the hints. */
+  readonly slugFlag: string;
 }): ConnectionPlan {
   const { slug, issuer } = options.input;
   const name = `${slug}.json`;
@@ -464,7 +475,7 @@ function planCustomConnection(options: {
         "E_CONFLICT",
         `${path} already exists and is not the ${slug} connection`,
         {
-          hint: "Rename or remove that file, or choose another --slug, then run the command again.",
+          hint: `Rename or remove that file, or choose another ${options.slugFlag}, then run the command again.`,
           details: { file: path, slug },
         },
       );
@@ -483,7 +494,7 @@ function planCustomConnection(options: {
         ? `${match.path} is already named ${slug} and is not an OIDC connection to ${issuer}`
         : `${match.path} is already named ${slug} and connects to ${existingIssuer}, not ${issuer}`,
       {
-        hint: "An applied connection keeps its issuer, and the server compares it exactly, so even a trailing slash names another provider. Choose another --slug for this connection, then move the schemas and flows that name the old one to it.",
+        hint: `An applied connection keeps its issuer, and the server compares it exactly, so even a trailing slash names another provider. Choose another ${options.slugFlag} for this connection, then move the schemas and flows that name the old one to it.`,
         details: { file: match.path, slug, issuer, existing_issuer: existingIssuer ?? null },
       },
     );
@@ -522,9 +533,11 @@ export function planConnection(options: {
   readonly files: readonly ConnectionFile[];
   readonly clientId?: ClientId;
   readonly scopesGiven?: boolean;
+  /** How the calling command spells the slug flag, for the hints. */
+  readonly slugFlag: string;
 }): ConnectionPlan {
-  const { selection, files, clientId, scopesGiven } = options;
+  const { selection, files, clientId, scopesGiven, slugFlag } = options;
   return selection.kind === "custom"
-    ? planCustomConnection({ input: selection.connection, files, clientId, scopesGiven })
-    : planCatalogConnection({ provider: idpProvider(selection.id), files, clientId });
+    ? planCustomConnection({ input: selection.connection, files, clientId, scopesGiven, slugFlag })
+    : planCatalogConnection({ provider: idpProvider(selection.id), files, clientId, slugFlag });
 }

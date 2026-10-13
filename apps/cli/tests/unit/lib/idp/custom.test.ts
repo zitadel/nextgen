@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { ZitadelError } from "../../../../src/lib/errors";
+import SsoEnable from "../../../../src/commands/sso/enable";
+import Setup from "../../../../src/commands/setup";
 import {
+  checkGivenCustomFlags,
   customFlagText,
+  ENABLE_FLAG_KEYS,
+  flagText,
+  SETUP_FLAG_KEYS,
   customFlagValues,
   ENABLE_FLAG_NAMES,
   givenCustomFlags,
@@ -155,25 +161,50 @@ describe("customFlagText", () => {
 });
 
 describe("customFlagValues", () => {
-  it("reads the settings under either prefix", () => {
+  it("reads the settings under the keys the command defines them by", () => {
     expect(
-      customFlagValues({ slug: "a", "display-name": "A", issuer: "https://a.example" }, ""),
+      customFlagValues(
+        { slug: "a", "display-name": "A", issuer: "https://a.example" },
+        ENABLE_FLAG_KEYS,
+      ),
     ).toEqual({
       slug: "a",
       displayName: "A",
       issuer: "https://a.example",
       scopes: undefined,
     });
-    expect(customFlagValues({ "sso-slug": "a", "sso-scopes": "openid" }, "sso-")).toEqual({
+  });
+
+  it("reads setup's own keys, not enable's", () => {
+    expect(customFlagValues({ "sso-slug": "a", "sso-scopes": "openid" }, SETUP_FLAG_KEYS)).toEqual({
       slug: "a",
       displayName: undefined,
       issuer: undefined,
       scopes: "openid",
     });
   });
+});
 
-  it("ignores a value that is not text", () => {
-    expect(customFlagValues({ slug: 3 }, "").slug).toBeUndefined();
+describe("the flag keys and the names built from them", () => {
+  it.each([
+    ["enable", ENABLE_FLAG_KEYS, ENABLE_FLAG_NAMES],
+    ["setup", SETUP_FLAG_KEYS, SETUP_FLAG_NAMES],
+  ])("name each %s flag after its key", (_command, keys, names) => {
+    expect(names).toEqual(
+      Object.fromEntries(Object.entries(keys).map(([setting, key]) => [setting, `--${key}`])),
+    );
+  });
+
+  it("defines every enable key as a flag of sso enable", () => {
+    expect(Object.keys(SsoEnable.flags)).toEqual(
+      expect.arrayContaining(Object.values(ENABLE_FLAG_KEYS)),
+    );
+  });
+
+  it("defines every setup key as a flag of setup", () => {
+    expect(Object.keys(Setup.flags)).toEqual(
+      expect.arrayContaining(Object.values(SETUP_FLAG_KEYS)),
+    );
   });
 });
 
@@ -184,10 +215,38 @@ describe("givenCustomFlags", () => {
       "--sso-scopes",
     ]);
   });
+});
 
-  it("spells the same settings differently for the two commands", () => {
-    expect(ENABLE_FLAG_NAMES.issuer).toBe("--issuer");
-    expect(SETUP_FLAG_NAMES.issuer).toBe("--sso-issuer");
+describe("checkGivenCustomFlags", () => {
+  it("accepts settings that are valid and ignores those that were not given", () => {
+    expect(() => checkGivenCustomFlags({ slug: "acme-sso" }, flag)).not.toThrow();
+  });
+
+  it.each([
+    ["slug", { slug: "Acme" }, "--slug"],
+    ["display name", { displayName: "  " }, "--display-name"],
+    ["issuer", { issuer: "http://sso.acme.example" }, "--issuer"],
+    ["scopes", { scopes: "profile" }, "--scopes"],
+  ])("names the flag of an invalid %s", (_setting, values, expected) => {
+    const error = refusal(() => checkGivenCustomFlags(values, flag));
+
+    expect(error.message).toContain(expected);
+  });
+
+  it("does not insist on the settings it was not given", () => {
+    expect(() => checkGivenCustomFlags({}, flag)).not.toThrow();
+  });
+});
+
+describe("flagText", () => {
+  it("writes only the settings that were given, quoted as shell words", () => {
+    expect(flagText({ slug: "acme-sso", displayName: "Acme SSO" }, SETUP_FLAG_NAMES)).toBe(
+      "--sso-slug acme-sso --sso-display-name 'Acme SSO'",
+    );
+  });
+
+  it("writes nothing when nothing was given", () => {
+    expect(flagText({}, SETUP_FLAG_NAMES)).toBe("");
   });
 });
 

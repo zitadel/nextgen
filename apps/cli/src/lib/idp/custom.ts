@@ -32,46 +32,73 @@ export type CustomFlagNames = {
   readonly scopes: string;
 };
 
-/** The flags on `sso enable`, which a failed setup suggests running instead. */
-export const ENABLE_FLAG_NAMES: CustomFlagNames = {
-  provider: "--provider",
-  slug: "--slug",
-  displayName: "--display-name",
-  issuer: "--issuer",
-  scopes: "--scopes",
-};
+/**
+ * The flag keys the two commands define for a custom connection, once. Each
+ * command builds its flag definitions from these, reads its parsed flags
+ * through them, and the names a message suggests come from them, so renaming
+ * one renames the flag, what is read from it, and what is suggested.
+ */
+export const ENABLE_FLAG_KEYS = {
+  provider: "provider",
+  slug: "slug",
+  displayName: "display-name",
+  issuer: "issuer",
+  scopes: "scopes",
+} as const;
 
 /** The `--sso-*` flags on `setup` that describe the same settings. */
-export const SETUP_FLAG_NAMES: CustomFlagNames = {
-  provider: "--sso",
-  slug: "--sso-slug",
-  displayName: "--sso-display-name",
-  issuer: "--sso-issuer",
-  scopes: "--sso-scopes",
+export const SETUP_FLAG_KEYS = {
+  provider: "sso",
+  slug: "sso-slug",
+  displayName: "sso-display-name",
+  issuer: "sso-issuer",
+  scopes: "sso-scopes",
+} as const;
+
+type FlagKeys = {
+  readonly provider: string;
+  readonly slug: string;
+  readonly displayName: string;
+  readonly issuer: string;
+  readonly scopes: string;
 };
+
+const flagNamesOf = (keys: FlagKeys): CustomFlagNames => ({
+  provider: `--${keys.provider}`,
+  slug: `--${keys.slug}`,
+  displayName: `--${keys.displayName}`,
+  issuer: `--${keys.issuer}`,
+  scopes: `--${keys.scopes}`,
+});
+
+/** The flags on `sso enable`, which a failed setup suggests running instead. */
+export const ENABLE_FLAG_NAMES: CustomFlagNames = flagNamesOf(ENABLE_FLAG_KEYS);
+
+/** The `--sso-*` flags on `setup` that describe the same settings. */
+export const SETUP_FLAG_NAMES: CustomFlagNames = flagNamesOf(SETUP_FLAG_KEYS);
+
+/**
+ * What a command's parsed flags say about a custom connection. Typed by the
+ * keys, so the flags a command parsed must carry them.
+ */
+export function customFlagValues<K extends FlagKeys>(
+  flags: { readonly [P in K["slug" | "displayName" | "issuer" | "scopes"]]?: string },
+  keys: K,
+): CustomFlagValues {
+  const read = (key: string) => (flags as Readonly<Record<string, string | undefined>>)[key];
+  return {
+    slug: read(keys.slug),
+    displayName: read(keys.displayName),
+    issuer: read(keys.issuer),
+    scopes: read(keys.scopes),
+  };
+}
 
 /** The warning a loopback issuer earns, or `undefined`: the server reaches only what its egress allow list permits. */
 export function loopbackIssuerWarning(selection: ProviderSelection): string | undefined {
   return selection.kind === "custom" && isLoopbackIssuer(selection.connection.issuer)
     ? `${selection.connection.issuer} is on this machine, and the server blocks requests to localhost unless NEXTGEN_HTTPCLIENT_ALLOW_LIST allows it, so sign-in will fail until it does.`
     : undefined;
-}
-
-/** What a command's parsed flags say about a custom connection, whichever prefix they carry. */
-export function customFlagValues(
-  flags: Readonly<Record<string, unknown>>,
-  prefix: "" | "sso-",
-): CustomFlagValues {
-  const read = (name: string) => {
-    const value = flags[`${prefix}${name}`];
-    return typeof value === "string" ? value : undefined;
-  };
-  return {
-    slug: read("slug"),
-    displayName: read("display-name"),
-    issuer: read("issuer"),
-    scopes: read("scopes"),
-  };
 }
 
 /** The names of the custom settings that were given, as the command spells them. */
@@ -84,6 +111,37 @@ export function givenCustomFlags(values: CustomFlagValues, flag: CustomFlagNames
   ]
     .filter(([, value]) => value !== undefined)
     .map(([name]) => name as string);
+}
+
+/** One setting's complaint, under the flag that carried it. */
+function checkedUnder<T>(name: string, parsed: Parsed<T>): T {
+  if (!parsed.ok) {
+    throw new ZitadelError("E_VALIDATION", `${name}: ${parsed.problem}`, {
+      hint: `Fix ${name} and run the command again.`,
+      details: { flag: name },
+    });
+  }
+  return parsed.value;
+}
+
+/**
+ * Check the settings that were given, and only those, naming the flag that
+ * carried a bad one. For a run that will ask for the rest: a slug the server
+ * would refuse is refused before the first question, as a missing client id is.
+ */
+export function checkGivenCustomFlags(values: CustomFlagValues, flag: CustomFlagNames): void {
+  if (values.slug !== undefined) {
+    checkedUnder(flag.slug, parseConnectionSlug(values.slug, RESERVED_SLUGS));
+  }
+  if (values.displayName !== undefined) {
+    checkedUnder(flag.displayName, parseDisplayName(values.displayName));
+  }
+  if (values.issuer !== undefined) {
+    checkedUnder(flag.issuer, parseIssuer(values.issuer));
+  }
+  if (values.scopes !== undefined) {
+    checkedUnder(flag.scopes, parseScopes(values.scopes));
+  }
 }
 
 /**
@@ -137,16 +195,7 @@ export function selectionFromFlags(
       details: { missing },
     });
   }
-  // Each setting says what is wrong with it, under the flag that carried it.
-  const checked = <T>(name: string, parsed: Parsed<T>): T => {
-    if (!parsed.ok) {
-      throw new ZitadelError("E_VALIDATION", `${name}: ${parsed.problem}`, {
-        hint: `Fix ${name} and run the command again.`,
-        details: { flag: name },
-      });
-    }
-    return parsed.value;
-  };
+  const checked = checkedUnder;
   return {
     kind: "custom",
     connection: {
@@ -166,12 +215,27 @@ export function selectionFromFlags(
  * credential: the name, issuer and scopes are the developer's own settings.
  */
 export function customFlagText(custom: CustomOidcInput, flag: CustomFlagNames): string {
+  return flagText(
+    {
+      slug: custom.slug,
+      displayName: custom.displayName,
+      issuer: custom.issuer,
+      scopes: custom.scopes.join(" "),
+    },
+    flag,
+  );
+}
+
+/** The same for whichever settings were given, each as one shell word. */
+export function flagText(values: CustomFlagValues, flag: CustomFlagNames): string {
   const word = (value: string) =>
     /^[A-Za-z0-9_@%+=:,./-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
   return [
-    `${flag.slug} ${word(custom.slug)}`,
-    `${flag.displayName} ${word(custom.displayName)}`,
-    `${flag.issuer} ${word(custom.issuer)}`,
-    `${flag.scopes} ${word(custom.scopes.join(" "))}`,
-  ].join(" ");
+    [flag.slug, values.slug],
+    [flag.displayName, values.displayName],
+    [flag.issuer, values.issuer],
+    [flag.scopes, values.scopes],
+  ]
+    .flatMap(([name, value]) => (value === undefined ? [] : [`${name} ${word(value)}`]))
+    .join(" ");
 }

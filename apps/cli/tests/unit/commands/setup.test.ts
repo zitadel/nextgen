@@ -5,9 +5,20 @@ import { join } from "node:path";
 import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { localServerHostsPlatform } from "../../../src/commands/setup";
+vi.mock("../../../src/commands/setup/prompts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  askCustomSettings: vi.fn(),
+}));
+
+import {
+  localServerHostsPlatform,
+  retryOptionsFromFlags,
+  setupRetryFlags,
+  ssoFromFlags,
+} from "../../../src/commands/setup";
+import { askCustomSettings } from "../../../src/commands/setup/prompts";
 import { writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
@@ -812,5 +823,110 @@ describe("setup command", () => {
     // `--use-case business` only appears in the reconstructed retry flags, so
     // its presence proves the non-default use case survived into the guidance.
     expect(res.stdout).toContain("--use-case business");
+  });
+});
+
+describe("a retry after a failure before the wizard", () => {
+  it("keeps the custom settings that were typed, though they do not make a connection yet", () => {
+    const retry = retryOptionsFromFlags({ sso: "custom", "sso-slug": "acme-sso" });
+
+    expect(setupRetryFlags(retry)).toContain("--sso custom --sso-slug acme-sso");
+  });
+
+  it("quotes what was typed for a shell", () => {
+    const retry = retryOptionsFromFlags({
+      sso: "custom",
+      "sso-slug": "acme-sso",
+      "sso-display-name": "Acme's SSO",
+    });
+
+    expect(setupRetryFlags(retry)).toContain("--sso-display-name 'Acme'\\''s SSO'");
+  });
+
+  it("restates a whole connection as before", () => {
+    const retry = retryOptionsFromFlags({
+      sso: "custom",
+      "sso-slug": "acme-sso",
+      "sso-display-name": "Acme",
+      "sso-issuer": "https://sso.acme.example",
+    });
+
+    expect(setupRetryFlags(retry)).toContain("--sso-issuer https://sso.acme.example");
+  });
+
+  it("drops --non-interactive while a provider is being configured, typed in part or not", () => {
+    const retry = retryOptionsFromFlags({
+      sso: "custom",
+      "sso-slug": "acme-sso",
+      "non-interactive": true,
+    });
+
+    expect(setupRetryFlags(retry)).not.toContain("--non-interactive");
+  });
+
+  it("does not carry a provider this CLI does not offer", () => {
+    const retry = retryOptionsFromFlags({ sso: "nonesuch", "sso-slug": "acme-sso" });
+
+    expect(setupRetryFlags(retry)).not.toContain("--sso");
+  });
+});
+
+describe("a custom provider named with --sso", () => {
+  const partial = { sso: "custom", "sso-slug": "acme-sso" };
+
+  it("has the settings it was not given asked for when a person is there", async () => {
+    vi.mocked(askCustomSettings).mockResolvedValueOnce({
+      slug: "acme-sso",
+      displayName: "Acme",
+      issuer: "https://sso.acme.example",
+      scopes: "openid",
+    });
+
+    const draft = await ssoFromFlags(partial, false, false);
+
+    expect(draft?.selection).toMatchObject({ kind: "custom", connection: { displayName: "Acme" } });
+  });
+
+  it("is asked about with what was already typed", async () => {
+    vi.mocked(askCustomSettings).mockClear();
+    vi.mocked(askCustomSettings).mockResolvedValueOnce({
+      slug: "acme-sso",
+      displayName: "Acme",
+      issuer: "https://sso.acme.example",
+      scopes: "openid",
+    });
+
+    await ssoFromFlags(partial, false, false);
+
+    expect(askCustomSettings).toHaveBeenCalledWith(expect.objectContaining({ slug: "acme-sso" }));
+  });
+
+  it("is not asked about when nobody is there to answer", async () => {
+    vi.mocked(askCustomSettings).mockClear();
+
+    await expect(ssoFromFlags(partial, true, false)).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+    expect(askCustomSettings).not.toHaveBeenCalled();
+  });
+});
+
+describe("setup with a custom provider described in part", () => {
+  it("names what is missing when the run cannot ask, whatever the server is doing", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-sso-"));
+    tempDirs.push(cwd);
+
+    const res = await setup(cwd, ["--sso", "custom", "--sso-slug", "acme-sso"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({ code: "E_VALIDATION" });
+  });
+
+  it("refuses a setting that is wrong before anything else", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-sso-"));
+    tempDirs.push(cwd);
+
+    const res = await setup(cwd, ["--sso", "custom", "--sso-slug", "Acme"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({ message: expect.stringContaining("--sso-slug") });
   });
 });

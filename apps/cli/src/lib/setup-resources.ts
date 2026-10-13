@@ -40,6 +40,7 @@ import {
   CONNECTION_SCHEMA_REF,
   customFlagText,
   ENABLE_FLAG_NAMES,
+  SETUP_FLAG_NAMES,
   IDPS_DIR,
   planConnection,
   readConnectionFiles,
@@ -124,7 +125,9 @@ export async function materializeSetupResources(opts: {
     connection: object;
     selection: ProviderSelection;
   }> = [];
-  const files = await readConnectionFiles(opts.cwd);
+  // Read only when a provider was chosen: a leftover file that does not parse
+  // is no reason for a plain setup to fail.
+  const files = (opts.sso ?? []).length > 0 ? await readConnectionFiles(opts.cwd) : [];
   for (const chosen of opts.sso ?? []) {
     const slug = providerOf(chosen.selection).slug;
     const connection = providerOf(chosen.selection).connection({
@@ -140,7 +143,11 @@ export async function materializeSetupResources(opts: {
     // The same questions `sso enable` asks: which file holds the slug, and whose
     // variables would collide. A plan that throws names the conflict; one that
     // says reuse means a connection file already holds this provider.
-    const existing = planConnection({ selection: chosen.selection, files });
+    const existing = planConnection({
+      selection: chosen.selection,
+      files,
+      slugFlag: SETUP_FLAG_NAMES.slug,
+    });
     if (existing.action === "reuse" || (await exists(join(opts.cwd, connectionPath)))) {
       const { hint, nextCommands } = connectionExists(chosen.selection);
       throw new ZitadelError(

@@ -24,7 +24,13 @@ import {
   validated,
 } from "@zitadel/config/idp";
 
-import { askConnectionEndpoints, callbackUriFor, type CustomFlagValues } from "../../../lib/idp";
+import {
+  askConnectionEndpoints,
+  callbackUriFor,
+  type CustomFlagValues,
+  loopbackIssuerWarning,
+} from "../../../lib/idp";
+import { reportWarning } from "../../../lib/warnings";
 import { askParsed } from "../../../lib/prompt-cancel";
 import { issuerFromPort } from "../../../lib/orca";
 
@@ -109,6 +115,11 @@ export class SocialSignInPrompt implements SetupPrompt {
         (name === CUSTOM_PROVIDER
           ? { kind: "custom", connection: await this.askCustom() }
           : { kind: "catalog", id: name });
+      // A custom connection typed in here has not been through the flag checks.
+      const loopback = flagged === undefined ? loopbackIssuerWarning(selection) : undefined;
+      if (loopback !== undefined) {
+        reportWarning(loopback);
+      }
       const entry = providerOf(selection);
       // Before the announcement, which names the vendor's console: on a
       // development run (ZITADEL_CLI_DEV) the provider may not be the vendor at

@@ -38,6 +38,7 @@ import {
   type FlowFile,
   credentialVariablesOf,
   customFlagValues,
+  ENABLE_FLAG_KEYS,
   ENABLE_FLAG_NAMES,
   loopbackIssuerWarning,
   planConnection,
@@ -97,20 +98,20 @@ export default class SsoEnable extends BaseCommand {
     // Not `required`: oclif's own "Missing required flag provider" is the one
     // refusal in this command that would carry no hint, and every other error
     // here names the next move. The check below does that instead.
-    provider: Flags.string({
+    [ENABLE_FLAG_KEYS.provider]: Flags.string({
       options: [...IDP_PROVIDERS, CUSTOM_PROVIDER],
       description: `Identity provider to enable, or "${CUSTOM_PROVIDER}" for any other OpenID Connect provider.`,
     }),
-    slug: nonBlankString({
+    [ENABLE_FLAG_KEYS.slug]: nonBlankString({
       description: "Name of the custom connection. Schemas and flows refer to it by this.",
     }),
-    "display-name": nonBlankString({
+    [ENABLE_FLAG_KEYS.displayName]: nonBlankString({
       description: "Name shown on the custom connection's sign-in button.",
     }),
-    issuer: nonBlankString({
+    [ENABLE_FLAG_KEYS.issuer]: nonBlankString({
       description: "Issuer URL of the custom provider. Its endpoints are found by OIDC discovery.",
     }),
-    scopes: nonBlankString({
+    [ENABLE_FLAG_KEYS.scopes]: nonBlankString({
       description:
         "Scopes the custom connection requests, separated by spaces or commas. Must include openid. Default: openid profile email.",
     }),
@@ -127,7 +128,7 @@ export default class SsoEnable extends BaseCommand {
     await this.toMeta(flags);
     const { cwd, nonInteractive, dryRun } = this.meta;
 
-    const provider = flags.provider;
+    const provider = flags[ENABLE_FLAG_KEYS.provider];
     if (provider === undefined) {
       // Named rather than prompted for: the catalog holds one provider today,
       // and a question offering a single answer is a keystroke, not a choice
@@ -140,7 +141,7 @@ export default class SsoEnable extends BaseCommand {
     // issuer the server would refuse on apply is refused here, where it was typed.
     const selection = selectionFromFlags(
       provider,
-      customFlagValues(flags, ""),
+      customFlagValues(flags, ENABLE_FLAG_KEYS),
       ENABLE_FLAG_NAMES,
       "--provider custom --slug acme-sso --display-name 'Acme SSO' --issuer https://sso.acme.example",
     );
@@ -171,7 +172,8 @@ export default class SsoEnable extends BaseCommand {
       selection,
       files: connections,
       clientId: clientIdFlag,
-      scopesGiven: flags.scopes !== undefined,
+      scopesGiven: flags[ENABLE_FLAG_KEYS.scopes] !== undefined,
+      slugFlag: ENABLE_FLAG_NAMES.slug,
     });
 
     const reusing = plan.action === "reuse";

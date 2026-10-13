@@ -355,6 +355,15 @@ describe("setup", () => {
           );
         });
 
+        it("offers the connection on the conflict step too", async () => {
+          const app = await anApp();
+          expect(await provider.setUp(app)).toSucceed();
+
+          const offering = await app.stepsOfferingSso();
+
+          expect(offering.map((step) => step.name)).toContain("sso-conflict");
+        });
+
         it("offers only the connection on every step that offers one", async () => {
           const app = await anApp();
           expect(await provider.setUp(app)).toSucceed();

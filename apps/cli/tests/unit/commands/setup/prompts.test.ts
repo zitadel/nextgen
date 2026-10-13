@@ -41,6 +41,7 @@ import {
   googleSelection,
 } from "../../../helpers/idp-values";
 
+import { takeReportedWarnings } from "../../../../src/lib/warnings";
 import { detectHealthyLocalServer } from "../../../../src/lib/local-server/runtime";
 
 import {
@@ -412,6 +413,33 @@ describe("SocialSignInPrompt", () => {
           endpoints: undefined,
         },
       ]);
+    });
+
+    it("warns about an issuer on this machine that was typed in, naming the allow list", async () => {
+      takeReportedWarnings();
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"] as never);
+      vi.mocked(text)
+        .mockResolvedValueOnce("acme-sso" as never)
+        .mockResolvedValueOnce("Acme SSO" as never)
+        .mockResolvedValueOnce("http://localhost:9100" as never)
+        .mockResolvedValueOnce("openid" as never)
+        .mockResolvedValueOnce("acme-client-id" as never);
+      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
+
+      await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+
+      expect(takeReportedWarnings().join(" ")).toContain("NEXTGEN_HTTPCLIENT_ALLOW_LIST");
+    });
+
+    it("says nothing about an issuer elsewhere", async () => {
+      takeReportedWarnings();
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"] as never);
+      describeAcme();
+      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
+
+      await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+
+      expect(takeReportedWarnings()).toEqual([]);
     });
 
     it("names the secret's variable after the connection, not after 'custom'", async () => {
