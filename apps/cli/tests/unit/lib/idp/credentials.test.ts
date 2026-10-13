@@ -8,19 +8,29 @@ describe("the recovery command for a credential", () => {
   it("names the owner, without which every variables command refuses", () => {
     // `variables set NAME` alone fails with "Name the owner: --project-level"
     // before making a request, so the recovery step would repair nothing.
-    expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION)).toContain("--project-level");
+    expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION, "")).toContain("--project-level");
   });
 
   it("is runnable rather than a bare subcommand", () => {
     // A JSON result is read by agents, which execute these as shell commands.
-    expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION)).toMatch(/^npx .+ variables set /);
+    expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION, "")).toMatch(
+      /^npx .+ variables set /,
+    );
   });
 
   it("marks a secret as one, so the value is not stored in the clear", () => {
-    expect(republishCommand("GOOGLE_CLIENT_SECRET", true, VERSION)).toContain(
+    expect(republishCommand("GOOGLE_CLIENT_SECRET", true, VERSION, "")).toContain(
       "variables set GOOGLE_CLIENT_SECRET --project-level --secret",
     );
-    expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION)).not.toContain("--secret");
+    expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION, "")).not.toContain("--secret");
+  });
+
+  it("carries the environment selector so the retry targets the same project", () => {
+    // The selector reproduces the invocation's --env/--env-file/--server; a
+    // retry without it would silently target the default project.
+    expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION, " --env production")).toContain(
+      "--project-level --env production",
+    );
   });
 });
 
@@ -33,6 +43,7 @@ describe("the recovery commands a result carries", () => {
           { name: "GOOGLE_CLIENT_SECRET", secret: true, published: "stored" },
         ],
         VERSION,
+        "",
       ),
     ).toEqual([]);
   });
@@ -44,6 +55,7 @@ describe("the recovery commands a result carries", () => {
         { name: "GOOGLE_CLIENT_SECRET", secret: true, published: "failed" },
       ],
       VERSION,
+      "",
     );
 
     expect(commands).toHaveLength(1);
@@ -57,6 +69,7 @@ describe("the recovery commands a result carries", () => {
       republishCommands(
         [{ name: "GOOGLE_CLIENT_ID", secret: false, published: "deferred" }],
         VERSION,
+        "",
       ),
     ).toHaveLength(1);
   });
@@ -65,12 +78,13 @@ describe("the recovery commands a result carries", () => {
     // No provider was enabled, or no secret was supplied: there is nothing to
     // republish and a command naming an empty variable would be noise.
     expect(
-      republishCommands([{ name: undefined, secret: false, published: "failed" }], VERSION),
+      republishCommands([{ name: undefined, secret: false, published: "failed" }], VERSION, ""),
     ).toEqual([]);
     expect(
       republishCommands(
         [{ name: "GOOGLE_CLIENT_ID", secret: false, published: undefined }],
         VERSION,
+        "",
       ),
     ).toEqual([]);
   });
