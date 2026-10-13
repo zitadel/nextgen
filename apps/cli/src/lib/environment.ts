@@ -1,4 +1,4 @@
-import { chmod, readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 
@@ -7,8 +7,8 @@ import { password, text } from "@clack/prompts";
 import { ZitadelError } from "./errors";
 import { hasZitadelSecret, readZitadelSecret } from "./project";
 import { bailOnCancel } from "./prompt-cancel";
+import { appendManagedEnvValue } from "./fs-safe";
 import { resolveServer, serverOrigin } from "./server";
-import { reportWarning } from "./warnings";
 
 /**
  * The values a command reads from an environment. Each resolves on its own, so
@@ -302,41 +302,13 @@ export async function requireValueInteractive(
 }
 
 /**
- * Appends `key=value` to a `.env.<name>.local`, creating it if absent, and
- * holds the file at `0600` because it may carry a secret. Newline-safe so a
- * file without a trailing newline is not concatenated onto its last line.
+ * Appends `key=value` to a `.env.<name>.local`, creating it if absent. The
+ * managed-env-file writer ({@link appendManagedEnvValue}) owns the 0600 mode,
+ * the chmod-failure policy and the line-break guard, so every secret-file write
+ * in the CLI goes through one place.
  */
 async function persistEnvValue(path: string, key: EnvironmentKey, value: string): Promise<void> {
-  // One `key=value` per line is the whole file format, so a line break in the
-  // value would inject a spurious line (or split a secret) that the next run
-  // reads back as different keys. A break is never a legitimate credential, URL
-  // or id, so refuse it rather than write a file we cannot read back faithfully.
-  if (/[\n\r]/.test(value)) {
-    throw new Error(`Refusing to persist ${key}: value contains a line break.`);
-  }
-  let existing = "";
-  try {
-    existing = await readFile(path, "utf8");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw error;
-    }
-  }
-  const next = `${existing}${existing && !existing.endsWith("\n") ? "\n" : ""}${key}=${value}\n`;
-  await writeFile(path, next, { mode: 0o600 });
-  // `writeFile`'s mode applies only on creation and is masked by the umask, so
-  // re-assert 0600 because the file may hold a secret. A filesystem that cannot
-  // chmod (FAT/exFAT, some bind mounts) must not fail the write — the secret is
-  // already on disk and the next run would read it back without re-prompting, so
-  // a throw would just be one confusing failure followed by silent success with
-  // the same file. Warn once that it could not be locked down, and proceed.
-  try {
-    await chmod(path, 0o600);
-  } catch (error) {
-    reportWarning(
-      `Wrote ${path} but could not set it to 0600 (${(error as NodeJS.ErrnoException).code ?? "unknown"}); its permissions may be broader than intended.`,
-    );
-  }
+  await appendManagedEnvValue(path, key, value);
 }
 
 /**

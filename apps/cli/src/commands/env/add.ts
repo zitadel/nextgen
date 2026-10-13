@@ -1,4 +1,4 @@
-import { chmod, stat, writeFile } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import { Flags } from "@oclif/core";
@@ -8,6 +8,7 @@ import { consola } from "consola";
 import { createZitadelClient } from "../../lib/api-client";
 import { ZitadelError } from "../../lib/errors";
 import { isEnvironmentName } from "../../lib/environment";
+import { writeManagedEnvFile } from "../../lib/fs-safe";
 import { isObject } from "../../lib/json";
 import {
   BaseCommand,
@@ -157,16 +158,7 @@ export default class EnvAdd extends BaseCommand {
       ...(issuer === undefined ? {} : { ZITADEL_ISSUER: issuer }),
       ...(publicVariable === undefined ? {} : { [publicVariable]: projectId }),
     };
-    await writeFile(
-      path,
-      `${Object.entries(values)
-        .map(([key, value]) => `${key}=${value}`)
-        .join("\n")}\n`,
-      { mode: 0o600 },
-    );
-    // `writeFile`'s mode applies only when it creates the file, and is masked by
-    // the umask, so a rewrite under --force would keep the old permissions.
-    await chmod(path, 0o600);
+    await writeManagedEnvFile(path, values);
     consola.success(`Wrote ${file}`);
 
     const appVariables: PlatformVariable[] = [
