@@ -3,6 +3,7 @@ import { cancel, confirm, isCancel } from "@clack/prompts";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
+import { deletedData } from "../../lib/oclif/envelope";
 import { ZitadelError } from "../../lib/errors";
 import { publicCliCommand } from "../../lib/public-cli";
 import { shellArg } from "../../lib/shell";
@@ -81,7 +82,7 @@ export default class OriginRm extends EnvironmentCommand {
 
     return this.emit({
       status: "ok",
-      data: { pattern, removed: true },
+      data: deletedData({ pattern }),
       pretty: `Stopped admitting ${pattern}`,
     });
   }
