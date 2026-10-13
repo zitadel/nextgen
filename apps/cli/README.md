@@ -2086,7 +2086,7 @@ EXAMPLES
 
   $ zitadel resources --json
 
-  $ zitadel resources --json | jq -r '.data.resources[] | "\(.topic): \(.verbs | join(", "))"'
+  $ zitadel resources --json | jq -r '.data.items[] | "\(.topic): \(.verbs | join(", "))"'
 ```
 
 ## `zitadel schemas get SCHEMA`

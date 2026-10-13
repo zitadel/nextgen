@@ -57,7 +57,7 @@ The CLI requires Node.js 24+.
   drops records or fields, so you end up reasoning from partial data. It is
   finite — read it whole, or narrow it *at the source*: use a `list` verb's
   `filter_fields` and pagination to fetch fewer records, or pipe to `jq` to pull
-  just what you need (e.g. `… resources --json | jq '.data.resources[].name'`).
+  just what you need (e.g. `… resources --json | jq '.data.items[].topic'`).
   `--help` output is bounded too — read it in full rather than `head`-ing it, or
   you will miss flags further down.
 - **Working directory.** Add `--cwd <path>` when operating outside the current
