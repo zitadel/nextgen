@@ -15,7 +15,7 @@ const MaxDeploymentTargets = 50
 
 // DeploymentReason records why a deployment was created.
 //
-//go:generate go tool enumer -type DeploymentReason -transform snake -trimprefix DeploymentReason -sql
+//go:generate go tool enumer -type DeploymentReason -transform snake -trimprefix DeploymentReason -sql -json
 type DeploymentReason uint8
 
 const (
@@ -46,61 +46,10 @@ func ErrDeploymentPermissionDenied() Error {
 	return newError(PrefixDeployment.ErrorCodePrefix("permission_denied"), "deployment: requires an operator-grade token bound to the project (project.write or a deployment.* scope)", nil, nil)
 }
 
-// DeploymentConflictDetails carries the newest deployment to the targets in
-// its wire shape, nil when nothing was deployed there.
+// DeploymentConflictDetails carries the newest deployment to the targets, nil
+// when nothing was deployed there.
 type DeploymentConflictDetails struct {
-	Deployment *DeploymentDetails `json:"deployment"`
-}
-
-// DeploymentDetails is a deployment as error details render it.
-type DeploymentDetails struct {
-	ID         string                   `json:"id"`
-	ProjectID  string                   `json:"project_id"`
-	ReleaseID  string                   `json:"release_id"`
-	Targets    []DeploymentTargetDetail `json:"targets"`
-	DeployedAt time.Time                `json:"deployed_at"`
-	Metadata   DeploymentMetadataDetail `json:"metadata"`
-}
-
-type DeploymentTargetDetail struct {
-	Origin string `json:"origin"`
-}
-
-type DeploymentMetadataDetail struct {
-	Reason         string  `json:"reason"`
-	Message        *string `json:"message"`
-	RollbackTo     *string `json:"rollback_to"`
-	DeployedBy     *string `json:"deployed_by"`
-	DeployedByType *string `json:"deployed_by_type"`
-}
-
-// NewDeploymentConflictDetails renders newest, nil when nothing was deployed.
-func NewDeploymentConflictDetails(newest *Deployment) DeploymentConflictDetails {
-	if newest == nil {
-		return DeploymentConflictDetails{}
-	}
-	targets := make([]DeploymentTargetDetail, len(newest.Targets))
-	for i, target := range newest.Targets {
-		targets[i] = DeploymentTargetDetail{Origin: target.Origin}
-	}
-	var actorType *string
-	if newest.Metadata.DeployedByType != nil {
-		actorType = new(string(*newest.Metadata.DeployedByType))
-	}
-	return DeploymentConflictDetails{Deployment: &DeploymentDetails{
-		ID:         newest.ID,
-		ProjectID:  newest.ProjectID,
-		ReleaseID:  newest.ReleaseID,
-		Targets:    targets,
-		DeployedAt: newest.DeployedAt,
-		Metadata: DeploymentMetadataDetail{
-			Reason:         newest.Metadata.Reason.String(),
-			Message:        newest.Metadata.Message,
-			RollbackTo:     newest.Metadata.RollbackTo,
-			DeployedBy:     newest.Metadata.DeployedBy,
-			DeployedByType: actorType,
-		},
-	}}
+	Deployment *Deployment `json:"deployment"`
 }
 
 // ErrDeploymentConflict reports a failed expected_deployment_id check.
@@ -111,30 +60,30 @@ func ErrDeploymentConflict(details DeploymentConflictDetails) Error {
 // DeploymentMetadata records why the release went live and who did it. A
 // caller without a user identity leaves DeployedBy and DeployedByType nil.
 type DeploymentMetadata struct {
-	Reason  DeploymentReason
-	Message *string
+	Reason  DeploymentReason `json:"reason"`
+	Message *string          `json:"message"`
 	// RollbackTo names the deployment a rollback re-applied.
-	RollbackTo     *string
-	DeployedBy     *string
-	DeployedByType *EventActorType
+	RollbackTo     *string         `json:"rollback_to"`
+	DeployedBy     *string         `json:"deployed_by"`
+	DeployedByType *EventActorType `json:"deployed_by_type"`
 }
 
 // DeploymentTarget is one origin a deployment covered.
 type DeploymentTarget struct {
-	Origin string
+	Origin string `json:"origin"`
 }
 
 // Deployment is an append-only record of a release going live on a set of
 // targets, sorted by origin. What a target serves is the newest deployment
 // that names it.
 type Deployment struct {
-	ProjectID  string
-	ID         string
-	ReleaseID  string
-	TargetKind DeploymentTargetKind
-	Targets    []DeploymentTarget
-	Metadata   DeploymentMetadata
-	DeployedAt time.Time
+	ProjectID  string               `json:"project_id"`
+	ID         string               `json:"id"`
+	ReleaseID  string               `json:"release_id"`
+	TargetKind DeploymentTargetKind `json:"-"`
+	Targets    []DeploymentTarget   `json:"targets"`
+	Metadata   DeploymentMetadata   `json:"metadata"`
+	DeployedAt time.Time            `json:"deployed_at"`
 }
 
 // Origins returns the target origins in order.
@@ -197,7 +146,7 @@ func CheckExpectedDeployment(current *Deployment, expected *string) error {
 	if expected == nil || (current != nil && current.ID == *expected) {
 		return nil
 	}
-	return ErrDeploymentConflict(NewDeploymentConflictDetails(current))
+	return ErrDeploymentConflict(DeploymentConflictDetails{Deployment: current})
 }
 
 // DeploymentField enumerates the fields of Deployment which can be used for

@@ -59,7 +59,7 @@ func TestDeploymentConflictRendersTheDeployment(t *testing.T) {
 			DeployedByType: new(domain.EventActorTypeService),
 		},
 	}
-	resp := deploymentErrorResponse(domain.ErrDeploymentConflict(domain.NewDeploymentConflictDetails(newest)))
+	resp := deploymentErrorResponse(domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{Deployment: newest}))
 	raw, ok := resp.Response.Details.Value["details"]
 	require.True(t, ok)
 	assert.JSONEq(t, `{"deployment":{

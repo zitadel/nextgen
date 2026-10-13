@@ -145,7 +145,7 @@ func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
 		input.ExpectedDeploymentID = new("dep_before")
 		_, err := svc.Create(t.Context(), input)
 		de := assertServiceDomainCode(t, err, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code)
-		assert.Equal(t, domain.NewDeploymentConflictDetails(winner), de.Details)
+		assert.Equal(t, domain.DeploymentConflictDetails{Deployment: winner}, de.Details)
 	})
 
 	t.Run("gives up with a conflict", func(t *testing.T) {
@@ -162,7 +162,7 @@ func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
 
 		_, err := svc.Create(t.Context(), deploymentInput())
 		de := assertServiceDomainCode(t, err, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code)
-		assert.Equal(t, domain.NewDeploymentConflictDetails(winner), de.Details)
+		assert.Equal(t, domain.DeploymentConflictDetails{Deployment: winner}, de.Details)
 	})
 }
 
@@ -217,7 +217,7 @@ func TestDeploymentServiceCreateGuard(t *testing.T) {
 		input.ExpectedDeploymentID = new("dep_stale")
 		_, err := svc.Create(t.Context(), input)
 		de := assertServiceDomainCode(t, err, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code)
-		assert.Equal(t, domain.NewDeploymentConflictDetails(serving), de.Details)
+		assert.Equal(t, domain.DeploymentConflictDetails{Deployment: serving}, de.Details)
 	})
 
 	// A stale guard is refused even when the deploy would change nothing.
