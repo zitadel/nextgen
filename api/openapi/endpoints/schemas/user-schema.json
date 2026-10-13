@@ -19,7 +19,7 @@
     "objectType": {
       "type": "string",
       "maxLength": 256,
-      "description": "The type of user this schema describes. This is a customer chosen name.\n",
+      "description": "The type of user this schema describes. This is a customer chosen name.\nEvery revision of a schema shares its `objectType`, and flow\ndefinitions name the schema they operate on by it.\n",
       "examples": [
         "human-user"
       ]
