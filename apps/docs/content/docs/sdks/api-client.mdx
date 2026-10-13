@@ -22,24 +22,44 @@ It exposes:
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
     ```sh
-    pnpm add @zitadel/api
+    pnpm add @zitadel/api@alpha
     ```
   </Tab>
   <Tab>
     ```sh
-    npm install @zitadel/api
+    npm install @zitadel/api@alpha
     ```
   </Tab>
   <Tab>
     ```sh
-    yarn add @zitadel/api
+    yarn add @zitadel/api@alpha
     ```
   </Tab>
 </Tabs>
 
 ## Usage
 
-Use the [API reference](/docs/reference/api) to inspect endpoint shapes. Use package exports from `@zitadel/api` when writing CLI, SDK, or app code against the typed client.
+The package has no root export; import from its subpaths:
+
+- `@zitadel/api/client` — `createZitadelClient`, a typed client bound to a base URL and an optional bearer token.
+- `@zitadel/api/config` — `configureZitadel` and `getApi`, the shared browser configuration the components and SDKs use.
+- `@zitadel/api/generated/model` — request and response types.
+- `@zitadel/api/generated/endpoints/zitadelNextGen` — the endpoint functions, with `.zod` and `.msw` variants for the Zod schemas and MSW handlers. The MSW handlers need the optional peers `msw` and `@faker-js/faker`.
+
+Call the API from server-side code:
+
+```ts
+import { createZitadelClient } from "@zitadel/api/client";
+
+const client = createZitadelClient({
+  baseUrl: process.env.ZITADEL_URL ?? "http://localhost:8080",
+  token: process.env.ZITADEL_PROJECT_SECRET, // server-side only
+});
+
+const project = await client.getProject(process.env.ZITADEL_PROJECT_ID!);
+```
+
+Use the [API reference](/docs/reference/api) to inspect endpoint shapes.
 
 <Callout title="Edit the OpenAPI source" type="warn">
   Do not hand-edit generated API package output. Update `api/openapi/**` and regenerate through the repo tasks.

@@ -19,17 +19,17 @@ The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zita
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
     ```sh
-    pnpm add @zitadel/sdk-nuxt
+    pnpm add @zitadel/sdk-nuxt@alpha
     ```
   </Tab>
   <Tab>
     ```sh
-    npm install @zitadel/sdk-nuxt
+    npm install @zitadel/sdk-nuxt@alpha
     ```
   </Tab>
   <Tab>
     ```sh
-    yarn add @zitadel/sdk-nuxt
+    yarn add @zitadel/sdk-nuxt@alpha
     ```
   </Tab>
 </Tabs>
@@ -38,40 +38,53 @@ The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zita
 
 <Tabs items={["CLI generated", "Manual"]}>
   <Tab>
-    The CLI adds pages, plugins, module config, environment files, and the SDK package.
+    The CLI adds pages, plugins, module config, environment files, and the SDK package. On the Nuxt 4 layout, pages and plugins go under `app/`.
 
     <Files>
-      <File name="pages/login.vue" />
-      <File name="pages/register.vue" />
-      <File name="pages/profile.vue" />
-      <File name="plugins/zitadel-components.client.ts" />
-      <File name="plugins/auth.server.ts" />
+      <File name="app/pages/login.vue" />
+      <File name="app/pages/register.vue" />
+      <File name="app/pages/profile.vue" />
+      <File name="app/plugins/zitadel-components.client.ts" />
+      <File name="app/plugins/auth.server.ts" />
       <File name="nuxt.config.ts" />
+      <File name=".env.local" />
+      <File name=".env.example" />
+      <File name="package.json" />
     </Files>
   </Tab>
   <Tab>
-    Create server middleware and runtime config:
-
-    ```ts
-    import { createNextgenMiddleware } from "@zitadel/sdk-nuxt/server";
-
-    const { nextgen } = useRuntimeConfig();
-
-    export default createNextgenMiddleware({
-      url: nextgen.url,
-      protectedRoutes: ["/profile"],
-      loginPath: "/login",
-    });
-    ```
+    Register the SDK's Nuxt module and configure it under `nextgen`. The module adds the server middleware and the plugin that exposes auth state; it reads `ZITADEL_PROJECT_SECRET` from the environment or `.env.local`.
 
     ```ts
     export default defineNuxtConfig({
+      modules: ["@zitadel/sdk-nuxt/module"],
+      nextgen: {
+        url: process.env.ZITADEL_URL ?? "http://localhost:8080",
+        loginPath: "/login",
+        protectedRoutes: ["/profile"],
+      },
       runtimeConfig: {
-        nextgen: {
-          url: process.env.ZITADEL_URL ?? "http://localhost:4000",
+        public: {
+          zitadelProjectId: process.env.NUXT_PUBLIC_ZITADEL_PROJECT_ID,
+        },
+      },
+      build: {
+        transpile: ["@zitadel/api", "@zitadel/components", "@zitadel/design-tokens"],
+      },
+      vue: {
+        compilerOptions: {
+          isCustomElement: (tag) => tag.startsWith("zitadel-"),
         },
       },
     });
+    ```
+
+    Register the web components on the client only, in `plugins/zitadel-components.client.ts`:
+
+    ```ts
+    import "@zitadel/components";
+
+    export default defineNuxtPlugin(() => {});
     ```
   </Tab>
 </Tabs>
@@ -80,19 +93,19 @@ The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zita
 
 <Steps>
   <Step>Register Nitro middleware for same-origin `/__nextgen/*` proxying.</Step>
-  <Step>Verify the session JWT and attach auth state to the request event.</Step>
+  <Step>Validate the session token and attach auth state to the request event.</Step>
   <Step>Use a server plugin to make auth state available to pages.</Step>
 </Steps>
 
 ## Verify
 
-- Start the app with `ZITADEL_URL` and `NUXT_PUBLIC_ZITADEL_PROJECT_ID`.
+- Start the app with `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET`, and `NUXT_PUBLIC_ZITADEL_PROJECT_ID` set (setup writes them to `.env.local`).
 - Visit `/login` and register a user.
 - Confirm `/profile` shows signed-in state.
 - Log out and confirm protected pages redirect to `/login`.
 
 ## See also
 
-- [SDK proxy](/docs/concepts/sdk-proxy) — why `/__nextgen/*` must be same-origin and how the project key is attached.
+- [SDK proxy](/docs/concepts/sdk-proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
 - [`apps/demo-nuxt`](https://github.com/zitadel/nextgen/tree/main/apps/demo-nuxt) — a runnable Nuxt example in this repo.
 - [`@zitadel/sdk-nuxt` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-nuxt) and the [CLI Nuxt patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/nuxt).

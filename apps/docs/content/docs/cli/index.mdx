@@ -3,21 +3,23 @@ title: CLI
 description: Command groups for setup, local runtime management, and repo configuration.
 ---
 
-The `@zitadel/cli` package scaffolds auth into Next.js, Nuxt, React, Vue, and Angular apps.
+The `@zitadel/cli` package scaffolds auth into Next.js, Nuxt, React, Vue, Angular, Solid, Svelte, and Qwik apps.
 
 ## Golden path
 
 ```sh
 npx @zitadel/cli@alpha doctor
 npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --server local
+npx @zitadel/cli@alpha setup --server local --force
 npm run dev
 ```
+
+`--force` lets setup scaffold into the directory `start` has already written `.zitadel/local/` into. In an existing app, leave it off.
 
 For automation:
 
 ```sh
-npx @zitadel/cli@alpha setup --framework next --server local --non-interactive --json
+npx @zitadel/cli@alpha setup --framework next --server local --force --non-interactive --json
 ```
 
 ## Agent Skills

@@ -19,17 +19,17 @@ The Svelte SDK is the SPA wrapper for the shared Zitadel login and logout widget
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
     ```sh
-    pnpm add @zitadel/sdk-svelte
+    pnpm add @zitadel/sdk-svelte@alpha
     ```
   </Tab>
   <Tab>
     ```sh
-    npm install @zitadel/sdk-svelte
+    npm install @zitadel/sdk-svelte@alpha
     ```
   </Tab>
   <Tab>
     ```sh
-    yarn add @zitadel/sdk-svelte
+    yarn add @zitadel/sdk-svelte@alpha
     ```
   </Tab>
 </Tabs>
@@ -73,8 +73,8 @@ The Svelte SDK is the SPA wrapper for the shared Zitadel login and logout widget
 
 <Steps>
   <Step>The widgets call the configured proxy path on the same origin.</Step>
-  <Step>In local Vite development, the generated proxy forwards `/__nextgen/*` to Zitadel and attaches the project service key only on the session exchange.</Step>
-  <Step>In production, the same-origin path comes from a platform rewrite or minimal worker (see [SDK proxy](/docs/concepts/sdk-proxy)) — or intentionally configure a backend URL for local-only experiments.</Step>
+  <Step>In local Vite development, the generated proxy forwards `/__nextgen/*` to Zitadel and adds the project secret to the session exchange, and to no other call.</Step>
+  <Step>In production, you supply the same-origin proxy yourself. Until the browser-safe credential lands it must add the project secret to the session exchange, which a plain rewrite cannot (see [SDK proxy](/docs/concepts/sdk-proxy#spas-in-production)).</Step>
 </Steps>
 
 ## Verify

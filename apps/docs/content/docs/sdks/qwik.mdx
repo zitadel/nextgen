@@ -23,17 +23,17 @@ The Qwik SDK is the SPA wrapper for the shared Zitadel login and logout widgets.
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
     ```sh
-    pnpm add @zitadel/sdk-qwik
+    pnpm add @zitadel/sdk-qwik@alpha
     ```
   </Tab>
   <Tab>
     ```sh
-    npm install @zitadel/sdk-qwik
+    npm install @zitadel/sdk-qwik@alpha
     ```
   </Tab>
   <Tab>
     ```sh
-    yarn add @zitadel/sdk-qwik
+    yarn add @zitadel/sdk-qwik@alpha
     ```
   </Tab>
 </Tabs>
@@ -45,7 +45,7 @@ The Qwik SDK is the SPA wrapper for the shared Zitadel login and logout widgets.
     The CLI configures the Vite proxy, writes app-level auth UI, adds environment files, and installs the SDK.
 
     <Files>
-      <File name="src/routes/login/index.tsx" />
+      <File name="src/app.tsx" />
       <File name="vite.config.ts" />
       <File name=".env.local" />
       <File name=".env.example" />
@@ -81,8 +81,8 @@ The Qwik SDK is the SPA wrapper for the shared Zitadel login and logout widgets.
 
 <Steps>
   <Step>The widgets call the configured proxy path on the same origin.</Step>
-  <Step>In local Vite development, the generated proxy forwards `/__nextgen/*` to Zitadel and attaches the project service key only on the session exchange.</Step>
-  <Step>In production, the same-origin path comes from a platform rewrite or minimal worker (see [SDK proxy](/docs/concepts/sdk-proxy)) — or intentionally configure a backend URL for local-only experiments.</Step>
+  <Step>In local Vite development, the generated proxy forwards `/__nextgen/*` to Zitadel and adds the project secret to the session exchange, and to no other call.</Step>
+  <Step>In production, you supply the same-origin proxy yourself. Until the browser-safe credential lands it must add the project secret to the session exchange, which a plain rewrite cannot (see [SDK proxy](/docs/concepts/sdk-proxy#spas-in-production)).</Step>
 </Steps>
 
 ## Verify

@@ -1,4 +1,4 @@
 {
   "title": "Schemas",
-  "pages": ["createSchema", "getSchemaById"]
+  "pages": ["createSchema", "listSchemas", "getSchemaById", "..."]
 }

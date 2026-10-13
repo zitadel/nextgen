@@ -1,0 +1,18 @@
+---
+title: Releases
+description: OpenAPI operations for configuration releases.
+---
+
+import { Card, Cards } from "fumadocs-ui/components/card";
+
+A release is an immutable snapshot of a project's configuration: one revision of
+each resource, plus who made it, when, and from which commit. Creating a release
+does not deploy it.
+
+<Cards>
+  <Card title="Create a release" href="/docs/reference/api/releases/createRelease" />
+  <Card title="Build a release from files" href="/docs/reference/api/releases/buildRelease" />
+  <Card title="List releases" href="/docs/reference/api/releases/listReleases" />
+  <Card title="Get a release by id" href="/docs/reference/api/releases/getReleaseById" />
+  <Card title="Revoke a release" href="/docs/reference/api/releases/revokeRelease" />
+</Cards>

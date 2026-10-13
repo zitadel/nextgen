@@ -28,9 +28,9 @@ Every JSON envelope includes:
 - `cli_version`
 - `command`
 - `source`
-- `status`
+- `status`: `ok`, `skipped`, or `error`
 
-Success responses include command-specific `data`. Failure responses include `code` and `message`. Agents should prefer `next_commands` over prose hints.
+`ok` responses include command-specific `data` and a `warnings` list. `skipped` is a deliberate no-op, not a failure, with a stable `reason` such as `already-claimed`. `error` responses include `code`, `message`, and usually a `hint`. Agents should prefer `next_commands` over prose hints: it sits inside `data` on `ok` responses and at the top level on `skipped` and `error` responses.
 
 ## Agent prompt
 
@@ -39,7 +39,7 @@ Create or use an empty local app directory. Run:
 
 1. npx @zitadel/cli@alpha doctor --non-interactive --json
 2. npx @zitadel/cli@alpha start --non-interactive --json
-3. npx @zitadel/cli@alpha setup --framework next --server local --non-interactive --json
+3. npx @zitadel/cli@alpha setup --framework next --server local --force --non-interactive --json
 4. npm run dev
 
 Use the available browser automation to open the generated app. Register a unique user, verify the signed-in profile state, log out, log back in with the same user, and finish on the signed-in page.
@@ -53,15 +53,13 @@ Summarize commands run, JSON statuses, files changed, browser steps completed, a
 
 ## Stable UI proof
 
-`<zitadel-login>` and `<zitadel-logout>` are web components with shadow DOM. Browser drivers with shadow-DOM-aware locators can target the test hooks directly. Generic DOM-eval drivers need to recurse through shadow roots.
+`<zitadel-login>` and `<zitadel-session>` are web components with shadow DOM, and the fields and buttons inside them have shadow roots of their own. Browser drivers with shadow-DOM-aware locators can target the test hooks directly. Generic DOM-eval drivers need to recurse through every shadow root.
 
-Useful hooks include:
+The hooks are `data-testid` values. Useful ones include:
 
-- `zitadel-field-email`
-- `zitadel-field-password`
-- `zitadel-action-submit`
-- `zitadel-input-email`
-- `zitadel-input-password`
-- `zitadel-action-submit-button`
+- `zitadel-field-email` and `zitadel-field-password` (the field elements)
+- `zitadel-input-email` and `zitadel-input-password` (the native inputs inside them)
+- `zitadel-action-submit` (the submit button element)
+- `zitadel-action-submit-button` (the native button inside it)
 
-For sign-out, open the user menu when needed and target `.signout-btn`.
+For sign-out, the generated profile page renders `<zitadel-session>`: target `[data-testid="zitadel-session-logout"]`.
