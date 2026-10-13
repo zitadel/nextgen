@@ -53,7 +53,8 @@ export class Orca {
   /**
    * Detects the framework in `cwd` and extracts its {@link FrameworkFacts},
    * honouring an explicit `requested` framework. Throws
-   * `E_FRAMEWORK_NOT_DETECTED` when nothing matches; a detector's
+   * `E_FRAMEWORK_NOT_DETECTED` when nothing matches, and `E_CONFLICT` when
+   * `cwd` holds an app of a framework other than `requested`; a detector's
    * `E_UNSUPPORTED_PROJECT_SHAPE` (recognised but unsupported) propagates.
    */
   async detect(cwd: string, requested?: string): Promise<FrameworkFacts> {
@@ -69,6 +70,20 @@ export class Orca {
       const facts = await detector.detect(cwd);
       if (facts) {
         return facts;
+      }
+    }
+    if (requested) {
+      // An app the requested framework's detector does not recognise is still
+      // an app. Reported as not detected, it would read as a directory to
+      // scaffold into, where `--force` creates a new app over this one.
+      for (const detector of this.detectors) {
+        if (detector.framework === requested) {
+          continue;
+        }
+        const facts = await detector.detect(cwd);
+        if (facts) {
+          throw this.frameworkMismatch(requested, facts.id);
+        }
       }
     }
     throw new ZitadelError(
@@ -176,6 +191,23 @@ export class Orca {
 
   private frameworkIds(): ReadonlyArray<string> {
     return this.detectors.map((detector) => detector.framework);
+  }
+
+  /** `cwd` holds a `detected` app, and setup was asked to set up a `requested` one. */
+  private frameworkMismatch(requested: string, detected: string): ZitadelError {
+    const name = (id: string) =>
+      this.availableFrameworks().find((framework) => framework.id === id)?.displayName ?? id;
+    return new ZitadelError(
+      "E_CONFLICT",
+      `Setup detects ${name(detected)} here, not ${name(requested)}`,
+      {
+        hint:
+          `Rerun setup without --framework, or with --framework ${detected}, to set up this ` +
+          `app, or point --cwd at the ${name(requested)} app you meant. Setup never scaffolds ` +
+          "a new app over one it detects, --force or not.",
+        details: { requested, detected },
+      },
+    );
   }
 }
 

@@ -63,6 +63,7 @@ import { derivePosture } from "../../lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
 import { readStdin } from "../../lib/variables";
 import {
+  assertNoSetupResourceConflicts,
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
@@ -347,6 +348,17 @@ export default class Setup extends BaseCommand {
       // and every rerun skipped the directory as already set up.
       await patcher.patch(patchContext(dryRunProject(issuer)), { cwd, dryRun: true, force });
     }
+    // The same for the schema, flow and connection files, which setup writes
+    // only once the project exists: a conflict on one of those left the
+    // project behind, and the rerun's `.env.local` kept pointing at it.
+    // Read-only, so a dry run reports them too.
+    await assertNoSetupResourceConflicts({
+      cwd,
+      force,
+      preset: answers.preset,
+      useCase: answers.useCase,
+      sso: answers.sso,
+    });
 
     // `POST /projects` is unauthenticated. CLI-managed projects opt out of
     // server fallback defaults, then setup uploads the local default schema and
@@ -825,7 +837,6 @@ export async function localServerHostsPlatform(server: string, timeoutMs = 1500)
   return Boolean(await readPlatformRuntime(server, timeoutMs));
 }
 
-/** A deterministic stand-in project for `--dry-run`, so no remote call is made. */
 /**
  * Removes `zitadel.json` (the marker the already-initialized guard skips on)
  * and `.zitadel/secret`, so a setup that failed after writing them can be rerun.
@@ -835,6 +846,7 @@ async function removeSetupMarkers(cwd: string): Promise<void> {
   await rm(join(cwd, ".zitadel/secret"), { force: true });
 }
 
+/** A deterministic stand-in project for `--dry-run`, so no remote call is made. */
 function dryRunProject(issuer: string): CreateProject201 {
   return {
     id: "dry-run-0000",
