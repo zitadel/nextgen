@@ -135,7 +135,7 @@ describe("app shell navigation", () => {
       ),
     );
     const router = renderShell();
-    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     const pill = await screen.findByRole("button", { name: "Switch project" });
     await waitFor(() => expect(pill).toHaveTextContent("Select a project"));
 
@@ -337,8 +337,10 @@ describe("project pill", () => {
     const list = within(await screen.findByRole("list", { name: "Switch project" }));
     await userEvent.click(list.getByRole("link", { name: "Delta" }));
 
-    await waitFor(() => expect(router.state.location.search).toMatchObject({ project: "proj_2" }));
-    expect(router.state.location.pathname).toBe("/teams");
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_2" }),
+    );
+    expect(router.state.resolvedLocation?.pathname).toBe("/teams");
     await waitFor(() => expect(pill).toHaveTextContent("Delta"));
     expect(screen.queryByRole("list", { name: "Switch project" })).not.toBeInTheDocument();
     await waitFor(() => expect(queried).toEqual(["proj_1", "proj_2"]));
@@ -363,8 +365,8 @@ describe("project pill", () => {
     const list = within(await screen.findByRole("list", { name: "Switch project" }));
     await userEvent.click(list.getByRole("link", { name: "Delta" }));
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
-    expect(router.state.location.search).toMatchObject({ project: "proj_2" });
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_2" });
   });
 
   it("links to the overview of every project beneath the list", async () => {
@@ -378,7 +380,7 @@ describe("project pill", () => {
     expect(all).toHaveAttribute("href", scopedPath("/projects", "proj_1"));
     await userEvent.click(all);
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     expect(screen.queryByRole("list", { name: "Switch project" })).not.toBeInTheDocument();
   });
 

@@ -116,7 +116,9 @@ describe("teams screen", () => {
     // The team's page, not only its URL: the test ends once the page has read
     // its team, rather than with that read still in flight.
     expect(await screen.findByRole("heading", { name: "Acme Web" })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe(`/teams/${team().id}`);
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.pathname).toBe(`/teams/${team().id}`),
+    );
   });
 
   it("offers View team from the row menu", async () => {
