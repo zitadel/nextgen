@@ -53,8 +53,12 @@ export default class VariableList extends EnvironmentCommand {
     return this.emit({
       status: "ok",
       data: {
-        variables: rows,
+        // The canonical list envelope every list command emits, so an agent can
+        // read any of them through `{ items, count, next_page_token }`. This
+        // endpoint returns the whole set in one page, so the token is null.
+        items: rows,
         count: rows.length,
+        next_page_token: null,
       },
       pretty: plain
         ? renderRows(COLUMNS, cells)
