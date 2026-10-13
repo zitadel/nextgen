@@ -17,12 +17,12 @@ if (sampleRate && !(Number(sampleRate) >= 0 && Number(sampleRate) <= 1)) {
 const config = {
   reactStrictMode: true,
   // Everything the docs serve lives under /docs, their scripts and styles
-  // too: on the cloud's host every other path belongs to the server
-  // (repo-root vercel.json).
+  // too: on the cloud's host every other path belongs to another service
+  // (repo-root vercel.json), /_next/ to the website.
   assetPrefix: "/docs",
   async redirects() {
     // The root serves nothing; locally (next dev, next start) it opens the
-    // docs. On the cloud's host the root belongs to the server.
+    // docs. On the cloud's host the root is the website's start page.
     return [{ source: "/", destination: "/docs", permanent: false }];
   },
 };

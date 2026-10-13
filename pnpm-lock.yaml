@@ -1001,6 +1001,40 @@ importers:
         specifier: 'catalog:'
         version: 5.31.1
 
+  apps/website:
+    dependencies:
+      '@vercel/analytics':
+        specifier: 'catalog:'
+        version: 2.0.1(8767c6f97f70b54d3d1e015327cc643f)
+      next:
+        specifier: 'catalog:'
+        version: 16.2.12(@babel/core@8.0.5)(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1)
+      react:
+        specifier: 'catalog:'
+        version: 19.2.8
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.2.8(react@19.2.8)
+    devDependencies:
+      '@tailwindcss/postcss':
+        specifier: 'catalog:'
+        version: 4.2.4
+      '@types/node':
+        specifier: ^24.19.1
+        version: 24.19.1
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.3(@types/react@19.2.14)
+      tailwindcss:
+        specifier: 'catalog:'
+        version: 4.2.4
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
   packages/api:
     dependencies:
       '@tanstack/react-query':
