@@ -4,7 +4,7 @@
   "flow_definition": {
     "name": "combined-password-passkey",
     "status": "active",
-    "user_schema": "${USER_SCHEMA_URL}",
+    "user_schema": "human-user",
     "purposes": {
       "login": "identifier",
       "register": "register"

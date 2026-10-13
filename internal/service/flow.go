@@ -225,6 +225,14 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 		return domain.FlowStepResult{}, domain.ErrRequestInvalid().WithMessage("session_id must not be empty")
 	}
 
+	// The definition names its schema by objectType, but the flow and the users
+	// it creates are validated against one revision, pinned here at start.
+	userSchema, schemaErr := resolveUserSchema(ctx, s.v2Pool.Statements(), req.Definition.ProjectID, req.Definition.UserSchema)
+	if schemaErr != nil {
+		return domain.FlowStepResult{}, domain.ErrInternal(schemaErr).WithMessage(
+			fmt.Sprintf("failed to resolve user schema %q of flow definition %s", req.Definition.UserSchema, req.Definition.ID))
+	}
+
 	sessionID, err := s.resolveFlowSession(ctx, req)
 	if err != nil {
 		return domain.FlowStepResult{}, err
@@ -243,7 +251,7 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 		Purpose:       req.Purpose,
 		Session:       domain.FlowSessionRef{ID: sessionID},
 		RedirectURI:   req.RedirectURI,
-		UserSchemaURL: req.Definition.UserSchema,
+		UserSchemaURL: userSchema.URL,
 	}
 	if req.AuthRequestID != nil {
 		in.AuthRequest = &domain.FlowAuthRequestRef{ID: *req.AuthRequestID}

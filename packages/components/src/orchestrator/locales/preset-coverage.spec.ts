@@ -30,7 +30,7 @@ type PresetFlow = {
 describe.each(
   SETUP_USE_CASES.flatMap((useCase) => SETUP_PRESETS.map((preset) => ({ useCase, preset }))),
 )("use case $useCase, preset $preset locale coverage", ({ useCase, preset }) => {
-  const flow = getDefaultLoginFlow({ preset, useCase, userSchemaUrl: "sch_TEST" }) as PresetFlow;
+  const flow = getDefaultLoginFlow({ preset, useCase }) as PresetFlow;
   const steps = flow.steps ?? [];
 
   describe.each(Object.entries(builtinLocales))("locale %s", (_lang, locale) => {

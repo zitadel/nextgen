@@ -62,7 +62,7 @@ describe("materializeSetupResources", () => {
     });
   });
 
-  it("reuses the server-returned schema id as user_schema on the flow", async () => {
+  it("names the schema by its objectType on the flow", async () => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi
@@ -85,7 +85,7 @@ describe("materializeSetupResources", () => {
     const flowFile = JSON.parse(await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8")) as {
       user_schema: string;
     };
-    expect(flowFile.user_schema).toBe("sch_01KWHF");
+    expect(flowFile.user_schema).toBe("human-user");
   });
 
   it("reconciles the schema file with the server's stored body and seeds its hash", async () => {

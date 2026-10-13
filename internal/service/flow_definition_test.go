@@ -39,10 +39,6 @@ var tenantUserSchema = []byte(`{
   }
 }`)
 
-type mockSchemaGetter struct {
-	getSchema func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error)
-}
-
 func v2PoolFromStatements(t *testing.T, stmts service.AllStatements) *service.DB {
 	t.Helper()
 	ctrl := gomock.NewController(t)
@@ -62,10 +58,6 @@ func v2PoolFromStatements(t *testing.T, stmts service.AllStatements) *service.DB
 	return service.NewPool(pool)
 }
 
-func (m *mockSchemaGetter) GetSchema(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
-	return m.getSchema(ctx, projectID, teamID, schemaID)
-}
-
 type mockBuiltinSchemaProvider struct {
 	getBuiltinSchemaFunc func(uri string) (*jsonschema.Schema, error)
 	latestSchemaURIFunc  func(kind domain.KnownSchemaKind) (string, error)
@@ -81,11 +73,14 @@ func (m *mockBuiltinSchemaProvider) LatestSchemaURI(kind domain.KnownSchemaKind)
 
 func Test_flowDefinitionService_Create(t *testing.T) {
 	userSchema := &domain.JSONSchema{
-		Schema: tenantUserSchema,
+		URL:        "https://tenant.com/schemas/my-user.json",
+		ObjectType: new("my-user"),
+		Schema:     tenantUserSchema,
 	}
 
 	type fields struct {
-		schemaResolver        service.SchemaGetter
+		// schemaReadErr fails the schema read; nil serves userSchema.
+		schemaReadErr         error
 		builtinSchemaProvider service.BuiltinSchemaProvider
 		validatorFn           func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error)
 		statements            func(ctrl *gomock.Controller) *servicemocks.MockAllStatements
@@ -105,11 +100,6 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 		{
 			name: "flow definition created successfully",
 			fields: fields{
-				schemaResolver: &mockSchemaGetter{
-					getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
-						return userSchema, nil
-					},
-				},
 				builtinSchemaProvider: &mockBuiltinSchemaProvider{
 					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
 						return "https://example.com/schemas/flow-definition.json", nil
@@ -167,7 +157,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				Status:        domain.FlowDefinitionStatusActive,
 				CreatedAt:     time.Now(),
 				UpdatedAt:     time.Now(),
-				UserSchema:    "https://tenant.com/schemas/my-user.json",
+				UserSchema:    "my-user",
 				Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
 				Audience: domain.FlowDefinitionAudience{
 					AppIDs:  []string{"app1"},
@@ -193,11 +183,6 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 		{
 			name: "flow definition created successfully - target with an existing external flow",
 			fields: fields{
-				schemaResolver: &mockSchemaGetter{
-					getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
-						return userSchema, nil
-					},
-				},
 				builtinSchemaProvider: &mockBuiltinSchemaProvider{
 					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
 						return "https://example.com/schemas/flow-definition.json", nil
@@ -272,7 +257,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				Status:        domain.FlowDefinitionStatusActive,
 				CreatedAt:     time.Now(),
 				UpdatedAt:     time.Now(),
-				UserSchema:    "https://tenant.com/schemas/my-user.json",
+				UserSchema:    "my-user",
 				Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
 				Audience: domain.FlowDefinitionAudience{
 					AppIDs:  []string{"app1"},
@@ -302,11 +287,6 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 		{
 			name: "failed to create flow definition - target with a non-existing external flow",
 			fields: fields{
-				schemaResolver: &mockSchemaGetter{
-					getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
-						return userSchema, nil
-					},
-				},
 				builtinSchemaProvider: &mockBuiltinSchemaProvider{
 					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
 						return &jsonschema.Schema{}, nil
@@ -373,11 +353,6 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 		{
 			name: "failed to create flow definition - validation failed",
 			fields: fields{
-				schemaResolver: &mockSchemaGetter{
-					getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
-						return userSchema, nil
-					},
-				},
 				builtinSchemaProvider: &mockBuiltinSchemaProvider{
 					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
 						return &jsonschema.Schema{}, nil
@@ -434,11 +409,6 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 		{
 			name: "failed to create flow definition - db error while creating",
 			fields: fields{
-				schemaResolver: &mockSchemaGetter{
-					getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
-						return userSchema, nil
-					},
-				},
 				builtinSchemaProvider: &mockBuiltinSchemaProvider{
 					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
 						return &jsonschema.Schema{}, nil
@@ -495,11 +465,6 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 		{
 			name: "a lost revision race answers revision_conflict",
 			fields: fields{
-				schemaResolver: &mockSchemaGetter{
-					getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
-						return userSchema, nil
-					},
-				},
 				builtinSchemaProvider: &mockBuiltinSchemaProvider{
 					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
 						return "https://example.com/schemas/flow-definition.json", nil
@@ -548,11 +513,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 		{
 			name: "failed to get user schema",
 			fields: fields{
-				schemaResolver: &mockSchemaGetter{
-					getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
-						return nil, assert.AnError
-					},
-				},
+				schemaReadErr: assert.AnError,
 				builtinSchemaProvider: &mockBuiltinSchemaProvider{
 					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
 						return &jsonschema.Schema{}, nil
@@ -598,7 +559,58 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					},
 				},
 			},
-			wantErr: domain.ErrSchemaFetchFailed("failed to fetch user schema", assert.AnError),
+			wantErr: domain.ErrSchemaFetchFailed("failed to fetch user schema", domain.ErrInternal(assert.AnError).WithMessage("failed to get schema from database")),
+		},
+		{
+			name: "unknown user schema",
+			fields: fields{
+				schemaReadErr: new(database.NoRowFoundError),
+				builtinSchemaProvider: &mockBuiltinSchemaProvider{
+					getBuiltinSchemaFunc: func(uri string) (*jsonschema.Schema, error) {
+						return &jsonschema.Schema{}, nil
+					},
+					latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
+						return "https://example.com/schemas/flow-definition.json", nil
+					},
+				},
+				statements: func(ctrl *gomock.Controller) *servicemocks.MockAllStatements {
+					stmts := servicemocks.NewMockAllStatements(ctrl)
+					return stmts
+				},
+			},
+			args: args{
+				ctx: context.Background(),
+				req: service.FlowDefinitionRequest{
+					ProjectID:     "project1",
+					Name:          "login",
+					Status:        "active",
+					SchemaVersion: "1.0.0",
+					FlowSchemaURI: "",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[string]string{"login": "step_1"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []domain.Field{"email"},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "step_2"},
+							},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							},
+						},
+						{
+							Name:     "step_2",
+							Complete: new(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`user schema "https://tenant.com/schemas/my-user.json" not found`, nil),
 		},
 	}
 	for _, tt := range tests {
@@ -609,9 +621,13 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 			if tt.fields.statements != nil {
 				stmts = tt.fields.statements(ctrl)
 			}
+			if tt.fields.schemaReadErr != nil {
+				stmts.EXPECT().GetJSONSchemaByID(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, tt.fields.schemaReadErr).AnyTimes()
+			} else {
+				stubUserSchemas(stmts, userSchema)
+			}
 			fd := service.NewFlowDefinitionService(
 				v2PoolFromStatements(t, stmts),
-				tt.fields.schemaResolver,
 				tt.fields.builtinSchemaProvider,
 				tt.fields.validatorFn,
 			)
@@ -787,14 +803,6 @@ func Test_flowDefinitionService_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			userSchema := &domain.JSONSchema{
-				Schema: tenantUserSchema,
-			}
-			schemaResolver := &mockSchemaGetter{
-				getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
-					return userSchema, nil
-				},
-			}
 			builtinSchemaProvider := &mockBuiltinSchemaProvider{
 				latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
 					return "https://example.com/schemas/flow-definition.json", nil
@@ -811,7 +819,6 @@ func Test_flowDefinitionService_Get(t *testing.T) {
 			}
 			fd := service.NewFlowDefinitionService(
 				v2PoolFromStatements(t, stmts),
-				schemaResolver,
 				builtinSchemaProvider,
 				validatorFn,
 			)
@@ -984,14 +991,6 @@ func Test_flowDefinitionService_List(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			userSchema := &domain.JSONSchema{
-				Schema: tenantUserSchema,
-			}
-			schemaResolver := &mockSchemaGetter{
-				getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
-					return userSchema, nil
-				},
-			}
 			builtinSchemaProvider := &mockBuiltinSchemaProvider{
 				latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
 					return "https://example.com/schemas/flow-definition.json", nil
@@ -1008,7 +1007,6 @@ func Test_flowDefinitionService_List(t *testing.T) {
 			}
 			fd := service.NewFlowDefinitionService(
 				v2PoolFromStatements(t, stmts),
-				schemaResolver,
 				builtinSchemaProvider,
 				validatorFn,
 			)
@@ -1047,7 +1045,6 @@ func Test_flowDefinitionService_List_limit(t *testing.T) {
 
 			fd := service.NewFlowDefinitionService(
 				v2PoolFromStatements(t, stmts),
-				&mockSchemaGetter{},
 				&mockBuiltinSchemaProvider{},
 				nil,
 			)

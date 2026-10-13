@@ -510,6 +510,33 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();
   });
 
+  test("POST /flow_definitions stores a schema id as the objectType it names", async () => {
+    const schema = await fetch(`${BASE}/schemas?project_id=proj_conformance_handle`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "user-schema",
+        metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        objectType: "conformance-handle",
+        "x-auth-methods": { passkey: { enabled: true } },
+        properties: { email: { type: "string", format: "email", "x-unique": "project" } },
+      }),
+    });
+    const { id } = (await schema.json()) as { id: string };
+
+    const res = await fetch(`${BASE}/flow_definitions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        project_id: "proj_conformance_handle",
+        flow_definition: { ...validFlowDefinitionBody(), user_schema: id },
+      }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { flow_definition: { user_schema: string } };
+    expect(body.flow_definition.user_schema).toBe("conformance-handle");
+  });
+
   test("POST /flow_definitions rejects an invalid definition with the server's flowdef.invalid envelope", async () => {
     const flowDefinition = validFlowDefinitionBody();
     // Wire register as a purpose without the flip transition — the exact

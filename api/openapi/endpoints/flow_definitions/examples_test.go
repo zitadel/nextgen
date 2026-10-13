@@ -53,10 +53,7 @@ func TestExampleFlowDefinitions(t *testing.T) {
 	var userSchema jsonschema.Schema
 	require.NoError(t, json.Unmarshal(exampleUserSchema, &userSchema))
 
-	const (
-		projectID     = "proj_example_round_trip"
-		userSchemaURL = "https://example.com/schemas/flow-engine-examples-user.json"
-	)
+	const projectID = "proj_example_round_trip"
 
 	examples := []struct {
 		name string
@@ -79,7 +76,6 @@ func TestExampleFlowDefinitions(t *testing.T) {
 
 			content := string(raw)
 			content = strings.ReplaceAll(content, "${PROJECT_ID}", projectID)
-			content = strings.ReplaceAll(content, "${USER_SCHEMA_URL}", userSchemaURL)
 
 			req := &api.CreateFlowDefinitionRequest{}
 			require.NoError(t, req.UnmarshalJSON([]byte(content)), "decode")
@@ -126,11 +122,7 @@ func TestDefaultLoginFlowDefinition(t *testing.T) {
 	var userSchema jsonschema.Schema
 	require.NoError(t, json.Unmarshal(exampleUserSchema, &userSchema))
 
-	defs, err := DefaultLoginFlowDefinitions(
-		"https://example.com",
-		"proj_default_round_trip",
-		"https://example.com/schemas/flow-engine-examples-user.json",
-	)
+	defs, err := DefaultLoginFlowDefinitions("https://example.com", "proj_default_round_trip")
 	require.NoError(t, err)
 	require.Len(t, defs, 1)
 

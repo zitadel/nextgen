@@ -39,30 +39,30 @@ export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")(
       definition,
       createdAt: entry.created_at,
       // No `expand` on this endpoint, so the badge costs a second call.
-      schemaName: await resolveSchemaName(
-        definition.user_schema,
-        requireProjectScope(deps.project),
-      ),
-      schemaId: definition.user_schema,
+      ...(await resolveSchema(definition.user_schema, requireProjectScope(deps.project))),
     };
   },
   component: FlowDefinitionDetail,
 });
 
-/**
- * Schema ids are unique per project only, so the lookup names the project the
- * flow belongs to — otherwise an ambiguous id resolves in the caller's own.
- */
-async function resolveSchemaName(
-  id: string | undefined,
+/** The newest revision of the schema the flow names by `objectType`. */
+async function resolveSchema(
+  objectType: string | undefined,
   projectId: string,
-): Promise<string | undefined> {
-  if (!id) return undefined;
+): Promise<{ schemaName?: string; schemaId?: string }> {
+  if (!objectType) return {};
   try {
-    const body = await api.getSchemaById(id, { project_id: projectId });
-    return schemaDisplayName(body.schema, id);
+    const page = await api.listSchemas({
+      project_id: projectId,
+      object_type: objectType,
+      revisions: "latest",
+      limit: 1,
+    });
+    const latest = page.schemas[0];
+    if (!latest) return {};
+    return { schemaName: schemaDisplayName(latest.schema, objectType), schemaId: latest.id };
   } catch {
-    return undefined;
+    return {};
   }
 }
 
