@@ -297,10 +297,10 @@ complete run — and when the query returns an empty affected set, the run is
 only skipped if every changed file is on a narrow explicitly-inert allowlist
 (`docs/`, root agent notes), because unclaimed files are not assumed inert.
 
-The Spanner emulator suite (`moon run server:test-spanner`) is not part of
-`full-pr`. It runs in the separate `spanner` workflow, nightly on `main` and on
-demand, and is not a required check. To run it against a branch, use
-`gh workflow run spanner.yml --ref <branch>`, or run the Moon task locally.
+The Spanner emulator suite (`moon run server:test-spanner`) runs in `full-pr`
+alongside the Postgres and SQLite lanes whenever Go tests run, against the
+zitadel fork of the emulator (see `internal/storage/testdb/spanner.go`). To run
+it locally, run the Moon task.
 
 **Version-only mode** (Changesets version PRs) runs `release:version`,
 `release:pack`, and tarball verification instead.
