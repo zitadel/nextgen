@@ -107,18 +107,26 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 // conflict answers a deploy that lost the optimistic lock with the newest
 // deployment to its targets.
 func (s *DeploymentService) conflict(ctx context.Context, entity *domain.Deployment) error {
-	stmts := s.v2Pool.Statements()
-	read, err := stmts.GetNewestTargets(ctx, entity.ProjectID, entity.Origins())
+	_, current, err := servedBy(ctx, s.v2Pool.Statements(), entity)
 	if err != nil {
-		return domain.ErrInternal(err).WithMessage("failed to read the targets")
-	}
-	var current *domain.Deployment
-	if newest := domain.NewestTargetDeployment(read); newest != nil {
-		if current, err = stmts.GetDeploymentByID(ctx, entity.ProjectID, newest.DeploymentID); err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to read the newest deployment")
-		}
+		return domain.ErrInternal(err).WithMessage("failed to read the newest deployment")
 	}
 	return domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{Deployment: current})
+}
+
+// servedBy reads what entity's targets serve, and the newest deployment to
+// them, nil when nothing was deployed there.
+func servedBy(ctx context.Context, stmts AllStatements, entity *domain.Deployment) ([]domain.TargetDeployment, *domain.Deployment, error) {
+	read, err := stmts.GetNewestTargets(ctx, entity.ProjectID, entity.Origins())
+	if err != nil {
+		return nil, nil, err
+	}
+	newest := domain.NewestTargetDeployment(read)
+	if newest == nil {
+		return read, nil, nil
+	}
+	current, err := stmts.GetDeploymentByID(ctx, entity.ProjectID, newest.DeploymentID)
+	return read, current, err
 }
 
 // create is one attempt of Create, in one transaction.
@@ -133,15 +141,9 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 			}
 			return err
 		}
-		read, err := stmts.GetNewestTargets(ctx, entity.ProjectID, entity.Origins())
+		read, current, err := servedBy(ctx, stmts, entity)
 		if err != nil {
 			return err
-		}
-		var current *domain.Deployment
-		if newest := domain.NewestTargetDeployment(read); newest != nil {
-			if current, err = stmts.GetDeploymentByID(ctx, entity.ProjectID, newest.DeploymentID); err != nil {
-				return err
-			}
 		}
 		if err := domain.CheckExpectedDeployment(current, input.ExpectedDeploymentID); err != nil {
 			return err

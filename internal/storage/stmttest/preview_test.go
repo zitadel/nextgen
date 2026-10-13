@@ -12,6 +12,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/deployment"
 	"github.com/zitadel/nextgen/internal/storage/preview"
 )
 
@@ -94,7 +95,7 @@ func TestPreviewStatements_Delete(t *testing.T) {
 
 		_, err = d.stmts.GetPreview(t.Context(), projectID, gitOrigin)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
-		assert.Equal(t, []string{dep.ID}, deploymentIDs(history(t, d.stmts, projectID, gitOrigin)))
+		assert.Equal(t, []string{dep.ID}, deployment.DeploymentIDs(history(t, d.stmts, projectID, gitOrigin)))
 	})
 }
 

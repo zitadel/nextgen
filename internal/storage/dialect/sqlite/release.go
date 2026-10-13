@@ -14,8 +14,7 @@ import (
 const (
 	createReleaseStmt = `INSERT INTO releases (project_id, id, content_hash, pointers, metadata, created_at)` +
 		` VALUES (?, ?, ?, ?, ?, ?) RETURNING created_at`
-	releaseQuery = `SELECT project_id, id, content_hash, pointers, metadata, created_at, revoked_at FROM releases`
-	// See the postgres statement.
+	releaseQuery      = `SELECT project_id, id, content_hash, pointers, metadata, created_at, revoked_at FROM releases`
 	revokeReleaseStmt = `UPDATE releases SET revoked_at = COALESCE(revoked_at, ?)` +
 		` WHERE project_id = ? AND id = ?` +
 		` RETURNING project_id, id, content_hash, pointers, metadata, created_at, revoked_at`

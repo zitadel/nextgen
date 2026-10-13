@@ -58,10 +58,6 @@ func tryDeploy(t *testing.T, stmts service.AllStatements, projectID, releaseID s
 	return entity, nil
 }
 
-func deploymentIDs(items []*domain.Deployment) []string {
-	return deployment.DeploymentIDs(items)
-}
-
 func history(t *testing.T, stmts service.AllStatements, projectID, origin string) []*domain.Deployment {
 	t.Helper()
 	result, err := stmts.ListDeployments(unfilteredListCtx(t), deployment.ListOptions(projectID, &origin, 50))
@@ -69,9 +65,9 @@ func history(t *testing.T, stmts service.AllStatements, projectID, origin string
 	return result.Items
 }
 
-func live(t *testing.T, stmts service.AllStatements, projectID string, now time.Time, filter deployment.LiveFilter) []*domain.Deployment {
+func live(t *testing.T, stmts service.AllStatements, projectID string, now time.Time, releaseID *string) []*domain.Deployment {
 	t.Helper()
-	result, err := stmts.ListLiveDeployments(unfilteredListCtx(t), now, deployment.LiveListOptions(projectID, now, filter, 50))
+	result, err := stmts.ListLiveDeployments(unfilteredListCtx(t), now, deployment.LiveListOptions(projectID, releaseID, 50))
 	require.NoError(t, err)
 	return result.Items
 }
@@ -126,7 +122,7 @@ func TestDeploymentStatements_FreshProject(t *testing.T) {
 		serving, err := d.stmts.GetNewestTargets(t.Context(), projectID, []string{appOrigin})
 		require.NoError(t, err)
 		assert.Empty(t, serving)
-		assert.Empty(t, live(t, d.stmts, projectID, time.Now(), deployment.LiveFilter{}))
+		assert.Empty(t, live(t, d.stmts, projectID, time.Now(), nil))
 		assert.Empty(t, history(t, d.stmts, projectID, appOrigin))
 	})
 }
@@ -187,7 +183,7 @@ func TestDeploymentStatements_RollbackAppends(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, first.DeployedAt.Equal(unchanged.DeployedAt))
 
-		assert.Equal(t, []string{rollback.ID, second.ID, first.ID}, deploymentIDs(history(t, d.stmts, projectID, appOrigin)))
+		assert.Equal(t, []string{rollback.ID, second.ID, first.ID}, deployment.DeploymentIDs(history(t, d.stmts, projectID, appOrigin)))
 	})
 }
 
@@ -249,23 +245,23 @@ func TestDeploymentStatements_LiveView(t *testing.T) {
 		appOnly := deploy(t, d.stmts, projectID, relB.ID, []string{appOrigin}, deployArgs{})
 
 		now := time.Now()
-		got := live(t, d.stmts, projectID, now, deployment.LiveFilter{})
-		require.Equal(t, []string{appOnly.ID, previews.ID, primaries.ID}, deploymentIDs(got))
+		got := live(t, d.stmts, projectID, now, nil)
+		require.Equal(t, []string{appOnly.ID, previews.ID, primaries.ID}, deployment.DeploymentIDs(got))
 		assert.Equal(t, []string{appOrigin}, got[0].Origins())
 		assert.Equal(t, []string{gitOrigin, shaOrigin}, got[1].Origins())
 		assert.Equal(t, []string{wwwOrigin}, got[2].Origins())
 
-		assert.Equal(t, []string{appOnly.ID, previews.ID}, deploymentIDs(live(t, d.stmts, projectID, now, deployment.LiveFilter{ReleaseID: new(relB.ID)})))
+		assert.Equal(t, []string{appOnly.ID, previews.ID}, deployment.DeploymentIDs(live(t, d.stmts, projectID, now, new(relB.ID))))
 
 		later := now.Add(2 * time.Hour)
-		assert.Equal(t, []string{appOnly.ID, primaries.ID}, deploymentIDs(live(t, d.stmts, projectID, later, deployment.LiveFilter{})))
+		assert.Equal(t, []string{appOnly.ID, primaries.ID}, deployment.DeploymentIDs(live(t, d.stmts, projectID, later, nil)))
 		for _, origin := range []string{gitOrigin, shaOrigin} {
 			swept, err := d.stmts.DeleteExpiredPreview(t.Context(), projectID, origin, later)
 			require.NoError(t, err)
 			assert.True(t, swept)
 		}
-		assert.Equal(t, []string{appOnly.ID, primaries.ID}, deploymentIDs(live(t, d.stmts, projectID, now, deployment.LiveFilter{})))
-		assert.Equal(t, []string{previews.ID}, deploymentIDs(history(t, d.stmts, projectID, gitOrigin)))
+		assert.Equal(t, []string{appOnly.ID, primaries.ID}, deployment.DeploymentIDs(live(t, d.stmts, projectID, now, nil)))
+		assert.Equal(t, []string{previews.ID}, deployment.DeploymentIDs(history(t, d.stmts, projectID, gitOrigin)))
 	})
 }
 
@@ -319,11 +315,11 @@ func TestDeploymentStatements_HistoryOutlivesTheTarget(t *testing.T) {
 		both := deploy(t, d.stmts, projectID, relA.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
 		appOnly := deploy(t, d.stmts, projectID, relB.ID, []string{appOrigin}, deployArgs{})
 
-		assert.Equal(t, []string{both.ID}, deploymentIDs(history(t, d.stmts, projectID, wwwOrigin)))
+		assert.Equal(t, []string{both.ID}, deployment.DeploymentIDs(history(t, d.stmts, projectID, wwwOrigin)))
 		got, err := d.stmts.GetDeploymentByID(t.Context(), projectID, both.ID)
 		require.NoError(t, err)
 		assert.Equal(t, []string{appOrigin, wwwOrigin}, got.Origins())
-		assert.Equal(t, []string{appOnly.ID, both.ID}, deploymentIDs(history(t, d.stmts, projectID, appOrigin)))
+		assert.Equal(t, []string{appOnly.ID, both.ID}, deployment.DeploymentIDs(history(t, d.stmts, projectID, appOrigin)))
 	})
 }
 
@@ -340,7 +336,7 @@ func TestDeploymentStatements_ListIsProjectScopedNewestFirst(t *testing.T) {
 
 		result, err := d.stmts.ListDeployments(unfilteredListCtx(t), deployment.ListOptions(projectID, nil, 50))
 		require.NoError(t, err)
-		assert.Equal(t, []string{second.ID, first.ID}, deploymentIDs(result.Items))
+		assert.Equal(t, []string{second.ID, first.ID}, deployment.DeploymentIDs(result.Items))
 		assert.Equal(t, []string{wwwOrigin}, result.Items[0].Origins())
 
 		assert.Empty(t, history(t, d.stmts, otherProject, wwwOrigin))

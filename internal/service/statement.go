@@ -231,8 +231,8 @@ type DeploymentStatements interface {
 	GetDeploymentsByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Deployment, error)
 	// ListDeployments lists deployments with every target they named.
 	ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
-	// ListLiveDeployments takes deployment.LiveListOptions and narrows each
-	// deployment to the targets it still serves at now.
+	// ListLiveDeployments lists, with deployment.LiveListOptions, the
+	// deployments some target serves at now, each narrowed to those targets.
 	ListLiveDeployments(ctx context.Context, now time.Time, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
 	// GetLiveDeployment is the deployment origin serves at now, narrowed to the
 	// targets it still serves; a NoRowFoundError when it serves nothing,

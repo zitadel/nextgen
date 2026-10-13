@@ -19,30 +19,22 @@ const (
 	previewTable    = "previews"
 
 	deploymentQuery = `SELECT project_id, id, release_id, target_kind, metadata, deployed_at FROM deployments`
-	targetsQuery    = `SELECT t.origin, t.deployment_id, t.release_id, d.target_kind, t.deployed_at, t.seq FROM deployment_targets t` +
-		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
-		` WHERE t.project_id = @p1 AND t.deployment_id IN UNNEST(@p2)`
 )
 
 var (
 	deploymentSchema = deployment.NewSchema(deploymentTable, targetsTable, previewTable)
 
 	deploymentColumns = []string{"project_id", "id", "release_id", "target_kind", "metadata", "deployed_at"}
-	targetColumns     = []string{"project_id", "deployment_id", "origin", "release_id", "deployed_at", "seq"}
+	targetColumns     = []string{"project_id", "deployment_id", "origin", "release_id", "target_kind", "deployed_at", "seq"}
 
-	newestTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, d.target_kind, t.deployed_at, t.seq FROM deployment_targets t` +
-		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
+	targetsQuery      = deployment.TargetsSelect(targetsTable) + ` WHERE t.project_id = @p1 AND t.deployment_id IN UNNEST(@p2)`
+	newestTargetsStmt = deployment.TargetsSelect(targetsTable) +
 		` WHERE t.project_id = @p1 AND t.origin IN UNNEST(@p2) AND NOT ` + deployment.NewerTargetExists(targetsTable)
-	liveTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, d.target_kind, t.deployed_at, t.seq FROM deployment_targets t` +
-		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
-		` WHERE t.project_id = @p1 AND t.deployment_id IN UNNEST(@p2) AND NOT ` + deployment.NewerTargetExists(targetsTable) +
-		` AND ` + deployment.TargetServesAt("d", previewTable) + `@p3))`
-	// See the postgres statement.
-	liveDeploymentStmt = deploymentQuery + ` WHERE project_id = @p1 AND id = (` +
-		`SELECT t.deployment_id FROM deployment_targets t` +
-		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
+	liveTargetsStmt = targetsQuery + ` AND NOT ` + deployment.NewerTargetExists(targetsTable) +
+		` AND ` + deployment.TargetServes(previewTable, "@p3")
+	liveDeploymentStmt = deploymentQuery + ` WHERE project_id = @p1 AND id = (SELECT t.deployment_id FROM ` + targetsTable + ` t` +
 		` WHERE t.project_id = @p1 AND t.origin = @p2 AND NOT ` + deployment.NewerTargetExists(targetsTable) +
-		` AND ` + deployment.TargetServesAt("d", previewTable) + `@p3)))`
+		` AND ` + deployment.TargetServes(previewTable, "@p3") + `)`
 )
 
 type deploymentStatements struct{ statement }
@@ -80,7 +72,7 @@ func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *dom
 		origins := entity.Origins()
 		for i, seq := range deployment.NextSeqs(origins, read) {
 			mutations = append(mutations, spanner.Insert(targetsTable, targetColumns,
-				[]any{entity.ProjectID, entity.ID, origins[i], entity.ReleaseID, deployedAt, seq}))
+				[]any{entity.ProjectID, entity.ID, origins[i], entity.ReleaseID, entity.TargetKind.String(), deployedAt, seq}))
 		}
 		if err := tx.BufferWrite(ctx, mutations); err != nil {
 			return err
@@ -127,21 +119,6 @@ func (ds deploymentStatements) GetLiveDeployment(ctx context.Context, projectID,
 	return entity, nil
 }
 
-func (ds deploymentStatements) getOne(ctx context.Context, stmt spanner.Statement) (*domain.Deployment, error) {
-	var entity *domain.Deployment
-	if err := ds.db.Query(ctx, stmt, func(iter *spanner.RowIterator) error {
-		var err error
-		entity, err = collectOneRow(iter, scanDeployment)
-		return err
-	}); err != nil {
-		return nil, err
-	}
-	if err := ds.attachTargets(ctx, entity.ProjectID, []*domain.Deployment{entity}, nil); err != nil {
-		return nil, err
-	}
-	return entity, nil
-}
-
 // GetDeploymentsByIDs implements [service.DeploymentStatements].
 func (ds deploymentStatements) GetDeploymentsByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Deployment, error) {
 	if len(ids) == 0 {
@@ -170,7 +147,7 @@ func (ds deploymentStatements) ListDeployments(ctx context.Context, filter *data
 
 // ListLiveDeployments implements [service.DeploymentStatements].
 func (ds deploymentStatements) ListLiveDeployments(ctx context.Context, now time.Time, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
-	return ds.list(ctx, filter, &now)
+	return ds.list(ctx, deployment.LiveAt(filter, now), &now)
 }
 
 func (ds deploymentStatements) list(ctx context.Context, filter *database.ListOptions[domain.DeploymentField], liveAt *time.Time) (*database.ListResult[*domain.Deployment], error) {
@@ -206,16 +183,11 @@ func (ds deploymentStatements) collect(ctx context.Context, stmt spanner.Stateme
 }
 
 func (ds deploymentStatements) attachTargets(ctx context.Context, projectID string, items []*domain.Deployment, liveAt *time.Time) error {
-	ids := deployment.DeploymentIDs(items)
-	var (
-		rows []domain.TargetDeployment
-		err  error
-	)
+	query, args := targetsQuery, []any{projectID, deployment.DeploymentIDs(items)}
 	if liveAt != nil {
-		rows, err = ds.collectTargets(ctx, liveTargetsStmt, projectID, ids, *liveAt)
-	} else {
-		rows, err = ds.collectTargets(ctx, targetsQuery, projectID, ids)
+		query, args = liveTargetsStmt, append(args, *liveAt)
 	}
+	rows, err := ds.collectTargets(ctx, query, args...)
 	if err != nil {
 		return err
 	}

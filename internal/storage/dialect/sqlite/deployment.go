@@ -3,7 +3,6 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -22,30 +21,22 @@ const (
 		` (project_id, id, release_id, target_kind, metadata, deployed_at) VALUES (?, ?, ?, ?, ?, ?)`
 	// Sets bind as one JSON array, read back by json_each.
 	createDeploymentTargetsStmt = `INSERT INTO deployment_targets` +
-		` (project_id, deployment_id, origin, release_id, deployed_at, seq)` +
-		` SELECT ?, ?, json_extract(value, '$.origin'), ?, ?, json_extract(value, '$.seq') FROM json_each(?)`
+		` (project_id, deployment_id, origin, release_id, target_kind, deployed_at, seq)` +
+		` SELECT ?, ?, json_extract(value, '$.origin'), ?, ?, ?, json_extract(value, '$.seq') FROM json_each(?)`
 	deploymentQuery = `SELECT project_id, id, release_id, target_kind, metadata, deployed_at FROM deployments`
-	targetsQuery    = `SELECT t.origin, t.deployment_id, t.release_id, d.target_kind, t.deployed_at, t.seq FROM deployment_targets t` +
-		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
-		` WHERE t.project_id = ? AND t.deployment_id IN (SELECT value FROM json_each(?))`
 )
 
 var (
 	deploymentSchema = deployment.NewSchema(deploymentsTable, targetsTable, previewsTable)
 
-	newestTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, d.target_kind, t.deployed_at, t.seq FROM deployment_targets t` +
-		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
+	targetsQuery      = deployment.TargetsSelect(targetsTable) + ` WHERE t.project_id = ? AND t.deployment_id IN (SELECT value FROM json_each(?))`
+	newestTargetsStmt = deployment.TargetsSelect(targetsTable) +
 		` WHERE t.project_id = ? AND t.origin IN (SELECT value FROM json_each(?)) AND NOT ` + deployment.NewerTargetExists(targetsTable)
-	liveTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, d.target_kind, t.deployed_at, t.seq FROM deployment_targets t` +
-		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
-		` WHERE t.project_id = ? AND t.deployment_id IN (SELECT value FROM json_each(?)) AND NOT ` + deployment.NewerTargetExists(targetsTable) +
-		` AND ` + deployment.TargetServesAt("d", previewsTable) + `?))`
-	// See the postgres statement.
-	liveDeploymentStmt = deploymentQuery + ` WHERE project_id = ?1 AND id = (` +
-		`SELECT t.deployment_id FROM deployment_targets t` +
-		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
+	liveTargetsStmt = targetsQuery + ` AND NOT ` + deployment.NewerTargetExists(targetsTable) +
+		` AND ` + deployment.TargetServes(previewsTable, "?")
+	liveDeploymentStmt = deploymentQuery + ` WHERE project_id = ?1 AND id = (SELECT t.deployment_id FROM ` + targetsTable + ` t` +
 		` WHERE t.project_id = ?1 AND t.origin = ?2 AND NOT ` + deployment.NewerTargetExists(targetsTable) +
-		` AND ` + deployment.TargetServesAt("d", previewsTable) + `?3)))`
+		` AND ` + deployment.TargetServes(previewsTable, "?3") + `)`
 )
 
 type deploymentStatements struct{ statement }
@@ -54,27 +45,9 @@ func newDeploymentStatements(client queryExecutor) deploymentStatements {
 	return deploymentStatements{statement: statement{client: client}}
 }
 
-func jsonArray(values []string) (string, error) {
-	encoded, err := json.Marshal(values)
-	return string(encoded), err
-}
-
-func targetsJSON(origins []string, seqs []int64) (string, error) {
-	type target struct {
-		Origin string `json:"origin"`
-		Seq    int64  `json:"seq"`
-	}
-	targets := make([]target, len(origins))
-	for i, origin := range origins {
-		targets[i] = target{Origin: origin, Seq: seqs[i]}
-	}
-	encoded, err := json.Marshal(targets)
-	return string(encoded), err
-}
-
 // GetNewestTargets implements [service.DeploymentStatements].
 func (ds deploymentStatements) GetNewestTargets(ctx context.Context, projectID string, origins []string) ([]domain.TargetDeployment, error) {
-	encoded, err := jsonArray(origins)
+	encoded, err := encodeJSON(origins)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +63,16 @@ func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *dom
 	if err != nil {
 		return err
 	}
-	targets, err := targetsJSON(entity.Origins(), deployment.NextSeqs(entity.Origins(), read))
+	type target struct {
+		Origin string `json:"origin"`
+		Seq    int64  `json:"seq"`
+	}
+	origins, seqs := entity.Origins(), deployment.NextSeqs(entity.Origins(), read)
+	rows := make([]target, len(origins))
+	for i, origin := range origins {
+		rows[i] = target{Origin: origin, Seq: seqs[i]}
+	}
+	targets, err := encodeJSON(rows)
 	if err != nil {
 		return err
 	}
@@ -103,7 +85,7 @@ func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *dom
 			return wrapError(err)
 		}
 		if _, err := tx.Exec(ctx, createDeploymentTargetsStmt,
-			entity.ProjectID, entity.ID, entity.ReleaseID, deployedAt.UnixNano(), targets,
+			entity.ProjectID, entity.ID, entity.ReleaseID, entity.TargetKind.String(), deployedAt.UnixNano(), targets,
 		); err != nil {
 			return wrapError(err)
 		}
@@ -128,38 +110,26 @@ func (ds deploymentStatements) GetDeploymentByID(ctx context.Context, projectID,
 	}, deploymentSchema); err != nil {
 		return nil, err
 	}
-	return ds.getOne(ctx, compiler.String(), compiler.args...)
+	return ds.getOne(ctx, nil, compiler.String(), compiler.args...)
 }
 
 // GetLiveDeployment implements [service.DeploymentStatements].
 func (ds deploymentStatements) GetLiveDeployment(ctx context.Context, projectID, origin string, now time.Time) (*domain.Deployment, error) {
-	rows, err := ds.client.Query(ctx, liveDeploymentStmt, projectID, origin, now.UnixNano())
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	entity, err := collectExactlyOneRow(rows, scanDeployment)
-	rows.Close()
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	if err := ds.attachTargets(ctx, projectID, []*domain.Deployment{entity}, &now); err != nil {
-		return nil, err
-	}
-	return entity, nil
+	return ds.getOne(ctx, &now, liveDeploymentStmt, projectID, origin, now.UnixNano())
 }
 
-func (ds deploymentStatements) getOne(ctx context.Context, query string, args ...any) (*domain.Deployment, error) {
+// getOne reads one deployment with its targets: all of them, or with liveAt
+// only those still serving then.
+func (ds deploymentStatements) getOne(ctx context.Context, liveAt *time.Time, query string, args ...any) (*domain.Deployment, error) {
 	rows, err := ds.client.Query(ctx, query, args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}
 	entity, err := collectExactlyOneRow(rows, scanDeployment)
-	// Closed before the next query, which may share its connection.
-	rows.Close()
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	if err := ds.attachTargets(ctx, entity.ProjectID, []*domain.Deployment{entity}, nil); err != nil {
+	if err := ds.attachTargets(ctx, entity.ProjectID, []*domain.Deployment{entity}, liveAt); err != nil {
 		return nil, err
 	}
 	return entity, nil
@@ -193,7 +163,7 @@ func (ds deploymentStatements) ListDeployments(ctx context.Context, filter *data
 
 // ListLiveDeployments implements [service.DeploymentStatements].
 func (ds deploymentStatements) ListLiveDeployments(ctx context.Context, now time.Time, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
-	return ds.list(ctx, filter, &now)
+	return ds.list(ctx, deployment.LiveAt(filter, now), &now)
 }
 
 func (ds deploymentStatements) list(ctx context.Context, filter *database.ListOptions[domain.DeploymentField], liveAt *time.Time) (*database.ListResult[*domain.Deployment], error) {
@@ -221,7 +191,6 @@ func (ds deploymentStatements) collect(ctx context.Context, query string, args .
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	defer rows.Close()
 	items, err := collectRows(rows, scanDeployment)
 	if err != nil {
 		return nil, wrapError(err)
@@ -230,16 +199,15 @@ func (ds deploymentStatements) collect(ctx context.Context, query string, args .
 }
 
 func (ds deploymentStatements) attachTargets(ctx context.Context, projectID string, items []*domain.Deployment, liveAt *time.Time) error {
-	ids, err := jsonArray(deployment.DeploymentIDs(items))
+	ids, err := encodeJSON(deployment.DeploymentIDs(items))
 	if err != nil {
 		return err
 	}
-	var rows []domain.TargetDeployment
+	query, args := targetsQuery, []any{projectID, ids}
 	if liveAt != nil {
-		rows, err = ds.collectTargets(ctx, liveTargetsStmt, projectID, ids, liveAt.UnixNano())
-	} else {
-		rows, err = ds.collectTargets(ctx, targetsQuery, projectID, ids)
+		query, args = liveTargetsStmt, append(args, liveAt.UnixNano())
 	}
+	rows, err := ds.collectTargets(ctx, query, args...)
 	if err != nil {
 		return err
 	}
@@ -252,7 +220,6 @@ func (ds deploymentStatements) collectTargets(ctx context.Context, query string,
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	defer rows.Close()
 	items, err := collectRows(rows, func(rows *sql.Rows) (domain.TargetDeployment, error) {
 		var (
 			scanned      domain.TargetDeployment

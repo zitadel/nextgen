@@ -39,10 +39,12 @@ CREATE TABLE deployment_targets (
     deployment_id  STRING(MAX) NOT NULL,
     origin         STRING(MAX) NOT NULL,
     release_id     STRING(MAX) NOT NULL,
+    target_kind    STRING(MAX) NOT NULL,
     deployed_at    TIMESTAMP   NOT NULL,
     seq            INT64       NOT NULL,
     CONSTRAINT chk_deployment_targets_origin CHECK (origin <> ''),
     CONSTRAINT chk_deployment_targets_seq CHECK (seq > 0),
+    CONSTRAINT chk_deployment_targets_target_kind CHECK (target_kind IN ('primary', 'preview')),
     CONSTRAINT fk_deployment_targets_deployment
         FOREIGN KEY (project_id, deployment_id)
         REFERENCES deployments (project_id, id)

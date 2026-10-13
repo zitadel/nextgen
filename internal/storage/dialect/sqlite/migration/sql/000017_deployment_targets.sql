@@ -32,10 +32,12 @@ CREATE TABLE deployment_targets (
     deployment_id  TEXT    NOT NULL,
     origin         TEXT    NOT NULL,
     release_id     TEXT    NOT NULL,
+    target_kind    TEXT    NOT NULL,
     deployed_at    INTEGER NOT NULL,
     seq            INTEGER NOT NULL,
     PRIMARY KEY (project_id, deployment_id, origin),
     CONSTRAINT chk_deployment_targets_seq CHECK (seq > 0),
+    CONSTRAINT chk_deployment_targets_target_kind CHECK (target_kind IN ('primary', 'preview')),
     CONSTRAINT chk_deployment_targets_origin CHECK (origin <> ''),
     CONSTRAINT fk_deployment_targets_deployment
         FOREIGN KEY (project_id, deployment_id) REFERENCES deployments (project_id, id) ON DELETE CASCADE

@@ -5,19 +5,27 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// NewerTargetExists holds when the origin of the deployment_targets row
-// aliased t has a row with a higher seq. Its negation picks what each origin
-// serves.
+// TargetsSelect selects deployment_targets rows aliased t, in the column order
+// the dialects scan.
+func TargetsSelect(targetsTable string) string {
+	return `SELECT t.origin, t.deployment_id, t.release_id, t.target_kind, t.deployed_at, t.seq FROM ` + targetsTable + ` t`
+}
+
+// NewerTargetExists holds when the origin of row t has a row with a higher
+// seq. Its negation picks what each origin serves.
 func NewerTargetExists(targetsTable string) string {
 	return `EXISTS (SELECT 1 FROM ` + targetsTable + ` newer` +
 		` WHERE newer.project_id = t.project_id AND newer.origin = t.origin AND newer.seq > t.seq)`
 }
 
-// TargetServesAt holds while the target row t of deployment d admits its
-// origin: always for a primary origin, until expiry for a preview URL. The
-// caller binds the time and closes with "))".
-func TargetServesAt(deploymentAlias, previewsTable string) string {
-	return `(` + deploymentAlias + `.target_kind = 'primary' OR EXISTS (SELECT 1 FROM ` + previewsTable + ` p` +
+// TargetServes holds while row t admits its origin at the time bound to
+// placeholder: always for a primary origin, until expiry for a preview URL.
+func TargetServes(previewsTable, placeholder string) string {
+	return targetServesOpen(previewsTable) + placeholder + `))`
+}
+
+func targetServesOpen(previewsTable string) string {
+	return `(t.target_kind = 'primary' OR EXISTS (SELECT 1 FROM ` + previewsTable + ` p` +
 		` WHERE p.project_id = t.project_id AND p.origin = t.origin AND p.expires_at > `
 }
 
@@ -53,9 +61,7 @@ func NewSchema(deploymentsTable, targetsTable, previewsTable string) database.Sc
 			Computed:  true,
 		},
 		domain.DeploymentFieldLive: {
-			SQLName: `EXISTS (` + ownTargets +
-				` AND NOT ` + NewerTargetExists(targetsTable) +
-				` AND ` + TargetServesAt(deploymentsTable, previewsTable),
+			SQLName:   `EXISTS (` + ownTargets + ` AND NOT ` + NewerTargetExists(targetsTable) + ` AND ` + targetServesOpen(previewsTable),
 			SQLSuffix: ")))",
 			Computed:  true,
 		},

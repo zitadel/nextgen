@@ -29,7 +29,7 @@ func newPreviewStatements(client queryExecutor) previewStatements {
 
 // UpsertPreviews implements [service.PreviewStatements].
 func (ps previewStatements) UpsertPreviews(ctx context.Context, projectID string, origins []string, expiresAt, createdAt time.Time) error {
-	encoded, err := jsonArray(origins)
+	encoded, err := encodeJSON(origins)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,6 @@ func (ps previewStatements) GetPreview(ctx context.Context, projectID, origin st
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	defer rows.Close()
 	entity, err := collectExactlyOneRow(rows, scanPreview)
 	if err != nil {
 		return nil, wrapError(err)
@@ -73,7 +72,6 @@ func (ps previewStatements) ListPreviews(ctx context.Context, filter *database.L
 		if err != nil {
 			return nil, wrapError(err)
 		}
-		defer rows.Close()
 		items, err := collectRows(rows, scanPreview)
 		if err != nil {
 			return nil, wrapError(err)
@@ -88,24 +86,14 @@ func (ps previewStatements) ListPreviews(ctx context.Context, filter *database.L
 
 // DeletePreview implements [service.PreviewStatements].
 func (ps previewStatements) DeletePreview(ctx context.Context, projectID, origin string) (bool, error) {
-	return ps.delete(ctx, deletePreviewStmt, projectID, origin)
+	n, err := execAffected(ctx, ps.client, deletePreviewStmt, projectID, origin)
+	return n > 0, err
 }
 
 // DeleteExpiredPreview implements [service.PreviewStatements].
 func (ps previewStatements) DeleteExpiredPreview(ctx context.Context, projectID, origin string, now time.Time) (bool, error) {
-	return ps.delete(ctx, deleteExpiredPreviewStmt, projectID, origin, now.UnixNano())
-}
-
-func (ps previewStatements) delete(ctx context.Context, query string, args ...any) (bool, error) {
-	result, err := ps.client.Exec(ctx, query, args...)
-	if err != nil {
-		return false, wrapError(err)
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return false, wrapError(err)
-	}
-	return affected > 0, nil
+	n, err := execAffected(ctx, ps.client, deleteExpiredPreviewStmt, projectID, origin, now.UnixNano())
+	return n > 0, err
 }
 
 func scanPreview(rows *sql.Rows) (*domain.Preview, error) {

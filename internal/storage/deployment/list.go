@@ -48,27 +48,20 @@ func ListOptions(projectID string, origin *string, limit uint32) *database.ListO
 	}
 }
 
-// LiveFilter narrows the live view to one release. One origin's live
-// deployment is DeploymentStatements.GetLiveDeployment.
-type LiveFilter struct {
-	ReleaseID *string
+// LiveListOptions lists the deployments some target still serves, newest
+// first; a non-nil releaseID narrows it to that release. ListLiveDeployments
+// applies the time with LiveAt.
+func LiveListOptions(projectID string, releaseID *string, limit uint32) *database.ListOptions[domain.DeploymentField] {
+	opts := ListOptions(projectID, nil, limit)
+	if releaseID != nil {
+		opts.Filter = database.And(opts.Filter, database.Equal(database.Col(domain.DeploymentFieldReleaseID), *releaseID))
+	}
+	return opts
 }
 
-// LiveListOptions lists the deployments some target still serves at now,
-// newest first.
-func LiveListOptions(projectID string, now time.Time, filter LiveFilter, limit uint32) *database.ListOptions[domain.DeploymentField] {
-	filters := []database.Filter[domain.DeploymentField]{
-		database.Equal(database.Col(domain.DeploymentFieldProjectID), projectID),
-		database.CorrelatedEqual(database.Col(domain.DeploymentFieldLive), now),
-	}
-	if filter.ReleaseID != nil {
-		filters = append(filters, database.Equal(database.Col(domain.DeploymentFieldReleaseID), *filter.ReleaseID))
-	}
-	return &database.ListOptions[domain.DeploymentField]{
-		Filter: database.And(filters...),
-		Pagination: database.Page[domain.DeploymentField]{
-			Limit:   limit,
-			OrderBy: NewestFirst(),
-		},
-	}
+// LiveAt returns opts narrowed to the deployments some target serves at now.
+func LiveAt(opts *database.ListOptions[domain.DeploymentField], now time.Time) *database.ListOptions[domain.DeploymentField] {
+	live := *opts
+	live.Filter = database.And(opts.Filter, database.CorrelatedEqual(database.Col(domain.DeploymentFieldLive), now))
+	return &live
 }

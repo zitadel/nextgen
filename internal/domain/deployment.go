@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -185,10 +186,9 @@ func NewDeployment(projectID, releaseID string, kind DeploymentTargetKind, origi
 			return nil, ErrDeploymentInvalid("a target origin is empty", nil)
 		}
 	}
-	// Sorts into a new slice: the caller's argument is not ours to reorder.
 	sorted := slices.Compact(slices.Sorted(slices.Values(origins)))
 	if len(sorted) > MaxDeploymentTargets {
-		return nil, ErrDeploymentInvalid("a deployment covers at most 50 targets", nil)
+		return nil, ErrDeploymentInvalid(fmt.Sprintf("a deployment covers at most %d targets", MaxDeploymentTargets), nil)
 	}
 	targets := make([]DeploymentTarget, len(sorted))
 	for i, origin := range sorted {

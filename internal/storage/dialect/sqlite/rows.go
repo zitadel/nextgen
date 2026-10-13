@@ -5,7 +5,10 @@ import (
 	"database/sql"
 )
 
+// collectRows and collectExactlyOneRow close rows, so a caller can run its
+// next query on the same connection.
 func collectRows[T any](rows *sql.Rows, scan func(*sql.Rows) (T, error)) ([]T, error) {
+	defer rows.Close()
 	var items []T
 	for rows.Next() {
 		item, err := scan(rows)
@@ -18,6 +21,7 @@ func collectRows[T any](rows *sql.Rows, scan func(*sql.Rows) (T, error)) ([]T, e
 }
 
 func collectExactlyOneRow[T any](rows *sql.Rows, scan func(*sql.Rows) (T, error)) (T, error) {
+	defer rows.Close()
 	var (
 		zero T
 		item T

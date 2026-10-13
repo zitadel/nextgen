@@ -28,8 +28,7 @@ func newPreviewStatements(db queryExecutor) previewStatements {
 	return previewStatements{statement: statement{db: db}}
 }
 
-// UpsertPreviews implements [service.PreviewStatements]. Existing rows only
-// get a new expiry.
+// UpsertPreviews implements [service.PreviewStatements].
 func (ps previewStatements) UpsertPreviews(ctx context.Context, projectID string, origins []string, expiresAt, createdAt time.Time) error {
 	return withTransaction(ctx, ps.db, func(ctx context.Context, tx queryExecutor) error {
 		present := make(map[string]bool, len(origins))
@@ -96,16 +95,16 @@ func (ps previewStatements) ListPreviews(ctx context.Context, filter *database.L
 
 // DeletePreview implements [service.PreviewStatements].
 func (ps previewStatements) DeletePreview(ctx context.Context, projectID, origin string) (bool, error) {
-	affected, err := ps.db.Update(ctx, buildStatement(deletePreviewStmt, projectID, origin).statement())
-	if err != nil {
-		return false, err
-	}
-	return affected > 0, nil
+	return ps.delete(ctx, buildStatement(deletePreviewStmt, projectID, origin).statement())
 }
 
 // DeleteExpiredPreview implements [service.PreviewStatements].
 func (ps previewStatements) DeleteExpiredPreview(ctx context.Context, projectID, origin string, now time.Time) (bool, error) {
-	affected, err := ps.db.Update(ctx, buildStatement(deleteExpiredPreviewStmt, projectID, origin, now).statement())
+	return ps.delete(ctx, buildStatement(deleteExpiredPreviewStmt, projectID, origin, now).statement())
+}
+
+func (ps previewStatements) delete(ctx context.Context, stmt spanner.Statement) (bool, error) {
+	affected, err := ps.db.Update(ctx, stmt)
 	if err != nil {
 		return false, err
 	}

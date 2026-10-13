@@ -22,13 +22,14 @@ CREATE TABLE zitadel_nextgen.deployments (
 CREATE INDEX idx_deployments_project_deployed_at
     ON zitadel_nextgen.deployments (project_id, deployed_at DESC, id DESC);
 
--- release_id and deployed_at are copied so the newest-per-origin seek reads
+-- release_id, target_kind and deployed_at are copied so target queries read
 -- this table alone. origin is not a reference, so history outlives it.
 CREATE TABLE zitadel_nextgen.deployment_targets (
     project_id TEXT COLLATE "C" NOT NULL
     , deployment_id TEXT COLLATE "C" NOT NULL
     , origin TEXT COLLATE "C" NOT NULL CHECK (origin <> '')
     , release_id TEXT COLLATE "C" NOT NULL
+    , target_kind TEXT COLLATE "C" NOT NULL CHECK (target_kind IN ('primary', 'preview'))
     , deployed_at TIMESTAMPTZ NOT NULL
     -- Counts the deployments to the origin; the newest has the highest.
     , seq BIGINT NOT NULL CHECK (seq > 0)

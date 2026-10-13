@@ -83,16 +83,16 @@ func (ps previewStatements) ListPreviews(ctx context.Context, filter *database.L
 
 // DeletePreview implements [service.PreviewStatements].
 func (ps previewStatements) DeletePreview(ctx context.Context, projectID, origin string) (bool, error) {
-	tag, err := ps.client.Exec(ctx, deletePreviewStmt, projectID, origin)
-	if err != nil {
-		return false, wrapError(err)
-	}
-	return tag.RowsAffected() > 0, nil
+	return ps.delete(ctx, deletePreviewStmt, projectID, origin)
 }
 
 // DeleteExpiredPreview implements [service.PreviewStatements].
 func (ps previewStatements) DeleteExpiredPreview(ctx context.Context, projectID, origin string, now time.Time) (bool, error) {
-	tag, err := ps.client.Exec(ctx, deleteExpiredPreviewStmt, projectID, origin, now)
+	return ps.delete(ctx, deleteExpiredPreviewStmt, projectID, origin, now)
+}
+
+func (ps previewStatements) delete(ctx context.Context, query string, args ...any) (bool, error) {
+	tag, err := ps.client.Exec(ctx, query, args...)
 	if err != nil {
 		return false, wrapError(err)
 	}

@@ -17,8 +17,7 @@ const (
 	releaseTable      = "releases"
 	createReleaseStmt = `INSERT INTO releases (project_id, id, content_hash, pointers, metadata)` +
 		` VALUES (@p1, @p2, @p3, @p4, @p5) THEN RETURN created_at`
-	releaseQuery = `SELECT project_id, id, content_hash, pointers, metadata, created_at, revoked_at FROM releases`
-	// See the postgres statement.
+	releaseQuery      = `SELECT project_id, id, content_hash, pointers, metadata, created_at, revoked_at FROM releases`
 	revokeReleaseStmt = `UPDATE releases SET revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP())` +
 		` WHERE project_id = @p1 AND id = @p2` +
 		` THEN RETURN project_id, id, content_hash, pointers, metadata, created_at, revoked_at`
