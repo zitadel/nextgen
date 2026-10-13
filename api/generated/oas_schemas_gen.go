@@ -10404,6 +10404,211 @@ func (s *CreateAuthAttemptRequest) SetSessionID(val OptNilSessionID) {
 	s.SessionID = val
 }
 
+// Merged schema.
+// Ref: #
+type CreateDeploymentBadRequest struct {
+	Code ErrorCode `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Merged property.
+	Details OptCreateDeploymentBadRequestDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *CreateDeploymentBadRequest) GetCode() ErrorCode {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *CreateDeploymentBadRequest) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *CreateDeploymentBadRequest) GetDetails() OptCreateDeploymentBadRequestDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *CreateDeploymentBadRequest) SetCode(val ErrorCode) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *CreateDeploymentBadRequest) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *CreateDeploymentBadRequest) SetDetails(val OptCreateDeploymentBadRequestDetails) {
+	s.Details = val
+}
+
+func (*CreateDeploymentBadRequest) createDeploymentRes() {}
+
+// Merged schema.
+type CreateDeploymentBadRequestDetails struct {
+	// The kind of target the deployment addresses, whose variable
+	// values it would freeze.
+	Kind CreateDeploymentBadRequestDetailsKind `json:"kind"`
+	// Every variable the release references with no value stored for
+	// that kind, sorted.
+	Names           []string `json:"names"`
+	AdditionalProps CreateDeploymentBadRequestDetailsAdditional
+}
+
+// GetKind returns the value of Kind.
+func (s *CreateDeploymentBadRequestDetails) GetKind() CreateDeploymentBadRequestDetailsKind {
+	return s.Kind
+}
+
+// GetNames returns the value of Names.
+func (s *CreateDeploymentBadRequestDetails) GetNames() []string {
+	return s.Names
+}
+
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *CreateDeploymentBadRequestDetails) GetAdditionalProps() CreateDeploymentBadRequestDetailsAdditional {
+	return s.AdditionalProps
+}
+
+// SetKind sets the value of Kind.
+func (s *CreateDeploymentBadRequestDetails) SetKind(val CreateDeploymentBadRequestDetailsKind) {
+	s.Kind = val
+}
+
+// SetNames sets the value of Names.
+func (s *CreateDeploymentBadRequestDetails) SetNames(val []string) {
+	s.Names = val
+}
+
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *CreateDeploymentBadRequestDetails) SetAdditionalProps(val CreateDeploymentBadRequestDetailsAdditional) {
+	s.AdditionalProps = val
+}
+
+type CreateDeploymentBadRequestDetailsAdditional map[string]jx.Raw
+
+func (s *CreateDeploymentBadRequestDetailsAdditional) init() CreateDeploymentBadRequestDetailsAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// The kind of target the deployment addresses, whose variable
+// values it would freeze.
+type CreateDeploymentBadRequestDetailsKind string
+
+const (
+	CreateDeploymentBadRequestDetailsKindPrimary CreateDeploymentBadRequestDetailsKind = "primary"
+)
+
+// AllValues returns all CreateDeploymentBadRequestDetailsKind values.
+func (CreateDeploymentBadRequestDetailsKind) AllValues() []CreateDeploymentBadRequestDetailsKind {
+	return []CreateDeploymentBadRequestDetailsKind{
+		CreateDeploymentBadRequestDetailsKindPrimary,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s CreateDeploymentBadRequestDetailsKind) MarshalText() ([]byte, error) {
+	switch s {
+	case CreateDeploymentBadRequestDetailsKindPrimary:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *CreateDeploymentBadRequestDetailsKind) UnmarshalText(data []byte) error {
+	switch CreateDeploymentBadRequestDetailsKind(data) {
+	case CreateDeploymentBadRequestDetailsKindPrimary:
+		*s = CreateDeploymentBadRequestDetailsKindPrimary
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The deployment conflicts with the state of the project, told apart by
+// `code`: `dep.conflict` when `expected_deployment_id` did not match,
+// carrying the actual newest deployment, or `rel.revoked` when the release
+// is revoked.
+// Ref: #
+// CreateDeploymentConflict represents sum type.
+type CreateDeploymentConflict struct {
+	Type                    CreateDeploymentConflictType // switch on this field
+	DeploymentGuardConflict DeploymentGuardConflict
+	ReleaseRevokedConflict  ReleaseRevokedConflict
+}
+
+// CreateDeploymentConflictType is oneOf type of CreateDeploymentConflict.
+type CreateDeploymentConflictType string
+
+// Possible values for CreateDeploymentConflictType.
+const (
+	DeploymentGuardConflictCreateDeploymentConflict CreateDeploymentConflictType = "dep.conflict"
+	ReleaseRevokedConflictCreateDeploymentConflict  CreateDeploymentConflictType = "rel.revoked"
+)
+
+// IsDeploymentGuardConflict reports whether CreateDeploymentConflict is DeploymentGuardConflict.
+func (s CreateDeploymentConflict) IsDeploymentGuardConflict() bool {
+	return s.Type == DeploymentGuardConflictCreateDeploymentConflict
+}
+
+// IsReleaseRevokedConflict reports whether CreateDeploymentConflict is ReleaseRevokedConflict.
+func (s CreateDeploymentConflict) IsReleaseRevokedConflict() bool {
+	return s.Type == ReleaseRevokedConflictCreateDeploymentConflict
+}
+
+// SetDeploymentGuardConflict sets CreateDeploymentConflict to DeploymentGuardConflict.
+func (s *CreateDeploymentConflict) SetDeploymentGuardConflict(v DeploymentGuardConflict) {
+	s.Type = DeploymentGuardConflictCreateDeploymentConflict
+	s.DeploymentGuardConflict = v
+}
+
+// GetDeploymentGuardConflict returns DeploymentGuardConflict and true boolean if CreateDeploymentConflict is DeploymentGuardConflict.
+func (s CreateDeploymentConflict) GetDeploymentGuardConflict() (v DeploymentGuardConflict, ok bool) {
+	if !s.IsDeploymentGuardConflict() {
+		return v, false
+	}
+	return s.DeploymentGuardConflict, true
+}
+
+// NewDeploymentGuardConflictCreateDeploymentConflict returns new CreateDeploymentConflict from DeploymentGuardConflict.
+func NewDeploymentGuardConflictCreateDeploymentConflict(v DeploymentGuardConflict) CreateDeploymentConflict {
+	var s CreateDeploymentConflict
+	s.SetDeploymentGuardConflict(v)
+	return s
+}
+
+// SetReleaseRevokedConflict sets CreateDeploymentConflict to ReleaseRevokedConflict.
+func (s *CreateDeploymentConflict) SetReleaseRevokedConflict(v ReleaseRevokedConflict) {
+	s.Type = ReleaseRevokedConflictCreateDeploymentConflict
+	s.ReleaseRevokedConflict = v
+}
+
+// GetReleaseRevokedConflict returns ReleaseRevokedConflict and true boolean if CreateDeploymentConflict is ReleaseRevokedConflict.
+func (s CreateDeploymentConflict) GetReleaseRevokedConflict() (v ReleaseRevokedConflict, ok bool) {
+	if !s.IsReleaseRevokedConflict() {
+		return v, false
+	}
+	return s.ReleaseRevokedConflict, true
+}
+
+// NewReleaseRevokedConflictCreateDeploymentConflict returns new CreateDeploymentConflict from ReleaseRevokedConflict.
+func NewReleaseRevokedConflictCreateDeploymentConflict(v ReleaseRevokedConflict) CreateDeploymentConflict {
+	var s CreateDeploymentConflict
+	s.SetReleaseRevokedConflict(v)
+	return s
+}
+
+func (*CreateDeploymentConflict) createDeploymentRes() {}
+
 type CreateDeploymentCreated Deployment
 
 func (*CreateDeploymentCreated) createDeploymentRes() {}
@@ -10648,54 +10853,50 @@ type CreateDeploymentOK Deployment
 
 func (*CreateDeploymentOK) createDeploymentRes() {}
 
-// The release to make live and the environment to make it live on.
-// Environments are addressed by name here — the name is the environment's
-// wire address — and resolved to ids once, when the deployment is created.
-// The stored record carries the ids, so it survives renames.
+// The release to make live and the targets to make it live on. The release
+// is named by exactly one of `release_id` or `content_hash`; a request with
+// both or neither answers `400` with `dep.invalid`.
 // `deployed_at` and `deployed_by` are derived server-side from the caller's
 // authentication context and are not accepted here.
 // Ref: #
 type CreateDeploymentRequest struct {
-	// The name of the environment to deploy to.
-	Environment EnvironmentName `json:"environment"`
-	// The release to make live. Must already exist in the project — deploying
-	// never assembles a release.
-	// Always explicit, for `promote` too: a promotion names the release it
-	// moves rather than asking the server to read the source environment's
-	// current one, so the caller promotes the release it inspected, not
-	// whatever is current by the time the request lands.
-	ReleaseID ReleaseID `json:"release_id"`
-	// Why this deployment happens. Omitted, the server records `deploy` —
-	// the plain case needs no annotation. Applied server-side rather than as
-	// a schema `default`: a default declared next to the shared reason
-	// schema would leak into every other use of it.
+	// The release to make live. Must exist in the project; deploying never
+	// assembles a release.
+	ReleaseID OptReleaseID `json:"release_id"`
+	// The content digest of the release to make live, in full with its
+	// `sha256:` prefix. A digest no release of the project carries answers
+	// `404` with `rel.not_found`; deploying never assembles a release.
+	ContentHash OptReleaseContentHash    `json:"content_hash"`
+	Targets     DeploymentTargetsRequest `json:"targets"`
+	// Why this deployment happens. Omitted, the server records `deploy`.
 	Reason OptDeploymentReason `json:"reason"`
-	// The name of the environment the release is promoted from. Required when
-	// `reason` is `promote`, rejected otherwise — before the name is
-	// resolved, so a source on a non-promotion answers `400` whether or not
-	// the name exists.
-	SourceEnvironment OptNilEnvironmentName `json:"source_environment"`
 	// A short free-form summary of why this deployment happened, analogous to
 	// a git commit message. Recorded on the deployment's metadata and shown
 	// when listing the history.
 	Message OptString `json:"message"`
-	// An optimistic-concurrency guard. When present, the deployment is only
-	// created if the environment's current deployment is exactly this one;
-	// otherwise the request answers `409` carrying the actual
-	// `current_deployment_id` and `current_release_id` in its details, and
+	// An optimistic-concurrency guard: the deployment the caller believes is
+	// the newest one to any of its targets. When present, the deployment
+	// is only created if the newest deployment to any of the resolved
+	// targets is exactly this one; otherwise the request answers `409`
+	// with `dep.conflict`, carrying the actual newest deployment, and
 	// nothing changes.
-	// Not persisted — it guards the swap, it is not part of the record.
-	ExpectedCurrentDeploymentID OptNilDeploymentID `json:"expected_current_deployment_id"`
-}
-
-// GetEnvironment returns the value of Environment.
-func (s *CreateDeploymentRequest) GetEnvironment() EnvironmentName {
-	return s.Environment
+	// Not persisted; it guards the write, it is not part of the record.
+	ExpectedDeploymentID OptDeploymentID `json:"expected_deployment_id"`
 }
 
 // GetReleaseID returns the value of ReleaseID.
-func (s *CreateDeploymentRequest) GetReleaseID() ReleaseID {
+func (s *CreateDeploymentRequest) GetReleaseID() OptReleaseID {
 	return s.ReleaseID
+}
+
+// GetContentHash returns the value of ContentHash.
+func (s *CreateDeploymentRequest) GetContentHash() OptReleaseContentHash {
+	return s.ContentHash
+}
+
+// GetTargets returns the value of Targets.
+func (s *CreateDeploymentRequest) GetTargets() DeploymentTargetsRequest {
+	return s.Targets
 }
 
 // GetReason returns the value of Reason.
@@ -10703,29 +10904,29 @@ func (s *CreateDeploymentRequest) GetReason() OptDeploymentReason {
 	return s.Reason
 }
 
-// GetSourceEnvironment returns the value of SourceEnvironment.
-func (s *CreateDeploymentRequest) GetSourceEnvironment() OptNilEnvironmentName {
-	return s.SourceEnvironment
-}
-
 // GetMessage returns the value of Message.
 func (s *CreateDeploymentRequest) GetMessage() OptString {
 	return s.Message
 }
 
-// GetExpectedCurrentDeploymentID returns the value of ExpectedCurrentDeploymentID.
-func (s *CreateDeploymentRequest) GetExpectedCurrentDeploymentID() OptNilDeploymentID {
-	return s.ExpectedCurrentDeploymentID
-}
-
-// SetEnvironment sets the value of Environment.
-func (s *CreateDeploymentRequest) SetEnvironment(val EnvironmentName) {
-	s.Environment = val
+// GetExpectedDeploymentID returns the value of ExpectedDeploymentID.
+func (s *CreateDeploymentRequest) GetExpectedDeploymentID() OptDeploymentID {
+	return s.ExpectedDeploymentID
 }
 
 // SetReleaseID sets the value of ReleaseID.
-func (s *CreateDeploymentRequest) SetReleaseID(val ReleaseID) {
+func (s *CreateDeploymentRequest) SetReleaseID(val OptReleaseID) {
 	s.ReleaseID = val
+}
+
+// SetContentHash sets the value of ContentHash.
+func (s *CreateDeploymentRequest) SetContentHash(val OptReleaseContentHash) {
+	s.ContentHash = val
+}
+
+// SetTargets sets the value of Targets.
+func (s *CreateDeploymentRequest) SetTargets(val DeploymentTargetsRequest) {
+	s.Targets = val
 }
 
 // SetReason sets the value of Reason.
@@ -10733,19 +10934,14 @@ func (s *CreateDeploymentRequest) SetReason(val OptDeploymentReason) {
 	s.Reason = val
 }
 
-// SetSourceEnvironment sets the value of SourceEnvironment.
-func (s *CreateDeploymentRequest) SetSourceEnvironment(val OptNilEnvironmentName) {
-	s.SourceEnvironment = val
-}
-
 // SetMessage sets the value of Message.
 func (s *CreateDeploymentRequest) SetMessage(val OptString) {
 	s.Message = val
 }
 
-// SetExpectedCurrentDeploymentID sets the value of ExpectedCurrentDeploymentID.
-func (s *CreateDeploymentRequest) SetExpectedCurrentDeploymentID(val OptNilDeploymentID) {
-	s.ExpectedCurrentDeploymentID = val
+// SetExpectedDeploymentID sets the value of ExpectedDeploymentID.
+func (s *CreateDeploymentRequest) SetExpectedDeploymentID(val OptDeploymentID) {
+	s.ExpectedDeploymentID = val
 }
 
 // CreateFlowDefinitionErrorResponse represents sum type.
@@ -15897,25 +16093,28 @@ func (s *DepPermissionDeniedDetails) init() DepPermissionDeniedDetails {
 	return m
 }
 
-// An immutable record of a release being made live on an environment.
-// Deploying, promoting and rolling back all create a deployment. The record
-// is what ran where and when — the ids and the timestamp — plus metadata
-// saying why and who. It is append-only: written once when the environment
-// starts running the release and never changed afterwards, so the deployment
-// log is the audit trail of what ran where.
-// Environments are referenced by id, not name. Names are resolved when the
-// deployment is created, so renaming an environment later does not reattach
-// its history.
+// An immutable record of a release being made live on a set of targets.
+// Deploying and rolling back both create a deployment. The record is what
+// ran where and when — the release, the targets and the timestamp — plus
+// metadata saying why and who. It is append-only: written once, in one
+// transaction for all of its targets, and never changed afterwards, so the
+// deployment log is the audit trail of what ran where.
+// A target serves the release of the newest deployment that targeted it.
+// An older deployment stays in the history after a newer one replaces it on
+// some or all of its targets.
 // Ref: #
 type Deployment struct {
 	// The opaque, immutable resource id, assigned at creation.
 	ID DeploymentID `json:"id"`
 	// The project this deployment belongs to.
 	ProjectID ProjectID `json:"project_id"`
-	// The environment this deployment made the release live on.
-	EnvironmentID string `json:"environment_id"`
-	// The release this deployment made live.
+	// The release this deployment made live. Always the release id, also
+	// when the request named the release by `content_hash`.
 	ReleaseID ReleaseID `json:"release_id"`
+	// The origins this deployment made the release live on, as resolved when
+	// it was created: `primary` appears here as the origins it expanded to.
+	// Sorted by origin.
+	Targets []DeploymentTarget `json:"targets"`
 	// When the deployment was created.
 	DeployedAt time.Time          `json:"deployed_at"`
 	Metadata   DeploymentMetadata `json:"metadata"`
@@ -15935,14 +16134,14 @@ func (s *Deployment) GetProjectID() ProjectID {
 	return s.ProjectID
 }
 
-// GetEnvironmentID returns the value of EnvironmentID.
-func (s *Deployment) GetEnvironmentID() string {
-	return s.EnvironmentID
-}
-
 // GetReleaseID returns the value of ReleaseID.
 func (s *Deployment) GetReleaseID() ReleaseID {
 	return s.ReleaseID
+}
+
+// GetTargets returns the value of Targets.
+func (s *Deployment) GetTargets() []DeploymentTarget {
+	return s.Targets
 }
 
 // GetDeployedAt returns the value of DeployedAt.
@@ -15970,14 +16169,14 @@ func (s *Deployment) SetProjectID(val ProjectID) {
 	s.ProjectID = val
 }
 
-// SetEnvironmentID sets the value of EnvironmentID.
-func (s *Deployment) SetEnvironmentID(val string) {
-	s.EnvironmentID = val
-}
-
 // SetReleaseID sets the value of ReleaseID.
 func (s *Deployment) SetReleaseID(val ReleaseID) {
 	s.ReleaseID = val
+}
+
+// SetTargets sets the value of Targets.
+func (s *Deployment) SetTargets(val []DeploymentTarget) {
+	s.Targets = val
 }
 
 // SetDeployedAt sets the value of DeployedAt.
@@ -16443,26 +16642,25 @@ func (s *DeploymentCreatedEventDelegationType) UnmarshalText(data []byte) error 
 }
 
 // Allowlisted fields for `deployment.created`. The deployment id is already
-// the event's `entity_id`; the ids here say what went live where. Ids, not
-// names: they survive environment renames, and because events carry no
-// foreign key, the audit trail of a deleted environment lives on here.
+// the event's `entity_id`; the fields here say what went live where.
 // Ref: #
 type DeploymentCreatedPayload struct {
-	EnvironmentID       OptString `json:"environment_id"`
-	ReleaseID           OptString `json:"release_id"`
-	Reason              OptString `json:"reason"`
-	Message             OptString `json:"message"`
-	SourceEnvironmentID OptString `json:"source_environment_id"`
-}
-
-// GetEnvironmentID returns the value of EnvironmentID.
-func (s *DeploymentCreatedPayload) GetEnvironmentID() OptString {
-	return s.EnvironmentID
+	ReleaseID OptString `json:"release_id"`
+	// The origins the release went live on, sorted.
+	Targets    []string  `json:"targets"`
+	Reason     OptString `json:"reason"`
+	Message    OptString `json:"message"`
+	RollbackTo OptString `json:"rollback_to"`
 }
 
 // GetReleaseID returns the value of ReleaseID.
 func (s *DeploymentCreatedPayload) GetReleaseID() OptString {
 	return s.ReleaseID
+}
+
+// GetTargets returns the value of Targets.
+func (s *DeploymentCreatedPayload) GetTargets() []string {
+	return s.Targets
 }
 
 // GetReason returns the value of Reason.
@@ -16475,19 +16673,19 @@ func (s *DeploymentCreatedPayload) GetMessage() OptString {
 	return s.Message
 }
 
-// GetSourceEnvironmentID returns the value of SourceEnvironmentID.
-func (s *DeploymentCreatedPayload) GetSourceEnvironmentID() OptString {
-	return s.SourceEnvironmentID
-}
-
-// SetEnvironmentID sets the value of EnvironmentID.
-func (s *DeploymentCreatedPayload) SetEnvironmentID(val OptString) {
-	s.EnvironmentID = val
+// GetRollbackTo returns the value of RollbackTo.
+func (s *DeploymentCreatedPayload) GetRollbackTo() OptString {
+	return s.RollbackTo
 }
 
 // SetReleaseID sets the value of ReleaseID.
 func (s *DeploymentCreatedPayload) SetReleaseID(val OptString) {
 	s.ReleaseID = val
+}
+
+// SetTargets sets the value of Targets.
+func (s *DeploymentCreatedPayload) SetTargets(val []string) {
+	s.Targets = val
 }
 
 // SetReason sets the value of Reason.
@@ -16500,9 +16698,9 @@ func (s *DeploymentCreatedPayload) SetMessage(val OptString) {
 	s.Message = val
 }
 
-// SetSourceEnvironmentID sets the value of SourceEnvironmentID.
-func (s *DeploymentCreatedPayload) SetSourceEnvironmentID(val OptString) {
-	s.SourceEnvironmentID = val
+// SetRollbackTo sets the value of RollbackTo.
+func (s *DeploymentCreatedPayload) SetRollbackTo(val OptString) {
+	s.RollbackTo = val
 }
 
 // A related object to embed on each returned deployment.
@@ -16547,29 +16745,79 @@ func (s *DeploymentExpand) UnmarshalText(data []byte) error {
 	}
 }
 
+// `expected_deployment_id` did not match: another deployment reached the
+// targets first.
+// Ref: #
+type DeploymentGuardConflict struct {
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string                         `json:"message"`
+	Details DeploymentGuardConflictDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *DeploymentGuardConflict) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *DeploymentGuardConflict) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *DeploymentGuardConflict) GetDetails() DeploymentGuardConflictDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *DeploymentGuardConflict) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *DeploymentGuardConflict) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *DeploymentGuardConflict) SetDetails(val DeploymentGuardConflictDetails) {
+	s.Details = val
+}
+
+type DeploymentGuardConflictDetails struct {
+	// The actual newest deployment to the targets, to inspect before
+	// retrying with its id as `expected_deployment_id`. Null when nothing
+	// has been deployed to any of the targets yet.
+	Deployment NilDeployment `json:"deployment"`
+}
+
+// GetDeployment returns the value of Deployment.
+func (s *DeploymentGuardConflictDetails) GetDeployment() NilDeployment {
+	return s.Deployment
+}
+
+// SetDeployment sets the value of Deployment.
+func (s *DeploymentGuardConflictDetails) SetDeployment(val NilDeployment) {
+	s.Deployment = val
+}
+
 type DeploymentID string
 
-// Why the release went live here and who made it happen. Set when the
-// deployment is created and never mutated afterwards — enrichment of the
-// record, while the ids and timestamp on the deployment itself say what ran
-// where and when. Every field is optional; a sparse object is a deployment
-// that simply was not annotated further.
+// Why the release went live and who made it happen. Set when the deployment
+// is created and never mutated afterwards — enrichment of the record, while
+// the release, targets and timestamp on the deployment itself say what ran
+// where and when.
 // Ref: #
 type DeploymentMetadata struct {
-	Reason OptDeploymentReason `json:"reason"`
+	Reason DeploymentReason `json:"reason"`
 	// The caller-supplied summary of why this deployment happened, analogous
 	// to a git commit message.
 	Message OptNilString `json:"message"`
-	// The environment the release was promoted from. Set exactly when
-	// `reason` is `promote`.
-	// Recorded as it stood at deployment time: it is not re-resolved later,
-	// so it may name an environment that has since been deleted.
-	SourceEnvironmentID OptNilString `json:"source_environment_id"`
-	// The name the source environment had at deployment time, set exactly
-	// when `source_environment_id` is. A snapshot for reading the history,
-	// not an address: a later rename does not update it, and the id is what
-	// identifies the environment.
-	SourceEnvironmentName OptNilEnvironmentName `json:"source_environment_name"`
+	// The earlier deployment this one re-applied, with its release and its
+	// targets. Null or absent for every other deployment, including one
+	// created with `reason: rollback` by naming a release directly.
+	RollbackTo OptNilDeploymentID `json:"rollback_to"`
 	// The identity that created the deployment. Absent when the caller is a
 	// machine principal carrying no user identity, which is the common case
 	// for deployments made from CI.
@@ -16579,7 +16827,7 @@ type DeploymentMetadata struct {
 }
 
 // GetReason returns the value of Reason.
-func (s *DeploymentMetadata) GetReason() OptDeploymentReason {
+func (s *DeploymentMetadata) GetReason() DeploymentReason {
 	return s.Reason
 }
 
@@ -16588,14 +16836,9 @@ func (s *DeploymentMetadata) GetMessage() OptNilString {
 	return s.Message
 }
 
-// GetSourceEnvironmentID returns the value of SourceEnvironmentID.
-func (s *DeploymentMetadata) GetSourceEnvironmentID() OptNilString {
-	return s.SourceEnvironmentID
-}
-
-// GetSourceEnvironmentName returns the value of SourceEnvironmentName.
-func (s *DeploymentMetadata) GetSourceEnvironmentName() OptNilEnvironmentName {
-	return s.SourceEnvironmentName
+// GetRollbackTo returns the value of RollbackTo.
+func (s *DeploymentMetadata) GetRollbackTo() OptNilDeploymentID {
+	return s.RollbackTo
 }
 
 // GetDeployedBy returns the value of DeployedBy.
@@ -16609,7 +16852,7 @@ func (s *DeploymentMetadata) GetDeployedByType() OptNilDeploymentMetadataDeploye
 }
 
 // SetReason sets the value of Reason.
-func (s *DeploymentMetadata) SetReason(val OptDeploymentReason) {
+func (s *DeploymentMetadata) SetReason(val DeploymentReason) {
 	s.Reason = val
 }
 
@@ -16618,14 +16861,9 @@ func (s *DeploymentMetadata) SetMessage(val OptNilString) {
 	s.Message = val
 }
 
-// SetSourceEnvironmentID sets the value of SourceEnvironmentID.
-func (s *DeploymentMetadata) SetSourceEnvironmentID(val OptNilString) {
-	s.SourceEnvironmentID = val
-}
-
-// SetSourceEnvironmentName sets the value of SourceEnvironmentName.
-func (s *DeploymentMetadata) SetSourceEnvironmentName(val OptNilEnvironmentName) {
-	s.SourceEnvironmentName = val
+// SetRollbackTo sets the value of RollbackTo.
+func (s *DeploymentMetadata) SetRollbackTo(val OptNilDeploymentID) {
+	s.RollbackTo = val
 }
 
 // SetDeployedBy sets the value of DeployedBy.
@@ -16693,19 +16931,16 @@ func (s *DeploymentMetadataDeployedByType) UnmarshalText(data []byte) error {
 	}
 }
 
-// Why the deployment was created. All three are the same operation — a new
-// deployment pointing the environment at a release — and the reason records
+// Why the deployment was created. Both are the same operation — a new
+// deployment making a release live on its targets — and the reason records
 // the caller's intent:
-// - `deploy` — a release goes live on the environment.
-// - `promote` — a release that already runs on another environment goes live
-// here; `source_environment_id` records where it came from.
-// - `rollback` — a release the environment ran earlier goes live again.
+// - `deploy` — a release goes live on the targets.
+// - `rollback` — a release the targets served earlier goes live again.
 // Ref: #
 type DeploymentReason string
 
 const (
 	DeploymentReasonDeploy   DeploymentReason = "deploy"
-	DeploymentReasonPromote  DeploymentReason = "promote"
 	DeploymentReasonRollback DeploymentReason = "rollback"
 )
 
@@ -16713,7 +16948,6 @@ const (
 func (DeploymentReason) AllValues() []DeploymentReason {
 	return []DeploymentReason{
 		DeploymentReasonDeploy,
-		DeploymentReasonPromote,
 		DeploymentReasonRollback,
 	}
 }
@@ -16722,8 +16956,6 @@ func (DeploymentReason) AllValues() []DeploymentReason {
 func (s DeploymentReason) MarshalText() ([]byte, error) {
 	switch s {
 	case DeploymentReasonDeploy:
-		return []byte(s), nil
-	case DeploymentReasonPromote:
 		return []byte(s), nil
 	case DeploymentReasonRollback:
 		return []byte(s), nil
@@ -16738,9 +16970,6 @@ func (s *DeploymentReason) UnmarshalText(data []byte) error {
 	case DeploymentReasonDeploy:
 		*s = DeploymentReasonDeploy
 		return nil
-	case DeploymentReasonPromote:
-		*s = DeploymentReasonPromote
-		return nil
 	case DeploymentReasonRollback:
 		*s = DeploymentReasonRollback
 		return nil
@@ -16748,6 +16977,24 @@ func (s *DeploymentReason) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+// One origin a deployment made its release live on.
+// Ref: #
+type DeploymentTarget struct {
+	Origin Origin `json:"origin"`
+}
+
+// GetOrigin returns the value of Origin.
+func (s *DeploymentTarget) GetOrigin() Origin {
+	return s.Origin
+}
+
+// SetOrigin sets the value of Origin.
+func (s *DeploymentTarget) SetOrigin(val Origin) {
+	s.Origin = val
+}
+
+type DeploymentTargetsRequest []string
 
 // Empty payload for event types with no typed fields
 // (e.g. `project.deleted`, `user.deleted`, `session.expired`).
@@ -32826,10 +33073,9 @@ func (s *ListDeploymentsErrorResponseStatusCode) SetResponse(val ListDeployments
 func (*ListDeploymentsErrorResponseStatusCode) listDeploymentsRes() {}
 
 // Deployments, newest first.
-// Filtered to one environment, the first row is that environment's current
-// deployment and the rest is its history. Unfiltered, the list interleaves
-// every environment of the project, so the first row is only the most recent
-// deployment anywhere, not any particular environment's current one.
+// In the history (the default), each deployment carries every target it
+// made the release live on. In the live view (`live=true`), each deployment
+// carries only the targets it still serves.
 // Ref: #
 type ListDeploymentsResponse struct {
 	Deployments []Deployment `json:"deployments"`
@@ -34891,6 +35137,51 @@ func (o NilDateTime) Get() (v time.Time, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o NilDateTime) Or(d time.Time) time.Time {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewNilDeployment returns new NilDeployment with value set to v.
+func NewNilDeployment(v Deployment) NilDeployment {
+	return NilDeployment{
+		Value: v,
+	}
+}
+
+// NilDeployment is nullable Deployment.
+type NilDeployment struct {
+	Value Deployment
+	Null  bool
+}
+
+// SetTo sets value to v.
+func (o *NilDeployment) SetTo(v Deployment) {
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o NilDeployment) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *NilDeployment) SetToNull() {
+	o.Null = true
+	var v Deployment
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o NilDeployment) Get() (v Deployment, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o NilDeployment) Or(d Deployment) Deployment {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -36999,6 +37290,52 @@ func (o OptCompletedFactorPayload) Or(d CompletedFactorPayload) CompletedFactorP
 	return d
 }
 
+// NewOptCreateDeploymentBadRequestDetails returns new OptCreateDeploymentBadRequestDetails with value set to v.
+func NewOptCreateDeploymentBadRequestDetails(v CreateDeploymentBadRequestDetails) OptCreateDeploymentBadRequestDetails {
+	return OptCreateDeploymentBadRequestDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptCreateDeploymentBadRequestDetails is optional CreateDeploymentBadRequestDetails.
+type OptCreateDeploymentBadRequestDetails struct {
+	Value CreateDeploymentBadRequestDetails
+	Set   bool
+}
+
+// IsSet returns true if OptCreateDeploymentBadRequestDetails was set.
+func (o OptCreateDeploymentBadRequestDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptCreateDeploymentBadRequestDetails) Reset() {
+	var v CreateDeploymentBadRequestDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptCreateDeploymentBadRequestDetails) SetTo(v CreateDeploymentBadRequestDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptCreateDeploymentBadRequestDetails) Get() (v CreateDeploymentBadRequestDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptCreateDeploymentBadRequestDetails) Or(d CreateDeploymentBadRequestDetails) CreateDeploymentBadRequestDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptCreateSessionRequestUserAgent returns new OptCreateSessionRequestUserAgent with value set to v.
 func NewOptCreateSessionRequestUserAgent(v CreateSessionRequestUserAgent) OptCreateSessionRequestUserAgent {
 	return OptCreateSessionRequestUserAgent{
@@ -37223,6 +37560,52 @@ func (o OptDeploymentCreatedEventDelegationType) Get() (v DeploymentCreatedEvent
 
 // Or returns value if set, or given parameter if does not.
 func (o OptDeploymentCreatedEventDelegationType) Or(d DeploymentCreatedEventDelegationType) DeploymentCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptDeploymentID returns new OptDeploymentID with value set to v.
+func NewOptDeploymentID(v DeploymentID) OptDeploymentID {
+	return OptDeploymentID{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDeploymentID is optional DeploymentID.
+type OptDeploymentID struct {
+	Value DeploymentID
+	Set   bool
+}
+
+// IsSet returns true if OptDeploymentID was set.
+func (o OptDeploymentID) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDeploymentID) Reset() {
+	var v DeploymentID
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDeploymentID) SetTo(v DeploymentID) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDeploymentID) Get() (v DeploymentID, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDeploymentID) Or(d DeploymentID) DeploymentID {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -42779,69 +43162,6 @@ func (o OptNilDeploymentMetadataDeployedByType) Or(d DeploymentMetadataDeployedB
 	return d
 }
 
-// NewOptNilEnvironmentName returns new OptNilEnvironmentName with value set to v.
-func NewOptNilEnvironmentName(v EnvironmentName) OptNilEnvironmentName {
-	return OptNilEnvironmentName{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptNilEnvironmentName is optional nullable EnvironmentName.
-type OptNilEnvironmentName struct {
-	Value EnvironmentName
-	Set   bool
-	Null  bool
-}
-
-// IsSet returns true if OptNilEnvironmentName was set.
-func (o OptNilEnvironmentName) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptNilEnvironmentName) Reset() {
-	var v EnvironmentName
-	o.Value = v
-	o.Set = false
-	o.Null = false
-}
-
-// SetTo sets value to v.
-func (o *OptNilEnvironmentName) SetTo(v EnvironmentName) {
-	o.Set = true
-	o.Null = false
-	o.Value = v
-}
-
-// IsNull returns true if value is Null.
-func (o OptNilEnvironmentName) IsNull() bool { return o.Null }
-
-// SetToNull sets value to null.
-func (o *OptNilEnvironmentName) SetToNull() {
-	o.Set = true
-	o.Null = true
-	var v EnvironmentName
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptNilEnvironmentName) Get() (v EnvironmentName, ok bool) {
-	if o.Null {
-		return v, false
-	}
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptNilEnvironmentName) Or(d EnvironmentName) EnvironmentName {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptNilFlowDefinitionStepTransitionsItemAction returns new OptNilFlowDefinitionStepTransitionsItemAction with value set to v.
 func NewOptNilFlowDefinitionStepTransitionsItemAction(v FlowDefinitionStepTransitionsItemAction) OptNilFlowDefinitionStepTransitionsItemAction {
 	return OptNilFlowDefinitionStepTransitionsItemAction{
@@ -45093,6 +45413,52 @@ func (o OptNotImplementedDetails) Or(d NotImplementedDetails) NotImplementedDeta
 	return d
 }
 
+// NewOptOrigin returns new OptOrigin with value set to v.
+func NewOptOrigin(v Origin) OptOrigin {
+	return OptOrigin{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptOrigin is optional Origin.
+type OptOrigin struct {
+	Value Origin
+	Set   bool
+}
+
+// IsSet returns true if OptOrigin was set.
+func (o OptOrigin) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptOrigin) Reset() {
+	var v Origin
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptOrigin) SetTo(v Origin) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptOrigin) Get() (v Origin, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptOrigin) Or(d Origin) Origin {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptPageToken returns new OptPageToken with value set to v.
 func NewOptPageToken(v PageToken) OptPageToken {
 	return OptPageToken{
@@ -46513,6 +46879,52 @@ func (o OptReleaseCreatedEventDelegationType) Get() (v ReleaseCreatedEventDelega
 
 // Or returns value if set, or given parameter if does not.
 func (o OptReleaseCreatedEventDelegationType) Or(d ReleaseCreatedEventDelegationType) ReleaseCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptReleaseID returns new OptReleaseID with value set to v.
+func NewOptReleaseID(v ReleaseID) OptReleaseID {
+	return OptReleaseID{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptReleaseID is optional ReleaseID.
+type OptReleaseID struct {
+	Value ReleaseID
+	Set   bool
+}
+
+// IsSet returns true if OptReleaseID was set.
+func (o OptReleaseID) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptReleaseID) Reset() {
+	var v ReleaseID
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptReleaseID) SetTo(v ReleaseID) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptReleaseID) Get() (v ReleaseID, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptReleaseID) Or(d ReleaseID) ReleaseID {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -49416,6 +49828,8 @@ func (o OptVarPermissionDeniedDetails) Or(d VarPermissionDeniedDetails) VarPermi
 	}
 	return d
 }
+
+type Origin string
 
 type PageToken string
 
@@ -56574,6 +56988,34 @@ func (s *ReleasePointerKind) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// The release is revoked and cannot be deployed.
+// Ref: #
+type ReleaseRevokedConflict struct {
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+}
+
+// GetCode returns the value of Code.
+func (s *ReleaseRevokedConflict) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ReleaseRevokedConflict) GetMessage() string {
+	return s.Message
+}
+
+// SetCode sets the value of Code.
+func (s *ReleaseRevokedConflict) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ReleaseRevokedConflict) SetMessage(val string) {
+	s.Message = val
 }
 
 // Merged schema.
