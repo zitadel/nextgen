@@ -18,11 +18,9 @@ cd "$(dirname "$0")/../.."
 # The other services' installs normally ran already; the Go preset does not
 # run this service's installCommand, so install when nothing is there.
 [ -x node_modules/.bin/turbo ] || sh apps/cloud/install.sh
-# turbo restores the login UI from Vercel's remote cache when nothing it
-# builds from changed. The project's secrets stay hidden from the JS builds
-# (turbo's strict env mode); TURBO_PLATFORM_ENV_DISABLED stops turbo warning
-# about each of them for every task.
-TURBO_TELEMETRY_DISABLED=1 TURBO_PLATFORM_ENV_DISABLED=1 corepack pnpm exec turbo run build --filter=@zitadel/login-ui
+# The login UI through turbo, with the remote-cache policy every service
+# shares (turbo-build.sh: previews restore, production only uploads).
+sh apps/cloud/turbo-build.sh @zitadel/login-ui
 
 version="$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' apps/server/package.json | head -1)"
 commit="${VERCEL_GIT_COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"

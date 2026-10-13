@@ -45,8 +45,12 @@ jobs:
       # setup on Depot runners.
       TURBO_API: https://vercel.com
       # Pull requests read the remote cache and never write it; only the merge
-      # queue (the commits that become main) uploads. Forks get no token at all
-      # and run with the local cache only, as with moon's Depot cache.
+      # queue (the commits that become main) uploads. This flag is set by the
+      # code under test, so it is not what keeps a pull request from writing:
+      # the OIDC policy on the Vercel side matches trusted refs only (main and
+      # the merge queue's gh-readonly-queue/* branches), so a pull-request run
+      # gets no token and uses the local cache (the plan: "Who may write to
+      # the cache"). Forks get no token either way.
       TURBO_CACHE: ${{ github.event_name == 'merge_group' && 'local:rw,remote:rw' || 'local:rw,remote:r' }}
     steps:
       - uses: actions/checkout@v6
