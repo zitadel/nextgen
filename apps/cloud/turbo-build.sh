@@ -21,6 +21,10 @@ set -eu
 package="${1:?package name, e.g. @zitadel/console}"
 shift
 
+# Vercel sets the deprecated TURBO_REMOTE_ONLY for turbo builds, and turbo
+# refuses to combine the legacy cache switches with TURBO_CACHE, which carries
+# the whole policy here.
+unset TURBO_REMOTE_ONLY TURBO_REMOTE_CACHE_READ_ONLY
 case "${VERCEL_ENV:-}" in
   production) TURBO_CACHE="local:rw,remote:w" ;;
   *) TURBO_CACHE="local:rw,remote:r" ;;

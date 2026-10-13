@@ -42,7 +42,10 @@
     "PLAYWRIGHT_BROWSERS_PATH",
     "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD",
     "TMPDIR",
-    "LC_ALL"
+    "LC_ALL",
+    // Vercel keeps corepack enabled for a turbo build only when this is
+    // listed here (it checks the file); the scripts run `corepack pnpm`.
+    "COREPACK_HOME"
   ],
   // The root files moon's .moon/tasks/*.yml list as implicitInputs: a change
   // to any of them re-runs every task. Turbo hashes each package's slice of
