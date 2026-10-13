@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@vercel/analytics": "catalog:",
+    "@vercel/speed-insights": "catalog:",
     "next": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"

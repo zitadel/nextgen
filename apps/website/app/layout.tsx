@@ -1,4 +1,5 @@
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 import { Arimo } from "next/font/google";
 import localFont from "next/font/local";
@@ -34,9 +35,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${arimo.variable} ${apkFutural.variable}`}>
       <body className="bg-background text-foreground antialiased">
         {children}
-        {/* Page views only: Speed Insights would need a sample rate like the
-            docs', for a page with nothing to tune. */}
+        {/* Web Analytics counts every page view; Speed Insights reports one
+            page load in a hundred. */}
         <Analytics />
+        <SpeedInsights sampleRate={0.01} />
       </body>
     </html>
   );
