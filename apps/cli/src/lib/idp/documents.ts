@@ -657,7 +657,11 @@ export function applySsoToFlow(
       // Edited by hand and already carrying the provider and its routes, which
       // is what the warning asks for: there is nothing left to say.
     } else if (!shippedPasswordSteps().includes(canonical(withoutSsoRoutes(password, terminal)))) {
-      skipped.push({ step: PASSWORD_STEP, region: `steps.${PASSWORD_STEP}`, reason: "hand-edited" });
+      skipped.push({
+        step: PASSWORD_STEP,
+        region: `steps.${PASSWORD_STEP}`,
+        reason: "hand-edited",
+      });
     } else {
       // Every provider the entry steps carry, not only the one named: a project
       // enabled before the password step offered providers has several to catch up.
