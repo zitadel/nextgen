@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { serverCanonicalFlow } from "./platform-handlers.js";
+import { serverCanonicalFlow } from "./server-canonical-flow.js";
 
 describe("serverCanonicalFlow", () => {
   const flow = (step: Record<string, unknown>) => ({ name: "login", steps: [step] });
