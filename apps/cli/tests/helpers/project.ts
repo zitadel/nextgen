@@ -317,6 +317,11 @@ export class ScaffoldedApp {
     );
   }
 
+  /** `setup` with exactly these flags and this on stdin, for a spec asserting how it refuses. */
+  setupSsoWith(args: string[], secret: string): Promise<CliResult> {
+    return this.pipingSecret(secret, () => this.setup(["--framework", "next", ...args]));
+  }
+
   /** `setup` with a custom connection described on the command line. */
   setupWithCustomSso(connection: CustomConnection, credentials: Credentials): Promise<CliResult> {
     return this.pipingSecret(credentials.secret, () =>

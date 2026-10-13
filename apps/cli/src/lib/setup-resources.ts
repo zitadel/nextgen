@@ -25,8 +25,10 @@ import {
 } from "@zitadel/config/defaults";
 import {
   type ConnectionEndpoints,
-  type CustomOidcInput,
-  idpProviderFor,
+  type ConnectionSlug,
+  type ProviderSelection,
+  providerOf,
+  selectionSlug,
 } from "@zitadel/config/idp";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
@@ -79,12 +81,7 @@ export async function materializeSetupResources(opts: {
    * The providers to enable, in the order they were chosen. One connection is
    * created per entry, and every slug is added to the schema and the flow.
    */
-  sso?: readonly {
-    provider: string;
-    custom?: CustomOidcInput;
-    clientId: string;
-    endpoints?: ConnectionEndpoints;
-  }[];
+  sso?: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[];
   /**
    * CLI version used to render `zitadel …` command mentions in the scaffolded
    * READMEs as runnable `npx @zitadel/cli@<version> …` commands — the CLI is
@@ -117,15 +114,14 @@ export async function materializeSetupResources(opts: {
   // setup does not remove a connection file it wrote -- so the retry would
   // then refuse on that file too, with nothing but the developer able to
   // clear it. One pass to build and refuse, a second to create.
-  const planned: Array<{ slug: string; connectionPath: string; connection: object }> = [];
+  const planned: Array<{ slug: ConnectionSlug; connectionPath: string; connection: object }> = [];
   for (const chosen of opts.sso ?? []) {
-    const connection = idpProviderFor(chosen.provider, chosen.custom).connection({
+    const slug = selectionSlug(chosen.selection);
+    const connection = providerOf(chosen.selection).connection({
       endpoints: chosen.endpoints,
       schemaProperties: Object.keys((schemaTemplate.properties as object | undefined) ?? {}),
       schemaRef: CONNECTION_SCHEMA_REF,
     });
-    const slug = typeof connection.slug === "string" ? connection.slug : undefined;
-    if (!slug) continue;
     const connectionPath = `${IDPS_DIR}/${slug}.json`;
     // Refused before anything is created, for two reasons: the file is the
     // developer's (see {@link CONNECTION_EXISTS}), and finding out after the
@@ -140,7 +136,7 @@ export async function materializeSetupResources(opts: {
     planned.push({ slug, connectionPath, connection });
   }
 
-  const slugs: string[] = planned.map((entry) => entry.slug);
+  const slugs = planned.map((entry) => entry.slug);
   for (const { connectionPath, connection } of planned) {
     // The create comes before the file. Setup does not remove a connection
     // file it wrote -- that rule is what keeps a developer's own file safe --

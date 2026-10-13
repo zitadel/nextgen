@@ -383,6 +383,45 @@ describe("setup", () => {
           expect(await app.plan()).toReportNothingToDo();
         });
 
+        describe("without both credentials", () => {
+          const flags = [
+            "--sso",
+            "custom",
+            "--sso-slug",
+            "acme-sso",
+            "--sso-display-name",
+            "Acme SSO",
+            "--sso-issuer",
+            "https://sso.acme.example",
+          ];
+
+          it("will not set up the provider without a client secret", async () => {
+            const app = await anApp();
+            const before = await app.snapshot();
+
+            const result = await app.setupSsoWith(
+              [...flags, "--sso-client-id", "acme-client-id"],
+              "",
+            );
+
+            expect(result).toFailWith("E_VALIDATION");
+            expect(result).toPrint("needs the client secret on stdin");
+            // Refused before anything exists to clean up.
+            expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+          });
+
+          it("will not set up the provider without a client id", async () => {
+            const app = await anApp();
+            const before = await app.snapshot();
+
+            const result = await app.setupSsoWith(flags, "acme-client-secret");
+
+            expect(result).toFailWith("E_VALIDATION");
+            expect(result).toPrint("needs --sso-client-id");
+            expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+          });
+        });
+
         it("lets a second connection to the same issuer be added afterwards", async () => {
           const app = await anApp();
           expect(await app.setupWithCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();

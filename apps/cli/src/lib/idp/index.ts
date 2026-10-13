@@ -23,7 +23,6 @@ export {
   credentialVariablesOf,
   type StoredVariables,
   planConnection,
-  planCustomConnection,
   refuseResolvedSecret,
   readConnectionFiles,
 } from "./connections";
@@ -38,9 +37,8 @@ export {
 } from "./documents";
 
 export {
-  customConnectionFromFlags,
   customFlagText,
-  refuseCustomFlagsWithoutCustom,
+  selectionFromFlags,
   type CustomFlagNames,
   type CustomFlagValues,
 } from "./custom";

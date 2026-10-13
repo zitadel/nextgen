@@ -1,9 +1,9 @@
 import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
 import {
   type ConnectionEndpoints,
-  type CustomOidcInput,
-  idpProviderFor,
-  type IdpProvider,
+  type Credentials,
+  type ProviderSelection,
+  selectionSlug,
 } from "@zitadel/config/idp";
 
 import type { FrameworkFacts } from "../../../lib/orca";
@@ -19,28 +19,18 @@ import type { FrameworkFacts } from "../../../lib/orca";
  * value, otherwise prompt and write).
  */
 /**
- * A social provider chosen during setup, with the credentials of the OAuth
- * application the developer registered for it.
+ * A social provider chosen during setup, with whatever of its application's
+ * credentials is known so far.
  *
- * Both credentials are required. Choosing a provider and then withholding one
- * scaffolds a sign-in button that cannot work: the connection document stores
- * `${{ NAME }}` references, and the engine resolves them from the project's
- * variables, so a missing value fails at the provider with `invalid_client`
- * long after setup reported success. Declining the provider is the answer for
- * "not now" — `sso enable` adds it once the OAuth application exists.
- *
- * Neither value is ever written to a `.zitadel/` file.
+ * Flags seed a draft and the wizard completes it, so until then either
+ * credential may be missing. {@link SsoAnswer} is a draft that has both, and
+ * everything that publishes a credential takes that type: choosing a provider
+ * and then withholding one scaffolds a sign-in button that cannot work, and it
+ * should not be possible to write the code that lets it happen.
  */
-export type SsoAnswer = {
-  readonly provider: string;
-  /**
-   * The connection the developer described, when `provider` is `custom`. A
-   * custom provider is not in the catalog, so what makes it this connection and
-   * not another travels with the answer.
-   */
-  readonly custom?: CustomOidcInput;
-  readonly clientId: string;
-  readonly secret: string;
+export type SsoDraft = {
+  readonly selection: ProviderSelection;
+  readonly credentials: Partial<Credentials>;
   /**
    * Where the connection points, when not at the vendor. Asked for only on a
    * development run (ZITADEL_CLI_DEV), whose one job is standing the provider
@@ -50,16 +40,33 @@ export type SsoAnswer = {
 };
 
 /**
- * The slug a provider's connection is written under. A catalog provider is
- * named by what it is; a custom one by what the developer called it.
+ * A provider with both credentials. Both are required: the connection document
+ * stores `${{ NAME }}` references, and the engine resolves them from the
+ * project's variables, so a missing value fails at the provider with
+ * `invalid_client` long after setup reported success. Declining the provider is
+ * the answer for "not now" — `sso enable` adds it once the OAuth application
+ * exists.
+ *
+ * Neither value is ever written to a `.zitadel/` file.
  */
-export function ssoSlug(answer: SsoAnswer): string {
-  return answer.custom?.slug ?? answer.provider;
-}
+export type SsoAnswer = SsoDraft & { readonly credentials: Credentials };
 
-/** The provider an answer names, catalog entry or custom connection alike. */
-export function ssoProvider(answer: SsoAnswer): IdpProvider {
-  return idpProviderFor(answer.provider, answer.custom);
+/**
+ * The drafts as answers, for a run that goes on to publish credentials.
+ *
+ * The wizard asks for whatever a flag left out, and a scripted run refuses
+ * before this point without the client id or the secret on stdin, so a draft
+ * that reaches here without one is a bug in setup and not something to ask
+ * the developer about.
+ */
+export function completeSso(drafts: readonly SsoDraft[]): SsoAnswer[] {
+  return drafts.map((draft) => {
+    const { clientId, secret } = draft.credentials;
+    if (clientId === undefined || secret === undefined) {
+      throw new Error(`no credentials were collected for ${selectionSlug(draft.selection)}`);
+    }
+    return { ...draft, credentials: { clientId, secret } };
+  });
 }
 
 export type SetupAnswers = {
@@ -79,7 +86,7 @@ export type SetupAnswers = {
    * flow already carry `sso_providers` as a list of slugs — one answer per
    * provider, each with its own credentials.
    */
-  sso: readonly SsoAnswer[];
+  sso: readonly SsoDraft[];
 };
 
 /** Read-only facts a prompt may need. */

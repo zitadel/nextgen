@@ -17,8 +17,8 @@ import { SocialSignInPrompt } from "./social-sign-in";
 import type { SetupPrompt } from "./types";
 import { UseCasePrompt } from "./use-case";
 
-export type { PromptContext, SetupAnswers, SetupPrompt, SsoAnswer } from "./types";
-export { ssoProvider, ssoSlug } from "./types";
+export type { PromptContext, SetupAnswers, SetupPrompt, SsoAnswer, SsoDraft } from "./types";
+export { completeSso } from "./types";
 export { bail } from "./cancel";
 export { DevPortPrompt } from "./dev-port";
 export { FrameworkConfirmPrompt } from "./framework-confirm";

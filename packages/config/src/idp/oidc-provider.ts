@@ -5,6 +5,7 @@ import {
   type IdpProvider,
   type ScaffoldOptions,
 } from "./provider.js";
+import type { ConnectionSlug, DisplayName, Issuer, Scopes } from "./types.js";
 
 /**
  * The parts of a connection document every OIDC provider composes the same way.
@@ -15,13 +16,13 @@ import {
  * whose document is shaped differently overrides rather than adds a branch.
  */
 export abstract class OidcProvider implements IdpProvider {
-  abstract readonly slug: string;
-  abstract readonly displayName: string;
+  abstract readonly slug: ConnectionSlug;
+  abstract readonly displayName: DisplayName;
   abstract readonly template: string | undefined;
   abstract readonly consoleUrl: string | undefined;
   abstract readonly docsUrl: string | undefined;
   abstract readonly callbackGuidance: CallbackGuidance | undefined;
-  abstract readonly issuer: string;
+  abstract readonly issuer: Issuer;
 
   /**
    * Schema property name → the claim this provider documents for it.
@@ -33,7 +34,7 @@ export abstract class OidcProvider implements IdpProvider {
   protected abstract readonly claimTable: Readonly<Record<string, string>>;
 
   /** Scopes the connection requests. */
-  protected abstract readonly scopes: readonly string[];
+  protected abstract readonly scopes: Scopes;
 
   /** The claim that carries the provider's stable, unique id for an account. */
   protected readonly subjectClaim: string = "sub";

@@ -6,10 +6,20 @@ import { password, text } from "@clack/prompts";
 import { consola } from "consola";
 
 import {
+  type ClientId,
+  type ClientSecret,
+  type ClientIdVariable,
+  type ClientSecretVariable,
+  type ConnectionSlug,
   credentialVariables,
   CUSTOM_PROVIDER,
-  idpProviderFor,
   IDP_PROVIDERS,
+  parseClientId,
+  parseClientSecret,
+  type ProviderName,
+  providerOf,
+  selectionName,
+  validated,
 } from "@zitadel/config/idp";
 
 import { createZitadelClient } from "../../lib/api-client";
@@ -24,19 +34,17 @@ import {
   askConnectionEndpoints,
   callbackUriFor,
   CONNECTION_SCHEMA_REF,
-  customConnectionFromFlags,
   enabledMethods,
+  type ConnectionPlan,
   type FlowFile,
-  IDPS_DIR,
   credentialVariablesOf,
   planConnection,
-  planCustomConnection,
   publishClientId,
   type PublishState,
   readConnectionFiles,
   readFlowFiles,
   readSchemaFiles,
-  refuseCustomFlagsWithoutCustom,
+  selectionFromFlags,
   reportClientIdOutcome,
   type StoredVariables,
   republishCommands,
@@ -139,18 +147,15 @@ export default class SsoEnable extends BaseCommand {
       issuer: "--issuer",
       scopes: "--scopes",
     };
-    refuseCustomFlagsWithoutCustom(customFlags, flagNames, provider);
     // Checked before the Project is read, like the provider itself: a name or
     // issuer the server would refuse on apply is refused here, where it was typed.
-    const custom =
-      provider === CUSTOM_PROVIDER
-        ? customConnectionFromFlags(
-            customFlags,
-            flagNames,
-            "--provider custom --slug acme-sso --display-name 'Acme SSO' --issuer https://sso.acme.example",
-          )
-        : undefined;
-    const entry = idpProviderFor(provider, custom);
+    const selection = selectionFromFlags(
+      provider,
+      customFlags,
+      flagNames,
+      "--provider custom --slug acme-sso --display-name 'Acme SSO' --issuer https://sso.acme.example",
+    );
+    const entry = providerOf(selection);
 
     // The Project is read before anything is asked for: being turned away
     // after typing a secret would mean typing it again.
@@ -166,14 +171,10 @@ export default class SsoEnable extends BaseCommand {
 
     const schema = selectSchema(await readSchemaFiles(cwd), flags.schema);
     const connections = await readConnectionFiles(cwd);
-    // `nonBlankString` has already refused a blank one and trimmed the rest.
-    const clientIdFlag = flags["client-id"];
-    // A custom connection is found by the slug the developer gave it. A catalog
-    // provider has one connection, found by what it is.
-    const plan =
-      custom === undefined
-        ? planConnection({ provider, files: connections, clientId: clientIdFlag })
-        : planCustomConnection({ input: custom, files: connections, clientId: clientIdFlag });
+    // `nonBlankString` has already refused a blank one.
+    const clientIdFlag =
+      flags["client-id"] === undefined ? undefined : validated(parseClientId(flags["client-id"]));
+    const plan = planConnection({ selection, files: connections, clientId: clientIdFlag });
 
     const reusing = plan.action === "reuse";
     // A reused connection may name its own variables — it is an editable file
@@ -210,7 +211,7 @@ export default class SsoEnable extends BaseCommand {
         reason: "dry-run",
         data: this.payload({
           projectId: secretFile.project_id,
-          provider,
+          provider: selectionName(selection),
           schema: schema.name,
           plan,
           callbackUri,
@@ -281,9 +282,9 @@ export default class SsoEnable extends BaseCommand {
       // whatever answers. Not asked of a custom connection, whose issuer the
       // developer has already given.
       const endpoints =
-        custom === undefined
+        selection.kind === "catalog"
           ? await askConnectionEndpoints({
-              provider,
+              provider: selection.id,
               developmentBuild: isDevelopmentBuild() && !nonInteractive,
               command: "Enable",
             })
@@ -351,7 +352,7 @@ export default class SsoEnable extends BaseCommand {
       data: {
         ...this.payload({
           projectId: secretFile.project_id,
-          provider,
+          provider: selectionName(selection),
           schema: schema.name,
           plan,
           callbackUri,
@@ -445,7 +446,7 @@ export default class SsoEnable extends BaseCommand {
   private async enableInConfiguration(
     cwd: string,
     schema: SchemaFile,
-    slug: string,
+    slug: ConnectionSlug,
     flows: FlowFile[],
   ): Promise<{ written: string[]; skipped: SsoSkipped[] }> {
     const methods = enabledMethods(schema);
@@ -481,9 +482,9 @@ export default class SsoEnable extends BaseCommand {
      * say which Project was changed.
      */
     projectId: string;
-    provider: string;
+    provider: ProviderName;
     schema: string;
-    plan: { action: string; slug: string; path?: string; file?: { path: string } };
+    plan: ConnectionPlan;
     callbackUri: string;
     secret: SecretOutcome | undefined;
     clientId: PublishState | undefined;
@@ -491,7 +492,7 @@ export default class SsoEnable extends BaseCommand {
      * The variable the connection names, which need not be the slug's, and is
      * `undefined` when the connection holds its client id as a literal.
      */
-    idVariable: string | undefined;
+    idVariable: ClientIdVariable | undefined;
     changed?: string[];
     skipped?: SsoSkipped[];
   }): Record<string, unknown> {
@@ -502,7 +503,7 @@ export default class SsoEnable extends BaseCommand {
       connection: {
         action: input.plan.action,
         slug: input.plan.slug,
-        file: input.plan.file?.path ?? input.plan.path ?? `${IDPS_DIR}/${input.plan.slug}.json`,
+        file: input.plan.action === "reuse" ? input.plan.file.path : input.plan.path,
       },
       callback_uri: input.callbackUri,
       changed: input.changed ?? [],
@@ -518,7 +519,7 @@ export default class SsoEnable extends BaseCommand {
     };
   }
 
-  private async askClientId(displayName: string, nonInteractive: boolean): Promise<string> {
+  private async askClientId(displayName: string, nonInteractive: boolean): Promise<ClientId> {
     if (nonInteractive) {
       throw new ZitadelError("E_VALIDATION", `No client id supplied for ${displayName}.`, {
         hint: "Pass --client-id, or run without --non-interactive to be asked for it.",
@@ -526,11 +527,13 @@ export default class SsoEnable extends BaseCommand {
     }
     const answer = await text({
       message: "Client ID",
-      // Vendors format these differently, so only emptiness can be checked.
-      validate: (value) => ((value ?? "").trim() === "" ? "Enter the client id." : undefined),
+      validate: (value) => {
+        const parsed = parseClientId(value ?? "");
+        return parsed.ok ? undefined : parsed.problem;
+      },
     });
     bailOnCancel(answer, "Enable");
-    return String(answer).trim();
+    return validated(parseClientId(String(answer)));
   }
 
   /**
@@ -542,12 +545,12 @@ export default class SsoEnable extends BaseCommand {
    * nothing was piped, and reading would block forever on a stream with no
    * data and no end, so that case is answered rather than waited on.
    */
-  private async pipedSecret(): Promise<string | undefined> {
+  private async pipedSecret(): Promise<ClientSecret | undefined> {
     if (process.stdin.isTTY) {
       return undefined;
     }
-    const piped = (await readStdin(process.stdin)).trim();
-    return piped === "" ? undefined : piped;
+    const parsed = parseClientSecret(await readStdin(process.stdin));
+    return parsed.ok ? parsed.value : undefined;
   }
 
   /**
@@ -557,26 +560,28 @@ export default class SsoEnable extends BaseCommand {
    * that fails at the token endpoint with `invalid_client` — a failure that
    * surfaces in a browser, not here. Refusing now is the cheaper answer.
    */
-  private async askClientSecret(variable: string, nonInteractive: boolean): Promise<string> {
+  private async askClientSecret(
+    variable: ClientSecretVariable,
+    nonInteractive: boolean,
+  ): Promise<ClientSecret> {
     if (nonInteractive) {
-      const refuse = (): never => {
+      const piped = await this.pipedSecret();
+      if (piped === undefined) {
         throw new ZitadelError("E_VALIDATION", `No client secret supplied for ${variable}.`, {
           hint: "Pipe it in on stdin, or run without --non-interactive to be asked for it. It is never a flag: that would put it in shell history, a process listing and CI logs.",
         });
-      };
-      if (process.stdin.isTTY) {
-        refuse();
       }
-      const piped = (await readStdin(process.stdin)).trim();
-      return piped === "" ? refuse() : piped;
+      return piped;
     }
     const answer = await password({
       message: `Client secret (published to the project as ${variable})`,
-      // Vendors format these differently, so only emptiness can be checked.
-      validate: (value) => ((value ?? "").trim() === "" ? "Enter the client secret." : undefined),
+      validate: (value) => {
+        const parsed = parseClientSecret(value ?? "");
+        return parsed.ok ? undefined : parsed.problem;
+      },
     });
     bailOnCancel(answer, "Enable");
-    return String(answer).trim();
+    return validated(parseClientSecret(String(answer)));
   }
 }
 

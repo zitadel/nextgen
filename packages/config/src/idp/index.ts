@@ -1,72 +1,100 @@
 /**
  * The providers `zitadel setup` and `sso enable` can scaffold a connection for.
  *
- * Adding one means adding a class and listing it here. That is a code change
- * rather than a data change, which is the point: a provider is not only a table
- * of values, and the ones that differ — OAuth2 rather than OIDC, a second
- * request to read an email, a claim the vendor does not emit — differ in
- * behaviour. Holding that in the provider keeps it out of the callers.
+ * Adding a catalog one means adding a class, naming it in {@link IDP_PROVIDERS}
+ * and listing it in the registry below, which the compiler holds to the same
+ * set. That is a code change rather than a data change, which is the point: a
+ * provider is not only a table of values, and the ones that differ — OAuth2
+ * rather than OIDC, a second request to read an email, a claim the vendor does
+ * not emit — differ in behaviour. Holding that in the provider keeps it out of
+ * the callers.
+ *
+ * Anything else the catalog does not list is a custom connection the developer
+ * describes, and {@link ProviderSelection} is how a caller says which of the two
+ * it holds.
  */
 import { CUSTOM_PROVIDER, CustomOidcProvider, type CustomOidcInput } from "./custom.js";
 import { GoogleProvider } from "./google.js";
 import type { IdpProvider } from "./provider.js";
+import type { ConnectionSlug } from "./types.js";
 
-const PROVIDERS: readonly IdpProvider[] = Object.freeze([new GoogleProvider()]);
+/** Every catalog provider's id. The `--provider` flag takes one, or `custom`. */
+export const IDP_PROVIDERS = Object.freeze(["google"] as const);
 
-const BY_SLUG: ReadonlyMap<string, IdpProvider> = new Map(
-  PROVIDERS.map((provider) => [provider.slug, provider]),
-);
+/** The id of a provider the catalog lists. */
+export type CatalogProviderId = (typeof IDP_PROVIDERS)[number];
 
-/** Every provider's slug, in listing order. The `--provider` flag takes one. */
-export const IDP_PROVIDERS: readonly string[] = Object.freeze(
-  PROVIDERS.map((provider) => provider.slug),
-);
+const REGISTRY: Readonly<Record<CatalogProviderId, IdpProvider>> = Object.freeze({
+  google: new GoogleProvider(),
+});
+
+/** The text names a provider goes by on a command line and in a result. */
+export type ProviderName = CatalogProviderId | typeof CUSTOM_PROVIDER;
 
 /**
- * One provider by slug.
+ * One provider by id.
  *
- * Throws rather than returning `undefined`: every caller has already had the
- * slug validated against {@link IDP_PROVIDERS}, so a miss here is a bug in this
- * package and not something a caller can act on.
+ * Takes an id, not any text: the callers that hold text have to go through
+ * {@link parseProviderSelection}, which says what to do with a name nothing
+ * answers to.
  */
-export function idpProvider(slug: string): IdpProvider {
-  const provider = BY_SLUG.get(slug);
-  if (provider === undefined) {
+export function idpProvider(id: CatalogProviderId): IdpProvider {
+  const provider = REGISTRY[id];
+  if (provider === undefined || !Object.hasOwn(REGISTRY, id)) {
     throw new Error(
-      `unknown identity provider ${JSON.stringify(slug)} (known providers: ${IDP_PROVIDERS.join(", ")})`,
+      `unknown identity provider ${JSON.stringify(id)} (known providers: ${IDP_PROVIDERS.join(", ")})`,
     );
   }
   return provider;
 }
 
 /**
- * The provider a setup or enable answer names: a catalog entry, or a custom
- * connection built from what the developer supplied.
- *
- * Both callers hold the same two things — the `--provider` value and, for
- * `custom`, its settings — so the choice lives here once.
+ * Which provider a connection is for: one the catalog knows, or one the
+ * developer described. A union rather than a name plus optional settings, so a
+ * custom provider cannot exist without its settings and a catalog one cannot
+ * carry any.
  */
-export function idpProviderFor(provider: string, custom?: CustomOidcInput): IdpProvider {
-  return provider === CUSTOM_PROVIDER ? customProvider(custom) : idpProvider(provider);
-}
+export type ProviderSelection =
+  | { readonly kind: "catalog"; readonly id: CatalogProviderId }
+  | { readonly kind: "custom"; readonly connection: CustomOidcInput };
 
-function customProvider(custom: CustomOidcInput | undefined): IdpProvider {
-  if (custom === undefined) {
-    throw new Error(`provider ${JSON.stringify(CUSTOM_PROVIDER)} needs its connection settings`);
+/**
+ * The selection a name and its settings describe, or `undefined` when no
+ * provider answers to the name — or when `custom` arrives without the
+ * settings that make it a connection.
+ */
+export function parseProviderSelection(
+  name: string,
+  custom?: CustomOidcInput,
+): ProviderSelection | undefined {
+  if (name === CUSTOM_PROVIDER) {
+    return custom === undefined ? undefined : { kind: "custom", connection: custom };
   }
-  return new CustomOidcProvider(custom);
+  return (IDP_PROVIDERS as readonly string[]).includes(name)
+    ? { kind: "catalog", id: name as CatalogProviderId }
+    : undefined;
 }
 
-export { ISSUER_REQUIREMENT, isSupportedIssuer } from "./issuer.js";
+/** The provider a selection names. */
+export function providerOf(selection: ProviderSelection): IdpProvider {
+  return selection.kind === "catalog"
+    ? idpProvider(selection.id)
+    : new CustomOidcProvider(selection.connection);
+}
+
+/** The slug the selection's connection is written and referenced under. */
+export function selectionSlug(selection: ProviderSelection): ConnectionSlug {
+  return selection.kind === "catalog" ? idpProvider(selection.id).slug : selection.connection.slug;
+}
+
+/** The selection's name, as a command line and a result say it: `google`, or `custom`. */
+export function selectionName(selection: ProviderSelection): ProviderName {
+  return selection.kind === "catalog" ? selection.id : CUSTOM_PROVIDER;
+}
 
 export {
   CUSTOM_PROVIDER,
   CustomOidcProvider,
-  DEFAULT_CUSTOM_SCOPES,
-  displayNameProblem,
-  parseScopes,
-  scopesProblem,
-  slugProblem,
   type CustomOidcInput,
 } from "./custom.js";
 export { GoogleProvider } from "./google.js";
@@ -83,3 +111,23 @@ export {
   type IdpProvider,
   type ScaffoldOptions,
 } from "./provider.js";
+export {
+  DEFAULT_SCOPES,
+  parseClientId,
+  parseClientSecret,
+  parseConnectionSlug,
+  parseDisplayName,
+  parseIssuer,
+  parseScopes,
+  validated,
+  type ClientId,
+  type ClientIdVariable,
+  type ClientSecret,
+  type ClientSecretVariable,
+  type ConnectionSlug,
+  type Credentials,
+  type DisplayName,
+  type Issuer,
+  type Parsed,
+  type Scopes,
+} from "./types.js";

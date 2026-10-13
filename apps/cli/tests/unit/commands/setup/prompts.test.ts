@@ -32,7 +32,14 @@ vi.mock("../../../../src/lib/local-server/runtime", async (importOriginal) => ({
 }));
 
 import { confirm, isCancel, multiselect, note, password, select, text } from "@clack/prompts";
-import { IDP_PROVIDERS } from "@zitadel/config/idp";
+import { IDP_PROVIDERS, type ProviderSelection } from "@zitadel/config/idp";
+
+import {
+  acmeSelection,
+  clientId,
+  clientSecret,
+  googleSelection,
+} from "../../../helpers/idp-values";
 
 import { detectHealthyLocalServer } from "../../../../src/lib/local-server/runtime";
 
@@ -344,9 +351,12 @@ describe("SocialSignInPrompt", () => {
 
     expect(answers.sso).toEqual([
       {
-        provider: "google",
-        clientId: "1234-abc.apps.googleusercontent.com",
-        secret: "s3cret",
+        selection: googleSelection,
+        credentials: {
+          clientId: "1234-abc.apps.googleusercontent.com",
+          secret: "s3cret",
+        },
+        endpoints: undefined,
       },
     ]);
     // The URI has to be exact — the vendor matches it literally — and the
@@ -388,15 +398,16 @@ describe("SocialSignInPrompt", () => {
 
       expect(answers.sso).toEqual([
         {
-          provider: "custom",
-          custom: {
-            slug: "acme-sso",
-            displayName: "Acme SSO",
-            issuer: "https://sso.acme.example",
-            scopes: ["openid", "profile", "email", "groups"],
+          selection: {
+            kind: "custom",
+            connection: {
+              slug: "acme-sso",
+              displayName: "Acme SSO",
+              issuer: "https://sso.acme.example",
+              scopes: ["openid", "profile", "email", "groups"],
+            },
           },
-          clientId: "acme-client-id",
-          secret: "acme-secret",
+          credentials: { clientId: "acme-client-id", secret: "acme-secret" },
           endpoints: undefined,
         },
       ]);
@@ -466,23 +477,42 @@ describe("SocialSignInPrompt", () => {
       expect(validate(3)("openid email")).toBeUndefined();
     });
 
+    it("will not take an empty client id or client secret, so the connection cannot be left without one", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"] as never);
+      describeAcme();
+      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
+
+      await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+
+      type Validate = (value: string) => string | undefined;
+      const validatorOf = (call: unknown[] | undefined): Validate => {
+        const [options] = call ?? [];
+        return (options as { validate: Validate }).validate;
+      };
+      const clientIdValidate = validatorOf(vi.mocked(text).mock.calls[4]);
+      const secretValidate = validatorOf(vi.mocked(password).mock.calls.at(-1));
+      for (const validate of [clientIdValidate, secretValidate]) {
+        expect(validate("")).toBeTruthy();
+        expect(validate("   ")).toBeTruthy();
+        expect(validate("something")).toBeUndefined();
+      }
+    });
+
     it("uses the description from --sso-* flags rather than asking again", async () => {
       vi.mocked(text).mockResolvedValueOnce("acme-client-id" as never);
       vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
-      const custom = {
-        slug: "acme-sso",
-        displayName: "Acme SSO",
-        issuer: "https://sso.acme.example",
-        scopes: ["openid"],
-      };
+      const selection = {
+        ...acmeSelection,
+        connection: { ...acmeSelection.connection, scopes: ["openid"] },
+      } as ProviderSelection;
 
       const answers = await new SocialSignInPrompt().ask(
-        baseAnswers({ sso: [{ provider: "custom", custom, clientId: "", secret: "" }] }),
+        baseAnswers({ sso: [{ selection, credentials: {} }] }),
         { ...ctx, ssoFromFlag: true },
       );
 
       expect(vi.mocked(text)).toHaveBeenCalledTimes(1);
-      expect(answers.sso[0]).toMatchObject({ provider: "custom", custom });
+      expect(answers.sso[0]?.selection).toEqual(selection);
     });
   });
 
@@ -544,17 +574,17 @@ describe("SocialSignInPrompt", () => {
   });
 
   it("does not ask which provider when --sso named one", async () => {
-    vi.mocked(password).mockResolvedValueOnce("" as never);
+    vi.mocked(password).mockResolvedValueOnce("a-secret" as never);
     const seeded = baseAnswers({
-      sso: [{ provider: "google", clientId: "from-the-flag", secret: "" }],
+      sso: [{ selection: googleSelection, credentials: { clientId: clientId("from-the-flag") } }],
     });
 
     const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
 
     expect(select).not.toHaveBeenCalled();
     expect(text).not.toHaveBeenCalled();
-    expect(answers.sso[0]?.provider).toBe("google");
-    expect(answers.sso[0]?.clientId).toBe("from-the-flag");
+    expect(answers.sso[0]?.selection).toEqual(googleSelection);
+    expect(answers.sso[0]?.credentials.clientId).toBe("from-the-flag");
   });
 
   it("still asks for the secret a flagged run could not supply", async () => {
@@ -562,24 +592,29 @@ describe("SocialSignInPrompt", () => {
     // interactive run with --sso arrives here without one.
     vi.mocked(password).mockResolvedValueOnce("typed-after-the-flag" as never);
     const seeded = baseAnswers({
-      sso: [{ provider: "google", clientId: "from-the-flag", secret: "" }],
+      sso: [{ selection: googleSelection, credentials: { clientId: clientId("from-the-flag") } }],
     });
 
     const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
 
     expect(password).toHaveBeenCalledOnce();
-    expect(answers.sso[0]?.secret).toBe("typed-after-the-flag");
+    expect(answers.sso[0]?.credentials.secret).toBe("typed-after-the-flag");
   });
 
   it("keeps a secret that was already piped in rather than asking again", async () => {
     const seeded = baseAnswers({
-      sso: [{ provider: "google", clientId: "from-the-flag", secret: "piped" }],
+      sso: [
+        {
+          selection: googleSelection,
+          credentials: { clientId: clientId("from-the-flag"), secret: clientSecret("piped") },
+        },
+      ],
     });
 
     const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
 
     expect(password).not.toHaveBeenCalled();
-    expect(answers.sso[0]?.secret).toBe("piped");
+    expect(answers.sso[0]?.credentials.secret).toBe("piped");
   });
 
   it("throws E_VALIDATION on Ctrl-C at the provider question", async () => {

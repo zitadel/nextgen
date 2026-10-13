@@ -4,13 +4,15 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import type { ProviderSelection, Scopes } from "@zitadel/config/idp";
+
 import { ZitadelError } from "../../../../src/lib/errors";
+import { clientId, displayName, googleSelection, issuer, slug } from "../../../helpers/idp-values";
 import {
   type ConnectionFile,
   IDPS_DIR,
   credentialVariablesOf,
   planConnection,
-  planCustomConnection,
   readConnectionFiles,
 } from "../../../../src/lib/idp";
 
@@ -65,7 +67,7 @@ describe("readConnectionFiles", () => {
 
 describe("planConnection", () => {
   it("creates google.json when the project has no google connection", () => {
-    const plan = planConnection({ provider: "google", files: [] });
+    const plan = planConnection({ selection: googleSelection, files: [] });
     expect(plan).toEqual({
       action: "create",
       name: "google.json",
@@ -76,13 +78,13 @@ describe("planConnection", () => {
 
   it("reuses an existing google connection rather than adding a second", () => {
     const existing = file("google.json", googleBody());
-    const plan = planConnection({ provider: "google", files: [existing] });
+    const plan = planConnection({ selection: googleSelection, files: [existing] });
     expect(plan).toMatchObject({ action: "reuse", slug: "google" });
   });
 
   it("recognises the provider by its issuer even when the template was removed", () => {
     const existing = file("corp.json", googleBody({ template: undefined, slug: "corp" }));
-    expect(planConnection({ provider: "google", files: [existing] })).toMatchObject({
+    expect(planConnection({ selection: googleSelection, files: [existing] })).toMatchObject({
       action: "reuse",
       slug: "corp",
     });
@@ -94,7 +96,7 @@ describe("planConnection", () => {
       template: "okta",
       oidc: { issuer: "https://acme.okta.com" },
     });
-    expect(planConnection({ provider: "google", files: [other] })).toMatchObject({
+    expect(planConnection({ selection: googleSelection, files: [other] })).toMatchObject({
       action: "create",
     });
   });
@@ -105,7 +107,7 @@ describe("planConnection", () => {
       file("google-work.json", googleBody({ slug: "google_work" })),
     ];
     try {
-      planConnection({ provider: "google", files });
+      planConnection({ selection: googleSelection, files });
       expect.unreachable("should have thrown");
     } catch (error) {
       expect(error).toBeInstanceOf(ZitadelError);
@@ -119,9 +121,9 @@ describe("planConnection", () => {
     const existing = file("google.json", googleBody());
     try {
       planConnection({
-        provider: "google",
+        selection: googleSelection,
         files: [existing],
-        clientId: "999.apps.googleusercontent.com",
+        clientId: clientId("999.apps.googleusercontent.com"),
       });
       expect.unreachable("should have thrown");
     } catch (error) {
@@ -135,9 +137,9 @@ describe("planConnection", () => {
     const existing = file("google.json", googleBody());
     expect(
       planConnection({
-        provider: "google",
+        selection: googleSelection,
         files: [existing],
-        clientId: "111.apps.googleusercontent.com",
+        clientId: clientId("111.apps.googleusercontent.com"),
       }),
     ).toMatchObject({ action: "reuse" });
   });
@@ -149,18 +151,12 @@ describe("planConnection", () => {
       oidc: { issuer: "https://acme.okta.com" },
     });
     try {
-      planConnection({ provider: "google", files: [squatter] });
+      planConnection({ selection: googleSelection, files: [squatter] });
       expect.unreachable("should have thrown");
     } catch (error) {
       expect((error as ZitadelError).code).toBe("E_CONFLICT");
       expect((error as ZitadelError).message).toContain("not a Google connection");
     }
-  });
-
-  it("rejects a provider the catalog does not know", () => {
-    expect(() => planConnection({ provider: "okta", files: [] })).toThrow(
-      /unknown identity provider/,
-    );
   });
 
   it("refuses two slugs whose credentials would land in one variable", () => {
@@ -170,7 +166,7 @@ describe("planConnection", () => {
     const existing = file("google-work.json", googleBody({ slug: "google-work" }));
     const reused = file("google_work.json", googleBody({ slug: "google_work" }));
 
-    expect(() => planConnection({ provider: "google", files: [existing, reused] })).toThrow(
+    expect(() => planConnection({ selection: googleSelection, files: [existing, reused] })).toThrow(
       /both use GOOGLE_WORK_CLIENT_SECRET|More than one Google connection/,
     );
   });
@@ -194,7 +190,7 @@ describe("planConnection", () => {
       }),
     );
 
-    expect(() => planConnection({ provider: "google", files: [okta] })).toThrow(
+    expect(() => planConnection({ selection: googleSelection, files: [okta] })).toThrow(
       /both use GOOGLE_CLIENT_SECRET/,
     );
   });
@@ -214,7 +210,7 @@ describe("planConnection", () => {
       }),
     );
 
-    expect(() => planConnection({ provider: "google", files: [both] })).toThrow(
+    expect(() => planConnection({ selection: googleSelection, files: [both] })).toThrow(
       /both credentials at GOOGLE_CLIENT_SECRET/,
     );
   });
@@ -226,7 +222,9 @@ describe("planConnection", () => {
     const { slug: _dropped, ...body } = googleBody();
     const noSlug = file("google.json", body as Record<string, unknown>);
 
-    expect(() => planConnection({ provider: "google", files: [noSlug] })).toThrow(/no slug/);
+    expect(() => planConnection({ selection: googleSelection, files: [noSlug] })).toThrow(
+      /no usable slug/,
+    );
   });
 
   it("does not claim a variable for a literal client id", () => {
@@ -245,7 +243,7 @@ describe("planConnection", () => {
       }),
     );
 
-    expect(credentialVariablesOf(literal, "google")).toEqual({
+    expect(credentialVariablesOf(literal, slug("google"))).toEqual({
       clientId: undefined,
       clientSecret: "GOOGLE_CLIENT_SECRET",
     });
@@ -266,7 +264,7 @@ describe("planConnection", () => {
       }),
     );
 
-    expect(planConnection({ provider: "google", files: [literal] })).toMatchObject({
+    expect(planConnection({ selection: googleSelection, files: [literal] })).toMatchObject({
       action: "reuse",
     });
   });
@@ -275,7 +273,7 @@ describe("planConnection", () => {
     const { oidc: _oidc, ...rest } = googleBody();
     const bare = file("google.json", { ...rest, oidc: { issuer: "https://accounts.google.com" } });
 
-    expect(credentialVariablesOf(bare, "google")).toEqual({
+    expect(credentialVariablesOf(bare, slug("google"))).toEqual({
       clientId: "GOOGLE_CLIENT_ID",
       clientSecret: "GOOGLE_CLIENT_SECRET",
     });
@@ -284,19 +282,21 @@ describe("planConnection", () => {
   it("does not mistake a connection for colliding with itself", () => {
     const only = file("google.json", googleBody({ slug: "google" }));
 
-    expect(planConnection({ provider: "google", files: [only] })).toMatchObject({
+    expect(planConnection({ selection: googleSelection, files: [only] })).toMatchObject({
       action: "reuse",
       slug: "google",
     });
   });
 });
 
-describe("planCustomConnection", () => {
+describe("planConnection for a custom connection", () => {
   const acme = {
-    slug: "acme-sso",
-    displayName: "Acme SSO",
-    issuer: "https://sso.acme.example",
+    slug: slug("acme-sso"),
+    displayName: displayName("Acme SSO"),
+    issuer: issuer("https://sso.acme.example"),
+    scopes: ["openid", "profile", "email"] as Scopes,
   };
+  const custom = (connection: typeof acme): ProviderSelection => ({ kind: "custom", connection });
   const acmeBody = (over: Record<string, unknown> = {}) => ({
     slug: "acme-sso",
     protocol: "oidc",
@@ -311,7 +311,7 @@ describe("planCustomConnection", () => {
   });
 
   it("creates a file named after the slug when nothing holds it", () => {
-    expect(planCustomConnection({ input: acme, files: [] })).toEqual({
+    expect(planConnection({ selection: custom(acme), files: [] })).toEqual({
       action: "create",
       name: "acme-sso.json",
       path: `${IDPS_DIR}/acme-sso.json`,
@@ -332,7 +332,7 @@ describe("planCustomConnection", () => {
       }),
     );
 
-    expect(planCustomConnection({ input: acme, files: [existing] })).toMatchObject({
+    expect(planConnection({ selection: custom(acme), files: [existing] })).toMatchObject({
       action: "create",
       slug: "acme-sso",
     });
@@ -340,9 +340,9 @@ describe("planCustomConnection", () => {
 
   it("is not confused by a catalog connection to the same issuer", () => {
     const google = file("google.json", googleBody());
-    const input = { ...acme, issuer: "https://accounts.google.com" };
+    const input = { ...acme, issuer: issuer("https://accounts.google.com") };
 
-    expect(planCustomConnection({ input, files: [google] })).toMatchObject({
+    expect(planConnection({ selection: custom(input), files: [google] })).toMatchObject({
       action: "create",
       slug: "acme-sso",
     });
@@ -351,7 +351,7 @@ describe("planCustomConnection", () => {
   it("reuses the connection that already has this slug and issuer", () => {
     const existing = file("acme-sso.json", acmeBody());
 
-    expect(planCustomConnection({ input: acme, files: [existing] })).toEqual({
+    expect(planConnection({ selection: custom(acme), files: [existing] })).toEqual({
       action: "reuse",
       file: existing,
       slug: "acme-sso",
@@ -361,7 +361,7 @@ describe("planCustomConnection", () => {
   it("finds the connection by its slug even when the file was renamed", () => {
     const existing = file("sso.json", acmeBody());
 
-    expect(planCustomConnection({ input: acme, files: [existing] })).toMatchObject({
+    expect(planConnection({ selection: custom(acme), files: [existing] })).toMatchObject({
       action: "reuse",
       slug: "acme-sso",
     });
@@ -369,16 +369,18 @@ describe("planCustomConnection", () => {
 
   it("does not take a trailing slash for a different issuer", () => {
     const existing = file("acme-sso.json", acmeBody());
-    const input = { ...acme, issuer: "https://sso.acme.example/" };
+    const input = { ...acme, issuer: issuer("https://sso.acme.example/") };
 
-    expect(planCustomConnection({ input, files: [existing] })).toMatchObject({ action: "reuse" });
+    expect(planConnection({ selection: custom(input), files: [existing] })).toMatchObject({
+      action: "reuse",
+    });
   });
 
   it("stops when the slug belongs to a connection to another issuer", () => {
     const existing = file("acme-sso.json", acmeBody());
-    const input = { ...acme, issuer: "https://sso.other.example" };
+    const input = { ...acme, issuer: issuer("https://sso.other.example") };
 
-    expect(() => planCustomConnection({ input, files: [existing] })).toThrow(
+    expect(() => planConnection({ selection: custom(input), files: [existing] })).toThrow(
       /already named acme-sso and connects to https:\/\/sso\.acme\.example/,
     );
   });
@@ -386,7 +388,7 @@ describe("planCustomConnection", () => {
   it("stops when the slug belongs to a connection that is not OIDC", () => {
     const existing = file("acme-sso.json", { slug: "acme-sso", protocol: "oauth2" });
 
-    expect(() => planCustomConnection({ input: acme, files: [existing] })).toThrow(
+    expect(() => planConnection({ selection: custom(acme), files: [existing] })).toThrow(
       /not an OIDC connection/,
     );
   });
@@ -394,7 +396,7 @@ describe("planCustomConnection", () => {
   it("refuses an unrelated file already sitting where the connection would go", () => {
     const occupied = file("acme-sso.json", acmeBody({ slug: "something-else" }));
 
-    expect(() => planCustomConnection({ input: acme, files: [occupied] })).toThrow(
+    expect(() => planConnection({ selection: custom(acme), files: [occupied] })).toThrow(
       /acme-sso\.json already exists and is not the acme-sso connection/,
     );
   });
@@ -402,7 +404,7 @@ describe("planCustomConnection", () => {
   it("stops when two files claim the slug", () => {
     const files = [file("a.json", acmeBody()), file("b.json", acmeBody())];
 
-    expect(() => planCustomConnection({ input: acme, files })).toThrow(
+    expect(() => planConnection({ selection: custom(acme), files })).toThrow(
       /More than one connection is named acme-sso/,
     );
   });
@@ -414,7 +416,11 @@ describe("planCustomConnection", () => {
     );
 
     expect(() =>
-      planCustomConnection({ input: acme, files: [existing], clientId: "another-id" }),
+      planConnection({
+        selection: custom(acme),
+        files: [existing],
+        clientId: clientId("another-id"),
+      }),
     ).toThrow(/already uses client id literal-id/);
   });
 
@@ -422,7 +428,7 @@ describe("planCustomConnection", () => {
     // `acme_sso` and `acme-sso` both derive ACME_SSO_CLIENT_ID.
     const existing = file("acme_sso.json", acmeBody({ slug: "acme_sso" }));
 
-    expect(() => planCustomConnection({ input: acme, files: [existing] })).toThrow(
+    expect(() => planConnection({ selection: custom(acme), files: [existing] })).toThrow(
       /both use ACME_SSO_CLIENT_ID/,
     );
   });
@@ -440,7 +446,7 @@ describe("planCustomConnection", () => {
       }),
     );
 
-    expect(() => planCustomConnection({ input: acme, files: [existing] })).toThrow(
+    expect(() => planConnection({ selection: custom(acme), files: [existing] })).toThrow(
       /okta\.json and acme-sso both use ACME_SSO_CLIENT_SECRET/,
     );
   });
@@ -450,7 +456,7 @@ describe("planCustomConnection", () => {
       "acme-sso.json",
       acmeBody({ oidc: { ...acmeBody().oidc, client_secret: "${{ ACME_SECRET }}" } }),
     );
-    const plan = planCustomConnection({ input: acme, files: [existing] });
+    const plan = planConnection({ selection: custom(acme), files: [existing] });
 
     expect(plan.action).toBe("reuse");
     if (plan.action === "reuse") {

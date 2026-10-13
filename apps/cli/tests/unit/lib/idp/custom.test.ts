@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { ZitadelError } from "../../../../src/lib/errors";
-import {
-  customConnectionFromFlags,
-  customFlagText,
-  refuseCustomFlagsWithoutCustom,
-} from "../../../../src/lib/idp";
+import { customFlagText, selectionFromFlags } from "../../../../src/lib/idp";
+import { displayName, issuer, slug } from "../../../helpers/idp-values";
 
 const flag = {
   provider: "--provider",
@@ -21,6 +18,15 @@ const valid = {
   issuer: "https://sso.acme.example",
 };
 
+/** The connection a command line describes, as the command would see it. */
+function custom(values: Parameters<typeof selectionFromFlags>[1], names = flag) {
+  const selection = selectionFromFlags("custom", values, names, "e.g.");
+  if (selection.kind !== "custom") {
+    throw new Error("expected a custom selection");
+  }
+  return selection.connection;
+}
+
 function refusal(run: () => unknown): ZitadelError {
   try {
     run();
@@ -31,36 +37,32 @@ function refusal(run: () => unknown): ZitadelError {
   throw new Error("expected a refusal");
 }
 
-describe("customConnectionFromFlags", () => {
+describe("selectionFromFlags for a custom connection", () => {
   it("returns the connection with the default scopes when none were named", () => {
-    expect(customConnectionFromFlags(valid, flag, "e.g.")).toEqual({
+    expect(custom(valid)).toEqual({
       ...valid,
       scopes: ["openid", "profile", "email"],
     });
   });
 
   it("splits scopes on spaces and commas and drops repeats", () => {
-    const connection = customConnectionFromFlags(
-      { ...valid, scopes: "openid, email  groups,openid" },
-      flag,
-      "e.g.",
-    );
+    const connection = custom({ ...valid, scopes: "openid, email  groups,openid" });
 
     expect(connection.scopes).toEqual(["openid", "email", "groups"]);
   });
 
   it("trims what was typed", () => {
-    const connection = customConnectionFromFlags(
-      { slug: " acme-sso ", displayName: " Acme SSO ", issuer: " https://sso.acme.example " },
-      flag,
-      "e.g.",
-    );
+    const connection = custom({
+      slug: " acme-sso ",
+      displayName: " Acme SSO ",
+      issuer: " https://sso.acme.example ",
+    });
 
     expect(connection).toMatchObject(valid);
   });
 
   it("names every missing setting at once, with an example to copy", () => {
-    const error = refusal(() => customConnectionFromFlags({}, flag, "--provider custom ..."));
+    const error = refusal(() => selectionFromFlags("custom", {}, flag, "--provider custom ..."));
 
     expect(error.code).toBe("E_VALIDATION");
     expect(error.message).toBe("A custom connection needs --slug, --display-name, --issuer");
@@ -79,16 +81,16 @@ describe("customConnectionFromFlags", () => {
     ["an issuer that is not a url", { issuer: "sso.acme.example" }, "--issuer"],
     ["scopes without openid", { scopes: "profile email" }, "must include openid"],
   ])("refuses %s", (_name, over, expected) => {
-    const error = refusal(() => customConnectionFromFlags({ ...valid, ...over }, flag, "e.g."));
+    const error = refusal(() => custom({ ...valid, ...over }));
 
     expect(error.code).toBe("E_VALIDATION");
     expect(error.message).toContain(expected);
   });
 
   it("accepts http on localhost, for a stand-in provider", () => {
-    expect(
-      customConnectionFromFlags({ ...valid, issuer: "http://localhost:9100" }, flag, "e.g.").issuer,
-    ).toBe("http://localhost:9100");
+    expect(custom({ ...valid, issuer: "http://localhost:9100" }).issuer).toBe(
+      "http://localhost:9100",
+    );
   });
 
   it("names the flag the way the calling command spells it", () => {
@@ -100,32 +102,33 @@ describe("customConnectionFromFlags", () => {
       scopes: "--sso-scopes",
     };
 
-    expect(refusal(() => customConnectionFromFlags({}, setup, "e.g.")).message).toContain(
+    expect(refusal(() => selectionFromFlags("custom", {}, setup, "e.g.")).message).toContain(
       "--sso-slug, --sso-display-name, --sso-issuer",
     );
   });
 });
 
-describe("refuseCustomFlagsWithoutCustom", () => {
-  it("lets a custom provider carry the flags", () => {
-    expect(() => refuseCustomFlagsWithoutCustom(valid, flag, "custom")).not.toThrow();
+describe("selectionFromFlags for a catalog provider", () => {
+  it("is just the provider, named", () => {
+    expect(selectionFromFlags("google", {}, flag, "e.g.")).toEqual({
+      kind: "catalog",
+      id: "google",
+    });
   });
 
-  it("lets a catalog provider carry none", () => {
-    expect(() => refuseCustomFlagsWithoutCustom({}, flag, "google")).not.toThrow();
-  });
-
-  it("refuses a flag that a catalog provider would ignore", () => {
+  it("refuses a custom setting the provider would ignore", () => {
     const error = refusal(() =>
-      refuseCustomFlagsWithoutCustom(
-        { issuer: "https://x.example", scopes: "openid" },
-        flag,
-        "google",
-      ),
+      selectionFromFlags("google", { issuer: "https://x.example", scopes: "openid" }, flag, "e.g."),
     );
 
     expect(error.message).toBe("--issuer, --scopes only applies to a custom connection");
     expect(error.hint).toBe("Add --provider custom, or remove them.");
+  });
+
+  it("refuses a name nothing answers to", () => {
+    expect(refusal(() => selectionFromFlags("okta", {}, flag, "e.g.")).message).toBe(
+      "Unknown provider okta",
+    );
   });
 });
 
@@ -134,9 +137,9 @@ describe("customFlagText", () => {
     expect(
       customFlagText(
         {
-          slug: "acme-sso",
-          displayName: "Acme's SSO; rm -rf",
-          issuer: "https://sso.acme.example",
+          slug: slug("acme-sso"),
+          displayName: displayName("Acme's SSO; rm -rf"),
+          issuer: issuer("https://sso.acme.example"),
           scopes: ["openid", "email"],
         },
         flag,

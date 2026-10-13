@@ -4,30 +4,32 @@ import {
   credentialVariables,
   CUSTOM_PROVIDER,
   type CustomOidcInput,
-  DEFAULT_CUSTOM_SCOPES,
-  displayNameProblem,
+  DEFAULT_SCOPES,
   idpProvider,
   IDP_PROVIDERS,
   type IdpProvider,
-  ISSUER_REQUIREMENT,
-  isSupportedIssuer,
+  type Issuer,
+  type Parsed,
+  parseClientId,
+  parseClientSecret,
+  parseConnectionSlug,
+  parseDisplayName,
+  parseIssuer,
+  parseProviderSelection,
   parseScopes,
-  scopesProblem,
-  slugProblem,
+  type ProviderName,
+  type ProviderSelection,
+  providerOf,
+  selectionName,
+  selectionSlug,
+  validated,
 } from "@zitadel/config/idp";
 
 import { askConnectionEndpoints, callbackUriFor } from "../../../lib/idp";
 import { issuerFromPort } from "../../../lib/orca";
 
 import { bail } from "./cancel";
-import {
-  type PromptContext,
-  type SetupAnswers,
-  type SetupPrompt,
-  type SsoAnswer,
-  ssoProvider,
-  ssoSlug,
-} from "./types";
+import type { PromptContext, SetupAnswers, SetupPrompt, SsoDraft } from "./types";
 
 /**
  * "Add social sign-in providers?" — the one onboarding question that needs
@@ -50,7 +52,7 @@ export class SocialSignInPrompt implements SetupPrompt {
   async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
     // `--sso` names the set; the wizard asks for it only when no flag did.
     const chosen = ctx.ssoFromFlag
-      ? answers.sso.map((answer) => answer.provider)
+      ? answers.sso.map((draft) => selectionName(draft.selection))
       : await this.chooseProviders();
     if (chosen.length === 0) {
       return { ...answers, sso: [] };
@@ -59,37 +61,45 @@ export class SocialSignInPrompt implements SetupPrompt {
     // Asked per provider rather than once: each registers its own OAuth
     // application, so each has its own console, its own client id and its own
     // secret. A flagged run still gets asked for whatever the flags left out.
-    const collected: SsoAnswer[] = [];
-    for (const provider of chosen) {
-      const flagged = answers.sso.find((answer) => answer.provider === provider);
+    const collected: SsoDraft[] = [];
+    for (const name of chosen) {
+      const flagged = answers.sso.find((draft) => selectionName(draft.selection) === name);
       // A custom connection is described before anything else about it can be
       // said: the announcement names its issuer, and its slug names the secret.
-      const custom =
-        provider === CUSTOM_PROVIDER ? (flagged?.custom ?? (await this.askCustom())) : undefined;
-      const entry = ssoProvider({ provider, custom, clientId: "", secret: "" });
+      const selection = parseProviderSelection(
+        name,
+        name === CUSTOM_PROVIDER
+          ? flagged?.selection.kind === "custom"
+            ? flagged.selection.connection
+            : await this.askCustom()
+          : undefined,
+      ) as ProviderSelection;
+      const entry = providerOf(selection);
       // Before the announcement, which names the vendor's console: on a
       // development run (ZITADEL_CLI_DEV) the provider may not be the vendor at
       // all. Not asked of a custom connection, whose issuer was just given.
       const endpoints =
-        custom !== undefined
+        selection.kind === "custom"
           ? undefined
           : (flagged?.endpoints ??
             (await askConnectionEndpoints({
-              provider,
+              provider: selection.id,
               developmentBuild: ctx.developmentBuild === true,
               command: "Setup",
             })));
       this.announce(entry, answers.devPort, endpoints?.issuer);
 
       const clientId =
-        flagged?.clientId !== undefined && flagged.clientId !== ""
-          ? flagged.clientId
-          : await this.askClientId(entry);
+        flagged?.credentials.clientId ??
+        (await this.prompt(`Client ID (${entry.displayName})`, parseClientId));
       const secret =
-        flagged?.secret !== undefined && flagged.secret !== ""
-          ? flagged.secret
-          : await this.askSecret(ssoSlug({ provider, custom, clientId: "", secret: "" }));
-      collected.push({ provider, ...(custom ? { custom } : {}), clientId, secret, endpoints });
+        flagged?.credentials.secret ??
+        (await this.prompt(
+          `Client secret (published to the project as ${credentialVariables(selectionSlug(selection)).clientSecret})`,
+          parseClientSecret,
+          { secret: true },
+        ));
+      collected.push({ selection, credentials: { clientId, secret }, endpoints });
     }
     return { ...answers, sso: collected };
   }
@@ -102,8 +112,8 @@ export class SocialSignInPrompt implements SetupPrompt {
    * `required: false` is what makes "none" an answer -- an explicit "not now"
    * option cannot coexist with ticking a provider beside it.
    */
-  private async chooseProviders(): Promise<readonly string[]> {
-    const chosen = await multiselect({
+  private async chooseProviders(): Promise<readonly ProviderName[]> {
+    const chosen = await multiselect<ProviderName>({
       message: "Add social sign-in providers?",
       // Nothing preselected, and declining costs nothing: `sso enable`
       // performs this journey on an existing Project later.
@@ -122,7 +132,7 @@ export class SocialSignInPrompt implements SetupPrompt {
       ],
     });
     bail(chosen);
-    return Array.isArray(chosen) ? chosen.map(String) : [];
+    return Array.isArray(chosen) ? chosen : [];
   }
 
   /**
@@ -131,7 +141,7 @@ export class SocialSignInPrompt implements SetupPrompt {
    * can be shown rather than left for the developer to work out, which
    * matters because the vendor matches it literally.
    */
-  private announce(entry: IdpProvider, devPort: number, issuer?: string): void {
+  private announce(entry: IdpProvider, devPort: number, issuer?: Issuer): void {
     note(
       [
         // Where to register depends on who is actually answering: pointing a
@@ -160,66 +170,47 @@ export class SocialSignInPrompt implements SetupPrompt {
    * would refuse is refused here, where it was typed.
    */
   private async askCustom(): Promise<CustomOidcInput> {
-    const slug = await text({
-      message: "Name for this connection (used in your configuration, e.g. acme-sso)",
-      validate: (value) => slugProblem(String(value ?? "").trim(), IDP_PROVIDERS),
-    });
-    bail(slug);
-    const displayName = await text({
-      message: "Name shown on the sign-in button (e.g. Acme SSO)",
-      validate: (value) => displayNameProblem(String(value ?? "")),
-    });
-    bail(displayName);
-    const issuer = await text({
-      message: "Issuer URL of the provider",
-      validate: (value) =>
-        isSupportedIssuer(String(value ?? "")) ? undefined : ISSUER_REQUIREMENT,
-    });
-    bail(issuer);
-    const scopes = await text({
-      message: "Scopes to request",
-      initialValue: DEFAULT_CUSTOM_SCOPES.join(" "),
-      validate: (value) => scopesProblem(parseScopes(String(value ?? ""))),
-    });
-    bail(scopes);
     return {
-      slug: String(slug).trim(),
-      displayName: String(displayName).trim(),
-      issuer: String(issuer).trim(),
-      scopes: parseScopes(String(scopes)),
+      slug: await this.prompt(
+        "Name for this connection (used in your configuration, e.g. acme-sso)",
+        (value) => parseConnectionSlug(value.trim(), IDP_PROVIDERS),
+      ),
+      displayName: await this.prompt(
+        "Name shown on the sign-in button (e.g. Acme SSO)",
+        parseDisplayName,
+      ),
+      issuer: await this.prompt("Issuer URL of the provider", parseIssuer),
+      scopes: await this.prompt("Scopes to request", parseScopes, {
+        initialValue: DEFAULT_SCOPES.join(" "),
+      }),
     };
   }
 
-  private async askClientId(entry: IdpProvider): Promise<string> {
-    const answer = await text({
-      // Named, because several providers may be asked for in a row and an
-      // unqualified "Client ID" three times over says nothing about which.
-      message: `Client ID (${entry.displayName})`,
-      // Vendors format these differently, so only emptiness can be checked.
-      validate: (value) => ((value ?? "").trim() === "" ? "Enter the client id." : undefined),
-    });
-    bail(answer);
-    return String(answer).trim();
-  }
-
   /**
-   * Required, not skippable. By this point the developer has chosen a provider
-   * and registered an OAuth application for it; a connection without the
-   * secret is a button that fails at the provider with `invalid_client`, long
-   * after setup reported success. "Not now" is answered by declining the
-   * provider, which costs nothing — `sso enable` adds it later.
+   * One question whose answer must parse. The prompt shows what is wrong with
+   * an answer as it is typed and does not accept one that does not parse, so
+   * what comes back is the parsed value and not text to check again.
    *
-   * The message names the project because that is the only place the value
-   * goes: the connection references it as `${{ NAME }}`, the engine resolves
-   * that from the project's variables, and nothing is written to disk.
+   * Required, not skippable, which matters most for the credentials: by this
+   * point the developer has chosen a provider and registered an OAuth
+   * application for it, and a connection without the secret is a button that
+   * fails at the provider with `invalid_client`, long after setup reported
+   * success. "Not now" is answered by declining the provider, which costs
+   * nothing — `sso enable` adds it later.
    */
-  private async askSecret(slug: string): Promise<string> {
-    const answer = await password({
-      message: `Client secret (published to the project as ${credentialVariables(slug).clientSecret})`,
-      // Vendors format these differently, so only emptiness can be checked.
-      validate: (value) => ((value ?? "").trim() === "" ? "Enter the client secret." : undefined),
-    });
+  private async prompt<T>(
+    message: string,
+    parse: (value: string) => Parsed<T>,
+    options: { readonly secret?: boolean; readonly initialValue?: string } = {},
+  ): Promise<T> {
+    const validate = (value: string | undefined) => {
+      const parsed = parse(value ?? "");
+      return parsed.ok ? undefined : parsed.problem;
+    };
+    const answer = options.secret
+      ? await password({ message, validate })
+      : await text({ message, validate, initialValue: options.initialValue });
     bail(answer);
-    return String(answer).trim();
+    return validated(parse(String(answer)));
   }
 }

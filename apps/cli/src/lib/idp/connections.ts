@@ -2,10 +2,16 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
+  type ClientId,
+  type ClientIdVariable,
+  type ClientSecretVariable,
+  type ConnectionSlug,
   credentialVariables,
   type CustomOidcInput,
   idpProvider,
   isVariableReference,
+  parseConnectionSlug,
+  type ProviderSelection,
   referencedVariable,
   type IdpProvider,
 } from "@zitadel/config/idp";
@@ -122,22 +128,23 @@ function credentialOf(
  * slug-derived name would store the credential where the connection never
  * looks and report it as stored.
  */
-export function credentialVariablesOf(file: ConnectionFile, slug: string): StoredVariables {
+export function credentialVariablesOf(file: ConnectionFile, slug: ConnectionSlug): StoredVariables {
   const scaffolded = credentialVariables(slug);
-  const named = (field: "client_id" | "client_secret", fallback: string): string | undefined => {
-    const stored = credentialOf(file, field);
-    if (stored === undefined) {
-      // The field is absent, so the scaffolded name is where this command
-      // would have pointed it and where it will point it now.
-      return fallback;
-    }
-    // A literal is the value itself. There is no variable behind it, and
-    // naming one would publish where the connection never looks.
-    return referencedVariable(stored);
+  // A field absent from the file is where this command would have pointed it
+  // and will point it now. One holding a literal is the value itself: there is
+  // no variable behind it, and naming one would publish where the connection
+  // never looks. What a `client_id` field references is a client id's variable
+  // whatever it is called, which is what the brand records.
+  const stored = (field: "client_id" | "client_secret") => {
+    const value = credentialOf(file, field);
+    return value === undefined ? null : referencedVariable(value);
   };
+  const id = stored("client_id");
+  const secret = stored("client_secret");
   return {
-    clientId: named("client_id", scaffolded.clientId),
-    clientSecret: named("client_secret", scaffolded.clientSecret),
+    clientId: id === null ? scaffolded.clientId : (id as ClientIdVariable | undefined),
+    clientSecret:
+      secret === null ? scaffolded.clientSecret : (secret as ClientSecretVariable | undefined),
   };
 }
 
@@ -150,8 +157,8 @@ export function credentialVariablesOf(file: ConnectionFile, slug: string): Store
  * another connection to collide with.
  */
 export type StoredVariables = {
-  readonly clientId: string | undefined;
-  readonly clientSecret: string | undefined;
+  readonly clientId: ClientIdVariable | undefined;
+  readonly clientSecret: ClientSecretVariable | undefined;
 };
 
 /**
@@ -206,11 +213,13 @@ export function refuseResolvedSecret(definition: object, id: string): void {
  */
 function refuseCollidingVariables(
   ours: StoredVariables,
-  slug: string,
+  slug: ConnectionSlug,
   files: readonly ConnectionFile[],
   except?: ConnectionFile,
 ): void {
-  if (ours.clientId !== undefined && ours.clientId === ours.clientSecret) {
+  // The one place the two kinds of name are compared on purpose: both credentials
+  // pointing at the same variable.
+  if (ours.clientId !== undefined && (ours.clientId as string) === ours.clientSecret) {
     throw new ZitadelError(
       "E_CONFLICT",
       `This connection points both credentials at ${ours.clientId}`,
@@ -221,10 +230,13 @@ function refuseCollidingVariables(
     );
   }
   for (const file of files) {
-    if (file === except || typeof file.body.slug !== "string") {
+    // A file with no usable slug is not one this command could have written,
+    // and its variables cannot be derived.
+    const theirSlug = parseConnectionSlug(String(file.body.slug ?? ""));
+    if (file === except || !theirSlug.ok) {
       continue;
     }
-    const theirs = credentialVariablesOf(file, file.body.slug);
+    const theirs = credentialVariablesOf(file, theirSlug.value);
     // A literal on either side names no variable, so it cannot collide.
     const shared = [ours.clientId, ours.clientSecret].find(
       (name) => name !== undefined && (name === theirs.clientId || name === theirs.clientSecret),
@@ -234,23 +246,23 @@ function refuseCollidingVariables(
     }
     throw new ZitadelError("E_CONFLICT", `${file.path} and ${slug} both use ${shared}`, {
       hint: "Point one of them at a variable of its own, then run the command again.",
-      details: { file: file.path, slug, other_slug: file.body.slug, variable: shared },
+      details: { file: file.path, slug, other_slug: theirSlug.value, variable: shared },
     });
   }
 }
 
 /** What the caller should do with the provider's connection. */
 export type ConnectionPlan =
-  | { readonly action: "reuse"; readonly file: ConnectionFile; readonly slug: string }
+  | { readonly action: "reuse"; readonly file: ConnectionFile; readonly slug: ConnectionSlug }
   | {
       readonly action: "create";
       readonly name: string;
       readonly path: string;
-      readonly slug: string;
+      readonly slug: ConnectionSlug;
     };
 
 /**
- * Decide whether the provider already has a connection in this Project.
+ * Decide whether a catalog provider already has a connection in this Project.
  *
  * Reuse is the default: a Project has one connection per provider, and a
  * second one for the same provider is nearly always an accident. Anything
@@ -262,13 +274,13 @@ export type ConnectionPlan =
  *   conflict rather than a reuse: the developer is pointing at a different
  *   OAuth application than the one already configured.
  */
-export function planConnection(options: {
-  readonly provider: string;
+function planCatalogConnection(options: {
+  readonly provider: IdpProvider;
   readonly files: readonly ConnectionFile[];
-  readonly clientId?: string;
+  readonly clientId?: ClientId;
 }): ConnectionPlan {
-  const entry = idpProvider(options.provider);
-  const slug = options.provider;
+  const entry = options.provider;
+  const slug = entry.slug;
   const matches = options.files.filter((file) => describesProvider(file, entry));
 
   if (matches.length > 1) {
@@ -278,7 +290,7 @@ export function planConnection(options: {
       `More than one ${entry.displayName} connection exists: ${names}`,
       {
         hint: "Keep the one this Project should use and remove the others, then run the command again.",
-        details: { provider: options.provider, files: matches.map((m) => m.path) },
+        details: { provider: slug, files: matches.map((m) => m.path) },
       },
     );
   }
@@ -290,24 +302,24 @@ export function planConnection(options: {
     // own. Inventing the provider's would point the schema and every flow at
     // an identity the connection does not declare, and the server rejects the
     // connection on the next apply for want of it.
-    const matchSlug = match.body.slug;
-    if (typeof matchSlug !== "string" || matchSlug === "") {
+    const matchSlug = parseConnectionSlug(String(match.body.slug ?? ""));
+    if (!matchSlug.ok) {
       throw new ZitadelError(
         "E_VALIDATION",
-        `${match.path} is a ${entry.displayName} connection with no slug`,
+        `${match.path} is a ${entry.displayName} connection with no usable slug`,
         {
-          hint: "Add a slug to the connection file -- the schemas and flows reference it by that name.",
-          details: { file: match.path },
+          hint: "Give the connection file a slug -- the schemas and flows reference it by that name.",
+          details: { file: match.path, problem: matchSlug.problem },
         },
       );
     }
     refuseCollidingVariables(
-      credentialVariablesOf(match, matchSlug),
-      matchSlug,
+      credentialVariablesOf(match, matchSlug.value),
+      matchSlug.value,
       options.files,
       match,
     );
-    return { action: "reuse", file: match, slug: matchSlug };
+    return { action: "reuse", file: match, slug: matchSlug.value };
   }
 
   // No match. The scaffolded name is the slug, so an unrelated file already
@@ -339,7 +351,7 @@ export function planConnection(options: {
  * worth refusing: rerunning with a different id would otherwise reuse a
  * file configured for another client.
  */
-function refuseDifferentClientId(match: ConnectionFile, clientId: string | undefined): void {
+function refuseDifferentClientId(match: ConnectionFile, clientId: ClientId | undefined): void {
   const existing = clientIdOf(match);
   const literal = existing !== undefined && !isVariableReference(existing);
   if (clientId !== undefined && literal && existing !== clientId) {
@@ -358,11 +370,6 @@ function refuseDifferentClientId(match: ConnectionFile, clientId: string | undef
   }
 }
 
-/** An issuer compared as the provider publishes it: a trailing slash is not a difference. */
-function sameIssuer(a: string, b: string): boolean {
-  return a.trim().replace(/\/+$/, "") === b.trim().replace(/\/+$/, "");
-}
-
 /**
  * Decide what to do with a custom connection, identified by the slug the
  * developer supplied.
@@ -378,10 +385,10 @@ function sameIssuer(a: string, b: string): boolean {
  * a connection to somewhere else is somebody else's, and replacing it would
  * repoint every schema and flow that names it.
  */
-export function planCustomConnection(options: {
+function planCustomConnection(options: {
   readonly input: CustomOidcInput;
   readonly files: readonly ConnectionFile[];
-  readonly clientId?: string;
+  readonly clientId?: ClientId;
 }): ConnectionPlan {
   const { slug, issuer } = options.input;
   const name = `${slug}.json`;
@@ -419,7 +426,9 @@ export function planCustomConnection(options: {
   const oidc = match.body.oidc;
   const existingIssuer =
     isObject(oidc) && typeof oidc.issuer === "string" ? oidc.issuer : undefined;
-  if (existingIssuer === undefined || !sameIssuer(existingIssuer, issuer)) {
+  // A trailing slash is not a different provider.
+  const trimmed = (url: string) => url.trim().replace(/\/+$/, "");
+  if (existingIssuer === undefined || trimmed(existingIssuer) !== trimmed(issuer)) {
     throw new ZitadelError(
       "E_CONFLICT",
       existingIssuer === undefined
@@ -434,4 +443,32 @@ export function planCustomConnection(options: {
   refuseDifferentClientId(match, options.clientId);
   refuseCollidingVariables(credentialVariablesOf(match, slug), slug, options.files, match);
   return { action: "reuse", file: match, slug };
+}
+
+/**
+ * Decide what to do with the connection for a provider in this Project.
+ *
+ * A catalog provider has one connection, found by what it is. Reuse is the
+ * default: a second one for the same provider is nearly always an accident.
+ * A custom connection is found by the slug the developer gave it, because a
+ * Project may hold several connections to one issuer and the name is the only
+ * thing that tells them apart.
+ *
+ * Anything ambiguous stops instead of guessing, because both alternatives —
+ * editing the wrong connection, or silently adding a duplicate — are worse
+ * than asking the developer which they meant.
+ *
+ * @param clientId - When given, a single match whose client id differs is a
+ *   conflict rather than a reuse: the developer is pointing at a different
+ *   OAuth application than the one already configured.
+ */
+export function planConnection(options: {
+  readonly selection: ProviderSelection;
+  readonly files: readonly ConnectionFile[];
+  readonly clientId?: ClientId;
+}): ConnectionPlan {
+  const { selection, files, clientId } = options;
+  return selection.kind === "custom"
+    ? planCustomConnection({ input: selection.connection, files, clientId })
+    : planCatalogConnection({ provider: idpProvider(selection.id), files, clientId });
 }

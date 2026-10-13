@@ -423,6 +423,53 @@ describe("sso enable", () => {
       });
     });
 
+    /**
+     * A provider that cannot sign anyone in is worse than none: the button
+     * appears and fails at the provider, long after the command reported
+     * success. So the command refuses, and leaves nothing behind, unless it has
+     * both halves of the application's credentials.
+     */
+    describe.each([
+      ["google", ["--provider", "google"]],
+      [
+        "a custom connection",
+        [
+          "--provider",
+          "custom",
+          "--slug",
+          "acme-sso",
+          "--display-name",
+          "Acme SSO",
+          "--issuer",
+          "https://sso.acme.example",
+        ],
+      ],
+    ])("%s without both credentials", (_name, provider) => {
+      it("will not enable the provider without a client secret", async () => {
+        const app = await aSetUpApp();
+        const before = await app.snapshot();
+
+        const result = await app.enableSsoWith([...provider, "--client-id", "a-client-id"], "");
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toPrint("No client secret supplied");
+        expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+        expect(await app.projectVariables()).toEqual([]);
+      });
+
+      it("will not enable the provider without a client id", async () => {
+        const app = await aSetUpApp();
+        const before = await app.snapshot();
+
+        const result = await app.enableSsoWith(provider, "a-client-secret");
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toPrint("No client id supplied");
+        expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+        expect(await app.projectVariables()).toEqual([]);
+      });
+    });
+
     describe("rendered for a terminal", () => {
       it("says which provider it enabled, and for which schema", async () => {
         const app = await aSetUpApp();
