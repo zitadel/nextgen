@@ -1,6 +1,9 @@
 -- +goose Up
 -- See the postgres migration.
 -- +goose StatementBegin
+DELETE FROM resource_scope_index WHERE resource_kind = 'deployment';
+-- +goose StatementEnd
+-- +goose StatementBegin
 DROP TABLE deployments;
 -- +goose StatementEnd
 -- +goose StatementBegin

@@ -2,6 +2,9 @@
 -- +goose Up
 -- See the postgres migration.
 -- +goose StatementBegin
+DELETE FROM resource_scope_index WHERE resource_kind = 'deployment'
+-- +goose StatementEnd
+-- +goose StatementBegin
 DROP INDEX IF EXISTS idx_deployments_project_deployed_at
 -- +goose StatementEnd
 -- +goose StatementBegin

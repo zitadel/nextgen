@@ -1,6 +1,8 @@
 -- +goose Up
 -- Deployments go to origins instead of environments. What an origin serves is
--- its newest row in deployment_origins; nothing stored is kept.
+-- its newest row in deployment_origins; nothing stored is kept, and the
+-- dropped deployments' resource-scope rows go with them.
+DELETE FROM zitadel_nextgen.resource_scope_index WHERE resource_kind = 'deployment';
 DROP TABLE zitadel_nextgen.deployments;
 
 CREATE TABLE zitadel_nextgen.deployments (

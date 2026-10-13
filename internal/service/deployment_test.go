@@ -56,7 +56,8 @@ func expectServing(statements *servicemocks.MockAllStatements, serving *domain.D
 		return nil
 	}
 	read := []domain.OriginDeployment{{
-		Origin: appOrigin, DeploymentID: serving.ID, ReleaseID: serving.ReleaseID, DeployedAt: serving.DeployedAt, Seq: 7,
+		Origin: appOrigin, DeploymentID: serving.ID, ReleaseID: serving.ReleaseID, Kind: serving.OriginKind,
+		DeployedAt: serving.DeployedAt, Seq: 7,
 	}}
 	statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return(read, nil)
 	statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", serving.ID).Return(serving, nil)
@@ -181,6 +182,19 @@ func TestDeploymentServiceCreateUnchangedPrimaryWritesNothing(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, result.Created)
 	assert.Same(t, serving, result.Deployment)
+}
+
+// An origin last served by a preview of the same release still gets the
+// primary deploy written, or it would expire with the preview.
+func TestDeploymentServiceCreatePrimaryOverPreviewWrites(t *testing.T) {
+	svc, statements := newMockedDeploymentService(t)
+	serving := servingDeployment("rel_1")
+	serving.OriginKind = domain.DeploymentOriginKindPreview
+	expectInsert(statements, expectServing(statements, serving))
+
+	result, err := svc.Create(t.Context(), deploymentInput())
+	require.NoError(t, err)
+	assert.True(t, result.Created)
 }
 
 // A preview deploy is always written, and renews the previews from its stamp.
