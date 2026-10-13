@@ -11,17 +11,18 @@
 # choice (a branch can change this file), which keeps honest branches from
 # filling the cache but protects nothing — production not reading does.
 #
-# The local cache is how a build reuses the previous build's results. Turbo's
-# default, .turbo/cache, does not survive to the next build: Vercel's build
-# cache keeps node_modules, not that directory. So it lives in node_modules.
-# Vercel keeps that cache per branch, a branch's first build starting from
-# production's, and only production builds write production's: production
-# restores only what production built, the boundary the installed packages
-# and Go's build cache in the same cache already rely on. A preview and
-# production compute the same task hashes (the root turbo.json keeps
-# Vercel's own variables out of them), so a branch's builds reuse
-# production's results and then their own. The cap keeps the cache from
-# growing build after build; the three apps' builds take about 6 MB.
+# The local cache is how a build reuses the previous build's results.
+# Turbo's default, .turbo/cache, does not survive to the next build:
+# Vercel's build cache keeps node_modules, not that directory. So it lives
+# in node_modules. Vercel keeps that cache per branch, a branch's first
+# build starting from production's, and only production builds, that is
+# main, write production's: production restores only what main built, the
+# boundary the installed packages and Go's build cache in the same cache
+# already rely on. A preview and production compute the same task hashes
+# (the root turbo.json keeps Vercel's own variables out of them), so a
+# branch's builds reuse production's results and then their own. The cap
+# keeps the cache from growing build after build; the three apps' builds
+# take about 6 MB.
 #
 # The project's secrets stay hidden from the JS builds (turbo's strict env
 # mode); TURBO_PLATFORM_ENV_DISABLED stops turbo warning about each of them

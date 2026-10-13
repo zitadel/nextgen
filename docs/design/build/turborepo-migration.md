@@ -444,9 +444,10 @@ sets them up:
   Vercel's build cache keeps `node_modules` from build to build and drops
   `.turbo/cache` (before the move, the same task hashes missed in nine
   previews of one branch in a row). Vercel keeps that cache per branch, a
-  new branch starting from production's, and only production builds write
-  production's, so production restores only what production built: the
-  boundary its installed packages and Go's build cache already rely on.
+  new branch starting from production's, and only production builds, that
+  is main, write production's, so production restores only what main
+  built: the boundary its installed packages and Go's build cache already
+  rely on.
   A branch's builds reuse production's results and then their own: the
   root `turbo.json` keeps Vercel's own variables (`VERCEL_TARGET_ENV`,
   `VITE_VERCEL_*`) out of the hashes, without which a preview never shared
@@ -577,15 +578,18 @@ the release graph.
    `zitadel/nextgen`) are set up and `ci-turbo` gets a token (see "Remote
    cache"). When the exchange fails, `ci-turbo` runs with the local cache
    only.
-3. **Production never restores from the cache; previews read it.** Vercel
-   builds upload their results to the team cache by default, previews
-   included, and a branch controls its own build, so a production build
-   must not restore what a branch build may have produced. `apps/cloud/
+3. **Production restores only what main built; previews read the remote
+   cache.** Vercel builds upload their results to the team cache by
+   default, previews included, and a branch controls its own build, so a
+   production build must not restore what a branch build may have
+   produced: production never reads the remote cache. `apps/cloud/
    turbo-build.sh` sets `local:rw,remote:w` for production and
    `local:rw,remote:r` for previews (see "Who may write to the cache"); no
-   Vercel setting is needed for that. The local cache is not covered by
-   this: it lives in Vercel's build cache, where production restores only
-   production builds' results (2026-10-13).
+   Vercel setting is needed for that. A cache only main writes is fine
+   (2026-10-13): production's local cache lives in Vercel's production
+   build cache, which only production builds, that is main, write. (A CLI
+   production deploy may write it too, but whoever may run one can ship
+   to production anyway.)
 4. **The Go tasks' scripts stay in `apps/server/package.json`** (published,
    inert).
 5. **Release builds keep rewriting `dist/` in place**, ordered by the edge
