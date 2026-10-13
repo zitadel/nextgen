@@ -6,7 +6,7 @@ import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
 import { baseTest } from "../../vitest.shared.mjs";
-import { optimizeDepsExclude, optimizeDepsInclude } from "./.storybook/optimize-deps.js";
+import { optimizeDepsExclude, optimizeDepsInclude } from "./.storybook/optimize-deps.ts";
 
 const dir = dirname(fileURLToPath(import.meta.url));
 

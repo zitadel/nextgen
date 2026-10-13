@@ -1,4 +1,4 @@
 {
-  "title": "Documentation",
-  "pages": ["index", "get-started", "concepts", "cli", "sdks"]
+  "title": "Zitadel preview",
+  "pages": ["index", "get-started", "concepts", "cli", "sdks", "reference/api"]
 }
