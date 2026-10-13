@@ -27,7 +27,7 @@ One Vercel deployment, five [services](https://vercel.com/docs/services):
 | `console` | Vite; the console build with `VITE_CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights | `/ui/console/*` (bare `/ui/console` redirects to the slash form) |
 | `storybook` | Storybook; `moon run storybook:build`, moved to `dist/storybook/` | `/storybook/*` (bare `/storybook` redirects to the slash form) |
 | `docs` | Next.js; `apps/docs`' own `pnpm run build`, never moon (moon cannot archive the symlinks Vercel's Next.js adapter writes) | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
-| `website` | Next.js; `apps/website`'s own `pnpm run build`, never moon, as the docs' | `/`, the coming-soon page with links to the docs, the console and the storybook, and its assets at `/_next/*` |
+| `website` | Next.js; `apps/website`'s own `pnpm run build`, never moon, as the docs' | `/`, the coming-soon page, and its assets at `/_next/*` |
 
 The console lives at the path the server would serve it from, on the same
 origin. The server's own console is switched off, and nothing else about
