@@ -18,7 +18,7 @@ func newMigrateCommand(configPath *string) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := loadConfig(*configPath)
+			cfg, err := readConfig(*configPath)
 			if err != nil {
 				return err
 			}

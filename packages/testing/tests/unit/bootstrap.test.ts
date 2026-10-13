@@ -88,7 +88,7 @@ describe("bootstrapProject", () => {
       project_id: "proj_1",
       schema_uri: DEFAULT_FLOW_SCHEMA_URI,
     });
-    expect(flowDefinition.user_schema).toBe("sch_1");
+    expect(flowDefinition.user_schema).toBe("human-user");
     expect(captured.flowAuth).toBe("Bearer secret_1");
   });
 

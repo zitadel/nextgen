@@ -31,6 +31,7 @@ func TestUserResponses_CarryDerivedIdentity(t *testing.T) {
 		"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
 		"$id": "https://identity-envelope.example.com/schemas/human-user.json",
 		"kind": "user-schema",
+		"objectType": "identity-envelope-user",
 		"type": "object",
 		"x-identifier": "email",
 		"x-display": ["givenName", "familyName"],

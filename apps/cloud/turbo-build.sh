@@ -16,10 +16,16 @@
 # for every task. Variables a build needs (CONSOLE_VERCEL_INSIGHTS,
 # CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE) pass through the environment and are
 # listed in the package's turbo.json.
+#
+# Turbo starts from its own binary, not through `pnpm exec`: a pnpm that a
+# pnpm process starts reads the pnpm_config_verify_deps_before_run=false the
+# parent hands down as set (pnpm 10.33/10.34), so every task's `pnpm run`
+# re-checked the workspace and logged an "Unsupported platform" warning for
+# each of the server's other-platform packages.
 set -eu
 package="${1:?package name, e.g. @zitadel/console}"
 shift
 
 export TURBO_TELEMETRY_DISABLED=1 TURBO_PLATFORM_ENV_DISABLED=1
 
-exec corepack pnpm exec turbo run build --filter="$package" "$@"
+exec node_modules/.bin/turbo run build --filter="$package" "$@"

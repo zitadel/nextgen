@@ -60,9 +60,6 @@ function stubCsrf(respond: () => Response) {
 const token = (value: string) => () => HttpResponse.json({ csrf_token: value });
 const failing = () => HttpResponse.json({ code: "internal", message: "no" }, { status: 500 });
 
-/** Resolves false after the pending requests had their turn. */
-const pending = () => new Promise<false>((resolve) => setTimeout(() => resolve(false), 50));
-
 /** What customFetch does on a 403 auth.csrf_invalid: ask for a token to retry with. */
 function rejectWrite(): Promise<string | undefined> {
   const onRejected = getApiCsrfRejectionHandler();
@@ -130,12 +127,15 @@ describe("fetchSession", () => {
     const calls = stubCsrf(token("tok_b"));
     // It never settles: answering null would send the guard to /login while
     // the reload is pending.
-    const settled = await Promise.race([fetchSession().then(() => true), pending()]);
+    let settled = false;
+    void fetchSession().then(() => {
+      settled = true;
+    });
 
+    await vi.waitFor(() => expect(sessionPage.reload).toHaveBeenCalledOnce());
     expect(settled).toBe(false);
     expect(calls()).toBe(0);
     expect(getApiCsrfToken()).toBeUndefined();
-    expect(sessionPage.reload).toHaveBeenCalledOnce();
   });
 
   // The person belongs to the document, so losing the session does not clear
