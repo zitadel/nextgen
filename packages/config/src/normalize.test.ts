@@ -183,6 +183,16 @@ describe("withoutFlowStepDefaults", () => {
     expect(withoutFlowStepDefaults(step)).toEqual(step);
   });
 
+  it("drops an empty fields list, which the platform omits", () => {
+    expect(withoutFlowStepDefaults({ name: "a", fields: [] })).toEqual({ name: "a" });
+  });
+
+  it("keeps fields that name something", () => {
+    const step = { name: "a", fields: ["email"] };
+
+    expect(withoutFlowStepDefaults(step)).toEqual(step);
+  });
+
   it("drops primary: false from an action, which the platform omits", () => {
     const step = { actions: [{ name: "skip", primary: false }] };
 
