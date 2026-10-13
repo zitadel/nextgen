@@ -31,6 +31,22 @@ tasks:
       persistent: true
       runInCI: false
 
+  # Deprecated alias for `e2e:journey` (the journey moved into the e2e project).
+  # Hands over to it, passing any runner flags straight through.
+  journey:
+    description: "Deprecated: use `moon run e2e:journey`."
+    command: "corepack"
+    args:
+      - "pnpm"
+      - "exec"
+      - "moon"
+      - "run"
+      - "e2e:journey"
+      - "--"
+    options:
+      cache: false
+      runInCI: false
+
   # The local runtime image (ghcr.io/zitadel/nextgen:local-dev): the server
   # cross-compiled for linux, with both UI dists embedded, in the release
   # Dockerfile. Needs Docker, so it stays out of CI.
