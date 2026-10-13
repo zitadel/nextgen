@@ -65,6 +65,10 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // generated surface; recorded as a question rather than implied to be owned.
   completeClaim: "part of the claim flow, but currently called by no command — unresolved",
   getClaimWindow: "part of the claim flow, but currently called by no command — unresolved",
+  // A preview exists only through a deployment to it, so it has no create to
+  // offer; listing and removing it are `zitadel preview`'s.
+  listPreviews: "previews are listed by `zitadel preview` (#1312)",
+  removePreview: "previews are removed by `zitadel preview` (#1312)",
 
   // Individual resource writes are not made here: `deploy` sends the whole
   // `.zitadel/` as one release bundle (ADR 035), so the per-kind create

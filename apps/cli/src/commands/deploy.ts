@@ -213,14 +213,6 @@ export default class Deploy extends EnvironmentCommand {
       );
     }
 
-    // The create response carries any non-blocking advisories the server
-    // raised while making the release live (a clamped preview ttl, say). The
-    // deploy succeeded regardless, so they are surfaced as warnings, not an
-    // error.
-    for (const warning of deployment.warnings ?? []) {
-      reportWarning(warning.message);
-    }
-
     const servedOrigins = deployment.targets.map((target) => target.origin);
     this.recordTelemetry({ origin_count: servedOrigins.length });
     return this.emit({

@@ -89,6 +89,7 @@ import {
   ListDeploymentsQueryParams,
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
+  ListPreviewsParams,
   ListPreviewsQueryParams,
   ListPreviewsResponse,
   ListReleasesQueryParams,
@@ -100,7 +101,7 @@ import {
   RemoveOriginBody,
   RemoveOriginParams,
   RemovePreviewBody,
-  RemovePreviewQueryParams,
+  RemovePreviewParams,
   RevokeReleaseParams,
   RevokeReleaseQueryParams,
   RollbackDeploymentBody,
@@ -600,28 +601,24 @@ function variableOwner(
  * no preview override, so the preview URL serves the production credential —
  * allowed, but worth flagging (ADR 062 §7, #1617).
  */
-type DeploymentWarning = { code: string; message: string; variable: string };
-
 /**
- * The project's variables as a deployment freezes them, and any warnings the
- * freeze raised. A primary deployment runs the `all` values alone; a preview
- * deployment prefers each name's `preview` override and falls back to the `all`
- * value where none exists. The result is a flat map — one value per name — so a
- * deployment never has to choose at read time.
+ * The project's variables as a deployment freezes them. A primary deployment
+ * runs the `all` values alone; a preview deployment prefers each name's
+ * `preview` override and falls back to the `all` value where none exists. The
+ * result is a flat map — one value per name — so a deployment never has to
+ * choose at read time.
  *
- * A preview fallback to an `all` secret is flagged: there is no preview-only
- * override, so the preview URL would serve the production secret, which the
- * operator should know even though it is not refused.
+ * The real contract has no such fallback: a deployment freezes the values stored
+ * for its own kind and answers `400 dep.variables_missing` when one is absent
+ * (#1640). The mock keeps the fallback until the variables contract (#1587,
+ * storage #1567) settles how a value is addressed to a kind.
  */
-function freezeVariables(
-  projectId: string,
-  preview: boolean,
-): { frozen: Map<string, VariableRecord>; warnings: DeploymentWarning[] } {
+function freezeVariables(projectId: string, preview: boolean): Map<string, VariableRecord> {
   const all =
     store.variables.get(variableOwner(projectId, undefined, "all")) ??
     new Map<string, VariableRecord>();
   if (!preview) {
-    return { frozen: new Map(all), warnings: [] };
+    return new Map(all);
   }
   const overrides =
     store.variables.get(variableOwner(projectId, undefined, "preview")) ??
@@ -630,20 +627,7 @@ function freezeVariables(
   for (const [name, held] of overrides) {
     frozen.set(name, held);
   }
-  const warnings: DeploymentWarning[] = [];
-  for (const [name, held] of all) {
-    if (held.secret && !overrides.has(name)) {
-      warnings.push({
-        code: "variable.missing_preview_secret",
-        message: `preview deployment falls back to the all secret ${name}; set a preview override to avoid serving the production secret`,
-        variable: name,
-      });
-    }
-  }
-  // Sorted by name so the warning list is stable between runs, like the rest of
-  // the mock's collection output.
-  warnings.sort((a, b) => a.variable.localeCompare(b.variable));
-  return { frozen, warnings };
+  return frozen;
 }
 
 /**
@@ -1879,7 +1863,7 @@ export function setupPlatformHandlers() {
       // The snapshot this deployment would freeze, resolved now. It decides
       // idempotency alongside the release: a variable-only change leaves the
       // release untouched but must still create a new deployment.
-      const { frozen, warnings } = freezeVariables(project.id, sawPreview);
+      const frozen = freezeVariables(project.id, sawPreview);
 
       // A preview deploy always renews its targets' previews — writing a new one
       // or extending the live one's expiry from this deploy's ttl — before the
@@ -1936,18 +1920,9 @@ export function setupPlatformHandlers() {
               ? { origin: row.origin, expiresAt }
               : row,
           );
-          // The create-deployment response wraps the deployment with the
-          // non-blocking `warnings` it raised. Re-deploying an unchanged preview
-          // that still falls back to an `all` secret keeps raising
-          // `variable.missing_preview_secret`, so the idempotent 200 carries the
-          // renewed warnings rather than dropping them — the preview consumer
-          // surfaces the safety warning on every retry, not only the first. The
-          // renewed-expiry `rows` are reported too, so the 200 reflects the
-          // clock the preview now runs on.
-          const base = deploymentResponse(newest, rows);
-          return HttpResponse.json(warnings.length > 0 ? { ...base, warnings } : base, {
-            status: 200,
-          });
+          // The renewed-expiry `rows` are reported, so the idempotent 200
+          // reflects the clock the preview now runs on.
+          return HttpResponse.json(deploymentResponse(newest, rows), { status: 200 });
         }
       }
 
@@ -1973,13 +1948,7 @@ export function setupPlatformHandlers() {
       // short-circuit, so a preview deploy renews them whether or not it reaches
       // this new-deployment path.
 
-      // Warnings ride the create response (a preview falling back to an `all`
-      // secret), surfaced only when there are any so the common case stays the
-      // bare deployment shape.
-      const response = deploymentResponse(record);
-      return HttpResponse.json(warnings.length > 0 ? { ...response, warnings } : response, {
-        status: 201,
-      });
+      return HttpResponse.json(deploymentResponse(record), { status: 201 });
     }),
 
     http.get("*/deployments", ({ request }) => {
@@ -2250,7 +2219,11 @@ export function setupPlatformHandlers() {
     // endpoints: no bearer check, so the narrower preview token the CLI uses
     // works — the Go handlers are unimplemented stubs regardless.
 
-    http.get("*/previews", ({ request }) => {
+    http.get("*/projects/:project_id/previews", ({ params, request }) => {
+      const path = parse(ListPreviewsParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
       // `limit` arrives as a string on the URL and the generated zod does not
       // coerce, so build it before validating, as the deployments list does.
       const record = queryRecord(request);
@@ -2265,7 +2238,7 @@ export function setupPlatformHandlers() {
       }
 
       const live = [...store.previews.values()]
-        .filter((preview) => preview.projectId === query.data.project_id && previewIsLive(preview))
+        .filter((preview) => preview.projectId === path.data.project_id && previewIsLive(preview))
         .sort(compareNewestFirst)
         .map((preview) => ({
           origin: preview.origin,
@@ -2295,10 +2268,10 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    http.post("*/previews/remove", async ({ request }) => {
-      const query = parse(RemovePreviewQueryParams, queryRecord(request), "invalid_query");
-      if (!query.ok) {
-        return query.response;
+    http.post("*/projects/:project_id/previews/remove", async ({ params, request }) => {
+      const path = parse(RemovePreviewParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
       }
       const raw = await readJson(request);
       if (raw === null) {
@@ -2315,7 +2288,7 @@ export function setupPlatformHandlers() {
       // because its preview is gone. The deployments that served it keep their
       // real target timestamps — removing a preview ends it, it does not rewrite
       // the history of what ran where and when.
-      store.previews.delete(previewKey(query.data.project_id, body.data.origin));
+      store.previews.delete(previewKey(path.data.project_id, body.data.origin));
       return new HttpResponse(null, { status: 204 });
     }),
 

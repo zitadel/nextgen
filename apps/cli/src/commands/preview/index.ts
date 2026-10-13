@@ -169,15 +169,6 @@ export default class Preview extends PreviewCommand {
       ...(ttl === undefined ? {} : { ttl: ttl.canonical }),
     });
 
-    // The create response carries non-fatal warnings — a preview deploy that
-    // fell back to an `all` secret because a variable has no preview override,
-    // so the preview URL serves the production credential (ADR 062 §7, #1617).
-    // Surface each through the warnings channel so the operator sees it on the
-    // terminal and in the `--json` envelope.
-    for (const warning of deployment.warnings ?? []) {
-      reportWarning(warning.message);
-    }
-
     const previews = deployment.targets.map((target) => ({
       url: target.origin,
       expires_at: target.expires_at ?? null,

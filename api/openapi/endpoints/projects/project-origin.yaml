@@ -1,4 +1,4 @@
-title: Origin
+title: ProjectOrigin
 type: object
 description: |
   One of a project's origins: a pattern and what it is for. A `primary`

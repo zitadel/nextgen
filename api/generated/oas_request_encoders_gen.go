@@ -11,7 +11,7 @@ import (
 )
 
 func encodeAddOriginRequest(
-	req *Origin,
+	req *ProjectOrigin,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

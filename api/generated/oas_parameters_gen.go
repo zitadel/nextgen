@@ -5055,7 +5055,7 @@ type ListDeploymentsParams struct {
 	// Narrows the list to the deployments that targeted this origin, given
 	// exactly as the deployment records it. An origin no deployment targeted
 	// answers an empty list, not an error.
-	Origin OptDeploymentOrigin `json:",omitempty,omitzero"`
+	Origin OptOrigin `json:",omitempty,omitzero"`
 	// Lists what each target serves now instead of the history. Defaults
 	// to `false`.
 	Live OptBool `json:",omitempty,omitzero"`
@@ -5084,7 +5084,7 @@ func unpackListDeploymentsParams(packed middleware.Parameters) (params ListDeplo
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
-			params.Origin = v.(OptDeploymentOrigin)
+			params.Origin = v.(OptOrigin)
 		}
 	}
 	{
@@ -5189,7 +5189,7 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotOriginVal DeploymentOrigin
+				var paramsDotOriginVal Origin
 				if err := func() error {
 					var paramsDotOriginValVal string
 					if err := func() error {
@@ -5208,7 +5208,7 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 					}(); err != nil {
 						return err
 					}
-					paramsDotOriginVal = DeploymentOrigin(paramsDotOriginValVal)
+					paramsDotOriginVal = Origin(paramsDotOriginValVal)
 					return nil
 				}(); err != nil {
 					return err
@@ -7408,7 +7408,7 @@ func decodeListMyProjectsParams(args [0]string, argsEscaped bool, r *http.Reques
 
 // ListPreviewsParams is parameters of listPreviews operation.
 type ListPreviewsParams struct {
-	// The unique identifier of the project.
+	// The project the previews belong to.
 	ProjectID ProjectID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
@@ -7423,7 +7423,7 @@ func unpackListPreviewsParams(packed middleware.Parameters) (params ListPreviews
 	{
 		key := middleware.ParameterKey{
 			Name: "project_id",
-			In:   "query",
+			In:   "path",
 		}
 		params.ProjectID = packed[key].(ProjectID)
 	}
@@ -7448,18 +7448,27 @@ func unpackListPreviewsParams(packed middleware.Parameters) (params ListPreviews
 	return params
 }
 
-func decodeListPreviewsParams(args [0]string, argsEscaped bool, r *http.Request) (params ListPreviewsParams, _ error) {
+func decodeListPreviewsParams(args [1]string, argsEscaped bool, r *http.Request) (params ListPreviewsParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode query: project_id.
+	// Decode path: project_id.
 	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
 		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "project_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
 
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+			if err := func() error {
 				var paramsDotProjectIDVal string
 				if err := func() error {
 					val, err := d.DecodeValue()
@@ -7479,7 +7488,7 @@ func decodeListPreviewsParams(args [0]string, argsEscaped bool, r *http.Request)
 				}
 				params.ProjectID = ProjectID(paramsDotProjectIDVal)
 				return nil
-			}); err != nil {
+			}(); err != nil {
 				return err
 			}
 			if err := func() error {
@@ -7491,13 +7500,13 @@ func decodeListPreviewsParams(args [0]string, argsEscaped bool, r *http.Request)
 				return err
 			}
 		} else {
-			return err
+			return validate.ErrFieldRequired
 		}
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "project_id",
-			In:   "query",
+			In:   "path",
 			Err:  err,
 		}
 	}
@@ -9426,7 +9435,7 @@ func decodeRemoveOriginParams(args [1]string, argsEscaped bool, r *http.Request)
 
 // RemovePreviewParams is parameters of removePreview operation.
 type RemovePreviewParams struct {
-	// The unique identifier of the project.
+	// The project the previews belong to.
 	ProjectID ProjectID
 }
 
@@ -9434,25 +9443,33 @@ func unpackRemovePreviewParams(packed middleware.Parameters) (params RemovePrevi
 	{
 		key := middleware.ParameterKey{
 			Name: "project_id",
-			In:   "query",
+			In:   "path",
 		}
 		params.ProjectID = packed[key].(ProjectID)
 	}
 	return params
 }
 
-func decodeRemovePreviewParams(args [0]string, argsEscaped bool, r *http.Request) (params RemovePreviewParams, _ error) {
-	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode query: project_id.
+func decodeRemovePreviewParams(args [1]string, argsEscaped bool, r *http.Request) (params RemovePreviewParams, _ error) {
+	// Decode path: project_id.
 	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
 		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "project_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
 
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+			if err := func() error {
 				var paramsDotProjectIDVal string
 				if err := func() error {
 					val, err := d.DecodeValue()
@@ -9472,7 +9489,7 @@ func decodeRemovePreviewParams(args [0]string, argsEscaped bool, r *http.Request
 				}
 				params.ProjectID = ProjectID(paramsDotProjectIDVal)
 				return nil
-			}); err != nil {
+			}(); err != nil {
 				return err
 			}
 			if err := func() error {
@@ -9484,13 +9501,13 @@ func decodeRemovePreviewParams(args [0]string, argsEscaped bool, r *http.Request
 				return err
 			}
 		} else {
-			return err
+			return validate.ErrFieldRequired
 		}
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "project_id",
-			In:   "query",
+			In:   "path",
 			Err:  err,
 		}
 	}

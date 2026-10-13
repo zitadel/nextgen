@@ -5,14 +5,15 @@ required:
   - origin
 properties:
   origin:
-    $ref: ../../components/schemas/deployment-origin.yaml
+    $ref: ../../components/schemas/origin.yaml
   expires_at:
+    type: string
+    format: date-time
     description: |
-      Present only on a target that is a preview URL: when its preview
-      expires. Null once the preview has expired or was removed. Absent on a
-      primary origin, which does not expire.
-    oneOf:
-      - type: string
-        format: date-time
-      - type: 'null'
+      Present only on a target that is a preview URL: the expiry this
+      deployment set for its preview. Fixed when the deployment is created,
+      like the rest of the record: a later deployment to the URL renews the
+      preview and records its own expiry, and removing the preview or
+      letting it expire leaves this value as it was. Absent on a primary
+      origin, which does not expire.
     example: '2026-10-09T14:10:00Z'

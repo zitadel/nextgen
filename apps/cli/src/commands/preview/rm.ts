@@ -75,7 +75,7 @@ export default class PreviewRm extends PreviewCommand {
 
     const { client, projectId } = await this.connect();
 
-    await client.removePreview({ origin: url }, { project_id: projectId });
+    await client.removePreview(projectId, { origin: url });
 
     return this.emit({
       status: "ok",

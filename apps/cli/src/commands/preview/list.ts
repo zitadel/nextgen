@@ -61,8 +61,7 @@ export default class PreviewList extends PreviewCommand {
     const { client, projectId } = await this.connect();
 
     const request = (token?: string): Promise<unknown> =>
-      client.listPreviews({
-        project_id: projectId,
+      client.listPreviews(projectId, {
         ...(flags.limit === undefined ? {} : { limit: flags.limit }),
         ...(token === undefined ? {} : { page_token: token }),
       });

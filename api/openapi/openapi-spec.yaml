@@ -154,6 +154,10 @@ paths:
     $ref: endpoints/projects/by_id/claim/complete/methods.yaml
   /projects/{project_id}/claim/window:
     $ref: endpoints/projects/by_id/claim/window/methods.yaml
+  /projects/{project_id}/previews:
+    $ref: endpoints/projects/by_id/previews/methods.yaml
+  /projects/{project_id}/previews/remove:
+    $ref: endpoints/projects/by_id/previews/remove/methods.yaml
   /sessions:
     $ref: endpoints/sessions/methods.yaml
   /sessions/query:
@@ -224,10 +228,6 @@ paths:
     $ref: endpoints/deployments/by_id/variables/methods.yaml
   /deployments/{deployment_id}/rollback:
     $ref: endpoints/deployments/by_id/rollback/methods.yaml
-  /previews:
-    $ref: endpoints/previews/methods.yaml
-  /previews/remove:
-    $ref: endpoints/previews/remove/methods.yaml
 
 components:
   securitySchemes:

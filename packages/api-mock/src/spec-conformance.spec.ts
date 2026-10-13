@@ -1818,7 +1818,7 @@ describe("api-mock releases and deployments", () => {
     expect(body.targets[0]?.origin).toBe(url);
     expect(new Date(body.targets[0]?.expires_at as string).getTime()).toBeGreaterThan(Date.now());
 
-    const listed = (await (await fetch(`${BASE}/previews?project_id=${project.id}`)).json()) as {
+    const listed = (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
       previews: { origin: string }[];
     };
     expect(listed.previews.map((preview) => preview.origin)).toEqual([url]);
@@ -1873,16 +1873,16 @@ describe("api-mock releases and deployments", () => {
     });
 
     const removePreview = () =>
-      fetch(`${BASE}/previews/remove?project_id=${project.id}`, {
+      fetch(`${BASE}/projects/${project.id}/previews/remove`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
         body: JSON.stringify({ origin: url }),
       });
 
     expect((await removePreview()).status).toBe(204);
-    const afterFirst = (await (
-      await fetch(`${BASE}/previews?project_id=${project.id}`)
-    ).json()) as { previews: unknown[] };
+    const afterFirst = (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
+      previews: unknown[];
+    };
     expect(afterFirst.previews).toHaveLength(0);
 
     // Idempotent: removing an already-gone preview still answers 204.
@@ -1904,7 +1904,7 @@ describe("api-mock releases and deployments", () => {
     });
     expect(first.status).toBe(201);
     const expiresFirst = (
-      (await (await fetch(`${BASE}/previews?project_id=${project.id}`)).json()) as {
+      (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
         previews: { expires_at: string }[];
       }
     ).previews[0]?.expires_at as string;
@@ -1920,7 +1920,7 @@ describe("api-mock releases and deployments", () => {
     expect(again.status).toBe(200);
     const renewedBody = (await again.json()) as { targets: { expires_at: string }[] };
     const expiresAgain = (
-      (await (await fetch(`${BASE}/previews?project_id=${project.id}`)).json()) as {
+      (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
         previews: { expires_at: string }[];
       }
     ).previews[0]?.expires_at as string;
@@ -1948,14 +1948,14 @@ describe("api-mock releases and deployments", () => {
     });
 
     const first = (await (
-      await fetch(`${BASE}/previews?project_id=${project.id}&limit=2`)
+      await fetch(`${BASE}/projects/${project.id}/previews?limit=2`)
     ).json()) as { previews: { origin: string }[]; next_page_token?: string | null };
     expect(first.previews).toHaveLength(2);
     const token = first.next_page_token;
     expect(typeof token).toBe("string");
 
     const second = (await (
-      await fetch(`${BASE}/previews?project_id=${project.id}&limit=2&page_token=${token}`)
+      await fetch(`${BASE}/projects/${project.id}/previews?limit=2&page_token=${token}`)
     ).json()) as { previews: { origin: string }[]; next_page_token?: string | null };
     expect(second.previews).toHaveLength(1);
     expect(second.next_page_token ?? null).toBeNull();
@@ -1965,7 +1965,7 @@ describe("api-mock releases and deployments", () => {
     expect(seen).toEqual([...urls].sort());
 
     // A token the mock never minted is rejected, like the real server.
-    const bad = await fetch(`${BASE}/previews?project_id=${project.id}&page_token=not-a-cursor`);
+    const bad = await fetch(`${BASE}/projects/${project.id}/previews?page_token=not-a-cursor`);
     expect(bad.status).toBe(400);
   });
 
@@ -1987,7 +1987,7 @@ describe("api-mock releases and deployments", () => {
       await fetch(`${BASE}/deployments/${deployed.id}?project_id=${project.id}`)
     ).json()) as { deployed_at: string; targets: { origin: string; expires_at: string }[] };
 
-    const removed = await fetch(`${BASE}/previews/remove?project_id=${project.id}`, {
+    const removed = await fetch(`${BASE}/projects/${project.id}/previews/remove`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
       body: JSON.stringify({ origin: url }),
@@ -1995,7 +1995,7 @@ describe("api-mock releases and deployments", () => {
     expect(removed.status).toBe(204);
 
     // The live preview list no longer admits the URL — its preview is gone.
-    const listed = (await (await fetch(`${BASE}/previews?project_id=${project.id}`)).json()) as {
+    const listed = (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
       previews: unknown[];
     };
     expect(listed.previews).toHaveLength(0);
@@ -2155,68 +2155,6 @@ describe("api-mock releases and deployments", () => {
       await fetch(`${BASE}/deployments/${rollback.id}/variables?project_id=${project.id}`)
     ).json()) as Record<string, unknown>;
     expect(frozen).toEqual({ API_URL: "https://api.v1.acme.com" });
-  });
-
-  test("warns when a preview deployment falls back to an all secret", async () => {
-    // A preview URL serving the production secret is allowed but flagged: there
-    // is no preview override for that name, so the deployment reports it.
-    const project = await newProject("deploy-preview-warn");
-    await fetch(`${BASE}/projects/${project.id}/origins`, {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
-      body: JSON.stringify({ pattern: "https://*-acme.vercel.app", kind: "preview" }),
-    });
-    await setVars(project.id, "", { API_TOKEN: { value: "prod-secret", secret: true } });
-    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
-      id: string;
-    };
-
-    const warned = await createDeployment(project.id, project.secret, {
-      release_id: release.id,
-      targets: ["https://pr-1-acme.vercel.app"],
-      ttl: "24h",
-    });
-    expect(warned.status).toBe(201);
-    const body = (await warned.json()) as {
-      warnings?: { code: string; variable: string; message: string }[];
-    };
-    expect(body.warnings).toHaveLength(1);
-    expect(body.warnings?.[0]).toMatchObject({
-      code: "variable.missing_preview_secret",
-      variable: "API_TOKEN",
-    });
-    expect(typeof body.warnings?.[0]?.message).toBe("string");
-
-    // Re-deploying the same preview target with unchanged config is idempotent
-    // (200), but the fallback to the production secret is still in effect, so
-    // the warning rides the retry response too rather than being dropped.
-    const retry = await createDeployment(project.id, project.secret, {
-      release_id: release.id,
-      targets: ["https://pr-1-acme.vercel.app"],
-      ttl: "24h",
-    });
-    expect(retry.status).toBe(200);
-    const retryBody = (await retry.json()) as {
-      warnings?: { code: string; variable: string }[];
-    };
-    expect(retryBody.warnings).toHaveLength(1);
-    expect(retryBody.warnings?.[0]).toMatchObject({
-      code: "variable.missing_preview_secret",
-      variable: "API_TOKEN",
-    });
-
-    // A preview override for the same name silences the warning: the preview no
-    // longer serves the production secret.
-    await setVars(project.id, "&applies_to=preview", {
-      API_TOKEN: { value: "preview-secret", secret: true },
-    });
-    const quiet = await createDeployment(project.id, project.secret, {
-      release_id: release.id,
-      targets: ["https://pr-2-acme.vercel.app"],
-      ttl: "24h",
-    });
-    expect(quiet.status).toBe(201);
-    expect((await quiet.json()) as { warnings?: unknown }).not.toHaveProperty("warnings");
   });
 
   test("answers dep.not_found for a deployment's variables under the wrong project", async () => {

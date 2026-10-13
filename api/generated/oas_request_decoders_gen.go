@@ -15,7 +15,7 @@ import (
 )
 
 func (s *Server) decodeAddOriginRequest(r *http.Request) (
-	req *Origin,
+	req *ProjectOrigin,
 	rawBody []byte,
 	close func() error,
 	rerr error,
@@ -62,7 +62,7 @@ func (s *Server) decodeAddOriginRequest(r *http.Request) (
 		rawBody = append(rawBody, buf...)
 		d := jx.DecodeBytes(buf)
 
-		var request Origin
+		var request ProjectOrigin
 		if err := func() error {
 			if err := request.Decode(d); err != nil {
 				return err

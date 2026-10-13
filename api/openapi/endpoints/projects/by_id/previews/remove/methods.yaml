@@ -14,7 +14,12 @@ post:
   tags:
     - Previews
   parameters:
-    - $ref: ../../../components/parameters/project-id.yaml
+    - name: project_id
+      in: path
+      required: true
+      description: The project the previews belong to.
+      schema:
+        $ref: ../../../../../components/schemas/project-id.yaml
   security:
     - oauth2:
         - deployment.write

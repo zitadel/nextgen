@@ -8,9 +8,14 @@ get:
   tags:
     - Previews
   parameters:
-    - $ref: ../../components/parameters/project-id.yaml
-    - $ref: ../../components/parameters/limit.yaml
-    - $ref: ../../components/parameters/page-token.yaml
+    - name: project_id
+      in: path
+      required: true
+      description: The project the previews belong to.
+      schema:
+        $ref: ../../../../components/schemas/project-id.yaml
+    - $ref: ../../../../components/parameters/limit.yaml
+    - $ref: ../../../../components/parameters/page-token.yaml
   security:
     - oauth2:
         - deployment.read
