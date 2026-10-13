@@ -62,14 +62,14 @@ func NewDeploymentService(v2Pool *DB) *DeploymentService {
 	return &DeploymentService{v2Pool: v2Pool}
 }
 
-// maxDeployAttempts bounds the retries of a deploy that lost the optimistic
-// lock to a concurrent deploy to one of its origins.
+// maxDeployAttempts bounds how often an unguarded deploy retries after losing
+// the optimistic lock.
 const maxDeployAttempts = 3
 
 // Create deploys a release to its targets with optimistic locking: it reads
-// what each target serves and writes without holding a lock. A concurrent
-// deploy to one of the origins makes the write fail, and Create retries on
-// what that deploy left, where expected_deployment_id then answers a conflict.
+// what each target serves and writes without holding a lock, and a concurrent
+// deploy to one of the origins makes the write fail. A guarded deploy then
+// answers a conflict with the winner; an unguarded one retries on top of it.
 func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentInput) (*CreateDeploymentOutput, error) {
 	actor, _ := audit.ActorFromContext(ctx)
 	entity, err := domain.NewDeployment(input.ProjectID, input.ReleaseID, input.TargetKind, input.Origins, domain.DeploymentMetadata{
@@ -89,10 +89,10 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 	for attempt := 1; ; attempt++ {
 		output, err := s.create(ctx, entity, input)
 		if _, lost := errors.AsType[*database.UniqueError](err); lost {
-			if attempt < maxDeployAttempts {
+			if input.ExpectedDeploymentID == nil && attempt < maxDeployAttempts {
 				continue
 			}
-			return nil, s.contended(ctx, entity)
+			return nil, s.conflict(ctx, entity)
 		}
 		if err != nil {
 			if de, ok := errors.AsType[domain.Error](err); ok {
@@ -104,9 +104,9 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 	}
 }
 
-// contended answers a deploy that kept losing the optimistic lock with a
-// conflict carrying the newest deployment to its targets.
-func (s *DeploymentService) contended(ctx context.Context, entity *domain.Deployment) error {
+// conflict answers a deploy that lost the optimistic lock with the newest
+// deployment to its targets.
+func (s *DeploymentService) conflict(ctx context.Context, entity *domain.Deployment) error {
 	stmts := s.v2Pool.Statements()
 	read, err := stmts.NewestTargets(ctx, entity.ProjectID, entity.Origins())
 	if err != nil {

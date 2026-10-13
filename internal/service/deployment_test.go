@@ -118,7 +118,8 @@ func TestDeploymentServiceCreateInsertsAgainstWhatItRead(t *testing.T) {
 	assert.True(t, result.Created)
 }
 
-// Losing the optimistic lock retries on what the winner left.
+// Losing the optimistic lock: an unguarded deploy retries on what the winner
+// left, a guarded one answers a conflict.
 func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
 	t.Run("unguarded deploy writes on the retry", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
@@ -132,14 +133,17 @@ func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
 		assert.True(t, result.Created)
 	})
 
-	t.Run("guarded deploy answers a conflict on the retry", func(t *testing.T) {
+	t.Run("guarded deploy answers a conflict without retrying", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		before := servingDeployment("rel_0")
 		before.ID = "dep_before"
 		expectServing(statements, before)
 		statements.EXPECT().InsertDeployment(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
 		winner := servingDeployment("rel_0")
-		expectServing(statements, winner)
+		statements.EXPECT().NewestTargets(gomock.Any(), "proj_1", []string{appOrigin}).Return([]domain.TargetDeployment{{
+			Origin: appOrigin, DeploymentID: winner.ID, DeployedAt: winner.DeployedAt, Seq: 8,
+		}}, nil)
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", winner.ID).Return(winner, nil)
 
 		input := deploymentInput()
 		input.ExpectedDeploymentID = new("dep_before")
