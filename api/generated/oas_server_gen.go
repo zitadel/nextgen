@@ -258,11 +258,6 @@ type Handler interface {
 	// be accessed.
 	// The schema can either be a concrete schema, e.g. a user schema, or a
 	// schema-url which will be resolved by the server.
-	// A schema sharing the `objectType` of an existing one is a new revision of
-	// it, and the active flow definitions naming that `objectType` run against
-	// it from then on. Each of them is validated against the new revision
-	// first; if any would no longer be valid, the revision is refused with
-	// `sch.invalid_request`, and the message names the flow and the problem.
 	//
 	// POST /schemas
 	CreateSchema(ctx context.Context, req CreateSchemaReq, params CreateSchemaParams) (CreateSchemaRes, error)
