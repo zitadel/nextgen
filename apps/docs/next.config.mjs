@@ -2,6 +2,17 @@ import { createMDX } from "fumadocs-mdx/next";
 
 const withMDX = createMDX();
 
+// The share of page loads that send Speed Insights (app/layout.tsx), from 0
+// (none) to 1 (every one, the default when unset); set per environment on
+// Vercel. A value outside 0–1 fails the build rather than reaching the
+// browser unnoticed.
+const sampleRate = process.env.DOCS_SPEED_INSIGHTS_SAMPLE_RATE;
+if (sampleRate && !(Number(sampleRate) >= 0 && Number(sampleRate) <= 1)) {
+  throw new Error(
+    `DOCS_SPEED_INSIGHTS_SAMPLE_RATE must be a number from 0 to 1, got "${sampleRate}".`,
+  );
+}
+
 /** @type {import('next').NextConfig} */
 const config = {
   reactStrictMode: true,
