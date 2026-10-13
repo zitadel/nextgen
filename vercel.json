@@ -81,7 +81,8 @@
   "regions": ["fra1"],
   "git": {
     "deploymentEnabled": {
-      "changeset-release/*": false
+      "changeset-release/*": false,
+      "gh-readonly-queue/**": false
     }
   }
 }
