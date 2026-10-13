@@ -18,12 +18,6 @@ type FlowDefinitionService interface {
 	List(ctx context.Context, req ListFlowDefinitionsRequest) (*ListFlowDefinitionsResponse, error)
 }
 
-// UserSchemaResolver returns the newest revision of the user schema ref names,
-// by objectType or by the id of one of its revisions.
-type UserSchemaResolver interface {
-	ResolveUserSchema(ctx context.Context, projectID, ref string) (*domain.JSONSchema, error)
-}
-
 type BuiltinSchemaProvider interface {
 	GetBuiltinSchema(uri string) (*jsonschema.Schema, error)
 	LatestSchemaURI(kind domain.KnownSchemaKind) (string, error)
@@ -45,14 +39,12 @@ type FlowDefinitionRequest struct {
 
 type flowDefinitionService struct {
 	v2Pool                 *DB
-	userSchemas            UserSchemaResolver
 	builtinSchemaProvider  BuiltinSchemaProvider
 	validateFlowDefinition flowDefinitionValidatorFunc
 }
 
 func NewFlowDefinitionService(
 	v2Pool *DB,
-	userSchemas UserSchemaResolver,
 	schemaProvider BuiltinSchemaProvider,
 	flowDefinitionValidatorFn flowDefinitionValidatorFunc,
 ) FlowDefinitionService {
@@ -61,7 +53,6 @@ func NewFlowDefinitionService(
 	}
 	return &flowDefinitionService{
 		v2Pool:                 v2Pool,
-		userSchemas:            userSchemas,
 		builtinSchemaProvider:  schemaProvider,
 		validateFlowDefinition: flowDefinitionValidatorFn,
 	}
@@ -76,7 +67,7 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 	if err != nil {
 		return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("invalid status: %q", req.Status), err)
 	}
-	userSchema, err := fd.userSchemas.ResolveUserSchema(ctx, req.ProjectID, req.UserSchema)
+	userSchema, err := resolveUserSchema(ctx, fd.v2Pool.Statements(), req.ProjectID, req.UserSchema)
 	if err != nil {
 		if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
 			return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("user schema %q not found", req.UserSchema), err)

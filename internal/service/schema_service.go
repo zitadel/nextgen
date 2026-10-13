@@ -195,11 +195,6 @@ func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID 
 	return schema, nil
 }
 
-// ResolveUserSchema implements [UserSchemaResolver].
-func (s *SchemaService) ResolveUserSchema(ctx context.Context, projectID, ref string) (*domain.JSONSchema, error) {
-	return resolveUserSchema(ctx, s.v2Pool.Statements(), projectID, ref)
-}
-
 func (s *SchemaService) ListSchemas(ctx context.Context, input ListSchemasInput) (*ListSchemasOutput, error) {
 	filters := []database.Filter[domain.JSONSchemaField]{
 		database.Equal(database.Col(domain.JSONSchemaFieldProjectID), input.ProjectID),
