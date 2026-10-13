@@ -14,8 +14,9 @@ The hosted cloud is the current `main`, built by Vercel from the repository
 and run in Frankfurt (`fra1`) against PlanetScale Postgres in the same AWS
 region. **`main` is production:** every merge deploys. Every other branch
 gets a preview deployment with a database of its own, except the Changesets
-version PR's (see [Deploying](#deploying)). Version tags and their npm
-packages remain the self-hosted artifact; this cloud does not run them.
+version PR's and the merge queue's (see [Deploying](#deploying)). Version
+tags and their npm packages remain the self-hosted artifact; this cloud does
+not run them.
 
 ## Layout
 
@@ -196,6 +197,14 @@ or garbled fails the build and the serving deployment stays.
   preview would differ from production in the server's version string
   alone. Once merged, the release builds as production and runs
   production's [deployment checks](#deployment-checks).
+- **The merge queue gets no preview.** The queue tests each pull request
+  on a temporary branch, `gh-readonly-queue/main/pr-<number>-<sha>`, and
+  `git.deploymentEnabled` turns off deployments of `gh-readonly-queue/**`
+  (a single `*` would stop at the branch's second `/` and match nothing).
+  The pull request already has its preview, and the commit the queue lands
+  on `main` deploys as production. A preview per queue branch would build
+  all four services again and leave one more database behind for every
+  queued pull request.
 - **Migrations must be expand/contract.** The previous deployment serves on
   the new schema until the new one is live, and Instant Rollback promotes
   an older deployment without touching the schema.

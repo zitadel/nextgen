@@ -3,7 +3,8 @@
 The deployment wrapper that runs `main` as a hosted, production-like cloud on
 Vercel with PlanetScale Postgres in Frankfurt. Every merge to `main` deploys
 to production; every other branch gets a preview with a database of its own,
-except the Changesets version PR's `changeset-release/*` branch.
+except the Changesets version PR's `changeset-release/*` branch and the merge
+queue's `gh-readonly-queue/**` branches.
 
 The repo-root [`vercel.json`](../../vercel.json) defines the Vercel
 deployment as five [services](https://vercel.com/docs/services):
