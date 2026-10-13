@@ -167,8 +167,8 @@ describe("claim page", () => {
     const { router } = await renderAt(CLAIM_PATH);
     await userEvent.click(await screen.findByRole("link", { name: "Open the console" }));
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
-    expect(router.state.location.search).toMatchObject({ project: PROJECT_ID });
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: PROJECT_ID });
   });
 
   // The gap the in-component ref cannot cover: a fresh mount gets a fresh ref.
@@ -510,7 +510,7 @@ describe("claim window countdown", () => {
       // seen it and settled, so any reload it triggered has run, before
       // asserting that it changed nothing.
       await waitFor(() => {
-        expect(router.state.location.state).not.toMatchObject({ zl: true });
+        expect(router.state.resolvedLocation?.state).not.toMatchObject({ zl: true });
         expect(router.state.status).toBe("idle");
       });
 
