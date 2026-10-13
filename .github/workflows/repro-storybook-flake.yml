@@ -73,8 +73,12 @@ jobs:
           if [ "${{ matrix.variant }}" = "flaky" ]; then
             sed -i 's/          isolate: false,/          isolate: true,/' \
               apps/storybook/vitest.config.ts
+            # Capture a Chromium NetLog so we can read the real net_error behind
+            # "Failed to fetch dynamically imported module" on a failing attempt.
+            sed -i 's#provider: playwright(),#provider: playwright({ launchOptions: { args: ["--log-net-log=/tmp/netlog-current.json"] } }),#' \
+              apps/storybook/vitest.config.ts
           fi
-          grep -nE "isolate: (true|false)" apps/storybook/vitest.config.ts
+          grep -nE "isolate: (true|false)|log-net-log" apps/storybook/vitest.config.ts
 
       # Match main: #1504 disables IPv6 on new interfaces so Docker veths get no
       # link-local address. We reproduce the CURRENT state (post-#1504), so the
@@ -115,15 +119,28 @@ jobs:
           fails=0
           for i in $(seq 1 "${ITERS}"); do
             rm -rf node_modules/.vite apps/storybook/node_modules/.vite
+            rm -f /tmp/netlog-current.json
             echo "::group::${{ matrix.variant }} shard ${{ matrix.shard }} attempt $i"
             if ( cd apps/storybook && corepack pnpm exec vitest run --project=storybook ) \
-                 > "attempt-$i.log" 2>&1; then
+                 > "apps/storybook/attempt-$i.log" 2>&1; then
               echo "attempt $i: PASS"
             else
               fails=$((fails + 1))
               echo "attempt $i: FAIL"
               grep -iE "Failed to fetch dynamically|dynamically imported|Failed to import test file|ERR_|504|ECONN|reset" \
-                "attempt-$i.log" | head -20 || true
+                "apps/storybook/attempt-$i.log" | head -20 || true
+              # Preserve the NetLog from this failing attempt and print the
+              # net_error distribution. -21 = ERR_NETWORK_CHANGED, -101 = reset,
+              # -100 = closed, -3 = aborted, -324 = empty response.
+              if [ -f /tmp/netlog-current.json ]; then
+                cp /tmp/netlog-current.json "apps/storybook/netlog-fail-$i.json"
+                echo "--- net_error tally (attempt $i) ---"
+                grep -oE '"net_error":-[0-9]+' "apps/storybook/netlog-fail-$i.json" | sort | uniq -c || true
+                echo "--- setup-file requests in netlog (attempt $i) ---"
+                grep -oE 'setup-file-with-project-annotations[^"]*' "apps/storybook/netlog-fail-$i.json" | head -3 || true
+              else
+                echo "(no netlog captured for attempt $i)"
+              fi
             fi
             echo "::endgroup::"
           done
@@ -140,6 +157,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: repro-${{ matrix.variant }}-shard-${{ matrix.shard }}
-          path: apps/storybook/attempt-*.log
+          path: |
+            apps/storybook/attempt-*.log
+            apps/storybook/netlog-fail-*.json
           if-no-files-found: ignore
           retention-days: 5
