@@ -90,6 +90,7 @@
   "assist": {
     "enabled": false
   },
+  "plugins": ["./biome-plugins/no-swallowed-chmod.grit", "./biome-plugins/no-removed-key.grit"],
   "overrides": [
     {
       "includes": ["**/*.{test,spec}.{ts,tsx,mts,cts}", "**/__tests__/**", "**/tests/**"],

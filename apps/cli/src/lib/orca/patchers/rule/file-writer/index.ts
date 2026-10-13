@@ -1,7 +1,8 @@
-import { chmod, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { ZitadelError } from "../../../../errors";
+import { enforceMode } from "../../../../fs-safe";
 import { isObject, parseJsonObject, setTopLevelJsonKey, stableStringify } from "../../../../json";
 import type { PatchedFile } from "../../types";
 import type { FileOp, ScaffoldPlan, ScaffoldResult } from "./types";
@@ -171,7 +172,7 @@ async function editFile(
   const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
   await writeFile(tmp, next);
   if (mode !== undefined) {
-    await chmod(tmp, mode).catch(() => undefined);
+    await enforceMode(tmp, mode);
   }
   await rename(tmp, path);
   record(result, path, "file", action);
@@ -208,7 +209,7 @@ async function ensureDir(
   }
   await mkdir(path, { recursive: true, mode });
   if (mode) {
-    await chmod(path, mode).catch(() => undefined);
+    await enforceMode(path, mode);
   }
   if (!existed) {
     record(result, path, "dir", "create");
@@ -248,7 +249,7 @@ async function writeText(
   const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
   await writeFile(tmp, contents, { mode: opts.mode });
   if (opts.mode) {
-    await chmod(tmp, opts.mode).catch(() => undefined);
+    await enforceMode(tmp, opts.mode);
   }
   await rename(tmp, path);
   record(result, path, "file", action);
@@ -308,7 +309,7 @@ async function mergeEnv(
     // whatever loose mode it drifted to. Matches how `env add` and
     // `writeZitadelSecret` chmod unconditionally.
     if (mode !== undefined && raw !== undefined && !dryRun) {
-      await chmod(path, mode).catch(() => undefined);
+      await enforceMode(path, mode);
     }
     result.filesSkipped.push(path);
     return;
@@ -331,7 +332,7 @@ async function mergeEnv(
   // by the umask, so re-assert it when rewriting an existing secret-bearing
   // target too (see the no-additions path above).
   if (mode !== undefined) {
-    await chmod(path, mode).catch(() => undefined);
+    await enforceMode(path, mode);
   }
   record(result, path, "file", action);
 }
