@@ -447,7 +447,11 @@ sets them up:
   new branch starting from production's, and only production builds write
   production's, so production restores only what production built: the
   boundary its installed packages and Go's build cache already rely on.
-  A branch's builds reuse production's results and then their own.
+  A branch's builds reuse production's results and then their own: the
+  root `turbo.json` keeps Vercel's own variables (`VERCEL_TARGET_ENV`,
+  `VITE_VERCEL_*`) out of the hashes, without which a preview never shared
+  a hash with production and no preview ever restored an upload of
+  production's.
 - **GitHub Actions on pull requests** run the pull request's code, and the
   OIDC policy gives every run of this repository a token that can write
   (Vercel's docs describe no read-only policy; forks get no token).

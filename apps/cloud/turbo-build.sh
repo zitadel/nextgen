@@ -17,8 +17,11 @@
 # Vercel keeps that cache per branch, a branch's first build starting from
 # production's, and only production builds write production's: production
 # restores only what production built, the boundary the installed packages
-# and Go's build cache in the same cache already rely on. The cap keeps it
-# from growing build after build; the three apps' builds take about 6 MB.
+# and Go's build cache in the same cache already rely on. A preview and
+# production compute the same task hashes (the root turbo.json keeps
+# Vercel's own variables out of them), so a branch's builds reuse
+# production's results and then their own. The cap keeps the cache from
+# growing build after build; the three apps' builds take about 6 MB.
 #
 # The project's secrets stay hidden from the JS builds (turbo's strict env
 # mode); TURBO_PLATFORM_ENV_DISABLED stops turbo warning about each of them
@@ -40,9 +43,5 @@ case "${VERCEL_ENV:-}" in
 esac
 export TURBO_CACHE TURBO_CACHE_DIR="$root/node_modules/.cache/turbo" TURBO_CACHE_MAX_SIZE=100MB
 export TURBO_TELEMETRY_DISABLED=1 TURBO_PLATFORM_ENV_DISABLED=1
-
-# TEMPORARY diagnostics, removed before merge: variable names only.
-echo "turbo-build: VITE_* in env: $(env | sed -n 's/^\(VITE_[A-Za-z0-9_]*\)=.*/\1/p' | sort | tr '\n' ' ')"
-echo "turbo-build: TURBO_CI_VENDOR_ENV_KEY=${TURBO_CI_VENDOR_ENV_KEY:-unset} VERCEL_TARGET_ENV=${VERCEL_TARGET_ENV:-unset} cache files: $(ls "$TURBO_CACHE_DIR" 2>/dev/null | wc -l)"
 
 exec corepack pnpm exec turbo run build --filter="$package" "$@"

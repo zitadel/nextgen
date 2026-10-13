@@ -80,6 +80,13 @@ hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   cache keys in that one build than everywhere else. The package lists it in
   its `env` and its config reads it (the console's `CONSOLE_*` variables and
   `vite.config.ts`).
+- Vercel's own variables are kept out of every hash (`globalEnv` in the
+  root `turbo.json`): `VERCEL_TARGET_ENV` and `VERCEL_ANALYTICS_ID`, which
+  turbo would otherwise hash into every task, and the `VITE_VERCEL_*` ones
+  Vite inference would pick up. So a preview and production compute the
+  same hashes. `VERCEL_*` still reaches every task unhashed (turbo's
+  built-in list): a build whose output depends on one, or on any other
+  Vercel variable, lists it in its `env`.
 - A task cannot set a variable's value. Values a lane needs (moon's task
   `env:` blocks) are set in the `package.json` script as defaults that a
   caller's own value overrides, as it overrides moon's task `env`:
