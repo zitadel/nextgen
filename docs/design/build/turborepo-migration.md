@@ -403,7 +403,7 @@ Two workable setups; the prototype's draft uses the first.
 | Shared with | the cloud deployments (same team cache): a build CI did is a hit on Vercel and the reverse | CI only |
 | Cost | free on the Pro plan; 1 TB/month upload; artifacts expire after 7 days | part of the Depot plan (as moon's cache today) |
 | Forks | no token, local cache only | same |
-| Write policy | `TURBO_CACHE=local:rw,remote:r` on pull requests, `remote:rw` on the merge queue; on Vercel, `apps/cloud/turbo-build.sh` sets `remote:r` for previews and `remote:w` for production (see "Who may write to the cache") | same flags |
+| Write policy | `TURBO_CACHE=local:rw,remote:rw` on pushes to main (which run the gate alone), `local:rw,remote:r` on pull requests and the merge queue; on Vercel, `apps/cloud/turbo-build.sh` sets `remote:r` for previews and `remote:w` for production (see "Who may write to the cache") | same flags |
 
 Recommendation: Vercel's, for the one shared cache and because the cloud
 deployments use it already. Set up on 2026-10-12: the variable
@@ -436,18 +436,19 @@ sets them up:
 - **GitHub Actions on pull requests** run the pull request's code, and the
   OIDC policy gives every run of this repository a token that can write
   (Vercel's docs describe no read-only policy; forks get no token).
-  Restricting the policy to trusted refs (the merge queue's
-  `gh-readonly-queue/*` branches) would take the remote cache away from pull
-  requests without narrowing who can write: anyone who can push a branch
-  can write through that branch's Vercel preview build. So pull requests
+  Restricting the policy to main would take the remote cache away from
+  pull requests without narrowing who can write: anyone who can push a
+  branch can write through that branch's Vercel preview build. So pull requests
   read (`remote:r`, their own choice, as on previews), and the boundary is
-  the one above: nothing that ships restores from the cache. Merge-queue
-  runs read and write, so a poisoned artifact could make a merge-queue run
-  pass for code that fails; the signatures below close that.
+  the one above: nothing that ships restores from the cache. Main creates
+  the cache: a push to main runs the gate and writes, pull requests and the
+  merge queue read. A poisoned artifact could still make a pull-request or
+  merge-queue run pass for code that fails; the signatures below close that.
 - **Later, to let production read again:** turbo's artifact signatures
   (`remoteCache.signature: true` with `TURBO_REMOTE_CACHE_SIGNATURE_KEY`).
   Production and trusted CI get the real key (a Vercel Production-only env
-  var; a GitHub environment with a branch rule for the merge queue), previews
+  var; a GitHub environment with a branch rule for main and the merge
+  queue), previews
   and pull requests a different one, and restores reject artifacts signed
   with the wrong key. That separates the two populations server-side without
   a second cache, at the price of two more secrets.
@@ -468,8 +469,9 @@ Land the prototype as is, plus: moon's
 `format`/`lint` tasks switched to the script files; moon's `retryCount`
 removed (the guard retries); `check-release-graph.mjs`, `release-manifest`,
 `check-typecheck-programs` and `doctor` ported behind the runner switch. Wire
-`ci-turbo.yml` to `pull_request` and `merge_group` as a non-required check and
-set up the remote cache. Every PR then runs both. What to compare, weekly:
+`ci-turbo.yml` to `pull_request` and `merge_group` as a non-required check,
+and to pushes to main, which run the gate alone to fill the remote cache; set
+up the remote cache. Every PR then runs both. What to compare, weekly:
 pass/fail per task (the two run summaries), what `ci-mode` gated under each
 runner (its step summary line), and the job durations. Divergences are bugs
 in the turbo configuration until proven otherwise. Exit criterion: two
@@ -570,3 +572,5 @@ the release graph.
    `api-mock`.
 7. **Dual run as proposed:** two to four weeks, exit after two consecutive
    weeks without a divergence that was turbo's fault.
+8. **Main creates the cache** (2026-10-13). `ci-turbo` writes the remote
+   cache only on pushes to main; pull requests and the merge queue read it.

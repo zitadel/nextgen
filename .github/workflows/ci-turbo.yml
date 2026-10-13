@@ -10,10 +10,15 @@ name: ci-turbo
 # What differs from ci.yml, step by step, is commented inline. The intent is
 # the same: install, decide the lanes, run the gate, then the explicit lanes
 # that moon kept out of its automatic selection.
+#
+# A push to main runs the gate alone and is the one run that writes the
+# remote cache, for the pull requests that branch from it.
 
 on:
   pull_request:
   merge_group:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -44,14 +49,14 @@ jobs:
       # this line and the remote-cache step to use Depot's, which needs no
       # setup on Depot runners.
       TURBO_API: https://vercel.com
-      # Pull requests read the remote cache and do not write it; only the
-      # merge queue (the commits that become main) uploads. The flag is set by
-      # the code under test, so it keeps honest branches from filling the
-      # cache and protects nothing: the OIDC policy gives every run of this
-      # repository a token that can write, as Vercel gives every preview
-      # build one. What protects is that nothing that ships restores from the
-      # cache (the plan: "Who may write to the cache"). Forks get no token.
-      TURBO_CACHE: ${{ github.event_name == 'merge_group' && 'local:rw,remote:rw' || 'local:rw,remote:r' }}
+      # Main creates the remote cache: a push to main writes it, pull requests
+      # and the merge queue only read. The flag is set by the code under
+      # test, so it keeps honest branches from filling the cache and protects
+      # nothing: the OIDC policy gives every run of this repository a token
+      # that can write, as Vercel gives every preview build one. What
+      # protects is that nothing that ships restores from the cache (the
+      # plan: "Who may write to the cache"). Forks get no token.
+      TURBO_CACHE: ${{ github.event_name == 'push' && 'local:rw,remote:rw' || 'local:rw,remote:r' }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -113,10 +118,17 @@ jobs:
         run: node scripts/check-pr-title.mjs --title "$PR_TITLE" --base "$BASE_SHA" --summary
 
       # Same outputs and gates as ci.yml; the affected set comes from turbo's
-      # task graph (NEXTGEN_TASK_RUNNER above) instead of `moon query`.
+      # task graph (NEXTGEN_TASK_RUNNER above) instead of `moon query`. On a
+      # push to main every lane gate stays off: its pull request ran them,
+      # and main only refreshes the cache through the gate.
       - name: Detect CI mode
         id: ci-mode
-        run: node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            echo "mode=full" >> "$GITHUB_OUTPUT"
+          else
+            node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
+          fi
 
       - name: Check Go generated files
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
