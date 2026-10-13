@@ -48,19 +48,16 @@ post:
           schema:
             $ref: ../session-with-token-response.yaml
     '400':
-      description: Invalid request.
+      description: |
+        Invalid request. A handoff token that is unknown, already exchanged, or
+        expired is refused with `sess.invalid_handoff_token`; the response does
+        not say which, and in each case the caller starts a new sign-in.
       content:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
     '401':
       description: Missing or invalid project credentials.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
-    '410':
-      description: Handoff token already consumed or expired.
       content:
         application/json:
           schema:

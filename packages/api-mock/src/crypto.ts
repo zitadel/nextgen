@@ -60,12 +60,10 @@ async function buildJwt(header: object, payload: object): Promise<string> {
 }
 
 /**
- * Discriminated error for handoff-token verification failures. Lets the
- * `/sessions/exchange` handler map distinct failure modes to distinct HTTP
- * status codes per the OpenAPI contract:
- *   - `expired`   → 410 Gone (also used for replays of an already-consumed
- *                   token; both surface the same status to the client)
- *   - everything else → 401 Unauthorized
+ * Discriminated error for handoff-token verification failures. The
+ * `/sessions/exchange` handler answers every kind alike — `400` with
+ * `sess.invalid_handoff_token`, as the server does for an unknown, replayed
+ * or expired token — so `kind` only names the reason when debugging.
  */
 export type HandoffErrorKind =
   | "structure"
