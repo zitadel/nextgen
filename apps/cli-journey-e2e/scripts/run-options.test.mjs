@@ -13,6 +13,7 @@ test("local journey defaults to the full framework matrix", () => {
     matrix: "full",
     preexistingApp: false,
     preset: "",
+    remote: false,
     runtime: "binary",
     suite: "frameworks",
     tarballsDir: "",
@@ -44,6 +45,7 @@ test("local journey can select one framework and tune concurrency", () => {
       matrix: "full",
       preexistingApp: false,
       preset: "",
+      remote: false,
       runtime: "docker",
       suite: "frameworks",
       tarballsDir: "/tmp/tarballs",
@@ -62,6 +64,7 @@ test("local journey can scaffold with a sign-in preset", () => {
     matrix: "full",
     preexistingApp: false,
     preset: "passkey-first",
+    remote: false,
     runtime: "binary",
     suite: "frameworks",
     tarballsDir: "",
@@ -80,6 +83,7 @@ test("the testkit suite pins the next framework and rejects an explicit one", ()
     matrix: "full",
     preexistingApp: false,
     preset: "",
+    remote: false,
     runtime: "binary",
     suite: "testkit",
     tarballsDir: "",
@@ -102,6 +106,7 @@ test("local journey can request the binary runtime explicitly", () => {
     matrix: "full",
     preexistingApp: false,
     preset: "",
+    remote: false,
     runtime: "binary",
     suite: "frameworks",
     tarballsDir: "",
@@ -165,6 +170,30 @@ test("--ci rejects the flags that pick a single variant's shape", () => {
   assert.throws(
     () => parseLocalJourneyArgs(["--ci", "--preexisting-app"]),
     /--ci runs the full CI journey set/,
+  );
+  assert.throws(
+    () => parseLocalJourneyArgs(["--ci", "--remote"]),
+    /--ci runs the full CI journey set/,
+  );
+});
+
+test("--remote sets up a frameworks lane against the https edge", () => {
+  const parsed = parseLocalJourneyArgs([
+    "--framework",
+    "vue",
+    "--preset",
+    "passkey-first",
+    "--remote",
+  ]);
+  assert.equal(parsed.remote, true);
+  assert.deepEqual(parsed.frameworkIds, ["vue"]);
+  assert.equal(parsed.preset, "passkey-first");
+});
+
+test("--remote is rejected for the testkit suite, which boots its own instance", () => {
+  assert.throws(
+    () => parseLocalJourneyArgs(["--suite", "testkit", "--remote"]),
+    /--remote applies to the frameworks suite only/,
   );
 });
 
