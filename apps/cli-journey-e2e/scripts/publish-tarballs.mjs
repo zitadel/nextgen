@@ -1,6 +1,6 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 
 const tarballsDir = process.argv[2];
 if (!tarballsDir) {
@@ -14,13 +14,22 @@ if (tarballs.length === 0) {
   throw new Error(`no .tgz files found in ${tarballsDir}`);
 }
 
-for (const file of tarballs) {
+// Checked for every tarball before the first publish, so a private package
+// stops the run with nothing half-published.
+const packages = tarballs.map((file) => {
   const tarball = join(tarballsDir, file);
   const manifest = readManifest(tarball);
   if (manifest.private === true) {
     throw new Error(`refusing to publish private package ${manifest.name} from ${tarball}`);
   }
-  run("npm", [
+  return { tarball, manifest };
+});
+
+// Each package is two npm calls, mostly npm's own start-up time; one after
+// the other, the 20 packages took ~14 s of every journey run. They are
+// independent of each other, so a few run at once.
+await mapWithConcurrency(packages, 6, async ({ tarball, manifest }) => {
+  await run("npm", [
     "publish",
     tarball,
     "--registry",
@@ -33,7 +42,7 @@ for (const file of tarballs) {
     "--loglevel",
     "error",
   ]);
-  run("npm", [
+  await run("npm", [
     "dist-tag",
     "add",
     `${manifest.name}@${manifest.version}`,
@@ -44,7 +53,7 @@ for (const file of tarballs) {
     "error",
   ]);
   console.log(`published ${manifest.name}@${manifest.version} as alpha and latest`);
-}
+});
 
 function readManifest(tarball) {
   const result = spawnSync("tar", ["-xOf", tarball, "package/package.json"], {
@@ -60,15 +69,41 @@ function readManifest(tarball) {
   return manifest;
 }
 
-function run(command, args) {
-  const result = spawnSync(command, args, {
-    stdio: "inherit",
+// After the first failure no lane starts another item; the ones in flight
+// finish before the error is thrown, so no npm process outlives the script.
+async function mapWithConcurrency(items, limit, worker) {
+  let next = 0;
+  let failure;
+  const lanes = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length && !failure) {
+      const item = items[next];
+      next += 1;
+      try {
+        await worker(item);
+      } catch (error) {
+        failure ??= error;
+      }
+    }
   });
-  if (result.error) {
-    throw new Error(`${command} ${args.join(" ")} failed: ${result.error.message}`);
+  await Promise.all(lanes);
+  if (failure) {
+    throw failure;
   }
-  if (result.status !== 0) {
-    const detail = result.signal ?? result.status ?? "unknown status";
-    throw new Error(`${command} ${args.join(" ")} failed with ${detail}`);
-  }
+}
+
+function run(command, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { stdio: "inherit" });
+    child.on("error", (error) => {
+      reject(new Error(`${command} ${args.join(" ")} failed: ${error.message}`));
+    });
+    child.on("exit", (code, signal) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      const detail = signal ?? code ?? "unknown status";
+      reject(new Error(`${command} ${args.join(" ")} failed with ${detail}`));
+    });
+  });
 }

@@ -3,7 +3,7 @@ title: Plan and apply
 description: Edit local Zitadel configuration and sync it to the platform.
 ---
 
-`.zitadel/schemas/*.json` and `.zitadel/flows/*.json` are the source of truth for your project's user schemas and login flows. Edit them, preview with `plan`, publish with `apply`.
+`.zitadel/schemas/*.json` and `.zitadel/flows/*.json` are the source of truth for your project's user schemas and login flows; `.zitadel/branding/` and `.zitadel/idps/` sync the same way. Edit them, preview with `plan`, publish with `apply`.
 
 `plan` previews the configuration sync diff without mutating files or platform state:
 
@@ -42,7 +42,7 @@ npx @zitadel/cli@alpha apply
 
 All files in `.zitadel/flows/` sync on `apply`, but the widget runs exactly one flow per sign-in — an extra flow needs a distinct `name` so the app can ask for it.
 
-Drop `.zitadel/flows/kiosk-login.json` next to the default flow. Same shape as `default-login.json` (start from a copy), with its own `name` and whatever steps the journey needs:
+Drop `.zitadel/flows/kiosk-login.json` next to the default flow. Same shape as `default-login.json` (start from a copy), with its own `name`, an `audience`, and whatever steps the journey needs:
 
 ```json
 {
@@ -51,9 +51,12 @@ Drop `.zitadel/flows/kiosk-login.json` next to the default flow. Same shape as `
   "status": "active",
   "user_schema": "human-user",
   "purposes": { "login": "identifier" },
+  "audience": { "app_ids": ["kiosk"] },
   "steps": [ "…copied from default-login.json, then edited…" ]
 }
 ```
+
+The `audience` keeps the new flow from becoming the default. Without one, it would be the newest active flow without an audience for `login`, so every login page that doesn't name a flow would start rendering it — `plan` warns about this before you apply. Add the `audience` before the first `apply`: adding it in a later edit doesn't undo this, because the revision without one stays active. Selecting a flow by name ignores its audience.
 
 Publish with `plan` / `apply`, then point the widget at it:
 
@@ -63,20 +66,19 @@ Publish with `plan` / `apply`, then point the widget at it:
 
 (or `flow-name="kiosk-login"` on the plain `<zitadel-login>` element). An unknown name or a flow that doesn't serve the requested purpose surfaces as a startup error in the widget.
 
-Without `flowName`, the platform serves the newest active flow that has no `audience`. A flow scoped via `audience.app_ids` / `audience.team_ids` is selected only when the flow-start request's hints identify that app or team (app match beats team match) — it never captures the project default.
+Without `flowName`, the server serves the newest active revision that has no `audience` and serves the requested purpose, whatever its flow's name. Older revisions count too. A flow scoped via `audience.app_ids` / `audience.team_ids` is preferred when the flow-start request's hints identify that app or team (app match beats team match), and is used otherwise only when no unscoped flow serves the purpose. `<zitadel-login>` sends no app or team hints, so audience targeting applies to direct `POST /flow` callers.
 
 ## How syncing works
 
 - `.zitadel/state.json` maps each config file to its platform id and last-synced content hash. `plan` and `apply` compare against it to decide what changed; don't edit it by hand.
-- **Flows are validated at plan time** against the same rules the platform enforces on apply — transition wiring, step reachability, schema field references, and cross-purpose invariants (e.g. a login entry step must wire `user_not_found` when `register` is also a purpose). Violations fail `plan` and `apply` before anything is uploaded, with the same error text the server would return. Non-blocking product guidance shows up as `# warning:` lines in the plan. (If the pre-flight ever disagrees with your server version, set `ZITADEL_SKIP_FLOW_VALIDATION` to skip it and let the server decide.)
+- **Flows are validated at plan time** against the same rules the platform enforces on apply — transition wiring, step reachability, schema field references, and cross-purpose invariants (e.g. a login entry step must wire `user_not_found` when `register` is also a purpose). Violations fail `plan` and `apply` before anything is uploaded, with the same error text the server would return. Non-blocking product guidance shows up as `# warning:` lines in the plan. (If the pre-flight ever disagrees with your server version, set `ZITADEL_SKIP_FLOW_VALIDATION=1` to skip it and let the server decide.)
 - **SSO configuration is checked across files at plan time.** `plan` and `apply` read your user schemas, login flows and connection files together and stop, before anything is changed, when they disagree about what the plan touches: a step that offers a provider its schema does not list (or when SSO is off), a schema that lists a provider with no connection file, a step that offers providers without routing every outcome (a `user_already_exists` route that carries an action does not count), a claim mapping that fills nothing the schema defines, a `verified_claims` key with no `claim_mapping` row, or a mapping or `verified_claims` key that names a property no schema has (a top-level property name, not a dotted path). The files a plan does not touch are not judged again; two connection files may not share a slug or a project variable, and that is checked across all of them. One error names every problem with the file, the step and the name at fault. Setting `ZITADEL_SKIP_FLOW_VALIDATION` turns this check off along with flow validation.
 - **Connection files are also checked against the platform, and that check is never skipped.** `ZITADEL_SKIP_FLOW_VALIDATION` does not turn these off. When a `client_id` or `client_secret` names a project variable, it must exist (`E_CREDENTIAL_MISSING` when it does not), the id must be a plain variable and the secret a secret one, and one variable may not serve both (`E_VALIDATION`). The `slug`, `protocol`, `oidc.issuer`, the OAuth2 `token_endpoint` and `userinfo_endpoint`, and `subject_claim` (an absent OIDC one reads as `sub`) of a connection that was applied cannot be edited (`E_VALIDATION`). If the platform cannot be read, the plan stops instead of skipping them.
 - **A removed connection file is not deleted.** Deleting a connection is not supported yet, so `plan` and `apply` report the file as kept: separately from the changes, with its own count (`unsupported_deletions` in `--json`, plus the files in `unsupported_deletion_files` on `apply`) and never as "no changes". Renaming a connection file is a move: the file takes over the connection, and nothing is left to restore.
-- Schemas are **revisioned**: an edit publishes a new immutable revision instead of mutating the old one, so existing users keep validating against the revision they were created with.
-- Flows are **mutable**: an edit updates the flow in place.
-- Flows name their schema by its `objectType` in `user_schema` and run against its newest revision, so a schema edit needs no change to the flow files.
+- Schemas and flows are **revisioned**: an edit publishes a new immutable revision instead of mutating the old one. Existing users keep validating against the schema revision they were created with. Older flow revisions stay active; a login that names a flow runs its newest active revision.
+- Flows name their schema by its `objectType` in `user_schema` and run against its newest revision, so a schema edit needs no change to `user_schema`. If the edit removes or renames a property a step collects, update that step's `fields`: `plan` only checks the flows it uploads.
 - Flow files carry `"$schema": "../meta/flow-definition.json"` — a pointer at the flow dialect spec setup copies into `.zitadel/meta/`, so editors validate and autocomplete flow edits offline. It is local-only: the platform ignores it, and syncing never treats it as a change.
-- Your local files stay as written — the CLI never rewrites them except to reconcile with a real server-side change. The platform stores your schema bytes verbatim; it does not spell meta-schema defaults out for you, so a revision holds exactly what you uploaded. Comparison is semantic rather than byte-for-byte: `x-editable: true`, `x-sensitive: false` and `x-mfa: false` are the declared defaults, so spelling one out or deleting it again changes no behavior and `plan` reports no change. That holds at any depth, including on a leaf of a nested object property.
+- Your local files stay as written — the CLI never rewrites them except to reconcile with a real server-side change. The platform re-encodes the schema you upload and writes `"x-audit": false` into every property that leaves it out, so a revision is not byte-for-byte what you sent. Comparison is semantic rather than byte-for-byte: `x-audit: false` is the declared default, so spelling it out or deleting it again changes no behavior and `plan` reports no change. That holds at any depth, including on a leaf of a nested object property.
 
 For agents:
 
@@ -85,4 +87,4 @@ npx @zitadel/cli@alpha plan --non-interactive --json
 npx @zitadel/cli@alpha apply --non-interactive --json
 ```
 
-Keep source-controlled configuration in `zitadel.json` and `.zitadel/**`. Keep `.zitadel/local/**` out of source control.
+Keep source-controlled configuration in `zitadel.json` and `.zitadel/**`. Keep `.env.local` and `.zitadel/secret` (both hold the project secret) and `.zitadel/local/**` (runtime data) out of source control. Setup adds `.zitadel/secret` and `.env*` (all but `.env.example`) to `.gitignore`; `start` adds `.zitadel/local/`.
