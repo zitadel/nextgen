@@ -188,6 +188,20 @@ tasks:
 
   # ── journey lane (former @zitadel/cli-journey-e2e) ───────────────────────────
 
+  # Run the journey by hand with any runner flags, e.g.
+  # `moon run e2e:journey -- --framework next` (see journey/README.md). Not part
+  # of `test`: the CI task below fixes the flags to the full `--ci` set.
+  journey:
+    command: "corepack pnpm run e2e-local"
+    env:
+      ZITADEL_TELEMETRY: "0"
+    deps:
+      - "cli:build"
+      - "testing:build"
+    options:
+      cache: false
+      runInCI: false
+
   # The CLI customer setup journey. `--ci` runs the fixed variant set in one
   # process (fresh-app framework matrix, passkey preset, pre-existing app,
   # testkit); `--runtime binary` drives the built server binary. In CI the

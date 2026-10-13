@@ -409,17 +409,17 @@ moon run e2e:demo-nuxt-mock
 The journey test creates one fresh app directory per selected framework outside
 the repo, runs the full CLI setup flow against local workspace packages, starts
 each generated app, and runs Playwright to verify the result. By default it runs
-the full framework matrix; use `moon run workspace:journey -- --framework next`
+the full framework matrix; use `moon run e2e:journey -- --framework next`
 for a single Next.js run:
 
 ```sh
-moon run workspace:journey
+moon run e2e:journey
 ```
 
 To exercise the Docker fallback path, provide a local backend image tag:
 
 ```sh
-moon run workspace:journey -- --runtime docker --image nextgen:local
+moon run e2e:journey -- --runtime docker --image nextgen:local
 ```
 
 Use `--keep` to preserve the temporary work directory after success. On failure

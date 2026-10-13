@@ -128,5 +128,5 @@ async function phaseRelease() {
 }
 
 async function phaseJourney() {
-  await run(process.execPath, ["scripts/run-journey.mjs"]);
+  await run("moon", ["run", "e2e:journey"]);
 }

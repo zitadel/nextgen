@@ -33,7 +33,7 @@ omit it (some CDP wrappers) should click `zitadel-action-submit` instead. For si
 `.signout-btn`; Playwright-style locators may use `zitadel-logout .signout-btn`.
 The canonical component hook list lives in `packages/components/README.md`.
 
-The checked-in automated regression path is `moon run workspace:journey`, which
+The checked-in automated regression path is `moon run e2e:journey`, which
 exercises fresh-app setup plus registration, logout, and login across the
 supported frameworks.
 

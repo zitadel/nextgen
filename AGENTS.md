@@ -115,7 +115,7 @@ Repo tooling:
 | Try the local Zitadel CLI          | `moon run workspace:cli -- --help`       |
 | Preview the docs site              | `moon run docs:dev`                      |
 | Run the server from source         | `moon run workspace:server -- --help`    |
-| Test the fresh-app onboarding path | `moon run workspace:journey`             |
+| Test the fresh-app onboarding path | `moon run e2e:journey`             |
 | Run normal local checks            | `moon ci :lint :typecheck :build :test`  |
 | Mirror CI locally                  | `moon run workspace:check -- --full`     |
 | Rerun one failed task              | `moon run <project>:<task>`              |
@@ -199,7 +199,7 @@ moon run e2e:demo-nuxt-mock
 The local reproduction command for the fresh-app consumer journey gate is:
 
 ```sh
-moon run workspace:journey
+moon run e2e:journey
 ```
 
 It proves the fresh-app path end to end and does not require Docker by

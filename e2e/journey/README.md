@@ -13,7 +13,7 @@ Qwik (`scripts/frameworks.mjs` is the authoritative list).
 ## Local runner
 
 ```sh
-moon run workspace:journey
+moon run e2e:journey
 ```
 
 The default mode runs the full framework matrix in parallel. It uses the
@@ -36,13 +36,13 @@ The default mode runs the full framework matrix in parallel. It uses the
 ### Options
 
 ```sh
-moon run workspace:journey -- --keep
-moon run workspace:journey -- --work-dir /tmp/zitadel-journey
-moon run workspace:journey -- --runtime docker --image nextgen:local
-moon run workspace:journey -- --framework next
-moon run workspace:journey -- --preexisting-app
-moon run workspace:journey -- --concurrency 2
-moon run workspace:journey -- --tarballs-dir dist/release/<version>/npm
+moon run e2e:journey -- --keep
+moon run e2e:journey -- --work-dir /tmp/zitadel-journey
+moon run e2e:journey -- --runtime docker --image nextgen:local
+moon run e2e:journey -- --framework next
+moon run e2e:journey -- --preexisting-app
+moon run e2e:journey -- --concurrency 2
+moon run e2e:journey -- --tarballs-dir dist/release/<version>/npm
 ```
 
 - `--framework <id>` runs one framework (`next`, `nuxt`, `react`, `vue`,
@@ -82,7 +82,7 @@ runtime. It does not use public Zitadel packages or GHCR images; it publishes
 the current workflow's package tarballs to Verdaccio and runs the same `npx`
 local setup flow against the generated app. The Docker fallback journey remains
 an opt-in local/manual check via
-`moon run workspace:journey -- --runtime docker --image <docker-tag>`. Private
+`moon run e2e:journey -- --runtime docker --image <docker-tag>`. Private
 support packages such as design tokens are bundled into the public packages
 that need them and must not be uploaded or published.
 
