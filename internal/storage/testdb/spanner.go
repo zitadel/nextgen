@@ -25,6 +25,13 @@ const (
 	testDatabase = "test-database"
 )
 
+// emulatorImage is the Cloud Spanner emulator the tests run against: the
+// zitadel fork's build, which runs read-write transactions on different rows
+// concurrently and no longer rebuilds the whole function catalog for every
+// query, so the Spanner suites run several times faster than on Google's image.
+// It is pinned to a commit so it cannot change under CI.
+const emulatorImage = "ghcr.io/zitadel/cloud-spanner-emulator:sha-64c19f595a68469694b6027165b62e1fed0f7c7f"
+
 // SpannerDSN returns a Spanner database DSN for integration tests. Precedence:
 // if ZITADEL_TEST_SPANNER_INSTANCE is set it provisions a fresh, uniquely named
 // database on that shared instance (the returned stop drops it); else if
@@ -33,12 +40,14 @@ const (
 // sets SPANNER_EMULATOR_HOST, and returns the database DSN plus a stop func
 // that clears the env var and terminates the container.
 //
-// The emulator is deliberately the only bring-up CI uses: it serialises on one
-// transaction at a time, which is what forces the aborts that keep the
-// abort-retry path honest (#788). Running these tests against a real instance
-// would hide a missing retry rather than fix it. The instance branch below is
-// therefore live code that nothing sets, kept as a fast way back if the
-// emulator turns out not to hold; see [instanceEnv]. Removal: #793.
+// The emulator is deliberately the only bring-up CI uses: transactions that
+// touch the same rows still abort, which is what keeps the abort-retry path
+// honest (#788). Running these tests against a real instance would hide a
+// missing retry rather than fix it. The instance branch below is therefore live
+// code that nothing sets, kept as a fast way back if the emulator turns out not
+// to hold; see [instanceEnv]. Removal: #793.
+//
+// The image is [emulatorImage], overridable with ZITADEL_TEST_SPANNER_IMAGE.
 func SpannerDSN(ctx context.Context) (string, func(), error) {
 	if strings.TrimSpace(os.Getenv(instanceEnv)) != "" {
 		return provision(ctx)
@@ -47,8 +56,12 @@ func SpannerDSN(ctx context.Context) (string, func(), error) {
 		return url, func() {}, nil
 	}
 
+	image := emulatorImage
+	if v := os.Getenv("ZITADEL_TEST_SPANNER_IMAGE"); v != "" {
+		image = v
+	}
 	req := testcontainers.ContainerRequest{
-		Image: "gcr.io/cloud-spanner-emulator/emulator:latest",
+		Image: image,
 		// Pin the platform: the arm64 emulator build returns commit timestamps at a
 		// different resolution than the amd64 one, which makes seven created_at
 		// assertions in stmttest and the spanner dialect fail on Apple Silicon while
