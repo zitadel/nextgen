@@ -187,6 +187,8 @@ as they were.
 | docs | `generate` (inputs openapi + redocly) | `#generate` | same inputs and outputs |
 | docs | `build` (`next build`, mergeArgs replace) | `#build` | existing script (`pnpm run generate && next build`): bundles once more than moon; the Vercel docs service runs the script without a runner |
 | docs | `dev`, `start` | same | existing |
+| docs | `e2e` (dep build), `e2e-deployment` (inline `DOCS_BASE_URL` check) | same | **new** scripts; the deployment lane's check is in the script |
+| console | `build` env inputs `$VITE_CONSOLE_VERCEL_INSIGHTS`, `$CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE` | `#build` `env` | both listed: strict mode would otherwise hide the unprefixed one from vite.config.ts |
 | login-ui | `build`, `build-release` (outputs staticui) | same | **new** `build-release`: `vite build` |
 | login-ui | `dev`, `preview` | same | existing |
 | mock-zitadel | `build`, `typecheck`, `test` | same | same edge (api-mock) |
@@ -353,6 +355,10 @@ token.
   `generate` / `test` → `turbo run sync:export --filter=@zitadel/design-tokens`
   etc. Its filtered install (`--filter @zitadel/design-tokens...`) keeps the
   root devDependencies, so `node_modules/.bin/turbo` is present.
+- **deployment-checks.yml** (and the production variant): `env -u CI -u
+  GITHUB_ACTIONS moon run docs:e2e-deployment` → `turbo run e2e-deployment
+  --filter=@zitadel/docs`; the step summary's "Reproduce" line changes with
+  it.
 - **Vercel:** the repo-root `vercel.json` and `apps/cloud/build.sh` already
   build with turbo (pilot). `apps/console/vercel.json` belongs to the paused
   legacy `nextgen` project and still says `moon run console:build`; it is

@@ -25,7 +25,8 @@ hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   `cd` to the directory the command needs.
 - Task names are script names: `dev:real`, `test:integration` and
   `sync:export` keep their colons; the e2e lanes are `e2e`, `e2e-real`,
-  `e2e-embedded`, `e2e-platform`, `e2e-local`, `e2e-testkit`.
+  `e2e-embedded`, `e2e-platform`, `e2e-local`, `e2e-testkit` and the docs'
+  `e2e-deployment`.
 
 ## Dependencies
 
