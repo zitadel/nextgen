@@ -13,8 +13,9 @@
 The hosted cloud is the current `main`, built by Vercel from the repository
 and run in Frankfurt (`fra1`) against PlanetScale Postgres in the same AWS
 region. **`main` is production:** every merge deploys. Every other branch
-gets a preview deployment with a database of its own. Version tags and their
-npm packages remain the self-hosted artifact; this cloud does not run them.
+gets a preview deployment with a database of its own, except the Changesets
+version PR's (see [Deploying](#deploying)). Version tags and their npm
+packages remain the self-hosted artifact; this cloud does not run them.
 
 ## Layout
 
@@ -186,6 +187,13 @@ or garbled fails the build and the serving deployment stays.
   branches included. There is no skip step: Vercel does not run a
   service's `ignoreCommand`, and most branches touch something the
   deployment builds from anyway.
+- **The Changesets version PR gets no preview.** `git.deploymentEnabled`
+  in `vercel.json` turns off deployments of `changeset-release/*`, so
+  Vercel starts none. `release-publish.yml` force-pushes that branch after
+  most merges to `main`, and it only bumps versions and changelogs: a
+  preview would differ from production in the server's version string
+  alone. Once merged, the release builds as production and runs
+  production's [deployment checks](#deployment-checks).
 - **Migrations must be expand/contract.** The previous deployment serves on
   the new schema until the new one is live, and Instant Rollback promotes
   an older deployment without touching the schema.
@@ -221,13 +229,25 @@ What starts it, and where the result lands, depends on the environment:
 
   Regenerating the secret in the project settings invalidates it: set it
   again.
+- **Nothing uploaded may hold a secret:** the repository is public, so
+  anyone signed in to GitHub can download a run's artifacts. Against a
+  deployment a suite records no traces and writes no HTML report, and the
+  workflow uploads its screenshots alone: a trace holds every request's
+  headers, the bypass secret among them, and so does the error of a request
+  that failed, which `error-context.md` and the HTML report keep. A
+  screenshot holds what the page shows, so a test whose page shows a secret
+  turns screenshots off. The errors reach the log and the annotations, where
+  GitHub masks the repository's secrets; it masks a secret the suite mints at
+  runtime, such as a session token, only once the job registers it
+  (`::add-mask::`). A suite added later, the server's too, follows the same
+  rule.
 - **Reading a red check**, in this order: the check's name says the service
   and the environment (production's status links its run); its annotations
   name the failing contract (the test's title) and list every URL that
   failed; the run's summary names the deployment and the command that
-  reproduces the run; the `docs-deployment-report` artifact holds the
-  Playwright report and the traces. A flaky production run is run again
-  from that run's page: it reports on the same commit again.
+  reproduces the run; a failed browser test's screenshots are the
+  `docs-deployment-screenshots` artifact. A flaky production run is run
+  again from that run's page: it reports on the same commit again.
 - By hand, against any deployment:
   `DOCS_BASE_URL=https://cloud-….vercel.app VERCEL_AUTOMATION_BYPASS_SECRET=… moon run docs:e2e-deployment`,
   or `gh workflow run deployment-checks.yml --ref <branch> -f url=https://cloud-….vercel.app`
