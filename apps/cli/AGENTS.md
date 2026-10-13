@@ -24,6 +24,18 @@ Scope pointers first — this file's own body covers **telemetry only**:
   `reportWarning` shows it in the terminal at once and adds it to the JSON
   envelope's `warnings`, and `emit` prints a result's `warnings` after its
   `pretty` text. A unit test fails on any other `consola.warn` call.
+- Managed env files (`.env.<name>.local`, which may carry a credential) are
+  written **only** through `writeManagedEnvFile` / `appendManagedEnvValue` in
+  `src/lib/fs-safe.ts`. Never call `node:fs` `writeFile`/`chmod` on one
+  directly. The utility is the single owner of three decisions that must not
+  drift between write sites: the `0600` mode; the chmod-failure policy (re-assert
+  the mode, but downgrade a failure to `reportWarning` and proceed — the value is
+  already on disk, so a throw would be one confusing failure followed by a next
+  run that reads it back and silently succeeds); and the line-break guard (a
+  `\n`/`\r` in a value is refused as a typed `E_VALIDATION`, because one `.env`
+  line per key means a newline would split or inject keys the next read
+  misparses). This is why there is no second hand-rolled env writer — `env add`
+  and the interactive `persistEnvValue` both go through it.
 - The flag surface deliberately tracks the [WebCLI spec](https://webcli.com/) so
   an agent can drive the CLI from conventions it already knows. That is the
   rationale; the canonical flag list, output-channel rules and the two
