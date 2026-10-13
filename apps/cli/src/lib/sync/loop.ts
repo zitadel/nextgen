@@ -118,6 +118,10 @@ export async function buildSyncPlan(
           consola.debug(`fetch ${syncer.kind} ${entry.id} failed:`, err);
         }
       }
+      if (syncer.deletion === "unsupported") {
+        actions.push({ kind: "skip", path: filePath, reason: "unsupported-deletion", syncer });
+        continue;
+      }
       actions.push({ kind: "delete", path: filePath, syncer, id: entry.id, oldContent });
     }
 
@@ -215,6 +219,17 @@ export async function buildSyncPlan(
         oldContent,
         ...(repin ? { repin } : {}),
       });
+    }
+  }
+
+  // What only the platform can answer, for every connection this plan writes.
+  for (const action of actions) {
+    if ((action.kind === "create" || action.kind === "update") && action.syncer.preflight) {
+      const old =
+        action.kind === "update"
+          ? (action.oldContent ?? (await fetchOldIfAsked(action.syncer, action.id, true)))
+          : null;
+      await action.syncer.preflight(action.path, action.content, old);
     }
   }
 
@@ -420,6 +435,12 @@ export async function runSyncLoop(
         break;
       }
       case "skip": {
+        if (action.reason === "unsupported-deletion") {
+          reportWarning(
+            `${action.path} was removed but deleting ${action.syncer.kind} resources is not supported yet ` +
+              `(#1013); nothing was deleted on the platform. Restore the file to clear this.`,
+          );
+        }
         consola.debug(`Skipped ${action.path} (${action.reason})`);
         break;
       }

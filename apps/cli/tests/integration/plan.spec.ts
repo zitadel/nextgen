@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type ScaffoldedApp, type UserSchemaDocument } from "../helpers/project";
+import {
+  aSetUpApp,
+  type ConnectionDocument,
+  type ScaffoldedApp,
+  type UserSchemaDocument,
+} from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -149,6 +154,90 @@ describe("plan", () => {
         }
         return sso;
       }
+
+      describe("connection files", () => {
+        const CONNECTION = ".zitadel/idps/google.json";
+
+        async function anAppServingGoogle(): Promise<ScaffoldedApp> {
+          const app = await anAppWithGoogle();
+          expect(await app.apply()).toSucceed();
+          return app;
+        }
+
+        it("stops on two files that claim the same slug", async () => {
+          const app = await anAppWithGoogle();
+          await app.writeProjectFile(
+            ".zitadel/idps/copy.json",
+            await app.readProjectFile(CONNECTION),
+          );
+
+          const result = await app.planAttempt();
+
+          expect(result).toFailWith("E_VALIDATION");
+          expect(result).toPrint("copy.json");
+        });
+
+        it.each([
+          [
+            "slug",
+            (c: ConnectionDocument) => {
+              c.slug = "google2";
+            },
+          ],
+          [
+            "oidc.issuer",
+            (c: ConnectionDocument) => {
+              c.oidc.issuer = "https://other.test";
+            },
+          ],
+          [
+            "subject_claim",
+            (c: ConnectionDocument) => {
+              c.subject_claim = "email";
+            },
+          ],
+        ])("refuses an edit of %s on a connection already applied", async (field, edit) => {
+          const app = await anAppServingGoogle();
+          await app.editConnection("google", edit);
+
+          const result = await app.planAttempt();
+
+          expect(result).toFailWith("E_VALIDATION");
+          expect(result).toPrint(field);
+          expect(result).toPrint(CONNECTION);
+        });
+
+        it("plans an edit of a field that does not identify the connection", async () => {
+          const app = await anAppServingGoogle();
+          await app.editConnection("google", (connection) => {
+            connection.display_name = "Google Workspace";
+          });
+
+          expect((await app.plan()).updates).toBe(1);
+        });
+
+        it("stops on a client_secret variable the project does not hold", async () => {
+          const app = await anAppWithGoogle();
+          expect(await app.deleteVariable("GOOGLE_CLIENT_SECRET")).toSucceed();
+
+          const result = await app.planAttempt();
+
+          expect(result).toFailWith("E_CREDENTIAL_MISSING");
+          expect(result).toPrint("GOOGLE_CLIENT_SECRET");
+          expect(result).toPrint(CONNECTION);
+        });
+
+        it("reports a removed connection file and plans no deletion", async () => {
+          const app = await anAppServingGoogle();
+          await app.deleteProjectFile(CONNECTION);
+
+          const result = await app.planRendered();
+
+          expect(result).toSucceed();
+          expect(result).toPrint("not supported yet");
+          expect((await app.plan()).deletes).toBe(0);
+        });
+      });
 
       it("accepts what sso enable writes", async () => {
         const app = await anAppWithGoogle();

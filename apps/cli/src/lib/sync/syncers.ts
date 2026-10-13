@@ -10,7 +10,7 @@ import { consola } from "consola";
 
 import type { ZitadelClient } from "@zitadel/api/client";
 import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
-import { isVariableReference } from "@zitadel/config/idp";
+import { isVariableReference, referencedVariable } from "@zitadel/config/idp";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 import {
   brandingConfigSchema,
@@ -107,6 +107,19 @@ function assertEnvRefs(data: object, env: EnvLookup): void {
   }
 }
 
+type ConnectionBody = {
+  slug?: string;
+  subject_claim?: string;
+  oidc?: { issuer?: string; client_secret?: string };
+};
+
+/** The fields that make a connection the one its linked users came through. */
+const IDENTITY_FIELDS = [
+  { name: "slug", read: (body: ConnectionBody) => body.slug },
+  { name: "oidc.issuer", read: (body: ConnectionBody) => body.oidc?.issuer },
+  { name: "subject_claim", read: (body: ConnectionBody) => body.subject_claim },
+] as const;
+
 /**
  * Syncs `.zitadel/idps/*.json`, one identity provider connection per file.
  *
@@ -116,8 +129,8 @@ function assertEnvRefs(data: object, env: EnvLookup): void {
  * be re-pinned.
  *
  * Deletion is not supported yet (#1013): what should happen to users already
- * linked to a connection is undesigned, so a removed file is reported and no
- * deletion is sent.
+ * linked to a connection is undesigned, so a removed file is reported by plan
+ * and apply and no deletion is sent.
  *
  * `fetch` reads the stored connection so an update plans with a field-level
  * diff, as every other resource does. It refuses a body whose `client_secret`
@@ -131,9 +144,11 @@ class IdpConnectionSyncer implements ResourceSyncer {
   readonly directory = IDPS_DIR;
   readonly mutable = true;
   readonly revisioned = false;
+  readonly deletion = "unsupported";
 
   private readonly client: ZitadelClient;
   private readonly projectId: string;
+  private variables: Promise<ReadonlySet<string> | undefined> | undefined;
 
   constructor(client: ZitadelClient, projectId: string) {
     this.client = client;
@@ -231,14 +246,72 @@ class IdpConnectionSyncer implements ResourceSyncer {
     return definition;
   }
 
+  /** Never reached: `deletion` is unsupported, so the loop reports a removed file and sends nothing. */
   async delete(_id: string): Promise<void> {
     throw new ZitadelError(
       "E_NOT_IMPLEMENTED",
       "Deleting an identity provider connection is not supported yet",
-      {
-        hint: "Restore the file, or remove the connection on the platform once deletion is designed (#1013).",
-      },
+      { hint: "Restore the file (#1013)." },
     );
+  }
+
+  /**
+   * What the files alone cannot say. An edit may not change what the
+   * connection is: its `slug`, `issuer` or `subject_claim` would re-key the
+   * users already linked to it, so it is refused naming the field. And a
+   * `client_secret` naming a variable the project does not hold would
+   * publish a connection that cannot sign anyone in.
+   */
+  async preflight(path: string, data: object, old: object | null): Promise<void> {
+    const next = data as ConnectionBody;
+    if (old !== null) {
+      const stored = old as ConnectionBody;
+      const changed = IDENTITY_FIELDS.filter(
+        ({ read }) => read(stored) !== undefined && read(stored) !== read(next),
+      );
+      if (changed.length > 0) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `${path}: ${changed.map(({ name }) => name).join(", ")} of the connection ${JSON.stringify(stored.slug)} cannot be edited`,
+          {
+            hint:
+              "These fields identify the connection and the users linked through it. " +
+              "Restore the stored value, or add a new connection file with its own slug.",
+            details: {
+              fields: changed.map(({ name, read }) => ({
+                name,
+                stored: read(stored),
+                local: read(next),
+              })),
+            },
+          },
+        );
+      }
+    }
+
+    const name = referencedVariable(next.oidc?.client_secret ?? "");
+    if (name === undefined) {
+      return;
+    }
+    this.variables ??= this.client
+      .getVariables({ project_id: this.projectId })
+      .then((held) => new Set(Object.keys(held)))
+      .catch((err: unknown) => {
+        // The write that follows reports an unreachable platform properly.
+        consola.debug("reading project variables failed:", err);
+        return undefined;
+      });
+    const held = await this.variables;
+    if (held !== undefined && !held.has(name)) {
+      throw new ZitadelError(
+        "E_CREDENTIAL_MISSING",
+        `${path}: client_secret names the variable ${name}, which the project does not have`,
+        {
+          hint: `Publish it with \`variables set ${name} --secret\`, then re-run.`,
+          details: { variable: name, file: path },
+        },
+      );
+    }
   }
 }
 

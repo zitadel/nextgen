@@ -174,6 +174,24 @@ describe("renderPlan — no changes", () => {
   it("prints no-changes message for empty action list", () => {
     expect(renderPlan([], false)).toContain("No changes.");
   });
+
+  it("still names a removed file whose resource cannot be deleted yet", () => {
+    const idp = makeSyncer("idp", ".zitadel/idps", { mutable: true });
+    const out = renderPlan(
+      [
+        {
+          kind: "skip",
+          path: ".zitadel/idps/google.json",
+          reason: "unsupported-deletion",
+          syncer: idp,
+        },
+      ],
+      false,
+    );
+    expect(out).toContain(".zitadel/idps/google.json was removed");
+    expect(out).toContain("will not delete it");
+    expect(out).not.toContain("to destroy");
+  });
 });
 
 describe("renderPlan — create block", () => {

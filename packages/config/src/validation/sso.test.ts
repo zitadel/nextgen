@@ -172,6 +172,19 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
     ],
   },
   {
+    name: "two connection files claim the same slug",
+    edit: (p) => {
+      p.connections["copy.json"] = structuredClone(connectionOf(p));
+    },
+    expect: [
+      {
+        rule: "sso/duplicate-slug",
+        file: "copy.json",
+        says: ["google", GOOGLE, "one connection"],
+      },
+    ],
+  },
+  {
     name: "a step offers a provider and routes only sso_authenticated",
     edit: (p) => {
       stepOf(p, "identifier").transitions = { sso_authenticated: { target: "done" } };
@@ -459,12 +472,13 @@ describe("how the rules read the project", () => {
       };
     });
 
-    // a.json is judged, on the step that offers it and as a file; b.json never is.
+    // a.json is judged, on the step that offers it and as a file; b.json is
+    // only named as the duplicate.
     expect(issues.map(({ rule, file }) => ({ rule, file }))).toEqual([
+      { rule: "sso/duplicate-slug", file: "b.json" },
       { rule: "sso/empty-claim-mapping", file: LOGIN },
       { rule: "sso/orphaned-mapping-target", file: "a.json" },
     ]);
-    expect(issues.some((issue) => issue.file === "b.json")).toBe(false);
   });
 
   it("does not also report the missing listing when sso is off, which one error already says", () => {

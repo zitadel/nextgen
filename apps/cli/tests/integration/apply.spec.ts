@@ -105,6 +105,39 @@ describe("apply", () => {
       });
     });
 
+    describe("a connection file removed after it was applied", () => {
+      it("says deletion is not supported and leaves the connection registered", async () => {
+        const app = await aSetUpApp();
+        expect(
+          await app.enableSso("google", { clientId: "1234-abc", secret: "the-client-secret" }),
+        ).toSucceed();
+        expect(await app.apply()).toSucceed();
+        await app.deleteProjectFile(".zitadel/idps/google.json");
+
+        const result = await app.apply();
+
+        expect(result).toSucceed();
+        expect(result).toPrint("not supported yet");
+        expect((await app.registeredIdps()).map((idp) => idp.slug)).toEqual(["google"]);
+      });
+    });
+
+    describe("a connection whose client_secret variable is missing", () => {
+      it("stops before sending anything", async () => {
+        const app = await aSetUpApp();
+        expect(
+          await app.enableSso("google", { clientId: "1234-abc", secret: "the-client-secret" }),
+        ).toSucceed();
+        expect(await app.deleteVariable("GOOGLE_CLIENT_SECRET")).toSucceed();
+
+        const result = await app.apply();
+
+        expect(result).toFailWith("E_CREDENTIAL_MISSING");
+        expect(result).toPrint("GOOGLE_CLIENT_SECRET");
+        expect(await app.registeredIdps()).toEqual([]);
+      });
+    });
+
     describe("--json", () => {
       it("reports a project that already matches as synced", async () => {
         const app = await aSetUpApp();

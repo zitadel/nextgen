@@ -145,6 +145,9 @@ Common error codes point at their own fix in `next_commands`:
 
 - `E_VALIDATION`: the body or flags are wrong; `message` names what, and
   `details` often lists the missing or available values.
+- `E_CREDENTIAL_MISSING`: a connection's `client_secret` names a project variable
+  that does not exist; `details.variable` is the name. Publish it with
+  `variables set NAME --secret`, then retry.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime, then retry with
   `--server local`.
 - `E_NOT_FOUND`: an HTTP 404 — a missing resource, or a `--server` that is not a

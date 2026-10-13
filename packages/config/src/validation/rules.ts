@@ -45,6 +45,7 @@ export const VALIDATION_RULES = {
   "sso/flow-enables-sso": { scope: "project", goRef: null },
   "sso/provider-id": { scope: "project", goRef: null },
   "sso/connection-resolves": { scope: "project", goRef: null },
+  "sso/duplicate-slug": { scope: "project", goRef: null },
   "sso/outcome-routing": { scope: "project", goRef: null },
   "sso/collection-conflict-routing": { scope: "project", goRef: null },
   "sso/empty-claim-mapping": { scope: "project", goRef: null },

@@ -103,6 +103,9 @@ export interface UserSchemaDocument {
 /** A connection file as committed, which the developer owns and edits. */
 export interface ConnectionDocument {
   slug: string;
+  display_name?: string;
+  subject_claim?: string;
+  oidc: { issuer: string };
   claim_mapping?: Record<string, string>;
   verified_claims?: Record<string, string>;
 }

@@ -14,8 +14,8 @@
  * the connection-to-schema rules need the whole tree, which only the CLI has.
  *
  * Warning-grade rules (missing mapping targets in some schemas, typo guards,
- * provisioning pairings) are #1083. State-dependent rules (slug changes,
- * identity-critical revisions, missing variables, literal secrets) are #1043.
+ * provisioning pairings) are #1083. The rules that need the platform (identity
+ * edits, missing variables) live in the connection syncer, which can read it.
  */
 
 import type { ProjectRuleId } from "./rules.js";
@@ -115,13 +115,23 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
     groups.set(key, group);
   };
 
-  // A slug names one connection. Duplicates are the syncer's concern (#1043);
-  // the first file in path order stands for the slug here.
+  // A slug names one connection, so two files claiming it cannot both be
+  // synced. The first file in path order stands for the slug in the rules below.
   const connectionBySlug = new Map<string, { path: string; body: Json }>();
   for (const [path, body] of [...tree.connections].sort(([a], [b]) => a.localeCompare(b))) {
     const slug = (body as Json).slug;
-    if (typeof slug === "string" && !connectionBySlug.has(slug)) {
+    if (typeof slug !== "string") {
+      continue;
+    }
+    const first = connectionBySlug.get(slug);
+    if (first === undefined) {
       connectionBySlug.set(slug, { path, body: body as Json });
+    } else {
+      add({
+        rule: "sso/duplicate-slug",
+        file: path,
+        message: `connection slug ${q(slug)} is also used by ${first.path}. A slug names one connection: change the slug here, or delete one of the two files.`,
+      });
     }
   }
 

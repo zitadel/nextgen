@@ -928,6 +928,81 @@ describe("IdpConnectionSyncer", () => {
     expect(await idp.update("idp_1", renamed)).toMatchObject({ id: "idp_2" });
   });
 
+  describe("preflight", () => {
+    const file = ".zitadel/idps/google.json";
+    const idpSyncer = (): ReturnType<typeof makeSyncers>[1] =>
+      makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" })[1];
+    const withVariables = (names: string[]) =>
+      server.use(
+        http.get(`${BASE}/variables`, () =>
+          HttpResponse.json(Object.fromEntries(names.map((name) => [name, { secret: true }]))),
+        ),
+      );
+
+    it("reports a client_secret variable the project does not hold, naming it and the file", async () => {
+      withVariables(["OTHER"]);
+
+      const error = await idpSyncer()
+        .preflight?.(file, connection, null)
+        .catch((err: unknown) => err);
+
+      expect(error).toMatchObject({ code: "E_CREDENTIAL_MISSING" });
+      expect((error as ZitadelError).message).toContain("GOOGLE_CLIENT_SECRET");
+      expect((error as ZitadelError).message).toContain(file);
+    });
+
+    it("accepts a client_secret variable the project holds", async () => {
+      withVariables(["GOOGLE_CLIENT_SECRET"]);
+
+      await expect(idpSyncer().preflight?.(file, connection, connection)).resolves.toBeUndefined();
+    });
+
+    it("leaves a platform it cannot read to the write that follows", async () => {
+      server.use(http.get(`${BASE}/variables`, () => HttpResponse.error()));
+
+      await expect(idpSyncer().preflight?.(file, connection, null)).resolves.toBeUndefined();
+    });
+
+    it.each([
+      ["slug", { ...connection, slug: "google2" }],
+      [
+        "oidc.issuer",
+        { ...connection, oidc: { ...connection.oidc, issuer: "https://other.test" } },
+      ],
+      ["subject_claim", { ...connection, subject_claim: "email" }],
+    ])("refuses an edit of %s before anything is sent", async (field, edited) => {
+      const stored = { ...connection, subject_claim: "sub" };
+      const next = field === "subject_claim" ? edited : { ...edited, subject_claim: "sub" };
+
+      const error = await idpSyncer()
+        .preflight?.(file, next, stored)
+        .catch((err: unknown) => err);
+
+      expect(error).toMatchObject({ code: "E_VALIDATION" });
+      expect((error as ZitadelError).message).toContain(field);
+      expect((error as ZitadelError).message).toContain(file);
+    });
+
+    it("allows an edit of a field that does not identify the connection", async () => {
+      withVariables(["GOOGLE_CLIENT_SECRET"]);
+
+      await expect(
+        idpSyncer().preflight?.(file, { ...connection, display_name: "Workspace" }, connection),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  it("declares deletion unsupported, so a removed file is reported and not sent", () => {
+    const [, idp] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
+
+    expect(idp.deletion).toBe("unsupported");
+  });
+
   it("refuses to delete, because what happens to linked users is undesigned", async () => {
     const [, idp] = makeSyncers({
       client,
