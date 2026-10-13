@@ -143,10 +143,11 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
         run: env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container
 
-      # The journey runner parallelizes the four CI variants (fresh-app matrix,
-      # passkey preset, pre-existing app, testkit) internally through its own
-      # concurrency pool, so a single process shares one port pool and one work
-      # dir instead of four orchestrated CI steps racing for ports.
+      # The journey runner parallelizes the five CI variants (fresh-app matrix,
+      # passkey preset, pre-existing app, testkit, remote https) internally
+      # through its own concurrency pool, so a single process shares one port
+      # pool and one work dir instead of five orchestrated CI steps racing for
+      # ports.
       # journey_matrix=single collapses the fresh-app framework matrix to Next
       # when no SDK, CLI, or journey surface moved — the flow widget is
       # framework-independent, so a server-only change proves as much on one
