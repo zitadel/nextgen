@@ -22,6 +22,7 @@ export default defineConfig(({ command, mode, isPreview }) => ({
   // 404 and the SPA never mounts. The dev server (plain "serve") stays at "/".
   base: command === "build" || isPreview ? consoleBase : "/",
   define: {
+    "import.meta.env.CONSOLE_VERCEL_INSIGHTS": JSON.stringify(vercelInsights(mode)),
     "import.meta.env.CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE": JSON.stringify(
       speedInsightsSampleRate(mode),
     ),
@@ -150,6 +151,14 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
       },
     },
   };
+}
+
+// `1` in the hosted cloud's build (src/vite-env.d.ts). Not VITE_-prefixed:
+// turbo hashes every VITE_* variable into every Vite package built in the
+// same run, so the console's dependencies would get other cache keys in the
+// cloud's console build than in all their other builds.
+function vercelInsights(mode: string): string {
+  return loadEnv(mode, import.meta.dirname, "").CONSOLE_VERCEL_INSIGHTS ?? "";
 }
 
 // The hosted cloud's Speed Insights sample rate (src/vite-env.d.ts). Named like
