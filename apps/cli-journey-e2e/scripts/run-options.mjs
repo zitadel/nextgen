@@ -6,6 +6,31 @@ import { frameworkForId, frameworkIds } from "./frameworks.mjs";
 // in apps/cli/src/lib/orca/patchers/posture.ts.
 const PREEXISTING_FRAMEWORK_IDS = ["next", "nuxt"];
 
+// The options CI sets, as environment variables beside the arguments. CI's
+// turbo job cannot pass them after `--`: turbo puts those arguments into the
+// cache key of every task in the run (vercel/turborepo#14770), so the
+// runner's dependencies would be rebuilt instead of restored.
+const ENV_VALUE_OPTIONS = [
+  ["JOURNEY_MATRIX", "--matrix"],
+  ["JOURNEY_RUNTIME", "--runtime"],
+  ["JOURNEY_TARBALLS_DIR", "--tarballs-dir"],
+  ["JOURNEY_WORK_DIR", "--work-dir"],
+];
+
+/**
+ * The arguments the JOURNEY_* variables stand for (`JOURNEY_CI=1` is
+ * `--ci`). They go in front of the command line's own arguments, which win.
+ */
+export function journeyArgsFromEnv(env) {
+  const args = env.JOURNEY_CI === "1" ? ["--ci"] : [];
+  for (const [name, flag] of ENV_VALUE_OPTIONS) {
+    if (env[name]) {
+      args.push(flag, env[name]);
+    }
+  }
+  return args;
+}
+
 export function parseLocalJourneyArgs(args) {
   const parsed = {
     ci: false,
