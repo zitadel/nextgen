@@ -687,20 +687,25 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
   if (envelope.status === "error") {
     expect(envelope.code, `${where}: error envelope carries no code`).toBeTypeOf("string");
   }
-  assertDataShape(where, args, envelope);
+  assertDataShape(where, envelope);
 }
 
 /**
  * The `data`-shape half of the contract, enforced on every command so an agent
- * reads every command's output the same way. Classed off the command verb so it
- * never false-positives on a non-list payload that happens to carry an array
- * (e.g. `variable resolve`'s `origins`): a `list` command must use the canonical
- * `{ items, count, next_page_token }` envelope (`listData`), and no command may
- * confirm a delete with `removed` instead of `deleted` (`deletedData`). A
- * divergent shape fails in that command's own spec, not a central list someone
- * forgot to update.
+ * reads every command's output the same way.
+ *
+ * Classed off the resolved command id (`envelope.command`), not the raw argv, so
+ * a positional argument that happens to be the word `list` (e.g. `variable get
+ * list`) is never misread as a list command. A `list` command (and `resources`,
+ * the one collection not named `… list`) must use the canonical
+ * `{ items, count, next_page_token }` envelope (`listData`); any command that
+ * emits `items` must carry `count` and `next_page_token`; a delete command must
+ * confirm with `deleted: true` (`deletedData`), and no command anywhere may use
+ * `removed`. A dry run has its own preview shape, so it is exempt. A divergent
+ * shape fails in that command's own spec, not a central list someone forgot to
+ * update.
  */
-function assertDataShape(where: string, args: string[], envelope: Envelope): void {
+function assertDataShape(where: string, envelope: Envelope): void {
   if (envelope.status !== "ok") {
     return;
   }
@@ -708,13 +713,18 @@ function assertDataShape(where: string, args: string[], envelope: Envelope): voi
   if (!data || typeof data !== "object") {
     return;
   }
-  const words = args.filter((arg) => !arg.startsWith("-"));
-  const verb = words[words.length - 1];
+  // A dry run previews what a write would do; it carries `dry_run: true` and
+  // not the real result shape, so the shape contract does not apply to it.
+  if (data.dry_run === true) {
+    return;
+  }
+  const command = envelope.command ?? "";
+  const verb = command.split(/[:\s]/).filter(Boolean).pop() ?? "";
 
-  if (verb === "list") {
+  if (verb === "list" || command === "resources") {
     expect(
       Array.isArray(data.items),
-      `${where}: a \`list\` command must emit its rows under \`items\` (use listData())`,
+      `${where}: a list command must emit its rows under \`items\` (use listData())`,
     ).toBe(true);
   }
   if (Array.isArray(data.items)) {
@@ -723,6 +733,12 @@ function assertDataShape(where: string, args: string[], envelope: Envelope): voi
     expect(
       token === null || typeof token === "string",
       `${where}: a list envelope needs \`next_page_token\` (string or null), got ${JSON.stringify(token)}`,
+    ).toBe(true);
+  }
+  if (verb === "rm" || verb === "delete" || verb === "remove") {
+    expect(
+      data.deleted === true,
+      `${where}: a \`${verb}\` command must confirm with \`deleted: true\` (use deletedData())`,
     ).toBe(true);
   }
   expect(
