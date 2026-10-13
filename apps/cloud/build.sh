@@ -17,8 +17,10 @@ cd "$(dirname "$0")/../.."
 
 # The other services' installs normally ran already; the Go preset does not
 # run this service's installCommand, so install when nothing is there.
-[ -x node_modules/.bin/moon ] || sh apps/cloud/install.sh
-corepack pnpm exec moon run login-ui:build
+[ -x node_modules/.bin/turbo ] || sh apps/cloud/install.sh
+# The login UI through turbo, with the remote-cache policy every service
+# shares (turbo-build.sh: previews restore, production only uploads).
+sh apps/cloud/turbo-build.sh @zitadel/login-ui
 
 version="$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' apps/server/package.json | head -1)"
 commit="${VERCEL_GIT_COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  // The k6 benchmark harness (ADR 067): a nested Go module whose tasks run in
+  // this directory. The root module is a dependency through the replace
+  // directive, and the root packages bench imports compile in the JSON
+  // meta-schemas and the config defaults through //go:embed.
+  "tasks": {
+    // Tracked Go files only, as the server project checks them.
+    "format": {
+      "inputs": ["**/*.go"]
+    },
+    // Compiles the root module's generated Go (api/generated, the enumer and
+    // mock files) through the replace directive, which the server's
+    // generation rewrites mid-graph; the edge keeps vet behind it, as the
+    // server's own vet is. build and test are ordered through vet.
+    "vet": {
+      "dependsOn": ["@zitadel/server#check-generate"],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/**/*.go",
+        "$TURBO_ROOT$/go.mod",
+        "$TURBO_ROOT$/go.sum",
+        "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json",
+        "$TURBO_ROOT$/packages/config/defaults/**"
+      ]
+    },
+    // The JavaScript k6 scenarios go through Biome like the server launcher.
+    "lint": {
+      "inputs": ["scripts/**/*.js", "$TURBO_ROOT$/biome.json"]
+    },
+    "build": {
+      "dependsOn": ["vet"],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/**/*.go",
+        "$TURBO_ROOT$/go.mod",
+        "$TURBO_ROOT$/go.sum",
+        "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json",
+        "$TURBO_ROOT$/packages/config/defaults/**"
+      ],
+      "outputs": ["dist/k6"]
+    },
+    "test": {
+      "dependsOn": ["format", "vet"],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/**/*.go",
+        "$TURBO_ROOT$/go.mod",
+        "$TURBO_ROOT$/go.sum",
+        "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json",
+        "$TURBO_ROOT$/packages/config/defaults/**"
+      ]
+    },
+    // Measure a server that is already running (locally `pnpm run server`):
+    //   turbo run sweep --filter=@zitadel/bench -- --vus 5 --duration 10s
+    "sweep": {
+      "cache": false,
+      "dependsOn": ["build"]
+    },
+    "summarize": {
+      "cache": false,
+      "dependsOn": ["build"]
+    }
+  }
+}
