@@ -75,15 +75,18 @@ hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   (`NEXTGEN_*` for the e2e lanes, `DOCKER_*` for the database lanes). The Go
   cache locations pass through globally.
 - A task cannot set a variable's value. Values a lane needs (moon's task
-  `env:` blocks) are set in the `package.json` script, for example
-  `NEXTGEN_SERVER_CONSOLE_ENABLED=false playwright test …`.
+  `env:` blocks) are set in the `package.json` script as defaults that a
+  caller's own value overrides, as it overrides moon's task `env`:
+  `NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false} playwright test …`.
 
 ## Mutex and retry
 
 Turbo has neither. `scripts/task-guard.mjs` wraps a command:
 `node ../../scripts/task-guard.mjs --mutex browser-tests --retries 3 -- vitest run`.
 The lock is a directory in the OS temp dir keyed by the repository root, so
-checkouts do not block each other and a dead holder is reclaimed. Names in
+checkouts do not block each other and a dead holder is reclaimed. The guard
+acts only when turbo runs the task (turbo sets `TURBO_HASH` for every task);
+under moon and when run by hand it runs the command once, unchanged. Names in
 use: `browser-tests` (one real-Chromium Vite server at a time, #1490) and
 `generated-sources` (the generation tasks and the tasks that read what they
 rewrite).

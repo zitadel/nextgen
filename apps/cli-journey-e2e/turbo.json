@@ -7,7 +7,7 @@
       "dependsOn": ["@zitadel/testing#build"]
     },
     // The harness drives the real CLI binary and imports the kit's
-    // virtual-passkey helper. The scripts set ZITADEL_TELEMETRY=0.
+    // virtual-passkey helper. The scripts default ZITADEL_TELEMETRY to 0.
     "e2e": {
       "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build"]
     },

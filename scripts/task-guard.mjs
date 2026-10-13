@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 /**
- * Runs a command under a named lock and/or with retries.
+ * Runs a command under a named lock and/or with retries, when Turborepo runs
+ * it.
  *
  *   node scripts/task-guard.mjs [--mutex <name>] [--retries <n>] -- <command> [args...]
  *
  * These are the two task options moon provides natively (`mutex`,
- * `retryCount`) and Turborepo does not; turbo's tasks get them from here.
- * Moon keeps its own: its browser-test tasks run each package's `test:all`
- * script, which calls Vitest without this guard. The generation scripts
- * (`generate`, `sync-schemas`) run under both runners, so under moon they
- * take this lock inside moon's own mutex, where it is uncontended and costs
- * nothing.
+ * `retryCount`) and Turborepo does not. The guard acts only when turbo started
+ * the task (turbo sets TURBO_HASH for every task it runs). Anywhere else, it
+ * runs the command once and passes on its exit status or signal, as the
+ * script did before the guard existed: under moon, which applies its own
+ * `mutex` and `retryCount`, and when a person runs the script directly.
  *
  * The lock is a directory under the OS temp dir, keyed by the repository
  * root, so two checkouts never block each other. The holder's pid is written
@@ -20,13 +20,11 @@
  */
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { constants, tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
-
-import { isDirectRun } from "./dev-process.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const POLL_MS = 250;
@@ -155,11 +153,25 @@ function runOnce(command) {
   });
 }
 
+/**
+ * Runs the command and resolves to `{ code }`, or to `{ signal }` when the
+ * command was killed and the guard is not acting (so the caller can die of the
+ * same signal). The lock and the retries apply only under turbo.
+ */
 export async function guard(
   options,
-  { log = (line) => console.error(`[task-guard] ${line}`) } = {},
+  {
+    env = process.env,
+    lockBase = tmpdir(),
+    log = (line) => console.error(`[task-guard] ${line}`),
+  } = {},
 ) {
-  const release = options.mutex ? await acquire(lockDir(options.mutex), { log }) : () => {};
+  if (!env.TURBO_HASH) {
+    return runOnce(options.command);
+  }
+  const release = options.mutex
+    ? await acquire(lockDir(options.mutex, repoRoot, lockBase), { log })
+    : () => {};
   const cleanup = () => release();
   process.on("exit", cleanup);
   try {
@@ -168,10 +180,10 @@ export async function guard(
       const result = await runOnce(options.command);
       if (result.signal) {
         log(`${options.command[0]} was killed by ${result.signal}`);
-        return 1;
+        return { code: 1 };
       }
       if (result.code === 0 || attempt === attempts) {
-        return result.code;
+        return { code: result.code };
       }
       log(`attempt ${attempt}/${attempts} failed (exit ${result.code}); retrying`);
     }
@@ -181,7 +193,19 @@ export async function guard(
   }
 }
 
-if (isDirectRun(import.meta.url)) {
+// Compares real paths: Node resolves the entry module's symlinks, so a plain
+// path comparison (dev-process.mjs's isDirectRun) is false when the script is
+// reached through a symlink, and the guard would exit 0 without running the
+// command.
+function invokedDirectly() {
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (invokedDirectly()) {
   let options;
   try {
     options = parseArgs(process.argv.slice(2));
@@ -190,10 +214,19 @@ if (isDirectRun(import.meta.url)) {
     process.exit(2);
   }
   guard(options).then(
-    (code) => process.exit(code),
+    (result) => {
+      if (result.signal) {
+        process.kill(process.pid, result.signal);
+        // Should the signal not end the process (an ignored one), exit as a
+        // shell reports a command killed by it.
+        process.exit(128 + (constants.signals[result.signal] ?? 0));
+      }
+      process.exit(result.code);
+    },
     (error) => {
       console.error(`task-guard: ${error.message}`);
-      process.exit(1);
+      // A command that is not there exits 127, as it would from the shell.
+      process.exit(error.code === "ENOENT" ? 127 : 1);
     },
   );
 }

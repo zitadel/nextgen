@@ -35,7 +35,7 @@ workflow, not the task graph.
 | Task graph | root `turbo.json`, 26 package `turbo.json` files (`"extends": ["//"]`) | Every moon task, with the same dependency edges. The root file holds the shared task shapes (moon's `.moon/tasks/*.yml`); each package file adds only what differs, which turbo merges field by field. |
 | Scripts as the task contract | 30 `package.json` files | Every task runs a `package.json` script: `lint` scripts for the 26 TypeScript packages, the Go server's 13 tasks as scripts in `apps/server/package.json`, 16 `build-release` scripts, the e2e lanes with the environment moon used to set. |
 | Tool packages | `tools/bench/package.json`, `tools/release/package.json`, `pnpm-workspace.yaml` (`tools/*`) | Moon's `bench` and `release` projects become private workspace packages (`@zitadel/bench`, `@zitadel/release`) so turbo can address their tasks. |
-| Mutex and retry | `scripts/task-guard.mjs` | `--mutex <name>` (a lock directory in the OS temp dir, keyed by repository root, stale holders reclaimed) and `--retries <n>`. Used by the four browser-mode test scripts and the six generated-sources tasks. |
+| Mutex and retry | `scripts/task-guard.mjs` | `--mutex <name>` (a lock directory in the OS temp dir, keyed by repository root, stale holders reclaimed) and `--retries <n>`. Used by the four browser-mode test scripts and the six generated-sources tasks. It acts only when turbo runs the task (`TURBO_HASH` is set); under moon, which has its own `mutex` and `retryCount`, and when a person runs the script, it runs the command once, unchanged. |
 | Inline scripts | `scripts/go-format-check.mjs`, `scripts/go-lint.mjs` | Turbo's versions of the `format` and `lint` inline scripts of the two Go projects; moon keeps its inline scripts until the cutover. |
 | Runner selection | `scripts/task-runner.mjs` (+ `.d.mts`) | `NEXTGEN_TASK_RUNNER=moon\|turbo` picks the runner the contributor scripts build through; maps `project:task` to turbo tasks and back. |
 | Ported scripts | `ci-mode.mjs`, `check.mjs`, `run-server.mjs`, `run-server-debug.mjs`, `run-cli.mjs`, `apps/console/scripts/dev-real.mts`, `apps/cli-journey-e2e/scripts/local-registry.mjs`, new `report-turbo-failures.mjs` | Work under either runner; tests added for the turbo paths. |
@@ -173,7 +173,7 @@ as they were.
 | cli | `test` (inputs + `/apps/server/bin/**`, mutex public-dist) | `#test` | inputs `$TURBO_ROOT$/apps/server/bin/**`; the mutex becomes the release chain's first edge |
 | cli | `build-release` (runDepsInParallel false, dep test) | `#build-release` | **new** script; `dependsOn: ["test", "@zitadel/sdk-next#build-release"]` |
 | cli | `readme` | `#readme` | existing; `outputs: ["README.md"]` |
-| cli-journey-e2e | `e2e`, `e2e-local`, `e2e-testkit` (env ZITADEL_TELEMETRY=0) | same | scripts set `ZITADEL_TELEMETRY=0`; **new** `e2e-testkit` |
+| cli-journey-e2e | `e2e`, `e2e-local`, `e2e-testkit` (env ZITADEL_TELEMETRY=0) | same | scripts default `ZITADEL_TELEMETRY` to `0`; **new** `e2e-testkit` |
 | console | `build` (outputs staticui, env input) | `#build` | `env: ["VITE_CONSOLE_VERCEL_INSIGHTS"]`, outputs `$TURBO_ROOT$/internal/staticui/console/dist/**` |
 | console | `build-release` | `#build-release` | **new** `vite build`; waits for the release chain |
 | console | `dev`, `preview` (persistent) | `#dev`, `#preview` | existing |
@@ -214,8 +214,11 @@ as they were.
 | `sdk-nuxt-dist` (sdk-nuxt `build`, `build-release`; demo-nuxt `build`) | demo-nuxt bundling from sdk-nuxt/dist | the existing `demo-nuxt#build → sdk-nuxt#build` edge orders the dev builds; the release build never shares a turbo invocation with demo-nuxt. If that ever changes, the guard covers it. |
 
 The lock lives in the OS temp dir under a hash of the repository root, so two
-checkouts never block each other, and the holder's pid is recorded so a crashed
-run cannot leave a lock behind.
+checkouts never block each other, and the holder's pid is recorded so the lock
+of a run that died is reclaimed (should the pid have been reused, the next run
+waits for it, at most 30 minutes). The guard acts only when turbo runs the
+task: turbo sets `TURBO_HASH` for every task. Under moon, which has its own
+`mutex`, it runs the command once, unchanged.
 
 ### `retryCount: 3` (4 uses)
 
@@ -277,7 +280,9 @@ slice of it.
 ### Task `env:` values (7 tasks)
 
 Turbo tasks cannot set environment values, only name variables to hash or
-pass through. The values moved into the scripts (`NEXTGEN_SERVER_CONSOLE_ENABLED=false
+pass through. The values moved into the scripts as defaults that a caller's own
+value overrides, as it overrides moon's task `env`
+(`NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false}
 playwright test …`), which is POSIX shell syntax; the better home is the
 Playwright configs and the kit's options, where the comments explaining each
 switch already live (cutover task). `$workspaceRoot` had no replacement and

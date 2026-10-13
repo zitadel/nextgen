@@ -6,7 +6,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "biome check .",
     "e2e": "playwright test",
-    "e2e-real": "NEXTGEN_SERVER_LOGIN_ENABLED=false NEXTGEN_SERVER_CONSOLE_ENABLED=false NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false playwright test --config playwright.real.config.mts"
+    "e2e-real": "NEXTGEN_SERVER_LOGIN_ENABLED=${NEXTGEN_SERVER_LOGIN_ENABLED-false} NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false} NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=${NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT-false} playwright test --config playwright.real.config.mts"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

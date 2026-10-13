@@ -41,7 +41,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "test:all": "pnpm run test",
-    "test:integration": "ZITADEL_SERVER_BINARY=$PWD/../../dist/server/nextgen NEXTGEN_SERVER_LOGIN_ENABLED=false NEXTGEN_SERVER_CONSOLE_ENABLED=false vitest run --config vitest.integration.config.ts",
+    "test:integration": "ZITADEL_SERVER_BINARY=${ZITADEL_SERVER_BINARY-$PWD/../../dist/server/nextgen} NEXTGEN_SERVER_LOGIN_ENABLED=${NEXTGEN_SERVER_LOGIN_ENABLED-false} NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false} vitest run --config vitest.integration.config.ts",
     "lint": "biome check .",
     "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build"
   },

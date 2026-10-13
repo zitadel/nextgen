@@ -103,8 +103,9 @@
     },
     // The e2e lanes boot real servers and browsers: never cached, and they
     // see the harness, server and Docker variables a developer or CI sets.
-    // The values moon's task `env` blocks used to set live in the package.json
-    // scripts now (e.g. NEXTGEN_SERVER_CONSOLE_ENABLED=false).
+    // The values moon's task `env` blocks set live in the package.json scripts
+    // too, as defaults the caller's own value overrides (e.g.
+    // NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false}).
     "e2e": {
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]

@@ -26,6 +26,14 @@ Where the two differ on purpose:
   `scripts/go-lint.mjs`). A change to one goes into the other.
 - Turbo's `bench` `vet` waits for the server's `check-generate`; moon's
   `bench:vet` does not.
+- `scripts/task-guard.mjs` also sits in two scripts moon runs (api `generate`,
+  config `sync-schemas`), but it acts only when turbo runs the task; under
+  moon it runs the command once, unchanged.
+- Some scripts set values a moon task's `env` sets too, because turbo cannot
+  (testing `test:integration`, the cli-journey-e2e lanes, the console and
+  demo-next real-instance lanes). They set them as defaults
+  (`${VAR-default}`), so a caller's own value still wins, as it does over
+  moon's `env`.
 
 ## Shared tasks live in `.moon/tasks`
 
