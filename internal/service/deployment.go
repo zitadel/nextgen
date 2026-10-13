@@ -108,7 +108,7 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 // deployment to its targets.
 func (s *DeploymentService) conflict(ctx context.Context, entity *domain.Deployment) error {
 	stmts := s.v2Pool.Statements()
-	read, err := stmts.NewestTargets(ctx, entity.ProjectID, entity.Origins())
+	read, err := stmts.GetNewestTargets(ctx, entity.ProjectID, entity.Origins())
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("failed to read the targets")
 	}
@@ -133,7 +133,7 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 			}
 			return err
 		}
-		read, err := stmts.NewestTargets(ctx, entity.ProjectID, entity.Origins())
+		read, err := stmts.GetNewestTargets(ctx, entity.ProjectID, entity.Origins())
 		if err != nil {
 			return err
 		}
@@ -153,7 +153,7 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 
 		// A copy per attempt: each one mints its own id and stamp.
 		written := *entity
-		if err := stmts.InsertDeployment(ctx, &written, read); err != nil {
+		if err := stmts.CreateDeployment(ctx, &written, read); err != nil {
 			// The release was read above, so the only reference left to
 			// trip is the project.
 			if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {

@@ -47,9 +47,9 @@ func tryDeploy(t *testing.T, stmts service.AllStatements, projectID, releaseID s
 	t.Helper()
 	entity, err := domain.NewDeployment(projectID, releaseID, args.kind, origins, args.metadata)
 	require.NoError(t, err)
-	serving, err := stmts.NewestTargets(t.Context(), projectID, entity.Origins())
+	serving, err := stmts.GetNewestTargets(t.Context(), projectID, entity.Origins())
 	require.NoError(t, err)
-	if err := stmts.InsertDeployment(t.Context(), entity, serving); err != nil {
+	if err := stmts.CreateDeployment(t.Context(), entity, serving); err != nil {
 		return entity, err
 	}
 	if args.kind == domain.DeploymentTargetKindPreview {
@@ -104,7 +104,7 @@ func TestDeploymentStatements_FanOutIsOneOperation(t *testing.T) {
 		assert.Equal(t, "user_1", *got.Metadata.DeployedBy)
 		assert.Equal(t, domain.EventActorTypeHuman, *got.Metadata.DeployedByType)
 
-		serving, err := d.stmts.NewestTargets(t.Context(), projectID, []string{appOrigin, wwwOrigin})
+		serving, err := d.stmts.GetNewestTargets(t.Context(), projectID, []string{appOrigin, wwwOrigin})
 		require.NoError(t, err)
 		require.Len(t, serving, 2)
 		for _, s := range serving {
@@ -123,19 +123,17 @@ func TestDeploymentStatements_FreshProject(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureReleaseProject(t, d.stmts)
 
-		serving, err := d.stmts.NewestTargets(t.Context(), projectID, []string{appOrigin})
+		serving, err := d.stmts.GetNewestTargets(t.Context(), projectID, []string{appOrigin})
 		require.NoError(t, err)
 		assert.Empty(t, serving)
-		_, err = d.stmts.NewestDeployment(t.Context(), projectID, appOrigin)
-		assert.ErrorIs(t, err, new(database.NoRowFoundError))
-		_, err = d.stmts.DeploymentAt(t.Context(), projectID, appOrigin, time.Now())
+		_, err = d.stmts.GetDeploymentAt(t.Context(), projectID, appOrigin, time.Now())
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 		assert.Empty(t, live(t, d.stmts, projectID, time.Now(), deployment.LiveFilter{}))
 		assert.Empty(t, history(t, d.stmts, projectID, appOrigin))
 	})
 }
 
-// NewestTargets answers per origin, for the named origins of the project only.
+// GetNewestTargets answers per origin, for the named origins of the project only.
 func TestDeploymentStatements_NewestTargets(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureReleaseProject(t, d.stmts)
@@ -149,7 +147,7 @@ func TestDeploymentStatements_NewestTargets(t *testing.T) {
 		deploy(t, d.stmts, projectID, relB.ID, []string{gitOrigin}, previewDeploy(time.Hour))
 		deploy(t, d.stmts, otherProject, otherRel.ID, []string{wwwOrigin}, deployArgs{})
 
-		serving, err := d.stmts.NewestTargets(t.Context(), projectID, []string{appOrigin, wwwOrigin, gitOrigin, shaOrigin})
+		serving, err := d.stmts.GetNewestTargets(t.Context(), projectID, []string{appOrigin, wwwOrigin, gitOrigin, shaOrigin})
 		require.NoError(t, err)
 		byOrigin := map[string]domain.TargetDeployment{}
 		for _, s := range serving {
@@ -191,7 +189,7 @@ func TestDeploymentStatements_RollbackAppends(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, first.DeployedAt.Equal(unchanged.DeployedAt))
 
-		newest, err := d.stmts.NewestDeployment(t.Context(), projectID, appOrigin)
+		newest, err := d.stmts.GetDeploymentAt(t.Context(), projectID, appOrigin, time.Now().Add(time.Hour))
 		require.NoError(t, err)
 		assert.Equal(t, rollback.ID, newest.ID)
 		assert.Equal(t, []string{rollback.ID, second.ID, first.ID}, deploymentIDs(history(t, d.stmts, projectID, appOrigin)))
@@ -208,18 +206,18 @@ func TestDeploymentStatements_DeploymentAt(t *testing.T) {
 		second := deploy(t, d.stmts, projectID, relB.ID, []string{appOrigin}, deployArgs{})
 		require.True(t, second.DeployedAt.After(first.DeployedAt))
 
-		_, err := d.stmts.DeploymentAt(t.Context(), projectID, appOrigin, first.DeployedAt.Add(-time.Microsecond))
+		_, err := d.stmts.GetDeploymentAt(t.Context(), projectID, appOrigin, first.DeployedAt.Add(-time.Microsecond))
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
-		at, err := d.stmts.DeploymentAt(t.Context(), projectID, appOrigin, first.DeployedAt)
+		at, err := d.stmts.GetDeploymentAt(t.Context(), projectID, appOrigin, first.DeployedAt)
 		require.NoError(t, err)
 		assert.Equal(t, first.ID, at.ID)
 
-		at, err = d.stmts.DeploymentAt(t.Context(), projectID, appOrigin, second.DeployedAt.Add(-time.Microsecond))
+		at, err = d.stmts.GetDeploymentAt(t.Context(), projectID, appOrigin, second.DeployedAt.Add(-time.Microsecond))
 		require.NoError(t, err)
 		assert.Equal(t, first.ID, at.ID)
 
-		at, err = d.stmts.DeploymentAt(t.Context(), projectID, appOrigin, time.Now().Add(time.Hour))
+		at, err = d.stmts.GetDeploymentAt(t.Context(), projectID, appOrigin, time.Now().Add(time.Hour))
 		require.NoError(t, err)
 		assert.Equal(t, second.ID, at.ID)
 	})
@@ -233,7 +231,7 @@ func TestDeploymentStatements_OptimisticLockAdmitsOneDeploy(t *testing.T) {
 		projectID := ensureReleaseProject(t, d.stmts)
 		base := createRelease(t, d.stmts, projectID, "base", domain.ReleaseMetadata{})
 		deploy(t, d.stmts, projectID, base.ID, []string{appOrigin}, deployArgs{})
-		read, err := d.stmts.NewestTargets(t.Context(), projectID, []string{appOrigin})
+		read, err := d.stmts.GetNewestTargets(t.Context(), projectID, []string{appOrigin})
 		require.NoError(t, err)
 
 		const racers = 4
@@ -249,7 +247,7 @@ func TestDeploymentStatements_OptimisticLockAdmitsOneDeploy(t *testing.T) {
 				// a loser must not leave its www row behind.
 				entity, err := domain.NewDeployment(projectID, releases[i].ID, domain.DeploymentTargetKindPrimary, []string{appOrigin, wwwOrigin}, domain.DeploymentMetadata{})
 				if err == nil {
-					err = d.stmts.InsertDeployment(context.Background(), entity, read)
+					err = d.stmts.CreateDeployment(context.Background(), entity, read)
 				}
 				errs[i] = err
 			})
@@ -303,7 +301,7 @@ func TestDeploymentStatements_LiveView(t *testing.T) {
 	})
 }
 
-// LiveDeployment checks the origin and its liveness on the same target row:
+// GetLiveDeployment checks the origin and its liveness on the same target row:
 // a deployment superseded on app but still live on www is what www serves,
 // not what app serves.
 func TestDeploymentStatements_LiveDeploymentOfOneOrigin(t *testing.T) {
@@ -317,28 +315,28 @@ func TestDeploymentStatements_LiveDeploymentOfOneOrigin(t *testing.T) {
 		previews := deploy(t, d.stmts, projectID, relA.ID, []string{gitOrigin, shaOrigin}, previewDeploy(time.Hour))
 		now := time.Now()
 
-		got, err := d.stmts.LiveDeployment(t.Context(), projectID, appOrigin, now)
+		got, err := d.stmts.GetLiveDeployment(t.Context(), projectID, appOrigin, now)
 		require.NoError(t, err)
 		assert.Equal(t, appOnly.ID, got.ID)
 
-		got, err = d.stmts.LiveDeployment(t.Context(), projectID, wwwOrigin, now)
+		got, err = d.stmts.GetLiveDeployment(t.Context(), projectID, wwwOrigin, now)
 		require.NoError(t, err)
 		assert.Equal(t, both.ID, got.ID)
 		assert.Equal(t, []string{wwwOrigin}, got.Origins(), "narrowed to the targets it still serves")
 
-		got, err = d.stmts.LiveDeployment(t.Context(), projectID, gitOrigin, now)
+		got, err = d.stmts.GetLiveDeployment(t.Context(), projectID, gitOrigin, now)
 		require.NoError(t, err)
 		assert.Equal(t, previews.ID, got.ID)
 
 		// An expired preview serves nothing, even while its sibling lives.
 		require.NoError(t, d.stmts.UpsertPreviews(t.Context(), projectID, []string{gitOrigin}, now.Add(-time.Minute), previews.DeployedAt))
-		_, err = d.stmts.LiveDeployment(t.Context(), projectID, gitOrigin, now)
+		_, err = d.stmts.GetLiveDeployment(t.Context(), projectID, gitOrigin, now)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
-		got, err = d.stmts.LiveDeployment(t.Context(), projectID, shaOrigin, now)
+		got, err = d.stmts.GetLiveDeployment(t.Context(), projectID, shaOrigin, now)
 		require.NoError(t, err)
 		assert.Equal(t, []string{shaOrigin}, got.Origins())
 
-		_, err = d.stmts.LiveDeployment(t.Context(), projectID, "https://nothing.acme.com", now)
+		_, err = d.stmts.GetLiveDeployment(t.Context(), projectID, "https://nothing.acme.com", now)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }
@@ -377,7 +375,7 @@ func TestDeploymentStatements_ListIsProjectScopedNewestFirst(t *testing.T) {
 		assert.Equal(t, []string{second.ID, first.ID}, deploymentIDs(result.Items))
 		assert.Equal(t, []string{wwwOrigin}, result.Items[0].Origins())
 
-		_, err = d.stmts.NewestDeployment(t.Context(), otherProject, wwwOrigin)
+		_, err = d.stmts.GetDeploymentAt(t.Context(), otherProject, wwwOrigin, time.Now())
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }

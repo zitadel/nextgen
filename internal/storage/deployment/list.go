@@ -49,7 +49,7 @@ func ListOptions(projectID string, origin *string, limit uint32) *database.ListO
 }
 
 // LiveFilter narrows the live view to one release. One origin's live
-// deployment is DeploymentStatements.LiveDeployment.
+// deployment is DeploymentStatements.GetLiveDeployment.
 type LiveFilter struct {
 	ReleaseID *string
 }

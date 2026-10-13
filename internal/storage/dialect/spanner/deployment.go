@@ -22,9 +22,6 @@ const (
 	targetsQuery    = `SELECT t.origin, t.deployment_id, t.release_id, d.target_kind, t.deployed_at, t.seq FROM deployment_targets t` +
 		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
 		` WHERE t.project_id = @p1 AND t.deployment_id IN UNNEST(@p2)`
-	newestDeploymentStmt = deploymentQuery + ` WHERE project_id = @p1 AND id = (` +
-		`SELECT t.deployment_id FROM deployment_targets t` +
-		` WHERE t.project_id = @p1 AND t.origin = @p2 ORDER BY t.seq DESC LIMIT 1)`
 	deploymentAtStmt = deploymentQuery + ` WHERE project_id = @p1 AND id = (` +
 		`SELECT t.deployment_id FROM deployment_targets t` +
 		` WHERE t.project_id = @p1 AND t.origin = @p2 AND t.deployed_at <= @p3 ORDER BY t.seq DESC LIMIT 1)`
@@ -57,13 +54,13 @@ func newDeploymentStatements(db queryExecutor) deploymentStatements {
 	return deploymentStatements{statement: statement{db: db}}
 }
 
-// NewestTargets implements [service.DeploymentStatements].
-func (ds deploymentStatements) NewestTargets(ctx context.Context, projectID string, origins []string) ([]domain.TargetDeployment, error) {
+// GetNewestTargets implements [service.DeploymentStatements].
+func (ds deploymentStatements) GetNewestTargets(ctx context.Context, projectID string, origins []string) ([]domain.TargetDeployment, error) {
 	return ds.collectTargets(ctx, newestTargetsStmt, projectID, origins)
 }
 
-// InsertDeployment implements [service.DeploymentStatements].
-func (ds deploymentStatements) InsertDeployment(ctx context.Context, entity *domain.Deployment, read []domain.TargetDeployment) error {
+// CreateDeployment implements [service.DeploymentStatements].
+func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.TargetDeployment) error {
 	if err := ensureManagedID(&entity.ID, domain.PrefixDeployment); err != nil {
 		return err
 	}
@@ -117,8 +114,8 @@ func (ds deploymentStatements) GetDeploymentByID(ctx context.Context, projectID,
 	return entity, nil
 }
 
-// LiveDeployment implements [service.DeploymentStatements].
-func (ds deploymentStatements) LiveDeployment(ctx context.Context, projectID, origin string, now time.Time) (*domain.Deployment, error) {
+// GetLiveDeployment implements [service.DeploymentStatements].
+func (ds deploymentStatements) GetLiveDeployment(ctx context.Context, projectID, origin string, now time.Time) (*domain.Deployment, error) {
 	var entity *domain.Deployment
 	if err := ds.db.Query(ctx, buildStatement(liveDeploymentStmt, projectID, origin, now).statement(), func(iter *spanner.RowIterator) error {
 		var err error
@@ -133,13 +130,8 @@ func (ds deploymentStatements) LiveDeployment(ctx context.Context, projectID, or
 	return entity, nil
 }
 
-// NewestDeployment implements [service.DeploymentStatements].
-func (ds deploymentStatements) NewestDeployment(ctx context.Context, projectID, origin string) (*domain.Deployment, error) {
-	return ds.getOne(ctx, buildStatement(newestDeploymentStmt, projectID, origin).statement())
-}
-
-// DeploymentAt implements [service.DeploymentStatements].
-func (ds deploymentStatements) DeploymentAt(ctx context.Context, projectID, origin string, at time.Time) (*domain.Deployment, error) {
+// GetDeploymentAt implements [service.DeploymentStatements].
+func (ds deploymentStatements) GetDeploymentAt(ctx context.Context, projectID, origin string, at time.Time) (*domain.Deployment, error) {
 	return ds.getOne(ctx, buildStatement(deploymentAtStmt, projectID, origin, at).statement())
 }
 
