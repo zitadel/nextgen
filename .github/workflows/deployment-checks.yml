@@ -1,11 +1,17 @@
 name: deployment-checks
 
-# Tests a deployment of the Vercel project `cloud` once Vercel built it: a
-# preview for a branch, production for main. Vercel posts a GitHub deployment
-# per deployment, and this workflow runs on its `deployment_status`, so the job
-# runs on the deployed commit and its check lands there: on the pull request
-# for a preview, on main for production, where Vercel's Deployment Checks can
-# hold the production domain until it passes (docs/runbooks/cloud.md).
+# Tests a deployment of the Vercel project `cloud` once Vercel built it, on
+# the deployment's own URL (cloud-<hash>-zitadel.vercel.app), never an alias:
+#
+# - A preview, on the `deployment_status` Vercel posts to GitHub for it. The
+#   run uses this file as it is on the deployed commit, so a branch that
+#   changes it is checked by its own preview, and the check lands there, on
+#   the pull request.
+# - Production, called by production-checks.yml, which Vercel starts before
+#   it assigns the production domains: that is what lets Vercel's Deployment
+#   Checks hold them until the suites pass (docs/runbooks/cloud.md).
+# - Any deployment by hand (`workflow_dispatch`, from any branch): a run again
+#   without a new deployment.
 #
 # The job runs each service's contract suite, today the docs', the way the
 # service runs it locally, but against the deployment's URL instead of a local
@@ -16,11 +22,6 @@ name: deployment-checks
 # environment; the annotations on it name the failing contract (the test's
 # title) and every URL that failed; the run's summary names the deployment and
 # the command that reproduces the run; the uploaded report holds the traces.
-#
-# A `deployment_status` run uses this file as it is on the deployed commit, so
-# a branch that changes it is checked by its own preview. `workflow_dispatch`
-# runs the same job against any deployment URL, from any branch: a run again
-# without a new deployment, or against production by hand.
 on:
   deployment_status:
   workflow_dispatch:
@@ -29,29 +30,48 @@ on:
         description: "The deployment to test, e.g. https://cloud-abc1234de-zitadel.vercel.app"
         required: true
         type: string
+  workflow_call:
+    inputs:
+      url:
+        description: "The deployment to test"
+        required: true
+        type: string
+      sha:
+        description: "The commit it was built from, whose suites run"
+        required: true
+        type: string
+      environment:
+        description: "What the job's name says was tested"
+        required: true
+        type: string
+    secrets:
+      VERCEL_AUTOMATION_BYPASS_SECRET:
+        required: true
 
 permissions:
   contents: read
 
 concurrency:
-  group: deployment-checks-${{ inputs.url || github.event.deployment_status.environment_url }}
+  # The event is part of the group, so a run by hand never cancels the run
+  # Vercel waits on for the same deployment.
+  group: deployment-checks-${{ github.event_name }}-${{ inputs.url || github.event.deployment_status.environment_url }}
   cancel-in-progress: true
 
 jobs:
   docs:
-    # Reads "deployment-checks / docs (Preview)" on a pull request and
-    # "docs (Production)" on main: the name says what was tested, and stays
-    # the same within an environment, which Vercel's Deployment Checks and
-    # branch protection match on.
-    name: docs (${{ github.event.deployment.environment || 'dispatch' }})
-    # Only a deployment of `cloud` that is ready: Vercel posts a status per
-    # state. The URL is the deployment's own (cloud-<hash>-zitadel.vercel.app),
-    # never a production alias, so production is tested before it is promoted
-    # rather than whatever serves the alias.
+    # Reads "docs (Preview)" on a pull request, "docs (Production)" called by
+    # production-checks.yml and "docs (dispatch)" by hand. Fixed rather than
+    # Vercel's environment label, which has read both "Preview" and
+    # "Preview – cloud": a check is matched by its name.
+    name: docs (${{ inputs.environment || (github.event_name == 'deployment_status' && 'Preview') || 'dispatch' }})
+    # Off a `deployment_status`, only a preview of `cloud` that is ready:
+    # Vercel posts a status per state, and production is production-checks.yml's.
+    # The URL is the deployment's own, never an alias.
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      github.event_name != 'deployment_status' ||
       (github.event.deployment_status.state == 'success' &&
        github.event.deployment.creator.login == 'vercel[bot]' &&
+       startsWith(github.event.deployment.environment, 'Preview') &&
        startsWith(github.event.deployment_status.environment_url, 'https://cloud-'))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -66,8 +86,8 @@ jobs:
     steps:
       - name: Name the deployment in the run's summary
         env:
-          ENVIRONMENT: ${{ github.event.deployment.environment || 'dispatch' }}
-          COMMIT: ${{ github.event.deployment.sha || github.sha }}
+          ENVIRONMENT: ${{ inputs.environment || github.event.deployment.environment || 'dispatch' }}
+          COMMIT: ${{ inputs.sha || github.event.deployment.sha || github.sha }}
         run: |
           {
             echo "- Deployment: $DOCS_BASE_URL ($ENVIRONMENT, commit ${COMMIT:0:8})"
@@ -78,7 +98,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           # The deployed commit; a dispatch takes the ref it was started from.
-          ref: ${{ github.event.deployment.sha || github.ref }}
+          ref: ${{ inputs.sha || github.event.deployment.sha || github.ref }}
 
       - uses: pnpm/action-setup@v5
         with:
