@@ -8,7 +8,14 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
 
 import type { MockHandle } from "./handlers.js";
-import { applyBranding, clearBranding, PASSWORD_FIELD, setupMockHandlers } from "./index.js";
+import {
+  applyBranding,
+  applyPasskey,
+  clearBranding,
+  clearPasskey,
+  PASSWORD_FIELD,
+  setupMockHandlers,
+} from "./index.js";
 
 const PROJECT_ID = "proj_demo";
 
@@ -47,6 +54,9 @@ beforeEach(() => {
   server.use(...mock.handlers);
   mock.reset();
   clearBranding();
+  // The passkey offer is a module-level overlay like branding; clear it so a
+  // test that enables it cannot leak the action into the next test's flow.
+  clearPasskey();
 });
 
 afterEach(() => {
@@ -550,5 +560,97 @@ describe("returnFromProvider", () => {
 
     const second = mock.returnFromProvider({ provider: "google", email: "grace@example.test" });
     expect((await getFlowStep(second)).step.name).toBe("done");
+  });
+});
+
+describe("passkey overlay", () => {
+  test("is off by default: the identifier step offers no passkey action", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    expect(start.step.name).toBe("identifier");
+    expect(start.step.actions?.some((a) => a.name === "passkey")).toBe(false);
+  });
+
+  test("applyPasskey adds exactly one identifier action and routes to passkey-login", async () => {
+    applyPasskey(true);
+
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    expect(start.step.name).toBe("identifier");
+    const offered = (start.step.actions ?? []).filter((a) => a.name === "passkey");
+    expect(offered).toHaveLength(1);
+    expect(offered[0]?.kind).toBe("passkey");
+
+    // A re-render must not accumulate a second copy (the overlay is idempotent).
+    const reread = await getFlowStep(start.id);
+    expect((reread.step.actions ?? []).filter((a) => a.name === "passkey")).toHaveLength(1);
+
+    // Choosing it reaches the dedicated passkey-login step with its WebAuthn
+    // challenge — the journey the Storybook PasskeyLogin story drives.
+    const login = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "passkey",
+      fields: { email: "alice@acme.com" },
+    });
+    expect(login.step.name).toBe("passkey-login");
+    expect(login.step.challenge?.method).toBe("passkey");
+  });
+
+  test("the password step also offers passkey and routes to passkey-login", async () => {
+    applyPasskey(true);
+
+    // Reach the password step: a known email whose account has a password.
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const password = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: { email: "alice@acme.com" },
+    });
+    expect(password.step.name).toBe("password");
+
+    // The overlay adds exactly one passkey action, with the password step's key.
+    const offered = (password.step.actions ?? []).filter((a) => a.name === "passkey");
+    expect(offered).toHaveLength(1);
+    expect(offered[0]?.kind).toBe("passkey");
+    expect(offered[0]?.text_key).toBe("password.action.passkey");
+
+    // Choosing it drives the flow to the dedicated passkey-login step.
+    const login = await submitFlowStep(password.id, {
+      session_token: password.session_token,
+      action: "passkey",
+    });
+    expect(login.step.name).toBe("passkey-login");
+    expect(login.step.challenge?.method).toBe("passkey");
+  });
+
+  test("the passkey action survives a password credential-error response", async () => {
+    applyPasskey(true);
+
+    // Reach the password step, then submit a wrong password so the handler's
+    // credential-error branch returns the password step directly.
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const password = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: { email: "wrong@example.com" },
+    });
+    expect(password.step.name).toBe("password");
+    const errored = await submitFlowStep(password.id, {
+      session_token: password.session_token,
+      action: "submit",
+      fields: { [PASSWORD_FIELD]: "hunter2" },
+    });
+
+    // Error response is still the password step, and the overlay must not drop
+    // the passkey action just because the submission failed.
+    expect(errored.step.name).toBe("password");
+    expect(errored.step.error).toBe("error.invalid_credentials");
+    expect((errored.step.actions ?? []).filter((a) => a.name === "passkey")).toHaveLength(1);
+  });
+
+  test("clearPasskey removes the action again", async () => {
+    applyPasskey(true);
+    clearPasskey();
+
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    expect(start.step.actions?.some((a) => a.name === "passkey")).toBe(false);
   });
 });
