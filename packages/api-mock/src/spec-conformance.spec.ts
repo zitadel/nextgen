@@ -344,7 +344,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pattern: "https://app.example.com", kind: "preview" }),
     });
-    expect(conflict.status).toBe(400);
+    expect(conflict.status).toBe(409);
     const conflictBody = (await conflict.json()) as Record<string, unknown>;
     expect(conflictBody.code).toBe("origin.kind_conflict");
   });

@@ -863,7 +863,7 @@ export function setupPlatformHandlers() {
             "origin.kind_conflict",
             "origin: the pattern is already stored with a different kind",
           ),
-          { status: 400 },
+          { status: 409 },
         );
       }
 

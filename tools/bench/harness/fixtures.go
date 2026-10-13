@@ -65,6 +65,11 @@ func LoadFixture(path string) (Fixture, error) {
 	if len(fx.Project.Origins) == 0 {
 		errs = errors.Join(errs, errors.New("project.origins needs at least one origin: the flow requests send it"))
 	}
+	for i, o := range fx.Project.Origins {
+		if o.Pattern == "" || o.Kind == "" {
+			errs = errors.Join(errs, fmt.Errorf("project.origins[%d]: pattern and kind are required", i))
+		}
+	}
 	if fx.User.Email == "" || fx.User.Password == "" {
 		errs = errors.Join(errs, errors.New("user.email and user.password are required"))
 	}
@@ -85,13 +90,9 @@ func LoadFixture(path string) (Fixture, error) {
 func originsToAPI(in []FixtureOrigin) []api.Origin {
 	out := make([]api.Origin, len(in))
 	for i, o := range in {
-		kind := o.Kind
-		if kind == "" {
-			kind = string(api.OriginKindPreview)
-		}
 		out[i] = api.Origin{
 			Pattern: o.Pattern,
-			Kind:    api.OriginKind(kind),
+			Kind:    api.OriginKind(o.Kind),
 		}
 	}
 	return out
