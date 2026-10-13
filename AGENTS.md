@@ -57,12 +57,15 @@ Product surfaces (`apps/`):
   wrapper and its per-platform binary packages (one per OS/arch).
 - `apps/console/` and `apps/login-ui/` — the two SPAs embedded into the Go
   server at `/ui/console/` and `/ui/login/`.
-- `apps/docs/` — the Fumapress/Fumadocs documentation site.
+- `apps/docs/` — the documentation site: Fumadocs on Next.js, served under
+  `/docs`, in the hosted cloud too.
+- `apps/website/` — the hosted cloud's coming-soon page at `/`: Next.js in
+  the new zitadel.com's look, the seed of the public website.
 
 Development and test surfaces (`apps/`):
 
 - `apps/storybook/` — the component workbench for the login surface
-  (`@zitadel/components`).
+  (`@zitadel/components`), served by the hosted cloud at `/storybook/`.
 - `apps/demo-next/` and `apps/demo-nuxt/` — reference integrations of the
   embedded sign-in component on each framework.
 - `apps/*-e2e/` — Playwright projects: one per demo (real framework
@@ -72,6 +75,10 @@ Development and test surfaces (`apps/`):
   temporary registry).
 - `apps/mock-zitadel/` — thin deployment wrapper that serves
   `packages/api-mock` as a live per-PR preview endpoint.
+- `apps/cloud/` — deployment wrapper of the hosted cloud: `main` on Vercel
+  with PlanetScale Postgres, a preview with a database of its own per branch.
+  The repo-root `vercel.json` defines its services; operations live in
+  [docs/runbooks/cloud.md](docs/runbooks/cloud.md).
 
 Published libraries (`packages/`):
 
@@ -209,8 +216,11 @@ In CI the branch-protection check is the GitHub Actions context `full-pr`,
 shown in the pull request UI as `ci / full-pr`; it consumes the workflow's
 packed npm tarballs instead of public Zitadel packages. Changesets PR comments
 are informational release-intent feedback and are not branch-protection
-requirements. Mirror the gate locally with
-`moon run workspace:check -- --full`; the full step list is in
+requirements. Pull requests land through the merge queue, which runs
+`full-pr` again on the latest `main`, so merge `main` into a branch only to
+resolve a conflict or pick up a change it needs, never just to keep it
+current ([CONTRIBUTING.md](CONTRIBUTING.md#merging)). Mirror the gate
+locally with `moon run workspace:check -- --full`; the full step list is in
 [CONTRIBUTING.md](CONTRIBUTING.md#what-ci-runs).
 
 ### Interactive demo verification
@@ -250,6 +260,11 @@ upward**. When deciding where a new test belongs:
    and `cli-journey-e2e` (the framework matrix across all 8 SDKs).
    Middleware-owning SDKs get their own e2e project because
    the proxy and route-protection layers are framework-specific.
+   The docs site's suite is the one that lives beside its app,
+   `apps/docs/tests/`: written against a URL, it runs on the local build
+   (`docs:e2e`) and on every deployment of the hosted cloud
+   (`docs:e2e-deployment`, see
+   [docs/runbooks/cloud.md](docs/runbooks/cloud.md#deployment-checks)).
 
 The consumer journey suite is the exception to the checked-in demo ownership
 rule: it belongs in `apps/cli-journey-e2e/` and must exercise a freshly
@@ -419,6 +434,10 @@ verify with `corepack pnpm exec changeset status --since origin/main`.
   [.moon/AGENTS.md](.moon/AGENTS.md): the shared tasks, the inputs rule and the
   dependency rules, and the `moon run workspace:check-moon-graph` check to run
   afterwards.
+- Turborepo runs the same tasks beside moon during the migration
+  ([docs/design/build/turborepo.md](docs/design/build/turborepo.md)): a task
+  change goes into `moon.yml` and the package's `turbo.json`, and the command
+  is a `package.json` script.
 
 ## Ephemeral Development Environments
 

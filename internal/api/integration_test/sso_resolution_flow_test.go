@@ -31,6 +31,9 @@ type ssoResolutionFixture struct {
 	idpFixture
 	team       *domain.Team
 	connection api.IdpResponse
+	// definitionName selects the definition flows start on; empty resolves
+	// by audience.
+	definitionName string
 }
 
 func newSSOResolutionFixture(t *testing.T, connection api.IdpConnection) *ssoResolutionFixture {
@@ -64,6 +67,9 @@ func (f *ssoResolutionFixture) startFlow(t *testing.T, sessionID string) ssoFlow
 	req := &api.CreateFlowRequest{ProjectID: f.projectID(), Purpose: api.CreateFlowRequestPurposeLogin}
 	if sessionID != "" {
 		req.SessionID = api.NewOptString(sessionID)
+	}
+	if f.definitionName != "" {
+		req.FlowDefinitionName = api.NewOptString(f.definitionName)
 	}
 	resp, err := f.client.CreateFlow(t.Context(), req)
 	require.NoError(t, err)
@@ -101,6 +107,7 @@ func (f *ssoResolutionFixture) createStaffSchema(t *testing.T) string {
 		"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
 		"$id": "https://sso-staff.example.com/schemas/staff-user.json",
 		"kind": "user-schema",
+		"objectType": "sso-staff-user",
 		"type": "object",
 		"x-identifier": "email",
 		"x-auth-methods": {"password": {"enabled": true}},
@@ -279,7 +286,7 @@ func TestSSOResolutionOtherConnectionSameSubjectDoesNotMatch(t *testing.T) {
 	assert.False(t, got.HandoffToken.Set)
 	// The unverified email cannot create a user, so the identity is collected;
 	// this definition does not route that outcome.
-	assert.Equal(t, domain.FlowImplicitOutcomeSSOUserNotFound, got.Step.Error.Value)
+	assert.Equal(t, domain.FlowStepErrorSSOUserNotFound, got.Step.Error.Value)
 	_, parked := f.attempt(t, flow).SSOCallback()
 	assert.True(t, parked, "a collected identity stays parked for the prefill")
 }
@@ -392,7 +399,7 @@ func (f *ssoResolutionFixture) requireCollected(t *testing.T, flow ssoFlow, resp
 	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
 	got := resp.(*api.FlowResponseHeaders).Response
 	assert.Equal(t, "identifier", got.Step.Name)
-	assert.Equal(t, domain.FlowImplicitOutcomeSSOUserNotFound, got.Step.Error.Value)
+	assert.Equal(t, domain.FlowStepErrorSSOUserNotFound, got.Step.Error.Value)
 	assert.False(t, got.HandoffToken.Set)
 	attempt := f.attempt(t, flow)
 	_, bound := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
@@ -514,7 +521,7 @@ func TestSSOResolutionAutoCreateRollsBackOnLinkFailure(t *testing.T) {
 	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-taken", emailClaims(), map[string]bool{"email": true})
 	email := helpers.RandString(8) + "@example.com"
 	resolver := service.NewFlowSSOIdentityResolver(
-		harness.EnsureServiceDB(t), harness.EnsureIDPConnectionService(t), harness.EnsureUserService(t), harness.EnsureSchemaStore(t),
+		harness.EnsureServiceDB(t), harness.EnsureIDPConnectionService(t), harness.EnsureUserService(t), harness.EnsureSchemaStore(t), harness.EnsureProjectHashers(t),
 	)
 	parked, ok := f.attempt(t, flow).SSOCallback()
 	require.True(t, ok)

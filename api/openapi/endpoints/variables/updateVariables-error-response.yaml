@@ -13,6 +13,7 @@ content:
         - $ref: '../../components/schemas/errors/var-invalid_name.yaml'
         - $ref: '../../components/schemas/errors/var-invalid_value.yaml'
         - $ref: '../../components/schemas/errors/var-no_project_id.yaml'
+        - $ref: '../../components/schemas/errors/proj-not_found.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
         - $ref: '../../components/schemas/errors/var-not_found.yaml'
@@ -29,6 +30,7 @@ content:
           var.invalid_name: '../../components/schemas/errors/var-invalid_name.yaml'
           var.invalid_value: '../../components/schemas/errors/var-invalid_value.yaml'
           var.no_project_id: '../../components/schemas/errors/var-no_project_id.yaml'
+          proj.not_found: '../../components/schemas/errors/proj-not_found.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
           var.not_found: '../../components/schemas/errors/var-not_found.yaml'
@@ -79,6 +81,11 @@ content:
         value:
           code: var.no_project_id
           message: 'a variable must be owned by a project'
+      proj.not_found:
+        summary: proj.not_found
+        value:
+          code: proj.not_found
+          message: 'project not found'
       req.invalid:
         summary: req.invalid
         value:

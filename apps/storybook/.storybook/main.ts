@@ -11,7 +11,7 @@ import type { StorybookConfig } from "@storybook/web-components-vite";
 // through a package export that would resolve to an unpublished `.ts` file.
 import { liquidRaw } from "../../../packages/components/vite-liquid-plugin.js";
 
-import { optimizeDepsExclude, optimizeDepsInclude } from "./optimize-deps.js";
+import { optimizeDepsExclude, optimizeDepsInclude } from "./optimize-deps.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const packagesDir = resolve(here, "../../../packages");
@@ -51,12 +51,18 @@ const reloadPollerScript = `<script>
  * See `apps/storybook/README.md`.
  *
  * `@zitadel/api-mock`'s public dir is served statically so MSW finds
- * `mockServiceWorker.js` at `/mockServiceWorker.js` (the orchestrator stories
- * mock the Flow API through `msw-storybook-addon`).
+ * `mockServiceWorker.js` at the site root (the orchestrator stories mock the
+ * Flow API through `msw-storybook-addon`).
  */
 const config: StorybookConfig = {
   framework: "@storybook/web-components-vite",
   stories: ["../src/**/*.stories.ts"],
+  // `msw-storybook-addon` is deliberately NOT registered as an addon: on the
+  // CSF3 path its preview annotations add a `beforeEach` that starts a second
+  // worker with the default setup unless `context.msw` is already set. We use
+  // the CSF3 `mswLoader(startWorker)` in `preview.ts` instead, which owns the
+  // single worker. Listing it here would reintroduce the duplicate-worker race,
+  // guarded only by loaders happening to run before `beforeEach`.
   addons: ["@storybook/addon-a11y", "@storybook/addon-vitest"],
   staticDirs: [{ from: apiMockPublicDir, to: "/" }],
   // Inject the workspace-source reload poller into the preview iframe — but only

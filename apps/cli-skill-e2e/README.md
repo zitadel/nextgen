@@ -52,12 +52,16 @@ Invoke it with pnpm:
 
 ```sh
 # reuse captured results (instant) — grade + open the report window
-ENV_FILE=./.secret.env pnpm --filter @zitadel/cli-skill-e2e test
+ENV_FILE=./.secret.env pnpm --filter @zitadel/cli-skill-e2e eval
 
 # re-run the containers from scratch (tens of minutes), then grade + open
-ENV_FILE=./.secret.env pnpm --filter @zitadel/cli-skill-e2e eval
+ENV_FILE=./.secret.env pnpm --filter @zitadel/cli-skill-e2e eval:fresh
 # or:  ENV_FILE=./.secret.env FRESH=1 pnpm --filter @zitadel/cli-skill-e2e exec vitest run
 ```
+
+The script is deliberately not called `test`: a task runner that selects tasks
+by script name (`turbo run test`) would otherwise pull this eval into the
+repository's test gate.
 
 Vitest runs the eval in `globalSetup`, asserts each **with-skill** stage reached
 its goal (the baseline is captured for comparison, not asserted), then in
