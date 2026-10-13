@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type ScaffoldedApp } from "../helpers/project";
+import { aSetUpApp, type ConnectionDocument, type ScaffoldedApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -132,6 +132,72 @@ describe("apply", () => {
         expect(await app.apply()).toSucceed();
 
         expect(await app.plan()).toReportNothingToDo();
+      });
+    });
+
+    describe("a connection claimed by two files", () => {
+      it("sends nothing", async () => {
+        const app = await aSetUpApp();
+        expect(
+          await app.enableSso("google", { clientId: "1234-abc", secret: "the-client-secret" }),
+        ).toSucceed();
+        await app.copyConnection("google", "copy");
+
+        const result = await app.apply();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(await app.registeredIdps()).toEqual([]);
+      });
+    });
+
+    describe("an edit to what identifies a connection", () => {
+      it.each([
+        [
+          "slug",
+          (connection: ConnectionDocument) => {
+            connection.slug = "google2";
+          },
+        ],
+        [
+          "oidc.issuer",
+          (connection: ConnectionDocument) => {
+            connection.oidc.issuer = "https://other.test";
+          },
+        ],
+        [
+          "subject_claim",
+          (connection: ConnectionDocument) => {
+            connection.subject_claim = "email";
+          },
+        ],
+      ])("to the %s is refused and leaves the platform as it was", async (_field, edit) => {
+        const app = await aSetUpApp();
+        expect(
+          await app.enableSso("google", { clientId: "1234-abc", secret: "the-client-secret" }),
+        ).toSucceed();
+        expect(await app.apply()).toSucceed();
+        const before = await app.registeredIdps();
+        await app.editConnection("google", edit);
+
+        const result = await app.apply();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(await app.registeredIdps()).toEqual(before);
+      });
+    });
+
+    describe("a connection whose client_id variable is missing", () => {
+      it("stops before sending anything", async () => {
+        const app = await aSetUpApp();
+        expect(
+          await app.enableSso("google", { clientId: "1234-abc", secret: "the-client-secret" }),
+        ).toSucceed();
+        expect(await app.deleteVariable("GOOGLE_CLIENT_ID")).toSucceed();
+
+        const result = await app.apply();
+
+        expect(result).toFailWith("E_CREDENTIAL_MISSING");
+        expect(await app.registeredIdps()).toEqual([]);
       });
     });
 

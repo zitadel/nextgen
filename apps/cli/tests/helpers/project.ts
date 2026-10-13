@@ -476,6 +476,11 @@ export class ScaffoldedApp {
     );
   }
 
+  /** The project-relative path of a connection's file, as a command reports it. */
+  connectionFile(slug: string): string {
+    return `.zitadel/idps/${slug}.json`;
+  }
+
   /** Adds a connection no schema lists, so removing it breaks nothing else. */
   async addUnlistedConnection(slug: string): Promise<void> {
     await this.copyConnection("google", slug);

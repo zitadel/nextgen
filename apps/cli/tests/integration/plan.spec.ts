@@ -245,6 +245,42 @@ describe("plan", () => {
           expect(data.warnings.map(({ rule }) => rule)).toContain("unsupported-deletion");
         });
 
+        it("does not re-check the variables of a connection that has not changed", async () => {
+          const app = await anAppServingGoogle();
+          expect(await app.deleteVariable("GOOGLE_CLIENT_SECRET")).toSucceed();
+
+          expect(await app.planAttempt()).toSucceed();
+        });
+
+        it("plans an edit when the project's variables cannot be listed", async () => {
+          const app = await anAppServingGoogle();
+          await app.editConnection("google", (connection) => {
+            connection.display_name = "Google Workspace";
+          });
+          platform.cannotListVariables();
+
+          expect(await app.planAttempt()).toSucceed();
+        });
+
+        it("stops on an edited connection whose stored copy cannot be read", async () => {
+          const app = await anAppServingGoogle();
+          await app.editConnection("google", (connection) => {
+            connection.display_name = "Google Workspace";
+          });
+          platform.cannotReadConnections();
+
+          expect(await app.planAttempt()).toFailWith("E_NETWORK");
+        });
+
+        it("names a removed connection file when rendered for a terminal", async () => {
+          const app = await anAppServingAnUnlistedConnection();
+          await app.removeConnection("spare");
+
+          const result = await app.planRendered();
+
+          expect(result).toPrint(app.connectionFile("spare"));
+        });
+
         it("stops on a removed connection file a schema still lists", async () => {
           const app = await anAppServingGoogle();
           await app.removeConnection("google");
