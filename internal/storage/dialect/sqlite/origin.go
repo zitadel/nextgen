@@ -58,6 +58,7 @@ func (s originStatements) ListOrigins(ctx context.Context, filter *database.List
 		filter.Pagination.OrderBy.Columns = []database.Column[domain.OriginField]{
 			database.Col(domain.OriginFieldCreatedAt),
 			database.Col(domain.OriginFieldPattern),
+			database.Col(domain.OriginFieldProjectID),
 		}
 	}
 

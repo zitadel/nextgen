@@ -85,7 +85,7 @@ type OriginStatements interface {
 	// [database.NoRowFoundError] when none matches.
 	GetOrigin(ctx context.Context, filter database.Filter[domain.OriginField]) (*domain.Origin, error)
 	// ListOrigins returns origins matching filter. Default order is
-	// created_at, then pattern when OrderBy is empty.
+	// created_at, then pattern, then project_id when OrderBy is empty.
 	ListOrigins(ctx context.Context, filter *database.ListOptions[domain.OriginField]) (*database.ListResult[*domain.Origin], error)
 	// InsertOrigin stores one origin. inserted is false when the same
 	// (project_id, pattern) already exists (caller decides kind conflict vs

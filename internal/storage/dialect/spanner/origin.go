@@ -18,7 +18,7 @@ const (
 	originQuery = `SELECT project_id, pattern, kind, created_at FROM project_origins`
 
 	// Explicit created_at so sequential inserts in one transaction keep a
-	// stable list order (created_at then pattern) instead of collapsing on
+	// stable list order (created_at, pattern, project_id) instead of collapsing on
 	// the column default.
 	insertOriginStmt = `INSERT INTO project_origins (project_id, pattern, kind, created_at) VALUES (@p1, @p2, @p3, @p4)`
 
@@ -62,6 +62,7 @@ func (s originStatements) ListOrigins(ctx context.Context, filter *database.List
 		filter.Pagination.OrderBy.Columns = []database.Column[domain.OriginField]{
 			database.Col(domain.OriginFieldCreatedAt),
 			database.Col(domain.OriginFieldPattern),
+			database.Col(domain.OriginFieldProjectID),
 		}
 	}
 

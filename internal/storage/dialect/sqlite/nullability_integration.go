@@ -17,6 +17,7 @@ import (
 func SchemaColumnNullability() []schematest.ColumnNullability {
 	var cols []schematest.ColumnNullability
 	cols = append(cols, schematest.Columns("projects", projectSchema)...)
+	cols = append(cols, schematest.Columns("project_origins", originSchema)...)
 	cols = append(cols, schematest.Columns("teams", teamSchema)...)
 	cols = append(cols, schematest.Columns("tokens", tokenSchema)...)
 	cols = append(cols, schematest.Columns("sessions", sessionSchema)...)

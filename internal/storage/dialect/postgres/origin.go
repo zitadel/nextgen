@@ -17,7 +17,7 @@ const (
 	originQuery = `SELECT project_id, pattern, kind, created_at FROM zitadel_nextgen.project_origins`
 
 	// clock_timestamp() (not now()) so sequential inserts in one transaction
-	// keep distinct created_at values; list order is created_at then pattern.
+	// keep distinct created_at values; list order is created_at, pattern, project_id.
 	insertOriginStmt = `INSERT INTO zitadel_nextgen.project_origins (project_id, pattern, kind, created_at)
 VALUES ($1, $2, $3, clock_timestamp())
 ON CONFLICT (project_id, pattern) DO NOTHING`
@@ -62,6 +62,7 @@ func (s originStatements) ListOrigins(ctx context.Context, filter *database.List
 		filter.Pagination.OrderBy.Columns = []database.Column[domain.OriginField]{
 			database.Col(domain.OriginFieldCreatedAt),
 			database.Col(domain.OriginFieldPattern),
+			database.Col(domain.OriginFieldProjectID),
 		}
 	}
 

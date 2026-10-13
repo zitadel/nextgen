@@ -25,7 +25,7 @@ func TestOriginsRoundTrip(t *testing.T) {
 
 		got, err := d.stmts.GetProjectByID(t.Context(), project.ID)
 		require.NoError(t, err)
-		// Create order must survive hydrate: list is created_at then pattern.
+		// Create order must survive hydrate: list is created_at, pattern, project_id.
 		assert.Equal(t, project.Origins, got.Origins)
 
 		listed, err := d.stmts.ListOrigins(t.Context(), &database.ListOptions[domain.OriginField]{

@@ -86,7 +86,63 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("user_totps", func(t *testing.T) { battleUserTOTPs(t, d) })
 		t.Run("user_passkeys", func(t *testing.T) { battleUserPasskeys(t, d) })
 		t.Run("user_recovery_codes", func(t *testing.T) { battleUserRecoveryCodes(t, d) })
+		t.Run("origins", func(t *testing.T) { battleOrigins(t, d) })
 	})
+}
+
+// battleOrigins pages ListOrigins across several projects that share the same
+// pattern. Without project_id in the default keyset, tied (created_at, pattern)
+// rows from different projects would be skipped on resume.
+func battleOrigins(t *testing.T, d dialect) {
+	t.Helper()
+	prefix := uniqueProjectID(t)
+	pattern := "https://battle.example.com"
+	projectIDs := make([]string, 0, 5)
+	for i := range 5 {
+		id := prefix + "-" + string(rune('a'+i))
+		p := newTestProject(id)
+		require.NoError(t, d.stmts.CreateProject(t.Context(), p))
+		t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), id) })
+		inserted, err := d.stmts.InsertOrigin(t.Context(), id, domain.Origin{
+			Pattern: pattern,
+			Kind:    domain.OriginKindPrimary,
+		})
+		require.NoError(t, err)
+		require.True(t, inserted)
+		projectIDs = append(projectIDs, id)
+	}
+	filters := make([]database.Filter[domain.OriginField], 0, len(projectIDs))
+	for _, id := range projectIDs {
+		filters = append(filters, database.Equal(database.Col(domain.OriginFieldProjectID), id))
+	}
+	filter := database.Or(filters...)
+	orderAsc := database.OrderBy[domain.OriginField]{
+		Columns: []database.Column[domain.OriginField]{
+			database.Col(domain.OriginFieldCreatedAt),
+			database.Col(domain.OriginFieldPattern),
+			database.Col(domain.OriginFieldProjectID),
+		},
+		Direction: database.OrderAsc,
+	}
+	originKey := func(o *domain.Origin) string { return o.ProjectID + "|" + o.Pattern }
+	baseline, err := d.stmts.ListOrigins(t.Context(), &database.ListOptions[domain.OriginField]{
+		Filter: filter,
+		Pagination: database.Page[domain.OriginField]{
+			Limit:   uint32(len(projectIDs)),
+			OrderBy: orderAsc,
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, baseline.Items, len(projectIDs))
+	want := make([]string, 0, len(baseline.Items))
+	for _, o := range baseline.Items {
+		want = append(want, originKey(o))
+	}
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.OriginField]) (*database.ListResult[*domain.Origin], error) {
+		return d.stmts.ListOrigins(t.Context(), &database.ListOptions[domain.OriginField]{
+			Filter: filter, Pagination: page,
+		})
+	}, originKey, 2)
 }
 
 func battleProjects(t *testing.T, d dialect) {

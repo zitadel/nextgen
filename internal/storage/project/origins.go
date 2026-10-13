@@ -6,7 +6,7 @@ import (
 )
 
 // ListOriginsOptions builds the hydrate list query for the given project ids:
-// Or(equal project_id…) ordered by created_at, pattern.
+// Or(equal project_id…) ordered by created_at, pattern, project_id.
 func ListOriginsOptions(projectIDs []string) *database.ListOptions[domain.OriginField] {
 	filters := make([]database.Filter[domain.OriginField], len(projectIDs))
 	for i, id := range projectIDs {
@@ -19,6 +19,7 @@ func ListOriginsOptions(projectIDs []string) *database.ListOptions[domain.Origin
 				Columns: []database.Column[domain.OriginField]{
 					database.Col(domain.OriginFieldCreatedAt),
 					database.Col(domain.OriginFieldPattern),
+					database.Col(domain.OriginFieldProjectID),
 				},
 			},
 		},

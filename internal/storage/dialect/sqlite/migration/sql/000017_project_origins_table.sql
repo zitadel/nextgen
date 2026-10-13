@@ -1,5 +1,8 @@
 -- +goose Up
 -- Move origins off the projects JSON column into a natural-key child table.
+-- Use j.type (not json_type(j.value)): json_each exposes string elements as
+-- unquoted text, so reparsing j.value aborts on legacy string arrays.
+-- DROP COLUMN keeps the parent table (and ON DELETE CASCADE children) intact.
 -- +goose StatementBegin
 CREATE TABLE project_origins (
     project_id TEXT NOT NULL
@@ -15,11 +18,11 @@ INSERT INTO project_origins (project_id, pattern, kind, created_at)
 SELECT
     p.id,
     CASE
-        WHEN json_type(j.value) = 'object' THEN json_extract(j.value, '$.pattern')
+        WHEN j.type = 'object' THEN json_extract(j.value, '$.pattern')
         ELSE j.value
     END,
     CASE
-        WHEN json_type(j.value) = 'object' THEN COALESCE(json_extract(j.value, '$.kind'), 'preview')
+        WHEN j.type = 'object' THEN COALESCE(json_extract(j.value, '$.kind'), 'preview')
         ELSE 'preview'
     END,
     p.created_at
@@ -29,60 +32,24 @@ WHERE p.origins IS NOT NULL
   AND p.origins != '[]';
 -- +goose StatementEnd
 -- +goose StatementBegin
-CREATE TABLE projects_new (
-    id TEXT PRIMARY KEY NOT NULL
-    , name TEXT NOT NULL
-    , password_hash_policy TEXT
-    , created_at INTEGER NOT NULL
-    , updated_at INTEGER NOT NULL
-);
--- +goose StatementEnd
--- +goose StatementBegin
-INSERT INTO projects_new (id, name, password_hash_policy, created_at, updated_at)
-SELECT id, name, password_hash_policy, created_at, updated_at FROM projects;
--- +goose StatementEnd
--- +goose StatementBegin
-DROP TABLE projects;
--- +goose StatementEnd
--- +goose StatementBegin
-ALTER TABLE projects_new RENAME TO projects;
+ALTER TABLE projects DROP COLUMN origins;
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
-CREATE TABLE projects_old (
-    id TEXT PRIMARY KEY NOT NULL
-    , name TEXT NOT NULL
-    , origins TEXT NOT NULL DEFAULT '[]'
-    , password_hash_policy TEXT
-    , created_at INTEGER NOT NULL
-    , updated_at INTEGER NOT NULL
+ALTER TABLE projects ADD COLUMN origins TEXT NOT NULL DEFAULT '[]';
+-- +goose StatementEnd
+-- +goose StatementBegin
+UPDATE projects
+SET origins = COALESCE(
+    (
+        SELECT json_group_array(json_object('pattern', o.pattern, 'kind', o.kind))
+        FROM project_origins o
+        WHERE o.project_id = projects.id
+    ),
+    '[]'
 );
 -- +goose StatementEnd
 -- +goose StatementBegin
-INSERT INTO projects_old (id, name, origins, password_hash_policy, created_at, updated_at)
-SELECT
-    p.id,
-    p.name,
-    COALESCE(
-        (
-            SELECT json_group_array(json_object('pattern', o.pattern, 'kind', o.kind))
-            FROM project_origins o
-            WHERE o.project_id = p.id
-        ),
-        '[]'
-    ),
-    p.password_hash_policy,
-    p.created_at,
-    p.updated_at
-FROM projects p;
--- +goose StatementEnd
--- +goose StatementBegin
 DROP TABLE project_origins;
--- +goose StatementEnd
--- +goose StatementBegin
-DROP TABLE projects;
--- +goose StatementEnd
--- +goose StatementBegin
-ALTER TABLE projects_old RENAME TO projects;
 -- +goose StatementEnd
