@@ -60,6 +60,7 @@ describe("manifest registry", () => {
         "data-testid",
         "autocomplete",
         "required",
+        "readonly",
         "pattern",
         "success",
         "forgot-password-href",

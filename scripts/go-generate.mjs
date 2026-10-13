@@ -68,6 +68,18 @@ const SKIP_DIRS = new Set([
 // Runs alone, between the enumer and mockgen phases — see the module comment.
 const ORDERED_PACKAGE = "api";
 
+// Go 1.27 turns the jsonv2 experiment on by default, which makes
+// encoding/json's Marshaler and Unmarshaler type aliases. ogen resolves an
+// x-ogen-type by asserting *types.Named on them and panics on an alias
+// (ogen-go/ogen#1747), so the api package generates with the experiment off.
+// A caller's own experiments are kept; the later entry wins. Drop this once an
+// ogen release carries the fix. A bare `go generate ./...` under Go 1.27 needs
+// the same variable set by hand.
+const ORDERED_PACKAGE_ENV = {
+  ...process.env,
+  GOEXPERIMENT: [process.env.GOEXPERIMENT, "nojsonv2"].filter(Boolean).join(","),
+};
+
 const DIRECTIVE = /^\/\/go:generate .*$/gm;
 
 export async function goGenerate({ log = console.log } = {}) {
@@ -98,7 +110,7 @@ export async function goGenerate({ log = console.log } = {}) {
 
   for (const dir of ordered) {
     log(`--- ${dir}`);
-    await run("go", ["generate", "."], { cwd: join(ROOT, dir) });
+    await run("go", ["generate", "."], { cwd: join(ROOT, dir), env: ORDERED_PACKAGE_ENV });
   }
 
   await runPhase(rest, MOCKGEN_PHASE, log);

@@ -44,6 +44,8 @@ export type ZlFieldInputDetail = { name: string; value: string };
  *                (`tabindex="-1"`) so Tab moves from one input straight to
  *                the next; keyboard users clear via the input itself.
  *   description  14/20 in `--zl-muted-foreground`
+ *   read-only    `--zl-muted` fill at full contrast, no hover edge and no
+ *                clear button; still focusable and still submitted
  *
  * Form participation: `<zl-field>` is a form-associated custom element.
  */
@@ -92,6 +94,7 @@ export class ZlField extends FormAtom {
   @property({ attribute: false }) accessor showPasswordLabel = "Show";
   @property({ attribute: false }) accessor hidePasswordLabel = "Hide";
   @property({ type: Boolean }) accessor required = false;
+  @property({ type: Boolean, reflect: true, attribute: "readonly" }) accessor readOnly = false;
   @property({ type: Boolean, reflect: true }) accessor invalid = false;
 
   /** Whether a toggle-enabled password field currently shows its value. */
@@ -194,10 +197,17 @@ export class ZlField extends FormAtom {
       "zr-field--invalid": this.invalid || showError,
       "zr-field--success": showSuccess,
       "zr-field--disabled": this.isDisabled,
+      "zr-field--readonly": this.readOnly,
     });
     const passwordToggle = this.hasPasswordToggle;
+    // A read-only field keeps the error and success icons but not the clear
+    // button, which would change the value. The password toggle stays: it
+    // only changes what is shown, not what is submitted.
     const showDefaultTrailing =
-      (this.trailingIcon || passwordToggle) && !this.hasSuffixSlot && !this.isDisabled;
+      !this.hasSuffixSlot &&
+      !this.isDisabled &&
+      (passwordToggle ||
+        (this.trailingIcon && (!this.readOnly || this.invalid || showError || showSuccess)));
     // The toggle lives in the trailing slot, so a filled `suffix` (or a
     // disabled field) means it is not drawn. Everything that assumes our
     // button — the revealed type, hiding Edge's own reveal — keys off this.
@@ -238,6 +248,7 @@ export class ZlField extends FormAtom {
             pattern=${ifDefined(this.pattern)}
             ?required=${this.required}
             ?disabled=${this.isDisabled}
+            ?readonly=${this.readOnly}
             aria-label=${ifDefined(this.label ? undefined : this.ariaLabelText)}
             aria-invalid=${this.invalid || showError ? "true" : "false"}
             aria-describedby=${describedBy || nothing}
@@ -499,6 +510,7 @@ export const zlFieldManifest: AtomManifest = {
     "data-testid",
     "required",
     "disabled",
+    "readonly",
     "invalid",
     "error",
     "success",

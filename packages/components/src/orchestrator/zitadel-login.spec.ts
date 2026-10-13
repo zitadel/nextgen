@@ -1197,7 +1197,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
               ],
               actions: [{ name: "submit", text_key: "submit.signin", primary: true }],
               gates: {},
-              error: "user_not_found",
+              error: "not_a_key",
             },
             branding: {},
           },
@@ -1215,7 +1215,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
     const alert = await waitFor(() => {
       const candidate = element.shadowRoot?.querySelector("zl-alert");
-      return candidate?.textContent?.includes("user_not_found") ? candidate : null;
+      return candidate?.textContent?.includes("not_a_key") ? candidate : null;
     });
     expect(alert).toBeTruthy();
   });
@@ -1288,7 +1288,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
   }
 
   it("clears the step error banner when the user edits a field, keeping typed input", async () => {
-    const element = await mountWithStepErrorBanner(host, "user_not_found");
+    const element = await mountWithStepErrorBanner(host, "error.user_not_found");
 
     typeInto(element, "email", "fixed@acme.com");
 
@@ -1327,7 +1327,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
   });
 
   it("does not resurrect a dismissed banner during the loading re-render", async () => {
-    const element = await mountWithStepErrorBanner(host, "user_not_found");
+    const element = await mountWithStepErrorBanner(host, "error.user_not_found");
     typeInto(element, "email", "fixed@acme.com");
     expect(element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]")).toBeNull();
 
@@ -1371,7 +1371,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
   });
 
   it("shows the banner again when the next response re-reports the error", async () => {
-    const element = await mountWithStepErrorBanner(host, "user_not_found");
+    const element = await mountWithStepErrorBanner(host, "error.user_not_found");
     typeInto(element, "email", "still-wrong@acme.com");
     expect(element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]")).toBeNull();
 
@@ -1388,7 +1388,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
   });
 
   it("keeps an explicitly dismissed banner away through the next loading render", async () => {
-    const element = await mountWithStepErrorBanner(host, "user_not_found");
+    const element = await mountWithStepErrorBanner(host, "error.user_not_found");
 
     // The shipped templates render the design's non-dismissible alert, so the
     // close control has to be opted into here — as a tenant template opting
