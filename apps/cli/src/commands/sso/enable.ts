@@ -274,12 +274,12 @@ export default class SsoEnable extends EnvironmentCommand {
       consola.info(`${schema.name} and its login flow already offer ${entry.displayName}`);
     }
     if (clientIdState !== undefined && idVariable !== undefined) {
-      reportClientIdOutcome(idVariable, clientIdState, this.meta.cliVersion);
+      reportClientIdOutcome(idVariable, clientIdState, this.meta.cliVersion, this.environmentSelector());
     }
     if (secret) {
       // A reuse that piped nothing in had no value to publish; a create always
       // has one, because the command refuses without it.
-      reportSecretOutcome(secret, this.meta.cliVersion, reusing);
+      reportSecretOutcome(secret, this.meta.cliVersion, reusing, this.environmentSelector());
     }
 
     return this.emit({
@@ -310,9 +310,10 @@ export default class SsoEnable extends EnvironmentCommand {
               { name: variable, secret: true, published: secret?.published },
             ],
             this.meta.cliVersion,
+            this.environmentSelector(),
           ),
-          publicCliCommand("plan", this.meta.cliVersion),
-          publicCliCommand("apply", this.meta.cliVersion),
+          publicCliCommand(`plan${this.environmentSelector()}`, this.meta.cliVersion),
+          publicCliCommand(`apply${this.environmentSelector()}`, this.meta.cliVersion),
         ],
       },
       pretty: `Enabled ${entry.displayName} for ${schema.name}`,
