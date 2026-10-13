@@ -29,6 +29,11 @@ func (s *projectService) AddOrigin(ctx context.Context, projectID string, origin
 			if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
 				return domain.ErrProjectNotFound().WithParent(err)
 			}
+			// Spanner aborts the txn on a lost insert race; bubble UniqueError so
+			// we can classify outside this transaction (see below).
+			if _, ok := errors.AsType[*database.UniqueError](err); ok {
+				return err
+			}
 			return domain.ErrInternal(err).WithMessage("failed to insert origin")
 		}
 		if inserted {
@@ -60,9 +65,28 @@ func (s *projectService) AddOrigin(ctx context.Context, projectID string, origin
 		return nil
 	})
 	if err != nil {
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			return s.originAfterUniqueConflict(ctx, projectID, origin, err)
+		}
 		return nil, err
 	}
 	return &stored, nil
+}
+
+// originAfterUniqueConflict resolves an insert that lost a uniqueness race
+// after the write transaction aborted (Spanner DML AlreadyExists).
+func (s *projectService) originAfterUniqueConflict(ctx context.Context, projectID string, origin domain.Origin, cause error) (*domain.Origin, error) {
+	existing, err := s.v2Pool.Statements().GetOrigin(ctx, database.And(
+		database.Equal(database.Col(domain.OriginFieldProjectID), projectID),
+		database.Equal(database.Col(domain.OriginFieldPattern), origin.Pattern),
+	))
+	if err != nil {
+		return nil, domain.ErrInternal(cause).WithMessage("failed to look up origin after conflict")
+	}
+	if existing.Kind != origin.Kind {
+		return nil, domain.ErrOriginKindConflict().WithParent(cause)
+	}
+	return &domain.Origin{Pattern: existing.Pattern, Kind: existing.Kind}, nil
 }
 
 // RemoveOrigin deletes one origin pattern. Removing a missing pattern is

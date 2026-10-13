@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/spanner"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -98,18 +96,32 @@ func (s originStatements) ListOrigins(ctx context.Context, filter *database.List
 }
 
 // InsertOrigin implements [service.OriginStatements].
+// Spanner aborts a read/write transaction when a DML INSERT hits AlreadyExists,
+// so Postgres/SQLite-style "insert then treat conflict as inserted=false" cannot
+// continue with a follow-up GetOrigin in the same txn. Lookup-then-insert keeps
+// the transaction usable (same mechanics as ADR 065's Spanner Enqueue path).
 func (s originStatements) InsertOrigin(ctx context.Context, projectID string, origin domain.Origin) (bool, error) {
+	pattern := strings.TrimSpace(origin.Pattern)
+	_, err := s.GetOrigin(ctx, database.And(
+		database.Equal(database.Col(domain.OriginFieldProjectID), projectID),
+		database.Equal(database.Col(domain.OriginFieldPattern), pattern),
+	))
+	if err == nil {
+		return false, nil
+	}
+	var noRow *database.NoRowFoundError
+	if !errors.As(err, &noRow) {
+		return false, err
+	}
+
 	stmt := buildStatement(
 		insertOriginStmt,
 		projectID,
-		strings.TrimSpace(origin.Pattern),
+		pattern,
 		string(origin.Kind),
 		time.Now().UTC(),
 	).statement()
 	if _, err := s.db.Update(ctx, stmt); err != nil {
-		if status.Code(err) == codes.AlreadyExists {
-			return false, nil
-		}
 		return false, wrapError(err)
 	}
 	return true, nil

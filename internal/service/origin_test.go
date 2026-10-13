@@ -86,6 +86,19 @@ func TestProjectService_AddOrigin(t *testing.T) {
 		require.ErrorIs(t, err, domain.ErrProjectNotFound())
 		assert.Nil(t, got)
 	})
+
+	t.Run("unique race classifies outside aborted txn", func(t *testing.T) {
+		t.Parallel()
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+		statements.EXPECT().InsertOrigin(gomock.Any(), project.ID, origin).
+			Return(false, database.NewUniqueError("project_origins", "PRIMARY KEY", errors.New("already exists")))
+		statements.EXPECT().GetOrigin(gomock.Any(), gomock.Any()).
+			Return(&origin, nil)
+
+		got, err := svc.AddOrigin(context.Background(), project.ID, origin)
+		require.NoError(t, err)
+		assert.Equal(t, &origin, got)
+	})
 }
 
 func TestProjectService_RemoveOrigin(t *testing.T) {
