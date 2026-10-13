@@ -13,6 +13,7 @@
  */
 
 import { getDefaultLoginFlow, SETUP_PRESETS } from "@zitadel/config/defaults";
+import { withoutFlowStepDefaults } from "@zitadel/config/normalize";
 
 import { ZitadelError } from "../errors";
 
@@ -389,20 +390,8 @@ function shippedPasswordSteps(): string[] {
  * `primary: false` and may state `gates` and `sso_providers` empty.
  */
 function withoutSsoRoutes(step: Step, terminal: string): Step {
-  const copy: Step = { ...step };
+  const copy: Step = { ...withoutFlowStepDefaults(step) };
   delete copy.sso_providers;
-  if (isObject(copy.gates) && Object.keys(copy.gates).length === 0) {
-    delete copy.gates;
-  }
-  if (Array.isArray(copy.actions)) {
-    copy.actions = copy.actions.map((action) => {
-      if (!isObject(action) || action.primary !== false) {
-        return action;
-      }
-      const { primary: _default, ...rest } = action;
-      return rest;
-    });
-  }
   if (isObject(copy.transitions)) {
     const written: Record<string, string> = {
       sso_authenticated: terminal,
