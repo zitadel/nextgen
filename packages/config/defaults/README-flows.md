@@ -15,10 +15,11 @@ to the schema, users won't see a new field until a flow step lists it.
 - `purposes` — entry step for each purpose (`login`, `register`, …). A
   single flow can serve multiple purposes.
 - `steps[]` — the ordered list of screens. Each step's `fields[]`
-  references properties of the pinned schema (or reserved tokens like
+  references properties of the flow's user schema (or reserved tokens like
   `x-auth-methods#password`), and `transitions` wires it to the next
   step.
-- `user_schema` — pins the flow to one specific user-schema revision.
+- `user_schema` — the user schema the flow runs against, named by its
+  `objectType`. The flow always uses that schema's newest revision.
 - `audience` (optional) — scopes the flow to specific apps or teams.
 
 ## Making changes
@@ -100,9 +101,7 @@ anything here afterwards.
 
 ## Schema revisions
 
-Editing a schema publishes a new immutable revision. When you `apply` a
-schema edit, the CLI rewrites `user_schema` in the flow files pinned to
-the old revision and publishes new revisions of those flows in the same
-run — the plan announces the re-pin beforehand, and the rewrite shows up
-in your git diff. Remember to update `steps[].fields[]` yourself when the
-edit added or removed properties the flow should collect.
+Editing a schema publishes a new immutable revision, and the flows naming
+its `objectType` run against it from then on, with no change to the flow
+files. Update `steps[].fields[]` yourself when the edit added or removed
+properties the flow should collect.
