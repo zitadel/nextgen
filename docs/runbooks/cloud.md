@@ -314,8 +314,8 @@ project and imports the root admin.
   Analytics and Speed Insights tabs. Speed Insights samples by the two
   `*_SPEED_INSIGHTS_SAMPLE_RATE` variables, read at build time, so a new rate
   takes a redeploy; `0` turns it off. Web Analytics has no sampling and counts
-  every page view. The website reports page views of its start page only, no
-  Speed Insights.
+  every page view. The website reports every page view of its start page and
+  Speed Insights for one page load in a hundred, a rate fixed in its layout.
 - **Signing in:** `/ui/console/` with the environment's root admin from
   1Password (production and preview have different passwords). Anyone else
   registers through the login UI.
