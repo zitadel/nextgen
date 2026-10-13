@@ -318,6 +318,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       body: JSON.stringify({
         kind: "user-schema",
         metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        objectType: "conformance",
         // Mirrors the server's designation rule (ADR 058 §1): password
         // requires a designated project-unique identifier.
         "x-identifier": "email",
@@ -338,6 +339,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       body: JSON.stringify({
         kind: "user-schema",
         metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        objectType: "conformance",
         // Mirrors the server's designation rule (ADR 058 §1): password
         // requires a designated project-unique identifier.
         "x-identifier": "email",
@@ -369,6 +371,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const doc = {
       kind: "user-schema",
       metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+      objectType: "conformance",
       "x-auth-methods": { password: { enabled: true } },
       title: "CustomTitle",
       "x-custom-extension": { keep: true },

@@ -9,6 +9,7 @@ description: |
 required:
   - metaSchema
   - kind
+  - objectType
   - x-auth-methods
 additionalProperties: true
 properties:

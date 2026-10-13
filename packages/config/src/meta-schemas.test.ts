@@ -268,6 +268,7 @@ describe("meta-schemas", () => {
     const userSchema = (properties: unknown) => ({
       metaSchema: "https://example.test/user-schema.json",
       kind: "user-schema",
+      objectType: "human-user",
       "x-auth-methods": { password: { enabled: true } },
       properties,
     });
