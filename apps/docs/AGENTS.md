@@ -98,8 +98,11 @@ deployment. The specs use paths only, so one spec proves both.
   one there, and goes into the matcher of `proxy.ts` (above).
 - `tests/pages.spec.ts` also pins the assets to `/docs/_next/` and
   `llms-full.txt` to the pages without the API operations.
-- One browser test (`*.browser.spec.ts`, Chromium) proves the site hydrates
-  and navigates; everything else is HTTP through Playwright's request fixture.
+- Two browser tests (`*.browser.spec.ts`, Chromium): the site hydrates and
+  navigates, and a page wears the look in both themes, each colour and face
+  compared with the token it should resolve to. The second catches a Fumadocs
+  upgrade that renames an element `app/global.css` styles by its id.
+  Everything else is HTTP through Playwright's request fixture.
 - Against a deployment, no traces and no HTML report, and the workflow uploads
   the screenshots alone: the repository is public, and a trace or the error of
   a failed request holds the bypass secret
