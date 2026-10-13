@@ -56,8 +56,8 @@ describe("landing routes", () => {
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
-    expect(router.state.location.search).toMatchObject({ project: "proj_1" });
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
     expect(await screen.findByRole("heading", { name: "Teams" })).toBeInTheDocument();
     expect(teamQueries).toEqual(["proj_1"]);
   });
@@ -70,8 +70,8 @@ describe("landing routes", () => {
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
-    expect(router.state.location.search).not.toHaveProperty("project");
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
   });
 
   it("keeps a scoped deep link's target while the person picks a project", async () => {
@@ -94,12 +94,12 @@ describe("landing routes", () => {
     );
     const router = await renderAt("/users/usr_1");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
-    expect(router.state.location.search).toMatchObject({ next: "/users/usr_1" });
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ next: "/users/usr_1" });
 
     await userEvent.click(await screen.findByRole("link", { name: "Globex" }));
-    await waitFor(() => expect(router.state.location.pathname).toBe("/users/usr_1"));
-    expect(router.state.location.search).toEqual({ project: "proj_2" });
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users/usr_1"));
+    expect(router.state.resolvedLocation?.search).toEqual({ project: "proj_2" });
   });
 
   it("selects the only project on an unscoped screen too", async () => {
@@ -111,8 +111,10 @@ describe("landing routes", () => {
     );
     const router = await renderAt("/projects");
 
-    await waitFor(() => expect(router.state.location.search).toMatchObject({ project: "proj_1" }));
-    expect(router.state.location.pathname).toBe("/projects");
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" }),
+    );
+    expect(router.state.resolvedLocation?.pathname).toBe("/projects");
   });
 
   it("asks for the person's projects once for the guard and the switcher", async () => {
@@ -129,7 +131,7 @@ describe("landing routes", () => {
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     const pill = await screen.findByRole("button", { name: "Switch project" });
     await waitFor(() => expect(pill).toHaveTextContent("Select a project"));
     expect(unpaged).toBe(1);
@@ -148,8 +150,8 @@ describe("landing routes", () => {
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
-    expect(router.state.location.search).toMatchObject({ project: "proj_1" });
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
   });
 
   it("does not take one listed project as the only one while more pages follow", async () => {
@@ -160,8 +162,8 @@ describe("landing routes", () => {
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
-    expect(router.state.location.search).not.toHaveProperty("project");
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
   });
 
   it("selects nothing for a person with no projects", async () => {
@@ -173,8 +175,8 @@ describe("landing routes", () => {
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
-    expect(router.state.location.search).not.toHaveProperty("project");
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
     expect(await screen.findByText("No projects yet.")).toBeInTheDocument();
   });
 
@@ -188,8 +190,8 @@ describe("landing routes", () => {
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
-    expect(router.state.location.search).not.toHaveProperty("project");
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
   });
 
   it("lands on Profile from settings", async () => {
@@ -202,7 +204,7 @@ describe("landing routes", () => {
     );
     const router = await renderAt("/settings");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/settings/profile"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings/profile"));
     expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
     // No screen claims WORKSPACE, so the heading is absent and no Admins row
     // survives from when that screen lived here.
