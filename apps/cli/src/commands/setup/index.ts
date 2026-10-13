@@ -106,6 +106,17 @@ const RENDERER_FLAG_DESCRIPTION =
     ? "Renderer (default: react)."
     : `Renderer (default: react). Not yet available: ${UNAVAILABLE_RENDERER_IDS.join(", ")}.`;
 
+/**
+ * The selector appended to setup's credential-recovery commands. `variable set`
+ * is an `EnvironmentCommand` that resolves the project and server from the
+ * environment, where the process environment outranks the `.env` files — so a
+ * bare retry in a shell holding production values would publish to the wrong
+ * project. Pinning `--env-file .env.development.local` (the file setup wrote)
+ * forces the local project the recovery is for, because `--env-file` outranks
+ * the process environment (unlike `--env`); same reasoning as the SSO recovery.
+ */
+const RECOVERY_SELECTOR = " --env-file .env.development.local";
+
 /** `zitadel setup` — create a project and scaffold local auth.
  *
  * Detects (or, for an empty directory, scaffolds then re-detects) the
@@ -371,12 +382,20 @@ export default class Setup extends BaseCommand {
     const credentialEnvFiles = [".env.local", ".env.development.local"];
     const envSnapshots = new Map<string, string | null>(
       await Promise.all(
-        credentialEnvFiles.map(
-          async (file): Promise<[string, string | null]> => [
-            file,
-            await readFile(join(cwd, file), "utf8").catch(() => null),
-          ],
-        ),
+        credentialEnvFiles.map(async (file): Promise<[string, string | null]> => {
+          try {
+            // The content to restore, or null only when the file is absent (so a
+            // rollback removes a file setup created). A different read error must
+            // not be read as "absent" — that would delete a pre-existing file the
+            // rollback should have restored — so it is rethrown.
+            return [file, await readFile(join(cwd, file), "utf8")];
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+              return [file, null];
+            }
+            throw error;
+          }
+        }),
       ),
     );
     consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
@@ -420,14 +439,20 @@ export default class Setup extends BaseCommand {
       // The patcher also merged this project's id and secrets into the
       // credential env files. Restore each to its pre-patch state — its prior
       // content, or removed when setup created it — so a rerun starts from
-      // clean credentials rather than inheriting the abandoned project's.
-      for (const [file, before] of envSnapshots) {
-        const target = join(cwd, file);
-        if (before === null) {
-          await rm(target, { force: true });
-        } else {
-          await writeFile(target, before);
+      // clean credentials rather than inheriting the abandoned project's. A
+      // failure here must not replace the real `error` below (its remedy is the
+      // useful one), so restore is best-effort.
+      try {
+        for (const [file, before] of envSnapshots) {
+          const target = join(cwd, file);
+          if (before === null) {
+            await rm(target, { force: true });
+          } else {
+            await writeFile(target, before);
+          }
         }
+      } catch {
+        // Keep the original failure as the thrown cause.
       }
       const cause = toZitadelError(error);
       throw new ZitadelError(cause.code, `Default resource setup failed: ${cause.message}`, {
@@ -493,12 +518,10 @@ export default class Setup extends BaseCommand {
               `${answer.endpoints.issuer}, not the provider`,
           );
         }
-        // setup binds the default environment, so its recovery commands carry
-        // no selector (an empty string appends nothing).
-        reportClientIdOutcome(idVariable, clientId, this.meta.cliVersion, "");
+        reportClientIdOutcome(idVariable, clientId, this.meta.cliVersion, RECOVERY_SELECTOR);
         // The wizard refuses an empty secret, so a deferred publish here only
         // ever means there was no project to publish to.
-        reportSecretOutcome(secret, this.meta.cliVersion, false, "");
+        reportSecretOutcome(secret, this.meta.cliVersion, false, RECOVERY_SELECTOR);
       }
     }
 
@@ -761,7 +784,7 @@ export default class Setup extends BaseCommand {
               ];
             }),
             this.meta.cliVersion,
-            "",
+            RECOVERY_SELECTOR,
           ),
           ...installOutcome.nextCommands,
           ...consoleStep.commands,
