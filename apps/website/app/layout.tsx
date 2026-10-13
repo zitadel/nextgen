@@ -3,14 +3,6 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 import { Arimo } from "next/font/google";
 import localFont from "next/font/local";
-import dark from "./icons/dark.ico";
-import dark16 from "./icons/dark-16.png";
-import dark32 from "./icons/dark-32.png";
-import dark180 from "./icons/dark-180.png";
-import light from "./icons/light.ico";
-import light16 from "./icons/light-16.png";
-import light32 from "./icons/light-32.png";
-import light180 from "./icons/light-180.png";
 import "./globals.css";
 
 // The website's faces: Arimo for text, APK Futural (a licensed webfont) for
@@ -36,36 +28,27 @@ export const metadata: Metadata = {
 };
 
 // The website's favicons (packages/theme/assets/favicons in
-// zitadel/new-website), declared as it does: a dark mark for a light browser,
-// a light one for a dark browser. Imports rather than app/icon.png and the
-// like, which Next would serve at the root, a path the cloud routes to the
-// server.
+// zitadel/new-website), served from public/favicons/ and declared as it does:
+// a dark mark for a light browser, a light one for a dark browser. The
+// console, the login UI and the docs link this same set (AGENTS.md).
 function favicons(): Metadata["icons"] {
-  const schemes = [
-    {
-      media: "(prefers-color-scheme: light)",
-      ico: light,
-      px16: light16,
-      px32: light32,
-      px180: light180,
-    },
-    {
-      media: "(prefers-color-scheme: dark)",
-      ico: dark,
-      px16: dark16,
-      px32: dark32,
-      px180: dark180,
-    },
-  ];
+  const schemes = ["light", "dark"].map((scheme) => ({
+    dir: `/favicons/${scheme}`,
+    media: `(prefers-color-scheme: ${scheme})`,
+  }));
   return {
-    icon: schemes.flatMap(({ media, ico, px16, px32 }) => [
-      { url: px16.src, sizes: "16x16", type: "image/png", media },
-      { url: px32.src, sizes: "32x32", type: "image/png", media },
-      { url: ico.src, type: "image/x-icon", media },
+    icon: schemes.flatMap(({ dir, media }) => [
+      { url: `${dir}/favicon-16x16.png`, sizes: "16x16", type: "image/png", media },
+      { url: `${dir}/favicon-32x32.png`, sizes: "32x32", type: "image/png", media },
+      { url: `${dir}/favicon.ico`, type: "image/x-icon", media },
     ]),
-    shortcut: schemes.map(({ media, ico }) => ({ url: ico.src, type: "image/x-icon", media })),
-    apple: schemes.map(({ media, px180 }) => ({
-      url: px180.src,
+    shortcut: schemes.map(({ dir, media }) => ({
+      url: `${dir}/favicon.ico`,
+      type: "image/x-icon",
+      media,
+    })),
+    apple: schemes.map(({ dir, media }) => ({
+      url: `${dir}/apple-touch-icon.png`,
       sizes: "180x180",
       type: "image/png",
       media,

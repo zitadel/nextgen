@@ -1,0 +1,8 @@
+type: string
+description: |
+  Which deployments a variable's value reaches. `primary` values are frozen
+  by deployments to primary origins, `preview` values by deployments to
+  preview URLs. Nothing falls back from one kind to the other.
+enum:
+  - primary
+  - preview

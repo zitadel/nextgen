@@ -1,0 +1,7 @@
+name: kind
+in: query
+required: false
+description: |
+  The kind of value the request addresses. Omit it to address both kinds.
+schema:
+  $ref: '../schemas/variable-kind.yaml'

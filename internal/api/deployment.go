@@ -19,8 +19,25 @@ func (h *Handler) CreateDeployment(ctx context.Context, _ *api.CreateDeploymentR
 	return nil, domain.ErrNotImplemented()
 }
 
+func (h *Handler) RollbackDeployment(ctx context.Context, _ api.OptRollbackDeploymentRequest, params api.RollbackDeploymentParams) (api.RollbackDeploymentRes, error) {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opWrite); err != nil {
+		return nil, err
+	}
+	return nil, domain.ErrNotImplemented()
+}
+
 func (h *Handler) GetDeploymentById(ctx context.Context, params api.GetDeploymentByIdParams) (api.GetDeploymentByIdRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opRead); err != nil {
+		return nil, err
+	}
+	return nil, domain.ErrNotImplemented()
+}
+
+func (h *Handler) GetDeploymentVariables(ctx context.Context, params api.GetDeploymentVariablesParams) (api.GetDeploymentVariablesRes, error) {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opRead); err != nil {
+		return nil, err
+	}
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), variableAccess, opRead); err != nil {
 		return nil, err
 	}
 	return nil, domain.ErrNotImplemented()
@@ -37,6 +54,23 @@ func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeployment
 				return nil, err
 			}
 		}
+	}
+	return nil, domain.ErrNotImplemented()
+}
+
+// The preview operations answer 501 like the deployment ones: a preview
+// exists only through a deployment to it.
+
+func (h *Handler) ListPreviews(ctx context.Context, params api.ListPreviewsParams) (api.ListPreviewsRes, error) {
+	if _, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), deploymentAccess, domain.ResourceKindDeployment); err != nil {
+		return nil, err
+	}
+	return nil, domain.ErrNotImplemented()
+}
+
+func (h *Handler) RemovePreview(ctx context.Context, _ *api.RemovePreviewRequest, params api.RemovePreviewParams) (api.RemovePreviewRes, error) {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opWrite); err != nil {
+		return nil, err
 	}
 	return nil, domain.ErrNotImplemented()
 }

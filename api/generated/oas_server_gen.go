@@ -82,25 +82,48 @@ type Handler interface {
 	CreateBranding(ctx context.Context, req *Branding, params CreateBrandingParams) (CreateBrandingRes, error)
 	// CreateDeployment implements createDeployment operation.
 	//
-	// Makes a release live on an environment by recording a deployment. The two
-	// happen atomically: when the call returns, the environment runs the named
-	// release and the record exists; on any failure the environment keeps
-	// running what it ran and no record is written.
-	// Deploying, promoting and rolling back are all this call — `reason` says
-	// which. None of them assembles a release: the release must already exist,
-	// and rolling back means deploying a release the environment ran earlier,
-	// chosen from its deployment history.
-	// Idempotent on the running release: deploying the release the environment
-	// already runs changes nothing and answers `200` with the deployment that
-	// made it live, so a re-run of `zitadel deploy` on unchanged content is a
-	// no-op end to end — matching `POST /releases`, which resolves the same
-	// content to the same release first. Anything else writes a new record,
-	// including the same release returning after something else ran in between:
-	// the log is append-only, and each row is one act of making a release live.
-	// `expected_current_deployment_id` guards against racing another deploy:
-	// when present, the swap only happens if the environment's current
-	// deployment still is the one named, and a mismatch answers `409` with the
-	// actual `current_deployment_id` and `current_release_id` in the details.
+	// Makes a release live on a set of targets by recording a deployment. The
+	// two happen atomically: when the call returns, every target serves the
+	// named release and the record exists; on any failure every target keeps
+	// serving what it served and no record is written.
+	// The release is named by exactly one of `release_id` or `content_hash`
+	// (both or neither answers `400` with `dep.invalid`), and must already
+	// exist in the project: deploying never assembles a release. An
+	// unknown release id or digest answers `404` with `rel.not_found`, and a
+	// revoked release answers `409` with `rel.revoked`.
+	// `targets` lists `primary`, which expands to every primary origin of the
+	// project, and exact origins. An origin that is neither a primary origin
+	// of the project nor matches one of its preview patterns answers `403`
+	// with `proj.origin_not_allowed`, and `primary` on a project with no
+	// primary origin answers `400` with `dep.invalid`. The deployment records
+	// the resolved origins, sorted, never the keyword.
+	// A deployment to preview URLs creates the preview for each of them, or
+	// renews it when it exists, in the same transaction, with the expiry set
+	// from `ttl`; each target in the response carries that expiry. It always
+	// writes a new deployment, answering `201`, even when the URLs already
+	// serve the release: that record is the renewal. Primary origins and
+	// preview URLs cannot be mixed in one deployment: that answers `400` with
+	// `dep.invalid`.
+	// A deployment freezes the variable values the project stores for its
+	// kind: primary origins use the primary values, preview URLs the preview
+	// values, with no fallback from one to the other. A release that
+	// references a variable with no value for that kind answers `400` with
+	// `dep.variables_missing`, naming the kind and every missing variable, and
+	// nothing is written.
+	// A deployment to primary origins is idempotent on what is served: when
+	// every resolved target already serves the release with the same frozen
+	// variable values, nothing changes and the call answers `200` with the
+	// newest deployment to those targets, so a re-run of `zitadel deploy` on
+	// unchanged content is a no-op end to end. The same release with a
+	// changed variable value is a new deployment.
+	// Anything else writes a new record covering all of the resolved targets,
+	// including the same release returning after something else was served in
+	// between: the log is append-only, and each record is one act of making a
+	// release live.
+	// `expected_deployment_id` guards against racing another deploy: when
+	// present, the write only happens if the newest deployment to any of the
+	// resolved targets still is the one named, and a mismatch answers `409`
+	// with `dep.conflict`, carrying the actual newest deployment.
 	//
 	// POST /deployments
 	CreateDeployment(ctx context.Context, req *CreateDeploymentRequest, params CreateDeploymentParams) (CreateDeploymentRes, error)
@@ -307,8 +330,12 @@ type Handler interface {
 	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)
 	// DeleteVariable implements deleteVariable operation.
 	//
-	// Removes the project's variable under this name. Deleting a name the
-	// project does not hold answers `var.not_found`.
+	// Removes the project's variable under this name for the kind `kind`
+	// names, leaving the other kind's value. Without `kind`, both are removed.
+	// A name with no value for any kind addressed answers `var.not_found`.
+	// Deployments already made keep the value they froze. The next deployment
+	// of that kind whose release references the name is refused with
+	// `dep.variables_missing`.
 	//
 	// DELETE /variables/{variable_name}
 	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
@@ -392,6 +419,18 @@ type Handler interface {
 	//
 	// GET /deployments/{deployment_id}
 	GetDeploymentById(ctx context.Context, params GetDeploymentByIdParams) (GetDeploymentByIdRes, error)
+	// GetDeploymentVariables implements getDeploymentVariables operation.
+	//
+	// Returns the variable values the deployment froze when it was made: the
+	// values of its kind the project stored at that moment, not what it stores
+	// now. Later writes and removals do not change them.
+	// Secret values are not returned. A secret appears as `{"secret": true}`.
+	// The lookup is scoped to the project in `project_id`: a deployment id
+	// belonging to another project answers not found exactly as an unknown id
+	// does.
+	//
+	// GET /deployments/{deployment_id}/variables
+	GetDeploymentVariables(ctx context.Context, params GetDeploymentVariablesParams) (GetDeploymentVariablesRes, error)
 	// GetEvent implements getEvent operation.
 	//
 	// Loads a single event by `(project_id, id)`. Requires `events.read`.
@@ -555,15 +594,19 @@ type Handler interface {
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
 	// GetVariable implements getVariable operation.
 	//
-	// Reads one of the project's variables by name. A name the project has not
-	// entered answers `var.not_found`. A secret is found but not disclosed: the
-	// response is `{"secret": true}`.
+	// Reads one of the project's variables by name, with its value per kind.
+	// `kind` narrows the answer to one kind. A name with no value for any kind
+	// addressed answers `var.not_found`, so `kind=preview` on a name stored for
+	// `primary` only is not found. A secret is found but not disclosed: its
+	// value is `{"secret": true}`.
 	//
 	// GET /variables/{variable_name}
 	GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error)
 	// GetVariables implements getVariables operation.
 	//
-	// Returns the project's variables, keyed by name.
+	// Returns the project's variables, keyed by name, each with its value per
+	// kind. `kind` narrows the answer to one kind: every name stored for it,
+	// which is what a deployment of that kind freezes.
 	// Secret values are not returned. A secret appears as `{"secret": true}`,
 	// which says a value is held without disclosing it.
 	//
@@ -602,10 +645,18 @@ type Handler interface {
 	// ListDeployments implements listDeployments operation.
 	//
 	// Lists deployments newest first: what ran where, and when.
-	// With `environment_name`, the list is that environment's history and its
-	// first row is the environment's current deployment. Without it, the list
-	// interleaves every environment of the project — a project-wide audit view
-	// in which the first row is only the most recent deployment anywhere.
+	// By default the list is the history: every deployment of the project, each
+	// with every target it made the release live on. With `origin`, it is the
+	// history of that origin alone, and its first row is the deployment the
+	// origin serves.
+	// With `live=true`, the list is what is served now: the newest deployment
+	// to each target, each carrying only the targets it still serves. A
+	// preview URL is served only while its preview is live, and its
+	// `expires_at` is the expiry its newest deployment set, which is the
+	// preview's current one. A deployment every target of which has since
+	// been replaced, or whose previews have all expired or been removed, does
+	// not appear. Combined with `origin`, the live view is the one deployment
+	// that origin serves, or empty.
 	// `expand: ["release"]` embeds the release each deployment made live, so a
 	// history renders with each entry's content without resolving `release_id`
 	// one by one. Expanding requires `release.read` and does not affect the
@@ -654,6 +705,14 @@ type Handler interface {
 	//
 	// GET /users/me/projects
 	ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error)
+	// ListPreviews implements listPreviews operation.
+	//
+	// Lists the project's live previews, newest first by `created_at`. An
+	// expired or removed preview is not listed; what was deployed to it stays
+	// in `GET /deployments`.
+	//
+	// GET /projects/{project_id}/previews
+	ListPreviews(ctx context.Context, params ListPreviewsParams) (ListPreviewsRes, error)
 	// ListReleases implements listReleases operation.
 	//
 	// Lists the project's releases, newest first.
@@ -773,6 +832,18 @@ type Handler interface {
 	//
 	// POST /users/query
 	QueryUsers(ctx context.Context, req *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
+	// RemovePreview implements removePreview operation.
+	//
+	// Ends a preview before it expires: the URL stops being served at once.
+	// The deployments to it stay in the history.
+	// Idempotent: a URL with no live preview, including one that has already
+	// expired or was removed before, answers `204` too, so a cleanup that
+	// races the expiry still succeeds.
+	// The URL travels in the body rather than the path because an origin
+	// contains `/`.
+	//
+	// POST /projects/{project_id}/previews/remove
+	RemovePreview(ctx context.Context, req *RemovePreviewRequest, params RemovePreviewParams) (RemovePreviewRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Logs out by permanently deleting the session.
@@ -816,6 +887,34 @@ type Handler interface {
 	//
 	// DELETE /sessions/{session_id}
 	RevokeSession(ctx context.Context, params RevokeSessionParams) (RevokeSessionRes, error)
+	// RollbackDeployment implements rollbackDeployment operation.
+	//
+	// Re-deploys the deployment named in the path: a new deployment with the
+	// same `release_id` and the same `targets`, `reason: rollback`, and
+	// `rollback_to` in its metadata naming the deployment it re-applied. The
+	// variable values that deployment resolved are re-applied with it, so the
+	// targets serve exactly what they served then. The history is append-only,
+	// so the deployments in between stay in it.
+	// Only a deployment to primary origins can be rolled back. One whose
+	// targets were preview URLs answers `400` with `dep.invalid`; deploy to
+	// the preview again instead. Every target must still be a primary origin
+	// of the project, as `POST /deployments` requires of an exact origin:
+	// when one is not, the request answers `403` with
+	// `proj.origin_not_allowed` naming it, and nothing changes. There is no
+	// narrowing to some of the targets: to roll back one origin, deploy the
+	// earlier release to it with `POST /deployments`.
+	// When every target already serves the deployment's release, nothing
+	// changes and the call answers `200` with the newest deployment to the
+	// targets.
+	// The release must not be revoked: a revoked one answers `409` with
+	// `rel.revoked`. An unknown deployment id, or one of another project,
+	// answers `404` with `dep.not_found`.
+	// A rollback never answers `dep.variables_missing`: the release and the
+	// frozen values it re-applies passed that check together when the named
+	// deployment was made.
+	//
+	// POST /deployments/{deployment_id}/rollback
+	RollbackDeployment(ctx context.Context, req OptRollbackDeploymentRequest, params RollbackDeploymentParams) (RollbackDeploymentRes, error)
 	// SetUserPassword implements setUserPassword operation.
 	//
 	// Set user password.
@@ -873,8 +972,12 @@ type Handler interface {
 	UpdateTeam(ctx context.Context, req *UpdateTeamRequest, params UpdateTeamParams) (UpdateTeamRes, error)
 	// UpdateVariables implements updateVariables operation.
 	//
-	// Enters, replaces and removes the project's variables. Names not in the
-	// body are untouched.
+	// Enters, replaces and removes the project's variables for the kind `kind`
+	// names. Names not in the body are untouched. Nothing here reaches a
+	// deployment already made: each deployment keeps the values it froze.
+	// Without `kind`, a plain value is written for both kinds and a secret for
+	// `primary` only, so a secret reaches previews only when written with
+	// `kind=preview`. `null` removes the name from every kind addressed.
 	// A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 	// stores the value encrypted under the project's active `secret` key, after
 	// which it can be referenced but not read back. `null` removes the name

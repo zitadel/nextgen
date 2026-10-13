@@ -1,9 +1,10 @@
 title: Variables
 description: |
-  The project's variables, keyed by name. One name is one value.
+  The variables a deployment froze, keyed by name. Every value is of the
+  deployment's kind.
 
-  An empty object is an ordinary answer, not an error — it means nothing has
-  been entered.
+  An empty object is an ordinary answer, not an error: nothing was stored for
+  that kind when the deployment was made.
 type: object
 propertyNames:
   $ref: ../../components/schemas/variable-name.yaml

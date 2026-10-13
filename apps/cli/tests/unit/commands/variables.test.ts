@@ -85,8 +85,9 @@ describe("variables list", () => {
     server.use(
       http.get("*/variables", () =>
         HttpResponse.json({
-          GOOGLE_CLIENT_SECRET: { secret: true },
-          GOOGLE_CLIENT_ID: "999-prod",
+          GOOGLE_CLIENT_SECRET: { primary: { secret: true } },
+          GOOGLE_CLIENT_ID: { primary: "999-prod", preview: "999-test" },
+          PREVIEW_ONLY: { preview: "x" },
         }),
       ),
     );
@@ -111,7 +112,9 @@ describe("variables list", () => {
 
   it("never emits a value key for a secret", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables", () => HttpResponse.json({ S: { secret: true } })));
+    server.use(
+      http.get("*/variables", () => HttpResponse.json({ S: { primary: { secret: true } } })),
+    );
 
     const res = await runCliForTest(["variables", "list", "--project-level", ...base(cwd)]);
 
@@ -119,12 +122,12 @@ describe("variables list", () => {
     expect(json.data.variables[0]).not.toHaveProperty("value");
   });
 
-  it("sends no environment_name, so the project level is the owner", async () => {
+  it("reads the primary values", async () => {
     const cwd = await makeProject();
     let seen: string | null = "unset";
     server.use(
       http.get("*/variables", ({ request }) => {
-        seen = new URL(request.url).searchParams.get("environment_name");
+        seen = new URL(request.url).searchParams.get("kind");
         return HttpResponse.json({});
       }),
     );
@@ -132,7 +135,7 @@ describe("variables list", () => {
     const res = await runCliForTest(["variables", "list", "--project-level", ...base(cwd)]);
 
     expect(res.exitCode).toBe(0);
-    expect(seen).toBeNull();
+    expect(seen).toBe("primary");
     const json = parseJson(res.stdout) as { data: { count: number } };
     expect(json.data.count).toBe(0);
   });
@@ -142,7 +145,9 @@ describe("variables list", () => {
     let call = 0;
     server.use(
       http.get("*/variables", () =>
-        HttpResponse.json(call++ === 0 ? { B: "two", A: { secret: true } } : {}),
+        HttpResponse.json(
+          call++ === 0 ? { B: { primary: "two" }, A: { primary: { secret: true } } } : {},
+        ),
       ),
     );
 
@@ -157,7 +162,9 @@ describe("variables list", () => {
 
   it("renders a table and a count on a terminal, unless --plain", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables", () => HttpResponse.json({ V: "one\ntwo\u001b[31m" })));
+    server.use(
+      http.get("*/variables", () => HttpResponse.json({ V: { primary: "one\ntwo\u001b[31m" } })),
+    );
 
     const table = await asTerminal(() =>
       runCliForTest(["variables", "list", "--project-level", ...plainArgs(cwd)]),
@@ -219,7 +226,7 @@ describe("variables list", () => {
 
   it("prints the project and the server on a terminal, and neither on a pipe", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables", () => HttpResponse.json({ A: "b" })));
+    server.use(http.get("*/variables", () => HttpResponse.json({ A: { primary: "b" } })));
 
     // The harness captures stdout, so process.stdout.isTTY is undefined here —
     // the same condition a pipe or a redirect creates.
@@ -273,12 +280,12 @@ describe("variables get", () => {
   it("returns a non-secret value, addressing the project level", async () => {
     const cwd = await makeProject();
     let path = "";
-    let environment: string | null = "unset";
+    let kind: string | null = "unset";
     server.use(
       http.get("*/variables/:name", ({ request, params }) => {
         path = String(params.name);
-        environment = new URL(request.url).searchParams.get("environment_name");
-        return HttpResponse.json("999-prod");
+        kind = new URL(request.url).searchParams.get("kind");
+        return HttpResponse.json({ primary: "999-prod" });
       }),
     );
 
@@ -292,7 +299,7 @@ describe("variables get", () => {
 
     expect(res.exitCode).toBe(0);
     expect(path).toBe("GOOGLE_CLIENT_ID");
-    expect(environment).toBeNull();
+    expect(kind).toBe("primary");
     const json = parseJson(res.stdout) as {
       data: { name: string; secret: boolean; value: string };
     };
@@ -305,7 +312,7 @@ describe("variables get", () => {
 
   it("prints the whole record on a pipe, as every other get does", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables/:name", () => HttpResponse.json("999-prod")));
+    server.use(http.get("*/variables/:name", () => HttpResponse.json({ primary: "999-prod" })));
 
     const res = await runCliForTest([
       "variables",
@@ -325,7 +332,9 @@ describe("variables get", () => {
 
   it("gives a pipe no value to capture for a secret", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables/:name", () => HttpResponse.json({ secret: true })));
+    server.use(
+      http.get("*/variables/:name", () => HttpResponse.json({ primary: { secret: true } })),
+    );
 
     const res = await runCliForTest([
       "variables",
@@ -341,7 +350,7 @@ describe("variables get", () => {
 
   it("lays the record out field by field on a terminal", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables/:name", () => HttpResponse.json("999-prod")));
+    server.use(http.get("*/variables/:name", () => HttpResponse.json({ primary: "999-prod" })));
 
     const res = await asTerminal(() =>
       runCliForTest(["variables", "get", "GOOGLE_CLIENT_ID", "--project-level", ...plainArgs(cwd)]),
@@ -358,7 +367,7 @@ describe("variables get", () => {
     const cwd = await makeProject();
     server.use(
       http.get("*/variables/:name", ({ params }) =>
-        HttpResponse.json(params.name === "TOKEN" ? { secret: true } : ""),
+        HttpResponse.json({ primary: params.name === "TOKEN" ? { secret: true } : "" }),
       ),
     );
 
@@ -375,7 +384,9 @@ describe("variables get", () => {
 
   it("reports a secret as held and carries no value", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables/:name", () => HttpResponse.json({ secret: true })));
+    server.use(
+      http.get("*/variables/:name", () => HttpResponse.json({ primary: { secret: true } })),
+    );
 
     const res = await runCliForTest(["variables", "get", "TOKEN", "--project-level", ...base(cwd)]);
 
@@ -387,7 +398,7 @@ describe("variables get", () => {
 
   it("escapes a value that would otherwise drive the terminal", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables/:name", () => HttpResponse.json("a\u001b[31mb")));
+    server.use(http.get("*/variables/:name", () => HttpResponse.json({ primary: "a\u001b[31mb" })));
 
     const res = await asTerminal(() =>
       runCliForTest(["variables", "get", "NASTY", "--project-level", ...plainArgs(cwd)]),
@@ -419,11 +430,11 @@ describe("variables set", () => {
   it("sends the piped value and marks it secret", async () => {
     const cwd = await makeProject();
     let body: Record<string, unknown> = {};
-    let environment: string | null = "unset";
+    let kind: string | null = "unset";
     server.use(
       http.patch("*/variables", async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
-        environment = new URL(request.url).searchParams.get("environment_name");
+        kind = new URL(request.url).searchParams.get("kind");
         return HttpResponse.json({});
       }),
     );
@@ -441,7 +452,7 @@ describe("variables set", () => {
     );
 
     expect(res.exitCode).toBe(0);
-    expect(environment).toBeNull();
+    expect(kind).toBeNull();
     expect(body).toEqual({ GOOGLE_CLIENT_SECRET: { value: "GOCSPX-abc", secret: true } });
     const json = parseJson(res.stdout) as { data: Record<string, unknown> };
     expect(json.data).toEqual({ name: "GOOGLE_CLIENT_SECRET", secret: true, type: "string" });
@@ -880,11 +891,11 @@ describe("variables delete", () => {
   it("deletes the name at the project level", async () => {
     const cwd = await makeProject();
     let path = "";
-    let environment: string | null = "unset";
+    let kind: string | null = "unset";
     server.use(
       http.delete("*/variables/:name", ({ request, params }) => {
         path = String(params.name);
-        environment = new URL(request.url).searchParams.get("environment_name");
+        kind = new URL(request.url).searchParams.get("kind");
         return new HttpResponse(null, { status: 204 });
       }),
     );
@@ -901,7 +912,7 @@ describe("variables delete", () => {
 
     expect(res.exitCode).toBe(0);
     expect(path).toBe("SUPPORT_EMAIL");
-    expect(environment).toBeNull();
+    expect(kind).toBeNull();
     const json = parseJson(res.stdout) as { data: Record<string, unknown> };
     expect(json.data).toEqual({ name: "SUPPORT_EMAIL", deleted: true });
   });

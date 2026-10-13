@@ -1,5 +1,5 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -90,8 +90,8 @@ describe("authentication guard", () => {
     const router = await renderAt("/users");
 
     expect(await screen.findByTestId("zitadel-login")).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/login");
-    expect(router.state.location.search).toEqual({ next: "/users" });
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/login"));
+    expect(router.state.resolvedLocation?.search).toEqual({ next: "/users" });
     // The widget's post-sign-in target carries the requested path, and the
     // widget receives a `project` HANDLE (not discrete attribute props):
     // the element property is the only config source that outranks the
@@ -120,7 +120,7 @@ describe("authentication guard", () => {
     const router = await renderAt("/");
 
     await screen.findByTestId("zitadel-login");
-    expect(router.state.location.search).toEqual({});
+    await waitFor(() => expect(router.state.resolvedLocation?.search).toEqual({}));
   });
 
   it("redirects a signed-in visitor away from /login to the requested path", async () => {
@@ -128,7 +128,7 @@ describe("authentication guard", () => {
     const router = await renderAt("/login?next=/schemas");
 
     expect(await screen.findByRole("heading", { name: "User schemas" })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/schemas");
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/schemas"));
   });
 
   it("drops unsafe ?next= values instead of following them", async () => {
@@ -162,6 +162,6 @@ describe("authentication guard", () => {
 
     expect(await screen.findByTestId("zitadel-login")).toBeInTheDocument();
     expect(signOut).toHaveBeenCalledOnce();
-    expect(router.state.location.pathname).toBe("/login");
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/login"));
   });
 });

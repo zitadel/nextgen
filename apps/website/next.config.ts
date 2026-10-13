@@ -11,9 +11,9 @@ if (sampleRate && !(Number(sampleRate) >= 0 && Number(sampleRate) <= 1)) {
   );
 }
 
-// The cloud routes only / and /_next/* to this app (repo-root vercel.json),
-// so it needs no base path or asset prefix: its assets already load from
-// /_next/.
+// The cloud routes /, /_next/* and the favicons (/favicon.ico, /favicons/*)
+// to this app (repo-root vercel.json), so it needs no base path or asset
+// prefix: its other assets already load from /_next/.
 const config: NextConfig = {
   reactStrictMode: true,
   turbopack: {
