@@ -80,6 +80,25 @@ describe("apply", () => {
   });
 
   describe("against a valid server", () => {
+    describe("an SSO configuration that does not hold together", () => {
+      it("sends nothing, so the platform is left exactly as it was", async () => {
+        const app = await aSetUpApp();
+        expect(
+          await app.enableSso("google", { clientId: "1234-abc", secret: "the-client-secret" }),
+        ).toSucceed();
+        await app.editConnection("google", (connection) => {
+          connection.claim_mapping = { email: "email", emailAddress: "mail" };
+        });
+
+        const result = await app.apply();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toPrint("claim_mapping target");
+        expect(result).toPrint("emailAddress");
+        expect(await app.registeredIdps()).toEqual([]);
+      });
+    });
+
     describe("--json", () => {
       it("reports a project that already matches as synced", async () => {
         const app = await aSetUpApp();

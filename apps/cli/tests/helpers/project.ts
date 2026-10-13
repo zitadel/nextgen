@@ -100,6 +100,13 @@ export interface UserSchemaDocument {
   "x-auth-methods"?: Record<string, { enabled: boolean; providers?: string[] }>;
 }
 
+/** A connection file as committed, which the developer owns and edits. */
+export interface ConnectionDocument {
+  slug: string;
+  claim_mapping?: Record<string, string>;
+  verified_claims?: Record<string, string>;
+}
+
 /** The login flow as committed, which the developer owns and edits. */
 export interface FlowDocument {
   purposes: Record<string, string>;
@@ -450,6 +457,11 @@ export class ScaffoldedApp {
   /** Edits the committed user schema, as the developer owning it would. */
   editUserSchema(edit: (schema: UserSchemaDocument) => void): Promise<void> {
     return this.editDocument(SCHEMA_FILE, edit);
+  }
+
+  /** Edits a committed connection file, as the developer owning it would. */
+  editConnection(slug: string, edit: (connection: ConnectionDocument) => void): Promise<void> {
+    return this.editDocument(`.zitadel/idps/${slug}.json`, edit);
   }
 
   /** Edits the committed login flow, as the developer owning it would. */

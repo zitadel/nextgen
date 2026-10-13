@@ -12,6 +12,11 @@ function addCompanyField(app: ScaffoldedApp): Promise<void> {
   });
 }
 
+const GOOGLE = {
+  clientId: "1234-abc.apps.googleusercontent.com",
+  secret: "the-client-secret",
+};
+
 /** Drops the transition the platform requires on a login entry step. */
 function breakTheLoginEntryStep(app: ScaffoldedApp): Promise<void> {
   return app.editLoginFlow((flow) => {
@@ -121,6 +126,134 @@ describe("plan", () => {
         });
 
         expect(await app.plan()).toReportNothingToDo();
+      });
+    });
+
+    /**
+     * Mistakes that only show when the schema, the flow and the connection are
+     * read together. Each one stops `plan` before anything is sent, and says
+     * which file and which name is at fault.
+     */
+    describe("SSO configuration across files", () => {
+      async function anAppWithGoogle(): Promise<ScaffoldedApp> {
+        const app = await aSetUpApp();
+        expect(await app.enableSso("google", GOOGLE)).toSucceed();
+        return app;
+      }
+
+      it("accepts what sso enable writes", async () => {
+        const app = await anAppWithGoogle();
+
+        expect((await app.plan()).total).toBeGreaterThan(0);
+      });
+
+      it("stops on a step that offers a provider the schema does not list", async () => {
+        const app = await anAppWithGoogle();
+        await app.editUserSchema((schema) => {
+          const sso = schema["x-auth-methods"]?.sso;
+          if (sso) sso.providers = ["okta"];
+        });
+
+        const result = await app.planAttempt();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toPrint("identifier");
+        expect(result).toPrint("is not listed in sso.providers");
+      });
+
+      it("stops on a step that offers providers when the schema has sso switched off", async () => {
+        const app = await anAppWithGoogle();
+        await app.editUserSchema((schema) => {
+          const sso = schema["x-auth-methods"]?.sso;
+          if (sso) sso.enabled = false;
+        });
+
+        const result = await app.planAttempt();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toPrint("is not an enabled authentication method");
+      });
+
+      it("stops on a schema that lists a provider with no connection file", async () => {
+        const app = await anAppWithGoogle();
+        await app.editUserSchema((schema) => {
+          schema["x-auth-methods"]?.sso?.providers?.push("okta");
+        });
+
+        const result = await app.planAttempt();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toPrint("default-human-user.json");
+        expect(result).toPrint("okta");
+        expect(result).toPrint("there is no connection file");
+      });
+
+      it("stops on a step that offers providers without routing every outcome", async () => {
+        const app = await anAppWithGoogle();
+        await app.editLoginFlow((flow) => {
+          const transitions = flow.steps.find((step) => step.name === "identifier")?.transitions;
+          delete transitions?.sso_user_not_found;
+          delete transitions?.user_already_exists;
+        });
+
+        const result = await app.planAttempt();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toPrint("does not route sso_user_not_found, user_already_exists");
+      });
+
+      it("stops on a claim mapping to a property no schema defines", async () => {
+        const app = await anAppWithGoogle();
+        await app.editConnection("google", (connection) => {
+          connection.claim_mapping = { email: "email", emailAddress: "mail" };
+        });
+
+        const result = await app.planAttempt();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toPrint("google.json");
+        expect(result).toPrint("claim_mapping target");
+        expect(result).toPrint("emailAddress");
+      });
+
+      it("stops on a verified claim that is not mapped", async () => {
+        const app = await anAppWithGoogle();
+        await app.editConnection("google", (connection) => {
+          connection.verified_claims = { givenName: "given_name_verified" };
+        });
+
+        const result = await app.planAttempt();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toPrint("givenName");
+        expect(result).toPrint("has no claim_mapping entry");
+      });
+
+      it("stops on a claim mapping that fills nothing the schema defines", async () => {
+        const app = await anAppWithGoogle();
+        await app.editConnection("google", (connection) => {
+          connection.claim_mapping = {};
+        });
+
+        const result = await app.planAttempt();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toPrint("shares no property");
+      });
+
+      it("names every problem at once, not only the first", async () => {
+        const app = await anAppWithGoogle();
+        await app.editUserSchema((schema) => {
+          schema["x-auth-methods"]?.sso?.providers?.push("okta");
+        });
+        await app.editConnection("google", (connection) => {
+          connection.claim_mapping = { email: "email", emailAddress: "mail" };
+        });
+
+        const result = await app.planAttempt();
+
+        expect(result).toPrint("okta");
+        expect(result).toPrint("emailAddress");
       });
     });
 

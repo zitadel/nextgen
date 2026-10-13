@@ -9,6 +9,7 @@ import { FLOWS_DIR } from "../flows";
 import { stableStringify } from "../json";
 import { annotateAssetWarnings } from "./asset-probe.js";
 import { validatePlannedFlows } from "./flow-validation.js";
+import { validatePlannedSso } from "./sso-validation.js";
 import type { PlanResourceChange } from "./plan-renderer.js";
 import { readState, removeFromState, updateState } from "./state.js";
 import { FatalFetchError } from "./types.js";
@@ -221,6 +222,8 @@ export async function buildSyncPlan(
   // server would otherwise enforce mid-apply, after the schema revision
   // already published. Throws E_VALIDATION before any mutation.
   validatePlannedFlows({ actions, scannedContents, stateResources: state.resources });
+  // The rules that read schemas, flows and connections together.
+  validatePlannedSso({ actions, scannedContents, stateResources: state.resources });
 
   // Reachability pre-flight for branding asset URLs. Annotates warnings only:
   // the machine planning is not necessarily the machine rendering the login

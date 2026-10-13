@@ -912,3 +912,10 @@ function validateAgainstSchema(def: FlowDef, schema: object): FlowValidationIssu
 
   return issues;
 }
+
+export {
+  validateSsoConfiguration,
+  type SsoConfigurationTree,
+  type SsoIssue,
+  type SsoRuleId,
+} from "./validate-sso.js";
