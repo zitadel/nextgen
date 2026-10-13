@@ -257,7 +257,9 @@ describe("setup command", () => {
       data: { next_actions: string[]; next_commands: string[] };
     };
     expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
-    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
+    expect(json.data.next_commands.at(-1)).toMatch(
+      /^npx @zitadel\/cli@\S+ claim --env-file \.env\.development\.local$/,
+    );
   });
 
   // A bootstrapped local server hosts its own platform project and claim
@@ -283,7 +285,9 @@ describe("setup command", () => {
       data: { next_actions: string[]; next_commands: string[] };
     };
     expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
-    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
+    expect(json.data.next_commands.at(-1)).toMatch(
+      /^npx @zitadel\/cli@\S+ claim --env-file \.env\.development\.local$/,
+    );
   });
 
   // The probe behind the real-run local nudge: only a runtime document
@@ -475,7 +479,9 @@ describe("setup command", () => {
       team_id?: string;
     };
     expect(secret.team_id).toBeUndefined();
-    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
+    expect(json.data.next_commands.at(-1)).toMatch(
+      /^npx @zitadel\/cli@\S+ claim --env-file \.env\.development\.local$/,
+    );
   });
 
   it("says the project went unattached when a local platform server has no local admin here", async () => {

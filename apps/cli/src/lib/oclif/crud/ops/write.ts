@@ -116,7 +116,12 @@ abstract class WriteOperation<
     const resultId = isObject(result) ? result[resource.idField] : undefined;
     const nextCommands =
       typeof resultId === "string" && resource.get
-        ? [publicCliCommand(`${topic} get ${resultId} --json`, meta.cliVersion)]
+        ? [
+            publicCliCommand(
+              `${topic} get ${resultId} --json${this.environmentSelector()}`,
+              meta.cliVersion,
+            ),
+          ]
         : [];
     return {
       status: "ok",
