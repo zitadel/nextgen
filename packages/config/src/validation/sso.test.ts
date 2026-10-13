@@ -222,6 +222,24 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
     ],
   },
   {
+    name: "a step routes user_already_exists only through a switch to another flow",
+    edit: (p) => {
+      const step = stepOf(p, "identifier");
+      step.transitions = {
+        ...step.transitions,
+        user_already_exists: { target: "done", action: "switch" } as { target: string },
+      };
+    },
+    expect: [
+      {
+        rule: "sso/outcome-routing",
+        file: LOGIN,
+        steps: ["identifier"],
+        says: ["user_already_exists", "Add a transition"],
+      },
+    ],
+  },
+  {
     name: "the collection step does not route user_already_exists",
     edit: (p) => {
       stepOf(p, "register-sso").transitions = { submit: { target: "done" } };
@@ -343,13 +361,6 @@ const accepted: Array<{ name: string; edit: (project: Project) => void }> = [
       p.flows[LOGIN]?.body.steps.push(
         aStep("register-password", { on_success: "create_user" }, ["submit"]),
       );
-    },
-  },
-  {
-    name: "a nested mapping name that resolves",
-    edit: (p) => {
-      schemaOf(p).properties.address = { properties: { street: {} } };
-      connectionOf(p).claim_mapping = { "address.street": "street" };
     },
   },
   {
@@ -528,22 +539,25 @@ describe("how the rules read the project", () => {
     ]);
   });
 
-  it("does not ask for a claim_mapping row where verified_claims reads no claim", () => {
+  it.each([["$supplementary_fetch"], [true]])(
+    "asks for a claim_mapping row for a verified_claims value of %s, because the engine reads the row first",
+    (value) => {
+      const issues = validate((p) => {
+        connectionOf(p).verified_claims = { email: value as string };
+        connectionOf(p).claim_mapping = {};
+      });
+
+      expect(issues.map((issue) => issue.rule)).toContain("sso/unmapped-verification-key");
+    },
+  );
+
+  it("takes a dotted claim_mapping name for no property, as the engine does", () => {
     const issues = validate((p) => {
-      connectionOf(p).verified_claims = { email: "$supplementary_fetch" };
-      connectionOf(p).claim_mapping = {};
+      schemaOf(p).properties.address = { properties: { street: {} } };
+      connectionOf(p).claim_mapping = { "address.street": "street" };
     });
 
-    expect(issues.map((issue) => issue.rule)).not.toContain("sso/unmapped-verification-key");
-  });
-
-  it("does not ask for a claim_mapping row where verified_claims is simply true", () => {
-    const issues = validate((p) => {
-      connectionOf(p).verified_claims = { email: true as unknown as string };
-      connectionOf(p).claim_mapping = {};
-    });
-
-    expect(issues.map((issue) => issue.rule)).not.toContain("sso/unmapped-verification-key");
+    expect(issues.map((issue) => issue.rule)).toContain("sso/orphaned-mapping-target");
   });
 
   it("names a verified_claims key that no schema has once, not twice", () => {

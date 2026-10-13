@@ -247,14 +247,61 @@ describe("plan", () => {
           expect(await app.planAttempt()).toSucceed();
         });
 
-        it("plans an edit when the project's variables cannot be listed", async () => {
+        it("stops when the project's variables cannot be listed", async () => {
           const app = await anAppServingGoogle();
           await app.editConnection("google", (connection) => {
             connection.display_name = "Google Workspace";
           });
           platform.cannotListVariables();
 
-          expect(await app.planAttempt()).toSucceed();
+          expect(await app.planAttempt()).toFailWith("E_NETWORK");
+        });
+
+        it("stops on a client secret that is not a secret variable", async () => {
+          const app = await anAppWithGoogle();
+          expect(await app.setVariable("GOOGLE_CLIENT_SECRET", "plain")).toSucceed();
+
+          expect(await app.planAttempt()).toFailWith("E_VALIDATION");
+        });
+
+        it("stops on a client id that is a secret variable", async () => {
+          const app = await anAppWithGoogle();
+          expect(await app.setVariable("GOOGLE_CLIENT_ID", "an-id", { secret: true })).toSucceed();
+
+          expect(await app.planAttempt()).toFailWith("E_VALIDATION");
+        });
+
+        it("reports a removed connection file apart from the changes, in --json", async () => {
+          const app = await anAppServingAnUnlistedConnection();
+          await app.removeConnection("spare");
+
+          const { data } = app.envelopeOf<{ total: number; unsupported_deletions: number }>(
+            await app.planAttempt(),
+          );
+
+          expect(data).toMatchObject({ total: 0, unsupported_deletions: 1 });
+        });
+
+        it("plans a renamed connection file as a move, not a create", async () => {
+          const app = await anAppServingGoogle();
+          await app.renameConnection("google", "google-main");
+
+          const { data } = app.envelopeOf<{ changes: Array<{ action: string }> }>(
+            await app.planAttempt(),
+          );
+
+          expect(data.changes.map((change) => change.action)).toEqual(["move"]);
+        });
+
+        it("does not ask to restore the file a rename left behind", async () => {
+          const app = await anAppServingGoogle();
+          await app.renameConnection("google", "google-main");
+
+          const { data } = app.envelopeOf<{ warnings: Array<{ rule: string }> }>(
+            await app.planAttempt(),
+          );
+
+          expect(data.warnings.map(({ rule }) => rule)).not.toContain("unsupported-deletion");
         });
 
         it("stops on an edited connection whose stored copy cannot be read", async () => {

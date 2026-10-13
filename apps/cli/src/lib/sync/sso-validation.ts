@@ -7,6 +7,7 @@ import { FLOWS_DIR } from "../flows";
 import { IDPS_DIR } from "../idp";
 import { SCHEMAS_DIR } from "../user-schema";
 import { reportWarning } from "../warnings";
+import { isUnsupportedDeletion } from "./plan-renderer.js";
 import type { ResourceEntry, SyncAction } from "./types.js";
 
 /**
@@ -15,15 +16,18 @@ import type { ResourceEntry, SyncAction } from "./types.js";
  * A flow that offers a provider its schema does not list, or a schema that
  * lists a provider with no connection file, is only visible when the files are
  * read together, and the server would reveal it mid-apply or not at all. This
- * reads the whole working tree and throws one E_VALIDATION naming every
- * problem, so `plan` and `apply` both stop before any request.
+ * reads the whole working tree, so the rules can see what each file points at,
+ * and throws one E_VALIDATION naming every problem it reports, so `plan` and
+ * `apply` both stop before any request.
  *
- * It runs only when this plan changes a schema, a flow or a connection, for the
- * same reason flow validation judges only the flows it uploads: an unchanged
- * project is never re-judged, so a rule added later cannot break one that was
- * already applied. Removing a file is a change: dropping a connection a schema
- * still lists is exactly the inconsistency this exists to stop, even though the
- * platform keeps the connection (it cannot be deleted yet).
+ * It reports only what this plan touches: the files it writes and the files
+ * those reference or are referenced by. An applied project is never re-judged
+ * for a file nobody edited, so a rule added later cannot stop an unrelated
+ * connection edit, and a plan with no edits does not fail on a rule change.
+ *
+ * A removed file whose resource the platform keeps is the one exception to
+ * "touches": a schema that still lists a connection with no file is
+ * inconsistent however it got there, and stays reported until it is fixed.
  */
 export function validatePlannedSso(opts: {
   actions: SyncAction[];
@@ -34,18 +38,17 @@ export function validatePlannedSso(opts: {
   if (process.env.ZITADEL_SKIP_FLOW_VALIDATION) {
     return;
   }
-  const changes = opts.actions.filter(
+  const writes = opts.actions.filter(
     (action) =>
-      action.kind === "create" ||
-      action.kind === "update" ||
-      action.kind === "revise" ||
-      action.kind === "delete" ||
-      (action.kind === "skip" && action.reason === "unsupported-deletion"),
+      (action.kind === "create" || action.kind === "update" || action.kind === "revise") &&
+      ["schema", "flow", "idp"].includes(action.syncer.kind),
   );
-  if (!changes.some((action) => ["schema", "flow", "idp"].includes(action.syncer.kind))) {
+  const keptRemovals = opts.actions.filter(
+    (action) => isUnsupportedDeletion(action) && action.syncer.kind === "idp",
+  );
+  if (writes.length === 0 && keptRemovals.length === 0) {
     return;
   }
-  const writes = changes.filter((action) => action.kind !== "delete" && action.kind !== "skip");
 
   const inDir = (dir: string) =>
     new Map([...opts.scannedContents].filter(([path]) => path.startsWith(`${dir}/`)));
@@ -61,7 +64,7 @@ export function validatePlannedSso(opts: {
       const schemaPath = pinnedSchemaPath(path, body, schemas, repins, opts.stateResources);
       // Said aloud, because the alternative is a flow that passes by not being
       // checked: its schema may be one this project does not keep locally.
-      if (schemaPath === undefined && offersProviders(body)) {
+      if (schemaPath === undefined && offeredProviders(body).length > 0) {
         reportWarning(
           `${path}: could not tell which local schema this flow pins, so its provider rules were not checked against a schema`,
         );
@@ -71,7 +74,15 @@ export function validatePlannedSso(opts: {
   );
   const tree: ProjectTree = { schemas, flows, connections: inDir(IDPS_DIR) };
 
-  const issues = validateProject(tree);
+  const relevant = touchedFiles(
+    writes.map((action) => action.path),
+    tree,
+  );
+  const issues = validateProject(tree).filter(
+    (issue) =>
+      relevant.has(issue.file) ||
+      (keptRemovals.length > 0 && issue.rule === "sso/connection-resolves"),
+  );
   if (issues.length === 0) {
     return;
   }
@@ -98,19 +109,85 @@ export function validatePlannedSso(opts: {
   );
 }
 
-/** Whether any step of a flow offers a provider. */
-function offersProviders(flow: object): boolean {
+/**
+ * The files a plan touches and the files they point at or are pointed at by:
+ * a connection and the schemas and flows that name its slug, a schema and the
+ * connections it lists and the flows pinned to it, a flow and its schema and the
+ * connections it offers. Connections stand together, because two of them can
+ * collide on a slug or a variable whichever one was edited.
+ */
+function touchedFiles(written: readonly string[], tree: ProjectTree): Set<string> {
+  const related = new Set(written);
+  const slugOf = (body: object) => (body as { slug?: unknown }).slug;
+  const connectionsListing = (slugs: readonly string[]) =>
+    [...tree.connections].filter(([, body]) => slugs.includes(slugOf(body) as string));
+  for (const path of written) {
+    if (tree.connections.has(path)) {
+      for (const connection of tree.connections.keys()) {
+        related.add(connection);
+      }
+      const slug = slugOf(tree.connections.get(path) as object);
+      for (const [schemaPath, schema] of tree.schemas) {
+        if (schemaProviders(schema).includes(slug as string)) {
+          related.add(schemaPath);
+        }
+      }
+      for (const [flowPath, { body }] of tree.flows) {
+        if (offeredProviders(body).includes(slug as string)) {
+          related.add(flowPath);
+        }
+      }
+    }
+    const schema = tree.schemas.get(path);
+    if (schema !== undefined) {
+      for (const [connectionPath] of connectionsListing(schemaProviders(schema))) {
+        related.add(connectionPath);
+      }
+      for (const [flowPath, flow] of tree.flows) {
+        if (flow.schemaPath === path) {
+          related.add(flowPath);
+        }
+      }
+    }
+    const flow = tree.flows.get(path);
+    if (flow !== undefined) {
+      if (flow.schemaPath !== undefined) {
+        related.add(flow.schemaPath);
+      }
+      for (const [connectionPath] of connectionsListing(offeredProviders(flow.body))) {
+        related.add(connectionPath);
+      }
+    }
+  }
+  return related;
+}
+
+/** The provider slugs a schema lists in `x-auth-methods.sso.providers`. */
+function schemaProviders(schema: object): string[] {
+  const methods = (schema as { "x-auth-methods"?: { sso?: { providers?: unknown } } })[
+    "x-auth-methods"
+  ];
+  const providers = methods?.sso?.providers;
+  return Array.isArray(providers)
+    ? providers.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+/** The provider slugs the steps of a flow offer. */
+function offeredProviders(flow: object): string[] {
   const steps = (flow as { steps?: unknown }).steps;
-  return (
-    Array.isArray(steps) &&
-    steps.some(
-      (step) =>
-        typeof step === "object" &&
-        step !== null &&
-        Array.isArray((step as { sso_providers?: unknown }).sso_providers) &&
-        (step as { sso_providers: unknown[] }).sso_providers.length > 0,
-    )
-  );
+  if (!Array.isArray(steps)) {
+    return [];
+  }
+  return steps.flatMap((step) => {
+    const providers =
+      typeof step === "object" && step !== null
+        ? (step as { sso_providers?: unknown }).sso_providers
+        : undefined;
+    return Array.isArray(providers)
+      ? providers.filter((item): item is string => typeof item === "string")
+      : [];
+  });
 }
 
 /**

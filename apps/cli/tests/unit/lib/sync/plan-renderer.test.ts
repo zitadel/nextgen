@@ -5,8 +5,10 @@ import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normaliz
 import {
   collectPlanWarnings,
   enumeratePlanResources,
+  isUnsupportedDeletion,
   renderPlan,
   summarizePlan,
+  unsupportedDeletionNote,
 } from "../../../../src/lib/sync/plan-renderer";
 import type { ResourceSyncer, SyncAction } from "../../../../src/lib/sync/types";
 
@@ -70,6 +72,8 @@ describe("summarizePlan", () => {
       updates: 1,
       revisions: 0,
       deletes: 1,
+      moves: 0,
+      unsupported_deletions: 0,
       total: 4,
     });
   });
@@ -80,6 +84,8 @@ describe("summarizePlan", () => {
       updates: 0,
       revisions: 0,
       deletes: 0,
+      moves: 0,
+      unsupported_deletions: 0,
       total: 0,
     });
     expect(summarizePlan([{ kind: "skip", path: "a", reason: "immutable" }])).toEqual({
@@ -87,6 +93,8 @@ describe("summarizePlan", () => {
       updates: 0,
       revisions: 0,
       deletes: 0,
+      moves: 0,
+      unsupported_deletions: 0,
       total: 0,
     });
   });
@@ -209,7 +217,7 @@ describe("renderPlan — no changes", () => {
       false,
     );
     expect(out).toContain(".zitadel/idps/google.json was removed");
-    expect(out).toContain("will not delete it");
+    expect(out).toContain("nothing was deleted on the platform");
     expect(out).not.toContain("to destroy");
   });
 });
@@ -836,5 +844,77 @@ describe("renderPlan — block strings (liquid_template)", () => {
 
     expect(out).toMatch(/\+ liquid_template = \(7 lines, sha256:[0-9a-f]{8}\)/);
     expect(out).not.toContain("zl-split__brand");
+  });
+});
+
+describe("a removed file whose resource cannot be deleted yet", () => {
+  const idp = makeSyncer("idp", ".zitadel/idps", { mutable: true });
+  const removed: SyncAction = {
+    kind: "skip",
+    path: ".zitadel/idps/google.json",
+    reason: "unsupported-deletion",
+    id: "idp_1",
+    syncer: idp,
+  };
+
+  it("is counted on its own and not in the total", () => {
+    expect(summarizePlan([removed])).toMatchObject({ unsupported_deletions: 1, total: 0 });
+  });
+
+  it("is not called no changes in the headline", () => {
+    expect(renderPlan([removed], false)).not.toContain("No changes.");
+  });
+
+  it("is the headline when it is all there is", () => {
+    expect(renderPlan([removed], false)).toContain("Nothing to apply, but 1 removed file");
+  });
+
+  it("uses the same words in the plan and in the warnings", () => {
+    const [warning] = collectPlanWarnings([removed]);
+
+    expect(warning?.message).toBe(unsupportedDeletionNote(removed as never));
+  });
+
+  it("is recognised as one", () => {
+    expect(isUnsupportedDeletion(removed)).toBe(true);
+  });
+
+  it("is not confused with an ordinary skip", () => {
+    expect(isUnsupportedDeletion({ kind: "skip", path: "a", reason: "no-change" })).toBe(false);
+  });
+});
+
+describe("a file that took over a resource from a removed one", () => {
+  const idp = makeSyncer("idp", ".zitadel/idps", { mutable: true });
+  const moved: SyncAction = {
+    kind: "create",
+    path: ".zitadel/idps/new.json",
+    syncer: idp,
+    content: {},
+    hash: "h",
+    movedFrom: ".zitadel/idps/old.json",
+  };
+
+  it("is counted as a move, not a create", () => {
+    expect(summarizePlan([moved])).toMatchObject({ creates: 0, moves: 1, total: 1 });
+  });
+
+  it("is a move row that says where it came from", () => {
+    expect(enumeratePlanResources([moved])).toEqual([
+      {
+        kind: "idp",
+        action: "move",
+        file: ".zitadel/idps/new.json",
+        moved_from: ".zitadel/idps/old.json",
+      },
+    ]);
+  });
+
+  it("says in the plan which file it took over from", () => {
+    expect(renderPlan([moved], false)).toContain("will take over the connection that was in");
+  });
+
+  it("is in the summary line as moved", () => {
+    expect(renderPlan([moved], false)).toContain("1 moved");
   });
 });

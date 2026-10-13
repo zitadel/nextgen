@@ -284,3 +284,90 @@ describe("validatePlannedSso", () => {
     });
   });
 });
+
+describe("validatePlannedSso reports only what the plan touches", () => {
+  const OTHER_CONNECTION = ".zitadel/idps/github.json";
+  const OTHER_FLOW = ".zitadel/flows/staff-login.json";
+  const OTHER_SCHEMA = ".zitadel/schemas/partners.json";
+
+  /** A flow that offers acme and routes only the sign-in outcome, which the server accepts. */
+  const lenientFlow = {
+    user_schema: "https://schemas.example.test/partners.json",
+    steps: [
+      {
+        name: "identifier",
+        sso_providers: ["github"],
+        transitions: { sso_authenticated: { target: "done" } },
+      },
+    ],
+  };
+  const tree = {
+    [SCHEMA]: schema(["acme"]),
+    [FLOW]: flow("https://schemas.example.test/staff.json", ["acme"]),
+    [CONNECTION]: connection,
+    [OTHER_SCHEMA]: {
+      $id: "https://schemas.example.test/partners.json",
+      properties: { email: {} },
+      "x-auth-methods": { sso: { enabled: true, providers: ["github"] } },
+    },
+    [OTHER_FLOW]: lenientFlow,
+    [OTHER_CONNECTION]: { slug: "github", claim_mapping: { email: "email" } },
+  };
+
+  const run = (actions: SyncAction[]) =>
+    failure(() =>
+      validatePlannedSso({ actions, scannedContents: contents(tree), stateResources: {} }),
+    );
+
+  it("does not stop an edit to one connection on another flow's older mistake", () => {
+    expect(run([create(CONNECTION, "idp", connection)])).toBeUndefined();
+  });
+
+  it("stops an edit to the flow that has the mistake", () => {
+    expect(run([create(OTHER_FLOW, "flow", lenientFlow)])).toContain("sso_user_not_found");
+  });
+
+  it("stops an edit to a connection the flow with the mistake offers", () => {
+    expect(
+      run([create(OTHER_CONNECTION, "idp", { slug: "github", claim_mapping: { email: "email" } })]),
+    ).toContain(OTHER_FLOW);
+  });
+
+  it("stops an edit to the schema a flow with the mistake is pinned to", () => {
+    expect(run([create(OTHER_SCHEMA, "schema", tree[OTHER_SCHEMA])])).toContain(OTHER_FLOW);
+  });
+
+  it("does not stop a plan that only keeps a removed connection no schema lists", () => {
+    const removed: SyncAction = {
+      kind: "skip",
+      path: ".zitadel/idps/gone.json",
+      reason: "unsupported-deletion",
+      syncer: syncer("idp"),
+      id: "idp_9",
+    };
+
+    expect(run([removed])).toBeUndefined();
+  });
+
+  it("does stop a plan that keeps a removed connection a schema still lists", () => {
+    const removed: SyncAction = {
+      kind: "skip",
+      path: ".zitadel/idps/github.json",
+      reason: "unsupported-deletion",
+      syncer: syncer("idp"),
+      id: "idp_9",
+    };
+    const without = { ...tree } as Record<string, object>;
+    delete without[OTHER_CONNECTION];
+
+    expect(
+      failure(() =>
+        validatePlannedSso({
+          actions: [removed],
+          scannedContents: contents(without),
+          stateResources: {},
+        }),
+      ),
+    ).toContain("no connection file");
+  });
+});

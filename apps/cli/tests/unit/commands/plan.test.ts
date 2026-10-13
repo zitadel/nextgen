@@ -103,6 +103,8 @@ describe("plan command", () => {
       updates: 0,
       revisions: 0,
       deletes: 0,
+      moves: 0,
+      unsupported_deletions: 0,
       total: 2,
       changes: [
         { kind: "schema", action: "create", file: ".zitadel/schemas/user.json" },

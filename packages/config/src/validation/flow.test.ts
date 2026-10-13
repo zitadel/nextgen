@@ -11,6 +11,7 @@ import {
   PURPOSE_FLIP_TARGETS,
   RESERVED_OUTCOMES,
   validateFlowDefinition,
+  type FlowValidationRuleId,
   type FlowValidationIssue,
 } from "./index.js";
 
@@ -951,4 +952,12 @@ describe("drift audit (Go validator)", () => {
       expect(body).toContain("FlowFieldChallengeIdentifier, FlowFieldChallengePassword");
     },
   );
+});
+
+describe("the rule id type names", () => {
+  it("keeps the old name for a flow rule id as an alias of the new one", () => {
+    const rule: FlowValidationRuleId = "step-names";
+
+    expect(Object.keys(FLOW_VALIDATION_RULES)).toContain(rule);
+  });
 });

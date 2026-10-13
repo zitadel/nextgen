@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, join, sep } from "node:path";
 
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { consola } from "consola";
@@ -11,7 +11,12 @@ import { stableStringify } from "../json";
 import { annotateAssetWarnings } from "./asset-probe.js";
 import { validatePlannedFlows } from "./flow-validation.js";
 import { validatePlannedSso } from "./sso-validation.js";
-import type { PlanResourceChange } from "./plan-renderer.js";
+import {
+  isUnsupportedDeletion,
+  type PlanResourceChange,
+  unsupportedDeletionNote,
+  type UnsupportedDeletion,
+} from "./plan-renderer.js";
 import { readState, removeFromState, updateState } from "./state.js";
 import { FatalFetchError } from "./types.js";
 import type { FlowRepin, ResourceEntry, ResourceSyncer, SyncAction } from "./types.js";
@@ -134,7 +139,7 @@ export async function buildSyncPlan(
     }
 
     for (const [absPath, content] of onDisk.entries()) {
-      const relPath = absPath.slice(cwd.length + 1);
+      const relPath = toStatePath(absPath, cwd);
       scannedContents.set(relPath, content);
       const entry = state.resources[relPath];
       const hash = hashForState(syncer, content);
@@ -239,17 +244,25 @@ export async function buildSyncPlan(
 
   // What only the platform can answer, for every file this plan writes. After
   // the local checks, so a mistake that needs no request is never hidden behind one.
-  const removedBySyncer = new Map<ResourceSyncer, Promise<object[]>>();
-  for (const action of actions) {
+  for (const action of [...actions]) {
     if ((action.kind === "create" || action.kind === "update") && action.syncer.preflight) {
       const old = action.kind === "update" ? await storedBody(action) : null;
-      let removed: object[] = [];
-      if (action.kind === "create") {
-        const known = removedBySyncer.get(action.syncer) ?? removedBodies(action.syncer, actions);
-        removedBySyncer.set(action.syncer, known);
-        removed = await known;
+      const existing = await action.syncer.preflight(action.path, action.content, old);
+      if (action.kind === "create" && existing !== undefined) {
+        // The platform already holds this resource, and a removed file the plan
+        // declines to delete is where it used to live: that is a move, not a new
+        // resource, and the removal is no longer a loose end.
+        const declined = actions.find(
+          (other): other is UnsupportedDeletion =>
+            isUnsupportedDeletion(other) &&
+            other.syncer === action.syncer &&
+            other.id === existing.id,
+        );
+        if (declined !== undefined) {
+          action.movedFrom = declined.path;
+          actions.splice(actions.indexOf(declined), 1);
+        }
       }
-      await action.syncer.preflight(action.path, action.content, old, removed);
     }
   }
 
@@ -276,6 +289,8 @@ export type SyncLoopResult = {
    * deleted). Feeds the `apply` `--json` `changes` array.
    */
   applied: PlanResourceChange[];
+  /** Removed files whose resource was kept, because it cannot be deleted yet. */
+  unsupported: string[];
 };
 
 /**
@@ -365,23 +380,26 @@ export async function runSyncLoop(
         const fallbackHash = newId ? hashForState(action.syncer, content) : action.hash;
         const entry: ResourceEntry = { id, hash: await writeBack(action, canonical, fallbackHash) };
         await updateState(cwd, action.path, entry);
-        // A resource that cannot be deleted and comes back under the same id
-        // was moved to this file: its old path no longer describes anything.
-        if (action.syncer.deletion === "unsupported") {
-          for (const [path, other] of Object.entries((await readState(cwd)).resources)) {
-            if (
-              path !== action.path &&
-              other.id === id &&
-              path.startsWith(action.syncer.directory)
-            ) {
-              await removeFromState(cwd, path);
-            }
-          }
+        if (action.movedFrom !== undefined) {
+          await removeFromState(cwd, action.movedFrom);
         }
-        consola.info(
-          `Created a new ${action.syncer.kind} on Zitadel from ${action.path} (id ${id})`,
-        );
-        applied.push({ kind: action.syncer.kind, action: "create", file: action.path, id });
+        if (action.movedFrom === undefined) {
+          consola.info(
+            `Created a new ${action.syncer.kind} on Zitadel from ${action.path} (id ${id})`,
+          );
+          applied.push({ kind: action.syncer.kind, action: "create", file: action.path, id });
+        } else {
+          consola.info(
+            `Moved the ${action.syncer.kind} from ${action.movedFrom} to ${action.path} (id ${id})`,
+          );
+          applied.push({
+            kind: action.syncer.kind,
+            action: "move",
+            file: action.path,
+            id,
+            moved_from: action.movedFrom,
+          });
+        }
         break;
       }
       case "revise": {
@@ -461,11 +479,8 @@ export async function runSyncLoop(
         break;
       }
       case "skip": {
-        if (action.reason === "unsupported-deletion") {
-          reportWarning(
-            `${action.path} was removed but deleting ${action.syncer.kind} resources is not supported yet ` +
-              `(#1013), so nothing was deleted on the platform. Restore the file if you did not mean to remove it.`,
-          );
+        if (isUnsupportedDeletion(action)) {
+          reportWarning(unsupportedDeletionNote(action));
         }
         consola.debug(`Skipped ${action.path} (${action.reason})`);
         break;
@@ -484,7 +499,11 @@ export async function runSyncLoop(
     }
   }
 
-  return { filesUpdated: [...new Set(filesUpdated)], applied };
+  return {
+    filesUpdated: [...new Set(filesUpdated)],
+    applied,
+    unsupported: actions.filter(isUnsupportedDeletion).map((action) => action.path),
+  };
 }
 
 /**
@@ -588,6 +607,17 @@ async function storedBody(action: Extract<SyncAction, { kind: "update" }>): Prom
   return action.oldContent ?? (await readStored(action.syncer, action.id));
 }
 
+/**
+ * The project-relative path a file is tracked under: always forward slashes,
+ * which is how state is written, whatever separator the platform uses.
+ */
+export function toStatePath(absolute: string, root: string, separator: string = sep): string {
+  return absolute
+    .slice(root.length + 1)
+    .split(separator)
+    .join("/");
+}
+
 async function readStored(syncer: ResourceSyncer, id: string): Promise<object | null> {
   try {
     return (await syncer.fetch?.(id)) ?? null;
@@ -600,31 +630,6 @@ async function readStored(syncer: ResourceSyncer, id: string): Promise<object | 
     }
     throw err;
   }
-}
-
-/**
- * The stored bodies of the files this plan declines to delete, read once for a
- * syncer that can. Held to the rule of {@link storedBody}: a body that cannot be
- * read stops the run, and only a resource gone from the platform reads as nothing.
- */
-async function removedBodies(
-  syncer: ResourceSyncer,
-  actions: ReadonlyArray<SyncAction>,
-): Promise<object[]> {
-  const bodies: object[] = [];
-  for (const action of actions) {
-    if (
-      action.kind === "skip" &&
-      action.reason === "unsupported-deletion" &&
-      action.syncer === syncer
-    ) {
-      const body = await readStored(syncer, action.id);
-      if (body !== null) {
-        bodies.push(body);
-      }
-    }
-  }
-  return bodies;
 }
 
 async function fetchOldIfAsked(

@@ -133,7 +133,13 @@ const IDENTITY_FIELDS = [
     name: "oauth2.userinfo_endpoint",
     read: (body: ConnectionBody) => body.oauth2?.userinfo_endpoint,
   },
-  { name: "subject_claim", read: (body: ConnectionBody) => body.subject_claim },
+  {
+    name: "subject_claim",
+    // The engine reads an absent OIDC subject claim as `sub`, so a file that
+    // leaves it out and one that says `sub` are the same connection.
+    read: (body: ConnectionBody) =>
+      body.subject_claim ?? (body.protocol === "oauth2" ? undefined : "sub"),
+  },
 ] as const;
 
 /**
@@ -164,7 +170,7 @@ class IdpConnectionSyncer implements ResourceSyncer {
 
   private readonly client: ZitadelClient;
   private readonly projectId: string;
-  private variables: Promise<ReadonlySet<string> | undefined> | undefined;
+  private variables: Promise<ReadonlyMap<string, boolean>> | undefined;
 
   constructor(client: ZitadelClient, projectId: string) {
     this.client = client;
@@ -282,11 +288,13 @@ class IdpConnectionSyncer implements ResourceSyncer {
     path: string,
     data: object,
     old: object | null,
-    removed: readonly object[],
-  ): Promise<void> {
+  ): Promise<{ id: string } | undefined> {
     const next = data as ConnectionBody;
-    const previous =
-      old ?? removed.find((body) => (body as ConnectionBody).slug === next.slug) ?? null;
+    // A file the platform does not track yet may still name a connection it
+    // holds, such as one moved here from a removed file, so the stored copy is
+    // looked up by slug and judged the same way.
+    const found = old === null ? await this.findBySlug(next.slug) : undefined;
+    const previous = old ?? found?.definition ?? null;
     if (previous !== null) {
       const stored = previous as ConnectionBody;
       const changed = IDENTITY_FIELDS.filter(
@@ -313,35 +321,88 @@ class IdpConnectionSyncer implements ResourceSyncer {
       }
     }
 
-    const credentials = [
-      { field: "client_id", value: (next.oidc ?? next.oauth2)?.client_id },
-      { field: "client_secret", value: (next.oidc ?? next.oauth2)?.client_secret },
-    ].flatMap(({ field, value }) => {
-      const name = referencedVariable(value ?? "");
-      return name === undefined ? [] : [{ field, name }];
-    });
-    if (credentials.length === 0) {
+    await this.checkVariables(path, next);
+    return found === undefined ? undefined : { id: found.id };
+  }
+
+  /** The stored connection with this slug, which a create would revise. */
+  private async findBySlug(
+    slug: string | undefined,
+  ): Promise<{ id: string; definition: object } | undefined> {
+    if (slug === undefined) {
+      return undefined;
+    }
+    const { idps } = await this.client.queryIdps(
+      { filter: [{ field: "slug", operation: "equals", value: slug }], limit: 1 },
+      { project_id: this.projectId },
+    );
+    const [match] = idps;
+    return match === undefined ? undefined : { id: match.id, definition: match.definition };
+  }
+
+  /**
+   * What the engine needs from the variables a connection names: they exist,
+   * the client id is a plain one it can put in the authorize URL, and the
+   * client secret is a secret one. A variable that cannot be read stops the
+   * run, like a stored copy that cannot be.
+   */
+  private async checkVariables(path: string, next: ConnectionBody): Promise<void> {
+    const block = next.oidc ?? next.oauth2;
+    const named = [
+      { field: "client_id", secret: false, name: referencedVariable(block?.client_id ?? "") },
+      {
+        field: "client_secret",
+        secret: true,
+        name: referencedVariable(block?.client_secret ?? ""),
+      },
+    ].flatMap((credential) =>
+      credential.name === undefined ? [] : [{ ...credential, name: credential.name }],
+    );
+    if (named.length === 0) {
       return;
     }
     this.variables ??= this.client
       .getVariables({ project_id: this.projectId })
-      .then((held) => new Set(Object.keys(held)))
-      .catch((err: unknown) => {
-        // The write that follows reports an unreachable platform properly.
-        consola.debug("reading project variables failed:", err);
-        return undefined;
-      });
+      .then(
+        (held) =>
+          new Map(Object.entries(held).map(([name, value]) => [name, typeof value === "object"])),
+      );
     const held = await this.variables;
-    const missing = credentials.find(({ name }) => held !== undefined && !held.has(name));
-    if (missing !== undefined) {
+    const [id, secret] = named;
+    if (id !== undefined && secret !== undefined && id.name === secret.name) {
       throw new ZitadelError(
-        "E_CREDENTIAL_MISSING",
-        `${path}: ${missing.field} names the variable ${missing.name}, which the project does not have`,
+        "E_VALIDATION",
+        `${path}: client_id and client_secret both name the variable ${id.name}`,
         {
-          hint: `Publish it with \`variables set ${missing.name} --project-level\` (add --secret for a secret), then re-run.`,
-          details: { variable: missing.name, field: missing.field, file: path },
+          hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
+          details: { variable: id.name, file: path },
         },
       );
+    }
+    for (const { field, secret: wantsSecret, name } of named) {
+      const isSecret = held.get(name);
+      if (isSecret === undefined) {
+        throw new ZitadelError(
+          "E_CREDENTIAL_MISSING",
+          `${path}: ${field} names the variable ${name}, which the project does not have`,
+          {
+            hint: `Publish it with \`variables set ${name} --project-level${wantsSecret ? " --secret" : ""}\`, then re-run.`,
+            details: { variable: name, field, file: path },
+          },
+        );
+      }
+      if (isSecret !== wantsSecret) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `${path}: ${field} names the variable ${name}, which is ${isSecret ? "a secret" : "not a secret"}`,
+          {
+            hint: wantsSecret
+              ? `The client secret must be a secret variable: publish it with \`variables set ${name} --project-level --secret\`.`
+              : `The client id must be a plain variable the engine can read back: publish it with \`variables set ${name} --project-level\`, without --secret.`,
+            details: { variable: name, field, file: path, secret: isSecret },
+          },
+        );
+      }
     }
   }
 }

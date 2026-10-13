@@ -106,32 +106,103 @@ describe("apply", () => {
     });
 
     describe("a connection file removed after it was applied", () => {
-      it("leaves the connection registered", async () => {
+      /** A set-up project with a connection no schema lists, applied, then its file removed. */
+      async function aProjectThatRemovedAConnection(): Promise<ScaffoldedApp> {
         const app = await aSetUpApp();
-        expect(
-          await app.enableSso("google", { clientId: "1234-abc", secret: "the-client-secret" }),
-        ).toSucceed();
+        await app.enableSso("google", { clientId: "1234-abc", secret: "the-client-secret" });
         await app.addUnlistedConnection("spare");
-        expect(await app.apply()).toSucceed();
+        await app.apply();
         await app.removeConnection("spare");
+        return app;
+      }
 
-        expect(await app.apply()).toSucceed();
+      it("leaves the connection registered", async () => {
+        const app = await aProjectThatRemovedAConnection();
+
+        await app.apply();
 
         expect((await app.registeredIdps()).map((idp) => idp.slug)).toContain("spare");
+      });
+
+      it("names the file in the output", async () => {
+        const app = await aProjectThatRemovedAConnection();
+
+        const result = await app.apply();
+
+        expect(result).toSay(app.connectionFile("spare"));
+      });
+
+      it("lists the kept removal apart from what it applied", async () => {
+        const app = await aProjectThatRemovedAConnection();
+
+        const result = await app.apply();
+
+        const { data } = app.envelopeOf<{ unsupported_deletions: string[] }>(result);
+        expect(data.unsupported_deletions).toEqual([app.connectionFile("spare")]);
+      });
+
+      it("does not say everything is in sync", async () => {
+        const app = await aProjectThatRemovedAConnection();
+
+        const result = await app.apply();
+
+        const { data } = app.envelopeOf<{ next_actions: string[] }>(result);
+        expect(data.next_actions.join(" ")).not.toContain("already in sync");
       });
     });
 
     describe("a connection file renamed after it was applied", () => {
-      it("leaves nothing to reconcile and nothing to warn about", async () => {
+      /** Google applied, then its file renamed without touching its contents. */
+      async function aRenamedApp(): Promise<ScaffoldedApp> {
         const app = await aSetUpApp();
-        expect(
-          await app.enableSso("google", { clientId: "1234-abc", secret: "the-client-secret" }),
-        ).toSucceed();
-        expect(await app.apply()).toSucceed();
+        await app.enableSso("google", { clientId: "1234-abc", secret: "the-client-secret" });
+        await app.apply();
         await app.renameConnection("google", "google-main");
-        expect(await app.apply()).toSucceed();
+        return app;
+      }
+
+      it("is reported as a move, not a create", async () => {
+        const app = await aRenamedApp();
+
+        const result = await app.apply();
+
+        const { data } = app.envelopeOf<{ changes: Array<{ action: string }> }>(result);
+        expect(data.changes.map((change) => change.action)).toEqual(["move"]);
+      });
+
+      it("says where it moved from", async () => {
+        const app = await aRenamedApp();
+
+        const result = await app.apply();
+
+        const { data } = app.envelopeOf<{ changes: Array<{ moved_from?: string }> }>(result);
+        expect(data.changes.map((change) => change.moved_from)).toEqual([
+          app.connectionFile("google"),
+        ]);
+      });
+
+      it("leaves no removed file kept", async () => {
+        const app = await aRenamedApp();
+
+        const result = await app.apply();
+
+        expect(
+          app.envelopeOf<{ unsupported_deletions: string[] }>(result).data.unsupported_deletions,
+        ).toEqual([]);
+      });
+
+      it("leaves nothing to reconcile", async () => {
+        const app = await aRenamedApp();
+        await app.apply();
 
         expect(await app.plan()).toReportNothingToDo();
+      });
+
+      it("keeps the connection registered once", async () => {
+        const app = await aRenamedApp();
+        await app.apply();
+
+        expect((await app.registeredIdps()).map((idp) => idp.slug)).toEqual(["google"]);
       });
     });
 

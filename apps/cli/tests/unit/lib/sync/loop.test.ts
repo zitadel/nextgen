@@ -13,10 +13,11 @@ import {
   buildSyncPlan,
   hashForState,
   runSyncLoop,
+  toStatePath,
   writeBackResource,
 } from "../../../../src/lib/sync/loop";
 import { makeSyncers } from "../../../../src/lib/sync/syncers";
-import { FatalFetchError } from "../../../../src/lib/sync/types";
+import { FatalFetchError, type ZitadelState } from "../../../../src/lib/sync/types";
 import { ZitadelError } from "../../../../src/lib/errors";
 import type { ResourceSyncer } from "../../../../src/lib/sync/syncers";
 
@@ -1610,6 +1611,12 @@ describe("a resource the platform cannot delete yet", () => {
     return cwd;
   }
 
+  const stateOf = async (cwd: string) =>
+    Object.keys(
+      (JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as ZitadelState)
+        .resources,
+    ).sort();
+
   it("plans a skip for a removed file, not a delete", async () => {
     const cwd = await aProjectThatLostItsFile();
     try {
@@ -1620,6 +1627,7 @@ describe("a resource the platform cannot delete yet", () => {
           kind: "skip",
           path: `${IDPS}/acme.json`,
           reason: "unsupported-deletion",
+          id: "idp_1",
         }),
       ]);
     } finally {
@@ -1640,7 +1648,7 @@ describe("a resource the platform cannot delete yet", () => {
     }
   });
 
-  it("sends no deletion on apply and keeps the state entry", async () => {
+  it("sends no deletion on apply", async () => {
     const cwd = await aProjectThatLostItsFile();
     try {
       const syncer = unsupported();
@@ -1648,26 +1656,100 @@ describe("a resource the platform cannot delete yet", () => {
       await runSyncLoop(cwd, [syncer]);
 
       expect(syncer.delete).not.toHaveBeenCalled();
-      const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8"));
-      expect(Object.keys(state.resources)).toEqual([`${IDPS}/acme.json`]);
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
   });
 
-  it("forgets the old path once the same resource comes back under a new file", async () => {
+  it("keeps the state entry on apply", async () => {
     const cwd = await aProjectThatLostItsFile();
     try {
-      await writeResource(cwd, IDPS, "renamed.json", { slug: "acme" });
-      const syncer = unsupported({ create: vi.fn().mockResolvedValue({ id: "idp_1" }) });
+      await runSyncLoop(cwd, [unsupported()]);
 
-      await runSyncLoop(cwd, [syncer]);
-
-      const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8"));
-      expect(Object.keys(state.resources)).toEqual([`${IDPS}/renamed.json`]);
+      expect(await stateOf(cwd)).toEqual([`${IDPS}/acme.json`]);
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
+  });
+
+  it("reports the kept removals on apply", async () => {
+    const cwd = await aProjectThatLostItsFile();
+    try {
+      const result = await runSyncLoop(cwd, [unsupported()]);
+
+      expect(result.unsupported).toEqual([`${IDPS}/acme.json`]);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  describe("when the same resource comes back under a new file", () => {
+    async function aRenamedProject(): Promise<string> {
+      const cwd = await aProjectThatLostItsFile();
+      await writeResource(cwd, IDPS, "renamed.json", { slug: "acme" });
+      return cwd;
+    }
+    const holdingIt = () =>
+      unsupported({
+        preflight: vi.fn().mockResolvedValue({ id: "idp_1" }),
+        create: vi.fn().mockResolvedValue({ id: "idp_1" }),
+      });
+
+    it("plans a move, not a create and a removal", async () => {
+      const cwd = await aRenamedProject();
+      try {
+        const actions = await buildSyncPlan(cwd, [holdingIt()]);
+
+        expect(actions).toEqual([
+          expect.objectContaining({
+            kind: "create",
+            path: `${IDPS}/renamed.json`,
+            movedFrom: `${IDPS}/acme.json`,
+          }),
+        ]);
+      } finally {
+        await rm(cwd, { recursive: true, force: true });
+      }
+    });
+
+    it("forgets the old path on apply", async () => {
+      const cwd = await aRenamedProject();
+      try {
+        await runSyncLoop(cwd, [holdingIt()]);
+
+        expect(await stateOf(cwd)).toEqual([`${IDPS}/renamed.json`]);
+      } finally {
+        await rm(cwd, { recursive: true, force: true });
+      }
+    });
+
+    it("reports a move, with where it came from", async () => {
+      const cwd = await aRenamedProject();
+      try {
+        const result = await runSyncLoop(cwd, [holdingIt()]);
+
+        expect(result.applied).toEqual([
+          expect.objectContaining({
+            action: "move",
+            file: `${IDPS}/renamed.json`,
+            moved_from: `${IDPS}/acme.json`,
+          }),
+        ]);
+      } finally {
+        await rm(cwd, { recursive: true, force: true });
+      }
+    });
+
+    it("keeps no loose end for the old path", async () => {
+      const cwd = await aRenamedProject();
+      try {
+        const result = await runSyncLoop(cwd, [holdingIt()]);
+
+        expect(result.unsupported).toEqual([]);
+      } finally {
+        await rm(cwd, { recursive: true, force: true });
+      }
+    });
   });
 
   it("keeps the old path when the new file is a different resource", async () => {
@@ -1678,14 +1760,46 @@ describe("a resource the platform cannot delete yet", () => {
 
       await runSyncLoop(cwd, [syncer]);
 
-      const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8"));
-      expect(Object.keys(state.resources).sort()).toEqual([
-        `${IDPS}/acme.json`,
-        `${IDPS}/other.json`,
-      ]);
+      expect(await stateOf(cwd)).toEqual([`${IDPS}/acme.json`, `${IDPS}/other.json`]);
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
+  });
+
+  it("does not drop a file that is still there because it shares an id", async () => {
+    const cwd = makeCwd();
+    // With the checks switched off, two files can claim one slug.
+    vi.stubEnv("ZITADEL_SKIP_FLOW_VALIDATION", "1");
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: { [`${IDPS}/a.json`]: { id: "idp_1", hash: "abc" } },
+      });
+      await writeResource(cwd, IDPS, "a.json", { slug: "same" });
+      await writeResource(cwd, IDPS, "b.json", { slug: "same" });
+      const syncer = unsupported({ create: vi.fn().mockResolvedValue({ id: "idp_1" }) });
+
+      await runSyncLoop(cwd, [syncer]);
+
+      expect(await stateOf(cwd)).toEqual([`${IDPS}/a.json`, `${IDPS}/b.json`]);
+    } finally {
+      vi.unstubAllEnvs();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("toStatePath", () => {
+  it("tracks a file under forward slashes whatever separator the platform uses", () => {
+    expect(toStatePath("C:\\work\\app\\.zitadel\\idps\\x.json", "C:\\work\\app", "\\")).toBe(
+      ".zitadel/idps/x.json",
+    );
+  });
+
+  it("leaves a path that already uses forward slashes as it is", () => {
+    expect(toStatePath("/work/app/.zitadel/idps/x.json", "/work/app", "/")).toBe(
+      ".zitadel/idps/x.json",
+    );
   });
 });
 
@@ -1715,12 +1829,9 @@ describe("a syncer's preflight", () => {
         syncer({ preflight, fetch: vi.fn().mockResolvedValue({ slug: "acme" }) }),
       ]);
 
-      expect(preflight).toHaveBeenCalledWith(
-        `${IDPS}/acme.json`,
-        expect.anything(),
-        { slug: "acme" },
-        [],
-      );
+      expect(preflight).toHaveBeenCalledWith(`${IDPS}/acme.json`, expect.anything(), {
+        slug: "acme",
+      });
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
@@ -1735,100 +1846,10 @@ describe("a syncer's preflight", () => {
 
       await buildSyncPlan(cwd, [syncer({ preflight })]);
 
-      expect(preflight).toHaveBeenCalledWith(`${IDPS}/acme.json`, expect.anything(), null, []);
+      expect(preflight).toHaveBeenCalledWith(`${IDPS}/acme.json`, expect.anything(), null);
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
-  });
-
-  it("is given the stored body of a file the plan declines to delete", async () => {
-    const cwd = makeCwd();
-    try {
-      await writeState(cwd, {
-        framework: "next",
-        resources: { [`${IDPS}/old.json`]: { id: "idp_1", hash: "abc" } },
-      });
-      await writeResource(cwd, IDPS, "renamed.json", { slug: "acme" });
-      const preflight = vi.fn().mockResolvedValue(undefined);
-      const fetch = vi.fn().mockResolvedValue({ slug: "acme", stored: true });
-
-      await buildSyncPlan(cwd, [syncer({ preflight, fetch, deletion: "unsupported" })]);
-
-      expect(preflight).toHaveBeenCalledWith(`${IDPS}/renamed.json`, expect.anything(), null, [
-        { slug: "acme", stored: true },
-      ]);
-    } finally {
-      await rm(cwd, { recursive: true, force: true });
-    }
-  });
-
-  describe("with a file the plan declines to delete", () => {
-    async function aProjectWithTwoNewFiles(): Promise<string> {
-      const cwd = makeCwd();
-      await writeState(cwd, {
-        framework: "next",
-        resources: { [`${IDPS}/old.json`]: { id: "idp_1", hash: "abc" } },
-      });
-      await writeResource(cwd, IDPS, "one.json", { slug: "one" });
-      await writeResource(cwd, IDPS, "two.json", { slug: "two" });
-      return cwd;
-    }
-
-    it("reads its stored body once, however many files are new", async () => {
-      const cwd = await aProjectWithTwoNewFiles();
-      try {
-        const fetch = vi.fn().mockResolvedValue({ slug: "old" });
-
-        await buildSyncPlan(cwd, [
-          syncer({
-            preflight: vi.fn().mockResolvedValue(undefined),
-            fetch,
-            deletion: "unsupported",
-          }),
-        ]);
-
-        expect(fetch).toHaveBeenCalledOnce();
-      } finally {
-        await rm(cwd, { recursive: true, force: true });
-      }
-    });
-
-    it("stops the plan when that stored body cannot be read", async () => {
-      const cwd = await aProjectWithTwoNewFiles();
-      try {
-        const unavailable = vi
-          .fn()
-          .mockRejectedValue(new ApiError(503, "http://x/idps/idp_1", {}, "unavailable"));
-
-        await expect(
-          buildSyncPlan(cwd, [
-            syncer({
-              preflight: vi.fn().mockResolvedValue(undefined),
-              fetch: unavailable,
-              deletion: "unsupported",
-            }),
-          ]),
-        ).rejects.toMatchObject({ status: 503 });
-      } finally {
-        await rm(cwd, { recursive: true, force: true });
-      }
-    });
-
-    it("carries on without it when the resource is gone from the platform", async () => {
-      const cwd = await aProjectWithTwoNewFiles();
-      try {
-        const preflight = vi.fn().mockResolvedValue(undefined);
-        const gone = vi
-          .fn()
-          .mockRejectedValue(new ApiError(404, "http://x/idps/idp_1", {}, "gone"));
-
-        await buildSyncPlan(cwd, [syncer({ preflight, fetch: gone, deletion: "unsupported" })]);
-
-        expect(preflight).toHaveBeenCalledWith(`${IDPS}/one.json`, expect.anything(), null, []);
-      } finally {
-        await rm(cwd, { recursive: true, force: true });
-      }
-    });
   });
 
   it("is not asked when the files already fail a local check", async () => {
@@ -1858,13 +1879,11 @@ describe("a syncer's preflight", () => {
     const cwd = await aProjectWithAnEditedFile();
     try {
       const refusing = syncer({
-        preflight: vi.fn().mockRejectedValue(new ZitadelError("E_CREDENTIAL_MISSING", "no")),
+        preflight: vi.fn().mockRejectedValue(new ZitadelError("E_VALIDATION", "no")),
         fetch: vi.fn().mockResolvedValue({}),
       });
 
-      await expect(runSyncLoop(cwd, [refusing])).rejects.toMatchObject({
-        code: "E_CREDENTIAL_MISSING",
-      });
+      await expect(runSyncLoop(cwd, [refusing])).rejects.toMatchObject({ code: "E_VALIDATION" });
       expect(refusing.update).not.toHaveBeenCalled();
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -1879,7 +1898,7 @@ describe("a syncer's preflight", () => {
 
       await buildSyncPlan(cwd, [syncer({ preflight, fetch: gone })]);
 
-      expect(preflight).toHaveBeenCalledWith(`${IDPS}/acme.json`, expect.anything(), null, []);
+      expect(preflight).toHaveBeenCalledWith(`${IDPS}/acme.json`, expect.anything(), null);
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }

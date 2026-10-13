@@ -158,15 +158,10 @@ export interface ResourceSyncer {
   readonly deletion?: "unsupported";
   /**
    * Checks that need the platform, run for every create and update before any
-   * mutation, given the file `path`. `removed` holds the stored bodies of files this plan declines to delete, so a renamed file is judged against what it replaces. `old` is the stored body of an update (null for a create, or
+   * mutation, given the file `path`. It answers with the id of the resource a create would revise, when one already holds its identity, so the planner can tell a moved file from a new one. `old` is the stored body of an update (null for a create, or
    * when it could not be read). Throws to stop the plan.
    */
-  preflight?(
-    path: string,
-    data: object,
-    old: object | null,
-    removed: readonly object[],
-  ): Promise<void>;
+  preflight?(path: string, data: object, old: object | null): Promise<{ id: string } | undefined>;
   fetch?(id: string): Promise<object>;
   /**
    * Reduce a body to its canonical comparison form: strip server-echoed
@@ -198,6 +193,10 @@ export type SyncPlanSummary = {
   updates: number;
   revisions: number;
   deletes: number;
+  /** Files that moved: the same resource, under a new file name. */
+  moves: number;
+  /** Removed files whose resource cannot be deleted yet; not part of `total`. */
+  unsupported_deletions: number;
   total: number;
 };
 
@@ -239,6 +238,11 @@ export type SyncAction =
       hash: string;
       repin?: FlowRepin;
       warnings?: ReadonlyArray<SyncActionWarning>;
+      /**
+       * The removed file this one replaces: the platform already holds the
+       * resource, so the write revises it rather than creating another.
+       */
+      movedFrom?: string;
     }
   | {
       kind: "update";

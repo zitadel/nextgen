@@ -26,15 +26,12 @@ export {
   FLOW_VALIDATION_RULES,
   VALIDATION_RULES,
   type FlowRuleId,
+  type FlowRuleId as FlowValidationRuleId,
   type ProjectRuleId,
-  type RuleId,
-  type RuleIdOf,
-  type Scope,
 } from "./rules.js";
 export type {
   FlowValidationIssue,
   FlowValidationSeverity,
   ProjectIssue,
   ProjectTree,
-  ValidationIssue,
 } from "./types.js";

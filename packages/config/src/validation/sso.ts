@@ -44,18 +44,14 @@ function schemaSso(schema: object): { enabled: boolean; providers: string[] } {
 
 /**
  * Whether a schema defines a property, by the name a mapping uses for it.
- * A dotted name walks into nested objects (`address.street`).
+ *
+ * One top-level property name, as the engine reads it: a name cannot hold a dot
+ * and a value is not addressable inside a nested object, so `address.street`
+ * names nothing and the engine drops the claim at sign-in.
  */
 function hasProperty(schema: object, name: string): boolean {
-  let level: unknown = (schema as Json).properties;
-  for (const part of name.split(".")) {
-    if (!isObject(level) || !Object.hasOwn(level, part)) {
-      return false;
-    }
-    const property = level[part];
-    level = isObject(property) ? property.properties : undefined;
-  }
-  return true;
+  const properties = (schema as Json).properties;
+  return isObject(properties) && Object.hasOwn(properties, name);
 }
 
 type Step = {
@@ -74,8 +70,28 @@ function stepsOf(flow: object): Step[] {
     name: typeof step.name === "string" ? step.name : "",
     providers: strings(step.sso_providers),
     onSuccess: typeof step.on_success === "string" ? step.on_success : undefined,
-    routes: new Set(isObject(step.transitions) ? Object.keys(step.transitions) : []),
+    routes: new Set(routedOutcomes(step.transitions)),
   }));
+}
+
+/**
+ * The outcomes a step routes. The engine follows an SSO collision only through
+ * a `user_already_exists` transition that has no action: one that switches or
+ * pivots to another flow leaves the step showing the SSO error instead.
+ */
+function routedOutcomes(transitions: unknown): string[] {
+  if (!isObject(transitions)) {
+    return [];
+  }
+  return Object.entries(transitions)
+    .filter(
+      ([outcome, route]) =>
+        outcome !== "user_already_exists" ||
+        !isObject(route) ||
+        route.action === undefined ||
+        route.action === null,
+    )
+    .map(([outcome]) => outcome);
 }
 
 /** `step "a"`, or `steps "a", "b"` when several have the same problem. */
@@ -301,11 +317,8 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
     }
     const unreadable = (key: string) =>
       referencing.length > 0 && !referencing.some((schema) => hasProperty(schema, key));
-    const verifiedByValue = isObject(body.verified_claims) ? body.verified_claims : {};
     for (const key of verified) {
-      const value = verifiedByValue[key];
-      const readsNoClaim = value === true || value === "$supplementary_fetch";
-      if (!mapping.includes(key) && !readsNoClaim && !unreadable(key)) {
+      if (!mapping.includes(key) && !unreadable(key)) {
         add({
           rule: "sso/unmapped-verification-key",
           file: path,
