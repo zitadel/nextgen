@@ -12,13 +12,7 @@ import {
 } from "../../../../src/lib/idp";
 import { displayName, issuer, slug } from "../../../helpers/idp-values";
 
-const flag = {
-  provider: "--provider",
-  slug: "--slug",
-  displayName: "--display-name",
-  issuer: "--issuer",
-  scopes: "--scopes",
-};
+const flag = ENABLE_FLAG_NAMES;
 
 const valid = {
   slug: "acme-sso",
