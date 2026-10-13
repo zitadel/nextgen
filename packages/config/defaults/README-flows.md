@@ -63,7 +63,7 @@ Typical edits:
   serves, the target must be that purpose's entry step, and `purpose`
   never combines with `action` (which targets another flow instead).
 - **Add another flow** — drop a new JSON file with its own `purposes`
-  and a distinct `name` (e.g. a per-team login). See
+  and a distinct `name` (e.g. a kiosk login). See
   [Multiple flows](#multiple-flows) for how it gets selected at runtime.
 
 ## Multiple flows
@@ -73,23 +73,24 @@ one flow per sign-in. Which one:
 
 - **By name** — give the flow a distinct `name` and pass it as
   `flowName` on `ZitadelLogin` (the `flow-name` attribute on
-  `<zitadel-login>`). The platform resolves that definition directly;
-  an unknown name or wrong purpose surfaces as a startup error in the
-  widget.
-- **By audience** — omit `flowName` and scope the flow with
-  `audience.app_ids` / `audience.team_ids`. A start request hinting one
-  of those ids gets the scoped flow (app match beats team match); all
-  other requests get the newest flow without an `audience`.
+  `<zitadel-login>`). The platform resolves that definition directly,
+  whatever its `audience`; an unknown name or wrong purpose surfaces as
+  a startup error in the widget.
+- **By default** — without `flowName`, the platform serves the newest
+  active flow that serves the requested purpose and has no `audience`.
 
-A flow scoped to an app or team never captures the project default —
-requests that don't identify that audience fall back to the unscoped
-flow.
+`audience.app_ids` / `audience.team_ids` select a flow only for callers
+of the flow API that send a matching `hint` (app match beats team
+match). `<zitadel-login>` sends no hint, so for the widget an
+`audience` does one thing: it keeps the flow out of the default. A
+scoped flow is still served when no unscoped flow serves the purpose.
 
 The flip side: a **new active flow without an `audience` becomes the
 newest unscoped definition, i.e. the default**, the moment it applies.
 `plan` calls this out with a `# warning:` line on the create so an
-experiment can't silently take over `/login` — scope it or pin
-`flow-name` in the widget if that isn't the intent.
+experiment can't silently take over `/login` — give it an `audience`
+and select it by `flowName`, or pin `flow-name` on the pages that
+should keep the current flow, if that isn't the intent.
 
 ## Presets
 
