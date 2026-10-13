@@ -218,6 +218,10 @@ tasks:
       - "10m"
       - "./..."
     deps:
+      # check-generate rewrites api/generated in place, and a `moon ci` that
+      # selects this lane downstream of the UI builds would otherwise start it
+      # alongside: packages loaded mid-rewrite fail to compile, or are missing.
+      - "check-generate"
       # Order UI builds before go test so //go:embed all:dist has files.
       - "console:build"
       - "login-ui:build"
@@ -274,6 +278,10 @@ tasks:
       - "1"
       - "./..."
     deps:
+      # check-generate rewrites api/generated in place, and a `moon ci` that
+      # selects this lane downstream of the UI builds would otherwise start it
+      # alongside: packages loaded mid-rewrite fail to compile, or are missing.
+      - "check-generate"
       # Order UI builds before go test so //go:embed all:dist has files.
       - "console:build"
       - "login-ui:build"
@@ -315,6 +323,10 @@ tasks:
       - "5m"
       - "./..."
     deps:
+      # check-generate rewrites api/generated in place, and a `moon ci` that
+      # selects this lane downstream of the UI builds would otherwise start it
+      # alongside: packages loaded mid-rewrite fail to compile, or are missing.
+      - "check-generate"
       # Order UI builds before go test so //go:embed all:dist has files.
       - "console:build"
       - "login-ui:build"
