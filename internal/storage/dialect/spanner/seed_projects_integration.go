@@ -94,3 +94,21 @@ func InsertUserPasswordAt(ctx context.Context, pool database.Pool, projectID, id
 	).statement())
 	return wrapError(err)
 }
+
+// InsertDeployment writes a deployments row for a test to freeze variables
+// against. CreateDeployment still swaps the current deployment of an
+// environment, a table that is gone (#1643), so until the deployments rework
+// lands the row has to be written directly: environment_id is still NOT NULL
+// and gets the empty string, and the metadata is the empty document.
+func InsertDeployment(ctx context.Context, pool database.Pool, projectID, id, releaseID string) error {
+	c, ok := pool.(*Client)
+	if !ok {
+		return fmt.Errorf("spanner.InsertDeployment: expected *Client, got %T", pool)
+	}
+	db := newClientDB(c.client)
+	_, err := db.Update(ctx, buildStatement(
+		`INSERT INTO deployments (project_id, id, environment_id, release_id, metadata) VALUES (@p1, @p2, '', @p3, JSON '{}')`,
+		projectID, id, releaseID,
+	).statement())
+	return wrapError(err)
+}

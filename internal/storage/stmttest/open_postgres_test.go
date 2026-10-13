@@ -29,6 +29,9 @@ func init() {
 		func(ctx context.Context, pool dbtest.Pool, projectID, id, userID, encodedHash string, createdAt time.Time) error {
 			return postgres.InsertUserPasswordAt(ctx, pool, projectID, id, userID, encodedHash, createdAt)
 		},
+		func(ctx context.Context, pool dbtest.Pool, projectID, id, releaseID string) error {
+			return postgres.InsertDeployment(ctx, pool, projectID, id, releaseID)
+		},
 		postgres.SchemaColumnNullability(),
 		func(ctx context.Context, pool dbtest.Pool) (map[string]map[string]bool, error) {
 			return postgres.LiveColumnNullability(ctx, pool)
