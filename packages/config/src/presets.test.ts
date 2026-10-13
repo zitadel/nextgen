@@ -22,7 +22,7 @@ describe.each([...SETUP_PRESETS])("preset %s", (preset) => {
 
   it("renders a flow that passes the config Zod and validates cleanly against its schema", () => {
     const schema = getDefaultHumanUserSchema({ preset });
-    const flow = getDefaultLoginFlow({ preset, userSchemaUrl: "sch_TEST" });
+    const flow = getDefaultLoginFlow({ preset });
     expect(flowConfigSchema.safeParse(flow).success).toBe(true);
     expect(validateFlowDefinition(flow, schema as object)).toEqual([]);
   });
@@ -58,7 +58,7 @@ describe("passkey-first preset shape", () => {
     "x-auth-methods": Record<string, { enabled: boolean }>;
     required: string[];
   };
-  const flow = getDefaultLoginFlow({ preset: "passkey-first", userSchemaUrl: "sch_TEST" });
+  const flow = getDefaultLoginFlow({ preset: "passkey-first" });
 
   // The schema says which methods exist; the order they are offered in is the
   // flow's, from its entry step (asserted below).
