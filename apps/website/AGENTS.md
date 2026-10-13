@@ -10,7 +10,7 @@ theme (`packages/theme`) for the look: its colours, APK Futural for headings,
 Arimo for text. `app/globals.css` keeps only the values this page uses, under
 the website's names (`bg-background`, `text-foreground`, `accent-strong`), so
 the website's components move over unchanged. It does not use
-`@zitadel/design-tokens`, the palette of the console and the login.
+`@zitadel/design-tokens`, the palette of the console, the login and the docs.
 
 ## The animation
 
