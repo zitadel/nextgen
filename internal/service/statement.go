@@ -45,6 +45,7 @@ type AllStatements interface {
 	UserRecoveryCodesStatements
 	BrandingStatements
 	VariableStatements
+	VariableSetStatements
 	ClaimStatements
 	ResourceScopeStatements
 	AuthzAssignmentStatements
@@ -517,26 +518,60 @@ type BrandingStatements interface {
 
 type VariableStatements interface {
 	Statements
-	// GetVariables returns the variables owner entered, for the given names (all
-	// names when none are given), ordered by name. Every owner column is matched
-	// exactly, so a name owner has not entered is absent even when another owner
-	// of the same project holds it -- nothing is inherited. This is the only
-	// place the owner predicate is enforced, so a caller never sees a variable
-	// entered elsewhere.
+	// GetVariables returns the variables owner entered for kind, for the given
+	// names (all names when none are given), ordered by name. The owner column
+	// and the kind are matched exactly, so a name owner has not entered for
+	// that kind is absent even when another owner of the same project holds
+	// it, or the same owner holds it for the other kind -- nothing is
+	// inherited and nothing falls back from primary to preview. This is the
+	// only place the owner predicate is enforced, so a caller never sees a
+	// variable entered elsewhere.
 	//
-	// The primary key is the name plus the owner, so at most one variable comes
-	// back per name and the caller has nothing to choose between.
-	GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
-	// SetVariable writes variable under its own name and owner, replacing the
-	// value and IsSecret flag of an existing variable with the same name and
-	// owner. A project that is missing or names no existing project is
+	// The primary key is the name plus the owner and kind, so at most one
+	// variable comes back per name and the caller has nothing to choose
+	// between.
+	GetVariables(ctx context.Context, owner domain.VariableOwner, kind domain.OriginKind, names ...string) ([]*domain.Variable, error)
+	// SetVariable writes variable under its own name, owner and kind,
+	// replacing the value and IsSecret flag of an existing variable with the
+	// same name, owner and kind. A value that applies to both kinds is two
+	// calls. A project that is missing or names no existing project is
 	// rejected by the table.
 	SetVariable(ctx context.Context, variable *domain.Variable) error
-	// DeleteVariable removes the variable owner entered under name. Removing one
-	// that is not there returns NoRowFoundError; it never deletes a variable
-	// with a different owner, since the owner column must match exactly, so
-	// one owner cannot remove what another entered.
-	DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error
+	// DeleteVariable removes the variable owner entered under name for kind.
+	// Removing one that is not there returns NoRowFoundError; it never
+	// deletes a variable with a different owner or kind, since both must
+	// match exactly, so one owner cannot remove what another entered and
+	// removing the primary value leaves the preview one.
+	DeleteVariable(ctx context.Context, owner domain.VariableOwner, kind domain.OriginKind, name string) error
+}
+
+// VariableSetStatements freezes the variables a deployment is created with
+// and reads them back (ADR 069). A set is content-addressed: identical values
+// in one project are stored once, however many deployments use them.
+type VariableSetStatements interface {
+	Statements
+	// FreezeDeploymentVariables copies the variables of projectID for kind
+	// into an immutable set and links deploymentID to it, in one transaction.
+	// It reads the rows of kind only: a preview freeze holds the preview
+	// values and nothing else, so a name entered for primary alone is absent
+	// from it, and a value that applies to both kinds is in both freezes
+	// because it was entered twice. A project with no variables freezes the
+	// empty set, which is stored and linked like any other.
+	//
+	// The set is inserted only when its hash is new to the project, so a
+	// deployment whose values did not change writes no set row and shares
+	// the one that exists. The link is one row per deployment: freezing the
+	// same deployment twice returns UniqueError, and a deployment that does
+	// not exist in projectID returns ForeignKeyError.
+	//
+	// Secrets are copied as the ciphertext stored, never decrypted. The set
+	// returned is what a later GetDeploymentVariables reads back.
+	FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string, kind domain.OriginKind) (*domain.VariableSet, error)
+	// GetDeploymentVariables returns the set deploymentID was frozen with,
+	// as it was then, whatever the project's variables have become since. A
+	// deployment that was never frozen -- or does not exist, or belongs to
+	// another project -- returns NoRowFoundError.
+	GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error)
 }
 
 type ClaimStatements interface {

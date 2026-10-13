@@ -26,6 +26,9 @@ func init() {
 		func(ctx context.Context, pool dbtest.Pool, projectID, id, name string, createdAt time.Time) error {
 			return spanner.InsertFlowDefinitionAt(ctx, pool, projectID, id, name, createdAt)
 		},
+		func(ctx context.Context, pool dbtest.Pool, projectID, id, releaseID string) error {
+			return spanner.InsertDeployment(ctx, pool, projectID, id, releaseID)
+		},
 		spanner.SchemaColumnNullability(),
 		func(ctx context.Context, pool dbtest.Pool) (map[string]map[string]bool, error) {
 			return spanner.LiveColumnNullability(ctx, pool)

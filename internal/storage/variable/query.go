@@ -5,21 +5,25 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// VisibleTo restricts the variables table to the rows owner entered, optionally
-// narrowed to names. It is [domain.VariableOwner.HasAccessTo] pushed into SQL:
-// the owner column has to match exactly.
+// VisibleTo restricts the variables table to the rows owner entered for kind,
+// optionally narrowed to names. It is [domain.VariableOwner.HasAccessTo]
+// pushed into SQL, with the kind beside it: the owner column has to match
+// exactly, and so does the kind.
 //
 // Equality, not the "unset means inherited" form: an owner is an address, not a
 // position in a ladder, so a name at an owner is one row rather than a set to
-// rank (ADR 062 §4).
+// rank (ADR 062 §4). The kind is matched the same way, because nothing falls
+// back from one kind to the other: a preview read never sees a primary value
+// (ADR 069).
 //
 // Filtering here rather than after the scan is what keeps another project's
 // variable out of a read. The domain predicate is not applied a second time, so
 // unlike the settings ladder this replaced, an unfiltered caller is not safe --
 // every read goes through here.
-func VisibleTo(owner domain.VariableOwner, names ...string) *database.ListOptions[VariableStorageField] {
+func VisibleTo(owner domain.VariableOwner, kind domain.OriginKind, names ...string) *database.ListOptions[VariableStorageField] {
 	filters := []database.Filter[VariableStorageField]{
 		database.Equal(database.Col(VariableStorageFieldProjectID), owner.ProjectID),
+		database.Equal(database.Col(VariableStorageFieldKind), kind.String()),
 	}
 	if len(names) > 0 {
 		filters = append(filters, anyName(names))
@@ -33,8 +37,8 @@ func VisibleTo(owner domain.VariableOwner, names ...string) *database.ListOption
 
 // ByName gives the read a total order that does not depend on physical row
 // order, so the same owner reading the same table twice gets the same slice.
-// Name alone is enough to be total: the read admits one owner, and the primary
-// key makes a name unique within it.
+// Name alone is enough to be total: the read admits one owner and one kind,
+// and the primary key makes a name unique within them.
 func ByName() database.OrderBy[VariableStorageField] {
 	return database.OrderBy[VariableStorageField]{
 		Columns: []database.Column[VariableStorageField]{
@@ -67,6 +71,7 @@ func RowToDomain(row *VariableStorage) *domain.Variable {
 	return &domain.Variable{
 		Name:     row.Name,
 		Owner:    domain.VariableOwner{ProjectID: row.ProjectID},
+		Kind:     row.Kind,
 		Value:    row.Value,
 		IsSecret: row.IsSecret,
 	}

@@ -18,6 +18,12 @@
 >
 > **Deviates from** [ADR 047](047-dialect-id-generation.md) §Prefix registry: a
 > variable has no minted PK (§6).
+>
+> **Amended by:** [ADR 069](069-variables-per-kind-frozen-per-deployment.md)
+> (the environment scope is gone: the owner is the project plus a kind,
+> `primary` or `preview`; a deployment freezes the values of its kind as a
+> content-addressed set; a deploy whose release references a missing name is
+> refused)
 
 ## Context
 
@@ -113,6 +119,14 @@ name would have to be rewritten with every rename or block renaming outright.
 The name is resolved to the ID once, at the API edge, and a name no environment
 answers to is `env.not_found` rather than a scope that holds nothing.
 
+> Amended by [ADR 069](069-variables-per-kind-frozen-per-deployment.md): the
+> environment is gone ([ADR 068](068-project-is-the-data-boundary.md)), so the
+> scope is the project. In its place a variable says which kind of target it
+> applies to, `primary` or `preview`, and a name is unique per project and
+> kind: one name may hold a primary and a preview value, as two rows, and
+> nothing falls back from one kind to the other. The exact match under
+> [Resolving variables](#resolving-variables) is on name, project and kind.
+
 In the future there will probably be a need for more levels in the scope. E.g.:
 configuration at a team/user-schema level. These are deliberately left out at
 the moment because it is cheap to add them later but adding them now would
@@ -143,6 +157,15 @@ Secrets are stored encrypted using the projects secret encryption key, as
 described in [ADR029](./029-cryptography-secrets-and-key-lifecycle.md).
 Decryption happens with the secret that encrypted the value. Because of key
 rotation, that can be different keys.
+
+> Amended by [ADR 069](069-variables-per-kind-frozen-per-deployment.md): the
+> table is keyed `(project_id, name, kind)`, and a value that applies to both
+> kinds is two rows. Beside it, `variable_sets` holds one immutable,
+> content-addressed document per distinct set of values in a project, and
+> `deployment_variable_sets` links each deployment to the set frozen for its
+> kind when it was created, so a deployment keeps its values however the
+> variables change afterwards. A secret is frozen as the ciphertext stored
+> here, never decrypted, and still decrypts by the key id in its own header.
 
 ### API
 
@@ -227,6 +250,15 @@ to be set:
   `variable.read` / `variable.write`.
 - **Deployment validation.** When a deployment is created, some validation
   needs to happen to ensure variables are present.
+
+> Amended by [ADR 069](069-variables-per-kind-frozen-per-deployment.md):
+> decided. A deploy is refused when its release references a name that is
+> missing from the set frozen for its kind, for primary and preview deploys
+> alike, and nothing is written. The service enforces it (#1566) and
+> `POST /deployments` reports the missing names (#1584). Rule 5 under
+> [Format](#format), an unresolved reference stays literal, applies when a
+> document is rendered, not when a deployment is created: a missing name
+> fails the deploy before anything renders.
 
 ## Alternatives considered
 

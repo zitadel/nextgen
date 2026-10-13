@@ -16,12 +16,21 @@ type VariableToSet struct {
 	IsSecret bool
 }
 
-// VariableService reads and writes the variables one owner entered (ADR 062).
+// apiVariableKind is the kind every read and write through this service
+// addresses. The API carries no kind yet: the request and response shapes
+// are #1587, and the default kind on write -- a plain value to both kinds, a
+// secret to primary only -- is #1566. Until those land, everything the API
+// enters or reads is the primary target's.
+const apiVariableKind = domain.OriginKindPrimary
+
+// VariableService reads and writes the variables one owner entered (ADR 062,
+// ADR 069).
 //
 // The owner is the project. Storage matches the owner column exactly, so a
-// value another project entered can never reach a caller here -- and, since
-// the primary key is the name plus that owner, a read yields at most one
-// variable per name and there is nothing to choose between.
+// value another project entered can never reach a caller here. The primary
+// key is the name, that owner and the kind, and this service reads and
+// writes one kind ([apiVariableKind]), so a read yields at most one variable
+// per name and there is nothing to choose between.
 type VariableService interface {
 	GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
 	GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
@@ -46,7 +55,7 @@ func NewVariableService(
 }
 
 func (s *variableService) GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error) {
-	variables, err := s.v2Pool.Statements().GetVariables(ctx, owner, names...)
+	variables, err := s.v2Pool.Statements().GetVariables(ctx, owner, apiVariableKind, names...)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to get variables from database")
 	}
@@ -79,6 +88,7 @@ func (s *variableService) GetDecryptedVariables(ctx context.Context, owner domai
 		decrypted = append(decrypted, &domain.Variable{
 			Name:     variable.Name,
 			Owner:    variable.Owner,
+			Kind:     variable.Kind,
 			Value:    value,
 			IsSecret: true,
 		})
@@ -111,19 +121,17 @@ func (s *variableService) SetVariables(ctx context.Context, owner domain.Variabl
 			varsToDelete = append(varsToDelete, varToSet.Name)
 			continue
 		}
+		var v *domain.Variable
 		if varToSet.IsSecret {
-			v, err := domain.NewSecretVariable(varToSet.Name, owner, varToSet.Value, crypter)
-			if err != nil {
-				return err
-			}
-			varsToWrite = append(varsToWrite, v)
+			v, err = domain.NewSecretVariable(varToSet.Name, owner, varToSet.Value, crypter)
 		} else {
-			v, err := domain.NewVariable(varToSet.Name, owner, varToSet.Value)
-			if err != nil {
-				return err
-			}
-			varsToWrite = append(varsToWrite, v)
+			v, err = domain.NewVariable(varToSet.Name, owner, varToSet.Value)
 		}
+		if err != nil {
+			return err
+		}
+		v.Kind = apiVariableKind
+		varsToWrite = append(varsToWrite, v)
 	}
 
 	// no need to start a transaction if there is only one variable -- but a
@@ -139,7 +147,7 @@ func (s *variableService) SetVariables(ctx context.Context, owner domain.Variabl
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		for _, name := range varsToDelete {
-			err := tx.Statements().DeleteVariable(ctx, owner, name)
+			err := tx.Statements().DeleteVariable(ctx, owner, apiVariableKind, name)
 			// Not DeleteVariable's "not found": a body states what the owner
 			// holds afterwards, and a name it never held already satisfies
 			// that. It is also what makes the request safe to retry.
@@ -179,7 +187,7 @@ func setVariableError(err error) error {
 }
 
 func (s *variableService) DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error {
-	if err := s.v2Pool.Statements().DeleteVariable(ctx, owner, name); err != nil {
+	if err := s.v2Pool.Statements().DeleteVariable(ctx, owner, apiVariableKind, name); err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return domain.ErrVariableNotFound().WithParent(err)
 		}
@@ -208,7 +216,7 @@ func (s *variableService) ReplaceVariablesInPlace(ctx context.Context, owner dom
 		variableNames = append(variableNames, placeholder.VariableName)
 	}
 
-	varList, err := s.v2Pool.Statements().GetVariables(ctx, owner, variableNames...)
+	varList, err := s.v2Pool.Statements().GetVariables(ctx, owner, apiVariableKind, variableNames...)
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("failed to get variables from database")
 	}

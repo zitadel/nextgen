@@ -2,16 +2,18 @@
 // domain mapping for the variables table.
 //
 // A variable row is one [domain.Variable]: a value entered by one project
-// under one name. Unlike the settings table this replaces, there is no ladder
-// and no final flag, so storage never collapses rows -- and never has to. A
-// read admits one owner exactly ([VisibleTo], which is
-// [domain.VariableOwner.HasAccessTo] pushed into SQL), and the primary key
-// makes a name unique within it, so a name yields at most one row.
+// under one name, for one kind of target. Unlike the settings table this
+// replaces, there is no ladder and no final flag, so storage never collapses
+// rows -- and never has to. A read admits one owner and one kind exactly
+// ([VisibleTo], which is [domain.VariableOwner.HasAccessTo] pushed into SQL
+// and narrowed to the kind), and the primary key makes a name unique within
+// them, so a name yields at most one row.
 package variable
 
 import (
 	"time"
 
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -19,8 +21,11 @@ import (
 // owner tuple flattened onto the row and the two row timestamps added, neither
 // of which the domain type carries.
 type VariableStorage struct {
-	Name       string
-	ProjectID  string
+	Name      string
+	ProjectID string
+	// Kind is parsed from the TEXT column by the dialect scan, so an unknown
+	// kind fails the read instead of decoding to primary.
+	Kind       domain.OriginKind
 	Value      any
 	IsSecret   bool
 	CreatedAt  time.Time
@@ -60,6 +65,14 @@ var Schema = database.NewSchema(map[VariableStorageField]database.FieldBinding[V
 		Accessor: func(v *VariableStorage) any { return v.ModifiedAt },
 		Coerce:   database.CoerceTime,
 	},
+	// Bound as its string, never as the enum: the Spanner client cannot
+	// encode the enum, and the column holds the name so a reordering of the
+	// Go constants cannot reinterpret rows already written.
+	VariableStorageFieldKind: {
+		SQLName:  "kind",
+		Accessor: func(v *VariableStorage) any { return v.Kind.String() },
+		Coerce:   database.CoerceString,
+	},
 })
 
 type VariableStorageField uint8
@@ -71,4 +84,5 @@ const (
 	VariableStorageFieldIsSecret
 	VariableStorageFieldCreatedAt
 	VariableStorageFieldModifiedAt
+	VariableStorageFieldKind
 )

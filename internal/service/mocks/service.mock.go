@@ -1927,17 +1927,17 @@ func (c *MockAllStatementsDeleteUserTOTPCall) DoAndReturn(f func(context.Context
 }
 
 // DeleteVariable mocks base method.
-func (m *MockAllStatements) DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error {
+func (m *MockAllStatements) DeleteVariable(ctx context.Context, owner domain.VariableOwner, kind domain.OriginKind, name string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteVariable", ctx, owner, name)
+	ret := m.ctrl.Call(m, "DeleteVariable", ctx, owner, kind, name)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteVariable indicates an expected call of DeleteVariable.
-func (mr *MockAllStatementsMockRecorder) DeleteVariable(ctx, owner, name any) *MockAllStatementsDeleteVariableCall {
+func (mr *MockAllStatementsMockRecorder) DeleteVariable(ctx, owner, kind, name any) *MockAllStatementsDeleteVariableCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteVariable", reflect.TypeOf((*MockAllStatements)(nil).DeleteVariable), ctx, owner, name)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteVariable", reflect.TypeOf((*MockAllStatements)(nil).DeleteVariable), ctx, owner, kind, name)
 	return &MockAllStatementsDeleteVariableCall{Call: call}
 }
 
@@ -1953,13 +1953,13 @@ func (c *MockAllStatementsDeleteVariableCall) Return(arg0 error) *MockAllStateme
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsDeleteVariableCall) Do(f func(context.Context, domain.VariableOwner, string) error) *MockAllStatementsDeleteVariableCall {
+func (c *MockAllStatementsDeleteVariableCall) Do(f func(context.Context, domain.VariableOwner, domain.OriginKind, string) error) *MockAllStatementsDeleteVariableCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsDeleteVariableCall) DoAndReturn(f func(context.Context, domain.VariableOwner, string) error) *MockAllStatementsDeleteVariableCall {
+func (c *MockAllStatementsDeleteVariableCall) DoAndReturn(f func(context.Context, domain.VariableOwner, domain.OriginKind, string) error) *MockAllStatementsDeleteVariableCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -2076,6 +2076,45 @@ func (c *MockAllStatementsExistsResourceScopeElsewhereCall) Do(f func(context.Co
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsExistsResourceScopeElsewhereCall) DoAndReturn(f func(context.Context, domain.ResourceKind, string, string) (bool, error)) *MockAllStatementsExistsResourceScopeElsewhereCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// FreezeDeploymentVariables mocks base method.
+func (m *MockAllStatements) FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string, kind domain.OriginKind) (*domain.VariableSet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FreezeDeploymentVariables", ctx, projectID, deploymentID, kind)
+	ret0, _ := ret[0].(*domain.VariableSet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FreezeDeploymentVariables indicates an expected call of FreezeDeploymentVariables.
+func (mr *MockAllStatementsMockRecorder) FreezeDeploymentVariables(ctx, projectID, deploymentID, kind any) *MockAllStatementsFreezeDeploymentVariablesCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FreezeDeploymentVariables", reflect.TypeOf((*MockAllStatements)(nil).FreezeDeploymentVariables), ctx, projectID, deploymentID, kind)
+	return &MockAllStatementsFreezeDeploymentVariablesCall{Call: call}
+}
+
+// MockAllStatementsFreezeDeploymentVariablesCall wrap *gomock.Call
+type MockAllStatementsFreezeDeploymentVariablesCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsFreezeDeploymentVariablesCall) Return(arg0 *domain.VariableSet, arg1 error) *MockAllStatementsFreezeDeploymentVariablesCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsFreezeDeploymentVariablesCall) Do(f func(context.Context, string, string, domain.OriginKind) (*domain.VariableSet, error)) *MockAllStatementsFreezeDeploymentVariablesCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsFreezeDeploymentVariablesCall) DoAndReturn(f func(context.Context, string, string, domain.OriginKind) (*domain.VariableSet, error)) *MockAllStatementsFreezeDeploymentVariablesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -2427,6 +2466,45 @@ func (c *MockAllStatementsGetDeploymentByIDCall) Do(f func(context.Context, stri
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsGetDeploymentByIDCall) DoAndReturn(f func(context.Context, string, string) (*domain.Deployment, error)) *MockAllStatementsGetDeploymentByIDCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetDeploymentVariables mocks base method.
+func (m *MockAllStatements) GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDeploymentVariables", ctx, projectID, deploymentID)
+	ret0, _ := ret[0].(*domain.VariableSet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDeploymentVariables indicates an expected call of GetDeploymentVariables.
+func (mr *MockAllStatementsMockRecorder) GetDeploymentVariables(ctx, projectID, deploymentID any) *MockAllStatementsGetDeploymentVariablesCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDeploymentVariables", reflect.TypeOf((*MockAllStatements)(nil).GetDeploymentVariables), ctx, projectID, deploymentID)
+	return &MockAllStatementsGetDeploymentVariablesCall{Call: call}
+}
+
+// MockAllStatementsGetDeploymentVariablesCall wrap *gomock.Call
+type MockAllStatementsGetDeploymentVariablesCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsGetDeploymentVariablesCall) Return(arg0 *domain.VariableSet, arg1 error) *MockAllStatementsGetDeploymentVariablesCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsGetDeploymentVariablesCall) Do(f func(context.Context, string, string) (*domain.VariableSet, error)) *MockAllStatementsGetDeploymentVariablesCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsGetDeploymentVariablesCall) DoAndReturn(f func(context.Context, string, string) (*domain.VariableSet, error)) *MockAllStatementsGetDeploymentVariablesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -3641,9 +3719,9 @@ func (c *MockAllStatementsGetUserUniqueAttributeScopesCall) DoAndReturn(f func(c
 }
 
 // GetVariables mocks base method.
-func (m *MockAllStatements) GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error) {
+func (m *MockAllStatements) GetVariables(ctx context.Context, owner domain.VariableOwner, kind domain.OriginKind, names ...string) ([]*domain.Variable, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, owner}
+	varargs := []any{ctx, owner, kind}
 	for _, a := range names {
 		varargs = append(varargs, a)
 	}
@@ -3654,9 +3732,9 @@ func (m *MockAllStatements) GetVariables(ctx context.Context, owner domain.Varia
 }
 
 // GetVariables indicates an expected call of GetVariables.
-func (mr *MockAllStatementsMockRecorder) GetVariables(ctx, owner any, names ...any) *MockAllStatementsGetVariablesCall {
+func (mr *MockAllStatementsMockRecorder) GetVariables(ctx, owner, kind any, names ...any) *MockAllStatementsGetVariablesCall {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, owner}, names...)
+	varargs := append([]any{ctx, owner, kind}, names...)
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVariables", reflect.TypeOf((*MockAllStatements)(nil).GetVariables), varargs...)
 	return &MockAllStatementsGetVariablesCall{Call: call}
 }
@@ -3673,13 +3751,13 @@ func (c *MockAllStatementsGetVariablesCall) Return(arg0 []*domain.Variable, arg1
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsGetVariablesCall) Do(f func(context.Context, domain.VariableOwner, ...string) ([]*domain.Variable, error)) *MockAllStatementsGetVariablesCall {
+func (c *MockAllStatementsGetVariablesCall) Do(f func(context.Context, domain.VariableOwner, domain.OriginKind, ...string) ([]*domain.Variable, error)) *MockAllStatementsGetVariablesCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsGetVariablesCall) DoAndReturn(f func(context.Context, domain.VariableOwner, ...string) ([]*domain.Variable, error)) *MockAllStatementsGetVariablesCall {
+func (c *MockAllStatementsGetVariablesCall) DoAndReturn(f func(context.Context, domain.VariableOwner, domain.OriginKind, ...string) ([]*domain.Variable, error)) *MockAllStatementsGetVariablesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -10222,17 +10300,17 @@ func (m *MockVariableStatements) EXPECT() *MockVariableStatementsMockRecorder {
 }
 
 // DeleteVariable mocks base method.
-func (m *MockVariableStatements) DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error {
+func (m *MockVariableStatements) DeleteVariable(ctx context.Context, owner domain.VariableOwner, kind domain.OriginKind, name string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteVariable", ctx, owner, name)
+	ret := m.ctrl.Call(m, "DeleteVariable", ctx, owner, kind, name)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteVariable indicates an expected call of DeleteVariable.
-func (mr *MockVariableStatementsMockRecorder) DeleteVariable(ctx, owner, name any) *MockVariableStatementsDeleteVariableCall {
+func (mr *MockVariableStatementsMockRecorder) DeleteVariable(ctx, owner, kind, name any) *MockVariableStatementsDeleteVariableCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteVariable", reflect.TypeOf((*MockVariableStatements)(nil).DeleteVariable), ctx, owner, name)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteVariable", reflect.TypeOf((*MockVariableStatements)(nil).DeleteVariable), ctx, owner, kind, name)
 	return &MockVariableStatementsDeleteVariableCall{Call: call}
 }
 
@@ -10248,21 +10326,21 @@ func (c *MockVariableStatementsDeleteVariableCall) Return(arg0 error) *MockVaria
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockVariableStatementsDeleteVariableCall) Do(f func(context.Context, domain.VariableOwner, string) error) *MockVariableStatementsDeleteVariableCall {
+func (c *MockVariableStatementsDeleteVariableCall) Do(f func(context.Context, domain.VariableOwner, domain.OriginKind, string) error) *MockVariableStatementsDeleteVariableCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockVariableStatementsDeleteVariableCall) DoAndReturn(f func(context.Context, domain.VariableOwner, string) error) *MockVariableStatementsDeleteVariableCall {
+func (c *MockVariableStatementsDeleteVariableCall) DoAndReturn(f func(context.Context, domain.VariableOwner, domain.OriginKind, string) error) *MockVariableStatementsDeleteVariableCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // GetVariables mocks base method.
-func (m *MockVariableStatements) GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error) {
+func (m *MockVariableStatements) GetVariables(ctx context.Context, owner domain.VariableOwner, kind domain.OriginKind, names ...string) ([]*domain.Variable, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, owner}
+	varargs := []any{ctx, owner, kind}
 	for _, a := range names {
 		varargs = append(varargs, a)
 	}
@@ -10273,9 +10351,9 @@ func (m *MockVariableStatements) GetVariables(ctx context.Context, owner domain.
 }
 
 // GetVariables indicates an expected call of GetVariables.
-func (mr *MockVariableStatementsMockRecorder) GetVariables(ctx, owner any, names ...any) *MockVariableStatementsGetVariablesCall {
+func (mr *MockVariableStatementsMockRecorder) GetVariables(ctx, owner, kind any, names ...any) *MockVariableStatementsGetVariablesCall {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, owner}, names...)
+	varargs := append([]any{ctx, owner, kind}, names...)
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVariables", reflect.TypeOf((*MockVariableStatements)(nil).GetVariables), varargs...)
 	return &MockVariableStatementsGetVariablesCall{Call: call}
 }
@@ -10292,13 +10370,13 @@ func (c *MockVariableStatementsGetVariablesCall) Return(arg0 []*domain.Variable,
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockVariableStatementsGetVariablesCall) Do(f func(context.Context, domain.VariableOwner, ...string) ([]*domain.Variable, error)) *MockVariableStatementsGetVariablesCall {
+func (c *MockVariableStatementsGetVariablesCall) Do(f func(context.Context, domain.VariableOwner, domain.OriginKind, ...string) ([]*domain.Variable, error)) *MockVariableStatementsGetVariablesCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockVariableStatementsGetVariablesCall) DoAndReturn(f func(context.Context, domain.VariableOwner, ...string) ([]*domain.Variable, error)) *MockVariableStatementsGetVariablesCall {
+func (c *MockVariableStatementsGetVariablesCall) DoAndReturn(f func(context.Context, domain.VariableOwner, domain.OriginKind, ...string) ([]*domain.Variable, error)) *MockVariableStatementsGetVariablesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
