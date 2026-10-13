@@ -10,7 +10,7 @@ theme (`packages/theme`) for the look: its colours, APK Futural for headings,
 Arimo for text. `app/globals.css` keeps only the values this page uses, under
 the website's names (`bg-background`, `text-foreground`, `accent-strong`), so
 the website's components move over unchanged. It does not use
-`@zitadel/design-tokens`, the palette of the console and the login.
+`@zitadel/design-tokens`, the palette of the console, the login and the docs.
 
 ## The animation
 
@@ -37,20 +37,26 @@ Lottie's timings and easings. As on the website it plays while the pointer is
 on it, returns to rest when the pointer leaves, and plays on its own where
 nothing hovers; here it also stays still for reduced motion.
 
-`app/icons/` holds the website's favicons, `packages/theme/assets/favicons` in
-`zitadel/new-website`, renamed so Next does not take them for its metadata
-files. `app/layout.tsx` declares them as the website does.
+`public/favicons/` holds the website's favicons,
+`packages/theme/assets/favicons` in `zitadel/new-website`, and
+`public/favicon.ico` its light one, laid out and declared (`app/layout.tsx`) as
+the website does: a dark mark for a light browser, a light one for a dark
+browser. They are the cloud's favicons, not only this page's: the console, the
+login UI and the docs link the same set at the same URLs, so a change here
+reaches them too; the storybook keeps Storybook's own. A single `/favicon.ico`
+cannot stand in for the set: each mark is one flat colour on a transparent
+ground, nearly invisible in the other theme's tab bar.
 
 ## Routing
 
-The cloud routes only `/` and `/_next/*` to this app (repo-root
-[`vercel.json`](../../vercel.json)); every other path belongs to another
-service, most of them to the server.
+The cloud routes only `/`, `/_next/*`, `/favicon.ico` and `/favicons/*` to this
+app (repo-root [`vercel.json`](../../vercel.json)); every other path belongs to
+another service, most of them to the server.
 
 - A new page, or a file in `public/`, needs a rewrite of its own in
   `vercel.json`; without one the server answers its path with a 404.
-- Every asset loads from `/_next/`: fonts through `next/font`, images and the
-  favicons as imports. Not through Next's metadata files (`app/icon.svg`,
+- Every other asset loads from `/_next/`: fonts through `next/font`, images as
+  imports. Not through Next's metadata files (`app/icon.svg`,
   `app/favicon.ico`, `opengraph-image`): Next serves those at the root.
 - A link to another app is a plain `<a>`, never `next/link`: each is a
   deployment of its own, which this app must not prefetch or route to itself.

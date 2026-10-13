@@ -69,10 +69,10 @@ func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDef
 	return resp, nil
 }
 
-// expandUserSchemas embeds each listed flow definition's user schema
-// (ADR 059: hydrate, never join — one batched query keyed on the page's
-// distinct schema ids, after the flow query ran, so ordering and page
-// tokens stay untouched).
+// expandUserSchemas embeds each listed flow definition's user schema: the
+// newest revision of the objectType it names (ADR 059: hydrate, never join —
+// one batched query keyed on the page's distinct object types, after the flow
+// query ran, so ordering and page tokens stay untouched).
 //
 // The schema kind gets its own authz stamp first: the flow-definition list
 // consumed the one-shot Allow skip, and reading schemas embedded must gate
@@ -85,27 +85,28 @@ func (h Handler) expandUserSchemas(ctx context.Context, projectID string, defini
 	}
 
 	seen := make(map[string]struct{}, len(definitions))
-	ids := make([]string, 0, len(definitions))
+	objectTypes := make([]string, 0, len(definitions))
 	for _, def := range definitions {
-		id := def.FlowDefinition.UserSchema
-		if _, dup := seen[id]; dup || id == "" {
+		objectType := def.FlowDefinition.UserSchema
+		if _, dup := seen[objectType]; dup || objectType == "" {
 			continue
 		}
-		seen[id] = struct{}{}
-		ids = append(ids, id)
+		seen[objectType] = struct{}{}
+		objectTypes = append(objectTypes, objectType)
 	}
 
-	byID := make(map[string]*api.Schema, len(ids))
-	if len(ids) > 0 {
+	byObjectType := make(map[string]*api.Schema, len(objectTypes))
+	if len(objectTypes) > 0 {
 		// One batched query suffices: the generated validation caps the flow
 		// page at the shared list maximum (limit defaults to 20, tops out at
 		// 100), so a page can never reference more distinct schemas than one
 		// schema query of the same maximum returns. If either cap ever moves
 		// independently, chunk this loop instead.
 		schemas, err := h.schemaService.ListSchemas(ctx, service.ListSchemasInput{
-			ProjectID: projectID,
-			IDs:       ids,
-			Limit:     len(ids),
+			ProjectID:                   projectID,
+			ObjectTypes:                 objectTypes,
+			LatestRevisionPerObjectType: true,
+			Limit:                       len(objectTypes),
 		})
 		if err != nil {
 			return err
@@ -115,12 +116,12 @@ func (h Handler) expandUserSchemas(ctx context.Context, projectID string, defini
 			if err != nil {
 				return err
 			}
-			byID[schema.URL] = apiSchema
+			byObjectType[*schema.ObjectType] = apiSchema
 		}
 	}
 
 	for i := range definitions {
-		if schema, ok := byID[definitions[i].FlowDefinition.UserSchema]; ok {
+		if schema, ok := byObjectType[definitions[i].FlowDefinition.UserSchema]; ok {
 			definitions[i].UserSchema.SetTo(*schema)
 		} else {
 			definitions[i].UserSchema.SetToNull()
