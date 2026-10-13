@@ -28,6 +28,7 @@ projects:
     sdk-vue: "packages/sdk-vue"
     testing: "packages/testing"
     storybook: "apps/storybook"
+    website: "apps/website"
 
 vcs:
   defaultBranch: "main"

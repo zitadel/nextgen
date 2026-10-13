@@ -32,6 +32,12 @@
       "framework": "nextjs",
       "installCommand": "sh ../cloud/install.sh",
       "buildCommand": "corepack pnpm run build"
+    },
+    "website": {
+      "root": "apps/website",
+      "framework": "nextjs",
+      "installCommand": "sh ../cloud/install.sh",
+      "buildCommand": "corepack pnpm run build"
     }
   },
   "redirects": [
@@ -69,6 +75,18 @@
       "source": "/docs/(.*)",
       "destination": {
         "service": "docs"
+      }
+    },
+    {
+      "source": "/",
+      "destination": {
+        "service": "website"
+      }
+    },
+    {
+      "source": "/_next/(.*)",
+      "destination": {
+        "service": "website"
       }
     },
     {
