@@ -3,23 +3,11 @@ import { consola } from "consola";
 import { createZitadelClient, type ZitadelClient } from "../api-client";
 import { type Environment, requireValueInteractive, resolveEnvironment } from "../environment";
 import { resolveCwd } from "../paths";
+import { shellArg } from "../shell";
 import { BaseCommand } from "./base";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
 import { environmentFlags } from "./environment-flags";
 import type { GlobalOptions } from "./types";
-
-/**
- * A single argument for a `next_commands` string, POSIX-quoted only when it
- * carries a character outside the shell-safe set, so a reproduced `--env-file`
- * path with a space or metacharacter stays one argument while an ordinary name
- * or URL is left bare.
- */
-function shellArg(value: string): string {
-  if (/^[A-Za-z0-9._:/@=-]+$/.test(value)) {
-    return value;
-  }
-  return `'${value.replaceAll("'", "'\\''")}'`;
-}
 
 /** The platform connection {@link EnvironmentCommand.connect} opens. */
 export type Connection = Readonly<{
