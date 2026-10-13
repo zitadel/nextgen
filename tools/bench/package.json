@@ -1,0 +1,16 @@
+{
+  "name": "@zitadel/bench",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The k6 benchmark harness (ADR 067), a nested Go module. This manifest only gives the task runner its scripts; nothing is published.",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "format": "node ../../scripts/go-format-check.mjs",
+    "vet": "go vet ./...",
+    "lint": "biome check scripts --no-errors-on-unmatched",
+    "build": "go build -o dist/k6 ./cmd/k6",
+    "test": "go test -timeout 5m ./...",
+    "sweep": "dist/k6 x nextgen sweep --base http://localhost:8080 --fixtures fixtures/local.json",
+    "summarize": "dist/k6 x nextgen summarize"
+  }
+}

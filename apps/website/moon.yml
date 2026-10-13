@@ -1,0 +1,40 @@
+id: "website"
+language: "typescript"
+layer: "application"
+stack: "frontend"
+
+workspace:
+  inheritedTasks:
+    # One static page and no unit tests yet; `typecheck` and `build` check it.
+    exclude:
+      - "test"
+
+tasks:
+  # lint is the inherited task unchanged, and so are the commands below.
+  typecheck:
+    options:
+      # `next typegen` writes .next/types, which `next build` wipes and
+      # rewrites: side by side, one fails on the other's files.
+      mutex: "website-next"
+
+  build:
+    outputs:
+      - ".next/**/*"
+    options:
+      # Replaces the inherited dist/**/* rather than adding to it.
+      mergeOutputs: "replace"
+      mutex: "website-next"
+
+  dev:
+    command: "corepack pnpm run dev"
+    options:
+      persistent: true
+      runInCI: false
+
+  start:
+    command: "corepack pnpm run start"
+    deps:
+      - "build"
+    options:
+      persistent: true
+      runInCI: false

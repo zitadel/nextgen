@@ -14,9 +14,9 @@ something of our own.
 ## Everything under `/docs`
 
 The hosted cloud routes only `/docs` and `/docs/(.*)` to this app; every other
-path belongs to the server (repo-root [`vercel.json`](../../vercel.json),
-[`apps/cloud/README.md`](../cloud/README.md)). So the template's root routes
-live under `/docs` here:
+path belongs to another service, `/_next/` to the website (repo-root
+[`vercel.json`](../../vercel.json), [`apps/cloud/README.md`](../cloud/README.md)).
+So the template's root routes live under `/docs` here:
 
 | Route | Template |
 | --- | --- |
@@ -75,3 +75,7 @@ deployment. The specs use paths only, so one spec proves both.
   `llms-full.txt` to the pages without the API operations.
 - One browser test (`*.browser.spec.ts`, Chromium) proves the site hydrates
   and navigates; everything else is HTTP through Playwright's request fixture.
+- Against a deployment, no traces and no HTML report, and the workflow uploads
+  the screenshots alone: the repository is public, and a trace or the error of
+  a failed request holds the bypass secret
+  ([`docs/runbooks/cloud.md`](../../docs/runbooks/cloud.md#deployment-checks)).

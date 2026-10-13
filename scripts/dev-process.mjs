@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 export function run(command, args = [], options = {}) {
   return new Promise((resolve, reject) => {
@@ -136,8 +136,19 @@ export function forwardedArgs(args = process.argv.slice(2)) {
   return args[0] === "--" ? args.slice(1) : args;
 }
 
+// Node loads the entry script from its real path: import.meta.url has every
+// symlink resolved, argv[1] keeps the path as given. Compare real paths, or a
+// script started through a symlink (macOS's /tmp links to /private/tmp) skips
+// its main block and exits 0 having done nothing.
 export function isDirectRun(moduleUrl, argv = process.argv) {
-  return Boolean(argv[1] && moduleUrl === pathToFileURL(resolve(argv[1])).href);
+  if (!argv[1]) {
+    return false;
+  }
+  try {
+    return realpathSync(argv[1]) === realpathSync(fileURLToPath(moduleUrl));
+  } catch {
+    return false;
+  }
 }
 
 function shellQuote(value) {

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "typecheck": {
+      "dependsOn": ["@zitadel/sdk-react#build"]
+    },
+    // Builds into the server's embed directory, outside the package. The
+    // hosted cloud's build bakes Vercel's insights and their sample rate in
+    // (src/vite-env.d.ts), so both variables are part of the cache key and
+    // visible to the build: Vite's framework inference hashes VITE_* already,
+    // but CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE has no prefix and vite.config.ts
+    // reads it from the environment, which strict mode hides unless it is
+    // listed. The other workspace packages the console imports resolve from
+    // source; sdk-react has no `@zitadel/source` entry.
+    "build": {
+      "dependsOn": ["@zitadel/sdk-react#build"],
+      "env": ["VITE_CONSOLE_VERCEL_INSIGHTS", "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"],
+      "outputs": ["$TURBO_ROOT$/internal/staticui/console/dist/**"]
+    },
+    // The release UI build consumes the package release output and runs after
+    // the public packages' release builds (tools/release/turbo.json).
+    "build-release": {
+      "dependsOn": ["@zitadel/api#build-release", "@zitadel/sdk-react#build", "@zitadel/release#build-public-packages"],
+      "env": ["VITE_CONSOLE_VERCEL_INSIGHTS", "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"],
+      "outputs": ["$TURBO_ROOT$/internal/staticui/console/dist/**"]
+    },
+    "test": {
+      "dependsOn": ["build"]
+    },
+    "dev": {
+      "dependsOn": ["@zitadel/sdk-react#build"]
+    },
+    // Real-data dev loop: boots a seeded ephemeral instance through the built
+    // CLI, then the dev server against it (scripts/dev-real.mts builds the
+    // server itself; a task dependency on the server build would cycle, as
+    // the server embeds the console).
+    "dev:real": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["@zitadel/sdk-react#build", "@zitadel/cli#build"],
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
+    },
+    "dev:claim": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["@zitadel/sdk-react#build", "@zitadel/cli#build"],
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
+    },
+    "preview": {
+      "dependsOn": ["build"]
+    }
+  }
+}
