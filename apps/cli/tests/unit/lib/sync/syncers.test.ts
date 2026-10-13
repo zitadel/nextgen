@@ -1176,7 +1176,17 @@ describe("IdpConnectionSyncer", () => {
       it("answers with the id of the connection that already holds its slug", async () => {
         storing(next);
 
-        await expect(idpSyncer().preflight?.(file, next, null)).resolves.toEqual({ id: "idp_1" });
+        await expect(idpSyncer().preflight?.(file, next, null)).resolves.toMatchObject({
+          id: "idp_1",
+        });
+      });
+
+      it("answers with the stored connection as well, for a plan to compare against", async () => {
+        storing(next);
+
+        await expect(idpSyncer().preflight?.(file, next, null)).resolves.toMatchObject({
+          definition: expect.objectContaining({ slug: "google" }),
+        });
       });
 
       it("judges it against that connection, so a moved file cannot change the issuer", async () => {
@@ -1202,6 +1212,17 @@ describe("IdpConnectionSyncer", () => {
         await expect(idpSyncer().preflight?.(file, next, next)).resolves.toBeUndefined();
       });
     });
+  });
+
+  it("names a stored connection by its slug, to match a removed file to what it kept", () => {
+    const [, idp] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
+
+    expect(idp.identityOf?.({ slug: "acme" })).toBe("acme");
   });
 
   it("declares deletion unsupported, so a removed file is reported and not sent", () => {

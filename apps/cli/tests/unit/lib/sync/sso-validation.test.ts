@@ -46,9 +46,9 @@ const create = (path: string, kind: string, content: object): SyncAction => ({
 const contents = (entries: Record<string, object>) => new Map(Object.entries(entries));
 
 /** The message `validatePlannedSso` fails with, or `undefined` when it is satisfied. */
-function failure(run: () => void): string | undefined {
+async function failure(run: () => Promise<void>): Promise<string | undefined> {
   try {
-    run();
+    await run();
   } catch (error) {
     expect(error).toBeInstanceOf(ZitadelError);
     return (error as ZitadelError).message;
@@ -67,9 +67,9 @@ describe("validatePlannedSso", () => {
     [CONNECTION]: connection,
   };
 
-  it("accepts a tree that agrees with itself", () => {
+  it("accepts a tree that agrees with itself", async () => {
     expect(
-      failure(() =>
+      await failure(() =>
         validatePlannedSso({
           actions: [create(FLOW, "flow", consistent[FLOW])],
           scannedContents: contents(consistent),
@@ -79,8 +79,8 @@ describe("validatePlannedSso", () => {
     ).toBeUndefined();
   });
 
-  it("stops on one that does not, naming the file", () => {
-    const message = failure(() =>
+  it("stops on one that does not, naming the file", async () => {
+    const message = await failure(() =>
       validatePlannedSso({
         actions: [create(FLOW, "flow", consistent[FLOW])],
         scannedContents: contents({ ...consistent, [SCHEMA]: schema(["other"]) }),
@@ -92,10 +92,10 @@ describe("validatePlannedSso", () => {
     expect(message).toContain('"acme" is not listed in sso.providers');
   });
 
-  it("does not re-judge a project this plan does not touch", () => {
+  it("does not re-judge a project this plan does not touch", async () => {
     // A rule added later must not break a project that was already applied.
     expect(
-      failure(() =>
+      await failure(() =>
         validatePlannedSso({
           actions: [{ kind: "skip", path: FLOW, reason: "no-change" }],
           scannedContents: contents({ ...consistent, [SCHEMA]: schema(["other"]) }),
@@ -105,11 +105,11 @@ describe("validatePlannedSso", () => {
     ).toBeUndefined();
   });
 
-  it("is skipped by the same switch as flow validation", () => {
+  it("is skipped by the same switch as flow validation", async () => {
     process.env.ZITADEL_SKIP_FLOW_VALIDATION = "1";
 
     expect(
-      failure(() =>
+      await failure(() =>
         validatePlannedSso({
           actions: [create(FLOW, "flow", consistent[FLOW])],
           scannedContents: contents({ ...consistent, [SCHEMA]: schema(["other"]) }),
@@ -119,10 +119,10 @@ describe("validatePlannedSso", () => {
     ).toBeUndefined();
   });
 
-  it("judges a plan that only removes a connection a schema still lists", () => {
+  it("judges a plan that only removes a connection a schema still lists", async () => {
     // Deleting the file is the change that makes the tree inconsistent.
     const remaining = { [SCHEMA]: schema(["acme"]) };
-    const message = failure(() =>
+    const message = await failure(() =>
       validatePlannedSso({
         actions: [
           {
@@ -135,6 +135,7 @@ describe("validatePlannedSso", () => {
         ],
         scannedContents: contents(remaining),
         stateResources: {},
+        slugOfKept: async () => "acme",
       }),
     );
 
@@ -143,10 +144,10 @@ describe("validatePlannedSso", () => {
     );
   });
 
-  it("names every problem under the path key flow validation uses, with the steps it is about", () => {
+  it("names every problem under the path key flow validation uses, with the steps it is about", async () => {
     let details: { issues?: Array<Record<string, unknown>> } | undefined;
     try {
-      validatePlannedSso({
+      await validatePlannedSso({
         actions: [create(FLOW, "flow", consistent[FLOW])],
         scannedContents: contents({ ...consistent, [SCHEMA]: schema(["other"]) }),
         stateResources: {},
@@ -162,10 +163,10 @@ describe("validatePlannedSso", () => {
     });
   });
 
-  it("says how to get past the check, and that nothing was changed", () => {
+  it("says how to get past the check, and that nothing was changed", async () => {
     let hint: string | undefined;
     try {
-      validatePlannedSso({
+      await validatePlannedSso({
         actions: [create(FLOW, "flow", consistent[FLOW])],
         scannedContents: contents({ ...consistent, [SCHEMA]: schema(["other"]) }),
         stateResources: {},
@@ -190,27 +191,27 @@ describe("validatePlannedSso", () => {
         }),
       );
 
-    it("by the id the schema declares", () => {
-      expect(run(flow("https://schemas.example.test/staff.json", ["acme"]))).toContain(
+    it("by the id the schema declares", async () => {
+      expect(await run(flow("https://schemas.example.test/staff.json", ["acme"]))).toContain(
         "is not listed in sso.providers",
       );
     });
 
-    it("by the id the platform assigned, once applied", () => {
+    it("by the id the platform assigned, once applied", async () => {
       expect(
-        run(flow("sch_01TEST", ["acme"]), {
+        await run(flow("sch_01TEST", ["acme"]), {
           stateResources: { [SCHEMA]: { id: "sch_01TEST", hash: "h" } },
         }),
       ).toContain("is not listed in sso.providers");
     });
 
-    it("by the file name in the URL setup wrote before the first apply", () => {
-      expect(run(flow("https://elsewhere.example.test/schemas/staff.json", ["acme"]))).toContain(
-        "is not listed in sso.providers",
-      );
+    it("by the file name in the URL setup wrote before the first apply", async () => {
+      expect(
+        await run(flow("https://elsewhere.example.test/schemas/staff.json", ["acme"])),
+      ).toContain("is not listed in sso.providers");
     });
 
-    it("by the file a re-pin in this plan names", () => {
+    it("by the file a re-pin in this plan names", async () => {
       const body = flow("sch_OLD", ["acme"]);
       const action: SyncAction = {
         kind: "create",
@@ -222,7 +223,7 @@ describe("validatePlannedSso", () => {
       };
 
       expect(
-        failure(() =>
+        await failure(() =>
           validatePlannedSso({
             actions: [action],
             scannedContents: contents({ ...broken, [FLOW]: body }),
@@ -232,7 +233,7 @@ describe("validatePlannedSso", () => {
       ).toContain("is not listed in sso.providers");
     });
 
-    it("not by a URL that only ends like a schema this project has already applied", () => {
+    it("not by a URL that only ends like a schema this project has already applied", async () => {
       // The platform gave staff.json an id, so a flow that names a URL is
       // naming some other schema, one this project does not keep locally. Paired
       // with staff.json it would be refused, since staff.json has sso off.
@@ -244,7 +245,7 @@ describe("validatePlannedSso", () => {
       const body = flow("https://other-tenant.example.test/staff.json", ["acme"]);
 
       expect(
-        failure(() =>
+        await failure(() =>
           validatePlannedSso({
             actions: [create(FLOW, "flow", body)],
             scannedContents: contents({ [SCHEMA]: off, [FLOW]: body, [CONNECTION]: connection }),
@@ -254,7 +255,7 @@ describe("validatePlannedSso", () => {
       ).toBeUndefined();
     });
 
-    it("and says so when a flow that offers providers could not be paired", () => {
+    it("and says so when a flow that offers providers could not be paired", async () => {
       takeReportedWarnings();
       run(flow("https://unrelated.example.test/other.json", ["acme"]));
 
@@ -263,7 +264,7 @@ describe("validatePlannedSso", () => {
       );
     });
 
-    it("not at all when it cannot be told, which leaves only the rules that need no schema", () => {
+    it("not at all when it cannot be told, which leaves only the rules that need no schema", async () => {
       // Paired with its schema this flow would be refused, since the schema has
       // sso switched off. With no way to pair them, only the flow's own rules run.
       const off = {
@@ -273,7 +274,7 @@ describe("validatePlannedSso", () => {
       const body = flow("https://unrelated.example.test/other.json", ["acme"]);
 
       expect(
-        failure(() =>
+        await failure(() =>
           validatePlannedSso({
             actions: [create(FLOW, "flow", body)],
             scannedContents: contents({ [SCHEMA]: off, [FLOW]: body, [CONNECTION]: connection }),
@@ -319,25 +320,27 @@ describe("validatePlannedSso reports only what the plan touches", () => {
       validatePlannedSso({ actions, scannedContents: contents(tree), stateResources: {} }),
     );
 
-  it("does not stop an edit to one connection on another flow's older mistake", () => {
-    expect(run([create(CONNECTION, "idp", connection)])).toBeUndefined();
+  it("does not stop an edit to one connection on another flow's older mistake", async () => {
+    expect(await run([create(CONNECTION, "idp", connection)])).toBeUndefined();
   });
 
-  it("stops an edit to the flow that has the mistake", () => {
-    expect(run([create(OTHER_FLOW, "flow", lenientFlow)])).toContain("sso_user_not_found");
+  it("stops an edit to the flow that has the mistake", async () => {
+    expect(await run([create(OTHER_FLOW, "flow", lenientFlow)])).toContain("sso_user_not_found");
   });
 
-  it("stops an edit to a connection the flow with the mistake offers", () => {
+  it("stops an edit to a connection the flow with the mistake offers", async () => {
     expect(
-      run([create(OTHER_CONNECTION, "idp", { slug: "github", claim_mapping: { email: "email" } })]),
+      await run([
+        create(OTHER_CONNECTION, "idp", { slug: "github", claim_mapping: { email: "email" } }),
+      ]),
     ).toContain(OTHER_FLOW);
   });
 
-  it("stops an edit to the schema a flow with the mistake is pinned to", () => {
-    expect(run([create(OTHER_SCHEMA, "schema", tree[OTHER_SCHEMA])])).toContain(OTHER_FLOW);
+  it("stops an edit to the schema a flow with the mistake is pinned to", async () => {
+    expect(await run([create(OTHER_SCHEMA, "schema", tree[OTHER_SCHEMA])])).toContain(OTHER_FLOW);
   });
 
-  it("does not stop a plan that only keeps a removed connection no schema lists", () => {
+  it("does not stop a plan that only keeps a removed connection no schema lists", async () => {
     const removed: SyncAction = {
       kind: "skip",
       path: ".zitadel/idps/gone.json",
@@ -346,10 +349,10 @@ describe("validatePlannedSso reports only what the plan touches", () => {
       id: "idp_9",
     };
 
-    expect(run([removed])).toBeUndefined();
+    expect(await run([removed])).toBeUndefined();
   });
 
-  it("does stop a plan that keeps a removed connection a schema still lists", () => {
+  it("does stop a plan that keeps a removed connection a schema still lists", async () => {
     const removed: SyncAction = {
       kind: "skip",
       path: ".zitadel/idps/github.json",
@@ -361,13 +364,130 @@ describe("validatePlannedSso reports only what the plan touches", () => {
     delete without[OTHER_CONNECTION];
 
     expect(
-      failure(() =>
+      await failure(() =>
         validatePlannedSso({
           actions: [removed],
           scannedContents: contents(without),
           stateResources: {},
+          slugOfKept: async () => "github",
         }),
       ),
     ).toContain("no connection file");
+  });
+});
+
+describe("validatePlannedSso and a kept removal", () => {
+  const kept = (path: string): SyncAction => ({
+    kind: "skip",
+    path,
+    reason: "unsupported-deletion",
+    syncer: syncer("idp"),
+    id: "idp_9",
+  });
+  const withMissingProvider = {
+    [SCHEMA]: schema(["acme", "never-existed"]),
+    [FLOW]: flow("https://schemas.example.test/staff.json", ["acme"]),
+    [CONNECTION]: connection,
+  };
+
+  it("does not fail a plan without edits on a provider that never had a file", async () => {
+    const message = await failure(() =>
+      validatePlannedSso({
+        actions: [kept(".zitadel/idps/gone.json")],
+        scannedContents: contents(withMissingProvider),
+        stateResources: {},
+        slugOfKept: async () => "gone",
+      }),
+    );
+
+    expect(message).toBeUndefined();
+  });
+
+  it("fails it on the provider the removed file was for", async () => {
+    const message = await failure(() =>
+      validatePlannedSso({
+        actions: [kept(".zitadel/idps/gone.json")],
+        scannedContents: contents(withMissingProvider),
+        stateResources: {},
+        slugOfKept: async () => "never-existed",
+      }),
+    );
+
+    expect(message).toContain('"never-existed"');
+  });
+
+  it("does not read what the removed file was for when nothing is missing", async () => {
+    let asked = false;
+
+    await failure(() =>
+      validatePlannedSso({
+        actions: [kept(".zitadel/idps/gone.json")],
+        scannedContents: contents({
+          [SCHEMA]: schema(["acme"]),
+          [FLOW]: flow("https://schemas.example.test/staff.json", ["acme"]),
+          [CONNECTION]: connection,
+        }),
+        stateResources: {},
+        slugOfKept: async () => {
+          asked = true;
+          return "gone";
+        },
+      }),
+    );
+
+    expect(asked).toBe(false);
+  });
+
+  it("does not fail a rename, whose new file carries the slug", async () => {
+    const renamed = {
+      [SCHEMA]: schema(["acme"]),
+      [FLOW]: flow("https://schemas.example.test/staff.json", ["acme"]),
+      ".zitadel/idps/acme-main.json": connection,
+    };
+
+    const message = await failure(() =>
+      validatePlannedSso({
+        actions: [kept(CONNECTION), create(".zitadel/idps/acme-main.json", "idp", connection)],
+        scannedContents: contents(renamed),
+        stateResources: {},
+        slugOfKept: async () => "acme",
+      }),
+    );
+
+    expect(message).toBeUndefined();
+  });
+});
+
+describe("validatePlannedSso and other connection files", () => {
+  const GITHUB = ".zitadel/idps/github.json";
+  const tree = {
+    [SCHEMA]: schema(["acme", "github"]),
+    [FLOW]: flow("https://schemas.example.test/staff.json", ["acme", "github"]),
+    [CONNECTION]: { slug: "acme", claim_mapping: { email: "email", typo: "x" } },
+    [GITHUB]: { slug: "github", claim_mapping: { email: "email" } },
+  };
+  const run = (actions: SyncAction[], over: Record<string, object> = {}) =>
+    failure(() =>
+      validatePlannedSso({
+        actions,
+        scannedContents: contents({ ...tree, ...over }),
+        stateResources: {},
+      }),
+    );
+
+  it("does not stop an edit to one on an older mistake in another", async () => {
+    expect(await run([create(GITHUB, "idp", tree[GITHUB])])).toBeUndefined();
+  });
+
+  it("still stops an edit to a connection with a mistake of its own", async () => {
+    expect(await run([create(CONNECTION, "idp", tree[CONNECTION])])).toContain(CONNECTION);
+  });
+
+  it("still stops two connections that claim one slug, whichever was edited", async () => {
+    const message = await run([create(GITHUB, "idp", tree[GITHUB])], {
+      [CONNECTION]: { slug: "github", claim_mapping: { email: "email" } },
+    });
+
+    expect(message).toContain("is also used by");
   });
 });

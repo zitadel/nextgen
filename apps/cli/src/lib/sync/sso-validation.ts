@@ -7,7 +7,7 @@ import { FLOWS_DIR } from "../flows";
 import { IDPS_DIR } from "../idp";
 import { SCHEMAS_DIR } from "../user-schema";
 import { reportWarning } from "../warnings";
-import { isUnsupportedDeletion } from "./plan-renderer.js";
+import { isUnsupportedDeletion, type UnsupportedDeletion } from "./plan-renderer.js";
 import type { ResourceEntry, SyncAction } from "./types.js";
 
 /**
@@ -29,11 +29,13 @@ import type { ResourceEntry, SyncAction } from "./types.js";
  * "touches": a schema that still lists a connection with no file is
  * inconsistent however it got there, and stays reported until it is fixed.
  */
-export function validatePlannedSso(opts: {
+export async function validatePlannedSso(opts: {
   actions: SyncAction[];
   scannedContents: ReadonlyMap<string, object>;
   stateResources: Readonly<Record<string, ResourceEntry>>;
-}): void {
+  /** What names the resource a kept removal left on the platform, read only when it is needed. */
+  slugOfKept?: (kept: UnsupportedDeletion) => Promise<string | undefined>;
+}): Promise<void> {
   // Already announced once by flow validation, which runs first.
   if (process.env.ZITADEL_SKIP_FLOW_VALIDATION) {
     return;
@@ -44,7 +46,8 @@ export function validatePlannedSso(opts: {
       ["schema", "flow", "idp"].includes(action.syncer.kind),
   );
   const keptRemovals = opts.actions.filter(
-    (action) => isUnsupportedDeletion(action) && action.syncer.kind === "idp",
+    (action): action is UnsupportedDeletion =>
+      isUnsupportedDeletion(action) && action.syncer.kind === "idp",
   );
   if (writes.length === 0 && keptRemovals.length === 0) {
     return;
@@ -74,14 +77,23 @@ export function validatePlannedSso(opts: {
   );
   const tree: ProjectTree = { schemas, flows, connections: inDir(IDPS_DIR) };
 
-  const relevant = touchedFiles(
-    writes.map((action) => action.path),
-    tree,
-  );
-  const issues = validateProject(tree).filter(
+  const written = writes.map((action) => action.path);
+  const relevant = touchedFiles(written, tree);
+  const connectionEdited = written.some((path) => tree.connections.has(path));
+  const found = validateProject(tree);
+  // A connection stands against every other one only where they collide.
+  const collisions = new Set<string>(["sso/duplicate-slug", "sso/shared-variable"]);
+  // A kept removal leaves its connection on the platform: a schema or flow that
+  // still names that slug with no file is inconsistent however it got there.
+  const keptSlugs =
+    keptRemovals.length > 0 && found.some((issue) => issue.rule === "sso/connection-resolves")
+      ? new Set(await Promise.all(keptRemovals.map((kept) => opts.slugOfKept?.(kept))))
+      : new Set<string | undefined>();
+  const issues = found.filter(
     (issue) =>
       relevant.has(issue.file) ||
-      (keptRemovals.length > 0 && issue.rule === "sso/connection-resolves"),
+      (connectionEdited && collisions.has(issue.rule) && tree.connections.has(issue.file)) ||
+      (issue.rule === "sso/connection-resolves" && keptSlugs.has(issue.slug)),
   );
   if (issues.length === 0) {
     return;
@@ -113,8 +125,7 @@ export function validatePlannedSso(opts: {
  * The files a plan touches and the files they point at or are pointed at by:
  * a connection and the schemas and flows that name its slug, a schema and the
  * connections it lists and the flows pinned to it, a flow and its schema and the
- * connections it offers. Connections stand together, because two of them can
- * collide on a slug or a variable whichever one was edited.
+ * connections it offers.
  */
 function touchedFiles(written: readonly string[], tree: ProjectTree): Set<string> {
   const related = new Set(written);
@@ -123,9 +134,6 @@ function touchedFiles(written: readonly string[], tree: ProjectTree): Set<string
     [...tree.connections].filter(([, body]) => slugs.includes(slugOf(body) as string));
   for (const path of written) {
     if (tree.connections.has(path)) {
-      for (const connection of tree.connections.keys()) {
-        related.add(connection);
-      }
       const slug = slugOf(tree.connections.get(path) as object);
       for (const [schemaPath, schema] of tree.schemas) {
         if (schemaProviders(schema).includes(slug as string)) {

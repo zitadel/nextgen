@@ -271,6 +271,15 @@ describe("plan", () => {
           expect(await app.planAttempt()).toFailWith("E_VALIDATION");
         });
 
+        it("counts a removed connection file the same way in plan and in apply", async () => {
+          const app = await anAppServingAnUnlistedConnection();
+          await app.removeConnection("spare");
+
+          const { data } = app.envelopeOf<{ unsupported_deletions: number }>(await app.apply());
+
+          expect(data.unsupported_deletions).toBe(1);
+        });
+
         it("reports a removed connection file apart from the changes, in --json", async () => {
           const app = await anAppServingAnUnlistedConnection();
           await app.removeConnection("spare");

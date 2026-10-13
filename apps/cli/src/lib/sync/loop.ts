@@ -17,7 +17,7 @@ import {
   unsupportedDeletionNote,
   type UnsupportedDeletion,
 } from "./plan-renderer.js";
-import { readState, removeFromState, updateState } from "./state.js";
+import { moveInState, readState, removeFromState, updateState } from "./state.js";
 import { FatalFetchError } from "./types.js";
 import type { FlowRepin, ResourceEntry, ResourceSyncer, SyncAction } from "./types.js";
 import { reportWarning } from "../warnings";
@@ -240,7 +240,15 @@ export async function buildSyncPlan(
   // already published. Throws E_VALIDATION before any mutation.
   validatePlannedFlows({ actions, scannedContents, stateResources: state.resources });
   // The rules that read schemas, flows and connections together.
-  validatePlannedSso({ actions, scannedContents, stateResources: state.resources });
+  await validatePlannedSso({
+    actions,
+    scannedContents,
+    stateResources: state.resources,
+    slugOfKept: async (kept) => {
+      const stored = await readStored(kept.syncer, kept.id);
+      return stored === null ? undefined : kept.syncer.identityOf?.(stored);
+    },
+  });
 
   // What only the platform can answer, for every file this plan writes. After
   // the local checks, so a mistake that needs no request is never hidden behind one.
@@ -260,6 +268,7 @@ export async function buildSyncPlan(
         );
         if (declined !== undefined) {
           action.movedFrom = declined.path;
+          action.oldContent = existing.definition;
           actions.splice(actions.indexOf(declined), 1);
         }
       }
@@ -379,9 +388,10 @@ export async function runSyncLoop(
         const { id, canonical } = await action.syncer.create(content);
         const fallbackHash = newId ? hashForState(action.syncer, content) : action.hash;
         const entry: ResourceEntry = { id, hash: await writeBack(action, canonical, fallbackHash) };
-        await updateState(cwd, action.path, entry);
-        if (action.movedFrom !== undefined) {
-          await removeFromState(cwd, action.movedFrom);
+        if (action.movedFrom === undefined) {
+          await updateState(cwd, action.path, entry);
+        } else {
+          await moveInState(cwd, action.movedFrom, action.path, entry);
         }
         if (action.movedFrom === undefined) {
           consola.info(
@@ -682,11 +692,14 @@ async function readJsonDir(dirPath: string): Promise<Map<string, object>> {
  * with a non-string one) is skipped: it does not pin a schema revision, so it
  * cannot be affected by one.
  */
-async function readLocalFlowUserSchemas(cwd: string): Promise<Map<string, string>> {
+export async function readLocalFlowUserSchemas(
+  cwd: string,
+  separator: string = sep,
+): Promise<Map<string, string>> {
   const result = new Map<string, string>();
   const flows = await readJsonDir(join(cwd, FLOWS_DIR));
   for (const [absPath, content] of flows.entries()) {
-    const relPath = absPath.slice(cwd.length + 1);
+    const relPath = toStatePath(absPath, cwd, separator);
     if (
       typeof content === "object" &&
       content !== null &&

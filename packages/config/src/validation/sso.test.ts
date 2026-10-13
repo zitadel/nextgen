@@ -235,7 +235,24 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
         rule: "sso/outcome-routing",
         file: LOGIN,
         steps: ["identifier"],
-        says: ["user_already_exists", "Add a transition"],
+        says: ["user_already_exists", "with no action", "remove its action"],
+      },
+    ],
+  },
+  {
+    name: "the collection step routes user_already_exists only through a switch to another flow",
+    edit: (p) => {
+      stepOf(p, "register-sso").transitions = {
+        submit: { target: "done" },
+        user_already_exists: { target: "done", action: "switch" } as { target: string },
+      };
+    },
+    expect: [
+      {
+        rule: "sso/collection-conflict-routing",
+        file: LOGIN,
+        steps: ["register-sso"],
+        says: ["user_already_exists", "no action", "Remove the action"],
       },
     ],
   },
@@ -558,6 +575,16 @@ describe("how the rules read the project", () => {
     });
 
     expect(issues.map((issue) => issue.rule)).toContain("sso/orphaned-mapping-target");
+  });
+
+  it("says which connection slug a provider with no file is", () => {
+    const issues = validate((p) => {
+      p.connections = {};
+    });
+
+    expect(
+      issues.filter((issue) => issue.rule === "sso/connection-resolves").map((i) => i.slug),
+    ).toEqual(["google", "google"]);
   });
 
   it("names a verified_claims key that no schema has once, not twice", () => {

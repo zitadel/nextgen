@@ -25,6 +25,8 @@ export type ProjectIssue = {
    * line to read and one fix to make.
    */
   steps?: readonly string[];
+  /** The connection slug the issue is about, when it is about one. */
+  slug?: string;
   message: string;
 };
 

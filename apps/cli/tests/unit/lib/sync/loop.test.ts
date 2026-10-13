@@ -12,6 +12,7 @@ import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normaliz
 import {
   buildSyncPlan,
   hashForState,
+  readLocalFlowUserSchemas,
   runSyncLoop,
   toStatePath,
   writeBackResource,
@@ -1691,7 +1692,9 @@ describe("a resource the platform cannot delete yet", () => {
     }
     const holdingIt = () =>
       unsupported({
-        preflight: vi.fn().mockResolvedValue({ id: "idp_1" }),
+        preflight: vi
+          .fn()
+          .mockResolvedValue({ id: "idp_1", definition: { slug: "acme", stored: true } }),
         create: vi.fn().mockResolvedValue({ id: "idp_1" }),
       });
 
@@ -1707,6 +1710,17 @@ describe("a resource the platform cannot delete yet", () => {
             movedFrom: `${IDPS}/acme.json`,
           }),
         ]);
+      } finally {
+        await rm(cwd, { recursive: true, force: true });
+      }
+    });
+
+    it("carries what the platform stores, so the plan can show what changes", async () => {
+      const cwd = await aRenamedProject();
+      try {
+        const [action] = await buildSyncPlan(cwd, [holdingIt()]);
+
+        expect(action).toMatchObject({ oldContent: { slug: "acme", stored: true } });
       } finally {
         await rm(cwd, { recursive: true, force: true });
       }
@@ -1784,6 +1798,21 @@ describe("a resource the platform cannot delete yet", () => {
       expect(await stateOf(cwd)).toEqual([`${IDPS}/a.json`, `${IDPS}/b.json`]);
     } finally {
       vi.unstubAllEnvs();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("readLocalFlowUserSchemas", () => {
+  it("keys each flow by the path state tracks it under", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeResource(cwd, ".zitadel/flows", "login.json", { user_schema: "sch_1" });
+
+      expect([...(await readLocalFlowUserSchemas(cwd)).keys()]).toEqual([
+        ".zitadel/flows/login.json",
+      ]);
+    } finally {
       await rm(cwd, { recursive: true, force: true });
     }
   });

@@ -728,10 +728,35 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
 
   switch (action.kind) {
     case "create": {
+      if (action.movedFrom !== undefined && action.oldContent !== undefined) {
+        // The platform already holds the resource, so show what changes in it
+        // the way an update does, under a header that says where it came from.
+        const [, ...diff] = renderBlock(
+          {
+            kind: "update",
+            path: action.path,
+            syncer: action.syncer,
+            id: "",
+            content: action.content,
+            hash: action.hash,
+            oldContent: action.oldContent,
+            ...(action.warnings ? { warnings: action.warnings } : {}),
+          },
+          tty,
+        );
+        return [
+          paint(
+            `${blkPad}# ${action.path} will take over the ${action.syncer.kind} that was in ${action.movedFrom}`,
+            A.bold,
+            tty,
+          ),
+          ...diff,
+        ];
+      }
       const header =
         action.movedFrom === undefined
           ? `${blkPad}# ${action.path} will be created`
-          : `${blkPad}# ${action.path} will take over the connection that was in ${action.movedFrom}`;
+          : `${blkPad}# ${action.path} will take over the ${action.syncer.kind} that was in ${action.movedFrom}`;
       const opening = `${blkPad}+ resource "${action.syncer.kind}" "${resourceName(action.path)}" {`;
       lines.push(paint(header, A.bold, tty));
       lines.push(paint(opening, A.green, tty));

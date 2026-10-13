@@ -911,7 +911,32 @@ describe("a file that took over a resource from a removed one", () => {
   });
 
   it("says in the plan which file it took over from", () => {
-    expect(renderPlan([moved], false)).toContain("will take over the connection that was in");
+    expect(renderPlan([moved], false)).toContain(
+      "will take over the idp that was in .zitadel/idps/old.json",
+    );
+  });
+
+  describe("when the stored connection is known", () => {
+    const stored = { slug: "acme", display_name: "Acme", id_note: "same" };
+    const withStored: SyncAction = {
+      ...moved,
+      content: { slug: "acme", display_name: "Acme SSO", id_note: "same" },
+      oldContent: stored,
+    } as SyncAction;
+
+    it("shows what changes, as an update does", () => {
+      expect(renderPlan([withStored], false)).toContain("display_name");
+    });
+
+    it("shows the old value next to the new one", () => {
+      const out = renderPlan([withStored], false);
+
+      expect(out).toContain('"Acme" -> "Acme SSO"');
+    });
+
+    it("does not show the connection as if it were new", () => {
+      expect(renderPlan([withStored], false)).not.toContain("(known after apply)");
+    });
   });
 
   it("is in the summary line as moved", () => {

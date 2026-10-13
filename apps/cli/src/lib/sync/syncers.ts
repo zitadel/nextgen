@@ -277,6 +277,10 @@ class IdpConnectionSyncer implements ResourceSyncer {
     );
   }
 
+  identityOf(stored: object): string | undefined {
+    return (stored as ConnectionBody).slug;
+  }
+
   /**
    * What the files alone cannot say. An edit may not change what the
    * connection is: its `slug`, `issuer` or `subject_claim` would re-key the
@@ -288,7 +292,7 @@ class IdpConnectionSyncer implements ResourceSyncer {
     path: string,
     data: object,
     old: object | null,
-  ): Promise<{ id: string } | undefined> {
+  ): Promise<{ id: string; definition: object } | undefined> {
     const next = data as ConnectionBody;
     // A file the platform does not track yet may still name a connection it
     // holds, such as one moved here from a removed file, so the stored copy is
@@ -322,7 +326,7 @@ class IdpConnectionSyncer implements ResourceSyncer {
     }
 
     await this.checkVariables(path, next);
-    return found === undefined ? undefined : { id: found.id };
+    return found;
   }
 
   /** The stored connection with this slug, which a create would revise. */

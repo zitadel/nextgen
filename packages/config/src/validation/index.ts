@@ -26,9 +26,12 @@ export {
   FLOW_VALIDATION_RULES,
   VALIDATION_RULES,
   type FlowRuleId,
-  type FlowRuleId as FlowValidationRuleId,
   type ProjectRuleId,
 } from "./rules.js";
+import type { FlowRuleId as RenamedFlowRuleId } from "./rules.js";
+
+/** @deprecated Use {@link FlowRuleId}; this is the same type under its old name. */
+export type FlowValidationRuleId = RenamedFlowRuleId;
 export type {
   FlowValidationIssue,
   FlowValidationSeverity,

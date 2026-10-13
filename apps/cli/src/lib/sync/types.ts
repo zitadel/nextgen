@@ -161,7 +161,13 @@ export interface ResourceSyncer {
    * mutation, given the file `path`. It answers with the id of the resource a create would revise, when one already holds its identity, so the planner can tell a moved file from a new one. `old` is the stored body of an update (null for a create, or
    * when it could not be read). Throws to stop the plan.
    */
-  preflight?(path: string, data: object, old: object | null): Promise<{ id: string } | undefined>;
+  /** What names a stored resource, for matching a removed file to the resource it kept. */
+  identityOf?(stored: object): string | undefined;
+  preflight?(
+    path: string,
+    data: object,
+    old: object | null,
+  ): Promise<{ id: string; definition: object } | undefined>;
   fetch?(id: string): Promise<object>;
   /**
    * Reduce a body to its canonical comparison form: strip server-echoed
@@ -243,6 +249,8 @@ export type SyncAction =
        * resource, so the write revises it rather than creating another.
        */
       movedFrom?: string;
+      /** For a move: what the platform stores, so the plan can show what changes. */
+      oldContent?: object;
     }
   | {
       kind: "update";

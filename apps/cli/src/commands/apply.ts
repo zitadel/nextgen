@@ -68,7 +68,8 @@ export default class Apply extends BaseCommand {
           // `files_updated` stays the local write-backs only.
           changes: applied,
           files_updated: filesUpdated,
-          unsupported_deletions: unsupported,
+          unsupported_deletions: unsupported.length,
+          unsupported_deletion_files: unsupported,
           next_actions:
             applied.length === 0
               ? [

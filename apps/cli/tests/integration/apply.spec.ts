@@ -137,8 +137,8 @@ describe("apply", () => {
 
         const result = await app.apply();
 
-        const { data } = app.envelopeOf<{ unsupported_deletions: string[] }>(result);
-        expect(data.unsupported_deletions).toEqual([app.connectionFile("spare")]);
+        const { data } = app.envelopeOf<{ unsupported_deletion_files: string[] }>(result);
+        expect(data.unsupported_deletion_files).toEqual([app.connectionFile("spare")]);
       });
 
       it("does not say everything is in sync", async () => {
@@ -187,7 +187,8 @@ describe("apply", () => {
         const result = await app.apply();
 
         expect(
-          app.envelopeOf<{ unsupported_deletions: string[] }>(result).data.unsupported_deletions,
+          app.envelopeOf<{ unsupported_deletion_files: string[] }>(result).data
+            .unsupported_deletion_files,
         ).toEqual([]);
       });
 

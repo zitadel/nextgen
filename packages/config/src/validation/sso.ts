@@ -59,6 +59,8 @@ type Step = {
   providers: string[];
   onSuccess: string | undefined;
   routes: ReadonlySet<string>;
+  /** Whether `user_already_exists` is there but carries an action, which the engine does not follow. */
+  collisionNeedsNoAction: boolean;
 };
 
 function stepsOf(flow: object): Step[] {
@@ -71,6 +73,10 @@ function stepsOf(flow: object): Step[] {
     providers: strings(step.sso_providers),
     onSuccess: typeof step.on_success === "string" ? step.on_success : undefined,
     routes: new Set(routedOutcomes(step.transitions)),
+    collisionNeedsNoAction:
+      isObject(step.transitions) &&
+      "user_already_exists" in step.transitions &&
+      !routedOutcomes(step.transitions).includes("user_already_exists"),
   }));
 }
 
@@ -116,6 +122,7 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
       rule: ProjectRuleId;
       file: string;
       steps: string[];
+      slug?: string;
       message: (steps: readonly string[]) => string;
     }
   >();
@@ -125,9 +132,10 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
     subject: string,
     step: string,
     message: (steps: readonly string[]) => string,
+    slug?: string,
   ) => {
     const key = JSON.stringify([rule, file, subject]);
-    const group = groups.get(key) ?? { rule, file, steps: [], message };
+    const group = groups.get(key) ?? { rule, file, steps: [], message, ...(slug ? { slug } : {}) };
     group.steps.push(step);
     groups.set(key, group);
   };
@@ -184,6 +192,7 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
         add({
           rule: "sso/connection-resolves",
           file: path,
+          slug,
           message: `sso.providers lists ${q(slug)} but there is no connection file with that slug under .zitadel/idps/. Add the file, or remove ${q(slug)} from sso.providers.`,
         });
       }
@@ -213,18 +222,19 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
             missing.join(),
             step.name,
             (steps) =>
-              `${stepsText(steps)}: offers sso_providers but does not route ${missing.join(", ")}. Add a transition for each.`,
+              `${stepsText(steps)}: offers sso_providers but does not route ${missing.join(", ")}. ${
+                step.collisionNeedsNoAction && missing.includes("user_already_exists")
+                  ? "A collision is followed only through a user_already_exists transition with no action, so remove its action. Add a transition for the rest."
+                  : "Add a transition for each."
+              }`,
           );
         }
       }
       if (step.onSuccess === "create_user_with_sso" && !step.routes.has("user_already_exists")) {
-        onStep(
-          "sso/collection-conflict-routing",
-          path,
-          "",
-          step.name,
-          (steps) =>
-            `${stepsText(steps)}: on_success create_user_with_sso must route user_already_exists. Add that transition.`,
+        onStep("sso/collection-conflict-routing", path, "", step.name, (steps) =>
+          step.collisionNeedsNoAction
+            ? `${stepsText(steps)}: on_success create_user_with_sso must route user_already_exists, and an SSO collision is followed only through a transition with no action. Remove the action from it.`
+            : `${stepsText(steps)}: on_success create_user_with_sso must route user_already_exists. Add that transition.`,
         );
       }
 
@@ -237,6 +247,7 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
             step.name,
             (steps) =>
               `${stepsText(steps)}: sso provider ${q(slug)} has no connection file with that slug under .zitadel/idps/. Add the file, or remove the provider from the flow.`,
+            slug,
           );
         }
       }
@@ -290,8 +301,8 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
       }
     }
   }
-  for (const { rule, file, steps, message } of groups.values()) {
-    add({ rule, file, steps, message: message(steps) });
+  for (const { rule, file, steps, message, slug } of groups.values()) {
+    add({ rule, file, steps, ...(slug ? { slug } : {}), message: message(steps) });
   }
 
   // Connection to schemas. A connection counts as used when a schema lists it
