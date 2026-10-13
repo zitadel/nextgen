@@ -150,6 +150,8 @@ describe("teams screen", () => {
     await userEvent.type(name, "Acme Web");
     await userEvent.click(screen.getByRole("button", { name: "Add team" }));
 
+    // The drawer closes once the team is created and the list has been read again.
+    await waitFor(() => expect(screen.queryByLabelText("Team name")).not.toBeInTheDocument());
     expect(created).toEqual([{ name: "Acme Web" }]);
   });
 

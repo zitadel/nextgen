@@ -303,7 +303,7 @@ describe("project pill", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Switch project" }));
     const list = within(await screen.findByRole("list", { name: "Switch project" }));
-    const href = list.getByRole("link", { name: "River" }).getAttribute("href") ?? "";
+    const href = (await list.findByRole("link", { name: "River" })).getAttribute("href") ?? "";
     const target = new URL(href, "http://console.invalid");
     expect(target.pathname).toBe("/teams");
     expect(Object.fromEntries(target.searchParams)).toEqual({
