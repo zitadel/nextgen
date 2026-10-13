@@ -15,6 +15,13 @@
   // HOME, SHELL, CI, TERM, GITHUB_ACTIONS, ...) and what framework inference
   // adds (VITE_* for Vite packages, NEXT_* for Next.js, ...).
   "envMode": "strict",
+  // Vite inference would hash the VITE_VERCEL_* variables Vercel sets in a
+  // build. Turbo leaves them out in the Vite service's build, where Vercel
+  // names the prefix (TURBO_CI_VENDOR_ENV_KEY), but not in the storybook's
+  // and the server's, so the same packages got other keys there than in the
+  // console's build and were built twice per deployment. No build here reads
+  // them. A negation here also applies to framework inference.
+  "globalEnv": ["!VITE_VERCEL_*"],
   "globalPassThroughEnv": [
     // Where Go keeps its toolchain, module and build caches; their contents
     // are keyed by Go itself. GOFLAGS and the target platform change outputs,

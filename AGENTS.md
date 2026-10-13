@@ -59,9 +59,8 @@ Product surfaces (`apps/`):
   server at `/ui/console/` and `/ui/login/`.
 - `apps/docs/` — the documentation site: Fumadocs on Next.js, served under
   `/docs`, in the hosted cloud too.
-- `apps/website/` — the hosted cloud's coming-soon page at `/`, with links to
-  the docs, the console and the storybook: Next.js in the new zitadel.com's
-  look, the seed of the public website.
+- `apps/website/` — the hosted cloud's coming-soon page at `/`: Next.js in
+  the new zitadel.com's look, the seed of the public website.
 
 Development and test surfaces (`apps/`):
 

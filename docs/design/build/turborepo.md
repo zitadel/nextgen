@@ -70,10 +70,24 @@ hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   `GITHUB_ACTIONS`, `RUNNER_TEMP`, `VERCEL`, `COREPACK_*`, `TURBO_*`, what
   framework inference adds (`VITE_*` for Vite packages, `NEXT_*` for Next.js)
   and what the task lists. `env` names variables that change the output and
-  are hashed (`VITE_CONSOLE_VERCEL_INSIGHTS`, `GOFLAGS`); `passThroughEnv`
+  are hashed (`CONSOLE_VERCEL_INSIGHTS`, `GOFLAGS`); `passThroughEnv`
   names variables a task reads at run time without affecting its output
   (`NEXTGEN_*` for the e2e lanes, `DOCKER_*` for the database lanes). The Go
   cache locations pass through globally.
+- A variable meant for one package does not get a framework prefix
+  (`VITE_`, `NEXT_PUBLIC_`): inference hashes a prefixed variable into every
+  package of that framework in the run, so its dependencies would get other
+  cache keys in that one build than everywhere else. The package lists it in
+  its `env` and its config reads it (the console's `CONSOLE_*` variables and
+  `vite.config.ts`).
+- On Vercel, turbo puts `VERCEL_TARGET_ENV` (`production` or `preview`)
+  into every task's hash, its default, so production and preview builds
+  keep separate cache entries. The `VITE_VERCEL_*` variables Vercel sets
+  are kept out of every hash (`globalEnv` in the root `turbo.json`): turbo
+  leaves them out only in the Vite service's build, and the same packages
+  would get other keys in the storybook's and the server's builds.
+  `VERCEL_*` still reaches every task unhashed (turbo's built-in list): a
+  build whose output depends on one lists it in its `env`.
 - A task cannot set a variable's value. Values a lane needs (moon's task
   `env:` blocks) are set in the `package.json` script as defaults that a
   caller's own value overrides, as it overrides moon's task `env`:
@@ -101,10 +115,19 @@ packages calls Vitest without the guard, so no suite retries under both.
 |---|---|
 | the default gate | `turbo run lint typecheck build test` |
 | one task | `turbo run test --filter=@zitadel/cli` |
-| pass arguments | `turbo run snapshot --filter=@zitadel/release -- --skip-container` |
+| pass arguments (by hand only, below) | `turbo run test --filter=@zitadel/cli -- --reporter=verbose` |
 | what would run | `turbo run build --dry` |
 | affected tasks, task-level | `turbo query '{ affectedTasks(base: "origin/main", tasks: ["test"]) { items { name package { name } } } }'` |
 | a run summary for the failure report | `--summarize` → `.turbo/runs/<id>.json`, `node scripts/report-turbo-failures.mjs` |
+
+Arguments after `--` reach only the named task, but turbo puts them into the
+cache key of every task in the run
+([vercel/turborepo#14770](https://github.com/vercel/turborepo/issues/14770),
+by design): the task's dependencies miss the cache and rebuild. A script that
+CI or another script runs through turbo therefore takes its options from the
+environment, listed in the task's `passThroughEnv`: `RELEASE_SKIP_CONTAINER=1`
+for the release snapshot, `JOURNEY_CI=1`, `JOURNEY_MATRIX`, … for the journey
+runner (`apps/cli-journey-e2e/README.md`).
 
 Do not select the gate with `--affected` or `--filter=…[ref]`: both follow
 `package.json` edges only and would skip the server's tests on a console
@@ -116,3 +139,11 @@ Turbo needs a `pnpm` binary on `PATH` (`corepack enable`). In a git worktree
 turbo's cache defaults to the main checkout's `.turbo/cache`; set
 `TURBO_CACHE_DIR` to keep worktrees apart. Telemetry is off in CI and on
 Vercel (`TURBO_TELEMETRY_DISABLED=1`); set it locally too.
+
+On Vercel, `apps/cloud/turbo-build.sh` runs the hosted cloud's builds with
+the cache as Vercel sets it up: every build reads and writes the team's
+remote cache, production and previews in separate entries, and keeps no
+local cache. Writing takes the team's token, which a fork's pull request
+never gets unapproved. The docs and the website do not build through turbo:
+with Skew Protection on, a Next.js build's cache key includes the
+deployment's ID, so no build could reuse another's.

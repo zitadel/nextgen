@@ -11,7 +11,7 @@
       "root": "apps/console",
       "framework": "vite",
       "installCommand": "sh ../cloud/install.sh",
-      "buildCommand": "cd ../.. && VITE_CONSOLE_VERCEL_INSIGHTS=1 sh apps/cloud/turbo-build.sh @zitadel/console && rm -rf apps/console/dist && mkdir -p apps/console/dist/ui/console && cp -R internal/staticui/console/dist/. apps/console/dist/ui/console/",
+      "buildCommand": "cd ../.. && CONSOLE_VERCEL_INSIGHTS=1 sh apps/cloud/turbo-build.sh @zitadel/console && rm -rf apps/console/dist && mkdir -p apps/console/dist/ui/console && cp -R internal/staticui/console/dist/. apps/console/dist/ui/console/",
       "outputDirectory": "dist",
       "rewrites": [
         {
