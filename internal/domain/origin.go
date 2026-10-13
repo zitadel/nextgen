@@ -1,6 +1,10 @@
 package domain
 
-import "strings"
+import (
+	"net/url"
+	"strconv"
+	"strings"
+)
 
 const PrefixOrigin ResourcePrefix = "origin"
 
@@ -55,4 +59,92 @@ func NormalizeOrigins(origins []Origin) []Origin {
 		}
 	}
 	return out
+}
+
+// ValidateOriginsWriteRules applies the structural write rules for create:
+// primary must be exact, kinds must be primary|preview, one kind per pattern,
+// and unbounded shared-host wildcards (https://*.vercel.app and peers) are
+// rejected. Shared-host allow-regexes beyond this baseline live on the service
+// OriginValidator once instance config is available.
+func ValidateOriginsWriteRules(origins []Origin) error {
+	seen := make(map[string]OriginKind, len(origins))
+	for _, o := range origins {
+		if err := validateOriginWriteRule(o); err != nil {
+			return err
+		}
+		pattern := strings.TrimSpace(o.Pattern)
+		if prev, ok := seen[pattern]; ok {
+			if prev != o.Kind {
+				return ErrOriginKindConflict()
+			}
+			return ErrOriginInvalid()
+		}
+		seen[pattern] = o.Kind
+	}
+	return nil
+}
+
+func validateOriginWriteRule(o Origin) error {
+	pattern := strings.TrimSpace(o.Pattern)
+	if pattern == "" || pattern != strings.ToLower(pattern) {
+		return ErrOriginInvalid()
+	}
+	u, err := url.Parse(pattern)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return ErrOriginInvalid()
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return ErrOriginInvalid()
+	}
+	if u.Opaque != "" || u.User != nil || u.Path != "" && u.Path != "/" || u.RawPath != "" ||
+		u.RawQuery != "" || u.Fragment != "" {
+		return ErrOriginInvalid()
+	}
+	if strings.HasSuffix(pattern, "/") {
+		return ErrOriginInvalid()
+	}
+
+	host := u.Hostname()
+	if host == "" {
+		return ErrOriginInvalid()
+	}
+	if port := u.Port(); port != "" {
+		if _, err := strconv.ParseUint(port, 10, 16); err != nil {
+			return ErrOriginInvalid()
+		}
+	}
+
+	starCount := strings.Count(host, "*")
+	if starCount > 1 {
+		return ErrOriginInvalid()
+	}
+	if starCount == 1 {
+		if o.Kind == OriginKindPrimary {
+			return ErrOriginPrimaryNotExact()
+		}
+		if o.Kind != OriginKindPreview {
+			return ErrOriginInvalid()
+		}
+		if isUnboundedSharedHostWildcard(host) {
+			return ErrOriginUnbounded()
+		}
+		return nil
+	}
+
+	if o.Kind != OriginKindPrimary && o.Kind != OriginKindPreview {
+		return ErrOriginInvalid()
+	}
+	return nil
+}
+
+// isUnboundedSharedHostWildcard reports hosts like "*.vercel.app" where the
+// sole label is "*" on a known shared parent. Tenant-unique labels
+// ("*-acme.vercel.app") pass.
+func isUnboundedSharedHostWildcard(host string) bool {
+	for _, shared := range []string{"vercel.app", "netlify.app", "pages.dev", "workers.dev"} {
+		if host == "*."+shared {
+			return true
+		}
+	}
+	return false
 }

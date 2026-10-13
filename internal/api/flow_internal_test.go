@@ -203,37 +203,43 @@ func TestValidateOriginAgainstProject(t *testing.T) {
 			allowed: nil,
 		},
 		{
-			name:    "exact match allows",
-			origin:  "http://localhost:3000",
-			allowed: []domain.Origin{{Pattern: "http://localhost:3000", Kind: domain.OriginKindPrimary}},
+			name:    "exact primary match allows",
+			origin:  "https://app.example.com",
+			allowed: []domain.Origin{{Pattern: "https://app.example.com", Kind: domain.OriginKindPrimary}},
 		},
 		{
-			name:   "loopback spellings are not aliased",
+			name:   "loopback is admitted when allowlist is non-empty",
 			origin: "http://127.0.0.1:3000",
 			allowed: []domain.Origin{
-				{Pattern: "http://localhost:3000", Kind: domain.OriginKindPrimary},
 				{Pattern: "https://app.example.com", Kind: domain.OriginKindPrimary},
 			},
+		},
+		{
+			name:    "ipv6 loopback is admitted when allowlist is non-empty",
+			origin:  "http://[::1]:3000",
+			allowed: []domain.Origin{{Pattern: "https://app.example.com", Kind: domain.OriginKindPrimary}},
+		},
+		{
+			name:    "preview exact pattern does not admit",
+			origin:  "https://preview.example.com",
+			allowed: []domain.Origin{{Pattern: "https://preview.example.com", Kind: domain.OriginKindPreview}},
 			wantErr: true,
 			wantInError: []string{
-				`"http://127.0.0.1:3000"`,
-				"http://localhost:3000, https://app.example.com",
+				`"https://preview.example.com"`,
 			},
 		},
 		{
-			name:    "ipv6 loopback is not aliased",
-			origin:  "http://[::1]:3000",
-			allowed: []domain.Origin{{Pattern: "http://localhost:3000", Kind: domain.OriginKindPrimary}},
+			name:   "non-loopback without primary match is rejected",
+			origin: "https://other.example.com",
+			allowed: []domain.Origin{
+				{Pattern: "https://app.example.com", Kind: domain.OriginKindPrimary},
+				{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview},
+			},
 			wantErr: true,
 			wantInError: []string{
-				`"http://[::1]:3000"`,
-				"http://localhost:3000",
+				`"https://other.example.com"`,
+				"https://app.example.com",
 			},
-		},
-		{
-			name:    "ipv6 exact match allows",
-			origin:  "http://[::1]:3000",
-			allowed: []domain.Origin{{Pattern: "http://[::1]:3000", Kind: domain.OriginKindPrimary}},
 		},
 	}
 

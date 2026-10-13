@@ -62,6 +62,51 @@ func TestNewProject(t *testing.T) {
 			},
 			wantErr: domain.ErrProjectNameInvalid(),
 		},
+		{
+			name: "primary wildcard is rejected",
+			args: args{
+				name: "my-project",
+				origins: []domain.Origin{
+					{Pattern: "https://*.example.com", Kind: domain.OriginKindPrimary},
+				},
+			},
+			wantErr: domain.ErrOriginPrimaryNotExact(),
+		},
+		{
+			name: "unbounded shared-host wildcard is rejected",
+			args: args{
+				name: "my-project",
+				origins: []domain.Origin{
+					{Pattern: "https://*.vercel.app", Kind: domain.OriginKindPreview},
+				},
+			},
+			wantErr: domain.ErrOriginUnbounded(),
+		},
+		{
+			name: "same pattern with different kinds conflicts",
+			args: args{
+				name: "my-project",
+				origins: []domain.Origin{
+					{Pattern: "https://app.example.com", Kind: domain.OriginKindPrimary},
+					{Pattern: "https://app.example.com", Kind: domain.OriginKindPreview},
+				},
+			},
+			wantErr: domain.ErrOriginKindConflict(),
+		},
+		{
+			name: "valid primary and preview origins",
+			args: args{
+				name: "my-project",
+				origins: []domain.Origin{
+					{Pattern: "https://app.example.com", Kind: domain.OriginKindPrimary},
+					{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview},
+				},
+			},
+			check: func(t *testing.T, got *domain.Project) {
+				assert.Equal(t, "my-project", got.Name)
+				assert.Len(t, got.Origins, 2)
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

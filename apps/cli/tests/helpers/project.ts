@@ -488,6 +488,7 @@ export class ScaffoldedApp {
         project_id: projectId,
         project_secret: "sk",
         preview_secret: "sk",
+        primary_origins: [],
         preview_origins: [],
         created_at: "2026-01-01T00:00:00.000Z",
       }),

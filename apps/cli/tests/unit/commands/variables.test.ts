@@ -31,6 +31,7 @@ async function makeProject(): Promise<string> {
       project_id: "proj_test",
       project_secret: "sk_proj_test_full",
       preview_secret: "sk_proj_test_preview",
+      primary_origins: [],
       preview_origins: [],
       created_at: "2026-01-01T00:00:00Z",
     }),

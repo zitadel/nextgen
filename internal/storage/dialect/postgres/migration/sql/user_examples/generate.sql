@@ -5,11 +5,10 @@
 -- 2. user_attributes: partitioned by HASH (project_id, user_id)
 -- 3. user_unique_attributes: partitioned by HASH (project_id, key)
 
-INSERT INTO zitadel_nextgen.projects (id, name, preview_origins)
+INSERT INTO zitadel_nextgen.projects (id, name)
 SELECT
     'proj_' || inst_id AS id,
-    'project_' || inst_id AS name,
-    '{}'::text[] AS preview_origins
+    'project_' || inst_id AS name
 FROM generate_series(1, 10) AS s(inst_id);
 
 INSERT INTO zitadel_nextgen.teams (project_id, id, name)

@@ -82,11 +82,6 @@ func LoadFixture(path string) (Fixture, error) {
 	return fx, nil
 }
 
-// Bootstrap applies a fixture to a running server through the generated
-// client — POST /projects mints the operator bearer, then the user and its
-// password — and proves the result by walking one login journey and one user
-// read before returning the target. A fixture that cannot be driven is
-// reported here, not as a wall of failed iterations later.
 func originsToAPI(in []FixtureOrigin) []api.ProjectOrigin {
 	out := make([]api.ProjectOrigin, len(in))
 	for i, o := range in {
@@ -98,6 +93,11 @@ func originsToAPI(in []FixtureOrigin) []api.ProjectOrigin {
 	return out
 }
 
+// Bootstrap applies a fixture to a running server through the generated
+// client — POST /projects mints the operator bearer, then the user and its
+// password — and proves the result by walking one login journey and one user
+// read before returning the target. A fixture that cannot be driven is
+// reported here, not as a wall of failed iterations later.
 func Bootstrap(ctx context.Context, base, lane string, fx Fixture) (Target, error) {
 	creds := NewCredentials("")
 	//egress:allow benchmark harness provisioning the server under test

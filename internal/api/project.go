@@ -149,13 +149,36 @@ func (h *Handler) ListMyProjects(ctx context.Context, params api.ListMyProjectsP
 }
 
 // AddOrigin is a stub until the origins service lands. Authz runs first so a
-// caller without origin.write learns that before the 501.
-func (h *Handler) AddOrigin(ctx context.Context, _ *api.ProjectOrigin, params api.AddOriginParams) (api.AddOriginRes, error) {
+// caller without origin.write learns that before the 501. Structural write
+// rules run next so invalid patterns fail with the same origin.* codes the
+// service will return; kind_conflict stays in the analyzed error set (via
+// addOriginExposeKindConflict) so the api-mock 409 and generated client union
+// stay aligned until storage is wired.
+func (h *Handler) AddOrigin(ctx context.Context, req *api.ProjectOrigin, params api.AddOriginParams) (api.AddOriginRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), originAccess, opWrite); err != nil {
 		return nil, err
 	}
+	if req == nil {
+		return nil, domain.ErrOriginInvalid()
+	}
+	if err := domain.ValidateOriginsWriteRules([]domain.Origin{{
+		Pattern: req.Pattern,
+		Kind:    domain.OriginKind(req.Kind),
+	}}); err != nil {
+		return nil, err
+	}
+	// Storage returns kind_conflict when the pattern already exists under
+	// another kind. The analyzer does not constant-fold this package var, so
+	// ErrOriginKindConflict remains in the OpenAPI union while the stub still
+	// always returns NotImplemented at runtime.
+	if addOriginExposeKindConflict {
+		return nil, domain.ErrOriginKindConflict()
+	}
 	return nil, domain.ErrNotImplemented()
 }
+
+// addOriginExposeKindConflict is always false at runtime. See AddOrigin.
+var addOriginExposeKindConflict bool
 
 // RemoveOrigin is a stub until the origins service lands. Authz runs first so a
 // caller without origin.delete learns that before the 501. opDelete maps to the
