@@ -17,10 +17,11 @@ import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../../hel
 /**
  * Unit-level guardrails for the `setup` command. The happy path
  * (project create + patch + apply round-trip) is covered by the
- * integration tests in `tests/integration/setup-next.test.ts`. The
- * cases here focus on the pre-flight branches that short-circuit
- * before any network or filesystem mutation, so they run without an
- * api-mock.
+ * integration tests in `tests/integration/setup.spec.ts`. The cases
+ * here focus on the pre-flight branches that short-circuit before any
+ * network or filesystem mutation, and on what a setup that fails
+ * partway through leaves on disk, so they run against the small
+ * servers below instead of an api-mock.
  */
 const tempDirs: string[] = [];
 const servers: Server[] = [];
@@ -506,6 +507,73 @@ describe("setup command pre-flight", () => {
   });
 });
 
+/**
+ * A failure once the project exists leaves that project behind, and the patch
+ * has already merged its id and secret into `.env.local`. A rerun only adds
+ * the keys the file is missing, `--force` or not, so a file left as it is
+ * keeps the rerun's app talking to a project with no schema or login flow.
+ */
+describe("setup that fails after it created the project", () => {
+  it("removes the .env.local it wrote when the schema upload fails", async () => {
+    const cwd = await makeNextApp();
+    const capture = await startCreateProjectCaptureServer();
+    capture.rejectsSchemaUploads();
+
+    const res = await runSetup(cwd, capture.url);
+
+    expect(res.exitCode).toBe(4);
+    expect(existsSync(join(cwd, ".env.local"))).toBe(false);
+  });
+
+  it("puts back the .env.local the app already had when the schema upload fails", async () => {
+    const cwd = await makeNextApp();
+    const own = "# The app's own settings\nDATABASE_URL=postgres://localhost:5432/app";
+    await writeFile(join(cwd, ".env.local"), own);
+    const capture = await startCreateProjectCaptureServer();
+    capture.rejectsSchemaUploads();
+
+    const res = await runSetup(cwd, capture.url);
+
+    expect(res.exitCode).toBe(4);
+    expect(await readFile(join(cwd, ".env.local"), "utf8")).toBe(own);
+  });
+
+  it("points the rerun's .env.local at the project the rerun created", async () => {
+    const cwd = await makeNextApp();
+    const capture = await startCreateProjectCaptureServer();
+    capture.rejectsSchemaUploads();
+    expect((await runSetup(cwd, capture.url)).exitCode).toBe(4);
+    capture.recovers();
+
+    const res = await runSetup(cwd, capture.url, ["--force"]);
+
+    expect(res.exitCode).toBe(0);
+    const rerun = capture.projects[1];
+    expect(envEntries(await readFile(join(cwd, ".env.local"), "utf8"))).toMatchObject({
+      ZITADEL_PROJECT_ID: rerun?.id,
+      ZITADEL_PROJECT_SECRET: rerun?.project_secret,
+      NEXT_PUBLIC_ZITADEL_PROJECT_ID: rerun?.id,
+    });
+  });
+
+  it("removes the .env.local it wrote when patching the app fails partway through", async () => {
+    const cwd = await makeNextApp();
+    // A directory where the login page goes, put there while the project is
+    // created: the dry run has passed, and the real patch merges `.env.local`
+    // before it reaches the page.
+    const capture = await startCreateProjectCaptureServer({
+      onCreateProject: async () => {
+        await mkdir(join(cwd, "app/login/page.tsx"), { recursive: true });
+      },
+    });
+
+    const res = await runSetup(cwd, capture.url);
+
+    expect(res.exitCode).toBe(3);
+    expect(existsSync(join(cwd, ".env.local"))).toBe(false);
+  });
+});
+
 describe("setup --design removal (#1039)", () => {
   it("--help no longer offers a login design", async () => {
     const res = await runCliForTest(["setup", "--help"]);
@@ -676,13 +744,26 @@ async function startNotFoundServer(): Promise<string> {
   return `http://localhost:${String(address.port)}`;
 }
 
-async function startCreateProjectCaptureServer(): Promise<{
+async function startCreateProjectCaptureServer(
+  opts: {
+    /** Runs before `POST /projects` is answered: after setup's dry-run patch, before its real one. */
+    onCreateProject?: () => Promise<void>;
+  } = {},
+): Promise<{
   url: string;
   body: Record<string, unknown> | null;
   requests: string[];
+  /** Every project created, in order. */
+  projects: Array<{ id: string; project_secret: string }>;
+  /** Makes `POST /schemas` fail, so setup fails after it created the project. */
+  rejectsSchemaUploads(): void;
+  /** Lets `POST /schemas` succeed again. */
+  recovers(): void;
 }> {
   let body: Record<string, unknown> | null = null;
+  let rejectsSchemas = false;
   const requests: string[] = [];
+  const projects: Array<{ id: string; project_secret: string }> = [];
   const server = createServer(async (req, res) => {
     const path = new URL(req.url ?? "/", "http://localhost").pathname;
     requests.push(`${req.method ?? "GET"} ${path}`);
@@ -692,16 +773,25 @@ async function startCreateProjectCaptureServer(): Promise<{
         chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
       }
       body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
+      await opts.onCreateProject?.();
+      const n = String(projects.length + 1);
+      const project = { id: `proj_test_${n}`, project_secret: `sk_proj_test_${n}_full` };
+      projects.push(project);
       res.writeHead(201, { "content-type": "application/json" }).end(
         JSON.stringify({
-          id: "proj_test",
+          ...project,
           name: "demo",
-          project_secret: "sk_proj_test_full",
           preview_secret: "sk_proj_test_preview",
           preview_origins: [],
           created_at: "2026-06-01T00:00:00.000Z",
         }),
       );
+      return;
+    }
+    if (req.method === "POST" && path === "/schemas" && rejectsSchemas) {
+      res
+        .writeHead(500, { "content-type": "application/json" })
+        .end(JSON.stringify({ code: "internal", message: "boom" }));
       return;
     }
     if (req.method === "POST" && path === "/schemas") {
@@ -736,7 +826,52 @@ async function startCreateProjectCaptureServer(): Promise<{
       return body;
     },
     requests,
+    projects,
+    rejectsSchemaUploads() {
+      rejectsSchemas = true;
+    },
+    recovers() {
+      rejectsSchemas = false;
+    },
   };
+}
+
+/** A detectable Next.js app with no Zitadel files yet. */
+async function makeNextApp(): Promise<string> {
+  const cwd = await makeTempDir();
+  await mkdir(join(cwd, "app"), { recursive: true });
+  await writeFile(
+    join(cwd, "package.json"),
+    JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
+  );
+  return cwd;
+}
+
+/** Runs a scripted setup of `cwd` against `server`, skipping the install. */
+function runSetup(cwd: string, server: string, extra: string[] = []) {
+  return runCliForTest([
+    "setup",
+    "--cwd",
+    cwd,
+    "--server",
+    server,
+    "--non-interactive",
+    "--json",
+    "--skip-install",
+    ...extra,
+  ]);
+}
+
+/** The `KEY=value` lines of an env file. */
+function envEntries(contents: string): Record<string, string> {
+  const entries: Record<string, string> = {};
+  for (const line of contents.split(/\r?\n/)) {
+    const match = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(line);
+    if (match?.[1] !== undefined) {
+      entries[match[1]] = match[2] ?? "";
+    }
+  }
+  return entries;
 }
 
 function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {

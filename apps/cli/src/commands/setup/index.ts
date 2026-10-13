@@ -1,4 +1,4 @@
-import { rm } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import { intro, outro } from "@clack/prompts";
@@ -26,7 +26,7 @@ import {
   claimState,
   claimWindowDeadline,
 } from "../../lib/claim-state";
-import { toZitadelError, ZitadelError } from "../../lib/errors";
+import { isErrno, toZitadelError, ZitadelError } from "../../lib/errors";
 import {
   publishClientId,
   type PublishState,
@@ -384,16 +384,21 @@ export default class Setup extends BaseCommand {
     this.recordTelemetry({ step: "project_created" });
 
     const ctx = patchContext(project);
+    // `.env.local` as it is before the patch merges this project's id and
+    // secret into it, so a failure below can put it back.
+    const envLocalBefore = await readEnvLocal(cwd);
     consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
     let result: Awaited<ReturnType<typeof patcher.patch>>;
     try {
       result = await patcher.patch(ctx, { cwd, dryRun, force });
     } catch (error) {
       // The dry run above already ruled out conflicts, so this is an I/O
-      // failure partway through. Remove the setup markers, as a failed
-      // resource upload does below, so a rerun is not skipped.
+      // failure partway through. Remove the setup markers and put
+      // `.env.local` back, as a failed resource upload does below, so a rerun
+      // starts over.
       if (!dryRun) {
         await removeSetupMarkers(cwd);
+        await restoreEnvLocal(cwd, envLocalBefore);
       }
       throw error;
     }
@@ -428,10 +433,12 @@ export default class Setup extends BaseCommand {
       // Remove both so a rerun starts a fresh setup instead of being skipped
       // forever with no default schema or login flow anywhere. The
       // half-provisioned project has no usable resources, so its credentials
-      // are not worth keeping.
-      // Only these two, and never a connection file: those are tenant-owned,
-      // and setup neither writes over nor removes one.
+      // are not worth keeping, and `.env.local`, where the patch merged them,
+      // goes back to what it held before.
+      // Only these, and never a connection file: those are tenant-owned, and
+      // setup neither writes over nor removes one.
       await removeSetupMarkers(cwd);
+      await restoreEnvLocal(cwd, envLocalBefore);
       const cause = toZitadelError(error);
       throw new ZitadelError(cause.code, `Default resource setup failed: ${cause.message}`, {
         // The cause knows its own remedy when it has one -- a file setup
@@ -844,6 +851,35 @@ function dryRunProject(issuer: string): CreateProject201 {
     preview_origins: [issuer],
     created_at: "2026-04-21T14:03:11.000Z",
   };
+}
+
+/** What `.env.local` holds, or `undefined` when there is no such file. */
+async function readEnvLocal(cwd: string): Promise<Buffer | undefined> {
+  try {
+    return await readFile(join(cwd, ".env.local"));
+  } catch (error) {
+    if (isErrno(error, "ENOENT")) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Puts `.env.local` back to what {@link readEnvLocal} read before the patch,
+ * and removes it when there was none. The patch merged the failed setup's
+ * project id and secret into it, and a merge only adds the keys a file is
+ * missing, `--force` or not: left in place, they would survive the rerun, and
+ * the app would talk to an abandoned project with no schema or login flow.
+ * `.env.example` needs nothing: it gets the same empty values on every run.
+ */
+async function restoreEnvLocal(cwd: string, before: Buffer | undefined): Promise<void> {
+  const path = join(cwd, ".env.local");
+  if (before === undefined) {
+    await rm(path, { force: true });
+    return;
+  }
+  await writeFile(path, before);
 }
 
 /**
