@@ -260,7 +260,7 @@ function failureAdvice(
   // advice below, which cannot repair an unsupported version.
   const typed = failed.find((check) => check.code !== undefined && check.hint !== undefined);
   if (typed?.hint !== undefined) {
-    return { hint: typed.hint, nextCommands: [publicCliCommand("doctor", cliVersion)] };
+    return { hint: typed.hint, nextCommands: [publicCliCommand(`doctor${selector}`, cliVersion)] };
   }
 
   if (failedNames.has("environment")) {

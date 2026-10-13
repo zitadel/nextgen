@@ -76,7 +76,7 @@ export default class VariableResolve extends EnvironmentCommand {
     if (live === undefined) {
       const where = origin === undefined ? "the project" : origin;
       throw new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${where}.`, {
-        hint: "Deploy first with `zitadel deploy`, then resolve its variables.",
+        hint: `Deploy first with \`zitadel deploy${this.environmentSelector()}\`, then resolve its variables.`,
         nextCommands: [`zitadel deploy${this.environmentSelector()}`],
       });
     }

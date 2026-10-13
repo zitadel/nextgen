@@ -206,7 +206,7 @@ export default class Deploy extends EnvironmentCommand {
         "E_CONFLICT",
         "Another deploy changed the targets since this one was prepared",
         {
-          hint: "Re-run `zitadel deploy`; it will build and deploy against the current state.",
+          hint: `Re-run \`zitadel deploy${this.environmentSelector()}\`; it will build and deploy against the current state.`,
           details: current === undefined ? undefined : { current_deployment: current },
           nextCommands: [`zitadel deployment list --live${this.environmentSelector()}`],
         },

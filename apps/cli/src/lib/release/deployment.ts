@@ -17,8 +17,10 @@ export type Deployment = CreateDeployment200 | CreateDeployment201;
 /**
  * A rollback, as the server returns it: 201 when it wrote a new deployment, 200
  * when every target already served the target deployment and nothing changed.
- * Kept as the union — like {@link Deployment} — so a caller can tell the two
- * apart rather than having the no-op collapsed into a write.
+ * Kept as the union — like {@link Deployment} — for fidelity to the API contract
+ * rather than casting one arm away. The two bodies are structurally identical
+ * and the client does not surface the status code, so a caller cannot yet tell a
+ * no-op from a write; distinguishing them would need the status threaded through.
  */
 export type RolledBackDeployment = RollbackDeployment200 | RollbackDeployment201;
 

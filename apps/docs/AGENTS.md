@@ -14,9 +14,9 @@ something of our own.
 ## Everything under `/docs`
 
 The hosted cloud routes only `/docs` and `/docs/(.*)` to this app; every other
-path belongs to the server (repo-root [`vercel.json`](../../vercel.json),
-[`apps/cloud/README.md`](../cloud/README.md)). So the template's root routes
-live under `/docs` here:
+path belongs to another service, `/_next/` to the website (repo-root
+[`vercel.json`](../../vercel.json), [`apps/cloud/README.md`](../cloud/README.md)).
+So the template's root routes live under `/docs` here:
 
 | Route | Template |
 | --- | --- |
