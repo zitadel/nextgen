@@ -111,6 +111,33 @@ func TestToFlowField_OmitsAutocompleteWhenAbsent(t *testing.T) {
 	require.False(t, got.Autocomplete.Set)
 }
 
+func TestToFlowField_ReadOnly(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		readOnly bool
+		want     apigen.OptBool
+	}{
+		{name: "set", readOnly: true, want: apigen.NewOptBool(true)},
+		{name: "omitted when false", readOnly: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := toFlowField(domain.FlowField{
+				Name:     "email",
+				Type:     domain.FlowFieldTypeEmail,
+				TextKey:  "register.field.email",
+				ReadOnly: tc.readOnly,
+			})
+
+			require.Equal(t, tc.want, got.ReadOnly)
+		})
+	}
+}
+
 func TestToFlowStep_EmitsSSOProvidersInOrder(t *testing.T) {
 	t.Parallel()
 

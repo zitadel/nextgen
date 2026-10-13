@@ -29,7 +29,14 @@ vi.mock("@/auth/session", async (importOriginal) => {
 // order the design puts them, then the project's own settings. `User schemas`
 // nests beneath `Users` rather than adding a second
 // top-level row.
-const NAV_ORDER = ["Projects", "Teams", "Users", "Login flows", "Project settings"];
+const NAV_ORDER = [
+  "Projects",
+  "Teams",
+  "Users",
+  "Authentication",
+  "Login flows",
+  "Project settings",
+];
 const NESTED_NAV = { parent: "Users", label: "User schemas" };
 const NESTED_BRANDING = { parent: "Login flows", label: "Branding" };
 // Absent for two different reasons, both deliberate:

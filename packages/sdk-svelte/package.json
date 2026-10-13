@@ -32,7 +32,9 @@
     "build": "vite build",
     "typecheck": "svelte-check --tsconfig ./tsconfig.lib.json && svelte-check --tsconfig ./tsconfig.spec.json",
     "test": "vitest run",
-    "test:all": "pnpm run test"
+    "test:all": "pnpm run test",
+    "lint": "biome check .",
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",

@@ -7,6 +7,7 @@ type OperationName = string
 
 const (
 	BeginUserPasskeyRegistrationOperation  OperationName = "BeginUserPasskeyRegistration"
+	BuildReleaseOperation                  OperationName = "BuildRelease"
 	CompleteClaimOperation                 OperationName = "CompleteClaim"
 	CreateAuthAttemptOperation             OperationName = "CreateAuthAttempt"
 	CreateBrandingOperation                OperationName = "CreateBranding"
@@ -61,6 +62,7 @@ const (
 	ListFlowDefinitionsOperation           OperationName = "ListFlowDefinitions"
 	ListIdpRevisionsOperation              OperationName = "ListIdpRevisions"
 	ListMyProjectsOperation                OperationName = "ListMyProjects"
+	ListPreviewsOperation                  OperationName = "ListPreviews"
 	ListReleasesOperation                  OperationName = "ListReleases"
 	ListSchemasOperation                   OperationName = "ListSchemas"
 	ListUserPasskeysOperation              OperationName = "ListUserPasskeys"
@@ -74,8 +76,11 @@ const (
 	QuerySessionsOperation                 OperationName = "QuerySessions"
 	QueryTeamsOperation                    OperationName = "QueryTeams"
 	QueryUsersOperation                    OperationName = "QueryUsers"
+	RemovePreviewOperation                 OperationName = "RemovePreview"
 	RevokeMySessionOperation               OperationName = "RevokeMySession"
+	RevokeReleaseOperation                 OperationName = "RevokeRelease"
 	RevokeSessionOperation                 OperationName = "RevokeSession"
+	RollbackDeploymentOperation            OperationName = "RollbackDeployment"
 	SetUserPasswordOperation               OperationName = "SetUserPassword"
 	SubmitFlowStepOperation                OperationName = "SubmitFlowStep"
 	UpdateTeamOperation                    OperationName = "UpdateTeam"
