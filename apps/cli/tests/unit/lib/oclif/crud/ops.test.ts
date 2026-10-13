@@ -241,3 +241,23 @@ describe("wire conventions", () => {
     expect(data.next_page_token).toBeUndefined();
   });
 });
+
+describe("write results", () => {
+  it("carries data in the envelope when the server answers without a body", async () => {
+    // `grants create` by identifier answers 202 with no body.
+    const accepted: CreateSpec<Ctx> = { schema, call: async () => undefined };
+    const command = bindOperation(
+      CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>,
+      definition(accepted),
+    );
+
+    const envelope = await (command as unknown as { run(argv: string[]): Promise<unknown> }).run([
+      "--name",
+      "a",
+      "--json",
+    ]);
+
+    // Round-tripped as printed: JSON drops a key whose value is undefined.
+    expect(JSON.parse(JSON.stringify(envelope))).toHaveProperty("data", {});
+  });
+});

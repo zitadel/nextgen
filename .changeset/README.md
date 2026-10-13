@@ -113,10 +113,13 @@ from Go paths, so judge those from the table.
 
 The repo is in changesets prerelease mode, tag `alpha` (`.changeset/pre.json`):
 
-- `changeset version` cuts `0.1.0-alpha.N`; consumed changesets are recorded in
+- `changeset version` cuts `1.0.0-alpha.N`; consumed changesets are recorded in
   `pre.json`, pending ones stay in the tree.
 - The fixed group versions together; `changeset publish` uses the `alpha` npm
-  dist-tag.
+  dist-tag, except for a package whose every version on npm is an `alpha`
+  prerelease: that one goes to `latest`. `release publish` stops before
+  publishing such a package and prints the one-time fix
+  (`scripts/release-dist-tags.mjs`).
 
 Leave alpha for a stable `latest` release:
 

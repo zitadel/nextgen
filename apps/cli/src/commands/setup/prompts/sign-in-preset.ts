@@ -17,7 +17,7 @@ export class SignInPresetPrompt implements SetupPrompt {
       return answers;
     }
     const labels: Record<SetupPreset, string> = {
-      "password-first": "Password first — email + password, passkey optional during registration",
+      "password-first": "Password first — email + password",
       "passkey-first": "Passkey first — one-tap passkey up front, email + password fallback",
     };
     const value = await select({
