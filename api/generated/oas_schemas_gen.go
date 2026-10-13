@@ -21300,8 +21300,7 @@ type FlowHint struct {
 	LoginName OptString `json:"login_name"`
 	// Scopes flow resolution to a team.
 	TeamID OptString `json:"team_id"`
-	// Scopes to a specific user type: the `objectType` of a user schema, or
-	// the id of one of its revisions.
+	// Scopes to a specific user type, the `objectType` of a user schema.
 	UserSchemaID OptString `json:"user_schema_id"`
 	// Scopes to a specific application.
 	AppID OptString `json:"app_id"`

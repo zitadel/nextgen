@@ -8,9 +8,7 @@ properties:
     description: Scopes flow resolution to a team.
   user_schema_id:
     type: string
-    description: |
-      Scopes to a specific user type: the `objectType` of a user schema, or
-      the id of one of its revisions.
+    description: Scopes to a specific user type, the `objectType` of a user schema.
   app_id:
     type: string
     description: Scopes to a specific application.
