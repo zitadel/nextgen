@@ -68,7 +68,7 @@ export default class DeploymentRollback extends EnvironmentCommand {
       const latest = deployments[0];
       if (!latest) {
         throw new ZitadelError("E_VALIDATION", "There is no deployment to roll back", {
-          hint: "Nothing has been deployed yet; check `zitadel deployment list`.",
+          hint: `Nothing has been deployed yet; check \`zitadel deployment list${this.environmentSelector()}\`.`,
         });
       }
       // Undoing the latest deploy means restoring each origin it touched to
@@ -83,7 +83,7 @@ export default class DeploymentRollback extends EnvironmentCommand {
       );
       if (priors.some((prior) => prior === undefined)) {
         throw new ZitadelError("E_VALIDATION", "There is no earlier deployment to roll back to", {
-          hint: "Name a deployment to re-apply, or check `zitadel deployment list`.",
+          hint: `Name a deployment to re-apply, or check \`zitadel deployment list${this.environmentSelector()}\`.`,
         });
       }
       // A single rollback re-applies one deployment. When the latest deploy's

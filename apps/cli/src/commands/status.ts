@@ -83,7 +83,12 @@ export default class Status extends EnvironmentCommand {
       this.meta.cliVersion,
       this.environmentSelector(),
     );
-    const nextActions = nextActionsFor(project, users, this.meta.cliVersion);
+    const nextActions = nextActionsFor(
+      project,
+      users,
+      this.meta.cliVersion,
+      this.environmentSelector(),
+    );
 
     return this.emit({
       status: "ok",
@@ -254,7 +259,15 @@ async function detectUserPresence(connect: () => Promise<Connection>): Promise<U
   }
 }
 
-function nextActionsFor(project: ProjectStatus, users: UserPresence, cliVersion: string): string[] {
+function nextActionsFor(
+  project: ProjectStatus,
+  users: UserPresence,
+  cliVersion: string,
+  // Appended to the `claim` the prose nudge quotes: the action text is a
+  // pasteable command, so it must carry the same environment selector the
+  // machine `next_commands` do, or a reader copying it retargets the project.
+  selector: string,
+): string[] {
   if (project.lifecycle === "not-configured") {
     return [
       "From your app directory, run setup; the CLI will detect the framework or ask in an empty directory.",
@@ -277,9 +290,10 @@ function nextActionsFor(project: ProjectStatus, users: UserPresence, cliVersion:
             claimAction(
               cliVersion,
               project.claim.deadline === undefined ? undefined : new Date(project.claim.deadline),
+              selector,
             ),
           ]
-        : [claimWindowClosedAction(cliVersion)]
+        : [claimWindowClosedAction(cliVersion, selector)]
       : [];
   if (users === "none") {
     return [verifyLoginAction(project.issuer), ...claim];
@@ -319,7 +333,7 @@ function nextCommandsFor(
     // `claim` is the safe reconciliation — the server checks the grant
     // before the window, so an attached project answers with a clean skip.
     if (project.claim?.kind === "detached") {
-      commands.push(`${claimCommand(cliVersion)}${selector}`);
+      commands.push(claimCommand(cliVersion, selector));
     }
     if (users === "none") {
       // Staged like next_actions: before the first login is proven in a
