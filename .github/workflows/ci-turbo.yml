@@ -87,11 +87,45 @@ jobs:
       # the job then runs with the local cache only ("Remote caching
       # disabled" in turbo's output), which is why the step may fail.
       - name: Set up Turborepo remote cache
+        id: remote-cache
         if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork) }}
         continue-on-error: true
         uses: vercel/setup-turborepo-remote-cache-action@v1.0.0
         with:
           team: ${{ vars.TURBO_TEAM }}
+
+      # TEMPORARY, until the first successful exchange: the action hides
+      # Vercel's response, so this repeats the exchange and prints the token's
+      # public claims and, on failure, the HTTP status and error body. Neither
+      # token is printed.
+      - name: Diagnose the OIDC token exchange
+        if: ${{ steps.remote-cache.outcome != 'success' && !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork) }}
+        env:
+          TURBO_TEAM_SLUG: ${{ vars.TURBO_TEAM }}
+        run: |
+          oidc="$(curl -sS -f -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).value")"
+          node -e '
+            const payload = process.argv[1].split(".")[1];
+            const claims = JSON.parse(Buffer.from(payload, "base64url").toString());
+            for (const key of ["iss", "aud", "sub", "repository", "repository_owner", "workflow_ref", "ref", "event_name"]) console.log(`${key}=${claims[key]}`);
+          ' "$oidc"
+          status="$(curl -sS -o "$RUNNER_TEMP/exchange.json" -w '%{http_code}' -X POST https://api.vercel.com/login/oauth/token \
+            --data "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
+            --data "client_id=cl_kyUx2zVvA4MGptBohkmtYHJly2XltXzD" \
+            --data "subject_token_type=urn:ietf:params:oauth:token-type:id_token" \
+            --data "requested_token_type=urn:ietf:params:oauth:token-type:access_token" \
+            --data-urlencode "team_id_or_slug=$TURBO_TEAM_SLUG" \
+            --data-urlencode "subject_token=$oidc")"
+          echo "exchange status: $status"
+          if [ "$status" != "200" ]; then cat "$RUNNER_TEMP/exchange.json"; echo; fi
+
+      # Depot runners inject a token for Depot's own turbo cache; with TURBO_API
+      # pointing at Vercel it only produces a failed request per task, and
+      # turbo would still report "Remote caching enabled". Without a Vercel
+      # token the job runs with the local cache alone.
+      - name: Use the local cache only when the token exchange failed
+        if: ${{ steps.remote-cache.outcome != 'success' }}
+        run: echo "TURBO_CACHE=local:rw" >> "$GITHUB_ENV"
 
       - name: Check PR title
         if: ${{ github.event_name == 'pull_request' }}
