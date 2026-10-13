@@ -3,6 +3,36 @@
 How tasks, inputs and dependencies are laid out across the workspace. Read this
 before editing any `moon.yml` or a file under `.moon/`.
 
+## Turborepo runs beside moon
+
+Every task here also exists in a `turbo.json` — the root one for the shared
+tasks, one per package for the rest — described in
+[docs/design/build/turborepo.md](../docs/design/build/turborepo.md). Until the
+cutover in [docs/design/build/turborepo-migration.md](../docs/design/build/turborepo-migration.md),
+a change to a task's command, dependencies, inputs or outputs goes into both
+files. CI runs the turbo version as the non-required `ci-turbo` job. Moon
+stays the runner of record, and the migration's first phase leaves its
+configuration exactly as on main.
+
+Where the two differ on purpose:
+
+- Moon's `test` task runs each package's `test:all` script, turbo runs
+  `test`. In the four browser-test packages (`api-mock`, `components`,
+  `sdk-qwik`, `storybook`) `test` wraps `scripts/task-guard.mjs` for turbo's
+  lock and retries, and `test:all` calls Vitest directly, because moon has
+  its own `mutex` and `retryCount` there.
+- The Go `format` and `lint` tasks keep their inline scripts here; turbo
+  runs file copies of them (`scripts/go-format-check.mjs`,
+  `scripts/go-lint.mjs`). A change to one goes into the other.
+- `scripts/task-guard.mjs` also sits in two scripts moon runs (api `generate`,
+  config `sync-schemas`), but it acts only when turbo runs the task; under
+  moon it runs the command once, unchanged.
+- Some scripts set values a moon task's `env` sets too, because turbo cannot
+  (testing `test:integration`, the cli-journey-e2e lanes, the console and
+  demo-next real-instance lanes). They set them as defaults
+  (`${VAR-default}`), so a caller's own value still wins, as it does over
+  moon's `env`.
+
 ## Shared tasks live in `.moon/tasks`
 
 - `.moon/tasks/all.yml` applies to every project. Its `implicitInputs` are the
