@@ -15,19 +15,13 @@
   // HOME, SHELL, CI, TERM, GITHUB_ACTIONS, ...) and what framework inference
   // adds (VITE_* for Vite packages, NEXT_* for Next.js, ...).
   "envMode": "strict",
-  // Vercel's own variables stay out of the hashes on Vercel. Turbo hashes
-  // VERCEL_TARGET_ENV (production or preview) and VERCEL_ANALYTICS_ID into
-  // every task unless told not to, so no preview could reuse a production
-  // build's results; and Vite inference hashes the VITE_VERCEL_* variables
-  // Vercel sets (only the Vite service's build already leaves them out), so
-  // the storybook's and the login UI's builds got other keys for the same
-  // packages than the console's. No build here reads any of them; a
-  // variable that changes what a build produces is listed in that task's
-  // `env` (docs/design/build/turborepo.md). Production cannot restore a
-  // preview's results through the shared keys: it never reads the remote
-  // cache (apps/cloud/turbo-build.sh). Negations here also apply to
-  // framework inference.
-  "globalEnv": ["!VERCEL_TARGET_ENV", "!VERCEL_ANALYTICS_ID", "!VITE_VERCEL_*"],
+  // Vite inference would hash the VITE_VERCEL_* variables Vercel sets in a
+  // build. Turbo leaves them out in the Vite service's build, where Vercel
+  // names the prefix (TURBO_CI_VENDOR_ENV_KEY), but not in the storybook's
+  // and the server's, so the same packages got other keys there than in the
+  // console's build and were built twice per deployment. No build here reads
+  // them. A negation here also applies to framework inference.
+  "globalEnv": ["!VITE_VERCEL_*"],
   "globalPassThroughEnv": [
     // Where Go keeps its toolchain, module and build caches; their contents
     // are keyed by Go itself. GOFLAGS and the target platform change outputs,

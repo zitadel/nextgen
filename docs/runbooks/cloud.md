@@ -323,23 +323,22 @@ project and imports the root admin.
   starts from production's) and restores it before the installs: every
   `node_modules`, the docs' and the website's `.next/cache`, and
   `.vercel/cache/golang`, the Go toolchain with its module and build caches.
-  Turbo's cache sits in `node_modules/.cache/turbo`
-  ([`apps/cloud/turbo-build.sh`](../../apps/cloud/turbo-build.sh)), so the
-  console, storybook and login UI builds reuse the previous build's results,
-  production only production builds'; it is capped at 100 MB, and the three
-  apps' builds take about 6 MB. Compressed, the whole cache must stay under
-  1.5 GB, the limit of the project's Standard build machines. A bigger one
-  is still created after the deployment, minutes of build machine time, then
-  dropped ("Build cache size … exceeds limit"), and the next build installs
-  every package and compiles the server from scratch. So the services
-  install with [`apps/cloud/install.sh`](../../apps/cloud/install.sh), which
-  leaves out the other platforms' native packages that the workspace
-  installs everywhere else (`supportedArchitectures` in
-  `pnpm-workspace.yaml`). That took the cache from 1.52 GB to 0.86 GB, a
-  little over half of it the Go caches. Go would keep each rebuild's
-  compiled packages for five days, so `build.sh` drops those no build used
-  in the last two hours. Each build log ends with the cache's size:
-  `Uploading build cache [...]`.
+  Turbo's results are not in it: the console, storybook and login UI builds
+  use the team's remote cache as Vercel sets it up
+  ([`apps/cloud/turbo-build.sh`](../../apps/cloud/turbo-build.sh)), every
+  build reading and writing it, production and previews in separate entries.
+  Compressed, the build cache must stay under 1.5 GB, the limit of the
+  project's Standard build machines. A bigger one is still created after the
+  deployment, minutes of build machine time, then dropped ("Build cache size
+  … exceeds limit"), and the next build installs every package and compiles
+  the server from scratch. So the services install with
+  [`apps/cloud/install.sh`](../../apps/cloud/install.sh), which leaves out
+  the other platforms' native packages that the workspace installs
+  everywhere else (`supportedArchitectures` in `pnpm-workspace.yaml`). That
+  took the cache from 1.52 GB to 0.86 GB, a little over half of it the Go
+  caches. Go would keep each rebuild's compiled packages for five days, so
+  `build.sh` drops those no build used in the last two hours. Each build log
+  ends with the cache's size: `Uploading build cache [...]`.
 
 ## Later: read replicas in other regions
 

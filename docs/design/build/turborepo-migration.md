@@ -411,7 +411,7 @@ Two workable setups; the prototype's draft uses the first.
 | Shared with | the cloud deployments (same team cache): a build CI did is a hit on Vercel and the reverse | CI only |
 | Cost | free on the Pro plan; 1 TB/month upload; artifacts expire after 7 days | part of the Depot plan (as moon's cache today) |
 | Forks | no token, local cache only | same |
-| Write policy | `TURBO_CACHE=local:rw,remote:rw` on pushes to main (which run the gate alone), `local:rw,remote:r` on pull requests and the merge queue; on Vercel, `apps/cloud/turbo-build.sh` sets `remote:r` for previews and `remote:w` for production (see "Who may write to the cache") | same flags |
+| Write policy | `TURBO_CACHE=local:rw,remote:rw` on pushes to main (which run the gate alone), `local:rw,remote:r` on pull requests and the merge queue; on Vercel, every build reads and writes, Vercel's default, production and previews in separate entries (see "Who may write to the cache") | same flags |
 
 Recommendation: Vercel's, for the one shared cache and because the cloud
 deployments use it already. Set up on 2026-10-12: the variable
@@ -432,39 +432,29 @@ task's hash decides what a later restore of that hash contains, and
 on a branch can drop it. The rules that follow from that, as the prototype
 sets them up:
 
-- **Vercel previews** run their branch's code with a token Vercel gives
-  every build, so the cache is writable by anyone who can push a branch.
-  Production builds therefore never restore from it (`apps/cloud/
-  turbo-build.sh`: `local:rw,remote:w` when `VERCEL_ENV=production`): they
-  upload for the previews to reuse. A poisoned artifact can reach other
-  previews (SSO-protected) at most. Previews are read-only by their own
-  choice, which keeps the cache tidy but protects nothing. Production gets
-  its cache hits from the local cache instead (next point).
-- **The local cache on Vercel** sits in `node_modules/.cache/turbo`:
-  Vercel's build cache keeps `node_modules` from build to build and drops
-  `.turbo/cache` (before the move, the same task hashes missed in nine
-  previews of one branch in a row). Vercel keeps that cache per branch, a
-  new branch starting from production's, and only production builds, that
-  is main, write production's, so production restores only what main
-  built: the boundary its installed packages and Go's build cache already
-  rely on.
-  A branch's builds reuse production's results and then their own: the
-  root `turbo.json` keeps Vercel's own variables (`VERCEL_TARGET_ENV`,
-  `VITE_VERCEL_*`) out of the hashes, without which a preview never shared
-  a hash with production and no preview ever restored an upload of
-  production's.
+- **Vercel builds** use the cache as Vercel sets it up (decision 3): every
+  build, production and preview, reads and writes it with a token Vercel
+  gives the build, and keeps no local cache. Turbo puts `VERCEL_TARGET_ENV`
+  into every task's hash, so production builds restore only entries written
+  under production's keys, previews only previews'. That separation is by
+  key, not by permission: a branch's preview build runs the branch's code
+  with a token that can write any entry, production's keys included, so
+  anyone who can push a branch could plant one. Forks cannot: their pull
+  requests get no build, and so no token, until a team member approves one
+  (the project's Git fork protection). A planted entry is removed by
+  clearing the team's cache (owners only).
 - **GitHub Actions on pull requests** run the pull request's code, and the
   OIDC policy gives every run of this repository a token that can write
   (Vercel's docs describe no read-only policy; forks get no token).
   Restricting the policy to main would take the remote cache away from
   pull requests without narrowing who can write: anyone who can push a
   branch can write through that branch's Vercel preview build. So pull requests
-  read (`remote:r`, their own choice, as on previews), and the boundary is
-  the one above: nothing that ships restores from the cache. Main creates
-  the cache: a push to main runs the gate and writes, pull requests and the
-  merge queue read. A poisoned artifact could still make a pull-request or
+  read (`remote:r`, their own choice). Main creates the cache: a push to
+  main runs the gate and writes, pull requests and the merge queue read.
+  Without `VERCEL_TARGET_ENV`, CI's entries are apart from the Vercel
+  builds'. A poisoned artifact could still make a pull-request or
   merge-queue run pass for code that fails; the signatures below close that.
-- **Later, to let trusted CI and production read the remote cache:** turbo's
+- **Later, to let only main's results reach production:** turbo's
   artifact signatures (`remoteCache.signature: true` with
   `TURBO_REMOTE_CACHE_SIGNATURE_KEY`). Production and trusted CI get the
   real key (a Vercel Production-only env var; a GitHub environment with a
@@ -578,18 +568,13 @@ the release graph.
    `zitadel/nextgen`) are set up and `ci-turbo` gets a token (see "Remote
    cache"). When the exchange fails, `ci-turbo` runs with the local cache
    only.
-3. **Production restores only what main built; previews read the remote
-   cache.** Vercel builds upload their results to the team cache by
-   default, previews included, and a branch controls its own build, so a
-   production build must not restore what a branch build may have
-   produced: production never reads the remote cache. `apps/cloud/
-   turbo-build.sh` sets `local:rw,remote:w` for production and
-   `local:rw,remote:r` for previews (see "Who may write to the cache"); no
-   Vercel setting is needed for that. A cache only main writes is fine
-   (2026-10-13): production's local cache lives in Vercel's production
-   build cache, which only production builds, that is main, write. (A CLI
-   production deploy may write it too, but whoever may run one can ship
-   to production anyway.)
+3. **Vercel builds use the remote cache as Vercel sets it up** (2026-10-13,
+   replacing "production never restores from the cache"). Every build,
+   production and preview, reads and writes the team's remote cache, and
+   turbo's default `VERCEL_TARGET_ENV` hash keeps production's entries
+   apart from the previews'. Writing takes the team's token, which forks do
+   not get (see "Who may write to the cache"). `apps/cloud/turbo-build.sh`
+   sets no cache policy of its own.
 4. **The Go tasks' scripts stay in `apps/server/package.json`** (published,
    inert).
 5. **Release builds keep rewriting `dist/` in place**, ordered by the edge

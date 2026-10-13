@@ -80,13 +80,14 @@ hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   cache keys in that one build than everywhere else. The package lists it in
   its `env` and its config reads it (the console's `CONSOLE_*` variables and
   `vite.config.ts`).
-- Vercel's own variables are kept out of every hash (`globalEnv` in the
-  root `turbo.json`): `VERCEL_TARGET_ENV` and `VERCEL_ANALYTICS_ID`, which
-  turbo would otherwise hash into every task, and the `VITE_VERCEL_*` ones
-  Vite inference would pick up. So a preview and production compute the
-  same hashes. `VERCEL_*` still reaches every task unhashed (turbo's
-  built-in list): a build whose output depends on one, or on any other
-  Vercel variable, lists it in its `env`.
+- On Vercel, turbo puts `VERCEL_TARGET_ENV` (`production` or `preview`)
+  into every task's hash, its default, so production and preview builds
+  keep separate cache entries. The `VITE_VERCEL_*` variables Vercel sets
+  are kept out of every hash (`globalEnv` in the root `turbo.json`): turbo
+  leaves them out only in the Vite service's build, and the same packages
+  would get other keys in the storybook's and the server's builds.
+  `VERCEL_*` still reaches every task unhashed (turbo's built-in list): a
+  build whose output depends on one lists it in its `env`.
 - A task cannot set a variable's value. Values a lane needs (moon's task
   `env:` blocks) are set in the `package.json` script as defaults that a
   caller's own value overrides, as it overrides moon's task `env`:
@@ -130,10 +131,10 @@ turbo's cache defaults to the main checkout's `.turbo/cache`; set
 `TURBO_CACHE_DIR` to keep worktrees apart. Telemetry is off in CI and on
 Vercel (`TURBO_TELEMETRY_DISABLED=1`); set it locally too.
 
-On Vercel, `apps/cloud/turbo-build.sh` runs the hosted cloud's builds and
-sets the cache policy: the local cache lives in `node_modules/.cache/turbo`,
-because Vercel's build cache keeps `node_modules` from build to build and
-drops `.turbo/cache`; production never reads the remote cache. The docs and
-the website do not build through turbo: with Skew Protection on, a Next.js
-build's cache key includes the deployment's ID, so no build could reuse
-another's.
+On Vercel, `apps/cloud/turbo-build.sh` runs the hosted cloud's builds with
+the cache as Vercel sets it up: every build reads and writes the team's
+remote cache, production and previews in separate entries, and keeps no
+local cache. Writing takes the team's token, which a fork's pull request
+never gets unapproved. The docs and the website do not build through turbo:
+with Skew Protection on, a Next.js build's cache key includes the
+deployment's ID, so no build could reuse another's.
