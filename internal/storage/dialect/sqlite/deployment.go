@@ -25,8 +25,9 @@ const (
 		` (project_id, deployment_id, origin, release_id, deployed_at, seq)` +
 		` SELECT ?, ?, json_extract(value, '$.origin'), ?, ?, json_extract(value, '$.seq') FROM json_each(?)`
 	deploymentQuery = `SELECT project_id, id, release_id, target_kind, metadata, deployed_at FROM deployments`
-	targetsQuery    = `SELECT origin, deployment_id, release_id, deployed_at, seq FROM deployment_targets` +
-		` WHERE project_id = ? AND deployment_id IN (SELECT value FROM json_each(?))`
+	targetsQuery    = `SELECT t.origin, t.deployment_id, t.release_id, d.target_kind, t.deployed_at, t.seq FROM deployment_targets t` +
+		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
+		` WHERE t.project_id = ? AND t.deployment_id IN (SELECT value FROM json_each(?))`
 	newestDeploymentStmt = deploymentQuery + ` WHERE project_id = ?1 AND id = (` +
 		`SELECT t.deployment_id FROM deployment_targets t` +
 		` WHERE t.project_id = ?1 AND t.origin = ?2 ORDER BY t.seq DESC LIMIT 1)`
@@ -38,9 +39,10 @@ const (
 var (
 	deploymentSchema = deployment.NewSchema(deploymentsTable, targetsTable, previewsTable)
 
-	newestTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at, t.seq FROM deployment_targets t` +
+	newestTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, d.target_kind, t.deployed_at, t.seq FROM deployment_targets t` +
+		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
 		` WHERE t.project_id = ? AND t.origin IN (SELECT value FROM json_each(?)) AND NOT ` + deployment.NewerTargetExists(targetsTable)
-	liveTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at, t.seq FROM deployment_targets t` +
+	liveTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, d.target_kind, t.deployed_at, t.seq FROM deployment_targets t` +
 		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
 		` WHERE t.project_id = ? AND t.deployment_id IN (SELECT value FROM json_each(?)) AND NOT ` + deployment.NewerTargetExists(targetsTable) +
 		` AND ` + deployment.TargetServesAt("d", previewsTable) + `?))`
@@ -270,13 +272,14 @@ func (ds deploymentStatements) collectTargets(ctx context.Context, query string,
 	items, err := collectRows(rows, func(rows *sql.Rows) (domain.TargetDeployment, error) {
 		var (
 			scanned      domain.TargetDeployment
+			kind         string
 			deployedNano int64
 		)
-		if err := rows.Scan(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &deployedNano, &scanned.Seq); err != nil {
+		if err := rows.Scan(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &kind, &deployedNano, &scanned.Seq); err != nil {
 			return scanned, err
 		}
 		scanned.DeployedAt = timeFromUnixNano(deployedNano)
-		return scanned, nil
+		return deployment.WithKind(scanned, kind)
 	})
 	if err != nil {
 		return nil, wrapError(err)

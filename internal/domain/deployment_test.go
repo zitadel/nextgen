@@ -93,13 +93,18 @@ func TestNewestTargetDeploymentBreaksTiesOnID(t *testing.T) {
 func TestDeploymentUnchanged(t *testing.T) {
 	origins := []string{"https://app.acme.com", "https://www.acme.com"}
 	serving := []TargetDeployment{
-		{Origin: "https://app.acme.com", ReleaseID: "rel_a"},
-		{Origin: "https://www.acme.com", ReleaseID: "rel_a"},
+		{Origin: "https://app.acme.com", ReleaseID: "rel_a", Kind: DeploymentTargetKindPrimary},
+		{Origin: "https://www.acme.com", ReleaseID: "rel_a", Kind: DeploymentTargetKindPrimary},
 	}
 	primary, err := NewDeployment("proj_1", "rel_a", DeploymentTargetKindPrimary, origins, DeploymentMetadata{})
 	require.NoError(t, err)
 	assert.True(t, primary.Unchanged(serving))
 	assert.False(t, primary.Unchanged(serving[:1]), "a target serving nothing is a change")
+
+	// An origin last served as a preview becomes a primary target: that is a
+	// change, or its row would still expire with the preview.
+	fromPreview := []TargetDeployment{serving[0], {Origin: "https://www.acme.com", ReleaseID: "rel_a", Kind: DeploymentTargetKindPreview}}
+	assert.False(t, primary.Unchanged(fromPreview))
 
 	other, err := NewDeployment("proj_1", "rel_b", DeploymentTargetKindPrimary, origins, DeploymentMetadata{})
 	require.NoError(t, err)

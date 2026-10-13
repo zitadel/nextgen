@@ -106,6 +106,16 @@ func AttachTargets(items []*domain.Deployment, rows []domain.TargetDeployment) {
 	}
 }
 
+// WithKind sets the target kind of a scanned target row.
+func WithKind(target domain.TargetDeployment, kind string) (domain.TargetDeployment, error) {
+	parsed, err := domain.DeploymentTargetKindString(kind)
+	if err != nil {
+		return target, fmt.Errorf("deployment %q carries an unknown target kind %q: %w", target.DeploymentID, kind, err)
+	}
+	target.Kind = parsed
+	return target, nil
+}
+
 // DeploymentIDs returns the ids of items, in order.
 func DeploymentIDs(items []*domain.Deployment) []string {
 	ids := make([]string, len(items))

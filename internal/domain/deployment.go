@@ -152,6 +152,7 @@ type TargetDeployment struct {
 	Origin       string
 	DeploymentID string
 	ReleaseID    string
+	Kind         DeploymentTargetKind
 	DeployedAt   time.Time
 	Seq          int64
 }
@@ -171,18 +172,19 @@ func NewestTargetDeployment(deployments []TargetDeployment) *TargetDeployment {
 }
 
 // Unchanged reports whether writing d would change nothing, given what each
-// target serves: its targets are primary origins that all serve its release.
-// A deployment to preview URLs is always written, since it renews them.
+// target serves: its targets are primary origins that all serve its release
+// from a primary deployment. A deployment to preview URLs is always written,
+// since it renews them.
 func (d *Deployment) Unchanged(serving []TargetDeployment) bool {
 	if d.TargetKind != DeploymentTargetKindPrimary {
 		return false
 	}
-	byOrigin := make(map[string]string, len(serving))
+	byOrigin := make(map[string]TargetDeployment, len(serving))
 	for _, s := range serving {
-		byOrigin[s.Origin] = s.ReleaseID
+		byOrigin[s.Origin] = s
 	}
 	for _, target := range d.Targets {
-		if release, ok := byOrigin[target.Origin]; !ok || release != d.ReleaseID {
+		if s, ok := byOrigin[target.Origin]; !ok || s.ReleaseID != d.ReleaseID || s.Kind != DeploymentTargetKindPrimary {
 			return false
 		}
 	}

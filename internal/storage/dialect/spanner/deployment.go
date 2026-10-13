@@ -19,8 +19,9 @@ const (
 	previewTable    = "previews"
 
 	deploymentQuery = `SELECT project_id, id, release_id, target_kind, metadata, deployed_at FROM deployments`
-	targetsQuery    = `SELECT origin, deployment_id, release_id, deployed_at, seq FROM deployment_targets` +
-		` WHERE project_id = @p1 AND deployment_id IN UNNEST(@p2)`
+	targetsQuery    = `SELECT t.origin, t.deployment_id, t.release_id, d.target_kind, t.deployed_at, t.seq FROM deployment_targets t` +
+		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
+		` WHERE t.project_id = @p1 AND t.deployment_id IN UNNEST(@p2)`
 	newestDeploymentStmt = deploymentQuery + ` WHERE project_id = @p1 AND id = (` +
 		`SELECT t.deployment_id FROM deployment_targets t` +
 		` WHERE t.project_id = @p1 AND t.origin = @p2 ORDER BY t.seq DESC LIMIT 1)`
@@ -35,9 +36,10 @@ var (
 	deploymentColumns = []string{"project_id", "id", "release_id", "target_kind", "metadata", "deployed_at"}
 	targetColumns     = []string{"project_id", "deployment_id", "origin", "release_id", "deployed_at", "seq"}
 
-	newestTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at, t.seq FROM deployment_targets t` +
+	newestTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, d.target_kind, t.deployed_at, t.seq FROM deployment_targets t` +
+		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
 		` WHERE t.project_id = @p1 AND t.origin IN UNNEST(@p2) AND NOT ` + deployment.NewerTargetExists(targetsTable)
-	liveTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at, t.seq FROM deployment_targets t` +
+	liveTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, d.target_kind, t.deployed_at, t.seq FROM deployment_targets t` +
 		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
 		` WHERE t.project_id = @p1 AND t.deployment_id IN UNNEST(@p2) AND NOT ` + deployment.NewerTargetExists(targetsTable) +
 		` AND ` + deployment.TargetServesAt("d", previewTable) + `@p3))`
@@ -242,12 +244,15 @@ func (ds deploymentStatements) collectTargets(ctx context.Context, query string,
 	if err := ds.db.Query(ctx, buildStatement(query, args...).statement(), func(iter *spanner.RowIterator) error {
 		var err error
 		items, err = collectRows(iter, func(row *spanner.Row) (domain.TargetDeployment, error) {
-			var scanned domain.TargetDeployment
-			if err := row.Columns(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &scanned.DeployedAt, &scanned.Seq); err != nil {
+			var (
+				scanned domain.TargetDeployment
+				kind    string
+			)
+			if err := row.Columns(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &kind, &scanned.DeployedAt, &scanned.Seq); err != nil {
 				return scanned, err
 			}
 			scanned.DeployedAt = scanned.DeployedAt.UTC()
-			return scanned, nil
+			return deployment.WithKind(scanned, kind)
 		})
 		return err
 	}); err != nil {

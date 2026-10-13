@@ -26,8 +26,9 @@ const (
 		` (project_id, deployment_id, origin, release_id, deployed_at, seq)` +
 		` SELECT $1, $2, o.origin, $3, $4, o.seq FROM unnest($5::text[], $6::bigint[]) AS o(origin, seq)`
 	deploymentQuery = `SELECT project_id, id, release_id, target_kind, metadata, deployed_at FROM zitadel_nextgen.deployments`
-	targetsQuery    = `SELECT origin, deployment_id, release_id, deployed_at, seq FROM zitadel_nextgen.deployment_targets` +
-		` WHERE project_id = $1 AND deployment_id = ANY($2)`
+	targetsQuery    = `SELECT t.origin, t.deployment_id, t.release_id, d.target_kind, t.deployed_at, t.seq FROM zitadel_nextgen.deployment_targets t` +
+		` JOIN zitadel_nextgen.deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
+		` WHERE t.project_id = $1 AND t.deployment_id = ANY($2)`
 	newestDeploymentStmt = deploymentQuery + ` WHERE project_id = $1 AND id = (` +
 		`SELECT t.deployment_id FROM zitadel_nextgen.deployment_targets t` +
 		` WHERE t.project_id = $1 AND t.origin = $2 ORDER BY t.seq DESC LIMIT 1)`
@@ -39,9 +40,10 @@ const (
 var (
 	deploymentSchema = deployment.NewSchema(deploymentsTable, targetsTable, previewsTable)
 
-	newestTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at, t.seq FROM zitadel_nextgen.deployment_targets t` +
+	newestTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, d.target_kind, t.deployed_at, t.seq FROM zitadel_nextgen.deployment_targets t` +
+		` JOIN zitadel_nextgen.deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
 		` WHERE t.project_id = $1 AND t.origin = ANY($2) AND NOT ` + deployment.NewerTargetExists(targetsTable)
-	liveTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, t.deployed_at, t.seq FROM zitadel_nextgen.deployment_targets t` +
+	liveTargetsStmt = `SELECT t.origin, t.deployment_id, t.release_id, d.target_kind, t.deployed_at, t.seq FROM zitadel_nextgen.deployment_targets t` +
 		` JOIN zitadel_nextgen.deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
 		` WHERE t.project_id = $1 AND t.deployment_id = ANY($2) AND NOT ` + deployment.NewerTargetExists(targetsTable) +
 		` AND ` + deployment.TargetServesAt("d", previewsTable) + `$3))`
@@ -244,12 +246,15 @@ func (ds deploymentStatements) collectTargets(ctx context.Context, client queryE
 		return nil, wrapError(err)
 	}
 	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.TargetDeployment, error) {
-		var scanned domain.TargetDeployment
-		if err := row.Scan(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &scanned.DeployedAt, &scanned.Seq); err != nil {
+		var (
+			scanned domain.TargetDeployment
+			kind    string
+		)
+		if err := row.Scan(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &kind, &scanned.DeployedAt, &scanned.Seq); err != nil {
 			return scanned, err
 		}
 		scanned.DeployedAt = scanned.DeployedAt.UTC()
-		return scanned, nil
+		return deployment.WithKind(scanned, kind)
 	})
 	if err != nil {
 		return nil, wrapError(err)

@@ -149,16 +149,18 @@ func TestDeploymentStatements_NewestTargets(t *testing.T) {
 		deploy(t, d.stmts, projectID, relB.ID, []string{gitOrigin}, previewDeploy(time.Hour))
 		deploy(t, d.stmts, otherProject, otherRel.ID, []string{wwwOrigin}, deployArgs{})
 
-		serving, err := d.stmts.NewestTargets(t.Context(), projectID, []string{appOrigin, wwwOrigin, shaOrigin})
+		serving, err := d.stmts.NewestTargets(t.Context(), projectID, []string{appOrigin, wwwOrigin, gitOrigin, shaOrigin})
 		require.NoError(t, err)
 		byOrigin := map[string]domain.TargetDeployment{}
 		for _, s := range serving {
 			byOrigin[s.Origin] = s
 		}
-		require.Len(t, byOrigin, 2, "an origin with nothing deployed has no row")
+		require.Len(t, byOrigin, 3, "an origin with nothing deployed has no row")
 		assert.Equal(t, appOnly.ID, byOrigin[appOrigin].DeploymentID)
 		assert.Equal(t, relB.ID, byOrigin[appOrigin].ReleaseID)
+		assert.Equal(t, domain.DeploymentTargetKindPrimary, byOrigin[appOrigin].Kind)
 		assert.Equal(t, both.ID, byOrigin[wwwOrigin].DeploymentID)
+		assert.Equal(t, domain.DeploymentTargetKindPreview, byOrigin[gitOrigin].Kind)
 	})
 }
 
