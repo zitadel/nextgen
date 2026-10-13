@@ -248,10 +248,11 @@ class SchemaSyncer implements ResourceSyncer {
   readonly mutable = false;
   readonly revisioned = true;
   readonly normalize = normalizeSchemaBody;
-  // Deliberately no `normalizeWrite`: the server stores schema bytes
-  // verbatim, so stripping spelled-out x-* defaults from the local file
-  // would drop them from the next published revision. Canonical schema
-  // bodies are written back as-is; `normalize` is comparison-only.
+  // No `normalizeWrite`: write-back writes the schema as the server returns
+  // it. That is the re-encoded body, not the uploaded bytes — the server
+  // decodes a schema into ogen's typed `UserSchema`, which sets
+  // `x-audit: false` on every property that omits it — so a rewritten file
+  // spells those defaults out. `normalize` is comparison-only.
 
   private readonly client: ZitadelClient;
   private readonly projectId: string;

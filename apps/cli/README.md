@@ -2629,9 +2629,7 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
-      --as=<option>      [default: string] Store the value as this JSON type. A
-                         reference to the whole field resolves to that type, so
-                         a number stays a number.
+      --as=<option>      [default: string] Store the value as this JSON type.
                          <options: string|number|boolean>
       --[no-]color       Colorize human output. Disable with --no-color;
                          NO_COLOR and FORCE_COLOR are honored too.

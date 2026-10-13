@@ -520,7 +520,7 @@ describe("BrandingSyncer", () => {
     ).toThrow(ZitadelError);
   });
 
-  it("validate throws E_VALIDATION on font_url (read-only in v1)", async () => {
+  it("validate throws E_VALIDATION on a top-level font_url (it belongs under typography)", async () => {
     const cwd = await makeBrandingProject();
     const [, , , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
 

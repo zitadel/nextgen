@@ -178,9 +178,14 @@ function validateBrandingAssetUrl(
     return;
   }
   if (parsed.protocol !== "https:" || parsed.host === "") {
+    // Worded as the server words it (validateBrandingFontURL,
+    // validateBrandingAssetURL): only a field with the carve-out mentions it.
     ctx.addIssue({
       code: "custom",
-      message: `${field} must be an absolute https URL (http is allowed for canonical loopback development hosts only).`,
+      message:
+        options.loopback === false
+          ? `${field} must be an absolute https URL.`
+          : `${field} must be an absolute https URL (http is allowed for canonical loopback development hosts only).`,
     });
   }
 }
