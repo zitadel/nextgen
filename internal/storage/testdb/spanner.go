@@ -30,7 +30,7 @@ const (
 // concurrently and no longer rebuilds the whole function catalog for every
 // query, so the Spanner suites run several times faster than on Google's image.
 // It is pinned to a commit so it cannot change under CI.
-const emulatorImage = "ghcr.io/zitadel/cloud-spanner-emulator:sha-64c19f595a68469694b6027165b62e1fed0f7c7f"
+const emulatorImage = "gcr.io/cloud-spanner-emulator/emulator:latest"
 
 // SpannerDSN returns a Spanner database DSN for integration tests. Precedence:
 // if ZITADEL_TEST_SPANNER_INSTANCE is set it provisions a fresh, uniquely named
