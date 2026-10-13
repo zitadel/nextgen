@@ -80,6 +80,7 @@ const (
 	RevokeMySessionOperation               OperationName = "RevokeMySession"
 	RevokeReleaseOperation                 OperationName = "RevokeRelease"
 	RevokeSessionOperation                 OperationName = "RevokeSession"
+	RollbackDeploymentOperation            OperationName = "RollbackDeployment"
 	SetUserPasswordOperation               OperationName = "SetUserPassword"
 	SubmitFlowStepOperation                OperationName = "SubmitFlowStep"
 	UpdateTeamOperation                    OperationName = "UpdateTeam"

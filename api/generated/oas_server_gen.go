@@ -867,6 +867,34 @@ type Handler interface {
 	//
 	// DELETE /sessions/{session_id}
 	RevokeSession(ctx context.Context, params RevokeSessionParams) (RevokeSessionRes, error)
+	// RollbackDeployment implements rollbackDeployment operation.
+	//
+	// Re-deploys the deployment named in the path: a new deployment with the
+	// same `release_id` and the same `targets`, `reason: rollback`, and
+	// `rollback_to` in its metadata naming the deployment it re-applied. The
+	// variable values that deployment resolved are re-applied with it, so the
+	// targets serve exactly what they served then. The history is append-only,
+	// so the deployments in between stay in it.
+	// Only a deployment to primary origins can be rolled back. One whose
+	// targets were preview URLs answers `400` with `dep.invalid`; deploy to
+	// the preview again instead. Every target must still be a primary origin
+	// of the project, as `POST /deployments` requires of an exact origin:
+	// when one is not, the request answers `403` with
+	// `proj.origin_not_allowed` naming it, and nothing changes. There is no
+	// narrowing to some of the targets: to roll back one origin, deploy the
+	// earlier release to it with `POST /deployments`.
+	// When every target already serves the deployment's release, nothing
+	// changes and the call answers `200` with the newest deployment to the
+	// targets.
+	// The release must not be revoked: a revoked one answers `409` with
+	// `rel.revoked`. An unknown deployment id, or one of another project,
+	// answers `404` with `dep.not_found`.
+	// A rollback never answers `dep.variables_missing`: the release and the
+	// frozen values it re-applies passed that check together when the named
+	// deployment was made.
+	//
+	// POST /deployments/{deployment_id}/rollback
+	RollbackDeployment(ctx context.Context, req OptRollbackDeploymentRequest, params RollbackDeploymentParams) (RollbackDeploymentRes, error)
 	// SetUserPassword implements setUserPassword operation.
 	//
 	// Set user password.
