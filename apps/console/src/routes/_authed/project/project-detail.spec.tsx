@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -58,8 +58,8 @@ describe("project detail", () => {
     const router = await renderDetail(`/projects/${PROJECT_ID}`);
 
     expect(await screen.findByRole("heading", { name: "River" })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/project");
-    expect(router.state.location.search).toMatchObject({ project: PROJECT_ID });
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/project"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: PROJECT_ID });
   });
 
   it("renders the name, the id and the created date", async () => {

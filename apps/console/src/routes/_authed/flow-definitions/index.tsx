@@ -39,7 +39,7 @@ export const Route = createFileRoute("/_authed/flow-definitions/")({
   staticData: { scope: "project", nav: { label: "Login flows", order: 5, icon: Workflow } },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
-    // Without the embed the row has only the schema's id, not its name.
+    // Without the embed the row has only the schema's objectType.
     // `latest` because this is a directory of flows, not a revision history:
     // publishing under an existing name generates a new row, and only the newest
     // one is the flow.
@@ -60,7 +60,7 @@ export interface FlowRow {
   updatedAt: string;
   /** `undefined` when the schema does not resolve for this caller. */
   schemaName: string | undefined;
-  /** The id behind {@link schemaName}, for the row's link to the schema. */
+  /** The revision behind {@link schemaName}, for the row's link to the schema. */
   schemaId: string | undefined;
 }
 
@@ -74,7 +74,7 @@ function toFlowRow(entry: FlowDefinitionEntry): FlowRow {
     definition,
     updatedAt: entry.updated_at,
     schemaName: embed ? schemaDisplayName(embed.schema, definition.user_schema) : undefined,
-    schemaId: definition.user_schema,
+    schemaId: embed?.id,
   };
 }
 

@@ -2,6 +2,7 @@ import { access, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs
 import { basename, dirname, join } from "node:path";
 
 import { ZitadelError } from "../errors";
+import { LOCAL_RUNTIME_DIR } from "../local-server/runtime";
 import { detectors } from "./detectors";
 import type { Detector, FrameworkFacts } from "./detectors/types";
 import { patchers } from "./patchers";
@@ -120,10 +121,11 @@ export class Orca {
       });
     }
     assertNpmSafeScaffoldDirectoryName(cwd);
-    // The underlying scaffolders require an empty directory. When --force lets us
-    // scaffold into a non-empty one, move the existing entries aside, scaffold,
-    // then restore anything the scaffold did not create itself.
-    const stash = target.scaffoldable ? undefined : await stashScaffoldDir(cwd, target.entries);
+    // The underlying scaffolders require an empty directory. When it holds the
+    // local runtime `start` left, or --force lets us scaffold into a non-empty
+    // one, move the existing entries aside, scaffold, then restore anything the
+    // scaffold did not create itself.
+    const stash = await stashScaffoldDir(cwd, target.entries);
     let scaffolded = false;
     try {
       await this.scaffolderFor(framework).scaffold(cwd, framework);
@@ -231,19 +233,51 @@ export function createOrca(): Orca {
 
 export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget> {
   // A fresh scaffold needs an empty directory. We deliberately keep no allowlist
-  // of "harmless" entries (`.gitignore`, `.zitadel`, `.claude`, …): that list is
-  // a maintenance treadmill, and each tool invents new metadata. Anything present
-  // means not-fresh, and `--force` is the single, explicit override.
-  const entries = await readdir(cwd);
-  const names = [...entries].sort();
-  if (names.length === 0) {
+  // of other tools' "harmless" entries (`.claude`, editor settings, …): that list
+  // is a maintenance treadmill, and each tool invents new metadata. Anything
+  // present means not-fresh, and `--force` is the single, explicit override.
+  //
+  // The one exception is what `zitadel start` itself leaves, so that `start`
+  // and then `setup` work in a new directory: the local runtime, and the
+  // `.gitignore` line that keeps it out of git. `scaffold()` moves both aside
+  // while the generator runs and merges the `.gitignore` back.
+  const names = [...(await readdir(cwd))].sort();
+  const others: string[] = [];
+  for (const name of names) {
+    if (!(await isLocalRuntimeEntry(cwd, name))) {
+      others.push(name);
+    }
+  }
+  if (others.length === 0) {
     return { scaffoldable: true, entries: names };
   }
   return {
     scaffoldable: false,
-    reason: `Directory is not empty (contains ${names.join(", ")}).`,
+    reason: `Directory is not empty (contains ${others.join(", ")}).`,
     entries: names,
   };
+}
+
+/**
+ * Whether `name` in `cwd` is one of the entries `zitadel start` writes
+ * (`ensureLocalState`): a `.zitadel` that holds nothing but the local runtime,
+ * or a `.gitignore` that holds nothing but the line ignoring it. Either may be
+ * empty once `reset` has removed the runtime.
+ */
+async function isLocalRuntimeEntry(cwd: string, name: string): Promise<boolean> {
+  try {
+    if (name === dirname(LOCAL_RUNTIME_DIR)) {
+      const inside = await readdir(join(cwd, name));
+      return inside.every((entry) => entry === basename(LOCAL_RUNTIME_DIR));
+    }
+    if (name === ".gitignore") {
+      const lines = (await readFile(join(cwd, name), "utf8")).split(/\r?\n/);
+      return lines.every((line) => ["", `${LOCAL_RUNTIME_DIR}/`].includes(line.trim()));
+    }
+  } catch {
+    // Not a directory, or not a readable file: not what `start` wrote.
+  }
+  return false;
 }
 
 async function stashScaffoldDir(
@@ -259,8 +293,20 @@ async function stashScaffoldDir(
     `.${basename(cwd)}.fresh-scaffold-stash-${String(process.pid)}-${String(Date.now())}`,
   );
   await mkdir(root, { mode: 0o700 });
-  for (const name of names) {
-    await rename(join(cwd, name), join(root, name));
+  const moved: string[] = [];
+  try {
+    for (const name of names) {
+      await rename(join(cwd, name), join(root, name));
+      moved.push(name);
+    }
+  } catch (error) {
+    // Put back what already moved, so a stash that fails halfway leaves the
+    // directory as it was rather than stranding entries in the stash.
+    for (const name of moved) {
+      await rename(join(root, name), join(cwd, name));
+    }
+    await rm(root, { recursive: true, force: true });
+    throw error;
   }
   return { root, names };
 }

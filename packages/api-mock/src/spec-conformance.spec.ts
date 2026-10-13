@@ -318,6 +318,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       body: JSON.stringify({
         kind: "user-schema",
         metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        objectType: "conformance",
         // Mirrors the server's designation rule (ADR 058 §1): password
         // requires a designated project-unique identifier.
         "x-identifier": "email",
@@ -338,6 +339,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       body: JSON.stringify({
         kind: "user-schema",
         metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        objectType: "conformance",
         // Mirrors the server's designation rule (ADR 058 §1): password
         // requires a designated project-unique identifier.
         "x-identifier": "email",
@@ -369,6 +371,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const doc = {
       kind: "user-schema",
       metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+      objectType: "conformance",
       "x-auth-methods": { password: { enabled: true } },
       title: "CustomTitle",
       "x-custom-extension": { keep: true },
@@ -505,6 +508,33 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // POST 201 and GET 200 share the `flow-definition-response`
     // envelope per the spec, so the GET response zod schema validates both.
     expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();
+  });
+
+  test("POST /flow_definitions stores a schema id as the objectType it names", async () => {
+    const schema = await fetch(`${BASE}/schemas?project_id=proj_conformance_handle`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "user-schema",
+        metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        objectType: "conformance-handle",
+        "x-auth-methods": { passkey: { enabled: true } },
+        properties: { email: { type: "string", format: "email", "x-unique": "project" } },
+      }),
+    });
+    const { id } = (await schema.json()) as { id: string };
+
+    const res = await fetch(`${BASE}/flow_definitions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        project_id: "proj_conformance_handle",
+        flow_definition: { ...validFlowDefinitionBody(), user_schema: id },
+      }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { flow_definition: { user_schema: string } };
+    expect(body.flow_definition.user_schema).toBe("conformance-handle");
   });
 
   test("POST /flow_definitions rejects an invalid definition with the server's flowdef.invalid envelope", async () => {

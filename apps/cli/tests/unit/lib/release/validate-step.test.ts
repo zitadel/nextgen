@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import defaultLogin from "@zitadel/config/defaults/default-login.json" with { type: "json" };
 import { afterEach, describe, expect, it } from "vitest";
 
 import { validateStep } from "../../../../src/lib/release/steps/validate";
@@ -96,6 +97,56 @@ describe("validate step", () => {
     };
 
     await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+
+  describe("a flow's user_schema", () => {
+    /** The default login flow, naming its schema `userSchema` and collecting `fields` first. */
+    const flowNaming = (userSchema: string, fields: string[]) => ({
+      ...defaultLogin,
+      user_schema: userSchema,
+      steps: defaultLogin.steps.map((step) =>
+        step.name === "identifier" ? { ...step, fields } : step,
+      ),
+    });
+
+    it("resolves the schema by its objectType, so a field the schema lacks is refused", async () => {
+      const bundle = {
+        schemas: [validSchema],
+        flow_definitions: [flowNaming("human-user", ["phone_number"])],
+        brandings: [],
+      };
+
+      await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        details: {
+          issues: [
+            expect.objectContaining({
+              message: expect.stringContaining("not a property in the user schema"),
+            }),
+          ],
+        },
+      });
+    });
+
+    it("accepts a field the named schema declares", async () => {
+      const bundle = {
+        schemas: [validSchema],
+        flow_definitions: [flowNaming("human-user", ["email"])],
+        brandings: [],
+      };
+
+      await expect(validateStep.run(ctx(bundle))).resolves.toBeUndefined();
+    });
+
+    it("skips the schema-dependent rules when no schema in the bundle has that objectType", async () => {
+      const bundle = {
+        schemas: [validSchema],
+        flow_definitions: [flowNaming("some-other-schema", ["phone_number"])],
+        brandings: [],
+      };
+
+      await expect(validateStep.run(ctx(bundle))).resolves.toBeUndefined();
+    });
   });
 
   it("rejects a malformed branding descriptor", async () => {

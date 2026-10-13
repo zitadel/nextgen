@@ -16954,10 +16954,8 @@ func (s ConfigurationBundleSchemasItem) encodeFields(e *jx.Encoder) {
 				e.Str("https://json-schema.org/draft/2020-12/schema")
 			}
 			{
-				if s.ObjectType.Set {
-					e.FieldStart("objectType")
-					s.ObjectType.Encode(e)
-				}
+				e.FieldStart("objectType")
+				e.Str(s.ObjectType)
 			}
 			{
 				e.FieldStart("metaSchema")
@@ -22641,10 +22639,8 @@ func (s CreateSchemaReq) encodeFields(e *jx.Encoder) {
 				e.Str("https://json-schema.org/draft/2020-12/schema")
 			}
 			{
-				if s.ObjectType.Set {
-					e.FieldStart("objectType")
-					s.ObjectType.Encode(e)
-				}
+				e.FieldStart("objectType")
+				e.Str(s.ObjectType)
 			}
 			{
 				e.FieldStart("metaSchema")
@@ -94760,10 +94756,8 @@ func (s SchemaDocument) encodeFields(e *jx.Encoder) {
 				e.Str("https://json-schema.org/draft/2020-12/schema")
 			}
 			{
-				if s.ObjectType.Set {
-					e.FieldStart("objectType")
-					s.ObjectType.Encode(e)
-				}
+				e.FieldStart("objectType")
+				e.Str(s.ObjectType)
 			}
 			{
 				e.FieldStart("metaSchema")
@@ -108505,10 +108499,8 @@ func (s *UserSchema) encodeFields(e *jx.Encoder) {
 		e.Str("https://json-schema.org/draft/2020-12/schema")
 	}
 	{
-		if s.ObjectType.Set {
-			e.FieldStart("objectType")
-			s.ObjectType.Encode(e)
-		}
+		e.FieldStart("objectType")
+		e.Str(s.ObjectType)
 	}
 	{
 		e.FieldStart("kind")
@@ -108585,9 +108577,11 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"$schema\"")
 			}
 		case "objectType":
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				s.ObjectType.Reset()
-				if err := s.ObjectType.Decode(d); err != nil {
+				v, err := d.Str()
+				s.ObjectType = string(v)
+				if err != nil {
 					return err
 				}
 				return nil
@@ -108688,7 +108682,7 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00011100,
+		0b00011110,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
