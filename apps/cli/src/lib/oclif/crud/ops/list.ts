@@ -10,6 +10,7 @@ import { wireOf } from "../wire";
 import { type ParsedFilter, parseFilter, parseSort } from "../query";
 import { parseOrThrow } from "../shared";
 import { chosenColumns } from "../columns";
+import { shellArg } from "../../../shell";
 import { fieldPaths, itemSchemaOf } from "../paths";
 import { renderRows, renderTable } from "../table";
 import type { Json, ListSpec } from "../types";
@@ -264,10 +265,6 @@ const repeatedFlags = (flags: Json): readonly string[] => {
   );
   return [...limit, ...sort, ...filters];
 };
-
-/** Quote a value that a shell would otherwise split or interpret. */
-const shellArg = (value: string): string =>
-  /^[A-Za-z0-9_.:@/=+-]+$/.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
 
 /**
  * Parsed filters as the flat query parameters a GET list expects. A field
