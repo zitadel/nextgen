@@ -64,13 +64,13 @@ tags:
       it.
   - name: Deployments
     description: |
-      A deployment makes a release live on a set of targets — the project's
-      primary origins, or preview URLs — and freezes the variable values
-      those targets use.
+      A deployment makes one release live on one or more targets — the
+      project's primary origins, or preview URLs — and freezes the variable
+      values those targets use.
 
-      Deployments form an append-only history of what ran where, and when.
-      Rolling back re-deploys an earlier deployment as a new one, with the
-      variable values it froze; the deployments in between stay in the
+      Deployments form an append-only history of what ran where, and when. A
+      rollback is another deployment: it re-deploys an earlier one with the
+      variable values it froze, and the deployments in between stay in the
       history.
   - name: Previews
     description: |

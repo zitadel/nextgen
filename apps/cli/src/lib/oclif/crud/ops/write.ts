@@ -120,7 +120,7 @@ abstract class WriteOperation<
         : [];
     return {
       status: "ok",
-      // An ok envelope always carries `data`, also when the platform accepts a
+      // An ok envelope always carries `data`, also when the server accepts a
       // write without a body (`grants create` by identifier answers 202).
       data:
         isObject(result) && nextCommands.length > 0
