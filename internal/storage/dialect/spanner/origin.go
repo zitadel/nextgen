@@ -70,7 +70,6 @@ func (s originStatements) ListOrigins(ctx context.Context, filter *database.List
 	origins, nextCursor, err := pagination.Page(filter.Pagination, originSchema, func(limit uint32) ([]*domain.Origin, error) {
 		page := filter.WithLimit(limit)
 		var compiler statementCompiler
-		// Empty table/resource skips management-list authz: origins hydrate under project reads.
 		if err := compileList(ctx, &compiler, originQuery, page, originSchema, "", ""); err != nil {
 			return nil, err
 		}

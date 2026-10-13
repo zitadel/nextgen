@@ -17,21 +17,15 @@ func (s *projectService) AddOrigin(ctx context.Context, projectID string, origin
 	if projectID == "" {
 		return nil, domain.ErrProjectMissingID()
 	}
-	origin = domain.NormalizeOrigins([]domain.Origin{origin})[0]
+	origin.Pattern = strings.TrimSpace(origin.Pattern)
 	if err := s.originValidator.Validate(origin); err != nil {
 		return nil, err
 	}
 
 	var stored domain.Origin
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if _, err := tx.Statements().GetProjectByID(ctx, projectID); err != nil {
-			if mapped := mapStorageError(err); mapped != err {
-				return mapped
-			}
-			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-				return domain.ErrProjectNotFound()
-			}
-			return domain.ErrInternal(err).WithMessage("failed to load project")
+		if err := requireProject(ctx, tx, projectID); err != nil {
+			return err
 		}
 
 		existing, err := tx.Statements().GetOrigin(ctx, database.And(
@@ -99,14 +93,8 @@ func (s *projectService) RemoveOrigin(ctx context.Context, projectID, pattern st
 	}
 
 	return s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if _, err := tx.Statements().GetProjectByID(ctx, projectID); err != nil {
-			if mapped := mapStorageError(err); mapped != err {
-				return mapped
-			}
-			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-				return domain.ErrProjectNotFound()
-			}
-			return domain.ErrInternal(err).WithMessage("failed to load project")
+		if err := requireProject(ctx, tx, projectID); err != nil {
+			return err
 		}
 
 		deleted, removed, err := tx.Statements().DeleteOriginByPattern(ctx, projectID, pattern)
@@ -128,4 +116,17 @@ func (s *projectService) RemoveOrigin(ctx context.Context, projectID, pattern st
 			},
 		})
 	})
+}
+
+func requireProject(ctx context.Context, tx Statementer[AllStatements], projectID string) error {
+	if _, err := tx.Statements().GetProjectByID(ctx, projectID); err != nil {
+		if mapped := mapStorageError(err); mapped != err {
+			return mapped
+		}
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return domain.ErrProjectNotFound()
+		}
+		return domain.ErrInternal(err).WithMessage("failed to load project")
+	}
+	return nil
 }

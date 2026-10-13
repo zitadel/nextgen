@@ -1,9 +1,9 @@
 package domain
 
 import (
-	"net"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -75,11 +75,8 @@ func (v OriginValidator) Validate(o Origin) error {
 		return ErrOriginInvalid()
 	}
 	if port := u.Port(); port != "" {
-		if _, err := net.LookupPort("tcp", port); err != nil {
-			// LookupPort rejects non-numeric; also allow numeric ports without service name.
-			if _, convErr := parsePortNumber(port); convErr != nil {
-				return ErrOriginInvalid()
-			}
+		if _, err := strconv.ParseUint(port, 10, 16); err != nil {
+			return ErrOriginInvalid()
 		}
 	}
 
@@ -94,9 +91,7 @@ func (v OriginValidator) Validate(o Origin) error {
 		if o.Kind != OriginKindPreview {
 			return ErrOriginInvalid()
 		}
-		if !wildcardInOwnLabel(host) {
-			return ErrOriginInvalid()
-		}
+		// A single * always sits inside one DNS label (dots split labels).
 		if v.isUnboundedSharedHost(host) {
 			return ErrOriginUnbounded()
 		}
@@ -109,57 +104,17 @@ func (v OriginValidator) Validate(o Origin) error {
 	return nil
 }
 
-func parsePortNumber(port string) (int, error) {
-	n := 0
-	for _, c := range port {
-		if c < '0' || c > '9' {
-			return 0, ErrOriginInvalid()
-		}
-		n = n*10 + int(c-'0')
-		if n > 65535 {
-			return 0, ErrOriginInvalid()
-		}
-	}
-	if n == 0 {
-		return 0, ErrOriginInvalid()
-	}
-	return n, nil
-}
-
-// wildcardInOwnLabel reports whether the single * sits inside one DNS label
-// (not across dots) so it can stand for one or more non-dot characters.
-func wildcardInOwnLabel(host string) bool {
-	for label := range strings.SplitSeq(host, ".") {
-		if strings.Count(label, "*") == 1 {
-			return true
-		}
-		if strings.Contains(label, "*") {
-			return false
-		}
-	}
-	return false
-}
-
 func (v OriginValidator) isUnboundedSharedHost(host string) bool {
 	shared := matchSharedHost(host, v.SharedHosts)
 	if shared == "" {
 		return false
 	}
-	allow := v.SharedHosts[shared]
-	if allow == nil {
-		return false
-	}
-	// Regexp matches the full hostname; no match means unbounded on that host.
-	return !allow.MatchString(host)
+	return !v.SharedHosts[shared].MatchString(host)
 }
 
 func matchSharedHost(host string, sharedHosts map[string]*regexp.Regexp) string {
 	best := ""
 	for shared := range sharedHosts {
-		shared = strings.ToLower(strings.TrimSpace(shared))
-		if shared == "" {
-			continue
-		}
 		if host == shared || strings.HasSuffix(host, "."+shared) {
 			if len(shared) > len(best) {
 				best = shared

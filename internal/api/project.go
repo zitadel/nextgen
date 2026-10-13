@@ -148,7 +148,7 @@ func (h *Handler) ListMyProjects(ctx context.Context, params api.ListMyProjectsP
 	}, nil
 }
 
-// AddOrigin stores one origin pattern on the project. Authz runs first.
+// AddOrigin stores one origin pattern on the project.
 func (h *Handler) AddOrigin(ctx context.Context, req *api.Origin, params api.AddOriginParams) (api.AddOriginRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), originAccess, opWrite); err != nil {
 		return nil, err
@@ -166,8 +166,8 @@ func (h *Handler) AddOrigin(ctx context.Context, req *api.Origin, params api.Add
 	}, nil
 }
 
-// RemoveOrigin deletes one origin pattern. Authz runs first. opDelete maps to
-// the project.admin relation, matching other delete-shaped management ops.
+// RemoveOrigin deletes one origin pattern. opDelete maps to the project.admin
+// relation, matching other delete-shaped management ops.
 func (h *Handler) RemoveOrigin(ctx context.Context, req *api.RemoveOriginReq, params api.RemoveOriginParams) (api.RemoveOriginRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), originAccess, opDelete); err != nil {
 		return nil, err

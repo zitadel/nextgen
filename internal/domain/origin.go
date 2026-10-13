@@ -16,7 +16,6 @@ const (
 )
 
 // Origin is one entry of a project's origin allowlist.
-// ProjectID and CreatedAt are storage fields; wire and events stay {pattern,kind}.
 type Origin struct {
 	Pattern   string     `json:"pattern"`
 	Kind      OriginKind `json:"kind"`

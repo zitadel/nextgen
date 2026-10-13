@@ -159,7 +159,6 @@ const (
 	ProjectFieldName
 	ProjectFieldCreatedAt
 	ProjectFieldUpdatedAt
-	ProjectFieldOrigins
 )
 
 type ProjectKeySet struct {

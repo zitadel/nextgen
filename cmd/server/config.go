@@ -33,12 +33,8 @@ type Config struct {
 	Origins OriginsConfig `mapstructure:"origins"`
 }
 
-// OriginsConfig is the instance-level origins policy. SharedHosts maps a shared
-// registrable host (suffix key) to an allow regexp that must match the full
-// hostname of a wildcard preview pattern. Setting this key replaces the
-// default map entirely (including to empty, which disables shared-host
-// unbounded checks). YAML/env values are strings; the config decode hook
-// compiles them into *regexp.Regexp.
+// OriginsConfig is the instance-level origins policy. SharedHosts is a
+// host→allow-regexp map; string values are compiled by the config decode hook.
 type OriginsConfig struct {
 	SharedHosts map[string]*regexp.Regexp `mapstructure:"shared_hosts"`
 }
