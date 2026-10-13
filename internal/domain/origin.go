@@ -1,6 +1,9 @@
 package domain
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 const PrefixOrigin ResourcePrefix = "origin"
 
@@ -13,10 +16,25 @@ const (
 )
 
 // Origin is one entry of a project's origin allowlist.
+// ProjectID and CreatedAt are storage fields; wire and events stay {pattern,kind}.
 type Origin struct {
-	Pattern string     `json:"pattern"`
-	Kind    OriginKind `json:"kind"`
+	Pattern   string     `json:"pattern"`
+	Kind      OriginKind `json:"kind"`
+	ProjectID string     `json:"-"`
+	CreatedAt time.Time  `json:"-"`
 }
+
+// OriginField enumerates the fields of Origin which can be used for filtering
+// and ordering.
+type OriginField uint8
+
+const (
+	OriginFieldUnspecified OriginField = iota
+	OriginFieldProjectID
+	OriginFieldPattern
+	OriginFieldKind
+	OriginFieldCreatedAt
+)
 
 func ErrOriginInvalid() Error {
 	return newError(PrefixOrigin.ErrorCodePrefix("invalid"), "origin: must be scheme://host[:port], lowercase, with no path", nil, nil)

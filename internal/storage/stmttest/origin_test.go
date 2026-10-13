@@ -28,9 +28,16 @@ func TestOriginsRoundTrip(t *testing.T) {
 		// Create order must survive hydrate: list is created_at then pattern.
 		assert.Equal(t, project.Origins, got.Origins)
 
-		listed, err := d.stmts.ListOriginsByProjectID(t.Context(), project.ID)
+		listed, err := d.stmts.ListOrigins(t.Context(), &database.ListOptions[domain.OriginField]{
+			Filter: database.Equal(database.Col(domain.OriginFieldProjectID), project.ID),
+		})
 		require.NoError(t, err)
-		assert.Equal(t, project.Origins, listed)
+		require.Len(t, listed.Items, len(project.Origins))
+		for i, want := range project.Origins {
+			assert.Equal(t, want.Pattern, listed.Items[i].Pattern)
+			assert.Equal(t, want.Kind, listed.Items[i].Kind)
+			assert.Equal(t, project.ID, listed.Items[i].ProjectID)
+		}
 	})
 }
 
@@ -49,9 +56,14 @@ func TestOriginsInsertIdempotentAndDelete(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, again)
 
-		got, err := d.stmts.GetOriginByPattern(t.Context(), project.ID, origin.Pattern)
+		got, err := d.stmts.GetOrigin(t.Context(), database.And(
+			database.Equal(database.Col(domain.OriginFieldProjectID), project.ID),
+			database.Equal(database.Col(domain.OriginFieldPattern), origin.Pattern),
+		))
 		require.NoError(t, err)
-		assert.Equal(t, origin, *got)
+		assert.Equal(t, origin.Pattern, got.Pattern)
+		assert.Equal(t, origin.Kind, got.Kind)
+		assert.Equal(t, project.ID, got.ProjectID)
 
 		deleted, removed, err := d.stmts.DeleteOriginByPattern(t.Context(), project.ID, origin.Pattern)
 		require.NoError(t, err)
@@ -64,7 +76,10 @@ func TestOriginsInsertIdempotentAndDelete(t *testing.T) {
 		assert.False(t, deleted)
 		assert.Nil(t, removed)
 
-		_, err = d.stmts.GetOriginByPattern(t.Context(), project.ID, origin.Pattern)
+		_, err = d.stmts.GetOrigin(t.Context(), database.And(
+			database.Equal(database.Col(domain.OriginFieldProjectID), project.ID),
+			database.Equal(database.Col(domain.OriginFieldPattern), origin.Pattern),
+		))
 		require.Error(t, err)
 		var noRow *database.NoRowFoundError
 		assert.ErrorAs(t, err, &noRow)
@@ -85,8 +100,10 @@ func TestOriginsProjectDeleteCascades(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, changed)
 
-		origins, err := d.stmts.ListOriginsByProjectID(t.Context(), project.ID)
+		listed, err := d.stmts.ListOrigins(t.Context(), &database.ListOptions[domain.OriginField]{
+			Filter: database.Equal(database.Col(domain.OriginFieldProjectID), project.ID),
+		})
 		require.NoError(t, err)
-		assert.Empty(t, origins)
+		assert.Empty(t, listed.Items)
 	})
 }

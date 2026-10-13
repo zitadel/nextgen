@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -32,10 +33,14 @@ type Config struct {
 	Origins OriginsConfig `mapstructure:"origins"`
 }
 
-// OriginsConfig is the instance-level origins policy. SharedHosts replaces the
-// built-in default list entirely when set (including to empty).
+// OriginsConfig is the instance-level origins policy. SharedHosts maps a shared
+// registrable host (suffix key) to an allow regexp that must match the full
+// hostname of a wildcard preview pattern. Setting this key replaces the
+// default map entirely (including to empty, which disables shared-host
+// unbounded checks). YAML/env values are strings; the config decode hook
+// compiles them into *regexp.Regexp.
 type OriginsConfig struct {
-	SharedHosts []string `mapstructure:"shared_hosts"`
+	SharedHosts map[string]*regexp.Regexp `mapstructure:"shared_hosts"`
 }
 
 // EventsConfig configures audit event retention and deployment export sinks.

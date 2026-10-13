@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"strings"
 
 	"github.com/ianlancetaylor/jsonschema"
@@ -82,15 +83,15 @@ type ProjectService interface {
 }
 
 // NewProjectService returns a [ProjectService] backed by the given repository.
-// sharedHosts is the effective origins.shared_hosts list after config
-// replace-defaults (nil/empty disables shared-host unbounded checks).
+// sharedHosts is the effective origins.shared_hosts host→allow-regexp map after
+// config replace-defaults (nil/empty disables shared-host unbounded checks).
 func NewProjectService(
 	v2Pool *DB,
 	serverURL string,
 	schemaValidator *domain.SchemaValidator,
 	keyService KeyService,
 	hashers *crypto.HasherFactory,
-	sharedHosts []string,
+	sharedHosts map[string]*regexp.Regexp,
 ) ProjectService {
 	return &projectService{
 		v2Pool:          v2Pool,

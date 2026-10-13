@@ -81,15 +81,12 @@ type ProjectStatements interface {
 // (project_id, pattern). There is no minted origin id.
 type OriginStatements interface {
 	Statements
-	// ListOriginsByProjectID returns the project's origins ordered by
-	// created_at, then pattern.
-	ListOriginsByProjectID(ctx context.Context, projectID string) ([]domain.Origin, error)
-	// ListOriginsByProjectIDs returns origins for many projects, keyed by
-	// project id. Missing projects are absent from the map.
-	ListOriginsByProjectIDs(ctx context.Context, projectIDs []string) (map[string][]domain.Origin, error)
-	// GetOriginByPattern returns the origin stored under pattern, or a
+	// GetOrigin returns one origin matching filter, or a
 	// [database.NoRowFoundError] when none matches.
-	GetOriginByPattern(ctx context.Context, projectID, pattern string) (*domain.Origin, error)
+	GetOrigin(ctx context.Context, filter database.Filter[domain.OriginField]) (*domain.Origin, error)
+	// ListOrigins returns origins matching filter. Default order is
+	// created_at, then pattern when OrderBy is empty.
+	ListOrigins(ctx context.Context, filter *database.ListOptions[domain.OriginField]) (*database.ListResult[*domain.Origin], error)
 	// InsertOrigin stores one origin. inserted is false when the same
 	// (project_id, pattern) already exists (caller decides kind conflict vs
 	// idempotent add).

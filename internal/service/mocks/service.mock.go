@@ -2861,41 +2861,41 @@ func (c *MockAllStatementsGetJSONSchemaByIDCall) DoAndReturn(f func(context.Cont
 	return c
 }
 
-// GetOriginByPattern mocks base method.
-func (m *MockAllStatements) GetOriginByPattern(ctx context.Context, projectID, pattern string) (*domain.Origin, error) {
+// GetOrigin mocks base method.
+func (m *MockAllStatements) GetOrigin(ctx context.Context, filter database.Filter[domain.OriginField]) (*domain.Origin, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetOriginByPattern", ctx, projectID, pattern)
+	ret := m.ctrl.Call(m, "GetOrigin", ctx, filter)
 	ret0, _ := ret[0].(*domain.Origin)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetOriginByPattern indicates an expected call of GetOriginByPattern.
-func (mr *MockAllStatementsMockRecorder) GetOriginByPattern(ctx, projectID, pattern any) *MockAllStatementsGetOriginByPatternCall {
+// GetOrigin indicates an expected call of GetOrigin.
+func (mr *MockAllStatementsMockRecorder) GetOrigin(ctx, filter any) *MockAllStatementsGetOriginCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOriginByPattern", reflect.TypeOf((*MockAllStatements)(nil).GetOriginByPattern), ctx, projectID, pattern)
-	return &MockAllStatementsGetOriginByPatternCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOrigin", reflect.TypeOf((*MockAllStatements)(nil).GetOrigin), ctx, filter)
+	return &MockAllStatementsGetOriginCall{Call: call}
 }
 
-// MockAllStatementsGetOriginByPatternCall wrap *gomock.Call
-type MockAllStatementsGetOriginByPatternCall struct {
+// MockAllStatementsGetOriginCall wrap *gomock.Call
+type MockAllStatementsGetOriginCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsGetOriginByPatternCall) Return(arg0 *domain.Origin, arg1 error) *MockAllStatementsGetOriginByPatternCall {
+func (c *MockAllStatementsGetOriginCall) Return(arg0 *domain.Origin, arg1 error) *MockAllStatementsGetOriginCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsGetOriginByPatternCall) Do(f func(context.Context, string, string) (*domain.Origin, error)) *MockAllStatementsGetOriginByPatternCall {
+func (c *MockAllStatementsGetOriginCall) Do(f func(context.Context, database.Filter[domain.OriginField]) (*domain.Origin, error)) *MockAllStatementsGetOriginCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsGetOriginByPatternCall) DoAndReturn(f func(context.Context, string, string) (*domain.Origin, error)) *MockAllStatementsGetOriginByPatternCall {
+func (c *MockAllStatementsGetOriginCall) DoAndReturn(f func(context.Context, database.Filter[domain.OriginField]) (*domain.Origin, error)) *MockAllStatementsGetOriginCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -4615,80 +4615,41 @@ func (c *MockAllStatementsListManagedGrantsCall) DoAndReturn(f func(context.Cont
 	return c
 }
 
-// ListOriginsByProjectID mocks base method.
-func (m *MockAllStatements) ListOriginsByProjectID(ctx context.Context, projectID string) ([]domain.Origin, error) {
+// ListOrigins mocks base method.
+func (m *MockAllStatements) ListOrigins(ctx context.Context, filter *database.ListOptions[domain.OriginField]) (*database.ListResult[*domain.Origin], error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListOriginsByProjectID", ctx, projectID)
-	ret0, _ := ret[0].([]domain.Origin)
+	ret := m.ctrl.Call(m, "ListOrigins", ctx, filter)
+	ret0, _ := ret[0].(*database.ListResult[*domain.Origin])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListOriginsByProjectID indicates an expected call of ListOriginsByProjectID.
-func (mr *MockAllStatementsMockRecorder) ListOriginsByProjectID(ctx, projectID any) *MockAllStatementsListOriginsByProjectIDCall {
+// ListOrigins indicates an expected call of ListOrigins.
+func (mr *MockAllStatementsMockRecorder) ListOrigins(ctx, filter any) *MockAllStatementsListOriginsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListOriginsByProjectID", reflect.TypeOf((*MockAllStatements)(nil).ListOriginsByProjectID), ctx, projectID)
-	return &MockAllStatementsListOriginsByProjectIDCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListOrigins", reflect.TypeOf((*MockAllStatements)(nil).ListOrigins), ctx, filter)
+	return &MockAllStatementsListOriginsCall{Call: call}
 }
 
-// MockAllStatementsListOriginsByProjectIDCall wrap *gomock.Call
-type MockAllStatementsListOriginsByProjectIDCall struct {
+// MockAllStatementsListOriginsCall wrap *gomock.Call
+type MockAllStatementsListOriginsCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsListOriginsByProjectIDCall) Return(arg0 []domain.Origin, arg1 error) *MockAllStatementsListOriginsByProjectIDCall {
+func (c *MockAllStatementsListOriginsCall) Return(arg0 *database.ListResult[*domain.Origin], arg1 error) *MockAllStatementsListOriginsCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsListOriginsByProjectIDCall) Do(f func(context.Context, string) ([]domain.Origin, error)) *MockAllStatementsListOriginsByProjectIDCall {
+func (c *MockAllStatementsListOriginsCall) Do(f func(context.Context, *database.ListOptions[domain.OriginField]) (*database.ListResult[*domain.Origin], error)) *MockAllStatementsListOriginsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsListOriginsByProjectIDCall) DoAndReturn(f func(context.Context, string) ([]domain.Origin, error)) *MockAllStatementsListOriginsByProjectIDCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// ListOriginsByProjectIDs mocks base method.
-func (m *MockAllStatements) ListOriginsByProjectIDs(ctx context.Context, projectIDs []string) (map[string][]domain.Origin, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListOriginsByProjectIDs", ctx, projectIDs)
-	ret0, _ := ret[0].(map[string][]domain.Origin)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListOriginsByProjectIDs indicates an expected call of ListOriginsByProjectIDs.
-func (mr *MockAllStatementsMockRecorder) ListOriginsByProjectIDs(ctx, projectIDs any) *MockAllStatementsListOriginsByProjectIDsCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListOriginsByProjectIDs", reflect.TypeOf((*MockAllStatements)(nil).ListOriginsByProjectIDs), ctx, projectIDs)
-	return &MockAllStatementsListOriginsByProjectIDsCall{Call: call}
-}
-
-// MockAllStatementsListOriginsByProjectIDsCall wrap *gomock.Call
-type MockAllStatementsListOriginsByProjectIDsCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsListOriginsByProjectIDsCall) Return(arg0 map[string][]domain.Origin, arg1 error) *MockAllStatementsListOriginsByProjectIDsCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsListOriginsByProjectIDsCall) Do(f func(context.Context, []string) (map[string][]domain.Origin, error)) *MockAllStatementsListOriginsByProjectIDsCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsListOriginsByProjectIDsCall) DoAndReturn(f func(context.Context, []string) (map[string][]domain.Origin, error)) *MockAllStatementsListOriginsByProjectIDsCall {
+func (c *MockAllStatementsListOriginsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.OriginField]) (*database.ListResult[*domain.Origin], error)) *MockAllStatementsListOriginsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -6523,41 +6484,41 @@ func (c *MockOriginStatementsDeleteOriginByPatternCall) DoAndReturn(f func(conte
 	return c
 }
 
-// GetOriginByPattern mocks base method.
-func (m *MockOriginStatements) GetOriginByPattern(ctx context.Context, projectID, pattern string) (*domain.Origin, error) {
+// GetOrigin mocks base method.
+func (m *MockOriginStatements) GetOrigin(ctx context.Context, filter database.Filter[domain.OriginField]) (*domain.Origin, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetOriginByPattern", ctx, projectID, pattern)
+	ret := m.ctrl.Call(m, "GetOrigin", ctx, filter)
 	ret0, _ := ret[0].(*domain.Origin)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetOriginByPattern indicates an expected call of GetOriginByPattern.
-func (mr *MockOriginStatementsMockRecorder) GetOriginByPattern(ctx, projectID, pattern any) *MockOriginStatementsGetOriginByPatternCall {
+// GetOrigin indicates an expected call of GetOrigin.
+func (mr *MockOriginStatementsMockRecorder) GetOrigin(ctx, filter any) *MockOriginStatementsGetOriginCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOriginByPattern", reflect.TypeOf((*MockOriginStatements)(nil).GetOriginByPattern), ctx, projectID, pattern)
-	return &MockOriginStatementsGetOriginByPatternCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOrigin", reflect.TypeOf((*MockOriginStatements)(nil).GetOrigin), ctx, filter)
+	return &MockOriginStatementsGetOriginCall{Call: call}
 }
 
-// MockOriginStatementsGetOriginByPatternCall wrap *gomock.Call
-type MockOriginStatementsGetOriginByPatternCall struct {
+// MockOriginStatementsGetOriginCall wrap *gomock.Call
+type MockOriginStatementsGetOriginCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockOriginStatementsGetOriginByPatternCall) Return(arg0 *domain.Origin, arg1 error) *MockOriginStatementsGetOriginByPatternCall {
+func (c *MockOriginStatementsGetOriginCall) Return(arg0 *domain.Origin, arg1 error) *MockOriginStatementsGetOriginCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockOriginStatementsGetOriginByPatternCall) Do(f func(context.Context, string, string) (*domain.Origin, error)) *MockOriginStatementsGetOriginByPatternCall {
+func (c *MockOriginStatementsGetOriginCall) Do(f func(context.Context, database.Filter[domain.OriginField]) (*domain.Origin, error)) *MockOriginStatementsGetOriginCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockOriginStatementsGetOriginByPatternCall) DoAndReturn(f func(context.Context, string, string) (*domain.Origin, error)) *MockOriginStatementsGetOriginByPatternCall {
+func (c *MockOriginStatementsGetOriginCall) DoAndReturn(f func(context.Context, database.Filter[domain.OriginField]) (*domain.Origin, error)) *MockOriginStatementsGetOriginCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -6637,80 +6598,41 @@ func (c *MockOriginStatementsIsStatementsCall) DoAndReturn(f func()) *MockOrigin
 	return c
 }
 
-// ListOriginsByProjectID mocks base method.
-func (m *MockOriginStatements) ListOriginsByProjectID(ctx context.Context, projectID string) ([]domain.Origin, error) {
+// ListOrigins mocks base method.
+func (m *MockOriginStatements) ListOrigins(ctx context.Context, filter *database.ListOptions[domain.OriginField]) (*database.ListResult[*domain.Origin], error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListOriginsByProjectID", ctx, projectID)
-	ret0, _ := ret[0].([]domain.Origin)
+	ret := m.ctrl.Call(m, "ListOrigins", ctx, filter)
+	ret0, _ := ret[0].(*database.ListResult[*domain.Origin])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListOriginsByProjectID indicates an expected call of ListOriginsByProjectID.
-func (mr *MockOriginStatementsMockRecorder) ListOriginsByProjectID(ctx, projectID any) *MockOriginStatementsListOriginsByProjectIDCall {
+// ListOrigins indicates an expected call of ListOrigins.
+func (mr *MockOriginStatementsMockRecorder) ListOrigins(ctx, filter any) *MockOriginStatementsListOriginsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListOriginsByProjectID", reflect.TypeOf((*MockOriginStatements)(nil).ListOriginsByProjectID), ctx, projectID)
-	return &MockOriginStatementsListOriginsByProjectIDCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListOrigins", reflect.TypeOf((*MockOriginStatements)(nil).ListOrigins), ctx, filter)
+	return &MockOriginStatementsListOriginsCall{Call: call}
 }
 
-// MockOriginStatementsListOriginsByProjectIDCall wrap *gomock.Call
-type MockOriginStatementsListOriginsByProjectIDCall struct {
+// MockOriginStatementsListOriginsCall wrap *gomock.Call
+type MockOriginStatementsListOriginsCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockOriginStatementsListOriginsByProjectIDCall) Return(arg0 []domain.Origin, arg1 error) *MockOriginStatementsListOriginsByProjectIDCall {
+func (c *MockOriginStatementsListOriginsCall) Return(arg0 *database.ListResult[*domain.Origin], arg1 error) *MockOriginStatementsListOriginsCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockOriginStatementsListOriginsByProjectIDCall) Do(f func(context.Context, string) ([]domain.Origin, error)) *MockOriginStatementsListOriginsByProjectIDCall {
+func (c *MockOriginStatementsListOriginsCall) Do(f func(context.Context, *database.ListOptions[domain.OriginField]) (*database.ListResult[*domain.Origin], error)) *MockOriginStatementsListOriginsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockOriginStatementsListOriginsByProjectIDCall) DoAndReturn(f func(context.Context, string) ([]domain.Origin, error)) *MockOriginStatementsListOriginsByProjectIDCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// ListOriginsByProjectIDs mocks base method.
-func (m *MockOriginStatements) ListOriginsByProjectIDs(ctx context.Context, projectIDs []string) (map[string][]domain.Origin, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListOriginsByProjectIDs", ctx, projectIDs)
-	ret0, _ := ret[0].(map[string][]domain.Origin)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListOriginsByProjectIDs indicates an expected call of ListOriginsByProjectIDs.
-func (mr *MockOriginStatementsMockRecorder) ListOriginsByProjectIDs(ctx, projectIDs any) *MockOriginStatementsListOriginsByProjectIDsCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListOriginsByProjectIDs", reflect.TypeOf((*MockOriginStatements)(nil).ListOriginsByProjectIDs), ctx, projectIDs)
-	return &MockOriginStatementsListOriginsByProjectIDsCall{Call: call}
-}
-
-// MockOriginStatementsListOriginsByProjectIDsCall wrap *gomock.Call
-type MockOriginStatementsListOriginsByProjectIDsCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockOriginStatementsListOriginsByProjectIDsCall) Return(arg0 map[string][]domain.Origin, arg1 error) *MockOriginStatementsListOriginsByProjectIDsCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockOriginStatementsListOriginsByProjectIDsCall) Do(f func(context.Context, []string) (map[string][]domain.Origin, error)) *MockOriginStatementsListOriginsByProjectIDsCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockOriginStatementsListOriginsByProjectIDsCall) DoAndReturn(f func(context.Context, []string) (map[string][]domain.Origin, error)) *MockOriginStatementsListOriginsByProjectIDsCall {
+func (c *MockOriginStatementsListOriginsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.OriginField]) (*database.ListResult[*domain.Origin], error)) *MockOriginStatementsListOriginsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

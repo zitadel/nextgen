@@ -22,7 +22,7 @@ func TestProjectService_AddOrigin(t *testing.T) {
 		t.Parallel()
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 		statements.EXPECT().GetProjectByID(gomock.Any(), project.ID).Return(project, nil)
-		statements.EXPECT().GetOriginByPattern(gomock.Any(), project.ID, origin.Pattern).
+		statements.EXPECT().GetOrigin(gomock.Any(), gomock.Any()).
 			Return(nil, &database.NoRowFoundError{})
 		statements.EXPECT().InsertOrigin(gomock.Any(), project.ID, origin).Return(true, nil)
 
@@ -35,7 +35,7 @@ func TestProjectService_AddOrigin(t *testing.T) {
 		t.Parallel()
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 		statements.EXPECT().GetProjectByID(gomock.Any(), project.ID).Return(project, nil)
-		statements.EXPECT().GetOriginByPattern(gomock.Any(), project.ID, origin.Pattern).
+		statements.EXPECT().GetOrigin(gomock.Any(), gomock.Any()).
 			Return(&origin, nil)
 
 		got, err := svc.AddOrigin(context.Background(), project.ID, origin)
@@ -48,7 +48,7 @@ func TestProjectService_AddOrigin(t *testing.T) {
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 		existing := domain.Origin{Pattern: origin.Pattern, Kind: domain.OriginKindPrimary}
 		statements.EXPECT().GetProjectByID(gomock.Any(), project.ID).Return(project, nil)
-		statements.EXPECT().GetOriginByPattern(gomock.Any(), project.ID, origin.Pattern).
+		statements.EXPECT().GetOrigin(gomock.Any(), gomock.Any()).
 			Return(&existing, nil)
 
 		got, err := svc.AddOrigin(context.Background(), project.ID, origin)

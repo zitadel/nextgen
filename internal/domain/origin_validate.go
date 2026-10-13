@@ -3,25 +3,38 @@ package domain
 import (
 	"net"
 	"net/url"
+	"regexp"
 	"strings"
 )
 
-// DefaultSharedHosts is the built-in list of hosts where a preview wildcard
-// must keep a literal tenant-unique label. Instance config key
-// origins.shared_hosts replaces this list entirely when set (including to
-// empty, which disables shared-host unbounded checks).
-var DefaultSharedHosts = []string{
-	"vercel.app",
-	"netlify.app",
-	"pages.dev",
-	"workers.dev",
+// DefaultSharedHostPatterns is the built-in host→allow-regexp string map.
+// Instance config key origins.shared_hosts replaces this map entirely when set
+// (including to empty, which disables shared-host unbounded checks). Each
+// regexp must match the full hostname of a wildcard preview pattern.
+var DefaultSharedHostPatterns = map[string]string{
+	"vercel.app":  `^\*[^*]+\.vercel\.app$`,
+	"netlify.app": `^\*--[^*]+\.netlify\.app$`,
+	"pages.dev":   `^\*\.[^*]+\.pages\.dev$`,
+	"workers.dev": `^\*\.[^*]+\.workers\.dev$`,
+}
+
+// DefaultSharedHosts is DefaultSharedHostPatterns compiled for tests and for
+// the nil-config default applied after config load.
+var DefaultSharedHosts = mustCompileSharedHosts(DefaultSharedHostPatterns)
+
+func mustCompileSharedHosts(patterns map[string]string) map[string]*regexp.Regexp {
+	out := make(map[string]*regexp.Regexp, len(patterns))
+	for host, pattern := range patterns {
+		out[host] = regexp.MustCompile(pattern)
+	}
+	return out
 }
 
 // OriginValidator checks write rules for create and add. SharedHosts is the
-// effective list after config replace-defaults; a nil or empty list skips
-// unbounded checks.
+// effective host→allow-regexp map after config replace-defaults; a nil or
+// empty map skips unbounded checks.
 type OriginValidator struct {
-	SharedHosts []string
+	SharedHosts map[string]*regexp.Regexp
 }
 
 // ValidateAll validates every origin; the first failure wins.
@@ -116,7 +129,7 @@ func parsePortNumber(port string) (int, error) {
 // wildcardInOwnLabel reports whether the single * sits inside one DNS label
 // (not across dots) so it can stand for one or more non-dot characters.
 func wildcardInOwnLabel(host string) bool {
-	for _, label := range strings.Split(host, ".") {
+	for label := range strings.SplitSeq(host, ".") {
 		if strings.Count(label, "*") == 1 {
 			return true
 		}
@@ -132,30 +145,17 @@ func (v OriginValidator) isUnboundedSharedHost(host string) bool {
 	if shared == "" {
 		return false
 	}
-	prefix := strings.TrimSuffix(host, "."+shared)
-	if prefix == host {
-		// host == shared (e.g. pattern host "vercel.app") — wildcard can't appear.
+	allow := v.SharedHosts[shared]
+	if allow == nil {
 		return false
 	}
-	switch shared {
-	case "vercel.app":
-		// https://*-team.vercel.app — one label, * plus a non-empty literal.
-		return !vercelTenantLabel(prefix)
-	case "netlify.app":
-		// https://*--site.netlify.app — one label starting with *-- and a site name.
-		return !netlifyTenantLabel(prefix)
-	case "pages.dev", "workers.dev":
-		// https://*.project.pages.dev / https://*.account.workers.dev
-		return !dottedTenantLabel(prefix)
-	default:
-		// Unknown shared host from config: require a literal label beside *.
-		return !hasLiteralBesideWildcard(prefix)
-	}
+	// Regexp matches the full hostname; no match means unbounded on that host.
+	return !allow.MatchString(host)
 }
 
-func matchSharedHost(host string, sharedHosts []string) string {
+func matchSharedHost(host string, sharedHosts map[string]*regexp.Regexp) string {
 	best := ""
-	for _, shared := range sharedHosts {
+	for shared := range sharedHosts {
 		shared = strings.ToLower(strings.TrimSpace(shared))
 		if shared == "" {
 			continue
@@ -167,55 +167,4 @@ func matchSharedHost(host string, sharedHosts []string) string {
 		}
 	}
 	return best
-}
-
-func vercelTenantLabel(prefix string) bool {
-	if strings.Contains(prefix, ".") {
-		return false
-	}
-	if !strings.HasPrefix(prefix, "*") || prefix == "*" {
-		return false
-	}
-	// Remainder after * must be non-empty and contain no *.
-	rest := strings.TrimPrefix(prefix, "*")
-	return rest != "" && !strings.Contains(rest, "*")
-}
-
-func netlifyTenantLabel(prefix string) bool {
-	if strings.Contains(prefix, ".") {
-		return false
-	}
-	if !strings.HasPrefix(prefix, "*--") {
-		return false
-	}
-	rest := strings.TrimPrefix(prefix, "*--")
-	return rest != "" && !strings.Contains(rest, "*")
-}
-
-func dottedTenantLabel(prefix string) bool {
-	labels := strings.Split(prefix, ".")
-	if len(labels) != 2 {
-		return false
-	}
-	return labels[0] == "*" && labels[1] != "" && !strings.Contains(labels[1], "*")
-}
-
-func hasLiteralBesideWildcard(prefix string) bool {
-	if !strings.Contains(prefix, "*") {
-		return true
-	}
-	for _, label := range strings.Split(prefix, ".") {
-		if label == "" || label == "*" {
-			continue
-		}
-		if strings.Contains(label, "*") {
-			rest := strings.ReplaceAll(label, "*", "")
-			if rest != "" {
-				return true
-			}
-			continue
-		}
-		return true
-	}
-	return false
 }

@@ -28,23 +28,24 @@ func (s *projectService) AddOrigin(ctx context.Context, projectID string, origin
 			if mapped := mapStorageError(err); mapped != err {
 				return mapped
 			}
-			var noRow *database.NoRowFoundError
-			if errors.As(err, &noRow) {
+			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 				return domain.ErrProjectNotFound()
 			}
 			return domain.ErrInternal(err).WithMessage("failed to load project")
 		}
 
-		existing, err := tx.Statements().GetOriginByPattern(ctx, projectID, origin.Pattern)
+		existing, err := tx.Statements().GetOrigin(ctx, database.And(
+			database.Equal(database.Col(domain.OriginFieldProjectID), projectID),
+			database.Equal(database.Col(domain.OriginFieldPattern), origin.Pattern),
+		))
 		if err == nil {
 			if existing.Kind != origin.Kind {
 				return domain.ErrOriginKindConflict()
 			}
-			stored = *existing
+			stored = domain.Origin{Pattern: existing.Pattern, Kind: existing.Kind}
 			return nil
 		}
-		var noRow *database.NoRowFoundError
-		if !errors.As(err, &noRow) {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
 			return domain.ErrInternal(err).WithMessage("failed to look up origin")
 		}
 
@@ -54,14 +55,17 @@ func (s *projectService) AddOrigin(ctx context.Context, projectID string, origin
 		}
 		if !inserted {
 			// Lost a race with another insert of the same pattern.
-			again, getErr := tx.Statements().GetOriginByPattern(ctx, projectID, origin.Pattern)
+			again, getErr := tx.Statements().GetOrigin(ctx, database.And(
+				database.Equal(database.Col(domain.OriginFieldProjectID), projectID),
+				database.Equal(database.Col(domain.OriginFieldPattern), origin.Pattern),
+			))
 			if getErr != nil {
 				return domain.ErrInternal(getErr).WithMessage("failed to re-read origin after conflict")
 			}
 			if again.Kind != origin.Kind {
 				return domain.ErrOriginKindConflict()
 			}
-			stored = *again
+			stored = domain.Origin{Pattern: again.Pattern, Kind: again.Kind}
 			return nil
 		}
 		stored = origin
@@ -99,8 +103,7 @@ func (s *projectService) RemoveOrigin(ctx context.Context, projectID, pattern st
 			if mapped := mapStorageError(err); mapped != err {
 				return mapped
 			}
-			var noRow *database.NoRowFoundError
-			if errors.As(err, &noRow) {
+			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 				return domain.ErrProjectNotFound()
 			}
 			return domain.ErrInternal(err).WithMessage("failed to load project")

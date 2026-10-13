@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -138,13 +139,32 @@ func TestOriginValidator(t *testing.T) {
 
 	t.Run("shared hosts replace not merge", func(t *testing.T) {
 		t.Parallel()
-		onlyPages := domain.OriginValidator{SharedHosts: []string{"pages.dev"}}
+		onlyPages := domain.OriginValidator{SharedHosts: map[string]*regexp.Regexp{
+			"pages.dev": regexp.MustCompile(domain.DefaultSharedHostPatterns["pages.dev"]),
+		}}
 		require.NoError(t, onlyPages.Validate(domain.Origin{
 			Pattern: "https://*.vercel.app",
 			Kind:    domain.OriginKindPreview,
 		}))
 		err := onlyPages.Validate(domain.Origin{
 			Pattern: "https://*.pages.dev",
+			Kind:    domain.OriginKindPreview,
+		})
+		require.Error(t, err)
+		assert.Equal(t, domain.ErrOriginUnbounded().Code, err.(domain.Error).Code)
+	})
+
+	t.Run("custom shared host allow regexp", func(t *testing.T) {
+		t.Parallel()
+		custom := domain.OriginValidator{SharedHosts: map[string]*regexp.Regexp{
+			"preview.example.com": regexp.MustCompile(`^\*\.tenant\.preview\.example\.com$`),
+		}}
+		require.NoError(t, custom.Validate(domain.Origin{
+			Pattern: "https://*.tenant.preview.example.com",
+			Kind:    domain.OriginKindPreview,
+		}))
+		err := custom.Validate(domain.Origin{
+			Pattern: "https://*.preview.example.com",
 			Kind:    domain.OriginKindPreview,
 		})
 		require.Error(t, err)

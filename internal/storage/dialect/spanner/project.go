@@ -164,13 +164,30 @@ func (ps projectStatements) hydrateOrigins(ctx context.Context, projects ...*dom
 	if len(projects) == 0 {
 		return nil
 	}
-	ids := make([]string, len(projects))
+	filters := make([]database.Filter[domain.OriginField], len(projects))
 	for i, p := range projects {
-		ids[i] = p.ID
+		filters[i] = database.Equal(database.Col(domain.OriginFieldProjectID), p.ID)
 	}
-	byProject, err := newOriginStatements(ps.db).ListOriginsByProjectIDs(ctx, ids)
+	listed, err := newOriginStatements(ps.db).ListOrigins(ctx, &database.ListOptions[domain.OriginField]{
+		Filter: database.Or(filters...),
+		Pagination: database.Page[domain.OriginField]{
+			OrderBy: database.OrderBy[domain.OriginField]{
+				Columns: []database.Column[domain.OriginField]{
+					database.Col(domain.OriginFieldCreatedAt),
+					database.Col(domain.OriginFieldPattern),
+				},
+			},
+		},
+	})
 	if err != nil {
 		return err
+	}
+	byProject := make(map[string][]domain.Origin, len(projects))
+	for _, o := range listed.Items {
+		byProject[o.ProjectID] = append(byProject[o.ProjectID], domain.Origin{
+			Pattern: o.Pattern,
+			Kind:    o.Kind,
+		})
 	}
 	for _, p := range projects {
 		origins := byProject[p.ID]
