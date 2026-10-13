@@ -11,16 +11,13 @@
 > CLI ([#1617](https://github.com/zitadel/nextgen/issues/1617)).
 >
 > **Builds on:** [ADR 062](062-per-environment-variables-and-secrets.md)
-> (variables and secrets, `${{ NAME }}`),
+> (variables and secrets, `${{ NAME }}`; its Scope, Storage and Deployment
+> validation sections state the model chosen here and were updated in place,
+> since that ADR is still proposed),
 > [ADR 029](029-cryptography-secrets-and-key-lifecycle.md) (envelope
 > encryption under per-project keys),
 > [ADR 068](068-project-is-the-data-boundary.md) (no environment entity; a
 > deployment targets the project's primary origins or a preview URL)
->
-> **Amends** [ADR 062](062-per-environment-variables-and-secrets.md): the
-> owner is the project plus a kind, the table is keyed by it, a deployment
-> freezes the values of its kind, and a deploy whose release references a
-> missing name is refused.
 >
 > **Deviates from** [ADR 047](047-dialect-id-generation.md) §Prefix registry:
 > neither `variable_sets` nor `deployment_variable_sets` has a minted PK; a
@@ -28,9 +25,10 @@
 
 ## Context
 
-ADR 062 scoped a variable to a project or to one of its environments and left
-deploy-time validation open. ADR 068 removed the environment, and with it the
-only thing that told a preview's values from production's. One rule of that
+ADR 062 first scoped a variable to a project or to one of its environments and
+left deploy-time validation open; its body now states the model this ADR
+chose. ADR 068 removed the environment, and with it the only thing that told a
+preview's values from production's. One rule of that
 scope survives: a preview URL is reachable by anyone who can guess it, so it
 must never run with a production secret.
 
@@ -173,8 +171,23 @@ Decided here or on the issues, implemented outside #1567:
   indexes the key id.
 - A set no deployment references can be collected, but no garbage collection
   exists yet.
-- A cap on the number of variables per project is still open: a set is one
-  cell, and a Spanner cell holds at most 10 MiB.
+- A set is one cell, and a Spanner cell holds at most 10 MiB; Postgres JSONB
+  and SQLite TEXT allow far more, so Spanner is the binding limit. The worst
+  case per entry, measured through the code path a secret takes: a name is at
+  most 255 bytes (`domain.MaxVariableNameLength`) and a string value at most
+  16 KiB (`domain.MaxVariableStringLength`); a secret holds the compact JWE
+  (A256GCMKW key wrap, A256GCM content) of the JSON-encoded value, whose
+  base64url ciphertext is 4/3 of that JSON plus 276 bytes of protected header
+  with a 44-byte key id, wrapped key, IV, tag and separators; the entry's own
+  JSON adds about 30 bytes. A value that JSON-encodes without escapes gives a
+  22,124-byte JWE and a 22,411-byte entry, 467 per cell. `json.Marshal`
+  escapes `<`, `>`, `&` and control characters as six bytes each, so a value
+  made of them encodes to 98,306 bytes, encrypts to a 131,351-byte JWE and
+  freezes as a 131,638-byte entry: 79 such entries fill the cell. A
+  per-project cap on variables is therefore needed so a freeze can never
+  exceed the cell, 79 names if the cap is a count or a budget on the encoded
+  size; enforcing it is the service's job on write (#1566), and this change
+  adds no enforcement.
 - The rework of deployments over targets
   ([#1572](https://github.com/zitadel/nextgen/issues/1572)) must keep
   `deployments (project_id, id)` as the target of the link's foreign key.

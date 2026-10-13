@@ -52,6 +52,13 @@ CREATE TABLE variable_sets (
     -- {"NAME":{"value":<json>,"secret":bool}}: one kind's values, resolved
     -- before the freeze. A secret is held as its ciphertext; see the postgres
     -- migration.
+    --
+    -- A cell holds at most 10 MiB, which makes Spanner the binding limit on
+    -- the size of a set. A worst-case entry -- a 255-byte name and a 16 KiB
+    -- value every byte of which JSON-escapes to six, encrypted to a
+    -- 131,351-byte JWE -- is 131,638 bytes, so 79 such entries fill the cell
+    -- (467 when the value needs no escapes). The per-project cap that keeps a
+    -- freeze under it is the service's (ADR 069, Consequences).
     entries         JSON        NOT NULL,
     created_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     CONSTRAINT chk_variable_sets_content_hash CHECK (CHAR_LENGTH(content_hash) = 64),
