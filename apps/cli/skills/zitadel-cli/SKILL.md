@@ -32,9 +32,9 @@ to install first:
 npx @zitadel/cli@alpha <command> --non-interactive --json
 ```
 
-During the public alpha, bare `npx @zitadel/cli` is promoted to the same tested
-alpha CLI so discovery works for first-time users. Prefer `@alpha`, or an exact
-`0.1.0-alpha.N` selector in agent scripts and bug reports, for reproducibility.
+Always pass `@alpha`: bare `npx @zitadel/cli` resolves npm's `latest` tag,
+which still points at an early `0.0.0` build. Use an exact `1.0.0-alpha.N`
+selector in agent scripts and bug reports for reproducibility.
 The CLI requires Node.js 24+.
 
 ## Using the CLI
@@ -126,8 +126,10 @@ Each invocation prints one JSON object:
 - On success: `data` with the command-specific payload.
 - On a no-op: `reason` (e.g. `no-framework-detected`, `orphaned-config`).
 - On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_NOT_FOUND`,
-  `E_CONFLICT`) and `message`.
-- `next_commands`: the suggested follow-ups. Prefer these over free-text hints.
+  `E_CONFLICT`) and `message`, usually with a `hint`, and `details` when there
+  is structured context.
+- `next_commands`: the suggested follow-ups, inside `data` on success and at
+  the top level on a no-op or failure. Prefer these over free-text hints.
 - `warnings`: things that went wrong without stopping the command, such as a
   value that was not published. Always present on success (often empty), and
   present on a no-op or failure when there are any. Read them before you report

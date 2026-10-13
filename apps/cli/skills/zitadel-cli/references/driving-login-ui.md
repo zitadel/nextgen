@@ -1,7 +1,7 @@
 ### Driving the login UI
 
-`<zitadel-login>` and `<zitadel-logout>` are Lit elements with open shadow
-roots. The stable automation hooks live inside nested shadow roots, so a flat
+`<zitadel-login>`, `<zitadel-session>`, and `<zitadel-logout>` are Lit elements
+with open shadow roots. The stable automation hooks live inside nested shadow roots, so a flat
 `document.querySelector('[data-testid="zitadel-input-email"]')` will not find
 the native control. Browser drivers with shadow-DOM-aware locators, such as
 Playwright, can target the hooks directly. Generic DOM-eval drivers should
@@ -29,9 +29,15 @@ button. Hooks stay method-named even when the flow engine names a credential
 field `x-auth-methods#<method>`; only the `name` attribute carries that raw
 form key. Enter inside a field submits the step's primary action, but only for
 key events that carry `key: "Enter"` — drivers whose synthesized key events
-omit it (some CDP wrappers) should click `zitadel-action-submit` instead. For sign-out, open the user menu button if needed, then pierce to
-`.signout-btn`; Playwright-style locators may use `zitadel-logout .signout-btn`.
-The canonical component hook list lives in `packages/components/README.md`.
+omit it (some CDP wrappers) should click `zitadel-action-submit` instead.
+
+For sign-out, the profile page that setup generates renders `<zitadel-session>`:
+click its `zitadel-session-logout` host, or the native button inside it,
+`zitadel-session-logout-button`. An app that renders `<zitadel-logout>` instead
+hides sign-out behind an avatar menu: click the "Open user menu" button, then
+pierce to `.signout-btn` (Playwright: `zitadel-logout .signout-btn`), which
+carries no hook. The canonical component hook list lives in
+`packages/components/README.md`.
 
 The checked-in automated regression path is `moon run workspace:journey`, which
 exercises fresh-app setup plus registration, logout, and login across the
@@ -50,8 +56,11 @@ plans as a `revise` and `apply` publishes a new revision; the login serves
 the newest one. `plan` validates templates with the authoritative LiquidJS
 validator (`E_VALIDATION` lists rule ids such as `no-script-tag` and
 `mandatory-gates`; every template must keep a trailing
-`{% mandatory_gates %}` tag). `font_url` is not writable yet; asset URLs
-must be absolute `https://`. Keep exactly one descriptor in
+`{% mandatory_gates %}` tag). Asset URLs must be absolute `https://`; images
+may use `http://` on loopback hosts during development. `typography.font_url`
+needs a `typography.font_family`, is always `https://`, and is loaded only when
+the login runs as `variant="page"`, which setup generates only for a freshly
+scaffolded Next.js or Nuxt app. Keep exactly one descriptor in
 `.zitadel/branding/` — extra `*.json` files there fail the scan.
 Server-provisioned defaults remain a fallback for non-CLI project
 creation, but CLI-created projects are authored from local files first. Flows are
