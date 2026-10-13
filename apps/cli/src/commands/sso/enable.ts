@@ -269,7 +269,7 @@ export default class SsoEnable extends BaseCommand {
     }
     for (const skipped of edits.skipped) {
       reportWarning(
-        `Left ${skipped.region} alone: it has been edited by hand. Update it yourself.`,
+        `Left ${skipped.region} alone: it has been edited by hand. Add ${entry.displayName} to its sso_providers and route sso_authenticated, sso_user_not_found and user_already_exists yourself.`,
       );
     }
     if (edits.written.length === 0 && edits.skipped.length === 0) {

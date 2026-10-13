@@ -254,6 +254,7 @@ export const flowMachine = createMachine({
     password: {
       on: {
         SUBMIT: [
+          chooseProvider,
           {
             // ADR 022 back-navigation: the engine injects a `back` action on
             // any step that has a predecessor.

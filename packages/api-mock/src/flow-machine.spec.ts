@@ -164,6 +164,17 @@ describe("every step that offers providers acts on the press", () => {
     expect(actor.getSnapshot().context.ssoProviderId).toBe("google");
   });
 
+  it("leaves for the provider from the password step, rather than signing in", () => {
+    const actor = startFlowActor();
+    actor.send({ type: "START", purpose: "login" });
+    actor.send({ type: "SUBMIT", action: "submit", fields: { email: "ada@example.test" } });
+    expect(actor.getSnapshot().value).toBe("password");
+
+    actor.send({ type: "SUBMIT", action: "sso", fields: {}, sso_provider_id: "google" });
+
+    expect(actor.getSnapshot().value).toBe("sso-redirect");
+  });
+
   it("leaves for the provider from the conflict step, rather than signing in", () => {
     const actor = atProvider();
     actor.send({

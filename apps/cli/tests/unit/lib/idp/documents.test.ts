@@ -810,7 +810,7 @@ describe("the password step", () => {
     expect(targetsOf(document, "password").user_already_exists).toBe("password");
   });
 
-  it("gains every provider, in the order they were enabled", () => {
+  it("gains every provider the entry steps carry", () => {
     const first = applySsoToFlow(shippedFlow(), "google", bothMethods);
     const second = applySsoToFlow(first.document, "acme-sso", bothMethods);
 

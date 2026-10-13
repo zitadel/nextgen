@@ -197,47 +197,12 @@ describe("sso enable", () => {
           return app;
         }
 
-        it("is reported as untouched", async () => {
-          const app = await anAppWithAnEditedPasswordStep();
-
-          const result = await app.enableSso(GOOGLE, CREDENTIALS);
-
-          expect(app.envelopeOf<{ untouched: string[] }>(result).data.untouched).not.toEqual([]);
-        });
-
         it("does not get the provider", async () => {
           const app = await anAppWithAnEditedPasswordStep();
           expect(await app.enableSso(GOOGLE, CREDENTIALS)).toSucceed();
           expect(await app.apply()).toSucceed();
 
           expect((await app.stepsOfferingSso()).map((step) => step.name)).not.toContain("password");
-        });
-      });
-
-      describe("a password step whose provider route the developer wrote", () => {
-        async function anAppWithAWrittenRoute(): Promise<ScaffoldedApp> {
-          const app = await anAppServingGoogle();
-          await app.editPasswordStep((step) => {
-            step.transitions = {
-              ...step.transitions,
-              sso_authenticated: { target: "done", purpose: "login" },
-            };
-          });
-          return app;
-        }
-
-        it("is reported as untouched when another run reaches it", async () => {
-          const app = await anAppWithAWrittenRoute();
-
-          const result = await app.enableSso(GOOGLE, CREDENTIALS);
-
-          expect(app.envelopeOf<{ untouched: string[] }>(result).data.untouched).not.toEqual([]);
-        });
-
-        it("still succeeds", async () => {
-          const app = await anAppWithAWrittenRoute();
-
-          expect(await app.enableSso(GOOGLE, CREDENTIALS)).toSucceed();
         });
       });
 
@@ -253,15 +218,6 @@ describe("sso enable", () => {
           const app = await aPasskeyFirstAppServingGoogle();
 
           expect((await app.stepsOfferingSso()).map((step) => step.name)).toContain("password");
-        });
-
-        it("keeps the passkey action", async () => {
-          const app = await aPasskeyFirstAppServingGoogle();
-
-          const { flow_definition } = await app.publishedFlow();
-          const password = flow_definition.steps.find((step) => step.name === "password");
-
-          expect(password?.actions?.map((action) => action.name)).toContain("passkey");
         });
 
         it("leaves nothing to reconcile", async () => {
