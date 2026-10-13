@@ -4,6 +4,7 @@ import { CommandGroups, type JsonEnvelope, nonBlankString, PreviewCommand } from
 import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderRows, renderTable } from "../../lib/oclif/crud/table";
 import { publicCliCommand } from "../../lib/public-cli";
+import { shellArg } from "../../lib/shell";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["url", "expires", "created"] as const;
@@ -88,7 +89,7 @@ export default class PreviewList extends PreviewCommand {
             [
               "preview list",
               ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
-              `--page-token ${next}`,
+              `--page-token ${shellArg(next)}`,
               "--json",
             ].join(" ") + this.environmentSelector(),
             cliVersion,
@@ -112,7 +113,7 @@ export default class PreviewList extends PreviewCommand {
               renderTable(COLUMNS, rows),
               "",
               `${rows.length} ${rows.length === 1 ? "preview" : "previews"}`,
-              ...(next ? [`More available: --page-token ${next} (or --all)`] : []),
+              ...(next ? [`More available: --page-token ${shellArg(next)} (or --all)`] : []),
             ].join("\n"),
     });
   }

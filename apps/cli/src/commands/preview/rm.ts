@@ -5,6 +5,7 @@ import { CommandGroups, type JsonEnvelope, nonBlankArg, PreviewCommand } from ".
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { ZitadelError } from "../../lib/errors";
 import { publicCliCommand } from "../../lib/public-cli";
+import { shellArg } from "../../lib/shell";
 
 /**
  * `zitadel preview rm <url>` — end a live preview before it expires.
@@ -49,7 +50,7 @@ export default class PreviewRm extends PreviewCommand {
     if (!force) {
       if (nonInteractive) {
         const retry = publicCliCommand(
-          `preview rm ${url} --force${this.environmentSelector()}`,
+          `preview rm ${shellArg(url)} --force${this.environmentSelector()}`,
           cliVersion,
         );
         throw new ZitadelError(
