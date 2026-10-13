@@ -107,7 +107,11 @@ function describesProvider(file: ConnectionFile, entry: IdpProvider): boolean {
     return true;
   }
   const oidc = file.body.oidc;
-  return file.body.slug === entry.slug && isObject(oidc) && oidc.issuer === entry.issuer;
+  return (
+    String(file.body.slug ?? "").trim() === entry.slug &&
+    isObject(oidc) &&
+    oidc.issuer === entry.issuer
+  );
 }
 
 /** The client id a connection file carries, whichever protocol it uses. */

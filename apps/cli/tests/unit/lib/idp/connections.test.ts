@@ -406,6 +406,19 @@ describe("planConnection for a custom connection", () => {
     ).toMatchObject({ action: "reuse", notApplied: ["display name", "scopes"] });
   });
 
+  it("judges each setting on its own, so only the one that was passed is reported", () => {
+    const existing = file("acme-sso.json", acmeBody({ display_name: "Old name" }));
+    const input = { ...acme, scopes: ["openid", "groups"] as Scopes };
+
+    expect(
+      planConnection({
+        selection: custom(input),
+        files: [existing],
+        given: { displayName: true, scopes: false },
+      }),
+    ).toMatchObject({ action: "reuse", notApplied: ["display name"] });
+  });
+
   it("says nothing about a setting that was left to its default", () => {
     const existing = file("acme-sso.json", acmeBody({ display_name: "Old name" }));
     const input = { ...acme, scopes: ["openid", "groups"] as Scopes };
