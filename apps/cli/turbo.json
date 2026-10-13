@@ -1,0 +1,29 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "typecheck": {
+      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/sdk-next#build"]
+    },
+    "build": {
+      "dependsOn": ["@zitadel/sdk-next#build"]
+    },
+    // The first of the release builds (tools/release/turbo.json): it runs the
+    // normal tests first, and the public packages' release builds wait for
+    // those tests before they clean the dist directories the tests import.
+    "build-release": {
+      "dependsOn": ["test", "@zitadel/sdk-next#build-release"]
+    },
+    // The @zitadel/server wrapper its server-wrapper test loads is an input,
+    // not a dependency on the server build: the built oclif commands only
+    // read the launcher script.
+    "test": {
+      "dependsOn": ["build", "@zitadel/api-mock#build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/server/bin/**"]
+    },
+    "readme": {
+      "dependsOn": ["build"],
+      "outputs": ["README.md"]
+    }
+  }
+}

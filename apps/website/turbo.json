@@ -1,0 +1,20 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  // The coming-soon page at the hosted cloud's root (Next.js). Mirrors
+  // apps/website/moon.yml; it has no tests yet.
+  "tasks": {
+    // Moon keeps typecheck and build apart with a mutex: `next typegen`
+    // writes .next/types, which `next build` wipes and rewrites, so side by
+    // side one fails on the other's files. Turbo orders them instead.
+    "typecheck": {
+      "dependsOn": ["build"]
+    },
+    "build": {
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
+    "start": {
+      "dependsOn": ["build"]
+    }
+  }
+}

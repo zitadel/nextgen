@@ -1,4 +1,5 @@
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 import { Arimo } from "next/font/google";
 import localFont from "next/font/local";
@@ -29,14 +30,19 @@ export const metadata: Metadata = {
   icons: { icon: { url: icon.src, type: "image/svg+xml" } },
 };
 
+// Unset reports every page load; next.config.ts rejects a value outside 0–1.
+// Web Analytics has no sampling and counts every page view.
+const speedInsightsSampleRate = Number(process.env.WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE || 1);
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${arimo.variable} ${apkFutural.variable}`}>
       <body className="bg-background text-foreground antialiased">
         {children}
-        {/* Page views only: Speed Insights would need a sample rate like the
-            docs', for a page with nothing to tune. */}
         <Analytics />
+        {/* The package reads a rate of 0 as unset, which would send every
+            page load. */}
+        {speedInsightsSampleRate > 0 && <SpeedInsights sampleRate={speedInsightsSampleRate} />}
       </body>
     </html>
   );

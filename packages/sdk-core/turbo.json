@@ -1,0 +1,19 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // contract.spec.ts imports @zitadel/components/events from its dist.
+    "typecheck": {
+      "dependsOn": ["@zitadel/components#build"]
+    },
+    "build": {
+      "dependsOn": ["@zitadel/api#build"]
+    },
+    "build-release": {
+      "dependsOn": ["@zitadel/api#build-release", "@zitadel/components#build-release"]
+    },
+    "test": {
+      "dependsOn": ["@zitadel/components#build"]
+    }
+  }
+}
