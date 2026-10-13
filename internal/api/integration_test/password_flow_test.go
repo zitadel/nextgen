@@ -243,8 +243,10 @@ func TestPasswordRegisterFlow(t *testing.T) {
 }
 
 // TestPasswordRegisterFlow_DuplicateEmail confirms a second registration with
-// the same email surfaces user_already_exists via the create_user writer
-// (UniqueError → StepError handled by the flow engine).
+// the same email keeps the flow on the signup step with
+// error.user_already_exists. The definition has no user_already_exists
+// transition, so the engine renders the error before create_user runs. A
+// corrected email then completes the sign-up.
 func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
@@ -309,10 +311,27 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 	require.Equal(t, "signup", badResp.Response.Step.Name, "duplicate email must keep flow on signup step")
 	errVal, errSet := badResp.Response.Step.Error.Get()
 	require.True(t, errSet, "expected an error on the step")
-	require.Equal(t, "user_already_exists", errVal)
+	require.Equal(t, domain.FlowStepErrorUserAlreadyExists, errVal)
 	require.False(t, badResp.Response.Step.Complete.Set, "expected non-terminal step")
 	_, hasToken := badResp.Response.HandoffToken.Get()
 	require.False(t, hasToken, "no handoff token on rejected registration")
+
+	// A corrected email continues the sign-up on the new attempt.
+	retryResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
+		Action: "submit",
+		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
+			"email":                   jx.Raw(`"pwregister-fresh@example.com"`),
+			"x-auth-methods#password": jx.Raw(`"some-strong-password"`),
+		}),
+	}, api.SubmitFlowStepParams{
+		ID:    flowID,
+		Zflow: mustExtractZflow(t, badResp.SetCookie),
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.SubmitFlowStepOK{}, retryResp, helpers.MustMarshal(t, retryResp))
+	retryOK := retryResp.(*api.SubmitFlowStepOK)
+	require.Equal(t, "done", retryOK.Response.Step.Name)
+	require.True(t, retryOK.Response.Step.Complete.Set, "expected terminal step")
 }
 
 // passwordLoginFlowDefinition mirrors examples/01-password-login.

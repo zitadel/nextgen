@@ -285,7 +285,7 @@ func TestSSOResolutionOtherConnectionSameSubjectDoesNotMatch(t *testing.T) {
 	assert.False(t, got.HandoffToken.Set)
 	// The unverified email cannot create a user, so the identity is collected;
 	// this definition does not route that outcome.
-	assert.Equal(t, domain.FlowImplicitOutcomeSSOUserNotFound, got.Step.Error.Value)
+	assert.Equal(t, domain.FlowStepErrorSSOUserNotFound, got.Step.Error.Value)
 	_, parked := f.attempt(t, flow).SSOCallback()
 	assert.True(t, parked, "a collected identity stays parked for the prefill")
 }
@@ -398,7 +398,7 @@ func (f *ssoResolutionFixture) requireCollected(t *testing.T, flow ssoFlow, resp
 	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
 	got := resp.(*api.FlowResponseHeaders).Response
 	assert.Equal(t, "identifier", got.Step.Name)
-	assert.Equal(t, domain.FlowImplicitOutcomeSSOUserNotFound, got.Step.Error.Value)
+	assert.Equal(t, domain.FlowStepErrorSSOUserNotFound, got.Step.Error.Value)
 	assert.False(t, got.HandoffToken.Set)
 	attempt := f.attempt(t, flow)
 	_, bound := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)

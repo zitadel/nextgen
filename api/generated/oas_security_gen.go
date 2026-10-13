@@ -234,6 +234,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ListIdpRevisionsOperation: []string{
 		"idp.read",
 	},
+	ListPreviewsOperation: []string{
+		"deployment.read",
+	},
 	ListReleasesOperation: []string{
 		"release.read",
 	},
@@ -271,11 +274,17 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	QueryUsersOperation: []string{
 		"user.read",
 	},
+	RemovePreviewOperation: []string{
+		"deployment.write",
+	},
 	RevokeReleaseOperation: []string{
 		"release.write",
 	},
 	RevokeSessionOperation: []string{
 		"session.delete",
+	},
+	RollbackDeploymentOperation: []string{
+		"deployment.write",
 	},
 	SetUserPasswordOperation: []string{
 		"user.write",
