@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -421,6 +421,46 @@ describe("setup command pre-flight", () => {
       throw new Error("expected create-project payload name to be a string");
     }
     expect(projectName.trim().length).toBeGreaterThan(0);
+  });
+
+  it("stops on a file it would overwrite before it creates a project", async () => {
+    // An existing Vite React app: setup writes the app's root component, so
+    // without --force it must refuse -- and before POST /projects, so nothing
+    // is left behind and a rerun is not skipped as already set up.
+    const cwd = await makeTempDir();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { react: "^19", vite: "^7" } }),
+    );
+    await writeFile(
+      join(cwd, "vite.config.ts"),
+      'import { defineConfig } from "vite";\n\nexport default defineConfig({});\n',
+    );
+    await mkdir(join(cwd, "src"), { recursive: true });
+    const ownApp = "export default function App() {\n  return <h1>Mine</h1>;\n}\n";
+    await writeFile(join(cwd, "src/App.tsx"), ownApp);
+    const capture = await startCreateProjectCaptureServer();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--server",
+      capture.url,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
+
+    expect(res.exitCode).toBe(5);
+    const json = parseJson(res.stdout) as { status: string; code: string; message: string };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_CONFLICT");
+    expect(json.message).toContain("App.tsx");
+    expect(capture.requests).not.toContain("POST /projects");
+    expect(existsSync(join(cwd, "zitadel.json"))).toBe(false);
+    expect(existsSync(join(cwd, ".zitadel/secret"))).toBe(false);
+    expect(await readFile(join(cwd, "src/App.tsx"), "utf8")).toBe(ownApp);
   });
 
   it("writes no login template and publishes no branding revision (#1039)", async () => {
