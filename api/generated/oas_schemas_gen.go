@@ -60704,6 +60704,8 @@ type RemoveOriginNoContent struct{}
 func (*RemoveOriginNoContent) removeOriginRes() {}
 
 type RemoveOriginReq struct {
+	// The origin pattern exactly as stored on the project (same
+	// string returned by create/get or addOrigin).
 	Pattern string `json:"pattern"`
 }
 

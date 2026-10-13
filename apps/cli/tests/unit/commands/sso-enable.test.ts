@@ -25,6 +25,7 @@ async function makeProject(schemas: Record<string, unknown> = {}): Promise<strin
       project_id: "proj_01TEST",
       project_secret: "s",
       preview_secret: "s",
+      primary_origins: [],
       preview_origins: [],
       created_at: new Date().toISOString(),
     })}\n`,

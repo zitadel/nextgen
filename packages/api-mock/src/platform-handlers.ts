@@ -823,7 +823,7 @@ export function setupPlatformHandlers() {
 
       const project = store.projects.get(path.data.project_id);
       if (!project) {
-        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+        return HttpResponse.json(errorBody("origin.not_found", "origin: not found"), { status: 404 });
       }
 
       const next = project.origins.filter((o) => o.pattern !== body.data.pattern);
@@ -853,7 +853,7 @@ export function setupPlatformHandlers() {
 
       const project = store.projects.get(path.data.project_id);
       if (!project) {
-        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+        return HttpResponse.json(errorBody("origin.not_found", "origin: not found"), { status: 404 });
       }
 
       const existing = project.origins.find((o) => o.pattern === body.data.pattern);

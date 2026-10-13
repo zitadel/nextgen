@@ -131,7 +131,7 @@ the target catalog for the planned paths in
 | `domain.delete` | Remove a domain | |
 | `feature.read` | Read `/projects/{id}/features` | |
 | `feature.write` | Change project feature configuration | No create/delete lifecycle. |
-| `origin.read` | Read/list `/projects/{id}/origins` | |
+| `origin.read` | Reserved — no standalone v1 list endpoint; origins surface on project GET | |
 | `origin.write` | Add/update an allowed origin | Create + manage. |
 | `origin.delete` | Remove an allowed origin | |
 | `signing_key.create` | Create a successor signing key | **Rotation = create successor** (no `signing_key.rotate`). Manual or sweep-driven; activation follows [ADR 039](../../adrs/039-signing-key-rotation-and-incident-response.md). Not in-place secret replacement. |

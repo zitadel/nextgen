@@ -28,6 +28,10 @@ post:
           properties:
             pattern:
               type: string
+              description: |
+                The origin pattern exactly as stored on the project (same
+                string returned by create/get or addOrigin).
+              example: https://app.example.com
   responses:
     '204':
       description: The pattern was removed.

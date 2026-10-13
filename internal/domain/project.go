@@ -79,10 +79,14 @@ func NewProject(name string, origins []Origin) (*Project, error) {
 	if name == "" {
 		return nil, ErrProjectNameInvalid()
 	}
+	normalized := NormalizeOrigins(origins)
+	if err := (OriginValidator{SharedHosts: DefaultSharedHosts}).ValidateAll(normalized); err != nil {
+		return nil, err
+	}
 
 	return &Project{
 		Name:    name,
-		Origins: NormalizeOrigins(origins),
+		Origins: normalized,
 	}, nil
 }
 

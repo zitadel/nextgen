@@ -16,9 +16,11 @@ required:
 properties:
   pattern:
     type: string
-    example: https://*-acmeinc.vercel.app
   kind:
     type: string
     enum:
       - primary
       - preview
+example:
+  pattern: https://*-acmeinc.vercel.app
+  kind: preview
