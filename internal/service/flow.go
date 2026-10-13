@@ -225,7 +225,8 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 		return domain.FlowStepResult{}, domain.ErrRequestInvalid().WithMessage("session_id must not be empty")
 	}
 
-	// Saves refuse a definition naming no schema, so a failure here is ours.
+	// The definition names its schema by objectType, but the flow and the users
+	// it creates are validated against one revision, pinned here at start.
 	userSchema, schemaErr := resolveUserSchema(ctx, s.v2Pool.Statements(), req.Definition.ProjectID, req.Definition.UserSchema)
 	if schemaErr != nil {
 		return domain.FlowStepResult{}, domain.ErrInternal(schemaErr).WithMessage(
