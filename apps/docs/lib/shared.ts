@@ -2,7 +2,7 @@ import { createGetUrl } from "fumadocs-core/source";
 
 export const appName = "Zitadel Preview Docs";
 // Every route the docs serve lives under /docs: on the cloud's host every
-// other path belongs to the server (repo-root vercel.json).
+// other path belongs to another service (repo-root vercel.json).
 export const docsRoute = "/docs";
 export const docsImageRoute = "/docs/og";
 // Only reached through proxy.ts, which rewrites a page's Markdown URL here.
