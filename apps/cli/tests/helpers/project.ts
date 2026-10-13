@@ -351,7 +351,7 @@ export class ScaffoldedApp {
   async projectOrigins(): Promise<ProjectOrigin[]> {
     const result = await this.cli(["origin", "list", "--json"]);
     expect(result, "origin list should have succeeded").toSucceed();
-    return this.envelopeOf<{ origins: ProjectOrigin[] }>(result).data.origins;
+    return this.envelopeOf<{ items: ProjectOrigin[] }>(result).data.items;
   }
 
   deleteVariable(name: string): Promise<CliResult> {

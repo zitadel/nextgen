@@ -83,7 +83,7 @@ describe("origin list", () => {
     const result = await list(cwd, ["--json"]);
 
     expect(parseJson(result.stdout)).toMatchObject({
-      data: { origins, count: 1 },
+      data: { items: origins, count: 1, next_page_token: null },
     });
   });
 
