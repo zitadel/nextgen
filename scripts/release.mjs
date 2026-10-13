@@ -5,6 +5,12 @@ import { fileURLToPath } from "node:url";
 import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
 import { upsertProductGithubRelease } from "./release-github.mjs";
 import {
+  findPrereleaseOnlyPackages,
+  prereleaseOnlyMessage,
+  readPrereleaseTag,
+} from "./release-dist-tags.mjs";
+import { PUBLIC_PACKAGE_NAMES } from "./release-manifest.mjs";
+import {
   detectReleaseAutomation,
   findUnrecordedPendingChangesets,
   readPrereleaseChangesetIds,
@@ -128,6 +134,7 @@ async function commandPublish(options) {
 
   await assertNoUnrecordedPendingChangesets();
   await assertMainBranch(options, { allowDryRunBypass: !options.recoverVersion });
+  await assertPrereleaseTagApplies();
 
   if (options.dryRun) {
     await commandSnapshot({ skipContainer: true });
@@ -160,6 +167,19 @@ async function commandPublish(options) {
   });
   await commandVerify();
   await upsertProductGithubRelease({ repoRoot, outDir, log: console.log });
+}
+
+// Fails before anything is published when `changeset publish` would put a
+// package on `latest` instead of the prerelease tag (see release-dist-tags.mjs).
+async function assertPrereleaseTagApplies() {
+  const tag = await readPrereleaseTag(repoRoot);
+  if (!tag) {
+    return;
+  }
+  const stuck = await findPrereleaseOnlyPackages(PUBLIC_PACKAGE_NAMES, tag);
+  if (stuck.length > 0) {
+    throw new Error(prereleaseOnlyMessage(stuck, tag));
+  }
 }
 
 function assertRecoverVersion(release, recoverVersion) {
