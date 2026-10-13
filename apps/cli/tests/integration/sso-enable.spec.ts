@@ -152,6 +152,76 @@ describe("sso enable", () => {
         expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
       });
 
+      /** The step of the committed login flow, or a failure that says it is missing. */
+      const passwordStepOf = (flow: { steps: Array<{ name: string }> }) => {
+        const step = flow.steps.find((candidate) => candidate.name === "password");
+        if (step === undefined) {
+          throw new Error("the login flow has no password step");
+        }
+        return step as (typeof flow.steps)[number] & {
+          sso_providers?: string[];
+          transitions?: Record<string, unknown>;
+          actions?: Array<{ name: string; text_key?: string }>;
+        };
+      };
+
+      it("offers the provider on the password step, for someone who typed their email", async () => {
+        // A user who signed up with a provider has no password. Typing their
+        // email sends them to this step, which was a dead end without it.
+        const app = await anAppServingGoogle();
+
+        const offering = await app.stepsOfferingSso();
+
+        expect(offering.map((step) => step.name)).toContain("password");
+      });
+
+      it("adds the provider to an existing project's untouched password step", async () => {
+        // A project enabled before the password step offered providers.
+        const app = await anAppWithGoogle();
+        await app.editLoginFlow((flow) => {
+          const password = passwordStepOf(flow);
+          delete password.sso_providers;
+          password.transitions = { submit: { target: "done" } };
+        });
+
+        expect(await app.enableSso(GOOGLE, CREDENTIALS)).toSucceed();
+        expect(await app.apply()).toSucceed();
+
+        expect((await app.stepsOfferingSso()).map((step) => step.name)).toContain("password");
+        expect(await app.plan()).toReportNothingToDo();
+      });
+
+      it("leaves a hand-edited password step alone and says so", async () => {
+        const app = await aSetUpApp();
+        await app.editLoginFlow((flow) => {
+          const action = passwordStepOf(flow).actions?.[0];
+          if (action === undefined) {
+            throw new Error("the password step has no action to edit");
+          }
+          action.text_key = "my.own.copy";
+        });
+
+        const result = await app.enableSso(GOOGLE, CREDENTIALS);
+
+        expect(result).toSucceed();
+        expect(app.envelopeOf<{ untouched: string[] }>(result).data.untouched).not.toEqual([]);
+        expect(await app.apply()).toSucceed();
+        expect((await app.stepsOfferingSso()).map((step) => step.name)).not.toContain("password");
+      });
+
+      it("keeps the passkey action on the passkey-first preset, and plan accepts the result", async () => {
+        const app = await aSetUpApp(["--preset", "passkey-first"]);
+
+        expect(await app.enableSso(GOOGLE, CREDENTIALS)).toSucceed();
+        expect(await app.apply()).toSucceed();
+
+        const { flow_definition } = await app.publishedFlow();
+        const password = flow_definition.steps.find((step) => step.name === "password");
+        expect(password?.sso_providers).toEqual([GOOGLE]);
+        expect(password?.actions?.map((action) => action.name)).toContain("passkey");
+        expect(await app.plan()).toReportNothingToDo();
+      });
+
       describe("once applied", () => {
         it("registers the provider with the platform", async () => {
           const app = await anAppServingGoogle();

@@ -65,9 +65,21 @@
           "text_key": "password.action.signin"
         }
       ],
+      "sso_providers": [
+        "google"
+      ],
       "transitions": {
         "submit": {
           "target": "done"
+        },
+        "sso_authenticated": {
+          "target": "done"
+        },
+        "user_already_exists": {
+          "target": "password"
+        },
+        "sso_user_not_found": {
+          "target": "register-sso"
         }
       }
     },

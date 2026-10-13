@@ -372,6 +372,22 @@ login and registration in one definition.
 `sso_providers` goes on both entry steps, which settles area 2's register-step
 topology [dependency](2-auth-method-selection.md#dependencies).
 
+The `password` step carries the providers too. Someone who signed up with a
+provider has no password, and if they type their email instead of clicking the
+button the `identifier` step sends them there: a step with only a password
+field is a dead end for them. The step routes what comes back from a provider
+like the entry steps do, with one difference: `user_already_exists` targets the
+step itself, not `sso-conflict`, because the account is already identified.
+When the provider account is someone else's, or unknown, the engine restarts
+the flow rather than creating a user.
+The step is edited only when the generator recognises it: the shipped step of
+either preset, once the providers and the routes it writes are set aside. A
+hand-edited one, including one whose provider routes were pointed elsewhere, is
+left alone and reported, as for every other generated step.
+Showing only the providers linked to the identified user, or skipping the step
+for a user without a password, would tell anyone who types an email which
+sign-in method that account uses, so neither is done.
+
 #### 2. The Three-Outcome Rule for SSO Steps
 Every step carrying `sso_providers` must explicitly handle three outcomes:
 `sso_authenticated`, `sso_user_not_found`, and `user_already_exists`.

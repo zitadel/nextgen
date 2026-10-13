@@ -49,6 +49,7 @@ export interface FlowStep {
   readonly sso_providers?: string[];
   readonly transitions?: Record<string, unknown>;
   readonly fields?: string[];
+  readonly actions?: ReadonlyArray<{ readonly name: string }>;
 }
 
 export interface PublishedSchema {
@@ -106,6 +107,7 @@ export interface FlowDocument {
   steps: Array<{
     name: string;
     fields?: string[];
+    actions?: Array<{ name: string; text_key?: string }>;
     transitions?: Record<string, unknown>;
     sso_providers?: string[];
   }>;

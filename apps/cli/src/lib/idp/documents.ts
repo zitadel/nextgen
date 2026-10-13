@@ -12,6 +12,8 @@
  * rewriting it would discard deliberate work.
  */
 
+import { getDefaultLoginFlow, SETUP_PRESETS } from "@zitadel/config/defaults";
+
 import { ZitadelError } from "../errors";
 
 /**
@@ -64,6 +66,8 @@ function loginEntry(flow: Json): string | undefined {
 const REGISTER_SSO = "register-sso";
 /** Step shown when the provider's email already has an account. */
 const SSO_CONFLICT = "sso-conflict";
+/** The step that asks the identified user for a password. */
+const PASSWORD_STEP = "password";
 
 /** Outcomes the engine fires after a provider returns, and where they go. */
 function providerOutcomes(terminal: string): Record<string, string> {
@@ -358,6 +362,63 @@ function matches(step: Step, expected: Step): boolean {
   return canonical(step) === canonical(expected);
 }
 
+let shippedPasswordForms: string[] | undefined;
+
+/**
+ * The password steps the shipped flows carry, one per preset, in the form
+ * {@link withoutSsoRoutes} reduces any password step to. A step that reduces to
+ * one of these is the one `setup` wrote, however many providers it offers.
+ * The shipped steps carry no provider routes, so the terminal does not matter.
+ */
+function shippedPasswordSteps(): string[] {
+  shippedPasswordForms ??= SETUP_PRESETS.flatMap((preset) => {
+    const flow = getDefaultLoginFlow({ preset }) as unknown as Json;
+    const step = stepNamed(flow, PASSWORD_STEP);
+    return step === undefined ? [] : [canonical(withoutSsoRoutes(step, "done"))];
+  });
+  return shippedPasswordForms;
+}
+
+/**
+ * A password step without what offering providers adds to it: the provider
+ * list, and the routes this generator writes for what comes back from one.
+ *
+ * A route that goes somewhere else is the developer's and stays, which is what
+ * makes the step read as edited. The platform's own rewrite is not an edit:
+ * `apply` writes the canonical definition back, which omits an action's
+ * `primary: false` and may state `gates` and `sso_providers` empty.
+ */
+function withoutSsoRoutes(step: Step, terminal: string): Step {
+  const copy: Step = { ...step };
+  delete copy.sso_providers;
+  if (isObject(copy.gates) && Object.keys(copy.gates).length === 0) {
+    delete copy.gates;
+  }
+  if (Array.isArray(copy.actions)) {
+    copy.actions = copy.actions.map((action) => {
+      if (!isObject(action) || action.primary !== false) {
+        return action;
+      }
+      const { primary: _default, ...rest } = action;
+      return rest;
+    });
+  }
+  if (isObject(copy.transitions)) {
+    const written: Record<string, string> = {
+      sso_authenticated: terminal,
+      sso_user_not_found: REGISTER_SSO,
+      user_already_exists: PASSWORD_STEP,
+    };
+    copy.transitions = Object.fromEntries(
+      Object.entries(copy.transitions).filter(
+        ([outcome, route]) =>
+          !(outcome in written && isObject(route) && route.target === written[outcome]),
+      ),
+    );
+  }
+  return copy;
+}
+
 /** The provider list a step should end up with: what it has, plus this slug. */
 function mergedProviders(step: Step, slug: string): unknown[] {
   const providers = Array.isArray(step.sso_providers) ? [...(step.sso_providers as unknown[])] : [];
@@ -545,6 +606,39 @@ export function applySsoToFlow(
       changed = true;
     }
     step.transitions = transitions;
+  }
+
+  // The password step is where someone lands who typed their email rather than
+  // clicking a provider. A user who signed up with a provider has no password,
+  // so a step with only a password field is a dead end for them. It offers the
+  // providers too, unless it has been edited by hand: it is a step the
+  // developer is likely to have changed, and the editors only write into what
+  // they recognise.
+  const password = stepNamed(document, PASSWORD_STEP);
+  if (password !== undefined && !providerSteps(document).includes(PASSWORD_STEP)) {
+    if (!shippedPasswordSteps().includes(canonical(withoutSsoRoutes(password, terminal)))) {
+      skipped.push({ region: `steps.${PASSWORD_STEP}`, reason: "hand-edited" });
+    } else {
+      if (addProvider(password, slug)) {
+        changed = true;
+      }
+      const transitions = isObject(password.transitions) ? { ...password.transitions } : {};
+      // The conflict step is for someone who arrived by provider with an email
+      // that has an account. Here the account is already identified, so the
+      // answer to "it already exists" is the step they are on.
+      const routes: Record<string, string> = {
+        ...providerOutcomes(terminal),
+        user_already_exists: PASSWORD_STEP,
+      };
+      for (const [outcome, target] of Object.entries(routes)) {
+        const current = transitions[outcome];
+        if (!isObject(current) || current.target !== target) {
+          transitions[outcome] = { target };
+          changed = true;
+        }
+      }
+      password.transitions = transitions;
+    }
   }
 
   // The password registration step shares the outcome, so it has to route to

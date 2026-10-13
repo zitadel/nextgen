@@ -282,7 +282,7 @@ transitions route it:
 | :--- | :--- | :--- |
 | **Known subject** | `sso_authenticated` | **Targets `done` (Authenticated).** Identity is pinned to `(connection, subject)`, not to claims, so profile edits cannot fork accounts. A sign-in does not update the stored user from fresh claims; that refresh is `is_auto_update`, deferred with its guards ([area 1](1-resource-model.md#deferred-and-cut-fields)). |
 | **Unknown subject** | `sso_user_not_found` | **Targets the data collection step** ([New Users: Prefill and Confirm](#new-users-prefill-and-confirm); `register-sso` in area 4's scaffold). Under `creation: disabled`, `sso_user_not_found` is not raised; the unknown subject is an error on the originating step ([Failures and Recovery](#failures-and-recovery)). |
-| **Unknown subject with unique-property collision** | `user_already_exists` | **Targets the conflict resolution step** ([Conflict Resolution Flow](#conflict-resolution-flow); `sso-conflict` in area 4's scaffold). The engine binds the attempt to the colliding account, and a correct password or passkey on that step signs that account in. |
+| **Unknown subject with unique-property collision** | `user_already_exists` | **Targets the conflict resolution step** ([Conflict Resolution Flow](#conflict-resolution-flow); `sso-conflict` in area 4's scaffold), except on the `password` step, where the account is already identified and the step shows again. The engine binds the attempt to the colliding account, and a correct password or passkey on that step signs that account in. |
 
 ### Creation Without Collection (`creation: auto`)
 
@@ -496,7 +496,9 @@ and the flow must route both:
    collision shows `error.user_already_exists` on the step instead.
 
 Both the entry step and the collection step carry the `user_already_exists`
-transition.
+transition. The `password` step carries it too, pointing at itself: a user who
+typed their email is already identified, so a collision with that same account
+shows the step again, and any other collision restarts the flow.
 
 > **Enumeration Note:** The conflict step and the `user_already_exists` outcome
 > behind it confirm to the person completing the ceremony that an account with
@@ -545,7 +547,7 @@ and recovery route without exposing internal technical details to the end user.
 | Requirement | Owed By / Target |
 | :--- | :--- |
 | **Callback URI Surface:** Expose `{origin}/__nextgen/idp/callback` in the setup journey and per environment. | CLI Journey (Area 4) |
-| **Flow Scaffolding:** Scaffold `sso_providers` on the entry steps (both, in the shipped shared-entry default) and the conflict step with its login route. | CLI Journey (Area 4) |
+| **Flow Scaffolding:** Scaffold `sso_providers` on the entry steps (both, in the shipped shared-entry default), the password step and the conflict step with its login route. | CLI Journey (Area 4) |
 | **Callback Route:** Register route under the server HTTP surface; the scaffolded proxy matcher is already prefix-wide (`/__nextgen/:path*`), so no patcher work remains. | Server |
 | **Localization Keys:** Export conflict-step copy (the account-exists explanation plus its submit, passkey, and sign-in actions), error copy, and provider button labels as `text_key` entries. | Login UI / Locale Work |
 | **UI & Branding Assets:** Add conditional SSO blocks to all five branding `login.liquid` templates and `default.liquid`; add provider glyphs to `zl-icon`. | Branding Defaults / Components |
