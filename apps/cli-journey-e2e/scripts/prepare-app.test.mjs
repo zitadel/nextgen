@@ -90,7 +90,6 @@ test("prepares the customer local setup journey in the app root", async () => {
           "local",
           "--dev-port",
           "3010",
-          "--force",
           "--cwd",
           appDir,
           "--non-interactive",
@@ -233,6 +232,52 @@ test("passes the sign-in preset through to setup and records it", async () => {
     assert.ok(JSON.parse(await readFile(join(workDir, "doctor-fix.json"), "utf8")));
     const boundary = await readFile(join(workDir, "myapp", "proxy.ts"), "utf8");
     assert.ok(boundary.includes("zitadel-cli: managed-file"));
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+});
+
+test("points setup at the remote lane's edge and keeps the runtime commands local", async () => {
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-journey-prepare-remote-test-"));
+  const calls = [];
+  const registryUrl = "http://127.0.0.1:4873";
+
+  try {
+    await prepareApp({
+      env: {
+        JOURNEY_APP_URL: "http://localhost:3010",
+        JOURNEY_CLI_PACKAGE: "@zitadel/cli",
+        JOURNEY_FRAMEWORK: "react",
+        JOURNEY_REGISTRY_URL: registryUrl,
+        JOURNEY_SDK_PACKAGE: "@zitadel/sdk-react",
+        JOURNEY_SETUP_SERVER: "https://zitadel.test:18443",
+        JOURNEY_WORK_DIR: workDir,
+        JOURNEY_ZITADEL_PORT: "18080",
+      },
+      logMetadata: false,
+      runCapture: async (command, args, options) => {
+        calls.push({ command, args });
+        if (args.includes("setup")) {
+          await writeGeneratedApp(options.cwd, registryUrl, "@zitadel/sdk-react");
+        }
+        return {
+          code: 0,
+          stdout: `${JSON.stringify(okEnvelope(args))}\n`,
+          stderr: "",
+        };
+      },
+    });
+
+    const setupCall = calls.find((call) => call.args.includes("setup"));
+    assert.equal(
+      setupCall.args[setupCall.args.indexOf("--server") + 1],
+      "https://zitadel.test:18443",
+    );
+    for (const step of ["doctor", "start"]) {
+      const call = calls.find((candidate) => candidate.args.includes(step));
+      assert.equal(call.args[call.args.indexOf("--port") + 1], "18080");
+      assert.ok(!call.args.includes("--server"), `${step} acts on the local runtime`);
+    }
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }

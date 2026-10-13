@@ -1,8 +1,8 @@
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -31,6 +31,14 @@ async function makeTempDir(): Promise<string> {
   return cwd;
 }
 
+/** Writes `files`, keyed by their path from `cwd`. */
+async function writeFiles(cwd: string, files: Record<string, string>): Promise<void> {
+  for (const [path, contents] of Object.entries(files)) {
+    await mkdir(dirname(join(cwd, path)), { recursive: true });
+    await writeFile(join(cwd, path), contents);
+  }
+}
+
 afterEach(async () => {
   for (const server of servers.splice(0)) {
     await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -42,6 +50,53 @@ afterEach(async () => {
     }
   }
 });
+
+/**
+ * Conflicts the file-writer cannot see, because the file is at another path
+ * (a root component, a request boundary), or that only showed once the
+ * project existed (the files setup writes after creating it).
+ */
+const PRE_PROJECT_CONFLICTS: ReadonlyArray<{
+  conflict: string;
+  files: Record<string, string>;
+  named: string;
+}> = [
+  {
+    conflict: "a root component at another path",
+    files: {
+      "package.json": JSON.stringify({
+        name: "demo",
+        dependencies: { react: "^19", vite: "^7" },
+      }),
+      "vite.config.js":
+        'import { defineConfig } from "vite";\n\nexport default defineConfig({});\n',
+      "index.html": '<script type="module" src="/src/main.jsx"></script>\n',
+      "src/main.jsx":
+        'import { createRoot } from "react-dom/client";\nimport App from "./App.jsx";\n\n' +
+        'createRoot(document.getElementById("root")).render(<App />);\n',
+      "src/App.jsx": "export default function App() {\n  return <h1>Mine</h1>;\n}\n",
+    },
+    named: "src/App.jsx",
+  },
+  {
+    conflict: "a request boundary under the other name",
+    files: {
+      "package.json": JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
+      "app/layout.tsx": "export default function Layout() {}\n",
+      "middleware.ts": "export function middleware() {}\n",
+    },
+    named: "middleware.ts",
+  },
+  {
+    conflict: "a default schema setup would overwrite",
+    files: {
+      "package.json": JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
+      "app/layout.tsx": "export default function Layout() {}\n",
+      ".zitadel/schemas/default-human-user.json": "{}\n",
+    },
+    named: "default-human-user.json",
+  },
+];
 
 describe("setup command pre-flight", () => {
   it("emits status: skipped when zitadel.json already exists", async () => {
@@ -81,7 +136,7 @@ describe("setup command pre-flight", () => {
     expect(json.hint).toContain("--framework");
   });
 
-  it("reports a non-empty dir and points at --force when runtime start left .zitadel behind", async () => {
+  it("scaffolds beside the runtime start left: asks for --framework, not --force", async () => {
     const cwd = await makeTempDir();
     const serverUrl = await startHealthServer();
     await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
@@ -100,9 +155,10 @@ describe("setup command pre-flight", () => {
     const json = parseJson(res.stdout) as { status: string; code: string; hint?: string };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_FRAMEWORK_NOT_DETECTED");
-    // `.zitadel/local` from `start` makes the directory non-empty, so the empty
-    // check stops here and points at --force rather than at --framework.
-    expect(json.hint).toContain("--force");
+    // `.zitadel/local` from `start` leaves the directory fresh for a scaffold,
+    // so a non-interactive run only lacks the framework to scaffold.
+    expect(json.hint).toContain("--framework");
+    expect(json.hint).not.toContain("--force");
   });
 
   it("keeps the framework in local-runtime-missing setup guidance", async () => {
@@ -420,6 +476,104 @@ describe("setup command pre-flight", () => {
       throw new Error("expected create-project payload name to be a string");
     }
     expect(projectName.trim().length).toBeGreaterThan(0);
+  });
+
+  it("stops on a file it would overwrite before it creates a project", async () => {
+    // An existing Vite React app: setup writes the app's root component, so
+    // without --force it must refuse -- and before POST /projects, so nothing
+    // is left behind and a rerun is not skipped as already set up.
+    const cwd = await makeTempDir();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { react: "^19", vite: "^7" } }),
+    );
+    await writeFile(
+      join(cwd, "vite.config.ts"),
+      'import { defineConfig } from "vite";\n\nexport default defineConfig({});\n',
+    );
+    await mkdir(join(cwd, "src"), { recursive: true });
+    const ownApp = "export default function App() {\n  return <h1>Mine</h1>;\n}\n";
+    await writeFile(join(cwd, "src/App.tsx"), ownApp);
+    const capture = await startCreateProjectCaptureServer();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--server",
+      capture.url,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
+
+    expect(res.exitCode).toBe(5);
+    const json = parseJson(res.stdout) as { status: string; code: string; message: string };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_CONFLICT");
+    expect(json.message).toContain("App.tsx");
+    expect(capture.requests).not.toContain("POST /projects");
+    expect(existsSync(join(cwd, "zitadel.json"))).toBe(false);
+    expect(existsSync(join(cwd, ".zitadel/secret"))).toBe(false);
+    expect(await readFile(join(cwd, "src/App.tsx"), "utf8")).toBe(ownApp);
+  });
+
+  it.each(PRE_PROJECT_CONFLICTS.map((c) => [c.conflict, c] as const))(
+    "stops on %s before it creates a project",
+    async (_conflict, { files, named }) => {
+      const cwd = await makeTempDir();
+      await writeFiles(cwd, files);
+      const capture = await startCreateProjectCaptureServer();
+
+      const res = await runCliForTest([
+        "setup",
+        "--cwd",
+        cwd,
+        "--server",
+        capture.url,
+        "--non-interactive",
+        "--json",
+        "--skip-install",
+      ]);
+
+      expect(res.exitCode).toBe(5);
+      const json = parseJson(res.stdout) as { code: string; message: string };
+      expect(json.code).toBe("E_CONFLICT");
+      expect(json.message).toContain(named);
+      expect(capture.requests).not.toContain("POST /projects");
+      expect(existsSync(join(cwd, "zitadel.json"))).toBe(false);
+    },
+  );
+
+  // Reported as no framework at all, the app would read as a directory to
+  // scaffold into, and --force would scaffold a new app over it.
+  it("stops on a --framework the app is not, instead of offering --force", async () => {
+    const cwd = await makeTempDir();
+    await writeFiles(cwd, {
+      "package.json": JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
+      "app/layout.tsx": "export default function Layout() {}\n",
+    });
+    const capture = await startCreateProjectCaptureServer();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--framework",
+      "react",
+      "--server",
+      capture.url,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
+
+    expect(res.exitCode).toBe(5);
+    const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
+    expect(json.code).toBe("E_CONFLICT");
+    expect(json.message).toBe("Setup detects Next.js here, not React (Vite)");
+    expect(json.hint).toContain("--force or not");
+    expect(capture.requests).toEqual([]);
   });
 
   it("writes no login template and publishes no branding revision (#1039)", async () => {

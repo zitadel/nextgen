@@ -194,7 +194,7 @@ as they were.
 | mock-zitadel | `build`, `typecheck`, `test` | same | same edge (api-mock) |
 | storybook | `test` (mutex, retry) | `#test` | guarded script |
 | storybook | `dev` | `#dev` | existing |
-| website | `lint`, `typecheck`, `build` (mutex website-next), `dev`, `start` | same | **new** `lint` script; `typecheck` depends on `build` instead of the mutex (`next typegen` and `next build` both write `.next/types`); `build` outputs `.next/**` without its cache |
+| website | `lint`, `typecheck`, `build`, `dev`, `start` | same | **new** `lint` script; `typecheck` depends on `build` (`next typegen` and `next build` both write `.next/types`), and so does moon's since it dropped its `website-next` mutex, which held only while a command ran, not while a cache hit restored `.next`; `build` outputs `.next/**` without its cache |
 | server | `openapi`, `format`, `generate`, `clean-generated`, `check-generate`, `check-generate-pruned`, `vet`, `lint`, `test`, `test-postgres`, `test-spanner`, `test-sqlite`, `build` | `@zitadel/server#…` | **new** scripts in `apps/server/package.json`, each `cd ../.. && …`; `format` and `lint` run the new script files; the generation tasks hold the guard's lock; `serverInputs` repeated as `inputs` per task |
 | bench | `format`, `vet`, `lint`, `build`, `test`, `sweep`, `summarize` | `@zitadel/bench#…` | **new** `tools/bench/package.json`; `benchInputs` repeated. `vet` depends on `@zitadel/server#check-generate` in turbo: the first `ci-turbo` run caught it compiling `api/generated` while the server's generation rewrote it, a race moon's order could hit too, so moon's `bench:vet` has the same dependency since #1704 |
 | release | `changesets`, `check-graph`, `build-public-packages`, `version`, `pack`, `snapshot`, `publish` | `@zitadel/release#…` | **new** `tools/release/package.json` (`cd ../.. && node scripts/release.mjs …`) |
@@ -205,7 +205,7 @@ as they were.
 
 ## What replaces each moon feature
 
-### `mutex` (17 uses, 3 names)
+### `mutex` (17 uses, 4 names)
 
 | mutex | protected | replacement |
 |---|---|---|

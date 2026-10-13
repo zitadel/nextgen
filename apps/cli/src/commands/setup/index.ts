@@ -84,6 +84,7 @@ import { derivePosture } from "../../lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
 import { readStdin } from "../../lib/variables";
 import {
+  assertNoSetupResourceConflicts,
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
@@ -387,6 +388,42 @@ export default class Setup extends BaseCommand {
     // origin (both derived from `answers.devPort`).
     framework = { ...framework, devPort: answers.devPort, url: issuer };
 
+    // Fresh scaffolds keep the widgets' full-page chrome; a pre-existing
+    // route-based app gets embeddable cards inside its own layout (ADR 044).
+    const posture = derivePosture(framework.id, scaffoldedFramework);
+    const patchContext = (project: CreateProject201): PatchContext => ({
+      framework,
+      rendererId: flags.renderer ?? "react",
+      project,
+      issuer,
+      server: answers.server,
+      cliVersion: this.meta.cliVersion,
+      scaffoldedFramework,
+      posture,
+      preset: answers.preset,
+      useCase: answers.useCase,
+    });
+    const patcher = orca.patcherFor(framework.id);
+    if (!dryRun) {
+      // Patch as a dry run first, against a placeholder project: a file setup
+      // would refuse to overwrite (E_CONFLICT), such as an existing app's own
+      // root component, stops setup here, before it creates a project and
+      // writes `zitadel.json`. Without this, the conflict surfaced after both,
+      // and every rerun skipped the directory as already set up.
+      await patcher.patch(patchContext(dryRunProject(issuer)), { cwd, dryRun: true, force });
+    }
+    // The same for the schema, flow and connection files, which setup writes
+    // only once the project exists: a conflict on one of those left the
+    // project behind, and the rerun's `.env.local` kept pointing at it.
+    // Read-only, so a dry run reports them too.
+    await assertNoSetupResourceConflicts({
+      cwd,
+      force,
+      preset: answers.preset,
+      useCase: answers.useCase,
+      sso: answers.sso,
+    });
+
     // `POST /projects` is unauthenticated. CLI-managed projects opt out of
     // server fallback defaults, then setup uploads the local default schema and
     // flow files through the typed resource APIs and records the returned IDs.
@@ -419,23 +456,20 @@ export default class Setup extends BaseCommand {
     consola.success(`Created project ${project.id}`);
     this.recordTelemetry({ step: "project_created" });
 
-    // Fresh scaffolds keep the widgets' full-page chrome; a pre-existing
-    // route-based app gets embeddable cards inside its own layout (ADR 044).
-    const posture = derivePosture(framework.id, scaffoldedFramework);
-    const ctx: PatchContext = {
-      framework,
-      rendererId: flags.renderer ?? "react",
-      project,
-      issuer,
-      server: answers.server,
-      cliVersion: this.meta.cliVersion,
-      scaffoldedFramework,
-      posture,
-      preset: answers.preset,
-      useCase: answers.useCase,
-    };
+    const ctx = patchContext(project);
     consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
-    const result = await orca.patcherFor(framework.id).patch(ctx, { cwd, dryRun, force });
+    let result: Awaited<ReturnType<typeof patcher.patch>>;
+    try {
+      result = await patcher.patch(ctx, { cwd, dryRun, force });
+    } catch (error) {
+      // The dry run above already ruled out conflicts, so this is an I/O
+      // failure partway through. Remove the setup markers, as a failed
+      // resource upload does below, so a rerun is not skipped.
+      if (!dryRun) {
+        await removeSetupMarkers(cwd);
+      }
+      throw error;
+    }
     for (const file of result.filesWritten) {
       const sentence = describeWrittenFile(relativeDisplay(cwd, file), dryRun);
       if (sentence) consola.info(sentence);
@@ -470,8 +504,7 @@ export default class Setup extends BaseCommand {
       // are not worth keeping.
       // Only these two, and never a connection file: those are tenant-owned,
       // and setup neither writes over nor removes one.
-      await rm(join(cwd, "zitadel.json"), { force: true });
-      await rm(join(cwd, ".zitadel/secret"), { force: true });
+      await removeSetupMarkers(cwd);
       const cause = toZitadelError(error);
       throw new ZitadelError(cause.code, `Default resource setup failed: ${cause.message}`, {
         // The cause knows its own remedy when it has one -- a file setup
@@ -871,6 +904,15 @@ async function resolveScaffoldFramework(
  */
 export async function localServerHostsPlatform(server: string, timeoutMs = 1500): Promise<boolean> {
   return Boolean(await readPlatformRuntime(server, timeoutMs));
+}
+
+/**
+ * Removes `zitadel.json` (the marker the already-initialized guard skips on)
+ * and `.zitadel/secret`, so a setup that failed after writing them can be rerun.
+ */
+async function removeSetupMarkers(cwd: string): Promise<void> {
+  await rm(join(cwd, "zitadel.json"), { force: true });
+  await rm(join(cwd, ".zitadel/secret"), { force: true });
 }
 
 /** A deterministic stand-in project for `--dry-run`, so no remote call is made. */

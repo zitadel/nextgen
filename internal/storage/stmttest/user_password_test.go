@@ -227,24 +227,30 @@ func TestUserPasswordStatements_HistoryFollowsTheChangeTransaction(t *testing.T)
 	})
 }
 
-// Concurrent changes, including concurrent first-ever sets, must each keep the
-// password they replaced: every hash ends up current or in the history.
+// Concurrent changes, including concurrent first-ever sets, must each succeed
+// and keep the password they replaced: every hash ends up current or in the
+// history, and the history runs strictly newest first. Each round releases its
+// writers at once, so they meet as closely as the runner allows; two of them
+// stamped in one microsecond used to fail on the unique index. A round has as
+// many writers as the history is deep, so the current password and the
+// history show all of them plus the password the round replaced.
 func TestUserPasswordStatements_HistoryUnderConcurrentChanges(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
-		for _, start := range []string{"", "hash-0"} {
-			userID := "user_pw_history_race" + start
-			require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "PW History Race")))
-			want := []string{"hash-a", "hash-b", "hash-c"}
-			if start != "" {
-				setTestUserPassword(t, d, projectID, userID, start)
-				want = append(want, start)
-			}
+		userID := "user_pw_history_race"
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "PW History Race")))
 
+		var replaced []string // the first round sets the first password
+		for round := range 8 {
+			want := replaced
+			start := make(chan struct{})
+			errs := make(chan error, domain.UserPasswordHistoryDepth)
 			var wg sync.WaitGroup
-			errs := make(chan error, 3)
-			for _, hash := range []string{"hash-a", "hash-b", "hash-c"} {
+			for writer := range domain.UserPasswordHistoryDepth {
+				hash := fmt.Sprintf("hash-%d-%d", round, writer)
+				want = append(want, hash)
 				wg.Go(func() {
+					<-start
 					errs <- d.stmts.SetUserPassword(context.Background(), &domain.SetUserPassword{
 						ProjectID:   projectID,
 						UserID:      userID,
@@ -252,14 +258,111 @@ func TestUserPasswordStatements_HistoryUnderConcurrentChanges(t *testing.T) {
 					})
 				})
 			}
+			close(start)
 			wg.Wait()
 			close(errs)
 			for err := range errs {
-				require.NoError(t, err)
+				require.NoError(t, err, "round %d", round)
 			}
 
-			got := append(userPasswordHistoryHashes(t, d, projectID, userID), currentUserPasswordHash(t, d, projectID, userID))
-			assert.ElementsMatch(t, want, got, "start %q", start)
+			current, err := d.stmts.GetUserPassword(t.Context(), userPasswordByUser(projectID, userID))
+			require.NoError(t, err)
+			history, err := d.stmts.GetUserPasswordHistory(t.Context(), projectID, userID)
+			require.NoError(t, err)
+			got, newer := []string{current.EncodedHash}, current.CreatedAt
+			for _, pw := range history {
+				assert.True(t, pw.CreatedAt.Before(newer), "round %d: %s is not older than the password after it", round, pw.EncodedHash)
+				got, newer = append(got, pw.EncodedHash), pw.CreatedAt
+			}
+			assert.ElementsMatch(t, want, got, "round %d", round)
+			replaced = []string{current.EncodedHash}
 		}
+	})
+}
+
+// A second change of one user waits until the first commits, then stamps after
+// it. Postgres waits on the user row's lock and SQLite on the write lock the
+// open transaction holds, so B cannot land while A is open. Spanner aborts one
+// of the two and replays it; the emulator aborts the open one, so there A often
+// lands after B. On every dialect both land and each keeps what it replaced.
+func TestUserPasswordStatements_SetWaitsForConcurrentSet(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		userID := "user_pw_wait"
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "pw-wait@example.com", "PW Wait")))
+		setTestUserPassword(t, d, projectID, userID, "hash-0")
+
+		set := func(ctx context.Context, stmts service.AllStatements, hash string) error {
+			return stmts.SetUserPassword(ctx, &domain.SetUserPassword{
+				ProjectID:   projectID,
+				UserID:      userID,
+				EncodedHash: hash,
+			})
+		}
+
+		var setA sync.Once
+		setACh := make(chan struct{})
+		releaseCh := make(chan struct{})
+		errA := make(chan error, 1)
+		go func() {
+			// No require in here: it would leave setACh open and hang the test.
+			errA <- d.pool.Transaction(context.Background(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+				if err := set(ctx, tx.Statements(), "hash-a"); err != nil {
+					return err
+				}
+				// Once, though spanner replays aborted attempts.
+				setA.Do(func() { close(setACh) })
+				<-releaseCh
+				return nil
+			})
+		}()
+		select {
+		case <-setACh:
+		case err := <-errA:
+			t.Fatalf("transaction A ended before it set its password: %v", err)
+		}
+
+		errB := make(chan error, 1)
+		go func() { errB <- set(context.Background(), d.stmts, "hash-b") }()
+		// The timer checks a lock property only: on Postgres and SQLite, B
+		// cannot land while A is open. A slow runner can only make it miss.
+		select {
+		case err := <-errB:
+			if d.name != "spanner" {
+				t.Errorf("B's change landed while A's transaction was open: %v", err)
+			}
+			errB <- err
+		case <-time.After(200 * time.Millisecond):
+		}
+
+		close(releaseCh)
+		require.NoError(t, <-errA)
+		require.NoError(t, <-errB)
+
+		current := currentUserPasswordHash(t, d, projectID, userID)
+		got := append(userPasswordHistoryHashes(t, d, projectID, userID), current)
+		assert.ElementsMatch(t, []string{"hash-0", "hash-a", "hash-b"}, got)
+		if d.name != "spanner" {
+			assert.Equal(t, "hash-b", current, "B landed after A, so B is current")
+		}
+	})
+}
+
+// A new password must become current even when the clock reads earlier than
+// the newest password, as after the clock steps back or a failover to a
+// server whose clock lags: the newest row is the current password, so a set
+// stamps its row after that one rather than at the clock.
+func TestUserPasswordStatements_SetStampsAfterNewest(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		userID := "user_pw_clock"
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "pw-clock@example.com", "PW Clock")))
+		ahead := time.Now().Add(time.Hour).UTC().Truncate(time.Microsecond)
+		require.NoError(t, d.insertUserPasswordAt(t.Context(), projectID, string(domain.PrefixUserPassword)+"_ahead", userID, "hash-ahead", ahead))
+
+		setTestUserPassword(t, d, projectID, userID, "hash-now")
+
+		assert.Equal(t, "hash-now", currentUserPasswordHash(t, d, projectID, userID), "the password set last is current")
+		assert.Equal(t, []string{"hash-ahead"}, userPasswordHistoryHashes(t, d, projectID, userID))
 	})
 }

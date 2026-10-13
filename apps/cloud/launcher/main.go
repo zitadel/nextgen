@@ -52,10 +52,11 @@ const (
 	defaultDataDir = "/tmp/nextgen-data"
 	defaultPort    = "8080"
 
-	// consolePath is where vercel.json mounts the console service. The server
-	// derives the console's URLs (claim, dashboard) from it, so the two must
-	// agree.
-	consolePath = "/ui/console"
+	// consolePath is where vercel.json mounts the console service and the
+	// base its build is made for (CONSOLE_BASE_PATH), not the self-hosted
+	// server's /ui/console. The server derives the console's URLs (claim,
+	// dashboard) from it, so the three must agree; a test holds them together.
+	consolePath = "/console"
 )
 
 // servingParams size the pgx pool of one function instance and keep pgx off

@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import type { ZitadelClient } from "@zitadel/api/client";
 import { DEFAULT_FLOW_CONFIG_PATH, DEFAULT_SCHEMA_CONFIG_PATH } from "@zitadel/config/defaults";
@@ -9,7 +9,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
-import { materializeSetupResources } from "../../../src/lib/setup-resources";
+import {
+  assertNoSetupResourceConflicts,
+  materializeSetupResources,
+} from "../../../src/lib/setup-resources";
 import { IDPS_DIR } from "../../../src/lib/idp";
 import { acmeSelection, googleSelection } from "../../helpers/idp-values";
 import { FLOWS_DIR } from "../../../src/lib/flows";
@@ -63,7 +66,7 @@ describe("materializeSetupResources", () => {
     });
   });
 
-  it("reuses the server-returned schema id as user_schema on the flow", async () => {
+  it("names the schema by its objectType on the flow", async () => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi
@@ -86,7 +89,7 @@ describe("materializeSetupResources", () => {
     const flowFile = JSON.parse(await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8")) as {
       user_schema: string;
     };
-    expect(flowFile.user_schema).toBe("sch_01KWHF");
+    expect(flowFile.user_schema).toBe("human-user");
   });
 
   it("reconciles the schema file with the server's stored body and seeds its hash", async () => {
@@ -594,6 +597,28 @@ describe("materializeSetupResources with a social provider", () => {
     ).rejects.toMatchObject({ code: "E_CONFLICT" });
   });
 
+  // Setup does not remove a connection file it wrote, so a schema refused
+  // after the connection exists would leave a file the retry refuses on.
+  it("refuses an existing default schema before it creates the connection", async () => {
+    const client = recordingClient();
+    await mkdir(join(cwd, SCHEMAS_DIR), { recursive: true });
+    await writeFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "{}\n");
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client,
+        projectId: "project_123",
+        force: false,
+        sso: google,
+      }),
+    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+
+    expect(client.createIdp).not.toHaveBeenCalled();
+    expect(existsSync(join(cwd, IDPS_DIR, "google.json"))).toBe(false);
+  });
+
   it("creates the connection before the flow that names it", async () => {
     const client = recordingClient();
 
@@ -717,5 +742,70 @@ describe("materializeSetupResources with several providers", () => {
     };
     const identifier = flow.steps.find((step) => step.name === "identifier");
     expect(identifier?.sso_providers).toEqual(["google", "acme"]);
+  });
+});
+
+/**
+ * Setup runs this before it creates the project: a conflict found once the
+ * project exists leaves the project behind, and the rerun's `.env.local`
+ * keeps its id and secret.
+ */
+describe("assertNoSetupResourceConflicts", () => {
+  it.each([DEFAULT_SCHEMA_CONFIG_PATH, DEFAULT_FLOW_CONFIG_PATH])(
+    "refuses an existing %s without --force",
+    async (path) => {
+      await mkdir(join(cwd, dirname(path)), { recursive: true });
+      await writeFile(join(cwd, path), "{}\n");
+
+      await expect(assertNoSetupResourceConflicts({ cwd, force: false })).rejects.toMatchObject({
+        code: "E_CONFLICT",
+        message: `${path} already exists`,
+        hint: expect.stringContaining("--force"),
+      });
+    },
+  );
+
+  it("lets --force replace the default schema and flow", async () => {
+    for (const path of [DEFAULT_SCHEMA_CONFIG_PATH, DEFAULT_FLOW_CONFIG_PATH]) {
+      await mkdir(join(cwd, dirname(path)), { recursive: true });
+      await writeFile(join(cwd, path), "{}\n");
+    }
+
+    await expect(assertNoSetupResourceConflicts({ cwd, force: true })).resolves.toBe(undefined);
+  });
+
+  it("refuses an existing connection for a chosen provider, even with --force", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, IDPS_DIR, "google.json"),
+      JSON.stringify({ slug: "google", template: "google" }),
+    );
+
+    await expect(
+      assertNoSetupResourceConflicts({ cwd, force: true, sso: [{ selection: googleSelection }] }),
+    ).rejects.toMatchObject({
+      code: "E_CONFLICT",
+      message: `${IDPS_DIR}/google.json already exists`,
+      hint: expect.stringContaining("never replaces or removes one"),
+    });
+  });
+
+  it("refuses a chosen provider whose slug another connection file holds, before the project exists", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, IDPS_DIR, "elsewhere.json"),
+      JSON.stringify({ slug: "google", template: "google" }),
+    );
+
+    await expect(
+      assertNoSetupResourceConflicts({ cwd, force: true, sso: [{ selection: googleSelection }] }),
+    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+  });
+
+  it("ignores a connection for a provider nobody chose", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(join(cwd, IDPS_DIR, "google.json"), JSON.stringify({ slug: "google" }));
+
+    await expect(assertNoSetupResourceConflicts({ cwd, force: false })).resolves.toBe(undefined);
   });
 });
