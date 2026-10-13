@@ -200,9 +200,9 @@ function offeredProviders(flow: object): string[] {
 
 /**
  * The local schema a flow's `user_schema` pins, or `undefined` when it cannot
- * be told. Before the first apply the flow names the schema by the URL setup
- * wrote, afterwards by the id the platform assigned, and a re-pin in this plan
- * names the file outright.
+ * be told. A flow names its schema by `objectType`, by the id the platform
+ * assigned, or by the URL an older setup wrote, and a re-pin in this plan names
+ * the file outright.
  */
 function pinnedSchemaPath(
   flowPath: string,
@@ -220,7 +220,8 @@ function pinnedSchemaPath(
     return undefined;
   }
   for (const [path, schema] of schemas) {
-    if (stateResources[path]?.id === ref || (schema as { $id?: unknown }).$id === ref) {
+    const { $id, objectType } = schema as { $id?: unknown; objectType?: unknown };
+    if (stateResources[path]?.id === ref || $id === ref || objectType === ref) {
       return path;
     }
   }

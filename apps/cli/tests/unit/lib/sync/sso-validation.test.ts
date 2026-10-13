@@ -197,6 +197,21 @@ describe("validatePlannedSso", () => {
       );
     });
 
+    it("by the objectType the schema declares", async () => {
+      const typed = { ...broken, [SCHEMA]: { ...schema(["other"]), objectType: "staff" } };
+      const body = flow("staff", ["acme"]);
+
+      expect(
+        await failure(() =>
+          validatePlannedSso({
+            actions: [create(FLOW, "flow", body)],
+            scannedContents: contents({ ...typed, [FLOW]: body }),
+            stateResources: {},
+          }),
+        ),
+      ).toContain("is not listed in sso.providers");
+    });
+
     it("by the id the platform assigned, once applied", async () => {
       expect(
         await run(flow("sch_01TEST", ["acme"]), {
