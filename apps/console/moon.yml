@@ -18,10 +18,11 @@ tasks:
     inputs:
       # Declaring inputs drops the default project folder, so it is restated.
       - "**/*"
-      # The hosted cloud's build bakes Vercel's insights and their sample
-      # rate in (src/vite-env.d.ts), so the variables are part of the cache
-      # key: that build is never restored into the server's embedded console,
-      # or the reverse.
+      # The hosted cloud's build bakes its base path, Vercel's insights and
+      # their sample rate in (vite.config.ts, src/vite-env.d.ts), so the
+      # variables are part of the cache key: that build is never restored into
+      # the server's embedded console, or the reverse.
+      - "$CONSOLE_BASE_PATH"
       - "$CONSOLE_VERCEL_INSIGHTS"
       - "$CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"
     outputs:

@@ -164,15 +164,6 @@ jobs:
           version="$(node -p "require('./apps/server/package.json').version")"
           node e2e/journey/scripts/verify-tarballs.mjs "dist/release/${version}/npm"
 
-      - name: Upload release snapshot
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-snapshot
-          path: dist/release
-          if-no-files-found: ignore
-          retention-days: 7
-
       - name: Upload journey diagnostics
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4

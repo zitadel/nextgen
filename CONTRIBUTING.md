@@ -301,9 +301,8 @@ demand, and is not a required check. To run it against a branch, use
 
 CI consumes the workflow's packed npm tarballs, not public Zitadel packages.
 Changesets PR comments are informational release-intent feedback, not a
-blocking gate. Workflow artifacts (the release snapshot whenever a journey
-lane runs — a run whose journeys are gated off, such as a docs-only or
-console-only PR, uploads no snapshot — and journey diagnostics on failure)
+blocking gate. The release snapshot the journeys install from stays on the
+runner; a failed run uploads journey and console e2e diagnostics, which
 expire after 7 days. The demo end-to-end suites and
 the Docker-fallback journey do not run in CI; they stay opt-in local checks
 (see below).

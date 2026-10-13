@@ -13,10 +13,12 @@ name: deployment-checks
 # - Any deployment by hand (`workflow_dispatch`, from any branch): a run again
 #   without a new deployment.
 #
-# The job runs each service's contract suite, today the docs', the way the
-# service runs it locally, but against the deployment's URL instead of a local
-# server (`docs:e2e-deployment`): what is checked is the artifact Vercel built,
-# routed by the repo-root vercel.json, behind Vercel's protection.
+# Each job runs a service's contract suite against the deployment's URL: the
+# docs' the way the service runs it locally, but against the deployment
+# instead of a local server (`docs:e2e-deployment`); the console's, which has
+# no local counterpart, signed out (`e2e:console-deployment`). What is
+# checked is the artifact Vercel built, routed by the repo-root vercel.json,
+# behind Vercel's protection.
 #
 # What broke is read in this order: the check's name says the service and the
 # environment; the annotations on it name the failing contract (the test's
@@ -48,6 +50,15 @@ on:
     secrets:
       VERCEL_AUTOMATION_BYPASS_SECRET:
         required: true
+    # Each suite's result, for production-checks.yml, which reports every
+    # suite as a status of its own.
+    outputs:
+      docs:
+        description: "`success` once the docs suite passed, empty otherwise"
+        value: ${{ jobs.docs.outputs.result }}
+      console:
+        description: "`success` once the console suite passed, empty otherwise"
+        value: ${{ jobs.console.outputs.result }}
 
 permissions:
   contents: read
@@ -76,6 +87,9 @@ jobs:
        startsWith(github.event.deployment_status.environment_url, 'https://cloud-'))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      # Set by the step after the suite, so only a run that got there passed.
+      result: ${{ steps.passed.outputs.result }}
     env:
       DOCS_BASE_URL: ${{ inputs.url || github.event.deployment_status.environment_url }}
       # The project's Protection Bypass for Automation secret, as a repository
@@ -140,6 +154,10 @@ jobs:
       - name: Run the docs suite against the deployment
         run: env -u CI -u GITHUB_ACTIONS moon run docs:e2e-deployment
 
+      - name: Record the pass
+        id: passed
+        run: echo "result=success" >> "$GITHUB_OUTPUT"
+
       # The screenshots and nothing else: the repository is public, so anyone
       # signed in to GitHub can download the artifact, and every other file
       # Playwright writes can hold the bypass secret. A trace records each
@@ -154,5 +172,89 @@ jobs:
         with:
           name: docs-deployment-screenshots
           path: apps/docs/test-results/**/*.png
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The console's suite, step for step as the docs job above, which says why:
+  # how vercel.json routes the console's paths, and the console signed out,
+  # down to the login widget's first step, which needs the server and its
+  # database behind it. It signs nobody in.
+  console:
+    name: console (${{ inputs.environment || (github.event_name == 'deployment_status' && 'Preview') || 'dispatch' }})
+    if: >-
+      github.event_name != 'deployment_status' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment.creator.login == 'vercel[bot]' &&
+       startsWith(github.event.deployment.environment, 'Preview') &&
+       startsWith(github.event.deployment_status.environment_url, 'https://cloud-'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      result: ${{ steps.passed.outputs.result }}
+    env:
+      CONSOLE_DEPLOYMENT_URL: ${{ inputs.url || github.event.deployment_status.environment_url }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      MOON_SUMMARY: detailed
+      DO_NOT_TRACK: "1"
+    steps:
+      - name: Name the deployment in the run's summary
+        env:
+          ENVIRONMENT: ${{ inputs.environment || github.event.deployment.environment || 'dispatch' }}
+          COMMIT: ${{ inputs.sha || github.event.deployment.sha || github.sha }}
+        run: |
+          {
+            echo "- Deployment: $CONSOLE_DEPLOYMENT_URL ($ENVIRONMENT, commit ${COMMIT:0:8})"
+            echo "- Reproduce: \`CONSOLE_DEPLOYMENT_URL=$CONSOLE_DEPLOYMENT_URL VERCEL_AUTOMATION_BYPASS_SECRET=… moon run e2e:console-deployment\`"
+            echo "- On a failure the annotations name the contract and the requests that failed; a failed browser test's screenshots are the \`console-deployment-screenshots\` artifact."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.sha || github.event.deployment.sha || github.ref }}
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        run: corepack pnpm --filter @zitadel/e2e exec playwright install chromium
+
+      - name: Check the bypass secret is set
+        run: |
+          [ -n "$VERCEL_AUTOMATION_BYPASS_SECRET" ] || {
+            echo "::error::Set the repository secret VERCEL_AUTOMATION_BYPASS_SECRET (docs/runbooks/cloud.md, Deployment checks)"
+            exit 1
+          }
+
+      - name: Run the console suite against the deployment
+        run: env -u CI -u GITHUB_ACTIONS moon run e2e:console-deployment
+
+      - name: Record the pass
+        id: passed
+        run: echo "result=success" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the screenshots
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: console-deployment-screenshots
+          path: e2e/console/test-results/**/*.png
           if-no-files-found: ignore
           retention-days: 7

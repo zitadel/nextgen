@@ -288,6 +288,7 @@ const TURBO_GRAPH_TASKS = [
   "console-real",
   "console-embedded",
   "console-platform",
+  "console-deployment",
   "demo-next-mock",
   "demo-next-real",
   "demo-nuxt-mock",
