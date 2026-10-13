@@ -181,6 +181,10 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
         run: turbo run test-postgres --filter=@zitadel/server
 
+      - name: Run Go integration tests (spanner)
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
+        run: turbo run test-spanner --filter=@zitadel/server
+
       - name: Run Go integration tests (sqlite)
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
         run: turbo run test-sqlite --filter=@zitadel/server
