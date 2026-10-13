@@ -13,12 +13,14 @@
     },
     // The build script bundles again before `next build`, because the
     // hosted cloud's docs service runs the script without a task runner.
+    // app/global.css imports the design tokens' CSS variables, which the
+    // repository commits, so that build needs no generation of them.
     "build": {
-      "dependsOn": ["generate"],
+      "dependsOn": ["generate", "@zitadel/design-tokens#generate"],
       "outputs": [".next/**", "!.next/cache/**"]
     },
     "dev": {
-      "dependsOn": ["generate"]
+      "dependsOn": ["generate", "@zitadel/design-tokens#generate"]
     },
     "start": {
       "dependsOn": ["build"]

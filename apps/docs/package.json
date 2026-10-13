@@ -21,6 +21,7 @@
     "@modelcontextprotocol/server": "catalog:",
     "@vercel/analytics": "catalog:",
     "@vercel/speed-insights": "catalog:",
+    "@zitadel/design-tokens": "workspace:*",
     "fumadocs-core": "catalog:",
     "fumadocs-mdx": "catalog:",
     "fumadocs-openapi": "catalog:",
@@ -29,6 +30,7 @@
     "next": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "shiki": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
