@@ -3,6 +3,7 @@ import { cancel, confirm, isCancel } from "@clack/prompts";
 
 import { CommandGroups, type JsonEnvelope, nonBlankArg, PreviewCommand } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
+import { deletedData } from "../../lib/oclif/envelope";
 import { ZitadelError } from "../../lib/errors";
 import { publicCliCommand } from "../../lib/public-cli";
 import { shellArg } from "../../lib/shell";
@@ -78,7 +79,7 @@ export default class PreviewRm extends PreviewCommand {
 
     return this.emit({
       status: "ok",
-      data: { url, removed: true },
+      data: deletedData({ url }),
       pretty: `Stopped serving ${url}`,
     });
   }
