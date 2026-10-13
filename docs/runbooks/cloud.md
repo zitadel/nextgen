@@ -140,8 +140,9 @@ Environment variables (add secrets with
 | `MASTER_KEY_ID` | Preview | preview's `master-key.id`, `cloud-preview-<year>-<month>` |
 | `MASTER_KEY_PREVIOUS_PEM_B64` | Production or Preview; sensitive; only during a rotation | the key being rotated out, which `setup-secrets.sh --force` sets |
 | `MASTER_KEY_PREVIOUS_ID` | Production or Preview; only during a rotation | its id |
-| `CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE` | Production or Preview; optional | the share of console page loads that send Speed Insights, `0` to `1`; unset sends every one |
-| `DOCS_SPEED_INSIGHTS_SAMPLE_RATE` | Production or Preview; optional | the same for the docs |
+| `CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the share of console page loads that send Speed Insights, `0` to `1`; unset sends every one |
+| `DOCS_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the same for the docs |
+| `WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the same for the website |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Production; sensitive | production's `admin-user.b64`: the root admin document |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Preview; sensitive | preview's `admin-user.b64` |
 | `ENABLE_EXPERIMENTAL_COREPACK` | Production, Preview | `1`: the builds run package scripts that call `pnpm`, which must be the workspace's pinned version |
@@ -310,12 +311,12 @@ project and imports the root admin.
   previews can be busy at the same time. Raise it (Parameters tab, needs a
   restart) before raising the pool size.
 - **Analytics:** the console reports page views and Web Vitals per route
-  pattern (`/ui/console/users/$userId`), the docs per page, to the project's
-  Analytics and Speed Insights tabs. Speed Insights samples by the two
-  `*_SPEED_INSIGHTS_SAMPLE_RATE` variables, read at build time, so a new rate
+  pattern (`/ui/console/users/$userId`), the docs and the website per page,
+  to the project's Analytics and Speed Insights tabs. Speed Insights samples
+  by one variable per frontend, `CONSOLE_`, `DOCS_` and
+  `WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE`, read at build time, so a new rate
   takes a redeploy; `0` turns it off. Web Analytics has no sampling and counts
-  every page view. The website reports every page view of its start page and
-  Speed Insights for one page load in a hundred, a rate fixed in its layout.
+  every page view.
 - **Signing in:** `/ui/console/` with the environment's root admin from
   1Password (production and preview have different passwords). Anyone else
   registers through the login UI.
