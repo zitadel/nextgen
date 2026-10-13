@@ -33801,6 +33801,12 @@ func (s *Field) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.ReadOnly.Set {
+			e.FieldStart("read_only")
+			s.ReadOnly.Encode(e)
+		}
+	}
+	{
 		if s.Validation.Set {
 			e.FieldStart("validation")
 			s.Validation.Encode(e)
@@ -33808,14 +33814,15 @@ func (s *Field) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfField = [7]string{
+var jsonFieldsNameOfField = [8]string{
 	0: "name",
 	1: "type",
 	2: "text_key",
 	3: "autocomplete",
 	4: "required",
 	5: "value",
-	6: "validation",
+	6: "read_only",
+	7: "validation",
 }
 
 // Decode decodes Field from json.
@@ -33892,6 +33899,16 @@ func (s *Field) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"value\"")
+			}
+		case "read_only":
+			if err := func() error {
+				s.ReadOnly.Reset()
+				if err := s.ReadOnly.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"read_only\"")
 			}
 		case "validation":
 			if err := func() error {
