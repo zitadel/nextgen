@@ -299,6 +299,16 @@ export default class SsoEnable extends BaseCommand {
         schemaRef: CONNECTION_SCHEMA_REF,
         endpoints,
       });
+      // A connection is scaffolded with the properties the provider maps by
+      // default, narrowed to what the schema defines. A schema that defines none
+      // of them leaves it with no mapping, and `plan` refuses a connection that
+      // fills nothing, so say so now and not on the next command.
+      if (!("claim_mapping" in connection)) {
+        reportWarning(
+          `${schema.path} defines none of the properties ${entry.displayName} maps by default, so ${plan.path} has no claim_mapping ` +
+            `and no sign-in can fill a user. Add the properties your provider returns to claim_mapping in ${plan.path}; plan refuses the connection until then.`,
+        );
+      }
       if (endpoints?.issuer !== undefined && endpoints.issuer !== entry.issuer) {
         // Said out loud: a connection pointing somewhere other than the
         // vendor is not what the developer will want in the end, and nothing
