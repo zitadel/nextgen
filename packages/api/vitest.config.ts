@@ -8,5 +8,8 @@ export default defineConfig({
     ...baseTest,
     name: "@zitadel/api",
     environment: "node",
+    // scripts/inline-openapi.ts feeds orval (orval.config.ts) and is tested
+    // beside it.
+    include: [...baseTest.include, "scripts/**/*.spec.ts"],
   },
 });

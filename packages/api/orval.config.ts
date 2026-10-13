@@ -1,15 +1,21 @@
+import { fileURLToPath } from "node:url";
+
 import { defineConfig } from "orval";
+
+import { inlineOpenApi } from "./scripts/inline-openapi";
+
+// `api/openapi/` is split one file per endpoint (see api/openapi/AGENTS.md), so
+// the spec is almost entirely `$ref`s into sibling files. They are inlined here
+// rather than by orval, which would break the recursive user property schema
+// into an empty one (see scripts/inline-openapi.ts).
+const spec = inlineOpenApi(
+  fileURLToPath(new URL("../../api/openapi/openapi-spec.yaml", import.meta.url)),
+);
 
 export default defineConfig({
   zitadel: {
     input: {
-      target: "../../api/openapi/openapi-spec.yaml",
-      // `api/openapi/` is split one file per endpoint (see api/openapi/AGENTS.md),
-      // so the spec is almost entirely `$ref`s into sibling files. orval 8.37
-      // stopped following external `$ref`s unless allow-listed — a fetch guard
-      // aimed at remote documents. Every target is a local file checked in beside
-      // the root, so allowing all adds no network reach.
-      parserOptions: { externalRefs: { allow: ["*"] } },
+      target: spec,
     },
     output: {
       target: "./src/generated/endpoints",
@@ -44,9 +50,7 @@ export default defineConfig({
   },
   zitadelZod: {
     input: {
-      target: "../../api/openapi/openapi-spec.yaml",
-      // See the note on the `zitadel` input above.
-      parserOptions: { externalRefs: { allow: ["*"] } },
+      target: spec,
     },
     output: {
       mode: "split",
