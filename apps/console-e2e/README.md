@@ -4,12 +4,13 @@ Playwright coverage for the console's runtime boundaries. Each lane serves the
 console differently, and the differences are the point — pick by which boundary
 you need proven.
 
-| Lane           | Serves the console | Backend                | Proves                            |
-| -------------- | ------------------ | ---------------------- | --------------------------------- |
-| `e2e`          | `vite preview`     | none                   | the SPA mounts under `/ui/console/` |
-| `e2e-real`     | Vite dev server    | real, via dev proxy    | resource screens against real data |
-| `e2e-embedded` | the Go binary      | real, same origin      | the production request path        |
-| `e2e-platform` | the Go binary      | real, platform project | a platform operator on the cookie   |
+| Lane             | Serves the console | Backend                | Proves                              |
+| ---------------- | ------------------ | ---------------------- | ----------------------------------- |
+| `e2e`            | `vite preview`     | none                   | the SPA mounts under `/ui/console/` |
+| `e2e-real`       | Vite dev server    | real, via dev proxy    | resource screens against real data  |
+| `e2e-embedded`   | the Go binary      | real, same origin      | the production request path         |
+| `e2e-platform`   | the Go binary      | real, platform project | a platform operator on the cookie   |
+| `e2e-deployment` | a cloud deployment | the deployment's own   | the cloud's routing, signed out     |
 
 ## Embedded shell smoke
 
@@ -95,6 +96,28 @@ selects that project itself (the operator's only grant, as `?project=`), so the
 screens run in a project other than the one the console signs into.
 `e2e-embedded` cannot cover this: it switches the platform project off to sign
 its seeded users into the harness project.
+
+## Deployment coverage
+
+```sh
+CONSOLE_DEPLOYMENT_URL=https://cloud-….vercel.app VERCEL_AUTOMATION_BYPASS_SECRET=… \
+  moon run console-e2e:e2e-deployment
+```
+
+Boots nothing: it checks a deployment of the hosted cloud, which serves the
+console as a Vercel service of its own at `/console/`, next to the server on
+the same origin (the repo-root `vercel.json`). That routing is what no other
+lane can see, so this one pins it: `/console/runtime.json` still reaches the
+server, the old `/ui/console` links redirect, and a deep link comes up as the
+signed-out sign-in screen with the login widget asking for an email, which
+takes the server's runtime document and its `POST /flow`. It signs nobody in,
+so it needs no credential but Vercel's bypass secret.
+
+[`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) runs it
+for every deployment, as it runs the docs' suite. Like that suite, it records no
+traces and writes no HTML report, and the workflow uploads only its screenshots:
+everything else Playwright writes can hold the bypass secret
+([the runbook](../../docs/runbooks/cloud.md#deployment-checks)).
 
 ## Handling the handshake
 
