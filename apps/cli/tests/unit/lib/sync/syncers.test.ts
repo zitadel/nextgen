@@ -966,6 +966,18 @@ describe("IdpConnectionSyncer", () => {
       expect((error as ZitadelError).message).toContain("GOOGLE_CLIENT_ID");
     });
 
+    it("tells the developer to publish the variable at the project level", async () => {
+      withVariables(["OTHER"]);
+
+      const error = await idpSyncer()
+        .preflight?.(file, connection, null, [])
+        .catch((err: unknown) => err);
+
+      expect((error as ZitadelError).hint).toContain(
+        "variables set GOOGLE_CLIENT_SECRET --project-level",
+      );
+    });
+
     it("accepts a client_secret variable the project holds", async () => {
       withVariables(["GOOGLE_CLIENT_SECRET"]);
 

@@ -112,6 +112,27 @@ describe("plan command", () => {
     });
   });
 
+  it("does not count a removed connection file as unchanged", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, ".zitadel/state.json"),
+      JSON.stringify({
+        framework: "next",
+        resources: { ".zitadel/idps/gone.json": { id: "idp_1", hash: "abc" } },
+      }),
+    );
+
+    const res = await runCliForTest([
+      "plan",
+      "--cwd",
+      cwd,
+      "--server",
+      "https://api.zitadel.cloud",
+    ]);
+
+    expect(`${res.stdout}\n${res.stderr}`).toContain("0 unchanged");
+  });
+
   it("errors with E_VALIDATION when a local resource is invalid", async () => {
     const cwd = await makeProject();
     // `type` must be a string/array; a number makes the schema invalid, and the
