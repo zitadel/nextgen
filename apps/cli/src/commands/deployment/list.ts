@@ -9,10 +9,7 @@ import {
 import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderRows, renderTable } from "../../lib/oclif/crud/table";
 import { publicCliCommand } from "../../lib/public-cli";
-
-/** Single-quote a value for a suggested shell command, matching the shared list builder. */
-const shellArg = (value: string): string =>
-  /^[A-Za-z0-9_.:@/=+-]+$/.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
+import { shellArg } from "../../lib/shell";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
