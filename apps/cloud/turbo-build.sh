@@ -3,32 +3,23 @@
 # @zitadel/console [turbo args]`, from the repository root (the services'
 # buildCommands in the repo-root vercel.json and build.sh call it).
 #
-# Vercel gives every deployment build a token for the team's remote cache,
-# and a preview build runs its branch's code with it, so the cache has to be
-# treated as writable by anyone who can push a branch. The boundary is that a
-# production build never restores from it: it builds from source and only
-# uploads, for the previews to reuse. Previews read and do not write; that is
-# the branch's own choice (a branch can change this file), which keeps honest
-# branches from filling the cache but protects nothing — production not
-# reading does.
+# The cache works as Vercel sets it up for every turbo build: each build
+# reads and writes the team's remote cache with a token Vercel gives it, and
+# keeps no local cache. Turbo puts VERCEL_TARGET_ENV into every task's hash,
+# so production builds find only what production builds wrote, previews only
+# what previews wrote. Writing takes the team's token: a fork's pull request
+# gets no build, and so no token, until a team member approves it (the
+# project's Git fork protection).
 #
 # The project's secrets stay hidden from the JS builds (turbo's strict env
 # mode); TURBO_PLATFORM_ENV_DISABLED stops turbo warning about each of them
-# for every task. Variables a build needs (VITE_CONSOLE_VERCEL_INSIGHTS,
+# for every task. Variables a build needs (CONSOLE_VERCEL_INSIGHTS,
 # CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE) pass through the environment and are
 # listed in the package's turbo.json.
 set -eu
 package="${1:?package name, e.g. @zitadel/console}"
 shift
 
-# Vercel sets the deprecated TURBO_REMOTE_ONLY for turbo builds, and turbo
-# refuses to combine the legacy cache switches with TURBO_CACHE, which carries
-# the whole policy here.
-unset TURBO_REMOTE_ONLY TURBO_REMOTE_CACHE_READ_ONLY
-case "${VERCEL_ENV:-}" in
-  production) TURBO_CACHE="local:rw,remote:w" ;;
-  *) TURBO_CACHE="local:rw,remote:r" ;;
-esac
-export TURBO_CACHE TURBO_TELEMETRY_DISABLED=1 TURBO_PLATFORM_ENV_DISABLED=1
+export TURBO_TELEMETRY_DISABLED=1 TURBO_PLATFORM_ENV_DISABLED=1
 
 exec corepack pnpm exec turbo run build --filter="$package" "$@"
