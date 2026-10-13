@@ -72,22 +72,6 @@ func (s AddOriginErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedAddOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case OriginInvalidAddOriginErrorResponse:
 		e.FieldStart("code")
 		e.Str("origin.invalid")
@@ -232,22 +216,6 @@ func (s AddOriginErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UnavailableAddOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	}
 }
 
@@ -283,9 +251,6 @@ func (s *AddOriginErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalAddOriginErrorResponse
 					found = true
-				case "not_implemented":
-					s.Type = NotImplementedAddOriginErrorResponse
-					found = true
 				case "origin.invalid":
 					s.Type = OriginInvalidAddOriginErrorResponse
 					found = true
@@ -313,9 +278,6 @@ func (s *AddOriginErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidAddOriginErrorResponse
 					found = true
-				case "unavailable":
-					s.Type = UnavailableAddOriginErrorResponse
-					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
 				}
@@ -340,10 +302,6 @@ func (s *AddOriginErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalAddOriginErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedAddOriginErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
 	case OriginInvalidAddOriginErrorResponse:
@@ -380,10 +338,6 @@ func (s *AddOriginErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidAddOriginErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableAddOriginErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -21078,6 +21032,22 @@ func (s CreateProjectErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case OriginKindConflictCreateProjectErrorResponse:
+		e.FieldStart("code")
+		e.Str("origin.kind_conflict")
+		{
+			s := s.OriginKindConflict
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case OriginPrimaryNotExactCreateProjectErrorResponse:
 		e.FieldStart("code")
 		e.Str("origin.primary_not_exact")
@@ -21227,6 +21197,9 @@ func (s *CreateProjectErrorResponse) Decode(d *jx.Decoder) error {
 				case "origin.invalid":
 					s.Type = OriginInvalidCreateProjectErrorResponse
 					found = true
+				case "origin.kind_conflict":
+					s.Type = OriginKindConflictCreateProjectErrorResponse
+					found = true
 				case "origin.primary_not_exact":
 					s.Type = OriginPrimaryNotExactCreateProjectErrorResponse
 					found = true
@@ -21293,6 +21266,10 @@ func (s *CreateProjectErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case OriginInvalidCreateProjectErrorResponse:
 		if err := s.OriginInvalid.Decode(d); err != nil {
+			return err
+		}
+	case OriginKindConflictCreateProjectErrorResponse:
+		if err := s.OriginKindConflict.Decode(d); err != nil {
 			return err
 		}
 	case OriginPrimaryNotExactCreateProjectErrorResponse:
@@ -90525,22 +90502,6 @@ func (s RemoveOriginErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedRemoveOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case OriginInvalidRemoveOriginErrorResponse:
 		e.FieldStart("code")
 		e.Str("origin.invalid")
@@ -90605,43 +90566,11 @@ func (s RemoveOriginErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ProjNotFoundRemoveOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.not_found")
-		{
-			s := s.ProjNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case ReqInvalidRemoveOriginErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
 			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UnavailableRemoveOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("unavailable")
-		{
-			s := s.Unavailable
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -90688,9 +90617,6 @@ func (s *RemoveOriginErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalRemoveOriginErrorResponse
 					found = true
-				case "not_implemented":
-					s.Type = NotImplementedRemoveOriginErrorResponse
-					found = true
 				case "origin.invalid":
 					s.Type = OriginInvalidRemoveOriginErrorResponse
 					found = true
@@ -90703,14 +90629,8 @@ func (s *RemoveOriginErrorResponse) Decode(d *jx.Decoder) error {
 				case "proj.missing_id":
 					s.Type = ProjMissingIDRemoveOriginErrorResponse
 					found = true
-				case "proj.not_found":
-					s.Type = ProjNotFoundRemoveOriginErrorResponse
-					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidRemoveOriginErrorResponse
-					found = true
-				case "unavailable":
-					s.Type = UnavailableRemoveOriginErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -90738,10 +90658,6 @@ func (s *RemoveOriginErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedRemoveOriginErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
 	case OriginInvalidRemoveOriginErrorResponse:
 		if err := s.OriginInvalid.Decode(d); err != nil {
 			return err
@@ -90758,16 +90674,8 @@ func (s *RemoveOriginErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.ProjMissingID.Decode(d); err != nil {
 			return err
 		}
-	case ProjNotFoundRemoveOriginErrorResponse:
-		if err := s.ProjNotFound.Decode(d); err != nil {
-			return err
-		}
 	case ReqInvalidRemoveOriginErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case UnavailableRemoveOriginErrorResponse:
-		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
 	default:

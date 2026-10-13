@@ -13,6 +13,7 @@ content:
         - $ref: '../../components/schemas/errors/sch-invalid_request.yaml'
         - $ref: '../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../components/schemas/errors/origin-invalid.yaml'
+        - $ref: '../../components/schemas/errors/origin-kind_conflict.yaml'
         - $ref: '../../components/schemas/errors/origin-primary_not_exact.yaml'
         - $ref: '../../components/schemas/errors/origin-unbounded.yaml'
         - $ref: '../../components/schemas/errors/proj-name_invalid.yaml'
@@ -31,6 +32,7 @@ content:
           sch.invalid_request: '../../components/schemas/errors/sch-invalid_request.yaml'
           not_implemented: '../../components/schemas/errors/not_implemented.yaml'
           origin.invalid: '../../components/schemas/errors/origin-invalid.yaml'
+          origin.kind_conflict: '../../components/schemas/errors/origin-kind_conflict.yaml'
           origin.primary_not_exact: '../../components/schemas/errors/origin-primary_not_exact.yaml'
           origin.unbounded: '../../components/schemas/errors/origin-unbounded.yaml'
           proj.name_invalid: '../../components/schemas/errors/proj-name_invalid.yaml'
@@ -83,6 +85,11 @@ content:
         value:
           code: origin.invalid
           message: 'origin: must be scheme://host[:port], lowercase, with no path'
+      origin.kind_conflict:
+        summary: origin.kind_conflict
+        value:
+          code: origin.kind_conflict
+          message: 'origin: the pattern is already stored with a different kind'
       origin.primary_not_exact:
         summary: origin.primary_not_exact
         value:

@@ -18,7 +18,6 @@ type AddOriginErrorResponse struct {
 	AuthUnauthorized       AuthUnauthorized
 	EvtInvalid             EvtInvalid
 	Internal               Internal
-	NotImplemented         NotImplemented
 	OriginInvalid          OriginInvalid
 	OriginKindConflict     OriginKindConflict
 	OriginNotFound         OriginNotFound
@@ -28,7 +27,6 @@ type AddOriginErrorResponse struct {
 	ProjMissingID          ProjMissingID
 	ProjNotFound           ProjNotFound
 	ReqInvalid             ReqInvalid
-	Unavailable            Unavailable
 }
 
 // AddOriginErrorResponseType is oneOf type of AddOriginErrorResponse.
@@ -39,7 +37,6 @@ const (
 	AuthUnauthorizedAddOriginErrorResponse       AddOriginErrorResponseType = "auth.unauthorized"
 	EvtInvalidAddOriginErrorResponse             AddOriginErrorResponseType = "evt.invalid"
 	InternalAddOriginErrorResponse               AddOriginErrorResponseType = "internal"
-	NotImplementedAddOriginErrorResponse         AddOriginErrorResponseType = "not_implemented"
 	OriginInvalidAddOriginErrorResponse          AddOriginErrorResponseType = "origin.invalid"
 	OriginKindConflictAddOriginErrorResponse     AddOriginErrorResponseType = "origin.kind_conflict"
 	OriginNotFoundAddOriginErrorResponse         AddOriginErrorResponseType = "origin.not_found"
@@ -49,7 +46,6 @@ const (
 	ProjMissingIDAddOriginErrorResponse          AddOriginErrorResponseType = "proj.missing_id"
 	ProjNotFoundAddOriginErrorResponse           AddOriginErrorResponseType = "proj.not_found"
 	ReqInvalidAddOriginErrorResponse             AddOriginErrorResponseType = "req.invalid"
-	UnavailableAddOriginErrorResponse            AddOriginErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether AddOriginErrorResponse is AuthUnauthorized.
@@ -64,11 +60,6 @@ func (s AddOriginErrorResponse) IsEvtInvalid() bool {
 
 // IsInternal reports whether AddOriginErrorResponse is Internal.
 func (s AddOriginErrorResponse) IsInternal() bool { return s.Type == InternalAddOriginErrorResponse }
-
-// IsNotImplemented reports whether AddOriginErrorResponse is NotImplemented.
-func (s AddOriginErrorResponse) IsNotImplemented() bool {
-	return s.Type == NotImplementedAddOriginErrorResponse
-}
 
 // IsOriginInvalid reports whether AddOriginErrorResponse is OriginInvalid.
 func (s AddOriginErrorResponse) IsOriginInvalid() bool {
@@ -113,11 +104,6 @@ func (s AddOriginErrorResponse) IsProjNotFound() bool {
 // IsReqInvalid reports whether AddOriginErrorResponse is ReqInvalid.
 func (s AddOriginErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidAddOriginErrorResponse
-}
-
-// IsUnavailable reports whether AddOriginErrorResponse is Unavailable.
-func (s AddOriginErrorResponse) IsUnavailable() bool {
-	return s.Type == UnavailableAddOriginErrorResponse
 }
 
 // SetAuthUnauthorized sets AddOriginErrorResponse to AuthUnauthorized.
@@ -180,27 +166,6 @@ func (s AddOriginErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalAddOriginErrorResponse(v Internal) AddOriginErrorResponse {
 	var s AddOriginErrorResponse
 	s.SetInternal(v)
-	return s
-}
-
-// SetNotImplemented sets AddOriginErrorResponse to NotImplemented.
-func (s *AddOriginErrorResponse) SetNotImplemented(v NotImplemented) {
-	s.Type = NotImplementedAddOriginErrorResponse
-	s.NotImplemented = v
-}
-
-// GetNotImplemented returns NotImplemented and true boolean if AddOriginErrorResponse is NotImplemented.
-func (s AddOriginErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
-	if !s.IsNotImplemented() {
-		return v, false
-	}
-	return s.NotImplemented, true
-}
-
-// NewNotImplementedAddOriginErrorResponse returns new AddOriginErrorResponse from NotImplemented.
-func NewNotImplementedAddOriginErrorResponse(v NotImplemented) AddOriginErrorResponse {
-	var s AddOriginErrorResponse
-	s.SetNotImplemented(v)
 	return s
 }
 
@@ -390,27 +355,6 @@ func (s AddOriginErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidAddOriginErrorResponse(v ReqInvalid) AddOriginErrorResponse {
 	var s AddOriginErrorResponse
 	s.SetReqInvalid(v)
-	return s
-}
-
-// SetUnavailable sets AddOriginErrorResponse to Unavailable.
-func (s *AddOriginErrorResponse) SetUnavailable(v Unavailable) {
-	s.Type = UnavailableAddOriginErrorResponse
-	s.Unavailable = v
-}
-
-// GetUnavailable returns Unavailable and true boolean if AddOriginErrorResponse is Unavailable.
-func (s AddOriginErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
-	if !s.IsUnavailable() {
-		return v, false
-	}
-	return s.Unavailable, true
-}
-
-// NewUnavailableAddOriginErrorResponse returns new AddOriginErrorResponse from Unavailable.
-func NewUnavailableAddOriginErrorResponse(v Unavailable) AddOriginErrorResponse {
-	var s AddOriginErrorResponse
-	s.SetUnavailable(v)
 	return s
 }
 
@@ -13274,6 +13218,7 @@ type CreateProjectErrorResponse struct {
 	SchInvalidRequest     SchInvalidRequest
 	NotImplemented        NotImplemented
 	OriginInvalid         OriginInvalid
+	OriginKindConflict    OriginKindConflict
 	OriginPrimaryNotExact OriginPrimaryNotExact
 	OriginUnbounded       OriginUnbounded
 	ProjNameInvalid       ProjNameInvalid
@@ -13296,6 +13241,7 @@ const (
 	SchInvalidRequestCreateProjectErrorResponse     CreateProjectErrorResponseType = "sch.invalid_request"
 	NotImplementedCreateProjectErrorResponse        CreateProjectErrorResponseType = "not_implemented"
 	OriginInvalidCreateProjectErrorResponse         CreateProjectErrorResponseType = "origin.invalid"
+	OriginKindConflictCreateProjectErrorResponse    CreateProjectErrorResponseType = "origin.kind_conflict"
 	OriginPrimaryNotExactCreateProjectErrorResponse CreateProjectErrorResponseType = "origin.primary_not_exact"
 	OriginUnboundedCreateProjectErrorResponse       CreateProjectErrorResponseType = "origin.unbounded"
 	ProjNameInvalidCreateProjectErrorResponse       CreateProjectErrorResponseType = "proj.name_invalid"
@@ -13347,6 +13293,11 @@ func (s CreateProjectErrorResponse) IsNotImplemented() bool {
 // IsOriginInvalid reports whether CreateProjectErrorResponse is OriginInvalid.
 func (s CreateProjectErrorResponse) IsOriginInvalid() bool {
 	return s.Type == OriginInvalidCreateProjectErrorResponse
+}
+
+// IsOriginKindConflict reports whether CreateProjectErrorResponse is OriginKindConflict.
+func (s CreateProjectErrorResponse) IsOriginKindConflict() bool {
+	return s.Type == OriginKindConflictCreateProjectErrorResponse
 }
 
 // IsOriginPrimaryNotExact reports whether CreateProjectErrorResponse is OriginPrimaryNotExact.
@@ -13565,6 +13516,27 @@ func (s CreateProjectErrorResponse) GetOriginInvalid() (v OriginInvalid, ok bool
 func NewOriginInvalidCreateProjectErrorResponse(v OriginInvalid) CreateProjectErrorResponse {
 	var s CreateProjectErrorResponse
 	s.SetOriginInvalid(v)
+	return s
+}
+
+// SetOriginKindConflict sets CreateProjectErrorResponse to OriginKindConflict.
+func (s *CreateProjectErrorResponse) SetOriginKindConflict(v OriginKindConflict) {
+	s.Type = OriginKindConflictCreateProjectErrorResponse
+	s.OriginKindConflict = v
+}
+
+// GetOriginKindConflict returns OriginKindConflict and true boolean if CreateProjectErrorResponse is OriginKindConflict.
+func (s CreateProjectErrorResponse) GetOriginKindConflict() (v OriginKindConflict, ok bool) {
+	if !s.IsOriginKindConflict() {
+		return v, false
+	}
+	return s.OriginKindConflict, true
+}
+
+// NewOriginKindConflictCreateProjectErrorResponse returns new CreateProjectErrorResponse from OriginKindConflict.
+func NewOriginKindConflictCreateProjectErrorResponse(v OriginKindConflict) CreateProjectErrorResponse {
+	var s CreateProjectErrorResponse
+	s.SetOriginKindConflict(v)
 	return s
 }
 
@@ -59599,14 +59571,11 @@ type RemoveOriginErrorResponse struct {
 	AuthUnauthorized       AuthUnauthorized
 	EvtInvalid             EvtInvalid
 	Internal               Internal
-	NotImplemented         NotImplemented
 	OriginInvalid          OriginInvalid
 	OriginNotFound         OriginNotFound
 	OriginPermissionDenied OriginPermissionDenied
 	ProjMissingID          ProjMissingID
-	ProjNotFound           ProjNotFound
 	ReqInvalid             ReqInvalid
-	Unavailable            Unavailable
 }
 
 // RemoveOriginErrorResponseType is oneOf type of RemoveOriginErrorResponse.
@@ -59617,14 +59586,11 @@ const (
 	AuthUnauthorizedRemoveOriginErrorResponse       RemoveOriginErrorResponseType = "auth.unauthorized"
 	EvtInvalidRemoveOriginErrorResponse             RemoveOriginErrorResponseType = "evt.invalid"
 	InternalRemoveOriginErrorResponse               RemoveOriginErrorResponseType = "internal"
-	NotImplementedRemoveOriginErrorResponse         RemoveOriginErrorResponseType = "not_implemented"
 	OriginInvalidRemoveOriginErrorResponse          RemoveOriginErrorResponseType = "origin.invalid"
 	OriginNotFoundRemoveOriginErrorResponse         RemoveOriginErrorResponseType = "origin.not_found"
 	OriginPermissionDeniedRemoveOriginErrorResponse RemoveOriginErrorResponseType = "origin.permission_denied"
 	ProjMissingIDRemoveOriginErrorResponse          RemoveOriginErrorResponseType = "proj.missing_id"
-	ProjNotFoundRemoveOriginErrorResponse           RemoveOriginErrorResponseType = "proj.not_found"
 	ReqInvalidRemoveOriginErrorResponse             RemoveOriginErrorResponseType = "req.invalid"
-	UnavailableRemoveOriginErrorResponse            RemoveOriginErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether RemoveOriginErrorResponse is AuthUnauthorized.
@@ -59640,11 +59606,6 @@ func (s RemoveOriginErrorResponse) IsEvtInvalid() bool {
 // IsInternal reports whether RemoveOriginErrorResponse is Internal.
 func (s RemoveOriginErrorResponse) IsInternal() bool {
 	return s.Type == InternalRemoveOriginErrorResponse
-}
-
-// IsNotImplemented reports whether RemoveOriginErrorResponse is NotImplemented.
-func (s RemoveOriginErrorResponse) IsNotImplemented() bool {
-	return s.Type == NotImplementedRemoveOriginErrorResponse
 }
 
 // IsOriginInvalid reports whether RemoveOriginErrorResponse is OriginInvalid.
@@ -59667,19 +59628,9 @@ func (s RemoveOriginErrorResponse) IsProjMissingID() bool {
 	return s.Type == ProjMissingIDRemoveOriginErrorResponse
 }
 
-// IsProjNotFound reports whether RemoveOriginErrorResponse is ProjNotFound.
-func (s RemoveOriginErrorResponse) IsProjNotFound() bool {
-	return s.Type == ProjNotFoundRemoveOriginErrorResponse
-}
-
 // IsReqInvalid reports whether RemoveOriginErrorResponse is ReqInvalid.
 func (s RemoveOriginErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidRemoveOriginErrorResponse
-}
-
-// IsUnavailable reports whether RemoveOriginErrorResponse is Unavailable.
-func (s RemoveOriginErrorResponse) IsUnavailable() bool {
-	return s.Type == UnavailableRemoveOriginErrorResponse
 }
 
 // SetAuthUnauthorized sets RemoveOriginErrorResponse to AuthUnauthorized.
@@ -59742,27 +59693,6 @@ func (s RemoveOriginErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalRemoveOriginErrorResponse(v Internal) RemoveOriginErrorResponse {
 	var s RemoveOriginErrorResponse
 	s.SetInternal(v)
-	return s
-}
-
-// SetNotImplemented sets RemoveOriginErrorResponse to NotImplemented.
-func (s *RemoveOriginErrorResponse) SetNotImplemented(v NotImplemented) {
-	s.Type = NotImplementedRemoveOriginErrorResponse
-	s.NotImplemented = v
-}
-
-// GetNotImplemented returns NotImplemented and true boolean if RemoveOriginErrorResponse is NotImplemented.
-func (s RemoveOriginErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
-	if !s.IsNotImplemented() {
-		return v, false
-	}
-	return s.NotImplemented, true
-}
-
-// NewNotImplementedRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from NotImplemented.
-func NewNotImplementedRemoveOriginErrorResponse(v NotImplemented) RemoveOriginErrorResponse {
-	var s RemoveOriginErrorResponse
-	s.SetNotImplemented(v)
 	return s
 }
 
@@ -59850,27 +59780,6 @@ func NewProjMissingIDRemoveOriginErrorResponse(v ProjMissingID) RemoveOriginErro
 	return s
 }
 
-// SetProjNotFound sets RemoveOriginErrorResponse to ProjNotFound.
-func (s *RemoveOriginErrorResponse) SetProjNotFound(v ProjNotFound) {
-	s.Type = ProjNotFoundRemoveOriginErrorResponse
-	s.ProjNotFound = v
-}
-
-// GetProjNotFound returns ProjNotFound and true boolean if RemoveOriginErrorResponse is ProjNotFound.
-func (s RemoveOriginErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
-	if !s.IsProjNotFound() {
-		return v, false
-	}
-	return s.ProjNotFound, true
-}
-
-// NewProjNotFoundRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from ProjNotFound.
-func NewProjNotFoundRemoveOriginErrorResponse(v ProjNotFound) RemoveOriginErrorResponse {
-	var s RemoveOriginErrorResponse
-	s.SetProjNotFound(v)
-	return s
-}
-
 // SetReqInvalid sets RemoveOriginErrorResponse to ReqInvalid.
 func (s *RemoveOriginErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidRemoveOriginErrorResponse
@@ -59889,27 +59798,6 @@ func (s RemoveOriginErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidRemoveOriginErrorResponse(v ReqInvalid) RemoveOriginErrorResponse {
 	var s RemoveOriginErrorResponse
 	s.SetReqInvalid(v)
-	return s
-}
-
-// SetUnavailable sets RemoveOriginErrorResponse to Unavailable.
-func (s *RemoveOriginErrorResponse) SetUnavailable(v Unavailable) {
-	s.Type = UnavailableRemoveOriginErrorResponse
-	s.Unavailable = v
-}
-
-// GetUnavailable returns Unavailable and true boolean if RemoveOriginErrorResponse is Unavailable.
-func (s RemoveOriginErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
-	if !s.IsUnavailable() {
-		return v, false
-	}
-	return s.Unavailable, true
-}
-
-// NewUnavailableRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from Unavailable.
-func NewUnavailableRemoveOriginErrorResponse(v Unavailable) RemoveOriginErrorResponse {
-	var s RemoveOriginErrorResponse
-	s.SetUnavailable(v)
 	return s
 }
 
