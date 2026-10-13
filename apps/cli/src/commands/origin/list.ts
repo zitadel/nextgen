@@ -1,7 +1,8 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { renderRows, renderTable } from "../../lib/oclif/crud/table";
+import { renderList } from "../../lib/oclif/crud/table";
+import { listData } from "../../lib/oclif/envelope";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["pattern", "kind"] as const;
@@ -40,23 +41,13 @@ export default class OriginList extends EnvironmentCommand {
     const plain = flags.plain || !process.stdout.isTTY;
     return this.emit({
       status: "ok",
-      data: {
-        // The canonical list envelope every list command emits, so an agent
-        // can read any of them through `{ items, count, next_page_token }`. The
-        // project returns its whole origin set in one page, so the token is null.
-        items: origins,
-        count: origins.length,
-        next_page_token: null,
-      },
-      pretty: plain
-        ? renderRows(COLUMNS, origins)
-        : origins.length === 0
-          ? "No origins on the project."
-          : [
-              renderTable(COLUMNS, origins),
-              "",
-              `${origins.length} ${origins.length === 1 ? "origin" : "origins"}`,
-            ].join("\n"),
+      // The project returns its whole origin set in one page, so the token is null.
+      data: listData(origins),
+      pretty: renderList(COLUMNS, origins, {
+        plain,
+        singular: "origin",
+        empty: "No origins on the project.",
+      }),
     });
   }
 }
