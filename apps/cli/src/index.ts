@@ -52,3 +52,5 @@ export const COMMANDS: Record<string, typeof Command> = {
   "variables:delete": VariablesDelete,
   ...RESOURCE_COMMANDS,
 };
+
+// spike: timing marker, not for merge
