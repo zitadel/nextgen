@@ -319,6 +319,14 @@ project and imports the root admin.
 - **Signing in:** `/ui/console/` with the environment's root admin from
   1Password (production and preview have different passwords). Anyone else
   registers through the login UI.
+- **Turbo's remote cache:** the console, storybook and login UI builds read
+  and write the team's remote cache, production and previews in separate
+  entries; each build's log shows `cache hit` or `cache miss` per task, and
+  the deployment's Run Summary shows why a task missed. A build with a
+  result that is wrong although its inputs are right (a broken or planted
+  entry) is fixed by a team owner clearing the cache (team Settings → Build
+  and Deployment → Remote Caching); a redeploy without the build cache
+  skips the remote cache too.
 - **Build cache:** Vercel keeps one per branch (a branch's first build
   starts from production's) and restores it before the installs: every
   `node_modules`, the docs' and the website's `.next/cache`, and
