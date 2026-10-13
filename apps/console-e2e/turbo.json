@@ -1,0 +1,28 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // The e2e lanes are opt-in; typechecking the specs is cheap and keeps API
+    // contract drift visible in CI.
+    "typecheck": {
+      "dependsOn": ["@zitadel/testing#build"]
+    },
+    "e2e": {
+      "dependsOn": ["@zitadel/console#build"]
+    },
+    // The three real-instance lanes boot the server build (which embeds the
+    // working tree's UI dists) through the kit. The ports (8093, 8095, 8097)
+    // and the binary path are the Playwright configs' defaults; the scripts
+    // set the NEXTGEN_* switches each lane asserts (see the moon.yml comments
+    // for why).
+    "e2e-real": {
+      "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"]
+    },
+    "e2e-embedded": {
+      "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"]
+    },
+    "e2e-platform": {
+      "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"]
+    }
+  }
+}

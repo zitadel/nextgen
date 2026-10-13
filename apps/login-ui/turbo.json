@@ -1,0 +1,30 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "typecheck": {
+      "dependsOn": ["@zitadel/components#build"]
+    },
+    "test": {
+      "dependsOn": ["@zitadel/components#build"]
+    },
+    // Builds into the server's embed directory, outside the package.
+    "build": {
+      "dependsOn": ["@zitadel/components#build"],
+      "outputs": ["$TURBO_ROOT$/internal/staticui/login/dist/**"]
+    },
+    // The release UI build consumes the package release output and runs after
+    // the public packages' release builds (tools/release/turbo.json).
+    "build-release": {
+      "dependsOn": ["@zitadel/components#build-release", "@zitadel/release#build-public-packages"],
+      "outputs": ["$TURBO_ROOT$/internal/staticui/login/dist/**"]
+    },
+    // components has no `@zitadel/source` entry, so the dev server loads its dist.
+    "dev": {
+      "dependsOn": ["@zitadel/components#build"]
+    },
+    "preview": {
+      "dependsOn": ["build"]
+    }
+  }
+}
