@@ -37,7 +37,7 @@ Two product constraints shape the answers:
   Routing must survive a hard refresh on a deep link, and the client basepath
   must line up with that embed prefix.
 - That embed prefix is owned by the Vite `base`
-  ([`vite.config.mts`](../../vite.config.mts): a build/preview prefix, `/` for
+  ([`vite.config.ts`](../../vite.config.ts): a build/preview prefix, `/` for
   the dev server), so the router should take the prefix from there rather than
   declaring its own copy.
 
@@ -47,7 +47,7 @@ Two product constraints shape the answers:
 
 The console uses **TanStack Router file-based routing**. Routes live under
 `src/routes/`; the `@tanstack/router-plugin` (already configured in
-[`vite.config.mts`](../../vite.config.mts) with `autoCodeSplitting: true`)
+[`vite.config.ts`](../../vite.config.ts) with `autoCodeSplitting: true`)
 generates `src/routeTree.gen.ts`.
 
 `src/routeTree.gen.ts` is a **generated file**: it is never hand-edited (per
@@ -83,7 +83,7 @@ Vite injects from its `base` option:
 const basepath = import.meta.env.BASE_URL.replace(/\/$/, "") || undefined;
 ```
 
-This makes the router prefix track [`vite.config.mts`](../../vite.config.mts)
+This makes the router prefix track [`vite.config.ts`](../../vite.config.ts)
 automatically: `BASE_URL` is the deployment prefix for `build`/`preview` and
 `/` for the dev server, so the router and the emitted asset base always agree —
 including under `vite preview` (PROD-built assets served by a "serve" command),
@@ -91,7 +91,7 @@ which is where an `import.meta.env.PROD` check would get the prefix wrong.
 
 The concrete prefix value is **not** something routing should bake in. The
 router stays value-agnostic: it reads whatever `BASE_URL` resolves to, so the
-prefix is owned by exactly one file (`vite.config.mts`) and can be changed — or
+prefix is owned by exactly one file (`vite.config.ts`) and can be changed — or
 dropped — there without touching any routing code. Hardcoding the prefix in the
 router (as legacy code did) is explicitly out.
 
@@ -224,7 +224,7 @@ the sidebar.
   — the typed client loaders call.
 - [`apps/console/src/router.tsx`](../../src/router.tsx),
   [`apps/console/src/main.tsx`](../../src/main.tsx),
-  [`apps/console/vite.config.mts`](../../vite.config.mts).
+  [`apps/console/vite.config.ts`](../../vite.config.ts).
 - [`internal/staticui/handler.go`](../../../../internal/staticui/handler.go)
   — SPA fallback that makes deep links survive refresh.
 - Root [ADR 055: A Lit-only login surface, with the console on shadcn/ui](../../../../docs/adrs/055-lit-only-login-surface.md)

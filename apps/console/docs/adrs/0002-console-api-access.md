@@ -201,7 +201,7 @@ that follows from who serves the console:
   script-readable bearer:
 
 ```ts
-// vite.config.mts (dev only) — illustrative
+// vite.config.ts (dev only) — illustrative
 server: {
   proxy: {
     // Vite proxy strips the /api prefix and forwards to the Go API; no credential

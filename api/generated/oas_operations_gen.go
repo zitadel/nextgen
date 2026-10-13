@@ -7,6 +7,7 @@ type OperationName = string
 
 const (
 	BeginUserPasskeyRegistrationOperation  OperationName = "BeginUserPasskeyRegistration"
+	BuildReleaseOperation                  OperationName = "BuildRelease"
 	CompleteClaimOperation                 OperationName = "CompleteClaim"
 	CreateAuthAttemptOperation             OperationName = "CreateAuthAttempt"
 	CreateBrandingOperation                OperationName = "CreateBranding"
@@ -75,6 +76,7 @@ const (
 	QueryTeamsOperation                    OperationName = "QueryTeams"
 	QueryUsersOperation                    OperationName = "QueryUsers"
 	RevokeMySessionOperation               OperationName = "RevokeMySession"
+	RevokeReleaseOperation                 OperationName = "RevokeRelease"
 	RevokeSessionOperation                 OperationName = "RevokeSession"
 	SetUserPasswordOperation               OperationName = "SetUserPassword"
 	SubmitFlowStepOperation                OperationName = "SubmitFlowStep"
