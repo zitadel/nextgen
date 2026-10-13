@@ -62,6 +62,7 @@ var payloadByEventType = map[string]string{
 	"branding.created": "branding-created-payload.yaml",
 
 	"release.created": "release-created-payload.yaml",
+	"release.revoked": "release-revoked-payload.yaml",
 
 	"idp.created": "idp-payload.yaml",
 	"idp.updated": "idp-payload.yaml",

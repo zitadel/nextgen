@@ -1,0 +1,77 @@
+title: ConfigurationBundle
+type: object
+description: |
+  The resources of a project's `.zitadel/` directory as authored on disk,
+  grouped by kind.
+
+  Resources reference each other by handle: a flow definition's
+  `user_schema` names a schema by its `objectType`, and a flow step's
+  `sso_providers`, like a schema's `x-auth-methods.sso.providers`, name IDP
+  connections by `slug`. A reference resolves to
+  the resource with that handle in this bundle; failing that, to the
+  project's newest revision of it, which the release then pins as well. A
+  handle that neither holds refuses the release, naming the pointer and the
+  handle. A bundle that references only resources it carries builds the
+  same release on any project.
+
+  A handle names one resource of its kind in a bundle. Two schemas with the
+  same `objectType`, two flow definitions with the same `name`, two IDP
+  connections with the same `slug`, or a schema without an `objectType`
+  refuse the release with `rel.invalid`, with an
+  entry for each such resource.
+
+  Each kind is optional, and the arrays may be empty: a project that never
+  ejected its branding omits `branding`. The bundle carries at least one
+  resource, and the release it builds pins at most 50, the most a release
+  pins: the resources the bundle carries plus those resolved from the
+  project. The server refuses anything outside that with `rel.invalid`.
+  Unknown keys are refused. More kinds join as they become release kinds.
+additionalProperties: false
+properties:
+  schemas:
+    type: array
+    maxItems: 50
+    description: |
+      User schemas, one per `.zitadel/schemas/*.json`, in either form
+      `POST /schemas` takes.
+
+      An inline `user-schema` must not declare `$id`: a schema's `$id` is
+      its revision's identity, so a changed schema under the same `$id`
+      could never become a new revision. Such a schema gets a `rel.invalid`
+      entry.
+
+      A `schema-url` entry's handle is the `objectType` of the document the
+      URL serves. Its revision is identified by the URL, so the release
+      reuses the project's revision for a URL the project already holds and
+      fetches the document only for a URL it does not.
+    items:
+      oneOf:
+        - $ref: ../../schemas/user-schema.yaml
+        - $ref: ../../schemas/schema-url.yaml
+      discriminator:
+        propertyName: kind
+        mapping:
+          user-schema: ../../schemas/user-schema.yaml
+          schema-url: ../../schemas/schema-url.yaml
+  flow_definitions:
+    type: array
+    maxItems: 50
+    description: Flow definitions, one per `.zitadel/flows/*.json`.
+    items:
+      $ref: ../../../components/flows/flow-definition.yaml
+  idps:
+    type: array
+    maxItems: 50
+    description: |
+      IDP connections, one per `.zitadel/idps/<slug>.json`, each the
+      connection document `POST /idps` takes as `idp`. Secrets appear only
+      as `${{ NAME }}` references to variables, never as values, so a bundle
+      carries no credentials.
+    items:
+      $ref: ../../idps/idp-connection.yaml
+  branding:
+    $ref: ../../../components/flows/branding.yaml
+    description: |
+      The descriptor from `.zitadel/branding/branding.json` with its template
+      inlined, exactly as `POST /branding` takes it. A project has one
+      branding, so this is a single object.
