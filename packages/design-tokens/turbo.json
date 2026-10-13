@@ -1,0 +1,33 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // Pulls the live tokens from the Figma API. Nothing in the repo says when
+    // they changed, so a cache hit would skip the fetch and report success.
+    "sync": {
+      "cache": false,
+      "passThroughEnv": ["FIGMA_*"]
+    },
+    "sync:export": {
+      "outputs": ["src/generated/figma.tokens.json"]
+    },
+    // The Figma export is the input; the rest is generated (and committed).
+    "generate": {
+      "outputs": [
+        "src/generated/tokens.css",
+        "src/generated/tokens.ts",
+        "src/generated/tailwind.css",
+        "src/generated/shadcn.css"
+      ]
+    },
+    "typecheck": {
+      "dependsOn": ["generate"]
+    },
+    "build": {
+      "dependsOn": ["generate"]
+    },
+    "test": {
+      "dependsOn": ["generate"]
+    }
+  }
+}
