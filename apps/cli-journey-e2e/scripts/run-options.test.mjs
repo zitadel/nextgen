@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
-import { parseLocalJourneyArgs } from "./run-options.mjs";
+import { journeyArgsFromEnv, parseLocalJourneyArgs } from "./run-options.mjs";
 
 test("local journey defaults to the full framework matrix", () => {
   assert.deepEqual(parseLocalJourneyArgs([]), {
@@ -166,6 +166,40 @@ test("--ci rejects the flags that pick a single variant's shape", () => {
     () => parseLocalJourneyArgs(["--ci", "--preexisting-app"]),
     /--ci runs the full CI journey set/,
   );
+});
+
+test("the JOURNEY_* variables stand for the options CI sets", () => {
+  assert.deepEqual(
+    journeyArgsFromEnv({
+      JOURNEY_CI: "1",
+      JOURNEY_MATRIX: "single",
+      JOURNEY_RUNTIME: "binary",
+      JOURNEY_TARBALLS_DIR: "dist/release/1.0.0/npm",
+      JOURNEY_WORK_DIR: "/tmp/ci-journey",
+    }),
+    [
+      "--ci",
+      "--matrix",
+      "single",
+      "--runtime",
+      "binary",
+      "--tarballs-dir",
+      "dist/release/1.0.0/npm",
+      "--work-dir",
+      "/tmp/ci-journey",
+    ],
+  );
+  assert.deepEqual(journeyArgsFromEnv({ JOURNEY_CI: "0", JOURNEY_MATRIX: "" }), []);
+});
+
+test("the command line's arguments win over the JOURNEY_* variables", () => {
+  const parsed = parseLocalJourneyArgs([
+    ...journeyArgsFromEnv({ JOURNEY_CI: "1", JOURNEY_WORK_DIR: "/tmp/from-env" }),
+    "--work-dir",
+    "/tmp/from-args",
+  ]);
+  assert.equal(parsed.ci, true);
+  assert.equal(parsed.workDir, "/tmp/from-args");
 });
 
 test("local journey rejects invalid options", () => {

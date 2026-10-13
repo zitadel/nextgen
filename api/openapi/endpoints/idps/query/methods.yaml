@@ -9,6 +9,7 @@ post:
   security:
     - oauth2:
         - idp.read
+    - nextgenSession: []
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
   requestBody:

@@ -56,6 +56,7 @@ var operationRolesNextgenSession = map[string][]string{
 	GetBrandingByIdOperation:       []string{},
 	GetFlowDefinitionOperation:     []string{},
 	GetGrantOperation:              []string{},
+	GetIdpByIdOperation:            []string{},
 	GetMySessionOperation:          []string{},
 	GetMySessionCsrfTokenOperation: []string{},
 	GetMyUserOperation:             []string{},
@@ -71,6 +72,7 @@ var operationRolesNextgenSession = map[string][]string{
 	PatchMyUserOperation:           []string{},
 	PatchProjectOperation:          []string{},
 	QueryGrantsOperation:           []string{},
+	QueryIdpsOperation:             []string{},
 	QueryTeamsOperation:            []string{},
 	QueryUsersOperation:            []string{},
 	RevokeMySessionOperation:       []string{},
@@ -102,6 +104,9 @@ func GetRolesForNextgenSession(operation string) []string {
 var oauth2ScopesOAuth2 = map[string][]string{
 	BeginUserPasskeyRegistrationOperation: []string{
 		"user.write",
+	},
+	BuildReleaseOperation: []string{
+		"release.write",
 	},
 	CreateAuthAttemptOperation: []string{
 		"auth_attempt.write",
@@ -265,6 +270,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	QueryUsersOperation: []string{
 		"user.read",
+	},
+	RevokeReleaseOperation: []string{
+		"release.write",
 	},
 	RevokeSessionOperation: []string{
 		"session.delete",

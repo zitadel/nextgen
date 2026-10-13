@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
-import { computeMode, forceFullReason, queryAffectedTargets, resolveGates } from "./ci-mode.mjs";
+import {
+  affectedTurboTargets,
+  computeMode,
+  forceFullReason,
+  queryAffectedTargets,
+  resolveGates,
+} from "./ci-mode.mjs";
 
 // Affected sets below are real `moon query tasks --affected --downstream deep`
 // results captured on main (2026-08-03/04) for one representative touched
@@ -406,21 +412,99 @@ function fakeSpawn(result) {
   return () => ({ status: 0, stdout: "", stderr: "", ...result });
 }
 
+const moon = { runner: "moon" };
+
 test("queryAffectedTargets parses the grouped task map", () => {
   const targets = queryAffectedTargets(
     "HEAD",
     fakeSpawn({ stdout: '{"tasks":{"server":{"test":{},"build":{}},"release":{"snapshot":{}}}}' }),
+    moon,
   );
   assert.deepEqual(targets?.sort(), ["release:snapshot", "server:build", "server:test"]);
 });
 
 test("queryAffectedTargets returns an empty set for an empty tasks map", () => {
-  assert.deepEqual(queryAffectedTargets("HEAD", fakeSpawn({ stdout: '{"tasks":{}}' })), []);
+  assert.deepEqual(queryAffectedTargets("HEAD", fakeSpawn({ stdout: '{"tasks":{}}' }), moon), []);
 });
 
 test("queryAffectedTargets fails open on schema drift, garbage output, and nonzero exits", () => {
-  assert.equal(queryAffectedTargets("HEAD", fakeSpawn({ stdout: '{"unexpected":true}' })), null);
-  assert.equal(queryAffectedTargets("HEAD", fakeSpawn({ stdout: '{"tasks":[1,2]}' })), null);
-  assert.equal(queryAffectedTargets("HEAD", fakeSpawn({ stdout: "not json" })), null);
-  assert.equal(queryAffectedTargets("HEAD", fakeSpawn({ status: 1, stderr: "boom" })), null);
+  const query = (result) => queryAffectedTargets("HEAD", fakeSpawn(result), moon);
+  assert.equal(query({ stdout: '{"unexpected":true}' }), null);
+  assert.equal(query({ stdout: '{"tasks":[1,2]}' }), null);
+  assert.equal(query({ stdout: "not json" }), null);
+  assert.equal(query({ status: 1, stderr: "boom" }), null);
+});
+
+// A trimmed `turbo run … --dry=json`: inputs are relative to the task's
+// package directory, dependents are task ids. The api build feeds the console
+// build, which the server's tests embed; the docs check stands alone.
+function turboGraph() {
+  const task = (taskId, directory, inputs, dependents, command = "pnpm run x") => ({
+    taskId,
+    directory,
+    command,
+    inputs: Object.fromEntries(inputs.map((file) => [file, "hash"])),
+    dependents,
+  });
+  return {
+    globalCacheInputs: { files: { "tsconfig.base.json": "hash", "biome.json": "hash" } },
+    tasks: [
+      task(
+        "@zitadel/api#generate",
+        "packages/api",
+        ["../../api/openapi/openapi-spec.yaml"],
+        ["@zitadel/api#build"],
+      ),
+      task("@zitadel/api#build", "packages/api", ["src/index.ts"], ["@zitadel/console#build"]),
+      task("@zitadel/console#build", "apps/console", ["src/main.tsx"], ["@zitadel/server#test"]),
+      task("@zitadel/server#test", "apps/server", ["../../internal/server.go"], []),
+      task("@zitadel/testing#test:integration", "packages/testing", ["src/kit.ts"], []),
+      task("//#check-adrs", "", ["docs/adrs/001.md"], []),
+      task("@zitadel/docs#test", "apps/docs", ["package.json"], [], "<NONEXISTENT>"),
+    ],
+  };
+}
+
+test("affectedTurboTargets walks dependents of the tasks whose inputs changed, not dependencies", () => {
+  assert.deepEqual(affectedTurboTargets(turboGraph(), ["apps/console/src/main.tsx"]).sort(), [
+    "console:build",
+    "server:test",
+  ]);
+  assert.deepEqual(affectedTurboTargets(turboGraph(), ["internal/server.go"]), ["server:test"]);
+  assert.deepEqual(affectedTurboTargets(turboGraph(), ["api/openapi/openapi-spec.yaml"]).sort(), [
+    "api:build",
+    "api:generate",
+    "console:build",
+    "server:test",
+  ]);
+});
+
+test("affectedTurboTargets maps root tasks, colon scripts and packages without a script", () => {
+  assert.deepEqual(affectedTurboTargets(turboGraph(), ["docs/adrs/001.md"]), [
+    "workspace:check-adrs",
+  ]);
+  assert.deepEqual(affectedTurboTargets(turboGraph(), ["packages/testing/src/kit.ts"]), [
+    "testing:test-integration",
+  ]);
+  // apps/docs has no test script: its placeholder task is never affected.
+  assert.deepEqual(affectedTurboTargets(turboGraph(), ["apps/docs/package.json"]), []);
+  assert.deepEqual(affectedTurboTargets(turboGraph(), ["README.md"]), []);
+});
+
+test("affectedTurboTargets treats a changed global input as affecting every task", () => {
+  const targets = affectedTurboTargets(turboGraph(), ["biome.json"]);
+  assert.equal(targets.length, 6);
+  assert.ok(targets.includes("workspace:check-adrs"));
+});
+
+test("queryAffectedTargets under turbo fails open on garbage output and nonzero exits", () => {
+  const query = (result, files = ["x"]) =>
+    queryAffectedTargets("HEAD", fakeSpawn(result), { runner: "turbo", files });
+  assert.equal(query({ stdout: "not json" }), null);
+  assert.equal(query({ stdout: '{"nope":1}' }), null);
+  assert.equal(query({ status: 1, stderr: "boom" }), null);
+  assert.deepEqual(
+    query({ stdout: JSON.stringify(turboGraph()) }, ["apps/console/src/main.tsx"]).sort(),
+    ["console:build", "server:test"],
+  );
 });

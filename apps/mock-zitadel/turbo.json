@@ -1,0 +1,17 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // Bundles the function into one self-contained file (tsdown.config.ts);
+    // the deployed entry imports this, not the workspace source.
+    "build": {
+      "dependsOn": ["@zitadel/api-mock#build"]
+    },
+    "typecheck": {
+      "dependsOn": ["@zitadel/api-mock#build"]
+    },
+    "test": {
+      "dependsOn": ["@zitadel/api-mock#build"]
+    }
+  }
+}
