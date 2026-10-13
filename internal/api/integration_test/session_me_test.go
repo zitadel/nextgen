@@ -36,6 +36,7 @@ func TestGetMySession_Identity(t *testing.T) {
 		"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
 		"$id": "https://session-me.example.com/schemas/human-user.json",
 		"kind": "user-schema",
+		"objectType": "session-me-user",
 		"type": "object",
 		"x-identifier": "email",
 		"x-display": ["givenName", "familyName"],

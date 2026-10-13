@@ -54,8 +54,8 @@ export type MaterializeSetupResourcesResult = {
  * initial state file.
  *
  * The schema is uploaded without an `$id`: the server assigns an opaque id on
- * `POST /schemas`, and the flow file can only be rendered after that id comes
- * back because `flow_definition.user_schema` must reference it.
+ * `POST /schemas`. The flow names the schema by its `objectType`, but is
+ * published after it because the server refuses a flow naming no schema.
  */
 export async function materializeSetupResources(opts: {
   cwd: string;
@@ -209,7 +209,7 @@ export async function materializeSetupResources(opts: {
     hash: schemaHash,
   });
 
-  const flowTemplate = getDefaultLoginFlow({ userSchemaUrl: schemaId, preset, useCase });
+  const flowTemplate = getDefaultLoginFlow({ preset, useCase });
   // The conflict step the provider needs can only offer what this schema
   // actually enables, so the methods are read back off the composed document
   // rather than inferred from the preset.

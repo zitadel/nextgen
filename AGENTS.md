@@ -216,8 +216,11 @@ In CI the branch-protection check is the GitHub Actions context `full-pr`,
 shown in the pull request UI as `ci / full-pr`; it consumes the workflow's
 packed npm tarballs instead of public Zitadel packages. Changesets PR comments
 are informational release-intent feedback and are not branch-protection
-requirements. Mirror the gate locally with
-`moon run workspace:check -- --full`; the full step list is in
+requirements. Pull requests land through the merge queue, which runs
+`full-pr` again on the latest `main`, so merge `main` into a branch only to
+resolve a conflict or pick up a change it needs, never just to keep it
+current ([CONTRIBUTING.md](CONTRIBUTING.md#merging)). Mirror the gate
+locally with `moon run workspace:check -- --full`; the full step list is in
 [CONTRIBUTING.md](CONTRIBUTING.md#what-ci-runs).
 
 ### Interactive demo verification

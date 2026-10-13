@@ -56,17 +56,18 @@ must be absolute `https://`. Keep exactly one descriptor in
 Server-provisioned defaults remain a fallback for non-CLI project
 creation, but CLI-created projects are authored from local files first. Flows are
 revisioned like branding: an edit plans as a `revise` and `apply` publishes a new
-immutable flow revision; a schema revise re-publishes the flows pinned to it with
-the new `user_schema` in the same run. A login pinned by `flow-name` serves that
+immutable flow revision. A flow names its schema by `objectType` in
+`user_schema` and runs against the schema's newest revision, so a schema revise
+leaves flow files alone. A login pinned by `flow-name` serves that
 flow's newest revision; an unpinned login serves the newest active unscoped flow
 in the project, whatever its name. Removing a flow file does not retire the
 flow. Managed files carry a marker comment; `eject` removes only
 files that still carry it, preserving anything the user replaced. For app-local
 development, `--server local` resolves through `.zitadel/local/runtime.json` and
 requires a healthy
-`npx @zitadel/cli@alpha start` runtime. Because `start` writes `.zitadel/local/`
-into the directory, it is no longer empty, so a same-directory `setup` that
-scaffolds must be passed `--force` (this is exactly what the golden path does).
+`npx @zitadel/cli@alpha start` runtime. The `.zitadel/local/` that `start`
+writes into the directory still counts as empty, so a same-directory `setup`
+scaffolds without `--force` (this is exactly what the golden path does).
 `setup` installs dependencies
 with the detected package manager by default; pass `--skip-install` when the
 agent or host workflow will install dependencies separately.

@@ -559,3 +559,16 @@ sections:
 - `Release notes / changeset` — changeset status for user-visible package
   changes.
 - `Notes` — reviewer context, follow-ups, risks, or `None`.
+
+### Merging
+
+`main` takes pull requests through GitHub's merge queue, squashed. Click
+**Merge when ready** (or run `gh pr merge --auto`): once `full-pr` is green
+on the pull request, the queue picks it up, runs `full-pr` again on it
+combined with the latest `main` and the pull requests queued ahead of it, and
+merges it when that run passes too. A failing run takes it out of the queue;
+fix the branch and queue it again.
+
+A branch does not have to be up to date with `main` to merge. Merge `main`
+into it only to resolve a conflict or to pick up a change you need: every
+push runs `full-pr` and rebuilds the branch's cloud preview.

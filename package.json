@@ -46,6 +46,14 @@
       "esbuild",
       "sharp"
     ],
+    "ignoredBuiltDependencies": [
+      "@parcel/watcher",
+      "@swc/core",
+      "lmdb",
+      "msgpackr-extract",
+      "msw",
+      "vue-demi"
+    ],
     "overrides": {
       "@types/react": "^19.2.14",
       "@types/node": "catalog:",

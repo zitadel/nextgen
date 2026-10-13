@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ZitadelError } from "../../../../src/lib/errors";
-import { Orca } from "../../../../src/lib/orca";
+import { inspectScaffoldTarget, Orca } from "../../../../src/lib/orca";
 import type { Detector } from "../../../../src/lib/orca";
 import { detectors } from "../../../../src/lib/orca/detectors";
 import { patchers } from "../../../../src/lib/orca/patchers";
@@ -136,19 +136,29 @@ describe("Orca detection", () => {
     expect(await orca.isFreshScaffoldTarget(await tmp())).toBe(true);
   });
 
-  it("treats any non-empty directory — even just a .gitignore — as not fresh", async () => {
+  it("treats a directory holding only what start leaves as fresh", async () => {
     const cwd = await tmp();
     await writeFile(join(cwd, ".gitignore"), ".zitadel/local/\n");
-
-    expect(await orca.isFreshScaffoldTarget(cwd)).toBe(false);
-  });
-
-  it("treats a directory containing .zitadel as not fresh", async () => {
-    const cwd = await tmp();
     await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
     await writeFile(join(cwd, ".zitadel/local/runtime.json"), "{}");
 
-    expect(await orca.isFreshScaffoldTarget(cwd)).toBe(false);
+    expect(await orca.isFreshScaffoldTarget(cwd)).toBe(true);
+
+    // After `reset`, the runtime is gone and its parent may stay behind empty.
+    await rm(join(cwd, ".zitadel/local"), { recursive: true });
+    expect(await orca.isFreshScaffoldTarget(cwd)).toBe(true);
+  });
+
+  it("treats a .gitignore with rules of its own as not fresh, and names only it", async () => {
+    const cwd = await tmp();
+    await writeFile(join(cwd, ".gitignore"), "node_modules\n.zitadel/local/\n");
+    await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
+
+    await expect(inspectScaffoldTarget(cwd)).resolves.toEqual({
+      scaffoldable: false,
+      reason: "Directory is not empty (contains .gitignore).",
+      entries: [".gitignore", ".zitadel"],
+    });
   });
 
   it("rejects project state and arbitrary files as fresh scaffold targets", async () => {
@@ -197,7 +207,7 @@ describe("Orca.scaffold", () => {
     await expect(readFile(join(cwd, "package.json"), "utf8")).resolves.toBe("{}");
   });
 
-  it("with force, scaffolds into a non-empty dir and restores what it did not create", async () => {
+  it("without force, scaffolds beside the runtime start left and restores it", async () => {
     const cwd = await tmpPackageSafe();
     await writeFile(join(cwd, ".gitignore"), ".zitadel/local/\n");
     await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
@@ -220,7 +230,7 @@ describe("Orca.scaffold", () => {
     };
     const guardedOrca = new Orca([fakeDetector], [guardedScaffolder], []);
 
-    await expect(guardedOrca.scaffold(cwd, "fake", true)).resolves.toMatchObject({ id: "fake" });
+    await expect(guardedOrca.scaffold(cwd, "fake")).resolves.toMatchObject({ id: "fake" });
     await expect(readFile(join(cwd, "package.json"), "utf8")).resolves.toBe("{}");
     // Untouched by the scaffold, so restored verbatim.
     await expect(readFile(join(cwd, ".zitadel/local/runtime.json"), "utf8")).resolves.toContain(
@@ -232,6 +242,17 @@ describe("Orca.scaffold", () => {
     await expect(readFile(join(cwd, ".gitignore"), "utf8")).resolves.toBe(
       "node_modules\n.zitadel/local/\n",
     );
+  });
+
+  it("with force, scaffolds into a non-empty dir and restores what it did not create", async () => {
+    const cwd = await tmpPackageSafe();
+    await writeFile(join(cwd, "notes.txt"), "mine");
+    await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
+
+    await expect(fakeOrca.scaffold(cwd, "fake", true)).resolves.toMatchObject({ id: "fake" });
+    await expect(readFile(join(cwd, "package.json"), "utf8")).resolves.toBe("{}");
+    await expect(readFile(join(cwd, "notes.txt"), "utf8")).resolves.toBe("mine");
+    await expect(stat(join(cwd, ".zitadel/local"))).resolves.toBeTruthy();
   });
 
   it("with force, a failed scaffold rolls back and restores the originals", async () => {
