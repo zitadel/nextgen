@@ -273,7 +273,12 @@ export default class SsoEnable extends EnvironmentCommand {
       consola.info(`${schema.name} and its login flow already offer ${entry.displayName}`);
     }
     if (clientIdState !== undefined && idVariable !== undefined) {
-      reportClientIdOutcome(idVariable, clientIdState, this.meta.cliVersion, this.environmentSelector());
+      reportClientIdOutcome(
+        idVariable,
+        clientIdState,
+        this.meta.cliVersion,
+        this.environmentSelector(),
+      );
     }
     if (secret) {
       // A reuse that piped nothing in had no value to publish; a create always
