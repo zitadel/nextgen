@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, MOCK_SERVER_URL } from "../helpers/project";
+import { aSetUpApp, MOCK_SERVER_URL, onATerminal } from "../helpers/project";
 
 const platform = usePlatformMock();
 
 interface Listing {
-  readonly environments: Array<{ name: string; source: string; resolved: boolean }>;
+  readonly items: Array<{ name: string; source: string; resolved: boolean }>;
 }
 
 describe("env list", () => {
@@ -45,9 +45,10 @@ describe("env list", () => {
 
         const result = await app.run(["env", "list", "--json"]);
 
-        expect(
-          app.envelopeOf<Listing>(result).data.environments.map((entry) => entry.name),
-        ).toEqual(["development", "production"]);
+        expect(app.envelopeOf<Listing>(result).data.items.map((entry) => entry.name)).toEqual([
+          "development",
+          "production",
+        ]);
       });
 
       it("leaves out a file that binds no project", async () => {
@@ -56,9 +57,9 @@ describe("env list", () => {
 
         const result = await app.run(["env", "list", "--json"]);
 
-        expect(
-          app.envelopeOf<Listing>(result).data.environments.map((entry) => entry.name),
-        ).not.toContain("scratch");
+        expect(app.envelopeOf<Listing>(result).data.items.map((entry) => entry.name)).not.toContain(
+          "scratch",
+        );
       });
 
       it("marks the environment that resolves now", async () => {
@@ -71,7 +72,7 @@ describe("env list", () => {
         const result = await app.run(["env", "list", "--env", "production", "--json"]);
 
         expect(
-          app.envelopeOf<Listing>(result).data.environments.filter((entry) => entry.resolved),
+          app.envelopeOf<Listing>(result).data.items.filter((entry) => entry.resolved),
         ).toEqual([expect.objectContaining({ name: "production" })]);
       });
 
@@ -80,9 +81,9 @@ describe("env list", () => {
 
         const result = await app.run(["env", "list", "--json"], { ZITADEL_PROJECT_ID: "proj_ci" });
 
-        expect(
-          app.envelopeOf<Listing>(result).data.environments.map((entry) => entry.source),
-        ).toContain("process environment");
+        expect(app.envelopeOf<Listing>(result).data.items.map((entry) => entry.source)).toContain(
+          "process environment",
+        );
       });
     });
 
@@ -90,7 +91,7 @@ describe("env list", () => {
       it("says which environment resolves now", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.run(["env", "list"]);
+        const result = await onATerminal(() => app.run(["env", "list"]));
 
         expect(result).toPrint("Resolved now: development");
       });
@@ -99,7 +100,7 @@ describe("env list", () => {
         const app = await aSetUpApp();
         await app.deleteProjectFile(".env.development.local");
 
-        const result = await app.run(["env", "list"]);
+        const result = await onATerminal(() => app.run(["env", "list"]));
 
         expect(result).toPrint("zitadel env add");
       });
