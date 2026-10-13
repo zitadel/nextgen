@@ -22,7 +22,8 @@ Four apps are **exceptions**, for reasons that are not a style choice:
   ([`internal/staticui/console/embed.go`](../internal/staticui/console/embed.go)).
   The output path is dictated by the embed, not by this convention. The
   hosted cloud's `console` service (repo-root [`vercel.json`](../vercel.json))
-  copies that build to `dist/ui/console/` and serves `dist`.
+  builds it for `/console/` (`CONSOLE_BASE_PATH`), copies that build to
+  `dist/console/` and serves `dist`.
 - **`docs`** and **`website`** are Next.js apps, deployed only as the hosted
   cloud's `docs` and `website` services: Next builds into `.next/`, which
   Vercel's Next.js preset reads, so there is no output directory to set.
