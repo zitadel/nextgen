@@ -442,7 +442,7 @@ export class ScaffoldedApp {
       ...(preview ? ["--preview"] : []),
     ]);
     expect(result, "variable list should have succeeded").toSucceed();
-    return this.envelopeOf<{ variables: ProjectVariable[] }>(result).data.variables;
+    return this.envelopeOf<{ items: ProjectVariable[] }>(result).data.items;
   }
 
   /**

@@ -2,6 +2,7 @@ import type { ZitadelClient } from "@zitadel/api/client";
 import type {
   CreateDeployment200,
   CreateDeployment201,
+  RollbackDeployment200,
   RollbackDeployment201,
 } from "@zitadel/api/generated/model";
 
@@ -12,6 +13,14 @@ import type {
  * than casting a warnings shape onto a plain deployment.
  */
 export type Deployment = CreateDeployment200 | CreateDeployment201;
+
+/**
+ * A rollback, as the server returns it: 201 when it wrote a new deployment, 200
+ * when every target already served the target deployment and nothing changed.
+ * Kept as the union — like {@link Deployment} — so a caller can tell the two
+ * apart rather than having the no-op collapsed into a write.
+ */
+export type RolledBackDeployment = RollbackDeployment200 | RollbackDeployment201;
 
 /** What target a deploy goes to: every primary origin, or one exact origin. */
 export type DeployTargets = ["primary"] | [string];
@@ -75,17 +84,16 @@ export async function rollbackDeployment(
      */
     expectedDeploymentId?: string;
   },
-): Promise<RollbackDeployment201> {
+): Promise<RolledBackDeployment> {
   const body = {
     ...(options?.message === undefined ? {} : { message: options.message }),
     ...(options?.expectedDeploymentId === undefined
       ? {}
       : { expected_deployment_id: options.expectedDeploymentId }),
   };
-  const result = await client.rollbackDeployment(
+  return client.rollbackDeployment(
     deploymentId,
     { project_id: projectId },
     Object.keys(body).length === 0 ? undefined : body,
   );
-  return result as RollbackDeployment201;
 }

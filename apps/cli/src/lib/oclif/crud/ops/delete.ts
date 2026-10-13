@@ -71,7 +71,12 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>> 
           `${capitalize(verb)} requires --force in non-interactive mode`,
           {
             hint: `Pass --force to ${verb} ${resource.singular} ${id}.`,
-            nextCommands: [publicCliCommand(`${topic} ${verb} ${id} --force`, meta.cliVersion)],
+            nextCommands: [
+              publicCliCommand(
+                `${topic} ${verb} ${id} --force${this.environmentSelector()}`,
+                meta.cliVersion,
+              ),
+            ],
           },
         );
       }

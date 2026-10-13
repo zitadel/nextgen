@@ -306,6 +306,13 @@ export async function requireValueInteractive(
  * file without a trailing newline is not concatenated onto its last line.
  */
 async function persistEnvValue(path: string, key: EnvironmentKey, value: string): Promise<void> {
+  // One `key=value` per line is the whole file format, so a line break in the
+  // value would inject a spurious line (or split a secret) that the next run
+  // reads back as different keys. A break is never a legitimate credential, URL
+  // or id, so refuse it rather than write a file we cannot read back faithfully.
+  if (/[\n\r]/.test(value)) {
+    throw new Error(`Refusing to persist ${key}: value contains a line break.`);
+  }
   let existing = "";
   try {
     existing = await readFile(path, "utf8");
@@ -316,8 +323,11 @@ async function persistEnvValue(path: string, key: EnvironmentKey, value: string)
   }
   const next = `${existing}${existing && !existing.endsWith("\n") ? "\n" : ""}${key}=${value}\n`;
   await writeFile(path, next, { mode: 0o600 });
-  // `writeFile`'s mode applies only on creation and is masked by the umask.
-  await chmod(path, 0o600).catch(() => undefined);
+  // `writeFile`'s mode applies only on creation and is masked by the umask, so
+  // re-assert 0600. The file may hold a secret, so a chmod we cannot apply means
+  // we cannot promise the credential file is private — surface it, do not hide
+  // it behind a success.
+  await chmod(path, 0o600);
 }
 
 /**

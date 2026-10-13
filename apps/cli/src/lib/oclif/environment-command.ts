@@ -3,10 +3,9 @@ import { consola } from "consola";
 import { createZitadelClient, type ZitadelClient } from "../api-client";
 import { type Environment, requireValueInteractive, resolveEnvironment } from "../environment";
 import { resolveCwd } from "../paths";
-import { shellArg } from "../shell";
 import { BaseCommand } from "./base";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
-import { environmentFlags } from "./environment-flags";
+import { environmentFlags, environmentSelectorSuffix } from "./environment-flags";
 import type { GlobalOptions } from "./types";
 
 /** The platform connection {@link EnvironmentCommand.connect} opens. */
@@ -78,16 +77,14 @@ export abstract class EnvironmentCommand extends BaseCommand {
    */
   protected environmentSelector(): string {
     const { environment } = this;
-    const parts: string[] = [];
-    if (environment.envFile !== undefined) {
-      parts.push(`--env-file ${shellArg(environment.envFile)}`);
-    } else if (environment.name.source === "--env") {
-      parts.push(`--env ${shellArg(environment.name.value)}`);
-    }
-    if (environment.values.ZITADEL_URL?.source === "--server") {
-      parts.push(`--server ${shellArg(environment.values.ZITADEL_URL.value)}`);
-    }
-    return parts.length === 0 ? "" : ` ${parts.join(" ")}`;
+    return environmentSelectorSuffix({
+      envFile: environment.envFile,
+      envName: environment.name.source === "--env" ? environment.name.value : undefined,
+      server:
+        environment.values.ZITADEL_URL?.source === "--server"
+          ? environment.values.ZITADEL_URL.value
+          : undefined,
+    });
   }
 
   /**
