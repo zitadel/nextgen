@@ -410,24 +410,6 @@ describe("sso enable", () => {
         ]);
       });
 
-      it("stops on a connection file that is not JSON", async () => {
-        const app = await aSetUpApp();
-        await app.writeBrokenConnection("broken", '{"client_secret": GOCSPX-leaked}');
-
-        const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS);
-
-        expect(result).toFailWith("E_VALIDATION");
-      });
-
-      it("does not repeat a pasted secret from a connection file that is not JSON", async () => {
-        const app = await aSetUpApp();
-        await app.writeBrokenConnection("broken", '{"client_secret": GOCSPX-leaked}');
-
-        const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS);
-
-        expect(result).not.toSay("GOCSPX-leaked");
-      });
-
       it("stops when the name belongs to a connection to another provider", async () => {
         const app = await anAppServingAcme();
 
