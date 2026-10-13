@@ -271,6 +271,6 @@ describe("user detail", () => {
 
     await waitFor(() => expect(deleted).toBe(true));
     // The record the screen is about is gone, so staying on it would 404.
-    await waitFor(() => expect(router.state.location.pathname).toBe("/users"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
   });
 });

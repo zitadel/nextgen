@@ -112,6 +112,13 @@ moon run console:test
 moon run console:build
 ```
 
+## Asserting on the route in specs
+
+Read `router.state.resolvedLocation`, never `router.state.location`. `location`
+changes when a navigation starts; `resolvedLocation` changes once its loaders
+have finished. A spec that ends on `location` can leave a loader's request in
+flight, which MSW then reports as unhandled in a later test.
+
 ## The claim page needs `dev-claim`, not `dev-real`
 
 `dev-real` boots one ordinary project and signs the console into it. The claim
