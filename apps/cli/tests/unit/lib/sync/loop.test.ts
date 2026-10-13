@@ -1762,6 +1762,75 @@ describe("a syncer's preflight", () => {
     }
   });
 
+  describe("with a file the plan declines to delete", () => {
+    async function aProjectWithTwoNewFiles(): Promise<string> {
+      const cwd = makeCwd();
+      await writeState(cwd, {
+        framework: "next",
+        resources: { [`${IDPS}/old.json`]: { id: "idp_1", hash: "abc" } },
+      });
+      await writeResource(cwd, IDPS, "one.json", { slug: "one" });
+      await writeResource(cwd, IDPS, "two.json", { slug: "two" });
+      return cwd;
+    }
+
+    it("reads its stored body once, however many files are new", async () => {
+      const cwd = await aProjectWithTwoNewFiles();
+      try {
+        const fetch = vi.fn().mockResolvedValue({ slug: "old" });
+
+        await buildSyncPlan(cwd, [
+          syncer({
+            preflight: vi.fn().mockResolvedValue(undefined),
+            fetch,
+            deletion: "unsupported",
+          }),
+        ]);
+
+        expect(fetch).toHaveBeenCalledOnce();
+      } finally {
+        await rm(cwd, { recursive: true, force: true });
+      }
+    });
+
+    it("stops the plan when that stored body cannot be read", async () => {
+      const cwd = await aProjectWithTwoNewFiles();
+      try {
+        const unavailable = vi
+          .fn()
+          .mockRejectedValue(new ApiError(503, "http://x/idps/idp_1", {}, "unavailable"));
+
+        await expect(
+          buildSyncPlan(cwd, [
+            syncer({
+              preflight: vi.fn().mockResolvedValue(undefined),
+              fetch: unavailable,
+              deletion: "unsupported",
+            }),
+          ]),
+        ).rejects.toMatchObject({ status: 503 });
+      } finally {
+        await rm(cwd, { recursive: true, force: true });
+      }
+    });
+
+    it("carries on without it when the resource is gone from the platform", async () => {
+      const cwd = await aProjectWithTwoNewFiles();
+      try {
+        const preflight = vi.fn().mockResolvedValue(undefined);
+        const gone = vi
+          .fn()
+          .mockRejectedValue(new ApiError(404, "http://x/idps/idp_1", {}, "gone"));
+
+        await buildSyncPlan(cwd, [syncer({ preflight, fetch: gone, deletion: "unsupported" })]);
+
+        expect(preflight).toHaveBeenCalledWith(`${IDPS}/one.json`, expect.anything(), null, []);
+      } finally {
+        await rm(cwd, { recursive: true, force: true });
+      }
+    });
+  });
+
   it("stops the run before anything is written when it throws", async () => {
     const cwd = await aProjectWithAnEditedFile();
     try {

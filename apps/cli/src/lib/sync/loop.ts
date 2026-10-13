@@ -239,10 +239,16 @@ export async function buildSyncPlan(
 
   // What only the platform can answer, for every file this plan writes. After
   // the local checks, so a mistake that needs no request is never hidden behind one.
+  const removedBySyncer = new Map<ResourceSyncer, Promise<object[]>>();
   for (const action of actions) {
     if ((action.kind === "create" || action.kind === "update") && action.syncer.preflight) {
       const old = action.kind === "update" ? await storedBody(action) : null;
-      const removed = await removedBodies(action.syncer, actions);
+      let removed: object[] = [];
+      if (action.kind === "create") {
+        const known = removedBySyncer.get(action.syncer) ?? removedBodies(action.syncer, actions);
+        removedBySyncer.set(action.syncer, known);
+        removed = await known;
+      }
       await action.syncer.preflight(action.path, action.content, old, removed);
     }
   }
@@ -579,11 +585,12 @@ export async function writeBackResource(
  * a resource gone from the platform reads as nothing stored.
  */
 async function storedBody(action: Extract<SyncAction, { kind: "update" }>): Promise<object | null> {
-  if (action.oldContent) {
-    return action.oldContent;
-  }
+  return action.oldContent ?? (await readStored(action.syncer, action.id));
+}
+
+async function readStored(syncer: ResourceSyncer, id: string): Promise<object | null> {
   try {
-    return (await action.syncer.fetch?.(action.id)) ?? null;
+    return (await syncer.fetch?.(id)) ?? null;
   } catch (err) {
     if (err instanceof FatalFetchError) {
       throw err.reason;
@@ -595,7 +602,11 @@ async function storedBody(action: Extract<SyncAction, { kind: "update" }>): Prom
   }
 }
 
-/** The stored bodies of the files this plan declines to delete, for a syncer that can read them. */
+/**
+ * The stored bodies of the files this plan declines to delete, read once for a
+ * syncer that can. Held to the rule of {@link storedBody}: a body that cannot be
+ * read stops the run, and only a resource gone from the platform reads as nothing.
+ */
 async function removedBodies(
   syncer: ResourceSyncer,
   actions: ReadonlyArray<SyncAction>,
@@ -607,8 +618,8 @@ async function removedBodies(
       action.reason === "unsupported-deletion" &&
       action.syncer === syncer
     ) {
-      const body = await syncer.fetch?.(action.id).catch(() => null);
-      if (body) {
+      const body = await readStored(syncer, action.id);
+      if (body !== null) {
         bodies.push(body);
       }
     }

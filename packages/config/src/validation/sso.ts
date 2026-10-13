@@ -138,7 +138,7 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
 
   // Two connections that name the same project variable would share a
   // credential, and publishing one overwrites the other.
-  const variableOwner = new Map<string, string>();
+  const variableOwner = new Map<string, { path: string; field: string }>();
   for (const [path, body] of [...tree.connections].sort(([a], [b]) => a.localeCompare(b))) {
     for (const block of [(body as Json).oidc, (body as Json).oauth2]) {
       for (const field of ["client_id", "client_secret"] as const) {
@@ -149,12 +149,12 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
         }
         const owner = variableOwner.get(name);
         if (owner === undefined) {
-          variableOwner.set(name, path);
-        } else if (owner !== path) {
+          variableOwner.set(name, { path, field });
+        } else if (owner.path !== path) {
           add({
             rule: "sso/shared-variable",
             file: path,
-            message: `${field} names the variable ${name}, which ${owner} also uses. Give each connection its own variable so one cannot overwrite the other.`,
+            message: `${field} names the variable ${name}, which ${owner.path} also uses (as its ${owner.field}). Give each connection its own variable so one cannot overwrite the other.`,
           });
         }
       }

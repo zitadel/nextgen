@@ -537,6 +537,15 @@ describe("how the rules read the project", () => {
     expect(issues.map((issue) => issue.rule)).not.toContain("sso/unmapped-verification-key");
   });
 
+  it("does not ask for a claim_mapping row where verified_claims is simply true", () => {
+    const issues = validate((p) => {
+      connectionOf(p).verified_claims = { email: true as unknown as string };
+      connectionOf(p).claim_mapping = {};
+    });
+
+    expect(issues.map((issue) => issue.rule)).not.toContain("sso/unmapped-verification-key");
+  });
+
   it("names a verified_claims key that no schema has once, not twice", () => {
     const issues = validate((p) => {
       connectionOf(p).verified_claims = { typo: "email_verified" };
