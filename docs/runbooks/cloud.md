@@ -23,11 +23,11 @@ One Vercel deployment, five [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds, compiles `apps/cloud/launcher`, then migrates | every path except the console's, the storybook's, the docs' and the website's, including `/console/runtime.json` and the login UI at `/ui/login/` |
-| `console` | Vite; the console build with `VITE_CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights | `/ui/console/*` (bare `/ui/console` redirects to the slash form) |
-| `storybook` | Storybook; `moon run storybook:build`, moved to `dist/storybook/` | `/storybook/*` (bare `/storybook` redirects to the slash form) |
-| `docs` | Next.js; `apps/docs`' own `pnpm run build`, never moon (moon cannot archive the symlinks Vercel's Next.js adapter writes) | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
-| `website` | Next.js; `apps/website`'s own `pnpm run build`, never moon, as the docs' | `/`, the coming-soon page with links to the docs, the console and the storybook, and its assets at `/_next/*` |
+| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds (with turbo, through `apps/cloud/turbo-build.sh`), compiles `apps/cloud/launcher`, then migrates | every path except the console's, the storybook's, the docs' and the website's, including `/console/runtime.json` and the login UI at `/ui/login/` |
+| `console` | Vite; `apps/cloud/turbo-build.sh` with `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights | `/ui/console/*` (bare `/ui/console` redirects to the slash form) |
+| `storybook` | Storybook; `apps/cloud/turbo-build.sh`, moved to `dist/storybook/` | `/storybook/*` (bare `/storybook` redirects to the slash form) |
+| `docs` | Next.js; `apps/docs`' own `pnpm run build`, without a task runner: moon cannot archive the symlinks Vercel's Next.js adapter writes, and turbo could never reuse a build, whose cache key holds the deployment's ID under Skew Protection | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
+| `website` | Next.js; `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the coming-soon page, and its assets at `/_next/*` |
 
 The console lives at the path the server would serve it from, on the same
 origin. The server's own console is switched off, and nothing else about
@@ -140,8 +140,9 @@ Environment variables (add secrets with
 | `MASTER_KEY_ID` | Preview | preview's `master-key.id`, `cloud-preview-<year>-<month>` |
 | `MASTER_KEY_PREVIOUS_PEM_B64` | Production or Preview; sensitive; only during a rotation | the key being rotated out, which `setup-secrets.sh --force` sets |
 | `MASTER_KEY_PREVIOUS_ID` | Production or Preview; only during a rotation | its id |
-| `CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE` | Production or Preview; optional | the share of console page loads that send Speed Insights, `0` to `1`; unset sends every one |
-| `DOCS_SPEED_INSIGHTS_SAMPLE_RATE` | Production or Preview; optional | the same for the docs |
+| `CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the share of console page loads that send Speed Insights, `0` to `1`; unset sends every one |
+| `DOCS_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the same for the docs |
+| `WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the same for the website |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Production; sensitive | production's `admin-user.b64`: the root admin document |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Preview; sensitive | preview's `admin-user.b64` |
 | `ENABLE_EXPERIMENTAL_COREPACK` | Production, Preview | `1`: the builds run package scripts that call `pnpm`, which must be the workspace's pinned version |
@@ -310,32 +311,43 @@ project and imports the root admin.
   previews can be busy at the same time. Raise it (Parameters tab, needs a
   restart) before raising the pool size.
 - **Analytics:** the console reports page views and Web Vitals per route
-  pattern (`/ui/console/users/$userId`), the docs per page, to the project's
-  Analytics and Speed Insights tabs. Speed Insights samples by the two
-  `*_SPEED_INSIGHTS_SAMPLE_RATE` variables, read at build time, so a new rate
+  pattern (`/ui/console/users/$userId`), the docs and the website per page,
+  to the project's Analytics and Speed Insights tabs. Speed Insights samples
+  by one variable per frontend, `CONSOLE_`, `DOCS_` and
+  `WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE`, read at build time, so a new rate
   takes a redeploy; `0` turns it off. Web Analytics has no sampling and counts
-  every page view. The website reports every page view of its start page and
-  Speed Insights for one page load in a hundred, a rate fixed in its layout.
+  every page view.
 - **Signing in:** `/ui/console/` with the environment's root admin from
   1Password (production and preview have different passwords). Anyone else
   registers through the login UI.
+- **Turbo's remote cache:** the console, storybook and login UI builds read
+  and write the team's remote cache, production and previews in separate
+  entries; each build's log shows `cache hit` or `cache miss` per task, and
+  the deployment's Run Summary shows why a task missed. A build with a
+  result that is wrong although its inputs are right (a broken or planted
+  entry) is fixed by a team owner clearing the cache (team Settings → Build
+  and Deployment → Remote Caching); a redeploy without the build cache
+  skips the remote cache too.
 - **Build cache:** Vercel keeps one per branch (a branch's first build
   starts from production's) and restores it before the installs: every
   `node_modules`, the docs' and the website's `.next/cache`, and
-  `.vercel/cache/golang`, the Go toolchain with its module and build
-  caches. Compressed, it must stay under 1.5 GB, the limit of the
-  project's Standard build machines. A bigger one is still created after
-  the deployment, minutes of build machine time, then dropped ("Build
-  cache size … exceeds limit"), and the next build installs every package
-  and compiles the server from scratch.
-  So the services install with
+  `.vercel/cache/golang`, the Go toolchain with its module and build caches.
+  Turbo's results are not in it: the console, storybook and login UI builds
+  use the team's remote cache as Vercel sets it up
+  ([`apps/cloud/turbo-build.sh`](../../apps/cloud/turbo-build.sh)), every
+  build reading and writing it, production and previews in separate entries.
+  Compressed, the build cache must stay under 1.5 GB, the limit of the
+  project's Standard build machines. A bigger one is still created after the
+  deployment, minutes of build machine time, then dropped ("Build cache size
+  … exceeds limit"), and the next build installs every package and compiles
+  the server from scratch. So the services install with
   [`apps/cloud/install.sh`](../../apps/cloud/install.sh), which leaves out
   the other platforms' native packages that the workspace installs
   everywhere else (`supportedArchitectures` in `pnpm-workspace.yaml`). That
   took the cache from 1.52 GB to 0.86 GB, a little over half of it the Go
   caches. Go would keep each rebuild's compiled packages for five days, so
-  `build.sh` drops those no build used in the last two hours. Each build
-  log ends with the cache's size: `Uploading build cache [...]`.
+  `build.sh` drops those no build used in the last two hours. Each build log
+  ends with the cache's size: `Uploading build cache [...]`.
 
 ## Later: read replicas in other regions
 

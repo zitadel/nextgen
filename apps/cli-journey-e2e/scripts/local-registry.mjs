@@ -4,6 +4,7 @@ import { cp, mkdir, open, readdir, readFile, rm, writeFile } from "node:fs/promi
 import { dirname, join } from "node:path";
 
 import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
+import { runnerCommand } from "../../../scripts/task-runner.mjs";
 
 export const packageDirs = [...PUBLIC_PACKAGE_DIRS];
 
@@ -85,7 +86,8 @@ export async function buildPackages(
   }
   const projectNames = await Promise.all(packageDirs.map((dir) => packageName(repoRoot, dir)));
   log(`building release npm tarballs for ${projectNames.join(", ")}`);
-  await run("moon", ["run", "release:pack"], { cwd: repoRoot, env });
+  const pack = runnerCommand(["release:pack"], env);
+  await run(pack.command, pack.args, { cwd: repoRoot, env });
 }
 
 export async function packPackages(

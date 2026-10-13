@@ -9,7 +9,9 @@
     "preview": "vite preview --host 0.0.0.0",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
-    "test:all": "pnpm run test"
+    "test:all": "pnpm run test",
+    "lint": "biome check .",
+    "build-release": "vite build"
   },
   "dependencies": {
     "@zitadel/components": "workspace:*",
