@@ -1831,6 +1831,29 @@ describe("a syncer's preflight", () => {
     });
   });
 
+  it("is not asked when the files already fail a local check", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, { framework: "next", resources: {} });
+      await writeResource(cwd, ".zitadel/flows", "login.json", {
+        name: "login",
+        status: "active",
+        purposes: { login: "start" },
+        steps: [{ name: "start", transitions: { submit: { target: "missing" } } }],
+      });
+      await writeResource(cwd, IDPS, "acme.json", { slug: "acme" });
+      const preflight = vi.fn().mockResolvedValue(undefined);
+      const flow = makeSyncer({ kind: "flow", directory: ".zitadel/flows", mutable: true });
+
+      await expect(buildSyncPlan(cwd, [flow, syncer({ preflight })])).rejects.toMatchObject({
+        code: "E_VALIDATION",
+      });
+      expect(preflight).not.toHaveBeenCalled();
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("stops the run before anything is written when it throws", async () => {
     const cwd = await aProjectWithAnEditedFile();
     try {

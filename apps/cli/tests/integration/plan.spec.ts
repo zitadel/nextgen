@@ -286,16 +286,6 @@ describe("plan", () => {
           expect(await app.planAttempt()).toFailWith("E_VALIDATION");
         });
 
-        it("reports a mistake in the files before one that needs the platform", async () => {
-          const app = await anAppWithGoogle();
-          expect(await app.deleteVariable("GOOGLE_CLIENT_SECRET")).toSucceed();
-          await app.editUserSchema((schema) => {
-            ssoOf(schema).providers = ["okta"];
-          });
-
-          expect(await app.planAttempt()).toFailWith("E_VALIDATION");
-        });
-
         it("stops on two connections that share a variable", async () => {
           const app = await anAppWithGoogle();
           await app.copyConnection("google", "spare");
