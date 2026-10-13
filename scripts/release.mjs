@@ -176,8 +176,17 @@ async function commandVerify() {
   console.log(`release artifacts verified for ${release.version}`);
 }
 
-function parseOptions(args) {
-  const parsed = { dryRun: false, skipContainer: false, recoverVersion: "", base: "" };
+// RELEASE_SKIP_CONTAINER=1 is --skip-container for CI's turbo job, which
+// cannot pass it after `--`: turbo puts those arguments into the cache key of
+// every task in the run (vercel/turborepo#14770), so the whole release graph
+// would be rebuilt instead of restored.
+function parseOptions(args, env = process.env) {
+  const parsed = {
+    dryRun: false,
+    skipContainer: env.RELEASE_SKIP_CONTAINER === "1",
+    recoverVersion: "",
+    base: "",
+  };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     switch (arg) {
@@ -253,7 +262,8 @@ function usage(error) {
 
 Options:
   --dry-run          Do not publish or mutate remote registries.
-  --skip-container   Build release files without building a local Docker image.
+  --skip-container   Build release files without building a local Docker image
+                     (or set RELEASE_SKIP_CONTAINER=1).
   --recover-version <v>
                      Publish recovery target version from release-publish.
   --base <ref>       Base ref for release publish detection.

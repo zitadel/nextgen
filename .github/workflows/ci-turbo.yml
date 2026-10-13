@@ -11,8 +11,14 @@ name: ci-turbo
 # the same: install, decide the lanes, run the gate, then the explicit lanes
 # that moon kept out of its automatic selection.
 #
-# A push to main runs the gate alone and is the one run that writes the
-# remote cache, for the pull requests that branch from it.
+# A push to main runs the generated-files check and the gate alone, and is
+# the one run that writes the remote cache, for the pull requests that
+# branch from it.
+#
+# Arguments never go after `--` in a turbo run here: turbo puts them into
+# the cache key of every task in the run, not just the task they are for
+# (vercel/turborepo#14770), so the run would rebuild what the gate just
+# built. The scripts take those options from the environment instead.
 
 on:
   pull_request:
@@ -120,7 +126,8 @@ jobs:
       # Same outputs and gates as ci.yml; the affected set comes from turbo's
       # task graph (NEXTGEN_TASK_RUNNER above) instead of `moon query`. On a
       # push to main every lane gate stays off: its pull request ran them,
-      # and main only refreshes the cache through the gate.
+      # and main only refreshes the cache, through the gate and the
+      # generated-files check.
       - name: Detect CI mode
         id: ci-mode
         run: |
@@ -130,8 +137,11 @@ jobs:
             node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
           fi
 
+      # Main runs it too, only to put its result in the remote cache: a pull
+      # request that changes none of its inputs then restores it instead of
+      # spending half a minute regenerating.
       - name: Check Go generated files
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && (steps.ci-mode.outputs.go_tests == 'true' || github.event_name == 'push') }}
         run: turbo run check-generate-pruned --filter=@zitadel/server
 
       - name: Cache Playwright browsers
@@ -176,9 +186,12 @@ jobs:
         run: turbo run test-sqlite --filter=@zitadel/server
 
       # No `env -u CI`: turbo has no runInCI, so nothing hides these tasks.
+      # RELEASE_SKIP_CONTAINER=1 is `--skip-container` (see the top).
       - name: Build release snapshot without container
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
-        run: turbo run snapshot --filter=@zitadel/release -- --skip-container
+        env:
+          RELEASE_SKIP_CONTAINER: "1"
+        run: turbo run snapshot --filter=@zitadel/release
 
       - name: Cache journey registry packages
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
@@ -189,18 +202,19 @@ jobs:
           restore-keys: |
             journey-verdaccio-${{ runner.os }}-
 
+      # The runner's options as JOURNEY_* variables (see the top): ci.yml's
+      # `--ci --matrix … --runtime binary --work-dir … --tarballs-dir …`.
       - name: Run journey e2e lanes
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
         env:
           JOURNEY_REGISTRY_STORAGE: ${{ runner.temp }}/journey-verdaccio-storage
+          JOURNEY_CI: "1"
+          JOURNEY_MATRIX: ${{ steps.ci-mode.outputs.journey_matrix }}
+          JOURNEY_RUNTIME: binary
+          JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
         run: |
           version="$(node -p "require('./apps/server/package.json').version")"
-          turbo run e2e-local --filter=@zitadel/cli-journey-e2e -- \
-            --ci \
-            --matrix "${{ steps.ci-mode.outputs.journey_matrix }}" \
-            --runtime binary \
-            --work-dir "${RUNNER_TEMP}/ci-journey" \
-            --tarballs-dir "dist/release/${version}/npm"
+          JOURNEY_TARBALLS_DIR="dist/release/${version}/npm" turbo run e2e-local --filter=@zitadel/cli-journey-e2e
 
       - name: Run @zitadel/testing real-instance suites
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_testing_demo == 'true' }}
