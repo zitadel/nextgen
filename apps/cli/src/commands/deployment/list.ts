@@ -7,7 +7,8 @@ import {
   nonBlankString,
 } from "../../lib/oclif";
 import { collectPages } from "../../lib/oclif/crud/paging";
-import { renderRows, renderTable } from "../../lib/oclif/crud/table";
+import { renderList } from "../../lib/oclif/crud/table";
+import { listData } from "../../lib/oclif/envelope";
 import { publicCliCommand } from "../../lib/public-cli";
 import { shellArg } from "../../lib/shell";
 
@@ -119,22 +120,16 @@ export default class DeploymentList extends EnvironmentCommand {
     const plain = flags.plain || !process.stdout.isTTY;
     return this.emit({
       status: "ok",
-      data: {
-        items: deployments,
-        count: deployments.length,
-        next_page_token: next,
-        ...(nextCommand === undefined ? {} : { next_commands: [nextCommand] }),
-      },
-      pretty: plain
-        ? renderRows(COLUMNS, rows)
-        : rows.length === 0
-          ? "No deployments yet."
-          : [
-              renderTable(COLUMNS, rows),
-              "",
-              `${rows.length} ${rows.length === 1 ? "deployment" : "deployments"}`,
-              ...(next ? [`More available: --page-token ${next} (or --all)`] : []),
-            ].join("\n"),
+      data: listData(deployments, {
+        nextPageToken: next,
+        nextCommands: nextCommand === undefined ? undefined : [nextCommand],
+      }),
+      pretty: renderList(COLUMNS, rows, {
+        plain,
+        singular: "deployment",
+        empty: "No deployments yet.",
+        footer: next ? [`More available: --page-token ${shellArg(next)} (or --all)`] : [],
+      }),
     });
   }
 }

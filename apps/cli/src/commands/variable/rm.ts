@@ -3,6 +3,7 @@ import { cancel, confirm, isCancel } from "@clack/prompts";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
+import { deletedData } from "../../lib/oclif/envelope";
 import { ZitadelError } from "../../lib/errors";
 import { assertVariableName, variableScope } from "../../lib/variables";
 import { publicCliCommand } from "../../lib/public-cli";
@@ -90,7 +91,7 @@ export default class VariableRm extends EnvironmentCommand {
 
     return this.emit({
       status: "ok",
-      data: { name, deleted: true, applies_to: flags.preview ? "preview" : "all" },
+      data: { ...deletedData({ name }), applies_to: flags.preview ? "preview" : "all" },
       pretty: `Removed ${name} from the project${flags.preview ? " (preview)" : ""}`,
     });
   }
