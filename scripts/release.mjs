@@ -7,9 +7,10 @@ import { upsertProductGithubRelease } from "./release-github.mjs";
 import {
   findPrereleaseOnlyPackages,
   prereleaseOnlyMessage,
+  readLocalPackages,
   readPrereleaseTag,
 } from "./release-dist-tags.mjs";
-import { PUBLIC_PACKAGE_NAMES } from "./release-manifest.mjs";
+import { PUBLIC_PACKAGE_DIRS } from "./release-manifest.mjs";
 import {
   detectReleaseAutomation,
   findUnrecordedPendingChangesets,
@@ -176,7 +177,8 @@ async function assertPrereleaseTagApplies() {
   if (!tag) {
     return;
   }
-  const stuck = await findPrereleaseOnlyPackages(PUBLIC_PACKAGE_NAMES, tag);
+  const packages = await readLocalPackages(repoRoot, PUBLIC_PACKAGE_DIRS);
+  const stuck = await findPrereleaseOnlyPackages(packages, tag);
   if (stuck.length > 0) {
     throw new Error(prereleaseOnlyMessage(stuck, tag));
   }

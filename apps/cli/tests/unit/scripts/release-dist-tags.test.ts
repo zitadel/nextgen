@@ -6,15 +6,18 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 type Capture = (command: string, args: string[]) => Promise<{ stdout: string }>;
 
+type LocalPackage = { name: string; version: string; license: string };
+
 type ReleaseDistTagsModule = {
   findPrereleaseOnlyPackages: (
-    names: string[],
+    packages: LocalPackage[],
     tag: string,
     options: { capture: Capture },
-  ) => Promise<string[]>;
+  ) => Promise<LocalPackage[]>;
   isPrereleaseOnly: (versions: string[], tag: string) => boolean;
   prereleaseIdentifier: (version: string) => string | undefined;
-  prereleaseOnlyMessage: (names: string[], tag: string) => string;
+  prereleaseOnlyMessage: (packages: LocalPackage[], tag: string) => string;
+  readLocalPackages: (root: string, dirs: string[]) => Promise<LocalPackage[]>;
   readPrereleaseTag: (root: string) => Promise<string | undefined>;
   readPublishedVersions: (name: string, options: { capture: Capture }) => Promise<string[]>;
 };
@@ -48,6 +51,10 @@ function npmView(registry: Record<string, string[] | string>): Capture {
   };
 }
 
+function localPackage(name: string, version = "1.0.0-alpha.26", license = "MIT"): LocalPackage {
+  return { name, version, license };
+}
+
 describe("release dist-tags preflight", () => {
   it("reads the prerelease identifier of a version", () => {
     expect(distTags.prereleaseIdentifier("1.0.0-alpha.25")).toBe("alpha");
@@ -77,17 +84,31 @@ describe("release dist-tags preflight", () => {
 
     const stuck = await distTags.findPrereleaseOnlyPackages(
       [
-        "@zitadel/sdk-react",
-        "@zitadel/sdk-solid",
-        "@zitadel/server",
-        "@zitadel/sdk-qwik",
-        "@zitadel/not-yet-published",
+        localPackage("@zitadel/sdk-react"),
+        localPackage("@zitadel/sdk-solid"),
+        localPackage("@zitadel/server"),
+        localPackage("@zitadel/sdk-qwik"),
+        localPackage("@zitadel/not-yet-published"),
       ],
       "alpha",
       { capture },
     );
 
-    expect(stuck).toEqual(["@zitadel/sdk-solid", "@zitadel/sdk-qwik"]);
+    expect(stuck.map((pkg) => pkg.name)).toEqual(["@zitadel/sdk-solid", "@zitadel/sdk-qwik"]);
+  });
+
+  it("skips a package whose local version is already published", async () => {
+    // changeset publish skips it too, so a recovery run of a published
+    // release must not stop here.
+    const capture = npmView({ "@zitadel/sdk-solid": ["0.1.0-alpha.11", "1.0.0-alpha.25"] });
+
+    const stuck = await distTags.findPrereleaseOnlyPackages(
+      [localPackage("@zitadel/sdk-solid", "1.0.0-alpha.25")],
+      "alpha",
+      { capture },
+    );
+
+    expect(stuck).toEqual([]);
   });
 
   it("rethrows registry failures other than a missing package", async () => {
@@ -102,15 +123,41 @@ describe("release dist-tags preflight", () => {
     );
   });
 
-  it("names the packages and gives a bootstrap command for each", () => {
+  it("names the packages and gives a bootstrap command with each one's license", () => {
     const message = distTags.prereleaseOnlyMessage(
-      ["@zitadel/sdk-solid", "@zitadel/sdk-svelte"],
+      [
+        localPackage("@zitadel/sdk-solid"),
+        localPackage("@zitadel/server", "1.0.0-alpha.26", "AGPL-3.0-only"),
+      ],
       "alpha",
     );
 
-    expect(message).toContain("@zitadel/sdk-solid, @zitadel/sdk-svelte only have `alpha`");
+    expect(message).toContain("@zitadel/sdk-solid, @zitadel/server only have `alpha`");
     expect(message.match(/npm publish --access public --tag bootstrap/g)).toHaveLength(2);
-    expect(message).toContain('"@zitadel/sdk-svelte" "@zitadel/sdk-svelte"');
+    expect(message).toContain('"@zitadel/sdk-solid" "MIT" "@zitadel/sdk-solid"');
+    expect(message).toContain('"@zitadel/server" "AGPL-3.0-only" "@zitadel/server"');
+  });
+
+  it("reads each package's name, version, and license", async () => {
+    const root = await mkdtemp(join(tmpdir(), "release-dist-tags-"));
+    tempDirs.push(root);
+    await mkdir(join(root, "packages/sdk-solid"), { recursive: true });
+    await writeFile(
+      join(root, "packages/sdk-solid/package.json"),
+      JSON.stringify({ name: "@zitadel/sdk-solid", version: "1.0.0-alpha.26", license: "MIT" }),
+    );
+    await mkdir(join(root, "packages/no-license"), { recursive: true });
+    await writeFile(
+      join(root, "packages/no-license/package.json"),
+      JSON.stringify({ name: "@zitadel/no-license", version: "1.0.0-alpha.26" }),
+    );
+
+    expect(await distTags.readLocalPackages(root, ["packages/sdk-solid"])).toEqual([
+      localPackage("@zitadel/sdk-solid"),
+    ]);
+    await expect(distTags.readLocalPackages(root, ["packages/no-license"])).rejects.toThrow(
+      "has no license",
+    );
   });
 
   it("reads the prerelease tag only in pre mode", async () => {
