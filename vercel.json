@@ -42,6 +42,12 @@
   },
   "redirects": [
     {
+      "source": "/ui/console/:path*",
+      "missing": [{ "type": "host", "value": ".*\\.vercel\\.app" }],
+      "destination": "https://cloud-zitadel.vercel.app/ui/console/:path*",
+      "permanent": false
+    },
+    {
       "source": "/ui/console",
       "destination": "/ui/console/",
       "permanent": true

@@ -3,10 +3,12 @@
 > **Code:** [`apps/cloud/`](../../apps/cloud/) and the repo-root
 > [`vercel.json`](../../vercel.json)
 > **Vercel project:** `zitadel/cloud` (renamed from `nextgen-preview-cloud`).
-> Production answers at `nextgen-preview-cloud.vercel.app` and at
-> `nextgen-docs-zitadel.vercel.app`, the docs' address that
-> [`skills/zitadel/SKILL.md`](../../skills/zitadel/SKILL.md) gives agents,
-> until a domain of our own is attached
+> Production answers at `preview.zitadel.com`; its other domains,
+> `nextgen-preview-cloud.vercel.app` and `nextgen-docs-zitadel.vercel.app`
+> (the docs' address that
+> [`skills/zitadel/SKILL.md`](../../skills/zitadel/SKILL.md) gives agents),
+> redirect there. The console alone is behind Vercel Authentication, at
+> `cloud-zitadel.vercel.app` ([Access](#access))
 > **PlanetScale:** organization `zitadel`, Postgres databases `production`
 > and `preview`, both in AWS `eu-central-1`
 
@@ -33,6 +35,22 @@ The console lives at the path the server would serve it from, on the same
 origin. The server's own console is switched off, and nothing else about
 the server changes: the session cookie, CSRF protection and the console
 links the server derives all work as in a self-hosted install.
+
+### Access
+
+For now the console is for the team only. Vercel Authentication guards
+whole hosts, never a path, and the project's Standard Protection leaves
+custom domains public, so `preview.zitadel.com` serves every service to
+anyone. The first redirect in `vercel.json` therefore sends the console's
+path on any host outside `vercel.app` to `cloud-zitadel.vercel.app`,
+production's own alias, which asks for a Vercel login (a 307 that keeps
+the query, so the server's claim and dashboard links still land). Being
+same-origin, the console signs in and calls the API on that host
+unchanged. Previews answer only on `vercel.app` hosts and never redirect.
+
+Only the console's screens move: the website, the docs, the storybook,
+the login UI and the API stay public on `preview.zitadel.com`. Dropping
+that redirect makes the console public again.
 
 The storybook, the login surface's component workbench, is deployed only
 here. Its orchestrator stories mock the API in the browser with a service
@@ -123,7 +141,9 @@ one login opens every preview.
 Settings: no Root Directory (the repository root holds `vercel.json`),
 Node.js 24, production branch `main`, preview deployments on, Web Analytics
 and Speed Insights enabled (their tabs in the project). Deployment
-Protection stays on Vercel Authentication.
+Protection: Vercel Authentication with Standard Protection, which keeps
+every `vercel.app` address behind a Vercel login and leaves custom domains
+public ([Access](#access)).
 
 Environment variables (add secrets with
 `vercel env add NAME production --sensitive --yes`, value on stdin):
@@ -316,9 +336,10 @@ project and imports the root admin.
   takes a redeploy; `0` turns it off. Web Analytics has no sampling and counts
   every page view. The website reports page views of its start page only, no
   Speed Insights.
-- **Signing in:** `/ui/console/` with the environment's root admin from
-  1Password (production and preview have different passwords). Anyone else
-  registers through the login UI.
+- **Signing in:** `/ui/console/` (in production at
+  `cloud-zitadel.vercel.app`, after a Vercel login) with the environment's
+  root admin from 1Password (production and preview have different
+  passwords). Anyone else registers through the login UI.
 - **Build cache:** Vercel keeps one per branch (a branch's first build
   starts from production's) and restores it before the installs: every
   `node_modules`, the docs' and the website's `.next/cache`, and
