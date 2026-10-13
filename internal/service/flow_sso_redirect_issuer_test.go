@@ -145,7 +145,7 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 	t.Run("a client_id reference is filled from the project variable", func(t *testing.T) {
 		t.Parallel()
 		variables := servicemocks.NewMockVariableService(gomock.NewController(t))
-		variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, "GOOGLE_CLIENT_ID").
+		variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, kindPtr(domain.OriginKindPrimary), "GOOGLE_CLIENT_ID").
 			Return([]*domain.Variable{{Name: "GOOGLE_CLIENT_ID", Value: "client-from-variable"}}, nil)
 		attempts := &fakeAuthAttempts{issueSSOState: &domain.SSOState{State: "state-1", BindingNonce: "bind-1", OIDCNonce: "nonce-1"}}
 
@@ -160,7 +160,7 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 	t.Run("a client_id reference with no variable is unavailable and issues no record", func(t *testing.T) {
 		t.Parallel()
 		variables := servicemocks.NewMockVariableService(gomock.NewController(t))
-		variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, "GOOGLE_CLIENT_ID").Return(nil, nil)
+		variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, kindPtr(domain.OriginKindPrimary), "GOOGLE_CLIENT_ID").Return(nil, nil)
 		attempts := &fakeAuthAttempts{}
 
 		_, err := ssoIssuer(t, ssoClientIDReferenceDocument, attempts, nil, variables, nil).Issue(t.Context(), ssoIssueInput)
@@ -171,7 +171,7 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 	t.Run("a client_id reference to a secret is unavailable and issues no record", func(t *testing.T) {
 		t.Parallel()
 		variables := servicemocks.NewMockVariableService(gomock.NewController(t))
-		variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, "GOOGLE_CLIENT_ID").
+		variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, kindPtr(domain.OriginKindPrimary), "GOOGLE_CLIENT_ID").
 			Return([]*domain.Variable{{Name: "GOOGLE_CLIENT_ID", Value: "ciphertext", IsSecret: true}}, nil)
 		attempts := &fakeAuthAttempts{}
 

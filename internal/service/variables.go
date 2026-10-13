@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -16,26 +17,21 @@ type VariableToSet struct {
 	IsSecret bool
 }
 
-// apiVariableKind is the kind every read and write through this service
-// addresses. The API carries no kind yet: the request and response shapes
-// are #1587, and the default kind on write -- a plain value to both kinds, a
-// secret to primary only -- is #1566. Until those land, everything the API
-// enters or reads is the primary target's.
-const apiVariableKind = domain.OriginKindPrimary
+// servedVariableKind is the kind ReplaceVariablesInPlace resolves against
+// while documents are served from the store rather than from a deployment's
+// frozen set.
+const servedVariableKind = domain.OriginKindPrimary
 
-// VariableService reads and writes the variables one owner entered (ADR 062,
+// VariableService reads and writes a project's variables per kind (ADR 062,
 // ADR 069).
 //
-// The owner is the project. Storage matches the owner column exactly, so a
-// value another project entered can never reach a caller here. The primary
-// key is the name, that owner and the kind, and this service reads and
-// writes one kind ([apiVariableKind]), so a read yields at most one variable
-// per name and there is nothing to choose between.
+// A nil kind addresses both kinds. Nothing falls back between them: a read of
+// one kind never yields the other's value.
 type VariableService interface {
-	GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
+	GetVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.OriginKind, names ...string) ([]*domain.Variable, error)
 	GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
-	SetVariables(ctx context.Context, owner domain.VariableOwner, variablesToSet []VariableToSet) error
-	DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error
+	SetVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.OriginKind, variablesToSet []VariableToSet) error
+	DeleteVariable(ctx context.Context, owner domain.VariableOwner, kind *domain.OriginKind, name string) error
 	ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) error
 }
 
@@ -54,16 +50,29 @@ func NewVariableService(
 	}
 }
 
-func (s *variableService) GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error) {
-	variables, err := s.v2Pool.Statements().GetVariables(ctx, owner, apiVariableKind, names...)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to get variables from database")
+// addressedKinds is the kind named, or both.
+func addressedKinds(kind *domain.OriginKind) []domain.OriginKind {
+	if kind == nil {
+		return domain.OriginKindValues()
+	}
+	return []domain.OriginKind{*kind}
+}
+
+func (s *variableService) GetVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.OriginKind, names ...string) ([]*domain.Variable, error) {
+	var variables []*domain.Variable
+	for _, k := range addressedKinds(kind) {
+		held, err := s.v2Pool.Statements().GetVariables(ctx, owner, k, names...)
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to get variables from database")
+		}
+		variables = append(variables, held...)
 	}
 	return variables, nil
 }
 
 func (s *variableService) GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error) {
-	variables, err := s.GetVariables(ctx, owner, names...)
+	kind := servedVariableKind
+	variables, err := s.GetVariables(ctx, owner, &kind, names...)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +105,16 @@ func (s *variableService) GetDecryptedVariables(ctx context.Context, owner domai
 	return decrypted, nil
 }
 
-func (s *variableService) SetVariables(ctx context.Context, owner domain.VariableOwner, variablesToSet []VariableToSet) error {
+type variableRemoval struct {
+	name string
+	kind domain.OriginKind
+}
+
+// SetVariables applies one patch in one transaction. Naming no kind writes a
+// plain value for both kinds and a secret for primary only, so a secret
+// reaches previews only when asked to; a null removes the name from every
+// kind addressed.
+func (s *variableService) SetVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.OriginKind, variablesToSet []VariableToSet) error {
 	if len(variablesToSet) == 0 {
 		return nil
 	}
@@ -105,7 +123,7 @@ func (s *variableService) SetVariables(ctx context.Context, owner domain.Variabl
 	var err error
 
 	containsSecret := slices.ContainsFunc(variablesToSet, func(set VariableToSet) bool {
-		return set.IsSecret
+		return set.IsSecret && set.Value != nil
 	})
 	if containsSecret {
 		crypter, err = s.keys.GetProjectCrypter(ctx, owner.ProjectID, domain.EncryptionKeyPurposeSecret)
@@ -114,11 +132,14 @@ func (s *variableService) SetVariables(ctx context.Context, owner domain.Variabl
 		}
 	}
 
+	kinds := addressedKinds(kind)
 	var varsToWrite []*domain.Variable
-	var varsToDelete []string
+	var varsToRemove []variableRemoval
 	for _, varToSet := range variablesToSet {
 		if varToSet.Value == nil {
-			varsToDelete = append(varsToDelete, varToSet.Name)
+			for _, k := range kinds {
+				varsToRemove = append(varsToRemove, variableRemoval{name: varToSet.Name, kind: k})
+			}
 			continue
 		}
 		var v *domain.Variable
@@ -130,31 +151,39 @@ func (s *variableService) SetVariables(ctx context.Context, owner domain.Variabl
 		if err != nil {
 			return err
 		}
-		v.Kind = apiVariableKind
-		varsToWrite = append(varsToWrite, v)
-	}
-
-	// no need to start a transaction if there is only one variable -- but a
-	// removal in the same batch is a second statement, and this path returns
-	// before the loop below would run it.
-	if len(varsToWrite) == 1 && len(varsToDelete) == 0 {
-		err = s.v2Pool.Statements().SetVariable(ctx, varsToWrite[0])
-		if err != nil {
-			return setVariableError(err)
+		targets := kinds
+		if varToSet.IsSecret && kind == nil {
+			targets = []domain.OriginKind{domain.OriginKindPrimary}
 		}
-		return nil
+		for _, k := range targets {
+			perKind := *v
+			perKind.Kind = k
+			varsToWrite = append(varsToWrite, &perKind)
+		}
 	}
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		for _, name := range varsToDelete {
-			err := tx.Statements().DeleteVariable(ctx, owner, apiVariableKind, name)
-			// Not DeleteVariable's "not found": a body states what the owner
-			// holds afterwards, and a name it never held already satisfies
-			// that. It is also what makes the request safe to retry.
-			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		held := make(map[domain.OriginKind]map[string]*domain.Variable, len(kinds))
+		for _, k := range domain.OriginKindValues() {
+			variables, err := tx.Statements().GetVariables(ctx, owner, k)
+			if err != nil {
+				return err
+			}
+			held[k] = domain.VariableListToMap(variables)
+		}
+
+		for _, removal := range varsToRemove {
+			// A name the kind never held is no error: a patch states what the
+			// project holds afterwards, which also makes a retry safe.
+			removed, ok := held[removal.kind][removal.name]
+			if !ok {
 				continue
 			}
-			if err != nil {
+			if err := tx.Statements().DeleteVariable(ctx, owner, removal.kind, removal.name); err != nil {
+				return err
+			}
+			delete(held[removal.kind], removal.name)
+			if err := emitVariableEvent(ctx, tx.Statements(), domain.EventTypeVariableRemoved, removed); err != nil {
 				return err
 			}
 		}
@@ -164,6 +193,15 @@ func (s *variableService) SetVariables(ctx context.Context, owner domain.Variabl
 			if err := tx.Statements().SetVariable(ctx, v); err != nil {
 				return err
 			}
+			held[v.Kind][v.Name] = v
+			if err := emitVariableEvent(ctx, tx.Statements(), domain.EventTypeVariableSet, v); err != nil {
+				return err
+			}
+		}
+		for _, variables := range held {
+			if len(variables) > domain.MaxVariablesPerKind {
+				return domain.ErrTooManyVariables()
+			}
 		}
 		return nil
 	})
@@ -171,6 +209,17 @@ func (s *variableService) SetVariables(ctx context.Context, owner domain.Variabl
 		return setVariableError(err)
 	}
 	return nil
+}
+
+func emitVariableEvent(ctx context.Context, stmts EventStatements, eventType domain.EventType, v *domain.Variable) error {
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       eventType,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  v.Owner.ProjectID,
+		EntityType: "variable",
+		EntityID:   v.Name,
+		Payload:    domain.VariablePayload{Kind: v.Kind.String(), Secret: v.IsSecret},
+	})
 }
 
 // setVariableError keeps a domain error as it is. The project reference is the
@@ -186,10 +235,35 @@ func setVariableError(err error) error {
 	return domain.ErrInternal(err).WithMessage("failed to write variable to database")
 }
 
-func (s *variableService) DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error {
-	if err := s.v2Pool.Statements().DeleteVariable(ctx, owner, apiVariableKind, name); err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return domain.ErrVariableNotFound().WithParent(err)
+// DeleteVariable removes name from every kind addressed. It is not found only
+// when none of them held it.
+func (s *variableService) DeleteVariable(ctx context.Context, owner domain.VariableOwner, kind *domain.OriginKind, name string) error {
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		var removed bool
+		for _, k := range addressedKinds(kind) {
+			held, err := tx.Statements().GetVariables(ctx, owner, k, name)
+			if err != nil {
+				return err
+			}
+			if len(held) == 0 {
+				continue
+			}
+			if err := tx.Statements().DeleteVariable(ctx, owner, k, name); err != nil {
+				return err
+			}
+			if err := emitVariableEvent(ctx, tx.Statements(), domain.EventTypeVariableRemoved, held[0]); err != nil {
+				return err
+			}
+			removed = true
+		}
+		if !removed {
+			return domain.ErrVariableNotFound()
+		}
+		return nil
+	})
+	if err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return de
 		}
 		return domain.ErrInternal(err).WithMessage("failed to delete variable from database")
 	}
@@ -216,7 +290,7 @@ func (s *variableService) ReplaceVariablesInPlace(ctx context.Context, owner dom
 		variableNames = append(variableNames, placeholder.VariableName)
 	}
 
-	varList, err := s.v2Pool.Statements().GetVariables(ctx, owner, apiVariableKind, variableNames...)
+	varList, err := s.v2Pool.Statements().GetVariables(ctx, owner, servedVariableKind, variableNames...)
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("failed to get variables from database")
 	}

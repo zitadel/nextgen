@@ -355,3 +355,10 @@ func IDPConnectionPayloadDelta(previous, next *IDPConnection) (IDPConnectionPayl
 	}
 	return payload, nil
 }
+
+// VariablePayload is shared by variable.set and variable.removed. The name is
+// the event's entity_id; a value never appears, secret or not.
+type VariablePayload struct {
+	Kind   string `json:"kind"`
+	Secret bool   `json:"secret"`
+}

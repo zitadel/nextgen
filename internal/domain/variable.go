@@ -17,6 +17,16 @@ const MaxVariableStringLength = 1 << 14 // 16k
 // never send back. Keep the two in step.
 const MaxVariableNameLength = 255
 
+// MaxVariablesPerKind bounds the names a project holds for one kind, so the
+// set a deployment freezes fits one Spanner cell even when every value is a
+// maximum-size secret (ADR 069).
+const MaxVariablesPerKind = 79
+
+func ErrTooManyVariables() Error {
+	return newError(PrefixVariable.ErrorCodePrefix("too_many"), "the project holds too many variables for this kind",
+		map[string]int{"limit": MaxVariablesPerKind}, nil)
+}
+
 func ErrVariableNotFound() Error {
 	return newError(PrefixVariable.ErrorCodePrefix("not_found"), "variable: not found", nil, nil)
 }

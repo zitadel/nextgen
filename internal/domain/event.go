@@ -91,6 +91,9 @@ const (
 
 	EventTypeDeploymentCreated EventType = "deployment.created"
 
+	EventTypeVariableSet     EventType = "variable.set"
+	EventTypeVariableRemoved EventType = "variable.removed"
+
 	EventTypeAuthzGranted EventType = "authz.granted"
 	EventTypeAuthzRevoked EventType = "authz.revoked"
 

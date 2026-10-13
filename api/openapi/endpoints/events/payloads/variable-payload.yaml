@@ -1,0 +1,14 @@
+title: VariablePayload
+type: object
+description: |
+  Allowlisted fields for `variable.set` and `variable.removed`. The variable's
+  name is the event's `entity_id`. A value never appears, secret or not.
+required:
+  - kind
+  - secret
+properties:
+  kind:
+    $ref: ../../../components/schemas/variable-kind.yaml
+  secret:
+    type: boolean
+    description: Whether the value set or removed is a secret.

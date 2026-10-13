@@ -99,7 +99,8 @@ func resolveSSOClientID(ctx context.Context, variables VariableService, projectI
 	if !ok {
 		return nil
 	}
-	vars, err := variables.GetVariables(ctx, domain.VariableOwner{ProjectID: projectID}, name)
+	kind := servedVariableKind
+	vars, err := variables.GetVariables(ctx, domain.VariableOwner{ProjectID: projectID}, &kind, name)
 	if err != nil {
 		return err
 	}

@@ -14,12 +14,9 @@ func (h *Handler) GetVariables(ctx context.Context, params api.GetVariablesParam
 		return nil, err
 	}
 
-	owner, err := variableOwner(params.ProjectID, params.Kind)
-	if err != nil {
-		return nil, err
-	}
+	owner, kind := variableOwner(params.ProjectID), variableKind(params.Kind)
 
-	vars, err := h.variableService.GetVariables(ctx, owner)
+	vars, err := h.variableService.GetVariables(ctx, owner, kind)
 	if err != nil {
 		return nil, err
 	}
@@ -37,26 +34,22 @@ func (h *Handler) GetVariable(ctx context.Context, params api.GetVariableParams)
 	}
 
 	name := string(params.VariableName)
-	owner, err := variableOwner(params.ProjectID, params.Kind)
+	owner, kind := variableOwner(params.ProjectID), variableKind(params.Kind)
+	variables, err := h.variableService.GetVariables(ctx, owner, kind, name)
 	if err != nil {
 		return nil, err
 	}
-	variables, err := h.variableService.GetVariables(ctx, owner, name)
-	if err != nil {
-		return nil, err
-	}
-	// At most one row: the read admits one owner and the primary key makes a
-	// name unique within it, so there is nothing to choose between. Empty means
-	// this owner has not entered the name -- another owner of the same project
-	// may hold it, and that is still a miss here, because nothing is inherited.
+	// Empty means no addressed kind holds the name; the other kind's value
+	// does not count, because nothing falls back between kinds.
 	if len(variables) == 0 {
 		return nil, domain.ErrVariableNotFound()
 	}
-	value, err := toAPIVariable(variables[0])
+	out, err := toAPIVariablesByKind(variables)
 	if err != nil {
 		return nil, err
 	}
-	return &api.VariableByKind{Primary: api.NewOptVariable(value)}, nil
+	value := out[name]
+	return &value, nil
 }
 
 func (h *Handler) UpdateVariables(ctx context.Context, req api.UpdateVariablesRequest, params api.UpdateVariablesParams) (api.UpdateVariablesRes, error) {
@@ -73,10 +66,7 @@ func (h *Handler) UpdateVariables(ctx context.Context, req api.UpdateVariablesRe
 			WithMessage("the request body must name at least one variable")
 	}
 
-	owner, err := variableOwner(params.ProjectID, params.Kind)
-	if err != nil {
-		return nil, err
-	}
+	owner, kind := variableOwner(params.ProjectID), variableKind(params.Kind)
 
 	writes := make([]service.VariableToSet, 0, len(req))
 	for name, input := range req {
@@ -90,11 +80,11 @@ func (h *Handler) UpdateVariables(ctx context.Context, req api.UpdateVariablesRe
 		writes = append(writes, service.VariableToSet{Name: name, Value: value, IsSecret: isSecret})
 	}
 
-	if err := h.variableService.SetVariables(ctx, owner, writes); err != nil {
+	if err := h.variableService.SetVariables(ctx, owner, kind, writes); err != nil {
 		return nil, err
 	}
 
-	vars, err := h.variableService.GetVariables(ctx, owner)
+	vars, err := h.variableService.GetVariables(ctx, owner, kind)
 	if err != nil {
 		return nil, err
 	}
@@ -114,11 +104,8 @@ func (h *Handler) DeleteVariable(ctx context.Context, params api.DeleteVariableP
 		return nil, err
 	}
 
-	owner, err := variableOwner(params.ProjectID, params.Kind)
-	if err != nil {
-		return nil, err
-	}
-	if err := h.variableService.DeleteVariable(ctx, owner, string(params.VariableName)); err != nil {
+	owner, kind := variableOwner(params.ProjectID), variableKind(params.Kind)
+	if err := h.variableService.DeleteVariable(ctx, owner, kind, string(params.VariableName)); err != nil {
 		return nil, err
 	}
 	return &api.DeleteVariableNoContent{}, nil
@@ -126,18 +113,23 @@ func (h *Handler) DeleteVariable(ctx context.Context, params api.DeleteVariableP
 
 /* ---------------- CONVERTERS ---------------- */
 
-// variableOwner turns the addressed scope into the owner storage matches on.
-// The store holds primary values only until it carries a kind, so a preview
-// request is not implemented yet.
-func variableOwner(projectID api.ProjectID, kind api.OptVariableKind) (domain.VariableOwner, error) {
-	if kind.Set && kind.Value == api.VariableKindPreview {
-		return domain.VariableOwner{}, domain.ErrNotImplemented()
-	}
-	return domain.VariableOwner{ProjectID: string(projectID)}, nil
+func variableOwner(projectID api.ProjectID) domain.VariableOwner {
+	return domain.VariableOwner{ProjectID: string(projectID)}
 }
 
-// toAPIVariablesByKind keys a read by name. Every stored value is a primary
-// value until the store carries a kind.
+// variableKind is the kind a request names, or nil for both.
+func variableKind(kind api.OptVariableKind) *domain.OriginKind {
+	if !kind.Set {
+		return nil
+	}
+	k := domain.OriginKindPrimary
+	if kind.Value == api.VariableKindPreview {
+		k = domain.OriginKindPreview
+	}
+	return &k
+}
+
+// toAPIVariablesByKind keys a read by name, each with its value per kind.
 func toAPIVariablesByKind(variables []*domain.Variable) (api.VariablesByKind, error) {
 	out := make(api.VariablesByKind, len(variables))
 	for _, variable := range variables {
@@ -145,7 +137,14 @@ func toAPIVariablesByKind(variables []*domain.Variable) (api.VariablesByKind, er
 		if err != nil {
 			return nil, err
 		}
-		out[variable.Name] = api.VariableByKind{Primary: api.NewOptVariable(value)}
+		byKind := out[variable.Name]
+		switch variable.Kind {
+		case domain.OriginKindPrimary:
+			byKind.Primary = api.NewOptVariable(value)
+		case domain.OriginKindPreview:
+			byKind.Preview = api.NewOptVariable(value)
+		}
+		out[variable.Name] = byKind
 	}
 	return out, nil
 }
@@ -237,6 +236,7 @@ func variableErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	case domain.ErrInvalidVariableName().Code,
 		domain.ErrInvalidVariableValue().Code,
+		domain.ErrTooManyVariables().Code,
 		domain.ErrNoVariableOwnerProjectID().Code,
 		domain.ErrSecretNotWholeValue().Code,
 		domain.ErrVariableDocumentTooDeep().Code,

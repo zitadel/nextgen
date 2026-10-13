@@ -7,15 +7,16 @@ content:
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
         - $ref: '../../components/schemas/errors/enc_key-not_found.yaml'
+        - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../components/schemas/errors/var-invalid_name.yaml'
         - $ref: '../../components/schemas/errors/var-invalid_value.yaml'
         - $ref: '../../components/schemas/errors/var-no_project_id.yaml'
-        - $ref: '../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../components/schemas/errors/proj-not_found.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
+        - $ref: '../../components/schemas/errors/var-too_many.yaml'
         - $ref: '../../components/schemas/errors/var-not_found.yaml'
         - $ref: '../../components/schemas/errors/var-permission_denied.yaml'
       discriminator:
@@ -24,15 +25,16 @@ content:
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
           enc_key.decrypt_failed: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
           enc_key.not_found: '../../components/schemas/errors/enc_key-not_found.yaml'
+          evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../components/schemas/errors/tkn-invalid.yaml'
           var.invalid_name: '../../components/schemas/errors/var-invalid_name.yaml'
           var.invalid_value: '../../components/schemas/errors/var-invalid_value.yaml'
           var.no_project_id: '../../components/schemas/errors/var-no_project_id.yaml'
-          not_implemented: '../../components/schemas/errors/not_implemented.yaml'
           proj.not_found: '../../components/schemas/errors/proj-not_found.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
+          var.too_many: '../../components/schemas/errors/var-too_many.yaml'
           var.not_found: '../../components/schemas/errors/var-not_found.yaml'
           var.permission_denied: '../../components/schemas/errors/var-permission_denied.yaml'
     examples:
@@ -51,6 +53,11 @@ content:
         value:
           code: enc_key.not_found
           message: 'encryption key not found'
+      evt.invalid:
+        summary: evt.invalid
+        value:
+          code: evt.invalid
+          message: 'event: invalid'
       internal:
         summary: internal
         value:
@@ -76,11 +83,6 @@ content:
         value:
           code: var.no_project_id
           message: 'a variable must be owned by a project'
-      not_implemented:
-        summary: not_implemented
-        value:
-          code: not_implemented
-          message: 'This feature is not implemented yet.'
       proj.not_found:
         summary: proj.not_found
         value:
@@ -96,6 +98,11 @@ content:
         value:
           code: enc_key.unknown_alg
           message: 'unsupported encryption algorithm'
+      var.too_many:
+        summary: var.too_many
+        value:
+          code: var.too_many
+          message: 'the project holds too many variables for this kind'
       var.not_found:
         summary: var.not_found
         value:

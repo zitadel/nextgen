@@ -56,6 +56,7 @@ same TX (shared `request_id`).
 | **Token** | `scopes[]` | Token string / JWE |
 | **Auth check** | `check_id`, `check_type`, `auth_attempt_id` | Challenge/proof JSON |
 | **Auth factor** | `user_id`, `factor_id` | Hash, public key material, challenges |
+| **Variable** | `kind`, `secret`; the name is `entity_id` | The value, plain or secret |
 
 `PATCH /projects/{id}` today only renames (`name`). `preview_origins` is set
 on **create** only. Create emits both fields; update emits `name` when
@@ -134,6 +135,8 @@ tracked below.
 | IDPConnectionService revise (existing slug) | `idp.updated` | `admin` | `idp_connection` | `revision_id`; delta: `display_name`, `template` (when changed) |
 | `CreateIDPIdentityLink` (SSO sign-in creates the user and links the provider account, same TX) | `idp.identity_link.created` | `entity` | `idp_identity_link` | `connection_id`, `user_id` (secondary; never the provider subject or claims) |
 | DeploymentService create (deploy and rollback alike; one event per deployment, whatever the number of targets) | `deployment.created` | `admin` | `deployment` | `release_id`, `targets`, `reason`, `message`, `rollback_to` |
+| VariableService set (one event per name and kind written) | `variable.set` | `admin` | `variable` | `kind`, `secret` |
+| VariableService remove (one event per name and kind removed; a name the kind did not hold emits none) | `variable.removed` | `admin` | `variable` | `kind`, `secret` |
 | Project create seed `CreateAuthzAssignment` (sk_proj) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService create (`CreateAuthzAssignment` for user/team on project.viewer, editor, or admin) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService revoke (`RevokeAuthzAssignment`) | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |

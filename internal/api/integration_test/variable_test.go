@@ -255,28 +255,55 @@ func TestVariables(t *testing.T) {
 		assert.NotContains(t, get(t, api.OptVariableKind{}), "BULK_C")
 	})
 
-	// The store holds primary values only until it carries a kind.
-	t.Run("a preview request is not implemented yet", func(t *testing.T) {
+	t.Run("each kind holds its own value", func(t *testing.T) {
 		preview := api.NewOptVariableKind(api.VariableKindPreview)
+		scalar := func(s string) api.Variable {
+			return api.NewVariableScalarVariable(api.NewStringVariableScalar(s))
+		}
 
-		read, err := client.GetVariables(t.Context(), api.GetVariablesParams{
-			ProjectID: projectID,
-			Kind:      preview,
+		update(t, api.OptVariableKind{}, api.UpdateVariablesRequest{
+			"KIND_PLAIN": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("prod")),
+			"KIND_SECRET": api.NewSecretVariableInputVariableInput(api.SecretVariableInput{
+				Value:  api.NewStringVariableScalar("s3cr3t"),
+				Secret: true,
+			}),
+		})
+		update(t, preview, api.UpdateVariablesRequest{
+			"KIND_PLAIN": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("test")),
+		})
+
+		res, err := client.GetVariables(t.Context(), api.GetVariablesParams{ProjectID: projectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.VariablesByKind{}, res, helpers.MustMarshal(t, res))
+		all := *res.(*api.VariablesByKind)
+		assert.Equal(t, api.VariableByKind{
+			Primary: api.NewOptVariable(scalar("prod")),
+			Preview: api.NewOptVariable(scalar("test")),
+		}, all["KIND_PLAIN"])
+		assert.Equal(t, api.VariableByKind{
+			Primary: api.NewOptVariable(api.NewSecretVariableVariable(api.SecretVariable{Secret: true})),
+		}, all["KIND_SECRET"], "a secret naming no kind reaches primary only")
+
+		missing, err := client.GetVariable(t.Context(), api.GetVariableParams{
+			ProjectID:    projectID,
+			VariableName: "KIND_SECRET",
+			Kind:         preview,
 		})
 		require.NoError(t, err)
-		status, code, _, ok := errorResponseParts(t, read)
-		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, read))
-		assert.Equal(t, http.StatusNotImplemented, status)
-		assert.Equal(t, domain.ErrNotImplemented().Code, code)
+		status, code, _, ok := errorResponseParts(t, missing)
+		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, missing))
+		assert.Equal(t, http.StatusNotFound, status)
+		assert.Equal(t, domain.ErrVariableNotFound().Code, code)
 
-		written := update(t, preview, api.UpdateVariablesRequest{
-			"NEVER_LANDS": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("x")),
+		deleted, err := client.DeleteVariable(t.Context(), api.DeleteVariableParams{
+			ProjectID:    projectID,
+			VariableName: "KIND_PLAIN",
+			Kind:         preview,
 		})
-		status, code, _, ok = errorResponseParts(t, written)
-		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, written))
-		assert.Equal(t, http.StatusNotImplemented, status)
-		assert.Equal(t, domain.ErrNotImplemented().Code, code)
-		assert.NotContains(t, get(t, api.OptVariableKind{}), "NEVER_LANDS")
+		require.NoError(t, err)
+		require.IsType(t, &api.DeleteVariableNoContent{}, deleted, helpers.MustMarshal(t, deleted))
+		assert.Equal(t, scalar("prod"), get(t, api.OptVariableKind{})["KIND_PLAIN"],
+			"removing the preview value leaves the primary one")
 	})
 }
 

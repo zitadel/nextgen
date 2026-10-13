@@ -126,7 +126,7 @@ func newSSOCallbackFixture(t *testing.T) *ssoCallbackFixture {
 	provider := newSSOProviderStub(t)
 	f := newSSOResolutionFixture(t, provider.connection())
 	require.NoError(t, harness.EnsureVariableService(t).SetVariables(t.Context(),
-		domain.VariableOwner{ProjectID: f.project.ID},
+		domain.VariableOwner{ProjectID: f.project.ID}, nil,
 		[]service.VariableToSet{
 			{Name: "GOOGLE_CLIENT_ID", Value: "client-1"},
 			{Name: "GOOGLE_SECRET", Value: ssoTestClientSecret, IsSecret: true},

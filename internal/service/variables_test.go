@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -64,15 +65,28 @@ func testVariable(t *testing.T, name string, owner domain.VariableOwner, value a
 }
 
 func TestVariableService_GetVariables(t *testing.T) {
-	t.Run("passes the owner and names through", func(t *testing.T) {
+	t.Run("reads the kind named", func(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
 		stored := []*domain.Variable{testVariable(t, "theme", variablesOwner, "dark")}
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.OriginKindPrimary, "theme").Return(stored, nil)
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.OriginKindPreview, "theme").Return(stored, nil)
 
-		got, err := svc.GetVariables(t.Context(), variablesOwner, "theme")
+		got, err := svc.GetVariables(t.Context(), variablesOwner, kindPtr(domain.OriginKindPreview), "theme")
 		require.NoError(t, err)
 		assert.Equal(t, stored, got)
+	})
+
+	t.Run("reads both kinds when none is named", func(t *testing.T) {
+		svc, statements, _ := newMockedVariableService(t)
+
+		primary := &domain.Variable{Name: "theme", Owner: variablesOwner, Kind: domain.OriginKindPrimary, Value: "dark"}
+		preview := &domain.Variable{Name: "theme", Owner: variablesOwner, Kind: domain.OriginKindPreview, Value: "light"}
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.OriginKindPrimary).Return([]*domain.Variable{primary}, nil)
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.OriginKindPreview).Return([]*domain.Variable{preview}, nil)
+
+		got, err := svc.GetVariables(t.Context(), variablesOwner, nil)
+		require.NoError(t, err)
+		assert.Equal(t, []*domain.Variable{primary, preview}, got)
 	})
 
 	t.Run("reports a storage failure", func(t *testing.T) {
@@ -81,10 +95,32 @@ func TestVariableService_GetVariables(t *testing.T) {
 		sentinel := errors.New("connection refused")
 		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.OriginKindPrimary).Return(nil, sentinel)
 
-		_, err := svc.GetVariables(t.Context(), variablesOwner)
+		_, err := svc.GetVariables(t.Context(), variablesOwner, kindPtr(domain.OriginKindPrimary))
 		require.Error(t, err)
 		assert.ErrorIs(t, err, sentinel)
 	})
+}
+
+func kindPtr(kind domain.OriginKind) *domain.OriginKind {
+	return &kind
+}
+
+// expectHeld answers the write's read of what each kind holds.
+func expectHeld(statements *servicemocks.MockAllStatements, primary, preview []*domain.Variable) {
+	statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.OriginKindPrimary).Return(primary, nil)
+	statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.OriginKindPreview).Return(preview, nil)
+}
+
+// expectEvents records the events a call inserts.
+func expectEvents(statements *servicemocks.MockAllStatements) *[]*domain.Event {
+	var events []*domain.Event
+	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, event *domain.Event) error {
+			events = append(events, event)
+			return nil
+		},
+	).AnyTimes()
+	return &events
 }
 
 func TestVariableService_GetDecryptedVariables(t *testing.T) {
@@ -193,49 +229,41 @@ func TestVariableService_GetDecryptedVariables(t *testing.T) {
 }
 
 func TestVariableService_SetVariables(t *testing.T) {
-	t.Run("stores a plain variable without consulting the key service", func(t *testing.T) {
+	t.Run("writes a plain value naming no kind for both kinds", func(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
+		expectHeld(statements, nil, nil)
+		events := expectEvents(statements)
 
 		// No key service EXPECT: a plain variable must not need a key.
+		var kinds []domain.OriginKind
 		statements.EXPECT().
 			SetVariable(gomock.Any(), gomock.Any()).
 			DoAndReturn(func(_ context.Context, v *domain.Variable) error {
 				assert.Equal(t, "theme", v.Name)
 				assert.Equal(t, "dark", v.Value)
-				assert.Equal(t, variablesOwner, v.Owner)
-				// The API carries no kind yet, so a write is the primary
-				// target's.
-				assert.Equal(t, domain.OriginKindPrimary, v.Kind)
 				assert.False(t, v.IsSecret)
+				kinds = append(kinds, v.Kind)
 				return nil
-			})
+			}).Times(2)
 
-		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
+		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, nil, []service.VariableToSet{
 			{Name: "theme", Value: "dark"},
 		}))
+		assert.ElementsMatch(t, []domain.OriginKind{domain.OriginKindPrimary, domain.OriginKindPreview}, kinds)
+		require.Len(t, *events, 2)
+		for _, event := range *events {
+			assert.Equal(t, domain.EventTypeVariableSet, event.EventType)
+			assert.Equal(t, "theme", *event.EntityID)
+		}
 	})
 
-	// The project was resolved from the request, so its reference failing means
-	// it was deleted between the access check and the write.
-	t.Run("reports a project that is gone as not found", func(t *testing.T) {
-		svc, statements, _ := newMockedVariableService(t)
-
-		statements.EXPECT().
-			SetVariable(gomock.Any(), gomock.Any()).
-			Return(database.NewForeignKeyError("variables", "fk_variables_project", errors.New("fk")))
-
-		err := svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
-			{Name: "theme", Value: "dark"},
-		})
-		assert.ErrorIs(t, err, domain.ErrProjectNotFound())
-	})
-
-	t.Run("encrypts a secret with the project's secret key", func(t *testing.T) {
+	t.Run("writes a secret naming no kind for primary only", func(t *testing.T) {
 		svc, statements, keys := newMockedVariableService(t)
+		expectHeld(statements, nil, nil)
+		events := expectEvents(statements)
 
 		crypter := cryptomock.NewMockCrypter(gomock.NewController(t))
 		crypter.EXPECT().Encrypt(`"s3cret"`).Return("ciphertext", nil)
-
 		keys.EXPECT().
 			GetProjectCrypter(gomock.Any(), variablesOwner.ProjectID, domain.EncryptionKeyPurposeSecret).
 			Return(crypter, nil)
@@ -243,14 +271,55 @@ func TestVariableService_SetVariables(t *testing.T) {
 		statements.EXPECT().
 			SetVariable(gomock.Any(), gomock.Any()).
 			DoAndReturn(func(_ context.Context, v *domain.Variable) error {
+				assert.Equal(t, domain.OriginKindPrimary, v.Kind)
 				assert.True(t, v.IsSecret)
 				assert.Equal(t, "ciphertext", v.Value, "the plaintext must never reach storage")
 				return nil
 			})
 
-		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
+		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, nil, []service.VariableToSet{
 			{Name: "token", Value: "s3cret", IsSecret: true},
 		}))
+		require.Len(t, *events, 1)
+		assert.JSONEq(t, `{"kind":"primary","secret":true}`, string((*events)[0].Payload),
+			"the payload never carries the value")
+	})
+
+	t.Run("writes a secret for preview when preview is named", func(t *testing.T) {
+		svc, statements, keys := newMockedVariableService(t)
+		expectHeld(statements, nil, nil)
+		expectEvents(statements)
+
+		crypter := cryptomock.NewMockCrypter(gomock.NewController(t))
+		crypter.EXPECT().Encrypt(gomock.Any()).Return("ciphertext", nil)
+		keys.EXPECT().GetProjectCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(crypter, nil)
+
+		statements.EXPECT().
+			SetVariable(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, v *domain.Variable) error {
+				assert.Equal(t, domain.OriginKindPreview, v.Kind)
+				return nil
+			})
+
+		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, kindPtr(domain.OriginKindPreview), []service.VariableToSet{
+			{Name: "token", Value: "s3cret", IsSecret: true},
+		}))
+	})
+
+	// The project was resolved from the request, so its reference failing means
+	// it was deleted between the access check and the write.
+	t.Run("reports a project that is gone as not found", func(t *testing.T) {
+		svc, statements, _ := newMockedVariableService(t)
+		expectHeld(statements, nil, nil)
+
+		statements.EXPECT().
+			SetVariable(gomock.Any(), gomock.Any()).
+			Return(database.NewForeignKeyError("variables", "fk_variables_project", errors.New("fk")))
+
+		err := svc.SetVariables(t.Context(), variablesOwner, kindPtr(domain.OriginKindPrimary), []service.VariableToSet{
+			{Name: "theme", Value: "dark"},
+		})
+		assert.ErrorIs(t, err, domain.ErrProjectNotFound())
 	})
 
 	// A failing key lookup used to fall through into encryption with a nil
@@ -263,20 +332,25 @@ func TestVariableService_SetVariables(t *testing.T) {
 			GetProjectCrypter(gomock.Any(), variablesOwner.ProjectID, domain.EncryptionKeyPurposeSecret).
 			Return(nil, sentinel)
 
-		// No SetVariable EXPECT: a write here would fail the test.
-		err := svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
+		// No storage EXPECT: a read or write here would fail the test.
+		err := svc.SetVariables(t.Context(), variablesOwner, nil, []service.VariableToSet{
 			{Name: "token", Value: "s3cret", IsSecret: true},
 		})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, sentinel)
 	})
 
-	t.Run("rejects an invalid variable before touching storage", func(t *testing.T) {
+	// Every value is constructed before any statement runs, so a bad name late
+	// in the batch stops the earlier entries and any removal from reaching
+	// storage.
+	t.Run("rejects the whole batch when one entry is invalid", func(t *testing.T) {
 		svc, _, _ := newMockedVariableService(t)
 
-		// No storage EXPECT: validation happens in the constructor.
-		err := svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
-			{Name: "bad name", Value: "v", IsSecret: false},
+		// No storage EXPECT: not even the valid entries may be written.
+		err := svc.SetVariables(t.Context(), variablesOwner, nil, []service.VariableToSet{
+			{Name: "good", Value: "v"},
+			{Name: "theme", Value: nil},
+			{Name: "bad name", Value: "v"},
 		})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, domain.ErrInvalidVariableName())
@@ -286,17 +360,18 @@ func TestVariableService_SetVariables(t *testing.T) {
 		svc, _, _ := newMockedVariableService(t)
 
 		// No storage and no key EXPECT: nothing may be reached.
-		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, nil))
+		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, nil, nil))
 	})
 
 	// The key is fetched once for the batch, not once per secret: a PATCH
 	// carrying several secrets is one key lookup.
 	t.Run("looks the project key up once however many secrets the batch holds", func(t *testing.T) {
 		svc, statements, keys := newMockedVariableService(t)
+		expectHeld(statements, nil, nil)
+		expectEvents(statements)
 
 		crypter := cryptomock.NewMockCrypter(gomock.NewController(t))
 		crypter.EXPECT().Encrypt(gomock.Any()).Return("ciphertext", nil).Times(2)
-
 		keys.EXPECT().
 			GetProjectCrypter(gomock.Any(), variablesOwner.ProjectID, domain.EncryptionKeyPurposeSecret).
 			Return(crypter, nil).
@@ -304,77 +379,60 @@ func TestVariableService_SetVariables(t *testing.T) {
 
 		statements.EXPECT().SetVariable(gomock.Any(), gomock.Any()).Return(nil).Times(3)
 
-		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
-			{Name: "client_id", Value: "public", IsSecret: false},
+		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, kindPtr(domain.OriginKindPrimary), []service.VariableToSet{
+			{Name: "client_id", Value: "public"},
 			{Name: "client_secret", Value: "s3cret", IsSecret: true},
 			{Name: "signing_secret", Value: "s3cret2", IsSecret: true},
 		}))
 	})
 
-	// Several names go in one transaction, so a failure partway through takes
-	// the earlier writes with it rather than leaving half a PATCH applied.
-	t.Run("writes a multi-name batch in one transaction", func(t *testing.T) {
+	// A null removes the name from every kind addressed, and only where it was
+	// held: a patch states what the project holds afterwards, so a name a kind
+	// never held is no error and emits no event.
+	t.Run("removes a name from the kinds that held it", func(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
-
-		statements.EXPECT().SetVariable(gomock.Any(), gomock.Any()).Return(nil).Times(2)
-
-		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
-			{Name: "host", Value: "example.com", IsSecret: false},
-			{Name: "retries", Value: 3, IsSecret: false},
-		}))
-	})
-
-	// Every value is constructed before any of them is written, so a bad name
-	// late in the batch stops the earlier ones from reaching storage.
-	t.Run("rejects the whole batch when one entry is invalid", func(t *testing.T) {
-		svc, _, _ := newMockedVariableService(t)
-
-		// No storage EXPECT: not even the valid first entry may be written.
-		err := svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
-			{Name: "good", Value: "v", IsSecret: false},
-			{Name: "bad name", Value: "v", IsSecret: false},
-		})
-		require.Error(t, err)
-		assert.ErrorIs(t, err, domain.ErrInvalidVariableName())
-	})
-
-	// A null in the body is a removal (RFC 7386), so a patch can carry names
-	// to remove without carrying anything to write.
-	t.Run("removes the names a patch carries", func(t *testing.T) {
-		svc, statements, _ := newMockedVariableService(t)
+		expectHeld(statements, []*domain.Variable{
+			{Name: "theme", Owner: variablesOwner, Kind: domain.OriginKindPrimary, Value: "dark"},
+		}, nil)
+		events := expectEvents(statements)
 
 		// No key EXPECT: a removal never needs the value, so never a key.
 		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, domain.OriginKindPrimary, "theme").Return(nil)
-		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, domain.OriginKindPrimary, "locale").Return(nil)
 
-		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
+		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, nil, []service.VariableToSet{
 			{Name: "theme"},
 			{Name: "locale"},
 		}))
+		require.Len(t, *events, 1)
+		assert.Equal(t, domain.EventTypeVariableRemoved, (*events)[0].EventType)
+		assert.JSONEq(t, `{"kind":"primary","secret":false}`, string((*events)[0].Payload))
 	})
 
-	// The one place a patch differs from DELETE /variables/{name}: a patch says
-	// what the owner holds afterwards, and a name it removes that was not there
-	// already satisfies that. It is also what makes a retry safe.
-	t.Run("removing a name the owner does not hold is not an error", func(t *testing.T) {
+	t.Run("removing a preview value leaves the primary one", func(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
+		expectHeld(statements,
+			[]*domain.Variable{{Name: "theme", Owner: variablesOwner, Kind: domain.OriginKindPrimary, Value: "dark"}},
+			[]*domain.Variable{{Name: "theme", Owner: variablesOwner, Kind: domain.OriginKindPreview, Value: "light"}},
+		)
+		expectEvents(statements)
 
-		statements.EXPECT().
-			DeleteVariable(gomock.Any(), variablesOwner, domain.OriginKindPrimary, "theme").
-			Return(database.NewNoRowFoundError(nil))
+		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, domain.OriginKindPreview, "theme").Return(nil)
 
-		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
+		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, kindPtr(domain.OriginKindPreview), []service.VariableToSet{
 			{Name: "theme"},
 		}))
 	})
 
-	t.Run("reports a removal failure that is not a missing row", func(t *testing.T) {
+	t.Run("reports a removal failure", func(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
+		expectHeld(statements, []*domain.Variable{
+			{Name: "theme", Owner: variablesOwner, Kind: domain.OriginKindPrimary, Value: "dark"},
+		}, nil)
 
 		sentinel := errors.New("connection refused")
 		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, domain.OriginKindPrimary, "theme").Return(sentinel)
 
-		err := svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
+		err := svc.SetVariables(t.Context(), variablesOwner, kindPtr(domain.OriginKindPrimary), []service.VariableToSet{
 			{Name: "theme"},
 		})
 		require.Error(t, err)
@@ -385,6 +443,10 @@ func TestVariableService_SetVariables(t *testing.T) {
 	// and removes another lands whole or not at all. Removals run first.
 	t.Run("applies writes and removals together, removals first", func(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
+		expectHeld(statements, []*domain.Variable{
+			{Name: "legacy_host", Owner: variablesOwner, Kind: domain.OriginKindPrimary, Value: "old"},
+		}, nil)
+		expectEvents(statements)
 
 		gomock.InOrder(
 			statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, domain.OriginKindPrimary, "legacy_host").Return(nil),
@@ -396,49 +458,80 @@ func TestVariableService_SetVariables(t *testing.T) {
 				}),
 		)
 
-		// The write is first in the batch and the removal still runs first: the
-		// service partitions the entries rather than replaying their order.
-		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
+		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, kindPtr(domain.OriginKindPrimary), []service.VariableToSet{
 			{Name: "host", Value: "example.com"},
 			{Name: "legacy_host", Value: nil},
 		}))
 	})
 
-	// The whole patch is built before any statement runs, so a bad value beside
-	// a removal stops the removal from happening at all.
-	t.Run("removes nothing when a value in the same patch is invalid", func(t *testing.T) {
-		svc, _, _ := newMockedVariableService(t)
+	// The cap keeps a frozen set within one Spanner cell.
+	t.Run("refuses a write that takes a kind past the cap", func(t *testing.T) {
+		svc, statements, _ := newMockedVariableService(t)
+		held := make([]*domain.Variable, domain.MaxVariablesPerKind)
+		for i := range held {
+			held[i] = &domain.Variable{Name: fmt.Sprintf("v%d", i), Owner: variablesOwner, Value: "x"}
+		}
+		expectHeld(statements, held, nil)
+		expectEvents(statements)
+		statements.EXPECT().SetVariable(gomock.Any(), gomock.Any()).Return(nil)
 
-		// No storage EXPECT: the removal must not reach storage either.
-		err := svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
-			{Name: "bad name", Value: "v"},
-			{Name: "theme", Value: nil},
+		err := svc.SetVariables(t.Context(), variablesOwner, kindPtr(domain.OriginKindPrimary), []service.VariableToSet{
+			{Name: "one_more", Value: "x"},
 		})
-		require.Error(t, err)
-		assert.ErrorIs(t, err, domain.ErrInvalidVariableName())
+		assert.ErrorIs(t, err, domain.ErrTooManyVariables())
+	})
+
+	t.Run("replacing a name at the cap is allowed", func(t *testing.T) {
+		svc, statements, _ := newMockedVariableService(t)
+		held := make([]*domain.Variable, domain.MaxVariablesPerKind)
+		for i := range held {
+			held[i] = &domain.Variable{Name: fmt.Sprintf("v%d", i), Owner: variablesOwner, Value: "x"}
+		}
+		expectHeld(statements, held, nil)
+		expectEvents(statements)
+		statements.EXPECT().SetVariable(gomock.Any(), gomock.Any()).Return(nil)
+
+		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, kindPtr(domain.OriginKindPrimary), []service.VariableToSet{
+			{Name: "v0", Value: "y"},
+		}))
 	})
 }
 
 func TestVariableService_DeleteVariable(t *testing.T) {
-	t.Run("deletes at the owner that entered the variable", func(t *testing.T) {
+	theme := func(kind domain.OriginKind) []*domain.Variable {
+		return []*domain.Variable{{Name: "theme", Owner: variablesOwner, Kind: kind, Value: "dark"}}
+	}
+
+	t.Run("deletes the kind named and leaves the other", func(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
+		events := expectEvents(statements)
 
-		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, domain.OriginKindPrimary, "theme").Return(nil)
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.OriginKindPreview, "theme").Return(theme(domain.OriginKindPreview), nil)
+		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, domain.OriginKindPreview, "theme").Return(nil)
 
-		require.NoError(t, svc.DeleteVariable(t.Context(), variablesOwner, "theme"))
+		require.NoError(t, svc.DeleteVariable(t.Context(), variablesOwner, kindPtr(domain.OriginKindPreview), "theme"))
+		require.Len(t, *events, 1)
+		assert.Equal(t, domain.EventTypeVariableRemoved, (*events)[0].EventType)
 	})
 
-	// Storage matches every owner column, so a variable the caller only
-	// inherits reports no row -- which is the caller's "not found".
-	t.Run("maps a missing row to ErrVariableNotFound", func(t *testing.T) {
+	t.Run("deletes every kind that holds the name when none is named", func(t *testing.T) {
+		svc, statements, _ := newMockedVariableService(t)
+		events := expectEvents(statements)
+
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.OriginKindPrimary, "theme").Return(theme(domain.OriginKindPrimary), nil)
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.OriginKindPreview, "theme").Return(nil, nil)
+		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, domain.OriginKindPrimary, "theme").Return(nil)
+
+		require.NoError(t, svc.DeleteVariable(t.Context(), variablesOwner, nil, "theme"))
+		assert.Len(t, *events, 1)
+	})
+
+	t.Run("is not found when no addressed kind holds the name", func(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
-		statements.EXPECT().
-			DeleteVariable(gomock.Any(), variablesOwner, domain.OriginKindPrimary, "theme").
-			Return(database.NewNoRowFoundError(nil))
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.OriginKindPreview, "theme").Return(nil, nil)
 
-		err := svc.DeleteVariable(t.Context(), variablesOwner, "theme")
-		require.Error(t, err)
+		err := svc.DeleteVariable(t.Context(), variablesOwner, kindPtr(domain.OriginKindPreview), "theme")
 		assert.ErrorIs(t, err, domain.ErrVariableNotFound())
 	})
 
@@ -446,9 +539,10 @@ func TestVariableService_DeleteVariable(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
 		sentinel := errors.New("connection refused")
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.OriginKindPrimary, "theme").Return(theme(domain.OriginKindPrimary), nil)
 		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, domain.OriginKindPrimary, "theme").Return(sentinel)
 
-		err := svc.DeleteVariable(t.Context(), variablesOwner, "theme")
+		err := svc.DeleteVariable(t.Context(), variablesOwner, kindPtr(domain.OriginKindPrimary), "theme")
 		require.Error(t, err)
 		assert.ErrorIs(t, err, sentinel)
 		assert.NotErrorIs(t, err, domain.ErrVariableNotFound())
