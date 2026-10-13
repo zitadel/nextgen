@@ -14,7 +14,9 @@
     "test": "vitest run",
     "test:all": "pnpm run test",
     "dev:real": "tsx --conditions=@zitadel/source scripts/dev-real.mts",
-    "dev:claim": "tsx --conditions=@zitadel/source scripts/dev-real.mts --claim"
+    "dev:claim": "tsx --conditions=@zitadel/source scripts/dev-real.mts --claim",
+    "lint": "biome check .",
+    "build-release": "vite build"
   },
   "dependencies": {
     "@fontsource/arimo": "catalog:",
