@@ -21,6 +21,9 @@ import type { ConnectionSlug } from "./types.js";
 /** Every catalog provider's id. The `--provider` flag takes one, or `custom`. */
 export const IDP_PROVIDERS = Object.freeze(["google"] as const);
 
+/** What a connection may not be called: a provider the catalog names, or the word that selects a custom one. */
+export const RESERVED_SLUGS: readonly string[] = [...IDP_PROVIDERS, CUSTOM_PROVIDER];
+
 /** The id of a provider the catalog lists. */
 export type CatalogProviderId = (typeof IDP_PROVIDERS)[number];
 

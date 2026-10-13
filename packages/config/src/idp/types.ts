@@ -115,7 +115,9 @@ export const DEFAULT_SCOPES: Scopes = ["openid", "profile", "email"];
 export function parseScopes(value: string | undefined): Parsed<Scopes> {
   const typed = (value ?? "").split(/[\s,]+/).filter((scope) => scope !== "");
   if (typed.length === 0) {
-    return ok(DEFAULT_SCOPES);
+    return value !== undefined && value.trim() !== ""
+      ? refuse("Name at least one scope, or leave the scopes out for the default set.")
+      : ok(DEFAULT_SCOPES);
   }
   if (!typed.includes("openid")) {
     return refuse("The scopes must include openid. Without it the provider returns no id_token.");

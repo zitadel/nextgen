@@ -69,7 +69,11 @@ describe("parseIssuer", () => {
 describe("parseScopes", () => {
   it("is the default set when nothing was typed", () => {
     expect(parseScopes(undefined)).toEqual({ ok: true, value: DEFAULT_SCOPES });
-    expect(parseScopes("  , ")).toEqual({ ok: true, value: DEFAULT_SCOPES });
+    expect(parseScopes("   ")).toEqual({ ok: true, value: DEFAULT_SCOPES });
+  });
+
+  it("refuses separators with no scope between them, which is not the same as nothing", () => {
+    expect(parseScopes("  , ")).toMatchObject({ ok: false });
   });
 
   it("splits on spaces and commas and drops repeats", () => {

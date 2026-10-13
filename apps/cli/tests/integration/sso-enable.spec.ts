@@ -356,6 +356,27 @@ describe("sso enable", () => {
         expect(result).toSay("not applied");
       });
 
+      it("does not warn about scopes the developer did not pass this time", async () => {
+        const app = await aSetUpApp();
+        const withScopes = { ...ACME, scopes: "openid groups" };
+        expect(await app.enableCustomSso(withScopes, ACME_CREDENTIALS)).toSucceed();
+
+        const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS);
+
+        expect(result).not.toSay("not applied");
+      });
+
+      it("stops when two names would share a credential variable", async () => {
+        const app = await anAppServingAcme();
+
+        const result = await app.enableCustomSso(
+          { ...ACME, slug: "acme_sso", displayName: "Acme again" },
+          ACME_CREDENTIALS,
+        );
+
+        expect(result).toFailWith("E_CONFLICT");
+      });
+
       it("warns when the same connection is enabled again with another display name", async () => {
         const app = await anAppServingAcme();
 

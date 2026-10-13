@@ -174,7 +174,15 @@ export default class SsoEnable extends BaseCommand {
     // `nonBlankString` has already refused a blank one.
     const clientIdFlag =
       flags["client-id"] === undefined ? undefined : validated(parseClientId(flags["client-id"]));
-    const plan = planConnection({ selection, files: connections, clientId: clientIdFlag });
+    const plan = planConnection({
+      selection,
+      files: connections,
+      clientId: clientIdFlag,
+      given: {
+        displayName: flags["display-name"] !== undefined,
+        scopes: flags.scopes !== undefined,
+      },
+    });
 
     const reusing = plan.action === "reuse";
     if (plan.action === "reuse" && plan.notApplied !== undefined) {

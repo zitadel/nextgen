@@ -65,6 +65,17 @@ describe("readConnectionFiles", () => {
   });
 });
 
+describe("readConnectionFiles with a file that is not JSON", () => {
+  it("does not repeat the text of the file in the error", async () => {
+    const cwd = await project({});
+    await writeFile(join(cwd, IDPS_DIR, "broken.json"), '{"client_secret": GOCSPX-leaked}', "utf8");
+
+    const error = await readConnectionFiles(cwd).catch((err: unknown) => err);
+
+    expect(JSON.stringify((error as { details?: unknown }).details)).not.toContain("GOCSPX-leaked");
+  });
+});
+
 describe("planConnection", () => {
   it("creates google.json when the project has no google connection", () => {
     const plan = planConnection({ selection: googleSelection, files: [] });
@@ -382,13 +393,37 @@ describe("planConnection for a custom connection", () => {
     });
   });
 
-  it("reuses the file but says the settings it did not apply", () => {
+  it("reuses the file but says the settings that were given and not applied", () => {
     const existing = file("acme-sso.json", acmeBody({ display_name: "Old name" }));
     const input = { ...acme, scopes: ["openid", "groups"] as Scopes };
 
-    expect(planConnection({ selection: custom(input), files: [existing] })).toMatchObject({
+    expect(
+      planConnection({
+        selection: custom(input),
+        files: [existing],
+        given: { displayName: true, scopes: true },
+      }),
+    ).toMatchObject({ action: "reuse", notApplied: ["display name", "scopes"] });
+  });
+
+  it("says nothing about a setting that was left to its default", () => {
+    const existing = file("acme-sso.json", acmeBody({ display_name: "Old name" }));
+    const input = { ...acme, scopes: ["openid", "groups"] as Scopes };
+
+    expect(
+      planConnection({
+        selection: custom(input),
+        files: [existing],
+        given: { displayName: false, scopes: false },
+      }),
+    ).not.toHaveProperty("notApplied");
+  });
+
+  it("finds the file that holds the slug even when the file spells it with spaces", () => {
+    const existing = file("acme-sso.json", acmeBody({ slug: " acme-sso " }));
+
+    expect(planConnection({ selection: custom(acme), files: [existing] })).toMatchObject({
       action: "reuse",
-      notApplied: ["display name", "scopes"],
     });
   });
 

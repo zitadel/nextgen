@@ -81,6 +81,7 @@ describe("selectionFromFlags for a custom connection", () => {
     ["an http issuer", { issuer: "http://sso.acme.example" }, "--issuer"],
     ["an issuer that is not a url", { issuer: "sso.acme.example" }, "--issuer"],
     ["scopes without openid", { scopes: "profile email" }, "must include openid"],
+    ["scopes that name nothing", { scopes: "," }, "at least one scope"],
   ])("refuses %s", (_name, over, expected) => {
     const error = refusal(() => custom({ ...valid, ...over }));
 

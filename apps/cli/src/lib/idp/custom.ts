@@ -2,6 +2,7 @@ import {
   CUSTOM_PROVIDER,
   type CustomOidcInput,
   IDP_PROVIDERS,
+  RESERVED_SLUGS,
   parseConnectionSlug,
   parseDisplayName,
   parseIssuer,
@@ -101,7 +102,7 @@ export function selectionFromFlags(
   return {
     kind: "custom",
     connection: {
-      slug: checked(flag.slug, parseConnectionSlug(slug, [...IDP_PROVIDERS, CUSTOM_PROVIDER])),
+      slug: checked(flag.slug, parseConnectionSlug(slug, RESERVED_SLUGS)),
       displayName: checked(flag.displayName, parseDisplayName(displayName)),
       issuer: checked(flag.issuer, parseIssuer(issuer)),
       scopes: checked(flag.scopes, parseScopes(values.scopes)),

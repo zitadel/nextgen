@@ -71,7 +71,7 @@ export async function readConnectionFiles(cwd: string): Promise<ConnectionFile[]
     } catch (error) {
       throw new ZitadelError("E_VALIDATION", `${path} is not valid JSON`, {
         hint: "Fix or remove the file, then run the command again.",
-        details: { file: path, parse_error: String(error) },
+        details: { file: path, parse_error: describeParseError(error) },
       });
     }
     if (!isObject(body)) {
@@ -82,6 +82,15 @@ export async function readConnectionFiles(cwd: string): Promise<ConnectionFile[]
     files.push({ name, path, body });
   }
   return files;
+}
+
+/**
+ * What went wrong parsing a file, without the text of the file. V8 quotes the
+ * source it choked on, and this file is where a pasted secret would be.
+ */
+function describeParseError(error: unknown): string {
+  const position = error instanceof Error ? /position (\d+)/.exec(error.message)?.[1] : undefined;
+  return position === undefined ? "invalid JSON" : `invalid JSON at position ${position}`;
 }
 
 /**
@@ -251,6 +260,13 @@ function refuseCollidingVariables(
   }
 }
 
+/**
+ * Which of a custom connection's settings the developer actually passed. A
+ * setting left out takes its default, and an existing file that differs from a
+ * default nobody asked for has not been contradicted.
+ */
+export type GivenSettings = { readonly displayName: boolean; readonly scopes: boolean };
+
 /** What the caller should do with the provider's connection. */
 export type ConnectionPlan =
   | {
@@ -395,11 +411,12 @@ function planCustomConnection(options: {
   readonly input: CustomOidcInput;
   readonly files: readonly ConnectionFile[];
   readonly clientId?: ClientId;
+  readonly given?: GivenSettings;
 }): ConnectionPlan {
   const { slug, issuer } = options.input;
   const name = `${slug}.json`;
   const path = `${IDPS_DIR}/${name}`;
-  const holders = options.files.filter((file) => file.body.slug === slug);
+  const holders = options.files.filter((file) => String(file.body.slug ?? "").trim() === slug);
 
   if (holders.length > 1) {
     throw new ZitadelError(
@@ -450,8 +467,12 @@ function planCustomConnection(options: {
   refuseCollidingVariables(credentialVariablesOf(match, slug), slug, options.files, match);
   const storedScopes = isObject(oidc) && Array.isArray(oidc.scopes) ? oidc.scopes.join(" ") : "";
   const notApplied = [
-    ...(match.body.display_name === options.input.displayName ? [] : (["display name"] as const)),
-    ...(storedScopes === options.input.scopes.join(" ") ? [] : (["scopes"] as const)),
+    ...(options.given?.displayName !== true || match.body.display_name === options.input.displayName
+      ? []
+      : (["display name"] as const)),
+    ...(options.given?.scopes !== true || storedScopes === options.input.scopes.join(" ")
+      ? []
+      : (["scopes"] as const)),
   ];
   return { action: "reuse", file: match, slug, ...(notApplied.length > 0 ? { notApplied } : {}) };
 }
@@ -477,9 +498,10 @@ export function planConnection(options: {
   readonly selection: ProviderSelection;
   readonly files: readonly ConnectionFile[];
   readonly clientId?: ClientId;
+  readonly given?: GivenSettings;
 }): ConnectionPlan {
-  const { selection, files, clientId } = options;
+  const { selection, files, clientId, given } = options;
   return selection.kind === "custom"
-    ? planCustomConnection({ input: selection.connection, files, clientId })
+    ? planCustomConnection({ input: selection.connection, files, clientId, given })
     : planCatalogConnection({ provider: idpProvider(selection.id), files, clientId });
 }
