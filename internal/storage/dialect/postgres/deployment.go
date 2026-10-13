@@ -29,9 +29,6 @@ const (
 	targetsQuery    = `SELECT t.origin, t.deployment_id, t.release_id, d.target_kind, t.deployed_at, t.seq FROM zitadel_nextgen.deployment_targets t` +
 		` JOIN zitadel_nextgen.deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
 		` WHERE t.project_id = $1 AND t.deployment_id = ANY($2)`
-	deploymentAtStmt = deploymentQuery + ` WHERE project_id = $1 AND id = (` +
-		`SELECT t.deployment_id FROM zitadel_nextgen.deployment_targets t` +
-		` WHERE t.project_id = $1 AND t.origin = $2 AND t.deployed_at <= $3 ORDER BY t.seq DESC LIMIT 1)`
 )
 
 var (
@@ -127,11 +124,6 @@ func (ds deploymentStatements) GetLiveDeployment(ctx context.Context, projectID,
 		return nil, err
 	}
 	return entity, nil
-}
-
-// GetDeploymentAt implements [service.DeploymentStatements].
-func (ds deploymentStatements) GetDeploymentAt(ctx context.Context, projectID, origin string, at time.Time) (*domain.Deployment, error) {
-	return ds.getOne(ctx, deploymentAtStmt, projectID, origin, at)
 }
 
 func (ds deploymentStatements) getOne(ctx context.Context, query string, args ...any) (*domain.Deployment, error) {

@@ -238,8 +238,6 @@ type DeploymentStatements interface {
 	// targets it still serves; a NoRowFoundError when it serves nothing,
 	// including after its preview expired.
 	GetLiveDeployment(ctx context.Context, projectID, origin string, now time.Time) (*domain.Deployment, error)
-	// GetDeploymentAt is the deployment origin served at an instant.
-	GetDeploymentAt(ctx context.Context, projectID, origin string, at time.Time) (*domain.Deployment, error)
 }
 
 type PreviewStatements interface {

@@ -22,9 +22,6 @@ const (
 	targetsQuery    = `SELECT t.origin, t.deployment_id, t.release_id, d.target_kind, t.deployed_at, t.seq FROM deployment_targets t` +
 		` JOIN deployments d ON d.project_id = t.project_id AND d.id = t.deployment_id` +
 		` WHERE t.project_id = @p1 AND t.deployment_id IN UNNEST(@p2)`
-	deploymentAtStmt = deploymentQuery + ` WHERE project_id = @p1 AND id = (` +
-		`SELECT t.deployment_id FROM deployment_targets t` +
-		` WHERE t.project_id = @p1 AND t.origin = @p2 AND t.deployed_at <= @p3 ORDER BY t.seq DESC LIMIT 1)`
 )
 
 var (
@@ -128,11 +125,6 @@ func (ds deploymentStatements) GetLiveDeployment(ctx context.Context, projectID,
 		return nil, err
 	}
 	return entity, nil
-}
-
-// GetDeploymentAt implements [service.DeploymentStatements].
-func (ds deploymentStatements) GetDeploymentAt(ctx context.Context, projectID, origin string, at time.Time) (*domain.Deployment, error) {
-	return ds.getOne(ctx, buildStatement(deploymentAtStmt, projectID, origin, at).statement())
 }
 
 func (ds deploymentStatements) getOne(ctx context.Context, stmt spanner.Statement) (*domain.Deployment, error) {

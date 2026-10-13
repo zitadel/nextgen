@@ -2469,45 +2469,6 @@ func (c *MockAllStatementsGetChallengeByIDCall) DoAndReturn(f func(context.Conte
 	return c
 }
 
-// GetDeploymentAt mocks base method.
-func (m *MockAllStatements) GetDeploymentAt(ctx context.Context, projectID, origin string, at time.Time) (*domain.Deployment, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetDeploymentAt", ctx, projectID, origin, at)
-	ret0, _ := ret[0].(*domain.Deployment)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetDeploymentAt indicates an expected call of GetDeploymentAt.
-func (mr *MockAllStatementsMockRecorder) GetDeploymentAt(ctx, projectID, origin, at any) *MockAllStatementsGetDeploymentAtCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDeploymentAt", reflect.TypeOf((*MockAllStatements)(nil).GetDeploymentAt), ctx, projectID, origin, at)
-	return &MockAllStatementsGetDeploymentAtCall{Call: call}
-}
-
-// MockAllStatementsGetDeploymentAtCall wrap *gomock.Call
-type MockAllStatementsGetDeploymentAtCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsGetDeploymentAtCall) Return(arg0 *domain.Deployment, arg1 error) *MockAllStatementsGetDeploymentAtCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsGetDeploymentAtCall) Do(f func(context.Context, string, string, time.Time) (*domain.Deployment, error)) *MockAllStatementsGetDeploymentAtCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsGetDeploymentAtCall) DoAndReturn(f func(context.Context, string, string, time.Time) (*domain.Deployment, error)) *MockAllStatementsGetDeploymentAtCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // GetDeploymentByID mocks base method.
 func (m *MockAllStatements) GetDeploymentByID(ctx context.Context, projectID, id string) (*domain.Deployment, error) {
 	m.ctrl.T.Helper()
