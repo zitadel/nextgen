@@ -13,6 +13,7 @@
  */
 
 import type { ConnectionSlug } from "@zitadel/config/idp";
+import { withoutFlowStepDefaults } from "@zitadel/config/normalize";
 
 import { ZitadelError } from "../errors";
 
@@ -357,45 +358,7 @@ function ssoConflictStep(
  * output as hand-edited.
  */
 function matches(step: Step, expected: Step): boolean {
-  return canonical(withoutServerDefaults(step)) === canonical(withoutServerDefaults(expected));
-}
-
-/**
- * The step keys the platform fills in or drops when it answers.
- *
- * `apply` writes the canonical definition back into the file, and that form is
- * not byte-for-byte what the generator wrote. The server omits an action's
- * `primary: false`, a default, so the passkey and sign-in actions of the
- * conflict step come back without it; and the API states `gates` and
- * `sso_providers` even when empty, which some platform builds write back as
- * `gates: {}` and `sso_providers: []`. It is the same step. Reading it as
- * hand-editing would skip the conflict step on the first provider added after
- * an apply, and that is exactly when a Project with several connections
- * reaches it.
- */
-const EMPTY_WHEN_UNSET = ["gates", "sso_providers"] as const;
-
-function withoutServerDefaults(step: Step): Step {
-  const copy: Step = { ...step };
-  for (const key of EMPTY_WHEN_UNSET) {
-    const value = copy[key];
-    const empty = Array.isArray(value)
-      ? value.length === 0
-      : isObject(value) && Object.keys(value).length === 0;
-    if (empty) {
-      delete copy[key];
-    }
-  }
-  if (Array.isArray(copy.actions)) {
-    copy.actions = copy.actions.map((action) => {
-      if (!isObject(action) || action.primary !== false) {
-        return action;
-      }
-      const { primary: _default, ...rest } = action;
-      return rest;
-    });
-  }
-  return copy;
+  return canonical(withoutFlowStepDefaults(step)) === canonical(withoutFlowStepDefaults(expected));
 }
 
 /** The provider list a step should end up with: what it has, plus this slug. */
