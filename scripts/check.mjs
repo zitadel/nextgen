@@ -133,8 +133,12 @@ async function phasePack() {
 }
 
 async function phaseRelease() {
+  // Not `-- --skip-container`: turbo would put the argument into the cache
+  // key of every task in the run and rebuild the whole release graph.
   const snapshot = runnerCommand(["release:snapshot"]);
-  await run(snapshot.command, [...snapshot.args, "--", "--skip-container"]);
+  await run(snapshot.command, snapshot.args, {
+    env: { ...process.env, RELEASE_SKIP_CONTAINER: "1" },
+  });
 }
 
 async function phaseJourney() {
