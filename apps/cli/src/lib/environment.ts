@@ -8,6 +8,7 @@ import { ZitadelError } from "./errors";
 import { hasZitadelSecret, readZitadelSecret } from "./project";
 import { bailOnCancel } from "./prompt-cancel";
 import { resolveServer, serverOrigin } from "./server";
+import { reportWarning } from "./warnings";
 
 /**
  * The values a command reads from an environment. Each resolves on its own, so
@@ -324,10 +325,18 @@ async function persistEnvValue(path: string, key: EnvironmentKey, value: string)
   const next = `${existing}${existing && !existing.endsWith("\n") ? "\n" : ""}${key}=${value}\n`;
   await writeFile(path, next, { mode: 0o600 });
   // `writeFile`'s mode applies only on creation and is masked by the umask, so
-  // re-assert 0600. The file may hold a secret, so a chmod we cannot apply means
-  // we cannot promise the credential file is private — surface it, do not hide
-  // it behind a success.
-  await chmod(path, 0o600);
+  // re-assert 0600 because the file may hold a secret. A filesystem that cannot
+  // chmod (FAT/exFAT, some bind mounts) must not fail the write — the secret is
+  // already on disk and the next run would read it back without re-prompting, so
+  // a throw would just be one confusing failure followed by silent success with
+  // the same file. Warn once that it could not be locked down, and proceed.
+  try {
+    await chmod(path, 0o600);
+  } catch (error) {
+    reportWarning(
+      `Wrote ${path} but could not set it to 0600 (${(error as NodeJS.ErrnoException).code ?? "unknown"}); its permissions may be broader than intended.`,
+    );
+  }
 }
 
 /**
