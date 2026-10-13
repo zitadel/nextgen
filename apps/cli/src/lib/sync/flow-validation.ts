@@ -151,15 +151,15 @@ function defaultSwapWarning(
   }
   const subject =
     action.kind === "create"
-      ? "this flow becomes the new default"
-      : "this revision becomes the newest active flow and the default";
+      ? "this flow definition becomes the project default"
+      : "this revision becomes the newest active flow definition and the project default";
   return {
     rule: "warn/default-flow-swap",
     message:
       `once applied, ${subject} for ${humanList(purposes)}: ` +
       `pages that do not explicitly set flow-name on <zitadel-login> will start rendering it. ` +
-      `If that is not intended, give the flow an "audience" before its first apply and select it by flowName, ` +
-      `or pin flow-name on the pages that should keep the current flow.`,
+      `If that is not intended, give the flow definition an "audience" before its first apply and select it by flowName, ` +
+      `or pin flow-name on the pages that should keep the current project default.`,
   };
 }
 
