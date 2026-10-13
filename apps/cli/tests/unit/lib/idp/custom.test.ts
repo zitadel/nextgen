@@ -5,6 +5,7 @@ import SsoEnable from "../../../../src/commands/sso/enable";
 import Setup from "../../../../src/commands/setup";
 import {
   checkGivenCustomFlags,
+  customExample,
   customFlagText,
   ENABLE_FLAG_KEYS,
   flagText,
@@ -267,5 +268,35 @@ describe("loopbackIssuerWarning", () => {
       loopbackIssuerWarning(selectionFromFlags("custom", valid, flag, "e.g.")),
     ).toBeUndefined();
     expect(loopbackIssuerWarning(selectionFromFlags("google", {}, flag, "e.g."))).toBeUndefined();
+  });
+});
+
+describe("customExample", () => {
+  it("spells the example with the flag names it is given", () => {
+    const renamed = {
+      provider: "--which",
+      slug: "--conn-slug",
+      displayName: "--label",
+      issuer: "--idp",
+      scopes: "--asks",
+    };
+
+    expect(customExample(renamed)).toBe(
+      "--which custom --conn-slug acme-sso --label 'Acme SSO' --idp https://sso.acme.example",
+    );
+  });
+
+  it("adds the scopes only when asked", () => {
+    expect(customExample(ENABLE_FLAG_NAMES, true)).toContain(
+      "--scopes 'openid profile email groups'",
+    );
+  });
+
+  it("leaves the scopes out otherwise", () => {
+    expect(customExample(ENABLE_FLAG_NAMES)).not.toContain("--scopes");
+  });
+
+  it("is what sso enable shows as its examples", () => {
+    expect(SsoEnable.examples.join("\n")).toContain(customExample(ENABLE_FLAG_NAMES));
   });
 });

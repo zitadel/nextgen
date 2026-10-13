@@ -377,7 +377,7 @@ function planCatalogConnection(options: {
       {
         hint:
           theirSlug === slug
-            ? `Point it at ${entry.displayName} if it is that connection, or rename it and choose another ${options.slugFlag}, then run the command again.`
+            ? `Point it at ${entry.displayName} if it is that connection. Otherwise change its slug, in the file and in the schemas and flows that name it, then run the command again.`
             : `Rename or remove that file, or give it the slug ${slug} if it is the ${entry.displayName} connection, then run the command again.`,
         details: { file: path, slug: occupied.body.slug ?? null },
       },

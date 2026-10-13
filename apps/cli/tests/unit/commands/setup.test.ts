@@ -12,6 +12,7 @@ vi.mock("../../../src/commands/setup/prompts", async (importOriginal) => ({
   askCustomSettings: vi.fn(),
 }));
 
+import { customExample, SETUP_FLAG_NAMES } from "../../../src/lib/idp";
 import {
   localServerHostsPlatform,
   retryOptionsFromFlags,
@@ -919,6 +920,37 @@ describe("setup with a custom provider described in part", () => {
     const res = await setup(cwd, ["--sso", "custom", "--sso-slug", "acme-sso"]);
 
     expect(parseJson(res.stdout)).toMatchObject({ code: "E_VALIDATION" });
+  });
+
+  it("names what is missing before it looks for the local server", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-sso-"));
+    tempDirs.push(cwd);
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--json",
+      "--server",
+      "local",
+      "--sso",
+      "custom",
+      "--sso-slug",
+      "acme-sso",
+    ]);
+
+    expect(parseJson(res.stdout)).toMatchObject({ code: "E_VALIDATION" });
+  });
+
+  it("shows the example with setup's own flags", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-sso-"));
+    tempDirs.push(cwd);
+
+    const res = await setup(cwd, ["--sso", "custom", "--sso-slug", "acme-sso"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      hint: expect.stringContaining(customExample(SETUP_FLAG_NAMES)),
+    });
   });
 
   it("refuses a setting that is wrong before anything else", async () => {

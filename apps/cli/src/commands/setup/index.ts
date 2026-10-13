@@ -40,6 +40,7 @@ import { toZitadelError, ZitadelError } from "../../lib/errors";
 import {
   customFlagText,
   checkGivenCustomFlags,
+  customExample,
   customFlagValues,
   flagText,
   ENABLE_FLAG_NAMES,
@@ -885,8 +886,7 @@ function dryRunProject(issuer: string): CreateProject201 {
 }
 
 /** What a command line describing a custom connection looks like, for an error to show. */
-const SSO_CUSTOM_EXAMPLE =
-  "--sso custom --sso-slug acme-sso --sso-display-name 'Acme SSO' --sso-issuer https://sso.acme.example";
+const SSO_CUSTOM_EXAMPLE = customExample(SETUP_FLAG_NAMES);
 
 /**
  * The provider a scripted run asked for, or `undefined` when it asked for

@@ -41,6 +41,7 @@ export {
   selectionFromFlags,
   type CustomFlagNames,
   checkGivenCustomFlags,
+  customExample,
   customFlagValues,
   ENABLE_FLAG_KEYS,
   flagText,

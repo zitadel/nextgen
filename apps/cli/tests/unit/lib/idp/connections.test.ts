@@ -255,6 +255,36 @@ describe("planConnection", () => {
     ).toThrow(/is a connection called google, but not to Google/);
   });
 
+  it("points a Google hint at the file and the schemas and flows, not at a flag", () => {
+    const local = file("google.json", {
+      slug: "google",
+      oidc: { issuer: "http://localhost:9100", client_id: "a", client_secret: "b" },
+    });
+    let hint = "";
+    try {
+      planConnection({ slugFlag: "--sso-slug", selection: googleSelection, files: [local] });
+    } catch (error) {
+      hint = (error as ZitadelError).hint ?? "";
+    }
+
+    expect(hint).toContain("in the schemas and flows that name it");
+  });
+
+  it("does not name a slug flag the catalog command refuses", () => {
+    const local = file("google.json", {
+      slug: "google",
+      oidc: { issuer: "http://localhost:9100", client_id: "a", client_secret: "b" },
+    });
+    let hint = "";
+    try {
+      planConnection({ slugFlag: "--slug", selection: googleSelection, files: [local] });
+    } catch (error) {
+      hint = (error as ZitadelError).hint ?? "";
+    }
+
+    expect(hint).not.toContain("--slug");
+  });
+
   it("does not ask for the slug it already has", () => {
     const local = file("google.json", {
       slug: "google",
@@ -603,6 +633,17 @@ describe("planConnection for a custom connection", () => {
     expect(() =>
       planConnection({ slugFlag: "--slug", selection: custom(acme), files: [occupied] }),
     ).toThrow(/acme-sso\.json already exists and is not the acme-sso connection/);
+  });
+  it("names the slug flag of the command in the hint about a file that holds the name", () => {
+    const occupied = file("acme-sso.json", acmeBody({ slug: "something-else" }));
+    let hint = "";
+    try {
+      planConnection({ slugFlag: "--sso-slug", selection: custom(acme), files: [occupied] });
+    } catch (error) {
+      hint = (error as ZitadelError).hint ?? "";
+    }
+
+    expect(hint).toContain("--sso-slug");
   });
 
   it("stops when two files claim the slug", () => {

@@ -37,6 +37,7 @@ import {
   type ConnectionPlan,
   type FlowFile,
   credentialVariablesOf,
+  customExample,
   customFlagValues,
   ENABLE_FLAG_KEYS,
   ENABLE_FLAG_NAMES,
@@ -91,8 +92,8 @@ export default class SsoEnable extends BaseCommand {
     "<%= config.bin %> sso enable --provider google",
     "<%= config.bin %> sso enable --provider google --schema customers",
     "<%= config.bin %> sso enable --provider google --client-id 1234-abc.apps.googleusercontent.com --non-interactive < secret.txt",
-    "<%= config.bin %> sso enable --provider custom --slug acme-sso --display-name 'Acme SSO' --issuer https://sso.acme.example",
-    "<%= config.bin %> sso enable --provider custom --slug acme-sso --display-name 'Acme SSO' --issuer https://sso.acme.example --scopes 'openid profile email groups' --client-id abc123 --non-interactive < secret.txt",
+    `<%= config.bin %> sso enable ${customExample(ENABLE_FLAG_NAMES)}`,
+    `<%= config.bin %> sso enable ${customExample(ENABLE_FLAG_NAMES, true)} --client-id abc123 --non-interactive < secret.txt`,
   ];
   static override flags = {
     // Not `required`: oclif's own "Missing required flag provider" is the one
@@ -143,7 +144,7 @@ export default class SsoEnable extends BaseCommand {
       provider,
       customFlagValues(flags, ENABLE_FLAG_KEYS),
       ENABLE_FLAG_NAMES,
-      "--provider custom --slug acme-sso --display-name 'Acme SSO' --issuer https://sso.acme.example",
+      customExample(ENABLE_FLAG_NAMES),
     );
     const entry = providerOf(selection);
     const loopback = loopbackIssuerWarning(selection);

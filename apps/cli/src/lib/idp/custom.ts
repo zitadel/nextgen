@@ -101,6 +101,20 @@ export function loopbackIssuerWarning(selection: ProviderSelection): string | un
     : undefined;
 }
 
+/**
+ * What a command line describing a custom connection looks like, spelled with
+ * the flags the command defines, for an error or a help example to show.
+ */
+export function customExample(flag: CustomFlagNames, withScopes = false): string {
+  return [
+    `${flag.provider} ${CUSTOM_PROVIDER}`,
+    `${flag.slug} acme-sso`,
+    `${flag.displayName} 'Acme SSO'`,
+    `${flag.issuer} https://sso.acme.example`,
+    ...(withScopes ? [`${flag.scopes} 'openid profile email groups'`] : []),
+  ].join(" ");
+}
+
 /** The names of the custom settings that were given, as the command spells them. */
 export function givenCustomFlags(values: CustomFlagValues, flag: CustomFlagNames): string[] {
   return [
