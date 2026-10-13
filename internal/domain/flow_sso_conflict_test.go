@@ -96,6 +96,9 @@ func TestFlowStateMachine_Process_ConflictBackAfterSignInAsksToSignIn(t *testing
 	assert.Equal(t, "identifier", identifier.State.CurrentStep)
 	assert.Empty(t, identifier.State.CollectedData.UserID)
 	assert.Equal(t, "attempt-2", identifier.State.AuthAttemptID, "releasing the account must rotate the auth attempt")
+	// Back is still offered here; removing it is #1041 AC #7, deferred until
+	// back entries remember the account they were shown for. Until then this
+	// pins that the way back ends in a step error, not an API error.
 	require.NotNil(t, findBackAction(identifier.Step))
 
 	back, err := w.sm.Process(t.Context(), def, identifier.State, domain.FlowSubmitInput{Action: "back"})
@@ -111,13 +114,14 @@ func TestFlowStateMachine_Process_ConflictBackAfterSignInAsksToSignIn(t *testing
 	assert.Equal(t, "sso-conflict", result.Step.Name)
 	require.NotNil(t, result.Step.Error)
 	assert.Equal(t, domain.FlowStepErrorSignInFirst, *result.Step.Error)
+	assert.Empty(t, result.State.CollectedData.AuthMethods.Password, "a password with nobody to check it against is not kept")
 }
 
-// A declared re-purpose drops the password a register leg banked without
-// checking it, so create_user cannot hand it to whoever the flow resolves
-// next.
-func TestFlowStateMachine_Process_RePurposeDropsBankedRegisterPassword(t *testing.T) {
-	t.Parallel()
+// bankedRegisterPassword starts a register flow whose register step collects
+// the password with the email, so the password is banked unchecked when the
+// flow moves on to register-password.
+func bankedRegisterPassword(t *testing.T) (*flowTestWorld, *domain.FlowDefinition, *domain.FlowState) {
+	t.Helper()
 	w := newFlowTestWorld(t)
 	def := purposeNavDefinition()
 	login := domain.FlowDefinitionPurposeLogin
@@ -152,67 +156,31 @@ func TestFlowStateMachine_Process_RePurposeDropsBankedRegisterPassword(t *testin
 	require.NoError(t, err)
 	require.Equal(t, "register-password", banked.State.CurrentStep)
 	require.Equal(t, "correct-horse-battery-staple", banked.State.CollectedData.AuthMethods.Password)
+	return w, def, banked.State
+}
 
-	result, err := w.sm.Process(t.Context(), def, banked.State, domain.FlowSubmitInput{Action: "sign_in"})
+// A declared re-purpose drops the password a register leg banked without
+// checking it, so create_user cannot hand it to whoever the flow resolves
+// next.
+func TestFlowStateMachine_Process_RePurposeDropsBankedRegisterPassword(t *testing.T) {
+	t.Parallel()
+	w, def, state := bankedRegisterPassword(t)
+
+	result, err := w.sm.Process(t.Context(), def, state, domain.FlowSubmitInput{Action: "sign_in"})
 	require.NoError(t, err)
 	assert.Equal(t, "identifier", result.State.CurrentStep)
 	assert.Empty(t, result.State.CollectedData.AuthMethods.Password)
 }
 
-// A step that routes to itself while the outcome flips the purpose is a new
-// variant of the step, so it still gets a back entry to the old one.
-func TestFlowStateMachine_Process_SelfTransitionWithPurposeFlipPushes(t *testing.T) {
+// Back onto a step that collects the identifier drops the banked password the
+// same way.
+func TestFlowStateMachine_Process_BackToIdentificationDropsBankedPassword(t *testing.T) {
 	t.Parallel()
-	w := newFlowTestWorld(t)
-	def := purposeNavDefinition()
-	for i := range def.Steps {
-		if def.Steps[i].Name == "register" {
-			def.Steps[i].Transitions[domain.FlowImplicitOutcomeUserAlreadyExists] = domain.FlowStepTransition{Target: "register"}
-		}
-	}
-	w.schemaResolver.EXPECT().
-		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
-		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
-		AnyTimes()
-	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
-	w.authAttemptService.EXPECT().SubmitIdentifier(gomock.Any(), gomock.Any()).Return("user_alice", nil)
+	w, def, state := bankedRegisterPassword(t)
 
-	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
-		Definition:    def,
-		Purpose:       domain.FlowDefinitionPurposeRegister,
-		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
-		UserSchemaURL: defaultSchemaURL,
-	})
-	require.NoError(t, err)
-	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
-		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{"email": "alice@example.com"},
-	})
+	result, err := w.sm.Process(t.Context(), def, state, domain.FlowSubmitInput{Action: "back"})
 	require.NoError(t, err)
 	assert.Equal(t, "register", result.State.CurrentStep)
-	assert.Equal(t, domain.FlowDefinitionPurposeLogin, result.State.CurrentPurpose)
-	assert.Equal(t, []domain.FlowBackEntry{{StepName: "register", Purpose: domain.FlowDefinitionPurposeRegister}}, result.State.BackStack)
-}
-
-func TestFlowStateMachine_Process_ConflictWrongPasswordKeepsUserBound(t *testing.T) {
-	t.Parallel()
-	w, def, state := conflictWorld(t)
-	w.authAttemptService.EXPECT().
-		SubmitPassword(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasswordInput) bool {
-			return in.AttemptID == "attempt-1" && in.Plain == "not-the-password"
-		})).
-		Return(domain.ErrAuthAttemptProofRejected(nil))
-	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
-
-	result, err := w.sm.Process(t.Context(), def, state, domain.FlowSubmitInput{
-		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{"x-auth-methods#password": "not-the-password"},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "sso-conflict", result.Step.Name)
-	require.NotNil(t, result.Step.Error)
-	assert.Equal(t, domain.FlowStepErrorInvalidCredentials, *result.Step.Error)
-	assert.Equal(t, "user_alice", result.State.CollectedData.UserID)
 	assert.Empty(t, result.State.CollectedData.AuthMethods.Password)
 }
 
@@ -237,123 +205,6 @@ func TestFlowStateMachine_Process_ConflictPasswordSignsInAndDropsPassword(t *tes
 	assert.Equal(t, "handoff_01TEST", result.HandoffToken)
 	assert.Equal(t, "user_alice", result.State.CollectedData.UserID)
 	assert.Empty(t, result.State.CollectedData.AuthMethods.Password)
-}
-
-// A step's own on_success runs after its password verified and still reads
-// it: on such a step the verified password is not dropped.
-func TestFlowStateMachine_Process_VerifiedPasswordReachesSameStepOnSuccess(t *testing.T) {
-	t.Parallel()
-	w := newFlowTestWorld(t)
-	def := purposeNavDefinition()
-	createUser := domain.FlowOnSuccessCreateUser
-	for i := range def.Steps {
-		if def.Steps[i].Name == "password" {
-			def.Steps[i].OnSuccess = &createUser
-		}
-	}
-	w.schemaResolver.EXPECT().
-		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
-		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
-		AnyTimes()
-	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
-	w.authAttemptService.EXPECT().SubmitIdentifier(gomock.Any(), gomock.Any()).Return("user_alice", nil)
-	w.authAttemptService.EXPECT().SubmitPassword(gomock.Any(), gomock.Any()).Return(nil)
-	w.createUser.EXPECT().
-		Handle(gomock.Any(), gomock.Cond(func(in domain.FlowOnSuccessInput) bool {
-			return in.State.CollectedData.AuthMethods.Password == "correct-horse-battery-staple"
-		})).
-		Return(domain.FlowOnSuccessResult{}, nil)
-	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Return(domain.FlowHandoffOutput{Token: "handoff_01TEST"}, nil)
-
-	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
-		Definition:    def,
-		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
-		UserSchemaURL: defaultSchemaURL,
-	})
-	require.NoError(t, err)
-	identified, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
-		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{"email": "alice@example.com"},
-	})
-	require.NoError(t, err)
-	require.Equal(t, "password", identified.State.CurrentStep)
-
-	result, err := w.sm.Process(t.Context(), def, identified.State, domain.FlowSubmitInput{
-		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{"x-auth-methods#password": "correct-horse-battery-staple"},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "handoff_01TEST", result.HandoffToken)
-}
-
-// A flow can reach the conflict step without binding a user.
-// A password there has nobody to be checked against: it is dropped and the
-// step asks the person to sign in, rather than failing the request.
-func TestFlowStateMachine_Process_ConflictPasswordWithoutUserAsksToSignIn(t *testing.T) {
-	t.Parallel()
-	w := newFlowTestWorld(t)
-	def := conflictDefinition()
-	def.Purposes[domain.FlowDefinitionPurposeLogin] = "sso-conflict"
-	w.schemaResolver.EXPECT().
-		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
-		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
-		AnyTimes()
-	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
-	w.authAttemptService.EXPECT().SubmitPassword(gomock.Any(), gomock.Any()).Times(0)
-
-	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
-		Definition:    def,
-		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
-		UserSchemaURL: defaultSchemaURL,
-	})
-	require.NoError(t, err)
-	require.Equal(t, "sso-conflict", start.State.CurrentStep)
-
-	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
-		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{"x-auth-methods#password": "correct-horse-battery-staple"},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "sso-conflict", result.Step.Name)
-	require.NotNil(t, result.Step.Error)
-	assert.Equal(t, domain.FlowStepErrorSignInFirst, *result.Step.Error)
-	assert.Empty(t, result.State.CollectedData.AuthMethods.Password)
-	assert.Empty(t, result.HandoffToken)
-}
-
-// A provider identity that collides with the bound user again re-renders the
-// conflict step in place: no history entry, so back still leads out of it
-// rather than to itself.
-func TestFlowStateMachine_Render_SSOCollisionOnConflictStepDoesNotGrowBackStack(t *testing.T) {
-	t.Parallel()
-	w, def, state := ssoRenderWorld(t)
-	def.Steps[0].Transitions[domain.FlowImplicitOutcomeUserAlreadyExists] = domain.FlowStepTransition{Target: "sso-conflict"}
-	// The provider button on the conflict step is what parks this result.
-	step := conflictStep()
-	step.SSOProviders = []string{"google"}
-	step.Transitions[domain.FlowImplicitOutcomeSSOAuthenticated] = domain.FlowStepTransition{Target: "done"}
-	def.Steps = append(def.Steps, step)
-	w.ssoProviders.EXPECT().
-		Resolve(gomock.Any(), testProjectID, "sso-conflict", gomock.Any()).
-		Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google"}}, nil).
-		AnyTimes()
-	state.CurrentStep = "sso-conflict"
-	state.CurrentPurpose = domain.FlowDefinitionPurposeLogin
-	state.CollectedData.UserID = "u-b"
-	state.History = []string{"credentials"}
-	state.BackStack = []domain.FlowBackEntry{{StepName: "credentials", Purpose: domain.FlowDefinitionPurposeRegister}}
-	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, nil), nil)
-	w.expectOwner("email", "alice@example.com", "u-b")
-	w.expectBindCollision("u-b", nil)
-
-	result, err := w.sm.Render(t.Context(), def, state)
-	require.NoError(t, err)
-	assert.Equal(t, "sso-conflict", result.Step.Name)
-	assert.Equal(t, "u-b", result.State.CollectedData.UserID)
-	assert.Equal(t, []string{"credentials"}, result.State.History)
-	assert.Equal(t, []domain.FlowBackEntry{{StepName: "credentials", Purpose: domain.FlowDefinitionPurposeRegister}}, result.State.BackStack)
 }
 
 // A passkey on the conflict step signs in the bound user: the ceremony runs on

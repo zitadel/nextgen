@@ -1243,9 +1243,7 @@ func (r *FlowStateMachineRuntime) renderStepError(pc *processCtx, resolved FlowR
 // from the user-submitted action it came from a handler diversion
 // (e.g. user_not_found); a missing transition in that case degrades
 // to the outcome's step error instead of ErrFlowInvalidAction. If
-// irreversible, BackStack is dropped after advance. A transition back to the
-// current step under the same purpose re-renders it without a history
-// entry.
+// irreversible, BackStack is dropped after advance.
 func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowResolvedFields, outcome string, irreversible bool) (FlowStepResult, error) {
 	transition, ok := pc.currentStep.Transitions[outcome]
 	if !ok {
@@ -1296,8 +1294,8 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 		// An exact undo of the previous navigation pops the back stack
 		// instead of pushing, so toggling Sign up / Sign in cannot grow
 		// History/BackStack past one entry (unbounded growth overflows
-		// the 4 KiB encrypted-cookie budget). Anything else advances
-		// below.
+		// the 4 KiB encrypted-cookie budget). Anything else falls through
+		// to the normal advance.
 		if top, ok := pc.state.PeekBackStack(); ok &&
 			top.StepName == nextStep.Name && top.Purpose == *transition.Purpose &&
 			len(pc.state.History) > 0 && pc.state.History[len(pc.state.History)-1] == top.StepName {
@@ -1309,15 +1307,7 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 		}
 	}
 
-	switch {
-	case repurposeUndo:
-		// The undo above already moved the flow back.
-	case nextStep.Name == pc.currentStep.Name && pc.state.CurrentPurpose == prevPurpose:
-		// The step shows itself again, as sso-conflict does on a repeated
-		// user_already_exists. Pushing it would make back return to the very
-		// step it is on, and grow History/BackStack with every repeat.
-		pc.state.IssuedAt = r.now()
-	default:
+	if !repurposeUndo {
 		r.advance(pc.state, pc.currentStep, prevPurpose, nextStep.Name)
 	}
 
@@ -1800,13 +1790,12 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 				continue
 			}
 			// A sign-in password is checked, not stored: [mergeCollected]
-			// has already banked it, so it is dropped when there is nobody
-			// to check it against, when it is rejected, and once it verified,
-			// rather than carried into whatever the flow resolves next. A
-			// step with its own on_success keeps a verified password, because
-			// that handler reads it; nothing drops it afterwards.
+			// has already banked it, so it is dropped here rather than
+			// carried into whatever the flow resolves next. The only
+			// on_success a login step can run is create_user, which would
+			// store it on a new account rather than the one it verified.
+			state.CollectedData.AuthMethods.Password = ""
 			if state.CollectedData.UserID == "" {
-				state.CollectedData.AuthMethods.Password = ""
 				return flowDispatchResult{StepError: new(FlowStepErrorSignInFirst)}, nil
 			}
 			err := r.authAttempts.SubmitPassword(ctx, FlowSubmitPasswordInput{
@@ -1815,15 +1804,11 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 				Plain:     value,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
-				state.CollectedData.AuthMethods.Password = ""
 				msg := FlowStepErrorInvalidCredentials
 				return flowDispatchResult{StepError: &msg}, nil
 			}
 			if err != nil {
 				return flowDispatchResult{}, fmt.Errorf("flow state machine: submit password: %w", err)
-			}
-			if pc.currentStep.OnSuccess == nil {
-				state.CollectedData.AuthMethods.Password = ""
 			}
 		}
 	}

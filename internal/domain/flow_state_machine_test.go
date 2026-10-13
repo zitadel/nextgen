@@ -4152,7 +4152,8 @@ func TestFlowStateMachine_Back_ToIdentifierRotatesAuthAttempt(t *testing.T) {
 	require.NotNil(t, afterWrongPassword.Step.Error)
 	require.Equal(t, domain.FlowStepErrorInvalidCredentials, *afterWrongPassword.Step.Error)
 	// mergeCollected banks the password before the proof is checked; the
-	// rejection drops it again rather than leaving it for whoever comes next.
+	// sign-in submit drops it again rather than leaving it for whoever comes
+	// next.
 	require.Empty(t, afterWrongPassword.State.CollectedData.AuthMethods.Password)
 
 	back, err := w.sm.Process(t.Context(), def, afterWrongPassword.State, domain.FlowSubmitInput{

@@ -439,6 +439,12 @@ export function registerSsoStep(input: StepFixtureInput): CreateFlow201 {
  * action are both present in the mock: the real step offers only what the
  * schema enables, which is the tenant's schema to decide and not something the
  * fixture can know.
+ *
+ * The mock does not model the step's error and back behaviour: the real step
+ * re-renders with `error.invalid_credentials` for a wrong password and
+ * `error.sign_in_first` when no account is bound, and the engine injects a
+ * `back` action when the step has a predecessor. The mock's machine signs in
+ * on every password submit, and a `back` submit falls through to `done` too.
  */
 export function ssoConflictStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
