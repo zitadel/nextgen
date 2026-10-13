@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
+import { takeReportedWarnings } from "../../../../src/lib/warnings";
+
 import { ZitadelError } from "../../../../src/lib/errors";
 import { validatePlannedSso } from "../../../../src/lib/sync/sso-validation";
 import type { ResourceSyncer, SyncAction } from "../../../../src/lib/sync/types";
@@ -117,6 +119,65 @@ describe("validatePlannedSso", () => {
     ).toBeUndefined();
   });
 
+  it("judges a plan that only removes a connection a schema still lists", () => {
+    // Deleting the file is the change that makes the tree inconsistent.
+    const remaining = { [SCHEMA]: schema(["acme"]) };
+    const message = failure(() =>
+      validatePlannedSso({
+        actions: [
+          {
+            kind: "delete",
+            path: CONNECTION,
+            syncer: syncer("idp"),
+            id: "idp_1",
+            oldContent: null,
+          },
+        ],
+        scannedContents: contents(remaining),
+        stateResources: {},
+      }),
+    );
+
+    expect(message).toContain(
+      `${SCHEMA}: sso.providers lists "acme" but there is no connection file`,
+    );
+  });
+
+  it("names every problem under the path key flow validation uses, with the steps it is about", () => {
+    let details: { issues?: Array<Record<string, unknown>> } | undefined;
+    try {
+      validatePlannedSso({
+        actions: [create(FLOW, "flow", consistent[FLOW])],
+        scannedContents: contents({ ...consistent, [SCHEMA]: schema(["other"]) }),
+        stateResources: {},
+      });
+    } catch (error) {
+      details = (error as ZitadelError).details as typeof details;
+    }
+
+    expect(details?.issues?.find((issue) => issue.rule === "sso/provider-id")).toMatchObject({
+      rule: "sso/provider-id",
+      path: FLOW,
+      steps: ["identifier"],
+    });
+  });
+
+  it("says how to get past the check, and that nothing was changed", () => {
+    let hint: string | undefined;
+    try {
+      validatePlannedSso({
+        actions: [create(FLOW, "flow", consistent[FLOW])],
+        scannedContents: contents({ ...consistent, [SCHEMA]: schema(["other"]) }),
+        stateResources: {},
+      });
+    } catch (error) {
+      hint = (error as ZitadelError).hint;
+    }
+
+    expect(hint).toContain("no changes were made");
+    expect(hint).toContain("ZITADEL_SKIP_FLOW_VALIDATION");
+  });
+
   describe("finding the schema a flow pins", () => {
     const broken = { ...consistent, [SCHEMA]: schema(["other"]) };
     const run = (flowBody: object, extra: Partial<Parameters<typeof validatePlannedSso>[0]> = {}) =>
@@ -169,6 +230,37 @@ describe("validatePlannedSso", () => {
           }),
         ),
       ).toContain("is not listed in sso.providers");
+    });
+
+    it("not by a URL that only ends like a schema this project has already applied", () => {
+      // The platform gave staff.json an id, so a flow that names a URL is
+      // naming some other schema, one this project does not keep locally. Paired
+      // with staff.json it would be refused, since staff.json has sso off.
+      takeReportedWarnings();
+      const off = {
+        ...schema(["acme"]),
+        "x-auth-methods": { sso: { enabled: false, providers: ["acme"] } },
+      };
+      const body = flow("https://other-tenant.example.test/staff.json", ["acme"]);
+
+      expect(
+        failure(() =>
+          validatePlannedSso({
+            actions: [create(FLOW, "flow", body)],
+            scannedContents: contents({ [SCHEMA]: off, [FLOW]: body, [CONNECTION]: connection }),
+            stateResources: { [SCHEMA]: { id: "sch_01TEST", hash: "h" } },
+          }),
+        ),
+      ).toBeUndefined();
+    });
+
+    it("and says so when a flow that offers providers could not be paired", () => {
+      takeReportedWarnings();
+      run(flow("https://unrelated.example.test/other.json", ["acme"]));
+
+      expect(takeReportedWarnings().join("\n")).toContain(
+        `${FLOW}: could not tell which local schema this flow pins`,
+      );
     });
 
     it("not at all when it cannot be told, which leaves only the rules that need no schema", () => {

@@ -1,6 +1,6 @@
 {
   "rule": "sso/connection-resolves",
-  "description": "Every named provider has a connection file.",
+  "description": "The connection is found by its slug, not its file name.",
   "tree": {
     "schemas": {
       ".zitadel/schemas/staff.json": {
@@ -78,7 +78,7 @@
       }
     },
     "connections": {
-      ".zitadel/idps/google.json": {
+      ".zitadel/idps/sso.json": {
         "slug": "google",
         "protocol": "oidc",
         "display_name": "Google",

@@ -1,6 +1,6 @@
 {
   "rule": "sso/flow-enables-sso",
-  "description": "The pinned schema enables sso.",
+  "description": "A schema with sso off is fine when no step of a flow pinned to it offers providers.",
   "tree": {
     "schemas": {
       ".zitadel/schemas/staff.json": {
@@ -16,6 +16,18 @@
             "providers": [
               "google"
             ]
+          }
+        }
+      },
+      ".zitadel/schemas/partners.json": {
+        "type": "object",
+        "properties": {
+          "email": {}
+        },
+        "x-auth-methods": {
+          "sso": {
+            "enabled": false,
+            "providers": []
           }
         }
       }

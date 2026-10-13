@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type ScaffoldedApp } from "../helpers/project";
+import { aSetUpApp, type ScaffoldedApp, type UserSchemaDocument } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -131,8 +131,8 @@ describe("plan", () => {
 
     /**
      * Mistakes that only show when the schema, the flow and the connection are
-     * read together. Each one stops `plan` before anything is sent, and says
-     * which file and which name is at fault.
+     * read together. Each stops `plan` before anything is sent and names the
+     * file or the name at fault; the wording is the validator's own tests'.
      */
     describe("SSO configuration across files", () => {
       async function anAppWithGoogle(): Promise<ScaffoldedApp> {
@@ -141,65 +141,71 @@ describe("plan", () => {
         return app;
       }
 
+      /** The schema's sso block, or a failure that says the scaffold changed. */
+      function ssoOf(schema: UserSchemaDocument) {
+        const sso = schema["x-auth-methods"]?.sso;
+        if (sso === undefined) {
+          throw new Error("the schema has no sso block");
+        }
+        return sso;
+      }
+
       it("accepts what sso enable writes", async () => {
         const app = await anAppWithGoogle();
 
-        expect((await app.plan()).total).toBeGreaterThan(0);
+        expect(await app.planAttempt()).toSucceed();
       });
 
       it("stops on a step that offers a provider the schema does not list", async () => {
         const app = await anAppWithGoogle();
         await app.editUserSchema((schema) => {
-          const sso = schema["x-auth-methods"]?.sso;
-          if (sso) sso.providers = ["okta"];
+          ssoOf(schema).providers = ["okta"];
+        });
+
+        const result = await app.planAttempt();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toPrint("default-login.json");
+      });
+
+      it("stops on a step that offers providers when the schema has sso off", async () => {
+        const app = await anAppWithGoogle();
+        await app.editUserSchema((schema) => {
+          ssoOf(schema).enabled = false;
         });
 
         const result = await app.planAttempt();
 
         expect(result).toFailWith("E_VALIDATION");
         expect(result).toPrint("identifier");
-        expect(result).toPrint("is not listed in sso.providers");
-      });
-
-      it("stops on a step that offers providers when the schema has sso switched off", async () => {
-        const app = await anAppWithGoogle();
-        await app.editUserSchema((schema) => {
-          const sso = schema["x-auth-methods"]?.sso;
-          if (sso) sso.enabled = false;
-        });
-
-        const result = await app.planAttempt();
-
-        expect(result).toFailWith("E_VALIDATION");
-        expect(result).toPrint("is not an enabled authentication method");
       });
 
       it("stops on a schema that lists a provider with no connection file", async () => {
         const app = await anAppWithGoogle();
         await app.editUserSchema((schema) => {
-          schema["x-auth-methods"]?.sso?.providers?.push("okta");
+          ssoOf(schema).providers?.push("okta");
         });
 
         const result = await app.planAttempt();
 
         expect(result).toFailWith("E_VALIDATION");
-        expect(result).toPrint("default-human-user.json");
         expect(result).toPrint("okta");
-        expect(result).toPrint("there is no connection file");
       });
 
-      it("stops on a step that offers providers without routing every outcome", async () => {
+      it("stops on a step that does not route every outcome", async () => {
         const app = await anAppWithGoogle();
         await app.editLoginFlow((flow) => {
           const transitions = flow.steps.find((step) => step.name === "identifier")?.transitions;
-          delete transitions?.sso_user_not_found;
-          delete transitions?.user_already_exists;
+          if (transitions === undefined) {
+            throw new Error("the identifier step has no transitions");
+          }
+          delete transitions.sso_user_not_found;
         });
 
         const result = await app.planAttempt();
 
         expect(result).toFailWith("E_VALIDATION");
-        expect(result).toPrint("does not route sso_user_not_found, user_already_exists");
+        expect(result).toPrint("sso_user_not_found");
       });
 
       it("stops on a claim mapping to a property no schema defines", async () => {
@@ -211,8 +217,6 @@ describe("plan", () => {
         const result = await app.planAttempt();
 
         expect(result).toFailWith("E_VALIDATION");
-        expect(result).toPrint("google.json");
-        expect(result).toPrint("claim_mapping target");
         expect(result).toPrint("emailAddress");
       });
 
@@ -226,10 +230,9 @@ describe("plan", () => {
 
         expect(result).toFailWith("E_VALIDATION");
         expect(result).toPrint("givenName");
-        expect(result).toPrint("has no claim_mapping entry");
       });
 
-      it("stops on a claim mapping that fills nothing the schema defines", async () => {
+      it("stops on a claim mapping that fills nothing", async () => {
         const app = await anAppWithGoogle();
         await app.editConnection("google", (connection) => {
           connection.claim_mapping = {};
@@ -238,13 +241,13 @@ describe("plan", () => {
         const result = await app.planAttempt();
 
         expect(result).toFailWith("E_VALIDATION");
-        expect(result).toPrint("shares no property");
+        expect(result).toPrint("google.json");
       });
 
-      it("names every problem at once, not only the first", async () => {
+      it("names every problem at once", async () => {
         const app = await anAppWithGoogle();
         await app.editUserSchema((schema) => {
-          schema["x-auth-methods"]?.sso?.providers?.push("okta");
+          ssoOf(schema).providers?.push("okta");
         });
         await app.editConnection("google", (connection) => {
           connection.claim_mapping = { email: "email", emailAddress: "mail" };

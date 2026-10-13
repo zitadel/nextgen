@@ -1,14 +1,27 @@
 {
   "rule": "sso/orphaned-verification-key",
-  "description": "Every verified_claims key is a schema property.",
+  "description": "A verified key only one of two referencing schemas defines is fine too.",
   "tree": {
     "schemas": {
       ".zitadel/schemas/staff.json": {
         "type": "object",
         "properties": {
-          "email": {
-            "type": "string"
+          "email": {},
+          "staffNumber": {}
+        },
+        "x-auth-methods": {
+          "sso": {
+            "enabled": true,
+            "providers": [
+              "google"
+            ]
           }
+        }
+      },
+      ".zitadel/schemas/partners.json": {
+        "type": "object",
+        "properties": {
+          "email": {}
         },
         "x-auth-methods": {
           "sso": {
@@ -83,7 +96,8 @@
         "protocol": "oidc",
         "display_name": "Google",
         "claim_mapping": {
-          "email": "email"
+          "email": "email",
+          "staffNumber": "employee_id"
         },
         "oidc": {
           "issuer": "https://accounts.google.com",
@@ -92,6 +106,9 @@
           "scopes": [
             "openid"
           ]
+        },
+        "verified_claims": {
+          "staffNumber": "employee_verified"
         }
       }
     }

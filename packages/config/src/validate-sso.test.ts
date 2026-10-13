@@ -16,7 +16,7 @@ type Fixture = {
     flows: Record<string, { body: object; schemaPath?: string }>;
     connections: Record<string, object>;
   };
-  expect: Array<{ rule: string; file: string; step?: string; includes: string[] }>;
+  expect: Array<{ rule: string; file: string; steps?: string[]; includes: string[] }>;
 };
 
 const asTree = (tree: Fixture["tree"]): SsoConfigurationTree => ({
@@ -52,22 +52,23 @@ describe("the fixture pairs", () => {
     ]);
   });
 
+  /** A verdict as a replay compares it: what, where and on which steps, in no particular order. */
+  const verdict = (issue: { rule: string; file: string; steps?: readonly string[] }) =>
+    JSON.stringify([issue.rule, issue.file, issue.steps ?? []]);
+
   for (const name of files) {
     const fixture = JSON.parse(readFileSync(join(fixturesDir, name), "utf8")) as Fixture;
 
     it(`${name}: ${fixture.description}`, () => {
       const issues = validateSsoConfiguration(asTree(fixture.tree));
 
-      expect(
-        issues.map(({ rule, file, step }) => ({ rule, file, ...(step ? { step } : {}) })),
-      ).toEqual(
-        fixture.expect.map(({ rule, file, step }) => ({ rule, file, ...(step ? { step } : {}) })),
-      );
-      issues.forEach((issue, index) => {
-        for (const fragment of fixture.expect[index]?.includes ?? []) {
-          expect(issue.message, `${name} #${index}`).toContain(fragment);
+      expect(issues.map(verdict).sort()).toEqual(fixture.expect.map(verdict).sort());
+      for (const expected of fixture.expect) {
+        const found = issues.find((issue) => verdict(issue) === verdict(expected));
+        for (const fragment of expected.includes) {
+          expect(found?.message, `${name}`).toContain(fragment);
         }
-      });
+      }
     });
   }
 });
@@ -181,5 +182,200 @@ describe("what the rules look at", () => {
       expect.stringContaining('"a"'),
       expect.stringContaining('"b"'),
     ]);
+  });
+
+  it("reports one cause once, however many steps it is made on", () => {
+    const step = (name: string) => ({
+      name,
+      sso_providers: ["acme"],
+      transitions: {
+        sso_authenticated: { target: "done" },
+        sso_user_not_found: { target: "done" },
+        user_already_exists: { target: "done" },
+      },
+    });
+    const issues = validateSsoConfiguration(
+      tree({
+        schemas: new Map([["s.json", schema(["other"])]]),
+        flows: new Map([
+          [
+            "login.json",
+            {
+              schemaPath: "s.json",
+              body: { steps: [step("identifier"), step("register"), step("sso-conflict")] },
+            },
+          ],
+        ]),
+        connections: new Map([
+          ["acme.json", connection("acme", { email: "email" })],
+          ["other.json", connection("other", { email: "email" })],
+        ]),
+      }),
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.steps).toEqual(["identifier", "register", "sso-conflict"]);
+    expect(issues[0]?.message).toContain('steps "identifier", "register", "sso-conflict"');
+  });
+
+  describe("a provider that only signs people in", () => {
+    const disabled = { slug: "acme", provisioning: { creation: "disabled" }, claim_mapping: {} };
+    const signInOnly = (routes: string[]) =>
+      tree({
+        schemas: new Map([["s.json", schema(["acme"])]]),
+        flows: new Map([
+          [
+            "login.json",
+            {
+              schemaPath: "s.json",
+              body: {
+                steps: [
+                  {
+                    name: "identifier",
+                    sso_providers: ["acme"],
+                    transitions: Object.fromEntries(routes.map((r) => [r, { target: "done" }])),
+                  },
+                ],
+              },
+            },
+          ],
+        ]),
+        connections: new Map([["acme.json", disabled]]),
+      });
+
+    it("needs only sso_authenticated, and no mapping", () => {
+      expect(validateSsoConfiguration(signInOnly(["sso_authenticated"]))).toEqual([]);
+    });
+
+    it("still needs sso_authenticated", () => {
+      expect(validateSsoConfiguration(signInOnly([])).map((issue) => issue.rule)).toEqual([
+        "sso/outcome-routing",
+      ]);
+    });
+
+    it("needs the register routes again as soon as another provider on the step creates users", () => {
+      const mixed = signInOnly(["sso_authenticated"]);
+      const created = new Map(mixed.connections);
+      created.set("other.json", connection("other", { email: "email" }));
+      const flows = new Map([
+        [
+          "login.json",
+          {
+            schemaPath: "s.json",
+            body: {
+              steps: [
+                {
+                  name: "identifier",
+                  sso_providers: ["acme", "other"],
+                  transitions: { sso_authenticated: { target: "done" } },
+                },
+              ],
+            },
+          },
+        ],
+      ]);
+
+      const issues = validateSsoConfiguration({
+        ...mixed,
+        connections: created,
+        flows,
+        schemas: new Map([["s.json", schema(["acme", "other"])]]),
+      });
+
+      expect(issues.map((issue) => issue.rule)).toEqual(["sso/outcome-routing"]);
+    });
+  });
+
+  it("judges a connection a flow offers even when no schema lists it", () => {
+    // `provider-id` reports the missing listing; the connection's own mistakes
+    // still show, because it is in use.
+    const issues = validateSsoConfiguration(
+      tree({
+        schemas: new Map([["s.json", schema([])]]),
+        flows: new Map([
+          [
+            "login.json",
+            {
+              schemaPath: "s.json",
+              body: {
+                steps: [
+                  {
+                    name: "identifier",
+                    sso_providers: ["acme"],
+                    transitions: {
+                      sso_authenticated: { target: "done" },
+                      sso_user_not_found: { target: "done" },
+                      user_already_exists: { target: "done" },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        ]),
+        connections: new Map([
+          ["acme.json", connection("acme", { email: "email" }, { other: "x" })],
+        ]),
+      }),
+    );
+
+    expect(issues.map((issue) => issue.rule)).toContain("sso/unmapped-verification-key");
+  });
+
+  it("reads a connection by its slug, and the first file in path order stands for a duplicate", () => {
+    const issues = validateSsoConfiguration(
+      tree({
+        schemas: new Map([["s.json", schema(["acme"])]]),
+        connections: new Map([
+          ["b.json", connection("acme", { email: "email" })],
+          ["a.json", connection("acme", { typo: "x" })],
+        ]),
+      }),
+    );
+
+    expect(issues).toEqual([
+      expect.objectContaining({ rule: "sso/orphaned-mapping-target", file: "a.json" }),
+    ]);
+  });
+
+  it("does not report a provider missing from sso.providers when sso is off", () => {
+    // `flow-enables-sso` already says it; a second error would be noise.
+    const issues = validateSsoConfiguration(
+      tree({
+        schemas: new Map([
+          [
+            "s.json",
+            {
+              properties: { email: {} },
+              "x-auth-methods": { sso: { enabled: false, providers: [] } },
+            },
+          ],
+        ]),
+        flows: new Map([
+          [
+            "login.json",
+            {
+              schemaPath: "s.json",
+              body: {
+                steps: [
+                  {
+                    name: "identifier",
+                    sso_providers: ["acme"],
+                    transitions: {
+                      sso_authenticated: { target: "done" },
+                      sso_user_not_found: { target: "done" },
+                      user_already_exists: { target: "done" },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        ]),
+        connections: new Map([["acme.json", connection("acme", { email: "email" })]]),
+      }),
+    );
+
+    expect(issues.map((issue) => issue.rule)).toEqual(["sso/flow-enables-sso"]);
   });
 });

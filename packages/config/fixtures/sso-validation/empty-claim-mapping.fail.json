@@ -1,6 +1,6 @@
 {
   "rule": "sso/empty-claim-mapping",
-  "description": "The connection maps nothing the pinned schema defines.",
+  "description": "The connection maps nothing, so no sign-in can fill the user.",
   "tree": {
     "schemas": {
       ".zitadel/schemas/staff.json": {
@@ -98,10 +98,13 @@
     {
       "rule": "sso/empty-claim-mapping",
       "file": ".zitadel/flows/login.json",
-      "step": "identifier",
+      "steps": [
+        "identifier"
+      ],
       "includes": [
         "identifier",
-        "google"
+        "google",
+        "is empty"
       ]
     }
   ]

@@ -116,7 +116,9 @@
     {
       "rule": "sso/provider-id",
       "file": ".zitadel/flows/login.json",
-      "step": "identifier",
+      "steps": [
+        "identifier"
+      ],
       "includes": [
         "google",
         "sso.providers"

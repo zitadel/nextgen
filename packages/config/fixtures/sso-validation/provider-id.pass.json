@@ -1,6 +1,6 @@
 {
   "rule": "sso/provider-id",
-  "description": "The schema lists the provider the step offers.",
+  "description": "Two providers on one step, both listed by the schema.",
   "tree": {
     "schemas": {
       ".zitadel/schemas/staff.json": {
@@ -14,7 +14,8 @@
           "sso": {
             "enabled": true,
             "providers": [
-              "google"
+              "google",
+              "github"
             ]
           }
         }
@@ -35,7 +36,8 @@
                 "email"
               ],
               "sso_providers": [
-                "google"
+                "google",
+                "github"
               ],
               "transitions": {
                 "sso_authenticated": {
@@ -82,6 +84,22 @@
         "slug": "google",
         "protocol": "oidc",
         "display_name": "Google",
+        "claim_mapping": {
+          "email": "email"
+        },
+        "oidc": {
+          "issuer": "https://accounts.google.com",
+          "client_id": "${{ GOOGLE_CLIENT_ID }}",
+          "client_secret": "${{ GOOGLE_CLIENT_SECRET }}",
+          "scopes": [
+            "openid"
+          ]
+        }
+      },
+      ".zitadel/idps/github.json": {
+        "slug": "github",
+        "protocol": "oidc",
+        "display_name": "Github",
         "claim_mapping": {
           "email": "email"
         },

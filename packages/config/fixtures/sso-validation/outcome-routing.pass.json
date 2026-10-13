@@ -1,6 +1,6 @@
 {
   "rule": "sso/outcome-routing",
-  "description": "The step routes all three outcomes.",
+  "description": "A step with providers routes every outcome and more, and a step with none routes none of them.",
   "tree": {
     "schemas": {
       ".zitadel/schemas/staff.json": {
@@ -47,6 +47,20 @@
                 "user_already_exists": {
                   "target": "done"
                 },
+                "user_not_found": {
+                  "target": "done"
+                },
+                "submit": {
+                  "target": "done"
+                }
+              }
+            },
+            {
+              "name": "password",
+              "fields": [
+                "email"
+              ],
+              "transitions": {
                 "submit": {
                   "target": "done"
                 }

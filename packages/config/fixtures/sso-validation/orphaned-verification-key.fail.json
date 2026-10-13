@@ -1,6 +1,6 @@
 {
   "rule": "sso/orphaned-verification-key",
-  "description": "verified_claims names nickname, which no schema defines.",
+  "description": "A mapped, verified key names nickname, which no schema defines. A mapped key that is unknown to the schema is both an orphaned target and an orphaned verification key.",
   "tree": {
     "schemas": {
       ".zitadel/schemas/staff.json": {

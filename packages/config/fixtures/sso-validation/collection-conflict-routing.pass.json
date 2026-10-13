@@ -1,6 +1,6 @@
 {
   "rule": "sso/collection-conflict-routing",
-  "description": "The collection step routes user_already_exists.",
+  "description": "Only a create_user_with_sso step needs the conflict route; a plain create_user step does not.",
   "tree": {
     "schemas": {
       ".zitadel/schemas/staff.json": {
@@ -47,6 +47,18 @@
                 "user_already_exists": {
                   "target": "done"
                 },
+                "submit": {
+                  "target": "done"
+                }
+              }
+            },
+            {
+              "name": "register-password",
+              "fields": [
+                "email"
+              ],
+              "on_success": "create_user",
+              "transitions": {
                 "submit": {
                   "target": "done"
                 }

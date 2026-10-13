@@ -33,8 +33,12 @@ export type SsoIssue = {
   readonly rule: SsoRuleId;
   /** Project-relative path of the file the issue is in. */
   readonly file: string;
-  /** The flow step the issue is anchored to, when it is about one. */
-  readonly step?: string;
+  /**
+   * The flow steps the issue is about, when it is about steps. One issue covers
+   * every step with the same problem, so a mistake made on four steps is one
+   * line to read and one fix to make.
+   */
+  readonly steps?: readonly string[];
   readonly message: string;
 };
 
@@ -108,10 +112,42 @@ function stepsOf(flow: object): Step[] {
   }));
 }
 
+/** `step "a"`, or `steps "a", "b"` when several have the same problem. */
+const stepsText = (steps: readonly string[]) =>
+  steps.length === 1 ? `step ${q(steps[0] as string)}` : `steps ${steps.map(q).join(", ")}`;
+
+/** Whether a connection lets a provider create users, which decides what a step must route. */
+const createsUsers = (connection: Json | undefined) =>
+  !isObject(connection?.provisioning) || connection.provisioning.creation !== "disabled";
+
 /** Validate the SSO configuration across files. Pure: collects every issue, never throws. */
 export function validateSsoConfiguration(tree: SsoConfigurationTree): SsoIssue[] {
   const issues: SsoIssue[] = [];
   const add = (issue: SsoIssue) => issues.push(issue);
+
+  // A mistake made on several steps is one cause. Steps are gathered under the
+  // rule, file and subject they share, and each group becomes one issue.
+  const groups = new Map<
+    string,
+    {
+      rule: SsoRuleId;
+      file: string;
+      steps: string[];
+      message: (steps: readonly string[]) => string;
+    }
+  >();
+  const onStep = (
+    rule: SsoRuleId,
+    file: string,
+    subject: string,
+    step: string,
+    message: (steps: readonly string[]) => string,
+  ) => {
+    const key = JSON.stringify([rule, file, subject]);
+    const group = groups.get(key) ?? { rule, file, steps: [], message };
+    group.steps.push(step);
+    groups.set(key, group);
+  };
 
   // A slug names one connection. Duplicates are the syncer's concern (#1043);
   // the first file in path order stands for the slug here.
@@ -130,7 +166,7 @@ export function validateSsoConfiguration(tree: SsoConfigurationTree): SsoIssue[]
         add({
           rule: "sso/connection-resolves",
           file: path,
-          message: `sso.providers lists ${q(slug)} but there is no connection file with that slug under .zitadel/idps/`,
+          message: `sso.providers lists ${q(slug)} but there is no connection file with that slug under .zitadel/idps/. Add the file, or remove ${q(slug)} from sso.providers.`,
         });
       }
     }
@@ -143,33 +179,47 @@ export function validateSsoConfiguration(tree: SsoConfigurationTree): SsoIssue[]
     for (const step of stepsOf(body)) {
       // Rules that need no schema.
       if (step.providers.length > 0) {
-        const missing = SSO_OUTCOMES.filter((outcome) => !step.routes.has(outcome));
+        // A step must route what a provider can return. A provider that never
+        // creates users never returns an unknown identity, so for a step that
+        // offers only such providers `sso_authenticated` is all it can get.
+        const creates = step.providers.some((slug) =>
+          createsUsers(connectionBySlug.get(slug)?.body),
+        );
+        const missing = (creates ? SSO_OUTCOMES : (["sso_authenticated"] as const)).filter(
+          (outcome) => !step.routes.has(outcome),
+        );
         if (missing.length > 0) {
-          add({
-            rule: "sso/outcome-routing",
-            file: path,
-            step: step.name,
-            message: `step ${q(step.name)}: offers sso_providers but does not route ${missing.join(", ")}`,
-          });
+          onStep(
+            "sso/outcome-routing",
+            path,
+            missing.join(),
+            step.name,
+            (steps) =>
+              `${stepsText(steps)}: offers sso_providers but does not route ${missing.join(", ")}. Add a transition for each.`,
+          );
         }
       }
       if (step.onSuccess === "create_user_with_sso" && !step.routes.has("user_already_exists")) {
-        add({
-          rule: "sso/collection-conflict-routing",
-          file: path,
-          step: step.name,
-          message: `step ${q(step.name)}: on_success create_user_with_sso must route user_already_exists`,
-        });
+        onStep(
+          "sso/collection-conflict-routing",
+          path,
+          "",
+          step.name,
+          (steps) =>
+            `${stepsText(steps)}: on_success create_user_with_sso must route user_already_exists. Add that transition.`,
+        );
       }
 
       for (const slug of step.providers) {
         if (!connectionBySlug.has(slug)) {
-          add({
-            rule: "sso/connection-resolves",
-            file: path,
-            step: step.name,
-            message: `step ${q(step.name)}: sso provider ${q(slug)} has no connection file with that slug under .zitadel/idps/`,
-          });
+          onStep(
+            "sso/connection-resolves",
+            path,
+            slug,
+            step.name,
+            (steps) =>
+              `${stepsText(steps)}: sso provider ${q(slug)} has no connection file with that slug under .zitadel/idps/. Add the file, or remove the provider from the flow.`,
+          );
         }
       }
 
@@ -178,39 +228,52 @@ export function validateSsoConfiguration(tree: SsoConfigurationTree): SsoIssue[]
         continue;
       }
       if (step.providers.length > 0 && !sso.enabled) {
-        add({
-          rule: "sso/flow-enables-sso",
-          file: path,
-          step: step.name,
-          message: `step ${q(step.name)}: offers sso_providers but "sso" is not an enabled authentication method in ${schemaPath}`,
-        });
+        onStep(
+          "sso/flow-enables-sso",
+          path,
+          "",
+          step.name,
+          (steps) =>
+            `${stepsText(steps)}: offers sso_providers but "sso" is not an enabled authentication method in ${schemaPath}. Enable it there, or remove sso_providers.`,
+        );
       }
       for (const slug of step.providers) {
         if (sso.enabled && !sso.providers.includes(slug)) {
-          add({
-            rule: "sso/provider-id",
-            file: path,
-            step: step.name,
-            message: `step ${q(step.name)}: sso provider ${q(slug)} is not listed in sso.providers of ${schemaPath}`,
-          });
+          onStep(
+            "sso/provider-id",
+            path,
+            slug,
+            step.name,
+            (steps) =>
+              `${stepsText(steps)}: sso provider ${q(slug)} is not listed in sso.providers of ${schemaPath}. Add it there, or remove it from the flow.`,
+          );
         }
         const connection = connectionBySlug.get(slug);
-        if (connection === undefined) {
+        // A provider that only signs people in fills no user, so what it maps
+        // does not matter.
+        if (connection === undefined || !createsUsers(connection.body)) {
           continue;
         }
         const mapped = Object.keys(
           isObject(connection.body.claim_mapping) ? connection.body.claim_mapping : {},
         );
         if (!mapped.some((key) => hasProperty(schema, key))) {
-          add({
-            rule: "sso/empty-claim-mapping",
-            file: path,
-            step: step.name,
-            message: `step ${q(step.name)}: claim_mapping of ${q(slug)} (${connection.path}) shares no property with ${schemaPath}, so no sign-in can fill the user`,
-          });
+          onStep(
+            "sso/empty-claim-mapping",
+            path,
+            slug,
+            step.name,
+            (steps) =>
+              `${stepsText(steps)}: claim_mapping of ${q(slug)} (${connection.path}) ${
+                mapped.length === 0 ? "is empty" : `maps nothing ${schemaPath} defines`
+              }, so no sign-in can fill the user. Map at least one property of ${schemaPath} in ${connection.path}.`,
+          );
         }
       }
     }
+  }
+  for (const { rule, file, steps, message } of groups.values()) {
+    add({ rule, file, steps, message: message(steps) });
   }
 
   // Connection to schemas. A connection counts as used when a schema lists it
@@ -239,7 +302,7 @@ export function validateSsoConfiguration(tree: SsoConfigurationTree): SsoIssue[]
         add({
           rule: "sso/unmapped-verification-key",
           file: path,
-          message: `verified_claims key ${q(key)} has no claim_mapping entry, so the claim is never read`,
+          message: `verified_claims key ${q(key)} has no claim_mapping entry, so the claim is never read. Add ${q(key)} to claim_mapping, or remove it from verified_claims.`,
         });
       }
     }
@@ -251,7 +314,7 @@ export function validateSsoConfiguration(tree: SsoConfigurationTree): SsoIssue[]
         add({
           rule: "sso/orphaned-mapping-target",
           file: path,
-          message: `claim_mapping target ${q(key)} is not a property of any schema that lists ${q(slug)} in sso.providers`,
+          message: `claim_mapping target ${q(key)} is not a property of any schema that lists ${q(slug)} in sso.providers. Fix the name, or remove the row.`,
         });
       }
     }
@@ -260,7 +323,7 @@ export function validateSsoConfiguration(tree: SsoConfigurationTree): SsoIssue[]
         add({
           rule: "sso/orphaned-verification-key",
           file: path,
-          message: `verified_claims key ${q(key)} is not a property of any schema that lists ${q(slug)} in sso.providers, so it can never verify`,
+          message: `verified_claims key ${q(key)} is not a property of any schema that lists ${q(slug)} in sso.providers, so it can never verify. Fix the name, or remove it.`,
         });
       }
     }

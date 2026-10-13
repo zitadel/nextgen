@@ -91,7 +91,9 @@
     {
       "rule": "sso/collection-conflict-routing",
       "file": ".zitadel/flows/login.json",
-      "step": "register-sso",
+      "steps": [
+        "register-sso"
+      ],
       "includes": [
         "register-sso",
         "user_already_exists"

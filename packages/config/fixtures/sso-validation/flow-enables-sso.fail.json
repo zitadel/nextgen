@@ -1,6 +1,6 @@
 {
   "rule": "sso/flow-enables-sso",
-  "description": "A step offers sso_providers but the pinned schema has sso disabled.",
+  "description": "A step offers a provider but the schema it pins has sso switched off.",
   "tree": {
     "schemas": {
       ".zitadel/schemas/staff.json": {
@@ -13,9 +13,7 @@
         "x-auth-methods": {
           "sso": {
             "enabled": false,
-            "providers": [
-              "google"
-            ]
+            "providers": []
           }
         }
       }
@@ -100,7 +98,9 @@
     {
       "rule": "sso/flow-enables-sso",
       "file": ".zitadel/flows/login.json",
-      "step": "identifier",
+      "steps": [
+        "identifier"
+      ],
       "includes": [
         "identifier",
         "not an enabled authentication method"

@@ -90,12 +90,18 @@ describe("apply", () => {
           connection.claim_mapping = { email: "email", emailAddress: "mail" };
         });
 
+        const before = {
+          schemas: await app.publishedSchemas(),
+          flows: await app.publishedFlows(),
+        };
+
         const result = await app.apply();
 
         expect(result).toFailWith("E_VALIDATION");
-        expect(result).toPrint("claim_mapping target");
         expect(result).toPrint("emailAddress");
         expect(await app.registeredIdps()).toEqual([]);
+        expect(await app.publishedSchemas()).toEqual(before.schemas);
+        expect(await app.publishedFlows()).toEqual(before.flows);
       });
     });
 

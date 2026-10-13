@@ -1,6 +1,6 @@
 {
   "rule": "sso/outcome-routing",
-  "description": "A step offers providers and routes only sso_authenticated.",
+  "description": "A step offers a provider and routes only sso_authenticated.",
   "tree": {
     "schemas": {
       ".zitadel/schemas/staff.json": {
@@ -94,7 +94,9 @@
     {
       "rule": "sso/outcome-routing",
       "file": ".zitadel/flows/login.json",
-      "step": "identifier",
+      "steps": [
+        "identifier"
+      ],
       "includes": [
         "sso_user_not_found",
         "user_already_exists"

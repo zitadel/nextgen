@@ -6,9 +6,8 @@
       ".zitadel/schemas/staff.json": {
         "type": "object",
         "properties": {
-          "email": {
-            "type": "string"
-          }
+          "email": {},
+          "givenName": {}
         },
         "x-auth-methods": {
           "sso": {
@@ -83,7 +82,8 @@
         "protocol": "oidc",
         "display_name": "Google",
         "claim_mapping": {
-          "email": "email"
+          "email": "email",
+          "givenName": "given_name"
         },
         "oidc": {
           "issuer": "https://accounts.google.com",
@@ -92,6 +92,10 @@
           "scopes": [
             "openid"
           ]
+        },
+        "verified_claims": {
+          "email": "email_verified",
+          "givenName": "given_name_verified"
         }
       }
     }

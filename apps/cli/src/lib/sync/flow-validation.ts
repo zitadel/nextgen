@@ -35,7 +35,7 @@ export function validatePlannedFlows(opts: {
   stateResources: Readonly<Record<string, ResourceEntry>>;
 }): void {
   if (process.env.ZITADEL_SKIP_FLOW_VALIDATION) {
-    reportWarning("Flow validation skipped (ZITADEL_SKIP_FLOW_VALIDATION is set)");
+    reportWarning("Flow and SSO validation skipped (ZITADEL_SKIP_FLOW_VALIDATION is set)");
     return;
   }
 
