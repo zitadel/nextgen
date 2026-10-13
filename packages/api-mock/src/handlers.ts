@@ -135,7 +135,9 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
   // the mock keys on email.
   const ssoIdentities = new SsoIdentityStore();
   // Where the callback sends the browser back to, recorded by the `sso`
-  // submission as the engine records it on the state row.
+  // submission as the engine records it on the state row. Only read while the
+  // flow waits in `sso-redirect`, which every HTTP path enters through that
+  // submission, so it is never stale when read.
   let returnTarget: string | null = null;
   // A failed provider return parks its key here, and the next render of the
   // originating step shows it once, as the engine's replay guard does.
@@ -161,14 +163,20 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
 
   function reset(): void {
     actor = startFlowActor();
-    captured = [];
-    returnTarget = null;
     pendingStepError = null;
+    captured = [];
     authn.clear();
     // Links too: a caller asking for a clean mock must not inherit an email
     // that a previous test signed up through a provider, which would turn the
     // next first-time sign-in into a straight sign-in.
     ssoIdentities.clear();
+  }
+
+  /** A new walk; a step error parked on the previous one does not carry over. */
+  function startFlow(purpose: CreateFlowBodyPurpose): void {
+    actor = startFlowActor();
+    pendingStepError = null;
+    actor.send({ type: "START", purpose });
   }
 
   function registerCredential(userHandle: string, credentialId: string): void {
@@ -209,9 +217,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     purpose?: CreateFlowBodyPurpose;
     error?: string;
   }): string {
-    actor = startFlowActor();
-    pendingStepError = null;
-    actor.send({ type: "START", purpose: input.purpose ?? "login" });
+    startFlow(input.purpose ?? "login");
     actor.send({
       type: "SUBMIT",
       action: "sso",
@@ -235,14 +241,14 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
   function idpCallback({ request }: { request: Request }): Response {
     const noStore = { "Cache-Control": "private, no-store" };
     const target = returnTarget;
+    // Every return leaves `sso-redirect`, so a replay lands here too, as an
+    // unknown or consumed state does on the engine.
     if (actor.getSnapshot().value !== "sso-redirect" || !target) {
       return new HttpResponse(IDP_CALLBACK_ERROR_PAGE, {
         status: 400,
         headers: { ...noStore, "Content-Type": "text/html; charset=utf-8" },
       });
     }
-    // Single-use, like the engine's state row: a replay gets the error page.
-    returnTarget = null;
     const query = new URL(request.url).searchParams;
     const error = query.get("error");
     completeProviderReturn({
@@ -335,10 +341,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     getCreateFlowMockHandler(async ({ request }) => {
       const body = (await request.clone().json()) as CreateFlowBody;
       captured.push({ kind: "createFlow", body });
-      actor = startFlowActor();
-      returnTarget = null;
-      pendingStepError = null;
-      actor.send({ type: "START", purpose: body.purpose });
+      startFlow(body.purpose);
       return currentResponse();
     }),
     // Hand-written rather than the generated wrapper: that one answers 200

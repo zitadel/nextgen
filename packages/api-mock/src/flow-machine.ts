@@ -75,10 +75,10 @@ export type SsoOutcome = "sso_authenticated" | "sso_user_not_found" | "user_alre
  * provider declined or the callback failed. Which error key the step shows is
  * the callback's business, not the machine's; the machine only goes back.
  */
-export type SsoReturn = SsoOutcome | "error";
+type SsoReturn = SsoOutcome | "error";
 
 /** The steps that offer provider buttons, and so the steps a failed return goes back to. */
-export type SsoOrigin = "identifier" | "register" | "sso-conflict";
+type SsoOrigin = "identifier" | "register" | "sso-conflict";
 
 export type FlowMachineContext = {
   tokenSeq: number;
@@ -354,12 +354,6 @@ export const flowMachine = createMachine({
           failedReturnTo("identifier"),
           failedReturnTo("register"),
           failedReturnTo("sso-conflict"),
-          {
-            // An error with no origin to go back to: the sign-in screen.
-            guard: ({ event }) => event.outcome === "error",
-            target: "identifier",
-            actions: [rotateToken],
-          },
           {
             guard: ({ event }) => event.outcome === "sso_user_not_found",
             target: "register-sso",

@@ -90,6 +90,38 @@ describe("<zitadel-login> with identity providers", () => {
     return element.shadowRoot?.querySelector("zl-sso-providers") as ZlSsoProviders;
   }
 
+  /**
+   * Mount on `location` as a fresh page load, recording the requests the
+   * widget makes until `ready` renders. `url` is the address it leaves behind.
+   */
+  async function landOn(
+    location: string,
+    ready: string,
+  ): Promise<{ element: ZitadelLogin; seen: string[]; url: string }> {
+    const seen: string[] = [];
+    const record = ({ request }: { request: Request }) => {
+      seen.push(`${request.method} ${new URL(request.url).pathname}`);
+    };
+    server.events.on("request:start", record);
+    const original = window.location.href;
+    const target = new URL(location, original);
+    window.history.replaceState({}, "", target.pathname + target.search + target.hash);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    let url = "";
+    try {
+      element.purpose = "login";
+      element.project = testProject;
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector(ready));
+      await element.updateComplete;
+      url = window.location.search + window.location.hash;
+    } finally {
+      window.history.replaceState({}, "", original);
+      server.events.removeListener("request:start", record);
+    }
+    return { element, seen, url };
+  }
+
   /** Stub navigation for the duration of `run`, returning the calls made. */
   async function withStubbedNavigation(run: () => Promise<void>): Promise<string[]> {
     const assign = vi.fn();
@@ -270,34 +302,6 @@ describe("<zitadel-login> with identity providers", () => {
     expect(redirects).toHaveLength(0);
   });
 
-  it("resumes the flow a provider callback left in the URL", async () => {
-    // The callback finishes by navigating the browser back with `?flow=<id>`.
-    // It is a fresh page load, so nothing of the previous document survives:
-    // a widget that ignores the parameter starts a new flow, and the user
-    // lands on a blank sign-in screen having just signed in.
-    const seen: string[] = [];
-    const record = ({ request }: { request: Request }) => {
-      seen.push(`${request.method} ${new URL(request.url).pathname}`);
-    };
-    server.events.on("request:start", record);
-    const original = window.location.href;
-    window.history.replaceState({}, "", "/login?flow=flow_mock");
-
-    try {
-      const element = document.createElement("zitadel-login") as ZitadelLogin;
-      element.purpose = "login";
-      element.project = testProject;
-      host.appendChild(element);
-      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
-    } finally {
-      window.history.replaceState({}, "", original);
-      server.events.removeListener("request:start", record);
-    }
-
-    expect(seen).toContain("GET /flow/flow_mock");
-    expect(seen).not.toContain("POST /flow");
-  });
-
   /**
    * The whole round trip against the mock, the way the engine runs it: the
    * provider button assigns `redirect_url`, the provider sends the browser to
@@ -315,10 +319,10 @@ describe("<zitadel-login> with identity providers", () => {
         atom.shadowRoot
           ?.querySelectorAll("zl-button")[0]
           ?.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+        // The loader paints after the navigation, so the redirect has happened.
         await waitFor(() =>
           element.shadowRoot?.querySelector('slot[name="loader"]') ? true : null,
         );
-        await new Promise((resolve) => setTimeout(resolve, 50));
       });
       element.remove();
       const submit = mock
@@ -339,33 +343,6 @@ describe("<zitadel-login> with identity providers", () => {
       return res.headers.get("location") ?? "";
     }
 
-    /** Land on the return target as a fresh page load, and wait for the resumed step. */
-    async function landOn(
-      location: string,
-      ready: string,
-    ): Promise<{ element: ZitadelLogin; seen: string[] }> {
-      const seen: string[] = [];
-      const record = ({ request }: { request: Request }) => {
-        seen.push(`${request.method} ${new URL(request.url).pathname}`);
-      };
-      server.events.on("request:start", record);
-      const original = window.location.href;
-      const url = new URL(location);
-      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
-      const element = document.createElement("zitadel-login") as ZitadelLogin;
-      try {
-        element.purpose = "login";
-        element.project = testProject;
-        host.appendChild(element);
-        await waitFor(() => element.shadowRoot?.querySelector(ready));
-        await element.updateComplete;
-      } finally {
-        window.history.replaceState({}, "", original);
-        server.events.removeListener("request:start", record);
-      }
-      return { element, seen };
-    }
-
     it("comes back through the callback and resumes onto the next step", async () => {
       const { redirectUrl, returnTarget } = await leaveForProvider();
       expect(redirectUrl).toBe("https://idp.mock.invalid/authorize");
@@ -373,6 +350,8 @@ describe("<zitadel-login> with identity providers", () => {
       const location = await provider({ state: "s", code: "c", email: "ada@example.test" });
       expect(location).toBe(returnTarget);
 
+      // A fresh page load: a widget that ignored `?flow=` would start a new
+      // flow and leave the user on a blank sign-in screen.
       const { element, seen } = await landOn(location, 'zl-field[name="given_name"]');
       expect(seen).toContain("GET /flow/flow_mock");
       expect(seen).not.toContain("POST /flow");
@@ -403,29 +382,7 @@ describe("<zitadel-login> with identity providers", () => {
         { status: 409 },
       );
 
-    async function resumeStale(): Promise<{ element: ZitadelLogin; seen: string[]; url: string }> {
-      const seen: string[] = [];
-      const record = ({ request }: { request: Request }) => {
-        seen.push(`${request.method} ${new URL(request.url).pathname}`);
-      };
-      server.events.on("request:start", record);
-      const original = window.location.href;
-      window.history.replaceState({}, "", "/login?keep=1&flow=flow_stale#top");
-      const element = document.createElement("zitadel-login") as ZitadelLogin;
-      let url = "";
-      try {
-        element.purpose = "login";
-        element.project = testProject;
-        host.appendChild(element);
-        await waitFor(() => element.shadowRoot?.querySelector("zl-field, zl-alert"));
-        await element.updateComplete;
-        url = window.location.search + window.location.hash;
-      } finally {
-        window.history.replaceState({}, "", original);
-        server.events.removeListener("request:start", record);
-      }
-      return { element, seen, url };
-    }
+    const resumeStale = () => landOn("/login?keep=1&flow=flow_stale#top", "zl-field, zl-alert");
 
     it("starts a fresh flow and tells the user why", async () => {
       server.use(http.get("*/flow/:id", restartRequired, { once: true }));
