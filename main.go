@@ -11,3 +11,5 @@ func main() {
 		log.Fatal(err)
 	}
 }
+
+// spike: timing marker, not for merge
