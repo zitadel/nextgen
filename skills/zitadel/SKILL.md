@@ -75,7 +75,7 @@ Look the page up before you fetch it — don't guess URLs. The index lists every
 page with a one-line description:
 
 ```
-https://nextgen-docs-zitadel.vercel.app/llms.txt
+https://nextgen-docs-zitadel.vercel.app/docs/llms.txt
 ```
 
 Links in the index are relative to the docs site, so prefix them with

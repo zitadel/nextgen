@@ -1,0 +1,186 @@
+@import "tailwindcss";
+
+/* The look of the new zitadel.com, from zitadel/new-website's theme
+   (packages/theme/styles/variables.css): only the values this page uses,
+   under the website's own names, so its components move over unchanged. */
+@theme {
+  --color-background: #0f0f11;
+  --color-foreground: #f4f4f6;
+  --color-text-primary: #f4f4f6;
+  --color-accent-strong: #bd2514;
+
+  /* layout.tsx sets --font-arimo and --font-apk-futural on <html>. */
+  --font-sans: var(--font-arimo), Arial, Helvetica, sans-serif;
+  --font-heading: var(--font-apk-futural), Arial, Helvetica, sans-serif;
+}
+
+/* The centerpiece (page.tsx): the website's hero animation, its own light
+   spilling around it, leaning toward the pointer (stage.tsx sets --tilt-x and
+   --tilt-y, from -0.5 to 0.5). */
+@layer components {
+  .stage {
+    --tilt-x: 0;
+    --tilt-y: 0;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    /* As wide as the column, 44rem, and the height beside the logo and the
+       caption allow. */
+    width: min(100%, 44rem, calc((100dvh - 13rem) * 550 / 448));
+  }
+
+  /* Over the animation's dark top, a little nearer than it, like the caption. */
+  .stage-logo {
+    position: relative;
+    z-index: 1;
+    height: 1.75rem;
+    width: auto;
+    /* A share of the stage's width, so of the frame's height too. */
+    margin-bottom: -3%;
+    translate: calc(var(--tilt-x) * 1rem) calc(var(--tilt-y) * 0.75rem);
+    transition: translate 900ms var(--ease);
+  }
+
+  .stage-frame {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 550 / 448;
+    perspective: 75rem;
+  }
+
+  .stage-art,
+  .stage-glow {
+    position: absolute;
+    inset: 0;
+    transition:
+      transform 900ms var(--ease),
+      translate 900ms var(--ease);
+  }
+
+  /* The animation, its edges melted into the page. */
+  .stage-art {
+    mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 70%, transparent 100%);
+    transform: rotateY(calc(var(--tilt-x) * 16deg)) rotateX(calc(var(--tilt-y) * -10deg));
+  }
+
+  /* Its light: the same frames, blurred, so it glows in step with them.
+     Lighten keeps only what is brighter than the page, the orange, and the
+     mask hides the edges of the frame. */
+  .stage-glow {
+    filter: blur(3rem) saturate(1.5);
+    mix-blend-mode: lighten;
+    mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 40%, transparent 100%);
+    opacity: 0.7;
+    transform: scale(1.3);
+    translate: calc(var(--tilt-x) * -3rem) calc(var(--tilt-y) * -2rem);
+  }
+
+  /* Tucked into the animation's faded bottom, lit by it from below. */
+  .stage-caption {
+    margin-top: -2.5rem;
+    font-family: var(--font-heading);
+    font-size: clamp(2.75rem, 9vw, 5rem);
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    text-align: center;
+    background: linear-gradient(
+      180deg,
+      var(--color-foreground) 35%,
+      var(--color-accent-strong) 150%
+    );
+    background-clip: text;
+    color: transparent;
+    translate: calc(var(--tilt-x) * 1rem) calc(var(--tilt-y) * 0.75rem);
+    transition: translate 900ms var(--ease);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .stage-frame {
+      animation: stage-in 1.6s var(--ease) both;
+    }
+
+    .stage-caption {
+      animation: caption-in 2s var(--ease) 0.2s both;
+    }
+  }
+
+  /* The logo (logo.tsx) moves as on the website: while the pointer is on it,
+     back at rest when it leaves, and on its own where nothing hovers. */
+  .logo-icon {
+    transform-box: view-box;
+    transform-origin: 63px 63px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .logo:hover .logo-icon {
+      animation: logo-spin 5s infinite;
+    }
+
+    .logo:hover .logo-letter {
+      animation: logo-roll 5s infinite both;
+    }
+
+    @media (hover: none) {
+      .logo .logo-icon {
+        animation: logo-spin 5s infinite;
+      }
+
+      .logo .logo-letter {
+        animation: logo-roll 5s infinite both;
+      }
+    }
+  }
+}
+
+/* The doors appear, then the words gather. */
+@keyframes stage-in {
+  from {
+    opacity: 0;
+    scale: 0.92;
+  }
+}
+
+@keyframes caption-in {
+  from {
+    opacity: 0;
+    letter-spacing: 0.4em;
+  }
+}
+
+/* The logo's Lottie, 150 frames at 30 a second: the icon turns once in the
+   first 60, each letter rolls down in 30 (its start set in logo.tsx), and the
+   rest of the 5 s is still. */
+@keyframes logo-spin {
+  from {
+    rotate: -360deg;
+    animation-timing-function: cubic-bezier(0.108, 0, 0, 1);
+  }
+
+  40%,
+  to {
+    rotate: 0deg;
+  }
+}
+
+@keyframes logo-roll {
+  from {
+    translate: 0 0;
+    animation-timing-function: cubic-bezier(0.199, 0, 0.121, 1);
+  }
+
+  20%,
+  to {
+    translate: 0 100px;
+  }
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-text-primary);
+  outline-offset: 2px;
+}
+
+::selection {
+  background-color: var(--color-text-primary);
+  color: var(--color-background);
+}

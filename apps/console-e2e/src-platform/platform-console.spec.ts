@@ -1,5 +1,6 @@
-import type { Page } from "@playwright/test";
 import { expect, registerWithPassword, test } from "@zitadel/testing/playwright";
+
+import { expectNoErrorBoundary } from "../src-real/support";
 
 /**
  * A platform operator in the embedded console (#1300): signed up through the
@@ -15,21 +16,6 @@ import { expect, registerWithPassword, test } from "@zitadel/testing/playwright"
  */
 
 const password = "Platform-Operator-Passw0rd!";
-
-/** The titles the console's error states render (`components/boundaries.tsx`). */
-const ERROR_STATES = [
-  /^Request failed \(\d+\)$/,
-  /^Not authorized$/,
-  /^Console API not authorized$/,
-  /^Something went wrong$/,
-  /^Not found$/,
-];
-
-async function expectNoErrorState(page: Page): Promise<void> {
-  for (const title of ERROR_STATES) {
-    await expect(page.getByText(title)).toHaveCount(0);
-  }
-}
 
 test("a platform operator reaches every management screen without an error", async ({
   page,
@@ -64,6 +50,7 @@ test("a platform operator reaches every management screen without an error", asy
     ["users", "Users"],
     ["teams?status=active", "Teams"],
     ["schemas", "User schemas"],
+    ["authentication", "Authentication"],
     ["flow-definitions", "Login flows"],
     ["branding", "Branding"],
   ] as const) {
@@ -72,8 +59,15 @@ test("a platform operator reaches every management screen without an error", asy
     await expect(page).toHaveURL(selected);
     // `.first()`: Branding repeats its title on the settings panel.
     await expect(page.getByRole("heading", { name: heading, exact: true }).first()).toBeVisible();
-    await expectNoErrorState(page);
+    await expectNoErrorBoundary(page);
   }
+
+  // A refused connection read hides the Identity providers tab instead of
+  // erroring, so the walk above cannot see it: the tab itself is the proof
+  // that the connection query answered on the cookie.
+  await page.goto("/ui/console/authentication?tab=identity-providers");
+  await expect(page.getByRole("tab", { name: "Identity providers", selected: true })).toBeVisible();
+  await expectNoErrorBoundary(page);
 
   // The branding preview starts its flow in the selected customer project,
   // not the platform project the operator signed in to. Only here do the two
@@ -99,12 +93,12 @@ test("a platform operator reaches every management screen without an error", asy
     .getByRole("link", { name: "Project settings" })
     .click();
   await expect(page).toHaveURL(new RegExp(`/project\\?project=${zitadel.handle.projectId}$`));
-  await expectNoErrorState(page);
+  await expectNoErrorBoundary(page);
 
   const field = page.getByLabel("Project name");
   const renamed = `${await field.inputValue()} (platform)`;
   await field.fill(renamed);
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByRole("heading", { name: renamed, exact: true })).toBeVisible();
-  await expectNoErrorState(page);
+  await expectNoErrorBoundary(page);
 });

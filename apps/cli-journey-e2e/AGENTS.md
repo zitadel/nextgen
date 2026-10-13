@@ -23,6 +23,10 @@ ADR 044) — both shapes run the same CLI path and browser journeys.
 - CI may pass prebuilt release snapshot tarballs to the journey runner with
   `--tarballs-dir`; that path must skip rebuilding and still verify/publish the
   provided tarballs through Verdaccio.
+- Every option CI sets has a `JOURNEY_*` variable (`journeyArgsFromEnv` in
+  `scripts/run-options.mjs`): CI's turbo job passes them that way, because
+  turbo puts arguments after `--` into every task's cache key. A new option
+  CI needs gets a variable there too.
 - CI runs all journey variants (fresh-app matrix, passkey preset,
   pre-existing app, testkit) concurrently in a single `--ci` invocation of the
   runner (one step in `.github/workflows/ci.yml`), which parallelizes them

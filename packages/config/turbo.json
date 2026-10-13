@@ -1,0 +1,28 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // `meta-schemas/` is gitignored build input, copied from the directory the
+    // server embeds. The package scripts run the copy themselves, so this
+    // task exists for cache invalidation: it names the upstream files as
+    // inputs, and every task that reads the copy depends on it. The script
+    // holds the `generated-sources` lock: the server's generation rewrites
+    // what it copies.
+    "sync-schemas": {
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json"],
+      "outputs": ["meta-schemas/*.json"]
+    },
+    "typecheck": {
+      "dependsOn": ["@zitadel/api#build", "sync-schemas"]
+    },
+    "build": {
+      "dependsOn": ["@zitadel/api#build", "sync-schemas"]
+    },
+    "build-release": {
+      "dependsOn": ["@zitadel/api#build-release"]
+    },
+    "test": {
+      "dependsOn": ["build"]
+    }
+  }
+}
