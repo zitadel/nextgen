@@ -48,6 +48,10 @@ func (s *Field) setDefaults() {
 		val := bool(false)
 		s.Required.SetTo(val)
 	}
+	{
+		val := bool(false)
+		s.ReadOnly.SetTo(val)
+	}
 }
 
 // setDefaults set default value of fields.
