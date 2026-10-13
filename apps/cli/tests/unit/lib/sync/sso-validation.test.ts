@@ -286,6 +286,34 @@ describe("validatePlannedSso", () => {
   });
 });
 
+describe("validatePlannedSso and the switch that turns flow validation off", () => {
+  const GITHUB = ".zitadel/idps/github.json";
+  const collision = {
+    [SCHEMA]: schema(["acme"]),
+    [FLOW]: flow("https://schemas.example.test/staff.json", ["acme"]),
+    [CONNECTION]: connection,
+    [GITHUB]: { slug: "acme", claim_mapping: { email: "email" } },
+  };
+  const collide = () =>
+    failure(() =>
+      validatePlannedSso({
+        actions: [create(CONNECTION, "idp", connection)],
+        scannedContents: contents(collision),
+        stateResources: {},
+      }),
+    );
+
+  it("reports two connection files with one slug", async () => {
+    expect(await collide()).toContain("is also used by");
+  });
+
+  it("does not report them when the switch is set, as the changeset says", async () => {
+    process.env.ZITADEL_SKIP_FLOW_VALIDATION = "1";
+
+    expect(await collide()).toBeUndefined();
+  });
+});
+
 describe("validatePlannedSso reports only what the plan touches", () => {
   const OTHER_CONNECTION = ".zitadel/idps/github.json";
   const OTHER_FLOW = ".zitadel/flows/staff-login.json";
