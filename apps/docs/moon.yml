@@ -32,6 +32,8 @@ tasks:
     command: "corepack pnpm exec next build"
     deps:
       - "generate"
+      # app/global.css imports the design tokens' CSS variables.
+      - "design-tokens:generate"
     outputs:
       - ".next/**/*"
     options:
@@ -45,6 +47,7 @@ tasks:
     command: "corepack pnpm exec next dev --port 3003"
     deps:
       - "generate"
+      - "design-tokens:generate"
     options:
       persistent: true
       runInCI: false
