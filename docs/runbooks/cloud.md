@@ -13,8 +13,9 @@
 The hosted cloud is the current `main`, built by Vercel from the repository
 and run in Frankfurt (`fra1`) against PlanetScale Postgres in the same AWS
 region. **`main` is production:** every merge deploys. Every other branch
-gets a preview deployment with a database of its own. Version tags and their
-npm packages remain the self-hosted artifact; this cloud does not run them.
+gets a preview deployment with a database of its own, except the Changesets
+version PR's (see [Deploying](#deploying)). Version tags and their npm
+packages remain the self-hosted artifact; this cloud does not run them.
 
 ## Layout
 
@@ -186,6 +187,13 @@ or garbled fails the build and the serving deployment stays.
   branches included. There is no skip step: Vercel does not run a
   service's `ignoreCommand`, and most branches touch something the
   deployment builds from anyway.
+- **The Changesets version PR gets no preview.** `git.deploymentEnabled`
+  in `vercel.json` turns off deployments of `changeset-release/*`, so
+  Vercel starts none. `release-publish.yml` force-pushes that branch after
+  most merges to `main`, and it only bumps versions and changelogs: a
+  preview would differ from production in the server's version string
+  alone. Once merged, the release builds as production and runs
+  production's [deployment checks](#deployment-checks).
 - **Migrations must be expand/contract.** The previous deployment serves on
   the new schema until the new one is live, and Instant Rollback promotes
   an older deployment without touching the schema.
