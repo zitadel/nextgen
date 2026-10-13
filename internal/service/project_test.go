@@ -235,7 +235,7 @@ func TestProjectService_Get(t *testing.T) {
 		Name:      "project aaa",
 		CreatedAt: now,
 		UpdatedAt: now,
-		Origins:   []domain.Origin{{Pattern: "myapp.example.com", Kind: domain.OriginKindPreview}},
+		Origins:   []domain.Origin{{Pattern: "https://myapp.example.com", Kind: domain.OriginKindPreview}},
 	}
 
 	tests := []struct {
