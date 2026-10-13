@@ -109,9 +109,33 @@ jobs:
         # interfaces only; loopback and the runner's NIC keep it. (#1490)
         run: sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
 
+      # SPIKE: run the Spanner suite against Spanner Omni (Google's self-hosted
+      # Spanner) instead of the emulator, to compare its time in the PR job.
+      # Host networking, because Omni advertises its own container addresses and
+      # the client must be able to reach them. The harness provisions a database
+      # per package on the instance named below (ZITADEL_TEST_SPANNER_INSTANCE),
+      # and SPANNER_EMULATOR_HOST points the Spanner clients at Omni without auth.
+      - name: Start Spanner Omni
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
+        run: |
+          docker run -d --name omni --network host \
+            us-docker.pkg.dev/spanner-omni/images/spanner-omni:2026.r4-lts start-single-server
+          for i in $(seq 1 90); do
+            if docker logs omni 2>&1 | grep -q 'Spanner is ready'; then
+              echo "Omni ready after ~$((i * 2))s"; exit 0
+            fi
+            sleep 2
+          done
+          docker logs omni 2>&1 | tail -30
+          echo "Omni did not become ready" >&2
+          exit 1
+
       - name: Run Moon build and test graph
         id: moon-ci
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        env:
+          ZITADEL_TEST_SPANNER_INSTANCE: projects/default/instances/default
+          SPANNER_EMULATOR_HOST: localhost:15000
         # moon ci only selects tasks whose own inputs changed. --downstream deep
         # with --include-relations also runs the tasks of every project that
         # depends on a changed one, so an api change re-tests its consumers.
@@ -120,6 +144,10 @@ jobs:
       - name: Report Moon CI failures
         if: ${{ failure() && steps.moon-ci.conclusion == 'failure' }}
         run: node scripts/report-moon-failures.mjs
+
+      - name: Spanner Omni log tail
+        if: ${{ always() && steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
+        run: docker logs omni 2>&1 | tail -20 || true
 
       - name: Run Go tests
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
