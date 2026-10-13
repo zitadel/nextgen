@@ -110,14 +110,20 @@ async function publishSecret(
  * run reports cannot drift apart — a JSON run prints no warnings at all, so
  * that list is the only place the recovery step appears.
  */
-export function republishCommand(name: string, secret: boolean, cliVersion: string): string {
+export function republishCommand(
+  name: string,
+  secret: boolean,
+  cliVersion: string,
+  selector: string,
+): string {
   // `--project-level` is not optional: every `variables` command refuses with
   // "Name the owner" without an owner, so a command missing it would fail
   // before it reached the API and repair nothing. The project level is also
   // the right owner — the engine resolves a connection's `${{ NAME }}` from
-  // the project's own variables.
+  // the project's own variables. `selector` carries the invocation's
+  // --env/--env-file/--server so the retry targets the same project.
   return publicCliCommand(
-    `variables set ${name} --project-level${secret ? " --secret" : ""}`,
+    `variables set ${name} --project-level${secret ? " --secret" : ""}${selector}`,
     cliVersion,
   );
 }
@@ -141,10 +147,11 @@ export type CredentialRecovery = {
 export function republishCommands(
   credentials: readonly CredentialRecovery[],
   cliVersion: string,
+  selector: string,
 ): string[] {
   return credentials.flatMap(({ name, secret, published }) =>
     name !== undefined && published !== undefined && published !== "stored"
-      ? [republishCommand(name, secret, cliVersion)]
+      ? [republishCommand(name, secret, cliVersion, selector)]
       : [],
   );
 }
@@ -186,11 +193,12 @@ export function reportSecretOutcome(
   outcome: SecretOutcome,
   cliVersion: string,
   noValue: boolean,
+  selector: string,
 ): void {
   reportPublished(
     outcome.name,
     outcome.published,
-    republishCommand(outcome.name, true, cliVersion),
+    republishCommand(outcome.name, true, cliVersion, selector),
     noValue,
   );
 }
@@ -201,6 +209,11 @@ export function reportSecretOutcome(
  * A missing one is never "no value yet": the command refuses without a client
  * id, so the only way here is a project it could not reach.
  */
-export function reportClientIdOutcome(name: string, state: PublishState, cliVersion: string): void {
-  reportPublished(name, state, republishCommand(name, false, cliVersion), false);
+export function reportClientIdOutcome(
+  name: string,
+  state: PublishState,
+  cliVersion: string,
+  selector: string,
+): void {
+  reportPublished(name, state, republishCommand(name, false, cliVersion, selector), false);
 }
