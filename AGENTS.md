@@ -254,6 +254,11 @@ upward**. When deciding where a new test belongs:
    framework matrix across all 8 SDKs). Middleware-owning SDKs get their own
    lane because
    the proxy and route-protection layers are framework-specific.
+   The docs site's suite is the one that lives beside its app,
+   `apps/docs/tests/`: written against a URL, it runs on the local build
+   (`docs:e2e`) and on every deployment of the hosted cloud
+   (`docs:e2e-deployment`, see
+   [docs/runbooks/cloud.md](docs/runbooks/cloud.md#deployment-checks)).
 
 The consumer journey suite is the exception to the checked-in demo ownership
 rule: it belongs in `e2e/journey/` and must exercise a freshly

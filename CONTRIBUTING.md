@@ -404,6 +404,17 @@ moon run e2e:demo-next-mock
 moon run e2e:demo-nuxt-mock
 ```
 
+### Docs site suite
+
+The docs site's contract suite runs against a URL: the local build by default
+(Playwright serves it on port 3003), or a deployment of the hosted cloud named
+by `DOCS_BASE_URL` (see [the cloud runbook](docs/runbooks/cloud.md#deployment-checks)):
+
+```sh
+corepack pnpm --filter @zitadel/docs exec playwright install chromium
+moon run docs:e2e
+```
+
 ### Fresh-app journey
 
 The journey test creates one fresh app directory per selected framework outside
