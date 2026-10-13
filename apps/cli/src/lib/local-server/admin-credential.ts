@@ -1,11 +1,12 @@
 import { pbkdf2Sync, randomBytes } from "node:crypto";
-import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 
 import { ZitadelError } from "../errors";
+import { enforceMode } from "../fs-safe";
 import { isObject } from "../json";
 import {
   findUpward,
@@ -163,7 +164,7 @@ export async function ensureLocalAdmin(
       mode: 0o644,
     },
   );
-  await chmod(staging, 0o644).catch(() => undefined);
+  await enforceMode(staging, 0o644);
   await rename(staging, userFile);
 
   return { admin, userFile };
@@ -197,7 +198,7 @@ async function writePrivateIfAbsent(path: string, content: string): Promise<bool
     if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
     throw error;
   }
-  await chmod(path, 0o600).catch(() => undefined);
+  await enforceMode(path, 0o600);
   return true;
 }
 
