@@ -2,15 +2,17 @@ get:
   operationId: getVariable
   summary: Get a variable
   description: |
-    Reads one of the project's variables by name. A name the project has not
-    entered answers `var.not_found`. A secret is found but not disclosed: the
-    response is `{"secret": true}`.
+    Reads one of the project's variables by name, with its value per kind.
+    `kind` narrows the answer to one kind. A name with no value for any kind
+    addressed answers `var.not_found`, so `kind=preview` on a name stored for
+    `primary` only is not found. A secret is found but not disclosed: its
+    value is `{"secret": true}`.
   tags:
     - Variables
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/variable-name.yaml
-    - $ref: ../../../components/parameters/environment-name-query.yaml
+    - $ref: ../../../components/parameters/variable-kind.yaml
   security:
     - oauth2:
         - variable.read
@@ -20,7 +22,7 @@ get:
       content:
         application/json:
           schema:
-            $ref: ../variable.yaml
+            $ref: ../variable-by-kind.yaml
     default:
       $ref: getVariable-error-response.yaml
 
@@ -28,14 +30,19 @@ delete:
   operationId: deleteVariable
   summary: Delete a variable
   description: |
-    Removes the project's variable under this name. Deleting a name the
-    project does not hold answers `var.not_found`.
+    Removes the project's variable under this name for the kind `kind`
+    names, leaving the other kind's value. Without `kind`, both are removed.
+    A name with no value for any kind addressed answers `var.not_found`.
+
+    Deployments already made keep the value they froze. The next deployment
+    of that kind whose release references the name is refused with
+    `dep.variables_missing`.
   tags:
     - Variables
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/variable-name.yaml
-    - $ref: ../../../components/parameters/environment-name-query.yaml
+    - $ref: ../../../components/parameters/variable-kind.yaml
   security:
     - oauth2:
         - variable.write

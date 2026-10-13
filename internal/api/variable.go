@@ -14,7 +14,7 @@ func (h *Handler) GetVariables(ctx context.Context, params api.GetVariablesParam
 		return nil, err
 	}
 
-	owner, err := variableOwner(params.ProjectID, params.EnvironmentName)
+	owner, err := variableOwner(params.ProjectID, params.Kind)
 	if err != nil {
 		return nil, err
 	}
@@ -24,7 +24,7 @@ func (h *Handler) GetVariables(ctx context.Context, params api.GetVariablesParam
 		return nil, err
 	}
 
-	out, err := toAPIVariables(vars)
+	out, err := toAPIVariablesByKind(vars)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func (h *Handler) GetVariable(ctx context.Context, params api.GetVariableParams)
 	}
 
 	name := string(params.VariableName)
-	owner, err := variableOwner(params.ProjectID, params.EnvironmentName)
+	owner, err := variableOwner(params.ProjectID, params.Kind)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func (h *Handler) GetVariable(ctx context.Context, params api.GetVariableParams)
 	if err != nil {
 		return nil, err
 	}
-	return &value, nil
+	return &api.VariableByKind{Primary: api.NewOptVariable(value)}, nil
 }
 
 func (h *Handler) UpdateVariables(ctx context.Context, req api.UpdateVariablesRequest, params api.UpdateVariablesParams) (api.UpdateVariablesRes, error) {
@@ -73,7 +73,7 @@ func (h *Handler) UpdateVariables(ctx context.Context, req api.UpdateVariablesRe
 			WithMessage("the request body must name at least one variable")
 	}
 
-	owner, err := variableOwner(params.ProjectID, params.EnvironmentName)
+	owner, err := variableOwner(params.ProjectID, params.Kind)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func (h *Handler) UpdateVariables(ctx context.Context, req api.UpdateVariablesRe
 	if err != nil {
 		return nil, err
 	}
-	out, err := toAPIVariables(vars)
+	out, err := toAPIVariablesByKind(vars)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (h *Handler) DeleteVariable(ctx context.Context, params api.DeleteVariableP
 		return nil, err
 	}
 
-	owner, err := variableOwner(params.ProjectID, params.EnvironmentName)
+	owner, err := variableOwner(params.ProjectID, params.Kind)
 	if err != nil {
 		return nil, err
 	}
@@ -127,26 +127,25 @@ func (h *Handler) DeleteVariable(ctx context.Context, params api.DeleteVariableP
 /* ---------------- CONVERTERS ---------------- */
 
 // variableOwner turns the addressed scope into the owner storage matches on.
-// No environment exists, so a named one is env.not_found rather than an empty
-// read of the project's variables.
-func variableOwner(projectID api.ProjectID, environment api.OptEnvironmentName) (domain.VariableOwner, error) {
-	if environment.Set && environment.Value != "" {
-		return domain.VariableOwner{}, domain.ErrEnvironmentNotFound()
+// The store holds primary values only until it carries a kind, so a preview
+// request is not implemented yet.
+func variableOwner(projectID api.ProjectID, kind api.OptVariableKind) (domain.VariableOwner, error) {
+	if kind.Set && kind.Value == api.VariableKindPreview {
+		return domain.VariableOwner{}, domain.ErrNotImplemented()
 	}
 	return domain.VariableOwner{ProjectID: string(projectID)}, nil
 }
 
-// toAPIVariables keys a read by name. The names are already unique -- one read,
-// one owner, and the primary key does the rest -- so no entry here overwrites
-// another.
-func toAPIVariables(variables []*domain.Variable) (api.Variables, error) {
-	out := make(api.Variables, len(variables))
+// toAPIVariablesByKind keys a read by name. Every stored value is a primary
+// value until the store carries a kind.
+func toAPIVariablesByKind(variables []*domain.Variable) (api.VariablesByKind, error) {
+	out := make(api.VariablesByKind, len(variables))
 	for _, variable := range variables {
 		value, err := toAPIVariable(variable)
 		if err != nil {
 			return nil, err
 		}
-		out[variable.Name] = value
+		out[variable.Name] = api.VariableByKind{Primary: api.NewOptVariable(value)}
 	}
 	return out, nil
 }

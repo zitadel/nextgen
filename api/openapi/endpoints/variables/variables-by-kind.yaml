@@ -1,0 +1,22 @@
+title: VariablesByKind
+description: |
+  The project's variables, keyed by name, each with its value per kind. A
+  name with no value for any kind addressed is not listed.
+
+  An empty object is an ordinary answer, not an error: nothing has been
+  entered for the kinds addressed.
+type: object
+propertyNames:
+  $ref: ../../components/schemas/variable-name.yaml
+additionalProperties:
+  $ref: variable-by-kind.yaml
+example:
+  GOOGLE_CLIENT_ID:
+    primary: prod-abc
+    preview: prod-abc
+  GOOGLE_CLIENT_SECRET:
+    primary:
+      secret: true
+  RETRY_COUNT:
+    primary: 10
+    preview: 3

@@ -5057,6 +5057,98 @@ func decodeGetDeploymentByIdResponse(resp *http.Response) (res GetDeploymentById
 	return res, nil
 }
 
+func decodeGetDeploymentVariablesResponse(resp *http.Response) (res GetDeploymentVariablesRes, _ error) {
+	switch resp.StatusCode {
+	case 200:
+		// Code 200.
+		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+		if err != nil {
+			return res, errors.Wrap(err, "parse media type")
+		}
+		switch {
+		case ct == "application/json":
+			buf, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return res, err
+			}
+			d := jx.DecodeBytes(buf)
+
+			var response Variables
+			if err := func() error {
+				if err := response.Decode(d); err != nil {
+					return err
+				}
+				if err := d.Skip(); err != io.EOF {
+					return errors.New("unexpected trailing data")
+				}
+				return nil
+			}(); err != nil {
+				err = &ogenerrors.DecodeBodyError{
+					ContentType: ct,
+					Body:        buf,
+					Err:         err,
+				}
+				return res, err
+			}
+			// Validate response.
+			if err := func() error {
+				if err := response.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return res, errors.Wrap(err, "validate")
+			}
+			return &response, nil
+		default:
+			return res, validate.InvalidContentType(ct)
+		}
+	}
+	// Default response.
+	res, err := func() (res GetDeploymentVariablesRes, err error) {
+		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+		if err != nil {
+			return res, errors.Wrap(err, "parse media type")
+		}
+		switch {
+		case ct == "application/json":
+			buf, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return res, err
+			}
+			d := jx.DecodeBytes(buf)
+
+			var response GetDeploymentVariablesErrorResponse
+			if err := func() error {
+				if err := response.Decode(d); err != nil {
+					return err
+				}
+				if err := d.Skip(); err != io.EOF {
+					return errors.New("unexpected trailing data")
+				}
+				return nil
+			}(); err != nil {
+				err = &ogenerrors.DecodeBodyError{
+					ContentType: ct,
+					Body:        buf,
+					Err:         err,
+				}
+				return res, err
+			}
+			return &GetDeploymentVariablesErrorResponseStatusCode{
+				StatusCode: resp.StatusCode,
+				Response:   response,
+			}, nil
+		default:
+			return res, validate.InvalidContentType(ct)
+		}
+	}()
+	if err != nil {
+		return res, errors.Wrapf(err, "default (code %d)", resp.StatusCode)
+	}
+	return res, nil
+}
+
 func decodeGetEventResponse(resp *http.Response) (res GetEventRes, _ error) {
 	switch resp.StatusCode {
 	case 200:
@@ -8035,7 +8127,7 @@ func decodeGetVariableResponse(resp *http.Response) (res GetVariableRes, _ error
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response Variable
+			var response VariableByKind
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -8127,7 +8219,7 @@ func decodeGetVariablesResponse(resp *http.Response) (res GetVariablesRes, _ err
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response Variables
+			var response VariablesByKind
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -13752,7 +13844,7 @@ func decodeUpdateVariablesResponse(resp *http.Response) (res UpdateVariablesRes,
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response Variables
+			var response VariablesByKind
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err

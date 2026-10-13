@@ -1153,14 +1153,18 @@ describe("api-mock idp connections and variables", () => {
     });
     // 200 with the addressed owner read back, not 204.
     expect(patch.status).toBe(200);
-    expect(((await patch.json()) as Record<string, unknown>).GOOGLE_CLIENT_ID).toBe(
-      "824.apps.googleusercontent.com",
-    );
+    expect(((await patch.json()) as Record<string, unknown>).GOOGLE_CLIENT_ID).toEqual({
+      primary: "824.apps.googleusercontent.com",
+      preview: "824.apps.googleusercontent.com",
+    });
 
     const res = await fetch(`${BASE}/variables?project_id=${projectId}`);
     const body = (await res.json()) as Record<string, unknown>;
     expect(GetVariablesResponse.safeParse(body).success).toBe(true);
-    expect(body.GOOGLE_CLIENT_ID).toBe("824.apps.googleusercontent.com");
+    expect(body.GOOGLE_CLIENT_ID).toEqual({
+      primary: "824.apps.googleusercontent.com",
+      preview: "824.apps.googleusercontent.com",
+    });
   });
 
   test("reads and deletes one variable by name", async () => {
@@ -1173,7 +1177,7 @@ describe("api-mock idp connections and variables", () => {
 
     const read = await fetch(`${BASE}/variables/SESSION_TTL?project_id=${projectId}`);
     expect(read.status).toBe(200);
-    expect(await read.json()).toBe(900);
+    expect(await read.json()).toEqual({ primary: 900, preview: 900 });
 
     const removed = await fetch(`${BASE}/variables/SESSION_TTL?project_id=${projectId}`, {
       method: "DELETE",
@@ -1182,7 +1186,7 @@ describe("api-mock idp connections and variables", () => {
     expect((await fetch(`${BASE}/variables/SESSION_TTL?project_id=${projectId}`)).status).toBe(404);
   });
 
-  test("answers var.not_found for a name this owner does not hold", async () => {
+  test("answers var.not_found for a name the project does not hold", async () => {
     const projectId = await newProject("vars-missing");
 
     const res = await fetch(`${BASE}/variables/ABSENT?project_id=${projectId}`);
@@ -1220,7 +1224,7 @@ describe("api-mock idp connections and variables", () => {
       await fetch(`${BASE}/variables?project_id=${projectId}`)
     ).json()) as Record<string, unknown>;
 
-    expect(body.GOOGLE_CLIENT_SECRET).toEqual({ secret: true });
+    expect(body.GOOGLE_CLIENT_SECRET).toEqual({ primary: { secret: true } });
     expect(JSON.stringify(body)).not.toContain("GOCSPX-real");
   });
 
@@ -1238,7 +1242,7 @@ describe("api-mock idp connections and variables", () => {
     await patch({ DROP: null });
 
     const body = (await (await fetch(url)).json()) as Record<string, unknown>;
-    expect(body.KEEP).toBe("a");
+    expect(body.KEEP).toEqual({ primary: "a", preview: "a" });
     expect(body).not.toHaveProperty("DROP");
   });
 
@@ -1360,30 +1364,49 @@ describe("api-mock idp and variable contract details", () => {
     expect(res.status).toBe(400);
   });
 
-  test("keeps an environment's variables separate from the project's", async () => {
-    // The project level does not see into its environments and an environment
-    // does not inherit the project's: they are distinct owners.
-    const projectId = await newProject("vars-owners");
-    const write = (query: string, payload: object) =>
-      fetch(`${BASE}/variables?${query}`, {
+  test("keeps each kind's value separate", async () => {
+    // Nothing falls back between kinds: a preview value is its own, and a
+    // removal naming a kind leaves the other kind's value.
+    const projectId = await newProject("vars-kinds");
+    const url = (kind?: string) =>
+      `${BASE}/variables?project_id=${projectId}${kind === undefined ? "" : `&kind=${kind}`}`;
+    const write = (kind: string | undefined, payload: object) =>
+      fetch(url(kind), {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
-    await write(`project_id=${projectId}`, { SHARED: { value: "project", secret: false } });
-    await write(`project_id=${projectId}&environment_name=production`, {
-      SHARED: { value: "prod", secret: false },
+    await write(undefined, { SHARED: "prod" });
+    await write("preview", { SHARED: "test" });
+
+    expect(await (await fetch(url())).json()).toEqual({
+      SHARED: { primary: "prod", preview: "test" },
+    });
+    expect(await (await fetch(url("primary"))).json()).toEqual({ SHARED: { primary: "prod" } });
+
+    const removed = await fetch(`${BASE}/variables/SHARED?project_id=${projectId}&kind=preview`, {
+      method: "DELETE",
+    });
+    expect(removed.status).toBe(204);
+    expect(
+      (await fetch(`${BASE}/variables/SHARED?project_id=${projectId}&kind=preview`)).status,
+    ).toBe(404);
+    expect(await (await fetch(url())).json()).toEqual({ SHARED: { primary: "prod" } });
+  });
+
+  test("writes a secret naming no kind for primary only", async () => {
+    const projectId = await newProject("vars-secret-kind");
+    const url = `${BASE}/variables?project_id=${projectId}`;
+    await fetch(url, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ TOKEN: { value: "s3cr3t", secret: true }, HOST: "example.com" }),
     });
 
-    const atProject = (await (
-      await fetch(`${BASE}/variables?project_id=${projectId}`)
-    ).json()) as Record<string, unknown>;
-    const atEnv = (await (
-      await fetch(`${BASE}/variables?project_id=${projectId}&environment_name=production`)
-    ).json()) as Record<string, unknown>;
-
-    expect(atProject.SHARED).toBe("project");
-    expect(atEnv.SHARED).toBe("prod");
+    expect(await (await fetch(url)).json()).toEqual({
+      TOKEN: { primary: { secret: true } },
+      HOST: { primary: "example.com", preview: "example.com" },
+    });
   });
 
   test("reads back what the write did not touch", async () => {
@@ -1400,6 +1423,9 @@ describe("api-mock idp and variable contract details", () => {
     const second = await write({ SECOND: { value: "b", secret: false } });
 
     const body = (await second.json()) as Record<string, unknown>;
-    expect(body).toEqual({ FIRST: "a", SECOND: "b" });
+    expect(body).toEqual({
+      FIRST: { primary: "a", preview: "a" },
+      SECOND: { primary: "b", preview: "b" },
+    });
   });
 });

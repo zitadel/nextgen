@@ -2,7 +2,9 @@ get:
   operationId: getVariables
   summary: Get variables
   description: |
-    Returns the project's variables, keyed by name.
+    Returns the project's variables, keyed by name, each with its value per
+    kind. `kind` narrows the answer to one kind: every name stored for it,
+    which is what a deployment of that kind freezes.
 
     Secret values are not returned. A secret appears as `{"secret": true}`,
     which says a value is held without disclosing it.
@@ -10,7 +12,7 @@ get:
     - Variables
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
-    - $ref: ../../components/parameters/environment-name-query.yaml
+    - $ref: ../../components/parameters/variable-kind.yaml
   security:
     - oauth2:
         - variable.read
@@ -20,7 +22,7 @@ get:
       content:
         application/json:
           schema:
-            $ref: variables.yaml
+            $ref: variables-by-kind.yaml
     default:
       $ref: getVariables-error-response.yaml
 
@@ -28,8 +30,13 @@ patch:
   operationId: updateVariables
   summary: Update variables
   description: |
-    Enters, replaces and removes the project's variables. Names not in the
-    body are untouched.
+    Enters, replaces and removes the project's variables for the kind `kind`
+    names. Names not in the body are untouched. Nothing here reaches a
+    deployment already made: each deployment keeps the values it froze.
+
+    Without `kind`, a plain value is written for both kinds and a secret for
+    `primary` only, so a secret reaches previews only when written with
+    `kind=preview`. `null` removes the name from every kind addressed.
 
     A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
     stores the value encrypted under the project's active `secret` key, after
@@ -44,7 +51,7 @@ patch:
     - Variables
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
-    - $ref: ../../components/parameters/environment-name-query.yaml
+    - $ref: ../../components/parameters/variable-kind.yaml
   security:
     - oauth2:
         - variable.write
@@ -57,11 +64,12 @@ patch:
   responses:
     '200':
       description: |
-        The variables were written. The body is the project's variables read
-        back, so it also carries whatever the write did not touch.
+        The variables were written. The body is the project's variables for
+        the kinds addressed, read back, so it also carries whatever the write
+        did not touch.
       content:
         application/json:
           schema:
-            $ref: variables.yaml
+            $ref: variables-by-kind.yaml
     default:
       $ref: updateVariables-error-response.yaml
