@@ -115,10 +115,19 @@ packages calls Vitest without the guard, so no suite retries under both.
 |---|---|
 | the default gate | `turbo run lint typecheck build test` |
 | one task | `turbo run test --filter=@zitadel/cli` |
-| pass arguments | `turbo run snapshot --filter=@zitadel/release -- --skip-container` |
+| pass arguments (by hand only, below) | `turbo run test --filter=@zitadel/cli -- --reporter=verbose` |
 | what would run | `turbo run build --dry` |
 | affected tasks, task-level | `turbo query '{ affectedTasks(base: "origin/main", tasks: ["test"]) { items { name package { name } } } }'` |
 | a run summary for the failure report | `--summarize` → `.turbo/runs/<id>.json`, `node scripts/report-turbo-failures.mjs` |
+
+Arguments after `--` reach only the named task, but turbo puts them into the
+cache key of every task in the run
+([vercel/turborepo#14770](https://github.com/vercel/turborepo/issues/14770),
+by design): the task's dependencies miss the cache and rebuild. A script that
+CI or another script runs through turbo therefore takes its options from the
+environment, listed in the task's `passThroughEnv`: `RELEASE_SKIP_CONTAINER=1`
+for the release snapshot, `JOURNEY_CI=1`, `JOURNEY_MATRIX`, … for the journey
+runner (`apps/cli-journey-e2e/README.md`).
 
 Do not select the gate with `--affected` or `--filter=…[ref]`: both follow
 `package.json` edges only and would skip the server's tests on a console
