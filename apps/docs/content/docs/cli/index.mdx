@@ -14,16 +14,16 @@ mkdir myapp
 cd myapp
 npx @zitadel/cli@alpha doctor
 npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --server local --force
+npx @zitadel/cli@alpha setup --server local
 npm run dev
 ```
 
-`--force` lets setup scaffold into the directory after `start` has written `.zitadel/local/` into it. Anywhere but a new, empty directory it would replace your files, so for an app you already have, follow [Add Zitadel to an existing app](/docs/get-started/quickstart#add-zitadel-to-an-existing-app).
+For an app you already have, follow [Add Zitadel to an existing app](/docs/get-started/quickstart#add-zitadel-to-an-existing-app) instead.
 
 For automation, in the same new, empty directory:
 
 ```sh
-npx @zitadel/cli@alpha setup --framework next --server local --force --non-interactive --json
+npx @zitadel/cli@alpha setup --framework next --server local --non-interactive --json
 ```
 
 ## Agent Skills
