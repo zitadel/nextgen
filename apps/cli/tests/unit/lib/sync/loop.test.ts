@@ -1548,7 +1548,7 @@ describe("plan-time flow validation", () => {
         },
       });
       await writeResource(cwd, ".zitadel/schemas", "user.json", schemaBody);
-      const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_A", preset: "passkey-first" });
+      const flow = getDefaultLoginFlow({ preset: "passkey-first" });
       await writeResource(cwd, ".zitadel/flows", "default.json", flow);
 
       const plan = buildSyncPlan(cwd, [schemaSyncer, makeFlowSyncer()]);

@@ -318,14 +318,13 @@ describe("apply", () => {
         expect((await app.publishedSchema()).schema.properties).toHaveProperty("company");
       });
 
-      it("moves the published flow onto the new revision in the same run", async () => {
+      it("keeps the published flow naming the schema by objectType", async () => {
         const app = await aSetUpApp();
         await addCompanyFieldAndUseIt(app);
 
         expect(await app.apply()).toSucceed();
 
-        const { id } = await app.publishedSchema();
-        expect((await app.publishedFlow()).flow_definition.user_schema).toBe(id);
+        expect((await app.publishedFlow()).flow_definition.user_schema).toBe("human-user");
       });
 
       it("leaves nothing to reconcile after a combined edit", async () => {

@@ -479,14 +479,14 @@ describe("plan", () => {
 
         expect(result).toPrint("company");
       });
-      it("says a new revision will be published and the flow re-pinned", async () => {
+      it("says a new revision will be published, which the flow follows by objectType", async () => {
         const app = await aSetUpApp();
         await addCompanyField(app);
 
         const result = await app.planRendered();
 
         expect(result).toPrint("will publish a new revision");
-        expect(result).toPrint("user_schema will be re-pinned to the new revision");
+        expect(result).not.toPrint("user_schema will be re-pinned to the new revision");
       });
       it("does not report fields the server echoes back as changes", async () => {
         const app = await aSetUpApp();
