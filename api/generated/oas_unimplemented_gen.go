@@ -23,7 +23,7 @@ var _ Handler = UnimplementedHandler{}
 // stored as written.
 //
 // POST /projects/{project_id}/origins
-func (UnimplementedHandler) AddOrigin(ctx context.Context, req *Origin, params AddOriginParams) (r AddOriginRes, _ error) {
+func (UnimplementedHandler) AddOrigin(ctx context.Context, req *ProjectOrigin, params AddOriginParams) (r AddOriginRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -133,16 +133,27 @@ func (UnimplementedHandler) CreateBranding(ctx context.Context, req *Branding, p
 // the resolved origins, sorted, never the keyword.
 // A deployment to preview URLs creates the preview for each of them, or
 // renews it when it exists, in the same transaction, with the expiry set
-// from `ttl`; each target in the response carries that expiry. Primary
-// origins and preview URLs cannot be mixed in one deployment: that
-// answers `400` with `dep.invalid`.
-// Idempotent on what is served: when every resolved target already serves
-// the release, nothing changes and the call answers `200` with the newest
-// deployment to those targets, so a re-run of `zitadel deploy` on
-// unchanged content is a no-op end to end. Anything else writes a new
-// record covering all of the resolved targets, including the same release
-// returning after something else was served in between: the log is
-// append-only, and each record is one act of making a release live.
+// from `ttl`; each target in the response carries that expiry. It always
+// writes a new deployment, answering `201`, even when the URLs already
+// serve the release: that record is the renewal. Primary origins and
+// preview URLs cannot be mixed in one deployment: that answers `400` with
+// `dep.invalid`.
+// A deployment freezes the variable values the project stores for its
+// kind: primary origins use the primary values, preview URLs the preview
+// values, with no fallback from one to the other. A release that
+// references a variable with no value for that kind answers `400` with
+// `dep.variables_missing`, naming the kind and every missing variable, and
+// nothing is written.
+// A deployment to primary origins is idempotent on what is served: when
+// every resolved target already serves the release with the same frozen
+// variable values, nothing changes and the call answers `200` with the
+// newest deployment to those targets, so a re-run of `zitadel deploy` on
+// unchanged content is a no-op end to end. The same release with a
+// changed variable value is a new deployment.
+// Anything else writes a new record covering all of the resolved targets,
+// including the same release returning after something else was served in
+// between: the log is append-only, and each record is one act of making a
+// release live.
 // `expected_deployment_id` guards against racing another deploy: when
 // present, the write only happens if the newest deployment to any of the
 // resolved targets still is the one named, and a mismatch answers `409`
@@ -791,11 +802,13 @@ func (UnimplementedHandler) ListBranding(ctx context.Context, params ListBrandin
 // history of that origin alone, and its first row is the deployment the
 // origin serves.
 // With `live=true`, the list is what is served now: the newest deployment
-// to each target, each carrying only the targets it still serves, with
-// the expiry of each preview URL. A deployment every target of which has
-// since been replaced, or whose previews have all expired or been
-// removed, does not appear. Combined with `origin`, the live view is the one deployment that
-// origin serves, or empty.
+// to each target, each carrying only the targets it still serves. A
+// preview URL is served only while its preview is live, and its
+// `expires_at` is the expiry its newest deployment set, which is the
+// preview's current one. A deployment every target of which has since
+// been replaced, or whose previews have all expired or been removed, does
+// not appear. Combined with `origin`, the live view is the one deployment
+// that origin serves, or empty.
 // `expand: ["release"]` embeds the release each deployment made live, so a
 // history renders with each entry's content without resolving `release_id`
 // one by one. Expanding requires `release.read` and does not affect the
@@ -856,6 +869,17 @@ func (UnimplementedHandler) ListIdpRevisions(ctx context.Context, params ListIdp
 //
 // GET /users/me/projects
 func (UnimplementedHandler) ListMyProjects(ctx context.Context, params ListMyProjectsParams) (r ListMyProjectsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListPreviews implements listPreviews operation.
+//
+// Lists the project's live previews, newest first by `created_at`. An
+// expired or removed preview is not listed; what was deployed to it stays
+// in `GET /deployments`.
+//
+// GET /projects/{project_id}/previews
+func (UnimplementedHandler) ListPreviews(ctx context.Context, params ListPreviewsParams) (r ListPreviewsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -1028,6 +1052,21 @@ func (UnimplementedHandler) RemoveOrigin(ctx context.Context, req *RemoveOriginR
 	return r, ht.ErrNotImplemented
 }
 
+// RemovePreview implements removePreview operation.
+//
+// Ends a preview before it expires: the URL stops being served at once.
+// The deployments to it stay in the history.
+// Idempotent: a URL with no live preview, including one that has already
+// expired or was removed before, answers `204` too, so a cleanup that
+// races the expiry still succeeds.
+// The URL travels in the body rather than the path because an origin
+// contains `/`.
+//
+// POST /projects/{project_id}/previews/remove
+func (UnimplementedHandler) RemovePreview(ctx context.Context, req *RemovePreviewRequest, params RemovePreviewParams) (r RemovePreviewRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // RevokeMySession implements revokeMySession operation.
 //
 // Logs out by permanently deleting the session.
@@ -1089,18 +1128,22 @@ func (UnimplementedHandler) RevokeSession(ctx context.Context, params RevokeSess
 // targets serve exactly what they served then. The history is append-only,
 // so the deployments in between stay in it.
 // Only a deployment to primary origins can be rolled back. One whose
-// targets were preview URLs answers `409` with `dep.invalid`; deploy to
+// targets were preview URLs answers `400` with `dep.invalid`; deploy to
 // the preview again instead. Every target must still be a primary origin
-// of the project: when one is not, the request answers `409` with
-// `dep.invalid` naming it, and nothing changes. There is no narrowing to
-// some of the targets: to roll back one origin, deploy the earlier
-// release to it with `POST /deployments`.
+// of the project, as `POST /deployments` requires of an exact origin:
+// when one is not, the request answers `403` with
+// `proj.origin_not_allowed` naming it, and nothing changes. There is no
+// narrowing to some of the targets: to roll back one origin, deploy the
+// earlier release to it with `POST /deployments`.
 // When every target already serves the deployment's release, nothing
 // changes and the call answers `200` with the newest deployment to the
 // targets.
 // The release must not be revoked: a revoked one answers `409` with
 // `rel.revoked`. An unknown deployment id, or one of another project,
 // answers `404` with `dep.not_found`.
+// A rollback never answers `dep.variables_missing`: the release and the
+// frozen values it re-applies passed that check together when the named
+// deployment was made.
 //
 // POST /deployments/{deployment_id}/rollback
 func (UnimplementedHandler) RollbackDeployment(ctx context.Context, req OptRollbackDeploymentRequest, params RollbackDeploymentParams) (r RollbackDeploymentRes, _ error) {

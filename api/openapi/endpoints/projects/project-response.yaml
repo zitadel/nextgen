@@ -21,7 +21,7 @@ properties:
   origins:
     type: array
     items:
-      $ref: origin.yaml
+      $ref: project-origin.yaml
     description: |
       The project's origin patterns, each a `{pattern, kind}`. An empty list
       admits every origin until the first pattern is added.

@@ -229,6 +229,10 @@ type ListMyProjectsRes interface {
 	listMyProjectsRes()
 }
 
+type ListPreviewsRes interface {
+	listPreviewsRes()
+}
+
 type ListReleasesRes interface {
 	listReleasesRes()
 }
@@ -283,6 +287,10 @@ type QueryUsersRes interface {
 
 type RemoveOriginRes interface {
 	removeOriginRes()
+}
+
+type RemovePreviewRes interface {
+	removePreviewRes()
 }
 
 type RevokeMySessionRes interface {

@@ -6,4 +6,4 @@ description: |
   exactly as the deployment records it. An origin no deployment targeted
   answers an empty list, not an error.
 schema:
-  $ref: '../schemas/deployment-origin.yaml'
+  $ref: '../schemas/origin.yaml'
