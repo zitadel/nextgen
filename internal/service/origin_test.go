@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,6 +10,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 func TestProjectService_AddOrigin(t *testing.T) {
@@ -20,7 +22,6 @@ func TestProjectService_AddOrigin(t *testing.T) {
 	t.Run("inserts and emits", func(t *testing.T) {
 		t.Parallel()
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
-		statements.EXPECT().ProjectExists(gomock.Any(), project.ID).Return(true, nil)
 		statements.EXPECT().InsertOrigin(gomock.Any(), project.ID, origin).Return(true, nil)
 
 		got, err := svc.AddOrigin(context.Background(), project.ID, origin)
@@ -31,7 +32,6 @@ func TestProjectService_AddOrigin(t *testing.T) {
 	t.Run("idempotent same kind", func(t *testing.T) {
 		t.Parallel()
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
-		statements.EXPECT().ProjectExists(gomock.Any(), project.ID).Return(true, nil)
 		statements.EXPECT().InsertOrigin(gomock.Any(), project.ID, origin).Return(false, nil)
 		statements.EXPECT().GetOrigin(gomock.Any(), gomock.Any()).
 			Return(&origin, nil)
@@ -45,7 +45,6 @@ func TestProjectService_AddOrigin(t *testing.T) {
 		t.Parallel()
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 		existing := domain.Origin{Pattern: origin.Pattern, Kind: domain.OriginKindPrimary}
-		statements.EXPECT().ProjectExists(gomock.Any(), project.ID).Return(true, nil)
 		statements.EXPECT().InsertOrigin(gomock.Any(), project.ID, origin).Return(false, nil)
 		statements.EXPECT().GetOrigin(gomock.Any(), gomock.Any()).
 			Return(&existing, nil)
@@ -80,7 +79,8 @@ func TestProjectService_AddOrigin(t *testing.T) {
 	t.Run("project missing", func(t *testing.T) {
 		t.Parallel()
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
-		statements.EXPECT().ProjectExists(gomock.Any(), project.ID).Return(false, nil)
+		statements.EXPECT().InsertOrigin(gomock.Any(), project.ID, origin).
+			Return(false, database.NewForeignKeyError("project_origins", "fk_project_origins_project", errors.New("fk")))
 
 		got, err := svc.AddOrigin(context.Background(), project.ID, origin)
 		require.ErrorIs(t, err, domain.ErrProjectNotFound())
@@ -97,7 +97,6 @@ func TestProjectService_RemoveOrigin(t *testing.T) {
 	t.Run("deletes and emits", func(t *testing.T) {
 		t.Parallel()
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
-		statements.EXPECT().ProjectExists(gomock.Any(), project.ID).Return(true, nil)
 		statements.EXPECT().DeleteOriginByPattern(gomock.Any(), project.ID, origin.Pattern).
 			Return(true, &origin, nil)
 
@@ -107,7 +106,6 @@ func TestProjectService_RemoveOrigin(t *testing.T) {
 	t.Run("idempotent when missing", func(t *testing.T) {
 		t.Parallel()
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
-		statements.EXPECT().ProjectExists(gomock.Any(), project.ID).Return(true, nil)
 		statements.EXPECT().DeleteOriginByPattern(gomock.Any(), project.ID, origin.Pattern).
 			Return(false, nil, nil)
 

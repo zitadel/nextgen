@@ -18,8 +18,6 @@ VALUES (?, ?, ?, ?, ?) RETURNING id, created_at, updated_at`
 
 	deleteByIDProjectStmt = `DELETE FROM projects WHERE id = ?`
 
-	projectExistsStmt = `SELECT EXISTS (SELECT 1 FROM projects WHERE id = ?)`
-
 	updateProjectStmt = `UPDATE projects SET name = ?, updated_at = ? WHERE id = ?
 RETURNING id, name, password_hash_policy, created_at, updated_at`
 
@@ -81,15 +79,6 @@ func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) (b
 		return false, wrapError(err)
 	}
 	return n > 0, nil
-}
-
-// ProjectExists implements [service.ProjectStatements].
-func (ps projectStatements) ProjectExists(ctx context.Context, id string) (bool, error) {
-	var exists bool
-	if err := ps.client.QueryRow(ctx, projectExistsStmt, id).Scan(&exists); err != nil {
-		return false, wrapError(err)
-	}
-	return exists, nil
 }
 
 // GetProjectByID implements [service.ProjectStatements].

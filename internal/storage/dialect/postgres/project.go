@@ -57,7 +57,6 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 
 const (
 	deleteByIDProjectStmt = `DELETE FROM zitadel_nextgen.projects WHERE id = $1`
-	projectExistsStmt     = `SELECT EXISTS (SELECT 1 FROM zitadel_nextgen.projects WHERE id = $1)`
 	projectQuery          = "SELECT id, name, password_hash_policy, created_at, updated_at FROM zitadel_nextgen.projects"
 )
 
@@ -69,19 +68,6 @@ func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) (b
 		return false, wrapError(err)
 	}
 	return tag.RowsAffected() > 0, nil
-}
-
-// ProjectExists implements [service.ProjectStatements].
-func (ps projectStatements) ProjectExists(ctx context.Context, id string) (bool, error) {
-	rows, err := ps.client.Query(ctx, projectExistsStmt, id)
-	if err != nil {
-		return false, wrapError(err)
-	}
-	exists, err := pgx.CollectExactlyOneRow(rows, pgx.RowTo[bool])
-	if err != nil {
-		return false, wrapError(err)
-	}
-	return exists, nil
 }
 
 // GetProjectByID implements [service.ProjectStatements].

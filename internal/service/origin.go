@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -23,12 +24,11 @@ func (s *projectService) AddOrigin(ctx context.Context, projectID string, origin
 
 	var stored domain.Origin
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := requireProject(ctx, tx, projectID); err != nil {
-			return err
-		}
-
 		inserted, err := tx.Statements().InsertOrigin(ctx, projectID, origin)
 		if err != nil {
+			if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
+				return domain.ErrProjectNotFound().WithParent(err)
+			}
 			return domain.ErrInternal(err).WithMessage("failed to insert origin")
 		}
 		if inserted {
@@ -66,7 +66,7 @@ func (s *projectService) AddOrigin(ctx context.Context, projectID string, origin
 }
 
 // RemoveOrigin deletes one origin pattern. Removing a missing pattern is
-// idempotent (no error).
+// idempotent (no error). Project existence is gated by authz on the HTTP path.
 func (s *projectService) RemoveOrigin(ctx context.Context, projectID, pattern string) error {
 	if projectID == "" {
 		return domain.ErrProjectMissingID()
@@ -77,10 +77,6 @@ func (s *projectService) RemoveOrigin(ctx context.Context, projectID, pattern st
 	}
 
 	return s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := requireProject(ctx, tx, projectID); err != nil {
-			return err
-		}
-
 		deleted, removed, err := tx.Statements().DeleteOriginByPattern(ctx, projectID, pattern)
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to delete origin")
@@ -100,18 +96,4 @@ func (s *projectService) RemoveOrigin(ctx context.Context, projectID, pattern st
 			},
 		})
 	})
-}
-
-func requireProject(ctx context.Context, tx Statementer[AllStatements], projectID string) error {
-	exists, err := tx.Statements().ProjectExists(ctx, projectID)
-	if err != nil {
-		if mapped := mapStorageError(err); mapped != err {
-			return mapped
-		}
-		return domain.ErrInternal(err).WithMessage("failed to load project")
-	}
-	if !exists {
-		return domain.ErrProjectNotFound()
-	}
-	return nil
 }

@@ -16,7 +16,6 @@ const (
 	createProjectStmt     = `INSERT INTO projects (id, name, password_hash_policy) VALUES (@p1, @p2, @p3) THEN RETURN id, created_at, updated_at`
 	updateProjectStmt     = `UPDATE projects SET name = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id, name, password_hash_policy, created_at, updated_at`
 	deleteByIDProjectStmt = `DELETE FROM projects WHERE id = @p1`
-	projectExistsStmt     = `SELECT EXISTS (SELECT 1 FROM projects WHERE id = @p1)`
 	projectQuery          = "SELECT id, name, password_hash_policy, created_at, updated_at FROM projects"
 
 	setProjectPasswordHashPolicyStmt = `UPDATE projects SET password_hash_policy = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id`
@@ -78,24 +77,6 @@ func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) (b
 		return false, err
 	}
 	return n > 0, nil
-}
-
-// ProjectExists implements [service.ProjectStatements].
-func (ps projectStatements) ProjectExists(ctx context.Context, id string) (bool, error) {
-	var exists bool
-	err := ps.db.Query(ctx, buildStatement(projectExistsStmt, id).statement(),
-		func(iter *spanner.RowIterator) error {
-			var qErr error
-			exists, qErr = collectOneRow(iter, func(row *spanner.Row) (bool, error) {
-				var found bool
-				return found, row.Columns(&found)
-			})
-			return qErr
-		})
-	if err != nil {
-		return false, wrapError(err)
-	}
-	return exists, nil
 }
 
 // GetProjectByID implements [service.ProjectStatements].

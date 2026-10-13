@@ -66,9 +66,6 @@ type ProjectStatements interface {
 	Statements
 	CreateProject(ctx context.Context, entity *domain.Project) error
 	GetProjectByID(ctx context.Context, id string) (*domain.Project, error)
-	// ProjectExists reports whether a project row exists without hydrating
-	// origins or other related data.
-	ProjectExists(ctx context.Context, id string) (bool, error)
 	UpdateProject(ctx context.Context, entity *domain.Project) error
 	// SetProjectPasswordHashPolicy writes the hashing method the project's
 	// passwords are written with. A nil policy clears the choice, which returns
