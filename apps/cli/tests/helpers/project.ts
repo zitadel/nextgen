@@ -454,6 +454,17 @@ export class ScaffoldedApp {
     return this.editDocument(SCHEMA_FILE, edit);
   }
 
+  /** Edits the password step of the committed login flow, as the developer owning it would. */
+  editPasswordStep(edit: (step: FlowDocument["steps"][number]) => void): Promise<void> {
+    return this.editLoginFlow((flow) => {
+      const step = flow.steps.find((candidate) => candidate.name === "password");
+      if (step === undefined) {
+        throw new Error("the login flow has no password step");
+      }
+      edit(step);
+    });
+  }
+
   /** Edits the committed login flow, as the developer owning it would. */
   editLoginFlow(edit: (flow: FlowDocument) => void): Promise<void> {
     return this.editDocument(FLOW_FILE, edit);

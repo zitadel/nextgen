@@ -384,6 +384,9 @@ The step is edited only when the generator recognises it: the shipped step of
 either preset, once the providers and the routes it writes are set aside. A
 hand-edited one, including one whose provider routes were pointed elsewhere, is
 left alone and reported, as for every other generated step.
+A password step that is exactly the shipped one reads as unedited, so a button the
+developer removed on purpose comes back on the next `sso enable`; nothing in the file
+distinguishes that from a project enabled before the step offered providers.
 Showing only the providers linked to the identified user, or skipping the step
 for a user without a password, would tell anyone who types an email which
 sign-in method that account uses, so neither is done.

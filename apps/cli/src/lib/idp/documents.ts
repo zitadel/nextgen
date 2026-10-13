@@ -401,7 +401,12 @@ function withoutSsoRoutes(step: Step, terminal: string): Step {
     copy.transitions = Object.fromEntries(
       Object.entries(copy.transitions).filter(
         ([outcome, route]) =>
-          !(outcome in written && isObject(route) && route.target === written[outcome]),
+          !(
+            outcome in written &&
+            isObject(route) &&
+            route.target === written[outcome] &&
+            Object.keys(route).length === 1
+          ),
       ),
     );
   }
@@ -608,8 +613,18 @@ export function applySsoToFlow(
     if (!shippedPasswordSteps().includes(canonical(withoutSsoRoutes(password, terminal)))) {
       skipped.push({ region: `steps.${PASSWORD_STEP}`, reason: "hand-edited" });
     } else {
-      if (addProvider(password, slug)) {
-        changed = true;
+      // Every provider the entry steps carry, not only the one named: a project
+      // enabled before the password step offered providers has several to catch up.
+      const offered = providerSteps(document).flatMap((name) => {
+        const entry = stepNamed(document, name);
+        return entry !== undefined && Array.isArray(entry.sso_providers)
+          ? (entry.sso_providers as unknown[])
+          : [];
+      });
+      for (const provider of new Set([...offered, slug])) {
+        if (typeof provider === "string" && addProvider(password, provider)) {
+          changed = true;
+        }
       }
       const transitions = isObject(password.transitions) ? { ...password.transitions } : {};
       // The conflict step is for someone who arrived by provider with an email

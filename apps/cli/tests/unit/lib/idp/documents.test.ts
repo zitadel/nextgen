@@ -765,6 +765,17 @@ describe("the password step", () => {
     expect(skipped).toEqual([]);
   });
 
+  it("catches an older project's password step up with every provider the entry steps carry", () => {
+    const older = structuredClone(enabled());
+    const password = stepNamed(older, "password");
+    delete password.sso_providers;
+    password.transitions = { submit: { target: "done" } };
+
+    const { document } = applySsoToFlow(older as object, "acme-sso", bothMethods);
+
+    expect(stepNamed(document, "password").sso_providers).toEqual(["google", "acme-sso"]);
+  });
+
   it("routes what comes back from the provider, with the account already identified", () => {
     const { document } = applySsoToFlow(shippedFlow(), "google", bothMethods);
 
