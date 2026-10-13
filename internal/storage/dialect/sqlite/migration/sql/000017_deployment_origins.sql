@@ -8,12 +8,12 @@ CREATE TABLE deployments (
     project_id   TEXT    NOT NULL,
     id           TEXT    NOT NULL,
     release_id   TEXT    NOT NULL,
-    target_kind  TEXT    NOT NULL,
+    origin_kind  TEXT    NOT NULL,
     metadata     TEXT    NOT NULL,
     deployed_at  INTEGER NOT NULL,
     PRIMARY KEY (project_id, id),
     CONSTRAINT chk_deployments_id CHECK (id <> ''),
-    CONSTRAINT chk_deployments_target_kind CHECK (target_kind IN ('primary', 'preview')),
+    CONSTRAINT chk_deployments_origin_kind CHECK (origin_kind IN ('primary', 'preview')),
     CONSTRAINT chk_deployments_metadata CHECK (json_type(metadata) = 'object'),
     CONSTRAINT fk_deployments_project
         FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
@@ -27,25 +27,25 @@ CREATE INDEX idx_deployments_project_deployed_at
 -- +goose StatementEnd
 
 -- +goose StatementBegin
-CREATE TABLE deployment_targets (
+CREATE TABLE deployment_origins (
     project_id     TEXT    NOT NULL,
     deployment_id  TEXT    NOT NULL,
     origin         TEXT    NOT NULL,
     release_id     TEXT    NOT NULL,
-    target_kind    TEXT    NOT NULL,
+    origin_kind    TEXT    NOT NULL,
     deployed_at    INTEGER NOT NULL,
     seq            INTEGER NOT NULL,
     PRIMARY KEY (project_id, deployment_id, origin),
-    CONSTRAINT chk_deployment_targets_seq CHECK (seq > 0),
-    CONSTRAINT chk_deployment_targets_target_kind CHECK (target_kind IN ('primary', 'preview')),
-    CONSTRAINT chk_deployment_targets_origin CHECK (origin <> ''),
-    CONSTRAINT fk_deployment_targets_deployment
+    CONSTRAINT chk_deployment_origins_seq CHECK (seq > 0),
+    CONSTRAINT chk_deployment_origins_origin_kind CHECK (origin_kind IN ('primary', 'preview')),
+    CONSTRAINT chk_deployment_origins_origin CHECK (origin <> ''),
+    CONSTRAINT fk_deployment_origins_deployment
         FOREIGN KEY (project_id, deployment_id) REFERENCES deployments (project_id, id) ON DELETE CASCADE
 );
 -- +goose StatementEnd
 -- +goose StatementBegin
-CREATE UNIQUE INDEX uq_deployment_targets_origin_seq
-    ON deployment_targets (project_id, origin, seq);
+CREATE UNIQUE INDEX uq_deployment_origins_seq
+    ON deployment_origins (project_id, origin, seq);
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -74,7 +74,7 @@ CREATE INDEX idx_previews_project_expires_at
 DROP TABLE IF EXISTS previews;
 -- +goose StatementEnd
 -- +goose StatementBegin
-DROP TABLE IF EXISTS deployment_targets;
+DROP TABLE IF EXISTS deployment_origins;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS deployments;

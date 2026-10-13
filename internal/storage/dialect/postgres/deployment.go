@@ -15,30 +15,30 @@ import (
 
 const (
 	deploymentsTable = "zitadel_nextgen.deployments"
-	targetsTable     = "zitadel_nextgen.deployment_targets"
+	originsTable     = "zitadel_nextgen.deployment_origins"
 	previewsTable    = "zitadel_nextgen.previews"
 
 	// clock_timestamp, not now(), which is the transaction's start.
 	createDeploymentStmt = `INSERT INTO zitadel_nextgen.deployments` +
-		` (project_id, id, release_id, target_kind, metadata, deployed_at)` +
+		` (project_id, id, release_id, origin_kind, metadata, deployed_at)` +
 		` VALUES ($1, $2, $3, $4, $5, clock_timestamp()) RETURNING deployed_at`
-	createDeploymentTargetsStmt = `INSERT INTO zitadel_nextgen.deployment_targets` +
-		` (project_id, deployment_id, origin, release_id, target_kind, deployed_at, seq)` +
+	createDeploymentOriginsStmt = `INSERT INTO zitadel_nextgen.deployment_origins` +
+		` (project_id, deployment_id, origin, release_id, origin_kind, deployed_at, seq)` +
 		` SELECT $1, $2, o.origin, $3, $4, $5, o.seq FROM unnest($6::text[], $7::bigint[]) AS o(origin, seq)`
-	deploymentQuery = `SELECT project_id, id, release_id, target_kind, metadata, deployed_at FROM zitadel_nextgen.deployments`
+	deploymentQuery = `SELECT project_id, id, release_id, origin_kind, metadata, deployed_at FROM zitadel_nextgen.deployments`
 )
 
 var (
-	deploymentSchema = deployment.NewSchema(deploymentsTable, targetsTable, previewsTable)
+	deploymentSchema = deployment.NewSchema(deploymentsTable, originsTable, previewsTable)
 
-	targetsQuery      = deployment.TargetsSelect(targetsTable) + ` WHERE t.project_id = $1 AND t.deployment_id = ANY($2)`
-	newestTargetsStmt = deployment.TargetsSelect(targetsTable) +
-		` WHERE t.project_id = $1 AND t.origin = ANY($2) AND NOT ` + deployment.NewerTargetExists(targetsTable)
-	liveTargetsStmt = targetsQuery + ` AND NOT ` + deployment.NewerTargetExists(targetsTable) +
-		` AND ` + deployment.TargetServes(previewsTable, "$3")
-	liveDeploymentStmt = deploymentQuery + ` WHERE project_id = $1 AND id = (SELECT t.deployment_id FROM ` + targetsTable + ` t` +
-		` WHERE t.project_id = $1 AND t.origin = $2 AND NOT ` + deployment.NewerTargetExists(targetsTable) +
-		` AND ` + deployment.TargetServes(previewsTable, "$3") + `)`
+	originsQuery        = deployment.OriginsSelect(originsTable) + ` WHERE t.project_id = $1 AND t.deployment_id = ANY($2)`
+	newestPerOriginStmt = deployment.OriginsSelect(originsTable) +
+		` WHERE t.project_id = $1 AND t.origin = ANY($2) AND NOT ` + deployment.NewerOriginRowExists(originsTable)
+	liveOriginsStmt = originsQuery + ` AND NOT ` + deployment.NewerOriginRowExists(originsTable) +
+		` AND ` + deployment.OriginServes(previewsTable, "$3")
+	liveDeploymentStmt = deploymentQuery + ` WHERE project_id = $1 AND id = (SELECT t.deployment_id FROM ` + originsTable + ` t` +
+		` WHERE t.project_id = $1 AND t.origin = $2 AND NOT ` + deployment.NewerOriginRowExists(originsTable) +
+		` AND ` + deployment.OriginServes(previewsTable, "$3") + `)`
 )
 
 type deploymentStatements struct{ statement }
@@ -47,13 +47,13 @@ func newDeploymentStatements(client queryExecutor) deploymentStatements {
 	return deploymentStatements{statement: statement{client: client}}
 }
 
-// GetNewestTargets implements [service.DeploymentStatements].
-func (ds deploymentStatements) GetNewestTargets(ctx context.Context, projectID string, origins []string) ([]domain.TargetDeployment, error) {
-	return ds.collectTargets(ctx, newestTargetsStmt, projectID, origins)
+// GetNewestPerOrigin implements [service.DeploymentStatements].
+func (ds deploymentStatements) GetNewestPerOrigin(ctx context.Context, projectID string, origins []string) ([]domain.OriginDeployment, error) {
+	return ds.collectOrigins(ctx, newestPerOriginStmt, projectID, origins)
 }
 
 // CreateDeployment implements [service.DeploymentStatements].
-func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.TargetDeployment) error {
+func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.OriginDeployment) error {
 	if err := ensureManagedID(&entity.ID, domain.PrefixDeployment); err != nil {
 		return err
 	}
@@ -64,12 +64,12 @@ func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *dom
 	var deployedAt time.Time
 	err = withTransaction(ctx, ds.client, func(ctx context.Context, tx queryExecutor) error {
 		if err := tx.QueryRow(ctx, createDeploymentStmt,
-			entity.ProjectID, entity.ID, entity.ReleaseID, entity.TargetKind.String(), metadata,
+			entity.ProjectID, entity.ID, entity.ReleaseID, entity.OriginKind.String(), metadata,
 		).Scan(&deployedAt); err != nil {
 			return wrapError(err)
 		}
-		if _, err := tx.Exec(ctx, createDeploymentTargetsStmt,
-			entity.ProjectID, entity.ID, entity.ReleaseID, entity.TargetKind.String(), deployedAt,
+		if _, err := tx.Exec(ctx, createDeploymentOriginsStmt,
+			entity.ProjectID, entity.ID, entity.ReleaseID, entity.OriginKind.String(), deployedAt,
 			entity.Origins(), deployment.NextSeqs(entity.Origins(), read),
 		); err != nil {
 			return wrapError(err)
@@ -103,7 +103,7 @@ func (ds deploymentStatements) GetLiveDeployment(ctx context.Context, projectID,
 	return ds.getOne(ctx, &now, liveDeploymentStmt, projectID, origin, now)
 }
 
-// getOne reads one deployment with its targets: all of them, or with liveAt
+// getOne reads one deployment with its origins: all of them, or with liveAt
 // only those still serving then.
 func (ds deploymentStatements) getOne(ctx context.Context, liveAt *time.Time, query string, args ...any) (*domain.Deployment, error) {
 	rows, err := ds.client.Query(ctx, query, args...)
@@ -184,11 +184,11 @@ func (ds deploymentStatements) collect(ctx context.Context, query string, args .
 }
 
 func (ds deploymentStatements) attachTargets(ctx context.Context, projectID string, items []*domain.Deployment, liveAt *time.Time) error {
-	query, args := targetsQuery, []any{projectID, deployment.DeploymentIDs(items)}
+	query, args := originsQuery, []any{projectID, deployment.DeploymentIDs(items)}
 	if liveAt != nil {
-		query, args = liveTargetsStmt, append(args, *liveAt)
+		query, args = liveOriginsStmt, append(args, *liveAt)
 	}
-	rows, err := ds.collectTargets(ctx, query, args...)
+	rows, err := ds.collectOrigins(ctx, query, args...)
 	if err != nil {
 		return err
 	}
@@ -196,14 +196,14 @@ func (ds deploymentStatements) attachTargets(ctx context.Context, projectID stri
 	return nil
 }
 
-func (ds deploymentStatements) collectTargets(ctx context.Context, query string, args ...any) ([]domain.TargetDeployment, error) {
+func (ds deploymentStatements) collectOrigins(ctx context.Context, query string, args ...any) ([]domain.OriginDeployment, error) {
 	rows, err := ds.client.Query(ctx, query, args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.TargetDeployment, error) {
+	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.OriginDeployment, error) {
 		var (
-			scanned domain.TargetDeployment
+			scanned domain.OriginDeployment
 			kind    string
 		)
 		if err := row.Scan(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &kind, &scanned.DeployedAt, &scanned.Seq); err != nil {
@@ -224,7 +224,7 @@ func scanDeployment(row pgx.CollectableRow) (*domain.Deployment, error) {
 		&scanned.ProjectID,
 		&scanned.ID,
 		&scanned.ReleaseID,
-		&scanned.TargetKind,
+		&scanned.OriginKind,
 		&scanned.Metadata,
 		&scanned.DeployedAt,
 	); err != nil {

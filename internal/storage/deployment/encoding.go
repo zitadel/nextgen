@@ -1,5 +1,5 @@
 // Package deployment holds shared helpers for the deployments and
-// deployment_targets tables used by v2 dialect statements.
+// deployment_origins tables used by v2 dialect statements.
 package deployment
 
 import (
@@ -27,7 +27,7 @@ type Row struct {
 	ProjectID  string
 	ID         string
 	ReleaseID  string
-	TargetKind string
+	OriginKind string
 	Metadata   []byte
 	DeployedAt time.Time
 }
@@ -47,7 +47,7 @@ func MarshalMetadata(m domain.DeploymentMetadata) ([]byte, error) {
 	return json.Marshal(encoded)
 }
 
-// ToDomain converts a scanned row into a domain.Deployment without targets;
+// ToDomain converts a scanned row into a domain.Deployment without origins;
 // AttachTargets fills them.
 func ToDomain(row Row) (*domain.Deployment, error) {
 	var encoded metadata
@@ -66,9 +66,9 @@ func ToDomain(row Row) (*domain.Deployment, error) {
 		reason = parsed
 	}
 
-	kind, err := domain.DeploymentTargetKindString(row.TargetKind)
+	kind, err := domain.DeploymentOriginKindString(row.OriginKind)
 	if err != nil {
-		return nil, fmt.Errorf("deployment %q carries an unknown target kind %q: %w", row.ID, row.TargetKind, err)
+		return nil, fmt.Errorf("deployment %q carries an unknown origin kind %q: %w", row.ID, row.OriginKind, err)
 	}
 
 	var actorType *domain.EventActorType
@@ -80,7 +80,7 @@ func ToDomain(row Row) (*domain.Deployment, error) {
 		ProjectID:  row.ProjectID,
 		ID:         row.ID,
 		ReleaseID:  row.ReleaseID,
-		TargetKind: kind,
+		OriginKind: kind,
 		Metadata: domain.DeploymentMetadata{
 			Reason:         reason,
 			Message:        encoded.Message,
@@ -94,7 +94,7 @@ func ToDomain(row Row) (*domain.Deployment, error) {
 }
 
 // AttachTargets sets each deployment's targets from rows, sorted by origin.
-func AttachTargets(items []*domain.Deployment, rows []domain.TargetDeployment) {
+func AttachTargets(items []*domain.Deployment, rows []domain.OriginDeployment) {
 	byID := make(map[string][]domain.DeploymentTarget, len(items))
 	for _, row := range rows {
 		byID[row.DeploymentID] = append(byID[row.DeploymentID], domain.DeploymentTarget{Origin: row.Origin})
@@ -106,11 +106,11 @@ func AttachTargets(items []*domain.Deployment, rows []domain.TargetDeployment) {
 	}
 }
 
-// WithKind sets the target kind of a scanned target row.
-func WithKind(target domain.TargetDeployment, kind string) (domain.TargetDeployment, error) {
-	parsed, err := domain.DeploymentTargetKindString(kind)
+// WithKind sets the origin kind of a scanned origin row.
+func WithKind(target domain.OriginDeployment, kind string) (domain.OriginDeployment, error) {
+	parsed, err := domain.DeploymentOriginKindString(kind)
 	if err != nil {
-		return target, fmt.Errorf("deployment %q carries an unknown target kind %q: %w", target.DeploymentID, kind, err)
+		return target, fmt.Errorf("deployment %q carries an unknown origin kind %q: %w", target.DeploymentID, kind, err)
 	}
 	target.Kind = parsed
 	return target, nil
@@ -130,11 +130,11 @@ func Stamp(now time.Time) time.Time {
 	return now.UTC().Truncate(time.Microsecond)
 }
 
-// NextSeqs returns the seq each origin's new target row takes: one past the
+// NextSeqs returns the seq each origin's new row takes: one past the
 // newest read, or 1 for an origin with nothing deployed. Inserting it is the
 // optimistic lock: a concurrent deploy that read the same rows takes the same
 // seq, and the unique index rejects whichever commits second.
-func NextSeqs(origins []string, read []domain.TargetDeployment) []int64 {
+func NextSeqs(origins []string, read []domain.OriginDeployment) []int64 {
 	newest := make(map[string]int64, len(read))
 	for _, r := range read {
 		newest[r.Origin] = r.Seq

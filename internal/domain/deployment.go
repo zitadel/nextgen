@@ -24,15 +24,15 @@ const (
 	DeploymentReasonRollback
 )
 
-// DeploymentTargetKind says whether a deployment's targets are primary origins
-// or preview URLs. One deployment never mixes them.
+// DeploymentOriginKind says whether a deployment goes to primary origins or to
+// preview URLs. One deployment never mixes them.
 //
-//go:generate go tool enumer -type DeploymentTargetKind -transform snake -trimprefix DeploymentTargetKind -sql
-type DeploymentTargetKind uint8
+//go:generate go tool enumer -type DeploymentOriginKind -transform snake -trimprefix DeploymentOriginKind -sql
+type DeploymentOriginKind uint8
 
 const (
-	DeploymentTargetKindPrimary DeploymentTargetKind = iota
-	DeploymentTargetKindPreview
+	DeploymentOriginKindPrimary DeploymentOriginKind = iota
+	DeploymentOriginKindPreview
 )
 
 func ErrDeploymentInvalid(details any, parent error) Error {
@@ -47,7 +47,7 @@ func ErrDeploymentPermissionDenied() Error {
 	return newError(PrefixDeployment.ErrorCodePrefix("permission_denied"), "deployment: requires an operator-grade token bound to the project (project.write or a deployment.* scope)", nil, nil)
 }
 
-// DeploymentConflictDetails carries the newest deployment to the targets, nil
+// DeploymentConflictDetails carries the newest deployment to the origins, nil
 // when nothing was deployed there.
 type DeploymentConflictDetails struct {
 	Deployment *Deployment `json:"deployment"`
@@ -75,19 +75,19 @@ type DeploymentTarget struct {
 }
 
 // Deployment is an append-only record of a release going live on a set of
-// targets, sorted by origin. What a target serves is the newest deployment
-// that names it.
+// origins, sorted. What an origin serves is the newest deployment that names
+// it.
 type Deployment struct {
 	ProjectID  string               `json:"project_id"`
 	ID         string               `json:"id"`
 	ReleaseID  string               `json:"release_id"`
-	TargetKind DeploymentTargetKind `json:"-"`
+	OriginKind DeploymentOriginKind `json:"-"`
 	Targets    []DeploymentTarget   `json:"targets"`
 	Metadata   DeploymentMetadata   `json:"metadata"`
 	DeployedAt time.Time            `json:"deployed_at"`
 }
 
-// Origins returns the target origins in order.
+// Origins returns the deployment's origins in order.
 func (d *Deployment) Origins() []string {
 	origins := make([]string, len(d.Targets))
 	for i, target := range d.Targets {
@@ -96,21 +96,21 @@ func (d *Deployment) Origins() []string {
 	return origins
 }
 
-// TargetDeployment is one deployment to one origin. Seq counts the
+// OriginDeployment is one deployment to one origin. Seq counts the
 // deployments to the origin; the newest has the highest.
-type TargetDeployment struct {
+type OriginDeployment struct {
 	Origin       string
 	DeploymentID string
 	ReleaseID    string
-	Kind         DeploymentTargetKind
+	Kind         DeploymentOriginKind
 	DeployedAt   time.Time
 	Seq          int64
 }
 
-// NewestTargetDeployment returns the newest of deployments, ordered by
+// NewestOriginDeployment returns the newest of deployments, ordered by
 // deployed_at then deployment id, or nil for none.
-func NewestTargetDeployment(deployments []TargetDeployment) *TargetDeployment {
-	var newest *TargetDeployment
+func NewestOriginDeployment(deployments []OriginDeployment) *OriginDeployment {
+	var newest *OriginDeployment
 	for i := range deployments {
 		d := &deployments[i]
 		if newest == nil || d.DeployedAt.After(newest.DeployedAt) ||
@@ -122,19 +122,19 @@ func NewestTargetDeployment(deployments []TargetDeployment) *TargetDeployment {
 }
 
 // Unchanged reports whether writing d would change nothing, given what each
-// target serves: its targets are primary origins that all serve its release
-// from a primary deployment. A deployment to preview URLs is always written,
+// origin serves: its origins are primary ones that all serve its release from
+// a primary deployment. A deployment to preview URLs is always written,
 // since it renews them.
-func (d *Deployment) Unchanged(serving []TargetDeployment) bool {
-	if d.TargetKind != DeploymentTargetKindPrimary {
+func (d *Deployment) Unchanged(serving []OriginDeployment) bool {
+	if d.OriginKind != DeploymentOriginKindPrimary {
 		return false
 	}
-	byOrigin := make(map[string]TargetDeployment, len(serving))
+	byOrigin := make(map[string]OriginDeployment, len(serving))
 	for _, s := range serving {
 		byOrigin[s.Origin] = s
 	}
 	for _, target := range d.Targets {
-		if s, ok := byOrigin[target.Origin]; !ok || s.ReleaseID != d.ReleaseID || s.Kind != DeploymentTargetKindPrimary {
+		if s, ok := byOrigin[target.Origin]; !ok || s.ReleaseID != d.ReleaseID || s.Kind != DeploymentOriginKindPrimary {
 			return false
 		}
 	}
@@ -142,7 +142,7 @@ func (d *Deployment) Unchanged(serving []TargetDeployment) bool {
 }
 
 // CheckExpectedDeployment fails with ErrDeploymentConflict unless expected is
-// nil or names current, the newest deployment to the targets.
+// nil or names current, the newest deployment to the origins.
 func CheckExpectedDeployment(current *Deployment, expected *string) error {
 	if expected == nil || (current != nil && current.ID == *expected) {
 		return nil
@@ -162,18 +162,18 @@ const (
 	DeploymentFieldDeployedAt
 	// DeploymentFieldOrigin filters to the deployments that named an origin.
 	DeploymentFieldOrigin
-	// DeploymentFieldLive filters to the deployments some target still serves.
+	// DeploymentFieldLive filters to the deployments some origin still serves.
 	DeploymentFieldLive
 )
 
-// NewDeployment validates the record and sorts its targets. The dialect mints
+// NewDeployment validates the record and sorts its origins. The dialect mints
 // the ID and stamps DeployedAt.
-func NewDeployment(projectID, releaseID string, kind DeploymentTargetKind, origins []string, metadata DeploymentMetadata) (*Deployment, error) {
+func NewDeployment(projectID, releaseID string, kind DeploymentOriginKind, origins []string, metadata DeploymentMetadata) (*Deployment, error) {
 	if !metadata.Reason.IsADeploymentReason() {
 		return nil, ErrDeploymentInvalid("unknown reason", nil)
 	}
-	if !kind.IsADeploymentTargetKind() {
-		return nil, ErrDeploymentInvalid("unknown target kind", nil)
+	if !kind.IsADeploymentOriginKind() {
+		return nil, ErrDeploymentInvalid("unknown origin kind", nil)
 	}
 	if strings.TrimSpace(releaseID) == "" {
 		return nil, ErrDeploymentInvalid("a release_id is required", nil)
@@ -183,7 +183,7 @@ func NewDeployment(projectID, releaseID string, kind DeploymentTargetKind, origi
 	}
 	for _, origin := range origins {
 		if strings.TrimSpace(origin) == "" {
-			return nil, ErrDeploymentInvalid("a target origin is empty", nil)
+			return nil, ErrDeploymentInvalid("an origin is empty", nil)
 		}
 	}
 	sorted := slices.Compact(slices.Sorted(slices.Values(origins)))
@@ -206,7 +206,7 @@ func NewDeployment(projectID, releaseID string, kind DeploymentTargetKind, origi
 	return &Deployment{
 		ProjectID:  projectID,
 		ReleaseID:  releaseID,
-		TargetKind: kind,
+		OriginKind: kind,
 		Targets:    targets,
 		Metadata:   metadata,
 	}, nil

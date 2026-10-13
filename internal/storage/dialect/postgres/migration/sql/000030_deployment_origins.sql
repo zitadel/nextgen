@@ -1,6 +1,6 @@
 -- +goose Up
--- Deployments target origins instead of environments. What an origin serves
--- is its newest target row; nothing stored is kept.
+-- Deployments go to origins instead of environments. What an origin serves is
+-- its newest row in deployment_origins; nothing stored is kept.
 DROP TABLE zitadel_nextgen.deployments;
 
 CREATE TABLE zitadel_nextgen.deployments (
@@ -8,7 +8,7 @@ CREATE TABLE zitadel_nextgen.deployments (
         REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE
     , id TEXT COLLATE "C" NOT NULL CHECK (id <> '')
     , release_id TEXT COLLATE "C" NOT NULL
-    , target_kind TEXT COLLATE "C" NOT NULL CHECK (target_kind IN ('primary', 'preview'))
+    , origin_kind TEXT COLLATE "C" NOT NULL CHECK (origin_kind IN ('primary', 'preview'))
     , metadata JSONB NOT NULL CHECK (jsonb_typeof(metadata) = 'object')
     , deployed_at TIMESTAMPTZ NOT NULL
 
@@ -22,14 +22,14 @@ CREATE TABLE zitadel_nextgen.deployments (
 CREATE INDEX idx_deployments_project_deployed_at
     ON zitadel_nextgen.deployments (project_id, deployed_at DESC, id DESC);
 
--- release_id, target_kind and deployed_at are copied so target queries read
+-- release_id, origin_kind and deployed_at are copied so origin queries read
 -- this table alone. origin is not a reference, so history outlives it.
-CREATE TABLE zitadel_nextgen.deployment_targets (
+CREATE TABLE zitadel_nextgen.deployment_origins (
     project_id TEXT COLLATE "C" NOT NULL
     , deployment_id TEXT COLLATE "C" NOT NULL
     , origin TEXT COLLATE "C" NOT NULL CHECK (origin <> '')
     , release_id TEXT COLLATE "C" NOT NULL
-    , target_kind TEXT COLLATE "C" NOT NULL CHECK (target_kind IN ('primary', 'preview'))
+    , origin_kind TEXT COLLATE "C" NOT NULL CHECK (origin_kind IN ('primary', 'preview'))
     , deployed_at TIMESTAMPTZ NOT NULL
     -- Counts the deployments to the origin; the newest has the highest.
     , seq BIGINT NOT NULL CHECK (seq > 0)
@@ -41,8 +41,8 @@ CREATE TABLE zitadel_nextgen.deployment_targets (
 
 -- The optimistic lock: two deploys that read the same newest row both write
 -- seq + 1, and this index rejects the second.
-CREATE UNIQUE INDEX uq_deployment_targets_origin_seq
-    ON zitadel_nextgen.deployment_targets (project_id, origin, seq);
+CREATE UNIQUE INDEX uq_deployment_origins_seq
+    ON zitadel_nextgen.deployment_origins (project_id, origin, seq);
 
 -- One row per preview URL; primary origins have none.
 CREATE TABLE zitadel_nextgen.previews (
@@ -62,7 +62,7 @@ CREATE INDEX idx_previews_project_expires_at
 
 -- +goose Down
 DROP TABLE IF EXISTS zitadel_nextgen.previews;
-DROP TABLE IF EXISTS zitadel_nextgen.deployment_targets;
+DROP TABLE IF EXISTS zitadel_nextgen.deployment_origins;
 DROP TABLE IF EXISTS zitadel_nextgen.deployments;
 
 CREATE TABLE zitadel_nextgen.deployments (

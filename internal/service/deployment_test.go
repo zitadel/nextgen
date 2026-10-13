@@ -42,30 +42,30 @@ func deploymentInput() service.CreateDeploymentInput {
 	return service.CreateDeploymentInput{
 		ProjectID:  "proj_1",
 		ReleaseID:  "rel_1",
-		TargetKind: domain.DeploymentTargetKindPrimary,
+		OriginKind: domain.DeploymentOriginKindPrimary,
 		Origins:    []string{appOrigin},
 	}
 }
 
 // expectServing sets up the reads of one attempt: the release, and what
 // appOrigin serves (nothing when serving is nil). It returns what was read.
-func expectServing(statements *servicemocks.MockAllStatements, serving *domain.Deployment) []domain.TargetDeployment {
+func expectServing(statements *servicemocks.MockAllStatements, serving *domain.Deployment) []domain.OriginDeployment {
 	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{ID: "rel_1"}, nil)
 	if serving == nil {
-		statements.EXPECT().GetNewestTargets(gomock.Any(), "proj_1", []string{appOrigin}).Return(nil, nil)
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return(nil, nil)
 		return nil
 	}
-	read := []domain.TargetDeployment{{
+	read := []domain.OriginDeployment{{
 		Origin: appOrigin, DeploymentID: serving.ID, ReleaseID: serving.ReleaseID, DeployedAt: serving.DeployedAt, Seq: 7,
 	}}
-	statements.EXPECT().GetNewestTargets(gomock.Any(), "proj_1", []string{appOrigin}).Return(read, nil)
+	statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return(read, nil)
 	statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", serving.ID).Return(serving, nil)
 	return read
 }
 
-func expectInsert(statements *servicemocks.MockAllStatements, read []domain.TargetDeployment) {
+func expectInsert(statements *servicemocks.MockAllStatements, read []domain.OriginDeployment) {
 	statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), read).
-		DoAndReturn(func(_ context.Context, entity *domain.Deployment, _ []domain.TargetDeployment) error {
+		DoAndReturn(func(_ context.Context, entity *domain.Deployment, _ []domain.OriginDeployment) error {
 			entity.ID = "dep_new"
 			entity.DeployedAt = deployedAt
 			return nil
@@ -75,7 +75,7 @@ func expectInsert(statements *servicemocks.MockAllStatements, read []domain.Targ
 func servingDeployment(releaseID string) *domain.Deployment {
 	return &domain.Deployment{
 		ProjectID: "proj_1", ID: "dep_serving", ReleaseID: releaseID,
-		TargetKind: domain.DeploymentTargetKindPrimary,
+		OriginKind: domain.DeploymentOriginKindPrimary,
 		Targets:    []domain.DeploymentTarget{{Origin: appOrigin}},
 		DeployedAt: deployedAt.Add(-time.Hour),
 	}
@@ -140,7 +140,7 @@ func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
 		expectServing(statements, before)
 		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
 		winner := servingDeployment("rel_0")
-		statements.EXPECT().GetNewestTargets(gomock.Any(), "proj_1", []string{appOrigin}).Return([]domain.TargetDeployment{{
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return([]domain.OriginDeployment{{
 			Origin: appOrigin, DeploymentID: winner.ID, DeployedAt: winner.DeployedAt, Seq: 8,
 		}}, nil)
 		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", winner.ID).Return(winner, nil)
@@ -159,7 +159,7 @@ func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
 			statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
 		}
 		winner := servingDeployment("rel_0")
-		statements.EXPECT().GetNewestTargets(gomock.Any(), "proj_1", []string{appOrigin}).Return([]domain.TargetDeployment{{
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return([]domain.OriginDeployment{{
 			Origin: appOrigin, DeploymentID: winner.ID, DeployedAt: winner.DeployedAt, Seq: 9,
 		}}, nil)
 		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", winner.ID).Return(winner, nil)
@@ -187,13 +187,13 @@ func TestDeploymentServiceCreateUnchangedPrimaryWritesNothing(t *testing.T) {
 func TestDeploymentServiceCreatePreviewAlwaysRenews(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
 	serving := servingDeployment("rel_1")
-	serving.TargetKind = domain.DeploymentTargetKindPreview
+	serving.OriginKind = domain.DeploymentOriginKindPreview
 	read := expectServing(statements, serving)
 	expectInsert(statements, read)
 	statements.EXPECT().UpsertPreviews(gomock.Any(), "proj_1", []string{appOrigin}, deployedAt.Add(168*time.Hour), deployedAt).Return(nil)
 
 	input := deploymentInput()
-	input.TargetKind = domain.DeploymentTargetKindPreview
+	input.OriginKind = domain.DeploymentOriginKindPreview
 	input.PreviewTTL = 168 * time.Hour
 	result, err := svc.Create(t.Context(), input)
 	require.NoError(t, err)
@@ -278,7 +278,7 @@ func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
 	t.Run("preview without ttl never reaches storage", func(t *testing.T) {
 		svc, _ := newMockedDeploymentService(t)
 		input := deploymentInput()
-		input.TargetKind = domain.DeploymentTargetKindPreview
+		input.OriginKind = domain.DeploymentOriginKindPreview
 		_, err := svc.Create(t.Context(), input)
 		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid(nil, nil).Code)
 	})

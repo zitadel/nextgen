@@ -218,24 +218,24 @@ type IDPIdentityLinkStatements interface {
 
 type DeploymentStatements interface {
 	Statements
-	// GetNewestTargets returns, for each of origins that has one, the newest
+	// GetNewestPerOrigin returns, for each of origins that has one, the newest
 	// deployment to it.
-	GetNewestTargets(ctx context.Context, projectID string, origins []string) ([]domain.TargetDeployment, error)
-	// CreateDeployment writes the deployment with every target, under an
-	// optimistic lock: read is what GetNewestTargets returned for its origins,
+	GetNewestPerOrigin(ctx context.Context, projectID string, origins []string) ([]domain.OriginDeployment, error)
+	// CreateDeployment writes the deployment with every origin, under an
+	// optimistic lock: read is what GetNewestPerOrigin returned for its origins,
 	// and when another deploy wrote to one of them since, nothing is written
 	// and it fails with a UniqueError. The caller re-reads and retries.
-	CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.TargetDeployment) error
+	CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.OriginDeployment) error
 	GetDeploymentByID(ctx context.Context, projectID, id string) (*domain.Deployment, error)
 	// GetDeploymentsByIDs skips unknown ids.
 	GetDeploymentsByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Deployment, error)
-	// ListDeployments lists deployments with every target they named.
+	// ListDeployments lists deployments with every origin they named.
 	ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
 	// ListLiveDeployments lists, with deployment.LiveListOptions, the
-	// deployments some target serves at now, each narrowed to those targets.
+	// deployments some origin serves at now, each narrowed to those origins.
 	ListLiveDeployments(ctx context.Context, now time.Time, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
 	// GetLiveDeployment is the deployment origin serves at now, narrowed to the
-	// targets it still serves; a NoRowFoundError when it serves nothing,
+	// origins it still serves; a NoRowFoundError when it serves nothing,
 	// including after its preview expired.
 	GetLiveDeployment(ctx context.Context, projectID, origin string, now time.Time) (*domain.Deployment, error)
 }

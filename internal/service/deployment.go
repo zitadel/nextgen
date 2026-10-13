@@ -17,7 +17,7 @@ import (
 type CreateDeploymentInput struct {
 	ProjectID  string
 	ReleaseID  string
-	TargetKind domain.DeploymentTargetKind
+	OriginKind domain.DeploymentOriginKind
 	Origins    []string
 	Reason     domain.DeploymentReason
 	Message    *string
@@ -29,7 +29,7 @@ type CreateDeploymentInput struct {
 }
 
 // CreateDeploymentOutput reports Created false when nothing was written and
-// Deployment is the newest deployment to the targets.
+// Deployment is the newest deployment to the origins.
 type CreateDeploymentOutput struct {
 	Deployment *domain.Deployment
 	Created    bool
@@ -66,13 +66,13 @@ func NewDeploymentService(v2Pool *DB) *DeploymentService {
 // the optimistic lock.
 const maxDeployAttempts = 3
 
-// Create deploys a release to its targets with optimistic locking: it reads
-// what each target serves and writes without holding a lock, and a concurrent
+// Create deploys a release to its origins with optimistic locking: it reads
+// what each origin serves and writes without holding a lock, and a concurrent
 // deploy to one of the origins makes the write fail. A guarded deploy then
 // answers a conflict with the winner; an unguarded one retries on top of it.
 func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentInput) (*CreateDeploymentOutput, error) {
 	actor, _ := audit.ActorFromContext(ctx)
-	entity, err := domain.NewDeployment(input.ProjectID, input.ReleaseID, input.TargetKind, input.Origins, domain.DeploymentMetadata{
+	entity, err := domain.NewDeployment(input.ProjectID, input.ReleaseID, input.OriginKind, input.Origins, domain.DeploymentMetadata{
 		Reason:         input.Reason,
 		Message:        input.Message,
 		RollbackTo:     input.RollbackTo,
@@ -82,7 +82,7 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 	if err != nil {
 		return nil, err
 	}
-	if entity.TargetKind == domain.DeploymentTargetKindPreview && input.PreviewTTL <= 0 {
+	if entity.OriginKind == domain.DeploymentOriginKindPreview && input.PreviewTTL <= 0 {
 		return nil, domain.ErrDeploymentInvalid("a deployment to preview URLs needs a ttl", nil)
 	}
 
@@ -105,7 +105,7 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 }
 
 // conflict answers a deploy that lost the optimistic lock with the newest
-// deployment to its targets.
+// deployment to its origins.
 func (s *DeploymentService) conflict(ctx context.Context, entity *domain.Deployment) error {
 	_, current, err := servedBy(ctx, s.v2Pool.Statements(), entity)
 	if err != nil {
@@ -114,14 +114,14 @@ func (s *DeploymentService) conflict(ctx context.Context, entity *domain.Deploym
 	return domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{Deployment: current})
 }
 
-// servedBy reads what entity's targets serve, and the newest deployment to
+// servedBy reads what entity's origins serve, and the newest deployment to
 // them, nil when nothing was deployed there.
-func servedBy(ctx context.Context, stmts AllStatements, entity *domain.Deployment) ([]domain.TargetDeployment, *domain.Deployment, error) {
-	read, err := stmts.GetNewestTargets(ctx, entity.ProjectID, entity.Origins())
+func servedBy(ctx context.Context, stmts AllStatements, entity *domain.Deployment) ([]domain.OriginDeployment, *domain.Deployment, error) {
+	read, err := stmts.GetNewestPerOrigin(ctx, entity.ProjectID, entity.Origins())
 	if err != nil {
 		return nil, nil, err
 	}
-	newest := domain.NewestTargetDeployment(read)
+	newest := domain.NewestOriginDeployment(read)
 	if newest == nil {
 		return read, nil, nil
 	}
@@ -163,7 +163,7 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 			}
 			return err
 		}
-		if written.TargetKind == domain.DeploymentTargetKindPreview {
+		if written.OriginKind == domain.DeploymentOriginKindPreview {
 			if err := stmts.UpsertPreviews(ctx, written.ProjectID, written.Origins(),
 				written.DeployedAt.Add(input.PreviewTTL), written.DeployedAt); err != nil {
 				return err

@@ -15,6 +15,5 @@ still answer 501.
 - **Previews.** A deployment to a preview URL also stores when that preview
   expires. Expired previews stop serving and can be removed, without losing
   their history.
-- **Revoked releases.** A release can be marked as revoked. A release that a
-  deployment uses can no longer be deleted.
+- **Revoked releases.** A release can be marked as revoked.
 - **Environments are gone from deployments.**

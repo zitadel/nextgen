@@ -15,26 +15,26 @@ import (
 
 const (
 	deploymentTable = "deployments"
-	targetsTable    = "deployment_targets"
+	originsTable    = "deployment_origins"
 	previewTable    = "previews"
 
-	deploymentQuery = `SELECT project_id, id, release_id, target_kind, metadata, deployed_at FROM deployments`
+	deploymentQuery = `SELECT project_id, id, release_id, origin_kind, metadata, deployed_at FROM deployments`
 )
 
 var (
-	deploymentSchema = deployment.NewSchema(deploymentTable, targetsTable, previewTable)
+	deploymentSchema = deployment.NewSchema(deploymentTable, originsTable, previewTable)
 
-	deploymentColumns = []string{"project_id", "id", "release_id", "target_kind", "metadata", "deployed_at"}
-	targetColumns     = []string{"project_id", "deployment_id", "origin", "release_id", "target_kind", "deployed_at", "seq"}
+	deploymentColumns = []string{"project_id", "id", "release_id", "origin_kind", "metadata", "deployed_at"}
+	originColumns     = []string{"project_id", "deployment_id", "origin", "release_id", "origin_kind", "deployed_at", "seq"}
 
-	targetsQuery      = deployment.TargetsSelect(targetsTable) + ` WHERE t.project_id = @p1 AND t.deployment_id IN UNNEST(@p2)`
-	newestTargetsStmt = deployment.TargetsSelect(targetsTable) +
-		` WHERE t.project_id = @p1 AND t.origin IN UNNEST(@p2) AND NOT ` + deployment.NewerTargetExists(targetsTable)
-	liveTargetsStmt = targetsQuery + ` AND NOT ` + deployment.NewerTargetExists(targetsTable) +
-		` AND ` + deployment.TargetServes(previewTable, "@p3")
-	liveDeploymentStmt = deploymentQuery + ` WHERE project_id = @p1 AND id = (SELECT t.deployment_id FROM ` + targetsTable + ` t` +
-		` WHERE t.project_id = @p1 AND t.origin = @p2 AND NOT ` + deployment.NewerTargetExists(targetsTable) +
-		` AND ` + deployment.TargetServes(previewTable, "@p3") + `)`
+	originsQuery        = deployment.OriginsSelect(originsTable) + ` WHERE t.project_id = @p1 AND t.deployment_id IN UNNEST(@p2)`
+	newestPerOriginStmt = deployment.OriginsSelect(originsTable) +
+		` WHERE t.project_id = @p1 AND t.origin IN UNNEST(@p2) AND NOT ` + deployment.NewerOriginRowExists(originsTable)
+	liveOriginsStmt = originsQuery + ` AND NOT ` + deployment.NewerOriginRowExists(originsTable) +
+		` AND ` + deployment.OriginServes(previewTable, "@p3")
+	liveDeploymentStmt = deploymentQuery + ` WHERE project_id = @p1 AND id = (SELECT t.deployment_id FROM ` + originsTable + ` t` +
+		` WHERE t.project_id = @p1 AND t.origin = @p2 AND NOT ` + deployment.NewerOriginRowExists(originsTable) +
+		` AND ` + deployment.OriginServes(previewTable, "@p3") + `)`
 )
 
 type deploymentStatements struct{ statement }
@@ -43,13 +43,13 @@ func newDeploymentStatements(db queryExecutor) deploymentStatements {
 	return deploymentStatements{statement: statement{db: db}}
 }
 
-// GetNewestTargets implements [service.DeploymentStatements].
-func (ds deploymentStatements) GetNewestTargets(ctx context.Context, projectID string, origins []string) ([]domain.TargetDeployment, error) {
-	return ds.collectTargets(ctx, newestTargetsStmt, projectID, origins)
+// GetNewestPerOrigin implements [service.DeploymentStatements].
+func (ds deploymentStatements) GetNewestPerOrigin(ctx context.Context, projectID string, origins []string) ([]domain.OriginDeployment, error) {
+	return ds.collectOrigins(ctx, newestPerOriginStmt, projectID, origins)
 }
 
 // CreateDeployment implements [service.DeploymentStatements].
-func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.TargetDeployment) error {
+func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.OriginDeployment) error {
 	if err := ensureManagedID(&entity.ID, domain.PrefixDeployment); err != nil {
 		return err
 	}
@@ -66,13 +66,13 @@ func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *dom
 		deployedAt = deployment.Stamp(time.Now())
 		mutations := []*spanner.Mutation{
 			spanner.Insert(deploymentTable, deploymentColumns, []any{
-				entity.ProjectID, entity.ID, entity.ReleaseID, entity.TargetKind.String(), metadata, deployedAt,
+				entity.ProjectID, entity.ID, entity.ReleaseID, entity.OriginKind.String(), metadata, deployedAt,
 			}),
 		}
 		origins := entity.Origins()
 		for i, seq := range deployment.NextSeqs(origins, read) {
-			mutations = append(mutations, spanner.Insert(targetsTable, targetColumns,
-				[]any{entity.ProjectID, entity.ID, origins[i], entity.ReleaseID, entity.TargetKind.String(), deployedAt, seq}))
+			mutations = append(mutations, spanner.Insert(originsTable, originColumns,
+				[]any{entity.ProjectID, entity.ID, origins[i], entity.ReleaseID, entity.OriginKind.String(), deployedAt, seq}))
 		}
 		if err := tx.BufferWrite(ctx, mutations); err != nil {
 			return err
@@ -183,11 +183,11 @@ func (ds deploymentStatements) collect(ctx context.Context, stmt spanner.Stateme
 }
 
 func (ds deploymentStatements) attachTargets(ctx context.Context, projectID string, items []*domain.Deployment, liveAt *time.Time) error {
-	query, args := targetsQuery, []any{projectID, deployment.DeploymentIDs(items)}
+	query, args := originsQuery, []any{projectID, deployment.DeploymentIDs(items)}
 	if liveAt != nil {
-		query, args = liveTargetsStmt, append(args, *liveAt)
+		query, args = liveOriginsStmt, append(args, *liveAt)
 	}
-	rows, err := ds.collectTargets(ctx, query, args...)
+	rows, err := ds.collectOrigins(ctx, query, args...)
 	if err != nil {
 		return err
 	}
@@ -195,13 +195,13 @@ func (ds deploymentStatements) attachTargets(ctx context.Context, projectID stri
 	return nil
 }
 
-func (ds deploymentStatements) collectTargets(ctx context.Context, query string, args ...any) ([]domain.TargetDeployment, error) {
-	var items []domain.TargetDeployment
+func (ds deploymentStatements) collectOrigins(ctx context.Context, query string, args ...any) ([]domain.OriginDeployment, error) {
+	var items []domain.OriginDeployment
 	if err := ds.db.Query(ctx, buildStatement(query, args...).statement(), func(iter *spanner.RowIterator) error {
 		var err error
-		items, err = collectRows(iter, func(row *spanner.Row) (domain.TargetDeployment, error) {
+		items, err = collectRows(iter, func(row *spanner.Row) (domain.OriginDeployment, error) {
 			var (
-				scanned domain.TargetDeployment
+				scanned domain.OriginDeployment
 				kind    string
 			)
 			if err := row.Columns(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &kind, &scanned.DeployedAt, &scanned.Seq); err != nil {
@@ -227,7 +227,7 @@ func scanDeployment(row *spanner.Row) (*domain.Deployment, error) {
 		&scanned.ProjectID,
 		&scanned.ID,
 		&scanned.ReleaseID,
-		&scanned.TargetKind,
+		&scanned.OriginKind,
 		&metadataJSON,
 		&deployedAt,
 	); err != nil {

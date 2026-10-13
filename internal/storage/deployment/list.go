@@ -48,7 +48,7 @@ func ListOptions(projectID string, origin *string, limit uint32) *database.ListO
 	}
 }
 
-// LiveListOptions lists the deployments some target still serves, newest
+// LiveListOptions lists the deployments some origin still serves, newest
 // first; a non-nil releaseID narrows it to that release. ListLiveDeployments
 // applies the time with LiveAt.
 func LiveListOptions(projectID string, releaseID *string, limit uint32) *database.ListOptions[domain.DeploymentField] {
@@ -59,7 +59,7 @@ func LiveListOptions(projectID string, releaseID *string, limit uint32) *databas
 	return opts
 }
 
-// LiveAt returns opts narrowed to the deployments some target serves at now.
+// LiveAt returns opts narrowed to the deployments some origin serves at now.
 func LiveAt(opts *database.ListOptions[domain.DeploymentField], now time.Time) *database.ListOptions[domain.DeploymentField] {
 	live := *opts
 	live.Filter = database.And(opts.Filter, database.CorrelatedEqual(database.Col(domain.DeploymentFieldLive), now))

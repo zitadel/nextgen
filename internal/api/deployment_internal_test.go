@@ -32,7 +32,7 @@ func TestDeploymentErrorResponseStatuses(t *testing.T) {
 // The 409 exists so the caller can retry on top of what actually runs, which
 // only works if the conflict's payload survives into the response envelope.
 func TestDeploymentConflictCarriesDetails(t *testing.T) {
-	// Nothing deployed to the targets yet: the payload says so with a null
+	// Nothing deployed to the origins yet: the payload says so with a null
 	// deployment rather than dropping the key.
 	resp := deploymentErrorResponse(domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}))
 	require.Equal(t, http.StatusConflict, resp.StatusCode)
@@ -50,7 +50,7 @@ func TestDeploymentConflictRendersTheDeployment(t *testing.T) {
 		ProjectID:  "proj_1",
 		ID:         "dep_1",
 		ReleaseID:  "rel_1",
-		TargetKind: domain.DeploymentTargetKindPrimary,
+		OriginKind: domain.DeploymentOriginKindPrimary,
 		Targets:    []domain.DeploymentTarget{{Origin: "https://app.acme.com"}},
 		DeployedAt: time.Date(2026, 10, 2, 14, 52, 0, 0, time.UTC),
 		Metadata: domain.DeploymentMetadata{

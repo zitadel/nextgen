@@ -2,7 +2,7 @@ package domain
 
 import "time"
 
-// Preview admits one exact URL as a deployment target until it expires. A
+// Preview admits one exact URL for deployments until it expires. A
 // deployment to the URL creates or renews it.
 type Preview struct {
 	ProjectID string
