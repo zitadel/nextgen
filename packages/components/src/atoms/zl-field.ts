@@ -42,6 +42,8 @@ export type ZlFieldInputDetail = { name: string; value: string };
  *                so Tab moves from one input straight to the next; keyboard
  *                users clear via the input itself.
  *   description  14/20 in `--zl-muted-foreground`
+ *   read-only    `--zl-muted` fill at full contrast, no hover edge and no
+ *                clear button; still focusable and still submitted
  *
  * Form participation: `<zl-field>` is a form-associated custom element.
  */
@@ -75,6 +77,7 @@ export class ZlField extends FormAtom {
     | undefined = undefined;
   @property({ type: Boolean, attribute: "trailing-icon" }) accessor trailingIcon = true;
   @property({ type: Boolean }) accessor required = false;
+  @property({ type: Boolean, reflect: true, attribute: "readonly" }) accessor readOnly = false;
   @property({ type: Boolean, reflect: true }) accessor invalid = false;
 
   @state() private accessor hasHelp = false;
@@ -135,8 +138,15 @@ export class ZlField extends FormAtom {
       "zr-field--invalid": this.invalid || showError,
       "zr-field--success": showSuccess,
       "zr-field--disabled": this.isDisabled,
+      "zr-field--readonly": this.readOnly,
     });
-    const showDefaultTrailing = this.trailingIcon && !this.hasSuffixSlot && !this.isDisabled;
+    // A read-only field keeps the error and success icons but not the clear
+    // button, which would change the value.
+    const showDefaultTrailing =
+      this.trailingIcon &&
+      !this.hasSuffixSlot &&
+      !this.isDisabled &&
+      (!this.readOnly || this.invalid || showError || showSuccess);
     const trailing = showDefaultTrailing ? this.renderTrailingIcon() : null;
     const wrapClass = classMap({
       "zr-field__wrap": true,
@@ -161,6 +171,7 @@ export class ZlField extends FormAtom {
             pattern=${ifDefined(this.pattern)}
             ?required=${this.required}
             ?disabled=${this.isDisabled}
+            ?readonly=${this.readOnly}
             aria-label=${ifDefined(this.label ? undefined : this.ariaLabelText)}
             aria-invalid=${this.invalid || showError ? "true" : "false"}
             aria-describedby=${describedBy || nothing}
@@ -370,6 +381,7 @@ export const zlFieldManifest: AtomManifest = {
     "data-testid",
     "required",
     "disabled",
+    "readonly",
     "invalid",
     "error",
     "success",
