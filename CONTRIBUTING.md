@@ -303,7 +303,10 @@ demand, and is not a required check. To run it against a branch, use
 `gh workflow run spanner.yml --ref <branch>`, or run the Moon task locally.
 
 **Version-only mode** (Changesets version PRs) runs `release:version`,
-`release:pack`, and tarball verification instead.
+`release:pack`, and tarball verification instead. A `package.json` change only
+qualifies when it is what `changeset version` writes — the `version` field and
+internal (`workspace:`) dependency ranges; a script or any other manifest edit
+runs full mode.
 
 CI consumes the workflow's packed npm tarballs, not public Zitadel packages.
 Changesets PR comments are informational release-intent feedback, not a

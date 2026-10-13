@@ -204,8 +204,118 @@ function journeys(gates) {
   ];
 }
 
-test("mode: changeset/version files only is version-only", () => {
-  assert.equal(computeMode([".changeset/x.md", "apps/server/package.json"]), "version-only");
+// A manifest as the version step finds it: internal dependencies on the
+// `workspace:` protocol beside an external one, conditional exports, and the
+// scripts moon tasks run.
+const MANIFEST_FILE = "packages/sdk-react/package.json";
+const MANIFEST = {
+  name: "@zitadel/sdk-react",
+  version: "1.0.0-alpha.25",
+  exports: { ".": { types: "./dist/index.d.ts", import: "./dist/index.js" } },
+  scripts: { build: "vite build", test: "vitest run", "test:all": "pnpm run test" },
+  dependencies: { "@lit/react": "^1.0.8", "@zitadel/sdk-core": "workspace:*" },
+};
+const BUMPED = { ...MANIFEST, version: "1.0.0-alpha.26" };
+const MERGE_BASE = "4b5e1d9";
+
+// Answers computeMode's git reads from `[before, after]` manifests per file:
+// the before side only at the merge base, a null side as a path git cannot
+// show, a string side as raw file text.
+function gitWith(manifests, mergeBase = MERGE_BASE) {
+  return (_command, args) => {
+    if (args[0] === "merge-base") {
+      return mergeBase ? { status: 0, stdout: `${mergeBase}\n` } : { status: 1, stdout: "" };
+    }
+    const [rev, file] = args[1].split(":");
+    const [before, after] = manifests[file] ?? [];
+    const side = (rev === "HEAD" ? after : rev === MERGE_BASE ? before : null) ?? null;
+    if (side === null) {
+      return { status: 128, stdout: "", stderr: `fatal: path '${file}' does not exist` };
+    }
+    return {
+      status: 0,
+      stdout: typeof side === "string" ? side : `${JSON.stringify(side, null, 2)}\n`,
+    };
+  };
+}
+
+test("mode: a pure version bump is version-only", () => {
+  const git = gitWith({ [MANIFEST_FILE]: [MANIFEST, BUMPED] });
+  // Out of pre mode the version step deletes the changesets it consumed; in
+  // pre mode, the alpha train's state, it records them in pre.json instead.
+  for (const consumed of [[".changeset/brave-otters-sing.md"], [".changeset/pre.json"]]) {
+    const files = [...consumed, "packages/sdk-react/CHANGELOG.md", MANIFEST_FILE];
+    assert.equal(computeMode(files, "origin/main", git), "version-only", consumed[0]);
+  }
+});
+
+test("mode: an internal dependency range the version step rewrites stays version-only", () => {
+  for (const field of [
+    "dependencies",
+    "devDependencies",
+    "peerDependencies",
+    "optionalDependencies",
+  ]) {
+    const before = { ...MANIFEST, [field]: { "@zitadel/api": "workspace:^1.0.0-alpha.25" } };
+    const after = {
+      ...before,
+      version: BUMPED.version,
+      [field]: { "@zitadel/api": "workspace:^1.0.0-alpha.26" },
+    };
+    const git = gitWith({ [MANIFEST_FILE]: [before, after] });
+    assert.equal(computeMode([MANIFEST_FILE], "origin/main", git), "version-only", field);
+  }
+});
+
+test("mode: a script-only manifest change runs full", () => {
+  const after = {
+    ...MANIFEST,
+    scripts: { ...MANIFEST.scripts, "test:all": "vitest run --browser" },
+  };
+  const git = gitWith({ [MANIFEST_FILE]: [MANIFEST, after] });
+  assert.equal(computeMode([MANIFEST_FILE], "origin/main", git), "full");
+});
+
+test("mode: any other manifest change runs full, even beside a version bump", () => {
+  const cases = {
+    script: { ...BUMPED, scripts: { ...MANIFEST.scripts, generate: "node generate.mjs" } },
+    "external range": {
+      ...BUMPED,
+      dependencies: { ...MANIFEST.dependencies, "@lit/react": "^2.0.0" },
+    },
+    "internal range operator": {
+      ...BUMPED,
+      dependencies: { ...MANIFEST.dependencies, "@zitadel/sdk-core": "workspace:^" },
+    },
+    "added dependency": {
+      ...BUMPED,
+      dependencies: { ...MANIFEST.dependencies, "@zitadel/api": "workspace:*" },
+    },
+    "export condition order": {
+      ...BUMPED,
+      exports: { ".": { import: "./dist/index.js", types: "./dist/index.d.ts" } },
+    },
+  };
+  for (const [change, after] of Object.entries(cases)) {
+    const files = ["packages/sdk-react/CHANGELOG.md", MANIFEST_FILE];
+    const git = gitWith({ [MANIFEST_FILE]: [MANIFEST, after] });
+    assert.equal(computeMode(files, "origin/main", git), "full", change);
+  }
+});
+
+test("mode: a manifest git cannot read or parse fails open", () => {
+  const cases = {
+    "new package": gitWith({ [MANIFEST_FILE]: [null, BUMPED] }),
+    "deleted package": gitWith({ [MANIFEST_FILE]: [MANIFEST, null] }),
+    "unparsable manifest": gitWith({ [MANIFEST_FILE]: [MANIFEST, "{ not json"] }),
+    "no merge base": gitWith({ [MANIFEST_FILE]: [MANIFEST, BUMPED] }, null),
+  };
+  for (const [failure, git] of Object.entries(cases)) {
+    assert.equal(computeMode([MANIFEST_FILE], "origin/main", git), "full", failure);
+  }
+});
+
+test("mode: a file outside the version step's output, or an empty diff, runs full", () => {
   assert.equal(computeMode([".changeset/x.md", "internal/a.go"]), "full");
   assert.equal(computeMode([]), "full");
 });

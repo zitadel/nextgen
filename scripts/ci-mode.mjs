@@ -6,7 +6,10 @@ import { isDirectRun } from "./dev-process.mjs";
 
 // Decides what the ci workflow runs, in three layers:
 //
-// 1. `mode` — `version-only` for Changesets version PRs, else `full`.
+// 1. `mode` — `version-only` for Changesets version PRs, else `full`. A
+//    changed package manifest only qualifies when it differs from the merge
+//    base in nothing but the fields `changeset version` rewrites, so a
+//    script or export change runs the full gate.
 // 2. Affected gates — within full mode, the expensive tail steps (Go suites,
 //    release snapshot, journey variants, real-instance e2e) are skipped when
 //    moon's affected task selection proves the change cannot reach them.
@@ -127,8 +130,35 @@ const ALL_GATES = [
   "browsers",
 ];
 
-export function computeMode(files) {
-  return files.length > 0 && files.every(isVersionOutputFile) ? "version-only" : "full";
+/**
+ * `version-only` when every changed file is version-step output and every
+ * changed package manifest moved only the fields `changeset version`
+ * rewrites, else `full`. A manifest git cannot show or that does not parse,
+ * on either side, fails open.
+ */
+export function computeMode(files, base, spawn = spawnSync) {
+  if (files.length === 0 || !files.every(isVersionOutputFile)) {
+    return "full";
+  }
+  const manifests = files.filter(isPackageManifest);
+  if (manifests.length === 0) {
+    return "version-only";
+  }
+  const git = (...args) => {
+    const result = spawn("git", args, { encoding: "utf8" });
+    return result.status === 0 ? result.stdout : null;
+  };
+  // `<base>...HEAD` diffs HEAD against the merge base, so the before side is
+  // read there too: read at `base`, a branch behind it would be charged with
+  // the manifest edits `base` gained since.
+  const mergeBase = git("merge-base", base, "HEAD")?.trim();
+  const versionStepOnly = manifests.every((file) =>
+    onlyVersionStepChanged(
+      mergeBase ? git("show", `${mergeBase}:${file}`) : null,
+      git("show", `HEAD:${file}`),
+    ),
+  );
+  return versionStepOnly ? "version-only" : "full";
 }
 
 export function forceFullReason(files) {
@@ -242,9 +272,58 @@ function isVersionOutputFile(file) {
     file === ".changeset/pre.json" ||
     file === ".changeset/config.json" ||
     file.startsWith(".changeset/") ||
-    file.endsWith("/package.json") ||
+    isPackageManifest(file) ||
     file.endsWith("/CHANGELOG.md")
   );
+}
+
+function isPackageManifest(file) {
+  return file.endsWith("/package.json");
+}
+
+// What `changeset version` rewrites in a package manifest: its `version`, and
+// the range of each internal dependency it bumps, keeping the range's
+// protocol and operator so only the version inside moves. Internal
+// dependencies are the `workspace:` ones — no external dependency can use
+// that protocol — so an external range change never passes.
+const DEPENDENCY_FIELDS = [
+  "dependencies",
+  "devDependencies",
+  "peerDependencies",
+  "optionalDependencies",
+];
+const SEMVER_RE = /\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?/g;
+
+function withoutVersionStepFields({ version, ...manifest }) {
+  for (const field of DEPENDENCY_FIELDS) {
+    if (manifest[field]) {
+      manifest[field] = Object.fromEntries(
+        Object.entries(manifest[field]).map(([name, range]) => [
+          name,
+          typeof range === "string" && range.startsWith("workspace:")
+            ? range.replace(SEMVER_RE, "<version>")
+            : range,
+        ]),
+      );
+    }
+  }
+  return manifest;
+}
+
+function onlyVersionStepChanged(before, after) {
+  if (!before || !after) {
+    return false;
+  }
+  try {
+    // Compared serialized, so key order counts: in `exports`, the order of
+    // the conditions is behavior.
+    return (
+      JSON.stringify(withoutVersionStepFields(JSON.parse(before))) ===
+      JSON.stringify(withoutVersionStepFields(JSON.parse(after)))
+    );
+  } catch {
+    return false;
+  }
 }
 
 function main() {
@@ -257,7 +336,7 @@ function main() {
     process.exit(diff.status ?? 1);
   }
   const files = diff.stdout.split(/\r?\n/).filter(Boolean);
-  const mode = computeMode(files);
+  const mode = computeMode(files, base);
 
   const needsQuery = mode === "full" && forceFullReason(files) === null;
   const targets = needsQuery ? queryAffectedTargets(base) : [];
