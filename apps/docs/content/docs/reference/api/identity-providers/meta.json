@@ -1,0 +1,11 @@
+{
+  "title": "Identity providers",
+  "pages": [
+    "createIdp",
+    "queryIdps",
+    "getIdpById",
+    "listIdpRevisions",
+    "getIdpRevisionById",
+    "..."
+  ]
+}

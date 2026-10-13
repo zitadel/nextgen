@@ -7,11 +7,21 @@
     "sessions",
     "---Configuration---",
     "flow-definitions",
+    "schemas",
+    "branding",
+    "identity-providers",
+    "variables",
+    "releases",
+    "deployments",
+    "previews",
+    "---Management---",
     "projects",
     "teams",
     "users",
-    "schemas",
+    "grants",
+    "events",
     "---System---",
-    "system"
+    "system",
+    "..."
   ]
 }

@@ -91,7 +91,12 @@ native shadow controls `zitadel-input-email` / `zitadel-input-password` /
 `zitadel-action-submit-button`. Hooks are method-named even when the flow engine
 names a credential field `x-auth-methods#<method>` — the `name` attribute keeps
 the raw wire key; only the hook is normalised (`hookName` in
-`src/internal/hook-name.ts`). For sign-out, pierce to `.signout-btn`.
+`src/internal/hook-name.ts`). For sign-out, the button inside `<zitadel-session>`
+(the signed-in card setup's profile pages render) carries
+`zitadel-session-logout`, and its native button `zitadel-session-logout-button`.
+`<zitadel-logout>` has no hook: open its avatar menu ("Open user menu"), then
+pierce to `.signout-btn`. Given a `<template>` child, it shows no menu, and the
+element marked `data-action="logout"` signs out.
 
 ## Read these, don't guess
 

@@ -28,9 +28,10 @@ ADR 044) — both shapes run the same CLI path and browser journeys.
   turbo puts arguments after `--` into every task's cache key. A new option
   CI needs gets a variable there too.
 - CI runs all journey variants (fresh-app matrix, passkey preset,
-  pre-existing app, testkit) concurrently in a single `--ci` invocation of the
-  runner (one step in `.github/workflows/ci.yml`), which parallelizes them
-  through its own concurrency pool so one process shares one port allocator.
+  pre-existing app, testkit, remote https) concurrently in a single `--ci`
+  invocation of the runner (one step in `.github/workflows/ci.yml`), which
+  parallelizes them through its own concurrency pool so one process shares
+  one port allocator.
   The step is gated on `snapshot` (i.e. any journey surface is affected,
   computed by `scripts/ci-mode.mjs`), and the fresh-app framework set is
   collapsed per-PR via `--matrix single|full` (the `journey_matrix` output,
@@ -42,6 +43,15 @@ ADR 044) — both shapes run the same CLI path and browser journeys.
   `start --runtime binary`, and
   `setup --framework <next|nuxt|react|vue|angular|solid|svelte|qwik> --server local`
   from the fresh app directory with `--non-interactive --json`.
+- The remote https lane (`--remote`; in `--ci`, react with the passkey-first
+  preset) is the one exception to `--server local`: setup points `--server` at
+  `scripts/https-edge.mjs`, a local https edge for `zitadel.test` in front of
+  the same local runtime. Like Vercel's edge it completes TLS only for its own
+  name, routes by `Host` and overwrites `X-Forwarded-*`, so it catches a
+  generated dev proxy that only works over plain http. The CLI and the
+  generated app's dev server reach it through a preloaded resolver and
+  `NODE_EXTRA_CA_CERTS` (`remoteHostEnv`); the browser still only talks to the
+  app on `localhost`.
 - Docker fallback coverage must opt in with `--runtime docker --image <tag>`.
 - Pack and upload only the public packages — `PUBLIC_RELEASE_PACKAGES` in
   `scripts/release-manifest.mjs` is the authoritative list, and
