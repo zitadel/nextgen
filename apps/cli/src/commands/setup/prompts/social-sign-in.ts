@@ -173,7 +173,7 @@ export class SocialSignInPrompt implements SetupPrompt {
     return {
       slug: await this.prompt(
         "Name for this connection (used in your configuration, e.g. acme-sso)",
-        (value) => parseConnectionSlug(value.trim(), IDP_PROVIDERS),
+        (value) => parseConnectionSlug(value, [...IDP_PROVIDERS, CUSTOM_PROVIDER]),
       ),
       displayName: await this.prompt(
         "Name shown on the sign-in button (e.g. Acme SSO)",

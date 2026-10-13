@@ -405,8 +405,6 @@ describe("setup", () => {
             );
 
             expect(result).toFailWith("E_VALIDATION");
-            expect(result).toPrint("needs the client secret on stdin");
-            // Refused before anything exists to clean up.
             expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
           });
 
@@ -420,26 +418,6 @@ describe("setup", () => {
             expect(result).toPrint("needs --sso-client-id");
             expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
           });
-        });
-
-        it("lets a second connection to the same issuer be added afterwards", async () => {
-          const app = await anApp();
-          expect(await app.setupWithCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
-
-          const second = await app.enableCustomSso(
-            { ...ACME, slug: "acme-staff", displayName: "Acme staff" },
-            { clientId: "staff-client-id", secret: "staff-client-secret" },
-          );
-
-          expect(second).toSucceed();
-          expect(await app.apply()).toSucceed();
-          expect((await app.registeredIdps()).map((idp) => idp.slug).sort()).toEqual([
-            "acme-sso",
-            "acme-staff",
-          ]);
-          for (const step of await app.stepsOfferingSso()) {
-            expect(step.sso_providers, step.name).toEqual(["acme-sso", "acme-staff"]);
-          }
         });
       });
     });

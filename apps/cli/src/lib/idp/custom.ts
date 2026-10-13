@@ -78,10 +78,11 @@ export function selectionFromFlags(
     return selection;
   }
 
-  const missing = [flag.slug, flag.displayName, flag.issuer].filter(
-    (name) => !given.includes(name),
-  );
-  if (missing.length > 0) {
+  const { slug, displayName, issuer } = values;
+  if (slug === undefined || displayName === undefined || issuer === undefined) {
+    const missing = [flag.slug, flag.displayName, flag.issuer].filter(
+      (name) => !given.includes(name),
+    );
     throw new ZitadelError("E_VALIDATION", `A custom connection needs ${missing.join(", ")}`, {
       hint: `Describe the connection, e.g. ${example}`,
       details: { missing },
@@ -100,9 +101,9 @@ export function selectionFromFlags(
   return {
     kind: "custom",
     connection: {
-      slug: checked(flag.slug, parseConnectionSlug((values.slug as string).trim(), IDP_PROVIDERS)),
-      displayName: checked(flag.displayName, parseDisplayName(values.displayName as string)),
-      issuer: checked(flag.issuer, parseIssuer(values.issuer as string)),
+      slug: checked(flag.slug, parseConnectionSlug(slug, [...IDP_PROVIDERS, CUSTOM_PROVIDER])),
+      displayName: checked(flag.displayName, parseDisplayName(displayName)),
+      issuer: checked(flag.issuer, parseIssuer(issuer)),
       scopes: checked(flag.scopes, parseScopes(values.scopes)),
     },
   };

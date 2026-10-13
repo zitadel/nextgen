@@ -82,11 +82,26 @@ describe("planConnection", () => {
     expect(plan).toMatchObject({ action: "reuse", slug: "google" });
   });
 
-  it("recognises the provider by its issuer even when the template was removed", () => {
-    const existing = file("corp.json", googleBody({ template: undefined, slug: "corp" }));
+  it("recognises the provider by its slug and issuer even when the template was removed", () => {
+    const existing = file("google.json", googleBody({ template: undefined }));
     expect(planConnection({ selection: googleSelection, files: [existing] })).toMatchObject({
       action: "reuse",
+      slug: "google",
+    });
+  });
+
+  it("does not claim a custom connection that points at the provider's issuer", () => {
+    const custom = file("corp.json", {
       slug: "corp",
+      oidc: {
+        issuer: "https://accounts.google.com",
+        client_id: "${{ CORP_CLIENT_ID }}",
+        client_secret: "${{ CORP_CLIENT_SECRET }}",
+      },
+    });
+    expect(planConnection({ selection: googleSelection, files: [custom] })).toMatchObject({
+      action: "create",
+      slug: "google",
     });
   });
 
@@ -305,7 +320,7 @@ describe("planConnection for a custom connection", () => {
       issuer: "https://sso.acme.example",
       client_id: "${{ ACME_SSO_CLIENT_ID }}",
       client_secret: "${{ ACME_SSO_CLIENT_SECRET }}",
-      scopes: ["openid"],
+      scopes: ["openid", "profile", "email"],
     },
     ...over,
   });
@@ -364,6 +379,16 @@ describe("planConnection for a custom connection", () => {
     expect(planConnection({ selection: custom(acme), files: [existing] })).toMatchObject({
       action: "reuse",
       slug: "acme-sso",
+    });
+  });
+
+  it("reuses the file but says the settings it did not apply", () => {
+    const existing = file("acme-sso.json", acmeBody({ display_name: "Old name" }));
+    const input = { ...acme, scopes: ["openid", "groups"] as Scopes };
+
+    expect(planConnection({ selection: custom(input), files: [existing] })).toMatchObject({
+      action: "reuse",
+      notApplied: ["display name", "scopes"],
     });
   });
 

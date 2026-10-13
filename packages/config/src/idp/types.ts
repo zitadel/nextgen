@@ -8,7 +8,9 @@ import { ISSUER_REQUIREMENT, isSupportedIssuer } from "./issuer.js";
  * function that handled them took `string`. Passing the secret's variable name
  * where the client id's belonged, or a provider name where a slug did, compiled
  * and then published a credential to the wrong place. Each value now has its
- * own type, and the only way to make one is a parser that checks it.
+ * own type, and a value reaches one through a parser that checks it. The
+ * exceptions are named: the catalog's own constants, and the variable names
+ * read back from a connection file, which are as the file says.
  *
  * A brand costs nothing at runtime: each is still the string it wraps.
  */
@@ -76,15 +78,16 @@ export function parseConnectionSlug(
   value: string,
   reserved: readonly string[] = [],
 ): Parsed<ConnectionSlug> {
-  if (!SLUG_PATTERN.test(value) || value.length > 64) {
+  const trimmed = value.trim();
+  if (!SLUG_PATTERN.test(trimmed) || trimmed.length > 64) {
     return refuse(
       'Use lowercase letters, digits, "-" and "_", starting with a letter or digit, at most 64 characters.',
     );
   }
-  if (reserved.includes(value)) {
-    return refuse(`"${value}" is a built-in provider. Choose another name for this connection.`);
+  if (reserved.includes(trimmed)) {
+    return refuse(`"${trimmed}" is a built-in provider. Choose another name for this connection.`);
   }
-  return ok(value as ConnectionSlug);
+  return ok(trimmed as ConnectionSlug);
 }
 
 /** The text on the sign-in button, or why there is none. */
@@ -120,13 +123,13 @@ export function parseScopes(value: string | undefined): Parsed<Scopes> {
   return ok(["openid", ...new Set(typed.filter((scope) => scope !== "openid"))]);
 }
 
-/** A client id, or why none was given. Vendors format them differently, so only emptiness is checked. */
+/** A client id, or why none was given. Surrounding whitespace is dropped, so typed or piped text works. Vendors format them differently, so only emptiness is checked. */
 export function parseClientId(value: string): Parsed<ClientId> {
   const trimmed = value.trim();
   return trimmed === "" ? refuse("Enter the client id.") : ok(trimmed as ClientId);
 }
 
-/** A client secret, or why none was given. */
+/** A client secret, or why none was given. Surrounding whitespace is dropped, which is what lets a piped value with its newline work. */
 export function parseClientSecret(value: string): Parsed<ClientSecret> {
   const trimmed = value.trim();
   return trimmed === "" ? refuse("Enter the client secret.") : ok(trimmed as ClientSecret);

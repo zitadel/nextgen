@@ -87,18 +87,18 @@ export async function readConnectionFiles(cwd: string): Promise<ConnectionFile[]
 /**
  * Whether a connection file describes the catalog entry's provider.
  *
- * Two independent signals, because either can be edited away: `template`
- * names the catalog entry the file was scaffolded from, and the OIDC issuer
- * identifies the provider itself. The issuer is the stronger signal — a file
- * pointing at Google is a Google connection whatever its template says — so a
- * disagreement still counts as a match and is left for the caller to report.
+ * `template` names the catalog entry the file was scaffolded from. When it was
+ * edited away, the file still counts if it carries the catalog's own slug and
+ * issuer. A different slug on the same issuer is a custom connection that
+ * happens to point at the provider, which a Project may hold alongside the
+ * catalog one, so the catalog provider does not claim it.
  */
 function describesProvider(file: ConnectionFile, entry: IdpProvider): boolean {
   if (file.body.template === entry.template) {
     return true;
   }
   const oidc = file.body.oidc;
-  return isObject(oidc) && oidc.issuer === entry.issuer;
+  return file.body.slug === entry.slug && isObject(oidc) && oidc.issuer === entry.issuer;
 }
 
 /** The client id a connection file carries, whichever protocol it uses. */
@@ -253,7 +253,13 @@ function refuseCollidingVariables(
 
 /** What the caller should do with the provider's connection. */
 export type ConnectionPlan =
-  | { readonly action: "reuse"; readonly file: ConnectionFile; readonly slug: ConnectionSlug }
+  | {
+      readonly action: "reuse";
+      readonly file: ConnectionFile;
+      readonly slug: ConnectionSlug;
+      /** Settings the developer gave that the existing file does not have, and so were not applied. */
+      readonly notApplied?: readonly ("display name" | "scopes")[];
+    }
   | {
       readonly action: "create";
       readonly name: string;
@@ -442,7 +448,12 @@ function planCustomConnection(options: {
   }
   refuseDifferentClientId(match, options.clientId);
   refuseCollidingVariables(credentialVariablesOf(match, slug), slug, options.files, match);
-  return { action: "reuse", file: match, slug };
+  const storedScopes = isObject(oidc) && Array.isArray(oidc.scopes) ? oidc.scopes.join(" ") : "";
+  const notApplied = [
+    ...(match.body.display_name === options.input.displayName ? [] : (["display name"] as const)),
+    ...(storedScopes === options.input.scopes.join(" ") ? [] : (["scopes"] as const)),
+  ];
+  return { action: "reuse", file: match, slug, ...(notApplied.length > 0 ? { notApplied } : {}) };
 }
 
 /**

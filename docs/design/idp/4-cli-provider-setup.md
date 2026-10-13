@@ -152,7 +152,7 @@ What is different from a catalog provider:
 * **Standard claims only.** The connection maps the claims the `profile` and
   `email` scopes define, narrowed to the properties the schema has
   (`email → email`, `givenName → given_name`, `familyName → family_name`), and
-  trusts `email` only when the provider returns `email_verified: true`.
+  trusts `email` only when the provider returns `email_verified: true`. A provider that never sends `email_verified` therefore never gets a verified email: the person lands on the collection step instead of being created automatically.
   That is the OpenID Connect standard, not Google's behaviour.
   Any other attribute (`contactEmail → mail`) is mapped by editing the file;
   explicit inputs for those mappings and for `verified_claims` come later.

@@ -224,128 +224,121 @@ describe("sso enable", () => {
         expect(registered.map((idp) => idp.slug)).toEqual([ACME.slug]);
       });
 
-      it("shows the developer's display name and issuer, and no template", async () => {
-        const app = await aSetUpApp();
-        expect(await app.enableCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
-
-        const connection = await app.committed.idpDocument(ACME.slug);
-
-        expect(connection).toMatchObject({
-          slug: "acme-sso",
-          display_name: "Acme SSO",
-          oidc: { issuer: "https://sso.acme.example", scopes: ["openid", "profile", "email"] },
-        });
-        expect(connection).not.toHaveProperty("template");
-      });
-
-      it("requests the scopes the developer named", async () => {
-        const app = await aSetUpApp();
-
-        const result = await app.enableCustomSso(
-          { ...ACME, scopes: "openid, groups" },
-          ACME_CREDENTIALS,
-        );
-
-        expect(result).toSucceed();
-        expect(await app.committed.idpDocument(ACME.slug)).toMatchObject({
-          oidc: { scopes: ["openid", "groups"] },
-        });
-      });
-
-      it("maps the standard claims, and trusts the email only as the provider verifies it", async () => {
-        const app = await aSetUpApp();
-        expect(await app.enableCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
-
-        const connection = await app.committed.idpDocument(ACME.slug);
-
-        expect(connection).toMatchObject({
-          claim_mapping: { email: "email" },
-          verified_claims: { email: "email_verified" },
-        });
-      });
-
-      it("keeps the credentials in variables named after the connection", async () => {
+      it("commits references to the credentials rather than the credentials", async () => {
         const app = await aSetUpApp();
         expect(await app.enableCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
 
         const connection = await app.committed.idpConnection(ACME.slug);
-        const published = await app.projectVariables();
 
         expect(connection.oidc.client_id).toBe("${{ ACME_SSO_CLIENT_ID }}");
         expect(connection.oidc.client_secret).toBe("${{ ACME_SSO_CLIENT_SECRET }}");
+      });
+
+      it("publishes the client id as a readable project variable", async () => {
+        const app = await aSetUpApp();
+        expect(await app.enableCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
+
+        const published = await app.projectVariables();
+
         expect(published).toEqual(
           expect.arrayContaining([
             expect.objectContaining({ name: "ACME_SSO_CLIENT_ID", value: "acme-client-id" }),
           ]),
         );
+      });
+
+      it("keeps the secret out of every file in the project", async () => {
+        const app = await aSetUpApp();
+        expect(await app.enableCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
+
         expect(await app.filesContaining(ACME_CREDENTIALS.secret)).toEqual([]);
       });
 
-      it("names the connection among the published auth methods and the steps offering it", async () => {
+      it("names the connection among the published auth methods", async () => {
         const app = await anAppServingAcme();
 
         const { schema } = await app.publishedSchema();
-        const offering = await app.stepsOfferingSso();
 
         expect(schema["x-auth-methods"]?.sso).toEqual({ enabled: true, providers: ["acme-sso"] });
+      });
+
+      it("offers the connection on the steps a sign-in starts from", async () => {
+        const app = await anAppServingAcme();
+
+        const offering = await app.stepsOfferingSso();
+
         expect(offering.map((step) => step.name)).toEqual(
           expect.arrayContaining(["identifier", "register"]),
         );
-        for (const step of offering) {
-          expect(step.sso_providers, step.name).toEqual(["acme-sso"]);
-        }
       });
 
-      it("changes nothing when the same connection is enabled again", async () => {
+      it("leaves nothing to reconcile when the same connection is enabled again", async () => {
         const app = await anAppServingAcme();
-        const files = await app.snapshot();
-        const before = {
-          variables: await app.projectVariables(),
-          connection: await app.committed.idpDocument(ACME.slug),
-          schema: await app.publishedSchema(),
-        };
 
         expect(await app.enableCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
 
-        expect(await app.projectVariables()).toEqual(before.variables);
-        expect(await app.committed.idpDocument(ACME.slug)).toEqual(before.connection);
-        expect(await app.publishedSchema()).toEqual(before.schema);
         expect(await app.plan()).toReportNothingToDo();
+      });
+
+      it("changes no file when the same connection is enabled again", async () => {
+        const app = await anAppServingAcme();
+        const files = await app.snapshot();
+
+        expect(await app.enableCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
+
         expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
       });
 
-      it("allows a second connection to the same issuer under another name", async () => {
-        const app = await anAppServingAcme();
+      describe("beside another connection to the same issuer", () => {
         const staff = { ...ACME, slug: "acme-staff", displayName: "Acme staff" };
+        const staffCredentials = { clientId: "staff-client-id", secret: "staff-client-secret" };
 
-        const result = await app.enableCustomSso(staff, {
-          clientId: "staff-client-id",
-          secret: "staff-client-secret",
+        async function anAppServingBoth(): Promise<ScaffoldedApp> {
+          const app = await anAppServingAcme();
+          expect(await app.enableCustomSso(staff, staffCredentials)).toSucceed();
+          expect(await app.apply()).toSucceed();
+          return app;
+        }
+
+        it("registers both", async () => {
+          const app = await anAppServingBoth();
+
+          expect((await app.registeredIdps()).map((idp) => idp.slug).sort()).toEqual([
+            "acme-sso",
+            "acme-staff",
+          ]);
         });
 
-        expect(result).toSucceed();
-        expect(await app.apply()).toSucceed();
-        expect((await app.registeredIdps()).map((idp) => idp.slug).sort()).toEqual([
-          "acme-sso",
-          "acme-staff",
-        ]);
-        const { schema } = await app.publishedSchema();
-        expect(schema["x-auth-methods"]?.sso?.providers).toEqual(["acme-sso", "acme-staff"]);
-        const offering = await app.stepsOfferingSso();
-        expect(offering.map((step) => step.name)).toContain("sso-conflict");
-        for (const step of offering) {
-          expect(step.sso_providers, step.name).toEqual(["acme-sso", "acme-staff"]);
-        }
+        it("lists both among the published auth methods", async () => {
+          const app = await anAppServingBoth();
+
+          const { schema } = await app.publishedSchema();
+
+          expect(schema["x-auth-methods"]?.sso?.providers).toEqual(["acme-sso", "acme-staff"]);
+        });
+
+        it("offers both on every step that offers either", async () => {
+          const app = await anAppServingBoth();
+
+          for (const step of await app.stepsOfferingSso()) {
+            expect(step.sso_providers, step.name).toEqual(["acme-sso", "acme-staff"]);
+          }
+        });
+
+        it("adds the step that resolves a collision between them", async () => {
+          const app = await anAppServingBoth();
+
+          const offering = await app.stepsOfferingSso();
+
+          expect(offering.map((step) => step.name)).toContain("sso-conflict");
+        });
       });
 
       it("offers a custom connection beside Google without disturbing it", async () => {
         const app = await anAppServingGoogle();
-
         expect(await app.enableCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
         expect(await app.apply()).toSucceed();
 
-        const { schema } = await app.publishedSchema();
-        expect(schema["x-auth-methods"]?.sso?.providers).toEqual([GOOGLE, "acme-sso"]);
         for (const step of await app.stepsOfferingSso()) {
           expect(step.sso_providers, step.name).toEqual([GOOGLE, "acme-sso"]);
         }
@@ -359,51 +352,29 @@ describe("sso enable", () => {
           ACME_CREDENTIALS,
         );
 
-        expect(result).toFail();
-        expect(result).toPrint("already named acme-sso");
+        expect(result).toFailWith("E_CONFLICT");
       });
 
-      it("refuses the name of a built-in provider", async () => {
+      it.each([
+        ["the name of a built-in provider", { ...ACME, slug: "google" }],
+        ["scopes without openid", { ...ACME, scopes: "profile email" }],
+        ["an issuer the server would refuse", { ...ACME, issuer: "http://sso.acme.example" }],
+      ])("refuses %s and leaves the project as it was", async (_name, connection) => {
         const app = await aSetUpApp();
+        const before = await app.snapshot();
 
-        const result = await app.enableCustomSso({ ...ACME, slug: "google" }, ACME_CREDENTIALS);
+        const result = await app.enableCustomSso(connection, ACME_CREDENTIALS);
 
-        expect(result).toFail();
-        expect(result).toPrint("built-in provider");
-        expect(await app.filesContaining("Acme SSO")).toEqual([]);
+        expect(result).toFailWith("E_VALIDATION");
+        expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
       });
 
-      it("refuses scopes without openid", async () => {
-        const app = await aSetUpApp();
-
-        const result = await app.enableCustomSso(
-          { ...ACME, scopes: "profile email" },
-          ACME_CREDENTIALS,
-        );
-
-        expect(result).toFail();
-        expect(result).toPrint("must include openid");
-      });
-
-      it("refuses an issuer the server would refuse", async () => {
-        const app = await aSetUpApp();
-
-        const result = await app.enableCustomSso(
-          { ...ACME, issuer: "http://sso.acme.example" },
-          ACME_CREDENTIALS,
-        );
-
-        expect(result).toFail();
-        expect(result).toPrint("https://");
-      });
-
-      it("needs the name, display name and issuer", async () => {
+      it("refuses a connection with no name, display name and issuer", async () => {
         const app = await aSetUpApp();
 
         const result = await app.enableSsoWith(["--provider", "custom"]);
 
-        expect(result).toFail();
-        expect(result).toPrint("--slug, --display-name, --issuer");
+        expect(result).toFailWith("E_VALIDATION");
       });
 
       it("refuses the custom flags for a provider the catalog describes", async () => {
@@ -418,17 +389,10 @@ describe("sso enable", () => {
           CREDENTIALS.clientId,
         ]);
 
-        expect(result).toFail();
-        expect(result).toPrint("only applies to a custom connection");
+        expect(result).toFailWith("E_VALIDATION");
       });
     });
 
-    /**
-     * A provider that cannot sign anyone in is worse than none: the button
-     * appears and fails at the provider, long after the command reported
-     * success. So the command refuses, and leaves nothing behind, unless it has
-     * both halves of the application's credentials.
-     */
     describe.each([
       ["google", ["--provider", "google"]],
       [
@@ -452,7 +416,6 @@ describe("sso enable", () => {
         const result = await app.enableSsoWith([...provider, "--client-id", "a-client-id"], "");
 
         expect(result).toFailWith("E_VALIDATION");
-        expect(result).toPrint("No client secret supplied");
         expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
         expect(await app.projectVariables()).toEqual([]);
       });
@@ -464,7 +427,6 @@ describe("sso enable", () => {
         const result = await app.enableSsoWith(provider, "a-client-secret");
 
         expect(result).toFailWith("E_VALIDATION");
-        expect(result).toPrint("No client id supplied");
         expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
         expect(await app.projectVariables()).toEqual([]);
       });

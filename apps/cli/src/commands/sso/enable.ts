@@ -177,6 +177,11 @@ export default class SsoEnable extends BaseCommand {
     const plan = planConnection({ selection, files: connections, clientId: clientIdFlag });
 
     const reusing = plan.action === "reuse";
+    if (plan.action === "reuse" && plan.notApplied !== undefined) {
+      reportWarning(
+        `${plan.file.path} already exists, so the ${plan.notApplied.join(" and ")} you gave ${plan.notApplied.length === 1 ? "was" : "were"} not applied. Edit the file to change ${plan.notApplied.length === 1 ? "it" : "them"}.`,
+      );
+    }
     // A reused connection may name its own variables — it is an editable file
     // — so the credentials go where it actually looks rather than where this
     // command would have put them.
