@@ -194,7 +194,11 @@ describe("doctor command", () => {
     const claim = json.data.checks.find((check) => check.name === "claim");
     expect(claim?.status).toBe("warn");
     expect(claim?.message).toContain("temporary and its data may be lost");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
+    // The nudge carries doctor's own --server so claim reconciles the project
+    // on the server doctor checked, not the default environment.
+    expect(json.data.next_commands).toContain(
+      expectedPublicCliCommand("claim --server https://api.zitadel.cloud"),
+    );
   });
 
   // Same advisory posture, reconciliation wording: past the 14-day window
@@ -216,7 +220,9 @@ describe("doctor command", () => {
     expect(claim?.status).toBe("warn");
     expect(claim?.message).toContain("claim window has closed");
     expect((json.data.next_actions ?? []).join("\n")).toContain("claim window has closed");
-    expect(json.data.next_commands ?? []).toContain(expectedPublicCliCommand("claim"));
+    expect(json.data.next_commands ?? []).toContain(
+      expectedPublicCliCommand("claim --server https://api.zitadel.cloud"),
+    );
   });
 
   // Claiming needs a human in a browser, so --fix has nothing safe to do. The

@@ -647,9 +647,9 @@ export default class Setup extends BaseCommand {
         (isLocal && (dryRun || hostsPlatform)));
     const claimNudge = nudgeClaim
       ? {
-          actions: [claimAction(this.meta.cliVersion, deadline)],
-          boxActions: [claimBoxAction(this.meta.cliVersion, deadline)],
-          commands: [claimCommand(this.meta.cliVersion)],
+          actions: [claimAction(this.meta.cliVersion, deadline, RECOVERY_SELECTOR)],
+          boxActions: [claimBoxAction(this.meta.cliVersion, deadline, RECOVERY_SELECTOR)],
+          commands: [claimCommand(this.meta.cliVersion, RECOVERY_SELECTOR)],
         }
       : { actions: [], boxActions: [], commands: [] };
     // Only when the project is the local admin's: the console lists nothing

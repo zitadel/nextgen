@@ -123,9 +123,6 @@ export default class SsoEnable extends EnvironmentCommand {
     const reusing = plan.action === "reuse";
     // A reused connection may name its own variables — it is an editable file
     // — so the credentials go where it actually looks rather than where this
-    // command would have put them.
-    // A reused connection may name its own variables — it is an editable file
-    // — so the credentials go where it actually looks rather than where this
     // command would have put them. A name is `undefined` when the file holds
     // that credential as a literal: there is no variable to publish to, and
     // publishing to a derived name would report success for a value the
@@ -340,18 +337,13 @@ export default class SsoEnable extends EnvironmentCommand {
   }
 
   /**
-   * Enable the provider in the schema and every login flow that runs against
-   * it, writing only what changed. A flow belonging to another schema is left
-   * alone: enabling Google for customers must not touch the employee journey.
-   */
-  /**
    * The flows this provider must be added to, or a refusal.
    *
    * Called before the connection is written and before either credential is
    * published, because no flow means no button however well everything else
-   * went: `plan` and `apply` both succeed and the sign-in screen simply never
-   * offers the provider. Failing afterwards would leave a connection file and
-   * two published variables behind for a provider that cannot be shown.
+   * went: `deploy` succeeds and the sign-in screen simply never offers the
+   * provider. Failing afterwards would leave a connection file and two
+   * published variables behind for a provider that cannot be shown.
    */
   private async targetFlows(cwd: string, schema: SchemaFile): Promise<FlowFile[]> {
     const publishedSchemaId = await publishedIdOf(cwd, schema.path);
@@ -362,7 +354,7 @@ export default class SsoEnable extends EnvironmentCommand {
       throw new ZitadelError("E_NOT_FOUND", `No login flow runs against ${schema.name}`, {
         hint:
           "The provider is offered by a flow, and none of the files under .zitadel/flows/ " +
-          "names this schema. Check the flow's user_schema, or run `apply` first so the " +
+          "names this schema. Check the flow's user_schema, or run `deploy` first so the " +
           "schema's published id is recorded in .zitadel/state.json.",
         details: { schema: schema.path },
       });
@@ -564,7 +556,7 @@ function refuseUneditable(path: string, body: object, target: SsoEditTarget): vo
 
 /**
  * The platform id a local file was last synced as, from `.zitadel/state.json`.
- * Absent before the first `apply`, and absent entirely on a Project that has
+ * Absent before the first `deploy`, and absent entirely on a Project that has
  * never synced — both mean "fall back to matching on the scaffolded URL".
  *
  * Only a missing file falls back. A malformed or unreadable state file is the

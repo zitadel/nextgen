@@ -17,7 +17,7 @@ const ASSET_FIELDS = ["logo_url", "hero_url"] as const;
 
 /**
  * Per-URL probe budget. Short on purpose: this runs on the critical path of
- * every `plan` and `apply`, and a dead host that never answers must cost a
+ * every `deploy` and `preview`, and a dead host that never answers must cost a
  * couple of seconds, not a hung command.
  */
 const DEFAULT_TIMEOUT_MS = 2500;
@@ -29,7 +29,7 @@ const MAX_REDIRECTS = 5;
  * Addresses an untrusted descriptor must never make the planning host contact.
  * The browser-side render gate still supports canonical loopback HTTP for local
  * development; the CLI probe deliberately leaves those URLs inconclusive
- * instead of turning `plan` over repo content into a localhost/network scanner.
+ * instead of turning `deploy` over repo content into a localhost/network scanner.
  */
 const UNSAFE_IPV4_ADDRESSES = new BlockList();
 for (const [network, prefix] of [

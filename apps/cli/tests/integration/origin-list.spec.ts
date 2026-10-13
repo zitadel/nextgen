@@ -38,7 +38,7 @@ describe("origin list", () => {
         const result = await app.run(["origin", "list", "--json"]);
 
         expect(result).toSucceed();
-        expect(app.envelopeOf<{ origins: unknown[] }>(result).data.origins).toEqual([]);
+        expect(app.envelopeOf<{ items: unknown[] }>(result).data.items).toEqual([]);
       });
 
       it("shows the patterns that were added", async () => {
@@ -49,7 +49,7 @@ describe("origin list", () => {
         const result = await app.run(["origin", "list", "--json"]);
 
         expect(result).toSucceed();
-        expect(app.envelopeOf<{ origins: { pattern: string }[] }>(result).data.origins).toEqual([
+        expect(app.envelopeOf<{ items: { pattern: string }[] }>(result).data.items).toEqual([
           { pattern: "https://app.acme.com", kind: "primary" },
           { pattern: "https://*-acme.vercel.app", kind: "preview" },
         ]);

@@ -225,7 +225,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
                 ...repeatedFlags(flags),
                 `--page-token ${shellArg(next)}`,
                 "--json",
-              ].join(" "),
+              ].join(" ") + this.environmentSelector(),
               meta.cliVersion,
             ),
           ]
