@@ -493,11 +493,11 @@ function escapeRegExp(value: string): string {
 /**
  * Reconcile a local file with the server's canonical body. What gets
  * written is the `normalizeWrite` form (strips pure transport noise like
- * the empty `audience` echo; for schemas the canonical body verbatim —
- * spelled-out x-* defaults must survive, or the next apply would publish
- * a revision without them). Equality is judged in the `normalize`
- * comparison form, so the file is rewritten only when it materially
- * differs from live state; hand-formatted files stay untouched otherwise.
+ * the empty `audience` echo; for schemas the canonical body as returned,
+ * with the `x-audit` defaults the server spells out on every property).
+ * Equality is judged in the `normalize` comparison form, so the file is
+ * rewritten only when it materially differs from live state;
+ * hand-formatted files stay untouched otherwise.
  * Returns the state hash of the written form.
  */
 export async function writeBackResource(
