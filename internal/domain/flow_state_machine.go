@@ -1229,6 +1229,8 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 		if outcome != pc.in.Action {
 			// The found user is already on the attempt. Keeping it would block
 			// a corrected identifier and let a passkey register on that user.
+			// The password stays: on sign-up it is the one chosen for the new
+			// account, and a later step may not collect it again.
 			if outcome == FlowImplicitOutcomeUserAlreadyExists {
 				if err := r.dropResolvedUser(pc, "unrouted collision"); err != nil {
 					return FlowStepResult{}, err
@@ -1264,6 +1266,7 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 		if err := r.dropResolvedUser(pc, "re-purpose"); err != nil {
 			return FlowStepResult{}, err
 		}
+		pc.state.CollectedData.AuthMethods.Password = ""
 		pc.state.CurrentPurpose = *transition.Purpose
 
 		// Purpose entries link to each other, forming a zero-input loop.
@@ -1304,16 +1307,9 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 }
 
 // dropResolvedUser abandons the identity this flow had settled on: the
-// resolved user, the credential material collected to authenticate them, and
-// any in-flight ceremony. When a user was resolved it rotates the auth
-// attempt in lockstep.
-//
-// The collected password goes because it belongs to the identity being
-// dropped, and [mergeCollected] banks it before the proof is ever checked —
-// so a rejected password outlives its attempt otherwise, and would be handed
-// to create_user for whoever the flow resolves next. Nothing prefills from
-// it (a password field always renders empty), so clearing it costs the user
-// nothing.
+// resolved user and any in-flight ceremony. When a user was resolved it
+// rotates the auth attempt in lockstep. The collected password is left to
+// the caller, since only some callers drop the identity it belongs to.
 //
 // The persisted attempt carries the resolved user as a factor, and
 // PrepareUserChallenge refuses a second user challenge on a session-linked
@@ -1327,7 +1323,6 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 func (r *FlowStateMachineRuntime) dropResolvedUser(pc *processCtx, reason string) error {
 	hadResolvedUser := pc.state.CollectedData.UserID != ""
 	clearUserBoundState(pc.state)
-	pc.state.CollectedData.AuthMethods.Password = ""
 	if !hadResolvedUser {
 		return nil
 	}
@@ -2202,6 +2197,12 @@ func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, e
 		if err := r.dropResolvedUser(pc, "back to identification"); err != nil {
 			return FlowStepResult{}, err
 		}
+		// The password belongs to the identity being dropped, and
+		// [mergeCollected] banks it before the proof is ever checked, so a
+		// rejected password would otherwise reach create_user for whoever the
+		// flow resolves next. A password field always renders empty, so
+		// clearing it costs the user nothing.
+		pc.state.CollectedData.AuthMethods.Password = ""
 	}
 
 	// Prefill and build after the drop, so the step reflects the state the

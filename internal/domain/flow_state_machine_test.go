@@ -1717,7 +1717,7 @@ func TestFlowStateMachine_FlipTable_OutcomeWithoutTransition_DoesNotFlip(t *test
 
 			result, err := w.sm.Process(t.Context(), tt.def, start.State, domain.FlowSubmitInput{
 				Action: domain.FlowActionSubmit,
-				Fields: map[string]any{"email": "alice@example.com", "x-auth-methods#password": "irrelevant"},
+				Fields: map[string]any{"email": "alice@example.com", "x-auth-methods#password": "s3cret-pass"},
 			})
 			require.NoError(t, err)
 			assert.Equal(t, "credentials", result.State.CurrentStep, "an unwired outcome keeps the user on the current step")
@@ -1728,6 +1728,9 @@ func TestFlowStateMachine_FlipTable_OutcomeWithoutTransition_DoesNotFlip(t *test
 				"CurrentPurpose must not flip when the routed outcome had no transition wired")
 			assert.Empty(t, result.State.CollectedData.UserID)
 			assert.Equal(t, tt.wantAttempt, result.State.AuthAttemptID)
+			// A later step may not collect the password again, and create_user
+			// fails without it.
+			assert.Equal(t, "s3cret-pass", result.State.CollectedData.AuthMethods.Password)
 		})
 	}
 }
