@@ -218,6 +218,12 @@ tasks:
       - "10m"
       - "./..."
     deps:
+      # Same as vet/test/build: go test type-loads api/generated (erroranalysis
+      # and the rest of ./...), so it must not start while check-generate is
+      # still rewriting those files. Observed on full-pr run 38377623149:
+      # test-postgres compiled a half-written oas_client_gen.go and failed
+      # with thousands of undefined: Origin / CreateAuthAttemptRequest errors.
+      - "check-generate"
       # Order UI builds before go test so //go:embed all:dist has files.
       - "console:build"
       - "login-ui:build"
@@ -274,6 +280,9 @@ tasks:
       - "1"
       - "./..."
     deps:
+      # Same check-generate race as test-postgres: type-load api/generated only
+      # after generation has finished rewriting it.
+      - "check-generate"
       # Order UI builds before go test so //go:embed all:dist has files.
       - "console:build"
       - "login-ui:build"
@@ -315,6 +324,9 @@ tasks:
       - "5m"
       - "./..."
     deps:
+      # Same check-generate race as test-postgres: type-load api/generated only
+      # after generation has finished rewriting it.
+      - "check-generate"
       # Order UI builds before go test so //go:embed all:dist has files.
       - "console:build"
       - "login-ui:build"

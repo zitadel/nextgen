@@ -24,7 +24,7 @@ post:
     content:
       application/json:
         schema:
-          $ref: ../../origin.yaml
+          $ref: ../../project-origin.yaml
   responses:
     '201':
       description: The pattern was added.

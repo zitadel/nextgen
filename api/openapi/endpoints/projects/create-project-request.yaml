@@ -8,7 +8,7 @@ properties:
   origins:
     type: array
     items:
-      $ref: origin.yaml
+      $ref: project-origin.yaml
     description: |
       The origins the project starts with. An omitted or empty list means
       every origin is admitted until the first pattern is added. Loopback

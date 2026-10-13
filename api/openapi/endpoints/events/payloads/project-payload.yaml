@@ -9,7 +9,7 @@ properties:
   origins:
     type: array
     items:
-      $ref: ../../projects/origin.yaml
+      $ref: ../../projects/project-origin.yaml
   password_hash_algorithm:
     type: string
     description: |

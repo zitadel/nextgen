@@ -33,26 +33,26 @@ func TestOriginsAddRemove(t *testing.T) {
 		require.NoError(t, err)
 		created, err := unauth.CreateProject(t.Context(), &api.CreateProjectRequest{
 			Name: helpers.ProjectName(),
-			Origins: []api.Origin{
-				{Pattern: "https://app.example.com", Kind: api.OriginKindPrimary},
-				{Pattern: "https://*-acme.vercel.app", Kind: api.OriginKindPreview},
+			Origins: []api.ProjectOrigin{
+				{Pattern: "https://app.example.com", Kind: api.ProjectOriginKindPrimary},
+				{Pattern: "https://*-acme.vercel.app", Kind: api.ProjectOriginKindPreview},
 			},
 			SeedDefaults: api.NewOptBool(false),
 		})
 		require.NoError(t, err)
 		resp, ok := created.(*api.CreateProjectResponse)
 		require.True(t, ok, helpers.MustMarshal(t, created))
-		assert.ElementsMatch(t, []api.Origin{
-			{Pattern: "https://app.example.com", Kind: api.OriginKindPrimary},
-			{Pattern: "https://*-acme.vercel.app", Kind: api.OriginKindPreview},
+		assert.ElementsMatch(t, []api.ProjectOrigin{
+			{Pattern: "https://app.example.com", Kind: api.ProjectOriginKindPrimary},
+			{Pattern: "https://*-acme.vercel.app", Kind: api.ProjectOriginKindPreview},
 		}, resp.Origins)
 		harness.CleanupProject(t, resp.ID)
 	})
 
 	t.Run("add is idempotent and rejects kind conflict", func(t *testing.T) {
-		first, err := client.AddOrigin(t.Context(), &api.Origin{
+		first, err := client.AddOrigin(t.Context(), &api.ProjectOrigin{
 			Pattern: "https://preview.example.com",
-			Kind:    api.OriginKindPreview,
+			Kind:    api.ProjectOriginKindPreview,
 		}, api.AddOriginParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 		origin, ok := first.(*api.AddOriginResponse)
@@ -60,17 +60,17 @@ func TestOriginsAddRemove(t *testing.T) {
 		assert.Equal(t, "https://preview.example.com", origin.Pattern)
 		assert.Equal(t, api.AddOriginResponseKindPreview, origin.Kind)
 
-		again, err := client.AddOrigin(t.Context(), &api.Origin{
+		again, err := client.AddOrigin(t.Context(), &api.ProjectOrigin{
 			Pattern: "https://preview.example.com",
-			Kind:    api.OriginKindPreview,
+			Kind:    api.ProjectOriginKindPreview,
 		}, api.AddOriginParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 		_, ok = again.(*api.AddOriginResponse)
 		require.True(t, ok, helpers.MustMarshal(t, again))
 
-		conflict, err := client.AddOrigin(t.Context(), &api.Origin{
+		conflict, err := client.AddOrigin(t.Context(), &api.ProjectOrigin{
 			Pattern: "https://preview.example.com",
-			Kind:    api.OriginKindPrimary,
+			Kind:    api.ProjectOriginKindPrimary,
 		}, api.AddOriginParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 		status, code, _, ok := errorResponseParts(t, conflict)
@@ -80,9 +80,9 @@ func TestOriginsAddRemove(t *testing.T) {
 	})
 
 	t.Run("remove is idempotent", func(t *testing.T) {
-		_, err := client.AddOrigin(t.Context(), &api.Origin{
+		_, err := client.AddOrigin(t.Context(), &api.ProjectOrigin{
 			Pattern: "https://tmp.example.com",
-			Kind:    api.OriginKindPrimary,
+			Kind:    api.ProjectOriginKindPrimary,
 		}, api.AddOriginParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 
@@ -102,9 +102,9 @@ func TestOriginsAddRemove(t *testing.T) {
 	})
 
 	t.Run("rejects unbounded shared host", func(t *testing.T) {
-		resp, err := client.AddOrigin(t.Context(), &api.Origin{
+		resp, err := client.AddOrigin(t.Context(), &api.ProjectOrigin{
 			Pattern: "https://*.vercel.app",
-			Kind:    api.OriginKindPreview,
+			Kind:    api.ProjectOriginKindPreview,
 		}, api.AddOriginParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 		status, code, _, ok := errorResponseParts(t, resp)
@@ -114,9 +114,9 @@ func TestOriginsAddRemove(t *testing.T) {
 	})
 
 	t.Run("rejects primary wildcard", func(t *testing.T) {
-		resp, err := client.AddOrigin(t.Context(), &api.Origin{
+		resp, err := client.AddOrigin(t.Context(), &api.ProjectOrigin{
 			Pattern: "https://*.example.com",
-			Kind:    api.OriginKindPrimary,
+			Kind:    api.ProjectOriginKindPrimary,
 		}, api.AddOriginParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 		status, code, _, ok := errorResponseParts(t, resp)

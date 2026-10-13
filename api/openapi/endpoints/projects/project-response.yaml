@@ -16,7 +16,7 @@ properties:
   origins:
     type: array
     items:
-      $ref: origin.yaml
+      $ref: project-origin.yaml
     description: |
       The project's origins. An empty list means every origin is admitted
       until the first pattern is added. Loopback origins are admitted without

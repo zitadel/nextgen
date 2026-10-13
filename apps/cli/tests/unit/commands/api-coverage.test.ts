@@ -70,6 +70,10 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // generated surface; recorded as a question rather than implied to be owned.
   completeClaim: "part of the claim flow, but currently called by no command — unresolved",
   getClaimWindow: "part of the claim flow, but currently called by no command — unresolved",
+  // A preview exists only through a deployment to it, so it has no create to
+  // offer; listing and removing it are `zitadel preview`'s.
+  listPreviews: "previews are listed by `zitadel preview` (#1312)",
+  removePreview: "previews are removed by `zitadel preview` (#1312)",
 
   // Configuration is written declaratively (ADR 035), never imperatively here.
   createSchema: "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
