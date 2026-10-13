@@ -9,8 +9,8 @@
   "type": "module",
   "scripts": {
     "generate": "node scripts/bundle-openapi.mjs",
-    "dev": "pnpm run generate && next dev --port 3003",
-    "build": "pnpm run generate && next build",
+    "dev": "node scripts/bundle-openapi.mjs && next dev --port 3003",
+    "build": "node scripts/bundle-openapi.mjs && next build",
     "start": "next start --port 3003",
     "typecheck": "next typegen && tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
     "lint": "biome check .",
