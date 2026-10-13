@@ -59,7 +59,7 @@ test("a page wears the console's colours, faces and code colours in both themes"
         if (!element) throw new Error(`nothing matches ${selector}`);
         return getComputedStyle(element);
       };
-      const firstFace = (family: string) => family.split(",")[0].trim();
+      const firstFace = (family: string) => (family.split(",")[0] ?? "").trim();
       const title = style("#nd-page > h1");
       const section = style(".prose h2");
 
@@ -84,7 +84,7 @@ test("a page wears the console's colours, faces and code colours in both themes"
           style('pre span[style*="--zl-shiki-token-string"]').color,
           resolve("color", "var(--zl-syntax-string)"),
         ],
-      };
+      } as const;
     });
 
     for (const [part, [actual, expected]] of Object.entries(look)) {
