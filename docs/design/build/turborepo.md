@@ -70,10 +70,16 @@ hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   `GITHUB_ACTIONS`, `RUNNER_TEMP`, `VERCEL`, `COREPACK_*`, `TURBO_*`, what
   framework inference adds (`VITE_*` for Vite packages, `NEXT_*` for Next.js)
   and what the task lists. `env` names variables that change the output and
-  are hashed (`VITE_CONSOLE_VERCEL_INSIGHTS`, `GOFLAGS`); `passThroughEnv`
+  are hashed (`CONSOLE_VERCEL_INSIGHTS`, `GOFLAGS`); `passThroughEnv`
   names variables a task reads at run time without affecting its output
   (`NEXTGEN_*` for the e2e lanes, `DOCKER_*` for the database lanes). The Go
   cache locations pass through globally.
+- A variable meant for one package does not get a framework prefix
+  (`VITE_`, `NEXT_PUBLIC_`): inference hashes a prefixed variable into every
+  package of that framework in the run, so its dependencies would get other
+  cache keys in that one build than everywhere else. The package lists it in
+  its `env` and its config reads it (the console's `CONSOLE_*` variables and
+  `vite.config.ts`).
 - A task cannot set a variable's value. Values a lane needs (moon's task
   `env:` blocks) are set in the `package.json` script as defaults that a
   caller's own value overrides, as it overrides moon's task `env`:
@@ -116,3 +122,11 @@ Turbo needs a `pnpm` binary on `PATH` (`corepack enable`). In a git worktree
 turbo's cache defaults to the main checkout's `.turbo/cache`; set
 `TURBO_CACHE_DIR` to keep worktrees apart. Telemetry is off in CI and on
 Vercel (`TURBO_TELEMETRY_DISABLED=1`); set it locally too.
+
+On Vercel, `apps/cloud/turbo-build.sh` runs the hosted cloud's builds and
+sets the cache policy: the local cache lives in `node_modules/.cache/turbo`,
+because Vercel's build cache keeps `node_modules` from build to build and
+drops `.turbo/cache`; production never reads the remote cache. The docs and
+the website do not build through turbo: with Skew Protection on, a Next.js
+build's cache key includes the deployment's ID, so no build could reuse
+another's.

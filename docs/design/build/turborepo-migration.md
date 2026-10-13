@@ -174,7 +174,7 @@ as they were.
 | cli | `build-release` (runDepsInParallel false, dep test) | `#build-release` | **new** script; `dependsOn: ["test", "@zitadel/sdk-next#build-release"]` |
 | cli | `readme` | `#readme` | existing; `outputs: ["README.md"]` |
 | cli-journey-e2e | `e2e`, `e2e-local`, `e2e-testkit` (env ZITADEL_TELEMETRY=0) | same | scripts default `ZITADEL_TELEMETRY` to `0`; **new** `e2e-testkit` |
-| console | `build` (outputs staticui, env input) | `#build` | `env: ["VITE_CONSOLE_VERCEL_INSIGHTS"]`, outputs `$TURBO_ROOT$/internal/staticui/console/dist/**` |
+| console | `build` (outputs staticui, env input) | `#build` | `env: ["CONSOLE_VERCEL_INSIGHTS"]`, outputs `$TURBO_ROOT$/internal/staticui/console/dist/**` |
 | console | `build-release` | `#build-release` | **new** `vite build`; waits for the release chain |
 | console | `dev`, `preview` (persistent) | `#dev`, `#preview` | existing |
 | console | `dev-real`, `dev-claim` (persistent) | `#dev:real`, `#dev:claim` | existing; the script builds the server through the selected runner |
@@ -188,7 +188,7 @@ as they were.
 | docs | `build` (`next build`, mergeArgs replace) | `#build` | existing script (`pnpm run generate && next build`): bundles once more than moon; the Vercel docs service runs the script without a runner |
 | docs | `dev`, `start` | same | existing |
 | docs | `e2e` (dep build), `e2e-deployment` (inline `DOCS_BASE_URL` check) | same | **new** scripts; the deployment lane's check is in the script |
-| console | `build` env inputs `$VITE_CONSOLE_VERCEL_INSIGHTS`, `$CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE` | `#build` `env` | both listed: strict mode would otherwise hide the unprefixed one from vite.config.ts |
+| console | `build` env inputs `$CONSOLE_VERCEL_INSIGHTS`, `$CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE` | `#build` `env` | both listed: strict mode would otherwise hide them from vite.config.ts. Neither is `VITE_`-prefixed: Vite inference would hash a prefixed one into every Vite package of the cloud's console build (as `VITE_CONSOLE_VERCEL_INSIGHTS`, it had `components` built twice per deployment) |
 | login-ui | `build`, `build-release` (outputs staticui) | same | **new** `build-release`: `vite build` |
 | login-ui | `dev`, `preview` | same | existing |
 | mock-zitadel | `build`, `typecheck`, `test` | same | same edge (api-mock) |
@@ -436,11 +436,18 @@ sets them up:
   every build, so the cache is writable by anyone who can push a branch.
   Production builds therefore never restore from it (`apps/cloud/
   turbo-build.sh`: `local:rw,remote:w` when `VERCEL_ENV=production`): they
-  build from source and upload for the previews to reuse. A poisoned
-  artifact can reach other previews (SSO-protected) at most. Previews are
-  read-only by their own choice, which keeps the cache tidy but protects
-  nothing. Cost: production deployments lose the pilot's ~35 s of cache
-  hits.
+  upload for the previews to reuse. A poisoned artifact can reach other
+  previews (SSO-protected) at most. Previews are read-only by their own
+  choice, which keeps the cache tidy but protects nothing. Production gets
+  its cache hits from the local cache instead (next point).
+- **The local cache on Vercel** sits in `node_modules/.cache/turbo`:
+  Vercel's build cache keeps `node_modules` from build to build and drops
+  `.turbo/cache` (before the move, the same task hashes missed in nine
+  previews of one branch in a row). Vercel keeps that cache per branch, a
+  new branch starting from production's, and only production builds write
+  production's, so production restores only what production built: the
+  boundary its installed packages and Go's build cache already rely on.
+  A branch's builds reuse production's results and then their own.
 - **GitHub Actions on pull requests** run the pull request's code, and the
   OIDC policy gives every run of this repository a token that can write
   (Vercel's docs describe no read-only policy; forks get no token).
@@ -452,14 +459,14 @@ sets them up:
   the cache: a push to main runs the gate and writes, pull requests and the
   merge queue read. A poisoned artifact could still make a pull-request or
   merge-queue run pass for code that fails; the signatures below close that.
-- **Later, to let production read again:** turbo's artifact signatures
-  (`remoteCache.signature: true` with `TURBO_REMOTE_CACHE_SIGNATURE_KEY`).
-  Production and trusted CI get the real key (a Vercel Production-only env
-  var; a GitHub environment with a branch rule for main and the merge
-  queue), previews
-  and pull requests a different one, and restores reject artifacts signed
-  with the wrong key. That separates the two populations server-side without
-  a second cache, at the price of two more secrets.
+- **Later, to let trusted CI and production read the remote cache:** turbo's
+  artifact signatures (`remoteCache.signature: true` with
+  `TURBO_REMOTE_CACHE_SIGNATURE_KEY`). Production and trusted CI get the
+  real key (a Vercel Production-only env var; a GitHub environment with a
+  branch rule for main and the merge queue), previews and pull requests a
+  different one, and restores reject artifacts signed with the wrong key.
+  That separates the two populations server-side without a second cache, at
+  the price of two more secrets.
 
 This was raised by the security review of the first pull request and is
 tracked there (zitadel/nextgen#1696).
@@ -572,7 +579,9 @@ the release graph.
    must not restore what a branch build may have produced. `apps/cloud/
    turbo-build.sh` sets `local:rw,remote:w` for production and
    `local:rw,remote:r` for previews (see "Who may write to the cache"); no
-   Vercel setting is needed for that.
+   Vercel setting is needed for that. The local cache is not covered by
+   this: it lives in Vercel's build cache, where production restores only
+   production builds' results (2026-10-13).
 4. **The Go tasks' scripts stay in `apps/server/package.json`** (published,
    inert).
 5. **Release builds keep rewriting `dist/` in place**, ordered by the edge
