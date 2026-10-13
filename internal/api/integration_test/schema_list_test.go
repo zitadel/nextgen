@@ -124,12 +124,12 @@ func TestListSchemasRevisions(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	createSchema := func(t *testing.T, title, objectTypeField string) string {
+	createSchema := func(t *testing.T, title, objectType string) string {
 		t.Helper()
 		doc := fmt.Sprintf(`{
 			"title": %q,
 			"$schema": "https://json-schema.org/draft/2020-12/schema",
-			%s
+			"objectType": %q,
 			"metaSchema": "%s/user-schema.json",
 			"kind": "user-schema",
 			"type": "object",
@@ -139,7 +139,7 @@ func TestListSchemasRevisions(t *testing.T) {
 			"properties": {
 				"givenName": { "type": "string" }
 			}
-		}`, title, objectTypeField, helpers.BuiltinSchemaBaseURL)
+		}`, title, objectType, helpers.BuiltinSchemaBaseURL)
 		sch := api.UserSchema{}
 		require.NoError(t, sch.UnmarshalJSON([]byte(doc)))
 		resp, err := client.CreateSchema(
@@ -156,12 +156,25 @@ func TestListSchemasRevisions(t *testing.T) {
 		consumer = "list-schemas-revisions-consumer"
 		business = "list-schemas-revisions-business"
 	)
-	consumerV1 := createSchema(t, "consumer v1", fmt.Sprintf(`"objectType": %q,`, consumer))
-	consumerV2 := createSchema(t, "consumer v2", fmt.Sprintf(`"objectType": %q,`, consumer))
-	businessV1 := createSchema(t, "business v1", fmt.Sprintf(`"objectType": %q,`, business))
-	// objectType is optional in the meta-schema, and #812 keeps producing rows
-	// without one by other routes. Such a row is a revision of nothing.
-	orphan := createSchema(t, "no object type", "")
+	consumerV1 := createSchema(t, "consumer v1", consumer)
+	consumerV2 := createSchema(t, "consumer v2", consumer)
+	businessV1 := createSchema(t, "business v1", business)
+	// A document fetched by URL is stored unparsed (#812), so its row carries
+	// no object type whatever the document declares. Such a row is a revision
+	// of nothing.
+	orphanRow := &domain.JSONSchema{
+		ProjectID: project.ID,
+		Kind:      domain.JSONSchemaKindUnknown,
+		Schema: []byte(fmt.Sprintf(`{
+			"title": "no object type",
+			"objectType": "list-schemas-revisions-orphan",
+			"metaSchema": "%s/user-schema.json",
+			"kind": "user-schema",
+			"x-auth-methods": {"passkey": {"enabled": true}}
+		}`, helpers.BuiltinSchemaBaseURL)),
+	}
+	require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateJSONSchema(t.Context(), orphanRow))
+	orphan := orphanRow.URL
 
 	list := func(t *testing.T, params api.ListSchemasParams) *api.ListSchemasResponse {
 		t.Helper()

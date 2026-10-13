@@ -69256,7 +69256,7 @@ type UserSchema struct {
 	// The type of user this schema describes. This is a customer chosen name.
 	// Every revision of a schema shares its `objectType`, and flow
 	// definitions name the schema they operate on by it.
-	ObjectType OptString `json:"objectType"`
+	ObjectType string `json:"objectType"`
 	// Discriminator value for a user schema create request.
 	Kind string `json:"kind"`
 	// The user Schema version used for this schema.
@@ -69286,7 +69286,7 @@ func (s *UserSchema) GetSchema() OptString {
 }
 
 // GetObjectType returns the value of ObjectType.
-func (s *UserSchema) GetObjectType() OptString {
+func (s *UserSchema) GetObjectType() string {
 	return s.ObjectType
 }
 
@@ -69331,7 +69331,7 @@ func (s *UserSchema) SetSchema(val OptString) {
 }
 
 // SetObjectType sets the value of ObjectType.
-func (s *UserSchema) SetObjectType(val OptString) {
+func (s *UserSchema) SetObjectType(val string) {
 	s.ObjectType = val
 }
 
