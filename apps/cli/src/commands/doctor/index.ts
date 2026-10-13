@@ -163,7 +163,7 @@ export default class Doctor extends BaseCommand {
     };
 
     if (failed.length > 0) {
-      const advice = failureAdvice(failed, image, port, this.meta.cliVersion);
+      const advice = failureAdvice(failed, image, port, this.meta.cliVersion, selector);
       // A check that failed with a typed CLI error advertises its own
       // category (e.g. the framework floor's E_UNSUPPORTED_PROJECT_SHAPE) —
       // surface that instead of the generic validation class so agents can
@@ -191,6 +191,11 @@ function failureAdvice(
   image: string,
   port: number,
   cliVersion: string,
+  // The invocation's --env/--env-file/--server suffix. Appended only to the
+  // retries that resolve the environment (the env-connect failure and the
+  // project `--fix`); the local-runtime remedies — docker, port, image,
+  // state-dir — are machine checks the selector would only clutter.
+  selector: string,
 ): { hint: string; nextCommands: string[] } {
   const failedNames = new Set(failed.map((check) => check.name));
 
@@ -261,21 +266,24 @@ function failureAdvice(
   if (failedNames.has("environment")) {
     return {
       hint: "The resolved environment could not connect. Check the server, project and credential it resolves with `zitadel env`, then rerun `zitadel doctor` with the same --env / --env-file.",
-      nextCommands: [publicCliCommand("env", cliVersion), publicCliCommand("doctor", cliVersion)],
+      nextCommands: [
+        publicCliCommand(`env${selector}`, cliVersion),
+        publicCliCommand(`doctor${selector}`, cliVersion),
+      ],
     };
   }
 
   const hasProjectFailure = failed.some((check) => !LOCAL_RUNTIME_CHECK_NAMES.has(check.name));
   if (hasProjectFailure) {
     return {
-      hint: `Run \`${publicCliCommand("doctor --fix", cliVersion)}\` to re-apply missing managed files.`,
-      nextCommands: [publicCliCommand("doctor --fix", cliVersion)],
+      hint: `Run \`${publicCliCommand(`doctor --fix${selector}`, cliVersion)}\` to re-apply missing managed files.`,
+      nextCommands: [publicCliCommand(`doctor --fix${selector}`, cliVersion)],
     };
   }
 
   return {
     hint: "Fix the reported checks, then rerun `zitadel doctor`.",
-    nextCommands: [publicCliCommand("doctor", cliVersion)],
+    nextCommands: [publicCliCommand(`doctor${selector}`, cliVersion)],
   };
 }
 
