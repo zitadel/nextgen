@@ -346,6 +346,7 @@ export class ZlField extends FormAtom {
           aria-describedby=${ifDefined(labelId)}
           title=${label}
           tabindex="-1"
+          @mousedown=${this.keepInputFocus}
           @click=${this.handlePasswordToggle}
         >
           <zl-icon name=${this.revealed ? "eye-off" : "eye"} size="16" decorative></zl-icon>
@@ -354,11 +355,33 @@ export class ZlField extends FormAtom {
     `;
   }
 
-  private handlePasswordToggle = (): void => {
+  /**
+   * Out of the tab order is not out of reach of the pointer: pressing the
+   * button would still move focus to it and blur the field mid-typing.
+   */
+  private keepInputFocus = (event: MouseEvent): void => {
+    event.preventDefault();
+  };
+
+  private handlePasswordToggle = async (): Promise<void> => {
+    const input = this.inputEl;
+    // Chrome puts the caret at 0 when the input's `type` attribute changes,
+    // which is how Lit applies the new type, so carry the selection across.
+    const start = input?.selectionStart ?? null;
+    const end = input?.selectionEnd ?? null;
+    const direction = input?.selectionDirection ?? undefined;
     this.revealed = !this.revealed;
-    // The button is out of the tab order, so a click would otherwise leave
-    // focus on it rather than back in the field the user is typing into.
-    this.inputEl?.focus();
+    // Focus normally never left (see keepInputFocus); this covers a touch or
+    // assistive-tech activation that did move it.
+    input?.focus();
+    await this.updateComplete;
+    if (input && start !== null && end !== null) {
+      // The reset is lazy: Chrome rebuilds the input's inner editor on the
+      // next layout and only then drops the caret. Forcing that layout first
+      // makes the restore stick, without a frame where the caret sits at 0.
+      void input.offsetWidth;
+      input.setSelectionRange(start, end, direction);
+    }
   };
 
   private syncFormState(): void {

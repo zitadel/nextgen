@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { userEvent } from "vitest/browser";
 
 import "./zl-field.js";
 import type { ZlField } from "./zl-field.js";
@@ -226,6 +227,38 @@ describe("<zl-field> password toggle (chromium)", () => {
     expect(input.type).toBe("text");
     return { form, field, input };
   }
+
+  it("keeps focus and the caret where they were across a real click", async () => {
+    host.innerHTML = `<zl-field name="pw" type="password" value="hunter2"></zl-field>`;
+    const field = host.querySelector("zl-field") as ZlField;
+    field.passwordToggle = true;
+    await field.updateComplete;
+    const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    const button = () =>
+      field.shadowRoot?.querySelector<HTMLButtonElement>(
+        '[part~="password-toggle"]',
+      ) as HTMLButtonElement;
+    input.focus();
+    input.setSelectionRange(4, 4);
+    let blurred = false;
+    input.addEventListener("blur", () => {
+      blurred = true;
+    });
+
+    await userEvent.click(button());
+    await field.updateComplete;
+    expect(input.type).toBe("text");
+    expect(field.shadowRoot?.activeElement).toBe(input);
+    expect([input.selectionStart, input.selectionEnd]).toEqual([4, 4]);
+
+    // A selection survives too, and so does the way back.
+    input.setSelectionRange(1, 5);
+    await userEvent.click(button());
+    await field.updateComplete;
+    expect(input.type).toBe("password");
+    expect([input.selectionStart, input.selectionEnd]).toEqual([1, 5]);
+    expect(blurred).toBe(false);
+  });
 
   it("hides the value when the owning form is reset", async () => {
     const { form, field, input } = await mountRevealed(
