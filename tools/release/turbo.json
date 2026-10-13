@@ -55,7 +55,7 @@
         "@zitadel/console#build-release",
         "@zitadel/login-ui#build-release"
       ],
-      "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA", "ZITADEL_*", "DOCKER_*", "GOFLAGS"]
+      "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA", "ZITADEL_*", "DOCKER_*", "GOFLAGS", "RELEASE_SKIP_CONTAINER"]
     },
     "publish": {
       "cache": false,

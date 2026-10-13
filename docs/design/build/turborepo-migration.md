@@ -319,7 +319,7 @@ somewhere other than the dev `dist/` (open decision 5). The order check
 | `scripts/check.mjs` | `moon run …`, `moon ci …` | phases call `runnerCommand` / `workspaceCommand`; the Node phase runs the whole gate under turbo (no `--affected`, see below) | done |
 | `scripts/run-server.mjs`, `run-server-debug.mjs`, `run-cli.mjs`, `apps/console/scripts/dev-real.mts`, `apps/cli-journey-e2e/scripts/local-registry.mjs` | `moon run <targets>` | `runnerCommand(targets)` | done; existing tests pass (default runner moon) |
 | `scripts/go-generate.mjs`, `check-pr-title.mjs`, `clean-generated.mjs`, `generated-outputs.mjs`, `assert-file.mjs` | mention moon in skip lists or hints | `.turbo` is already skipped; hints say `moon run server:generate` → runner-neutral wording | cutover |
-| `scripts/release.mjs` | none (its deps came from the task graph) | unchanged; `turbo run snapshot --filter=@zitadel/release -- --skip-container` forwards arguments the same way | unchanged |
+| `scripts/release.mjs` | none (its deps came from the task graph) | reads `RELEASE_SKIP_CONTAINER=1` as `--skip-container`: under turbo, arguments after `--` would put new cache keys on the whole release graph (turborepo.md, Commands) | done |
 
 Why no `--affected` for the gate: turbo's `--affected` and `--filter=…[ref]`
 select packages, following `package.json` edges only. The artifact edges
@@ -337,12 +337,12 @@ set.
 |---|---|
 | `MOON_SUMMARY=detailed` | `--summarize` + `report-turbo-failures.mjs` |
 | `node scripts/ci-mode.mjs <base>` | same, with `NEXTGEN_TASK_RUNNER=turbo` |
-| `moon run server:check-generate-pruned` | `turbo run check-generate-pruned --filter=@zitadel/server` |
+| `moon run server:check-generate-pruned` | `turbo run check-generate-pruned --filter=@zitadel/server`, on pushes to main too, so that its result is in the remote cache |
 | `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph --downstream deep --include-relations` | `turbo run lint typecheck build test check-adrs check-moon-graph --continue=dependencies-successful --summarize` |
 | `moon run server:test` | dropped: part of the gate (moon re-ran it because `moon ci` selects by affectedness) |
 | `moon run server:test-postgres` / `test-sqlite` | `turbo run test-postgres --filter=@zitadel/server` / `test-sqlite` |
-| `env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container` | `turbo run snapshot --filter=@zitadel/release -- --skip-container` (no `env -u`) |
-| `… moon run cli-journey-e2e:e2e-local -- --ci …` | `turbo run e2e-local --filter=@zitadel/cli-journey-e2e -- --ci …` |
+| `env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container` | `RELEASE_SKIP_CONTAINER=1 turbo run snapshot --filter=@zitadel/release` (no `env -u`; no arguments after `--`, see turborepo.md) |
+| `… moon run cli-journey-e2e:e2e-local -- --ci …` | `JOURNEY_CI=1 JOURNEY_MATRIX=… turbo run e2e-local --filter=@zitadel/cli-journey-e2e` |
 | `… moon run testing:test-integration demo-next-e2e:e2e-real` | `turbo run test:integration e2e-real --filter=@zitadel/testing --filter=@zitadel/demo-next-e2e` |
 | `… moon run console-e2e:e2e-real` (embedded, platform) | `turbo run e2e-real --filter=@zitadel/console-e2e` (…) |
 | `… moon run release:version` / `release:pack` | `turbo run version --filter=@zitadel/release` / `pack` |
@@ -356,7 +356,9 @@ token.
 - **release-publish.yml:** `env -u CI moon run release:publish [-- --dry-run
   --recover-version X]` → `turbo run publish --filter=@zitadel/release -- …`.
   The job needs the remote-cache step only for speed; publishing itself is
-  `cache: false` throughout.
+  `cache: false` throughout. The arguments after `--` give the dependencies
+  new cache keys (turborepo.md, Commands), so they rebuild; acceptable for a
+  rare job, or the options become environment variables like the snapshot's.
 - **spanner.yml:** `moon run server:test-spanner` → `turbo run test-spanner
   --filter=@zitadel/server`; `MOON_SUMMARY` goes.
 - **sync-design-tokens.yml:** `moon run design-tokens:sync-export` / `sync` /
@@ -396,7 +398,7 @@ Command translation, for the rewrite and for muscle memory:
 | `moon run a:build b:build` | `turbo run build --filter=@zitadel/a --filter=@zitadel/b` |
 | `moon ci :lint :typecheck :build :test` | `turbo run lint typecheck build test` |
 | `moon run workspace:<task>` | `pnpm run <task>` (or `turbo run <task>` for the root tasks) |
-| `moon run x:task -- --flag` | `turbo run task --filter=@zitadel/x -- --flag` |
+| `moon run x:task -- --flag` | `turbo run task --filter=@zitadel/x -- --flag` (by hand; it re-keys every task in the run, see turborepo.md) |
 | `moon projects` / `moon tasks` | `turbo ls` / `turbo run <task> --dry` |
 | `moon query tasks --affected` | `turbo query '{ affectedTasks(base: "origin/main", tasks: […]) { items { name package { name } } } }'` |
 | `MOON_SUMMARY=detailed` | `--summarize` |
