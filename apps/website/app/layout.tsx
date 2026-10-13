@@ -30,15 +30,19 @@ export const metadata: Metadata = {
   icons: { icon: { url: icon.src, type: "image/svg+xml" } },
 };
 
+// Unset reports every page load; next.config.ts rejects a value outside 0–1.
+// Web Analytics has no sampling and counts every page view.
+const speedInsightsSampleRate = Number(process.env.WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE || 1);
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${arimo.variable} ${apkFutural.variable}`}>
       <body className="bg-background text-foreground antialiased">
         {children}
-        {/* Web Analytics counts every page view; Speed Insights reports one
-            page load in a hundred. */}
         <Analytics />
-        <SpeedInsights sampleRate={0.01} />
+        {/* The package reads a rate of 0 as unset, which would send every
+            page load. */}
+        {speedInsightsSampleRate > 0 && <SpeedInsights sampleRate={speedInsightsSampleRate} />}
       </body>
     </html>
   );
