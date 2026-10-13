@@ -36,9 +36,9 @@ func TestOriginsNotImplemented(t *testing.T) {
 	}
 
 	t.Run("add", func(t *testing.T) {
-		resp, err := client.AddOrigin(t.Context(), &api.Origin{
+		resp, err := client.AddOrigin(t.Context(), &api.ProjectOrigin{
 			Pattern: "https://app.example.com",
-			Kind:    api.OriginKindPrimary,
+			Kind:    api.ProjectOriginKindPrimary,
 		}, api.AddOriginParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
 		expectNotImplemented(t, resp)

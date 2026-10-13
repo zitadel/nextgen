@@ -150,7 +150,7 @@ func (h *Handler) ListMyProjects(ctx context.Context, params api.ListMyProjectsP
 
 // AddOrigin is a stub until the origins service lands. Authz runs first so a
 // caller without origin.write learns that before the 501.
-func (h *Handler) AddOrigin(ctx context.Context, _ *api.Origin, params api.AddOriginParams) (api.AddOriginRes, error) {
+func (h *Handler) AddOrigin(ctx context.Context, _ *api.ProjectOrigin, params api.AddOriginParams) (api.AddOriginRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), originAccess, opWrite); err != nil {
 		return nil, err
 	}
@@ -169,7 +169,7 @@ func (h *Handler) RemoveOrigin(ctx context.Context, _ *api.RemoveOriginReq, para
 
 // ------------------ Converters ---------------
 
-func apiOriginsToDomain(in []api.Origin) []domain.Origin {
+func apiOriginsToDomain(in []api.ProjectOrigin) []domain.Origin {
 	if in == nil {
 		return nil
 	}
@@ -185,15 +185,15 @@ func apiOriginsToDomain(in []api.Origin) []domain.Origin {
 
 // domainOriginsToAPI converts domain origins onto the wire. A nil domain slice
 // becomes an empty array so required response fields stay present.
-func domainOriginsToAPI(in []domain.Origin) []api.Origin {
+func domainOriginsToAPI(in []domain.Origin) []api.ProjectOrigin {
 	if in == nil {
-		return []api.Origin{}
+		return []api.ProjectOrigin{}
 	}
-	out := make([]api.Origin, len(in))
+	out := make([]api.ProjectOrigin, len(in))
 	for i, o := range in {
-		out[i] = api.Origin{
+		out[i] = api.ProjectOrigin{
 			Pattern: o.Pattern,
-			Kind:    api.OriginKind(o.Kind),
+			Kind:    api.ProjectOriginKind(o.Kind),
 		}
 	}
 	return out

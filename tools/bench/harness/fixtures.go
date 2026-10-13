@@ -87,12 +87,12 @@ func LoadFixture(path string) (Fixture, error) {
 // password — and proves the result by walking one login journey and one user
 // read before returning the target. A fixture that cannot be driven is
 // reported here, not as a wall of failed iterations later.
-func originsToAPI(in []FixtureOrigin) []api.Origin {
-	out := make([]api.Origin, len(in))
+func originsToAPI(in []FixtureOrigin) []api.ProjectOrigin {
+	out := make([]api.ProjectOrigin, len(in))
 	for i, o := range in {
-		out[i] = api.Origin{
+		out[i] = api.ProjectOrigin{
 			Pattern: o.Pattern,
-			Kind:    api.OriginKind(o.Kind),
+			Kind:    api.ProjectOriginKind(o.Kind),
 		}
 	}
 	return out

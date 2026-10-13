@@ -117,16 +117,16 @@ func TestCreateProject(t *testing.T) {
 			name: "no optional fields",
 			req: &api.CreateProjectRequest{
 				Name:    helpers.ProjectName(),
-				Origins: make([]api.Origin, 0),
+				Origins: make([]api.ProjectOrigin, 0),
 			},
 		},
 		{
 			name: "with optional fields",
 			req: &api.CreateProjectRequest{
 				Name: helpers.ProjectName(),
-				Origins: []api.Origin{
-					{Pattern: "*.vercel.app", Kind: api.OriginKindPreview},
-					{Pattern: "*.netlify.app", Kind: api.OriginKindPreview},
+				Origins: []api.ProjectOrigin{
+					{Pattern: "*.vercel.app", Kind: api.ProjectOriginKindPreview},
+					{Pattern: "*.netlify.app", Kind: api.ProjectOriginKindPreview},
 				},
 			},
 		},
@@ -224,7 +224,7 @@ func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
 
 	resp, err := client.CreateProject(t.Context(), &api.CreateProjectRequest{
 		Name:         helpers.ProjectName(),
-		Origins:      make([]api.Origin, 0),
+		Origins:      make([]api.ProjectOrigin, 0),
 		SeedDefaults: api.NewOptBool(false),
 	})
 	require.NoError(t, err)
@@ -280,9 +280,9 @@ func TestGetProject(t *testing.T) {
 	}{
 		{
 			name: "ok",
-			want: &api.ProjectResponse{Name: project.Name, Origins: []api.Origin{
-				{Pattern: "*.example.com", Kind: api.OriginKindPreview},
-				{Pattern: "localhost:3000", Kind: api.OriginKindPreview},
+			want: &api.ProjectResponse{Name: project.Name, Origins: []api.ProjectOrigin{
+				{Pattern: "*.example.com", Kind: api.ProjectOriginKindPreview},
+				{Pattern: "localhost:3000", Kind: api.ProjectOriginKindPreview},
 			}},
 		},
 		{
@@ -332,7 +332,7 @@ func TestProjectSessionCaller(t *testing.T) {
 	t.Run("granted person opens the project", func(t *testing.T) {
 		resp, err := grantee.GetProject(t.Context(), params)
 		require.NoError(t, err)
-		assertProjectResponse(t, &api.ProjectResponse{Name: project.Name, Origins: []api.Origin{}}, resp)
+		assertProjectResponse(t, &api.ProjectResponse{Name: project.Name, Origins: []api.ProjectOrigin{}}, resp)
 	})
 
 	t.Run("granted person renames the project", func(t *testing.T) {
@@ -408,15 +408,15 @@ func TestPatchProject(t *testing.T) {
 		{
 			name: "rename",
 			req:  &api.PatchProjectRequest{Name: api.NewOptNilString(renamed)},
-			want: &api.ProjectResponse{Name: renamed, Origins: []api.Origin{}},
+			want: &api.ProjectResponse{Name: renamed, Origins: []api.ProjectOrigin{}},
 		},
 		{
 			name:    "origins are left untouched",
 			origins: keptOrigins,
 			req:     &api.PatchProjectRequest{Name: api.NewOptNilString(renamedKeep)},
-			want: &api.ProjectResponse{Name: renamedKeep, Origins: []api.Origin{
-				{Pattern: "*.example.com", Kind: api.OriginKindPreview},
-				{Pattern: "localhost:3000", Kind: api.OriginKindPreview},
+			want: &api.ProjectResponse{Name: renamedKeep, Origins: []api.ProjectOrigin{
+				{Pattern: "*.example.com", Kind: api.ProjectOriginKindPreview},
+				{Pattern: "localhost:3000", Kind: api.ProjectOriginKindPreview},
 			}},
 		},
 		{
@@ -662,9 +662,9 @@ func TestQueryProjects(t *testing.T) {
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	var (
-		own = api.ProjectResponse{Name: project.Name, Origins: []api.Origin{
-			{Pattern: "*.example.com", Kind: api.OriginKindPreview},
-			{Pattern: "localhost:3000", Kind: api.OriginKindPreview},
+		own = api.ProjectResponse{Name: project.Name, Origins: []api.ProjectOrigin{
+			{Pattern: "*.example.com", Kind: api.ProjectOriginKindPreview},
+			{Pattern: "localhost:3000", Kind: api.ProjectOriginKindPreview},
 		}}
 		requestInvalid = domain.ErrRequestInvalid()
 		// A minute of slack absorbs the whole-second truncation RFC3339 applies.
