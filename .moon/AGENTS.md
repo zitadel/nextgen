@@ -13,6 +13,12 @@ a change to a task's command, dependencies, inputs or outputs goes into both
 files, and the command is a `package.json` script both runners run. CI runs
 the turbo version as the non-required `ci-turbo` job.
 
+One exception keeps moon's behaviour unchanged: moon's `test` task runs each
+package's `test:all` script, turbo runs `test`. In the four browser-test
+packages (`api-mock`, `components`, `sdk-qwik`, `storybook`) `test` wraps
+`scripts/task-guard.mjs` for turbo's lock and retries, and `test:all` calls
+Vitest directly, because moon has its own `mutex` and `retryCount` there.
+
 ## Shared tasks live in `.moon/tasks`
 
 - `.moon/tasks/all.yml` applies to every project. Its `implicitInputs` are the

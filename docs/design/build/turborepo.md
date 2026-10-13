@@ -87,6 +87,10 @@ use: `browser-tests` (one real-Chromium Vite server at a time, #1490) and
 `generated-sources` (the generation tasks and the tasks that read what they
 rewrite).
 
+Moon keeps its own `mutex` and `retryCount` until the cutover. Its `test`
+task runs each package's `test:all` script, which in the four browser-test
+packages calls Vitest without the guard, so no suite retries under both.
+
 ## Commands
 
 | | |

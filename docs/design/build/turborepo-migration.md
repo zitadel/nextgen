@@ -219,12 +219,13 @@ run cannot leave a lock behind.
 
 ### `retryCount: 3` (4 uses)
 
-`task-guard --retries 3` in the same four browser-test scripts. The flake it
-exists for is a cold-start race, so the retry re-runs the whole suite (warm),
-which Vitest's own per-test `retry` would not do — a failed module import fails
-the file. While both runners are configured the suites retry under moon's
-retry too (up to nine attempts in the worst case); the dual-run phase drops
-moon's `retryCount` first.
+`task-guard --retries 3` in the same four browser-test `test` scripts. The
+flake it exists for is a cold-start race, so the retry re-runs the whole suite
+(warm), which Vitest's own per-test `retry` would not do — a failed module
+import fails the file. Moon is unchanged: its `test` task runs each package's
+`test:all` script, which calls Vitest directly, so moon keeps its own
+`retryCount: 3` and `mutex` and no suite retries under both. The `test:all`
+scripts go with moon at the cutover.
 
 ### `runInCI` (72 uses)
 
@@ -465,9 +466,9 @@ recommendation was to hedge and wait for a trigger.
 
 ### Phase 1: dual run (2 to 4 weeks)
 
-Land the prototype as is, plus: moon's
-`format`/`lint` tasks switched to the script files; moon's `retryCount`
-removed (the guard retries); `check-release-graph.mjs`, `release-manifest`,
+Land the prototype as is, plus: moon's `format`/`lint` tasks switched to the
+script files (moon keeps its `retryCount`: its `test:all` scripts bypass the
+guard); `check-release-graph.mjs`, `release-manifest`,
 `check-typecheck-programs` and `doctor` ported behind the runner switch. Wire
 `ci-turbo.yml` to `pull_request` and `merge_group` as a non-required check,
 and to pushes to main, which run the gate alone to fill the remote cache; set

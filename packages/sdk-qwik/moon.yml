@@ -57,6 +57,7 @@ tasks:
       # Vite server runs at a time; concurrent servers starve under moon's CI
       # graph and drop module fetches. (#1490)
       mutex: "browser-tests"
-      # The retry for the cold-start flake (#1490) lives in the package's test
-      # script (scripts/task-guard.mjs --retries 3), so it applies under every
-      # task runner; the script also takes the browser-tests lock.
+      # Retry a failed browser suite in CI. The flake is a cold-start race:
+      # the first attempt warms the Vite dep cache, so a retry runs warm and
+      # clears the "Failed to fetch dynamically imported module" failure. (#1490)
+      retryCount: 3
