@@ -11,7 +11,7 @@ import (
 )
 
 func encodeAddOriginRequest(
-	req *Origin,
+	req *ProjectOrigin,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -418,6 +418,20 @@ func encodeQueryUsersRequest(
 
 func encodeRemoveOriginRequest(
 	req *RemoveOriginReq,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeRemovePreviewRequest(
+	req *RemovePreviewRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

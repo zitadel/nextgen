@@ -1,27 +1,14 @@
 title: DeploymentConflict
-type: object
 description: |
-  The deployment conflicts with the state of the project. Only
-  `dep.conflict`, a stale `expected_deployment_id`, carries `details`.
-required:
-  - code
-  - message
-properties:
-  code:
-    $ref: ../../components/schemas/error-code.yaml
-  message:
-    type: string
-    description: Human-readable explanation of the error.
-  details:
-    type: object
-    required:
-      - deployment
-    properties:
-      deployment:
-        description: |
-          The actual newest deployment to the targets, to inspect before
-          retrying with its id as `expected_deployment_id`. Null when nothing
-          has been deployed to any of the targets yet.
-        oneOf:
-          - $ref: deployment.yaml
-          - type: 'null'
+  The deployment conflicts with the state of the project, told apart by
+  `code`: `dep.conflict` when `expected_deployment_id` did not match,
+  carrying the actual newest deployment, or `rel.revoked` when the release
+  is revoked.
+oneOf:
+  - $ref: deployment-guard-conflict.yaml
+  - $ref: release-revoked-conflict.yaml
+discriminator:
+  propertyName: code
+  mapping:
+    dep.conflict: deployment-guard-conflict.yaml
+    rel.revoked: release-revoked-conflict.yaml

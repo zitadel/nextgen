@@ -10,12 +10,13 @@ post:
     so the deployments in between stay in it.
 
     Only a deployment to primary origins can be rolled back. One whose
-    targets were preview URLs answers `409` with `dep.invalid`; deploy to
+    targets were preview URLs answers `400` with `dep.invalid`; deploy to
     the preview again instead. Every target must still be a primary origin
-    of the project: when one is not, the request answers `409` with
-    `dep.invalid` naming it, and nothing changes. There is no narrowing to
-    some of the targets: to roll back one origin, deploy the earlier
-    release to it with `POST /deployments`.
+    of the project, as `POST /deployments` requires of an exact origin:
+    when one is not, the request answers `403` with
+    `proj.origin_not_allowed` naming it, and nothing changes. There is no
+    narrowing to some of the targets: to roll back one origin, deploy the
+    earlier release to it with `POST /deployments`.
 
     When every target already serves the deployment's release, nothing
     changes and the call answers `200` with the newest deployment to the
@@ -24,6 +25,10 @@ post:
     The release must not be revoked: a revoked one answers `409` with
     `rel.revoked`. An unknown deployment id, or one of another project,
     answers `404` with `dep.not_found`.
+
+    A rollback never answers `dep.variables_missing`: the release and the
+    frozen values it re-applies passed that check together when the named
+    deployment was made.
   tags:
     - Deployments
   parameters:
@@ -97,31 +102,48 @@ post:
                   rollback_to: dep_01KX4SB9C8E1F0N9WD3P2E4YM5
                   deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
                   deployed_by_type: human
-    '409':
+    '400':
       description: |
-        The rollback cannot happen: `dep.conflict` when the guard did not
-        match, with the actual newest deployment in `details.deployment`;
-        `dep.invalid` when the deployment targeted preview URLs or one of
-        its targets is no longer a primary origin; `rel.revoked` when its
-        release is revoked.
+        The deployment targeted preview URLs, which are never rolled back:
+        `dep.invalid`.
       content:
         application/json:
           schema:
-            $ref: ../../deployment-conflict.yaml
+            $ref: ../../../../components/error-details.yaml
           examples:
             preview:
               summary: The deployment targeted preview URLs
               value:
                 code: dep.invalid
                 message: 'deployment: a deployment to preview URLs cannot be rolled back'
+    '403':
+      description: |
+        A target is no longer a primary origin of the project:
+        `proj.origin_not_allowed`, naming it.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+          examples:
             targetRemoved:
               summary: A target is no longer a primary origin
               description: |
                 Roll back the remaining origins by deploying the earlier
                 release to them with `POST /deployments`.
               value:
-                code: dep.invalid
-                message: 'deployment: https://www.acme.com is no longer a primary origin of the project'
+                code: proj.origin_not_allowed
+                message: 'project: https://www.acme.com is not a primary origin'
+    '409':
+      description: |
+        The rollback conflicts with the state of the project:
+        `dep.conflict` when the guard did not match, with the actual newest
+        deployment in `details.deployment`; `rel.revoked` when its release
+        is revoked.
+      content:
+        application/json:
+          schema:
+            $ref: ../../deployment-conflict.yaml
+          examples:
             revoked:
               summary: The release is revoked
               value:

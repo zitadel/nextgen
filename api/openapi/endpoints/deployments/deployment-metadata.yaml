@@ -5,6 +5,8 @@ description: |
   is created and never mutated afterwards — enrichment of the record, while
   the release, targets and timestamp on the deployment itself say what ran
   where and when.
+required:
+  - reason
 properties:
   reason:
     $ref: ../../components/schemas/deployment-reason.yaml
@@ -20,8 +22,9 @@ properties:
   rollback_to:
     description: |
       The deployment `POST /deployments/{deployment_id}/rollback` re-applied,
-      with its release and its targets. Null for every other deployment,
-      including one created by `POST /deployments` with `reason: rollback`.
+      with its release and its targets. Null or absent for every other
+      deployment, including one created by `POST /deployments` with
+      `reason: rollback`.
     oneOf:
       - $ref: ../../components/schemas/deployment-id.yaml
       - type: 'null'
