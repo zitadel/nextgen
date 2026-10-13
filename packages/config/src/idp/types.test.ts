@@ -32,6 +32,14 @@ describe("parseConnectionSlug", () => {
     }
   });
 
+  it("trims what surrounds the slug, as it does the other values", () => {
+    expect(parseConnectionSlug("  acme-sso ")).toEqual({ ok: true, value: "acme-sso" });
+  });
+
+  it("refuses a reserved name that was typed with spaces around it", () => {
+    expect(parseConnectionSlug(" google ", ["google"])).toMatchObject({ ok: false });
+  });
+
   it("refuses a reserved name, saying why", () => {
     expect(parseConnectionSlug("google", ["google"])).toEqual({
       ok: false,

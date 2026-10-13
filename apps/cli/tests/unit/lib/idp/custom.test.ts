@@ -75,6 +75,7 @@ describe("selectionFromFlags for a custom connection", () => {
     ["a slug with a space", { slug: "acme sso" }, "--slug"],
     ["a slug over 64 characters", { slug: "a".repeat(65) }, "--slug"],
     ["the name of a built-in provider", { slug: "google" }, "built-in provider"],
+    ["the name custom, which is not a connection", { slug: "custom" }, "built-in provider"],
     ["a blank display name", { displayName: "  " }, "--display-name"],
     ["a display name over 256 characters", { displayName: "x".repeat(257) }, "--display-name"],
     ["an http issuer", { issuer: "http://sso.acme.example" }, "--issuer"],

@@ -344,6 +344,51 @@ describe("sso enable", () => {
         }
       });
 
+      it("warns when the same connection is enabled again with other scopes", async () => {
+        const app = await anAppServingAcme();
+
+        const result = await app.enableCustomSso(
+          { ...ACME, scopes: "openid groups" },
+          ACME_CREDENTIALS,
+        );
+
+        expect(result).toSucceed();
+        expect(result).toSay("not applied");
+      });
+
+      it("warns when the same connection is enabled again with another display name", async () => {
+        const app = await anAppServingAcme();
+
+        const result = await app.enableCustomSso(
+          { ...ACME, displayName: "Acme staff" },
+          ACME_CREDENTIALS,
+        );
+
+        expect(result).toSay("not applied");
+      });
+
+      it("does not warn when the same connection is enabled again unchanged", async () => {
+        const app = await anAppServingAcme();
+
+        const result = await app.enableCustomSso(ACME, ACME_CREDENTIALS);
+
+        expect(result).not.toSay("not applied");
+      });
+
+      it("is not claimed by Google when it points at Google's issuer", async () => {
+        const app = await aSetUpApp();
+        const corp = { ...ACME, slug: "corp", issuer: "https://accounts.google.com" };
+        expect(await app.enableCustomSso(corp, ACME_CREDENTIALS)).toSucceed();
+
+        expect(await app.enableSso(GOOGLE, CREDENTIALS)).toSucceed();
+        expect(await app.apply()).toSucceed();
+
+        expect((await app.registeredIdps()).map((idp) => idp.slug).sort()).toEqual([
+          "corp",
+          GOOGLE,
+        ]);
+      });
+
       it("stops when the name belongs to a connection to another provider", async () => {
         const app = await anAppServingAcme();
 
@@ -357,6 +402,7 @@ describe("sso enable", () => {
 
       it.each([
         ["the name of a built-in provider", { ...ACME, slug: "google" }],
+        ["the name custom", { ...ACME, slug: "custom" }],
         ["scopes without openid", { ...ACME, scopes: "profile email" }],
         ["an issuer the server would refuse", { ...ACME, issuer: "http://sso.acme.example" }],
       ])("refuses %s and leaves the project as it was", async (_name, connection) => {
