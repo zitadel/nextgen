@@ -6,24 +6,25 @@
       "dependsOn": ["@zitadel/sdk-react#build"]
     },
     // Builds into the server's embed directory, outside the package. The
-    // hosted cloud's build bakes Vercel's insights and their sample rate in
-    // (src/vite-env.d.ts), so both variables are part of the cache key and
-    // visible to the build. Neither has the VITE_ prefix: Vite's framework
-    // inference would hash a prefixed one into every Vite package of the run,
-    // the console's dependencies too (vite.config.ts), and strict mode hides
-    // an unprefixed one unless it is listed here. The other workspace
+    // hosted cloud's build bakes its base path, Vercel's insights and their
+    // sample rate in (vite.config.ts, src/vite-env.d.ts), so the variables are
+    // part of the cache key and visible to the build. None has the VITE_
+    // prefix: Vite's framework inference would hash a prefixed one into every
+    // Vite package of the run, the console's dependencies too
+    // (vite.config.ts), and strict mode hides an unprefixed one unless it is
+    // listed here. The other workspace
     // packages the console imports resolve from source; sdk-react has no
     // `@zitadel/source` entry.
     "build": {
       "dependsOn": ["@zitadel/sdk-react#build"],
-      "env": ["CONSOLE_VERCEL_INSIGHTS", "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"],
+      "env": ["CONSOLE_BASE_PATH", "CONSOLE_VERCEL_INSIGHTS", "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"],
       "outputs": ["$TURBO_ROOT$/internal/staticui/console/dist/**"]
     },
     // The release UI build consumes the package release output and runs after
     // the public packages' release builds (tools/release/turbo.json).
     "build-release": {
       "dependsOn": ["@zitadel/api#build-release", "@zitadel/sdk-react#build", "@zitadel/release#build-public-packages"],
-      "env": ["CONSOLE_VERCEL_INSIGHTS", "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"],
+      "env": ["CONSOLE_BASE_PATH", "CONSOLE_VERCEL_INSIGHTS", "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"],
       "outputs": ["$TURBO_ROOT$/internal/staticui/console/dist/**"]
     },
     "test": {

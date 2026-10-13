@@ -4,9 +4,8 @@ description: OpenAPI-generated endpoint docs for the next-generation Zitadel pre
 ---
 
 import { Card, Cards } from "fumadocs-ui/components/card";
-import { Callout } from "fumadocs-ui/components/callout";
 
-The API reference is generated from `api/openapi/openapi-spec.yaml` during the docs build.
+The API reference is generated from the server's OpenAPI document, one page per operation, grouped by the document's tags.
 
 Use it when you need exact request bodies, response shapes, auth requirements, and operation names for the preview server. For the higher-level product path, start with the CLI and SDK docs first:
 
@@ -14,26 +13,35 @@ Use it when you need exact request bodies, response shapes, auth requirements, a
 - [CLI](/docs/cli)
 - [SDKs](/docs/sdks)
 
-<Callout title="Grouped by OpenAPI tags" type="info">
-  Generated operation pages are grouped by domain tags from the OpenAPI source. Update the spec tags when an endpoint belongs in a different reference section.
-</Callout>
-
 ## Runtime auth
 
 <Cards>
-  <Card title="Flows" href="/docs/reference/api/flows" description="Flow start, step, submit, and session integration endpoints." />
-  <Card title="Authentication Attempts" href="/docs/reference/api/authentication-attempts" description="Challenge, verification, handoff, and state-machine endpoints." />
+  <Card title="Flows" href="/docs/reference/api/flows" description="Flow start, current step, and submit endpoints." />
+  <Card title="Authentication attempts" href="/docs/reference/api/authentication-attempts" description="Challenge, verification, handoff, and state-machine endpoints." />
   <Card title="Sessions" href="/docs/reference/api/sessions" description="Session creation, lookup, exchange, and teardown endpoints." />
 </Cards>
 
 ## Configuration
 
 <Cards>
-  <Card title="Flow Definitions" href="/docs/reference/api/flow-definitions" description="Templates that describe login, registration, and recovery flows." />
-  <Card title="Projects" href="/docs/reference/api/projects" description="Project creation and lookup endpoints." />
-  <Card title="Teams" href="/docs/reference/api/teams" description="Team creation and lookup endpoints." />
-  <Card title="Users" href="/docs/reference/api/users" description="User creation, lookup, current-user, and password endpoints." />
-  <Card title="Schemas" href="/docs/reference/api/schemas" description="User schema creation and lookup endpoints." />
+  <Card title="Flow definitions" href="/docs/reference/api/flow-definitions" description="Templates that describe login, registration, and recovery flows." />
+  <Card title="Schemas" href="/docs/reference/api/schemas" description="User schema creation, listing, and lookup endpoints." />
+  <Card title="Branding" href="/docs/reference/api/branding" description="Login branding revisions: layout, template, assets, colors, typography, and shape." />
+  <Card title="Identity providers" href="/docs/reference/api/identity-providers" description="External login provider connections and their revisions." />
+  <Card title="Variables" href="/docs/reference/api/variables" description="Named values and secrets that identity provider connections reference." />
+  <Card title="Releases" href="/docs/reference/api/releases" description="Immutable sets of pinned schema, flow, and branding revisions." />
+  <Card title="Deployments" href="/docs/reference/api/deployments" description="Record which release runs where. Specified; answers 501 today." />
+  <Card title="Previews" href="/docs/reference/api/previews" description="Live preview URLs. Specified; answers 501 today." />
+</Cards>
+
+## Management
+
+<Cards>
+  <Card title="Projects" href="/docs/reference/api/projects" description="Project creation, query, lookup, update, and claim endpoints." />
+  <Card title="Teams" href="/docs/reference/api/teams" description="Team creation, query, lookup, update, and deletion endpoints." />
+  <Card title="Users" href="/docs/reference/api/users" description="User lifecycle, current-user, password, passkey, and team endpoints." />
+  <Card title="Grants" href="/docs/reference/api/grants" description="Viewer, editor, and admin roles for users and teams on a project." />
+  <Card title="Events" href="/docs/reference/api/events" description="The project's audit events." />
 </Cards>
 
 ## System
@@ -41,5 +49,3 @@ Use it when you need exact request bodies, response shapes, auth requirements, a
 <Cards>
   <Card title="System" href="/docs/reference/api/system" description="Health, liveness, and readiness endpoints." />
 </Cards>
-
-The source OpenAPI document is bundled into `apps/docs/.generated/openapi.mjs` before Fumadocs creates the reference pages.

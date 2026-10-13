@@ -32,9 +32,9 @@ to install first:
 npx @zitadel/cli@alpha <command> --non-interactive --json
 ```
 
-During the public alpha, bare `npx @zitadel/cli` is promoted to the same tested
-alpha CLI so discovery works for first-time users. Prefer `@alpha`, or an exact
-`0.1.0-alpha.N` selector in agent scripts and bug reports, for reproducibility.
+Always pass `@alpha`: bare `npx @zitadel/cli` resolves npm's `latest` tag,
+which still points at an early `0.0.0` build. Use an exact `1.0.0-alpha.N`
+selector in agent scripts and bug reports for reproducibility.
 The CLI requires Node.js 24+.
 
 ## Using the CLI
@@ -114,8 +114,9 @@ once — every resource, its verbs, each verb's `create_fields` / `update_fields
 (flag name, kind, `required`, any closed value set), its `filter_fields` /
 `sort_fields`, and the `delete_outcome` a destructive verb returns — so prefer it
 over reading `<resource> --help` one at a time. A `list` verb's envelope carries
-`data.count`, so a "how many …?" question is one `list --json` call: read the
-count, do not page and tally.
+`data.count`, the number of items it returned. A list returns one page unless
+you pass `--all`, so a "how many …?" question is one `list --all --json` call:
+read the count, do not page and tally.
 
 ## Reading the envelope
 
@@ -124,10 +125,13 @@ Each invocation prints one JSON object:
 - `status`: `ok` | `skipped` | `error`.
 - `cli_version`, `command`, `source`: always present.
 - On success: `data` with the command-specific payload.
-- On a no-op: `reason` (e.g. `no-framework-detected`, `orphaned-config`).
+- On a no-op: `reason` (e.g. `already-initialized`, `already-claimed`,
+  `nothing-to-eject`).
 - On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_NOT_FOUND`,
-  `E_CONFLICT`) and `message`.
-- `next_commands`: the suggested follow-ups. Prefer these over free-text hints.
+  `E_CONFLICT`) and `message`, usually with a `hint`, and `details` when there
+  is structured context.
+- `next_commands`: the suggested follow-ups, inside `data` on success and at
+  the top level on a no-op or failure. Prefer these over free-text hints.
 - `warnings`: things that went wrong without stopping the command, such as a
   value that was not published. Always present on success (often empty), and
   present on a no-op or failure when there are any. Read them before you report
