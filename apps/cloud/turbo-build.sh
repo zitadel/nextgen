@@ -41,4 +41,8 @@ esac
 export TURBO_CACHE TURBO_CACHE_DIR="$root/node_modules/.cache/turbo" TURBO_CACHE_MAX_SIZE=100MB
 export TURBO_TELEMETRY_DISABLED=1 TURBO_PLATFORM_ENV_DISABLED=1
 
+# TEMPORARY diagnostics, removed before merge: variable names only.
+echo "turbo-build: VITE_* in env: $(env | sed -n 's/^\(VITE_[A-Za-z0-9_]*\)=.*/\1/p' | sort | tr '\n' ' ')"
+echo "turbo-build: TURBO_CI_VENDOR_ENV_KEY=${TURBO_CI_VENDOR_ENV_KEY:-unset} VERCEL_TARGET_ENV=${VERCEL_TARGET_ENV:-unset} cache files: $(ls "$TURBO_CACHE_DIR" 2>/dev/null | wc -l)"
+
 exec corepack pnpm exec turbo run build --filter="$package" "$@"
