@@ -280,13 +280,6 @@ function refuseCollidingVariables(
   }
 }
 
-/**
- * Which of a custom connection's settings the developer actually passed. A
- * setting left out takes its default, and an existing file that differs from a
- * default nobody asked for has not been contradicted.
- */
-export type GivenSettings = { readonly displayName: boolean; readonly scopes: boolean };
-
 /** What the caller should do with the provider's connection. */
 export type ConnectionPlan =
   | {
@@ -444,7 +437,8 @@ function planCustomConnection(options: {
   readonly input: CustomOidcInput;
   readonly files: readonly ConnectionFile[];
   readonly clientId?: ClientId;
-  readonly given?: GivenSettings;
+  /** Whether `--scopes` was passed: a default nobody asked for has not been contradicted. */
+  readonly scopesGiven?: boolean;
 }): ConnectionPlan {
   const { slug, issuer } = options.input;
   const name = `${slug}.json`;
@@ -498,10 +492,8 @@ function planCustomConnection(options: {
   refuseCollidingVariables(credentialVariablesOf(match, slug), slug, options.files, match);
   const storedScopes = isObject(oidc) && Array.isArray(oidc.scopes) ? oidc.scopes.join(" ") : "";
   const notApplied = [
-    ...(options.given?.displayName !== true || match.body.display_name === options.input.displayName
-      ? []
-      : (["display name"] as const)),
-    ...(options.given?.scopes !== true || storedScopes === options.input.scopes.join(" ")
+    ...(match.body.display_name === options.input.displayName ? [] : (["display name"] as const)),
+    ...(options.scopesGiven !== true || storedScopes === options.input.scopes.join(" ")
       ? []
       : (["scopes"] as const)),
   ];
@@ -529,10 +521,10 @@ export function planConnection(options: {
   readonly selection: ProviderSelection;
   readonly files: readonly ConnectionFile[];
   readonly clientId?: ClientId;
-  readonly given?: GivenSettings;
+  readonly scopesGiven?: boolean;
 }): ConnectionPlan {
-  const { selection, files, clientId, given } = options;
+  const { selection, files, clientId, scopesGiven } = options;
   return selection.kind === "custom"
-    ? planCustomConnection({ input: selection.connection, files, clientId, given })
+    ? planCustomConnection({ input: selection.connection, files, clientId, scopesGiven })
     : planCatalogConnection({ provider: idpProvider(selection.id), files, clientId });
 }

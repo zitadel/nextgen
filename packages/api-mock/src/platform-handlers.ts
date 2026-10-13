@@ -22,6 +22,8 @@
  */
 import { randomBytes, randomUUID } from "node:crypto";
 
+import { serverCanonicalFlow } from "./server-canonical-flow.js";
+
 import type {
   CompleteClaim200,
   CreateFlowDefinition201,
@@ -333,7 +335,7 @@ function flowResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
     project_id: r.projectId,
     flow_definition: {
       audience: {},
-      ...(r.body as Record<string, unknown>),
+      ...serverCanonicalFlow(r.body as Record<string, unknown>),
       // After the spread: an update that omits `status` keeps the stored one,
       // which is what the endpoint documents.
       status: r.status,

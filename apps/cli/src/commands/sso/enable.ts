@@ -171,10 +171,7 @@ export default class SsoEnable extends BaseCommand {
       selection,
       files: connections,
       clientId: clientIdFlag,
-      given: {
-        displayName: flags["display-name"] !== undefined,
-        scopes: flags.scopes !== undefined,
-      },
+      scopesGiven: flags.scopes !== undefined,
     });
 
     const reusing = plan.action === "reuse";

@@ -13,7 +13,6 @@
  */
 
 import type { ConnectionSlug } from "@zitadel/config/idp";
-import { withoutFlowStepDefaults } from "@zitadel/config/normalize";
 
 import { ZitadelError } from "../errors";
 
@@ -358,7 +357,39 @@ function ssoConflictStep(
  * output as hand-edited.
  */
 function matches(step: Step, expected: Step): boolean {
-  return canonical(withoutFlowStepDefaults(step)) === canonical(withoutFlowStepDefaults(expected));
+  return canonical(withoutServerDefaults(step)) === canonical(withoutServerDefaults(expected));
+}
+
+/**
+ * A step without what the platform leaves out when it answers.
+ *
+ * `apply` writes the canonical definition back into the file, and the server
+ * omits an action's `primary: false` (a default), an empty `fields` list, and
+ * an empty `gates` map, so the step in the file is not byte for byte what this
+ * generator wrote though it is the same step. Reading it as hand-edited would
+ * skip the step on the next provider.
+ */
+function withoutServerDefaults(step: Step): Step {
+  const copy: Step = { ...step };
+  for (const key of ["fields", "gates"]) {
+    const value = copy[key];
+    const empty = Array.isArray(value)
+      ? value.length === 0
+      : isObject(value) && Object.keys(value).length === 0;
+    if (empty) {
+      delete copy[key];
+    }
+  }
+  if (Array.isArray(copy.actions)) {
+    copy.actions = copy.actions.map((action) => {
+      if (!isObject(action) || action.primary !== false) {
+        return action;
+      }
+      const { primary: _default, ...rest } = action;
+      return rest;
+    });
+  }
+  return copy;
 }
 
 /** The provider list a step should end up with: what it has, plus this slug. */

@@ -454,43 +454,31 @@ describe("planConnection for a custom connection", () => {
     });
   });
 
-  it("reuses the file but says the settings that were given and not applied", () => {
-    const existing = file("acme-sso.json", acmeBody({ display_name: "Old name" }));
+  it("reuses the file but says the scopes that were given and not applied", () => {
+    const existing = file("acme-sso.json", acmeBody());
     const input = { ...acme, scopes: ["openid", "groups"] as Scopes };
 
     expect(
-      planConnection({
-        selection: custom(input),
-        files: [existing],
-        given: { displayName: true, scopes: true },
-      }),
-    ).toMatchObject({ action: "reuse", notApplied: ["display name", "scopes"] });
+      planConnection({ selection: custom(input), files: [existing], scopesGiven: true }),
+    ).toMatchObject({ action: "reuse", notApplied: ["scopes"] });
   });
 
-  it("judges each setting on its own, so only the one that was passed is reported", () => {
-    const existing = file("acme-sso.json", acmeBody({ display_name: "Old name" }));
+  it("says nothing about scopes that were left to their default", () => {
+    const existing = file("acme-sso.json", acmeBody());
     const input = { ...acme, scopes: ["openid", "groups"] as Scopes };
 
-    expect(
-      planConnection({
-        selection: custom(input),
-        files: [existing],
-        given: { displayName: true, scopes: false },
-      }),
-    ).toMatchObject({ action: "reuse", notApplied: ["display name"] });
+    expect(planConnection({ selection: custom(input), files: [existing] })).not.toHaveProperty(
+      "notApplied",
+    );
   });
 
-  it("says nothing about a setting that was left to its default", () => {
+  it("always says a display name that differs, because it is always given", () => {
     const existing = file("acme-sso.json", acmeBody({ display_name: "Old name" }));
-    const input = { ...acme, scopes: ["openid", "groups"] as Scopes };
 
-    expect(
-      planConnection({
-        selection: custom(input),
-        files: [existing],
-        given: { displayName: false, scopes: false },
-      }),
-    ).not.toHaveProperty("notApplied");
+    expect(planConnection({ selection: custom(acme), files: [existing] })).toMatchObject({
+      action: "reuse",
+      notApplied: ["display name"],
+    });
   });
 
   it("finds the file that holds the slug even when the file spells it with spaces", () => {

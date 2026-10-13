@@ -68,13 +68,7 @@ export type ProviderSelection =
  * provider answers to the name — or when `custom` arrives without the
  * settings that make it a connection.
  */
-export function parseProviderSelection(
-  name: string,
-  custom?: CustomOidcInput,
-): ProviderSelection | undefined {
-  if (name === CUSTOM_PROVIDER) {
-    return custom === undefined ? undefined : { kind: "custom", connection: custom };
-  }
+export function parseProviderSelection(name: string): ProviderSelection | undefined {
   return (IDP_PROVIDERS as readonly string[]).includes(name)
     ? { kind: "catalog", id: name as CatalogProviderId }
     : undefined;

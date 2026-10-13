@@ -16,7 +16,6 @@ import {
   parseConnectionSlug,
   parseDisplayName,
   parseIssuer,
-  parseProviderSelection,
   parseScopes,
   type ProviderName,
   type ProviderSelection,
@@ -105,14 +104,11 @@ export class SocialSignInPrompt implements SetupPrompt {
       const flagged = answers.sso.find((draft) => selectionName(draft.selection) === name);
       // A custom connection is described before anything else about it can be
       // said: the announcement names its issuer, and its slug names the secret.
-      const selection = parseProviderSelection(
-        name,
-        name === CUSTOM_PROVIDER
-          ? flagged?.selection.kind === "custom"
-            ? flagged.selection.connection
-            : await this.askCustom()
-          : undefined,
-      ) as ProviderSelection;
+      const selection: ProviderSelection =
+        flagged?.selection ??
+        (name === CUSTOM_PROVIDER
+          ? { kind: "custom", connection: await this.askCustom() }
+          : { kind: "catalog", id: name });
       const entry = providerOf(selection);
       // Before the announcement, which names the vendor's console: on a
       // development run (ZITADEL_CLI_DEV) the provider may not be the vendor at

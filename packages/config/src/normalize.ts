@@ -54,38 +54,6 @@ function isEmptyAudience(value: unknown): boolean {
 }
 
 /**
- * A flow step with what the platform fills in or drops on its way back
- * removed, so a step it rewrote reads as the one that was written.
- *
- * The server omits an action's `primary: false` (a default) and an empty
- * `fields` list, and states `gates` and `sso_providers` even when empty, which
- * some builds write back as `gates: {}` and `sso_providers: []`. Comparison only, like
- * {@link normalizeFlowBody}: the result is never uploaded or written to a file.
- */
-export function withoutFlowStepDefaults(step: object): object {
-  const copy: Record<string, unknown> = { ...step };
-  for (const key of ["fields", "gates", "sso_providers"]) {
-    const value = copy[key];
-    const empty = Array.isArray(value)
-      ? value.length === 0
-      : isPlainObject(value) && Object.keys(value).length === 0;
-    if (empty) {
-      delete copy[key];
-    }
-  }
-  if (Array.isArray(copy.actions)) {
-    copy.actions = copy.actions.map((action: unknown) => {
-      if (!isPlainObject(action) || action.primary !== false) {
-        return action;
-      }
-      const { primary: _default, ...rest } = action;
-      return rest;
-    });
-  }
-  return copy;
-}
-
-/**
  * Return a deep copy of a bare flow-definition body with server-echoed
  * noise removed: an empty `audience` and any detail-envelope keys. A
  * top-level `$schema` is stripped too — it is a local editor affordance

@@ -7,6 +7,7 @@ import {
   parseProviderSelection,
   providerOf,
   selectionName,
+  type ProviderSelection,
   type CatalogProviderId,
 } from "./index.js";
 import { displayName, issuer, slug } from "./test-support.js";
@@ -56,7 +57,7 @@ describe("a provider selection", () => {
   });
 
   it("names a custom connection by what the developer called it", () => {
-    const selection = parseProviderSelection("custom", acme);
+    const selection: ProviderSelection = { kind: "custom", connection: acme };
 
     expect(selection).toEqual({ kind: "custom", connection: acme });
     expect(selection && selectionName(selection)).toBe("custom");

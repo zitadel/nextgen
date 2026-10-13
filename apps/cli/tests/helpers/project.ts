@@ -164,11 +164,6 @@ class CommittedFiles {
     }>;
   }
 
-  /** A connection exactly as committed, whatever else it carries. */
-  idpDocument(slug: string): Promise<Record<string, unknown>> {
-    return this.read(`.zitadel/idps/${slug}.json`);
-  }
-
   /** The ejected branding descriptor. */
   brandingDescriptor(): Promise<Record<string, unknown>> {
     return this.read(".zitadel/branding/branding.json");
@@ -289,24 +284,16 @@ export class ScaffoldedApp {
   }
 
   /** `sso enable` for a connection the developer describes, secret piped as a script would. */
-  enableCustomSso(
-    connection: CustomConnection,
-    credentials: Credentials,
-    extraArgs: string[] = [],
-  ): Promise<CliResult> {
-    return this.pipingSecret(credentials.secret, () =>
-      this.cli([
-        "sso",
-        "enable",
-        "--non-interactive",
-        "--json",
+  enableCustomSso(connection: CustomConnection, credentials: Credentials): Promise<CliResult> {
+    return this.enableSsoWith(
+      [
         "--provider",
         "custom",
         ...customFlags(connection, "--"),
         "--client-id",
         credentials.clientId,
-        ...extraArgs,
-      ]),
+      ],
+      credentials.secret,
     );
   }
 
@@ -324,16 +311,15 @@ export class ScaffoldedApp {
 
   /** `setup` with a custom connection described on the command line. */
   setupWithCustomSso(connection: CustomConnection, credentials: Credentials): Promise<CliResult> {
-    return this.pipingSecret(credentials.secret, () =>
-      this.setup([
-        "--framework",
-        "next",
+    return this.setupSsoWith(
+      [
         "--sso",
         "custom",
         ...customFlags(connection, "--sso-"),
         "--sso-client-id",
         credentials.clientId,
-      ]),
+      ],
+      credentials.secret,
     );
   }
 

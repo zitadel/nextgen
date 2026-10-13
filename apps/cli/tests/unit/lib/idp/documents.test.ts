@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { slug } from "../../../helpers/idp-values";
 import { ZitadelError } from "../../../../src/lib/errors";
+import { serverCanonicalFlow } from "@zitadel/api-mock";
 import { applySsoToFlow, applySsoToSchema, ssoEditRefusal } from "../../../../src/lib/idp";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../../../../..");
@@ -795,58 +796,35 @@ describe("refusing a document the editors would overwrite", () => {
 
     expect(skipped.map((entry) => entry.region)).toContain("steps.sso-conflict");
   });
-
-  it("still gains a second provider after the platform filled in its empty defaults", () => {
-    // `apply` writes the canonical definition back, and the API always states
-    // `gates` and `sso_providers`. The step is the generator's own output
-    // however it is spelled, so a second provider must still reach it.
-    const first = applySsoToFlow(shippedFlow(), slug("google"), { password: true, passkey: true });
-    const written = JSON.parse(JSON.stringify(first.document)) as {
-      steps: Record<string, unknown>[];
-    };
-    for (const step of written.steps) {
-      step.gates ??= {};
-      if (step.name === "register-sso") {
-        step.sso_providers ??= [];
-      }
-    }
-
-    const { document, skipped } = applySsoToFlow(written, slug("acme-sso"), {
-      password: true,
-      passkey: true,
-    });
-    const steps = (document as { steps: { name: string; sso_providers?: unknown[] }[] }).steps;
-
-    expect(skipped).toEqual([]);
-    expect(steps.find((step) => step.name === "sso-conflict")?.sso_providers).toEqual([
-      "google",
-      "acme-sso",
-    ]);
-    expect(steps.find((step) => step.name === "identifier")?.sso_providers).toEqual([
-      "google",
-      "acme-sso",
-    ]);
-  });
 });
 
-describe("a step the server rewrote without its empty fields", () => {
-  it("is still the step the generator wrote, so the next provider reaches it", () => {
-    const methods = { password: false, passkey: true };
-    const first = applySsoToFlow(shippedFlow(), slug("google"), methods);
-    const written = JSON.parse(JSON.stringify(first.document)) as {
-      steps: { name: string; fields?: unknown[] }[];
-    };
-    const conflict = written.steps.find((step) => step.name === "sso-conflict");
-    if (conflict === undefined) {
-      throw new Error("the flow has no sso-conflict step");
-    }
-    if (Array.isArray(conflict.fields) && conflict.fields.length === 0) {
-      delete conflict.fields;
-    }
+describe.each([
+  { name: "password and passkey", methods: { password: true, passkey: true } },
+  {
+    name: "passkey only, so the conflict step has no fields",
+    methods: { password: false, passkey: true },
+  },
+])("a flow the server rewrote on apply, with $name", ({ methods }) => {
+  const rewritten = () =>
+    serverCanonicalFlow(
+      applySsoToFlow(shippedFlow(), slug("google"), methods).document as Record<string, unknown>,
+    );
 
-    const { document, skipped } = applySsoToFlow(written, slug("acme-sso"), methods);
+  it("reports no step as edited when another provider is added", () => {
+    const { skipped } = applySsoToFlow(rewritten(), slug("acme-sso"), methods);
 
-    expect(skipped.map((entry) => entry.region)).not.toContain("steps.sso-conflict");
+    expect(skipped).toEqual([]);
+  });
+
+  it("adds the provider to the conflict step", () => {
+    const { document } = applySsoToFlow(rewritten(), slug("acme-sso"), methods);
+
     expect(stepNamed(document, "sso-conflict").sso_providers).toEqual(["google", "acme-sso"]);
+  });
+
+  it("adds the provider to the entry steps", () => {
+    const { document } = applySsoToFlow(rewritten(), slug("acme-sso"), methods);
+
+    expect(stepNamed(document, "identifier").sso_providers).toEqual(["google", "acme-sso"]);
   });
 });
