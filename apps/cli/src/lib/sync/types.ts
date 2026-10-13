@@ -150,6 +150,18 @@ export interface ResourceSyncer {
    */
   update(id: string, data: object): Promise<{ id?: string; canonical?: object }>;
   delete(id: string): Promise<void>;
+  /**
+   * `"unsupported"` when the platform cannot delete this resource yet. A file
+   * removed locally is then reported by `plan` and `apply` and never sent, and
+   * its state entry stays so the report repeats until the file is restored.
+   */
+  readonly deletion?: "unsupported";
+  /**
+   * Checks that need the platform, run for every create and update before any
+   * mutation, given the file `path`. `old` is the stored body of an update (null for a create, or
+   * when it could not be read). Throws to stop the plan.
+   */
+  preflight?(path: string, data: object, old: object | null): Promise<void>;
   fetch?(id: string): Promise<object>;
   /**
    * Reduce a body to its canonical comparison form: strip server-echoed
@@ -247,4 +259,5 @@ export type SyncAction =
       warnings?: ReadonlyArray<SyncActionWarning>;
     }
   | { kind: "delete"; path: string; syncer: ResourceSyncer; id: string; oldContent: object | null }
-  | { kind: "skip"; path: string; reason: "immutable" | "no-change" };
+  | { kind: "skip"; path: string; reason: "immutable" | "no-change" }
+  | { kind: "skip"; path: string; reason: "unsupported-deletion"; syncer: ResourceSyncer };

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { describe, expect, it, vi } from "vitest";
 
 import { createZitadelClient } from "@zitadel/api/client";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
@@ -1583,6 +1584,218 @@ describe("plan-time flow validation", () => {
       expect(actions.find((a) => a.path === FLOW_PATH)?.kind).toBe("create");
     } finally {
       vi.unstubAllEnvs();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("a resource the platform cannot delete yet", () => {
+  const IDPS = ".zitadel/idps";
+  const unsupported = (overrides: Partial<ResourceSyncer> = {}) =>
+    makeSyncer({
+      kind: "idp",
+      directory: IDPS,
+      mutable: true,
+      deletion: "unsupported",
+      ...overrides,
+    });
+
+  async function aProjectThatLostItsFile(): Promise<string> {
+    const cwd = makeCwd();
+    await writeState(cwd, {
+      framework: "next",
+      resources: { [`${IDPS}/acme.json`]: { id: "idp_1", hash: "abc" } },
+    });
+    await mkdir(join(cwd, IDPS), { recursive: true });
+    return cwd;
+  }
+
+  it("plans a skip for a removed file, not a delete", async () => {
+    const cwd = await aProjectThatLostItsFile();
+    try {
+      const actions = await buildSyncPlan(cwd, [unsupported()]);
+
+      expect(actions).toEqual([
+        expect.objectContaining({
+          kind: "skip",
+          path: `${IDPS}/acme.json`,
+          reason: "unsupported-deletion",
+        }),
+      ]);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("does not read the stored resource for a file it will not delete", async () => {
+    const cwd = await aProjectThatLostItsFile();
+    try {
+      const fetch = vi.fn().mockResolvedValue({});
+
+      await buildSyncPlan(cwd, [unsupported({ fetch })], true);
+
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("sends no deletion on apply and keeps the state entry", async () => {
+    const cwd = await aProjectThatLostItsFile();
+    try {
+      const syncer = unsupported();
+
+      await runSyncLoop(cwd, [syncer]);
+
+      expect(syncer.delete).not.toHaveBeenCalled();
+      const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8"));
+      expect(Object.keys(state.resources)).toEqual([`${IDPS}/acme.json`]);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("forgets the old path once the same resource comes back under a new file", async () => {
+    const cwd = await aProjectThatLostItsFile();
+    try {
+      await writeResource(cwd, IDPS, "renamed.json", { slug: "acme" });
+      const syncer = unsupported({ create: vi.fn().mockResolvedValue({ id: "idp_1" }) });
+
+      await runSyncLoop(cwd, [syncer]);
+
+      const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8"));
+      expect(Object.keys(state.resources)).toEqual([`${IDPS}/renamed.json`]);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the old path when the new file is a different resource", async () => {
+    const cwd = await aProjectThatLostItsFile();
+    try {
+      await writeResource(cwd, IDPS, "other.json", { slug: "other" });
+      const syncer = unsupported({ create: vi.fn().mockResolvedValue({ id: "idp_2" }) });
+
+      await runSyncLoop(cwd, [syncer]);
+
+      const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8"));
+      expect(Object.keys(state.resources).sort()).toEqual([
+        `${IDPS}/acme.json`,
+        `${IDPS}/other.json`,
+      ]);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("a syncer's preflight", () => {
+  const IDPS = ".zitadel/idps";
+  const tracked = {
+    framework: "next",
+    resources: { [`${IDPS}/acme.json`]: { id: "idp_1", hash: "old" } },
+  };
+
+  async function aProjectWithAnEditedFile(): Promise<string> {
+    const cwd = makeCwd();
+    await writeState(cwd, tracked);
+    await writeResource(cwd, IDPS, "acme.json", { slug: "acme", changed: true });
+    return cwd;
+  }
+
+  const syncer = (overrides: Partial<ResourceSyncer> = {}) =>
+    makeSyncer({ kind: "idp", directory: IDPS, mutable: true, ...overrides });
+
+  it("is given the stored body of an update", async () => {
+    const cwd = await aProjectWithAnEditedFile();
+    try {
+      const preflight = vi.fn().mockResolvedValue(undefined);
+
+      await buildSyncPlan(cwd, [
+        syncer({ preflight, fetch: vi.fn().mockResolvedValue({ slug: "acme" }) }),
+      ]);
+
+      expect(preflight).toHaveBeenCalledWith(`${IDPS}/acme.json`, expect.anything(), {
+        slug: "acme",
+      });
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("is given nothing stored for a create", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, { framework: "next", resources: {} });
+      await writeResource(cwd, IDPS, "acme.json", { slug: "acme" });
+      const preflight = vi.fn().mockResolvedValue(undefined);
+
+      await buildSyncPlan(cwd, [syncer({ preflight })]);
+
+      expect(preflight).toHaveBeenCalledWith(`${IDPS}/acme.json`, expect.anything(), null);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("stops the run before anything is written when it throws", async () => {
+    const cwd = await aProjectWithAnEditedFile();
+    try {
+      const refusing = syncer({
+        preflight: vi.fn().mockRejectedValue(new ZitadelError("E_VALIDATION", "no")),
+        fetch: vi.fn().mockResolvedValue({}),
+      });
+
+      await expect(runSyncLoop(cwd, [refusing])).rejects.toMatchObject({
+        code: "E_VALIDATION",
+      });
+      expect(refusing.update).not.toHaveBeenCalled();
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("is given nothing stored when the resource is gone from the platform", async () => {
+    const cwd = await aProjectWithAnEditedFile();
+    try {
+      const preflight = vi.fn().mockResolvedValue(undefined);
+      const gone = vi.fn().mockRejectedValue(new ApiError(404, "http://x/idps/idp_1", {}, "gone"));
+
+      await buildSyncPlan(cwd, [syncer({ preflight, fetch: gone })]);
+
+      expect(preflight).toHaveBeenCalledWith(`${IDPS}/acme.json`, expect.anything(), null);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("stops the plan when the stored body cannot be read for any other reason", async () => {
+    const cwd = await aProjectWithAnEditedFile();
+    try {
+      const preflight = vi.fn().mockResolvedValue(undefined);
+      const unavailable = vi
+        .fn()
+        .mockRejectedValue(new ApiError(503, "http://x/idps/idp_1", {}, "unavailable"));
+
+      await expect(
+        buildSyncPlan(cwd, [syncer({ preflight, fetch: unavailable })]),
+      ).rejects.toMatchObject({ status: 503 });
+      expect(preflight).not.toHaveBeenCalled();
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("raises a refused read as the refusal, not as a failed fetch", async () => {
+    const cwd = await aProjectWithAnEditedFile();
+    try {
+      const refusal = new ZitadelError("E_VALIDATION", "resolved secret");
+      const fetch = vi.fn().mockRejectedValue(new FatalFetchError(refusal));
+
+      await expect(buildSyncPlan(cwd, [syncer({ preflight: vi.fn(), fetch })])).rejects.toBe(
+        refusal,
+      );
+    } finally {
       await rm(cwd, { recursive: true, force: true });
     }
   });

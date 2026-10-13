@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { consola } from "consola";
 
 import { ZitadelError } from "../errors";
@@ -103,6 +104,11 @@ export async function buildSyncPlan(
         continue;
       }
       if (onDisk.has(join(cwd, filePath)) || !entry.id) {
+        continue;
+      }
+
+      if (syncer.deletion === "unsupported") {
+        actions.push({ kind: "skip", path: filePath, reason: "unsupported-deletion", syncer });
         continue;
       }
 
@@ -214,6 +220,14 @@ export async function buildSyncPlan(
         oldContent,
         ...(repin ? { repin } : {}),
       });
+    }
+  }
+
+  // What only the platform can answer, for every connection this plan writes.
+  for (const action of actions) {
+    if ((action.kind === "create" || action.kind === "update") && action.syncer.preflight) {
+      const old = action.kind === "update" ? await storedBody(action) : null;
+      await action.syncer.preflight(action.path, action.content, old);
     }
   }
 
@@ -334,6 +348,19 @@ export async function runSyncLoop(
         const fallbackHash = newId ? hashForState(action.syncer, content) : action.hash;
         const entry: ResourceEntry = { id, hash: await writeBack(action, canonical, fallbackHash) };
         await updateState(cwd, action.path, entry);
+        // A resource that cannot be deleted and comes back under the same id
+        // was moved to this file: its old path no longer describes anything.
+        if (action.syncer.deletion === "unsupported") {
+          for (const [path, other] of Object.entries((await readState(cwd)).resources)) {
+            if (
+              path !== action.path &&
+              other.id === id &&
+              path.startsWith(action.syncer.directory)
+            ) {
+              await removeFromState(cwd, path);
+            }
+          }
+        }
         consola.info(
           `Created a new ${action.syncer.kind} on Zitadel from ${action.path} (id ${id})`,
         );
@@ -417,6 +444,12 @@ export async function runSyncLoop(
         break;
       }
       case "skip": {
+        if (action.reason === "unsupported-deletion") {
+          reportWarning(
+            `${action.path} was removed but deleting ${action.syncer.kind} resources is not supported yet ` +
+              `(#1013); nothing was deleted on the platform. Restore the file to clear this.`,
+          );
+        }
         consola.debug(`Skipped ${action.path} (${action.reason})`);
         break;
       }
@@ -527,6 +560,28 @@ export async function writeBackResource(
     await writeFile(absPath, `${stableStringify(writeBody)}\n`);
   }
   return { hash: hashForState(syncer, writeBody), changed };
+}
+
+/**
+ * The stored body an update is checked against. Unlike a plan's diff, a check
+ * cannot proceed on a body it failed to read, so a failure stops the run; only
+ * a resource gone from the platform reads as nothing stored.
+ */
+async function storedBody(action: Extract<SyncAction, { kind: "update" }>): Promise<object | null> {
+  if (action.oldContent) {
+    return action.oldContent;
+  }
+  try {
+    return (await action.syncer.fetch?.(action.id)) ?? null;
+  } catch (err) {
+    if (err instanceof FatalFetchError) {
+      throw err.reason;
+    }
+    if (err instanceof ApiError && err.status === 404) {
+      return null;
+    }
+    throw err;
+  }
 }
 
 async function fetchOldIfAsked(

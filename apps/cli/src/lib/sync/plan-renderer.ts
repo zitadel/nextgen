@@ -33,6 +33,13 @@ export function collectPlanWarnings(
     for (const warning of warningsOf(action)) {
       out.push({ path: action.path, rule: warning.rule, message: warning.message });
     }
+    if (action.kind === "skip" && action.reason === "unsupported-deletion") {
+      out.push({
+        path: action.path,
+        rule: "unsupported-deletion",
+        message: `deleting ${action.syncer.kind} resources is not supported yet (#1013); apply will not delete it on the platform`,
+      });
+    }
   }
   return out;
 }
@@ -108,8 +115,23 @@ export function enumeratePlanResources(actions: ReadonlyArray<SyncAction>): Plan
 export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): string {
   const active = actions.filter((a) => a.kind !== "skip");
 
+  const unsupported = actions.flatMap((a) =>
+    a.kind === "skip" && a.reason === "unsupported-deletion" ? [a] : [],
+  );
+  const unsupportedNote = unsupported.map((a) =>
+    paint(
+      `# ${a.path} was removed, but deleting ${a.syncer.kind} resources is not supported yet (#1013): ` +
+        `apply will not delete it on the platform. Restore the file to clear this.`,
+      A.yellow,
+      tty,
+    ),
+  );
+
   if (active.length === 0) {
-    return paint("No changes. Your Zitadel configuration matches the current state.", A.bold, tty);
+    return [
+      paint("No changes. Your Zitadel configuration matches the current state.", A.bold, tty),
+      ...unsupportedNote,
+    ].join("\n");
   }
 
   const out: string[] = [];
@@ -151,6 +173,7 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
     );
   }
 
+  out.push(...unsupportedNote);
   return out.join("\n");
 }
 
