@@ -214,6 +214,33 @@ describe("sso enable", () => {
         });
       });
 
+      describe("a password step whose provider route the developer wrote", () => {
+        async function anAppWithAWrittenRoute(): Promise<ScaffoldedApp> {
+          const app = await anAppServingGoogle();
+          await app.editPasswordStep((step) => {
+            step.transitions = {
+              ...step.transitions,
+              sso_authenticated: { target: "done", purpose: "login" },
+            };
+          });
+          return app;
+        }
+
+        it("is reported as untouched when another run reaches it", async () => {
+          const app = await anAppWithAWrittenRoute();
+
+          const result = await app.enableSso(GOOGLE, CREDENTIALS);
+
+          expect(app.envelopeOf<{ untouched: string[] }>(result).data.untouched).not.toEqual([]);
+        });
+
+        it("still succeeds", async () => {
+          const app = await anAppWithAWrittenRoute();
+
+          expect(await app.enableSso(GOOGLE, CREDENTIALS)).toSucceed();
+        });
+      });
+
       describe("on the passkey-first preset", () => {
         async function aPasskeyFirstAppServingGoogle(): Promise<ScaffoldedApp> {
           const app = await aSetUpApp(["--preset", "passkey-first"]);

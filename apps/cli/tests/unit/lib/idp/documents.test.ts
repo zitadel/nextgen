@@ -919,6 +919,22 @@ describe("the password step", () => {
     });
   });
 
+  it("takes a route with more than a target to be the developer's own", () => {
+    const edited = JSON.parse(JSON.stringify(enabled())) as ReturnType<typeof enabled>;
+    const password = edited.steps.find((step) => step.name === "password");
+    if (password?.transitions === undefined) {
+      throw new Error("the flow has no password step with transitions");
+    }
+    password.transitions.sso_authenticated = { target: "done", purpose: "login" };
+
+    const { document, skipped } = applySsoToFlow(edited, "acme-sso", bothMethods);
+
+    expect(skipped.map((entry) => entry.region)).toContain("steps.password");
+    expect(stepNamed(document, "password").transitions).toMatchObject({
+      sso_authenticated: { target: "done", purpose: "login" },
+    });
+  });
+
   it("says nothing about a flow that has no password step", () => {
     const flow = shippedFlow() as { steps: Array<Record<string, unknown>> };
     flow.steps = flow.steps.filter((step) => step.name !== "password");
