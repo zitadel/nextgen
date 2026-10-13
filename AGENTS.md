@@ -59,6 +59,8 @@ Product surfaces (`apps/`):
   server at `/ui/console/` and `/ui/login/`.
 - `apps/docs/` — the documentation site: Fumadocs on Next.js, served under
   `/docs`, in the hosted cloud too.
+- `apps/website/` — the hosted cloud's coming-soon page at `/`: Next.js in
+  the new zitadel.com's look, the seed of the public website.
 
 Development and test surfaces (`apps/`):
 
@@ -429,6 +431,10 @@ verify with `corepack pnpm exec changeset status --since origin/main`.
   [.moon/AGENTS.md](.moon/AGENTS.md): the shared tasks, the inputs rule and the
   dependency rules, and the `moon run workspace:check-moon-graph` check to run
   afterwards.
+- Turborepo runs the same tasks beside moon during the migration
+  ([docs/design/build/turborepo.md](docs/design/build/turborepo.md)): a task
+  change goes into `moon.yml` and the package's `turbo.json`, and the command
+  is a `package.json` script.
 
 ## Ephemeral Development Environments
 

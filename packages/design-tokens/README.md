@@ -8,7 +8,7 @@ widths), and emits four artifacts consumers can rely on:
 
 | Surface              | Path                                          | Consumer                                                |
 | -------------------- | --------------------------------------------- | ------------------------------------------------------- |
-| CSS variables        | `@zitadel/design-tokens/css/tokens.css` | Lit atoms, orchestrator chrome, tenant CSS              |
+| CSS variables        | `@zitadel/design-tokens/css/tokens.css` | Lit atoms, orchestrator chrome, tenant CSS, `apps/docs` (through Fumadocs' shadcn preset) |
 | Tailwind v4 `@theme` | `@zitadel/design-tokens/css/tailwind.css` | Consumers that want the `--*-zl-*` / `bg-zl-*` utilities |
 | shadcn bridge        | `@zitadel/design-tokens/css/shadcn.css` | `apps/console` (unprefixed `bg-background`, …)          |
 | Typed TS constants   | `@zitadel/design-tokens`              | The Lit atoms' `t` bridge in `packages/components`, any TS consumer |

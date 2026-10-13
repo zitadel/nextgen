@@ -86,7 +86,9 @@
     "test:all": "pnpm run test",
     "readme": "oclif readme",
     "prepack": "tsdown && oclif manifest",
-    "postpack": "rm -f oclif.manifest.json"
+    "postpack": "rm -f oclif.manifest.json",
+    "lint": "biome check .",
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build"
   },
   "dependencies": {
     "@clack/prompts": "catalog:",
