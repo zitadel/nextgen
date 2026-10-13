@@ -195,7 +195,7 @@ as they were.
 | storybook | `test` (mutex, retry) | `#test` | guarded script |
 | storybook | `dev` | `#dev` | existing |
 | server | `openapi`, `format`, `generate`, `clean-generated`, `check-generate`, `check-generate-pruned`, `vet`, `lint`, `test`, `test-postgres`, `test-spanner`, `test-sqlite`, `build` | `@zitadel/server#…` | **new** scripts in `apps/server/package.json`, each `cd ../.. && …`; `format` and `lint` run the new script files; the generation tasks hold the guard's lock; `serverInputs` repeated as `inputs` per task |
-| bench | `format`, `vet`, `lint`, `build`, `test`, `sweep`, `summarize` | `@zitadel/bench#…` | **new** `tools/bench/package.json`; `benchInputs` repeated |
+| bench | `format`, `vet`, `lint`, `build`, `test`, `sweep`, `summarize` | `@zitadel/bench#…` | **new** `tools/bench/package.json`; `benchInputs` repeated. `vet` now depends on `server:check-generate` in both configs: the first `ci-turbo` run caught it compiling `api/generated` while the server's generation rewrote it, a race moon's order had hidden |
 | release | `changesets`, `check-graph`, `build-public-packages`, `version`, `pack`, `snapshot`, `publish` | `@zitadel/release#…` | **new** `tools/release/package.json` (`cd ../.. && node scripts/release.mjs …`) |
 | workspace | `test`, `check-typecheck`, `check-openapi-rules`, `check-moon-graph`, `check-adrs` | `//#…` | root scripts (**new** for the four checks), explicit inputs as in moon.yml |
 | workspace | `doctor`, `server`, `server-debug`, `journey`, `build-local-image`, `smoke-container`, `check` | `//#…` | root scripts (**new** `server-debug`, `build-local-image`, `smoke-container`) |

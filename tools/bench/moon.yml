@@ -33,8 +33,14 @@ tasks:
       - "**/*.go"
       - "/scripts/go-format-check.mjs"
 
+  # Compiles the root module's generated Go (api/generated, the enumer and
+  # mock files) through the replace directive, which server:generate and its
+  # checks rewrite mid-graph; the dep keeps vet behind them, as server:vet is.
+  # build and test are ordered through vet.
   vet:
     command: "go vet ./..."
+    deps:
+      - "server:check-generate"
     inputs:
       - "@group(benchInputs)"
 
