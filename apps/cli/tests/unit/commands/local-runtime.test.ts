@@ -819,7 +819,7 @@ describe("local runtime commands", () => {
       next_commands?: string[];
     };
     expect(envelope.status).toBe("error");
-    expect(envelope.next_commands).toEqual([expectedPublicCliCommand("start")]);
+    expect(envelope.next_commands).toEqual([expectedPublicCliCommand(`start --cwd ${cwd}`)]);
   });
 
   it("stop succeeds without suggesting a restart", async () => {
@@ -981,7 +981,9 @@ describe("local runtime commands", () => {
       next_commands?: string[];
     };
     expect(envelope.status).toBe("error");
-    expect(envelope.next_commands).toEqual([expectedPublicCliCommand("reset --force")]);
+    expect(envelope.next_commands).toEqual([
+      expectedPublicCliCommand(`reset --force --cwd ${cwd}`),
+    ]);
   });
 });
 

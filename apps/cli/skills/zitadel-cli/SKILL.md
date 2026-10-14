@@ -78,7 +78,7 @@ The CLI requires Node.js 24+.
   project.
 - **Origins.** `zitadel origin add <url> --kind primary|preview`, `origin list`
   and `origin rm <url>` manage the URLs a project serves: a `primary` origin is
-  where `deploy` publishes, a `preview` pattern (it may hold a `*`) is where
+  where the app is served, a `preview` pattern (it may hold a `*`) is where
   pull-request builds run. They need the project secret, not the preview token.
   An empty list admits every origin, so removing the last one opens the project
   up; `origin rm` asks first and needs `--force` when non-interactive. Removing

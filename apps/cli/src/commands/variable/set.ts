@@ -99,6 +99,29 @@ export default class VariableSet extends EnvironmentCommand {
     const { client, projectId } = await this.connect();
     const scope = variableScope(projectId, flags.preview);
 
+    // A name whose value every deploy freezes is a secret holds a credential,
+    // so its preview override is one too: stored plain it would be readable,
+    // and a preview deploy would freeze the credential in the clear. A token
+    // that may not read the slot leaves the check to whoever can.
+    if (flags.preview && !flags.secret) {
+      const all = await client.getVariables({ project_id: projectId }).catch(() => undefined);
+      const held = all?.[name];
+      if (typeof held === "object" && held !== null) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `${name} is a secret, so its preview value must be one too.`,
+          {
+            hint: "Set the preview value with --secret, piped in or prompted for.",
+            nextCommands: [
+              inShell(this.suggest(pipeArgs(name, true, "string", true)), {
+                after: " < value.txt",
+              }),
+            ],
+          },
+        );
+      }
+    }
+
     if (dryRun) {
       // A value given on the command line is checked as the real run checks
       // it, so a preview never reports a write the run would refuse.
@@ -113,8 +136,9 @@ export default class VariableSet extends EnvironmentCommand {
         ...preview,
         data: {
           ...(preview.data as object),
+          name,
+          type,
           secret: flags.secret,
-          as: type,
           applies_to: flags.preview ? "preview" : "all",
         },
         pretty: `${preview.pretty} on the project${flags.secret ? " (secret)" : ""}${type === "string" ? "" : ` as ${type}`}${flags.preview ? " (preview)" : ""}`,

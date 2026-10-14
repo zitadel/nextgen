@@ -103,7 +103,7 @@ export default class Start extends BaseCommand {
             console: `${serverUrl}/ui/console/`,
             login: `${serverUrl}/ui/login/`,
           },
-          ...nextCommandsData([unscopedCommand("start", this.meta.cliVersion)]),
+          ...nextCommandsData([this.suggestUnscoped("start")]),
         },
       });
     }

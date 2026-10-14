@@ -245,6 +245,17 @@ describe("deploy", () => {
         expect(result).toFailWith("E_CONFLICT");
       });
 
+      it("hints at re-running with a message when another deploy lands first", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.deployData();
+        platform.racesTheNextDeploy();
+
+        const result = await app.deploy();
+
+        expect(result).toHintAt("deploy -m");
+      });
+
       it("validates and writes nothing on a dry run", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

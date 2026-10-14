@@ -623,10 +623,32 @@ describe("variable set", () => {
       topic: "variable",
       id: "TOKEN",
       secret: false,
-      as: "string",
+      type: "string",
     });
     expect(json.data).not.toHaveProperty("value");
     expect(json.data).not.toHaveProperty("environment");
+  });
+
+  it("refuses a plain preview value for a name whose value is a secret", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.get("*/variables", () => HttpResponse.json({ GOOGLE_CLIENT_SECRET: { secret: true } })),
+    );
+
+    const res = await runCliForTest([
+      "variable",
+      "set",
+      "GOOGLE_CLIENT_SECRET",
+      "hunter2",
+      "--preview",
+      ...base(cwd),
+    ]);
+
+    const json = parseJson(res.stdout) as { code: string; next_commands?: string[] };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.next_commands?.[0]).toContain(
+      "variable set GOOGLE_CLIENT_SECRET --secret --preview",
+    );
   });
 
   it("refuses a given value its --as cannot parse under --dry-run, as the real run does", async () => {

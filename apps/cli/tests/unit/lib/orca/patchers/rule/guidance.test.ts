@@ -112,7 +112,7 @@ describe("guidance content", () => {
     expect(agents).toContain('"$schema": "../meta/flow-definition.json"');
     expect(agents).toContain(".zitadel/meta/user-schema.json");
     expect(agents).toContain("npx @zitadel/cli@0.1.0-alpha.15 deploy --dry-run");
-    expect(agents).toContain("--non-interactive --json");
+    expect(agents).toContain("Leave `--json` off the dry run to see that diff");
     expect(agents).toContain("Never edit `.zitadel/state.json`");
   });
 
