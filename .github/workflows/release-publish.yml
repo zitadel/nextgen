@@ -103,10 +103,16 @@ jobs:
           ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
           fetch-depth: 0
 
+      # Keyed like ci.yml's setup-go step (see the comment there), so this job
+      # restores the Go cache ci.yml saves: both build through GOCACHEPROG on
+      # Depot and keep the same files in GOCACHE.
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
+          cache-dependency-path: |
+            go.sum
+            tools/bench/go.sum
 
       - uses: pnpm/action-setup@v5
         with:
