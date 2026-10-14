@@ -74,6 +74,8 @@ var payloadByEventType = map[string]string{
 	"origin.added":   "origin-payload.yaml",
 	"origin.removed": "origin-payload.yaml",
 
+	"preview.removed": "preview-payload.yaml",
+
 	"authz.granted": "authz-granted-payload.yaml",
 	"authz.revoked": "authz-granted-payload.yaml",
 

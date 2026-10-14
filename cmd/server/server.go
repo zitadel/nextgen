@@ -283,6 +283,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	brandingService := service.NewBrandingService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	releaseService := service.NewReleaseService(serviceDBPool)
+	deploymentService := service.NewDeploymentService(serviceDBPool)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
 	eventService := service.NewEventService(serviceDBPool)
 	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
@@ -379,6 +380,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			teamService,
 			brandingService,
 			releaseService,
+			deploymentService,
 			idpConnectionService,
 			eventService,
 			tokenService,

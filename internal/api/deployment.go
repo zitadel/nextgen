@@ -6,6 +6,7 @@ import (
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 // The deployment operations answer 501 until the deployment service deploys
@@ -48,21 +49,43 @@ func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeployment
 	return nil, domain.ErrNotImplemented()
 }
 
-// The preview operations answer 501 like the deployment ones: a preview
-// exists only through a deployment to it.
-
 func (h *Handler) ListPreviews(ctx context.Context, params api.ListPreviewsParams) (api.ListPreviewsRes, error) {
-	if _, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), deploymentAccess, domain.ResourceKindDeployment); err != nil {
+	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), deploymentAccess, domain.ResourceKindDeployment)
+	if err != nil {
 		return nil, err
 	}
-	return nil, domain.ErrNotImplemented()
+
+	result, err := h.deploymentService.ListPreviews(ctx, service.ListPreviewsInput{
+		ProjectID: string(params.ProjectID),
+		PageToken: string(params.PageToken.Value),
+		Limit:     int(params.Limit.Value),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	resp := api.ListPreviewsResponse{Previews: make([]api.Preview, len(result.Items))}
+	for i, entity := range result.Items {
+		resp.Previews[i] = api.Preview{
+			Origin:    api.Origin(entity.Origin),
+			ExpiresAt: entity.ExpiresAt,
+			CreatedAt: entity.CreatedAt,
+		}
+	}
+	if result.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(result.NextPageToken))
+	}
+	return &resp, nil
 }
 
-func (h *Handler) RemovePreview(ctx context.Context, _ *api.RemovePreviewRequest, params api.RemovePreviewParams) (api.RemovePreviewRes, error) {
+func (h *Handler) RemovePreview(ctx context.Context, req *api.RemovePreviewRequest, params api.RemovePreviewParams) (api.RemovePreviewRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opWrite); err != nil {
 		return nil, err
 	}
-	return nil, domain.ErrNotImplemented()
+	if err := h.deploymentService.RemovePreview(ctx, string(params.ProjectID), string(req.Origin)); err != nil {
+		return nil, err
+	}
+	return &api.RemovePreviewNoContent{}, nil
 }
 
 // deploymentErrorResponse maps the deployment error codes onto statuses.

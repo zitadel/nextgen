@@ -5,6 +5,7 @@ package integration_test
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -12,7 +13,60 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
+
+// TestPreviews seeds previews through the deployment service, since a
+// deployment over HTTP still answers 501, then lists and removes them.
+func TestPreviews(t *testing.T) {
+	t.Parallel()
+
+	fixture := newReleaseFixture(t)
+	created := fixture.create(t, &api.CreateReleaseRequest{Pointers: fixture.pointers()})
+	require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
+	project := api.ProjectID(fixture.project)
+	origins := []string{"https://acme-git-sso-acmeinc.vercel.app", "https://acme-k3x9v2-acmeinc.vercel.app"}
+
+	_, err := service.NewDeploymentService(harness.EnsureServiceDB(t)).Create(t.Context(), service.CreateDeploymentInput{
+		ProjectID:  fixture.project,
+		ReleaseID:  string(created.(*api.CreateReleaseCreated).ID),
+		OriginKind: domain.DeploymentOriginKindPreview,
+		Origins:    origins,
+		Reason:     domain.DeploymentReasonDeploy,
+		PreviewTTL: 168 * time.Hour,
+	})
+	require.NoError(t, err)
+
+	list := func(t *testing.T) []string {
+		t.Helper()
+		resp, err := fixture.client.ListPreviews(t.Context(), api.ListPreviewsParams{ProjectID: project})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPreviewsResponse{}, resp, helpers.MustMarshal(t, resp))
+		var listed []string
+		for _, p := range resp.(*api.ListPreviewsResponse).Previews {
+			assert.True(t, p.ExpiresAt.After(p.CreatedAt))
+			listed = append(listed, string(p.Origin))
+		}
+		return listed
+	}
+	remove := func(t *testing.T, origin string) {
+		t.Helper()
+		resp, err := fixture.client.RemovePreview(t.Context(),
+			&api.RemovePreviewRequest{Origin: api.Origin(origin)},
+			api.RemovePreviewParams{ProjectID: project})
+		require.NoError(t, err)
+		require.IsType(t, &api.RemovePreviewNoContent{}, resp, helpers.MustMarshal(t, resp))
+	}
+
+	assert.ElementsMatch(t, origins, list(t))
+
+	remove(t, origins[0])
+	assert.Equal(t, origins[1:], list(t))
+
+	// Again, with nothing left to remove.
+	remove(t, origins[0])
+	assert.Equal(t, origins[1:], list(t))
+}
 
 // TestDeploymentsNotImplemented pins the deployment operations to 501 until
 // the deployment service deploys to targets. Each request goes through the
@@ -97,20 +151,6 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 				TTL:       api.NewOptPreviewTTL("168h"),
 			},
 			api.CreateDeploymentParams{ProjectID: project})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
-	})
-
-	t.Run("list previews", func(t *testing.T) {
-		resp, err := fixture.client.ListPreviews(t.Context(), api.ListPreviewsParams{ProjectID: project})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
-	})
-
-	t.Run("remove a preview", func(t *testing.T) {
-		resp, err := fixture.client.RemovePreview(t.Context(),
-			&api.RemovePreviewRequest{Origin: "https://acme-git-sso-acmeinc.vercel.app"},
-			api.RemovePreviewParams{ProjectID: project})
 		require.NoError(t, err)
 		expectNotImplemented(t, resp)
 	})
