@@ -73,7 +73,7 @@ const auth = useAuth();
 </template>
 ```
 
-The returned state intentionally omits the raw JWT — use `getAuth(event)` in
+The returned state intentionally omits the raw session token — use `getAuth(event)` in
 a server route when you need the token to call upstream APIs:
 
 ```ts

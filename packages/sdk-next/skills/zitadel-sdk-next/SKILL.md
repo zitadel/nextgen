@@ -42,7 +42,7 @@ where the code runs, not the root, from client modules:
 | Import                         | Runs in                           | Provides                           |
 | ------------------------------ | --------------------------------- | ---------------------------------- |
 | `@zitadel/sdk-next/middleware` | Edge middleware                   | `nextgenMiddleware`, `createProxy` |
-| `@zitadel/sdk-next/server`     | Server Components, Route Handlers | `auth()`, `NextgenProvider`        |
+| `@zitadel/sdk-next/server`     | Server Components, Route Handlers | `auth()`, `getClientAuth()`, `NextgenProvider` |
 | `@zitadel/sdk-next/react`      | Client Components                 | `useAuth()`, `AuthContextProvider` |
 | `@zitadel/sdk-next/session`    | Client Components                 | `getSession()`                     |
 | `@zitadel/sdk-next/client`     | Client boundary                   | `configureZitadel()`, web components |

@@ -10,7 +10,7 @@ export default defineNuxtPlugin(() => {
     session: null,
   };
 
-  // Strip the raw JWT before seeding useState. The bearer token must not be
+  // Strip the raw session token before seeding useState. The bearer token must not be
   // serialised into the Nuxt SSR payload (__NUXT__) where it would be exposed
   // to client-side JavaScript and third-party scripts. Vue components only
   // need userId / identifier / display — use getAuth(event) server-side when the

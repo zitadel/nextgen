@@ -9,7 +9,7 @@ import type { ClientAuthResult } from "../types";
  * client automatically. No additional setup is required beyond registering
  * the middleware.
  *
- * The returned {@link ClientAuthResult} intentionally omits the raw JWT —
+ * The returned {@link ClientAuthResult} intentionally omits the raw session token —
  * use {@link getAuth} in a server route or middleware when the token is
  * needed to call upstream APIs.
  *

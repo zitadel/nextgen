@@ -61,8 +61,11 @@ export interface ZitadelSignoutDetail {
 
 /**
  * Payload of the `zitadel-session-missing` event: the widget asked for the
- * session and the server answered that there is none (401 or 404). Empty for
- * now; an object so fields can be added without breaking handlers.
+ * session and got the backend's no-session answer (a `401` carrying
+ * `auth.unauthorized`, a `404` carrying `sess.not_found`, or a session that
+ * names no user yet). Any other failure keeps the widget as it is and fires no
+ * event. Empty for now; an object so fields can be added without breaking
+ * handlers.
  */
 export type ZitadelSessionMissingDetail = Readonly<Record<never, never>>;
 
