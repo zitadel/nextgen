@@ -160,6 +160,9 @@
         "packages/*/package.json",
         "apps/*/tsconfig*.json",
         "packages/*/tsconfig*.json",
+        "e2e/moon.yml",
+        "e2e/package.json",
+        "e2e/tsconfig*.json",
         "vitest.config.ts"
       ]
     },
@@ -184,8 +187,10 @@
         "apps/*/moon.yml",
         "packages/*/moon.yml",
         "tools/*/moon.yml",
+        "e2e/moon.yml",
         "apps/*/package.json",
-        "packages/*/package.json"
+        "packages/*/package.json",
+        "e2e/package.json"
       ]
     },
     "//#check-adrs": {
