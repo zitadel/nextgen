@@ -175,8 +175,8 @@ test("the setup admin can add and remove a project admin, and the colleague sees
 
 /**
  * The journey's own metadata, plus the lanes this suite stays out of: local
- * ownership is framework-independent, the fresh-app lane already covers it, and
- * the docker lane keeps to the scaffold journey.
+ * ownership is framework- and preset-independent, the fresh-app lane already
+ * covers it, and the docker lane keeps to the scaffold journey.
  */
 async function journeyMetadataOrSkip(): Promise<JourneyMetadata & { localRuntimeUrl: string }> {
   const metadata = JSON.parse(
@@ -185,6 +185,10 @@ async function journeyMetadataOrSkip(): Promise<JourneyMetadata & { localRuntime
   test.skip(
     metadata.framework !== "next",
     "local ownership is framework-independent; next lane only",
+  );
+  test.skip(
+    metadata.preset !== null,
+    "the fresh-app lane already proves local ownership; a preset lane keeps to its sign-in journey",
   );
   test.skip(
     process.env.JOURNEY_PREEXISTING_APP === "1",

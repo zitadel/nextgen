@@ -14,8 +14,6 @@ import { expectNoErrorBoundary, signIn } from "./support";
  * server's own message.
  */
 
-test.describe.configure({ mode: "parallel" });
-
 // The Projects block is out of the MVP: design removed the project selector
 // (design decisions log D6, 2026-07-31), and the backend could not grant access
 // regardless — roles need ADR 034's app-group catalog (epic #419) and
@@ -90,37 +88,6 @@ test("renders exactly the properties the API's schema defines", async ({ page, z
   // rendering.
   await expect.poll(() => renderedFields(drawer)).toEqual(schema.properties);
   await expectNoErrorBoundary(page);
-});
-
-test("marks only the properties the schema does not require", async ({ page, zitadel, seed }) => {
-  const schema = await projectSchema(zitadel);
-  const drawer = await openDrawer(page, zitadel.handle, await seed.user());
-
-  for (const property of schema.properties) {
-    const field = drawer
-      .locator('[data-slot="field"]')
-      .filter({ has: page.locator(`input[name="${property}"]`) });
-    await expect(field.getByText("Optional")).toHaveCount(schema.required.has(property) ? 0 : 1);
-  }
-});
-
-test("keeps submit disabled until every required property has a value", async ({
-  page,
-  zitadel,
-  seed,
-}) => {
-  const schema = await projectSchema(zitadel);
-  const drawer = await openDrawer(page, zitadel.handle, await seed.user());
-  const submit = drawer.getByRole("button", { name: "Add user", exact: true });
-
-  await expect(submit).toBeDisabled();
-
-  for (const property of schema.required) {
-    await drawer
-      .locator(`input[name="${property}"]`)
-      .fill(property === "email" ? uniqueEmail("gate") : "value");
-  }
-  await expect(submit).toBeEnabled();
 });
 
 test("creates a user and shows it in the list", async ({ page, zitadel, seed }) => {

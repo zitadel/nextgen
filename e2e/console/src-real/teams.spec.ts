@@ -13,8 +13,6 @@ import { expectNoErrorBoundary, signIn } from "./support";
  * stamped rather than what the console assumed.
  */
 
-test.describe.configure({ mode: "parallel" });
-
 /** A name unique per test, so the parallel workers never collide on the project's unique-name rule. */
 function teamName(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;

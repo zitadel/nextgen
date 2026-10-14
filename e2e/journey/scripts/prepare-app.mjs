@@ -27,6 +27,9 @@ export async function prepareApp(options = {}) {
   const runtime = localRuntime(env.JOURNEY_RUNTIME);
   const preset = options.preset ?? env.JOURNEY_PRESET ?? "";
   const preexistingApp = options.preexistingApp ?? env.JOURNEY_PREEXISTING_APP === "1";
+  // The runner's suite: `frameworks`, or `testkit`, which scaffolds the app
+  // for the kit's own consumer suite and runs none of the journey specs.
+  const suite = options.suite ?? (env.JOURNEY_SUITE || "frameworks");
   // `local`, or the remote lane's https edge in front of the same local runtime.
   const setupServer = options.setupServer ?? (env.JOURNEY_SETUP_SERVER || "local");
   const fs = {
@@ -113,7 +116,7 @@ export async function prepareApp(options = {}) {
       ],
       writeFile: fs.writeFile,
     });
-    if (framework.id === "next") {
+    if (framework.id === "next" && suite === "frameworks" && !preset && !preexistingApp) {
       await runManagedFileDriftProbe({
         appDir,
         cliPackage,
@@ -240,10 +243,11 @@ async function runCliJsonStep(input) {
 /**
  * Journey-level proof of the doctor managed-files contract on the freshly
  * generated app: deleting the scaffolded request boundary must fail
- * `doctor`, and `doctor --fix` must restore the file and pass. Runs on the
- * Next suite only — the contract is framework-neutral and unit-covered in
- * apps/cli; one framework proves the published consumer path end to end
- * without slowing every suite. Writes `doctor-drift.json` and
+ * `doctor`, and `doctor --fix` must restore the file and pass. Runs in the
+ * fresh-app Next suite only (no preset, no pre-existing app, not the
+ * testkit's scaffold) — the contract is framework-neutral and unit-covered
+ * in apps/cli; one suite proves the published consumer path end to end
+ * without slowing the others. Writes `doctor-drift.json` and
  * `doctor-fix.json` artifacts that `contract.spec.ts` asserts on.
  */
 async function runManagedFileDriftProbe(input) {

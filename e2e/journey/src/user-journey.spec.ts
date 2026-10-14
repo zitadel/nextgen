@@ -48,7 +48,6 @@ if (preset === "password-first") {
     }
     await gotoLogin(page);
     await registerWithPassword(page, { email, password, profile: registrationProfile });
-    await skipPasskeyUpsellIfVisible(page);
     await expectSignedIn(page);
     await expectSessionCookie(page);
 
@@ -95,7 +94,6 @@ if (preset === "password-first") {
     await clickFlowAction(page, "submit");
     await fillFlowField(page, "password", password, { label: /password/i });
     await clickFlowAction(page, "submit");
-    await skipPasskeyUpsellIfVisible(page);
     await expectSignedIn(page);
     await expectSessionCookie(page);
   });
@@ -163,24 +161,6 @@ async function gotoLogin(page: Page): Promise<void> {
       await page.waitForURL(loginUrl, { timeout: 5000 });
     }
   });
-}
-
-async function skipPasskeyUpsellIfVisible(page: Page): Promise<void> {
-  const skip = page.getByRole("button", { name: /skip for now/i });
-  const nextState = await Promise.race([
-    skip.waitFor({ state: "visible", timeout: 30_000 }).then(() => "passkey-upsell" as const),
-    signedInLocator(page)
-      .first()
-      .waitFor({ state: "visible", timeout: 30_000 })
-      .then(() => "signed-in" as const),
-  ]).catch(() => {
-    throw new Error(
-      `Timed out waiting for signed-in surface or passkey upsell; current URL: ${page.url()}`,
-    );
-  });
-  if (nextState === "passkey-upsell") {
-    await skip.click();
-  }
 }
 
 async function expectSignedIn(page: Page): Promise<void> {

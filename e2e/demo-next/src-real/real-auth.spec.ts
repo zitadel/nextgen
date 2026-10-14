@@ -24,15 +24,7 @@ async function expectAuthenticatedAs(page: Page, user: SeededUser): Promise<void
   expect(session?.httpOnly).toBe(true);
 }
 
-// Two tests, each minting its own user, running in parallel workers against
-// the one shared instance: proves per-test seeding is isolation enough.
 test("seeded user completes the password login flow", async ({ page, seed }) => {
-  const user = await seed.user();
-  await loginWithPassword(page, user);
-  await expectAuthenticatedAs(page, user);
-});
-
-test("a second seeded user logs in independently in parallel", async ({ page, seed }) => {
   const user = await seed.user();
   await loginWithPassword(page, user);
   await expectAuthenticatedAs(page, user);

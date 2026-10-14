@@ -362,6 +362,7 @@ async function runFrameworkJourney(context) {
         // leak-proofing as JOURNEY_PRESET above.
         JOURNEY_PREEXISTING_APP: context.preexistingApp ? "1" : "",
         JOURNEY_PRESET: context.preset,
+        JOURNEY_SUITE: context.suite,
         // What setup's --server points at: the local runtime, or the remote
         // lane's https edge in front of it.
         JOURNEY_SETUP_SERVER: edge?.url ?? "local",
@@ -482,6 +483,8 @@ async function runTestkitJourney(context) {
         // preceding CI journey step's GITHUB_ENV export cannot leak in.
         JOURNEY_PREEXISTING_APP: "",
         JOURNEY_PRESET: context.preset,
+        // Skips the scaffold checks only the journey specs read.
+        JOURNEY_SUITE: context.suite,
         JOURNEY_ZITADEL_PORT: String(context.zitadelPort),
         JOURNEY_REGISTRY_URL: registryUrl,
         JOURNEY_RUNTIME: options.runtime,
