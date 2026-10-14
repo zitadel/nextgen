@@ -34,6 +34,27 @@ func newMockedReleaseService(t *testing.T) (service.ReleaseService, *servicemock
 	return service.NewReleaseService(service.NewPool(pool)), statements
 }
 
+// loginFlow collects email, which the human-user.json revision declares and
+// human-user-v2.json dropped.
+func loginFlow() *domain.FlowDefinition {
+	return &domain.FlowDefinition{
+		ProjectID:  "proj_1",
+		ID:         "flowdef_1",
+		Name:       "default-login",
+		UserSchema: "human-user",
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:        "identify",
+				Fields:      []domain.Field{"email"},
+				Actions:     []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+				Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+			},
+			{Name: "done", Complete: new(domain.FlowStepCompleteRedirect)},
+		},
+	}
+}
+
 // expectHandleReads stubs the per-kind revision reads that resolve a handle:
 // a schema by its objectType, a flow definition by its name, and branding by
 // nothing at all.
@@ -44,10 +65,23 @@ func expectHandleReads(statements *servicemocks.MockAllStatements) {
 			ProjectID:  "proj_1",
 			URL:        "https://example.com/human-user.json",
 			ObjectType: new("human-user"),
+			Schema: []byte(`{"type": "object", "x-identifier": "email",
+				"x-auth-methods": {"password": {"enabled": true}},
+				"properties": {"email": {"type": "string", "format": "email", "x-unique": "team"}}}`),
+		}, nil).AnyTimes()
+	statements.EXPECT().
+		GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.com/human-user-v2.json").
+		Return(&domain.JSONSchema{
+			ProjectID:  "proj_1",
+			URL:        "https://example.com/human-user-v2.json",
+			ObjectType: new("human-user"),
+			Schema: []byte(`{"type": "object",
+				"x-auth-methods": {"password": {"enabled": true}},
+				"properties": {"name": {"type": "string"}}}`),
 		}, nil).AnyTimes()
 	statements.EXPECT().
 		GetFlowDefinitionByID(gomock.Any(), "proj_1", "flowdef_1").
-		Return(&domain.FlowDefinition{ProjectID: "proj_1", ID: "flowdef_1", Name: "default-login", UserSchema: "human-user"}, nil).AnyTimes()
+		Return(loginFlow(), nil).AnyTimes()
 	statements.EXPECT().
 		GetBrandingByID(gomock.Any(), "proj_1", "brnd_1").
 		Return(&domain.Branding{ProjectID: "proj_1", ID: "brnd_1"}, nil).AnyTimes()
@@ -266,6 +300,27 @@ func TestReleaseServiceCreateRejectsMissingUserSchema(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, domain.ErrReleaseUnresolvedReference().Code, domErr.Code)
 	assert.Equal(t, "flow_definition default-login: user_schema human-user not found", domErr.Message)
+}
+
+// The flow is checked against the schema revision in the release, not the
+// one it was saved against.
+func TestReleaseServiceCreateRejectsFlowNotFittingItsSchema(t *testing.T) {
+	svc, statements := newMockedReleaseService(t)
+	expectHandleReads(statements)
+
+	_, err := svc.Create(t.Context(), service.CreateReleaseInput{
+		ProjectID: "proj_1",
+		Pointers: []service.CreateReleasePointer{
+			{Kind: domain.ReleasePointerKindFlowDefinition, RevisionID: "flowdef_1"},
+			{Kind: domain.ReleasePointerKindSchema, RevisionID: "https://example.com/human-user-v2.json"},
+		},
+	})
+	require.Error(t, err)
+
+	domErr, ok := errors.AsType[domain.Error](err)
+	require.True(t, ok)
+	assert.Equal(t, domain.ErrReleaseInvalid(nil, nil).Code, domErr.Code)
+	assert.Equal(t, "flow_definition default-login: does not fit user_schema human-user revision https://example.com/human-user-v2.json", domErr.Message)
 }
 
 // Two revisions of one resource cannot both be pinned: the release would

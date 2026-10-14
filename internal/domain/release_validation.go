@@ -1,6 +1,14 @@
 package domain
 
-import "fmt"
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"maps"
+	"slices"
+
+	"github.com/ianlancetaylor/jsonschema"
+)
 
 // ErrReleaseUnresolvedReference reports a handle a revision in the release
 // names that the release does not reference. The message names the pointer
@@ -30,9 +38,23 @@ type releaseHandleRef struct {
 func (r ReleaseRevision) handleRefs() []releaseHandleRef {
 	switch r.Pointer.Kind {
 	case ReleasePointerKindFlowDefinition:
-		return []releaseHandleRef{
+		refs := []releaseHandleRef{
 			{kind: ReleasePointerKindSchema, field: "user_schema", handle: r.FlowDefinition.UserSchema},
 		}
+		// A switch or pivot targets another flow by name. Sorted so the first
+		// miss reported is the same on every run.
+		for _, step := range r.FlowDefinition.Steps {
+			for _, key := range slices.Sorted(maps.Keys(step.Transitions)) {
+				if transition := step.Transitions[key]; !transition.IsCurrentFlow() {
+					refs = append(refs, releaseHandleRef{
+						kind:   ReleasePointerKindFlowDefinition,
+						field:  fmt.Sprintf("step %s transition %s flow", step.Name, key),
+						handle: transition.Target,
+					})
+				}
+			}
+		}
+		return refs
 	default:
 		return nil
 	}
@@ -47,6 +69,9 @@ func (r ReleaseRevision) handleRefs() []releaseHandleRef {
 // hides its errors.
 func ValidateRelease(revisions []ReleaseRevision) error {
 	if err := validateReleaseReferencesClosed(revisions); err != nil {
+		return err
+	}
+	if err := validateReleaseFlowsFitSchemas(revisions); err != nil {
 		return err
 	}
 	return nil
@@ -69,6 +94,44 @@ func validateReleaseReferencesClosed(revisions []ReleaseRevision) error {
 				return ErrReleaseUnresolvedReference().WithMessage(fmt.Sprintf("%s %s: %s %s not found",
 					revision.Pointer.Kind, revision.Pointer.Handle, ref.field, ref.handle))
 			}
+		}
+	}
+	return nil
+}
+
+// validateReleaseFlowsFitSchemas checks every flow against the user schema
+// revision the release references under its user_schema handle, as a flow is
+// checked on save. A flow saved against one revision may not fit another.
+// Runs after closure, so the schema is always there.
+func validateReleaseFlowsFitSchemas(revisions []ReleaseRevision) error {
+	schemas := make(map[string]ReleaseRevision)
+	for _, revision := range revisions {
+		if revision.Pointer.Kind == ReleasePointerKindSchema {
+			schemas[revision.Pointer.Handle] = revision
+		}
+	}
+	for _, revision := range revisions {
+		if revision.Pointer.Kind != ReleasePointerKindFlowDefinition {
+			continue
+		}
+		flow := revision.FlowDefinition
+		schema := schemas[flow.UserSchema]
+
+		var document *jsonschema.Schema
+		if err := json.Unmarshal(schema.Schema.Schema, &document); err != nil {
+			return ErrInternal(err).WithMessage("failed to unmarshal user schema")
+		}
+		if _, err := ValidateFlowDefinition(document, *flow); err != nil {
+			reason, ok := errors.AsType[Error](err)
+			if !ok {
+				return ErrInternal(err).WithMessage("failed to validate flow definition")
+			}
+			details := reason.Details
+			if details == nil {
+				details = reason.Message
+			}
+			return ErrReleaseInvalid(details, err).WithMessage(fmt.Sprintf("%s %s: does not fit user_schema %s revision %s",
+				revision.Pointer.Kind, revision.Pointer.Handle, flow.UserSchema, schema.Pointer.RevisionID))
 		}
 	}
 	return nil

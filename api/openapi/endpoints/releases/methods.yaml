@@ -19,7 +19,16 @@ post:
     that did not resolve, for example
     `flow_definition default-login: user_schema human-user not found`,
     because a release pins many and the code alone does not say which one
-    failed.
+    failed. A flow a switch or pivot transition targets by name is such a
+    handle too.
+
+    Every flow definition is then checked against the user schema revision
+    the release carries under its `user_schema` handle, as
+    `POST /flow_definitions` checks it against the newest revision. A flow
+    that does not fit that revision, for example because it collects a field
+    the revision no longer declares, refuses the request with `rel.invalid`.
+    The message names the flow and the schema revision, and `details` carries
+    the reason.
 
     Idempotent on the pinned set: metadata is excluded from the comparison,
     so re-submitting the same revisions with a different `message` answers
