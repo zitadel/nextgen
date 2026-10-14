@@ -1,36 +1,54 @@
 import { appendFileSync } from "node:fs";
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 
 import { isDirectRun } from "../../../scripts/dev-process.mjs";
 
 // CI keeps the journey's Verdaccio store (JOURNEY_REGISTRY_STORAGE) in the
-// Actions cache, and each save takes about 8 s. The store changes on every run
-// whether or not it gained anything: Verdaccio rewrites a package's metadata
-// whenever it revalidates it against npmjs, and local-registry.mjs republishes
-// the @zitadel packages. Only new tarballs make a saved store worth more, and
-// they arrive only when an install needs a version the store lacks. So CI
-// lists the tarballs after the restore and again after the journey, and saves
-// only when the second list has new ones.
+// Actions cache, and each save takes about 8 s. A save pays off only when the
+// journey changed what a later run gets from the store:
+// - new tarballs, which arrive when an install needs a version the store lacks;
+// - refreshed packuments that are still fresh when a later run asks for them.
+//   Verdaccio rewrites a package.json only when it revalidated it against
+//   npmjs, and asks npmjs again once it is the uplink's `maxage` old. Runs
+//   restore a store minutes after it was saved, so under the 2-minute default
+//   a refresh never lasts that long, and every run refreshes what it uses
+//   anyway. A longer maxage in local-registry.mjs makes refreshes worth saving.
+// The @zitadel packages never count: local-registry.mjs republishes them on
+// every run. CI lists the tarballs after the restore; after the journey,
+// `compare` checks for new tarballs and for packuments written since that list.
 //
 //   node registry-cache.mjs list <storage> <list-file>
-//   node registry-cache.mjs compare <storage> <list-file>
+//   node registry-cache.mjs compare <storage> <list-file> [<verdaccio-config>]
 //
-// `compare` writes `count=<new tarballs>` to $GITHUB_OUTPUT.
+// `compare` writes `save=true|false` to $GITHUB_OUTPUT.
 
 // Republished on every run, so never a reason to save.
 const REPUBLISHED_SCOPE = "@zitadel/";
 
+// Verdaccio's uplink `maxage` when the config sets none.
+export const DEFAULT_MAXAGE_MS = 2 * 60_000;
+
+// Verdaccio's interval units (parseInterval in its lib/utils.js); no unit is
+// seconds.
+const INTERVAL_UNITS = {
+  "": 1000,
+  ms: 1,
+  s: 1000,
+  m: 60_000,
+  h: 3_600_000,
+  d: 86_400_000,
+  w: 7 * 86_400_000,
+  M: 30 * 86_400_000,
+  y: 365 * 86_400_000,
+};
+
 // A cold store makes every tarball new; the log names this many.
 const LOGGED_NEW_TARBALLS = 50;
 
-/**
- * The store's npmjs tarballs as sorted storage-relative paths
- * (`<name>/<name>-<version>.tgz`, `@scope/<name>/<name>-<version>.tgz`). A
- * missing store has none. Verdaccio downloads a tarball under a temporary name
- * and renames it when complete, so every `.tgz` here is a whole one.
- */
-export async function listTarballs(storage) {
+// The store's files as sorted storage-relative paths, without the republished
+// scope. A missing store has none.
+async function storeFiles(storage) {
   let entries;
   try {
     entries = await readdir(storage, { recursive: true, withFileTypes: true });
@@ -41,10 +59,54 @@ export async function listTarballs(storage) {
     throw error;
   }
   return entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".tgz"))
+    .filter((entry) => entry.isFile())
     .map((entry) => relative(storage, join(entry.parentPath, entry.name)).split(sep).join("/"))
     .filter((path) => !path.startsWith(REPUBLISHED_SCOPE))
     .sort();
+}
+
+/**
+ * The store's npmjs tarballs (`<name>/<name>-<version>.tgz`,
+ * `@scope/<name>/<name>-<version>.tgz`). Verdaccio downloads a tarball under a
+ * temporary name and renames it when complete, so every `.tgz` here is a whole
+ * one.
+ */
+export async function listTarballs(storage) {
+  return (await storeFiles(storage)).filter((path) => path.endsWith(".tgz"));
+}
+
+/**
+ * The packuments (`<name>/package.json`) written after `since` (epoch ms):
+ * those the journey revalidated against npmjs or fetched for the first time.
+ */
+export async function packumentsWrittenSince(storage, since) {
+  const written = [];
+  for (const path of await storeFiles(storage)) {
+    if (path.endsWith("/package.json") && (await stat(join(storage, path))).mtimeMs > since) {
+      written.push(path);
+    }
+  }
+  return written;
+}
+
+/**
+ * The `maxage` local-registry.mjs gives the npmjs uplink, in ms, from the
+ * Verdaccio config it wrote; Verdaccio's 2-minute default without one.
+ */
+export function uplinkMaxageMs(config) {
+  const value = /^\s+maxage:\s*["']?([^"'\n]*?)["']?\s*$/m.exec(config ?? "")?.[1];
+  if (!value) {
+    return DEFAULT_MAXAGE_MS;
+  }
+  let total = 0;
+  for (const part of value.split(/\s+/)) {
+    const match = /^(\d+(?:\.\d+)?)(ms|s|m|h|d|w|M|y|)$/.exec(part);
+    if (!match) {
+      return DEFAULT_MAXAGE_MS;
+    }
+    total += Number(match[1]) * INTERVAL_UNITS[match[2]];
+  }
+  return total;
 }
 
 /** The tarballs in `current` that `restored` lacks. */
@@ -54,24 +116,42 @@ export function newTarballs(restored, current) {
 }
 
 /**
- * The restored list as `list` wrote it. Without one, every tarball counts as
- * new, so the store is saved as it was before this check existed.
+ * The restored list as `list` wrote it, and when it was written. Without one,
+ * every tarball counts as new, so the store is saved as it was before this
+ * check existed.
  */
 export async function readTarballList(listFile) {
   try {
-    return (await readFile(listFile, "utf8")).split("\n").filter(Boolean);
+    const [text, info] = await Promise.all([readFile(listFile, "utf8"), stat(listFile)]);
+    return { tarballs: text.split("\n").filter(Boolean), listedAt: info.mtimeMs };
   } catch (error) {
     if (error?.code === "ENOENT") {
-      return [];
+      return { tarballs: [], listedAt: 0 };
+    }
+    throw error;
+  }
+}
+
+async function readOptional(path) {
+  if (!path) {
+    return "";
+  }
+  try {
+    return await readFile(path, "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return "";
     }
     throw error;
   }
 }
 
 async function main(argv = process.argv.slice(2), env = process.env) {
-  const [command, storage, listFile] = argv;
+  const [command, storage, listFile, configFile] = argv;
   if (!["list", "compare"].includes(command) || !storage || !listFile) {
-    throw new Error("usage: node registry-cache.mjs <list|compare> <storage> <list-file>");
+    throw new Error(
+      "usage: node registry-cache.mjs <list|compare> <storage> <list-file> [<verdaccio-config>]",
+    );
   }
   const current = await listTarballs(storage);
   if (command === "list") {
@@ -79,8 +159,12 @@ async function main(argv = process.argv.slice(2), env = process.env) {
     console.log(`journey registry: ${current.length} tarballs restored`);
     return;
   }
-  const restored = await readTarballList(listFile);
+  const { tarballs: restored, listedAt } = await readTarballList(listFile);
   const added = newTarballs(restored, current);
+  const refreshed = await packumentsWrittenSince(storage, listedAt);
+  const maxage = uplinkMaxageMs(await readOptional(configFile));
+  const refreshesLast = maxage > DEFAULT_MAXAGE_MS;
+  const save = added.length > 0 || (refreshesLast && refreshed.length > 0);
   console.log(
     `journey registry: ${restored.length} tarballs restored, ${current.length} now, ${added.length} new`,
   );
@@ -90,8 +174,12 @@ async function main(argv = process.argv.slice(2), env = process.env) {
   if (added.length > LOGGED_NEW_TARBALLS) {
     console.log(`  … and ${added.length - LOGGED_NEW_TARBALLS} more`);
   }
+  console.log(
+    `journey registry: ${refreshed.length} packuments refreshed; with an uplink maxage of ${maxage / 1000} s they ${refreshesLast ? "count" : "do not count"}`,
+  );
+  console.log(`journey registry: ${save ? "saving" : "not saving"} the store`);
   if (env.GITHUB_OUTPUT) {
-    appendFileSync(env.GITHUB_OUTPUT, `count=${added.length}\n`);
+    appendFileSync(env.GITHUB_OUTPUT, `save=${save}\n`);
   }
 }
 

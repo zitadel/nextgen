@@ -229,15 +229,16 @@ jobs:
 
       # Right after the journey; ci.yml's journey is part of its e2e step, so
       # the save there waits for every lane.
-      - name: Look for new journey registry packages
-        id: journey-registry-new
+      - name: Look for journey registry changes
+        id: journey-registry-changes
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
         run: >-
           node e2e/journey/scripts/registry-cache.mjs compare
           "$RUNNER_TEMP/journey-verdaccio-storage" "$RUNNER_TEMP/journey-verdaccio-restored.txt"
+          "$RUNNER_TEMP/ci-journey/verdaccio/config.yaml"
 
       - name: Save journey registry packages
-        if: ${{ steps.journey-registry-new.outputs.count > 0 }}
+        if: ${{ steps.journey-registry-changes.outputs.save == 'true' }}
         uses: actions/cache/save@v5
         with:
           path: ${{ runner.temp }}/journey-verdaccio-storage
