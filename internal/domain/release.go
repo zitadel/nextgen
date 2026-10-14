@@ -145,8 +145,7 @@ func NewRelease(projectID string, pointers []ReleasePointer, metadata ReleaseMet
 	// describes one state of the project, so two revisions of the same
 	// resource are a contradiction rather than an ordering problem.
 	//
-	// That every revision exists needs database reads and is the service's;
-	// that the references between them resolve is [ValidateRelease].
+	// Rules between revisions are [ValidateRelease]'s.
 	for i := 1; i < len(sorted); i++ {
 		if sorted[i].Kind == sorted[i-1].Kind && sorted[i].Handle == sorted[i-1].Handle {
 			return nil, ErrReleaseInvalid(

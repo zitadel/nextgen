@@ -85,7 +85,6 @@ func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (
 	if err != nil {
 		return nil, err
 	}
-	// After the constructor, so the rules only ever see a well-formed set.
 	if err := domain.ValidateRelease(content); err != nil {
 		return nil, err
 	}
@@ -182,13 +181,8 @@ func (s *releaseService) getByContentHash(ctx context.Context, projectID, conten
 	return entity, nil
 }
 
-// loadContent reads every revision the caller asked for, proving each exists
-// in the project. A revision's handle is read from the revision itself, so a
-// resource is always recorded under the identity it declares.
-//
-// Ordering, the empty set and duplicate handles are the domain constructor's
-// to reject, and the rules between revisions [domain.ValidateRelease]'s; this
-// only loads.
+// loadContent reads each requested revision from the project; its handle
+// comes from the revision itself.
 func (s *releaseService) loadContent(ctx context.Context, projectID string, requested []CreateReleasePointer) (domain.ReleaseContent, error) {
 	stmts := s.v2Pool.Statements()
 	var content domain.ReleaseContent
@@ -226,7 +220,6 @@ func (s *releaseService) loadContent(ctx context.Context, projectID string, requ
 			if err != nil {
 				return content, mapRevisionLookupError(err, pointer)
 			}
-			// A project has one branding, so a release carries at most one.
 			if content.Branding != nil {
 				return content, domain.ErrReleaseInvalid(fmt.Sprintf("%s %q is referenced twice",
 					domain.ReleasePointerKindBranding, domain.ReleaseBrandingHandle), nil)
@@ -235,7 +228,6 @@ func (s *releaseService) loadContent(ctx context.Context, projectID string, requ
 
 		default:
 			// Unreachable over HTTP: the wire enum admits only the kinds above.
-			// It stays mapped for the in-process callers that skip the decoder.
 			return content, domain.ErrReleaseInvalid(fmt.Sprintf("unknown pointer kind %d", pointer.Kind), nil)
 		}
 	}

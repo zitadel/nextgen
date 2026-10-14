@@ -10,8 +10,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// humanUserDocument carries the email field the login flow collects;
-// humanUserWithoutEmail is a revision of the same handle that dropped it.
 var (
 	humanUserDocument = []byte(`{
   "type": "object",
@@ -99,8 +97,7 @@ func TestValidateReleaseUnresolvedUserSchema(t *testing.T) {
 	requireUnresolved(t, err, "flow_definition default-login: user_schema human-user not found")
 }
 
-// A handle of another kind does not resolve the reference: a flow named
-// human-user is not the schema.
+// A flow named human-user is not the schema.
 func TestValidateReleaseMatchesKind(t *testing.T) {
 	t.Parallel()
 
@@ -135,8 +132,6 @@ func TestValidateReleaseSchemaSSOProviders(t *testing.T) {
 	assert.NoError(t, domain.ValidateRelease(content))
 }
 
-// The flow was saved against a revision that had email; the release pairs
-// it with one that dropped it.
 func TestValidateReleaseFlowMustFitItsSchema(t *testing.T) {
 	t.Parallel()
 

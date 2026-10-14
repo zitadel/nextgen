@@ -34,8 +34,7 @@ func newMockedReleaseService(t *testing.T) (service.ReleaseService, *servicemock
 	return service.NewReleaseService(service.NewPool(pool)), statements
 }
 
-// loginFlow collects email, which the human-user.json revision declares and
-// human-user-v2.json dropped.
+// loginFlow collects email, which human-user-v2.json dropped.
 func loginFlow() *domain.FlowDefinition {
 	return &domain.FlowDefinition{
 		ProjectID:  "proj_1",
@@ -284,8 +283,6 @@ func TestReleaseServiceCreateRejectsSchemaWithoutObjectType(t *testing.T) {
 	assert.Equal(t, domain.ErrReleaseRevisionUnpinnable(nil).Code, domErr.Code)
 }
 
-// A flow names its user schema by objectType, and the release must reference
-// that schema too, so a miss fails here rather than on a login request.
 func TestReleaseServiceCreateRejectsMissingUserSchema(t *testing.T) {
 	svc, statements := newMockedReleaseService(t)
 	expectHandleReads(statements)
@@ -305,7 +302,6 @@ func TestReleaseServiceCreateRejectsMissingUserSchema(t *testing.T) {
 	assert.Equal(t, "flow_definition default-login: user_schema human-user not found", domErr.Message)
 }
 
-// An IDP connection is referenced by its revision and recorded under its slug.
 func TestReleaseServiceCreateReferencesIDPConnection(t *testing.T) {
 	svc, statements := newMockedReleaseService(t)
 	expectHandleReads(statements)
@@ -339,8 +335,6 @@ func TestReleaseServiceCreateRejectsUnknownIDPRevision(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrReleaseRevisionNotFound(nil))
 }
 
-// The flow is checked against the schema revision in the release, not the
-// one it was saved against.
 func TestReleaseServiceCreateRejectsFlowNotFittingItsSchema(t *testing.T) {
 	svc, statements := newMockedReleaseService(t)
 	expectHandleReads(statements)

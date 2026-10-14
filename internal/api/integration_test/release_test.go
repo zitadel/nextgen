@@ -182,8 +182,6 @@ func TestCreateRelease(t *testing.T) {
 		assert.NotEmpty(t, message)
 	})
 
-	// The flow names its user schema by objectType, so a release referencing the
-	// flow without that schema would fail on a login request rather than here.
 	t.Run("referencing a flow without its user schema is rejected", func(t *testing.T) {
 		resp := fixture.create(t, &api.CreateReleaseRequest{
 			Pointers: []api.CreateReleasePointer{
@@ -303,9 +301,7 @@ func TestCreateReleaseUnauthenticated(t *testing.T) {
 	assert.Equal(t, domain.ErrAuthUnauthorized(nil).Code, code)
 }
 
-// A flow is checked against the schema revision the release carries under its
-// user_schema handle, not the one it was saved against. v2 drops firstName,
-// which the flow collects.
+// v2 drops firstName, which the flow collects.
 func TestCreateReleaseChecksFlowAgainstItsSchemaRevision(t *testing.T) {
 	t.Parallel()
 
