@@ -16230,8 +16230,8 @@ func (*DeleteUserByIDUnauthorized) deleteUserByIDRes() {}
 type DeleteVariableErrorResponse struct {
 	Type                DeleteVariableErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
 	Internal            Internal
-	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	VarNotFound         VarNotFound
 	VarPermissionDenied VarPermissionDenied
@@ -16243,8 +16243,8 @@ type DeleteVariableErrorResponseType string
 // Possible values for DeleteVariableErrorResponseType.
 const (
 	AuthUnauthorizedDeleteVariableErrorResponse    DeleteVariableErrorResponseType = "auth.unauthorized"
+	EvtInvalidDeleteVariableErrorResponse          DeleteVariableErrorResponseType = "evt.invalid"
 	InternalDeleteVariableErrorResponse            DeleteVariableErrorResponseType = "internal"
-	NotImplementedDeleteVariableErrorResponse      DeleteVariableErrorResponseType = "not_implemented"
 	ReqInvalidDeleteVariableErrorResponse          DeleteVariableErrorResponseType = "req.invalid"
 	VarNotFoundDeleteVariableErrorResponse         DeleteVariableErrorResponseType = "var.not_found"
 	VarPermissionDeniedDeleteVariableErrorResponse DeleteVariableErrorResponseType = "var.permission_denied"
@@ -16255,14 +16255,14 @@ func (s DeleteVariableErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedDeleteVariableErrorResponse
 }
 
+// IsEvtInvalid reports whether DeleteVariableErrorResponse is EvtInvalid.
+func (s DeleteVariableErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidDeleteVariableErrorResponse
+}
+
 // IsInternal reports whether DeleteVariableErrorResponse is Internal.
 func (s DeleteVariableErrorResponse) IsInternal() bool {
 	return s.Type == InternalDeleteVariableErrorResponse
-}
-
-// IsNotImplemented reports whether DeleteVariableErrorResponse is NotImplemented.
-func (s DeleteVariableErrorResponse) IsNotImplemented() bool {
-	return s.Type == NotImplementedDeleteVariableErrorResponse
 }
 
 // IsReqInvalid reports whether DeleteVariableErrorResponse is ReqInvalid.
@@ -16301,6 +16301,27 @@ func NewAuthUnauthorizedDeleteVariableErrorResponse(v AuthUnauthorized) DeleteVa
 	return s
 }
 
+// SetEvtInvalid sets DeleteVariableErrorResponse to EvtInvalid.
+func (s *DeleteVariableErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidDeleteVariableErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if DeleteVariableErrorResponse is EvtInvalid.
+func (s DeleteVariableErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidDeleteVariableErrorResponse returns new DeleteVariableErrorResponse from EvtInvalid.
+func NewEvtInvalidDeleteVariableErrorResponse(v EvtInvalid) DeleteVariableErrorResponse {
+	var s DeleteVariableErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
 // SetInternal sets DeleteVariableErrorResponse to Internal.
 func (s *DeleteVariableErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalDeleteVariableErrorResponse
@@ -16319,27 +16340,6 @@ func (s DeleteVariableErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalDeleteVariableErrorResponse(v Internal) DeleteVariableErrorResponse {
 	var s DeleteVariableErrorResponse
 	s.SetInternal(v)
-	return s
-}
-
-// SetNotImplemented sets DeleteVariableErrorResponse to NotImplemented.
-func (s *DeleteVariableErrorResponse) SetNotImplemented(v NotImplemented) {
-	s.Type = NotImplementedDeleteVariableErrorResponse
-	s.NotImplemented = v
-}
-
-// GetNotImplemented returns NotImplemented and true boolean if DeleteVariableErrorResponse is NotImplemented.
-func (s DeleteVariableErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
-	if !s.IsNotImplemented() {
-		return v, false
-	}
-	return s.NotImplemented, true
-}
-
-// NewNotImplementedDeleteVariableErrorResponse returns new DeleteVariableErrorResponse from NotImplemented.
-func NewNotImplementedDeleteVariableErrorResponse(v NotImplemented) DeleteVariableErrorResponse {
-	var s DeleteVariableErrorResponse
-	s.SetNotImplemented(v)
 	return s
 }
 
@@ -17968,6 +17968,8 @@ type Event struct {
 	UserCreatedEvent                UserCreatedEvent
 	UserDeletedEvent                UserDeletedEvent
 	UserUpdatedEvent                UserUpdatedEvent
+	VariableDeletedEvent            VariableDeletedEvent
+	VariableSetEvent                VariableSetEvent
 }
 
 // EventType is oneOf type of Event.
@@ -18014,6 +18016,8 @@ const (
 	UserCreatedEventEvent                EventType = "user.created"
 	UserDeletedEventEvent                EventType = "user.deleted"
 	UserUpdatedEventEvent                EventType = "user.updated"
+	VariableDeletedEventEvent            EventType = "variable.deleted"
+	VariableSetEventEvent                EventType = "variable.set"
 )
 
 // IsAuthAttemptCreatedEvent reports whether Event is AuthAttemptCreatedEvent.
@@ -18140,6 +18144,12 @@ func (s Event) IsUserDeletedEvent() bool { return s.Type == UserDeletedEventEven
 
 // IsUserUpdatedEvent reports whether Event is UserUpdatedEvent.
 func (s Event) IsUserUpdatedEvent() bool { return s.Type == UserUpdatedEventEvent }
+
+// IsVariableDeletedEvent reports whether Event is VariableDeletedEvent.
+func (s Event) IsVariableDeletedEvent() bool { return s.Type == VariableDeletedEventEvent }
+
+// IsVariableSetEvent reports whether Event is VariableSetEvent.
+func (s Event) IsVariableSetEvent() bool { return s.Type == VariableSetEventEvent }
 
 // SetAuthAttemptCreatedEvent sets Event to AuthAttemptCreatedEvent.
 func (s *Event) SetAuthAttemptCreatedEvent(v AuthAttemptCreatedEvent) {
@@ -18957,6 +18967,48 @@ func (s Event) GetUserUpdatedEvent() (v UserUpdatedEvent, ok bool) {
 func NewUserUpdatedEventEvent(v UserUpdatedEvent) Event {
 	var s Event
 	s.SetUserUpdatedEvent(v)
+	return s
+}
+
+// SetVariableDeletedEvent sets Event to VariableDeletedEvent.
+func (s *Event) SetVariableDeletedEvent(v VariableDeletedEvent) {
+	s.Type = VariableDeletedEventEvent
+	s.VariableDeletedEvent = v
+}
+
+// GetVariableDeletedEvent returns VariableDeletedEvent and true boolean if Event is VariableDeletedEvent.
+func (s Event) GetVariableDeletedEvent() (v VariableDeletedEvent, ok bool) {
+	if !s.IsVariableDeletedEvent() {
+		return v, false
+	}
+	return s.VariableDeletedEvent, true
+}
+
+// NewVariableDeletedEventEvent returns new Event from VariableDeletedEvent.
+func NewVariableDeletedEventEvent(v VariableDeletedEvent) Event {
+	var s Event
+	s.SetVariableDeletedEvent(v)
+	return s
+}
+
+// SetVariableSetEvent sets Event to VariableSetEvent.
+func (s *Event) SetVariableSetEvent(v VariableSetEvent) {
+	s.Type = VariableSetEventEvent
+	s.VariableSetEvent = v
+}
+
+// GetVariableSetEvent returns VariableSetEvent and true boolean if Event is VariableSetEvent.
+func (s Event) GetVariableSetEvent() (v VariableSetEvent, ok bool) {
+	if !s.IsVariableSetEvent() {
+		return v, false
+	}
+	return s.VariableSetEvent, true
+}
+
+// NewVariableSetEventEvent returns new Event from VariableSetEvent.
+func NewVariableSetEventEvent(v VariableSetEvent) Event {
+	var s Event
+	s.SetVariableSetEvent(v)
 	return s
 }
 
@@ -28945,7 +28997,6 @@ type GetVariableErrorResponse struct {
 	Type                GetVariableErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
-	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	VarNotFound         VarNotFound
 	VarPermissionDenied VarPermissionDenied
@@ -28958,7 +29009,6 @@ type GetVariableErrorResponseType string
 const (
 	AuthUnauthorizedGetVariableErrorResponse    GetVariableErrorResponseType = "auth.unauthorized"
 	InternalGetVariableErrorResponse            GetVariableErrorResponseType = "internal"
-	NotImplementedGetVariableErrorResponse      GetVariableErrorResponseType = "not_implemented"
 	ReqInvalidGetVariableErrorResponse          GetVariableErrorResponseType = "req.invalid"
 	VarNotFoundGetVariableErrorResponse         GetVariableErrorResponseType = "var.not_found"
 	VarPermissionDeniedGetVariableErrorResponse GetVariableErrorResponseType = "var.permission_denied"
@@ -28972,11 +29022,6 @@ func (s GetVariableErrorResponse) IsAuthUnauthorized() bool {
 // IsInternal reports whether GetVariableErrorResponse is Internal.
 func (s GetVariableErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetVariableErrorResponse
-}
-
-// IsNotImplemented reports whether GetVariableErrorResponse is NotImplemented.
-func (s GetVariableErrorResponse) IsNotImplemented() bool {
-	return s.Type == NotImplementedGetVariableErrorResponse
 }
 
 // IsReqInvalid reports whether GetVariableErrorResponse is ReqInvalid.
@@ -29033,27 +29078,6 @@ func (s GetVariableErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetVariableErrorResponse(v Internal) GetVariableErrorResponse {
 	var s GetVariableErrorResponse
 	s.SetInternal(v)
-	return s
-}
-
-// SetNotImplemented sets GetVariableErrorResponse to NotImplemented.
-func (s *GetVariableErrorResponse) SetNotImplemented(v NotImplemented) {
-	s.Type = NotImplementedGetVariableErrorResponse
-	s.NotImplemented = v
-}
-
-// GetNotImplemented returns NotImplemented and true boolean if GetVariableErrorResponse is NotImplemented.
-func (s GetVariableErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
-	if !s.IsNotImplemented() {
-		return v, false
-	}
-	return s.NotImplemented, true
-}
-
-// NewNotImplementedGetVariableErrorResponse returns new GetVariableErrorResponse from NotImplemented.
-func NewNotImplementedGetVariableErrorResponse(v NotImplemented) GetVariableErrorResponse {
-	var s GetVariableErrorResponse
-	s.SetNotImplemented(v)
 	return s
 }
 
@@ -29153,7 +29177,6 @@ type GetVariablesErrorResponse struct {
 	Type                GetVariablesErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
-	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	VarNotFound         VarNotFound
 	VarPermissionDenied VarPermissionDenied
@@ -29166,7 +29189,6 @@ type GetVariablesErrorResponseType string
 const (
 	AuthUnauthorizedGetVariablesErrorResponse    GetVariablesErrorResponseType = "auth.unauthorized"
 	InternalGetVariablesErrorResponse            GetVariablesErrorResponseType = "internal"
-	NotImplementedGetVariablesErrorResponse      GetVariablesErrorResponseType = "not_implemented"
 	ReqInvalidGetVariablesErrorResponse          GetVariablesErrorResponseType = "req.invalid"
 	VarNotFoundGetVariablesErrorResponse         GetVariablesErrorResponseType = "var.not_found"
 	VarPermissionDeniedGetVariablesErrorResponse GetVariablesErrorResponseType = "var.permission_denied"
@@ -29180,11 +29202,6 @@ func (s GetVariablesErrorResponse) IsAuthUnauthorized() bool {
 // IsInternal reports whether GetVariablesErrorResponse is Internal.
 func (s GetVariablesErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetVariablesErrorResponse
-}
-
-// IsNotImplemented reports whether GetVariablesErrorResponse is NotImplemented.
-func (s GetVariablesErrorResponse) IsNotImplemented() bool {
-	return s.Type == NotImplementedGetVariablesErrorResponse
 }
 
 // IsReqInvalid reports whether GetVariablesErrorResponse is ReqInvalid.
@@ -29241,27 +29258,6 @@ func (s GetVariablesErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetVariablesErrorResponse(v Internal) GetVariablesErrorResponse {
 	var s GetVariablesErrorResponse
 	s.SetInternal(v)
-	return s
-}
-
-// SetNotImplemented sets GetVariablesErrorResponse to NotImplemented.
-func (s *GetVariablesErrorResponse) SetNotImplemented(v NotImplemented) {
-	s.Type = NotImplementedGetVariablesErrorResponse
-	s.NotImplemented = v
-}
-
-// GetNotImplemented returns NotImplemented and true boolean if GetVariablesErrorResponse is NotImplemented.
-func (s GetVariablesErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
-	if !s.IsNotImplemented() {
-		return v, false
-	}
-	return s.NotImplemented, true
-}
-
-// NewNotImplementedGetVariablesErrorResponse returns new GetVariablesErrorResponse from NotImplemented.
-func NewNotImplementedGetVariablesErrorResponse(v NotImplemented) GetVariablesErrorResponse {
-	var s GetVariablesErrorResponse
-	s.SetNotImplemented(v)
 	return s
 }
 
@@ -46451,6 +46447,132 @@ func (o OptNilUserUpdatedEventActorType) Or(d UserUpdatedEventActorType) UserUpd
 	return d
 }
 
+// NewOptNilVariableDeletedEventActorType returns new OptNilVariableDeletedEventActorType with value set to v.
+func NewOptNilVariableDeletedEventActorType(v VariableDeletedEventActorType) OptNilVariableDeletedEventActorType {
+	return OptNilVariableDeletedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilVariableDeletedEventActorType is optional nullable VariableDeletedEventActorType.
+type OptNilVariableDeletedEventActorType struct {
+	Value VariableDeletedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilVariableDeletedEventActorType was set.
+func (o OptNilVariableDeletedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilVariableDeletedEventActorType) Reset() {
+	var v VariableDeletedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilVariableDeletedEventActorType) SetTo(v VariableDeletedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilVariableDeletedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilVariableDeletedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v VariableDeletedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilVariableDeletedEventActorType) Get() (v VariableDeletedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilVariableDeletedEventActorType) Or(d VariableDeletedEventActorType) VariableDeletedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilVariableSetEventActorType returns new OptNilVariableSetEventActorType with value set to v.
+func NewOptNilVariableSetEventActorType(v VariableSetEventActorType) OptNilVariableSetEventActorType {
+	return OptNilVariableSetEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilVariableSetEventActorType is optional nullable VariableSetEventActorType.
+type OptNilVariableSetEventActorType struct {
+	Value VariableSetEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilVariableSetEventActorType was set.
+func (o OptNilVariableSetEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilVariableSetEventActorType) Reset() {
+	var v VariableSetEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilVariableSetEventActorType) SetTo(v VariableSetEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilVariableSetEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilVariableSetEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v VariableSetEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilVariableSetEventActorType) Get() (v VariableSetEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilVariableSetEventActorType) Or(d VariableSetEventActorType) VariableSetEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNotImplementedDetails returns new OptNotImplementedDetails with value set to v.
 func NewOptNotImplementedDetails(v NotImplementedDetails) OptNotImplementedDetails {
 	return OptNotImplementedDetails{
@@ -51189,6 +51311,52 @@ func (o OptVarInvalidValueDetails) Or(d VarInvalidValueDetails) VarInvalidValueD
 	return d
 }
 
+// NewOptVarLimitExceededDetails returns new OptVarLimitExceededDetails with value set to v.
+func NewOptVarLimitExceededDetails(v VarLimitExceededDetails) OptVarLimitExceededDetails {
+	return OptVarLimitExceededDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVarLimitExceededDetails is optional VarLimitExceededDetails.
+type OptVarLimitExceededDetails struct {
+	Value VarLimitExceededDetails
+	Set   bool
+}
+
+// IsSet returns true if OptVarLimitExceededDetails was set.
+func (o OptVarLimitExceededDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVarLimitExceededDetails) Reset() {
+	var v VarLimitExceededDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVarLimitExceededDetails) SetTo(v VarLimitExceededDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVarLimitExceededDetails) Get() (v VarLimitExceededDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVarLimitExceededDetails) Or(d VarLimitExceededDetails) VarLimitExceededDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptVarNoProjectIDDetails returns new OptVarNoProjectIDDetails with value set to v.
 func NewOptVarNoProjectIDDetails(v VarNoProjectIDDetails) OptVarNoProjectIDDetails {
 	return OptVarNoProjectIDDetails{
@@ -51373,6 +51541,98 @@ func (o OptVariable) Or(d Variable) Variable {
 	return d
 }
 
+// NewOptVariableDeletedEventDelegationType returns new OptVariableDeletedEventDelegationType with value set to v.
+func NewOptVariableDeletedEventDelegationType(v VariableDeletedEventDelegationType) OptVariableDeletedEventDelegationType {
+	return OptVariableDeletedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVariableDeletedEventDelegationType is optional VariableDeletedEventDelegationType.
+type OptVariableDeletedEventDelegationType struct {
+	Value VariableDeletedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptVariableDeletedEventDelegationType was set.
+func (o OptVariableDeletedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVariableDeletedEventDelegationType) Reset() {
+	var v VariableDeletedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVariableDeletedEventDelegationType) SetTo(v VariableDeletedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVariableDeletedEventDelegationType) Get() (v VariableDeletedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVariableDeletedEventDelegationType) Or(d VariableDeletedEventDelegationType) VariableDeletedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptVariableDeletedPayloadKind returns new OptVariableDeletedPayloadKind with value set to v.
+func NewOptVariableDeletedPayloadKind(v VariableDeletedPayloadKind) OptVariableDeletedPayloadKind {
+	return OptVariableDeletedPayloadKind{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVariableDeletedPayloadKind is optional VariableDeletedPayloadKind.
+type OptVariableDeletedPayloadKind struct {
+	Value VariableDeletedPayloadKind
+	Set   bool
+}
+
+// IsSet returns true if OptVariableDeletedPayloadKind was set.
+func (o OptVariableDeletedPayloadKind) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVariableDeletedPayloadKind) Reset() {
+	var v VariableDeletedPayloadKind
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVariableDeletedPayloadKind) SetTo(v VariableDeletedPayloadKind) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVariableDeletedPayloadKind) Get() (v VariableDeletedPayloadKind, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVariableDeletedPayloadKind) Or(d VariableDeletedPayloadKind) VariableDeletedPayloadKind {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptVariableKind returns new OptVariableKind with value set to v.
 func NewOptVariableKind(v VariableKind) OptVariableKind {
 	return OptVariableKind{
@@ -51413,6 +51673,98 @@ func (o OptVariableKind) Get() (v VariableKind, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptVariableKind) Or(d VariableKind) VariableKind {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptVariableSetEventDelegationType returns new OptVariableSetEventDelegationType with value set to v.
+func NewOptVariableSetEventDelegationType(v VariableSetEventDelegationType) OptVariableSetEventDelegationType {
+	return OptVariableSetEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVariableSetEventDelegationType is optional VariableSetEventDelegationType.
+type OptVariableSetEventDelegationType struct {
+	Value VariableSetEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptVariableSetEventDelegationType was set.
+func (o OptVariableSetEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVariableSetEventDelegationType) Reset() {
+	var v VariableSetEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVariableSetEventDelegationType) SetTo(v VariableSetEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVariableSetEventDelegationType) Get() (v VariableSetEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVariableSetEventDelegationType) Or(d VariableSetEventDelegationType) VariableSetEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptVariableSetPayloadKind returns new OptVariableSetPayloadKind with value set to v.
+func NewOptVariableSetPayloadKind(v VariableSetPayloadKind) OptVariableSetPayloadKind {
+	return OptVariableSetPayloadKind{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVariableSetPayloadKind is optional VariableSetPayloadKind.
+type OptVariableSetPayloadKind struct {
+	Value VariableSetPayloadKind
+	Set   bool
+}
+
+// IsSet returns true if OptVariableSetPayloadKind was set.
+func (o OptVariableSetPayloadKind) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVariableSetPayloadKind) Reset() {
+	var v VariableSetPayloadKind
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVariableSetPayloadKind) SetTo(v VariableSetPayloadKind) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVariableSetPayloadKind) Get() (v VariableSetPayloadKind, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVariableSetPayloadKind) Or(d VariableSetPayloadKind) VariableSetPayloadKind {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -69103,15 +69455,16 @@ type UpdateVariablesErrorResponse struct {
 	AuthUnauthorized    AuthUnauthorized
 	EncKeyDecryptFailed EncKeyDecryptFailed
 	EncKeyNotFound      EncKeyNotFound
+	EvtInvalid          EvtInvalid
 	Internal            Internal
 	TknInvalid          TknInvalid
 	VarInvalidName      VarInvalidName
 	VarInvalidValue     VarInvalidValue
 	VarNoProjectID      VarNoProjectID
-	NotImplemented      NotImplemented
 	ProjNotFound        ProjNotFound
 	ReqInvalid          ReqInvalid
 	EncKeyUnknownAlg    EncKeyUnknownAlg
+	VarLimitExceeded    VarLimitExceeded
 	VarNotFound         VarNotFound
 	VarPermissionDenied VarPermissionDenied
 }
@@ -69124,15 +69477,16 @@ const (
 	AuthUnauthorizedUpdateVariablesErrorResponse    UpdateVariablesErrorResponseType = "auth.unauthorized"
 	EncKeyDecryptFailedUpdateVariablesErrorResponse UpdateVariablesErrorResponseType = "enc_key.decrypt_failed"
 	EncKeyNotFoundUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "enc_key.not_found"
+	EvtInvalidUpdateVariablesErrorResponse          UpdateVariablesErrorResponseType = "evt.invalid"
 	InternalUpdateVariablesErrorResponse            UpdateVariablesErrorResponseType = "internal"
 	TknInvalidUpdateVariablesErrorResponse          UpdateVariablesErrorResponseType = "tkn.invalid"
 	VarInvalidNameUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "var.invalid_name"
 	VarInvalidValueUpdateVariablesErrorResponse     UpdateVariablesErrorResponseType = "var.invalid_value"
 	VarNoProjectIDUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "var.no_project_id"
-	NotImplementedUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "not_implemented"
 	ProjNotFoundUpdateVariablesErrorResponse        UpdateVariablesErrorResponseType = "proj.not_found"
 	ReqInvalidUpdateVariablesErrorResponse          UpdateVariablesErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgUpdateVariablesErrorResponse    UpdateVariablesErrorResponseType = "enc_key.unknown_alg"
+	VarLimitExceededUpdateVariablesErrorResponse    UpdateVariablesErrorResponseType = "var.limit_exceeded"
 	VarNotFoundUpdateVariablesErrorResponse         UpdateVariablesErrorResponseType = "var.not_found"
 	VarPermissionDeniedUpdateVariablesErrorResponse UpdateVariablesErrorResponseType = "var.permission_denied"
 )
@@ -69150,6 +69504,11 @@ func (s UpdateVariablesErrorResponse) IsEncKeyDecryptFailed() bool {
 // IsEncKeyNotFound reports whether UpdateVariablesErrorResponse is EncKeyNotFound.
 func (s UpdateVariablesErrorResponse) IsEncKeyNotFound() bool {
 	return s.Type == EncKeyNotFoundUpdateVariablesErrorResponse
+}
+
+// IsEvtInvalid reports whether UpdateVariablesErrorResponse is EvtInvalid.
+func (s UpdateVariablesErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidUpdateVariablesErrorResponse
 }
 
 // IsInternal reports whether UpdateVariablesErrorResponse is Internal.
@@ -69177,11 +69536,6 @@ func (s UpdateVariablesErrorResponse) IsVarNoProjectID() bool {
 	return s.Type == VarNoProjectIDUpdateVariablesErrorResponse
 }
 
-// IsNotImplemented reports whether UpdateVariablesErrorResponse is NotImplemented.
-func (s UpdateVariablesErrorResponse) IsNotImplemented() bool {
-	return s.Type == NotImplementedUpdateVariablesErrorResponse
-}
-
 // IsProjNotFound reports whether UpdateVariablesErrorResponse is ProjNotFound.
 func (s UpdateVariablesErrorResponse) IsProjNotFound() bool {
 	return s.Type == ProjNotFoundUpdateVariablesErrorResponse
@@ -69195,6 +69549,11 @@ func (s UpdateVariablesErrorResponse) IsReqInvalid() bool {
 // IsEncKeyUnknownAlg reports whether UpdateVariablesErrorResponse is EncKeyUnknownAlg.
 func (s UpdateVariablesErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgUpdateVariablesErrorResponse
+}
+
+// IsVarLimitExceeded reports whether UpdateVariablesErrorResponse is VarLimitExceeded.
+func (s UpdateVariablesErrorResponse) IsVarLimitExceeded() bool {
+	return s.Type == VarLimitExceededUpdateVariablesErrorResponse
 }
 
 // IsVarNotFound reports whether UpdateVariablesErrorResponse is VarNotFound.
@@ -69267,6 +69626,27 @@ func (s UpdateVariablesErrorResponse) GetEncKeyNotFound() (v EncKeyNotFound, ok 
 func NewEncKeyNotFoundUpdateVariablesErrorResponse(v EncKeyNotFound) UpdateVariablesErrorResponse {
 	var s UpdateVariablesErrorResponse
 	s.SetEncKeyNotFound(v)
+	return s
+}
+
+// SetEvtInvalid sets UpdateVariablesErrorResponse to EvtInvalid.
+func (s *UpdateVariablesErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidUpdateVariablesErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if UpdateVariablesErrorResponse is EvtInvalid.
+func (s UpdateVariablesErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from EvtInvalid.
+func NewEvtInvalidUpdateVariablesErrorResponse(v EvtInvalid) UpdateVariablesErrorResponse {
+	var s UpdateVariablesErrorResponse
+	s.SetEvtInvalid(v)
 	return s
 }
 
@@ -69375,27 +69755,6 @@ func NewVarNoProjectIDUpdateVariablesErrorResponse(v VarNoProjectID) UpdateVaria
 	return s
 }
 
-// SetNotImplemented sets UpdateVariablesErrorResponse to NotImplemented.
-func (s *UpdateVariablesErrorResponse) SetNotImplemented(v NotImplemented) {
-	s.Type = NotImplementedUpdateVariablesErrorResponse
-	s.NotImplemented = v
-}
-
-// GetNotImplemented returns NotImplemented and true boolean if UpdateVariablesErrorResponse is NotImplemented.
-func (s UpdateVariablesErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
-	if !s.IsNotImplemented() {
-		return v, false
-	}
-	return s.NotImplemented, true
-}
-
-// NewNotImplementedUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from NotImplemented.
-func NewNotImplementedUpdateVariablesErrorResponse(v NotImplemented) UpdateVariablesErrorResponse {
-	var s UpdateVariablesErrorResponse
-	s.SetNotImplemented(v)
-	return s
-}
-
 // SetProjNotFound sets UpdateVariablesErrorResponse to ProjNotFound.
 func (s *UpdateVariablesErrorResponse) SetProjNotFound(v ProjNotFound) {
 	s.Type = ProjNotFoundUpdateVariablesErrorResponse
@@ -69456,6 +69815,27 @@ func (s UpdateVariablesErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg,
 func NewEncKeyUnknownAlgUpdateVariablesErrorResponse(v EncKeyUnknownAlg) UpdateVariablesErrorResponse {
 	var s UpdateVariablesErrorResponse
 	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
+// SetVarLimitExceeded sets UpdateVariablesErrorResponse to VarLimitExceeded.
+func (s *UpdateVariablesErrorResponse) SetVarLimitExceeded(v VarLimitExceeded) {
+	s.Type = VarLimitExceededUpdateVariablesErrorResponse
+	s.VarLimitExceeded = v
+}
+
+// GetVarLimitExceeded returns VarLimitExceeded and true boolean if UpdateVariablesErrorResponse is VarLimitExceeded.
+func (s UpdateVariablesErrorResponse) GetVarLimitExceeded() (v VarLimitExceeded, ok bool) {
+	if !s.IsVarLimitExceeded() {
+		return v, false
+	}
+	return s.VarLimitExceeded, true
+}
+
+// NewVarLimitExceededUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from VarLimitExceeded.
+func NewVarLimitExceededUpdateVariablesErrorResponse(v VarLimitExceeded) UpdateVariablesErrorResponse {
+	var s UpdateVariablesErrorResponse
+	s.SetVarLimitExceeded(v)
 	return s
 }
 
@@ -72969,6 +73349,59 @@ func (s *VarInvalidValueDetails) init() VarInvalidValueDetails {
 
 // Merged schema.
 // Ref: #
+type VarLimitExceeded struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptVarLimitExceededDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *VarLimitExceeded) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *VarLimitExceeded) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *VarLimitExceeded) GetDetails() OptVarLimitExceededDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *VarLimitExceeded) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *VarLimitExceeded) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *VarLimitExceeded) SetDetails(val OptVarLimitExceededDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type VarLimitExceededDetails map[string]jx.Raw
+
+func (s *VarLimitExceededDetails) init() VarLimitExceededDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type VarNoProjectID struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -73225,6 +73658,508 @@ func (s *VariableByKind) SetPreview(val OptVariable) {
 
 func (*VariableByKind) getVariableRes() {}
 
+// Merged schema.
+// Ref: #
+type VariableDeletedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category VariableDeletedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilVariableDeletedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptVariableDeletedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                             `json:"delegation_id"`
+	Grantor        OptString                             `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString           `json:"flow_id"`
+	Metadata OptEventMetadata       `json:"metadata"`
+	Payload  VariableDeletedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *VariableDeletedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *VariableDeletedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *VariableDeletedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *VariableDeletedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *VariableDeletedEvent) GetCategory() VariableDeletedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *VariableDeletedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *VariableDeletedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *VariableDeletedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *VariableDeletedEvent) GetActorType() OptNilVariableDeletedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *VariableDeletedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *VariableDeletedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *VariableDeletedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *VariableDeletedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *VariableDeletedEvent) GetDelegationType() OptVariableDeletedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *VariableDeletedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *VariableDeletedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *VariableDeletedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *VariableDeletedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *VariableDeletedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *VariableDeletedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *VariableDeletedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *VariableDeletedEvent) GetPayload() VariableDeletedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *VariableDeletedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *VariableDeletedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *VariableDeletedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *VariableDeletedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *VariableDeletedEvent) SetCategory(val VariableDeletedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *VariableDeletedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *VariableDeletedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *VariableDeletedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *VariableDeletedEvent) SetActorType(val OptNilVariableDeletedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *VariableDeletedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *VariableDeletedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *VariableDeletedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *VariableDeletedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *VariableDeletedEvent) SetDelegationType(val OptVariableDeletedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *VariableDeletedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *VariableDeletedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *VariableDeletedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *VariableDeletedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *VariableDeletedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *VariableDeletedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *VariableDeletedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *VariableDeletedEvent) SetPayload(val VariableDeletedPayload) {
+	s.Payload = val
+}
+
+type VariableDeletedEventActorType string
+
+const (
+	VariableDeletedEventActorTypeHuman   VariableDeletedEventActorType = "human"
+	VariableDeletedEventActorTypeService VariableDeletedEventActorType = "service"
+	VariableDeletedEventActorTypeSystem  VariableDeletedEventActorType = "system"
+	VariableDeletedEventActorTypeAgent   VariableDeletedEventActorType = "agent"
+)
+
+// AllValues returns all VariableDeletedEventActorType values.
+func (VariableDeletedEventActorType) AllValues() []VariableDeletedEventActorType {
+	return []VariableDeletedEventActorType{
+		VariableDeletedEventActorTypeHuman,
+		VariableDeletedEventActorTypeService,
+		VariableDeletedEventActorTypeSystem,
+		VariableDeletedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s VariableDeletedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case VariableDeletedEventActorTypeHuman:
+		return []byte(s), nil
+	case VariableDeletedEventActorTypeService:
+		return []byte(s), nil
+	case VariableDeletedEventActorTypeSystem:
+		return []byte(s), nil
+	case VariableDeletedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *VariableDeletedEventActorType) UnmarshalText(data []byte) error {
+	switch VariableDeletedEventActorType(data) {
+	case VariableDeletedEventActorTypeHuman:
+		*s = VariableDeletedEventActorTypeHuman
+		return nil
+	case VariableDeletedEventActorTypeService:
+		*s = VariableDeletedEventActorTypeService
+		return nil
+	case VariableDeletedEventActorTypeSystem:
+		*s = VariableDeletedEventActorTypeSystem
+		return nil
+	case VariableDeletedEventActorTypeAgent:
+		*s = VariableDeletedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type VariableDeletedEventCategory string
+
+const (
+	VariableDeletedEventCategoryRequest VariableDeletedEventCategory = "request"
+	VariableDeletedEventCategoryAuth    VariableDeletedEventCategory = "auth"
+	VariableDeletedEventCategorySession VariableDeletedEventCategory = "session"
+	VariableDeletedEventCategoryAdmin   VariableDeletedEventCategory = "admin"
+	VariableDeletedEventCategoryEntity  VariableDeletedEventCategory = "entity"
+	VariableDeletedEventCategorySignal  VariableDeletedEventCategory = "signal"
+)
+
+// AllValues returns all VariableDeletedEventCategory values.
+func (VariableDeletedEventCategory) AllValues() []VariableDeletedEventCategory {
+	return []VariableDeletedEventCategory{
+		VariableDeletedEventCategoryRequest,
+		VariableDeletedEventCategoryAuth,
+		VariableDeletedEventCategorySession,
+		VariableDeletedEventCategoryAdmin,
+		VariableDeletedEventCategoryEntity,
+		VariableDeletedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s VariableDeletedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case VariableDeletedEventCategoryRequest:
+		return []byte(s), nil
+	case VariableDeletedEventCategoryAuth:
+		return []byte(s), nil
+	case VariableDeletedEventCategorySession:
+		return []byte(s), nil
+	case VariableDeletedEventCategoryAdmin:
+		return []byte(s), nil
+	case VariableDeletedEventCategoryEntity:
+		return []byte(s), nil
+	case VariableDeletedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *VariableDeletedEventCategory) UnmarshalText(data []byte) error {
+	switch VariableDeletedEventCategory(data) {
+	case VariableDeletedEventCategoryRequest:
+		*s = VariableDeletedEventCategoryRequest
+		return nil
+	case VariableDeletedEventCategoryAuth:
+		*s = VariableDeletedEventCategoryAuth
+		return nil
+	case VariableDeletedEventCategorySession:
+		*s = VariableDeletedEventCategorySession
+		return nil
+	case VariableDeletedEventCategoryAdmin:
+		*s = VariableDeletedEventCategoryAdmin
+		return nil
+	case VariableDeletedEventCategoryEntity:
+		*s = VariableDeletedEventCategoryEntity
+		return nil
+	case VariableDeletedEventCategorySignal:
+		*s = VariableDeletedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type VariableDeletedEventDelegationType string
+
+const (
+	VariableDeletedEventDelegationTypeDirect    VariableDeletedEventDelegationType = "direct"
+	VariableDeletedEventDelegationTypeDelegated VariableDeletedEventDelegationType = "delegated"
+	VariableDeletedEventDelegationTypePatShared VariableDeletedEventDelegationType = "pat_shared"
+	VariableDeletedEventDelegationTypeExchanged VariableDeletedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all VariableDeletedEventDelegationType values.
+func (VariableDeletedEventDelegationType) AllValues() []VariableDeletedEventDelegationType {
+	return []VariableDeletedEventDelegationType{
+		VariableDeletedEventDelegationTypeDirect,
+		VariableDeletedEventDelegationTypeDelegated,
+		VariableDeletedEventDelegationTypePatShared,
+		VariableDeletedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s VariableDeletedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case VariableDeletedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case VariableDeletedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case VariableDeletedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case VariableDeletedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *VariableDeletedEventDelegationType) UnmarshalText(data []byte) error {
+	switch VariableDeletedEventDelegationType(data) {
+	case VariableDeletedEventDelegationTypeDirect:
+		*s = VariableDeletedEventDelegationTypeDirect
+		return nil
+	case VariableDeletedEventDelegationTypeDelegated:
+		*s = VariableDeletedEventDelegationTypeDelegated
+		return nil
+	case VariableDeletedEventDelegationTypePatShared:
+		*s = VariableDeletedEventDelegationTypePatShared
+		return nil
+	case VariableDeletedEventDelegationTypeExchanged:
+		*s = VariableDeletedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `variable.deleted` events, one row removed.
+// Ref: #
+type VariableDeletedPayload struct {
+	Kind OptVariableDeletedPayloadKind `json:"kind"`
+}
+
+// GetKind returns the value of Kind.
+func (s *VariableDeletedPayload) GetKind() OptVariableDeletedPayloadKind {
+	return s.Kind
+}
+
+// SetKind sets the value of Kind.
+func (s *VariableDeletedPayload) SetKind(val OptVariableDeletedPayloadKind) {
+	s.Kind = val
+}
+
+type VariableDeletedPayloadKind string
+
+const (
+	VariableDeletedPayloadKindPrimary VariableDeletedPayloadKind = "primary"
+	VariableDeletedPayloadKindPreview VariableDeletedPayloadKind = "preview"
+)
+
+// AllValues returns all VariableDeletedPayloadKind values.
+func (VariableDeletedPayloadKind) AllValues() []VariableDeletedPayloadKind {
+	return []VariableDeletedPayloadKind{
+		VariableDeletedPayloadKindPrimary,
+		VariableDeletedPayloadKindPreview,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s VariableDeletedPayloadKind) MarshalText() ([]byte, error) {
+	switch s {
+	case VariableDeletedPayloadKindPrimary:
+		return []byte(s), nil
+	case VariableDeletedPayloadKindPreview:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *VariableDeletedPayloadKind) UnmarshalText(data []byte) error {
+	switch VariableDeletedPayloadKind(data) {
+	case VariableDeletedPayloadKindPrimary:
+		*s = VariableDeletedPayloadKindPrimary
+		return nil
+	case VariableDeletedPayloadKindPreview:
+		*s = VariableDeletedPayloadKindPreview
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // One entry of an update. A bare scalar enters a non-secret value, an object
 // states the flag explicitly, and `null` removes the name.
 // The shorthand exists because most variables are not secrets and spelling
@@ -73474,6 +74409,520 @@ func NewBoolVariableScalar(v bool) VariableScalar {
 	var s VariableScalar
 	s.SetBool(v)
 	return s
+}
+
+// Merged schema.
+// Ref: #
+type VariableSetEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category VariableSetEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilVariableSetEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptVariableSetEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                         `json:"delegation_id"`
+	Grantor        OptString                         `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString       `json:"flow_id"`
+	Metadata OptEventMetadata   `json:"metadata"`
+	Payload  VariableSetPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *VariableSetEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *VariableSetEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *VariableSetEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *VariableSetEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *VariableSetEvent) GetCategory() VariableSetEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *VariableSetEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *VariableSetEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *VariableSetEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *VariableSetEvent) GetActorType() OptNilVariableSetEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *VariableSetEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *VariableSetEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *VariableSetEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *VariableSetEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *VariableSetEvent) GetDelegationType() OptVariableSetEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *VariableSetEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *VariableSetEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *VariableSetEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *VariableSetEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *VariableSetEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *VariableSetEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *VariableSetEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *VariableSetEvent) GetPayload() VariableSetPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *VariableSetEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *VariableSetEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *VariableSetEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *VariableSetEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *VariableSetEvent) SetCategory(val VariableSetEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *VariableSetEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *VariableSetEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *VariableSetEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *VariableSetEvent) SetActorType(val OptNilVariableSetEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *VariableSetEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *VariableSetEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *VariableSetEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *VariableSetEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *VariableSetEvent) SetDelegationType(val OptVariableSetEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *VariableSetEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *VariableSetEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *VariableSetEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *VariableSetEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *VariableSetEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *VariableSetEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *VariableSetEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *VariableSetEvent) SetPayload(val VariableSetPayload) {
+	s.Payload = val
+}
+
+type VariableSetEventActorType string
+
+const (
+	VariableSetEventActorTypeHuman   VariableSetEventActorType = "human"
+	VariableSetEventActorTypeService VariableSetEventActorType = "service"
+	VariableSetEventActorTypeSystem  VariableSetEventActorType = "system"
+	VariableSetEventActorTypeAgent   VariableSetEventActorType = "agent"
+)
+
+// AllValues returns all VariableSetEventActorType values.
+func (VariableSetEventActorType) AllValues() []VariableSetEventActorType {
+	return []VariableSetEventActorType{
+		VariableSetEventActorTypeHuman,
+		VariableSetEventActorTypeService,
+		VariableSetEventActorTypeSystem,
+		VariableSetEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s VariableSetEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case VariableSetEventActorTypeHuman:
+		return []byte(s), nil
+	case VariableSetEventActorTypeService:
+		return []byte(s), nil
+	case VariableSetEventActorTypeSystem:
+		return []byte(s), nil
+	case VariableSetEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *VariableSetEventActorType) UnmarshalText(data []byte) error {
+	switch VariableSetEventActorType(data) {
+	case VariableSetEventActorTypeHuman:
+		*s = VariableSetEventActorTypeHuman
+		return nil
+	case VariableSetEventActorTypeService:
+		*s = VariableSetEventActorTypeService
+		return nil
+	case VariableSetEventActorTypeSystem:
+		*s = VariableSetEventActorTypeSystem
+		return nil
+	case VariableSetEventActorTypeAgent:
+		*s = VariableSetEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type VariableSetEventCategory string
+
+const (
+	VariableSetEventCategoryRequest VariableSetEventCategory = "request"
+	VariableSetEventCategoryAuth    VariableSetEventCategory = "auth"
+	VariableSetEventCategorySession VariableSetEventCategory = "session"
+	VariableSetEventCategoryAdmin   VariableSetEventCategory = "admin"
+	VariableSetEventCategoryEntity  VariableSetEventCategory = "entity"
+	VariableSetEventCategorySignal  VariableSetEventCategory = "signal"
+)
+
+// AllValues returns all VariableSetEventCategory values.
+func (VariableSetEventCategory) AllValues() []VariableSetEventCategory {
+	return []VariableSetEventCategory{
+		VariableSetEventCategoryRequest,
+		VariableSetEventCategoryAuth,
+		VariableSetEventCategorySession,
+		VariableSetEventCategoryAdmin,
+		VariableSetEventCategoryEntity,
+		VariableSetEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s VariableSetEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case VariableSetEventCategoryRequest:
+		return []byte(s), nil
+	case VariableSetEventCategoryAuth:
+		return []byte(s), nil
+	case VariableSetEventCategorySession:
+		return []byte(s), nil
+	case VariableSetEventCategoryAdmin:
+		return []byte(s), nil
+	case VariableSetEventCategoryEntity:
+		return []byte(s), nil
+	case VariableSetEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *VariableSetEventCategory) UnmarshalText(data []byte) error {
+	switch VariableSetEventCategory(data) {
+	case VariableSetEventCategoryRequest:
+		*s = VariableSetEventCategoryRequest
+		return nil
+	case VariableSetEventCategoryAuth:
+		*s = VariableSetEventCategoryAuth
+		return nil
+	case VariableSetEventCategorySession:
+		*s = VariableSetEventCategorySession
+		return nil
+	case VariableSetEventCategoryAdmin:
+		*s = VariableSetEventCategoryAdmin
+		return nil
+	case VariableSetEventCategoryEntity:
+		*s = VariableSetEventCategoryEntity
+		return nil
+	case VariableSetEventCategorySignal:
+		*s = VariableSetEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type VariableSetEventDelegationType string
+
+const (
+	VariableSetEventDelegationTypeDirect    VariableSetEventDelegationType = "direct"
+	VariableSetEventDelegationTypeDelegated VariableSetEventDelegationType = "delegated"
+	VariableSetEventDelegationTypePatShared VariableSetEventDelegationType = "pat_shared"
+	VariableSetEventDelegationTypeExchanged VariableSetEventDelegationType = "exchanged"
+)
+
+// AllValues returns all VariableSetEventDelegationType values.
+func (VariableSetEventDelegationType) AllValues() []VariableSetEventDelegationType {
+	return []VariableSetEventDelegationType{
+		VariableSetEventDelegationTypeDirect,
+		VariableSetEventDelegationTypeDelegated,
+		VariableSetEventDelegationTypePatShared,
+		VariableSetEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s VariableSetEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case VariableSetEventDelegationTypeDirect:
+		return []byte(s), nil
+	case VariableSetEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case VariableSetEventDelegationTypePatShared:
+		return []byte(s), nil
+	case VariableSetEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *VariableSetEventDelegationType) UnmarshalText(data []byte) error {
+	switch VariableSetEventDelegationType(data) {
+	case VariableSetEventDelegationTypeDirect:
+		*s = VariableSetEventDelegationTypeDirect
+		return nil
+	case VariableSetEventDelegationTypeDelegated:
+		*s = VariableSetEventDelegationTypeDelegated
+		return nil
+	case VariableSetEventDelegationTypePatShared:
+		*s = VariableSetEventDelegationTypePatShared
+		return nil
+	case VariableSetEventDelegationTypeExchanged:
+		*s = VariableSetEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `variable.set` events: one row entered or replaced. The value
+// is never included, plain or encrypted.
+// Ref: #
+type VariableSetPayload struct {
+	Kind   OptVariableSetPayloadKind `json:"kind"`
+	Secret OptBool                   `json:"secret"`
+}
+
+// GetKind returns the value of Kind.
+func (s *VariableSetPayload) GetKind() OptVariableSetPayloadKind {
+	return s.Kind
+}
+
+// GetSecret returns the value of Secret.
+func (s *VariableSetPayload) GetSecret() OptBool {
+	return s.Secret
+}
+
+// SetKind sets the value of Kind.
+func (s *VariableSetPayload) SetKind(val OptVariableSetPayloadKind) {
+	s.Kind = val
+}
+
+// SetSecret sets the value of Secret.
+func (s *VariableSetPayload) SetSecret(val OptBool) {
+	s.Secret = val
+}
+
+type VariableSetPayloadKind string
+
+const (
+	VariableSetPayloadKindPrimary VariableSetPayloadKind = "primary"
+	VariableSetPayloadKindPreview VariableSetPayloadKind = "preview"
+)
+
+// AllValues returns all VariableSetPayloadKind values.
+func (VariableSetPayloadKind) AllValues() []VariableSetPayloadKind {
+	return []VariableSetPayloadKind{
+		VariableSetPayloadKindPrimary,
+		VariableSetPayloadKindPreview,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s VariableSetPayloadKind) MarshalText() ([]byte, error) {
+	switch s {
+	case VariableSetPayloadKindPrimary:
+		return []byte(s), nil
+	case VariableSetPayloadKindPreview:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *VariableSetPayloadKind) UnmarshalText(data []byte) error {
+	switch VariableSetPayloadKind(data) {
+	case VariableSetPayloadKindPrimary:
+		*s = VariableSetPayloadKindPrimary
+		return nil
+	case VariableSetPayloadKindPreview:
+		*s = VariableSetPayloadKindPreview
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // The variables a deployment froze, keyed by name.

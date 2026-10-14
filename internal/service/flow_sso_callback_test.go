@@ -196,7 +196,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 					Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: revisionDoc}, nil)
 			},
 			variables: func(m *servicemocks.MockVariableService) {
-				m.EXPECT().GetDecryptedVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, "GOOGLE_SECRET").Return(nil, nil)
+				m.EXPECT().GetDecryptedVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_SECRET").Return(nil, nil)
 			},
 			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
 			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
@@ -209,7 +209,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 					Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: revisionDoc}, nil)
 			},
 			variables: func(m *servicemocks.MockVariableService) {
-				m.EXPECT().GetDecryptedVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, "GOOGLE_SECRET").
+				m.EXPECT().GetDecryptedVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_SECRET").
 					Return([]*domain.Variable{{Name: "GOOGLE_SECRET", Value: "plain", IsSecret: false}}, nil)
 			},
 			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
@@ -480,7 +480,7 @@ func TestFlowSSOCallback_Process_StoresTheIdentity(t *testing.T) {
 			connections.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
 				Return(&domain.IDPConnection{Slug: ssoCallbackSlug, RevisionID: "idprev_1", Document: doc}, nil)
 			variables := servicemocks.NewMockVariableService(ctrl)
-			variables.EXPECT().GetDecryptedVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, "GOOGLE_SECRET").
+			variables.EXPECT().GetDecryptedVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_SECRET").
 				Return([]*domain.Variable{{Name: "GOOGLE_SECRET", Value: "secret-1", IsSecret: true}}, nil)
 			attempts := &fakeAuthAttempts{
 				consumeCheck:  &domain.SSOCallbackCheck{Pending: ssoCallbackPending()},

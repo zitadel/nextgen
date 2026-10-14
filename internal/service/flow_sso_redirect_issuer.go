@@ -99,7 +99,9 @@ func resolveSSOClientID(ctx context.Context, variables VariableService, projectI
 	if !ok {
 		return nil
 	}
-	vars, err := variables.GetVariables(ctx, domain.VariableOwner{ProjectID: projectID}, name)
+	// The primary value: a sign-in resolves against the primary target until
+	// it reads the set its deployment froze.
+	vars, err := variables.GetVariables(ctx, domain.VariableOwner{ProjectID: projectID}, new(domain.DeploymentOriginKindPrimary), name)
 	if err != nil {
 		return err
 	}

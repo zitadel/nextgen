@@ -213,7 +213,8 @@ func (c *FlowSSOCallback) resolveClientSecret(ctx context.Context, projectID str
 		// logged.
 		return "", errors.New("client_secret is not a variable reference")
 	}
-	vars, err := c.variables.GetDecryptedVariables(ctx, domain.VariableOwner{ProjectID: projectID}, name)
+	// The primary value, as the redirect resolved the client_id.
+	vars, err := c.variables.GetDecryptedVariables(ctx, domain.VariableOwner{ProjectID: projectID}, new(domain.DeploymentOriginKindPrimary), name)
 	if err != nil {
 		return "", err
 	}
