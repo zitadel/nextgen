@@ -439,6 +439,19 @@ describe("variable set", () => {
     expect(json.data.preview).toEqual({ held: false });
   });
 
+  it("succeeds when the token may write variables but not read them", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.get("*/variables", () =>
+        HttpResponse.json({ code: "auth.unauthorized", message: "no" }, { status: 403 }),
+      ),
+    );
+
+    const res = await runCliForTest(["variable", "set", "GREETING", "hello", ...base(cwd)]);
+
+    expect(res.exitCode).toBe(0);
+  });
+
   it("says on a terminal what each slot holds after the write", async () => {
     // Real mock, so the read-back after the write is honest: a plain value
     // prints in the `all` slot, a secret prints its marker, and the untouched
@@ -531,7 +544,8 @@ describe("variable set", () => {
       expect(json.hint).toContain("Pipe it in on stdin.");
       // The server this run was pointed at, before the redirection: without
       // it the piped secret would land in the default project's store.
-      expect(retry).toContain(`--server ${SERVER} < value.txt`);
+      expect(retry).toContain(`--server ${SERVER}`);
+      expect(retry.endsWith(" < value.txt")).toBe(true);
     } finally {
       if (original) {
         Object.defineProperty(process, "stdin", original);
@@ -1148,13 +1162,13 @@ describe("variable resolve", () => {
 
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as {
-      data: { deployment_id: string; origins: string[]; variables: Array<Record<string, unknown>> };
+      data: { deployment_id: string; origins: string[]; items: Array<Record<string, unknown>> };
     };
     expect(json.data.deployment_id).toBe("dep_1");
     // The chosen origin is named in the output, so a bare resolve says which
     // target the frozen map runs on (#1617).
     expect(json.data.origins).toEqual(["https://app.acme.com"]);
-    expect(json.data.variables).toEqual([
+    expect(json.data.items).toEqual([
       { name: "API_URL", secret: false, value: "https://api.acme.com" },
       { name: "TOKEN", secret: true },
     ]);

@@ -2,15 +2,16 @@ import type { ZitadelClient } from "@zitadel/api/client";
 import type {
   CreateDeployment200,
   CreateDeployment201,
+  ListDeployments200DeploymentsItem,
   RollbackDeployment200,
   RollbackDeployment201,
 } from "@zitadel/api/generated/model";
 
+import { collectPages } from "../oclif/crud/paging";
+
 /**
- * A deployment, as create returns it: the deployment record plus the
- * `warnings` the create response carries (the 200 and 201 shapes match). The
- * field is part of the generated model now, so callers read it directly rather
- * than casting a warnings shape onto a plain deployment.
+ * A deployment, as create returns it: 200 when every target already served it,
+ * 201 when it wrote a new one. The two shapes match.
  */
 export type Deployment = CreateDeployment200 | CreateDeployment201;
 
@@ -23,6 +24,43 @@ export type Deployment = CreateDeployment200 | CreateDeployment201;
  * no-op from a write; distinguishing them would need the status threaded through.
  */
 export type RolledBackDeployment = RollbackDeployment200 | RollbackDeployment201;
+
+/** One row of the deployment list. */
+export type ListedDeployment = ListDeployments200DeploymentsItem;
+
+/**
+ * Every live deployment of the project, newest first, drained across pages: one
+ * live preview per open pull request can push the primary origins' deployment
+ * off the first page, and a guard, a baseline or a rollback read from that page
+ * alone would quietly miss it.
+ */
+export async function listLiveDeployments(
+  client: ZitadelClient,
+  projectId: string,
+  options: { origin?: string; withRelease?: boolean } = {},
+): Promise<ListedDeployment[]> {
+  const { items } = await collectPages(
+    (token) =>
+      client.listDeployments({
+        project_id: projectId,
+        live: true,
+        ...(options.origin === undefined ? {} : { origin: options.origin }),
+        ...(options.withRelease ? { expand: ["release"] } : {}),
+        ...(token === undefined ? {} : { page_token: token }),
+      }),
+    { items: "deployments", all: true, nextPageToken: "next_page_token" },
+  );
+  return items as ListedDeployment[];
+}
+
+/**
+ * Whether a deployment serves a primary origin. A preview deployment's targets
+ * carry an expiry; it is never the baseline, the guard or the thing a bare
+ * rollback undoes.
+ */
+export function servesPrimary(deployment: Pick<ListedDeployment, "targets">): boolean {
+  return deployment.targets.some((target) => target.expires_at == null);
+}
 
 /** What target a deploy goes to: every primary origin, or one exact origin. */
 export type DeployTargets = ["primary"] | [string];

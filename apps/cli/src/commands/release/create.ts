@@ -12,6 +12,7 @@ import {
   worktreeIsDirty,
 } from "../../lib/release";
 import { nextCommandsData } from "../../lib/oclif/envelope";
+import { ZitadelError } from "../../lib/errors";
 
 /**
  * `zitadel release create` — build a release from `.zitadel/` and post it,
@@ -78,6 +79,18 @@ export default class ReleaseCreate extends EnvironmentCommand {
       gitSha: await headSha(cwd),
       gitDirty: await worktreeIsDirty(cwd),
     });
+    // Building dedupes on content, revoked releases included: the same tree
+    // answers with the revoked release, which can never be deployed.
+    if (release.revoked_at) {
+      throw new ZitadelError(
+        "E_CONFLICT",
+        `This content was already released as ${release.id}, which is revoked`,
+        {
+          hint: "A revoked release can never be served again. Change the configuration so it builds a new release.",
+          details: { release_id: release.id, content_hash: release.content_hash },
+        },
+      );
+    }
 
     return this.emit({
       status: "ok",

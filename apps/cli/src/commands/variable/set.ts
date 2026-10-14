@@ -1,4 +1,5 @@
 import { Args, Flags } from "@oclif/core";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import type { GetVariables200 } from "@zitadel/api/generated/model";
 
@@ -131,27 +132,43 @@ export default class VariableSet extends EnvironmentCommand {
       parse: (raw: string) => parseVariableValue(raw, type),
     });
 
-    await client.updateVariables({ [name]: { value, secret: flags.secret } }, scope);
+    // The write answers with the slot it wrote, read back, so the output is the
+    // store's own answer for that slot — a secret says only that a value is held
+    // (ADR 062 §7), never the value itself.
+    const written = slotState(
+      name,
+      (await client.updateVariables(
+        { [name]: { value, secret: flags.secret } },
+        scope,
+      )) as GetVariables200,
+    );
     this.recordTelemetry({ is_secret: flags.secret });
 
-    // Report what the store now holds for the name, not what the request asked
-    // for: a write to one slot leaves the other standing, and the server decides
-    // what a read discloses. Both slots are read back so the output is the
-    // store's own answer — a secret says only that a value is held (ADR 062 §7),
-    // never the value itself.
-    const [allBucket, previewBucket] = await Promise.all([
-      client.getVariables({ project_id: projectId }),
-      client.getVariables({ project_id: projectId, applies_to: "preview" }),
-    ]);
-    const all = slotState(name, allBucket);
-    const preview = slotState(name, previewBucket);
+    // A write to one slot leaves the other standing, so that one is read too.
+    // It is only reported: a token that may write but not read variables has
+    // still stored the value, and must not be told the write failed.
+    const otherSlot = await readSlot(() =>
+      client.getVariables({
+        project_id: projectId,
+        ...(flags.preview ? {} : { applies_to: "preview" as const }),
+      }),
+    );
+    const other = otherSlot === undefined ? undefined : slotState(name, otherSlot);
+    const all = flags.preview ? other : written;
+    const preview = flags.preview ? written : other;
 
     return this.emit({
       status: "ok",
-      data: { name, type, applies_to: flags.preview ? "preview" : "all", all, preview },
+      data: {
+        name,
+        type,
+        applies_to: flags.preview ? "preview" : "all",
+        ...(all === undefined ? {} : { all }),
+        ...(preview === undefined ? {} : { preview }),
+      },
       pretty: renderDetail(`Set ${name} on the project`, ["all", "preview"], {
-        all: slotCell(all),
-        preview: slotCell(preview),
+        all: all === undefined ? "(not readable)" : slotCell(all),
+        preview: preview === undefined ? "(not readable)" : slotCell(preview),
       }),
     });
   }
@@ -214,4 +231,18 @@ function pipeArgs(name: string, secret: boolean, type: VariableType, preview: bo
     ...(type === "string" ? [] : ["--as", type]),
     ...(preview ? ["--preview"] : []),
   ].join(" ");
+}
+
+/** A bucket read, or nothing when the token may not read variables. */
+async function readSlot(
+  read: () => Promise<GetVariables200>,
+): Promise<GetVariables200 | undefined> {
+  try {
+    return await read();
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      return undefined;
+    }
+    throw error;
+  }
 }

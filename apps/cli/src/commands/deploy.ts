@@ -9,7 +9,9 @@ import {
   diffStep,
   headSha,
   idpConnectionsStep,
+  listLiveDeployments,
   runSteps,
+  servesPrimary,
   type StepContext,
   validateStep,
   worktreeIsDirty,
@@ -164,8 +166,7 @@ export default class Deploy extends EnvironmentCommand {
     // When they agree, the id guards the create against another deploy that
     // raced in since we inspected: the server refuses with 409 rather than
     // overwriting that deploy unseen (#538).
-    const liveQuery = { project_id: projectId, live: true, ...(origin ? { origin } : {}) };
-    const live = (await client.listDeployments(liveQuery)).deployments;
+    const live = await listLiveDeployments(client, projectId, origin ? { origin } : {});
     const newest = new Set(
       landing.map(
         (target) =>
@@ -209,8 +210,8 @@ export default class Deploy extends EnvironmentCommand {
         );
       }
       // The deployment that raced in on a primary origin, not a live preview.
-      const current = (await client.listDeployments(liveQuery)).deployments.find((deployment) =>
-        deployment.targets.some((target) => target.expires_at == null),
+      const current = (await listLiveDeployments(client, projectId, origin ? { origin } : {})).find(
+        servesPrimary,
       );
       throw new ZitadelError(
         "E_CONFLICT",

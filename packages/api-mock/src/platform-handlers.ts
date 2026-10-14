@@ -1756,9 +1756,11 @@ export function setupPlatformHandlers() {
 
     // --- deployments -----------------------------------------------------
     // A deployment makes a release live on a set of targets, expanding
-    // `primary` to the project's primary origins. It is idempotent on what is
-    // served and append-only; rollback re-applies an earlier one. Variable
-    // freezing arrives with the variables work. The Go handlers are stubs.
+    // `primary` to the project's primary origins, and freezes the project's
+    // variables as it does. A primary deploy is skipped only when every target
+    // already serves this release and that frozen snapshot; a preview deploy
+    // always writes one. History is append-only; rollback re-applies an
+    // earlier deployment. The Go handlers are stubs.
 
     http.post("*/deployments", async ({ request }) => {
       const query = parse(CreateDeploymentQueryParams, queryRecord(request), "invalid_query");

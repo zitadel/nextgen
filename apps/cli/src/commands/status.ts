@@ -35,6 +35,7 @@ import {
   unscopedCommand,
 } from "../lib/suggestion";
 import { nextCommandsData } from "../lib/oclif/envelope";
+import { DEPLOY_ARGS } from "../lib/release";
 
 /**
  * `zitadel status` — summarize the local server and project state.
@@ -349,7 +350,7 @@ function nextCommandsFor(
       // keeps the lifecycle-only behavior rather than withholding on no signal).
       commands.push(projectCommand("deploy --dry-run", selector, cliVersion));
     } else {
-      commands.push(projectCommand("deploy", selector, cliVersion));
+      commands.push(projectCommand(DEPLOY_ARGS, selector, cliVersion));
     }
   }
   return commands;

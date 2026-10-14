@@ -3,7 +3,7 @@ import type { ListDeployments200DeploymentsItem } from "@zitadel/api/generated/m
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { collectPages } from "../../lib/oclif/crud/paging";
-import { rollbackDeployment } from "../../lib/release";
+import { listLiveDeployments, rollbackDeployment, servesPrimary } from "../../lib/release";
 import { ZitadelError } from "../../lib/errors";
 
 /**
@@ -62,7 +62,9 @@ export default class DeploymentRollback extends EnvironmentCommand {
           }),
         { items: "deployments", all: true, nextPageToken: "next_page_token" },
       );
-      const deployments = items as ListDeployments200DeploymentsItem[];
+      // A preview deployment is never the deploy a bare rollback undoes, nor
+      // one it can restore: the server refuses to roll one back.
+      const deployments = (items as ListDeployments200DeploymentsItem[]).filter(servesPrimary);
       const latest = deployments[0];
       if (!latest) {
         throw new ZitadelError("E_VALIDATION", "There is no deployment to roll back", {
@@ -141,9 +143,7 @@ export default class DeploymentRollback extends EnvironmentCommand {
     // when nothing is live there, which an optional id cannot stand in for.
     const target = await client.getDeploymentById(targetId, { project_id: projectId });
     const targetOrigins = new Set(target.targets.map((entry) => entry.origin));
-    const expectedDeploymentId = (
-      await client.listDeployments({ project_id: projectId, live: true })
-    ).deployments.find((deployment) =>
+    const expectedDeploymentId = (await listLiveDeployments(client, projectId)).find((deployment) =>
       deployment.targets.some((entry) => targetOrigins.has(entry.origin)),
     )?.id;
 
