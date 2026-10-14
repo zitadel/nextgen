@@ -1,5 +1,4 @@
 import { Flags } from "@oclif/core";
-import { cancel, confirm, isCancel } from "@clack/prompts";
 import type { ListDeployments200DeploymentsItem } from "@zitadel/api/generated/model";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
@@ -43,7 +42,7 @@ export default class DeploymentRollback extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(DeploymentRollback);
     await this.toMeta(flags);
-    const { nonInteractive, dryRun, force, cliVersion } = this.meta;
+    const { dryRun, cliVersion } = this.meta;
 
     const { client, projectId } = await this.connect();
 
@@ -129,30 +128,17 @@ export default class DeploymentRollback extends EnvironmentCommand {
       })
     ).deployments[0]?.id;
 
-    if (!force) {
-      if (nonInteractive) {
-        throw new ZitadelError(
-          "E_VALIDATION",
-          "Rolling back requires --force in non-interactive mode",
-          {
-            hint: `Pass --force to re-apply ${targetId}.`,
-            nextCommands: [
-              publicCliCommand(
-                `deployment rollback ${targetId} --force${this.environmentSelector()}`,
-                cliVersion,
-              ),
-            ],
-          },
-        );
-      }
-      const answer = await confirm({
-        message: `Re-apply ${targetId}? Its release goes live again.`,
-        initialValue: false,
-      });
-      if (isCancel(answer) || !answer) {
-        cancel("Rollback cancelled.");
-        return this.emit({ status: "skipped", reason: "rollback-cancelled" });
-      }
+    const confirmed = await this.input({
+      kind: "confirm",
+      name: `re-apply ${targetId}`,
+      message: `Re-apply ${targetId}? Its release goes live again.`,
+      retry: publicCliCommand(
+        `deployment rollback ${targetId} --force${this.environmentSelector()}`,
+        cliVersion,
+      ),
+    });
+    if (!confirmed) {
+      return this.emit({ status: "skipped", reason: "rollback-cancelled" });
     }
 
     const deployment = await rollbackDeployment(client, projectId, targetId, {

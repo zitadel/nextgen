@@ -1,5 +1,4 @@
 import { Args, Flags } from "@oclif/core";
-import { cancel, isCancel, password, text } from "@clack/prompts";
 
 import type { GetVariables200 } from "@zitadel/api/generated/model";
 
@@ -10,7 +9,6 @@ import { ZitadelError } from "../../lib/errors";
 import {
   assertVariableName,
   parseVariableValue,
-  readStdin,
   toVariableRow,
   VARIABLE_TYPES,
   variableCells,
@@ -49,7 +47,7 @@ export default class VariableSet extends EnvironmentCommand {
     // schema accepts, so this is not `nonBlankArg`. A secret refuses it below.
     // `ignoreStdin` keeps oclif from folding piped input into this arg — a
     // secret and a scripted plain value both arrive on stdin, which this command
-    // reads itself through `readStdin`.
+    // reads itself through `input`.
     value: Args.string({
       required: false,
       ignoreStdin: true,
@@ -75,7 +73,7 @@ export default class VariableSet extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(VariableSet);
     await this.toMeta(flags);
-    const { nonInteractive, dryRun, cliVersion } = this.meta;
+    const { dryRun, cliVersion } = this.meta;
     const name = args.name;
     const type = flags.as as VariableType;
 
@@ -116,44 +114,26 @@ export default class VariableSet extends EnvironmentCommand {
     }
 
     // A plain value given on the command line is used as it is. Otherwise the
-    // value is prompted for, or read from stdin when scripting.
-    let raw: string;
-    if (args.value !== undefined && !flags.secret) {
-      raw = args.value;
-    } else {
-      // A terminal on stdin means nothing was piped: fail rather than block on a
-      // read that would never end.
-      if (nonInteractive && process.stdin.isTTY) {
-        const retry = pipeHint(
-          name,
-          flags.secret,
-          type,
-          flags.preview,
-          cliVersion,
-          this.environmentSelector(),
-        );
-        throw new ZitadelError("E_VALIDATION", `No value supplied for ${name}.`, {
-          hint: `Pipe the value in: ${retry}`,
-          nextCommands: [retry],
-        });
-      }
-      // The prompt is masked when the value is to be stored as a secret, so it
-      // does not stay on screen or in a scrollback buffer.
-      const answer = nonInteractive
-        ? await readStdin(process.stdin)
-        : flags.secret
-          ? await password({ message: `Value for ${name}` })
-          : await text({ message: `Value for ${name}` });
-      if (isCancel(answer)) {
-        cancel("Set cancelled.");
-        throw new ZitadelError("E_VALIDATION", "Set cancelled by user");
-      }
-      // An empty submission reads as `undefined` from the prompt and has to
-      // become `""`, not the string "undefined". An empty string is a value the
-      // scalar schema accepts.
-      raw = String(answer ?? "");
-    }
-    const value = parseVariableValue(raw, type);
+    // value is prompted for, or piped in when scripting. The prompt is masked
+    // when the value is to be stored as a secret, so it does not stay on screen
+    // or in a scrollback buffer. An empty string is a value the scalar schema
+    // accepts; only an absent input is an error.
+    const value = await this.input({
+      kind: flags.secret ? "secret" : "text",
+      name: `value for ${name}`,
+      message: `Value for ${name}`,
+      ...(flags.secret || args.value === undefined ? {} : { given: args.value }),
+      stdin: true,
+      retry: pipeHint(
+        name,
+        flags.secret,
+        type,
+        flags.preview,
+        cliVersion,
+        this.environmentSelector(),
+      ),
+      parse: (raw: string) => parseVariableValue(raw, type),
+    });
 
     await client.updateVariables({ [name]: { value, secret: flags.secret } }, scope);
     this.recordTelemetry({ is_secret: flags.secret });

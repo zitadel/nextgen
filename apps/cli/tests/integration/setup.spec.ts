@@ -425,6 +425,30 @@ describe("setup", () => {
           expect(result).toFailWith("E_VALIDATION");
         });
 
+        it("names the secret as what is missing", async () => {
+          const app = await anApp();
+
+          const result = await app.setupSsoWith(
+            [...flags, "--sso-client-id", "acme-client-id"],
+            "",
+          );
+
+          expect(result).toExplain("No client secret supplied");
+          expect(result).toHintAt("Pipe it in on stdin.");
+        });
+
+        it("suggests piping the secret in, without carrying one", async () => {
+          const app = await anApp();
+
+          const result = await app.setupSsoWith(
+            [...flags, "--sso-client-id", "acme-client-id"],
+            "",
+          );
+
+          expect(result).toSuggest(`printf '%s' "$CLIENT_SECRET" | `);
+          expect(result).toSuggest("setup --sso custom --sso-client-id <id>");
+        });
+
         it("will not set up the provider without a client id", async () => {
           const app = await anApp();
 

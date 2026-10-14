@@ -1,10 +1,8 @@
 import { Flags } from "@oclif/core";
-import { cancel, confirm, isCancel } from "@clack/prompts";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
-import { ZitadelError } from "../../lib/errors";
 import { assertVariableName, variableScope } from "../../lib/variables";
 import { publicCliCommand } from "../../lib/public-cli";
 
@@ -42,7 +40,7 @@ export default class VariableRm extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(VariableRm);
     await this.toMeta(flags);
-    const { nonInteractive, dryRun, force, cliVersion } = this.meta;
+    const { dryRun, cliVersion } = this.meta;
     const name = args.name;
 
     assertVariableName(name);
@@ -62,29 +60,17 @@ export default class VariableRm extends EnvironmentCommand {
       });
     }
 
-    if (!force) {
-      if (nonInteractive) {
-        const retry = publicCliCommand(
-          `variable rm ${name}${flags.preview ? " --preview" : ""} --force${this.environmentSelector()}`,
-          cliVersion,
-        );
-        throw new ZitadelError(
-          "E_VALIDATION",
-          "Removing a variable requires --force in non-interactive mode",
-          {
-            hint: `Pass --force to remove ${name} from the project.`,
-            nextCommands: [retry],
-          },
-        );
-      }
-      const answer = await confirm({
-        message: `Remove ${name} from the project?`,
-        initialValue: false,
-      });
-      if (isCancel(answer) || !answer) {
-        cancel("Remove cancelled.");
-        return this.emit({ status: "skipped", reason: "remove-cancelled" });
-      }
+    const confirmed = await this.input({
+      kind: "confirm",
+      name: `remove ${name} from the project`,
+      message: `Remove ${name} from the project?`,
+      retry: publicCliCommand(
+        `variable rm ${name}${flags.preview ? " --preview" : ""} --force${this.environmentSelector()}`,
+        cliVersion,
+      ),
+    });
+    if (!confirmed) {
+      return this.emit({ status: "skipped", reason: "remove-cancelled" });
     }
 
     await client.deleteVariable(name, scope);

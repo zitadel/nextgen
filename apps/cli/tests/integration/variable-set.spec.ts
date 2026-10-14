@@ -42,6 +42,34 @@ describe("variable set", () => {
   });
 
   describe("against a valid server", () => {
+    describe("with no value piped in", () => {
+      it("is refused", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.setVariableWithNothingPiped("FOO");
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toExplain("No value for FOO supplied");
+        expect(result).toHintAt("Pipe it in on stdin.");
+      });
+
+      it("suggests the command that pipes it in", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.setVariableWithNothingPiped("TOKEN", { secret: true });
+
+        expect(result).toSuggest("variable set TOKEN --secret");
+      });
+
+      it("enters nothing", async () => {
+        const app = await aSetUpApp();
+
+        await app.setVariableWithNothingPiped("FOO");
+
+        expect(await app.projectVariables()).toEqual([]);
+      });
+    });
+
     describe("--json", () => {
       it("enters a plain value given on the command line", async () => {
         const app = await aSetUpApp();
