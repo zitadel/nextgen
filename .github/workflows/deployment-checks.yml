@@ -212,6 +212,30 @@ jobs:
         with:
           ref: ${{ inputs.sha || github.event.deployment.sha || github.ref }}
 
+      # On production this workflow comes from main's head but the code from
+      # the deployed commit, which can predate the move of the e2e suites into
+      # e2e/ (a deployment still building when that merged, or a rollback).
+      # Run the suite the checked-out commit has.
+      - name: Find the console suite in this commit
+        id: suite
+        run: |
+          if [ -f e2e/console/playwright.deployment.config.mts ]; then
+            {
+              echo "target=e2e:console-deployment"
+              echo "package=@zitadel/e2e"
+              echo "results=e2e/console/test-results"
+            } >> "$GITHUB_OUTPUT"
+          elif [ -f apps/console-e2e/playwright.deployment.config.mts ]; then
+            {
+              echo "target=console-e2e:e2e-deployment"
+              echo "package=@zitadel/console-e2e"
+              echo "results=apps/console-e2e/test-results"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::This commit has no console deployment suite."
+            exit 1
+          fi
+
       - uses: pnpm/action-setup@v5
         with:
           run_install: false
@@ -234,7 +258,9 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Playwright Chromium
-        run: corepack pnpm --filter @zitadel/e2e exec playwright install chromium
+        env:
+          SUITE_PACKAGE: ${{ steps.suite.outputs.package }}
+        run: corepack pnpm --filter "$SUITE_PACKAGE" exec playwright install chromium
 
       - name: Check the bypass secret is set
         run: |
@@ -244,7 +270,9 @@ jobs:
           }
 
       - name: Run the console suite against the deployment
-        run: env -u CI -u GITHUB_ACTIONS moon run e2e:console-deployment
+        env:
+          SUITE_TARGET: ${{ steps.suite.outputs.target }}
+        run: env -u CI -u GITHUB_ACTIONS moon run "$SUITE_TARGET"
 
       - name: Record the pass
         id: passed
@@ -255,6 +283,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: console-deployment-screenshots
-          path: e2e/console/test-results/**/*.png
+          path: ${{ steps.suite.outputs.results }}/**/*.png
           if-no-files-found: ignore
           retention-days: 7
