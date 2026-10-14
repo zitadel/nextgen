@@ -4,6 +4,7 @@ import { npmDistTagForCliVersion } from "../../../../public-cli";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
+import { devScriptPortOp } from "../dev-script-port";
 import {
   hooksServerTemplate,
   indexPageTemplate,
@@ -58,6 +59,9 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
         path: src("routes/profile/+page.svelte"),
         contents: profilePageTemplate(ctx.project.id),
       },
+      // Pin the dev script to the origin setup registered; --strictPort makes
+      // Vite exit instead of drifting to a port the project does not allow.
+      devScriptPortOp(ctx.issuer, { strictPort: true }),
       { kind: "merge-env", path: ".env.example", entries: { PUBLIC_ZITADEL_PROJECT_ID: "" } },
       {
         kind: "merge-env",
@@ -89,8 +93,21 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
     ];
   }
 
+  protected override infrastructureFiles(view: PatchView): ReadonlyArray<string> {
+    // The auth boundary — proxy, session check and route protection — is
+    // infrastructure: without it /__nextgen/* 404s and protected routes open, so
+    // doctor fails rather than warning about a missing page.
+    return [join(view.framework.appDir, "hooks.server.ts")];
+  }
+
   protected routeDeps(_view: PatchView): ReadonlyArray<string> {
     return [SDK_DEPENDENCY, COMPONENT_DEPENDENCY];
+  }
+
+  protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
+    // The dev script's port is pinned in place by an `edit` op eject can't
+    // revert, so it is listed as a manual cleanup step.
+    return ["package.json"];
   }
 
   protected summary(_ctx: PatchContext): { title: string; detail: string } {

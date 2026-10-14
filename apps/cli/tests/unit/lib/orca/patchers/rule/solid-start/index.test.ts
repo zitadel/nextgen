@@ -104,7 +104,7 @@ describe("SolidStartPatcher.artifacts", () => {
     expect(artifacts.markedFiles).toContain("src/middleware.ts");
     expect(artifacts.markedFiles).toContain("src/routes/login.tsx");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-solid-start", "@zitadel/sdk-solid"]);
-    expect(artifacts.configEdits).toEqual(["vite.config.*"]);
+    expect(artifacts.configEdits).toEqual(["vite.config.*", "package.json"]);
   });
 });
 
@@ -113,5 +113,36 @@ describe("SolidStartPatcher.canPatch", () => {
     const patcher = new SolidStartPatcher();
     expect(patcher.canPatch("solid-start")).toBe(true);
     expect(patcher.canPatch("solid")).toBe(false);
+  });
+});
+
+describe("SolidStartPatcher dev server port", () => {
+  // Setup registers one origin; a dev server on any other port is refused.
+  it("pins the dev script to the registered port, strictly", () => {
+    const op = new SolidStartPatcher()
+      .plan(ctx())
+      .ops.find(
+        (candidate): candidate is Extract<FileOp, { kind: "edit" }> =>
+          candidate.kind === "edit" && candidate.path === "package.json",
+      );
+    const port = new URL(ctx().issuer).port;
+
+    const pkg = JSON.parse(op!.edit(JSON.stringify({ scripts: { dev: "vite dev" } })));
+
+    expect(pkg.scripts.dev).toBe(`vite dev --port ${port} --strictPort`);
+  });
+});
+
+describe("SolidStartPatcher vite.config wiring", () => {
+  // Without the middleware registration the proxy and session check never run.
+  it("marks the middleware registration as infrastructure wiring", () => {
+    const op = new SolidStartPatcher()
+      .plan(ctx())
+      .ops.find(
+        (candidate): candidate is Extract<FileOp, { kind: "edit" }> =>
+          candidate.kind === "edit" && Array.isArray(candidate.path),
+      );
+
+    expect(op?.wiring).toBe("infrastructure");
   });
 });

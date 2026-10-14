@@ -5,6 +5,7 @@ import { configCandidates } from "../config-paths";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
+import { devScriptPortOp } from "../dev-script-port";
 import { solidStartConfigEdit } from "./vite-config";
 import {
   indexPageTemplate,
@@ -53,7 +54,12 @@ export class SolidStartPatcher extends AbstractRulePatcher {
         kind: "edit",
         path: [...VITE_CONFIG_PATHS],
         edit: solidStartConfigEdit(),
+        // Registers the auth middleware: without it doctor must fail, not pass.
+        wiring: "infrastructure",
       },
+      // Pin the dev script to the origin setup registered; --strictPort makes
+      // Vite exit instead of drifting to a port the project does not allow.
+      devScriptPortOp(ctx.issuer, { strictPort: true }),
       { kind: "merge-env", path: ".env.example", entries: { VITE_ZITADEL_PROJECT_ID: "" } },
       {
         kind: "merge-env",
@@ -84,12 +90,19 @@ export class SolidStartPatcher extends AbstractRulePatcher {
     ];
   }
 
+  protected override infrastructureFiles(view: PatchView): ReadonlyArray<string> {
+    // The auth boundary — proxy, session check and route protection — is
+    // infrastructure: without it /__nextgen/* 404s and protected routes open, so
+    // doctor fails rather than warning about a missing page.
+    return [join(view.framework.appDir, "middleware.ts")];
+  }
+
   protected routeDeps(_view: PatchView): ReadonlyArray<string> {
     return [SDK_DEPENDENCY, COMPONENT_DEPENDENCY];
   }
 
   protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
-    return ["vite.config.*"];
+    return ["vite.config.*", "package.json"];
   }
 
   protected summary(_ctx: PatchContext): { title: string; detail: string } {

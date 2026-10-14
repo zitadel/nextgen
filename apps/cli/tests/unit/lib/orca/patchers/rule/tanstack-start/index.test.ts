@@ -85,7 +85,7 @@ describe("TanStackStartPatcher.plan", () => {
     );
   });
 
-  it("seeds the public project id and no other config edit", () => {
+  it("seeds the public project id and edits no config but the dev script", () => {
     const plan = new TanStackStartPatcher().plan(ctx());
     const envOp = plan.ops.find(
       (op): op is Extract<FileOp, { kind: "merge-env" }> =>
@@ -94,13 +94,16 @@ describe("TanStackStartPatcher.plan", () => {
         "VITE_ZITADEL_PROJECT_ID" in op.entries,
     );
     expect(envOp?.entries).toMatchObject({ VITE_ZITADEL_PROJECT_ID: "proj-1" });
-    // baseOps adds AGENTS.md/README.md guidance edits to every plan; assert no
-    // framework CONFIG edit beyond those.
+    // baseOps adds AGENTS.md/README.md guidance edits to every plan; beyond
+    // those the only config edit is the dev script's port.
     expect(
-      plan.ops.some(
-        (op) => op.kind === "edit" && !["AGENTS.md", "README.md"].includes(String(op.path)),
-      ),
-    ).toBe(false);
+      plan.ops
+        .filter(
+          (op): op is Extract<FileOp, { kind: "edit" }> =>
+            op.kind === "edit" && !["AGENTS.md", "README.md"].includes(String(op.path)),
+        )
+        .map((op) => op.path),
+    ).toEqual(["package.json"]);
   });
 
   it("adds the SDK dependency at the CLI's prerelease tag", () => {
@@ -125,7 +128,7 @@ describe("TanStackStartPatcher.artifacts", () => {
     expect(artifacts.markedFiles).toContain("src/start.ts");
     expect(artifacts.markedFiles).toContain("src/routes/login.tsx");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-tanstack-start"]);
-    expect(artifacts.configEdits).toEqual([]);
+    expect(artifacts.configEdits).toEqual(["package.json"]);
   });
 });
 
@@ -134,5 +137,22 @@ describe("TanStackStartPatcher.canPatch", () => {
     const patcher = new TanStackStartPatcher();
     expect(patcher.canPatch("tanstack-start")).toBe(true);
     expect(patcher.canPatch("react")).toBe(false);
+  });
+});
+
+describe("TanStackStartPatcher dev server port", () => {
+  // Setup registers one origin; a dev server on any other port is refused.
+  it("pins the dev script to the registered port, strictly", () => {
+    const op = new TanStackStartPatcher()
+      .plan(ctx())
+      .ops.find(
+        (candidate): candidate is Extract<FileOp, { kind: "edit" }> =>
+          candidate.kind === "edit" && candidate.path === "package.json",
+      );
+    const port = new URL(ctx().issuer).port;
+
+    const pkg = JSON.parse(op!.edit(JSON.stringify({ scripts: { dev: "vite dev" } })));
+
+    expect(pkg.scripts.dev).toBe(`vite dev --port ${port} --strictPort`);
   });
 });

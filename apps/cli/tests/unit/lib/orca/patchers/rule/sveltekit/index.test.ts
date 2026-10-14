@@ -71,7 +71,7 @@ describe("SvelteKitPatcher.plan", () => {
     );
   });
 
-  it("seeds the public project id and no other config edit", () => {
+  it("seeds the public project id and edits no config but the dev script", () => {
     const plan = new SvelteKitPatcher().plan(ctx());
     const envOp = plan.ops.find(
       (op): op is Extract<FileOp, { kind: "merge-env" }> =>
@@ -80,13 +80,16 @@ describe("SvelteKitPatcher.plan", () => {
         "PUBLIC_ZITADEL_PROJECT_ID" in op.entries,
     );
     expect(envOp?.entries).toMatchObject({ PUBLIC_ZITADEL_PROJECT_ID: "proj-1" });
-    // baseOps adds AGENTS.md/README.md guidance edits to every plan; assert no
-    // framework CONFIG edit beyond those.
+    // baseOps adds AGENTS.md/README.md guidance edits to every plan; beyond
+    // those the only config edit is the dev script's port.
     expect(
-      plan.ops.some(
-        (op) => op.kind === "edit" && !["AGENTS.md", "README.md"].includes(String(op.path)),
-      ),
-    ).toBe(false);
+      plan.ops
+        .filter(
+          (op): op is Extract<FileOp, { kind: "edit" }> =>
+            op.kind === "edit" && !["AGENTS.md", "README.md"].includes(String(op.path)),
+        )
+        .map((op) => op.path),
+    ).toEqual(["package.json"]);
   });
 
   it("adds the server SDK + the Svelte component lib at the CLI's prerelease tag", () => {
@@ -111,7 +114,7 @@ describe("SvelteKitPatcher.artifacts", () => {
     expect(artifacts.markedFiles).toContain("src/hooks.server.ts");
     expect(artifacts.markedFiles).toContain("src/routes/login/+page.svelte");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-sveltekit", "@zitadel/sdk-svelte"]);
-    expect(artifacts.configEdits).toEqual([]);
+    expect(artifacts.configEdits).toEqual(["package.json"]);
   });
 });
 
@@ -120,5 +123,22 @@ describe("SvelteKitPatcher.canPatch", () => {
     const patcher = new SvelteKitPatcher();
     expect(patcher.canPatch("sveltekit")).toBe(true);
     expect(patcher.canPatch("svelte")).toBe(false);
+  });
+});
+
+describe("SvelteKitPatcher dev server port", () => {
+  // Setup registers one origin; a dev server on any other port is refused.
+  it("pins the dev script to the registered port, strictly", () => {
+    const op = new SvelteKitPatcher()
+      .plan(ctx())
+      .ops.find(
+        (candidate): candidate is Extract<FileOp, { kind: "edit" }> =>
+          candidate.kind === "edit" && candidate.path === "package.json",
+      );
+    const port = new URL(ctx().issuer).port;
+
+    const pkg = JSON.parse(op!.edit(JSON.stringify({ scripts: { dev: "vite dev" } })));
+
+    expect(pkg.scripts.dev).toBe(`vite dev --port ${port} --strictPort`);
   });
 });
