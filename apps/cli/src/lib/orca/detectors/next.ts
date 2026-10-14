@@ -4,12 +4,22 @@ import { join } from "node:path";
 import { ZitadelError } from "../../errors";
 import {
   assertDependencyFloor,
+  assertInstalledFloor,
+  type DependencyFloor,
   dependencyVersionMajor,
   hasDependency,
   readPackageJson,
 } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
+
+/** The oldest Next.js the CLI integrates; see {@link NextDetector.detect}. */
+const NEXT_FLOOR: DependencyFloor = {
+  dependency: "next",
+  minimum: "15.2.3",
+  product: "Next.js",
+  hint: "Upgrade the app to Next.js 15.2.3 or later (e.g. `npx @next/codemod@latest upgrade`) and rerun: earlier releases let a request skip middleware (CVE-2025-29927).",
+};
 
 /**
  * Detects a Next.js App Router project and extracts its facts: the App Router
@@ -38,16 +48,14 @@ export class NextDetector implements Detector {
     // the first 15.x that does not skip middleware for a request carrying
     // `x-middleware-subrequest` (CVE-2025-29927), which would bypass the
     // generated `protectedRoutes`. The floor is enforced here so setup and
-    // doctor share one loud gate instead of degrading silently; only a spec
-    // that provably cannot resolve to 15.2.3+ is rejected, so `^15.0.0`
-    // passes (it can resolve to a fixed release) while `15.2.2` and `~15.1.0`
-    // do not. Protocol specs and dist-tags pass.
-    assertDependencyFloor(pkg, {
-      dependency: "next",
-      minimum: "15.2.3",
-      product: "Next.js",
-      hint: "Upgrade the app to Next.js 15.2.3 or later (e.g. `npx @next/codemod@latest upgrade`) and rerun: earlier releases let a request skip middleware (CVE-2025-29927).",
-    });
+    // doctor share one loud gate instead of degrading silently. The declared
+    // spec is refused only when it provably cannot resolve to 15.2.3+, so
+    // `^15.0.0` passes while `15.2.2` and `~15.1.0` do not; protocol specs
+    // and dist-tags pass. What is installed is judged too: `^15.0.0` with
+    // 15.2.2 in node_modules still runs the vulnerable release. With nothing
+    // installed, the spec is the only gate.
+    assertDependencyFloor(pkg, NEXT_FLOOR);
+    await assertInstalledFloor(cwd, NEXT_FLOOR);
 
     const appDir = (await dirExists(join(cwd, "app")))
       ? "app"

@@ -44,8 +44,11 @@ This ADR records the floors and the enforcement point.
   with semver range semantics: it rejects only when the range cannot resolve
   to the floor or newer (`^14.2.0`, `<15` and `15.2.2` reject; `>=14`,
   `14 || 16` and `^15.0.0` pass because a supported version satisfies them —
-  for `^15.0.0` the lockfile decides, and the SDK's peer range flags an
-  installed 15.2.2). Specs that
+  for `^15.0.0` the lockfile decides). Next.js is also judged by what is
+  installed: when `node_modules/next/package.json` resolves from the app root,
+  a release below the floor rejects even under an accepting range, because
+  pnpm only warns on the SDK's peer range and would run 15.2.2. With nothing
+  installed, the spec is the only gate. Specs that
   carry no provable version at all — protocol specs (`file:`, `link:`,
   `workspace:`, git URLs) and dist-tags (`latest`, `canary`) — always pass;
   blocking on them would be hostile guessing. Prereleases of the floor major

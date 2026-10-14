@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -6,10 +6,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   assertDependencyFloor,
+  assertInstalledFloor,
   dependencySpecProvablyBelow,
   dependencySpecProvablyBelowMajor,
   dependencyVersionMajor,
   hasDependency,
+  installedVersion,
   readPackageJson,
   type PackageJson,
 } from "../../../../../src/lib/orca/detectors/package-json";
@@ -155,5 +157,82 @@ describe("assertDependencyFloor", () => {
 
   it("passes a spec that may resolve to a supported version", () => {
     expect(() => assertDependencyFloor({ dependencies: { nuxt: "latest" } }, floor)).not.toThrow();
+  });
+});
+
+/** Installs a package under `root`'s `node_modules` with the given manifest. */
+async function install(root: string, name: string, manifest: string): Promise<void> {
+  await mkdir(join(root, "node_modules", name), { recursive: true });
+  await writeFile(join(root, "node_modules", name, "package.json"), manifest);
+}
+
+describe("installedVersion", () => {
+  it("reads the version installed in the app's node_modules", async () => {
+    await install(dir, "next", JSON.stringify({ name: "next", version: "15.2.2" }));
+
+    expect(await installedVersion(dir, "next")).toBe("15.2.2");
+  });
+
+  it("finds a version hoisted to a parent's node_modules", async () => {
+    const app = join(dir, "apps", "web");
+    await mkdir(app, { recursive: true });
+    await install(dir, "next", JSON.stringify({ name: "next", version: "15.1.7" }));
+
+    expect(await installedVersion(app, "next")).toBe("15.1.7");
+  });
+
+  it("prefers the app's own install over a hoisted one", async () => {
+    const app = join(dir, "apps", "web");
+    await install(dir, "next", JSON.stringify({ name: "next", version: "15.1.7" }));
+    await install(app, "next", JSON.stringify({ name: "next", version: "15.3.0" }));
+
+    expect(await installedVersion(app, "next")).toBe("15.3.0");
+  });
+
+  it("reports nothing when the package is not installed", async () => {
+    expect(await installedVersion(dir, "zitadel-not-installed-anywhere")).toBeUndefined();
+  });
+
+  it.each([
+    ["no version", JSON.stringify({ name: "next" })],
+    ["an invalid version", JSON.stringify({ name: "next", version: "fifteen" })],
+    ["malformed JSON", "{"],
+  ])("reports nothing for a manifest with %s", async (_case, manifest) => {
+    await install(dir, "next", manifest);
+
+    expect(await installedVersion(dir, "next")).toBeUndefined();
+  });
+});
+
+describe("assertInstalledFloor", () => {
+  const floor = { dependency: "next", minimum: "15.2.3", product: "Next.js", hint: "Upgrade." };
+
+  it("refuses an installed version below the floor with E_UNSUPPORTED_PROJECT_SHAPE", async () => {
+    await install(dir, "next", JSON.stringify({ version: "15.2.2" }));
+
+    await expect(assertInstalledFloor(dir, floor)).rejects.toMatchObject({
+      code: "E_UNSUPPORTED_PROJECT_SHAPE",
+      hint: "Upgrade.",
+    });
+  });
+
+  it("names the installed version and the floor", async () => {
+    await install(dir, "next", JSON.stringify({ version: "15.2.2" }));
+
+    await expect(assertInstalledFloor(dir, floor)).rejects.toThrow(
+      "Next.js 15.2.2 is installed, below the supported floor — the CLI integrates Next.js 15.2.3 and newer",
+    );
+  });
+
+  it.each(["15.2.3", "15.2.3-canary.1", "16.0.0"])("passes %s installed", async (version) => {
+    await install(dir, "next", JSON.stringify({ version }));
+
+    await expect(assertInstalledFloor(dir, floor)).resolves.toBeUndefined();
+  });
+
+  it("passes when nothing is installed", async () => {
+    await expect(
+      assertInstalledFloor(dir, { ...floor, dependency: "zitadel-not-installed-anywhere" }),
+    ).resolves.toBeUndefined();
   });
 });

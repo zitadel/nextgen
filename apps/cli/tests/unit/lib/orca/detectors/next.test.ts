@@ -25,6 +25,15 @@ async function writeNextPackageJson(extra: Record<string, unknown> = {}): Promis
   );
 }
 
+/** Installs Next.js at `version` in the app's `node_modules`. */
+async function installNext(version: string): Promise<void> {
+  await mkdir(join(dir, "node_modules", "next"), { recursive: true });
+  await writeFile(
+    join(dir, "node_modules", "next", "package.json"),
+    JSON.stringify({ name: "next", version }),
+  );
+}
+
 describe("NextDetector", () => {
   it("declares the next framework id", () => {
     expect(detector.framework).toBe("next");
@@ -150,6 +159,45 @@ describe("NextDetector", () => {
 
     expect(await detector.detect(dir)).toMatchObject({ id: "next" });
   });
+
+  it.each([
+    ["^15.0.0", "15.2.2"],
+    ["^15.1.0", "15.1.7"],
+    ["latest", "15.0.0"],
+  ])(
+    "refuses next %s with %s installed, which skips middleware for a forged subrequest header",
+    async (spec, installed) => {
+      await mkdir(join(dir, "app"));
+      await writeNextPackageJson({ dependencies: { next: spec } });
+      await installNext(installed);
+
+      await expect(detector.detect(dir)).rejects.toThrow(
+        `Next.js ${installed} is installed, below the supported floor — the CLI integrates Next.js 15.2.3 and newer`,
+      );
+    },
+  );
+
+  it("points an app with a vulnerable Next installed at the release that fixes it", async () => {
+    await mkdir(join(dir, "app"));
+    await writeNextPackageJson({ dependencies: { next: "^15.0.0" } });
+    await installNext("15.2.2");
+
+    await expect(detector.detect(dir)).rejects.toMatchObject({
+      code: "E_UNSUPPORTED_PROJECT_SHAPE",
+      hint: expect.stringContaining("Upgrade the app to Next.js 15.2.3 or later"),
+    });
+  });
+
+  it.each(["15.2.3", "15.5.4", "16.0.0"])(
+    "accepts next ^15.0.0 with %s installed",
+    async (installed) => {
+      await mkdir(join(dir, "app"));
+      await writeNextPackageJson({ dependencies: { next: "^15.0.0" } });
+      await installNext(installed);
+
+      expect(await detector.detect(dir)).toMatchObject({ id: "next" });
+    },
+  );
 
   it("lets an unparseable next version through the floor", async () => {
     // "latest" carries no provable major; blocking on it would be hostile.

@@ -12,6 +12,14 @@ function downgradeTheFramework(app: ScaffoldedApp): Promise<void> {
   });
 }
 
+/** Leaves a range the floor accepts, with a release below the floor installed under it. */
+async function installAnOldFrameworkUnderARange(app: ScaffoldedApp): Promise<void> {
+  await app.editPackageJson((pkg) => {
+    pkg.dependencies.next = "^15.0.0";
+  });
+  await app.hasInstalled("next", "15.2.2");
+}
+
 /** Swaps the app's SDK dependency for the CLI, leaving `@zitadel/cli` its only Zitadel package. */
 function keepOnlyTheCli(app: ScaffoldedApp): Promise<void> {
   return app.editPackageJson((pkg) => {
@@ -85,6 +93,24 @@ describe("doctor", () => {
       it("points at the upgrade", async () => {
         const app = await aSetUpApp();
         await downgradeTheFramework(app);
+
+        const result = await app.doctor();
+
+        expect(result).toHintAt("Upgrade the app to Next.js 15.2.3 or later");
+      });
+
+      it("reports an installed framework version below the floor", async () => {
+        const app = await aSetUpApp();
+        await installAnOldFrameworkUnderARange(app);
+
+        const result = await app.doctor();
+
+        expect(result).toFailWith("E_UNSUPPORTED_PROJECT_SHAPE");
+      });
+
+      it("points an installed framework version below the floor at the upgrade", async () => {
+        const app = await aSetUpApp();
+        await installAnOldFrameworkUnderARange(app);
 
         const result = await app.doctor();
 
