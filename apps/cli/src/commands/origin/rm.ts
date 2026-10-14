@@ -4,6 +4,7 @@ import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } fro
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
 import { shellArg } from "../../lib/shell";
+import { reportWarning } from "../../lib/warnings";
 
 /**
  * `zitadel origin rm <pattern>` — remove one origin pattern from the project.
@@ -65,10 +66,23 @@ export default class OriginRm extends EnvironmentCommand {
 
     await client.removeOrigin(projectId, { pattern });
 
+    // An empty list admits every origin, so removing the last pattern opens the
+    // project up rather than closing it: said aloud, since it is the opposite
+    // of what removing one pattern otherwise does.
+    const remaining = (await client.getProject(projectId)).origins ?? [];
+    if (remaining.length === 0) {
+      reportWarning(
+        `${pattern} was the project's last origin, so the project now admits every origin. Add the ones it should admit with "zitadel origin add".`,
+      );
+    }
+
     return this.emit({
       status: "ok",
       data: deletedData({ pattern }),
-      pretty: `Stopped admitting ${pattern}`,
+      pretty:
+        remaining.length === 0
+          ? `Removed ${pattern}; the project has no origins left and admits every origin`
+          : `Stopped admitting ${pattern}`,
     });
   }
 }

@@ -217,7 +217,12 @@ export default class EnvAdd extends BaseCommand {
     // would send the user to a value that is not there — point them at the
     // project's own secret instead.
     const writtenKeys = new Set(Object.keys(values));
-    const newEnvironment = environmentSelectorSuffix({ envName: name });
+    // The new environment, by name and directory: this run's own selection is
+    // not it.
+    const newEnvironment = environmentSelectorSuffix({
+      envName: name,
+      ...(typeof flags.cwd === "string" ? { cwd: flags.cwd } : {}),
+    });
     const { cliVersion } = this.meta;
     const render = (variables: PlatformVariable[]): string[] =>
       variables.map((variable) =>
@@ -269,9 +274,9 @@ export default class EnvAdd extends BaseCommand {
         // Quoted like the machine command, and only offered when it can run:
         // without the project secret in the file it would fail to authenticate.
         writtenKeys.has("ZITADEL_PROJECT_SECRET")
-          ? `Allow this project's origin: zitadel origin add ${issuer === undefined ? "<your-app-url>" : shellArg(issuer)} --kind primary --env ${name}`
-          : `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${file}: zitadel origin add ${issuer === undefined ? "<your-app-url>" : shellArg(issuer)} --kind primary --env ${name}`,
-        `Check what resolves: zitadel env --env ${name}`,
+          ? `Allow this project's origin: zitadel origin add ${issuer === undefined ? "<your-app-url>" : shellArg(issuer)} --kind primary${newEnvironment}`
+          : `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${file}: zitadel origin add ${issuer === undefined ? "<your-app-url>" : shellArg(issuer)} --kind primary${newEnvironment}`,
+        `Check what resolves: zitadel env${newEnvironment}`,
         "",
         "The deployed app never reads that file. Set these where it is built and run.",
         "",

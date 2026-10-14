@@ -73,6 +73,25 @@ describe("origin rm", () => {
         expect(await app.projectOrigins()).toEqual([]);
       });
 
+      it("warns that removing the last origin admits every origin", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin("https://app.acme.com", "primary");
+
+        const result = await app.removeOrigin("https://app.acme.com");
+
+        expect(result).toSay("admits every origin");
+      });
+
+      it("does not warn while other origins remain", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin("https://app.acme.com", "primary");
+        await app.addOrigin("https://www.acme.com", "primary");
+
+        const result = await app.removeOrigin("https://app.acme.com");
+
+        expect(result).not.toSay("admits every origin");
+      });
+
       it("fails on a pattern the project does not hold", async () => {
         const app = await aSetUpApp();
 

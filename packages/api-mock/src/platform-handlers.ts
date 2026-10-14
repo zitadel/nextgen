@@ -674,12 +674,6 @@ export type PlatformStoreSnapshot = {
    */
   variableNames: string[];
   /**
-   * The origin patterns stored across every project, in insertion order. A
-   * caller driving the mock over HTTP observes origins through `GET
-   * /projects/:id` (the CLI's `origin list`); this is the in-process view.
-   */
-  originPatterns: string[];
-  /**
    * Ids of the live challenges. A caller that drove `claim/init` over HTTP
    * (a CLI under test, say) never sees the response body, so this is the only
    * way to learn the id it needs to hand to {@link completeClaimChallenge} or
@@ -710,9 +704,6 @@ export function snapshotPlatformStore(): PlatformStoreSnapshot {
       .sort((a, b) => b.seq - a.seq)
       .map((deployment) => deployment.id),
     variableNames: [...store.variables.values()].flatMap((owned) => [...owned.keys()]),
-    originPatterns: [...store.projects.values()].flatMap((project) =>
-      project.origins.map((origin) => origin.pattern),
-    ),
     claimChallengeIds: [...store.claimChallenges.keys()],
   };
 }
