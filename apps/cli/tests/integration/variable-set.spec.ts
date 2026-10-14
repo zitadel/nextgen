@@ -120,6 +120,42 @@ describe("variable set", () => {
         expect(all).toEqual({ held: true, secret: true });
       });
 
+      it("refuses a plain preview value for a secret", async () => {
+        const app = await aSetUpApp();
+        await app.setVariable("TOKEN", "s3cret", { secret: true });
+
+        const result = await app.run(["variable", "set", "TOKEN", "plain", "--preview", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("suggests setting a secret's preview value as a secret", async () => {
+        const app = await aSetUpApp();
+        await app.setVariable("TOKEN", "s3cret", { secret: true });
+
+        const result = await app.run(["variable", "set", "TOKEN", "plain", "--preview", "--json"]);
+
+        expect(result).toSuggest("variable set TOKEN --secret --preview");
+      });
+
+      it("writes no plain preview value for a secret", async () => {
+        const app = await aSetUpApp();
+        await app.setVariable("TOKEN", "s3cret", { secret: true });
+
+        await app.run(["variable", "set", "TOKEN", "plain", "--preview", "--json"]);
+
+        expect(await app.projectVariables({ preview: true })).toEqual([]);
+      });
+
+      it("warns when making a name secret leaves a plain preview value", async () => {
+        const app = await aSetUpApp();
+        await app.setVariable("TOKEN", "plain", { preview: true });
+
+        const result = await app.setVariable("TOKEN", "s3cret", { secret: true });
+
+        expect(result).toSay("its preview value is stored plain");
+      });
+
       it("reports a preview write back in the preview slot", async () => {
         const app = await aSetUpApp();
         await app.setVariable("API_URL", "https://api.acme.com");
