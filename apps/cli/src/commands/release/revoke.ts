@@ -1,9 +1,7 @@
 import { Flags } from "@oclif/core";
-import { cancel, confirm, isCancel } from "@clack/prompts";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { revokeRelease } from "../../lib/release";
-import { ZitadelError } from "../../lib/errors";
 import { publicCliCommand } from "../../lib/public-cli";
 
 /**
@@ -34,7 +32,7 @@ export default class ReleaseRevoke extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(ReleaseRevoke);
     await this.toMeta(flags);
-    const { nonInteractive, dryRun, force, cliVersion } = this.meta;
+    const { dryRun, cliVersion } = this.meta;
     const releaseId = args.release_id;
 
     // A dry run makes no request, so it answers before the connection and
@@ -48,30 +46,17 @@ export default class ReleaseRevoke extends EnvironmentCommand {
       });
     }
 
-    if (!force) {
-      if (nonInteractive) {
-        throw new ZitadelError(
-          "E_VALIDATION",
-          "Revoking a release requires --force in non-interactive mode",
-          {
-            hint: `Pass --force to revoke ${releaseId}.`,
-            nextCommands: [
-              publicCliCommand(
-                `release revoke ${releaseId} --force${this.environmentSelector()}`,
-                cliVersion,
-              ),
-            ],
-          },
-        );
-      }
-      const answer = await confirm({
-        message: `Revoke ${releaseId}? Its content can never be served again.`,
-        initialValue: false,
-      });
-      if (isCancel(answer) || !answer) {
-        cancel("Revoke cancelled.");
-        return this.emit({ status: "skipped", reason: "revoke-cancelled" });
-      }
+    const confirmed = await this.input({
+      kind: "confirm",
+      name: `revoke ${releaseId}`,
+      message: `Revoke ${releaseId}? Its content can never be served again.`,
+      retry: publicCliCommand(
+        `release revoke ${releaseId} --force${this.environmentSelector()}`,
+        cliVersion,
+      ),
+    });
+    if (!confirmed) {
+      return this.emit({ status: "skipped", reason: "revoke-cancelled" });
     }
 
     const { client, projectId } = await this.connect();
