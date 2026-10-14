@@ -543,7 +543,12 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
 
   it("every step carrying sso_providers routes all three outcomes", () => {
     const ssoSteps = flow.steps.filter((s) => s.sso_providers);
-    expect(ssoSteps.map((s) => s.name)).toEqual(["identifier", "register", "sso-conflict"]);
+    expect(ssoSteps.map((s) => s.name)).toEqual([
+      "identifier",
+      "password",
+      "register",
+      "sso-conflict",
+    ]);
     for (const step of ssoSteps) {
       for (const outcome of ["sso_authenticated", "sso_user_not_found", "user_already_exists"]) {
         expect(step.transitions?.[outcome], `${step.name} routes ${outcome}`).toBeDefined();
@@ -551,8 +556,17 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
       expect(step.transitions!.sso_user_not_found!.target).toBe("register-sso");
     }
     // user_not_found stays the typed-email outcome with the shipped target.
-    expect(ssoSteps[0]!.transitions!.user_not_found).toEqual({ target: "register" });
-    expect(ssoSteps[1]!.transitions!.user_not_found).toBeUndefined();
+    const byName = new Map(ssoSteps.map((s) => [s.name, s]));
+    expect(byName.get("identifier")!.transitions!.user_not_found).toEqual({ target: "register" });
+    expect(byName.get("register")!.transitions!.user_not_found).toBeUndefined();
+  });
+
+  it("the password step offers the providers, for a user who typed their email and has no password", () => {
+    const password = flow.steps.find((s) => s.name === "password")!;
+
+    expect(password.sso_providers).toEqual(["google"]);
+    expect(password.transitions!.user_already_exists).toEqual({ target: "sso-conflict" });
+    expect(password.transitions!.sso_authenticated).toEqual({ target: "done" });
   });
 
   it("both firing points reach sso-conflict, whose sign-in re-purposes to login's entry; no pivot anywhere", () => {
@@ -585,7 +599,8 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
 
   it("provider ids reference area 1's connection slug", () => {
     const ids = flow.steps.flatMap((s) => s.sso_providers ?? []);
-    expect(ids).toEqual(["google", "google", "google"]);
+    // Every step offers the same one connection, whichever steps carry it.
+    expect(new Set(ids)).toEqual(new Set(["google"]));
     expect((googleExample as { slug: string }).slug).toBe("google");
   });
 
@@ -599,7 +614,7 @@ describe("scaffolded flow (schemas/default-login.scaffold.json)", () => {
     );
     for (const step of stripped.steps) delete step.sso_providers;
     const byName = new Map(stripped.steps.map((s) => [s.name, s]));
-    for (const name of ["identifier", "register"]) {
+    for (const name of ["identifier", "password", "register"]) {
       for (const outcome of ["sso_authenticated", "sso_user_not_found", "user_already_exists"]) {
         delete byName.get(name)!.transitions![outcome];
       }

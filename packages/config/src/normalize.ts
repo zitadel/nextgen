@@ -8,12 +8,13 @@
  * sides before hashing or diffing keeps a one-field edit rendering as a
  * one-field diff.
  *
- * Normalized bodies are for COMPARISON. Never upload them, and never
- * write a normalized schema body to a file: the server stores schema
- * bytes verbatim without materializing meta-schema defaults, so a
- * stripped `"x-audit": false` would vanish from the next published
- * revision. (Flow write-back may reuse {@link normalizeFlowBody} —
- * everything it strips is pure transport noise.)
+ * Normalized bodies are for COMPARISON; uploads send the file as written.
+ * Comparing without the defaults is sound because the server applies them
+ * itself: it decodes a schema into ogen's typed `UserSchema`, which sets
+ * `x-audit: false` on every property that omits it, and stores the
+ * re-encoded body (`internal/api/schema.go`), so a spelled-out default and
+ * an omitted one publish the same revision. (Flow write-back may reuse
+ * {@link normalizeFlowBody} — everything it strips is pure transport noise.)
  */
 
 /**

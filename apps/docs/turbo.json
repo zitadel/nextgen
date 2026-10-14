@@ -1,0 +1,48 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // Bundles api/openapi into .generated/, which lib/openapi.ts imports,
+    // applying the repo's Redocly config.
+    "generate": {
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/api/openapi/**/*.yaml", "$TURBO_ROOT$/redocly.yaml"],
+      "outputs": [".generated/openapi.mjs", ".generated/openapi.d.mts"]
+    },
+    "typecheck": {
+      "dependsOn": ["generate"]
+    },
+    // The build script bundles again before `next build`, because the
+    // hosted cloud's docs service runs the script without a task runner.
+    // app/global.css imports the design tokens' CSS variables, which the
+    // repository commits, so that build needs no generation of them.
+    //
+    // The build waits for typecheck, as in moon.yml: `next build` empties
+    // .next/types, where tsc reads the route types, so side by side
+    // typecheck failed with TS2304. A task-guard mutex would leave a gap: a
+    // cache hit restores .next without running the script.
+    "build": {
+      "dependsOn": ["typecheck", "generate", "@zitadel/design-tokens#generate"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
+    "dev": {
+      "dependsOn": ["generate", "@zitadel/design-tokens#generate"]
+    },
+    "start": {
+      "dependsOn": ["build"]
+    },
+    // The site's contract suite (tests/, playwright.config.mts); Playwright
+    // serves the build on port 3003.
+    "e2e": {
+      "dependsOn": ["build"],
+      "passThroughEnv": ["DOCS_*", "VERCEL_AUTOMATION_BYPASS_SECRET", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
+    },
+    // The same suite against a deployment of the hosted cloud, which
+    // DOCS_BASE_URL names (VERCEL_AUTOMATION_BYPASS_SECRET opens its
+    // protection); .github/workflows/deployment-checks.yml runs it for every
+    // deployment. The script refuses to run without DOCS_BASE_URL.
+    "e2e-deployment": {
+      "cache": false,
+      "passThroughEnv": ["DOCS_*", "VERCEL_AUTOMATION_BYPASS_SECRET", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
+    }
+  }
+}

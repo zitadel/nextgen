@@ -1,0 +1,15 @@
+{
+  "title": "Projects",
+  "pages": [
+    "createProject",
+    "queryProjects",
+    "listMyProjects",
+    "getProject",
+    "patchProject",
+    "initClaim",
+    "getClaimWindow",
+    "getClaimStatus",
+    "completeClaim",
+    "..."
+  ]
+}

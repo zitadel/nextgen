@@ -23,7 +23,13 @@ import {
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
-import { type ConnectionEndpoints, idpProvider } from "@zitadel/config/idp";
+import {
+  type ConnectionEndpoints,
+  type ConnectionSlug,
+  type ProviderSelection,
+  providerOf,
+  selectionName,
+} from "@zitadel/config/idp";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
 import { FLOWS_DIR } from "./flows";
@@ -32,7 +38,12 @@ import {
   applySsoToSchema,
   authMethods,
   CONNECTION_SCHEMA_REF,
+  customFlagText,
+  ENABLE_FLAG_NAMES,
+  SETUP_FLAG_NAMES,
   IDPS_DIR,
+  planConnection,
+  readConnectionFiles,
   refuseResolvedSecret,
 } from "./idp";
 import { stableStringify } from "./json";
@@ -54,8 +65,8 @@ export type MaterializeSetupResourcesResult = {
  * initial state file.
  *
  * The schema is uploaded without an `$id`: the server assigns an opaque id on
- * `POST /schemas`, and the flow file can only be rendered after that id comes
- * back because `flow_definition.user_schema` must reference it.
+ * `POST /schemas`. The flow names the schema by its `objectType`, but is
+ * published after it because the server refuses a flow naming no schema.
  */
 export async function materializeSetupResources(opts: {
   cwd: string;
@@ -75,7 +86,7 @@ export async function materializeSetupResources(opts: {
    * The providers to enable, in the order they were chosen. One connection is
    * created per entry, and every slug is added to the schema and the flow.
    */
-  sso?: readonly { provider: string; clientId: string; endpoints?: ConnectionEndpoints }[];
+  sso?: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[];
   /**
    * CLI version used to render `zitadel …` command mentions in the scaffolded
    * READMEs as runnable `npx @zitadel/cli@<version> …` commands — the CLI is
@@ -90,49 +101,25 @@ export async function materializeSetupResources(opts: {
   const filesWritten: string[] = [];
   const preset = opts.preset ?? DEFAULT_SETUP_PRESET;
   const useCase = opts.useCase ?? DEFAULT_SETUP_USE_CASE;
-
-  const { $id: _templateId, ...schemaTemplate } = getDefaultHumanUserSchema({
-    preset,
-    useCase,
-  }) as { $id?: string } & Record<string, unknown>;
-  void _templateId;
+  const schemaTemplate = defaultSchemaTemplate(preset, useCase);
 
   // The connection goes first, and is created before the schema and flow that
   // name its slug: a Project should never be published claiming a provider the
   // platform does not hold. Its claim mapping reads the template's properties,
   // which enabling the provider does not change.
-  // Every connection is built and every path checked before the first create.
-  // Checking inside the loop would refuse "before anything is created" only
-  // for the first provider: a conflict on the second would leave the first
-  // created on the platform, its file written and its state recorded, and
-  // setup does not remove a connection file it wrote -- so the retry would
-  // then refuse on that file too, with nothing but the developer able to
-  // clear it. One pass to build and refuse, a second to create.
-  const planned: Array<{ slug: string; connectionPath: string; connection: object }> = [];
-  for (const chosen of opts.sso ?? []) {
-    const connection = idpProvider(chosen.provider).connection({
-      endpoints: chosen.endpoints,
-      schemaProperties: Object.keys((schemaTemplate.properties as object | undefined) ?? {}),
-      schemaRef: CONNECTION_SCHEMA_REF,
-    });
-    const slug = typeof connection.slug === "string" ? connection.slug : undefined;
-    if (!slug) continue;
-    const connectionPath = `${IDPS_DIR}/${slug}.json`;
-    // Refused before anything is created, for two reasons: the file is the
-    // developer's (see {@link CONNECTION_EXISTS}), and finding out after the
-    // create would leave the project holding a connection no local file
-    // tracks.
-    if (await exists(join(opts.cwd, connectionPath))) {
-      throw new ZitadelError("E_CONFLICT", `${connectionPath} already exists`, {
-        hint: CONNECTION_EXISTS.hint,
-        nextCommands: CONNECTION_EXISTS.nextCommands,
-      });
-    }
-    planned.push({ slug, connectionPath, connection });
-  }
+  // Every file is checked before the first create, the schema and flow too.
+  // Checking as each one is written would refuse "before anything is created"
+  // only for the first: a conflict later on would leave a connection created
+  // on the platform, its file written and its state recorded, and setup does
+  // not remove a connection file it wrote -- so the retry would then refuse
+  // on that file too, with nothing but the developer able to clear it. One
+  // pass to build and refuse, a second to create. Setup runs the same pass
+  // before it creates the project, through assertNoSetupResourceConflicts.
+  const planned = planConnections(schemaTemplate, opts.sso);
+  await refuseResourceConflicts(opts.cwd, opts.force, planned);
 
-  const slugs: string[] = planned.map((entry) => entry.slug);
-  for (const { connectionPath, connection } of planned) {
+  const slugs = planned.map((entry) => entry.slug);
+  for (const { connectionPath, connection, selection } of planned) {
     // The create comes before the file. Setup does not remove a connection
     // file it wrote -- that rule is what keeps a developer's own file safe --
     // so writing first would leave one behind on any failure here and the
@@ -150,7 +137,15 @@ export async function materializeSetupResources(opts: {
     await mkdir(join(opts.cwd, IDPS_DIR), { recursive: true });
     // Still `wx` rather than `opts.force`: the check above is the early
     // refusal, this is the one that cannot be raced.
-    if (await writeResourceFile(opts.cwd, connectionPath, connection, false, CONNECTION_EXISTS)) {
+    if (
+      await writeResourceFile(
+        opts.cwd,
+        connectionPath,
+        connection,
+        false,
+        connectionExists(selection),
+      )
+    ) {
       filesWritten.push(join(opts.cwd, connectionPath));
     }
     // The same guard the syncer applies: this write puts the canonical body
@@ -209,7 +204,7 @@ export async function materializeSetupResources(opts: {
     hash: schemaHash,
   });
 
-  const flowTemplate = getDefaultLoginFlow({ userSchemaUrl: schemaId, preset, useCase });
+  const flowTemplate = getDefaultLoginFlow({ preset, useCase });
   // The conflict step the provider needs can only offer what this schema
   // actually enables, so the methods are read back off the composed document
   // rather than inferred from the preset.
@@ -277,6 +272,110 @@ export async function materializeSetupResources(opts: {
 }
 
 /**
+ * Throws the `E_CONFLICT` {@link materializeSetupResources} would throw on a
+ * file it refuses to write: the default schema or flow without `force`, or a
+ * connection for one of the chosen providers, which it never replaces.
+ *
+ * Setup calls this before it creates the project. Those files are written
+ * only once the project exists, so a conflict found there leaves the project
+ * behind, and a rerun keeps its id and secret in `.env.local`: setup merges
+ * only the keys that file is missing.
+ */
+export async function assertNoSetupResourceConflicts(opts: {
+  cwd: string;
+  force: boolean;
+  preset?: SetupPreset;
+  useCase?: SetupUseCase;
+  sso?: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[];
+}): Promise<void> {
+  const schemaTemplate = defaultSchemaTemplate(
+    opts.preset ?? DEFAULT_SETUP_PRESET,
+    opts.useCase ?? DEFAULT_SETUP_USE_CASE,
+  );
+  await refuseResourceConflicts(opts.cwd, opts.force, planConnections(schemaTemplate, opts.sso));
+}
+
+/** The default human user schema for a preset and use case, without the template's `$id`. */
+function defaultSchemaTemplate(
+  preset: SetupPreset,
+  useCase: SetupUseCase,
+): Record<string, unknown> {
+  const { $id: _templateId, ...schemaTemplate } = getDefaultHumanUserSchema({
+    preset,
+    useCase,
+  }) as { $id?: string } & Record<string, unknown>;
+  void _templateId;
+  return schemaTemplate;
+}
+
+type PlannedConnection = {
+  slug: ConnectionSlug;
+  connectionPath: string;
+  connection: object;
+  selection: ProviderSelection;
+};
+
+/** The connection each chosen provider gets, and the file it is written to. */
+function planConnections(
+  schemaTemplate: Record<string, unknown>,
+  sso: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[] | undefined,
+): PlannedConnection[] {
+  const planned: PlannedConnection[] = [];
+  for (const chosen of sso ?? []) {
+    const provider = providerOf(chosen.selection);
+    const connection = provider.connection({
+      endpoints: chosen.endpoints,
+      schemaProperties: Object.keys((schemaTemplate.properties as object | undefined) ?? {}),
+      schemaRef: CONNECTION_SCHEMA_REF,
+    });
+    planned.push({
+      slug: provider.slug,
+      connectionPath: `${IDPS_DIR}/${provider.slug}.json`,
+      connection,
+      selection: chosen.selection,
+    });
+  }
+  return planned;
+}
+
+/**
+ * Throws on the first file setup would refuse to write. A connection is
+ * refused with or without `force`, for two reasons: the file is the
+ * developer's (see {@link connectionExists}), and finding out after the
+ * create would leave the project holding a connection no local file tracks.
+ *
+ * The same questions `sso enable` asks: which file holds the slug, and whose
+ * variables would collide. A plan that throws names the conflict; one that
+ * says reuse means a connection file already holds this provider.
+ */
+async function refuseResourceConflicts(
+  cwd: string,
+  force: boolean,
+  connections: readonly PlannedConnection[],
+): Promise<void> {
+  // Read only when a provider was chosen: a leftover file that does not parse
+  // is no reason for a plain setup to fail.
+  const files = connections.length > 0 ? await readConnectionFiles(cwd) : [];
+  for (const { connectionPath, selection } of connections) {
+    const existing = planConnection({ selection, files, slugFlag: SETUP_FLAG_NAMES.slug });
+    if (existing.action === "reuse" || (await exists(join(cwd, connectionPath)))) {
+      throw resourceExists(
+        existing.action === "reuse" ? existing.file.path : connectionPath,
+        connectionExists(selection),
+      );
+    }
+  }
+  if (force) {
+    return;
+  }
+  for (const path of [DEFAULT_SCHEMA_CONFIG_PATH, DEFAULT_FLOW_CONFIG_PATH]) {
+    if (await exists(join(cwd, path))) {
+      throw resourceExists(path);
+    }
+  }
+}
+
+/**
  * Write a README file, but never overwrite an existing one. A developer who
  * has edited the README should keep their edits when `setup --force` is
  * re-run.
@@ -304,13 +403,21 @@ async function writeReadmeFile(cwd: string, relPath: string, content: string): P
  * tenant-owned. So the one rule is that setup does not write there, and the
  * developer decides what happens to the file.
  */
-const CONNECTION_EXISTS: { hint: string; nextCommands: string[] } = {
-  hint:
-    "A connection file is yours to keep, so setup never replaces or removes one. " +
-    "Remove it and run setup again to scaffold a fresh one, or keep it and enable the " +
-    "provider afterwards to reuse it.",
-  nextCommands: ["zitadel sso enable --provider google"],
-};
+function connectionExists(selection: ProviderSelection): { hint: string; nextCommands: string[] } {
+  return {
+    hint:
+      "A connection file is yours to keep, so setup never replaces or removes one. " +
+      "Remove it and run setup again to scaffold a fresh one, or keep it and enable the " +
+      "provider afterwards to reuse it.",
+    nextCommands: [
+      `zitadel sso enable --provider ${selectionName(selection)}${
+        selection.kind === "custom"
+          ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
+          : ""
+      }`,
+    ],
+  };
+}
 
 /** Whether a path is there, without caring why it is not. */
 async function exists(path: string): Promise<boolean> {
@@ -335,15 +442,22 @@ async function writeResourceFile(
     return true;
   } catch (error) {
     if (isErrno(error, "EEXIST")) {
-      throw new ZitadelError("E_CONFLICT", `${relPath} already exists`, {
-        hint:
-          onExists?.hint ??
-          "Move the file aside or rerun setup with --force if you want setup to replace it.",
-        nextCommands: onExists?.nextCommands,
-      });
+      throw resourceExists(relPath, onExists);
     }
     throw error;
   }
+}
+
+function resourceExists(
+  relPath: string,
+  onExists?: { hint: string; nextCommands?: string[] },
+): ZitadelError {
+  return new ZitadelError("E_CONFLICT", `${relPath} already exists`, {
+    hint:
+      onExists?.hint ??
+      "Move the file aside or rerun setup with --force if you want setup to replace it.",
+    nextCommands: onExists?.nextCommands,
+  });
 }
 
 function requiredString(value: unknown, label: string): string {

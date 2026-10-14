@@ -51,11 +51,13 @@ describe("setup telemetry dimensions", () => {
   });
 
   it("keeps the sso dimension an enum, so no provider value is free text", async () => {
-    // The flag is oclif-constrained to the catalog, so every value this can
-    // take is a slug that shipped with the CLI, plus "none".
+    // The flag is oclif-constrained to the catalog plus "custom", so every value
+    // this can take is a slug that shipped with the CLI, "custom", or "none". A
+    // custom connection's own slug is the developer's free text and is never
+    // recorded: the dimension says "custom", not which one.
     const source = await readFile(setupCommand, "utf8");
     expect(source).toContain('sso: flags.sso ?? "none"');
-    expect(source).toContain("options: [...IDP_PROVIDERS]");
+    expect(source).toContain("options: [...IDP_PROVIDERS, CUSTOM_PROVIDER]");
     expect([...IDP_PROVIDERS].every((slug) => /^[a-z][a-z0-9_-]*$/.test(slug))).toBe(true);
   });
 

@@ -265,7 +265,6 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		serviceDBPool,
-		schemaService,
 		schemaValidator,
 		nil,
 	)
@@ -280,11 +279,9 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
-	environmentService := service.NewEnvironmentService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	releaseService := service.NewReleaseService(serviceDBPool)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
-	deploymentService := service.NewDeploymentService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
 	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
 	userService := service.NewUserService(
@@ -322,7 +319,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		createUserHandler,
 		flowAuth,
 		service.NewFlowSSOProviderResolver(idpConnectionService),
-		service.NewFlowSSOIdentityResolver(serviceDBPool, idpConnectionService, userService, schemaStore),
+		service.NewFlowSSOIdentityResolver(serviceDBPool, idpConnectionService, userService, schemaStore, projectHashers),
 		service.NewFlowSSORedirectIssuer(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient),
 		time.Now,
 	)
@@ -379,10 +376,8 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			flowDefinitionSvc,
 			teamService,
 			brandingService,
-			environmentService,
 			releaseService,
 			idpConnectionService,
-			deploymentService,
 			eventService,
 			tokenService,
 			keyService,
@@ -489,7 +484,24 @@ func consoleBaseURL(publicBase, consolePath string) (string, error) {
 // environment, which is what a command-line flag has to do.
 type configOverride func(*viper.Viper)
 
+// loadConfig reads the configuration the server serves with: readConfig's,
+// plus the master keys, one generated when none is configured and
+// generation is on.
 func loadConfig(configPath string, overrides ...configOverride) (Config, error) {
+	cfg, err := readConfig(configPath, overrides...)
+	if err != nil {
+		return Config{}, err
+	}
+	if err := ensureServerMasterKey(&cfg.Server); err != nil {
+		return Config{}, err
+	}
+	return cfg, nil
+}
+
+// readConfig reads and validates the configuration without touching the
+// master keys, which only serving needs: `migrate` reads its configuration
+// here, so it neither requires a master key nor generates one.
+func readConfig(configPath string, overrides ...configOverride) (Config, error) {
 	v := viper.NewWithOptions(viper.ExperimentalBindStruct())
 	v.SetEnvPrefix("NEXTGEN")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
@@ -655,11 +667,10 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 	if err := ensureServerDataDir(cfg.Server.DataDir); err != nil {
 		return Config{}, err
 	}
-	if err := ensureServerMasterKey(&cfg.Server); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
-
-	return cfg, cfg.Validate()
+	return cfg, nil
 }
 
 // stringToWeakSliceHookFunc splits a string into a slice on sep, without

@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import { appendFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { posix } from "node:path";
 
 import { isDirectRun } from "./dev-process.mjs";
+import { moonTargetOf, taskRunner } from "./task-runner.mjs";
 
 // Decides what the ci workflow runs, in three layers:
 //
@@ -18,7 +20,7 @@ import { isDirectRun } from "./dev-process.mjs";
 //    single representative framework when no SDK, CLI, or journey surface
 //    moved: the scaffolded flow widget is framework-independent, so a
 //    server-only change proves as much on one framework as on the full
-//    matrix (apps/cli-journey-e2e/scripts/frameworks.mjs owns the list).
+//    matrix (e2e/journey/scripts/frameworks.mjs owns the list).
 //
 // The gates fail open: known repo-wide files no task claims (workflow
 // definitions, scripts/, moon config, root manifests and compiler/release
@@ -95,7 +97,7 @@ const SHARED_JOURNEY_TRIGGERS = [
   "sdk-next:build",
 ];
 const SDK_BUILD_RE = /^sdk-[a-z-]+:build$/;
-const JOURNEY_PROJECT_PREFIX = "cli-journey-e2e:";
+const JOURNEY_PROJECT_PREFIX = "e2e:journey";
 
 // Full framework matrix only when a surface that differs per framework
 // moved: an SDK build, the CLI (owns the scaffold templates), or the journey
@@ -108,15 +110,26 @@ const GO_TEST_TARGETS = [
   "server:test-postgres",
   "server:test-sqlite",
 ];
-const TESTING_DEMO_TARGETS = ["testing:test-integration", "demo-next-e2e:e2e-real"];
+const TESTING_DEMO_TARGETS = ["testing:test-integration", "e2e:demo-next-real"];
 // Both real-instance console lanes: the dev-proxy suite and the embedded
 // suite (binary-served /ui/* + API at one origin). Either being affected
 // runs the console gate — the workflow steps them sequentially so two local
 // instances do not contend.
-const CONSOLE_E2E_TARGETS = ["console-e2e:e2e-real", "console-e2e:e2e-embedded"];
+const CONSOLE_E2E_TARGETS = ["e2e:console-real", "e2e:console-embedded"];
+// The lanes that need no backend: the console's preview smoke and the demos
+// against api-mock. ci-turbo.yml runs them in one step; moon runs them as part
+// of e2e:all.
+const MOCK_E2E_TARGETS = ["e2e:console-smoke", "e2e:demo-next-mock", "e2e:demo-nuxt-mock"];
+// The aggregate ci.yml runs in its own e2e step (`moon exec e2e:all`) when the
+// `e2e` gate is on: moon counts it affected whenever any lane is, and running it
+// runs every lane as its dependency, the journey included, whether or not a
+// journey trigger above moved (an api-mock change reaches it through the mock
+// lanes). ci-turbo.yml gates its lane steps one by one and ignores this gate.
+const E2E_SUITE_TARGET = "e2e:all";
 
 const ALL_GATES = [
   "go_tests",
+  "e2e",
   "snapshot",
   "journey_fresh_app",
   "journey_passkey",
@@ -124,6 +137,7 @@ const ALL_GATES = [
   "journey_testkit",
   "suites_testing_demo",
   "suites_console",
+  "suites_mock",
   "browsers",
 ];
 
@@ -182,34 +196,66 @@ export function resolveGates({ mode, files, targets }) {
   const journeyPreexisting = journeyNextScaffold || set.has("sdk-nuxt:build");
   const suitesTestingDemo = TESTING_DEMO_TARGETS.some((t) => set.has(t));
   const suitesConsole = CONSOLE_E2E_TARGETS.some((t) => set.has(t));
+  const suitesMock = MOCK_E2E_TARGETS.some((t) => set.has(t));
   const anyJourney = journeyFreshApp || journeyNextScaffold || journeyPreexisting;
+  const e2eSuite = set.has(E2E_SUITE_TARGET);
 
   const gates = {
     go_tests: GO_TEST_TARGETS.some((t) => set.has(t)),
-    // The snapshot exists in PR CI to feed the journeys (the tarball handoff
-    // is a filesystem contract moon cannot see), so it runs iff any does.
-    snapshot: anyJourney,
+    // ci.yml's e2e step. A forced run (above) turns it on too: a workflow,
+    // root-script or moon.yml edit moves no lane's inputs, so moon alone would
+    // select nothing there.
+    e2e: e2eSuite,
+    // The snapshot exists in PR CI to feed the journey (the tarball handoff is
+    // a filesystem contract moon cannot see), so it runs whenever the journey
+    // can: a journey trigger moved, or the e2e step runs the whole suite.
+    snapshot: anyJourney || e2eSuite,
     journey_fresh_app: journeyFreshApp,
     journey_passkey: journeyNextScaffold,
     journey_preexisting: journeyPreexisting,
     journey_testkit: journeyNextScaffold,
     suites_testing_demo: suitesTestingDemo,
     suites_console: suitesConsole,
+    suites_mock: suitesMock,
     // Provisions Chromium for the e2e suites and journeys (their steps have no
     // per-package install-browsers dep). The browser `:test` lanes
     // (components/api-mock/storybook) install Chromium themselves via a moon dep,
     // so they don't need this gate.
-    browsers: suitesTestingDemo || suitesConsole || anyJourney,
+    browsers: suitesTestingDemo || suitesConsole || suitesMock || anyJourney,
   };
   const matrix =
     journeyProject || anySdkBuild || MATRIX_TRIGGERS.some((t) => set.has(t)) ? "full" : "single";
   return { gates, matrix, reason: null };
 }
 
-export function queryAffectedTargets(base, spawn = spawnSync) {
+/**
+ * The affected task set as moon `project:task` targets, from whichever task
+ * runner is selected (scripts/task-runner.mjs): moon's own affected query, or
+ * the same walk over turbo's task graph. `files` is the diff, which only the
+ * turbo form needs. Returns null when the query failed — which fails open.
+ */
+export function queryAffectedTargets(
+  base,
+  spawn = spawnSync,
+  { runner = taskRunner(), files = [] } = {},
+) {
+  return runner === "turbo"
+    ? queryTurboAffectedTargets(files, spawn)
+    : queryMoonAffectedTargets(base, spawn);
+}
+
+function queryMoonAffectedTargets(base, spawn) {
+  // Asked as a local run would be. In CI, moon drops a task that does not run
+  // there (`runInCI: false` or "skip") from the affected set when its own
+  // inputs changed, yet the gates exist for exactly such tasks: the e2e lanes
+  // are "skip" and run in ci.yml's own e2e step, so a spec edit must still
+  // count. The gates ask what a change reaches, not what `moon ci` would run.
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(([name]) => name !== "CI" && name !== "GITHUB_ACTIONS"),
+  );
   const result = spawn("moon", ["query", "tasks", "--affected", "--downstream", "deep"], {
     encoding: "utf8",
-    env: { ...process.env, MOON_BASE: base },
+    env: { ...env, MOON_BASE: base, MOON_HEAD: "HEAD" },
   });
   if (result.status !== 0) {
     // A failed query fails open; make the failure diagnosable from the run
@@ -232,6 +278,120 @@ export function queryAffectedTargets(base, spawn = spawnSync) {
     );
   } catch {
     console.error(`# moon query returned non-JSON stdout: ${String(result.stdout).slice(0, 200)}`);
+    return null;
+  }
+}
+
+// Every non-persistent task name in turbo.json: a `--dry=json` over all of
+// them is the whole task graph, with each task's hashed inputs and dependents.
+const TURBO_GRAPH_TASKS = [
+  "lint",
+  "typecheck",
+  "build",
+  "test",
+  "build-release",
+  "install-browsers",
+  "generate",
+  "sync-schemas",
+  "sync",
+  "sync:export",
+  "readme",
+  "format",
+  "vet",
+  "openapi",
+  "check-generate",
+  "check-generate-pruned",
+  "clean-generated",
+  "test-postgres",
+  "test-sqlite",
+  "test-spanner",
+  "test:integration",
+  "e2e",
+  "e2e-local",
+  "console-smoke",
+  "console-real",
+  "console-embedded",
+  "console-platform",
+  "console-deployment",
+  "demo-next-mock",
+  "demo-next-real",
+  "demo-nuxt-mock",
+  "journey",
+  "journey-local",
+  "changesets",
+  "check-graph",
+  "build-public-packages",
+  "version",
+  "pack",
+  "snapshot",
+  "publish",
+  "sweep",
+  "summarize",
+  "check-adrs",
+  "check-moon-graph",
+  "check-typecheck",
+  "check-openapi-rules",
+  "doctor",
+  "build-local-image",
+  "smoke-container",
+  "check",
+];
+
+/**
+ * moon's `--affected --downstream deep` over turbo's graph: the tasks whose
+ * hashed inputs include a changed file are the roots, and everything that
+ * depends on a root, transitively, is affected. Dependencies of a root are
+ * not — `turbo query affectedTasks` lists them, but the gates key on upstream
+ * builds (`api:build`), so that answer would run every lane on every change.
+ * A changed global input (root manifests, the shared configs) affects every
+ * task, as moon's implicitInputs do.
+ */
+export function affectedTurboTargets(graph, files) {
+  if (!Array.isArray(graph?.tasks)) {
+    return null;
+  }
+  const changed = new Set(files);
+  const globalChanged = Object.keys(graph.globalCacheInputs?.files ?? {}).some((file) =>
+    changed.has(file),
+  );
+  const tasks = graph.tasks.filter((task) => task.command !== "<NONEXISTENT>");
+  const byId = new Map(tasks.map((task) => [task.taskId, task]));
+  const roots = tasks.filter(
+    (task) =>
+      globalChanged ||
+      Object.keys(task.inputs ?? {}).some((input) =>
+        changed.has(posix.normalize(posix.join(task.directory ?? "", input))),
+      ),
+  );
+  const affected = new Set();
+  const pending = roots.map((task) => task.taskId);
+  while (pending.length > 0) {
+    const id = pending.pop();
+    if (affected.has(id)) continue;
+    affected.add(id);
+    for (const dependent of byId.get(id)?.dependents ?? []) pending.push(dependent);
+  }
+  return [...affected].map((id) => {
+    const [packageName, taskName] = id.split("#");
+    return moonTargetOf(packageName, taskName);
+  });
+}
+
+function queryTurboAffectedTargets(files, spawn) {
+  const result = spawn("turbo", ["run", ...TURBO_GRAPH_TASKS, "--dry=json"], {
+    encoding: "utf8",
+    env: { ...process.env, TURBO_TELEMETRY_DISABLED: "1" },
+    maxBuffer: 256 * 1024 * 1024,
+  });
+  if (result.status !== 0) {
+    process.stderr.write(result.stderr ?? "");
+    console.error(`# turbo dry run failed (exit ${result.status})`);
+    return null;
+  }
+  try {
+    return affectedTurboTargets(JSON.parse(result.stdout), files);
+  } catch {
+    console.error(`# turbo returned non-JSON stdout: ${String(result.stdout).slice(0, 200)}`);
     return null;
   }
 }
@@ -260,7 +420,7 @@ function main() {
   const mode = computeMode(files);
 
   const needsQuery = mode === "full" && forceFullReason(files) === null;
-  const targets = needsQuery ? queryAffectedTargets(base) : [];
+  const targets = needsQuery ? queryAffectedTargets(base, spawnSync, { files }) : [];
   const { gates, matrix, reason } = resolveGates({ mode, files, targets });
 
   const lines = [

@@ -149,6 +149,16 @@ describe("brandingConfigSchema", () => {
     expect(JSON.stringify(result.error?.issues)).toContain("typography.font_url");
   });
 
+  it("words the http font_url error as the server does, without the loopback carve-out", () => {
+    const result = brandingConfigSchema.safeParse({
+      ...base,
+      typography: { font_family: "Inter", font_url: "http://localhost:3000/font.css" },
+    });
+    const messages = result.error?.issues.map((issue) => issue.message) ?? [];
+    expect(messages).toContain("typography.font_url must be an absolute https URL.");
+    expect(messages.join("\n")).not.toContain("loopback");
+  });
+
   it("rejects a URL carrying credentials", () => {
     for (const [field, doc] of [
       ["logo_url", { ...base, logo_url: "https://user:pass@cdn.example.com/logo.svg" }],
