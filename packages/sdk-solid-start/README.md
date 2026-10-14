@@ -194,7 +194,8 @@ export default function Profile() {
 
 The widgets' events surface as optional callbacks: `onFlowStep`, `onFlowInput`,
 `onFlowComplete`, `onFlowRedirect` and `onFlowError` on `ZitadelLogin`, and
-`onSignout` and `onSessionMissing` (no session when the widget loads) on
+`onSignout`, `onSessionMissing` (no session when the widget loads) and
+`onSessionError` (loading the session or signing out failed some other way) on
 `ZitadelLogout` and `ZitadelSession`. To show work-email copy for
 a business audience, pass `locales={businessLocales}`; both come from
 `@zitadel/sdk-solid`, so wrap the widget inside the `clientOnly` loader:

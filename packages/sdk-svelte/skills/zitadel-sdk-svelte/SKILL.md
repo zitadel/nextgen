@@ -74,6 +74,10 @@ SvelteKit, where a `+page.svelte` also renders on the server, mount them after
 - **Post URLs.** `postSignInUrl` (on `ZitadelLogin`) and `postSignOutUrl` (on
   `ZitadelLogout`) are where the browser lands after each flow.
 - **Session card.** `<ZitadelSession {project} />` renders the signed-in user.
+- **No session.** When the visitor has no session, the session widgets render nothing and call
+  `onSessionMissing`; the session card also goes to its `postSignOutUrl` (unless that is the page it
+  is on), so point it at the login page. Any other failure (a 5xx, a network
+  error) keeps the widget, shows the error and calls `onSessionError`.
 - **Event callbacks** are optional `on…` props (for example `onFlowComplete`
   on the login, `onSignout` on logout and the session card); the README and the
   types list them all.

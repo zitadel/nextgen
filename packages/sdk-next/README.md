@@ -206,10 +206,13 @@ JSON or a framework's HTML 404 page from a misrouted proxy — throws so a broke
 proxy doesn't silently render as signed out. Sign-in and sign-out navigate
 (`post-sign-in-url` / `post-sign-out-url`), so chrome re-reads on the next page
 load without extra wiring; to react in place, listen for the widgets'
-`zitadel-signout` / `zitadel-flow-complete` events. When `<zitadel-session>`
+`zitadel-signout` / `zitadel-flow-complete` events, and for
+`zitadel-session-error` to tell an outage (a 5xx, a network error) from a
+signed-out visitor. When `<zitadel-session>`
 finds no session as it loads, it fires `zitadel-session-missing` and goes to
 its `post-sign-out-url`, so a signed-out visit to a client-rendered profile page
-ends on the login page.
+ends on the login page. When that URL is the page the card is on, it renders
+nothing there instead of reloading the page.
 
 ### 5. Login page
 

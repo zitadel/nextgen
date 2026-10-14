@@ -2619,6 +2619,7 @@ describe("<zitadel-login> defaults for unset props", () => {
     ["theme", ""],
     ["lang", ""],
     ["suppressHeader", false],
+    ["resumeFlowId", ""],
   ] as const;
 
   const UNSET = [undefined, null, ""] as const;

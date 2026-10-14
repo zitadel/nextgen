@@ -71,6 +71,10 @@ export function ProfilePage() {
   the flow completes.
 - The components forward the widget's `zitadel-*` events as optional `on*`
   callbacks (e.g. `onFlowComplete`, `onSignout`) if you need to react in-app.
+- **No session.** When the visitor has no session, the session widgets render nothing and call
+  `onSessionMissing`; the session card also goes to its `postSignOutUrl` (unless that is the page it
+  is on), so point it at the login page. Any other failure (a 5xx, a network
+  error) keeps the widget, shows the error and calls `onSessionError`.
 
 ## Read these, don't guess
 

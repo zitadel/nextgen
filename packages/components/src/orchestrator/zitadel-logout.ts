@@ -19,10 +19,9 @@ import "../atoms/zl-icon.js";
  * Reads the user's identity from the typed `getMySession` operation
  * (`GET /sessions/me`, credentialed) — the same source as `<zitadel-session>`,
  * so both signed-in surfaces stay consistent and work against the real backend.
- * The avatar/preview show `name`, then `email`, then the always-present
- * `user_id`. NOTE: the current server response includes only the `user_id`, so
- * the avatar falls back to the id until the backend returns a human-readable
- * `name`/`email`.
+ * The avatar and the preview name the user by `user.display`, then
+ * `user.identifier` (the login identifier), then `user_id`, the first that is
+ * set; the preview adds the identifier under a display name.
  *
  * It renders an avatar trigger with a dropdown that exposes a "Sign out"
  * action, and calls the typed `revokeMySession` operation in `@zitadel/api`

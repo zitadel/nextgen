@@ -29,9 +29,12 @@ The signed-in session card is `<ZitadelSession :project="project" />` (exported 
 
 `ZitadelLogin` emits `flowStep`, `flowInput`, `flowComplete`, `flowRedirect` and
 `flowError` (listen with `@flow-step` and so on); `ZitadelLogout` and
-`ZitadelSession` emit `signout` and `sessionMissing` (listen with
-`@session-missing`) (the visitor has no session: the widget renders nothing, and the session card
-goes to its `postSignOutUrl` when one is set). Each payload is the event detail. An unset or
+`ZitadelSession` emit `signout`, `sessionMissing` (listen with
+`@session-missing`; the visitor has no session: the widget renders nothing, and the session card
+goes to its `postSignOutUrl` when one is set) and `sessionError` (listen with `@session-error`;
+loading the session or signing out failed some other way, such as a 5xx or a network error, and
+the detail has `phase`, `message` and, when a response came back, `status` and `code`). Each
+payload is the event detail. An unset or
 cleared prop leaves the widget on its default (for example the "Signed in as"
 heading).
 
@@ -39,7 +42,7 @@ The default slot goes into the element's light DOM, so `ZitadelLogout` accepts a
 `<template>` for a custom sign-out control (`{{display}}`, `{{identifier}}` and
 `{{initial}}` are filled in, and an element with `data-action="logout"` signs
 out), and `ZitadelLogin` accepts content for its `slot="attribution-trailing"`
-slot. Vue compiles `{{display}}` as its own interpolation (to an empty string),
+slot. `ZitadelSession` takes no slot content: its element has no slot to show it in. Vue compiles `{{display}}` as its own interpolation (to an empty string),
 so mark the template `v-pre` to hand the placeholders to the element as written:
 
 ```vue

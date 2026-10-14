@@ -210,4 +210,13 @@ describe("auto-imported composables", () => {
       expect(existsSync(join(built, file.replace(/\.ts$/, ".js")))).toBe(true);
     },
   );
+
+  // Nuxt types each auto-import as `typeof import("<dist>/…/useAuth")`; without
+  // a declaration beside the `.js`, apps get `any`.
+  it.each(readdirSync(source).filter((file) => file.endsWith(".ts")))(
+    "ships a declaration for %s in the built composables directory",
+    (file) => {
+      expect(existsSync(join(built, file.replace(/\.ts$/, ".d.ts")))).toBe(true);
+    },
+  );
 });

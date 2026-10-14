@@ -66,7 +66,11 @@ import { ZitadelLogout, ZitadelSession } from '@zitadel/sdk-solid';
 Widget events are surfaced as optional `on…` callbacks (for example
 `onFlowComplete` on the login, `onSignout` on logout and the session card)
 when you need to react to them yourself; the README and the types list them
-all.
+all. When the visitor has no session, the session widgets render nothing and
+call `onSessionMissing`; the session card also goes to its `postSignOutUrl`
+(unless that is the page it is on), so point it at the login page. Any other
+failure (a 5xx, a network error) keeps the widget, shows the error and calls
+`onSessionError`.
 
 **Same-origin proxy.** The widgets call `${proxyPath}/…` same-origin
 (default `/__nextgen`). For local development the CLI dev proxy covers this;
