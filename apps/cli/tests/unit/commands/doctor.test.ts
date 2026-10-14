@@ -204,6 +204,18 @@ describe("doctor command", () => {
     );
   });
 
+  it("does not pin the claim to a .env.development.local that names another project", async () => {
+    const cwd = await makeHealthyProject();
+    await writeDetachedSecret(cwd);
+    await writeFile(join(cwd, ".env.development.local"), "ZITADEL_PROJECT_ID=someone-else\n");
+
+    const res = await doctor(cwd);
+
+    expect(
+      (parseJson(res.stdout) as { data: { next_commands?: string[] } }).data.next_commands,
+    ).toContain(expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`));
+  });
+
   it("pins the claim it suggests to setup's file when there is one", async () => {
     const cwd = await makeHealthyProject();
     await writeDetachedSecret(cwd);

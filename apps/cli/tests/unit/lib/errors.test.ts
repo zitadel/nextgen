@@ -243,6 +243,16 @@ describe("toZitadelError", () => {
     expect(toZitadelError(auth).code).toBe("E_AUTH");
     expect(toZitadelError(server).code).toBe("E_NETWORK");
   });
+
+  it("classifies a 403 refusing a target origin as E_VALIDATION, not E_AUTH", () => {
+    const refused = new ApiError(
+      403,
+      "http://mock/deployments",
+      { code: "proj.origin_not_allowed", message: "project: https://x is not a primary origin" },
+      "POST returned 403",
+    );
+    expect(toZitadelError(refused).code).toBe("E_VALIDATION");
+  });
 });
 
 /**

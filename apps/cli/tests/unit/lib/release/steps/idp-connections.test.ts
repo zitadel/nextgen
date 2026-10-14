@@ -91,6 +91,23 @@ describe("idp-connections step", () => {
     expect(createIdp).not.toHaveBeenCalled();
   });
 
+  it("names the deploy's environment in how to publish a literal client_secret", async () => {
+    const cwd = await project({
+      "google.json": googleBody({
+        oidc: {
+          issuer: "https://accounts.google.com",
+          client_id: "111.apps.googleusercontent.com",
+          client_secret: "a-literal-secret",
+          scopes: ["openid"],
+        },
+      }),
+    });
+
+    await expect(idpConnectionsStep.run(ctx(cwd, {}))).rejects.toMatchObject({
+      hint: expect.stringContaining("variable set NAME --secret --env staging"),
+    });
+  });
+
   it("creates no connection when a later file is malformed", async () => {
     // Lexical order: `a-google.json` is read before `b-bad.json`, so a
     // validate-then-create loop would create the first before the second
