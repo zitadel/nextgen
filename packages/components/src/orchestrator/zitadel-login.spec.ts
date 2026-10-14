@@ -2538,4 +2538,39 @@ describe("<zitadel-login> config that arrives after upgrade", () => {
 
     expect(createFlows()).toHaveLength(1);
   });
+
+  /** A login configured only through its attributes, rendered to its first step. */
+  async function mountFromAttributes(): Promise<ZitadelLogin> {
+    _resetConfigForTesting();
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.setAttribute("project-id", "demo-project");
+    element.setAttribute("proxy-path", API_BASE);
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="email"]'));
+    return element;
+  }
+
+  // A server-rendered Qwik widget boots from its attributes and is handed the
+  // same project as a handle once it resumes.
+  it("does not restart when a project handle names the project its attributes did", async () => {
+    const element = await mountFromAttributes();
+
+    element.project = { projectId: "demo-project", proxyPath: API_BASE };
+    element.projectId = undefined as unknown as string;
+    element.proxyPath = undefined as unknown as string;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(createFlows()).toHaveLength(1);
+  });
+
+  it("restarts when a project handle names a different project than its attributes", async () => {
+    const element = await mountFromAttributes();
+
+    element.project = { projectId: "other-project", proxyPath: API_BASE };
+
+    await waitFor(() => createFlows().length === 2);
+    expect(createFlows()[1]).toEqual({ purpose: "login", project_id: "other-project" });
+  });
 });
