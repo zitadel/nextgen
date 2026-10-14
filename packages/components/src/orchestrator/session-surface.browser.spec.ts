@@ -186,3 +186,36 @@ describe("<zitadel-session> surface (chromium)", () => {
     expect(identityRect.bottom).toBeLessThanOrEqual(bodyRect.bottom);
   });
 });
+
+describe("<zitadel-session> without a session (chromium)", () => {
+  const original = globalThis.fetch;
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    _resetConfigForTesting();
+    globalThis.fetch = vi.fn(
+      async (): Promise<Response> => new Response(null, { status: 401 }),
+    ) as unknown as typeof fetch;
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+    globalThis.fetch = original;
+  });
+
+  it("takes no space and offers no Sign out", async () => {
+    const element = document.createElement("zitadel-session") as ZitadelSession;
+    element.project = configureZitadel({ proxyPath: "/__nextgen", projectId: "signed-out" });
+    const missing = new Promise((resolve) => {
+      host.addEventListener("zitadel-session-missing", resolve, { once: true });
+    });
+    host.appendChild(element);
+    await missing;
+    await element.updateComplete;
+
+    expect(element.getBoundingClientRect().height).toBe(0);
+    expect(element.shadowRoot?.querySelector("zl-button")).toBeNull();
+  });
+});

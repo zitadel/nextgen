@@ -24,6 +24,7 @@ import type {
   ZitadelFlowStepDetail,
   ZitadelLoginProps,
   ZitadelLogoutProps,
+  ZitadelSessionMissingDetail,
   ZitadelSessionProps,
   ZitadelSignoutDetail,
 } from "./types";
@@ -69,6 +70,7 @@ declare module "solid-js" {
         "post-sign-out-url"?: string;
         theme?: "light" | "dark" | "auto";
         "on:zitadel-signout"?: (event: CustomEvent<ZitadelSignoutDetail>) => void;
+        "on:zitadel-session-missing"?: (event: CustomEvent<ZitadelSessionMissingDetail>) => void;
       };
       "zitadel-session": Omit<HTMLAttributes<HTMLElement>, "ref"> & {
         ref?: ZitadelSessionElement | ((el: ZitadelSessionElement) => void);
@@ -84,6 +86,7 @@ declare module "solid-js" {
         "prop:suppressHeader"?: boolean;
         "suppress-header"?: boolean;
         "on:zitadel-signout"?: (event: CustomEvent<ZitadelSignoutDetail>) => void;
+        "on:zitadel-session-missing"?: (event: CustomEvent<ZitadelSessionMissingDetail>) => void;
       };
     }
   }
@@ -145,7 +148,7 @@ export function ZitadelLogin(
  * Solid component wrapping the `<zitadel-logout>` web component. Binds every prop
  * (the {@link ZitadelProject} handle, or the discrete project id / proxy path,
  * and the rest) as a DOM property, forwards the widget's `zitadel-signout`
- * event as an optional callback, and renders `children` into the element, so
+ * and `zitadel-session-missing` events as optional callbacks, and renders `children` into the element, so
  * a `<template>` child switches it to template mode.
  *
  * A forwarded `ref` resolves to the underlying `<zitadel-logout>` DOM element,
@@ -166,6 +169,7 @@ export function ZitadelLogout(
       post-sign-out-url={props.postSignOutUrl}
       theme={props.theme}
       on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
+      on:zitadel-session-missing={(event) => props.onSessionMissing?.(event.detail)}
     >
       {props.children}
     </zitadel-logout>
@@ -176,8 +180,8 @@ export function ZitadelLogout(
  * Solid component wrapping the `<zitadel-session>` web component — the
  * post-sign-in "signed in as" card. Binds every prop (the {@link ZitadelProject}
  * handle, or the discrete project id / proxy path, and the rest) as a DOM
- * property, forwards the widget's `zitadel-signout` event as an optional
- * callback, and renders `children` into the element. An unset or `undefined`
+ * property, forwards the widget's `zitadel-signout` and `zitadel-session-missing`
+ * events as optional callbacks, and renders `children` into the element. An unset or `undefined`
  * prop leaves the element's own default in place.
  *
  * A forwarded `ref` resolves to the underlying `<zitadel-session>` DOM element.
@@ -201,6 +205,7 @@ export function ZitadelSession(
       theme={props.theme}
       prop:suppressHeader={props.suppressHeader}
       on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
+      on:zitadel-session-missing={(event) => props.onSessionMissing?.(event.detail)}
     >
       {props.children}
     </zitadel-session>

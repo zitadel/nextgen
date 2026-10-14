@@ -1,7 +1,11 @@
 import type { ElementRef } from "@angular/core";
 import type { ZitadelProject } from "@zitadel/api/config";
 import type { ZitadelSession as ZitadelSessionElement } from "@zitadel/components";
-import type { ZitadelSignoutDetail, ZitadelSessionConfig } from "@zitadel/sdk-core/types";
+import type {
+  ZitadelSessionMissingDetail,
+  ZitadelSignoutDetail,
+  ZitadelSessionConfig,
+} from "@zitadel/sdk-core/types";
 
 import {
   Component,
@@ -18,7 +22,7 @@ import "@zitadel/components";
  * Angular wrapper for the `<zitadel-session>` Lit web component — the
  * post-sign-in "signed in as" card. See {@link ZitadelLoginComponent} for the
  * strategy. The widget's `zitadel-signout` event is re-emitted with its detail
- * as the `signout` output. The underlying `<zitadel-session>` custom element is
+ * as the `signout` output, and `zitadel-session-missing` as `sessionMissing`. The underlying `<zitadel-session>` custom element is
  * exposed via the {@link element} getter.
  *
  * ```html
@@ -42,6 +46,7 @@ import "@zitadel/components";
     [attr.theme]="theme"
     [suppressHeader]="suppressHeader"
     (zitadel-signout)="onSignout($event)"
+    (zitadel-session-missing)="onSessionMissing($event)"
   ><ng-content /></zitadel-session>`,
 })
 export class ZitadelSessionComponent implements ZitadelSessionConfig {
@@ -55,6 +60,7 @@ export class ZitadelSessionComponent implements ZitadelSessionConfig {
   @Input() theme?: "light" | "dark" | "auto";
   @Input() suppressHeader?: boolean;
   @Output() signout = new EventEmitter<ZitadelSignoutDetail>();
+  @Output() sessionMissing = new EventEmitter<ZitadelSessionMissingDetail>();
 
   @ViewChild("el") private elementRef?: ElementRef<ZitadelSessionElement>;
 
@@ -65,5 +71,9 @@ export class ZitadelSessionComponent implements ZitadelSessionConfig {
 
   onSignout(event: Event): void {
     this.signout.emit((event as CustomEvent<ZitadelSignoutDetail>).detail);
+  }
+
+  onSessionMissing(event: Event): void {
+    this.sessionMissing.emit((event as CustomEvent<ZitadelSessionMissingDetail>).detail);
   }
 }

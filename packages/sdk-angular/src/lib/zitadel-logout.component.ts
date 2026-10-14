@@ -1,7 +1,11 @@
 import type { ElementRef } from "@angular/core";
 import type { ZitadelProject } from "@zitadel/api/config";
 import type { ZitadelLogout as ZitadelLogoutElement } from "@zitadel/components";
-import type { ZitadelSignoutDetail, ZitadelLogoutConfig } from "@zitadel/sdk-core/types";
+import type {
+  ZitadelSessionMissingDetail,
+  ZitadelSignoutDetail,
+  ZitadelLogoutConfig,
+} from "@zitadel/sdk-core/types";
 
 import {
   Component,
@@ -18,7 +22,7 @@ import "@zitadel/components";
  * Angular wrapper for the `<zitadel-logout>` Lit web component. See
  * {@link ZitadelLoginComponent} for the strategy. The widget's
  * `zitadel-signout` event is re-emitted with its detail as the `signout`
- * output. The underlying `<zitadel-logout>` custom element is exposed via the
+ * output, and `zitadel-session-missing` as `sessionMissing`. The underlying `<zitadel-logout>` custom element is exposed via the
  * {@link element} getter (the Angular analogue of React's `forwardRef`).
  *
  * Content placed inside the wrapper is projected into the element, so a
@@ -42,6 +46,7 @@ import "@zitadel/components";
     [attr.post-sign-out-url]="postSignOutUrl"
     [attr.theme]="theme"
     (zitadel-signout)="onSignout($event)"
+    (zitadel-session-missing)="onSessionMissing($event)"
   ><ng-content /></zitadel-logout>`,
 })
 export class ZitadelLogoutComponent implements ZitadelLogoutConfig {
@@ -51,6 +56,7 @@ export class ZitadelLogoutComponent implements ZitadelLogoutConfig {
   @Input() postSignOutUrl?: string;
   @Input() theme?: "light" | "dark" | "auto";
   @Output() signout = new EventEmitter<ZitadelSignoutDetail>();
+  @Output() sessionMissing = new EventEmitter<ZitadelSessionMissingDetail>();
 
   @ViewChild("el") private elementRef?: ElementRef<ZitadelLogoutElement>;
 
@@ -61,5 +67,9 @@ export class ZitadelLogoutComponent implements ZitadelLogoutConfig {
 
   onSignout(event: Event): void {
     this.signout.emit((event as CustomEvent<ZitadelSignoutDetail>).detail);
+  }
+
+  onSessionMissing(event: Event): void {
+    this.sessionMissing.emit((event as CustomEvent<ZitadelSessionMissingDetail>).detail);
   }
 }

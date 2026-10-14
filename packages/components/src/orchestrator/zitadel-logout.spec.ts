@@ -159,13 +159,62 @@ describe("<zitadel-logout>", () => {
     expect(trigger.textContent?.trim()).toBe("U");
   });
 
-  it("falls back to a placeholder initial when there is no active session", async () => {
-    sessionStatus = 401;
+  it.each([401, 404])("renders nothing when the session request answers %i", async (status) => {
+    sessionStatus = status;
     const element = mount();
     await flush(element);
-    const trigger = shadowQuery<HTMLButtonElement>(element, ".trigger");
-    expect(trigger.textContent?.trim()).toBe("?");
+    expect(element.shadowRoot?.querySelector(".trigger")).toBeNull();
   });
+
+  it("fires zitadel-session-missing when there is no active session", async () => {
+    sessionStatus = 401;
+    const events: CustomEvent[] = [];
+    host.addEventListener("zitadel-session-missing", (event) => events.push(event as CustomEvent));
+    const element = mount();
+    await flush(element);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.bubbles && events[0]?.composed).toBe(true);
+  });
+
+  it("stays on the page when there is no active session", async () => {
+    sessionStatus = 401;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, href: "" },
+      writable: true,
+    });
+    const element = mount(
+      '<zitadel-logout post-sign-out-url="https://app.test/done"></zitadel-logout>',
+    );
+    await flush(element);
+    expect(window.location.href).toBe("");
+  });
+
+  it("removes a projected template when there is no active session", async () => {
+    sessionStatus = 401;
+    const element = mount(`
+      <zitadel-logout>
+        <template><button data-action="logout">Bye {{display}}</button></template>
+      </zitadel-logout>
+    `);
+    await flush(element);
+    expect(element.querySelector("button[data-action='logout']")).toBeNull();
+  });
+
+  it.each([500, 503])(
+    "keeps the avatar and reports a %i from the session request",
+    async (status) => {
+      sessionStatus = status;
+      const events: Event[] = [];
+      host.addEventListener("zitadel-session-missing", (event) => events.push(event));
+      const element = mount();
+      await flush(element);
+      shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+      await element.updateComplete;
+      expect(shadowQuery<HTMLElement>(element, ".error-bar").textContent).toContain(String(status));
+      expect(events).toHaveLength(0);
+    },
+  );
 
   it("substitutes template tokens and wires data-action='logout' triggers", async () => {
     currentName = "Bob Builder";
@@ -300,6 +349,31 @@ describe("<zitadel-logout>", () => {
     }
   });
 
+  it.each([401, 404])(
+    "treats a %i from the sign-out request as signed out and navigates",
+    async (status) => {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: { ...window.location, href: "" },
+        writable: true,
+      });
+      const element = mount();
+      element.postSignOutUrl = "https://app.test/done";
+      await flush(element);
+      server.use(http.delete(`${API_BASE}/sessions/me`, () => new HttpResponse(null, { status })));
+      const events: Event[] = [];
+      element.addEventListener("zitadel-signout", (event) => events.push(event));
+
+      shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+      await element.updateComplete;
+      shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
+      await new Promise((resolve) => setTimeout(resolve, 32));
+
+      expect(events).toHaveLength(1);
+      expect(window.location.href).toBe("https://app.test/done");
+    },
+  );
+
   it("surfaces a network error in the dropdown without redirecting", async () => {
     const element = mount();
     await flush(element);
@@ -328,7 +402,7 @@ describe("<zitadel-logout> after signing out in place", () => {
     host.innerHTML = "";
   });
 
-  it("drops the identity from the avatar without a post-sign-out-url", async () => {
+  it("renders nothing after signing out without a post-sign-out-url", async () => {
     currentName = "Alice Liddell";
     host.innerHTML = "<zitadel-logout></zitadel-logout>";
     const element = host.querySelector("zitadel-logout") as ZitadelLogout;
@@ -339,10 +413,10 @@ describe("<zitadel-logout> after signing out in place", () => {
     shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
     await flush(element);
 
-    expect(shadowQuery<HTMLButtonElement>(element, ".trigger").textContent?.trim()).toBe("?");
+    expect(element.shadowRoot?.querySelector(".trigger")).toBeNull();
   });
 
-  it("re-projects the template without the identity", async () => {
+  it("removes the projected template", async () => {
     currentName = "Bob Builder";
     host.innerHTML = `
       <zitadel-logout>
@@ -355,7 +429,7 @@ describe("<zitadel-logout> after signing out in place", () => {
     (element.querySelector("button[data-action='logout']") as HTMLButtonElement).click();
     await flush(element);
 
-    expect(element.querySelector("button[data-action='logout']")?.textContent).toBe("Bye  [?]");
+    expect(element.querySelector("button[data-action='logout']")).toBeNull();
   });
 });
 
