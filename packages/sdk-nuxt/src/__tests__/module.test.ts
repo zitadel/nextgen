@@ -1,5 +1,5 @@
 import type { Nuxt } from "@nuxt/schema";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -188,4 +188,19 @@ describe("@zitadel/sdk-nuxt module", () => {
     expect(runtime.public.zitadelProjectId).toBe("proj #1");
     expect(runtime.nextgen.projectSecret).toBe("sk_#1");
   });
+});
+
+// The module auto-imports `runtime/composables` from the published dist, so a
+// composable the build leaves out is an undefined global in every app page
+// (`useZitadelProject is not defined`). `sdk-nuxt:test` runs after the build.
+describe("auto-imported composables", () => {
+  const source = join(import.meta.dirname, "../runtime/composables");
+  const built = join(import.meta.dirname, "../../dist/runtime/composables");
+
+  it.each(readdirSync(source).filter((file) => file.endsWith(".ts")))(
+    "ships %s in the built composables directory",
+    (file) => {
+      expect(existsSync(join(built, file.replace(/\.ts$/, ".js")))).toBe(true);
+    },
+  );
 });
