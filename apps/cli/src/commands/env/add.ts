@@ -18,8 +18,10 @@ import {
 } from "../../lib/oclif";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "../../lib/orca/patchers/rule/public-project-id";
 import { readZitadelConfig } from "../../lib/project";
-import { publicCliCommand } from "../../lib/public-cli";
 import { DEFAULT_SERVER, resolveServer, serverOrigin } from "../../lib/server";
+import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
+import { nextCommandsData } from "../../lib/oclif/envelope";
+import { projectCommand } from "../../lib/suggestion";
 
 /** A variable to set on a hosting platform or in a pipeline. A secret is named, never printed. */
 type PlatformVariable = { name: string; value?: string; secret?: boolean };
@@ -104,10 +106,7 @@ export default class EnvAdd extends BaseCommand {
             answer.trim() === ""
               ? ({ ok: false, problem: "Enter the server URL." } as const)
               : ({ ok: true, value: serverOrigin(answer.trim()) } as const),
-          retry: publicCliCommand(
-            `env add ${name} --server https://api.zitadel.cloud`,
-            this.meta.cliVersion,
-          ),
+          retry: this.suggestUnscoped(`env add ${name} --server https://api.zitadel.cloud`),
         });
 
     const appUrl =
@@ -226,7 +225,10 @@ export default class EnvAdd extends BaseCommand {
         project_id: projectId,
         keys: Object.keys(values),
         platform,
-        next_commands: [`zitadel env --env ${name}`],
+        // The new environment, by name: this run's own selection is not it.
+        ...nextCommandsData([
+          projectCommand("env", environmentSelectorSuffix({ envName: name }), this.meta.cliVersion),
+        ]),
       },
       pretty: [
         `Wrote ${file} with ${Object.keys(values).join(", ")}`,

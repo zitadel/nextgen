@@ -1,4 +1,5 @@
 import { ApiError, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
+import type { SuggestedCommand } from "./suggestion";
 
 /**
  * Closed set of failure categories the CLI can surface. Every error the
@@ -51,7 +52,8 @@ export const EXIT_CODES: Record<ZitadelErrorCode, number> = {
  */
 export type ZitadelErrorOptions = {
   hint?: string;
-  nextCommands?: string[];
+  /** Built by the `lib/suggestion` builders, so a project command keeps its selector. */
+  nextCommands?: readonly SuggestedCommand[];
   details?: unknown;
 };
 
@@ -64,7 +66,7 @@ export type ZitadelErrorOptions = {
 export class ZitadelError extends Error {
   readonly code: ZitadelErrorCode;
   readonly hint?: string;
-  readonly nextCommands?: string[];
+  readonly nextCommands?: readonly SuggestedCommand[];
   readonly details?: unknown;
 
   constructor(code: ZitadelErrorCode, message: string, opts: ZitadelErrorOptions = {}) {

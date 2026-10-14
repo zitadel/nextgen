@@ -1,3 +1,5 @@
+import type { SuggestedCommand } from "../suggestion";
+
 /**
  * Builders for the `data` of a command's JSON envelope.
  *
@@ -17,12 +19,12 @@
  */
 export function listData<T>(
   items: readonly T[],
-  opts: { nextPageToken?: string | null; nextCommands?: readonly string[] } = {},
+  opts: { nextPageToken?: string | null; nextCommands?: readonly SuggestedCommand[] } = {},
 ): {
   items: readonly T[];
   count: number;
   next_page_token: string | null;
-  next_commands?: readonly string[];
+  next_commands?: readonly SuggestedCommand[];
 } {
   const base = {
     items,
@@ -58,4 +60,18 @@ export function mutatedData<I extends Record<string, string>, V extends string>(
   verb: V,
 ): I & Record<V, true> {
   return { ...identifier, [verb]: true } as I & Record<V, true>;
+}
+
+/**
+ * The `next_commands` a command's `data` carries, spread into the data object:
+ * `{ ...result, ...nextCommandsData(commands) }`. It takes `SuggestedCommand`s,
+ * which only the `lib/suggestion` builders make, so every entry has had its
+ * environment selector decided (#1689). A Biome GritQL rule
+ * (`biome-plugins/no-raw-next-commands.grit`) rejects a hand-written
+ * `next_commands:` key anywhere else.
+ */
+export function nextCommandsData(commands: readonly SuggestedCommand[]): {
+  next_commands: readonly SuggestedCommand[];
+} {
+  return { next_commands: commands };
 }

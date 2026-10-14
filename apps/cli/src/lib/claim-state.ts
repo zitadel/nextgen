@@ -2,6 +2,7 @@ import type { BoxAction } from "./box";
 import { serverKind } from "./oclif/server-kind";
 import type { ZitadelSecret } from "./project";
 import { publicCliCommand } from "./public-cli";
+import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "./suggestion";
 
 /**
  * Mirrors domain.ClaimWindow (internal/domain/claim.go): the server refuses
@@ -156,21 +157,29 @@ function claimSentence(deadline?: Date): string {
  * `claim` must carry so it targets the project this run is about rather than
  * whatever the next shell's environment resolves to; empty when none applies.
  */
-export function claimAction(cliVersion: string, deadline?: Date, selector = ""): string {
-  return `${claimSentence(deadline)} Run ${publicCliCommand(`claim${selector}`, cliVersion)}.`;
+export function claimAction(
+  cliVersion: string,
+  deadline: Date | undefined,
+  selector: EnvironmentSelector,
+): string {
+  return `${claimSentence(deadline)} Run ${claimCommand(cliVersion, selector)}.`;
 }
 
 /** The same nudge for the human box, with the command on its own styled line. */
-export function claimBoxAction(cliVersion: string, deadline?: Date, selector = ""): BoxAction {
+export function claimBoxAction(
+  cliVersion: string,
+  deadline: Date | undefined,
+  selector: EnvironmentSelector,
+): BoxAction {
   return {
     text: claimSentence(deadline),
-    command: publicCliCommand(`claim${selector}`, cliVersion),
+    command: claimCommand(cliVersion, selector),
   };
 }
 
 /** The command for `next_commands`. `selector` carries the environment suffix. */
-export function claimCommand(cliVersion: string, selector = ""): string {
-  return publicCliCommand(`claim${selector}`, cliVersion);
+export function claimCommand(cliVersion: string, selector: EnvironmentSelector): SuggestedCommand {
+  return projectCommand("claim", selector, cliVersion);
 }
 
 /**
@@ -183,10 +192,10 @@ export function claimCommand(cliVersion: string, selector = ""): string {
  * the window, so an attached project answers with a clean already-claimed
  * skip, and only a genuinely unattached one gets the final refusal.
  */
-export function claimWindowClosedAction(cliVersion: string, selector = ""): string {
+export function claimWindowClosedAction(cliVersion: string, selector: EnvironmentSelector): string {
   return (
     `The local record says this project's ${CLAIM_WINDOW_DAYS}-day claim window has ` +
-    `closed. Run ${publicCliCommand(`claim${selector}`, cliVersion)} to reconcile: a project ` +
+    `closed. Run ${claimCommand(cliVersion, selector)} to reconcile: a project ` +
     "claimed from another machine confirms its team, and one never claimed can no " +
     `longer be claimed. ${publicCliCommand("setup", cliVersion)} in a fresh directory ` +
     "gets you a new project you can claim."

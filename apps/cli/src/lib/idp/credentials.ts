@@ -6,8 +6,8 @@ import type {
 } from "@zitadel/config/idp";
 import { consola } from "consola";
 
-import { publicCliCommand } from "../public-cli";
 import { reportWarning } from "../warnings";
+import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "../suggestion";
 
 /**
  * Publishes one variable to the project.
@@ -120,16 +120,17 @@ export function republishCommand(
   name: ClientIdVariable | ClientSecretVariable,
   secret: boolean,
   cliVersion: string,
-  selector: string,
-): string {
+  selector: EnvironmentSelector,
+): SuggestedCommand {
   // `--project-level` is not optional: every `variables` command refuses with
   // "Name the owner" without an owner, so a command missing it would fail
   // before it reached the API and repair nothing. The project level is also
   // the right owner — the engine resolves a connection's `${{ NAME }}` from
   // the project's own variables. `selector` carries the invocation's
   // --env/--env-file/--server so the retry targets the same project.
-  return publicCliCommand(
-    `variables set ${name} --project-level${secret ? " --secret" : ""}${selector}`,
+  return projectCommand(
+    `variables set ${name} --project-level${secret ? " --secret" : ""}`,
+    selector,
     cliVersion,
   );
 }
@@ -153,8 +154,8 @@ export type CredentialRecovery = {
 export function republishCommands(
   credentials: readonly CredentialRecovery[],
   cliVersion: string,
-  selector: string,
-): string[] {
+  selector: EnvironmentSelector,
+): SuggestedCommand[] {
   return credentials.flatMap(({ name, secret, published }) =>
     name !== undefined && published !== undefined && published !== "stored"
       ? [republishCommand(name, secret, cliVersion, selector)]
@@ -199,7 +200,7 @@ export function reportSecretOutcome(
   outcome: SecretOutcome,
   cliVersion: string,
   noValue: boolean,
-  selector: string,
+  selector: EnvironmentSelector,
 ): void {
   reportPublished(
     outcome.name,
@@ -219,7 +220,7 @@ export function reportClientIdOutcome(
   name: ClientIdVariable,
   state: PublishState,
   cliVersion: string,
-  selector: string,
+  selector: EnvironmentSelector,
 ): void {
   reportPublished(name, state, republishCommand(name, false, cliVersion, selector), false);
 }

@@ -61,6 +61,7 @@ import {
 } from "../../lib/idp";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
+import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
 import { serverKind } from "../../lib/oclif/server-kind";
 import { findLocalAdminFor } from "../../lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
@@ -82,7 +83,6 @@ import {
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { type Asker, input } from "../../lib/input";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
-import { publicCliCommand } from "../../lib/public-cli";
 import { derivePosture } from "../../lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
 import {
@@ -113,6 +113,13 @@ import {
 } from "./summary";
 import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
+import {
+  inShell,
+  projectCommand,
+  type SuggestedCommand,
+  unscopedCommand,
+} from "../../lib/suggestion";
+import { nextCommandsData } from "../../lib/oclif/envelope";
 
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the
@@ -147,7 +154,16 @@ const RENDERER_FLAG_DESCRIPTION =
  * forces the local project the recovery is for, because `--env-file` outranks
  * the process environment (unlike `--env`); same reasoning as the SSO recovery.
  */
-const RECOVERY_SELECTOR = " --env-file .env.development.local";
+const RECOVERY_SELECTOR = environmentSelectorSuffix({ envFile: ".env.development.local" });
+
+/**
+ * {@link RECOVERY_SELECTOR} plus `--server local`, for the recovery after a
+ * local-server failure (see `ssoRecovery`).
+ */
+const LOCAL_RECOVERY_SELECTOR = environmentSelectorSuffix({
+  envFile: ".env.development.local",
+  server: "local",
+});
 
 /** `zitadel setup` — create a project and scaffold local auth.
  *
@@ -570,7 +586,7 @@ export default class Setup extends BaseCommand {
             "scaffolds. It does not cover a connection under .zitadel/idps/ -- those are " +
             "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
             "one, or keep it and enable the provider after setup to reuse it.",
-        nextCommands: cause.nextCommands ?? ["zitadel setup --force"],
+        nextCommands: cause.nextCommands ?? [unscopedCommand("setup --force")],
         details: cause.details,
       });
     }
@@ -763,10 +779,10 @@ export default class Setup extends BaseCommand {
           boxActions: [claimBoxAction(this.meta.cliVersion, deadline, RECOVERY_SELECTOR)],
           commands: [claimCommand(this.meta.cliVersion, RECOVERY_SELECTOR)],
         }
-      : { actions: [], boxActions: [], commands: [] };
+      : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
     // Only when the project is the local admin's: the console lists nothing
     // else for them, so the command would open an empty console otherwise.
-    const consoleCommand = publicCliCommand("console", this.meta.cliVersion);
+    const consoleCommand = unscopedCommand("console", this.meta.cliVersion);
     const consoleStep = ownedByLocalAdmin
       ? {
           actions: [
@@ -780,7 +796,7 @@ export default class Setup extends BaseCommand {
           ],
           commands: [consoleCommand],
         }
-      : { actions: [], boxActions: [], commands: [] };
+      : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
@@ -878,7 +894,7 @@ export default class Setup extends BaseCommand {
         // A JSON run prints no warnings, so a credential the project never
         // received would otherwise appear only as a `published` status with
         // nothing to act on. `sso enable` reports the same recovery step.
-        next_commands: [
+        ...nextCommandsData([
           ...republishCommands(
             answers.sso.flatMap((answer) => {
               const slug = providerOf(answer.selection).slug;
@@ -902,7 +918,7 @@ export default class Setup extends BaseCommand {
           ...installOutcome.nextCommands,
           ...consoleStep.commands,
           ...claimNudge.commands,
-        ],
+        ]),
       },
     });
   }
@@ -955,7 +971,7 @@ async function resolveScaffoldFramework(
       nextCommands:
         guidance.serverFlag === "local" && suggested
           ? [
-              publicCliCommand(
+              unscopedCommand(
                 `setup ${setupRetryFlags({ ...guidance.retry, framework: suggested })}`,
                 guidance.cliVersion,
               ),
@@ -1168,7 +1184,10 @@ export async function ssoFromFlags(
     stdin: true,
     // A concrete rerun for an agent, never carrying the value: the secret is
     // piped from the caller's own environment.
-    retry: `printf '%s' "$CLIENT_SECRET" | ${publicCliCommand(`setup --sso ${flags.sso} --sso-client-id <id> ...`, cliVersion)}`,
+    retry: inShell(
+      unscopedCommand(`setup --sso ${flags.sso} --sso-client-id <id> ...`, cliVersion),
+      { before: `printf '%s' "$CLIENT_SECRET" | ` },
+    ),
   });
   return { selection, credentials: { clientId: clientId.value, secret } };
 }
@@ -1381,7 +1400,7 @@ function runFromHint(retry: SetupRetryOptions): string {
 function ssoRecovery(
   retry: SetupRetryOptions,
   cliVersion: string,
-): { hint: string; commands: string[] } {
+): { hint: string; commands: SuggestedCommand[] } {
   const chosen = retry.sso ?? [];
   const remaining = chosen.slice(1);
   if (remaining.length === 0) {
@@ -1398,7 +1417,8 @@ function ssoRecovery(
     // what the command does. `sso enable` asks for the id, exactly as it asks
     // for the secret, which was never put in command text for the same
     // reason.
-    // `--server local`, as the setup retry pins it. An unpinned `sso enable`
+    // LOCAL_RECOVERY_SELECTOR carries `--server local`, as the setup retry
+    // pins it. An unpinned `sso enable`
     // takes its server from `ZITADEL_URL`, so with that variable set to
     // another server it would publish the client id and secret there --
     // leaving the local provider unconfigured and the credentials somewhere
@@ -1413,12 +1433,13 @@ function ssoRecovery(
     // process environment (unlike `--env`), so it is the one that forces the
     // generated development credential the local project actually expects.
     commands: remaining.map((selection) =>
-      publicCliCommand(
+      projectCommand(
         `sso enable --provider ${selectionName(selection)}${
           selection.kind === "custom"
             ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
             : ""
-        } --server local --env-file .env.development.local`,
+        }`,
+        LOCAL_RECOVERY_SELECTOR,
         cliVersion,
       ),
     ),
@@ -1454,8 +1475,8 @@ async function createProjectWithLocalHint(
         "If you meant to use a local Zitadel server, start it first " +
         `and retry setup with ${retryFlags}. ${runFromHint(retry)}${sso.hint}`.trimEnd(),
       nextCommands: [
-        publicCliCommand("start", cliVersion),
-        publicCliCommand(`setup ${retryFlags}`, cliVersion),
+        unscopedCommand("start", cliVersion),
+        unscopedCommand(`setup ${retryFlags}`, cliVersion),
         ...sso.commands,
       ],
       details: {
@@ -1517,8 +1538,8 @@ async function assertLocalServerVersion(
         `halfway. Run start to restart it on ${expected}; its data stays. ${where}` +
         `Then rerun setup. ${runFromHint(retry)}`.trimEnd(),
       nextCommands: [
-        publicCliCommand("start", cliVersion),
-        publicCliCommand(`setup ${setupRetryFlags(retry)}`, cliVersion),
+        unscopedCommand("start", cliVersion),
+        unscopedCommand(`setup ${setupRetryFlags(retry)}`, cliVersion),
       ],
       details: {
         server_url: runtime.server_url,
@@ -1550,8 +1571,8 @@ function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: st
       sso.hint +
       "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
     nextCommands: [
-      publicCliCommand("start", cliVersion),
-      publicCliCommand(setupCommand, cliVersion),
+      unscopedCommand("start", cliVersion),
+      unscopedCommand(setupCommand, cliVersion),
       ...sso.commands,
     ],
     details: normalized.details,

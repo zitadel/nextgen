@@ -30,8 +30,15 @@ import { environmentFlags, environmentSelectorSuffix } from "../../lib/oclif/env
 import { createOrca } from "../../lib/orca";
 import { hasZitadelConfig } from "../../lib/project";
 import { listenersForPort } from "../../lib/prober/ports";
-import { publicCliCommand } from "../../lib/public-cli";
 import { SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
+import {
+  type EnvironmentSelector,
+  projectCommand,
+  shellCommand,
+  type SuggestedCommand,
+  unscopedCommand,
+} from "../../lib/suggestion";
+import { nextCommandsData } from "../../lib/oclif/envelope";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
   "server-binary",
@@ -157,7 +164,7 @@ export default class Doctor extends BaseCommand {
       ...(warningAdvice
         ? {
             next_actions: warningAdvice.nextActions,
-            next_commands: warningAdvice.nextCommands,
+            ...nextCommandsData(warningAdvice.nextCommands),
           }
         : {}),
     };
@@ -195,14 +202,14 @@ function failureAdvice(
   // retries that resolve the environment (the env-connect failure and the
   // project `--fix`); the local-runtime remedies — docker, port, image,
   // state-dir — are machine checks the selector would only clutter.
-  selector: string,
-): { hint: string; nextCommands: string[] } {
+  selector: EnvironmentSelector,
+): { hint: string; nextCommands: SuggestedCommand[] } {
   const failedNames = new Set(failed.map((check) => check.name));
 
   if (failedNames.has("server-binary")) {
     return {
       hint: "The Zitadel server npm package is not available. Reinstall the CLI package, then retry.",
-      nextCommands: [publicCliCommand("doctor", cliVersion)],
+      nextCommands: [unscopedCommand("doctor", cliVersion)],
     };
   }
 
@@ -217,22 +224,22 @@ function failureAdvice(
   if (failedNames.has("image")) {
     return {
       hint: "The local Zitadel image is not available. Check Docker registry access, build it locally, or pass --image / ZITADEL_LOCAL_IMAGE.",
-      nextCommands: [`docker pull ${image}`, publicCliCommand("doctor", cliVersion)],
+      nextCommands: [shellCommand(`docker pull ${image}`), unscopedCommand("doctor", cliVersion)],
     };
   }
 
   if (failedNames.has("state-dir")) {
     return {
       hint: "The local Zitadel state directory is not writable. Fix directory permissions, then rerun `zitadel doctor`.",
-      nextCommands: [publicCliCommand("doctor", cliVersion)],
+      nextCommands: [unscopedCommand("doctor", cliVersion)],
     };
   }
 
   if (failedNames.has("port")) {
     const fallbackPort = port === DEFAULT_LOCAL_SERVER_PORT ? port + 1 : DEFAULT_LOCAL_SERVER_PORT;
-    const stopCommand = publicCliCommand("stop --all", cliVersion);
-    const retryCommand = publicCliCommand("doctor", cliVersion);
-    const alternatePortCommand = publicCliCommand(
+    const stopCommand = unscopedCommand("stop --all", cliVersion);
+    const retryCommand = unscopedCommand("doctor", cliVersion);
+    const alternatePortCommand = unscopedCommand(
       `doctor --port ${String(fallbackPort)}`,
       cliVersion,
     );
@@ -249,8 +256,8 @@ function failureAdvice(
     return {
       hint: "Existing local runtime metadata was found, but the local Zitadel server is not healthy. Start it again or reset stale local data.",
       nextCommands: [
-        publicCliCommand("start", cliVersion),
-        publicCliCommand("reset --force", cliVersion),
+        unscopedCommand("start", cliVersion),
+        unscopedCommand("reset --force", cliVersion),
       ],
     };
   }
@@ -260,15 +267,15 @@ function failureAdvice(
   // advice below, which cannot repair an unsupported version.
   const typed = failed.find((check) => check.code !== undefined && check.hint !== undefined);
   if (typed?.hint !== undefined) {
-    return { hint: typed.hint, nextCommands: [publicCliCommand(`doctor${selector}`, cliVersion)] };
+    return { hint: typed.hint, nextCommands: [projectCommand("doctor", selector, cliVersion)] };
   }
 
   if (failedNames.has("environment")) {
     return {
       hint: "The resolved environment could not connect. Check the server, project and credential it resolves with `zitadel env`, then rerun `zitadel doctor` with the same --env / --env-file.",
       nextCommands: [
-        publicCliCommand(`env${selector}`, cliVersion),
-        publicCliCommand(`doctor${selector}`, cliVersion),
+        projectCommand("env", selector, cliVersion),
+        projectCommand("doctor", selector, cliVersion),
       ],
     };
   }
@@ -276,24 +283,24 @@ function failureAdvice(
   const hasProjectFailure = failed.some((check) => !LOCAL_RUNTIME_CHECK_NAMES.has(check.name));
   if (hasProjectFailure) {
     return {
-      hint: `Run \`${publicCliCommand(`doctor --fix${selector}`, cliVersion)}\` to re-apply missing managed files.`,
-      nextCommands: [publicCliCommand(`doctor --fix${selector}`, cliVersion)],
+      hint: `Run \`${projectCommand("doctor --fix", selector, cliVersion)}\` to re-apply missing managed files.`,
+      nextCommands: [projectCommand("doctor --fix", selector, cliVersion)],
     };
   }
 
   return {
     hint: "Fix the reported checks, then rerun `zitadel doctor`.",
-    nextCommands: [publicCliCommand(`doctor${selector}`, cliVersion)],
+    nextCommands: [projectCommand("doctor", selector, cliVersion)],
   };
 }
 
 function advisoryForWarnings(
   warnings: CheckOutcome[],
   cliVersion: string,
-  selector: string,
-): { nextActions: string[]; nextCommands: string[] } | undefined {
+  selector: EnvironmentSelector,
+): { nextActions: string[]; nextCommands: SuggestedCommand[] } | undefined {
   const nextActions: string[] = [];
-  const nextCommands: string[] = [];
+  const nextCommands: SuggestedCommand[] = [];
   if (warnings.some((check) => check.name === "docker-cli")) {
     const advice = dockerRuntimeGuidance("doctor", cliVersion);
     nextActions.push(...advice.nextActions);
@@ -323,7 +330,7 @@ function advisoryForWarnings(
     nextActions.push(
       "Review other host-wide CLI-managed local Zitadel runtimes before starting a new one.",
     );
-    nextCommands.push(publicCliCommand("stop --all", cliVersion));
+    nextCommands.push(unscopedCommand("stop --all", cliVersion));
   }
 
   const dependencyRemedy = remedyCommandOf(
@@ -611,7 +618,7 @@ function formatListeners(listeners: Awaited<ReturnType<typeof listenersForPort>>
  * Surfacing that string keeps the structured advisory identical to the
  * command quoted in the warning's prose.
  */
-function remedyCommandOf(check: CheckOutcome | undefined): string | undefined {
+function remedyCommandOf(check: CheckOutcome | undefined): SuggestedCommand | undefined {
   if (check?.status !== "warn") {
     return undefined;
   }
@@ -620,7 +627,7 @@ function remedyCommandOf(check: CheckOutcome | undefined): string | undefined {
     return undefined;
   }
   const remedy = (details as { remedy_command?: unknown }).remedy_command;
-  return typeof remedy === "string" && remedy.length > 0 ? remedy : undefined;
+  return typeof remedy === "string" && remedy.length > 0 ? shellCommand(remedy) : undefined;
 }
 
 /**
@@ -654,7 +661,7 @@ function hasManagedRuntimeProcesses(check: CheckOutcome | undefined): boolean {
   );
 }
 
-function unique(values: string[]): string[] {
+function unique<T extends string>(values: T[]): T[] {
   return [...new Set(values)];
 }
 

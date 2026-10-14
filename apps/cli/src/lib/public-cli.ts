@@ -29,11 +29,12 @@ export function normalizePublicCliCommand(command: string, cliVersion: string): 
   return command;
 }
 
-export function normalizePublicCliCommands(
-  commands: ReadonlyArray<string> | undefined,
+export function normalizePublicCliCommands<T extends string>(
+  commands: ReadonlyArray<T> | undefined,
   cliVersion: string,
-): string[] | undefined {
-  return commands?.map((command) => normalizePublicCliCommand(command, cliVersion));
+): T[] | undefined {
+  // Only the `zitadel` prefix changes, so a suggestion stays a suggestion.
+  return commands?.map((command) => normalizePublicCliCommand(command, cliVersion) as T);
 }
 
 /**

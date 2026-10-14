@@ -11,7 +11,7 @@ import {
   runSyncLoop,
   summarizePlan,
 } from "../lib/sync";
-import { publicCliCommand } from "../lib/public-cli";
+import { nextCommandsData } from "../lib/oclif/envelope";
 
 /**
  * `zitadel apply` — validate and upload repo config to the platform.
@@ -74,9 +74,7 @@ export default class Apply extends EnvironmentCommand {
                 ],
           // Carry the selector in effect so the suggested re-run targets the
           // same environment this apply did, not the default one.
-          next_commands: [
-            publicCliCommand(`plan${this.environmentSelector()}`, this.meta.cliVersion),
-          ],
+          ...nextCommandsData([this.suggest("plan")]),
         },
       });
     }

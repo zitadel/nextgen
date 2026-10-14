@@ -3,7 +3,6 @@ import { Flags } from "@oclif/core";
 import { CommandGroups, type JsonEnvelope, nonBlankArg, OwnerCommand } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { assertVariableName } from "../../lib/variables";
-import { publicCliCommand } from "../../lib/public-cli";
 
 /**
  * The `variables delete` topic command — remove one variable from the project
@@ -35,7 +34,7 @@ export default class VariablesDelete extends OwnerCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(VariablesDelete);
     await this.toMeta(flags);
-    const { dryRun, cliVersion } = this.meta;
+    const { dryRun } = this.meta;
     const name = args.name;
 
     assertVariableName(name);
@@ -56,7 +55,7 @@ export default class VariablesDelete extends OwnerCommand {
       kind: "confirm",
       name: `delete ${name} from the project`,
       message: `Delete ${name} from the project?`,
-      retry: publicCliCommand(`variables delete ${name} --project-level --force`, cliVersion),
+      retry: this.suggest(`variables delete ${name} --project-level --force`),
     });
     if (!confirmed) {
       return this.emit({ status: "skipped", reason: "delete-cancelled" });

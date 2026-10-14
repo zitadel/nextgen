@@ -1,6 +1,5 @@
 import { Flags } from "@oclif/core";
 
-import { publicCliCommand } from "../../../public-cli";
 import { deletedData, mutatedData } from "../../envelope";
 import type { CommandResult, GlobalOptions } from "../../types";
 import { article, capitalize, dryRunResult, idArg, idValue } from "../shared";
@@ -67,10 +66,7 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>> 
       kind: "confirm",
       name: `${verb} ${resource.singular} ${id}`,
       message: `${capitalize(verb)} ${resource.singular} ${id}?`,
-      retry: publicCliCommand(
-        `${topic} ${verb} ${id} --force${this.environmentSelector()}`,
-        meta.cliVersion,
-      ),
+      retry: this.suggest(`${topic} ${verb} ${id} --force`),
     });
     if (!confirmed) {
       return { status: "skipped", reason: `${verb}-cancelled` };

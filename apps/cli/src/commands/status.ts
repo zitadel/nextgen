@@ -28,7 +28,13 @@ import {
   readZitadelConfig,
   readZitadelSecret,
 } from "../lib/project";
-import { publicCliCommand } from "../lib/public-cli";
+import {
+  type EnvironmentSelector,
+  projectCommand,
+  type SuggestedCommand,
+  unscopedCommand,
+} from "../lib/suggestion";
+import { nextCommandsData } from "../lib/oclif/envelope";
 
 /**
  * `zitadel status` — summarize the local server and project state.
@@ -83,7 +89,12 @@ export default class Status extends EnvironmentCommand {
       this.meta.cliVersion,
       this.environmentSelector(),
     );
-    const nextActions = nextActionsFor(project, users, this.meta.cliVersion);
+    const nextActions = nextActionsFor(
+      project,
+      users,
+      this.meta.cliVersion,
+      this.environmentSelector(),
+    );
 
     return this.emit({
       status: "ok",
@@ -112,7 +123,7 @@ export default class Status extends EnvironmentCommand {
         },
         project,
         next_actions: nextActions,
-        next_commands: nextCommands,
+        ...nextCommandsData(nextCommands),
       },
     });
   }
@@ -254,7 +265,12 @@ async function detectUserPresence(connect: () => Promise<Connection>): Promise<U
   }
 }
 
-function nextActionsFor(project: ProjectStatus, users: UserPresence, cliVersion: string): string[] {
+function nextActionsFor(
+  project: ProjectStatus,
+  users: UserPresence,
+  cliVersion: string,
+  selector: EnvironmentSelector,
+): string[] {
   if (project.lifecycle === "not-configured") {
     return [
       "From your app directory, run setup; the CLI will detect the framework or ask in an empty directory.",
@@ -277,9 +293,10 @@ function nextActionsFor(project: ProjectStatus, users: UserPresence, cliVersion:
             claimAction(
               cliVersion,
               project.claim.deadline === undefined ? undefined : new Date(project.claim.deadline),
+              selector,
             ),
           ]
-        : [claimWindowClosedAction(cliVersion)]
+        : [claimWindowClosedAction(cliVersion, selector)]
       : [];
   if (users === "none") {
     return [verifyLoginAction(project.issuer), ...claim];
@@ -299,27 +316,27 @@ function nextCommandsFor(
   // for the default environment). Carried into every project-scoped follow-up so
   // an agent running them stays on the environment `status` reported, rather than
   // silently falling back to the default development project.
-  selector: string,
-): string[] {
-  const commands: string[] = [];
+  selector: EnvironmentSelector,
+): SuggestedCommand[] {
+  const commands: SuggestedCommand[] = [];
   if (serverLifecycle !== "running") {
-    commands.push(publicCliCommand("start", cliVersion));
+    commands.push(unscopedCommand("start", cliVersion));
   }
   if (project.lifecycle === "not-configured") {
-    commands.push(publicCliCommand("setup --server local", cliVersion));
+    commands.push(unscopedCommand("setup --server local", cliVersion));
   } else if (project.lifecycle === "orphaned-config") {
     commands.push(
-      publicCliCommand("setup --force", cliVersion),
-      publicCliCommand(`doctor --fix${selector}`, cliVersion),
+      unscopedCommand("setup --force", cliVersion),
+      projectCommand("doctor --fix", selector, cliVersion),
     );
   } else {
-    commands.push(publicCliCommand(`doctor${selector}`, cliVersion));
+    commands.push(projectCommand("doctor", selector, cliVersion));
     // Suggested even when the local record says the window has closed: the
     // record can be stale (claimed from another machine reads detached), and
     // `claim` is the safe reconciliation — the server checks the grant
     // before the window, so an attached project answers with a clean skip.
     if (project.claim?.kind === "detached") {
-      commands.push(`${claimCommand(cliVersion)}${selector}`);
+      commands.push(claimCommand(cliVersion, selector));
     }
     if (users === "none") {
       // Staged like next_actions: before the first login is proven in a
@@ -327,9 +344,9 @@ function nextCommandsFor(
       // verify mission lives in next_actions. `apply` joins once users
       // exist ("some") or when the probe can't tell ("unknown" keeps the
       // lifecycle-only behavior rather than withholding on no signal).
-      commands.push(publicCliCommand(`plan${selector}`, cliVersion));
+      commands.push(projectCommand("plan", selector, cliVersion));
     } else {
-      commands.push(publicCliCommand(`apply${selector}`, cliVersion));
+      commands.push(projectCommand("apply", selector, cliVersion));
     }
   }
   return commands;
