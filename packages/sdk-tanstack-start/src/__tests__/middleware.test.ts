@@ -18,7 +18,14 @@ import {
 } from "../middleware";
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
 import { clearSessionCheckBackoff } from "@zitadel/sdk-core/middleware";
-import { DEAD, OUTAGES, PROXY_FAILURES } from "./outages";
+import {
+  DEAD,
+  JWE_SESSION_TOKEN,
+  OFF_ORIGIN_LOCATIONS,
+  OUTAGES,
+  PROXY_FAILURES,
+  exchangeAnswer,
+} from "./outages";
 
 // The JWKS cache and the session-check backoff are module-level and per
 // issuer: start every case cold, so each one asks its own mock, and keep the
@@ -306,6 +313,55 @@ describe("handleNextgenRequest", () => {
       expect(decision.response.headers.get("location")).toBe(expected);
     });
 
+    it.each(OFF_ORIGIN_LOCATIONS)("keeps %s on this app", async (location) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(null, { status: 303, headers: { location } })),
+      );
+
+      const decision = await handleNextgenRequest(
+        makeRequest("http://localhost:3000/__nextgen/idp/callback?code=x"),
+        { url: "http://localhost:4000" },
+      );
+
+      if (decision.type !== "proxy") throw new Error("expected proxy");
+      expect(
+        new URL(decision.response.headers.get("location") ?? "", "http://unset.invalid").hostname,
+      ).toBe("localhost");
+    });
+
+    it("keeps the session token out of the exchange body the browser reads", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => exchangeAnswer()),
+      );
+
+      const decision = await handleNextgenRequest(
+        makeRequest("http://localhost:3000/__nextgen/sessions/exchange", { method: "POST" }),
+        { url: "http://localhost:4000" },
+      );
+
+      if (decision.type !== "proxy") throw new Error("expected proxy");
+      expect(await decision.response.text()).not.toContain(JWE_SESSION_TOKEN);
+    });
+
+    it("still sets the session cookie from the exchange", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => exchangeAnswer()),
+      );
+
+      const decision = await handleNextgenRequest(
+        makeRequest("http://localhost:3000/__nextgen/sessions/exchange", { method: "POST" }),
+        { url: "http://localhost:4000" },
+      );
+
+      if (decision.type !== "proxy") throw new Error("expected proxy");
+      expect(decision.response.headers.getSetCookie()).toEqual(
+        exchangeAnswer().headers.getSetCookie(),
+      );
+    });
+
     function captureUpstreamHeaders(): () => Headers | undefined {
       let captured: Headers | undefined;
       vi.stubGlobal(
@@ -435,8 +491,8 @@ describe("createNextgenRequestMiddleware", () => {
   });
 
   // A bad loginPath must fail once at setup, not answer every request with a 500.
-  it.each(["https://evil.test/x", "//evil.test"])(
-    "throws at setup on loginPath %s",
+  it.each(["https://evil.test/x", "//evil.test", "/\\evil.test", "/\t/evil.test"])(
+    "throws at setup on loginPath %j",
     (loginPath) => {
       expect(() => createNextgenRequestMiddleware({ loginPath })).toThrow(
         /loginPath must be a relative path/,
@@ -507,6 +563,41 @@ describe("opaque session cookie", () => {
       vi.fn(async () => response),
     );
   }
+
+  it("checks a cookie shaped like the backend's own with the backend, not the JWKS", async () => {
+    const backend = vi.fn(async (_url: string) =>
+      Response.json({ session_id: "s1", user_id: "u1" }),
+    );
+    vi.stubGlobal("fetch", backend);
+
+    const decision = await handleNextgenRequest(
+      makeRequest("http://localhost:3000/admin", {
+        cookie: `__nextgen_session=${JWE_SESSION_TOKEN}`,
+      }),
+      OPTIONS,
+    );
+
+    expect([
+      decision.type === "continue" && decision.auth.isAuthenticated,
+      backend.mock.calls.map(([url]) => String(url)),
+    ]).toEqual([true, ["http://localhost:4000/sessions/me"]]);
+  });
+
+  it("asks a client to retry a protected route when the backoff ends", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("fetch failed"))),
+    );
+
+    const decision = await handleNextgenRequest(
+      makeRequest("http://localhost:3000/admin", { cookie: COOKIE }),
+      OPTIONS,
+    );
+
+    expect(
+      decision.type === "unavailable" ? decision.response.headers.get("retry-after") : decision,
+    ).toBe("15");
+  });
 
   it("signs in a live session that names a user, with the user's details", async () => {
     sessionsMe(

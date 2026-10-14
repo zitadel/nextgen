@@ -9,6 +9,7 @@ import {
   filterResponseHeaders,
   matchesRoutes,
   proxyFailureResponse,
+  redactExchangeBody,
   requiresProjectSecret,
   sessionUnavailableResponse,
   validateOpaqueSessionToken,
@@ -235,7 +236,10 @@ async function proxyRequest(
     responseHeaders.append("set-cookie", cookie);
   }
 
-  return new Response(upstream.body, {
+  // The exchange's answer echoes the HttpOnly session token; the browser
+  // gets the cookie, never the token in a script-readable body (ADR 036).
+  const browserBody = await redactExchangeBody(req.method, suffix, upstream, responseHeaders);
+  return new Response(browserBody, {
     status: upstream.status,
     headers: responseHeaders,
   });
@@ -359,7 +363,7 @@ async function handleAuth(
     // The backend could not be asked. The session may be live, so its cookie
     // survives the outage; a protected route is retryable, not a sign-in.
     if (matchesRoutes(pathname, protectedRoutes)) {
-      return sessionUnavailableResponse();
+      return sessionUnavailableResponse(url);
     }
     // auth() reports `reason: "unavailable"` without asking the backend again.
     const tunnelled = tunnelHeaders(req, {

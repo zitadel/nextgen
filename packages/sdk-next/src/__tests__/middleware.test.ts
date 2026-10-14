@@ -5,7 +5,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createProxy, nextgenMiddleware } from "../middleware";
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
 import { clearSessionCheckBackoff } from "@zitadel/sdk-core/middleware";
-import { DEAD, OUTAGES, PROXY_FAILURES } from "./outages";
+import {
+  DEAD,
+  JWE_SESSION_TOKEN,
+  OFF_ORIGIN_LOCATIONS,
+  OUTAGES,
+  PROXY_FAILURES,
+  exchangeAnswer,
+} from "./outages";
 
 // The JWKS cache and the session-check backoff are module-level and per
 // issuer: start every case cold, so each one asks its own mock, and keep the
@@ -521,6 +528,34 @@ describe("nextgenMiddleware", () => {
       expect((capturedHeaders as Headers).get("authorization")).toBe("Bearer caller-key");
     });
 
+    it("keeps the session token out of the exchange body the browser reads", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => exchangeAnswer()),
+      );
+
+      const res = await nextgenMiddleware(
+        new NextRequest("http://localhost:3000/__nextgen/sessions/exchange", { method: "POST" }),
+        { url: "http://localhost:4000" },
+      );
+
+      expect(await res.text()).not.toContain(JWE_SESSION_TOKEN);
+    });
+
+    it("still sets the session cookie from the exchange", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => exchangeAnswer()),
+      );
+
+      const res = await nextgenMiddleware(
+        new NextRequest("http://localhost:3000/__nextgen/sessions/exchange", { method: "POST" }),
+        { url: "http://localhost:4000" },
+      );
+
+      expect(res.headers.getSetCookie()).toEqual(exchangeAnswer().headers.getSetCookie());
+    });
+
     it("preserves the upstream session cache policy", async () => {
       vi.stubGlobal(
         "fetch",
@@ -563,6 +598,24 @@ describe("nextgenMiddleware", () => {
       expect(res.headers.get("location")).toBe("http://localhost:3000/callback");
       expect(res.headers.get("location")).not.toContain("internal-auth.corp");
       expect(res.headers.get("content-type")).toBe("application/json");
+    });
+  });
+
+  describe("proxy: redirects whose path starts with //", () => {
+    it.each(OFF_ORIGIN_LOCATIONS)("keeps %s on this app", async (location) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(null, { status: 303, headers: { location } })),
+      );
+
+      const res = await nextgenMiddleware(
+        new NextRequest("http://localhost:3000/__nextgen/idp/google/callback"),
+        { url: "http://localhost:4000" },
+      );
+
+      expect(new URL(res.headers.get("location") ?? "", "http://unset.invalid").origin).toBe(
+        "http://localhost:3000",
+      );
     });
   });
 
@@ -829,6 +882,37 @@ describe("opaque session cookie", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("checks a cookie shaped like the backend's own with the backend, not the JWKS", async () => {
+    const backend = vi.fn(async (_url: string) =>
+      Response.json({ session_id: "s1", user_id: "u1" }),
+    );
+    vi.stubGlobal("fetch", backend);
+
+    const res = await nextgenMiddleware(
+      makeRequest("http://localhost:3000/admin", `__nextgen_session=${JWE_SESSION_TOKEN}`),
+      OPTIONS,
+    );
+
+    expect([tunnelled(res), backend.mock.calls.map(([url]) => String(url))]).toEqual([
+      JWE_SESSION_TOKEN,
+      ["http://localhost:4000/sessions/me"],
+    ]);
+  });
+
+  it("asks a client to retry a protected route when the backoff ends", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("fetch failed"))),
+    );
+
+    const res = await nextgenMiddleware(
+      makeRequest("http://localhost:3000/admin", COOKIE),
+      OPTIONS,
+    );
+
+    expect(res.headers.get("retry-after")).toBe("15");
   });
 
   it("tunnels a live session that names a user to server components", async () => {
@@ -1107,8 +1191,8 @@ describe("project secret sources", () => {
 
 describe("createProxy", () => {
   // A bad loginPath must fail once at setup, not answer every request with a 500.
-  it.each(["https://evil.test/x", "//evil.test"])(
-    "throws at setup on loginPath %s",
+  it.each(["https://evil.test/x", "//evil.test", "/\\evil.test", "/\t/evil.test"])(
+    "throws at setup on loginPath %j",
     (loginPath) => {
       expect(() =>
         createProxy(

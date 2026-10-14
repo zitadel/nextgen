@@ -95,19 +95,50 @@ export type LoginPathRoutes = {
   readonly ignoredRoutes?: readonly string[];
 };
 
+/** A base no login path can name: resolving against it shows whether a path leaves the app. */
+const LOGIN_PATH_PROBE = "http://login-path.invalid";
+
+/**
+ * Whether `path` stays on this app: it starts with a single `/`, holds no
+ * backslash, whitespace or control character (WHATWG URL parsing reads `/\`
+ * as `//` and drops tabs and newlines, so `/\evil.example` and
+ * `/<TAB>/evil.example` both name another host), and resolves to the origin it
+ * was resolved against.
+ */
+function isAppPath(path: string): boolean {
+  if (!path.startsWith("/") || path.startsWith("//") || /[\\\s\p{Cc}]/u.test(path)) {
+    return false;
+  }
+  try {
+    return new URL(path, LOGIN_PATH_PROBE).origin === LOGIN_PATH_PROBE;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Throws unless `loginPath` is a path on this app: it must start with a single
- * `/`. An absolute URL (`https://evil.com/phish`) or a protocol-relative one
- * (`//evil.com`) would turn the protected-route redirect into an open redirect.
+ * `/`, and neither it nor its percent-decoded form may hold a backslash,
+ * whitespace or a control character, or resolve to another origin. An
+ * absolute URL (`https://evil.com/phish`), a protocol-relative one
+ * (`//evil.com`) or one a URL parser reads as such (`/\evil.com`,
+ * `/<TAB>/evil.com`, `/%5Cevil.com`) would turn the protected-route redirect
+ * into an open redirect.
  *
  * @param loginPath - The configured login path.
  */
 export function assertLoginPath(loginPath: string): void {
-  if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
+  let decoded: string | undefined;
+  try {
+    decoded = decodeURIComponent(loginPath);
+  } catch {
+    decoded = undefined;
+  }
+  if (!isAppPath(loginPath) || decoded === undefined || !isAppPath(decoded)) {
     throw new Error(
       `[nextgen] loginPath must be a relative path starting with a single "/". ` +
-        `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
-        `would allow open-redirect attacks.`,
+        `Received: ${JSON.stringify(loginPath)}. Using an absolute or protocol-relative URL ` +
+        `(or a path a URL parser reads as one) would allow open-redirect attacks.`,
     );
   }
 }
@@ -168,6 +199,66 @@ export function requiresProjectSecret(method: string, pathname: string): boolean
   return method.toUpperCase() === "POST" && pathname === "/sessions/exchange";
 }
 
+/**
+ * The fields of the handoff exchange's answer (`SessionWithTokenResponse`)
+ * that carry a credential: the backend echoes the session token it also sets
+ * as the HttpOnly `__nextgen_session` cookie.
+ */
+export const EXCHANGE_CREDENTIAL_FIELDS: readonly string[] = ["session_token"];
+
+/**
+ * The body a proxied response may hand the browser.
+ *
+ * The handoff exchange (`POST /sessions/exchange`, the one call the proxy
+ * stamps with the project secret) answers with the session and the session
+ * token, which the backend also sets as the HttpOnly `__nextgen_session`
+ * cookie. Relayed verbatim, that body would give every script on the page (a
+ * fetch wrapper, an analytics SDK, an XSS) the token HttpOnly exists to keep
+ * from it (ADR 036: the session token never appears in anything
+ * script-readable). The widget reads only the cookie, so the proxy drops
+ * {@link EXCHANGE_CREDENTIAL_FIELDS} from that body and leaves the rest of the
+ * response (status, `Set-Cookie`, the other fields) as it was.
+ *
+ * Every other response's body passes through as the upstream stream. For the
+ * exchange, the body is read and re-serialised, so `headers` loses
+ * `content-encoding` (`fetch` has already decoded it) and gets the new
+ * `content-length`. A body that is not a JSON object passes through as text.
+ *
+ * @param method   - The proxied request's HTTP method.
+ * @param pathname - The path after the proxy prefix, e.g. `/sessions/exchange`.
+ * @param upstream - The backend's response.
+ * @param headers  - The headers the proxy answers with; adjusted in place.
+ * @returns The body to answer with.
+ */
+export async function redactExchangeBody(
+  method: string,
+  pathname: string,
+  upstream: Response,
+  headers: Headers,
+): Promise<ReadableStream<Uint8Array> | string | null> {
+  if (!requiresProjectSecret(method, pathname) || upstream.body === null) {
+    return upstream.body;
+  }
+  let body = await upstream.text();
+  try {
+    const parsed = JSON.parse(body) as unknown;
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      const fields = parsed as Record<string, unknown>;
+      if (EXCHANGE_CREDENTIAL_FIELDS.some((field) => Object.hasOwn(fields, field))) {
+        for (const field of EXCHANGE_CREDENTIAL_FIELDS) {
+          delete fields[field];
+        }
+        body = JSON.stringify(fields);
+      }
+    }
+  } catch {
+    // Not JSON: an error page, say. It carries no session token field.
+  }
+  headers.delete("content-encoding");
+  headers.set("content-length", String(new TextEncoder().encode(body).byteLength));
+  return body;
+}
+
 // ─── Response header filtering ───────────────────────────────────────────────
 
 /**
@@ -195,6 +286,12 @@ export function requiresProjectSecret(method: string, pathname: string): boolean
  * so `next?flow=x` answered to `/__nextgen/idp/google/callback` means
  * `/__nextgen/idp/google/next?flow=x`. An unparseable value is the one case with
  * nothing to forward.
+ *
+ * The path is set on a copy of the app's URL, never re-parsed as a reference:
+ * a path that starts with `//` (`https://app.test//evil.example/x`,
+ * `/.//evil.example`, `https://a/\evil.example`) would read as
+ * protocol-relative and take its host from the path. The result must keep the
+ * app's origin, or there is nothing to forward.
  */
 function ontoThisApp(location: string, selfUrl: string | undefined): string | undefined {
   if (selfUrl === undefined || selfUrl === "") {
@@ -203,7 +300,11 @@ function ontoThisApp(location: string, selfUrl: string | undefined): string | un
   try {
     const base = new URL(selfUrl);
     const target = new URL(location, base);
-    return new URL(`${target.pathname}${target.search}${target.hash}`, base).toString();
+    const out = new URL(base.href);
+    out.pathname = target.pathname;
+    out.search = target.search;
+    out.hash = target.hash;
+    return out.origin === base.origin ? out.toString() : undefined;
   } catch {
     return undefined;
   }
@@ -270,7 +371,13 @@ export type NextgenSession = {
   identifierProperty: string | null;
   /** The user's display name rendering, or `null` when the schema designates none. */
   display: string | null;
-  /** The raw verified JWT. */
+  /**
+   * The raw session token the request carried: a JWT whose signature was
+   * verified, or the backend's opaque `__nextgen_session` token (a compact
+   * JWE), which the SDK cannot verify itself and which the backend's
+   * `GET /sessions/me` confirmed is live. Server-side only: never hand it to
+   * the browser (see {@link toClientAuth}).
+   */
   token: string;
 };
 
@@ -565,9 +672,13 @@ export function isWellFormedSessionToken(token: string): boolean {
  * `opaqueTokenTimeoutMs` (5 s), so a hanging backend is probed at most once
  * per window rather than half the time.
  *
- * Any other `unknown` answer (a `500`, a `429`, an unexpected `401`/`404`, an
- * unreadable body) does not start it: it may be caused by the request's own
- * token, and must not let one request sign out everyone else.
+ * Only such a failure starts it. A slow answer that arrives within
+ * `opaqueTokenTimeoutMs` is an answer: every request waits for its own, so a
+ * backend that is slow but healthy (a cold start, a busy database) never makes
+ * a signed-in user's session unavailable. Any other `unknown` answer (a `500`,
+ * a `429`, an unexpected `401`/`404`, an unreadable body) does not start it
+ * either: it may be caused by the request's own token, and must not let one
+ * request sign out everyone else.
  *
  * The backoff lives in module state, so it is per process or isolate: each
  * serverless instance, edge isolate or worker has its own (see the sdk-core
@@ -575,19 +686,8 @@ export function isWellFormedSessionToken(token: string): boolean {
  */
 export const SESSION_CHECK_BACKOFF_MS = 15_000;
 
-/**
- * How long a session check may be in flight before other checks against the
- * same backend stop waiting for it: while one has gone unanswered this long,
- * further checks answer `unknown` at once instead of each sending a request of
- * its own and waiting out `opaqueTokenTimeoutMs`.
- */
-export const SESSION_CHECK_STALL_MS = 1_000;
-
 /** Per backend URL: until when a session check answers `unknown` without asking. */
 const sessionCheckBackoff = new Map<string, number>();
-
-/** Per backend URL: when each check now in flight started. */
-const sessionChecksInFlight = new Map<string, Set<{ readonly startedAt: number }>>();
 
 /** Per backend URL: until when an `unknown` that starts no backoff is not logged again. */
 const sessionCheckQuietUntil = new Map<string, number>();
@@ -599,22 +699,29 @@ const sessionCheckQuietUntil = new Map<string, number>();
  */
 export function clearSessionCheckBackoff(): void {
   sessionCheckBackoff.clear();
-  sessionChecksInFlight.clear();
   sessionCheckQuietUntil.clear();
-}
-
-/** Whether a check against `issuerUrl` has been in flight for {@link SESSION_CHECK_STALL_MS}. */
-function hasStalledCheck(issuerUrl: string, now: number): boolean {
-  for (const check of sessionChecksInFlight.get(issuerUrl) ?? []) {
-    if (now - check.startedAt >= SESSION_CHECK_STALL_MS) {
-      return true;
-    }
-  }
-  return false;
 }
 
 /** Statuses a gateway answers when the backend behind it is down or too slow. */
 const UNREACHABLE_STATUSES: ReadonlySet<number> = new Set([502, 503, 504]);
+
+/** Why a check came back `unknown`, for the log line. */
+function describeFailure(error: unknown, timeoutMs: number): string {
+  if ((error as { name?: unknown } | null)?.name === "TimeoutError") {
+    return `no answer within ${timeoutMs}ms`;
+  }
+  return `a network error (${error instanceof Error ? error.message : String(error)})`;
+}
+
+/**
+ * What a `GET /sessions/me` answer says about the session, as
+ * {@link readSessionAnswer} reads it. An `unknown` names why, for a log line or
+ * an error message.
+ */
+export type SessionAnswer =
+  | { readonly status: "live"; readonly session: OpaqueSession }
+  | { readonly status: "dead" }
+  | { readonly status: "unknown"; readonly why: string };
 
 /** The `code` of the backend's error envelope, or `undefined` when the body is not one. */
 async function errorCode(res: Response): Promise<string | undefined> {
@@ -626,24 +733,77 @@ async function errorCode(res: Response): Promise<string | undefined> {
   }
 }
 
-/** Why a check came back `unknown`, for the log line. */
-function describeFailure(error: unknown, timeoutMs: number): string {
-  if ((error as { name?: unknown } | null)?.name === "TimeoutError") {
-    return `no answer within ${timeoutMs}ms`;
+/**
+ * Reads the backend's answer to `GET /sessions/me`, the one rule every reader
+ * of it applies (the server SDKs' session check and sdk-next's browser
+ * `getSession()`):
+ *
+ * - `live`: a `2xx` whose JSON names the session, a non-empty string
+ *   `session_id`. Its `userId` is `null` for an anonymous session. Identity
+ *   fields are normalised: anything other than a non-empty string (an empty
+ *   `display`, a numeric `user_id`) reads as `null`, so a UI rendering
+ *   `display ?? identifier` never shows an empty name.
+ * - `dead`: a `401` whose body carries the backend's `auth.unauthorized` code,
+ *   or a `404` carrying `sess.not_found`. The code alone decides; the
+ *   `message` is not needed.
+ * - `unknown`: anything else, including a `401`/`404` without that code (a
+ *   gateway, a WAF or a wrong base path answers those too), an unreadable body,
+ *   and a `2xx` that is not a session (`{}`, a proxy's own JSON).
+ *
+ * A body that fails to arrive (a network error or a timeout while reading it)
+ * rejects, so the caller can tell an unreachable backend from an odd answer.
+ *
+ * @param res - The answer to `GET /sessions/me`.
+ */
+export async function readSessionAnswer(res: Response): Promise<SessionAnswer> {
+  if (res.status === 401 || res.status === 404) {
+    const code = await errorCode(res);
+    if (
+      (res.status === 401 && code === "auth.unauthorized") ||
+      (res.status === 404 && code === "sess.not_found")
+    ) {
+      return { status: "dead" };
+    }
+    return { status: "unknown", why: `HTTP ${res.status} without the backend's error code` };
   }
-  if (error instanceof SyntaxError) {
-    return "an unreadable response body";
+  if (!res.ok) {
+    return { status: "unknown", why: `HTTP ${res.status}` };
   }
-  return `a network error (${error instanceof Error ? error.message : String(error)})`;
+  let body: {
+    session_id?: unknown;
+    user_id?: unknown;
+    user?: { identifier?: unknown; identifier_property?: unknown; display?: unknown } | null;
+  } | null;
+  try {
+    body = (await res.json()) as typeof body;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return { status: "unknown", why: "an unreadable response body" };
+    }
+    throw error;
+  }
+  // Only the session JSON (it always names its `session_id`) is a session; any
+  // other 2xx (an empty body, a proxy's JSON) says nothing about the session.
+  if (typeof body?.session_id !== "string" || body.session_id === "") {
+    return { status: "unknown", why: "an answer that is not a session" };
+  }
+  const text = (value: unknown): string | null =>
+    typeof value === "string" && value !== "" ? value : null;
+  return {
+    status: "live",
+    session: {
+      userId: text(body.user_id),
+      identifier: text(body.user?.identifier),
+      identifierProperty: text(body.user?.identifier_property),
+      display: text(body.user?.display),
+    },
+  };
 }
 
 /**
  * Validates an opaque session token by asking the backend
- * (`GET {issuerUrl}/sessions/me`) whether the session is live.
- *
- * Identity fields are normalised: anything other than a non-empty string
- * (an empty `display`, a numeric `user_id`) reads as `null`, so a UI rendering
- * `display ?? identifier` never shows an empty name.
+ * (`GET {issuerUrl}/sessions/me`) whether the session is live, reading the
+ * answer with {@link readSessionAnswer}.
  *
  * A token that is not {@link isWellFormedSessionToken well formed} is `dead`
  * without asking the backend.
@@ -651,10 +811,9 @@ function describeFailure(error: unknown, timeoutMs: number): string {
  * Only a failure to reach the backend (a network error, a timeout, a
  * `502`/`503`/`504`) starts a backoff of {@link SESSION_CHECK_BACKOFF_MS} for
  * `issuerUrl`: until it ends, checks answer `unknown` at once, without asking
- * the backend, and the failure is logged once for the window. While a check
- * has gone unanswered for {@link SESSION_CHECK_STALL_MS}, other checks answer
- * `unknown` at once too, so a hanging backend is not sent one request per
- * visitor. Any other `unknown` (a `500`, say) holds for that request only, and
+ * the backend, and the failure is logged once for the window. A slow answer
+ * within `timeoutMs` is waited for, however many checks are waiting on the
+ * backend. Any other `unknown` (a `500`, say) holds for that request only, and
  * is logged at most once per {@link SESSION_CHECK_BACKOFF_MS}.
  *
  * @param token     - The opaque session token from the `__nextgen_session` cookie.
@@ -672,16 +831,12 @@ export async function validateOpaqueSessionToken(
   if (!isWellFormedSessionToken(token)) {
     return { status: "dead" };
   }
-  const now = Date.now();
   const backoffUntil = sessionCheckBackoff.get(issuerUrl);
   if (backoffUntil !== undefined) {
-    if (now < backoffUntil) {
+    if (Date.now() < backoffUntil) {
       return { status: "unknown" };
     }
     sessionCheckBackoff.delete(issuerUrl);
-  }
-  if (hasStalledCheck(issuerUrl, now)) {
-    return { status: "unknown" };
   }
   const message = (why: string, after: string): string =>
     `[nextgen] could not check the session at ${issuerUrl}/sessions/me: ${why}. ` +
@@ -720,71 +875,51 @@ export async function validateOpaqueSessionToken(
   } catch (error) {
     return unanswered(`the request could not be built (${String(error)})`);
   }
-  const inFlight = { startedAt: now };
-  const checks = sessionChecksInFlight.get(issuerUrl) ?? new Set();
-  sessionChecksInFlight.set(issuerUrl, checks.add(inFlight));
   try {
     const res = await fetch(target, {
       method: "GET",
       headers,
       signal: AbortSignal.timeout(timeoutMs),
     });
-    if (res.status === 401 || res.status === 404) {
-      // A gateway, a WAF or a wrong base path answers 401/404 too; only the
-      // backend's own error code says the session is gone.
-      const code = await errorCode(res);
-      if (
-        (res.status === 401 && code === "auth.unauthorized") ||
-        (res.status === 404 && code === "sess.not_found")
-      ) {
-        return { status: "dead" };
-      }
-      return unanswered(`HTTP ${res.status} without the backend's error code`);
-    }
     if (UNREACHABLE_STATUSES.has(res.status)) {
       return unreachable(`HTTP ${res.status}`);
     }
-    if (!res.ok) {
-      return unanswered(`HTTP ${res.status}`);
-    }
-    const body = (await res.json()) as {
-      session_id?: unknown;
-      user_id?: unknown;
-      user?: { identifier?: unknown; identifier_property?: unknown; display?: unknown };
-    } | null;
-    // Only the session JSON (it always names its `session_id`) is a session;
-    // any other 200 (an empty body, a proxy's JSON) is a response-shape
-    // problem, not an outage, and says nothing about the session.
-    if (typeof body?.session_id !== "string" || body.session_id === "") {
-      return unanswered("an answer that is not a session");
-    }
-    const text = (value: unknown): string | null =>
-      typeof value === "string" && value !== "" ? value : null;
-    return {
-      status: "live",
-      session: {
-        userId: text(body?.user_id),
-        identifier: text(body?.user?.identifier),
-        identifierProperty: text(body?.user?.identifier_property),
-        display: text(body?.user?.display),
-      },
-    };
+    const answer = await readSessionAnswer(res);
+    return answer.status === "unknown" ? unanswered(answer.why) : answer;
   } catch (error) {
-    // An unreadable body says nothing about the backend's health; a network
-    // error or a timeout (sending, or reading the body) says it is unreachable.
-    // Neither says the session is dead.
-    return error instanceof SyntaxError
-      ? unanswered(describeFailure(error, timeoutMs))
-      : unreachable(describeFailure(error, timeoutMs));
-  } finally {
-    checks.delete(inFlight);
-    if (checks.size === 0 && sessionChecksInFlight.get(issuerUrl) === checks) {
-      sessionChecksInFlight.delete(issuerUrl);
-    }
+    // A network error or a timeout (sending, or reading the body) says the
+    // backend is unreachable. It does not say the session is dead.
+    return unreachable(describeFailure(error, timeoutMs));
   }
 }
 
 // ─── Failure responses ───────────────────────────────────────────────────────
+
+/**
+ * The `retry-after` a {@link sessionUnavailableResponse} sends when no backoff
+ * is running: the session could not be checked for this request only (a
+ * `500`, say), so a retry soon may well succeed.
+ */
+export const SESSION_UNAVAILABLE_RETRY_AFTER_S = 5;
+
+/**
+ * How many seconds a client should wait before retrying a request whose
+ * session could not be checked: the time left in the session-check backoff
+ * ({@link SESSION_CHECK_BACKOFF_MS}) for `issuerUrl`, rounded up and at least
+ * 1, because the backend is not asked again before it ends; else
+ * {@link SESSION_UNAVAILABLE_RETRY_AFTER_S}. Without `issuerUrl`, the longest
+ * backoff running for any backend counts.
+ */
+function retryAfterSeconds(issuerUrl: string | undefined): number {
+  const now = Date.now();
+  const until =
+    issuerUrl === undefined
+      ? Math.max(0, ...sessionCheckBackoff.values())
+      : (sessionCheckBackoff.get(issuerUrl) ?? 0);
+  return until > now
+    ? Math.max(1, Math.ceil((until - now) / 1000))
+    : SESSION_UNAVAILABLE_RETRY_AFTER_S;
+}
 
 /**
  * The answer to a protected route whose session could not be checked because
@@ -793,14 +928,22 @@ export async function validateOpaqueSessionToken(
  * session cookie survives the outage, and a reload signs the user straight
  * back in once the backend answers again. Redirecting to the login page
  * instead would show a signed-in user a sign-in form.
+ *
+ * Its `retry-after` is the time left in the session-check backoff, so a
+ * client that honours it does not come back while the SDK would answer the
+ * same `503` without asking the backend; with no backoff running it is
+ * {@link SESSION_UNAVAILABLE_RETRY_AFTER_S} seconds.
+ *
+ * @param issuerUrl - The backend whose backoff counts. Omitted, the longest
+ *   backoff running for any backend does.
  */
-export function sessionUnavailableResponse(): Response {
+export function sessionUnavailableResponse(issuerUrl?: string): Response {
   return new Response("The sign-in service is unavailable. Try again shortly.", {
     status: 503,
     headers: {
       "content-type": "text/plain; charset=utf-8",
       "cache-control": "no-store",
-      "retry-after": "5",
+      "retry-after": String(retryAfterSeconds(issuerUrl)),
     },
   });
 }

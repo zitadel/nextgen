@@ -17,7 +17,14 @@ import type { QwikRequestEvent } from "../request-handler";
 import { createNextgenOnRequest, getAuth, getClientAuth } from "../request-handler";
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
 import { clearSessionCheckBackoff } from "@zitadel/sdk-core/middleware";
-import { DEAD, OUTAGES, PROXY_FAILURES } from "./outages";
+import {
+  DEAD,
+  JWE_SESSION_TOKEN,
+  OFF_ORIGIN_LOCATIONS,
+  OUTAGES,
+  PROXY_FAILURES,
+  exchangeAnswer,
+} from "./outages";
 
 // The JWKS cache and the session-check backoff are module-level and per
 // issuer: start every case cold, so each one asks its own mock, and keep the
@@ -351,6 +358,15 @@ describe("createNextgenOnRequest (Qwik City)", () => {
       ).toThrow(/loginPath must be a relative path/i);
     });
 
+    it.each(["/\\evil.test/x", "/\t/evil.test/x"])(
+      "throws on loginPath %j, which a URL parser reads as another host",
+      (loginPath) => {
+        expect(() => createNextgenOnRequest({ url: "http://localhost:4000", loginPath })).toThrow(
+          /loginPath must be a relative path/i,
+        );
+      },
+    );
+
     it("throws on a protocol-relative loginPath", () => {
       expect(() =>
         createNextgenOnRequest({ url: "http://localhost:4000", loginPath: "//evil.test/x" }),
@@ -411,6 +427,48 @@ describe("createNextgenOnRequest (Qwik City)", () => {
 
       await run(handler, h.ev);
       expect(h.sent?.headers.get("location")).toBe(expected);
+    });
+
+    it.each(OFF_ORIGIN_LOCATIONS)("keeps %s on this app", async (location) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(null, { status: 303, headers: { location } })),
+      );
+      const h = makeHarness("http://localhost:3000/__nextgen/idp/callback?code=x");
+
+      await run(createNextgenOnRequest({ url: "http://localhost:4000" }), h.ev);
+
+      expect(new URL(h.sent?.headers.get("location") ?? "", "http://unset.invalid").hostname).toBe(
+        "localhost",
+      );
+    });
+
+    it("keeps the session token out of the exchange body the browser reads", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => exchangeAnswer()),
+      );
+      const h = makeHarness("http://localhost:3000/__nextgen/sessions/exchange", {
+        method: "POST",
+      });
+
+      await run(createNextgenOnRequest({ url: "http://localhost:4000" }), h.ev);
+
+      expect(await h.sent?.text()).not.toContain(JWE_SESSION_TOKEN);
+    });
+
+    it("still sets the session cookie from the exchange", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => exchangeAnswer()),
+      );
+      const h = makeHarness("http://localhost:3000/__nextgen/sessions/exchange", {
+        method: "POST",
+      });
+
+      await run(createNextgenOnRequest({ url: "http://localhost:4000" }), h.ev);
+
+      expect(h.sent?.headers.getSetCookie()).toEqual(exchangeAnswer().headers.getSetCookie());
     });
 
     function captureUpstreamHeaders(): () => Headers | undefined {
@@ -558,6 +616,34 @@ describe("opaque session cookie", () => {
       loginPath: "/login",
     });
   }
+
+  it("checks a cookie shaped like the backend's own with the backend, not the JWKS", async () => {
+    const backend = vi.fn(async (_url: string) =>
+      Response.json({ session_id: "s1", user_id: "u1" }),
+    );
+    vi.stubGlobal("fetch", backend);
+    const h = makeHarness("http://localhost:3000/admin", {
+      cookie: `__nextgen_session=${JWE_SESSION_TOKEN}`,
+    });
+
+    await run(protectedHandler(), h.ev);
+
+    expect([getAuth(h.ev).isAuthenticated, backend.mock.calls.map(([url]) => String(url))]).toEqual(
+      [true, ["http://localhost:4000/sessions/me"]],
+    );
+  });
+
+  it("asks a client to retry a protected route when the backoff ends", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("fetch failed"))),
+    );
+    const h = makeHarness("http://localhost:3000/admin", { cookie: COOKIE });
+
+    await run(protectedHandler(), h.ev);
+
+    expect(h.sent?.headers.get("retry-after")).toBe("15");
+  });
 
   it("signs in a live session that names a user, with the user's details", async () => {
     sessionsMe(
