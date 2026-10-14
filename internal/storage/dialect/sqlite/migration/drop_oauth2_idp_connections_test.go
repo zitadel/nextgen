@@ -14,7 +14,7 @@ import (
 	migrationpkg "github.com/zitadel/nextgen/internal/storage/dialect/sqlite/migration"
 )
 
-// 000016 deletes every connection with an oauth2 revision, together with its
+// 000019 deletes every connection with an oauth2 revision, together with its
 // identity links and scope index row, and leaves an oidc connection alone.
 func TestDropOAuth2IDPConnections(t *testing.T) {
 	ctx := t.Context()
@@ -29,7 +29,7 @@ func TestDropOAuth2IDPConnections(t *testing.T) {
 	require.NoError(t, db.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&foreignKeys))
 	require.Equal(t, 1, foreignKeys)
 
-	require.NoError(t, migrationpkg.MigrateUpTo(ctx, db, 15))
+	require.NoError(t, migrationpkg.MigrateUpTo(ctx, db, 18))
 
 	for _, stmt := range []string{
 		`INSERT INTO projects (id, name, preview_origins, created_at, updated_at) VALUES ('prj_mig', 'mig', '[]', 1, 1)`,

@@ -13,7 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/testdb"
 )
 
-// 000032 deletes every connection with an oauth2 revision, together with its
+// 000035 deletes every connection with an oauth2 revision, together with its
 // identity links and scope index row, and leaves an oidc connection alone.
 func TestDropOAuth2IDPConnections(t *testing.T) {
 	ctx := t.Context()
@@ -27,7 +27,7 @@ func TestDropOAuth2IDPConnections(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	require.NoError(t, migrationpkg.MigrateUpTo(ctx, db, 31))
+	require.NoError(t, migrationpkg.MigrateUpTo(ctx, db, 34))
 
 	for _, stmt := range []string{
 		`INSERT INTO projects (id, name, preview_origins) VALUES ('prj_mig', 'mig', '[]')`,
