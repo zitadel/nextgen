@@ -94,7 +94,7 @@ jobs:
       # `install-browsers` dep; this covers the Playwright e2e specs.
       - name: Cache Playwright browsers
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -159,7 +159,7 @@ jobs:
       # a stale store is still valid.
       - name: Cache journey registry packages
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/journey-verdaccio-storage
           key: journey-verdaccio-${{ runner.os }}-${{ github.run_id }}
@@ -212,7 +212,7 @@ jobs:
 
       - name: Upload journey diagnostics
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: journey-diagnostics
           path: ${{ runner.temp }}/ci-journey/diagnostics
@@ -224,7 +224,7 @@ jobs:
       # the project secret and sits beside them in .zitadel-testing/.
       - name: Upload e2e diagnostics
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-diagnostics
           path: |

@@ -135,7 +135,7 @@ jobs:
         run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -172,7 +172,7 @@ jobs:
       # (docs/runbooks/cloud.md, "Deployment checks").
       - name: Upload the screenshots
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docs-deployment-screenshots
           path: apps/docs/test-results/**/*.png
@@ -260,7 +260,7 @@ jobs:
         run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -290,7 +290,7 @@ jobs:
       # glob into /**/*.png, every PNG on the runner.
       - name: Upload the screenshots
         if: ${{ failure() && steps.suite.outputs.results != '' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: console-deployment-screenshots
           path: ${{ steps.suite.outputs.results }}/**/*.png
