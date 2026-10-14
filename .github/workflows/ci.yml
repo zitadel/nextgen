@@ -30,6 +30,10 @@ jobs:
       # cross-tool standard (https://consoledonottrack.com) the CLI honors, so
       # no build runs here ever ship events to the telemetry backend.
       DO_NOT_TRACK: "1"
+      # Playwright forces FORCE_COLOR=1 on its workers and web servers, and Node
+      # warns on every process that also sees NO_COLOR. Blank it so only the
+      # test output is left in the log.
+      NO_COLOR: ""
     steps:
       - uses: actions/checkout@v6
         with:

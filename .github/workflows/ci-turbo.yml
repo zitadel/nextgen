@@ -46,6 +46,10 @@ jobs:
       id-token: write
     env:
       DO_NOT_TRACK: "1"
+      # Playwright forces FORCE_COLOR=1 on its workers and web servers, and Node
+      # warns on every process that also sees NO_COLOR. Blank it so only the
+      # test output is left in the log.
+      NO_COLOR: ""
       TURBO_TELEMETRY_DISABLED: "1"
       # The contributor scripts (run-cli, local-registry, check) build through
       # turbo instead of moon; scripts/ci-mode.mjs asks turbo's graph.

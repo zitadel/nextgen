@@ -98,6 +98,10 @@ jobs:
       # See ci.yml.
       MOON_SUMMARY: detailed
       DO_NOT_TRACK: "1"
+      # Playwright forces FORCE_COLOR=1 on its workers and web servers, and Node
+      # warns on every process that also sees NO_COLOR. Blank it so only the
+      # test output is left in the log.
+      NO_COLOR: ""
     steps:
       - name: Name the deployment in the run's summary
         env:
@@ -196,6 +200,10 @@ jobs:
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
       MOON_SUMMARY: detailed
       DO_NOT_TRACK: "1"
+      # Playwright forces FORCE_COLOR=1 on its workers and web servers, and Node
+      # warns on every process that also sees NO_COLOR. Blank it so only the
+      # test output is left in the log.
+      NO_COLOR: ""
     steps:
       - name: Name the deployment in the run's summary
         env:
