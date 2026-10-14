@@ -153,11 +153,11 @@ as they were.
 | api | `generate` (mutex generated-sources, inputs `/api/openapi/**/*.yaml`) | `@zitadel/api#generate` | `generate` → `task-guard --mutex generated-sources -- orval …`; inputs `$TURBO_ROOT$/api/openapi/**/*.yaml` |
 | api | `build-release` (inline, mutex public-dist) | `#build-release` | **new** `release-clean.mjs local-dist && pnpm run build`; ordered after `@zitadel/cli#test` |
 | api-mock, components, sdk-qwik, storybook | `install-browsers` (cache false) | `#install-browsers` | **new** `playwright install chromium`; the `test` task depends on it, as in moon |
-| api-mock | `test` (mutex browser-tests, retryCount 3) | `#test` | `test` → `task-guard --mutex browser-tests --retries 3 -- vitest run` |
+| api-mock | `test` (retryCount 3) | `#test` | `test` → `task-guard --retries 3 -- vitest run` |
 | api-mock | `start` (persistent) | `#start` | existing |
 | components | `build` (dep config:build, design-tokens:build) | `#build` | same edges |
 | components | `build-release` (inline + check script) | `#build-release` | **new** script with `check-standalone-artifact.mjs` |
-| components | `test` (mutex, retry, dep build) | `#test` | guarded script |
+| components | `test` (retry, dep build) | `#test` | guarded script |
 | config | `sync-schemas` (mutex generated-sources) | `#sync-schemas` | script wrapped in the guard; the `pre*` scripts keep calling it |
 | config | `build-release` (mutex public-dist) | `#build-release` | ordered after api's release build |
 | design-tokens | `sync` (cache false) | `#sync` | `passThroughEnv: FIGMA_*` |
@@ -167,7 +167,7 @@ as they were.
 | sdk-* | `build-release` (inline) | `#build-release` | **new** script; the dev build's edges, on the release builds (components, sdk-core) |
 | sdk-nuxt | `build` (mutex sdk-nuxt-dist) | `#build` | ordered by the demo-nuxt edge; see mutexes |
 | sdk-nuxt | `dev` (persistent) | `#dev` | existing |
-| sdk-qwik | `install-browsers`, `test` (mutex, retry) | same | guarded script |
+| sdk-qwik | `install-browsers`, `test` (retry) | same | guarded script |
 | testing | `test-integration` (env, cache false) | `#test:integration` | existing script, now sets the env itself |
 | testing | `build-release` | `#build-release` | after config's release build |
 | cli | `test` (inputs + `/apps/server/bin/**`, mutex public-dist) | `#test` | inputs `$TURBO_ROOT$/apps/server/bin/**`; the mutex becomes an edge: the release builds start after it |
@@ -202,11 +202,10 @@ as they were.
 
 ## What replaces each moon feature
 
-### `mutex` (19 uses, 5 names)
+### `mutex` (15 uses, 4 names)
 
 | mutex | protected | replacement |
 |---|---|---|
-| `browser-tests` (components, api-mock, storybook, sdk-qwik `test`) | one real-Chromium Vite server at a time (#1490) | `task-guard --mutex browser-tests` in the four `test` scripts: a lock held across the retries. Ordering edges were rejected: with `--continue=dependencies-successful` one failing browser suite would skip the other three. |
 | `generated-sources` (server `generate`, `clean-generated`, `check-generate`, `check-generate-pruned`; api `generate`; config `sync-schemas`) | generation rewriting files other tasks read mid-graph | `task-guard --mutex generated-sources` in the six scripts. Ordering edges were rejected: they would put the Go generation on the critical path of every TypeScript build. |
 | `public-dist` (api, config, sdk-next `build-release`; cli `test`) | release builds cleaning a dist the CLI tests import | an edge: the release builds start after `@zitadel/cli#test`. Moon could not express that edge (cli depends on those packages, a project-graph cycle); turbo has no project graph. |
 | `demo-next-app` (e2e `demo-next-mock`, `demo-next-real`) | the two lanes that serve apps/demo-next with `next dev` on :3002 from one `.next` folder; the other lanes of ci.yml's e2e step (`moon exec e2e:all`) run beside them | their two scripts hold `task-guard --mutex demo-next-app`; ci-turbo.yml also runs the lane groups as separate steps. |
@@ -221,14 +220,15 @@ task: turbo sets `TURBO_HASH` for every task. Under moon, which has its own
 
 ### `retryCount: 3` (4 uses)
 
-`task-guard --retries 3` in the same four browser-test `test` scripts. The
-flake it exists for is a module import that Chromium aborts when a container
-changes the host's addresses (#1490, now prevented in CI; the retry stays as a
-safety net), so the retry re-runs the whole suite, which Vitest's own per-test
-`retry` would not do — a failed module import fails the file. Moon is
-unchanged: its `test` task runs each package's `test:all` script, which calls
-Vitest directly, so moon keeps its own `retryCount: 3` and `mutex` and no suite
-retries under both. The `test:all` scripts go with moon at the cutover.
+`task-guard --retries 3` in the four browser-test `test` scripts (components,
+api-mock, storybook, sdk-qwik). The flake it exists for is a module import that
+Chromium aborts when a container changes the host's addresses (#1490, now
+prevented in CI; the retry stays as a safety net), so the retry re-runs the
+whole suite, which Vitest's own per-test `retry` would not do — a failed module
+import fails the file. Moon is unchanged: its `test` task runs each package's
+`test:all` script, which calls Vitest directly, so moon keeps its own
+`retryCount: 3` and no suite retries under both. The `test:all` scripts go with
+moon at the cutover.
 
 ### `runInCI` (72 uses)
 

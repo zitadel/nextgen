@@ -100,15 +100,16 @@ hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
 ## Mutex and retry
 
 Turbo has neither. `scripts/task-guard.mjs` wraps a command:
-`node ../../scripts/task-guard.mjs --mutex browser-tests --retries 3 -- vitest run`.
-The lock is a directory in the OS temp dir keyed by the repository root, so
-checkouts do not block each other and a dead holder is reclaimed. The guard
-acts only when turbo runs the task (turbo sets `TURBO_HASH` for every task);
-under moon and when run by hand it runs the command once, unchanged. Names in
-use: `browser-tests` (one real-Chromium Vite server at a time, #1490),
-`generated-sources` (the generation tasks and the tasks that read what they
-rewrite) and `demo-next-app` (the two demo-next e2e lanes, which both serve the
-demo on :3002; moon has a mutex of the same name on them).
+`node ../../scripts/task-guard.mjs --mutex generated-sources -- orval …` holds a
+lock while the command runs, and the four browser-test packages run
+`node ../../scripts/task-guard.mjs --retries 3 -- vitest run`. The lock is a
+directory in the OS temp dir keyed by the repository root, so checkouts do not
+block each other and a dead holder is reclaimed. The guard acts only when turbo
+runs the task (turbo sets `TURBO_HASH` for every task); under moon and when run
+by hand it runs the command once, unchanged. Names in use: `generated-sources`
+(the generation tasks and the tasks that read what they rewrite) and
+`demo-next-app` (the two demo-next e2e lanes, which both serve the demo on
+:3002; moon has a mutex of the same name on them).
 
 Moon keeps its own `mutex` and `retryCount` until the cutover. Its `test`
 task runs each package's `test:all` script, which in the four browser-test

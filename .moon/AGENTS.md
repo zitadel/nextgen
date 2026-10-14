@@ -19,8 +19,8 @@ Where the two differ on purpose:
 - Moon's `test` task runs each package's `test:all` script, turbo runs
   `test`. In the four browser-test packages (`api-mock`, `components`,
   `sdk-qwik`, `storybook`) `test` wraps `scripts/task-guard.mjs` for turbo's
-  lock and retries, and `test:all` calls Vitest directly, because moon has
-  its own `mutex` and `retryCount` there.
+  retries, and `test:all` calls Vitest directly, because moon has its own
+  `retryCount` there.
 - The Go `format` and `lint` tasks keep their inline scripts here; turbo
   runs file copies of them (`scripts/go-format-check.mjs`,
   `scripts/go-lint.mjs`). A change to one goes into the other.

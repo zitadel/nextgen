@@ -53,10 +53,6 @@ tasks:
       - "install-browsers"
       - "build"
     options:
-      # Shared mutex with the other browser-mode suites so only one real-Chromium
-      # Vite server runs at a time; concurrent servers starve under moon's CI
-      # graph and drop module fetches. (#1490)
-      mutex: "browser-tests"
       # Retry a failed browser suite in CI, as a safety net. It was added for
       # "Failed to fetch dynamically imported module": Chromium aborting module
       # imports when a container changes the host's addresses, which ci.yml's
