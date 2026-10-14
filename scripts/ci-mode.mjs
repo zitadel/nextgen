@@ -116,6 +116,10 @@ const TESTING_DEMO_TARGETS = ["testing:test-integration", "e2e:demo-next-real"];
 // runs the console gate — the workflow steps them sequentially so two local
 // instances do not contend.
 const CONSOLE_E2E_TARGETS = ["e2e:console-real", "e2e:console-embedded"];
+// The lanes that need no backend: the console's preview smoke and the demos
+// against api-mock. ci-turbo.yml runs them in one step; moon runs them as part
+// of e2e:all.
+const MOCK_E2E_TARGETS = ["e2e:console-smoke", "e2e:demo-next-mock", "e2e:demo-nuxt-mock"];
 // The aggregate ci.yml names in its `moon ci` call. When moon selects it, every
 // lane runs as its dependency, the journey included, whether or not a journey
 // trigger above moved (an api-mock change reaches it through the mock lanes).
@@ -130,6 +134,7 @@ const ALL_GATES = [
   "journey_testkit",
   "suites_testing_demo",
   "suites_console",
+  "suites_mock",
   "browsers",
 ];
 
@@ -188,6 +193,7 @@ export function resolveGates({ mode, files, targets }) {
   const journeyPreexisting = journeyNextScaffold || set.has("sdk-nuxt:build");
   const suitesTestingDemo = TESTING_DEMO_TARGETS.some((t) => set.has(t));
   const suitesConsole = CONSOLE_E2E_TARGETS.some((t) => set.has(t));
+  const suitesMock = MOCK_E2E_TARGETS.some((t) => set.has(t));
   const anyJourney = journeyFreshApp || journeyNextScaffold || journeyPreexisting;
 
   const gates = {
@@ -204,11 +210,12 @@ export function resolveGates({ mode, files, targets }) {
     journey_testkit: journeyNextScaffold,
     suites_testing_demo: suitesTestingDemo,
     suites_console: suitesConsole,
+    suites_mock: suitesMock,
     // Provisions Chromium for the e2e suites and journeys (their steps have no
     // per-package install-browsers dep). The browser `:test` lanes
     // (components/api-mock/storybook) install Chromium themselves via a moon dep,
     // so they don't need this gate.
-    browsers: suitesTestingDemo || suitesConsole || anyJourney,
+    browsers: suitesTestingDemo || suitesConsole || suitesMock || anyJourney,
   };
   const matrix =
     journeyProject || anySdkBuild || MATRIX_TRIGGERS.some((t) => set.has(t)) ? "full" : "single";
@@ -286,11 +293,7 @@ const TURBO_GRAPH_TASKS = [
   "test-spanner",
   "test:integration",
   "e2e",
-  "e2e-real",
-  "e2e-embedded",
-  "e2e-platform",
   "e2e-local",
-  "e2e-testkit",
   "console-smoke",
   "console-real",
   "console-embedded",
@@ -315,7 +318,6 @@ const TURBO_GRAPH_TASKS = [
   "check-typecheck",
   "check-openapi-rules",
   "doctor",
-  "journey",
   "build-local-image",
   "smoke-container",
   "check",

@@ -334,14 +334,28 @@ test("docs-only change gates everything off", () => {
   assert.ok(allFalse(gates));
 });
 
-test("go change runs everything, but the journey matrix collapses to one framework", () => {
+test("go change runs everything but the mock lanes, and the journey matrix collapses to one framework", () => {
   const { gates, matrix } = resolveGates({
     mode: "full",
     files: ["internal/a.go"],
     targets: GO_CLASS,
   });
-  assert.ok(allTrue(gates));
+  // The mock lanes run against api-mock, never the server.
+  const { suites_mock: suitesMock, ...rest } = gates;
+  assert.ok(allTrue(rest));
+  assert.equal(suitesMock, false);
   assert.equal(matrix, "single");
+});
+
+test("api-mock change runs the mock lanes", () => {
+  const { gates } = resolveGates({
+    mode: "full",
+    files: ["packages/api-mock/src/crypto.ts"],
+    targets: API_MOCK_CLASS,
+  });
+  assert.equal(gates.suites_mock, true);
+  assert.equal(gates.browsers, true);
+  assert.equal(gates.suites_console, false);
 });
 
 test("console change runs everything, but the journey matrix collapses to one framework", () => {

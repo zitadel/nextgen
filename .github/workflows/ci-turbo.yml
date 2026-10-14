@@ -220,6 +220,13 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_testing_demo == 'true' }}
         run: turbo run test:integration demo-next-real --filter=@zitadel/testing --filter=@zitadel/e2e
 
+      # The lanes that need no backend: the console's preview smoke and the demos
+      # against api-mock (moon runs them inside e2e:all). After the step above:
+      # both demo-next lanes serve the demo on :3002.
+      - name: Run mock-backed e2e lanes
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_mock == 'true' }}
+        run: turbo run console-smoke demo-next-mock demo-nuxt-mock --filter=@zitadel/e2e
+
       - name: Run console real-instance suite
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_console == 'true' }}
         run: turbo run console-real --filter=@zitadel/e2e
