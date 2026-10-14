@@ -123,6 +123,7 @@ export default class Deploy extends EnvironmentCommand {
       origin,
       bundle,
       brandingSources,
+      suggest: (args) => this.suggest(args),
     };
 
     // Before-release steps: validate, sync IdPs (validated and previewed but

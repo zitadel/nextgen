@@ -114,6 +114,7 @@ import {
 import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
 import {
+  type EnvironmentSelector,
   inShell,
   projectCommand,
   type SuggestedCommand,
@@ -154,16 +155,19 @@ const RENDERER_FLAG_DESCRIPTION =
  * forces the local project the recovery is for, because `--env-file` outranks
  * the process environment (unlike `--env`); same reasoning as the SSO recovery.
  */
-const RECOVERY_SELECTOR = environmentSelectorSuffix({ envFile: ".env.development.local" });
+function recoverySelector(cwd: string | undefined): EnvironmentSelector {
+  // `--cwd` too, as typed: `--env-file` resolves against it, so a recovery
+  // run from where setup was launched reads the file setup wrote.
+  return environmentSelectorSuffix({ envFile: ".env.development.local", cwd });
+}
 
 /**
- * {@link RECOVERY_SELECTOR} plus `--server local`, for the recovery after a
+ * {@link recoverySelector} plus `--server local`, for the recovery after a
  * local-server failure (see `ssoRecovery`).
  */
-const LOCAL_RECOVERY_SELECTOR = environmentSelectorSuffix({
-  envFile: ".env.development.local",
-  server: "local",
-});
+function localRecoverySelector(cwd: string | undefined): EnvironmentSelector {
+  return environmentSelectorSuffix({ envFile: ".env.development.local", server: "local", cwd });
+}
 
 /** `zitadel setup` — create a project and scaffold local auth.
  *
@@ -646,10 +650,15 @@ export default class Setup extends BaseCommand {
               `${answer.endpoints.issuer}, not the provider`,
           );
         }
-        reportClientIdOutcome(idVariable, clientId, this.meta.cliVersion, RECOVERY_SELECTOR);
+        reportClientIdOutcome(
+          idVariable,
+          clientId,
+          this.meta.cliVersion,
+          recoverySelector(flags.cwd),
+        );
         // The wizard refuses an empty secret, so a deferred publish here only
         // ever means there was no project to publish to.
-        reportSecretOutcome(secret, this.meta.cliVersion, false, RECOVERY_SELECTOR);
+        reportSecretOutcome(secret, this.meta.cliVersion, false, recoverySelector(flags.cwd));
       }
     }
 
@@ -775,9 +784,9 @@ export default class Setup extends BaseCommand {
         (isLocal && (dryRun || hostsPlatform)));
     const claimNudge = nudgeClaim
       ? {
-          actions: [claimAction(this.meta.cliVersion, deadline, RECOVERY_SELECTOR)],
-          boxActions: [claimBoxAction(this.meta.cliVersion, deadline, RECOVERY_SELECTOR)],
-          commands: [claimCommand(this.meta.cliVersion, RECOVERY_SELECTOR)],
+          actions: [claimAction(this.meta.cliVersion, deadline, recoverySelector(flags.cwd))],
+          boxActions: [claimBoxAction(this.meta.cliVersion, deadline, recoverySelector(flags.cwd))],
+          commands: [claimCommand(this.meta.cliVersion, recoverySelector(flags.cwd))],
         }
       : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
     // Only when the project is the local admin's: the console lists nothing
@@ -913,7 +922,7 @@ export default class Setup extends BaseCommand {
               ];
             }),
             this.meta.cliVersion,
-            RECOVERY_SELECTOR,
+            recoverySelector(flags.cwd),
           ),
           ...installOutcome.nextCommands,
           ...consoleStep.commands,
@@ -1417,7 +1426,7 @@ function ssoRecovery(
     // what the command does. `sso enable` asks for the id, exactly as it asks
     // for the secret, which was never put in command text for the same
     // reason.
-    // LOCAL_RECOVERY_SELECTOR carries `--server local`, as the setup retry
+    // localRecoverySelector carries `--server local`, as the setup retry
     // pins it. An unpinned `sso enable`
     // takes its server from `ZITADEL_URL`, so with that variable set to
     // another server it would publish the client id and secret there --
@@ -1439,7 +1448,7 @@ function ssoRecovery(
             ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
             : ""
         }`,
-        LOCAL_RECOVERY_SELECTOR,
+        localRecoverySelector(retry.cwd),
         cliVersion,
       ),
     ),

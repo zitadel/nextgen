@@ -102,13 +102,20 @@ export default class DeploymentRollback extends EnvironmentCommand {
       }
       // A rollback re-applies the named deployment to every origin it
       // targeted, which the request cannot narrow. If that deployment also
-      // targeted an origin the undone deploy never touched, re-applying it
-      // would silently move that origin back too, so it is refused instead.
+      // targeted an origin the undone deploy never touched, and that origin
+      // has since moved on to a newer deployment, re-applying it would
+      // silently move that origin back too, so it is refused instead. An
+      // origin the prior deployment still serves is left exactly as it is.
       const prior = priors[0] as ListDeployments200DeploymentsItem;
       const undone = new Set(origins);
       const beyond = prior.targets
         .map((target) => target.origin)
-        .filter((target) => !undone.has(target));
+        .filter(
+          (target) =>
+            !undone.has(target) &&
+            deployments.find((deployment) => deployment.targets.some((t) => t.origin === target))
+              ?.id !== prior.id,
+        );
       if (beyond.length > 0) {
         throw new ZitadelError(
           "E_VALIDATION",

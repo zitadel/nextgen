@@ -44,7 +44,7 @@ export const idpConnectionsStep: Step = {
     if (connections.length > 0) {
       const held = await heldVariables(ctx);
       for (const entry of entries) {
-        checkCredentialVariables(entry.body, `${IDPS_DIR}/${entry.name}`, held);
+        checkCredentialVariables(entry.body, `${IDPS_DIR}/${entry.name}`, held, ctx.suggest);
       }
     }
     for (const connection of connections) {
@@ -127,6 +127,7 @@ function checkCredentialVariables(
   connection: object,
   file: string,
   held: ReadonlyMap<string, boolean>,
+  suggest: StepContext["suggest"],
 ): void {
   const body = connection as {
     oidc?: { client_id?: unknown; client_secret?: unknown };
@@ -159,7 +160,8 @@ function checkCredentialVariables(
         "E_CREDENTIAL_MISSING",
         `${file}: ${field} names the variable ${name}, which the project does not have`,
         {
-          hint: `Publish it with \`variable set ${name}${wantsSecret ? " --secret" : ""}\`, then deploy again.`,
+          hint: "Publish it with the command below, then deploy again.",
+          nextCommands: [suggest(`variable set ${name}${wantsSecret ? " --secret" : ""}`)],
           details: { variable: name, field, file },
         },
       );
@@ -170,8 +172,9 @@ function checkCredentialVariables(
         `${file}: ${field} names the variable ${name}, which is ${isSecret ? "a secret" : "not a secret"}`,
         {
           hint: wantsSecret
-            ? `The client secret must be a secret variable: publish it with \`variable set ${name} --secret\`.`
-            : `The client id must be a plain variable the engine can read back: publish it with \`variable set ${name}\`, without --secret.`,
+            ? "The client secret must be a secret variable: publish it with the command below."
+            : "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.",
+          nextCommands: [suggest(`variable set ${name}${wantsSecret ? " --secret" : ""}`)],
           details: { variable: name, field, file, secret: isSecret },
         },
       );

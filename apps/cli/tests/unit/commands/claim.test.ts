@@ -13,7 +13,8 @@ import {
 } from "@zitadel/api-mock/platform";
 import { http, passthrough } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { text } from "@clack/prompts";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   localContainerName,
@@ -21,7 +22,11 @@ import {
   writeRuntimeMetadata,
   type RuntimeMetadata,
 } from "../../../src/lib/local-server/runtime";
+import Claim from "../../../src/commands/claim";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { asTerminal } from "../../helpers/terminal";
+
+vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
 
 /**
  * `zitadel claim` against the api-mock, which is the only working claim
@@ -393,6 +398,31 @@ describe("claim", () => {
     expect(secret.project_id).toBe(fallback.id);
     expect(secret.team_id).toBeUndefined();
     expect(secret.claimed_at).toBeUndefined();
+  });
+
+  it("asks for a missing project id on a terminal and keeps the answer", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
+    tempDirs.push(cwd);
+    const envProject = await createProjectOnMock();
+    await writeFile(
+      join(cwd, ".env.production.local"),
+      [`ZITADEL_URL=${SERVER}`, `ZITADEL_PROJECT_SECRET=${envProject.project_secret}`, ""].join(
+        "\n",
+      ),
+      { mode: 0o600 },
+    );
+    vi.mocked(text).mockResolvedValueOnce(envProject.id);
+
+    // The built CLI bundles its own prompts, so a prompt can only be answered
+    // by running the command from source, where `input` is the one module asked.
+    await Promise.all([
+      asTerminal(() => Claim.run(["--cwd", cwd, "--no-open", "--env", "production"])),
+      onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, envProject.id)),
+    ]);
+
+    expect(await readFile(join(cwd, ".env.production.local"), "utf8")).toContain(
+      `ZITADEL_PROJECT_ID=${envProject.id}`,
+    );
   });
 
   it("claims from an env file with no local secret present", async () => {
