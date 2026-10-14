@@ -45,10 +45,18 @@ properties it fixes, both of which this mock got wrong until they were corrected
   name let the orchestrator send a key the real backend refuses — invisible to
   every mock-backed test.
 
-Two knowing, documented exceptions: the `identifier` step keeps a `recover`
+Steps that `zitadel sso enable` adds (`register-sso`, `sso-conflict`) are not in
+`default-login.json`. Their authority is
+[`docs/design/idp/schemas/default-login.scaffold.json`](../../docs/design/idp/schemas/default-login.scaffold.json),
+which the CLI's `applySsoToFlow` test keeps in step with the generator. The
+`sso-conflict` password field is keyed by `PASSWORD_FIELD` as well.
+
+Three knowing, documented exceptions: the `identifier` step keeps a `recover`
 navigate action (the default flow defines no recovery step yet) so that screen
-stays reachable, and the `passkey-upsell`/`passkey-setup` pair is retained for
-direct actor injection though the default flow no longer routes through it.
+stays reachable; the `passkey-upsell`/`passkey-setup` pair is retained for
+direct actor injection though the default flow no longer routes through it; and
+`register-sso` serves `given_name`/`family_name` plus a `sign_in` navigate
+where the scaffold collects `email` with a single `submit`.
 (`register` on identifier and `sign_in` on register used to be listed here;
 they are real now — the default declares them as navigate actions with
 purposed transitions.)

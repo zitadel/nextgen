@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { PASSWORD_FIELD } from "./fixtures/login.js";
 import { startFlowActor, type FlowStepName, type SsoOutcome } from "./flow-machine.js";
 
 function atProvider(): ReturnType<typeof startFlowActor> {
@@ -145,7 +146,11 @@ describe("sso-conflict", () => {
   it("accepts a password and signs in", () => {
     const actor = conflicted();
 
-    actor.send({ type: "SUBMIT", action: "submit", fields: { password: "hunter2" } });
+    actor.send({
+      type: "SUBMIT",
+      action: "submit",
+      fields: { [PASSWORD_FIELD]: "correct-horse-battery-staple" },
+    });
 
     expect(actor.getSnapshot().value).toBe("done");
   });

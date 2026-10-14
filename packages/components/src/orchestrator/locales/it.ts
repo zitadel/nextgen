@@ -198,6 +198,7 @@ export const it: Locale = {
   "error.user_not_found": "Non abbiamo trovato un account con questi dati.",
   "error.sso_user_not_found": "Non esiste ancora un account per questo accesso.",
   "error.outcome_unhandled": "Non è stato possibile proseguire questo passaggio. Riprova.",
+  "error.sign_in_first": "Accedi prima al tuo account.",
 
   // --- Errori campo / modulo ---
   "error.email_required": "Inserisci un indirizzo e-mail",

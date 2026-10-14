@@ -613,6 +613,9 @@ describe("setupMockHandlers — the provider round trip", () => {
     const back = await viaCallback(id, { email: "exists@example.com" });
 
     expect(back.step.name).toBe("sso-conflict");
+    // Keyed like the real step, so a password submit the orchestrator
+    // builds from it is one the server accepts.
+    expect(back.step.fields?.map((f) => f.name)).toEqual([PASSWORD_FIELD]);
   });
 
   test("an email that already has a passkey account reaches sso-conflict", async () => {
