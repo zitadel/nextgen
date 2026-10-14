@@ -1,10 +1,8 @@
 import { Flags } from "@oclif/core";
-import { cancel, confirm, isCancel } from "@clack/prompts";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
-import { ZitadelError } from "../../lib/errors";
 import { publicCliCommand } from "../../lib/public-cli";
 import { shellArg } from "../../lib/shell";
 
@@ -37,7 +35,7 @@ export default class OriginRm extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(OriginRm);
     await this.toMeta(flags);
-    const { nonInteractive, dryRun, force, cliVersion } = this.meta;
+    const { dryRun, cliVersion } = this.meta;
     const pattern = args.pattern;
 
     // A dry run makes no request, so it answers before the connection — the
@@ -48,32 +46,20 @@ export default class OriginRm extends EnvironmentCommand {
       return this.emit({ ...preview, pretty: `${preview.pretty} from the project` });
     }
 
-    if (!force) {
-      if (nonInteractive) {
-        // A preview pattern can carry a `*`, so the retry is copy-pasteable only
-        // if the shell will not expand it: `shellArg` single-quotes any pattern
-        // holding a glob or other special character before interpolating it.
-        const retry = publicCliCommand(
-          `origin rm ${shellArg(pattern)} --force${this.environmentSelector()}`,
-          cliVersion,
-        );
-        throw new ZitadelError(
-          "E_VALIDATION",
-          "Removing an origin requires --force in non-interactive mode",
-          {
-            hint: `Pass --force to remove ${pattern} from the project.`,
-            nextCommands: [retry],
-          },
-        );
-      }
-      const answer = await confirm({
-        message: `Remove ${pattern} from the project?`,
-        initialValue: false,
-      });
-      if (isCancel(answer) || !answer) {
-        cancel("Remove cancelled.");
-        return this.emit({ status: "skipped", reason: "remove-cancelled" });
-      }
+    // A preview pattern can carry a `*`, so the retry is copy-pasteable only if
+    // the shell will not expand it: `shellArg` single-quotes any pattern holding
+    // a glob or other special character before interpolating it.
+    const confirmed = await this.input({
+      kind: "confirm",
+      name: `remove ${pattern} from the project`,
+      message: `Remove ${pattern} from the project?`,
+      retry: publicCliCommand(
+        `origin rm ${shellArg(pattern)} --force${this.environmentSelector()}`,
+        cliVersion,
+      ),
+    });
+    if (!confirmed) {
+      return this.emit({ status: "skipped", reason: "remove-cancelled" });
     }
 
     const { client, projectId } = await this.connect();
