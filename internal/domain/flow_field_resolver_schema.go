@@ -529,6 +529,20 @@ func (x xAuthMethodsReader) IsEnabled(method string) bool {
 	return enabled
 }
 
+// SSOProviders returns the IDP connection slugs under `sso.providers`.
+func (x xAuthMethodsReader) SSOProviders() []string {
+	methods, _ := x.raw.V.(map[string]any)
+	sso, _ := methods["sso"].(map[string]any)
+	providers, _ := sso["providers"].([]any)
+	slugs := make([]string, 0, len(providers))
+	for _, provider := range providers {
+		if slug, ok := provider.(string); ok {
+			slugs = append(slugs, slug)
+		}
+	}
+	return slugs
+}
+
 // requirednessKeywords can make a property required outside a `required`
 // list, or (a reference) hide what a subschema requires.
 var requirednessKeywords = map[string]bool{
