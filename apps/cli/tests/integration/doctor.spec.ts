@@ -88,7 +88,7 @@ describe("doctor", () => {
 
         const result = await app.doctor();
 
-        expect(result).toHintAt("Upgrade the app to Next 15+");
+        expect(result).toHintAt("Upgrade the app to Next.js 15.2.3 or later");
       });
 
       it("does not offer a repair it cannot make", async () => {
