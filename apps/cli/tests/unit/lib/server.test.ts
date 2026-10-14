@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { localRuntimePaths, type RuntimeMetadata } from "../../../src/lib/local-server/runtime";
-import { DEFAULT_SERVER, resolveServer } from "../../../src/lib/server";
+import { DEFAULT_SERVER, parseServer, resolveServer } from "../../../src/lib/server";
 
 let dir: string;
 let servers: Server[] = [];
@@ -116,3 +116,20 @@ async function startHealthServer(): Promise<string> {
   }
   return `http://localhost:${String(address.port)}`;
 }
+
+describe("parseServer", () => {
+  it("gives the origin of a URL", () => {
+    expect(parseServer(" https://api.example.com/some/path ")).toEqual({
+      ok: true,
+      value: "https://api.example.com",
+    });
+  });
+
+  it("reports a URL with no scheme instead of throwing", () => {
+    expect(parseServer("api.zitadel.cloud")).toMatchObject({ ok: false });
+  });
+
+  it("reports an empty answer", () => {
+    expect(parseServer("  ")).toEqual({ ok: false, problem: "Enter the server URL." });
+  });
+});

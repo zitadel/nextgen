@@ -158,6 +158,20 @@ describe("env add", () => {
       expect(out).toContain("once ZITADEL_PROJECT_SECRET is in .env.production.local");
     });
 
+    it("names the app origin it already has in the step that waits on the secret", async () => {
+      const cwd = await makeProject("next");
+
+      const out = await addRendered(
+        cwd,
+        "--project",
+        "proj_existing",
+        "--app-url",
+        "https://app.acme.com",
+      );
+
+      expect(out).toContain("origin add https://app.acme.com --kind primary --env production");
+    });
+
     it("restricts the project to the app's origin first", async () => {
       const cwd = await makeProject("next");
 
@@ -167,6 +181,25 @@ describe("env add", () => {
         "origin add https://app.acme.com --kind primary --env production",
       );
     });
+  });
+
+  it("keeps --project in the retry it suggests for a missing server", async () => {
+    const cwd = await makeProject("next");
+
+    const result = await runCliForTest([
+      "env",
+      "add",
+      "staging",
+      "--project",
+      "proj_existing",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+    ]);
+
+    const envelope = parseJson(result.stdout) as { next_commands?: string[] };
+    expect(envelope.next_commands?.[0]).toContain("--project proj_existing");
   });
 
   describe("the file it writes", () => {

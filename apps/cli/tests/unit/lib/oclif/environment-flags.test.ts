@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { COMMANDS } from "../../../../src/index";
 import { BaseCommand } from "../../../../src/lib/oclif/base";
-import { environmentFlags } from "../../../../src/lib/oclif/environment-flags";
+import {
+  environmentFlags,
+  environmentSelectorSuffix,
+} from "../../../../src/lib/oclif/environment-flags";
 
 /** `[name, char]` for every flag in a bag. */
 const entries = (bag: Record<string, { char?: string }>): Array<[string, string | undefined]> =>
@@ -63,5 +66,21 @@ describe("clashes", () => {
     expect(clashes({ env: { char: "e" } }, { extra: { char: "e" } })).toEqual([
       "-e is shared by --env and --extra",
     ]);
+  });
+});
+
+describe("environmentSelectorSuffix", () => {
+  it("is empty for a run that named nothing", () => {
+    expect(environmentSelectorSuffix({})).toBe("");
+  });
+
+  it("keeps --cwd, which --env-file resolves against", () => {
+    expect(environmentSelectorSuffix({ cwd: "apps/web", envFile: ".env.prod" })).toBe(
+      " --env-file .env.prod --cwd apps/web",
+    );
+  });
+
+  it("quotes a value the shell would split", () => {
+    expect(environmentSelectorSuffix({ cwd: "my app" })).toBe(" --cwd 'my app'");
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
+import { anApp, aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -30,8 +30,39 @@ describe("origin rm", () => {
     });
   });
 
+  describe("against a server that refuses connections", () => {
+    it("fails", async () => {
+      const app = await aSetUpApp();
+      platform.refusesConnections();
+
+      const result = await app.run(["origin", "rm", "https://app.acme.com", "--force", "--json"]);
+
+      expect(result).toFailWith("E_NETWORK");
+    });
+  });
+
   describe("against a valid server", () => {
     describe("--json", () => {
+      it("refuses an environment holding only the preview token", async () => {
+        const app = await anApp();
+        await app.bindEnvironment("ci", {
+          ZITADEL_PROJECT_ID: "proj_ci",
+          ZITADEL_PREVIEW_TOKEN: "pk_ci",
+        });
+
+        const result = await app.run([
+          "origin",
+          "rm",
+          "https://app.acme.com",
+          "--force",
+          "--env",
+          "ci",
+          "--json",
+        ]);
+
+        expect(result).toSay("ZITADEL_PROJECT_SECRET");
+      });
+
       it("stops admitting a pattern that was added", async () => {
         const app = await aSetUpApp();
         await app.addOrigin("https://app.acme.com", "primary");
