@@ -8,9 +8,9 @@
     "build": {
       "dependsOn": ["@zitadel/sdk-next#build"]
     },
-    // The first of the release builds (tools/release/turbo.json): it runs the
-    // normal tests first, and the public packages' release builds wait for
-    // those tests before they clean the dist directories the tests import.
+    // It runs the normal tests first, and the public packages' release builds
+    // wait for those tests (through api's release build) before they clean
+    // the dist directories the tests import.
     "build-release": {
       "dependsOn": ["test", "@zitadel/sdk-next#build-release"]
     },

@@ -123,19 +123,27 @@ jobs:
         # depends on a changed one, so an api change re-tests its consumers.
         run: moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph --downstream deep --include-relations
 
-      # The Go database lanes depend on the console and login UI builds their
-      # binary embeds, so `moon ci` above also runs them whenever one of those
-      # builds is affected, and these steps then run them a second time.
-      # Folding them into the graph step (and dropping these) is a follow-up.
-      - name: Run Go integration tests (postgres)
+      # The graph step above runs the Go database lanes whenever moon finds
+      # them affected, as dependents of the console and login UI builds their
+      # binary embeds. When ci-mode forces a full run for files neither lane
+      # lists as input (a workflow-only edit, say), go_tests is on but moon
+      # finds the lanes unaffected, so the two steps below are their only run.
+      # This step reads the graph's report, so those steps run only the lanes
+      # it did not.
+      - name: Find the Go database lanes the graph ran
+        id: graph-lanes
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
+        run: node scripts/ci-mode.mjs --ran-in-graph postgres=server:test-postgres sqlite=server:test-sqlite
+
+      - name: Run Go integration tests (postgres)
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && steps.graph-lanes.outputs.postgres != 'true' }}
         run: moon run server:test-postgres
 
       # The Spanner emulator lane is not part of this job: it runs in
       # spanner.yml (nightly and on demand) and is not a required check.
 
       - name: Run Go integration tests (sqlite)
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && steps.graph-lanes.outputs.sqlite != 'true' }}
         run: moon run server:test-sqlite
 
       # Build the journey's release tarballs outside any moon graph, then hand
@@ -180,7 +188,11 @@ jobs:
       - name: Run e2e suites
         id: moon-e2e
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.e2e == 'true' }}
-        run: moon exec e2e:all --ignore-ci-checks --on-failure continue
+        # Streamed rather than buffered: buffered, a task's output reached the
+        # log only when the task ended, every line under one timestamp (run
+        # 38585094551). Each line still names its task, and MOON_SUMMARY still
+        # replays the failed tasks' output after the run.
+        run: moon exec e2e:all --ignore-ci-checks --on-failure continue --output-style stream
         env:
           # The journey's options, as ci-turbo.yml passes them: the work dir the
           # diagnostics upload below reads, ci-mode's framework scope (`single`

@@ -66,10 +66,22 @@ async function commandSnapshot(options) {
 
   await run("go", ["mod", "download"], { cwd: repoRoot });
   await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
-  await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
-  await createArchives({ repoRoot, outDir, version: release.version });
-  await packPublicPackages({ repoRoot, outDir, version: release.version });
-  await prepareDockerContext({ repoRoot, outDir, version: release.version });
+  // Three independent lanes over the built binaries, run side by side: each
+  // writes only its own output (the platform packages' bin/ and then npm/,
+  // archives/, docker-context/). Every lane settles before the first failure
+  // is rethrown, so a failing lane never leaves another's processes running.
+  const lanes = await Promise.allSettled([
+    (async () => {
+      await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
+      await packPublicPackages({ repoRoot, outDir, version: release.version });
+    })(),
+    createArchives({ repoRoot, outDir, version: release.version }),
+    prepareDockerContext({ repoRoot, outDir, version: release.version }),
+  ]);
+  const failedLane = lanes.find((lane) => lane.status === "rejected");
+  if (failedLane) {
+    throw failedLane.reason;
+  }
   await writeReleaseMetadata({ repoRoot, outDir, release, gitInfo: info });
 
   if (!options.skipContainer) {
