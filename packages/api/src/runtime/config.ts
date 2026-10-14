@@ -84,6 +84,14 @@ function writeSlot(value: ZitadelProject | null): void {
 const apiCache = new WeakMap<ZitadelProject, ZitadelApi>();
 
 /**
+ * Event dispatched on `globalThis` when {@link configureZitadel} stores a new
+ * project handle. The handle lives in a plain slot, not a reactive store, so a
+ * widget that started before the app configured (in an effect that ran after
+ * mount) listens for this to try again.
+ */
+export const CONFIG_CHANGE_EVENT = "zitadel-config-change";
+
+/**
  * Initializes app-wide SDK configuration and returns the frozen
  * {@link ZitadelProject} handle.
  *
@@ -92,14 +100,6 @@ const apiCache = new WeakMap<ZitadelProject, ZitadelApi>();
  * original. This prevents accidental overwrites while remaining safe
  * for HMR and framework double-mounts.
  */
-/**
- * Event dispatched on `globalThis` when {@link configureZitadel} stores a new
- * project handle. The handle lives in a plain slot, not a reactive store, so a
- * widget that started before the app configured (in an effect that ran after
- * mount) listens for this to try again.
- */
-export const CONFIG_CHANGE_EVENT = "zitadel-config-change";
-
 export function configureZitadel(config: ZitadelConfig): ZitadelProject {
   const resolvedProxyPath = config.proxyPath ?? "/__nextgen";
   const existing = readSlot();

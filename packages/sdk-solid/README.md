@@ -29,7 +29,9 @@ The widgets' events are also surfaced as optional callbacks:
 
 - `ZitadelLogin`: `onFlowStep`, `onFlowInput`, `onFlowComplete`, `onFlowRedirect`, and
   `onFlowError`.
-- `ZitadelLogout` and `ZitadelSession`: `onSignout`.
+- `ZitadelLogout` and `ZitadelSession`: `onSignout` and `onSessionMissing` (the visitor has no
+  session: the widget renders nothing, and the session card goes to its `postSignOutUrl` when
+  one is set).
 
 Leaving a prop unset, or setting it back to `undefined`, keeps the element's own default (for
 example the session card's "Signed in as" heading).

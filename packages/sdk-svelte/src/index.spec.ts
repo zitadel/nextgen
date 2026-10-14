@@ -19,6 +19,7 @@ import { businessLocales } from "./lib/index";
 import ZitadelLogin from "./lib/ZitadelLogin.svelte";
 import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
+import LogoutTemplate from "./__tests__/LogoutTemplate.svelte";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
@@ -256,5 +257,22 @@ describe("ZitadelLogout template children", () => {
     const el = container.querySelector<ZitadelLogoutElement>("zitadel-logout")!;
     await el.updateComplete;
     expect(el.querySelector("span [data-action='logout']")?.textContent).toBe("Bye");
+  });
+});
+
+/** The text a `<template>` carries, wherever the renderer put its children. */
+function templateText(host: Element): string {
+  const template = host.querySelector("template");
+  return `${template?.content.textContent ?? ""}${template?.textContent ?? ""}`;
+}
+
+describe("ZitadelLogout template placeholders", () => {
+  // Svelte reads `{{display}}` as an expression; `{'{{display}}'}` is the
+  // escape the README documents, so the element receives the placeholder.
+  it("reach the element verbatim from a string expression", () => {
+    const { container } = render(LogoutTemplate, { props: { project } });
+    expect(templateText(container.querySelector("zitadel-logout")!)).toContain(
+      "Sign out {{display}}",
+    );
   });
 });

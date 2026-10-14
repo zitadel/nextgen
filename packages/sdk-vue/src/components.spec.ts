@@ -274,3 +274,30 @@ describe("ZitadelLogout template slot", () => {
     expect(el.querySelector("span [data-action='logout']")?.textContent).toBe("Bye");
   });
 });
+
+/** The text a `<template>` carries, wherever the renderer put its children. */
+function templateText(host: Element): string {
+  const template = host.querySelector("template");
+  return `${template?.content.textContent ?? ""}${template?.textContent ?? ""}`;
+}
+
+describe("ZitadelLogout template placeholders", () => {
+  // Vue claims `{{display}}` as its own interpolation; `v-pre` is the escape
+  // the README documents, so the element receives the literal placeholder.
+  it("reach the element verbatim from a v-pre template", () => {
+    const { container } = render(
+      defineComponent({
+        components: { ZitadelLogout },
+        setup: () => ({ project }),
+        template: `
+          <ZitadelLogout :project="project">
+            <template v-pre><button data-action="logout">Sign out {{display}}</button></template>
+          </ZitadelLogout>
+        `,
+      }),
+    );
+    expect(templateText(container.querySelector("zitadel-logout")!)).toContain(
+      "Sign out {{display}}",
+    );
+  });
+});

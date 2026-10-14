@@ -14,11 +14,17 @@ pnpm add @zitadel/sdk-tanstack-start
 
 Register a global request middleware in `src/start.ts` — the file TanStack Start
 auto-loads as its server entry. It must export a `startInstance` from
-`createStart`; wire the auth middleware via `requestMiddleware`:
+`createStart`; wire the auth middleware via `requestMiddleware`. Having this
+file opts the app out of TanStack Start's automatic CSRF protection for server
+functions, so restore it with `createCsrfMiddleware` and list it before auth:
 
 ```ts
-import { createMiddleware, createStart } from '@tanstack/react-start';
+import { createCsrfMiddleware, createMiddleware, createStart } from '@tanstack/react-start';
 import { createNextgenRequestMiddleware } from '@zitadel/sdk-tanstack-start/server';
+
+const csrfMiddleware = createCsrfMiddleware({
+  filter: (ctx) => ctx.handlerType === 'serverFn',
+});
 
 const authMiddleware = createMiddleware({ type: 'request' }).server(
   createNextgenRequestMiddleware({
@@ -30,7 +36,7 @@ const authMiddleware = createMiddleware({ type: 'request' }).server(
 );
 
 export const startInstance = createStart(() => ({
-  requestMiddleware: [authMiddleware],
+  requestMiddleware: [csrfMiddleware, authMiddleware],
 }));
 ```
 
@@ -77,7 +83,10 @@ export const Route = createFileRoute('/admin')({
 ```
 
 `protectedRoutes` alone only guards full document requests (a hard load or
-reload), not client-side `<Link>` navigation.
+reload), not client-side `<Link>` navigation. Without a `beforeLoad` guard, the
+`ZitadelSession` card is the guard on client-side navigation: when it finds no
+session it navigates to its `postSignOutUrl`, so a signed-out visitor still ends
+at `/login`. The `beforeLoad` guard above keeps the route from rendering at all.
 
 ### 3. Render the login widget
 

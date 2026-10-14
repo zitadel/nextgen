@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+import ts from "typescript";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { getProxyPath } from "./base-url";
@@ -110,6 +114,26 @@ describe("configureZitadel", () => {
 
     instanceA._resetConfigForTesting();
     instanceB._resetConfigForTesting();
+  });
+
+  // IDE hovers and the emitted `.d.mts` read the docblock directly above a
+  // declaration, so a block wedged in between steals it.
+  test("carries its own docblock in the source", () => {
+    const file = fileURLToPath(new URL("./config.ts", import.meta.url));
+    const source = ts.createSourceFile(
+      file,
+      readFileSync(file, "utf8"),
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    const declaration = source.statements
+      .filter(ts.isFunctionDeclaration)
+      .find((node) => node.name?.text === "configureZitadel");
+    const docs = declaration ? ts.getJSDocCommentsAndTags(declaration) : [];
+
+    expect(docs.map((doc) => ts.getTextOfJSDocComment(doc.comment))).toEqual([
+      expect.stringMatching(/^Initializes app-wide SDK configuration/),
+    ]);
   });
 });
 

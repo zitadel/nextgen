@@ -55,6 +55,10 @@ All packages ship on the `@alpha` dist-tag and move together as one release trai
 | --------- | ------- | --------- | -------------------------------- | ------------- |
 | Next.js | `@zitadel/sdk-next` | Server (App Router) | Built into the SDK middleware | routes + `proxy.ts` (or `middleware.ts`, by the Next version in `package.json`) |
 | Nuxt | `@zitadel/sdk-nuxt` | Server (Nitro) | Nitro server middleware | pages + plugins + module in `nuxt.config` |
+| SvelteKit | `@zitadel/sdk-sveltekit` + `@zitadel/sdk-svelte` | Server (SSR) | `handle` server hook | `src/hooks.server.ts` + routes |
+| SolidStart | `@zitadel/sdk-solid-start` + `@zitadel/sdk-solid` | Server (SSR) | SolidStart request middleware | `src/middleware.ts` registered in `vite.config.ts` + routes |
+| Qwik City | `@zitadel/sdk-qwik-city` + `@zitadel/sdk-qwik` | Server (SSR) | Root `onRequest` plugin | `src/routes/plugin@nextgen.ts` + routes |
+| TanStack Start | `@zitadel/sdk-tanstack-start` | Server (SSR) | Global request middleware | `src/start.ts` + routes |
 | React | `@zitadel/sdk-react` | SPA | Vite dev proxy / your deploy proxy | Vite proxy + auth UI |
 | Vue | `@zitadel/sdk-vue` | SPA | Vite dev proxy / your deploy proxy | Vite proxy + auth UI |
 | Angular | `@zitadel/sdk-angular` | SPA | dev-server proxy / your deploy proxy | proxy config + components |

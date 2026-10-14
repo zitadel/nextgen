@@ -7,7 +7,6 @@ import type {
   SubmitFlowStepBodyChallengeResponse,
   SubmitFlowStepBodyFields,
 } from "@zitadel/api/generated/model";
-import { getZitadelConfig } from "@zitadel/api/config";
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
 import type { Liquid, Template } from "liquidjs";
@@ -38,7 +37,7 @@ import { stampExportparts } from "./exportparts.js";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { en, builtinLocales, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
-import { resolveApi } from "./resolve-api.js";
+import { resolveApi, resolveProject } from "./resolve-api.js";
 import { createSanitiser } from "./sanitiser.js";
 import { ZitadelSurface } from "./surface.js";
 import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
@@ -778,20 +777,20 @@ export class ZitadelLogin extends ZitadelSurface {
   private restartPending = false;
 
   private flowConfigKey(): string {
-    // The handle `resolveApi` would pick over the attributes, so a late
-    // `configureZitadel()` counts as a config change too.
-    const handle = this.project ?? getZitadelConfig();
+    // Keyed on the project `resolveApi` actually picks, not on the channel that
+    // supplied it: a late `configureZitadel()` or a new handle still counts as a
+    // change, but the same project arriving as attributes first and as a
+    // `project` handle or global config later (what a server-rendered Qwik
+    // widget does) does not start a second flow.
+    const resolved = resolveProject(this.project, this.projectAttrs);
     // Every unset spelling (`undefined`, `null`, `""`) is the same config, so
     // a framework re-binding an empty prop does not restart an untouched flow.
     return JSON.stringify(
       [
-        handle?.projectId,
-        handle?.proxyPath,
-        handle?.url,
-        handle?.publishableKey,
-        this.projectId,
-        this.proxyPath,
-        this.url,
+        resolved?.projectId,
+        resolved?.proxyPath,
+        resolved?.url,
+        resolved?.publishableKey,
         this.purpose,
         this.flowName,
       ].map((value) => value || ""),

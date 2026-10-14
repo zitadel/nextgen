@@ -1,5 +1,5 @@
 ---
-"@zitadel/sdk-react": patch
+"@zitadel/sdk-react": minor
 ---
 
 The package is now marked `"use client"`, so a Next.js App Router server component can render the

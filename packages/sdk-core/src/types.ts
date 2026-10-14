@@ -59,6 +59,13 @@ export interface ZitadelSignoutDetail {
   readonly identifier: string;
 }
 
+/**
+ * Payload of the `zitadel-session-missing` event: the widget asked for the
+ * session and the server answered that there is none (401 or 404). Empty for
+ * now; an object so fields can be added without breaking handlers.
+ */
+export type ZitadelSessionMissingDetail = Readonly<Record<never, never>>;
+
 /* ───────────────────────────  SPA widget contract  ───────────────────────
  * Single source of truth shared by every SPA SDK (react, vue, angular, solid,
  * svelte, qwik). The event maps below declare which widget events exist and
@@ -81,15 +88,18 @@ export interface ZitadelLoginEventMap {
 /** Events emitted by `<zitadel-logout>`, keyed to their detail payload. */
 export interface ZitadelLogoutEventMap {
   "zitadel-signout": ZitadelSignoutDetail;
+  "zitadel-session-missing": ZitadelSessionMissingDetail;
 }
 
 /**
  * Events emitted by `<zitadel-session>`, keyed to their detail payload.
  * `zitadel-signout` reuses {@link ZitadelSignoutDetail} so the post-sign-in
- * card and the avatar menu speak the same sign-out contract.
+ * card and the avatar menu speak the same sign-out contract, and both report a
+ * visitor without a session through `zitadel-session-missing`.
  */
 export interface ZitadelSessionEventMap {
   "zitadel-signout": ZitadelSignoutDetail;
+  "zitadel-session-missing": ZitadelSessionMissingDetail;
 }
 
 /**
@@ -106,14 +116,16 @@ export const ZITADEL_LOGIN_EVENT_HANDLERS = {
   "zitadel-flow-error": "onFlowError",
 } as const satisfies Record<keyof ZitadelLoginEventMap, `on${string}`>;
 
-/** Maps the `<zitadel-logout>` event to the callback prop the SDKs expose. */
+/** Maps the `<zitadel-logout>` events to the callback props the SDKs expose. */
 export const ZITADEL_LOGOUT_EVENT_HANDLERS = {
   "zitadel-signout": "onSignout",
+  "zitadel-session-missing": "onSessionMissing",
 } as const satisfies Record<keyof ZitadelLogoutEventMap, `on${string}`>;
 
-/** Maps the `<zitadel-session>` event to the callback prop the SDKs expose. */
+/** Maps the `<zitadel-session>` events to the callback props the SDKs expose. */
 export const ZITADEL_SESSION_EVENT_HANDLERS = {
   "zitadel-signout": "onSignout",
+  "zitadel-session-missing": "onSessionMissing",
 } as const satisfies Record<keyof ZitadelSessionEventMap, `on${string}`>;
 
 /** Runtime list of `<zitadel-login>` event names (drives wiring + drift tests). */

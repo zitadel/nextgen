@@ -21,8 +21,6 @@ The Vue SDK wraps the shared web components with Vue 3-friendly bindings.
     ```sh
     pnpm add @zitadel/sdk-vue@alpha
     ```
-
-    `ZitadelLogin` emits `flowStep`, `flowInput`, `flowComplete`, `flowRedirect` and `flowError`; `ZitadelLogout` and `ZitadelSession` emit `signout`. Each payload is the event detail. `ZitadelSession` is the signed-in card (`<ZitadelSession :project="project" />`). An unset or cleared prop leaves the widget on its default, for example the "Signed in as" heading. The default slot goes into the element's light DOM, so `ZitadelLogout` accepts a `<template>` for a custom sign-out control and `ZitadelLogin` accepts `slot="attribution-trailing"` content.
   </Tab>
   <Tab>
     ```sh
@@ -69,6 +67,16 @@ The Vue SDK wraps the shared web components with Vue 3-friendly bindings.
       <ZitadelLogin :project="project" purpose="login" postSignInUrl="/" />
       <ZitadelLogout :project="project" postSignOutUrl="/login" />
     </template>
+    ```
+
+    `ZitadelLogin` emits `flowStep`, `flowInput`, `flowComplete`, `flowRedirect` and `flowError`; `ZitadelLogout` and `ZitadelSession` emit `signout` and `sessionMissing` (`@session-missing`). Each payload is the event detail. When the visitor has no session, the session widgets fire `zitadel-session-missing` instead and render nothing; the session card also goes to its `postSignOutUrl` when one is set. `ZitadelSession` is the signed-in card (`<ZitadelSession :project="project" />`). An unset or cleared prop leaves the widget on its default, for example the "Signed in as" heading. The default slot goes into the element's light DOM, so `ZitadelLogout` accepts a `<template>` for a custom sign-out control and `ZitadelLogin` accepts `slot="attribution-trailing"` content. Vue compiles `{{display}}` as its own interpolation, so mark the template `v-pre` to hand the placeholders to the element as written:
+
+    ```vue
+    <ZitadelLogout :project="project">
+      <template v-pre>
+        <button data-action="logout">Sign out {{display}}</button>
+      </template>
+    </ZitadelLogout>
     ```
   </Tab>
 </Tabs>

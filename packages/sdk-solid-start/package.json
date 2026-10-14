@@ -49,7 +49,7 @@
   },
   "peerDependencies": {
     "@solidjs/start": "^1.0.0 || ^2.0.0-0",
-    "solid-js": ">=1.6"
+    "solid-js": "^1.8.0"
   },
   "devDependencies": {
     "@solidjs/router": "^1.0.0",

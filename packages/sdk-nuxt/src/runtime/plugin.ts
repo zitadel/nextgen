@@ -43,12 +43,18 @@ export default defineNuxtPlugin(() => {
     (publicConfig.nextgenApiBase as string | undefined) ??
     "/__nextgen";
   const projectId = (publicConfig.zitadelProjectId as string | undefined) ?? "";
-  const url =
-    (runtimeConfig.nextgen?.url as string | undefined) ??
-    (runtimeConfig.nextgen?.issuerUrl as string | undefined) ??
-    "http://localhost:8080";
+  // `nextgen` is private runtime config (it holds the project secret), so it
+  // exists only on the server. Reading it in the browser makes Nuxt warn
+  // (NUXT_E1003) and advise making it public, which would ship the secret.
+  // The browser handle only needs the proxy path; the URL is read where there
+  // is a request, i.e. on the server.
+  const url = event
+    ? ((runtimeConfig.nextgen?.url as string | undefined) ??
+      (runtimeConfig.nextgen?.issuerUrl as string | undefined) ??
+      "http://localhost:8080")
+    : undefined;
 
   if (proxyPath && projectId) {
-    configureZitadel({ proxyPath, projectId, url });
+    configureZitadel({ proxyPath, projectId, ...(url ? { url } : {}) });
   }
 });
