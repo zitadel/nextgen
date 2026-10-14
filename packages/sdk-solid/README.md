@@ -38,6 +38,9 @@ The widgets' events are also surfaced as optional callbacks:
 Leaving a prop unset, or setting it back to `undefined`, keeps the element's own default (for
 example the session card's "Signed in as" heading).
 
+`ZitadelLogin` also takes `resumeFlowId`, an existing flow to resume instead of starting a new
+one. Unset, `null` or `""` falls back to the `flow` query parameter.
+
 Children are rendered into the element. Give `ZitadelLogout` a `<template>` child to replace its
 avatar menu with your own markup, filled with `{{display}}`, `{{identifier}}` and `{{initial}}`,
 where any `data-action="logout"` element signs out. Content with `slot="attribution-trailing"`

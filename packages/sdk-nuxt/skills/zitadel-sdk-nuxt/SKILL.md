@@ -27,10 +27,10 @@ wiring the middleware without the module.
 ## Install
 
 ```bash
-pnpm add @zitadel/sdk-nuxt
+pnpm add @zitadel/sdk-nuxt@alpha
 # login/logout web components are a separate, non-transitive dependency under
 # strict package managers (pnpm, Yarn PnP) — declare it explicitly:
-pnpm add @zitadel/components
+pnpm add @zitadel/components@alpha
 ```
 
 Peer deps: `nuxt >=4`, `h3 >=1`.
@@ -139,5 +139,6 @@ component attributes against the installed version rather than assuming.
   the server proxy and the widgets together, but a provider returns the browser
   to `/__nextgen/idp/{slug}/callback`, which is proxied only under the default
   prefix.
-- **`useAuth()` never carries the JWT.** It is omitted so the token is not
-  serialized into the SSR payload; use `getAuth(event)` server-side for it.
+- **`useAuth()` never carries the session token.** It is omitted so the token
+  is not serialized into the SSR payload; use `getAuth(event)` server-side for
+  it.

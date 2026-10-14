@@ -20,6 +20,12 @@ tasks:
 
   build-public-packages:
     command: "node -e 0"
+    # The release builds run in parallel as far as their deps allow. Each one
+    # depends on the release builds of the packages its dev build depends on,
+    # so none reads a dist another is rewriting. All of them start after
+    # cli:test, because cli:build-release runs its deps one after the other,
+    # and after the rest of their entry point's work, because pack, snapshot
+    # and publish do too. release:check-graph asserts both.
     deps:
       - "release:check-graph"
       - "cli:build-release"
@@ -42,7 +48,6 @@ tasks:
       - "testing:build-release"
     options:
       cache: false
-      runDepsInParallel: false
       runFromWorkspaceRoot: true
       # Excluded from `moon ci`: release package builds remove stale files and
       # rewrite dist output inside their build-release tasks. The check-graph

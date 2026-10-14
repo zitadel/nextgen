@@ -44,7 +44,9 @@ config, so a component rendered without `[project]` falls back to it. It accepts
 
 Each component's inputs mirror the shared `ZitadelLoginConfig` / `ZitadelLogoutConfig` /
 `ZitadelSessionConfig` types. An input you leave unset, or clear back to `undefined`, keeps
-the widget's own default (e.g. `purpose` is `"login"`).
+the widget's own default (e.g. `purpose` is `"login"`). `<zitadel-auth-login>` also takes
+`resumeFlowId`, an existing flow to resume instead of starting a new one; unset, `null` or `""`
+falls back to the `flow` query parameter.
 
 | Component                | Outputs (each emits the event detail)                                |
 | ------------------------ | -------------------------------------------------------------------- |

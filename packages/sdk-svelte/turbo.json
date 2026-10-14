@@ -9,7 +9,7 @@
       "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
     },
     "build-release": {
-      "dependsOn": ["@zitadel/components#build-release", "@zitadel/sdk-core#build-release", "@zitadel/sdk-solid#build-release"]
+      "dependsOn": ["@zitadel/components#build-release", "@zitadel/sdk-core#build-release"]
     },
     // api-mock serves the Flow API to the specs (test-setup.ts).
     "test": {

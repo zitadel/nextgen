@@ -5,7 +5,7 @@ SolidStart middleware and helpers for Nextgen Auth.
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-solid-start
+pnpm add @zitadel/sdk-solid-start@alpha
 ```
 
 ## Setup
@@ -141,7 +141,7 @@ Install the Solid component library and render its `ZitadelLogin` component.
 `@zitadel/sdk-solid-start` is server-only; the widget comes from `@zitadel/sdk-solid`:
 
 ```bash
-pnpm add @zitadel/sdk-solid
+pnpm add @zitadel/sdk-solid@alpha
 ```
 
 Load it with SolidStart's `clientOnly`, so the widget is created in the browser

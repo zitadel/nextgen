@@ -5,7 +5,7 @@ TanStack Start request middleware and helpers for Nextgen Auth.
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-tanstack-start
+pnpm add @zitadel/sdk-tanstack-start@alpha
 ```
 
 ## Setup

@@ -182,6 +182,36 @@ describe("<zitadel-logout>", () => {
     expect(events[0]?.bubbles && events[0]?.composed).toBe(true);
   });
 
+  it("reports a load failure it missed while removed, once put back", async () => {
+    let requests = 0;
+    let answer: () => void = () => undefined;
+    server.use(
+      http.get(`${API_BASE}/sessions/me`, async () => {
+        requests += 1;
+        if (requests === 1) {
+          await new Promise<void>((resolve) => {
+            answer = resolve;
+          });
+        }
+        return HttpResponse.json({ code: "internal", message: "Internal error" }, { status: 500 });
+      }),
+    );
+    const errors: Event[] = [];
+    const element = mount();
+    element.addEventListener("zitadel-session-error", (e) => errors.push(e));
+    await flush(element);
+    element.remove();
+    answer();
+    await flush(element);
+    expect(errors).toHaveLength(0);
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(requests).toBe(2);
+    expect(errors).toHaveLength(1);
+  });
+
   it("announces a missing session once put back after removal swallowed the answer", async () => {
     let requests = 0;
     let answer: () => void = () => undefined;

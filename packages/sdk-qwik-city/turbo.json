@@ -9,7 +9,7 @@
       "dependsOn": ["@zitadel/sdk-core#build"]
     },
     "build-release": {
-      "dependsOn": ["@zitadel/sdk-core#build-release", "@zitadel/sdk-solid-start#build-release"]
+      "dependsOn": ["@zitadel/sdk-core#build-release"]
     },
     "test": {
       "dependsOn": ["build"]

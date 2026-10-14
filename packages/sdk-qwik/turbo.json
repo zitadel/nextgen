@@ -9,7 +9,7 @@
       "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
     },
     "build-release": {
-      "dependsOn": ["@zitadel/components#build-release", "@zitadel/sdk-core#build-release", "@zitadel/sdk-svelte#build-release"]
+      "dependsOn": ["@zitadel/components#build-release", "@zitadel/sdk-core#build-release"]
     },
     // The suite runs in real Chromium (Qwik 2's client render and the wrapped
     // Lit components need a real DOM); api-mock serves the Flow API to the
