@@ -4365,10 +4365,8 @@ func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w
 
 // handleDeleteVariableRequest handles deleteVariable operation.
 //
-// Removes the variable this owner entered under this name.
-// A variable is deletable only by the owner that entered it. Deleting a name
-// another owner of the same project holds answers `var.not_found` and leaves
-// that owner's value standing.
+// Removes the project's variable under this name. Deleting a name the
+// project does not hold answers `var.not_found`.
 // `applies_to` selects which value is removed: `all` (the default) or the
 // `preview` override. Removing one leaves the other standing.
 //
@@ -9442,12 +9440,9 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 
 // handleGetVariableRequest handles getVariable operation.
 //
-// Reads one variable by name from the owner this request addresses — one
-// environment of the project with `environment_name`, the project level
-// itself without it.
-// A name that owner has not entered answers `var.not_found`, even when
-// another owner of the same project holds it: nothing is inherited. A secret
-// is found but not disclosed: the response is `{"secret": true}`.
+// Reads one of the project's variables by name. A name the project has not
+// entered answers `var.not_found`. A secret is found but not disclosed: the
+// response is `{"secret": true}`.
 // `applies_to` selects which value is read: `all` (the default) or the
 // `preview` override. A name with no value for the selected `applies_to`
 // answers `var.not_found`.
@@ -9649,12 +9644,7 @@ func (s *Server) handleGetVariableRequest(args [1]string, argsEscaped bool, w ht
 
 // handleGetVariablesRequest handles getVariables operation.
 //
-// Returns the variables entered at the owner this request addresses, keyed by
-// name — one environment of the project with `environment_name`, the project
-// level itself without it.
-// Owners are separate, not a ladder: an environment does not inherit the
-// project's variables and the project does not see its environments'. Reading
-// everything a project holds therefore means reading each owner in turn.
+// Returns the project's variables, keyed by name.
 // Secret values are not returned. A secret appears as `{"secret": true}`,
 // which says a value is held without disclosing it.
 // `applies_to` selects which value is read: `all` (the default) is the value
@@ -16359,20 +16349,16 @@ func (s *Server) handleUpdateTeamRequest(args [1]string, argsEscaped bool, w htt
 
 // handleUpdateVariablesRequest handles updateVariables operation.
 //
-// Enters, replaces and removes variables at the owner this request
-// addresses.
-// Every name in the body is applied at exactly that owner — the project, or
-// the environment named by `environment_name` — and reaches no other. Names
-// not in the body are untouched.
+// Enters, replaces and removes the project's variables. Names not in the
+// body are untouched.
 // A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 // stores the value encrypted under the project's active `secret` key, after
-// which it can be referenced but not read back. `null` removes the name from
-// this owner (RFC 7386), which is how several variables are removed in one
-// request; removing a name this owner does not hold is a no-op rather than an
-// error.
+// which it can be referenced but not read back. `null` removes the name
+// (RFC 7386), which is how several variables are removed in one request;
+// removing a name the project does not hold is a no-op rather than an error.
 // The body is applied whole or not at all, so a rejected request leaves the
-// owner exactly as it was. Writing the same name and owner twice replaces the
-// value rather than duplicating it, which makes a retry safe.
+// project's variables exactly as they were. Writing the same name twice
+// replaces the value rather than duplicating it, which makes a retry safe.
 // `applies_to` selects which value is written: `all` (the default) is the
 // value every deploy freezes, `preview` is the override a preview deploy
 // prefers. A name holds at most these two values, and writing one does not
