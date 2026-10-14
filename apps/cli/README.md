@@ -59,7 +59,7 @@ them yourself. The project's default user schema and login flow are provisioned
 from versioned local defaults; setup writes editable copies into
 `.zitadel/schemas/default-human-user.json` and
 `.zitadel/flows/default-login.json`, uploads them through the schema and flow
-APIs, then seeds `.zitadel/state.json` so `zitadel deploy --dry-run` shows no diff.
+APIs, then seeds `.zitadel/state.json` with what it uploaded.
 Open the dev server URL printed by your framework, register a user, log out,
 log back in, and end on the signed-in profile page. That user is an end user
 of your app. The management console is a separate sign-in: run

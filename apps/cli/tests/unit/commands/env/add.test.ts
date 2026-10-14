@@ -116,7 +116,7 @@ describe("env add", () => {
 
       expect(suggested(envelope).length).toBeGreaterThan(0);
       for (const command of suggested(envelope)) {
-        expect(command).toMatch(/ --env production$/);
+        expect(command).toContain(" --env production");
       }
     });
 

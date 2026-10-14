@@ -18,6 +18,7 @@ import {
   variableScope,
 } from "../../lib/variables";
 import { inShell } from "../../lib/suggestion";
+import { reportWarning } from "../../lib/warnings";
 
 /**
  * `zitadel variable set NAME [VALUE]` — enter or replace one variable on the
@@ -233,16 +234,22 @@ function pipeArgs(name: string, secret: boolean, type: VariableType, preview: bo
   ].join(" ");
 }
 
-/** A bucket read, or nothing when the token may not read variables. */
+/**
+ * A bucket read after the write has landed, or nothing when it cannot be read:
+ * the value is already stored, so a refused or failed courtesy read is said
+ * aloud rather than reported as a failed write.
+ */
 async function readSlot(
   read: () => Promise<GetVariables200>,
 ): Promise<GetVariables200 | undefined> {
   try {
     return await read();
   } catch (error) {
-    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-      return undefined;
+    if (!(error instanceof ApiError && (error.status === 401 || error.status === 403))) {
+      reportWarning(
+        `The value was stored, but the other slot could not be read back: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
-    throw error;
+    return undefined;
   }
 }

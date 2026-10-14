@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import { copyFile, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -6,8 +7,18 @@ import { promisify } from "node:util";
 
 const run = promisify(execFile);
 
-/** `.zitadel/` relative to the repo root, the only path a deploy diffs. */
-const CONFIG_PATH = ".zitadel/";
+/**
+ * The directories a release is built from, the only paths a deploy diffs. Not
+ * the whole of `.zitadel/`: `state.json` and `meta/` are not published, and
+ * `.zitadel/secret` or `.zitadel/local/`, left untracked but not ignored, would
+ * otherwise be marked for the diff and their contents printed.
+ */
+const CONFIG_PATHS = [
+  ".zitadel/schemas/",
+  ".zitadel/flows/",
+  ".zitadel/branding/",
+  ".zitadel/idps/",
+];
 
 /** Run git in `cwd`, returning its stdout, or null when git cannot answer. */
 async function git(cwd: string, args: string[], env?: NodeJS.ProcessEnv): Promise<string | null> {
@@ -57,7 +68,7 @@ export async function diffConfigAgainst(
   if (resolved === null) {
     return null;
   }
-  const diffArgs = ["diff", color ? "--color=always" : "--no-color", sha, "--", CONFIG_PATH];
+  const diffArgs = ["diff", color ? "--color=always" : "--no-color", sha, "--", ...CONFIG_PATHS];
 
   // `git diff` omits untracked files, but a release bundle includes every new
   // file under `.zitadel/`, so a brand-new (untracked) resource must show in
@@ -77,7 +88,12 @@ export async function diffConfigAgainst(
     // The real index may not exist yet (a fresh repo); start empty if so.
     await copyFile(resolve(cwd, indexPath), tempIndex).catch(() => undefined);
     const env: NodeJS.ProcessEnv = { GIT_INDEX_FILE: tempIndex };
-    await git(cwd, ["add", "-N", "--", CONFIG_PATH], env);
+    // `git add` refuses a whole pathspec when one part matches nothing, so only
+    // the directories this project has are marked.
+    const present = CONFIG_PATHS.filter((path) => existsSync(join(cwd, path)));
+    if (present.length > 0) {
+      await git(cwd, ["add", "-N", "--", ...present], env);
+    }
     // Fall back to the plain diff if the scratch-index diff could not run, so a
     // resolvable commit never reports "no diff available" by mistake.
     return (await git(cwd, diffArgs, env)) ?? (await git(cwd, diffArgs));

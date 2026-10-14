@@ -23,6 +23,12 @@ beforeEach(() => {
       removed.push((await request.json()) as Record<string, unknown>);
       return new HttpResponse(null, { status: 204 });
     }),
+    http.get(`${SERVER}/projects/:id`, ({ params }) =>
+      HttpResponse.json({
+        id: params.id,
+        origins: [{ pattern: "https://other.acme.com", kind: "primary" }],
+      }),
+    ),
   );
 });
 

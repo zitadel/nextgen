@@ -8,6 +8,7 @@ import { hasZitadelSecret, readZitadelSecret } from "./project";
 import { appendManagedEnvValue } from "./fs-safe";
 import { parseServer, resolveServer, serverOrigin } from "./server";
 import { unscopedCommand } from "./suggestion";
+import { shellArg } from "./shell";
 
 /**
  * The values a command reads from an environment. Each resolves on its own, so
@@ -46,6 +47,8 @@ export type Environment = Readonly<{
   consulted: readonly Consulted[];
   /** The `--env-file` path as given, if one was. */
   envFile?: string;
+  /** The project directory the run resolved against. */
+  cwd: string;
 }>;
 
 export type ResolveEnvironmentInput = Readonly<{
@@ -260,6 +263,7 @@ export async function resolveEnvironment(input: ResolveEnvironmentInput): Promis
     name,
     values,
     consulted,
+    cwd: input.cwd,
     ...(input.envFile === undefined ? {} : { envFile: input.envFile }),
   };
 }
@@ -307,7 +311,17 @@ export function requireValue(environment: Environment, key: EnvironmentKey): str
       ? `${consulted} Set ${key} in ${boundFile} or the process environment, or run \`zitadel env add ${name}\`.`
       : `${consulted} Set ${key} in ${file ?? `${boundFile} or the process environment`}${file === undefined ? "" : " or the process environment"}.`,
     ...(unbound
-      ? { nextCommands: [unscopedCommand(name === "development" ? "setup" : `env add ${name}`)] }
+      ? {
+          // Run in the directory this run addressed, which need not be the
+          // shell's: `setup` and `env add` both write their files there.
+          nextCommands: [
+            unscopedCommand(
+              `${name === "development" ? "setup" : `env add ${name}`}${
+                environment.cwd === process.cwd() ? "" : ` --cwd ${shellArg(environment.cwd)}`
+              }`,
+            ),
+          ],
+        }
       : {}),
     details: {
       environment: name,
