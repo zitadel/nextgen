@@ -169,11 +169,13 @@ type JWEHeader struct {
 	EncryptionAlgorithm jose.ContentEncryption `json:"enc"`
 }
 
-// storedKeyIDPattern is the shape of an encryption key id the storage dialects
-// mint (ADR 047): the enc_key prefix, then a ULID (Postgres, SQLite) or a
-// UUID v4 (Spanner).
+// storedKeyIDPattern is the shape a stored encryption key id may have: the
+// enc_key prefix, then a bounded body of URL-safe ASCII. ADR 047 keeps the body
+// opaque (a ULID on Postgres and SQLite, a UUID v4 on Spanner today), so this
+// does not pin a generator: it only keeps NUL, control, non-ASCII and
+// over-long values away from the key lookup.
 var storedKeyIDPattern = regexp.MustCompile(
-	`^` + string(PrefixEncryptionKey) + `_(?:[0-9A-HJKMNP-TV-Z]{26}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`,
+	`^` + string(PrefixEncryptionKey) + `_[A-Za-z0-9_-]{1,64}$`,
 )
 
 // DecodeStoredKeyJWEHeader decodes the header of a JWE a client presents back
