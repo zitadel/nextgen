@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { npmDistTagForCliVersion } from "../../../../public-cli";
+import { npmSelectorForCliVersion } from "../../../../public-cli";
 import { configCandidates } from "../config-paths";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
@@ -18,7 +18,7 @@ import {
 const SDK_DEPENDENCY = "@zitadel/sdk-solid-start";
 /**
  * The idiomatic Solid component library that ships the `<ZitadelLogin>` /
- * `<ZitadelLogout>` Solid components the routes render. The server SDK above is
+ * `<ZitadelSession>` Solid components the routes render. The server SDK above is
  * plumbing only; the widget comes from here, so a SolidStart app gets the native
  * Solid component (typed props, callback events) rather than the bare element.
  */
@@ -34,7 +34,7 @@ const VITE_CONFIG_PATHS = configCandidates("vite.config");
  * non-destructive `vite.config.*` edit (SolidStart 2 reads middleware from the
  * Vite plugin, not a top-level `app.config.ts` field). Contributes the
  * landing/login/register/profile file-based routes (the idiomatic
- * `<ZitadelLogin>`/`<ZitadelLogout>` Solid components from `@zitadel/sdk-solid`),
+ * `<ZitadelLogin>`/`<ZitadelSession>` Solid components from `@zitadel/sdk-solid`),
  * the public project-id env var, and both deps.
  */
 export class SolidStartPatcher extends AbstractRulePatcher {
@@ -47,8 +47,8 @@ export class SolidStartPatcher extends AbstractRulePatcher {
     return [
       { kind: "write", path: src("middleware.ts"), contents: middlewareTemplate() },
       { kind: "write", path: src("routes/index.tsx"), contents: indexPageTemplate() },
-      { kind: "write", path: src("routes/login.tsx"), contents: loginPageTemplate() },
-      { kind: "write", path: src("routes/register.tsx"), contents: registerPageTemplate() },
+      { kind: "write", path: src("routes/login.tsx"), contents: loginPageTemplate(ctx) },
+      { kind: "write", path: src("routes/register.tsx"), contents: registerPageTemplate(ctx) },
       { kind: "write", path: src("routes/profile.tsx"), contents: profilePageTemplate() },
       {
         kind: "edit",
@@ -69,12 +69,12 @@ export class SolidStartPatcher extends AbstractRulePatcher {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: npmDistTagForCliVersion(ctx.cliVersion),
+        version: npmSelectorForCliVersion(ctx.cliVersion),
       },
       {
         kind: "add-dep",
         name: COMPONENT_DEPENDENCY,
-        version: npmDistTagForCliVersion(ctx.cliVersion),
+        version: npmSelectorForCliVersion(ctx.cliVersion),
       },
     ];
   }

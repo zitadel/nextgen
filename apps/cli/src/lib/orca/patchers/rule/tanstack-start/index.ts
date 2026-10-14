@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { npmDistTagForCliVersion } from "../../../../public-cli";
+import { npmSelectorForCliVersion } from "../../../../public-cli";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
@@ -20,7 +20,7 @@ const SDK_DEPENDENCY = "@zitadel/sdk-tanstack-start";
  * TanStack Start proxies the backend and verifies the session through a server
  * entrypoint — here the `@zitadel/sdk-tanstack-start` request middleware
  * registered in `src/start.ts`. Contributes the landing/login/register/profile
- * file-based routes (rendering the typed `<ZitadelLogin>`/`<ZitadelLogout>`
+ * file-based routes (rendering the typed `<ZitadelLogin>`/`<ZitadelSession>`
  * React wrappers), the public project-id env var, and the SDK dep. No config
  * edit is needed — `src/start.ts` is a plain file, so (like Next) every managed
  * file carries the marker.
@@ -35,8 +35,8 @@ export class TanStackStartPatcher extends AbstractRulePatcher {
     return [
       { kind: "write", path: src("start.ts"), contents: startTemplate() },
       { kind: "write", path: src("routes/index.tsx"), contents: indexRouteTemplate() },
-      { kind: "write", path: src("routes/login.tsx"), contents: loginRouteTemplate() },
-      { kind: "write", path: src("routes/register.tsx"), contents: registerRouteTemplate() },
+      { kind: "write", path: src("routes/login.tsx"), contents: loginRouteTemplate(ctx) },
+      { kind: "write", path: src("routes/register.tsx"), contents: registerRouteTemplate(ctx) },
       { kind: "write", path: src("routes/profile.tsx"), contents: profileRouteTemplate() },
       // Pin the dev script to the origin setup registered; --strictPort makes
       // Vite exit instead of drifting to a port the project does not allow.
@@ -50,7 +50,7 @@ export class TanStackStartPatcher extends AbstractRulePatcher {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: npmDistTagForCliVersion(ctx.cliVersion),
+        version: npmSelectorForCliVersion(ctx.cliVersion),
       },
     ];
   }

@@ -82,17 +82,60 @@ describe("SolidStartPatcher.plan", () => {
     expect(edit?.path).toContain("vite.config.ts");
   });
 
-  it("adds the SDK + component dependencies at the CLI's prerelease tag", () => {
+  it("adds the SDK + component dependencies at the CLI's exact version", () => {
     const deps = new SolidStartPatcher()
       .plan(ctx())
       .ops.filter((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
     expect(deps).toContainEqual(
-      expect.objectContaining({ name: "@zitadel/sdk-solid-start", version: "alpha" }),
+      expect.objectContaining({ name: "@zitadel/sdk-solid-start", version: "0.1.0-alpha.0" }),
     );
     expect(deps).toContainEqual(
-      expect.objectContaining({ name: "@zitadel/sdk-solid", version: "alpha" }),
+      expect.objectContaining({ name: "@zitadel/sdk-solid", version: "0.1.0-alpha.0" }),
     );
   });
+
+  const businessPages = ["src/routes/login.tsx", "src/routes/register.tsx"];
+
+  // Minimal and consumer scaffolds keep the widget's neutral built-in copy.
+  it.each(businessPages)("keeps the neutral copy in %s by default", (path) => {
+    expect(writeContents(new SolidStartPatcher().plan(ctx()), path)).not.toContain(
+      "businessLocales",
+    );
+  });
+
+  it.each(businessPages)("keeps the neutral copy in %s for consumer projects", (path) => {
+    expect(
+      writeContents(new SolidStartPatcher().plan({ ...ctx(), useCase: "consumer" }), path),
+    ).not.toContain("businessLocales");
+  });
+
+  it.each(businessPages)(
+    "imports the business copy overlay in %s for business projects",
+    (path) => {
+      expect(
+        writeContents(new SolidStartPatcher().plan({ ...ctx(), useCase: "business" }), path),
+      ).toContain(
+        'import("@zitadel/sdk-solid").then(({ ZitadelLogin: Login, businessLocales }) =>',
+      );
+    },
+  );
+
+  it.each(businessPages)("passes the business copy overlay in %s for business projects", (path) => {
+    expect(
+      writeContents(new SolidStartPatcher().plan({ ...ctx(), useCase: "business" }), path),
+    ).toContain("<Login {...props} locales={businessLocales} />");
+  });
+
+  // The overlay ships in the client-only module, so the loader must not pull
+  // @zitadel/sdk-solid in at module scope to reach it.
+  it.each(businessPages)(
+    "keeps @zitadel/sdk-solid client-only in %s for business projects",
+    (path) => {
+      expect(
+        writeContents(new SolidStartPatcher().plan({ ...ctx(), useCase: "business" }), path),
+      ).not.toMatch(/^import .* from "@zitadel\/sdk-solid";$/m);
+    },
+  );
 });
 
 describe("SolidStartPatcher.artifacts", () => {

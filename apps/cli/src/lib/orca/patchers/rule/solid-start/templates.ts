@@ -1,5 +1,6 @@
 import { MANAGED_MARKER } from "../../../../paths";
 
+import type { PatchContext } from "../../types";
 import { PROXY_PATH } from "../proxy";
 
 // Enforce the dark surface the Zitadel widgets are designed for, so pages never
@@ -70,14 +71,34 @@ export default function Index() {
  * `VITE_`-prefixed env to the client) and proxy path are passed as props rather
  * than a `configureZitadel` handle — building the handle here would require
  * importing `@zitadel/sdk-solid` at module scope, reintroducing the SSR crash.
+ *
+ * Projects set up with the business use case additionally pass the SDK's
+ * `businessLocales` overlay to the widget, restoring work-email copy on top of
+ * the widget's neutral built-in dictionaries. The overlay ships in the same
+ * client-only module, so the loader wraps the widget to apply it.
  */
-function authPage(purpose: "login" | "register"): string {
-  return `${MANAGED_MARKER}
-import { clientOnly } from "@solidjs/start";
+function authPage(purpose: "login" | "register", ctx: PatchContext): string {
+  const business = ctx.useCase === "business";
+  const loader = business
+    ? `import type { ComponentProps } from "solid-js";
 
+// Set up for a business audience: businessLocales overlays work-email copy on
+// the login widget's neutral built-in dictionaries. Have the loader return the
+// plain ZitadelLogin to fall back to the neutral wording.
+const ZitadelLogin = clientOnly(() =>
+  import("@zitadel/sdk-solid").then(({ ZitadelLogin: Login, businessLocales }) => ({
+    default: (props: ComponentProps<typeof Login>) => (
+      <Login {...props} locales={businessLocales} />
+    ),
+  })),
+);`
+    : `
 const ZitadelLogin = clientOnly(() =>
   import("@zitadel/sdk-solid").then((m) => ({ default: m.ZitadelLogin })),
-);
+);`;
+  return `${MANAGED_MARKER}
+import { clientOnly } from "@solidjs/start";
+${loader}
 
 export default function ${purpose === "login" ? "Login" : "Register"}() {
   return (
@@ -94,12 +115,12 @@ export default function ${purpose === "login" ? "Login" : "Register"}() {
 `;
 }
 
-export function loginPageTemplate(): string {
-  return authPage("login");
+export function loginPageTemplate(ctx: PatchContext): string {
+  return authPage("login", ctx);
 }
 
-export function registerPageTemplate(): string {
-  return authPage("register");
+export function registerPageTemplate(ctx: PatchContext): string {
+  return authPage("register", ctx);
 }
 
 /**

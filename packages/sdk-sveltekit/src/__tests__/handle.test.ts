@@ -7,7 +7,8 @@
  * the hook touches. The assertions mirror the sdk-nuxt middleware contract.
  */
 
-import type { Handle, RequestEvent } from "@sveltejs/kit";
+import type { RequestEvent } from "@sveltejs/kit";
+import type { Handle } from "@sveltejs/kit/hooks";
 
 import { generateKeyPairSync, createSign } from "node:crypto";
 import { describe, it, expect, expectTypeOf, vi, beforeEach } from "vitest";

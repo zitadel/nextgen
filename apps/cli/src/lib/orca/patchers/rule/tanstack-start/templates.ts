@@ -1,5 +1,6 @@
 import { MANAGED_MARKER } from "../../../../paths";
 
+import type { PatchContext } from "../../types";
 import { PROXY_PATH } from "../proxy";
 
 // Enforce the dark surface the Zitadel widgets are designed for, so pages never
@@ -85,15 +86,30 @@ function Home() {
  * `@zitadel/sdk-tanstack-start/react` as its `project` prop. The public project
  * id comes from Vite's `import.meta.env.VITE_ZITADEL_PROJECT_ID`; the backend URL
  * never reaches the browser (the widget talks to the same-origin `${PROXY_PATH}`
- * proxy).
+ * proxy). The wrapper mounts the widget on the client only, after hydration, so
+ * it starts its flow with these props in place.
+ *
+ * Projects set up with the business use case additionally pass the SDK's
+ * `businessLocales` overlay to the widget, restoring work-email copy on top of
+ * the widget's neutral built-in dictionaries.
  */
-function authRoute(purpose: "login" | "register"): string {
+function authRoute(purpose: "login" | "register", ctx: PatchContext): string {
   const path = purpose === "login" ? "/login" : "/register";
   const componentName = purpose === "login" ? "LoginPage" : "RegisterPage";
+  const business = ctx.useCase === "business";
+  const reactImports = business ? "ZitadelLogin, businessLocales" : "ZitadelLogin";
+  const localesComment = business
+    ? `
+
+// Set up for a business audience: businessLocales overlays work-email copy on
+// the login widget's neutral built-in dictionaries. Remove the locales prop to
+// fall back to the neutral wording.`
+    : "";
+  const localesAttr = business ? " locales={businessLocales}" : "";
   return `${MANAGED_MARKER}
 import { createFileRoute } from "@tanstack/react-router";
-import { ZitadelLogin } from "@zitadel/sdk-tanstack-start/react";
-import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";
+import { ${reactImports} } from "@zitadel/sdk-tanstack-start/react";
+import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";${localesComment}
 
 const projectId = import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "";
 
@@ -106,19 +122,19 @@ export const Route = createFileRoute("${path}")({
 function ${componentName}() {
   return (
     <div style={{ position: "fixed", inset: 0, overflow: "auto", background: "#0f0f11", colorScheme: "dark" }}>
-      <ZitadelLogin project={project} purpose="${purpose}" postSignInUrl="/profile" />
+      <ZitadelLogin project={project}${localesAttr} purpose="${purpose}" postSignInUrl="/profile" />
     </div>
   );
 }
 `;
 }
 
-export function loginRouteTemplate(): string {
-  return authRoute("login");
+export function loginRouteTemplate(ctx: PatchContext): string {
+  return authRoute("login", ctx);
 }
 
-export function registerRouteTemplate(): string {
-  return authRoute("register");
+export function registerRouteTemplate(ctx: PatchContext): string {
+  return authRoute("register", ctx);
 }
 
 /**

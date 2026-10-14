@@ -77,7 +77,11 @@ reload), not client-side `<Link>` navigation.
 
 ### 3. Render the login widget
 
-Use the typed React wrappers from the `/react` entry:
+Use the typed React wrappers from the `/react` entry. They are
+`@zitadel/sdk-react`'s components, rendered on the client only: on the server and
+during hydration they render nothing, and right after hydration they mount the
+widget with every prop in place, so it never starts a flow with its defaults.
+The `/client` entry only configures the SDK; it exports no components.
 
 ```tsx
 import { ZitadelLogin } from '@zitadel/sdk-tanstack-start/react';
@@ -89,6 +93,23 @@ export function LoginPage() {
   return <ZitadelLogin project={project} purpose="login" postSignInUrl="/admin" />;
 }
 ```
+
+`ZitadelSession` renders the signed-in "signed in as" card with a sign-out
+button, and `ZitadelLogout` a sign-out control on its own:
+
+```tsx
+import { ZitadelSession } from '@zitadel/sdk-tanstack-start/react';
+
+export function ProfilePage() {
+  return <ZitadelSession project={project} postSignOutUrl="/login" />;
+}
+```
+
+The widgets' events surface as optional callbacks: `onFlowStep`, `onFlowInput`,
+`onFlowComplete`, `onFlowRedirect` and `onFlowError` on `ZitadelLogin`, and
+`onSignout` on `ZitadelLogout` and `ZitadelSession`. Pass
+`locales={businessLocales}` (also exported from `/react`) to show work-email copy
+for a business audience.
 
 ## Middleware options
 

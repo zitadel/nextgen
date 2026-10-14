@@ -89,6 +89,26 @@ export default component$(() => {
 });
 ```
 
+`ZitadelSession` renders the signed-in "signed in as" card with a sign-out
+button, and `ZitadelLogout` a sign-out control on its own:
+
+```tsx
+import { component$ } from '@qwik.dev/core';
+import { ZitadelSession, configureZitadel } from '@zitadel/sdk-qwik';
+
+const project = configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });
+
+export default component$(() => {
+  return <ZitadelSession project={project} postSignOutUrl="/login" />;
+});
+```
+
+The widgets' events surface as optional QRL callbacks: `onFlowStep$`,
+`onFlowInput$`, `onFlowComplete$`, `onFlowRedirect$` and `onFlowError$` on
+`ZitadelLogin`, and `onSignout$` on `ZitadelLogout` and `ZitadelSession`. Pass
+`locales={businessLocales}` (exported from `@zitadel/sdk-qwik`) to show
+work-email copy for a business audience.
+
 ## Handler options
 
 | Option              | Type                 | Default                      | Description                                                          |

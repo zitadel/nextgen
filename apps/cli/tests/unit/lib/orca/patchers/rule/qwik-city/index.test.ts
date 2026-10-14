@@ -96,17 +96,51 @@ describe("QwikCityPatcher.plan", () => {
     ).toEqual(["package.json"]);
   });
 
-  it("adds both SDKs as devDependencies at the CLI's prerelease tag", () => {
+  it("adds both SDKs as devDependencies at the CLI's exact version", () => {
     const deps = new QwikCityPatcher()
       .plan(ctx())
       .ops.filter((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
     // Qwik bundles devDependencies into the server build; ecosystem packages go there.
     expect(deps).toContainEqual(
-      expect.objectContaining({ name: "@zitadel/sdk-qwik-city", version: "alpha", dev: true }),
+      expect.objectContaining({
+        name: "@zitadel/sdk-qwik-city",
+        version: "0.1.0-alpha.0",
+        dev: true,
+      }),
     );
     expect(deps).toContainEqual(
-      expect.objectContaining({ name: "@zitadel/sdk-qwik", version: "alpha", dev: true }),
+      expect.objectContaining({ name: "@zitadel/sdk-qwik", version: "0.1.0-alpha.0", dev: true }),
     );
+  });
+
+  const businessPages = ["src/routes/login/index.tsx", "src/routes/register/index.tsx"];
+
+  // Minimal and consumer scaffolds keep the widget's neutral built-in copy.
+  it.each(businessPages)("keeps the neutral copy in %s by default", (path) => {
+    expect(writeContents(new QwikCityPatcher().plan(ctx()), path)).not.toContain("businessLocales");
+  });
+
+  it.each(businessPages)("keeps the neutral copy in %s for consumer projects", (path) => {
+    expect(
+      writeContents(new QwikCityPatcher().plan({ ...ctx(), useCase: "consumer" }), path),
+    ).not.toContain("businessLocales");
+  });
+
+  it.each(businessPages)(
+    "imports the business copy overlay in %s for business projects",
+    (path) => {
+      expect(
+        writeContents(new QwikCityPatcher().plan({ ...ctx(), useCase: "business" }), path),
+      ).toContain(
+        'import { ZitadelLogin, businessLocales, configureZitadel } from "@zitadel/sdk-qwik";',
+      );
+    },
+  );
+
+  it.each(businessPages)("passes the business copy overlay in %s for business projects", (path) => {
+    expect(
+      writeContents(new QwikCityPatcher().plan({ ...ctx(), useCase: "business" }), path),
+    ).toContain("locales={businessLocales}");
   });
 });
 

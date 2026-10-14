@@ -106,11 +106,43 @@ describe("TanStackStartPatcher.plan", () => {
     ).toEqual(["package.json"]);
   });
 
-  it("adds the SDK dependency at the CLI's prerelease tag", () => {
+  it("pins the SDK dependency at the CLI's exact version", () => {
     const dep = new TanStackStartPatcher()
       .plan(ctx())
       .ops.find((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
-    expect(dep).toMatchObject({ name: "@zitadel/sdk-tanstack-start", version: "alpha" });
+    expect(dep).toMatchObject({ name: "@zitadel/sdk-tanstack-start", version: "0.1.0-alpha.0" });
+  });
+
+  const businessPages = ["src/routes/login.tsx", "src/routes/register.tsx"];
+
+  // Minimal and consumer scaffolds keep the widget's neutral built-in copy.
+  it.each(businessPages)("keeps the neutral copy in %s by default", (path) => {
+    expect(writeContents(new TanStackStartPatcher().plan(ctx()), path)).not.toContain(
+      "businessLocales",
+    );
+  });
+
+  it.each(businessPages)("keeps the neutral copy in %s for consumer projects", (path) => {
+    expect(
+      writeContents(new TanStackStartPatcher().plan({ ...ctx(), useCase: "consumer" }), path),
+    ).not.toContain("businessLocales");
+  });
+
+  it.each(businessPages)(
+    "imports the business copy overlay in %s for business projects",
+    (path) => {
+      expect(
+        writeContents(new TanStackStartPatcher().plan({ ...ctx(), useCase: "business" }), path),
+      ).toContain(
+        'import { ZitadelLogin, businessLocales } from "@zitadel/sdk-tanstack-start/react";',
+      );
+    },
+  );
+
+  it.each(businessPages)("passes the business copy overlay in %s for business projects", (path) => {
+    expect(
+      writeContents(new TanStackStartPatcher().plan({ ...ctx(), useCase: "business" }), path),
+    ).toContain("locales={businessLocales}");
   });
 });
 

@@ -112,6 +112,26 @@ which server-rendered markup cannot carry, so it is created in the browser with
 its config in place. `onMount` never runs during SSR, and works
 on SvelteKit 2 and 3 alike (`$app/environment` is deprecated in SvelteKit 3).
 
+To read the project id from the environment, use Vite's
+`import.meta.env.VITE_ZITADEL_PROJECT_ID`, which both SvelteKit majors expose to
+the browser (`zitadel setup` seeds it in `.env.local`).
+
+`ZitadelSession` renders the signed-in "signed in as" card with a sign-out
+button, and `ZitadelLogout` a sign-out control on its own. Mount them the same
+way:
+
+```svelte
+{#if mounted}
+  <ZitadelSession {project} postSignOutUrl="/login" />
+{/if}
+```
+
+The widgets' events surface as optional callbacks: `onFlowStep`, `onFlowInput`,
+`onFlowComplete`, `onFlowRedirect` and `onFlowError` on `ZitadelLogin`, and
+`onSignout` on `ZitadelLogout` and `ZitadelSession`. Pass
+`locales={businessLocales}` (exported from `@zitadel/sdk-svelte`) to show
+work-email copy for a business audience.
+
 ## Middleware options
 
 | Option              | Type                 | Default              | Description                                                                                    |

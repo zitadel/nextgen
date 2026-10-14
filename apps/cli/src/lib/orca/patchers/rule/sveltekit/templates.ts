@@ -95,23 +95,36 @@ export function indexPageTemplate(): string {
  * guard so the widget only mounts on the client. `configureZitadel` returns the
  * project handle.
  *
- * The public project id is embedded directly rather than read from an `$env`
- * module: the location of SvelteKit's public-env import differs between major
- * versions (`$env/static/public` is deprecated in SvelteKit 3 in favour of
- * `$app/env/public`, and `$env/dynamic/public` does not surface the value in
- * every adapter), so a single template cannot import it and still support both
- * SvelteKit 2 and 3. The project id is public (not a secret — it reaches the
- * browser either way), and setup still writes `PUBLIC_ZITADEL_PROJECT_ID` to
- * `.env.local` for app code that prefers to read it from the environment.
+ * The public project id comes from `VITE_ZITADEL_PROJECT_ID` through Vite's
+ * `import.meta.env`, which SvelteKit 2 and 3 both expose to the browser, rather
+ * than from an `$env` module: those moved between the majors
+ * (`$env/static/public` is deprecated in SvelteKit 3 for `$app/env/public`), so a
+ * single template could not import them on both. Setup seeds the variable in
+ * `.env.local`, as it does for the other Vite-based frameworks.
+ *
+ * Projects set up with the business use case additionally pass the SDK's
+ * `businessLocales` overlay to the widget, restoring work-email copy on top of
+ * the widget's neutral built-in dictionaries.
  */
-function authPage(purpose: "login" | "register", projectId: string): string {
+function authPage(purpose: "login" | "register", ctx: PatchContext): string {
+  const business = ctx.useCase === "business";
+  const importNames = business
+    ? "ZitadelLogin, businessLocales, configureZitadel"
+    : "ZitadelLogin, configureZitadel";
+  const localesComment = business
+    ? `
+  // Set up for a business audience: businessLocales overlays work-email copy on
+  // the login widget's neutral built-in dictionaries. Remove the locales prop to
+  // fall back to the neutral wording.`
+    : "";
+  const localesAttr = business ? " locales={businessLocales}" : "";
   return `<script lang="ts">
   ${MANAGED_MARKER}
   import { onMount } from "svelte";
-  import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-svelte";
+  import { ${importNames} } from "@zitadel/sdk-svelte";${localesComment}
 
   const project = configureZitadel({
-    projectId: ${JSON.stringify(projectId)},
+    projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "",
     proxyPath: "${PROXY_PATH}",
   });
   // Mount the widget on the client only. onMount never runs during SSR, and
@@ -124,29 +137,29 @@ function authPage(purpose: "login" | "register", projectId: string): string {
 
 <main style="${WIDGET_WRAP}">
   {#if mounted}
-    <ZitadelLogin {project} purpose="${purpose}" postSignInUrl="/profile" />
+    <ZitadelLogin {project}${localesAttr} purpose="${purpose}" postSignInUrl="/profile" />
   {/if}
 </main>
 `;
 }
 
-export function loginPageTemplate(projectId: string): string {
-  return authPage("login", projectId);
+export function loginPageTemplate(ctx: PatchContext): string {
+  return authPage("login", ctx);
 }
 
-export function registerPageTemplate(projectId: string): string {
-  return authPage("register", projectId);
+export function registerPageTemplate(ctx: PatchContext): string {
+  return authPage("register", ctx);
 }
 
 /** `src/routes/profile/+page.svelte` — the signed-in view: the "signed in as" session card, with sign-out. */
-export function profilePageTemplate(projectId: string): string {
+export function profilePageTemplate(): string {
   return `<script lang="ts">
   ${MANAGED_MARKER}
   import { onMount } from "svelte";
   import { ZitadelSession, configureZitadel } from "@zitadel/sdk-svelte";
 
   const project = configureZitadel({
-    projectId: ${JSON.stringify(projectId)},
+    projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "",
     proxyPath: "${PROXY_PATH}",
   });
   // Mount the widget on the client only. onMount never runs during SSR, and

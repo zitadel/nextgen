@@ -77,9 +77,9 @@ describe("SvelteKitPatcher.plan", () => {
       (op): op is Extract<FileOp, { kind: "merge-env" }> =>
         op.kind === "merge-env" &&
         op.path === ".env.local" &&
-        "PUBLIC_ZITADEL_PROJECT_ID" in op.entries,
+        "VITE_ZITADEL_PROJECT_ID" in op.entries,
     );
-    expect(envOp?.entries).toMatchObject({ PUBLIC_ZITADEL_PROJECT_ID: "proj-1" });
+    expect(envOp?.entries).toMatchObject({ VITE_ZITADEL_PROJECT_ID: "proj-1" });
     // baseOps adds AGENTS.md/README.md guidance edits to every plan; beyond
     // those the only config edit is the dev script's port.
     expect(
@@ -92,16 +92,68 @@ describe("SvelteKitPatcher.plan", () => {
     ).toEqual(["package.json"]);
   });
 
-  it("adds the server SDK + the Svelte component lib at the CLI's prerelease tag", () => {
+  it("adds the server SDK + the Svelte component lib at the CLI's exact version", () => {
     const deps = new SvelteKitPatcher()
       .plan(ctx())
       .ops.filter((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
     expect(deps).toContainEqual(
-      expect.objectContaining({ name: "@zitadel/sdk-sveltekit", version: "alpha" }),
+      expect.objectContaining({ name: "@zitadel/sdk-sveltekit", version: "0.1.0-alpha.0" }),
     );
     expect(deps).toContainEqual(
-      expect.objectContaining({ name: "@zitadel/sdk-svelte", version: "alpha" }),
+      expect.objectContaining({ name: "@zitadel/sdk-svelte", version: "0.1.0-alpha.0" }),
     );
+  });
+
+  const businessPages = ["src/routes/login/+page.svelte", "src/routes/register/+page.svelte"];
+
+  // Minimal and consumer scaffolds keep the widget's neutral built-in copy.
+  it.each(businessPages)("keeps the neutral copy in %s by default", (path) => {
+    expect(writeContents(new SvelteKitPatcher().plan(ctx()), path)).not.toContain(
+      "businessLocales",
+    );
+  });
+
+  it.each(businessPages)("keeps the neutral copy in %s for consumer projects", (path) => {
+    expect(
+      writeContents(new SvelteKitPatcher().plan({ ...ctx(), useCase: "consumer" }), path),
+    ).not.toContain("businessLocales");
+  });
+
+  it.each(businessPages)(
+    "imports the business copy overlay in %s for business projects",
+    (path) => {
+      expect(
+        writeContents(new SvelteKitPatcher().plan({ ...ctx(), useCase: "business" }), path),
+      ).toContain(
+        'import { ZitadelLogin, businessLocales, configureZitadel } from "@zitadel/sdk-svelte";',
+      );
+    },
+  );
+
+  it.each(businessPages)("passes the business copy overlay in %s for business projects", (path) => {
+    expect(
+      writeContents(new SvelteKitPatcher().plan({ ...ctx(), useCase: "business" }), path),
+    ).toContain("<ZitadelLogin {project} locales={businessLocales}");
+  });
+
+  // The pages read the project id from the env setup seeds, so editing
+  // .env.local points the app at another project.
+  it.each(widgetPages)("reads the project id from VITE_ZITADEL_PROJECT_ID in %s", (path) => {
+    expect(writeContents(new SvelteKitPatcher().plan(ctx()), path)).toContain(
+      'projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "",',
+    );
+  });
+
+  it.each(widgetPages)("does not bake the project id into %s", (path) => {
+    expect(writeContents(new SvelteKitPatcher().plan(ctx()), path)).not.toContain("proj-1");
+  });
+
+  it("seeds no PUBLIC_ variable that nothing reads", () => {
+    const keys = new SvelteKitPatcher()
+      .plan(ctx())
+      .ops.filter((op): op is Extract<FileOp, { kind: "merge-env" }> => op.kind === "merge-env")
+      .flatMap((op) => Object.keys(op.entries));
+    expect(keys).not.toContain("PUBLIC_ZITADEL_PROJECT_ID");
   });
 });
 

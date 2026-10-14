@@ -1,5 +1,6 @@
 import { MANAGED_MARKER } from "../../../../paths";
 
+import type { PatchContext } from "../../types";
 import { PROXY_PATH } from "../proxy";
 
 // Enforce the dark surface the Zitadel widgets are designed for, so pages never
@@ -52,11 +53,27 @@ export default component$(() => (
  * from `@zitadel/sdk-qwik` (typed props, callback events). `configureZitadel`
  * returns the project handle at module scope; the public project id comes from
  * `PUBLIC_ZITADEL_PROJECT_ID` via Qwik's `import.meta.env`.
+ *
+ * Projects set up with the business use case additionally pass the SDK's
+ * `businessLocales` overlay to the widget, restoring work-email copy on top of
+ * the widget's neutral built-in dictionaries.
  */
-function authPage(purpose: "login" | "register"): string {
+function authPage(purpose: "login" | "register", ctx: PatchContext): string {
+  const business = ctx.useCase === "business";
+  const importNames = business
+    ? "ZitadelLogin, businessLocales, configureZitadel"
+    : "ZitadelLogin, configureZitadel";
+  const localesComment = business
+    ? `
+
+// Set up for a business audience: businessLocales overlays work-email copy on
+// the login widget's neutral built-in dictionaries. Remove the locales prop to
+// fall back to the neutral wording.`
+    : "";
+  const localesAttr = business ? " locales={businessLocales}" : "";
   return `${MANAGED_MARKER}
 import { component$ } from "@qwik.dev/core";
-import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-qwik";
+import { ${importNames} } from "@zitadel/sdk-qwik";${localesComment}
 
 const project = configureZitadel({
   projectId: import.meta.env.PUBLIC_ZITADEL_PROJECT_ID ?? "",
@@ -66,19 +83,19 @@ const project = configureZitadel({
 export default component$(() => {
   return (
     <div style="${WIDGET_WRAP}">
-      <ZitadelLogin project={project} purpose="${purpose}" postSignInUrl="/profile" />
+      <ZitadelLogin project={project}${localesAttr} purpose="${purpose}" postSignInUrl="/profile" />
     </div>
   );
 });
 `;
 }
 
-export function loginPageTemplate(): string {
-  return authPage("login");
+export function loginPageTemplate(ctx: PatchContext): string {
+  return authPage("login", ctx);
 }
 
-export function registerPageTemplate(): string {
-  return authPage("register");
+export function registerPageTemplate(ctx: PatchContext): string {
+  return authPage("register", ctx);
 }
 
 /** `src/routes/profile/index.tsx` — the signed-in view: the "signed in as" session card, with sign-out. */

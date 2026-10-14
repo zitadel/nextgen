@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { npmDistTagForCliVersion } from "../../../../public-cli";
+import { npmSelectorForCliVersion } from "../../../../public-cli";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
@@ -17,7 +17,7 @@ import {
 const SDK_DEPENDENCY = "@zitadel/sdk-sveltekit";
 /**
  * The idiomatic Svelte component library that ships the `<ZitadelLogin>` /
- * `<ZitadelLogout>` Svelte components the routes render. The server SDK above is
+ * `<ZitadelSession>` Svelte components the routes render. The server SDK above is
  * plumbing only; the widget comes from here, so a SvelteKit app gets the native
  * Svelte component (typed props, callback events) rather than the bare element.
  */
@@ -28,7 +28,7 @@ const COMPONENT_DEPENDENCY = "@zitadel/sdk-svelte";
  * proxies the backend and verifies the session through a server entrypoint —
  * here the `@zitadel/sdk-sveltekit` `handle` hook in `src/hooks.server.ts`.
  * Contributes the layout + landing/login/register/profile file-based routes (the
- * idiomatic `<ZitadelLogin>`/`<ZitadelLogout>` Svelte components from
+ * idiomatic `<ZitadelLogin>`/`<ZitadelSession>` Svelte components from
  * `@zitadel/sdk-svelte`), the public project-id env var, and both deps. No config
  * edit is needed — the hook is a plain file, so (like Next) every managed file
  * carries the marker.
@@ -47,36 +47,36 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
       {
         kind: "write",
         path: src("routes/login/+page.svelte"),
-        contents: loginPageTemplate(ctx.project.id),
+        contents: loginPageTemplate(ctx),
       },
       {
         kind: "write",
         path: src("routes/register/+page.svelte"),
-        contents: registerPageTemplate(ctx.project.id),
+        contents: registerPageTemplate(ctx),
       },
       {
         kind: "write",
         path: src("routes/profile/+page.svelte"),
-        contents: profilePageTemplate(ctx.project.id),
+        contents: profilePageTemplate(),
       },
       // Pin the dev script to the origin setup registered; --strictPort makes
       // Vite exit instead of drifting to a port the project does not allow.
       devScriptPortOp(ctx.issuer, { strictPort: true }),
-      { kind: "merge-env", path: ".env.example", entries: { PUBLIC_ZITADEL_PROJECT_ID: "" } },
+      { kind: "merge-env", path: ".env.example", entries: { VITE_ZITADEL_PROJECT_ID: "" } },
       {
         kind: "merge-env",
         path: ".env.local",
-        entries: { PUBLIC_ZITADEL_PROJECT_ID: ctx.project.id },
+        entries: { VITE_ZITADEL_PROJECT_ID: ctx.project.id },
       },
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: npmDistTagForCliVersion(ctx.cliVersion),
+        version: npmSelectorForCliVersion(ctx.cliVersion),
       },
       {
         kind: "add-dep",
         name: COMPONENT_DEPENDENCY,
-        version: npmDistTagForCliVersion(ctx.cliVersion),
+        version: npmSelectorForCliVersion(ctx.cliVersion),
       },
     ];
   }

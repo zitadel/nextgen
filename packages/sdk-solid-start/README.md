@@ -94,11 +94,11 @@ Install the Solid component library and render its `ZitadelLogin` component.
 pnpm add @zitadel/sdk-solid
 ```
 
-Load it with SolidStart's `clientOnly`. The widget registers custom elements
-(`customElements.define`) when its module is imported, which throws during
-SSR — a top-level `import … from '@zitadel/sdk-solid'` in a route crashes the
-server render and the page comes back empty. `clientOnly` defers the import to
-the browser:
+Load it with SolidStart's `clientOnly`, so the widget is created in the browser
+with its config in place: its config is set as element properties, which
+server-rendered markup cannot carry. `clientOnly` also keeps
+`@zitadel/sdk-solid`, which registers the custom elements when its module is
+imported, out of the server render:
 
 ```tsx
 import { clientOnly } from '@solidjs/start';
@@ -121,7 +121,43 @@ export default function Login() {
 
 Pass `projectId` / `proxyPath` as props rather than a `configureZitadel`
 handle: building the handle means importing `@zitadel/sdk-solid` at module
-scope, which brings the SSR crash back.
+scope, outside the client-only boundary.
+
+`ZitadelSession` renders the signed-in "signed in as" card with a sign-out
+button, and `ZitadelLogout` a sign-out control on its own. Load them the same
+way:
+
+```tsx
+const ZitadelSession = clientOnly(() =>
+  import('@zitadel/sdk-solid').then((m) => ({ default: m.ZitadelSession })),
+);
+
+export default function Profile() {
+  return (
+    <ZitadelSession
+      projectId={import.meta.env.VITE_ZITADEL_PROJECT_ID}
+      proxyPath="/__nextgen"
+      postSignOutUrl="/login"
+    />
+  );
+}
+```
+
+The widgets' events surface as optional callbacks: `onFlowStep`, `onFlowInput`,
+`onFlowComplete`, `onFlowRedirect` and `onFlowError` on `ZitadelLogin`, and
+`onSignout` on `ZitadelLogout` and `ZitadelSession`. To show work-email copy for
+a business audience, pass `locales={businessLocales}`; both come from
+`@zitadel/sdk-solid`, so wrap the widget inside the `clientOnly` loader:
+
+```tsx
+const ZitadelLogin = clientOnly(() =>
+  import('@zitadel/sdk-solid').then(({ ZitadelLogin: Login, businessLocales }) => ({
+    default: (props: ComponentProps<typeof Login>) => (
+      <Login {...props} locales={businessLocales} />
+    ),
+  })),
+);
+```
 
 ## Middleware options
 

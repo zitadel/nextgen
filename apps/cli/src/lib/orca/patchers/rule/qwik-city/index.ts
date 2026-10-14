@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { npmDistTagForCliVersion } from "../../../../public-cli";
+import { npmSelectorForCliVersion } from "../../../../public-cli";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
@@ -16,7 +16,7 @@ import {
 const SDK_DEPENDENCY = "@zitadel/sdk-qwik-city";
 /**
  * The idiomatic Qwik component library that ships the `<ZitadelLogin>` /
- * `<ZitadelLogout>` Qwik components the routes render. The server SDK above is
+ * `<ZitadelSession>` Qwik components the routes render. The server SDK above is
  * plumbing only; the widget comes from here, so a Qwik City app gets the native
  * Qwik component (typed props, callback events) rather than the bare element.
  */
@@ -27,7 +27,7 @@ const COMPONENT_DEPENDENCY = "@zitadel/sdk-qwik";
  * proxies the backend and verifies the session through a server entrypoint —
  * here the `@zitadel/sdk-qwik-city` `onRequest` plugin in
  * `src/routes/plugin@nextgen.ts`. Contributes the landing/login/register/profile
- * file-based routes (the idiomatic `<ZitadelLogin>`/`<ZitadelLogout>` Qwik
+ * file-based routes (the idiomatic `<ZitadelLogin>`/`<ZitadelSession>` Qwik
  * components from `@zitadel/sdk-qwik`), the public project-id env var, and both
  * deps. No config edit is needed — the plugin is a plain route file, so (like
  * Next) every managed file carries the marker.
@@ -42,8 +42,12 @@ export class QwikCityPatcher extends AbstractRulePatcher {
     return [
       { kind: "write", path: src("routes/plugin@nextgen.ts"), contents: pluginTemplate() },
       { kind: "write", path: src("routes/index.tsx"), contents: indexPageTemplate() },
-      { kind: "write", path: src("routes/login/index.tsx"), contents: loginPageTemplate() },
-      { kind: "write", path: src("routes/register/index.tsx"), contents: registerPageTemplate() },
+      { kind: "write", path: src("routes/login/index.tsx"), contents: loginPageTemplate(ctx) },
+      {
+        kind: "write",
+        path: src("routes/register/index.tsx"),
+        contents: registerPageTemplate(ctx),
+      },
       { kind: "write", path: src("routes/profile/index.tsx"), contents: profilePageTemplate() },
       // Pin the dev script to the origin setup registered; --strictPort makes
       // Vite exit instead of drifting to a port the project does not allow.
@@ -63,7 +67,7 @@ export class QwikCityPatcher extends AbstractRulePatcher {
         // `dependencies` entry rather than duplicating it.
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: npmDistTagForCliVersion(ctx.cliVersion),
+        version: npmSelectorForCliVersion(ctx.cliVersion),
         dev: true,
       },
       {
@@ -71,7 +75,7 @@ export class QwikCityPatcher extends AbstractRulePatcher {
         // bundled the same way.
         kind: "add-dep",
         name: COMPONENT_DEPENDENCY,
-        version: npmDistTagForCliVersion(ctx.cliVersion),
+        version: npmSelectorForCliVersion(ctx.cliVersion),
         dev: true,
       },
     ];
