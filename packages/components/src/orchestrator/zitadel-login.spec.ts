@@ -2449,3 +2449,80 @@ describe("<zitadel-login preview-state> repaint", () => {
     control.remove();
   });
 });
+
+// A server-rendered widget can upgrade before its framework hands it config
+// (Qwik resumes markup without re-running refs; React sets properties in a
+// layout effect after hydration). Config that arrives late must still apply.
+describe("<zitadel-login> config that arrives after upgrade", () => {
+  function createFlows(): unknown[] {
+    return mock
+      .getCaptured()
+      .filter((entry) => entry.kind === "createFlow")
+      .map((entry) => (entry as { body: unknown }).body);
+  }
+
+  it("starts a flow once a project arrives after an unconfigured start", async () => {
+    _resetConfigForTesting();
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
+
+    element.projectId = "demo-project";
+    element.proxyPath = API_BASE;
+
+    await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="email"]'));
+    expect(createFlows()).toEqual([{ purpose: "login", project_id: "demo-project" }]);
+  });
+
+  it("restarts with a purpose that arrives before the visitor acts", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = await mount(host);
+
+    element.purpose = "register";
+
+    await waitFor(() => createFlows().length === 2);
+    expect(createFlows()[1]).toEqual({ purpose: "register", project_id: "demo-project" });
+  });
+
+  it("applies a purpose that arrives while the first start is in flight", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = attachLogin(host);
+    // The first render queues the start; one more turn and it is in flight.
+    await element.updateComplete;
+    await Promise.resolve();
+
+    element.purpose = "register";
+
+    await waitFor(() => createFlows().length === 2);
+    expect(createFlows()[1]).toEqual({ purpose: "register", project_id: "demo-project" });
+  });
+
+  it("keeps the visitor's flow when config changes after they submit", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = await mount(host);
+    type(element, "email", "alice@acme.com");
+    submit(element);
+    await waitFor(() => element.shadowRoot?.querySelector(`zl-field[name="${PASSWORD_FIELD}"]`));
+
+    element.purpose = "register";
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(createFlows()).toHaveLength(1);
+  });
+
+  it("does not restart when a framework re-assigns an equal project handle", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = await mount(host);
+
+    element.project = { ...testProject };
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(createFlows()).toHaveLength(1);
+  });
+});

@@ -126,6 +126,9 @@ function flowIdFromLocation(): string {
 /** The query parameter the orchestrator reads the flow id from after a provider callback. */
 const FLOW_QUERY_PARAM = "flow";
 
+/** The properties that decide which flow starts; a late change restarts an untouched flow. */
+const FLOW_INPUTS = ["project", "projectId", "proxyPath", "url", "purpose", "flowName"] as const;
+
 /**
  * The page URL the callback sends the browser back to, with this flow's id
  * in the query so the reload resumes the flow (see {@link flowIdFromLocation}).
@@ -501,6 +504,9 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   override updated(changed: PropertyValues<this>): void {
+    if (FLOW_INPUTS.some((input) => changed.has(input))) {
+      this.restartForLateConfig();
+    }
     // Re-stamp part forwarding and widget-mode chrome on every commit:
     // `unsafeHTML` re-parses whenever the rendered string changes (step
     // swap, loading toggle, error dismiss), replacing previously stamped
@@ -747,9 +753,62 @@ export class ZitadelLogin extends ZitadelSurface {
    */
   private restarting = false;
 
+  /**
+   * The flow-defining config the current flow (or startup error) came from, as
+   * a comparable key; `undefined` until the first start. A flow starts exactly
+   * once on its own, from `firstUpdated` — but a server-rendered widget can
+   * upgrade before its framework hands it config: Qwik resumes markup without
+   * re-running refs, and React sets properties in a layout effect after
+   * hydration. {@link restartForLateConfig} compares against this key so config
+   * that arrives late still takes effect instead of leaving a "requires a
+   * configured project" error, or a sign-in flow on a register page.
+   */
+  private startedWith: string | undefined;
+
+  /** Set once the visitor submits anything; from then on config never restarts the flow. */
+  private submitted = false;
+
+  /** Config changed while a start was in flight; re-check once it settles. */
+  private restartPending = false;
+
+  private flowConfigKey(): string {
+    const handle = this.project;
+    return JSON.stringify([
+      handle?.projectId,
+      handle?.proxyPath,
+      handle?.url,
+      handle?.publishableKey,
+      this.projectId,
+      this.proxyPath,
+      this.url,
+      this.purpose,
+      this.flowName,
+    ]);
+  }
+
+  /**
+   * Starts a fresh flow when flow-defining config changed since the current
+   * flow started and the visitor has not acted yet. Once a step is submitted
+   * the flow is the visitor's, and a framework re-binding its props must not
+   * throw their progress away.
+   */
+  private restartForLateConfig(): void {
+    if (this.startedWith === undefined || this.submitted || this.preview) return;
+    if (this.flowConfigKey() === this.startedWith) return;
+    if (this.loading) {
+      this.restartPending = true;
+      return;
+    }
+    this.formValues = {};
+    // Deferred like the first start: called from `updated`, where setting
+    // `loading` synchronously would schedule a change-in-update.
+    queueMicrotask(() => void this.startFlow());
+  }
+
   private async startFlow(): Promise<void> {
     this.loading = true;
     this.startupError = null;
+    this.startedWith = this.flowConfigKey();
     try {
       // Resolve inside the try so a missing configuration surfaces through
       // `handleTransportError` (rendered as `startupError`) rather than as an
@@ -805,6 +864,10 @@ export class ZitadelLogin extends ZitadelSurface {
     }
     // After `loading` has settled: the `loading` preview holds it back up.
     if (this.preview) this.applyPreviewState();
+    if (this.restartPending) {
+      this.restartPending = false;
+      this.restartForLateConfig();
+    }
   }
 
   /**
@@ -1471,6 +1534,7 @@ export class ZitadelLogin extends ZitadelSurface {
     // this one check keeps a preview from ever writing to the flow.
     if (!this.response || this.loading || this.preview) return;
     const { id, session_token } = this.response;
+    this.submitted = true;
     this.loading = true;
     try {
       // Only send field values the current step defines. `formValues` carries
