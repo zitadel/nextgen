@@ -11,9 +11,10 @@ name: ci-turbo
 # the same: install, decide the lanes, run the gate, then the explicit lanes
 # that moon kept out of its automatic selection.
 #
-# A push to main runs the generated-files check and the gate alone, and is
-# the one run that writes the remote cache, for the pull requests that
-# branch from it.
+# Every run writes the remote cache (TURBO_CACHE below). A push to main runs
+# the generated-files check and the gate alone, so that the cache holds
+# main's results for the branches cut from it, also where the merge queue
+# skipped the gate (a version PR).
 #
 # Arguments never go after `--` in a turbo run here: turbo puts them into
 # the cache key of every task in the run, not just the task they are for
@@ -59,14 +60,16 @@ jobs:
       # this line and the remote-cache step to use Depot's, which needs no
       # setup on Depot runners.
       TURBO_API: https://vercel.com
-      # Main creates the remote cache: a push to main writes it, pull requests
-      # and the merge queue only read. The flag is set by the code under
-      # test, so it keeps honest branches from filling the cache and protects
-      # nothing: the OIDC policy gives every run of this repository a token
-      # that can write, as Vercel gives every preview build one. What
-      # protects is that nothing that ships restores from the cache (the
-      # plan: "Who may write to the cache"). Forks get no token.
-      TURBO_CACHE: ${{ github.event_name == 'push' && 'local:rw,remote:rw' || 'local:rw,remote:r' }}
+      # Every run reads and writes the remote cache, pull requests and the
+      # merge queue too, as moon's runs do with Depot's: a pull request's
+      # later pushes restore what its earlier ones built, and the merge
+      # queue writes the results of the commit that lands on main. A
+      # read-only flag would protect nothing, since the code under test sets
+      # it: the OIDC policy gives every run of this repository a token that
+      # can write, as Vercel gives every preview build one, and CI's entries
+      # stay apart from the Vercel builds' (the plan: "Who may write to the
+      # cache"). Forks get no token.
+      TURBO_CACHE: local:rw,remote:rw
     steps:
       - uses: actions/checkout@v6
         with:
