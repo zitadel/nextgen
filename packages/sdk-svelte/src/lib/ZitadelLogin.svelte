@@ -10,6 +10,7 @@
     ZitadelFlowStepDetail,
     ZitadelLoginProps,
   } from './types';
+  import { assignGiven } from './given';
 
   let {
     project,
@@ -40,6 +41,14 @@
   export function getElement(): ZitadelLoginElement | undefined {
     return el;
   }
+
+  // Props the element has defaults for are assigned only when given; a
+  // binding would assign `undefined` and overwrite the default.
+  $effect(() => {
+    if (el) {
+      assignGiven(el, { lang, variant, theme, suppressHeader });
+    }
+  });
 
   $effect(() => {
     const node = el;
@@ -76,12 +85,8 @@
   {project}
   {purpose}
   {locales}
-  {lang}
   project-id={projectId}
   proxy-path={proxyPath}
   post-sign-in-url={postSignInUrl}
   flow-name={flowName}
-  variant={variant}
-  theme={theme}
-  suppressHeader={suppressHeader}
 ></zitadel-login>
