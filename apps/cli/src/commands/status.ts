@@ -302,7 +302,7 @@ function nextActionsFor(
     return [verifyLoginAction(project.issuer), ...claim];
   }
   if (users === "some") {
-    return [...customizeAndPublishActions(cliVersion), ...claim];
+    return [...customizeAndPublishActions(cliVersion, selector), ...claim];
   }
   return claim;
 }
