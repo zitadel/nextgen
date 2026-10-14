@@ -3,6 +3,7 @@ package api_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -109,6 +110,10 @@ var fixedKey = [32]byte{
 	0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
 }
 
+// fixedKeyID is a stored encryption key id in the shape the dialects mint; a
+// presented flow cookie naming any other kid is refused before the key lookup.
+const fixedKeyID = "enc_key_01JAAAAAAAAAAAAAAAAAAAAAAA"
+
 type testServer struct {
 	srv      *httptest.Server
 	crypter  crypto.Crypter
@@ -128,13 +133,24 @@ func newTestServer(t *testing.T, middleware ...func(http.Handler) http.Handler) 
 // sealErr while opening the presented one still works.
 func newTestServerSealing(t *testing.T, sealErr error, middleware ...func(http.Handler) http.Handler) *testServer {
 	t.Helper()
+	return newTestServerKeys(t, nil, sealErr, middleware...)
+}
 
-	crypter := op.NewAES256GCMCrypto(fixedKey, "")
+// newTestServerKeys lets a test make the key lookup for opening a presented
+// cookie fail with openErr, and sealing a new one fail with sealErr.
+func newTestServerKeys(t *testing.T, openErr, sealErr error, middleware ...func(http.Handler) http.Handler) *testServer {
+	t.Helper()
+
+	crypter := op.NewAES256GCMCrypto(fixedKey, fixedKeyID)
 
 	mock := gomock.NewController(t)
 	tokenService := mocks.NewMockTokenService(mock)
 	keyService := mocks.NewMockKeyService(mock)
-	keyService.EXPECT().GetCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(crypter, nil).AnyTimes()
+	if openErr != nil {
+		keyService.EXPECT().GetCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, openErr).AnyTimes()
+	} else {
+		keyService.EXPECT().GetCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(crypter, nil).AnyTimes()
+	}
 	if sealErr != nil {
 		keyService.EXPECT().GetProjectCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, sealErr).AnyTimes()
 	} else {
@@ -256,6 +272,28 @@ func TestSubmitFlowStep_TamperedCookieReturns401(t *testing.T) {
 	}, "garbage")
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("status = %d", resp.StatusCode)
+	}
+}
+
+// A flow cookie whose JWE header names a key no stored key could be is refused
+// as an invalid cookie before the key lookup. The key store here fails every
+// lookup the way Postgres does for a kid with a NUL byte, so a header that
+// reached it would answer 500 instead of 401.
+func TestSubmitFlowStep_MalformedCookieHeaderReturns401(t *testing.T) {
+	ts := newTestServerKeys(t, domain.ErrInternal(errors.New("invalid byte sequence (SQLSTATE 22021)")), nil)
+
+	for _, header := range []string{
+		`{"alg":"A256GCMKW","enc":"A256GCM","kid":"a\u0000b"}`,
+		`{"alg":"A256GCMKW","enc":"A256GCM","kid":"key-1"}`,
+		`{"alg":"dir","enc":"A256GCM","kid":"` + fixedKeyID + `"}`,
+	} {
+		cookie := base64.RawURLEncoding.EncodeToString([]byte(header)) + ".key.iv.ciphertext.tag"
+		resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+			"action": "submit",
+		}, cookie)
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("header %s: status = %d, body = %s", header, resp.StatusCode, body)
+		}
 	}
 }
 

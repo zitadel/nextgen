@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -138,7 +139,7 @@ func (t *Token) JWE(encrypter op.Encrypter) (string, error) {
 }
 
 func ParseAndValidateToken(ctx context.Context, token string, decrypter crypto2.DecrypterFactory) (*Token, error) {
-	header, err := DecodeJWEHeader(token)
+	header, err := DecodeStoredKeyJWEHeader(token)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +165,37 @@ func ParseAndValidateToken(ctx context.Context, token string, decrypter crypto2.
 
 type JWEHeader struct {
 	KeyID               string                 `json:"kid"`
+	KeyAlgorithm        jose.KeyAlgorithm      `json:"alg"`
 	EncryptionAlgorithm jose.ContentEncryption `json:"enc"`
+}
+
+// storedKeyIDPattern is the shape of an encryption key id the storage dialects
+// mint (ADR 047): the enc_key prefix, then a ULID (Postgres, SQLite) or a
+// UUID v4 (Spanner).
+var storedKeyIDPattern = regexp.MustCompile(
+	`^` + string(PrefixEncryptionKey) + `_(?:[0-9A-HJKMNP-TV-Z]{26}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`,
+)
+
+// DecodeStoredKeyJWEHeader decodes the header of a JWE a client presents back
+// to the server (a token, a flow cookie), which was sealed with a stored
+// encryption key. Its kid is looked up in the database, so a header naming
+// anything the server would not have written is refused here as an invalid
+// token: a kid with a NUL byte or invalid UTF-8 would otherwise reach the key
+// lookup and fail there as an internal error, letting an anonymous request
+// turn a refused credential into a 500. Stored keys always seal with
+// A256GCMKW/A256GCM ([EncryptionKey.Crypter]).
+func DecodeStoredKeyJWEHeader(token string) (*JWEHeader, error) {
+	header, err := DecodeJWEHeader(token)
+	if err != nil {
+		return nil, err
+	}
+	if !storedKeyIDPattern.MatchString(header.KeyID) {
+		return nil, ErrInvalidToken().WithDetails("unknown key id format")
+	}
+	if header.KeyAlgorithm != jose.A256GCMKW || header.EncryptionAlgorithm != jose.A256GCM {
+		return nil, ErrInvalidToken().WithDetails("unsupported algorithm")
+	}
+	return header, nil
 }
 
 func DecodeJWEHeader(token string) (*JWEHeader, error) {
