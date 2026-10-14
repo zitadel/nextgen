@@ -131,20 +131,21 @@ export default class DeploymentRollback extends EnvironmentCommand {
       });
     }
 
-    // The deployment the caller currently sees live on the targets. Read
-    // before the confirmation gate and passed through as the optimistic
-    // guard, so a deploy that lands while the prompt is open (or between this
-    // read and the write in non-interactive mode) makes the server answer 409
-    // rather than letting the rollback overwrite a change the caller never
-    // saw. Omitted when nothing is live, which an optional id cannot stand in
-    // for.
+    // The deployment the caller currently sees live on the rollback's targets:
+    // the newest live deployment to any origin the re-applied deployment
+    // covers, which is what the server compares against. Read before the
+    // confirmation gate and passed through as the optimistic guard, so a
+    // deploy that lands while the prompt is open (or between this read and the
+    // write in non-interactive mode) makes the server answer 409 rather than
+    // letting the rollback overwrite a change the caller never saw. Omitted
+    // when nothing is live there, which an optional id cannot stand in for.
+    const target = await client.getDeploymentById(targetId, { project_id: projectId });
+    const targetOrigins = new Set(target.targets.map((entry) => entry.origin));
     const expectedDeploymentId = (
-      await client.listDeployments({
-        project_id: projectId,
-        live: true,
-        ...(flags.origin === undefined ? {} : { origin: flags.origin }),
-      })
-    ).deployments[0]?.id;
+      await client.listDeployments({ project_id: projectId, live: true })
+    ).deployments.find((deployment) =>
+      deployment.targets.some((entry) => targetOrigins.has(entry.origin)),
+    )?.id;
 
     const confirmed = await this.input({
       kind: "confirm",

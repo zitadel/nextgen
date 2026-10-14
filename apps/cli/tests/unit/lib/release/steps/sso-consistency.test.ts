@@ -4,9 +4,9 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { ZitadelError } from "../../../../src/lib/errors";
-import { validateSsoConsistency } from "../../../../src/lib/release/steps/sso-consistency";
-import { takeReportedWarnings } from "../../../../src/lib/warnings";
+import { ZitadelError } from "../../../../../src/lib/errors";
+import { validateSsoConsistency } from "../../../../../src/lib/release/steps/sso-consistency";
+import { takeReportedWarnings } from "../../../../../src/lib/warnings";
 
 const SCHEMA = ".zitadel/schemas/staff.json";
 const FLOW = ".zitadel/flows/login.json";

@@ -2,6 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
 import {
+  assertPrimaryOrigin,
   buildBundle,
   createDeployment,
   createReleaseFromBundle,
@@ -31,17 +32,6 @@ import { nextCommandsData } from "../lib/oclif/envelope";
  * It replaces `plan` and `apply`: a release is published as one immutable unit
  * and deployed, rather than each resource being synced in place.
  */
-
-/**
- * Whether an origin pattern covers a concrete origin URL, matching the server's
- * glob rule: a `*` stands for one or more characters, none of them a dot, so
- * `https://*.preview.acme.com` covers `https://pr-7.preview.acme.com` but not a
- * deeper label. A pattern with no `*` matches only its exact self.
- */
-function originMatchesPattern(pattern: string, origin: string): boolean {
-  const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, (ch) => (ch === "*" ? "\0" : `\\${ch}`));
-  return new RegExp(`^${escaped.replaceAll("\0", "[^.]+")}$`).test(origin);
-}
 
 export default class Deploy extends EnvironmentCommand {
   static override description = "Build a release from .zitadel/ and deploy it to the project.";
@@ -95,24 +85,10 @@ export default class Deploy extends EnvironmentCommand {
     // The origins this deploy lands on, for the optimistic guard below.
     let landing: string[] = origin === undefined ? [] : [origin];
     if (origin !== undefined) {
-      const origins = (await client.getProject(projectId)).origins ?? [];
-      const isPrimary = origins.some(
-        (entry) => entry.kind === "primary" && entry.pattern === origin,
-      );
-      if (!isPrimary) {
-        const isPreview = origins.some(
-          (entry) => entry.kind === "preview" && originMatchesPattern(entry.pattern, origin),
-        );
-        if (isPreview) {
-          throw new ZitadelError("E_VALIDATION", `${origin} is a preview origin`, {
-            hint: "Pass a primary origin; preview origins are served by pull-request builds.",
-          });
-        }
-        throw new ZitadelError("E_VALIDATION", `${origin} is not an origin of the project`, {
-          hint: `Pass a primary origin, or add it first with \`zitadel origin add${this.environmentSelector()}\`.`,
-          nextCommands: [this.suggest("origin list")],
-        });
-      }
+      assertPrimaryOrigin((await client.getProject(projectId)).origins ?? [], origin, {
+        hint: `Pass a primary origin, or add it first with \`zitadel origin add${this.environmentSelector()}\`.`,
+        nextCommands: [this.suggest("origin list")],
+      });
     } else if (!dryRun) {
       // With no --origin the deploy goes to every primary origin, so the
       // project must have at least one. Checked here, before the bundle is
@@ -232,7 +208,10 @@ export default class Deploy extends EnvironmentCommand {
           },
         );
       }
-      const current = (await client.listDeployments(liveQuery)).deployments[0];
+      // The deployment that raced in on a primary origin, not a live preview.
+      const current = (await client.listDeployments(liveQuery)).deployments.find((deployment) =>
+        deployment.targets.some((target) => target.expires_at == null),
+      );
       throw new ZitadelError(
         "E_CONFLICT",
         "Another deploy changed the targets since this one was prepared",

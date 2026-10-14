@@ -6,8 +6,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import {
   brandingAssetWarnings,
   resolvePublicAddresses,
-} from "../../../../src/lib/release/steps/asset-probe";
-import { userAgentInterceptor } from "../../../../src/lib/user-agent";
+} from "../../../../../src/lib/release/steps/asset-probe";
+import { userAgentInterceptor } from "../../../../../src/lib/user-agent";
 
 const { lookupMock } = vi.hoisted(() => ({ lookupMock: vi.fn() }));
 vi.mock("node:dns/promises", () => ({ lookup: lookupMock }));

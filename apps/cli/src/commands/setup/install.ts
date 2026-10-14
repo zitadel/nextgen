@@ -12,6 +12,7 @@ import {
   type PackageManager,
 } from "../../lib/package-manager";
 import { shellCommand, type SuggestedCommand, unscopedCommand } from "../../lib/suggestion";
+import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
 
 type InstallReason = "dry-run" | "skip-install" | "no-dependency-changes";
 
@@ -148,7 +149,11 @@ function outcome(input: {
     install: input.install,
     devCommand: input.devCommand,
     boxActions,
-    nextActions: [...verifyActions, ...customizeAndPublishActions(input.cliVersion)],
+    // Setup's project is the default environment's, which needs no selector.
+    nextActions: [
+      ...verifyActions,
+      ...customizeAndPublishActions(input.cliVersion, environmentSelectorSuffix({})),
+    ],
     nextCommands: input.includeInstallCommand
       ? [shellCommand(input.install.command), shellCommand(input.devCommand), planCommand]
       : [shellCommand(input.devCommand), planCommand],

@@ -4,9 +4,9 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { IDPS_DIR } from "../../../../src/lib/idp";
-import type { StepContext } from "../../../../src/lib/release/pipeline";
-import { idpConnectionsStep } from "../../../../src/lib/release/steps/idp-connections";
+import { IDPS_DIR } from "../../../../../src/lib/idp";
+import type { StepContext } from "../../../../../src/lib/release/pipeline";
+import { idpConnectionsStep } from "../../../../../src/lib/release/steps/idp-connections";
 
 /** A connection the server would accept: a `${{ NAME }}` client_secret. */
 const googleBody = (over: Record<string, unknown> = {}) => ({

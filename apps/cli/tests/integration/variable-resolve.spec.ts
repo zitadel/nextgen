@@ -94,6 +94,28 @@ describe("variable resolve", () => {
 
         expect(result).toFailWith("E_NOT_FOUND");
       });
+
+      it("suggests deploying to a primary origin nothing is deployed to, alone", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://a.example.com");
+        await app.addPrimaryOrigin("https://b.example.com");
+        await app.deployData(["--origin", "https://a.example.com"]);
+
+        const result = await app.resolveVariables({ origin: "https://b.example.com" });
+
+        expect(result).toSuggest("deploy --origin https://b.example.com");
+      });
+
+      it("suggests no deploy for a preview origin, which only a preview build serves", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.addOrigin("https://*-acme.vercel.app", "preview");
+        await app.deployData();
+
+        const result = await app.resolveVariables({ origin: "https://pr-7-acme.vercel.app" });
+
+        expect(result).not.toSuggest("deploy");
+      });
     });
   });
 });

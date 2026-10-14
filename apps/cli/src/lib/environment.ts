@@ -114,7 +114,14 @@ const ENVIRONMENT_NAME = /^[A-Za-z0-9._-]+$/;
  * resolves can also be bound.
  */
 export function isEnvironmentName(value: string): boolean {
-  return ENVIRONMENT_NAME.test(value) && !value.includes("..");
+  // `.env.<name>` for `local` is `.env.local`, setup's development file, and a
+  // name ending in `.local` would read another environment's `.local` file.
+  return (
+    ENVIRONMENT_NAME.test(value) &&
+    !value.includes("..") &&
+    value !== "local" &&
+    !value.endsWith(".local")
+  );
 }
 
 function assertEnvironmentName(name: Resolved): void {
@@ -124,7 +131,8 @@ function assertEnvironmentName(name: Resolved): void {
   throw new ZitadelError("E_VALIDATION", `${name.value} is not a valid environment name`, {
     hint:
       `The ${name.source} environment name may use only letters, digits, dot, dash ` +
-      'and underscore, and may not contain "..". Pass a safe --env or set ZITADEL_ENV.',
+      'and underscore, may not contain "..", and may not be `local` or end in `.local`. ' +
+      "Pass a safe --env or set ZITADEL_ENV.",
   });
 }
 
@@ -211,9 +219,14 @@ export async function resolveEnvironment(input: ResolveEnvironmentInput): Promis
   // the development one. A named environment or an explicit --env-file that
   // lacks a value must fail naming it, not borrow the development project's
   // id or credential and send it to another server.
+  // An --env-file names its file outright, so no `.env.*` file fills its gaps:
+  // with no --env the name is `development`, and `.env.development.local` is
+  // setup's development project too.
   const setupFiles = name.value === "development" && input.envFile === undefined;
-  for (const file of environmentFiles(name.value, setupFiles)) {
-    sources.push({ source: file, values: await readEnvFile(join(input.cwd, file)) });
+  if (input.envFile === undefined) {
+    for (const file of environmentFiles(name.value, setupFiles)) {
+      sources.push({ source: file, values: await readEnvFile(join(input.cwd, file)) });
+    }
   }
   if (setupFiles) {
     const secret = (await hasZitadelSecret(input.cwd))
@@ -236,7 +249,7 @@ export async function resolveEnvironment(input: ResolveEnvironmentInput): Promis
     for (const key of ENVIRONMENT_KEYS) {
       const value = supplied?.[key];
       if (value !== undefined && values[key] === undefined) {
-        values[key] = { value: key === "ZITADEL_URL" ? serverOrigin(value) : value, source };
+        values[key] = { value: key === "ZITADEL_URL" ? originFrom(value, source) : value, source };
         taken.push(key);
       }
     }
@@ -251,6 +264,22 @@ export async function resolveEnvironment(input: ResolveEnvironmentInput): Promis
   };
 }
 
+/** A server value as an origin, or an `E_VALIDATION` naming where it came from. */
+function originFrom(value: string, source: string): string {
+  try {
+    return serverOrigin(value);
+  } catch (error) {
+    throw new ZitadelError(
+      "E_VALIDATION",
+      `ZITADEL_URL from ${source} is not a valid server: ${value}`,
+      {
+        hint: `Fix or remove ZITADEL_URL in ${source}; it must be a URL such as https://api.zitadel.cloud.`,
+        ...(error instanceof Error ? { details: { cause: error.message } } : {}),
+      },
+    );
+  }
+}
+
 /**
  * The value a command cannot run without, or an `E_VALIDATION` naming the
  * environment, the variable and every source the chain looked in.
@@ -262,14 +291,20 @@ export function requireValue(environment: Environment, key: EnvironmentKey): str
   }
   const name = environment.name.value;
   const consulted = `Consulted, in order: ${environment.consulted.map((entry) => entry.source).join(", ")}.`;
+  // The file to set the value in. An --env-file run reads that file; an
+  // environment already bound by `env add` has its `.env.<name>.local`. Only an
+  // unbound environment is pointed at `env add` (or `setup` for development):
+  // re-running `env add` on a bound one would refuse, and with --force replace
+  // the binding with a new project.
+  const boundFile = `.env.${name}.local`;
+  const bound = environment.consulted.some((entry) => entry.source === boundFile && entry.present);
+  const file = environment.envFile ?? (bound ? boundFile : undefined);
   throw new ZitadelError("E_VALIDATION", `${key} is not set for the ${name} environment`, {
-    // An --env-file run reads that file: pointing it at `.env.<name>.local`
-    // or at `setup`, which creates a new project, would send it elsewhere.
     hint:
-      environment.envFile === undefined
-        ? `${consulted} Set ${key} in .env.${name}.local or the process environment, or run \`zitadel env add ${name}\`.`
-        : `${consulted} Set ${key} in ${environment.envFile} or the process environment.`,
-    ...(environment.envFile === undefined
+      file === undefined
+        ? `${consulted} Set ${key} in ${boundFile} or the process environment, or run \`zitadel env add ${name}\`.`
+        : `${consulted} Set ${key} in ${file} or the process environment.`,
+    ...(file === undefined
       ? { nextCommands: [unscopedCommand(name === "development" ? "setup" : `env add ${name}`)] }
       : {}),
     details: {

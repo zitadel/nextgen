@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { MANAGED_MARKER } from "../../../src/lib/paths";
+import { advisoryForWarnings } from "../../../src/commands/doctor/index";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 
 type Check = { name: string; status: "pass" | "warn" | "fail"; message: string; path?: string };
@@ -592,3 +593,26 @@ async function freePort(): Promise<number> {
   }
   return address.port;
 }
+
+describe("advisoryForWarnings", () => {
+  const claimWarning = {
+    name: "claim",
+    status: "warn" as const,
+    message: "temporary",
+    details: { claimable: true },
+  };
+
+  it("suggests claiming the local project on the server doctor checked", () => {
+    const advice = advisoryForWarnings([claimWarning], "1.0.0-alpha.25", "https://a.example");
+
+    expect(advice?.nextCommands).toEqual([
+      expectedPublicCliCommand("claim --server https://a.example"),
+    ]);
+  });
+
+  it("adds no selector to the claim when doctor named no server", () => {
+    const advice = advisoryForWarnings([claimWarning], "1.0.0-alpha.25", undefined);
+
+    expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("claim")]);
+  });
+});

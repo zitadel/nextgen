@@ -1,4 +1,5 @@
 import { Flags } from "@oclif/core";
+import type { ZitadelClient } from "@zitadel/api/client";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
 import { renderRows, renderTable } from "../../lib/oclif/crud/table";
@@ -74,11 +75,7 @@ export default class VariableResolve extends EnvironmentCommand {
 
     const live = deployments[0];
     if (live === undefined) {
-      const where = origin === undefined ? "the project" : origin;
-      throw new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${where}.`, {
-        hint: `Deploy first with \`zitadel deploy${this.environmentSelector()}\`, then resolve its variables.`,
-        nextCommands: [this.suggest("deploy")],
-      });
+      throw await this.nothingDeployed(client, projectId, origin);
     }
     // The live list narrows each deployment to the origins it still serves, so
     // this names exactly what the resolved map runs on — the chosen origin,
@@ -107,6 +104,35 @@ export default class VariableResolve extends EnvironmentCommand {
               "",
               `${rows.length} ${rows.length === 1 ? "variable" : "variables"} frozen by ${live.id} for ${where}`,
             ].join("\n"),
+    });
+  }
+
+  /**
+   * The miss for an origin nothing is deployed to, with the fix that reaches
+   * it: a bare `deploy` goes to every primary origin, so a named primary is
+   * deployed to on its own, and a preview origin is only ever served by a
+   * pull-request build, never by `deploy`.
+   */
+  private async nothingDeployed(
+    client: ZitadelClient,
+    projectId: string,
+    origin: string | undefined,
+  ): Promise<ZitadelError> {
+    if (origin === undefined) {
+      return new ZitadelError("E_NOT_FOUND", "Nothing is deployed to the project.", {
+        hint: `Deploy first with \`zitadel deploy${this.environmentSelector()}\`, then resolve its variables.`,
+        nextCommands: [this.suggest("deploy")],
+      });
+    }
+    const origins = (await client.getProject(projectId)).origins ?? [];
+    if (origins.some((entry) => entry.kind === "primary" && entry.pattern === origin)) {
+      return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
+        hint: "Deploy to it first, then resolve its variables.",
+        nextCommands: [this.suggest(`deploy --origin ${shellArg(origin)}`)],
+      });
+    }
+    return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
+      hint: "A preview URL is served by a pull-request build, not by `deploy`; resolve its variables once that build has deployed it.",
     });
   }
 }

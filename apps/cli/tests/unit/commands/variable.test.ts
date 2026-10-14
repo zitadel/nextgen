@@ -899,6 +899,22 @@ describe("variable rm", () => {
     );
   });
 
+  it("keeps --preview in the suggested --force retry, so it removes the override", async () => {
+    const cwd = await makeProject();
+
+    const res = await runCliForTest([
+      "variable",
+      "rm",
+      "SUPPORT_EMAIL",
+      "--preview",
+      "--non-interactive",
+      ...base(cwd),
+    ]);
+
+    const json = parseJson(res.stdout) as { next_commands?: string[] };
+    expect(json.next_commands?.[0]).toContain("variable rm SUPPORT_EMAIL --preview --force");
+  });
+
   it("deletes the name at the project level", async () => {
     const cwd = await makeProject();
     let path = "";

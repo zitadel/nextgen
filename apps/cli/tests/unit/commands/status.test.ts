@@ -358,8 +358,8 @@ describe("status command", () => {
     expect(actions).toContain("Customize what you ask for and how people sign in");
     expect(actions).toContain(".zitadel/schemas/");
     expect(actions).toContain(
-      `See your changes before they go live: ${expectedPublicCliCommand("deploy --dry-run")} to ` +
-        `preview, then ${expectedPublicCliCommand("deploy")} to publish.`,
+      `See your changes before they go live: ${expectedPublicCliCommand("deploy --dry-run --server https://api.zitadel.cloud")} to ` +
+        `preview, then ${expectedPublicCliCommand("deploy --server https://api.zitadel.cloud")} to publish.`,
     );
     expect(actions).not.toContain("register a user");
     expect(json.data.next_commands).toContain(
