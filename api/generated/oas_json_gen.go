@@ -16822,7 +16822,7 @@ func (s ConfigurationBundleSchemasItem) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("metaSchema")
-				json.EncodeURI(e, s.MetaSchema)
+				e.Str(s.MetaSchema)
 			}
 			{
 				e.FieldStart("x-auth-methods")
@@ -22507,7 +22507,7 @@ func (s CreateSchemaReq) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("metaSchema")
-				json.EncodeURI(e, s.MetaSchema)
+				e.Str(s.MetaSchema)
 			}
 			{
 				e.FieldStart("x-auth-methods")
@@ -93968,7 +93968,7 @@ func (s SchemaDocument) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("metaSchema")
-				json.EncodeURI(e, s.MetaSchema)
+				e.Str(s.MetaSchema)
 			}
 			{
 				e.FieldStart("x-auth-methods")
@@ -107715,7 +107715,7 @@ func (s *UserSchema) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("metaSchema")
-		json.EncodeURI(e, s.MetaSchema)
+		e.Str(s.MetaSchema)
 	}
 	{
 		e.FieldStart("x-auth-methods")
@@ -107810,8 +107810,8 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 		case "metaSchema":
 			requiredBitSet[0] |= 1 << 3
 			if err := func() error {
-				v, err := json.DecodeURI(d)
-				s.MetaSchema = v
+				v, err := d.Str()
+				s.MetaSchema = string(v)
 				if err != nil {
 					return err
 				}

@@ -68,6 +68,12 @@ paths:
                       type: string
                   $schema:
                     type: string
+                  bare_url:
+                    type: string
+                    format: uri
+                  capped_url:
+                    type: string
+                    maxLength: 2048
                   x-unique:
                     type: string
         "400":

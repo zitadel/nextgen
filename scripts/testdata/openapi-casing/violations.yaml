@@ -62,5 +62,9 @@ paths:
                   # camelCase test, so PascalCase has to fail here too.
                   PascalCase:
                     type: string
+                  homepage_url:
+                    type: string
+                    format: uri
+                    maxLength: 2048
         "400":
           description: bad request

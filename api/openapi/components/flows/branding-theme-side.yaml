@@ -9,7 +9,6 @@ description: |
 properties:
   logo_url:
     type: string
-    format: uri
     maxLength: 2048
     description: |
       The mark for this surface. A logo is never recoloured, so each side

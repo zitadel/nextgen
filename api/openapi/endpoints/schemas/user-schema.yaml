@@ -31,7 +31,6 @@ properties:
     description: Discriminator value for a user schema create request.
   metaSchema:
     type: string
-    format: uri
     maxLength: 1024
     description: The user Schema version used for this schema.
   x-auth-methods:

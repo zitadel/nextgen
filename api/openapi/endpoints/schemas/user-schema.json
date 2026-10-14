@@ -32,7 +32,6 @@
     },
     "metaSchema": {
       "type": "string",
-      "format": "uri",
       "maxLength": 1024,
       "description": "The user Schema version used for this schema."
     },

@@ -7361,10 +7361,10 @@ type Branding struct {
 	// Fallback mark, used only when neither `theme.light.logo_url` nor
 	// `theme.dark.logo_url` is set. Prefer the per-side marks — one file
 	// cannot serve both surfaces.
-	LogoURL OptURI `json:"logo_url"`
+	LogoURL OptString `json:"logo_url"`
 	// Hero image URL, for templates that reference `branding.hero_url`. The
 	// bundled default template does not use it.
-	HeroURL    OptURI                `json:"hero_url"`
+	HeroURL    OptString             `json:"hero_url"`
 	Theme      OptBrandingTheme      `json:"theme"`
 	Typography OptBrandingTypography `json:"typography"`
 	Shape      OptBrandingShape      `json:"shape"`
@@ -7386,12 +7386,12 @@ func (s *Branding) GetLiquidTemplate() OptString {
 }
 
 // GetLogoURL returns the value of LogoURL.
-func (s *Branding) GetLogoURL() OptURI {
+func (s *Branding) GetLogoURL() OptString {
 	return s.LogoURL
 }
 
 // GetHeroURL returns the value of HeroURL.
-func (s *Branding) GetHeroURL() OptURI {
+func (s *Branding) GetHeroURL() OptString {
 	return s.HeroURL
 }
 
@@ -7426,12 +7426,12 @@ func (s *Branding) SetLiquidTemplate(val OptString) {
 }
 
 // SetLogoURL sets the value of LogoURL.
-func (s *Branding) SetLogoURL(val OptURI) {
+func (s *Branding) SetLogoURL(val OptString) {
 	s.LogoURL = val
 }
 
 // SetHeroURL sets the value of HeroURL.
-func (s *Branding) SetHeroURL(val OptURI) {
+func (s *Branding) SetHeroURL(val OptString) {
 	s.HeroURL = val
 }
 
@@ -8529,12 +8529,12 @@ type BrandingThemeSide struct {
 	// The mark for this surface. A logo is never recoloured, so each side
 	// carries its own file. Absent means no mark on this side, unless the
 	// top-level `logo_url` is the only one set.
-	LogoURL OptURI             `json:"logo_url"`
+	LogoURL OptString          `json:"logo_url"`
 	Palette OptBrandingPalette `json:"palette"`
 }
 
 // GetLogoURL returns the value of LogoURL.
-func (s *BrandingThemeSide) GetLogoURL() OptURI {
+func (s *BrandingThemeSide) GetLogoURL() OptString {
 	return s.LogoURL
 }
 
@@ -8544,7 +8544,7 @@ func (s *BrandingThemeSide) GetPalette() OptBrandingPalette {
 }
 
 // SetLogoURL sets the value of LogoURL.
-func (s *BrandingThemeSide) SetLogoURL(val OptURI) {
+func (s *BrandingThemeSide) SetLogoURL(val OptString) {
 	s.LogoURL = val
 }
 
@@ -8572,7 +8572,7 @@ type BrandingTypography struct {
 	// full-page login. In the default `variant="widget"` it is stored but not
 	// loaded: the component injects no stylesheet, and the embedding page
 	// loads the face.
-	FontURL OptURI `json:"font_url"`
+	FontURL OptString `json:"font_url"`
 	// Multiplier on the base text sizes, `1` when omitted.
 	Scale OptFloat64 `json:"scale"`
 }
@@ -8583,7 +8583,7 @@ func (s *BrandingTypography) GetFontFamily() OptString {
 }
 
 // GetFontURL returns the value of FontURL.
-func (s *BrandingTypography) GetFontURL() OptURI {
+func (s *BrandingTypography) GetFontURL() OptString {
 	return s.FontURL
 }
 
@@ -8598,7 +8598,7 @@ func (s *BrandingTypography) SetFontFamily(val OptString) {
 }
 
 // SetFontURL sets the value of FontURL.
-func (s *BrandingTypography) SetFontURL(val OptURI) {
+func (s *BrandingTypography) SetFontURL(val OptString) {
 	s.FontURL = val
 }
 
@@ -69257,7 +69257,7 @@ type UserSchema struct {
 	// Discriminator value for a user schema create request.
 	Kind string `json:"kind"`
 	// The user Schema version used for this schema.
-	MetaSchema             url.URL     `json:"metaSchema"`
+	MetaSchema             string      `json:"metaSchema"`
 	XMinusAuthMinusMethods AuthMethods `json:"x-auth-methods"`
 	// Path of the leaf property whose value identifies a user (nested leaves
 	// are addressed by their dot-joined attribute path). The property must
@@ -69293,7 +69293,7 @@ func (s *UserSchema) GetKind() string {
 }
 
 // GetMetaSchema returns the value of MetaSchema.
-func (s *UserSchema) GetMetaSchema() url.URL {
+func (s *UserSchema) GetMetaSchema() string {
 	return s.MetaSchema
 }
 
@@ -69338,7 +69338,7 @@ func (s *UserSchema) SetKind(val string) {
 }
 
 // SetMetaSchema sets the value of MetaSchema.
-func (s *UserSchema) SetMetaSchema(val url.URL) {
+func (s *UserSchema) SetMetaSchema(val string) {
 	s.MetaSchema = val
 }
 
