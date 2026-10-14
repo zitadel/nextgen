@@ -7,6 +7,7 @@ import { input } from "./input";
 import { hasZitadelSecret, readZitadelSecret } from "./project";
 import { appendManagedEnvValue } from "./fs-safe";
 import { resolveServer, serverOrigin } from "./server";
+import { unscopedCommand } from "./suggestion";
 
 /**
  * The values a command reads from an environment. Each resolves on its own, so
@@ -244,7 +245,7 @@ export function requireValue(environment: Environment, key: EnvironmentKey): str
     hint:
       `Consulted, in order: ${environment.consulted.map((entry) => entry.source).join(", ")}. ` +
       `Set ${key} in .env.${name}.local or the process environment, or run \`zitadel env add ${name}\`.`,
-    nextCommands: [name === "development" ? "zitadel setup" : `zitadel env add ${name}`],
+    nextCommands: [unscopedCommand(name === "development" ? "setup" : `env add ${name}`)],
     details: {
       environment: name,
       variable: key,

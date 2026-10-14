@@ -3,7 +3,6 @@ import { Flags } from "@oclif/core";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
-import { publicCliCommand } from "../../lib/public-cli";
 import { shellArg } from "../../lib/shell";
 
 /**
@@ -35,7 +34,7 @@ export default class OriginRm extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(OriginRm);
     await this.toMeta(flags);
-    const { dryRun, cliVersion } = this.meta;
+    const { dryRun } = this.meta;
     const pattern = args.pattern;
 
     // A dry run makes no request, so it answers before the connection — the
@@ -53,10 +52,7 @@ export default class OriginRm extends EnvironmentCommand {
       kind: "confirm",
       name: `remove ${pattern} from the project`,
       message: `Remove ${pattern} from the project?`,
-      retry: publicCliCommand(
-        `origin rm ${shellArg(pattern)} --force${this.environmentSelector()}`,
-        cliVersion,
-      ),
+      retry: this.suggest(`origin rm ${shellArg(pattern)} --force`),
     });
     if (!confirmed) {
       return this.emit({ status: "skipped", reason: "remove-cancelled" });

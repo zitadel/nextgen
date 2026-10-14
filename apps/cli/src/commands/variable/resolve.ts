@@ -65,8 +65,8 @@ export default class VariableResolve extends EnvironmentCommand {
         "More than one deployment is live; name which origin to resolve with --origin.",
         {
           hint: `Live origins: ${origins.join(", ")}.`,
-          nextCommands: origins.map(
-            (o) => `zitadel variable resolve --origin ${shellArg(o)}${this.environmentSelector()}`,
+          nextCommands: origins.map((o) =>
+            this.suggest(`variable resolve --origin ${shellArg(o)}`),
           ),
         },
       );
@@ -77,7 +77,7 @@ export default class VariableResolve extends EnvironmentCommand {
       const where = origin === undefined ? "the project" : origin;
       throw new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${where}.`, {
         hint: `Deploy first with \`zitadel deploy${this.environmentSelector()}\`, then resolve its variables.`,
-        nextCommands: [`zitadel deploy${this.environmentSelector()}`],
+        nextCommands: [this.suggest("deploy")],
       });
     }
     // The live list narrows each deployment to the origins it still serves, so

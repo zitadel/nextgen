@@ -529,6 +529,9 @@ describe("variable set", () => {
       expect(retry).toContain("variable set TOKEN");
       expect(retry).toContain("--secret");
       expect(json.hint).toContain("Pipe it in on stdin.");
+      // The server this run was pointed at, before the redirection: without
+      // it the piped secret would land in the default project's store.
+      expect(retry).toContain(`--server ${SERVER} < value.txt`);
     } finally {
       if (original) {
         Object.defineProperty(process, "stdin", original);
@@ -879,6 +882,23 @@ describe("variable rm asked on a terminal", () => {
 });
 
 describe("variable rm", () => {
+  it("keeps the run's server in the suggested --force retry", async () => {
+    const cwd = await makeProject();
+
+    const res = await runCliForTest([
+      "variable",
+      "rm",
+      "SUPPORT_EMAIL",
+      "--non-interactive",
+      ...base(cwd),
+    ]);
+
+    const json = parseJson(res.stdout) as { next_commands?: string[] };
+    expect(json.next_commands?.[0]).toContain(
+      `variable rm SUPPORT_EMAIL --force --server ${SERVER}`,
+    );
+  });
+
   it("deletes the name at the project level", async () => {
     const cwd = await makeProject();
     let path = "";

@@ -7,6 +7,7 @@ import { BaseCommand } from "./base";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
 import { environmentFlags, environmentSelectorSuffix } from "./environment-flags";
 import type { GlobalOptions } from "./types";
+import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "../suggestion";
 
 /** The platform connection {@link EnvironmentCommand.connect} opens. */
 export type Connection = Readonly<{
@@ -75,7 +76,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
    * exclusive; `--server` (the URL only) can accompany either. Empty when the
    * invocation used no selector.
    */
-  protected environmentSelector(): string {
+  protected environmentSelector(): EnvironmentSelector {
     const { environment } = this;
     return environmentSelectorSuffix({
       envFile: environment.envFile,
@@ -85,6 +86,16 @@ export abstract class EnvironmentCommand extends BaseCommand {
           ? environment.values.ZITADEL_URL.value
           : undefined,
     });
+  }
+
+  /**
+   * A `zitadel` command aimed at this run's project: `args` with this run's
+   * {@link environmentSelector} appended, in the public `npx` form. Use it for
+   * every suggestion a project command makes; a command that deliberately
+   * leaves the project uses {@link BaseCommand.suggestUnscoped}.
+   */
+  protected suggest(args: string): SuggestedCommand {
+    return projectCommand(args, this.environmentSelector(), this.meta.cliVersion);
   }
 
   /**

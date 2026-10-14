@@ -1,3 +1,5 @@
+import type { SuggestedCommand } from "../suggestion";
+
 /**
  * Fields present on every JSON envelope regardless of status. Agents key off
  * these to correlate output with the CLI version, the command that ran, and the
@@ -95,6 +97,6 @@ export type CommandResult =
       readonly status: "skipped";
       readonly reason: string;
       readonly data?: unknown;
-      readonly nextCommands?: ReadonlyArray<string>;
+      readonly nextCommands?: ReadonlyArray<SuggestedCommand>;
       readonly pretty?: string;
     };

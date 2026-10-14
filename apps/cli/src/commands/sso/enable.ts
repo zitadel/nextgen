@@ -21,7 +21,6 @@ import {
 import type { ZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
 import { isErrno, ZitadelError } from "../../lib/errors";
-import { publicCliCommand } from "../../lib/public-cli";
 import { stableStringify } from "../../lib/json";
 import {
   applySsoToFlow,
@@ -66,6 +65,8 @@ import {
 } from "../../lib/oclif";
 import { readState } from "../../lib/sync/state";
 import { reportWarning } from "../../lib/warnings";
+import { inShell, type SuggestedCommand } from "../../lib/suggestion";
+import { nextCommandsData } from "../../lib/oclif/envelope";
 
 /**
  * The `sso enable` command — add a provider to a Project's sign-in methods.
@@ -142,9 +143,11 @@ export default class SsoEnable extends EnvironmentCommand {
     const entry = providerOf(selection);
     // What an agent can run once the missing credential is to hand. Only for a
     // catalog provider: a custom connection needs its settings repeated too.
-    const retryFor = (clientId: string, pipe = ""): string | undefined =>
+    const retryFor = (clientId: string, pipe = ""): SuggestedCommand | undefined =>
       selection.kind === "catalog"
-        ? `${pipe}${publicCliCommand(`sso enable --provider ${provider} --client-id ${clientId}`, this.meta.cliVersion)}`
+        ? inShell(this.suggest(`sso enable --provider ${provider} --client-id ${clientId}`), {
+            before: pipe,
+          })
         : undefined;
     const loopback = loopbackIssuerWarning(selection);
     if (loopback !== undefined) {
@@ -423,7 +426,7 @@ export default class SsoEnable extends EnvironmentCommand {
         // credential never arrived fails at token exchange. An ok result
         // carries its follow-ups in data.next_commands (errors use the
         // top-level nextCommands instead).
-        next_commands: [
+        ...nextCommandsData([
           ...republishCommands(
             [
               { name: idVariable, secret: false, published: clientIdState },
@@ -432,9 +435,9 @@ export default class SsoEnable extends EnvironmentCommand {
             this.meta.cliVersion,
             this.environmentSelector(),
           ),
-          publicCliCommand(`deploy --dry-run${this.environmentSelector()}`, this.meta.cliVersion),
-          publicCliCommand(`deploy${this.environmentSelector()}`, this.meta.cliVersion),
-        ],
+          this.suggest("deploy --dry-run"),
+          this.suggest("deploy"),
+        ]),
       },
       pretty: `Enabled ${entry.displayName} for ${schema.name}`,
     });

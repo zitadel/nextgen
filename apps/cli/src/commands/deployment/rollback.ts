@@ -5,7 +5,6 @@ import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } fro
 import { collectPages } from "../../lib/oclif/crud/paging";
 import { rollbackDeployment } from "../../lib/release";
 import { ZitadelError } from "../../lib/errors";
-import { publicCliCommand } from "../../lib/public-cli";
 
 /**
  * `zitadel deployment rollback [<deployment_id>]` — re-apply an earlier
@@ -42,7 +41,7 @@ export default class DeploymentRollback extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(DeploymentRollback);
     await this.toMeta(flags);
-    const { dryRun, cliVersion } = this.meta;
+    const { dryRun } = this.meta;
 
     const { client, projectId } = await this.connect();
 
@@ -95,7 +94,7 @@ export default class DeploymentRollback extends EnvironmentCommand {
           "The last deployment's origins have different histories, so one rollback can't undo it",
           {
             hint: "Name the deployment to re-apply, or roll back one origin at a time with --origin.",
-            nextCommands: [`zitadel deployment list${this.environmentSelector()}`],
+            nextCommands: [this.suggest("deployment list")],
           },
         );
       }
@@ -132,10 +131,7 @@ export default class DeploymentRollback extends EnvironmentCommand {
       kind: "confirm",
       name: `re-apply ${targetId}`,
       message: `Re-apply ${targetId}? Its release goes live again.`,
-      retry: publicCliCommand(
-        `deployment rollback ${targetId} --force${this.environmentSelector()}`,
-        cliVersion,
-      ),
+      retry: this.suggest(`deployment rollback ${targetId} --force`),
     });
     if (!confirmed) {
       return this.emit({ status: "skipped", reason: "rollback-cancelled" });
