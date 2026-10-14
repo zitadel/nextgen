@@ -7,10 +7,6 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 )
 
-func ErrReleaseUnresolvedReference() Error {
-	return newError(PrefixRelease.ErrorCodePrefix("unresolved_reference"), "release: handle is not in the release", nil, nil)
-}
-
 // ReleaseContent is the revisions a release references, loaded for
 // [ValidateRelease].
 type ReleaseContent struct {
