@@ -40,13 +40,13 @@ func newVariableStatements(client queryExecutor) variableStatements {
 }
 
 // GetVariables implements [service.VariableStatements].
-func (s variableStatements) GetVariables(ctx context.Context, owner domain.VariableOwner, kind domain.TargetKind, names ...string) ([]*domain.Variable, error) {
+func (s variableStatements) GetVariables(ctx context.Context, owner domain.VariableOwner, kind domain.DeploymentOriginKind, names ...string) ([]*domain.Variable, error) {
 	return readVariables(ctx, s.client, owner, kind, names...)
 }
 
 // readVariables is the read behind GetVariables on any executor, so a freeze
 // can run it on its own transaction and copy the rows that transaction sees.
-func readVariables(ctx context.Context, client queryExecutor, owner domain.VariableOwner, kind domain.TargetKind, names ...string) ([]*domain.Variable, error) {
+func readVariables(ctx context.Context, client queryExecutor, owner domain.VariableOwner, kind domain.DeploymentOriginKind, names ...string) ([]*domain.Variable, error) {
 	var compiler statementCompiler
 	if err := compileRead(&compiler, variablesQuery, variable.VisibleTo(owner, kind, names...), variable.Schema); err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func (s variableStatements) SetVariable(ctx context.Context, v *domain.Variable)
 }
 
 // DeleteVariable implements [service.VariableStatements].
-func (s variableStatements) DeleteVariable(ctx context.Context, owner domain.VariableOwner, kind domain.TargetKind, name string) error {
+func (s variableStatements) DeleteVariable(ctx context.Context, owner domain.VariableOwner, kind domain.DeploymentOriginKind, name string) error {
 	tag, err := s.client.Exec(ctx, deleteVariableStmt,
 		owner.ProjectID, name, kind.String(),
 	)
@@ -106,7 +106,7 @@ func scanVariable(row pgx.CollectableRow) (*variable.VariableStorage, error) {
 	}
 	// Parsed from its name rather than scanned into the enum, so a kind this
 	// server does not know fails the read instead of decoding to primary.
-	kind, err := domain.TargetKindString(kindName)
+	kind, err := domain.DeploymentOriginKindString(kindName)
 	if err != nil {
 		return nil, err
 	}

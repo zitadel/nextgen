@@ -22,10 +22,15 @@ VALUES ($1, $2, $3)
 ON CONFLICT (project_id, content_hash) DO NOTHING`
 
 	// A plain insert: the primary key is what makes a second freeze of the
-	// same deployment a UniqueError, and the deployment key is what makes a
-	// deployment the project does not hold a ForeignKeyError.
-	linkDeploymentVariableSetStmt = `INSERT INTO zitadel_nextgen.deployment_variable_sets (project_id, deployment_id, kind, set_hash)
-VALUES ($1, $2, $3, $4)`
+	// same deployment a UniqueError. The deployment key is a safety net only;
+	// a deployment the project does not hold is already a NoRowFoundError
+	// from the kind read above.
+	linkDeploymentVariableSetStmt = `INSERT INTO zitadel_nextgen.deployment_variable_sets (project_id, deployment_id, set_hash)
+VALUES ($1, $2, $3)`
+
+	// Which rows to freeze is the deployment's own kind, read on the freeze's
+	// transaction; a deployment the project does not hold is no row.
+	deploymentOriginKindQuery = `SELECT origin_kind FROM zitadel_nextgen.deployments WHERE project_id = $1 AND id = $2`
 
 	// The link row and the set it names, in one round trip. A deployment that
 	// was never frozen has no link row, which QueryRow reports as no row.
@@ -42,7 +47,7 @@ func newVariableSetStatements(client queryExecutor) variableSetStatements {
 }
 
 // FreezeDeploymentVariables implements [service.VariableSetStatements].
-func (s variableSetStatements) FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string, kind domain.TargetKind) (*domain.VariableSet, error) {
+func (s variableSetStatements) FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error) {
 	// Set inside the callback and reset per attempt. Postgres never replays
 	// the callback, but the Spanner dialect does, and the three dialects
 	// keep the same shape so a reader of one knows the others.
@@ -51,6 +56,10 @@ func (s variableSetStatements) FreezeDeploymentVariables(ctx context.Context, pr
 		set = nil
 		// Read on the transaction rather than the client, so the set holds
 		// the rows the link lands beside, or nothing lands at all.
+		kind, err := readDeploymentOriginKind(ctx, tx, projectID, deploymentID)
+		if err != nil {
+			return err
+		}
 		variables, err := readVariables(ctx, tx, domain.VariableOwner{ProjectID: projectID}, kind)
 		if err != nil {
 			return err
@@ -66,7 +75,7 @@ func (s variableSetStatements) FreezeDeploymentVariables(ctx context.Context, pr
 		if _, err := tx.Exec(ctx, insertVariableSetStmt, projectID, frozen.Hash, entries); err != nil {
 			return wrapError(err)
 		}
-		if _, err := tx.Exec(ctx, linkDeploymentVariableSetStmt, projectID, deploymentID, kind.String(), frozen.Hash); err != nil {
+		if _, err := tx.Exec(ctx, linkDeploymentVariableSetStmt, projectID, deploymentID, frozen.Hash); err != nil {
 			return wrapError(err)
 		}
 		set = frozen
@@ -76,6 +85,17 @@ func (s variableSetStatements) FreezeDeploymentVariables(ctx context.Context, pr
 		return nil, err
 	}
 	return set, nil
+}
+
+// readDeploymentOriginKind returns the kind of target deploymentID went to,
+// which is the kind of variables it freezes. The column holds the kind's
+// name under a CHECK, so a name the enum does not know is a broken row.
+func readDeploymentOriginKind(ctx context.Context, client queryExecutor, projectID, deploymentID string) (domain.DeploymentOriginKind, error) {
+	var name string
+	if err := client.QueryRow(ctx, deploymentOriginKindQuery, projectID, deploymentID).Scan(&name); err != nil {
+		return 0, wrapError(err)
+	}
+	return domain.DeploymentOriginKindString(name)
 }
 
 // GetDeploymentVariables implements [service.VariableSetStatements].

@@ -63,12 +63,11 @@ CREATE TABLE variable_sets (
 
 -- +goose StatementBegin
 -- Which set a deployment runs with: one row per deployment, written in the
--- deployment's transaction. kind records which rows were frozen, since the
--- set itself does not say.
+-- deployment's transaction. Which rows were frozen is the deployment's
+-- origin_kind, read when the set is frozen, so the link does not repeat it.
 CREATE TABLE deployment_variable_sets (
     project_id     TEXT NOT NULL,
     deployment_id  TEXT NOT NULL,
-    kind           TEXT NOT NULL CHECK (kind IN ('primary', 'preview')),
     set_hash       TEXT NOT NULL,
     PRIMARY KEY (project_id, deployment_id),
     -- A direct project key beside the deployment key, the shape the postgres

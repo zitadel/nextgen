@@ -557,7 +557,7 @@ type VariableStatements interface {
 	// The primary key is the name plus the owner and kind, so at most one
 	// variable comes back per name and the caller has nothing to choose
 	// between.
-	GetVariables(ctx context.Context, owner domain.VariableOwner, kind domain.TargetKind, names ...string) ([]*domain.Variable, error)
+	GetVariables(ctx context.Context, owner domain.VariableOwner, kind domain.DeploymentOriginKind, names ...string) ([]*domain.Variable, error)
 	// SetVariable writes variable under its own name, owner and kind,
 	// replacing the value and IsSecret flag of an existing variable with the
 	// same name, owner and kind. A value that applies to both kinds is two
@@ -569,7 +569,7 @@ type VariableStatements interface {
 	// deletes a variable with a different owner or kind, since both must
 	// match exactly, so one owner cannot remove what another entered and
 	// removing the primary value leaves the preview one.
-	DeleteVariable(ctx context.Context, owner domain.VariableOwner, kind domain.TargetKind, name string) error
+	DeleteVariable(ctx context.Context, owner domain.VariableOwner, kind domain.DeploymentOriginKind, name string) error
 }
 
 // VariableSetStatements freezes the variables a deployment is created with
@@ -577,23 +577,26 @@ type VariableStatements interface {
 // in one project are stored once, however many deployments use them.
 type VariableSetStatements interface {
 	Statements
-	// FreezeDeploymentVariables copies the variables of projectID for kind
-	// into an immutable set and links deploymentID to it, in one transaction.
-	// It reads the rows of kind only: a preview freeze holds the preview
-	// values and nothing else, so a name entered for primary alone is absent
-	// from it, and a value that applies to both kinds is in both freezes
-	// because it was entered twice. A project with no variables freezes the
-	// empty set, which is stored and linked like any other.
+	// FreezeDeploymentVariables copies the variables of projectID for the
+	// deployment's origin kind into an immutable set and links deploymentID
+	// to it, in one transaction. The kind is the deployment's own, read from
+	// its row inside that transaction, never a caller's choice. It reads the
+	// rows of that kind only: a preview deployment freezes the preview values
+	// and nothing else, so a name entered for primary alone is absent from
+	// it, and a value that applies to both kinds is in both freezes because
+	// it was entered twice. A project with no variables freezes the empty
+	// set, which is stored and linked like any other.
 	//
 	// The set is inserted only when its hash is new to the project, so a
 	// deployment whose values did not change writes no set row and shares
 	// the one that exists. The link is one row per deployment: freezing the
 	// same deployment twice returns UniqueError, and a deployment that does
-	// not exist in projectID returns ForeignKeyError.
+	// not exist in projectID -- including one of another project -- returns
+	// NoRowFoundError, since there is no row to read the kind from.
 	//
 	// Secrets are copied as the ciphertext stored, never decrypted. The set
 	// returned is what a later GetDeploymentVariables reads back.
-	FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string, kind domain.TargetKind) (*domain.VariableSet, error)
+	FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error)
 	// GetDeploymentVariables returns the set deploymentID was frozen with,
 	// as it was then, whatever the project's variables have become since. A
 	// deployment that was never frozen -- or does not exist, or belongs to

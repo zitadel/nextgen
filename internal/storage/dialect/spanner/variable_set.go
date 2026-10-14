@@ -22,10 +22,15 @@ const (
 VALUES (@p1, @p2, @p3)`
 
 	// A plain insert: the primary key is what makes a second freeze of the
-	// same deployment a UniqueError, and the deployment key is what makes a
-	// deployment the project does not hold a ForeignKeyError.
-	linkDeploymentVariableSetStmt = `INSERT INTO deployment_variable_sets (project_id, deployment_id, kind, set_hash)
-VALUES (@p1, @p2, @p3, @p4)`
+	// same deployment a UniqueError. The deployment key is a safety net only;
+	// a deployment the project does not hold is already a NoRowFoundError
+	// from the kind read above.
+	linkDeploymentVariableSetStmt = `INSERT INTO deployment_variable_sets (project_id, deployment_id, set_hash)
+VALUES (@p1, @p2, @p3)`
+
+	// Which rows to freeze is the deployment's own kind, read on the freeze's
+	// transaction; a deployment the project does not hold is no row.
+	deploymentOriginKindQuery = `SELECT origin_kind FROM deployments WHERE project_id = @p1 AND id = @p2`
 
 	// The link row and the set it names, in one round trip. A deployment that
 	// was never frozen has no link row, which collectOneRow reports as no row.
@@ -42,7 +47,7 @@ func newVariableSetStatements(db queryExecutor) variableSetStatements {
 }
 
 // FreezeDeploymentVariables implements [service.VariableSetStatements].
-func (s variableSetStatements) FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string, kind domain.TargetKind) (*domain.VariableSet, error) {
+func (s variableSetStatements) FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error) {
 	// Set inside the callback and reset per attempt: ReadWriteTransaction
 	// retries an aborted attempt by running the whole callback again, and the
 	// retry must not report the set an aborted attempt read.
@@ -51,6 +56,10 @@ func (s variableSetStatements) FreezeDeploymentVariables(ctx context.Context, pr
 		set = nil
 		// Read on the transaction rather than the client, so the set holds
 		// the rows the link lands beside, or nothing lands at all.
+		kind, err := readDeploymentOriginKind(ctx, tx, projectID, deploymentID)
+		if err != nil {
+			return err
+		}
 		variables, err := readVariables(ctx, tx, domain.VariableOwner{ProjectID: projectID}, kind)
 		if err != nil {
 			return err
@@ -67,13 +76,12 @@ func (s variableSetStatements) FreezeDeploymentVariables(ctx context.Context, pr
 		if err != nil {
 			return err
 		}
-		// The kind is bound as its name, never as the enum, which the Spanner
-		// client cannot encode. Causes stay wrapped: an abort has to keep its
-		// status for the retry to see.
+		// Causes stay wrapped: an abort has to keep its status for the retry
+		// to see.
 		if _, err := tx.Update(ctx, buildStatement(insertVariableSetStmt, projectID, frozen.Hash, entries).statement()); err != nil {
 			return wrapError(err)
 		}
-		if _, err := tx.Update(ctx, buildStatement(linkDeploymentVariableSetStmt, projectID, deploymentID, kind.String(), frozen.Hash).statement()); err != nil {
+		if _, err := tx.Update(ctx, buildStatement(linkDeploymentVariableSetStmt, projectID, deploymentID, frozen.Hash).statement()); err != nil {
 			return wrapError(err)
 		}
 		set = frozen
@@ -83,6 +91,27 @@ func (s variableSetStatements) FreezeDeploymentVariables(ctx context.Context, pr
 		return nil, err
 	}
 	return set, nil
+}
+
+// readDeploymentOriginKind returns the kind of target deploymentID went to,
+// which is the kind of variables it freezes. The column holds the kind's
+// name under a CHECK, so a name the enum does not know is a broken row.
+func readDeploymentOriginKind(ctx context.Context, db queryExecutor, projectID, deploymentID string) (domain.DeploymentOriginKind, error) {
+	var kind domain.DeploymentOriginKind
+	if err := db.Query(ctx, buildStatement(deploymentOriginKindQuery, projectID, deploymentID).statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		kind, err = collectOneRow(iter, func(row *spanner.Row) (domain.DeploymentOriginKind, error) {
+			var name string
+			if err := row.Columns(&name); err != nil {
+				return 0, err
+			}
+			return domain.DeploymentOriginKindString(name)
+		})
+		return err
+	}); err != nil {
+		return 0, returnQueryError(err)
+	}
+	return kind, nil
 }
 
 // GetDeploymentVariables implements [service.VariableSetStatements].

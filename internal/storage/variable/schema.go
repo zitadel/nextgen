@@ -25,7 +25,7 @@ type VariableStorage struct {
 	ProjectID string
 	// Kind is parsed from the TEXT column by the dialect scan, so an unknown
 	// kind fails the read instead of decoding to primary.
-	Kind       domain.TargetKind
+	Kind       domain.DeploymentOriginKind
 	Value      any
 	IsSecret   bool
 	CreatedAt  time.Time

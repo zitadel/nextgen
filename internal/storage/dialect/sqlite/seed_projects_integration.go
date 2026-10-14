@@ -90,21 +90,3 @@ func InsertUserPasswordAt(ctx context.Context, pool database.Pool, projectID, id
 	)
 	return wrapError(err)
 }
-
-// InsertDeployment writes a deployments row for a test to freeze variables
-// against. CreateDeployment still swaps the current deployment of an
-// environment, a table that is gone (#1643), so until the deployments rework
-// lands the row has to be written directly: environment_id is still NOT NULL
-// and gets the empty string, the metadata is the empty document, and
-// deployed_at is stamped in Go like every timestamp in this dialect.
-func InsertDeployment(ctx context.Context, pool database.Pool, projectID, id, releaseID string) error {
-	p, ok := pool.(*Pool)
-	if !ok {
-		return fmt.Errorf("sqlite.InsertDeployment: expected *Pool, got %T", pool)
-	}
-	_, err := p.sqlDB.ExecContext(ctx,
-		`INSERT INTO deployments (project_id, id, environment_id, release_id, metadata, deployed_at) VALUES (?, ?, '', ?, '{}', ?)`,
-		projectID, id, releaseID, nowUnixNano(),
-	)
-	return wrapError(err)
-}

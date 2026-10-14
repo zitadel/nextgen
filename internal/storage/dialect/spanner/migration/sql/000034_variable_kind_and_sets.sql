@@ -79,9 +79,7 @@ CREATE TABLE variable_sets (
 CREATE TABLE deployment_variable_sets (
     project_id      STRING(MAX) NOT NULL,
     deployment_id   STRING(MAX) NOT NULL,
-    kind            STRING(16)  NOT NULL,
     set_hash        STRING(64)  NOT NULL,
-    CONSTRAINT chk_deployment_variable_sets_kind CHECK (kind = 'primary' OR kind = 'preview'),
     CONSTRAINT fk_deployment_variable_sets_project
         FOREIGN KEY (project_id)
         REFERENCES projects (id)

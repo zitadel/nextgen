@@ -108,23 +108,25 @@ deployment's transaction:
 |-----------------|--------------------------------------------------------------------------------------------------------|
 | `project_id`    | foreign key to `projects`, `ON DELETE CASCADE`                                                         |
 | `deployment_id` | with `project_id`, foreign key to `deployments (project_id, id)`, `ON DELETE CASCADE`                  |
-| `kind`          | which rows were frozen, since the set itself does not say                                              |
 | `set_hash`      | with `project_id`, foreign key to `variable_sets (project_id, content_hash)`, `ON DELETE NO ACTION`; indexed   |
 
-The set key is `NO ACTION`, so a set a deployment uses can never be deleted.
-The direct project key exists beside the deployment key because Postgres runs
+Which rows were frozen is the deployment's `origin_kind`
+(`domain.DeploymentOriginKind`, #1679), so the link does not repeat it. The
+set key is `NO ACTION`, so a set a deployment uses can never be deleted. The
+direct project key exists beside the deployment key because Postgres runs
 cascades one level at a time: deleting a project removes the sets at the first
 level, but through the deployment key alone the link rows would go only at the
-third (projects, then releases, then deployments), and the `NO ACTION` check
-would find them still there and abort the delete. `sessions` has the same
-shape.
+second (projects, then deployments), and the `NO ACTION` check would find them
+still there and abort the delete. `sessions` has the same shape.
 
-The freeze is one statement that, inside one transaction, reads the variables
-of the kind, builds the set, inserts it only when its hash is new to the
-project (an insert that ignores the key conflict and nothing else), inserts
-the link and returns the set. A second freeze of the same deployment is a
-`database.UniqueError`, an unknown deployment a `database.ForeignKeyError`,
-and reading a deployment that was never frozen a `database.NoRowFoundError`.
+The freeze is one statement that, inside one transaction, reads the
+deployment's kind from its row, reads the variables of that kind, builds the
+set, inserts it only when its hash is new to the project (an insert that
+ignores the key conflict and nothing else), inserts the link and returns the
+set. The kind is never a caller's choice. A second freeze of the same
+deployment is a `database.UniqueError`, a deployment the project does not hold
+a `database.NoRowFoundError` (there is no row to read the kind from), and
+reading a deployment that was never frozen a `database.NoRowFoundError`.
 No new domain error is added, because each one generates an API error schema.
 Neither table has a minted id, as ADR 062 already deviates from
 [ADR 047](047-dialect-id-generation.md): a set is addressed by its hash and a
@@ -188,9 +190,11 @@ Decided here or on the issues, implemented outside #1567:
   exceed the cell, 79 names if the cap is a count or a budget on the encoded
   size; enforcing it is the service's job on write (#1566), and this change
   adds no enforcement.
-- The rework of deployments over targets
-  ([#1572](https://github.com/zitadel/nextgen/issues/1572)) must keep
-  `deployments (project_id, id)` as the target of the link's foreign key.
+- The rework of deployments over origins
+  ([#1679](https://github.com/zitadel/nextgen/pull/1679)) kept
+  `deployments (project_id, id)` as the target of the link's foreign key and
+  gave the row the `origin_kind` the freeze reads; any later rework must keep
+  both.
 - The migration drops the existing variables on every dialect: the product is
   in alpha, and SQLite and Spanner cannot change a primary key in place
   anyway. Values entered before it are entered again.

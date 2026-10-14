@@ -63,22 +63,21 @@ CREATE TABLE zitadel_nextgen.variable_sets (
 );
 
 -- Which set a deployment runs with: one row per deployment, written in the
--- deployment's transaction. kind records which rows were frozen, since the
--- set itself does not say.
+-- deployment's transaction. Which rows were frozen is the deployment's
+-- origin_kind, read when the set is frozen, so the link does not repeat it.
 CREATE TABLE zitadel_nextgen.deployment_variable_sets (
     project_id TEXT COLLATE "C" NOT NULL
     , deployment_id TEXT COLLATE "C" NOT NULL
-    , kind TEXT COLLATE "C" NOT NULL CHECK (kind IN ('primary', 'preview'))
     , set_hash TEXT COLLATE "C" NOT NULL
 
     , PRIMARY KEY (project_id, deployment_id)
     -- A direct project key beside the deployment key, because Postgres runs
     -- cascades one level at a time. Deleting a project removes variable_sets
     -- at the first level, but through the deployment key alone these rows
-    -- would only go at the third (projects, then releases, then
-    -- deployments), and the NO ACTION check on the set key below would find
-    -- them still here and abort the delete. The direct key removes them at
-    -- the first level, beside the sets. sessions has the same shape (000007).
+    -- would only go at the second (projects, then deployments, 000030), and
+    -- the NO ACTION check on the set key below would find them still here
+    -- and abort the delete. The direct key removes them at the first level,
+    -- beside the sets. sessions has the same shape (000007).
     , CONSTRAINT fk_deployment_variable_sets_project
         FOREIGN KEY (project_id)
         REFERENCES zitadel_nextgen.projects (id)

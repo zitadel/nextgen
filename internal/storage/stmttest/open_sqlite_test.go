@@ -29,9 +29,6 @@ func init() {
 		func(ctx context.Context, pool dbtest.Pool, projectID, id, userID, encodedHash string, createdAt time.Time) error {
 			return sqlite.InsertUserPasswordAt(ctx, pool, projectID, id, userID, encodedHash, createdAt)
 		},
-		func(ctx context.Context, pool dbtest.Pool, projectID, id, releaseID string) error {
-			return sqlite.InsertDeployment(ctx, pool, projectID, id, releaseID)
-		},
 		sqlite.SchemaColumnNullability(),
 		func(ctx context.Context, pool dbtest.Pool) (map[string]map[string]bool, error) {
 			return sqlite.LiveColumnNullability(ctx, pool)

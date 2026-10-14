@@ -5,6 +5,7 @@ package stmttest
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,13 +14,16 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// variableSetFixture is a project with one release, so a test can seed the
-// deployments it freezes variables against. Everything it creates hangs off
-// the project, which the cleanup deletes.
+// variableSetFixture is a project with one release and one origin of each
+// kind, so a test can create the deployments it freezes variables against the
+// way the service does. Everything it creates hangs off the project, which
+// the cleanup deletes.
 type variableSetFixture struct {
-	d         dialect
-	projectID string
-	releaseID string
+	d             dialect
+	projectID     string
+	releaseID     string
+	primaryOrigin string
+	previewOrigin string
 }
 
 func newVariableSetFixture(t *testing.T, d dialect) *variableSetFixture {
@@ -29,7 +33,11 @@ func newVariableSetFixture(t *testing.T, d dialect) *variableSetFixture {
 	t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), projectID) })
 
 	release := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
-	return &variableSetFixture{d: d, projectID: projectID, releaseID: release.ID}
+	return &variableSetFixture{
+		d: d, projectID: projectID, releaseID: release.ID,
+		primaryOrigin: "https://" + projectID + ".example.test",
+		previewOrigin: "https://pr-1-" + projectID + ".example.test",
+	}
 }
 
 func (f *variableSetFixture) owner() domain.VariableOwner {
@@ -38,24 +46,28 @@ func (f *variableSetFixture) owner() domain.VariableOwner {
 
 // set writes a variable of the project for kind. No cleanup: the project
 // delete takes it.
-func (f *variableSetFixture) set(t *testing.T, name string, kind domain.TargetKind, value any, isSecret bool) {
+func (f *variableSetFixture) set(t *testing.T, name string, kind domain.DeploymentOriginKind, value any, isSecret bool) {
 	t.Helper()
 	require.NoError(t, f.d.stmts.SetVariable(t.Context(), &domain.Variable{
 		Name: name, Owner: f.owner(), Kind: kind, Value: value, IsSecret: isSecret,
 	}))
 }
 
-// deploy seeds a deployment of the release and returns its id.
-func (f *variableSetFixture) deploy(t *testing.T) string {
+// deploy creates a deployment of the release to the fixture's origin of kind
+// and returns its id. The kind lives on the deployment: it is what a freeze
+// reads to decide which rows to copy.
+func (f *variableSetFixture) deploy(t *testing.T, kind domain.DeploymentOriginKind) string {
 	t.Helper()
-	id := "dep-" + uniqueSuffix(t)
-	require.NoError(t, f.d.insertDeployment(t.Context(), f.projectID, id, f.releaseID))
-	return id
+	args, origin := deployArgs{kind: kind}, f.primaryOrigin
+	if kind == domain.DeploymentOriginKindPreview {
+		args, origin = previewDeploy(time.Hour), f.previewOrigin
+	}
+	return deploy(t, f.d.stmts, f.projectID, f.releaseID, []string{origin}, args).ID
 }
 
-func (f *variableSetFixture) freeze(t *testing.T, deploymentID string, kind domain.TargetKind) *domain.VariableSet {
+func (f *variableSetFixture) freeze(t *testing.T, deploymentID string) *domain.VariableSet {
 	t.Helper()
-	set, err := f.d.stmts.FreezeDeploymentVariables(t.Context(), f.projectID, deploymentID, kind)
+	set, err := f.d.stmts.FreezeDeploymentVariables(t.Context(), f.projectID, deploymentID)
 	require.NoError(t, err)
 	return set
 }
@@ -77,24 +89,24 @@ func entryValues(set *domain.VariableSet) map[string]any {
 	return values
 }
 
-// A freeze copies the rows of the kind it is asked for: the primary freeze
-// holds the primary values and the preview freeze the preview ones, and a
+// A freeze copies the rows of the deployment's own kind: a primary deployment
+// freezes the primary values and a preview deployment the preview ones, and a
 // name entered for one kind only is absent from the other's set rather than
 // inherited by it (ADR 069 §2).
 func TestVariableSetStatements_FreezesOneKind(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		f := newVariableSetFixture(t, d)
-		f.set(t, "api_url", domain.TargetKindPrimary, "https://api.example.test", false)
-		f.set(t, "api_url", domain.TargetKindPreview, "https://preview.example.test", false)
-		f.set(t, "primary_only", domain.TargetKindPrimary, "no preview value", false)
+		f.set(t, "api_url", domain.DeploymentOriginKindPrimary, "https://api.example.test", false)
+		f.set(t, "api_url", domain.DeploymentOriginKindPreview, "https://preview.example.test", false)
+		f.set(t, "primary_only", domain.DeploymentOriginKindPrimary, "no preview value", false)
 
-		primary := f.freeze(t, f.deploy(t), domain.TargetKindPrimary)
+		primary := f.freeze(t, f.deploy(t, domain.DeploymentOriginKindPrimary))
 		assert.Equal(t, map[string]any{
 			"api_url":      "https://api.example.test",
 			"primary_only": "no preview value",
 		}, entryValues(primary))
 
-		preview := f.freeze(t, f.deploy(t), domain.TargetKindPreview)
+		preview := f.freeze(t, f.deploy(t, domain.DeploymentOriginKindPreview))
 		assert.Equal(t, map[string]any{
 			"api_url": "https://preview.example.test",
 		}, entryValues(preview), "a preview set holds preview rows only: nothing falls back to the primary value")
@@ -108,15 +120,15 @@ func TestVariableSetStatements_FreezesOneKind(t *testing.T) {
 func TestVariableSetStatements_ValuesSurviveLaterChanges(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		f := newVariableSetFixture(t, d)
-		f.set(t, "api_url", domain.TargetKindPrimary, "https://v1.example.test", false)
-		f.set(t, "legacy_flag", domain.TargetKindPrimary, true, false)
+		f.set(t, "api_url", domain.DeploymentOriginKindPrimary, "https://v1.example.test", false)
+		f.set(t, "legacy_flag", domain.DeploymentOriginKindPrimary, true, false)
 
-		deploymentID := f.deploy(t)
-		frozen := f.freeze(t, deploymentID, domain.TargetKindPrimary)
+		deploymentID := f.deploy(t, domain.DeploymentOriginKindPrimary)
+		frozen := f.freeze(t, deploymentID)
 
 		// The variables move on: one changes, one goes.
-		f.set(t, "api_url", domain.TargetKindPrimary, "https://v2.example.test", false)
-		require.NoError(t, d.stmts.DeleteVariable(t.Context(), f.owner(), domain.TargetKindPrimary, "legacy_flag"))
+		f.set(t, "api_url", domain.DeploymentOriginKindPrimary, "https://v2.example.test", false)
+		require.NoError(t, d.stmts.DeleteVariable(t.Context(), f.owner(), domain.DeploymentOriginKindPrimary, "legacy_flag"))
 
 		got := f.get(t, deploymentID)
 		assert.Equal(t, frozen.Hash, got.Hash)
@@ -126,7 +138,7 @@ func TestVariableSetStatements_ValuesSurviveLaterChanges(t *testing.T) {
 		}, entryValues(got), "the deployment must keep the values it was created with")
 
 		// A deployment created now sees the variables as they are now.
-		next := f.freeze(t, f.deploy(t), domain.TargetKindPrimary)
+		next := f.freeze(t, f.deploy(t, domain.DeploymentOriginKindPrimary))
 		assert.Equal(t, map[string]any{"api_url": "https://v2.example.test"}, entryValues(next))
 	})
 }
@@ -138,8 +150,8 @@ func TestVariableSetStatements_EmptySet(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		f := newVariableSetFixture(t, d)
 
-		deploymentID := f.deploy(t)
-		frozen := f.freeze(t, deploymentID, domain.TargetKindPrimary)
+		deploymentID := f.deploy(t, domain.DeploymentOriginKindPrimary)
+		frozen := f.freeze(t, deploymentID)
 		assert.Empty(t, frozen.Entries)
 
 		empty, err := domain.VariableSetHash(nil)
@@ -159,29 +171,29 @@ func TestVariableSetStatements_EmptySet(t *testing.T) {
 func TestVariableSetStatements_IdenticalValuesShareOneSet(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		f := newVariableSetFixture(t, d)
-		f.set(t, "api_url", domain.TargetKindPrimary, "https://api.example.test", false)
-		f.set(t, "retries", domain.TargetKindPrimary, 3, false)
+		f.set(t, "api_url", domain.DeploymentOriginKindPrimary, "https://api.example.test", false)
+		f.set(t, "retries", domain.DeploymentOriginKindPrimary, 3, false)
 
-		first := f.deploy(t)
-		second := f.deploy(t)
-		firstSet := f.freeze(t, first, domain.TargetKindPrimary)
-		secondSet := f.freeze(t, second, domain.TargetKindPrimary)
+		first := f.deploy(t, domain.DeploymentOriginKindPrimary)
+		second := f.deploy(t, domain.DeploymentOriginKindPrimary)
+		firstSet := f.freeze(t, first)
+		secondSet := f.freeze(t, second)
 
 		assert.Equal(t, firstSet.Hash, secondSet.Hash, "unchanged values must resolve to the set that already exists")
 		assert.Equal(t, firstSet.Entries, secondSet.Entries)
 		assert.Equal(t, f.get(t, first), f.get(t, second))
 
 		// A change is a new set; the earlier deployments keep the old one.
-		f.set(t, "retries", domain.TargetKindPrimary, 5, false)
-		third := f.freeze(t, f.deploy(t), domain.TargetKindPrimary)
+		f.set(t, "retries", domain.DeploymentOriginKindPrimary, 5, false)
+		third := f.freeze(t, f.deploy(t, domain.DeploymentOriginKindPrimary))
 		assert.NotEqual(t, firstSet.Hash, third.Hash)
 		assert.Equal(t, firstSet.Hash, f.get(t, first).Hash)
 		assert.Equal(t, firstSet.Hash, f.get(t, second).Hash)
 
 		// Rolling back is freezing the old values again: the old set is
 		// reused, not re-created.
-		f.set(t, "retries", domain.TargetKindPrimary, 3, false)
-		rollback := f.freeze(t, f.deploy(t), domain.TargetKindPrimary)
+		f.set(t, "retries", domain.DeploymentOriginKindPrimary, 3, false)
+		rollback := f.freeze(t, f.deploy(t, domain.DeploymentOriginKindPrimary))
 		assert.Equal(t, firstSet.Hash, rollback.Hash)
 	})
 }
@@ -193,13 +205,13 @@ func TestVariableSetStatements_RoundTripRehashes(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		f := newVariableSetFixture(t, d)
 		const ciphertext = "eyJhbGciOiJBMjU2R0NNS1ciLCJraWQiOiJrZXktMSJ9.encrypted.value"
-		f.set(t, "api_url", domain.TargetKindPrimary, "https://api.example.test", false)
-		f.set(t, "client_secret", domain.TargetKindPrimary, ciphertext, true)
-		f.set(t, "retries", domain.TargetKindPrimary, 3, false)
-		f.set(t, "verbose", domain.TargetKindPrimary, true, false)
+		f.set(t, "api_url", domain.DeploymentOriginKindPrimary, "https://api.example.test", false)
+		f.set(t, "client_secret", domain.DeploymentOriginKindPrimary, ciphertext, true)
+		f.set(t, "retries", domain.DeploymentOriginKindPrimary, 3, false)
+		f.set(t, "verbose", domain.DeploymentOriginKindPrimary, true, false)
 
-		deploymentID := f.deploy(t)
-		frozen := f.freeze(t, deploymentID, domain.TargetKindPrimary)
+		deploymentID := f.deploy(t, domain.DeploymentOriginKindPrimary)
+		frozen := f.freeze(t, deploymentID)
 		got := f.get(t, deploymentID)
 
 		// The entries come back sorted by name, in three different JSON
@@ -222,27 +234,25 @@ func TestVariableSetStatements_RoundTripRehashes(t *testing.T) {
 func TestVariableSetStatements_Errors(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		f := newVariableSetFixture(t, d)
-		f.set(t, "api_url", domain.TargetKindPrimary, "https://api.example.test", false)
+		f.set(t, "api_url", domain.DeploymentOriginKindPrimary, "https://api.example.test", false)
 
 		t.Run("freezing a deployment twice is a UniqueError", func(t *testing.T) {
-			deploymentID := f.deploy(t)
-			f.freeze(t, deploymentID, domain.TargetKindPrimary)
+			deploymentID := f.deploy(t, domain.DeploymentOriginKindPrimary)
+			f.freeze(t, deploymentID)
 
-			_, err := d.stmts.FreezeDeploymentVariables(t.Context(), f.projectID, deploymentID, domain.TargetKindPrimary)
+			_, err := d.stmts.FreezeDeploymentVariables(t.Context(), f.projectID, deploymentID)
 			assert.ErrorIs(t, err, new(database.UniqueError), "a deployment runs with one set, for good")
-
-			// Not even for the other kind: the link is per deployment.
-			_, err = d.stmts.FreezeDeploymentVariables(t.Context(), f.projectID, deploymentID, domain.TargetKindPreview)
-			assert.ErrorIs(t, err, new(database.UniqueError))
 		})
 
-		t.Run("freezing an unknown deployment is a ForeignKeyError", func(t *testing.T) {
-			_, err := d.stmts.FreezeDeploymentVariables(t.Context(), f.projectID, "dep-does-not-exist", domain.TargetKindPrimary)
-			assert.ErrorIs(t, err, new(database.ForeignKeyError))
+		// The kind is read from the deployment's row, so a deployment that
+		// is not there has nothing to read: no row, before any key is checked.
+		t.Run("freezing an unknown deployment is a NoRowFoundError", func(t *testing.T) {
+			_, err := d.stmts.FreezeDeploymentVariables(t.Context(), f.projectID, "dep-does-not-exist")
+			assert.ErrorIs(t, err, new(database.NoRowFoundError))
 		})
 
 		t.Run("reading a deployment that was never frozen is a NoRowFoundError", func(t *testing.T) {
-			deploymentID := f.deploy(t)
+			deploymentID := f.deploy(t, domain.DeploymentOriginKindPrimary)
 
 			_, err := d.stmts.GetDeploymentVariables(t.Context(), f.projectID, deploymentID)
 			assert.ErrorIs(t, err, new(database.NoRowFoundError))
@@ -259,20 +269,20 @@ func TestVariableSetStatements_ProjectIsolation(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		one := newVariableSetFixture(t, d)
 		other := newVariableSetFixture(t, d)
-		one.set(t, "api_url", domain.TargetKindPrimary, "https://one.example.test", false)
-		other.set(t, "api_url", domain.TargetKindPrimary, "https://other.example.test", false)
+		one.set(t, "api_url", domain.DeploymentOriginKindPrimary, "https://one.example.test", false)
+		other.set(t, "api_url", domain.DeploymentOriginKindPrimary, "https://other.example.test", false)
 
-		oneDeployment := one.deploy(t)
-		otherDeployment := other.deploy(t)
-		assert.Equal(t, map[string]any{"api_url": "https://one.example.test"}, entryValues(one.freeze(t, oneDeployment, domain.TargetKindPrimary)))
-		assert.Equal(t, map[string]any{"api_url": "https://other.example.test"}, entryValues(other.freeze(t, otherDeployment, domain.TargetKindPrimary)))
+		oneDeployment := one.deploy(t, domain.DeploymentOriginKindPrimary)
+		otherDeployment := other.deploy(t, domain.DeploymentOriginKindPrimary)
+		assert.Equal(t, map[string]any{"api_url": "https://one.example.test"}, entryValues(one.freeze(t, oneDeployment)))
+		assert.Equal(t, map[string]any{"api_url": "https://other.example.test"}, entryValues(other.freeze(t, otherDeployment)))
 
 		t.Run("a deployment is addressed through its own project", func(t *testing.T) {
 			_, err := d.stmts.GetDeploymentVariables(t.Context(), other.projectID, oneDeployment)
 			assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
-			_, err = d.stmts.FreezeDeploymentVariables(t.Context(), other.projectID, oneDeployment, domain.TargetKindPrimary)
-			assert.ErrorIs(t, err, new(database.ForeignKeyError), "a deployment of one project cannot be frozen under another")
+			_, err = d.stmts.FreezeDeploymentVariables(t.Context(), other.projectID, oneDeployment)
+			assert.ErrorIs(t, err, new(database.NoRowFoundError), "a deployment of one project cannot be frozen under another")
 		})
 
 		// The same values in two projects hash the same and are still two
@@ -281,12 +291,12 @@ func TestVariableSetStatements_ProjectIsolation(t *testing.T) {
 		// cascade takes its own set, and the other project's deployment still
 		// reads the set it froze, under the same hash and its own project.
 		t.Run("identical values in two projects are two sets", func(t *testing.T) {
-			one.set(t, "api_url", domain.TargetKindPrimary, "https://shared.example.test", false)
-			other.set(t, "api_url", domain.TargetKindPrimary, "https://shared.example.test", false)
+			one.set(t, "api_url", domain.DeploymentOriginKindPrimary, "https://shared.example.test", false)
+			other.set(t, "api_url", domain.DeploymentOriginKindPrimary, "https://shared.example.test", false)
 
-			oneSet := one.freeze(t, one.deploy(t), domain.TargetKindPrimary)
-			otherDeployment := other.deploy(t)
-			otherSet := other.freeze(t, otherDeployment, domain.TargetKindPrimary)
+			oneSet := one.freeze(t, one.deploy(t, domain.DeploymentOriginKindPrimary))
+			otherDeployment := other.deploy(t, domain.DeploymentOriginKindPrimary)
+			otherSet := other.freeze(t, otherDeployment)
 			assert.Equal(t, oneSet.Hash, otherSet.Hash)
 			assert.Equal(t, one.projectID, oneSet.ProjectID)
 			assert.Equal(t, other.projectID, otherSet.ProjectID)
@@ -305,16 +315,16 @@ func TestVariableSetStatements_ProjectIsolation(t *testing.T) {
 // Deleting a project takes its sets and links with it. This is the guard for
 // the cascade order on Postgres: the link's NO ACTION key to the set would
 // abort the delete if the links were only removed through the deployment
-// cascade, three levels down, after the sets are gone at the first.
+// cascade, a level further down, after the sets are gone at the first.
 func TestVariableSetStatements_ProjectDeleteCascades(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		f := newVariableSetFixture(t, d)
-		f.set(t, "api_url", domain.TargetKindPrimary, "https://api.example.test", false)
-		f.set(t, "api_url", domain.TargetKindPreview, "https://preview.example.test", false)
-		primary := f.deploy(t)
-		preview := f.deploy(t)
-		f.freeze(t, primary, domain.TargetKindPrimary)
-		f.freeze(t, preview, domain.TargetKindPreview)
+		f.set(t, "api_url", domain.DeploymentOriginKindPrimary, "https://api.example.test", false)
+		f.set(t, "api_url", domain.DeploymentOriginKindPreview, "https://preview.example.test", false)
+		primary := f.deploy(t, domain.DeploymentOriginKindPrimary)
+		preview := f.deploy(t, domain.DeploymentOriginKindPreview)
+		f.freeze(t, primary)
+		f.freeze(t, preview)
 
 		_, err := d.stmts.DeleteProjectByID(t.Context(), f.projectID)
 		require.NoError(t, err, "a project with frozen deployments must still be deletable")
@@ -324,7 +334,7 @@ func TestVariableSetStatements_ProjectDeleteCascades(t *testing.T) {
 		_, err = d.stmts.GetDeploymentVariables(t.Context(), f.projectID, preview)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
-		variables, err := d.stmts.GetVariables(t.Context(), f.owner(), domain.TargetKindPrimary)
+		variables, err := d.stmts.GetVariables(t.Context(), f.owner(), domain.DeploymentOriginKindPrimary)
 		require.NoError(t, err)
 		assert.Empty(t, variables)
 	})
