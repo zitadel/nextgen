@@ -77,3 +77,20 @@ func InsertFlowDefinitionAt(ctx context.Context, pool database.Pool, projectID, 
 	).statement())
 	return wrapError(err)
 }
+
+// InsertUserPasswordAt inserts a user_passwords row at an exact created_at.
+// SetUserPassword never accepts a caller-supplied created_at, so a test that
+// needs a newest password the clock has not reached yet has to write the row
+// itself.
+func InsertUserPasswordAt(ctx context.Context, pool database.Pool, projectID, id, userID, encodedHash string, createdAt time.Time) error {
+	c, ok := pool.(*Client)
+	if !ok {
+		return fmt.Errorf("spanner.InsertUserPasswordAt: expected *Client, got %T", pool)
+	}
+	db := newClientDB(c.client)
+	_, err := db.Update(ctx, buildStatement(
+		`INSERT INTO user_passwords (project_id, id, user_id, encoded_hash, created_at) VALUES (@p1, @p2, @p3, @p4, @p5)`,
+		projectID, id, userID, encodedHash, createdAt,
+	).statement())
+	return wrapError(err)
+}

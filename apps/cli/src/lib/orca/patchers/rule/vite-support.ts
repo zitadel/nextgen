@@ -23,11 +23,21 @@ import {
  * app-plane `POST /sessions/exchange` operation. The secret stays server-side:
  * Vite only exposes vars with the configured `envPrefix` (default `VITE_`) to
  * client bundles, so this server-only key never leaks into the browser.
+ *
+ * The backend is addressed by its own name: `changeOrigin` sends the target's
+ * host as `Host`, which Node also uses as the TLS server name and for the
+ * certificate check, so a remote https server accepts the connection — and one
+ * behind a shared edge such as Vercel, which routes by `Host`, finds the
+ * deployment. The app's own origin travels in `X-Forwarded-Host` and
+ * `X-Forwarded-Proto` (`xfwd`), which the server reads before `Host`, as the
+ * Next and Nuxt middleware send it. The WebAuthn relying party comes from the
+ * browser's `Origin`, which the proxy passes on untouched.
  */
 function proxyEntryCode(server: string): string {
   return `/* ${PROXY_CREDENTIAL_POLICY_MARKER} */ {
   target: ${JSON.stringify(server)},
-  changeOrigin: false,
+  changeOrigin: true,
+  xfwd: true,
   rewrite: (path) => path.replace(/^\\${PROXY_PATH}/, "").replace(/^(?!\\/)/, "/"),
   configure: (proxy) => {
     const secret = loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_SECRET;
@@ -85,6 +95,33 @@ function isLegacyManagedProxy(source: string): boolean {
   );
 }
 
+/**
+ * The generated entry as emitted before it forwarded the app's origin:
+ * `changeOrigin: false` straight after `target`. Keeping the browser's `Host`
+ * also kept `localhost` as the TLS server name, so that proxy could reach no
+ * remote https server.
+ */
+const HOST_KEEPING_ENTRY =
+  /(["']\/__nextgen["']:\s*(?:\/\* zitadel:proxy:v2 \*\/\s*)?\{\r?\n([\t ]+)target: [^\r\n]+,\r?\n)\2changeOrigin: false,(\r?\n)/;
+
+/**
+ * Moves the CLI's own host-keeping entry to the origin-forwarding shape of
+ * {@link proxyEntryCode}. Only the generated layout in a config that carries
+ * the credential-policy marker qualifies, and a config that already sets
+ * `xfwd` has made its own forwarding choice: a hand-written `/__nextgen` entry
+ * is never touched.
+ */
+function forwardAppOrigin(source: string): string {
+  if (!source.includes(PROXY_CREDENTIAL_POLICY_MARKER) || /\bxfwd\s*:/.test(source)) {
+    return source;
+  }
+  return source.replace(
+    HOST_KEEPING_ENTRY,
+    (_entry, head: string, indent: string, eol: string) =>
+      `${head}${indent}changeOrigin: true,${eol}${indent}xfwd: true,${eol}`,
+  );
+}
+
 /** The imports that the injected proxy entry depends on. */
 const PROXY_IMPORTS = [{ from: "vite", imported: "loadEnv", local: "loadEnv" }] as const;
 
@@ -95,9 +132,11 @@ const PROXY_IMPORTS = [{ from: "vite", imported: "loadEnv", local: "loadEnv" }] 
  * preserving the user's plugins, options, and formatting. Leaves `server.host`
  * alone so the user can still opt into network binding (`--host`/`host: true`);
  * the issuer/origin requirement is about the port, not the bind host. Idempotent
- * — entries already present are left as-is. Throws `E_VALIDATION` when the file
- * is absent or the config object cannot be reached (function-built/exotic
- * configs), with a hint to add the block manually.
+ * — entries already present are left as-is, except the CLI's own earlier proxy
+ * shapes, which are migrated in place: the unconditional bearer listener and
+ * the host-keeping entry. Throws `E_VALIDATION` when the file is absent or the
+ * config object cannot be reached (function-built/exotic configs), with a hint
+ * to add the block manually.
  */
 export function viteProxyEdit(
   devPort: number,
@@ -115,6 +154,9 @@ export function viteProxyEdit(
       );
     } else if (workingSource !== undefined) {
       assertNoUnreviewedProjectSecretProxy(workingSource, label);
+    }
+    if (workingSource !== undefined) {
+      workingSource = forwardAppOrigin(workingSource);
     }
 
     const mod = parseConfigModule(workingSource, label);

@@ -10,7 +10,7 @@ const speedInsightsSampleRate = Number(import.meta.env.CONSOLE_SPEED_INSIGHTS_SA
 /**
  * Vercel Web Analytics and Speed Insights, for the console the hosted cloud
  * serves (the root route renders it only in that build). Both report the
- * matched route (`/ui/console/users/$userId`), so a screen's page views and
+ * matched route (`/console/users/$userId`), so a screen's page views and
  * vitals add up across the resources it shows. Speed Insights reports the
  * sampled share of page loads; Web Analytics has no sampling and counts them
  * all.

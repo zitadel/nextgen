@@ -35,7 +35,7 @@ export function validatePlannedFlows(opts: {
   stateResources: Readonly<Record<string, ResourceEntry>>;
 }): void {
   if (process.env.ZITADEL_SKIP_FLOW_VALIDATION) {
-    reportWarning("Flow validation skipped (ZITADEL_SKIP_FLOW_VALIDATION is set)");
+    reportWarning("Flow and SSO validation skipped (ZITADEL_SKIP_FLOW_VALIDATION is set)");
     return;
   }
 
@@ -151,14 +151,15 @@ function defaultSwapWarning(
   }
   const subject =
     action.kind === "create"
-      ? "this flow becomes the new default"
-      : "this revision becomes the newest active flow and the default";
+      ? "this flow definition becomes the project default"
+      : "this revision becomes the newest active flow definition and the project default";
   return {
     rule: "warn/default-flow-swap",
     message:
       `once applied, ${subject} for ${humanList(purposes)}: ` +
       `pages that do not explicitly set flow-name on <zitadel-login> will start rendering it. ` +
-      `If that is not intended, scope it with "audience" or set flow-name on the pages that should use it.`,
+      `If that is not intended, give the flow definition an "audience" before its first apply and select it by flowName, ` +
+      `or pin flow-name on the pages that should keep the current project default.`,
   };
 }
 
@@ -169,13 +170,10 @@ function humanList(items: readonly string[]): string {
 }
 
 /**
- * Locate the local content of the schema a flow's `user_schema` pins.
- * A repin action already names the schema file (the pin is adopting that
- * file's next/new revision); otherwise the pinned id is looked up in
- * state and its file body taken from this scan. Unresolvable refs (e.g.
- * an un-substituted `${USER_SCHEMA_URL}` placeholder or a server-side
- * schema not tracked locally) return undefined — flow-local rules still
- * run, schema-dependent rules are skipped.
+ * Locate the local content of the schema a flow's `user_schema` names: the
+ * repin's schema file, a scanned schema with that `objectType`, or the file
+ * state maps a schema id to. Unresolvable refs return undefined, so only
+ * flow-local rules run.
  */
 function resolveSchemaContent(
   action: Extract<SyncAction, { kind: "create" | "update" | "revise" }>,
@@ -188,6 +186,12 @@ function resolveSchemaContent(
   const ref = (action.content as { user_schema?: unknown }).user_schema;
   if (typeof ref !== "string" || ref === "") {
     return undefined;
+  }
+  for (const content of scannedContents.values()) {
+    const { kind, objectType } = content as { kind?: unknown; objectType?: unknown };
+    if (kind === "user-schema" && objectType === ref) {
+      return content;
+    }
   }
   for (const [path, entry] of Object.entries(stateResources)) {
     if (entry.id === ref) {

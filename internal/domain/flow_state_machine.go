@@ -17,13 +17,11 @@ import (
 
 // Step error text keys the state machine emits when an auth-attempt
 // proof is rejected. Every engine-emitted step error must be a
-// localizable `error.*` catalog key or a reserved outcome token:
-// /login localizes only `error.*`-prefixed step errors and treats
-// outcome tokens as routing, so anything else renders verbatim (see
+// localizable `error.*` catalog key: /login localizes only
+// `error.*`-prefixed step errors, so anything else renders verbatim (see
 // `localiseFlowErrorKeys` in
 // packages/components/src/orchestrator/liquid.ts). New emission sites
-// add a const here; [FlowStepErrorAllowed] and its contract test keep
-// the set honest.
+// add a const here; TestFlowStepErrorContract keeps the set honest.
 const (
 	// FlowStepErrorInvalidCredentials reports a rejected password
 	// proof. The client routes it inline to the password field
@@ -67,24 +65,46 @@ const (
 	FlowStepErrorSSOUserCannotBeCreated = "error.sso_user_cannot_be_created"
 	// FlowStepErrorUserAlreadyExists reports a unique value another user
 	// holds where the engine cannot bind that user, so it cannot route
-	// user_already_exists: a user of another schema.
+	// user_already_exists: a user of another schema. Also what an unwired
+	// user_already_exists outcome renders.
 	FlowStepErrorUserAlreadyExists = "error.user_already_exists"
+	// FlowStepErrorUserNotFound reports an unknown identifier on a step
+	// that does not wire user_not_found.
+	FlowStepErrorUserNotFound = "error.user_not_found"
+	// FlowStepErrorSSOUserNotFound reports a provider identity with no
+	// account on a step that does not wire sso_user_not_found.
+	FlowStepErrorSSOUserNotFound = "error.sso_user_not_found"
+	// FlowStepErrorOutcomeUnhandled reports an unwired outcome with no
+	// key of its own.
+	FlowStepErrorOutcomeUnhandled = "error.outcome_unhandled"
+	// FlowStepErrorSignInFirst reports a password submitted on a sign-in
+	// step that has no user to check it against, such as a conflict step
+	// reached without binding the colliding user. The password is
+	// discarded; the user has to sign in from the start. The key avoids the
+	// `error.<field>_<rule>` shape so it cannot read as a field's validation
+	// error.
+	FlowStepErrorSignInFirst = "error.sign_in_first"
 )
+
+// unwiredOutcomeErrors maps an implicit outcome the current step does not
+// route to the step error it renders instead.
+var unwiredOutcomeErrors = map[string]string{
+	FlowImplicitOutcomeUserNotFound:      FlowStepErrorUserNotFound,
+	FlowImplicitOutcomeUserAlreadyExists: FlowStepErrorUserAlreadyExists,
+	FlowImplicitOutcomeSSOUserNotFound:   FlowStepErrorSSOUserNotFound,
+}
 
 // errSSOClaimRejected reports a verified unique claim that fails its own
 // property. The user may not change a verified value, and the account cannot
 // hold this one, so nothing is created and no step is shown to collect it.
 var errSSOClaimRejected = errors.New("flow state machine: the user schema rejects a verified unique claim")
 
-// FlowStepErrorAllowed reports whether a step error value honors the
-// client contract: a localizable `error.*` text key or a reserved
-// outcome token (reservedOutcomes in flow_definition_validator.go).
-func FlowStepErrorAllowed(key string) bool {
-	if strings.HasPrefix(key, "error.") {
-		return true
+// UnwiredOutcomeError returns the step error an unwired outcome renders.
+func UnwiredOutcomeError(outcome string) string {
+	if key, ok := unwiredOutcomeErrors[outcome]; ok {
+		return key
 	}
-	_, ok := reservedOutcomes[key]
-	return ok
+	return FlowStepErrorOutcomeUnhandled
 }
 
 // FlowStateMachine drives a flow definition forward in response to
@@ -1222,14 +1242,22 @@ func (r *FlowStateMachineRuntime) renderStepError(pc *processCtx, resolved FlowR
 // renders (or terminates on a terminal step). When outcome differs
 // from the user-submitted action it came from a handler diversion
 // (e.g. user_not_found); a missing transition in that case degrades
-// to a step error instead of ErrFlowInvalidAction. If irreversible,
-// BackStack is dropped after advance.
+// to the outcome's step error instead of ErrFlowInvalidAction. If
+// irreversible, BackStack is dropped after advance.
 func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowResolvedFields, outcome string, irreversible bool) (FlowStepResult, error) {
 	transition, ok := pc.currentStep.Transitions[outcome]
 	if !ok {
 		if outcome != pc.in.Action {
-			msg := outcome
-			return r.renderStepError(pc, resolved, &msg)
+			// The found user is already on the attempt. Keeping it would block
+			// a corrected identifier and let a passkey register on that user.
+			// The password stays: on sign-up it is the one chosen for the new
+			// account, and a later step may not collect it again.
+			if outcome == FlowImplicitOutcomeUserAlreadyExists {
+				if err := r.dropResolvedUser(pc, "unrouted collision"); err != nil {
+					return FlowStepResult{}, err
+				}
+			}
+			return r.renderStepError(pc, resolved, new(UnwiredOutcomeError(outcome)))
 		}
 		return FlowStepResult{}, fmt.Errorf("%w: %q on step %q", ErrFlowInvalidAction(), pc.in.Action, pc.currentStep.Name)
 	}
@@ -1259,6 +1287,7 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 		if err := r.dropResolvedUser(pc, "re-purpose"); err != nil {
 			return FlowStepResult{}, err
 		}
+		pc.state.CollectedData.AuthMethods.Password = ""
 		pc.state.CurrentPurpose = *transition.Purpose
 
 		// Purpose entries link to each other, forming a zero-input loop.
@@ -1299,16 +1328,9 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 }
 
 // dropResolvedUser abandons the identity this flow had settled on: the
-// resolved user, the credential material collected to authenticate them, and
-// any in-flight ceremony. When a user was resolved it rotates the auth
-// attempt in lockstep.
-//
-// The collected password goes because it belongs to the identity being
-// dropped, and [mergeCollected] banks it before the proof is ever checked —
-// so a rejected password outlives its attempt otherwise, and would be handed
-// to create_user for whoever the flow resolves next. Nothing prefills from
-// it (a password field always renders empty), so clearing it costs the user
-// nothing.
+// resolved user and any in-flight ceremony. When a user was resolved it
+// rotates the auth attempt in lockstep. The collected password is left to
+// the caller, since only some callers drop the identity it belongs to.
 //
 // The persisted attempt carries the resolved user as a factor, and
 // PrepareUserChallenge refuses a second user challenge on a session-linked
@@ -1322,7 +1344,6 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 func (r *FlowStateMachineRuntime) dropResolvedUser(pc *processCtx, reason string) error {
 	hadResolvedUser := pc.state.CollectedData.UserID != ""
 	clearUserBoundState(pc.state)
-	pc.state.CollectedData.AuthMethods.Password = ""
 	if !hadResolvedUser {
 		return nil
 	}
@@ -1768,6 +1789,15 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 			if state.CurrentPurpose != FlowDefinitionPurposeLogin {
 				continue
 			}
+			// A sign-in password is checked, not stored: [mergeCollected]
+			// has already banked it, so it is dropped here rather than
+			// carried into whatever the flow resolves next. The only
+			// on_success a login step can run is create_user, which would
+			// store it on a new account rather than the one it verified.
+			state.CollectedData.AuthMethods.Password = ""
+			if state.CollectedData.UserID == "" {
+				return flowDispatchResult{StepError: new(FlowStepErrorSignInFirst)}, nil
+			}
 			err := r.authAttempts.SubmitPassword(ctx, FlowSubmitPasswordInput{
 				ProjectID: state.ProjectID,
 				AttemptID: state.AuthAttemptID,
@@ -2197,6 +2227,12 @@ func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, e
 		if err := r.dropResolvedUser(pc, "back to identification"); err != nil {
 			return FlowStepResult{}, err
 		}
+		// The password belongs to the identity being dropped, and
+		// [mergeCollected] banks it before the proof is ever checked, so a
+		// rejected password would otherwise reach create_user for whoever the
+		// flow resolves next. A password field always renders empty, so
+		// clearing it costs the user nothing.
+		pc.state.CollectedData.AuthMethods.Password = ""
 	}
 
 	// Prefill and build after the drop, so the step reflects the state the

@@ -51,6 +51,12 @@ export interface PlatformMock {
    */
   hangs(): Promise<void>;
 
+  /** Makes the project's variables unreadable while everything else answers. */
+  cannotListVariables(): void;
+
+  /** Makes a stored connection unreadable while everything else answers. */
+  cannotReadConnections(): void;
+
   /** Drops any arranged failure, so the platform answers normally again. */
   recovers(): void;
 
@@ -115,6 +121,22 @@ export function usePlatformMock(): PlatformMock {
           }),
         );
       });
+    },
+
+    cannotListVariables() {
+      server.use(
+        http.get("*/variables", () =>
+          HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+        ),
+      );
+    },
+
+    cannotReadConnections() {
+      server.use(
+        http.get("*/idps/:id", () =>
+          HttpResponse.json({ code: "unavailable", message: "down" }, { status: 503 }),
+        ),
+      );
     },
 
     recovers() {

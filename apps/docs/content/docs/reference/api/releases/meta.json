@@ -1,0 +1,11 @@
+{
+  "title": "Releases",
+  "pages": [
+    "createRelease",
+    "buildRelease",
+    "listReleases",
+    "getReleaseById",
+    "revokeRelease",
+    "..."
+  ]
+}

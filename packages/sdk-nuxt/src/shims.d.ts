@@ -16,6 +16,7 @@ declare module "#imports" {
     nextgen?: {
       url?: string;
       issuerUrl?: string;
+      proxyPath?: string;
       loginPath?: string;
       protectedRoutes?: string[];
     };

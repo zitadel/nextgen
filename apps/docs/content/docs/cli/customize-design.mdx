@@ -3,7 +3,7 @@ title: Customize the login design
 description: Choose a starter login design, add your branding, and publish it as a revision.
 ---
 
-The login component ships with a built-in template that follows your project without any files in your repo. Its look comes from your app: theme it with `--zl-*` custom properties and put any page layout — a split screen, a brand pane, marketing copy — around it in your own code. When you need to change the widget's *structure*, you take ownership of its template: the CLI copies a starter design into `.zitadel/branding/`, and from then on the login renders your files.
+The login component ships with a built-in template that follows your project without any files in your repo. Its look comes from your app: theme it with `--zl-*` custom properties and put any page layout — a split screen, a brand pane, marketing copy — around it in your own code. When you need to change the widget's *structure*, you take ownership of its template: the CLI copies a starter design into `.zitadel/branding/`, and once you apply it, the login renders your files.
 
 ## Starter designs
 
@@ -30,18 +30,24 @@ npx @zitadel/cli@alpha branding eject
 
 ## Add your branding
 
-Brand assets live in `branding.json` and must be hosted `https://` URLs — the CLI validates them at plan time, and the platform rejects anything else:
+Brand assets live in `branding.json` and must be hosted `https://` URLs. While you develop, images may also use `http://` on `localhost`, a `127.x.x.x` address, or `[::1]`; the login shows them only when its own page runs on one of those hosts. The CLI validates the URLs at plan time, and the server rejects anything else:
 
 ```json
 {
   "$schema": "../meta/branding.json",
   "layout": "centered",
   "logo_url": "https://cdn.example.com/logo.svg",
+  "typography": {
+    "font_family": "Inter, ui-sans-serif, sans-serif",
+    "font_url": "https://fonts.googleapis.com/css2?family=Inter&display=swap"
+  },
   "liquid_template": { "$file": "./login.liquid" }
 }
 ```
 
-Only some designs render each asset (see the table above); a URL configured for a design that does not use it is simply ignored. Custom fonts are not configurable yet — load fonts from the page embedding the login instead.
+Each design decides which images it shows: `centered` shows the logo, `minimal` shows none, and neither shows `hero_url`. A URL the design doesn't use is stored but not shown, and `plan` still checks it.
+
+`typography.font_family` sets the typeface for body and headings; include a generic family as a fallback. `typography.font_url` is a stylesheet that loads the face. It needs a `font_family`, must be `https://`, and is loaded only when the login runs as `variant="page"`. Setup generates page-variant sign-in pages only when it creates the Next.js or Nuxt app itself, in an empty directory. In a Next.js or Nuxt app that already exists, even a new one, and in every SPA template, the login runs as a widget, so load the font from your own page there.
 
 ## Publish and iterate
 
@@ -54,7 +60,7 @@ npx @zitadel/cli@alpha apply
 
 `plan` validates the descriptor and the template (LiquidJS parse, banned patterns, required tags) and shows the pending change; `apply` publishes it. Every publish creates an immutable revision — there is no in-place update, and rolling back means re-applying an earlier template. The live login picks up the newest revision on its next step response.
 
-The scaffolded `README.md` in `.zitadel/branding/` documents the template rules (compose `zl-*` components, no scripts or inline styles, copy through translation keys).
+The scaffolded `README.md` in `.zitadel/branding/` documents the template rules (compose `zl-*` components, no `<script>` or `<style>` tags or inline event handlers, copy through translation keys).
 
 ## Ownership trade-off
 

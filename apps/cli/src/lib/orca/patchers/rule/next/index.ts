@@ -1,9 +1,11 @@
-import { join } from "node:path";
+import { stat } from "node:fs/promises";
+import { basename, join } from "node:path";
 
+import { ZitadelError } from "../../../../errors";
 import { MANAGED_MARKER } from "../../../../paths";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
-import { AbstractRulePatcher } from "../base";
+import { AbstractRulePatcher, PREFLIGHT_FORCE_NOTE } from "../base";
 import { devScriptPortOp } from "../dev-script-port";
 import { getRenderer } from "./renderers/registry";
 import type { RendererSpec } from "./renderers/types";
@@ -43,6 +45,37 @@ export class NextPatcher extends AbstractRulePatcher {
   /** Returns true for Next.js projects. */
   canPatch(framework: string): boolean {
     return framework === "next";
+  }
+
+  /**
+   * Next.js runs one request boundary, and it looks for it in two places and
+   * under every page extension: `middleware.ts` beside the boundary setup
+   * writes is as much a conflict as one at the same path, but the file-writer
+   * only sees the latter. Next 16 refuses to start with both a `proxy.*` and a
+   * `middleware.*` at the project root or in `src/` (its dev server checks
+   * both levels), and a second file under the same name means one of them
+   * silently never runs. On Next 15 a `proxy.ts` is just a file of the app's,
+   * unless the version is unknown: then setup writes Next 15's
+   * `middleware.ts`, and cannot rule out a Next 16 that rejects the pair.
+   */
+  protected override async preflight(ctx: PatchContext, cwd: string): Promise<void> {
+    const boundary = requestBoundaryFile(ctx.framework);
+    const target = join(ctx.framework.appDir, `../${boundary.filename}`);
+    const unknownVersion = ctx.framework.versionMajor === undefined;
+    const names =
+      boundary.functionName === "proxy" || unknownVersion
+        ? ["middleware", "proxy"]
+        : ["middleware"];
+    for (const dir of [".", "src"]) {
+      for (const name of names) {
+        for (const extension of BOUNDARY_EXTENSIONS) {
+          const path = join(dir, `${name}.${extension}`);
+          if (path !== target && (await isFile(join(cwd, path)))) {
+            throw boundaryConflict(path, target, unknownVersion);
+          }
+        }
+      }
+    }
   }
 
   protected routeOps(ctx: PatchContext): FileOp[] {
@@ -232,6 +265,51 @@ function requestBoundaryFile(framework: PatchContext["framework"]): {
     return { filename: "proxy.ts", functionName: "proxy" };
   }
   return { filename: "middleware.ts", functionName: "middleware" };
+}
+
+/** The extensions Next.js reads a request boundary under: its default `pageExtensions`. */
+const BOUNDARY_EXTENSIONS = ["tsx", "ts", "jsx", "js"] as const;
+
+/** Why the app's own request boundary at `existing` stops setup, which writes `target`. */
+function boundaryConflict(existing: string, target: string, unknownVersion: boolean): ZitadelError {
+  const existingName = basename(existing).split(".")[0];
+  const targetName = basename(target, ".ts");
+  const details = { path: existing, writes: target };
+  if (existingName === targetName) {
+    return new ZitadelError(
+      "E_CONFLICT",
+      `Next.js runs one ${targetName} file, and this app already has ${existing}`,
+      {
+        hint:
+          `Setup writes ${target}, and one of the two would never run. Move ${existing} ` +
+          `aside and rerun setup, then merge it into ${target}. ${PREFLIGHT_FORCE_NOTE}`,
+        details,
+      },
+    );
+  }
+  // With no version, the existing proxy.ts may be Next 16's boundary or, on
+  // Next 15, just a module of the app's: only the version decides, so pinning
+  // it is the fix, not moving the file.
+  const remedy = unknownVersion
+    ? 'Setup reads no Next.js version from package.json (a tag such as "latest" names ' +
+      `none), so it writes the ${target} of Next 15. Pin next to the version range the app ` +
+      'runs, such as "^16.0.0", and rerun setup: on Next 16 it then writes proxy.ts, and on ' +
+      `Next 15 it leaves your ${existing} alone.`
+    : "Next.js 16 renamed middleware.ts to proxy.ts. Move " +
+      `${existing} aside and rerun setup, then merge it into ${target}.`;
+  return new ZitadelError(
+    "E_CONFLICT",
+    `Next.js 16 won't start with both ${existing} and the ${target} setup writes`,
+    { hint: `${remedy} ${PREFLIGHT_FORCE_NOTE}`, details },
+  );
+}
+
+async function isFile(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile();
+  } catch {
+    return false;
+  }
 }
 
 function dependencyVersionForCli(cliVersion: string, fallback: string): string {

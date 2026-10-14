@@ -67,7 +67,6 @@ export async function bootstrapProject(
   const schemaId = requireString(schema.id, "schema id");
 
   const flowBody = getDefaultLoginFlow({
-    userSchemaUrl: schemaId,
     preset: options.preset,
     useCase: options.useCase,
   });

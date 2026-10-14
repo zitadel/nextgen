@@ -45,12 +45,12 @@ Lower-level packages the framework SDKs are built on. Reach for these to embed t
 
 ## Choosing an SDK
 
-All packages ship on the `@alpha` dist-tag and move together as one train.
+All packages ship on the `@alpha` dist-tag and move together as one release train. Install them with the tag (`pnpm add @zitadel/sdk-next@alpha`): `latest` doesn't follow the train.
 
 | Framework | Package | Rendering | Same-origin `/__nextgen/*` proxy | CLI scaffolds |
 | --------- | ------- | --------- | -------------------------------- | ------------- |
-| Next.js | `@zitadel/sdk-next` | Server (App Router) | Built into the SDK middleware | routes + `middleware.ts` |
-| Nuxt | `@zitadel/sdk-nuxt` | Server (Nitro) | Nitro server middleware | pages + server middleware |
+| Next.js | `@zitadel/sdk-next` | Server (App Router) | Built into the SDK middleware | routes + `proxy.ts` (or `middleware.ts`, by the Next version in `package.json`) |
+| Nuxt | `@zitadel/sdk-nuxt` | Server (Nitro) | Nitro server middleware | pages + plugins + module in `nuxt.config` |
 | React | `@zitadel/sdk-react` | SPA | Vite dev proxy / your deploy proxy | Vite proxy + auth UI |
 | Vue | `@zitadel/sdk-vue` | SPA | Vite dev proxy / your deploy proxy | Vite proxy + auth UI |
 | Angular | `@zitadel/sdk-angular` | SPA | dev-server proxy / your deploy proxy | proxy config + components |
@@ -58,6 +58,6 @@ All packages ship on the `@alpha` dist-tag and move together as one train.
 | Svelte | `@zitadel/sdk-svelte` | SPA | Vite dev proxy / your deploy proxy | Vite proxy + auth UI |
 | Qwik | `@zitadel/sdk-qwik` | SPA | Vite dev proxy / your deploy proxy | Vite proxy + auth UI |
 | Components | `@zitadel/components` | Web components | n/a (wrapped by an SDK) | — |
-| API client | `@zitadel/api` | n/a | n/a | typed client |
+| API client | `@zitadel/api` | n/a | n/a | — |
 
-The same-origin proxy is the one concept shared by every SDK. See [SDK proxy](/docs/concepts/sdk-proxy) for why `/__nextgen/*` must be same-origin and how credentials are scoped to it.
+The same-origin proxy is the one concept shared by every SDK. See [SDK proxy](/docs/concepts/sdk-proxy) for why `/__nextgen/*` must be same-origin and which call carries the project secret.

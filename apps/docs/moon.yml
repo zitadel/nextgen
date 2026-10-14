@@ -31,6 +31,16 @@ tasks:
   build:
     command: "corepack pnpm exec next build"
     deps:
+      # After typecheck, never beside it: `next build` empties .next/types and
+      # fills it again, and tsc reads the route types there (next-env.d.ts
+      # imports .next/types/routes.d.ts), so side by side typecheck failed
+      # with TS2304 on PageProps, LayoutProps and RouteContext. The build is
+      # the one that waits: it takes longer, and fails on a type error anyway.
+      # An edge, not a mutex: moon holds a mutex only while the command runs,
+      # not while it restores or archives .next.
+      - "typecheck"
+      # Listed here and not only reached through typecheck: typecheck has no
+      # outputs, so moon would not hash generate through it.
       - "generate"
       # app/global.css imports the design tokens' CSS variables.
       - "design-tokens:generate"

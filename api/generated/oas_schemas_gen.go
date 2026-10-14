@@ -19559,10 +19559,6 @@ func (s *ExchangeHandoffErrorResponseStatusCode) SetResponse(val ExchangeHandoff
 
 func (*ExchangeHandoffErrorResponseStatusCode) exchangeHandoffRes() {}
 
-type ExchangeHandoffGone ErrorDetails
-
-func (*ExchangeHandoffGone) exchangeHandoffRes() {}
-
 type ExchangeHandoffUnauthorized ErrorDetails
 
 func (*ExchangeHandoffUnauthorized) exchangeHandoffRes() {}
@@ -19571,7 +19567,8 @@ func (*ExchangeHandoffUnauthorized) exchangeHandoffRes() {}
 // Ref: #
 type ExchangeRequest struct {
 	// The one-time handoff token minted by `POST /auth_attempts/{id}/handoff`.
-	// Single-use — replaying it after a successful exchange returns `410 Gone`.
+	// Single-use — replaying it after a successful exchange returns `400` with
+	// `sess.invalid_handoff_token`, the same answer as an unknown or expired token.
 	HandoffToken string `json:"handoff_token"`
 	// Optional session lifetime after exchange as an ISO-8601 duration. When omitted, the server
 	// uses the configured default. Must not exceed the configured maximum.
@@ -21067,10 +21064,14 @@ type FlowDefinition struct {
 	// human display label as well; no separate slug.
 	Name   string               `json:"name"`
 	Status FlowDefinitionStatus `json:"status"`
-	// Server-assigned identifier of the user schema this flow operates on,
-	// as returned by `POST /schemas`. Opaque to the client — the shape is a
-	// server implementation detail. Step `fields` reference properties
-	// defined in the resolved schema; the engine resolves field types, validation, and
+	// The user schema this flow operates on, named by its `objectType`. The
+	// flow runs against the project's newest revision of that schema, so
+	// publishing a schema revision needs no change to the flow. A schema id
+	// as returned by `POST /schemas` is also accepted and is stored as that
+	// schema's `objectType`; reading the definition back returns the
+	// `objectType`. A value naming no schema of the project is refused with
+	// `flowdef.invalid`. Step `fields` reference properties defined in the
+	// resolved schema; the engine resolves field types, validation, and
 	// implicit outcomes from schema annotations at runtime.
 	UserSchema string `json:"user_schema"`
 	// Maps each purpose this definition handles to its entry-point step.
@@ -21795,7 +21796,7 @@ type FlowHint struct {
 	LoginName OptString `json:"login_name"`
 	// Scopes flow resolution to a team.
 	TeamID OptString `json:"team_id"`
-	// Scopes to a specific user type.
+	// Scopes to a specific user type, the `objectType` of a user schema.
 	UserSchemaID OptString `json:"user_schema_id"`
 	// Scopes to a specific application.
 	AppID OptString `json:"app_id"`
@@ -22267,9 +22268,10 @@ type FlowStep struct {
 	// Field names appear verbatim, so clients localise unknown keys via
 	// the generic `error.field_<rule>` catalog entries. Other engine
 	// failures carry `error.*` catalog keys as well (e.g.
-	// `error.invalid_credentials`, `error.passkey_invalid`); a
-	// non-`error.` payload is an outcome token (e.g. `user_not_found`)
-	// that clients keep verbatim.
+	// `error.invalid_credentials`, `error.passkey_invalid`). An outcome
+	// the step has no transition for sends `error.user_not_found`,
+	// `error.user_already_exists`, `error.sso_user_not_found`, or
+	// `error.outcome_unhandled` for any other outcome.
 	Error OptNilString `json:"error"`
 	// Present only on terminal steps. Tells the frontend what to do:
 	// - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
@@ -71725,7 +71727,9 @@ type UserSchema struct {
 	// The JSON Schema version used for this schema.
 	Schema OptString `json:"$schema"`
 	// The type of user this schema describes. This is a customer chosen name.
-	ObjectType OptString `json:"objectType"`
+	// Every revision of a schema shares its `objectType`, and flow
+	// definitions name the schema they operate on by it.
+	ObjectType string `json:"objectType"`
 	// Discriminator value for a user schema create request.
 	Kind string `json:"kind"`
 	// The user Schema version used for this schema.
@@ -71755,7 +71759,7 @@ func (s *UserSchema) GetSchema() OptString {
 }
 
 // GetObjectType returns the value of ObjectType.
-func (s *UserSchema) GetObjectType() OptString {
+func (s *UserSchema) GetObjectType() string {
 	return s.ObjectType
 }
 
@@ -71800,7 +71804,7 @@ func (s *UserSchema) SetSchema(val OptString) {
 }
 
 // SetObjectType sets the value of ObjectType.
-func (s *UserSchema) SetObjectType(val OptString) {
+func (s *UserSchema) SetObjectType(val string) {
 	s.ObjectType = val
 }
 

@@ -74,3 +74,19 @@ func InsertFlowDefinitionAt(ctx context.Context, pool database.Pool, projectID, 
 	)
 	return wrapError(err)
 }
+
+// InsertUserPasswordAt inserts a user_passwords row at an exact created_at.
+// SetUserPassword never accepts a caller-supplied created_at, so a test that
+// needs a newest password the clock has not reached yet has to write the row
+// itself.
+func InsertUserPasswordAt(ctx context.Context, pool database.Pool, projectID, id, userID, encodedHash string, createdAt time.Time) error {
+	p, ok := pool.(*Pool)
+	if !ok {
+		return fmt.Errorf("postgres.InsertUserPasswordAt: expected *Pool, got %T", pool)
+	}
+	_, err := p.pool.Exec(ctx,
+		`INSERT INTO zitadel_nextgen.user_passwords (project_id, id, user_id, encoded_hash, created_at) VALUES ($1, $2, $3, $4, $5)`,
+		projectID, id, userID, encodedHash, createdAt,
+	)
+	return wrapError(err)
+}

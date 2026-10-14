@@ -184,7 +184,8 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 	require.Len(t, listed.Items, 1)
 
 	flowDef := listed.Items[0]
-	assert.Equal(t, schemaURL, flowDef.UserSchema)
+	require.NotNil(t, schema.ObjectType)
+	assert.Equal(t, *schema.ObjectType, flowDef.UserSchema, "the flow names the schema by objectType")
 	assert.Equal(t, "identifier", flowDef.Purposes[domain.FlowDefinitionPurposeLogin])
 	assert.Equal(t, "register", flowDef.Purposes[domain.FlowDefinitionPurposeRegister])
 
