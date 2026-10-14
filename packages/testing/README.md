@@ -104,12 +104,14 @@ test("member sees the dashboard", async ({ authenticatedPage }) => {
 Underneath sits `seed.session()`, whose `sessionToken` also drives session
 APIs without any browser — backend tests call the instance directly with the
 cookie header (`cookie: __nextgen_session=<sessionToken>`, the SDK
-middleware's own headless pattern). Scope: password flows (the shipped
-`password-first` presets). A flow step demanding anything beyond the user's
-email and password — a challenge, another factor — fails with the step name;
-log in through the UI for those. `seed.identity()` complements registration
-specs: an unused email+password that creates nothing, so the flow under test
-must create the user.
+middleware's own headless pattern; `SESSION_COOKIE_NAME` holds the name).
+Scope: password flows (the shipped `password-first` presets). A flow step
+demanding anything beyond the user's email and password — a challenge,
+another factor — fails with the step name; log in through the UI for those.
+`seed.identity()` complements registration specs: an unused email+password
+that creates nothing, so the flow under test must create the user. It needs
+no instance, so a spec without `withZitadel()` — against an app you started
+yourself — imports it as `identity()`.
 
 ### Drive the login flow
 
@@ -191,6 +193,8 @@ import {
   startLocalZitadel, // boot + bootstrap an ephemeral instance
   connectZitadel,    // attach to an existing instance via its handle
   writeHandshake, readHandshakeSync, waitForHandshake,
+  identity,          // unused { email, password }, no instance needed
+  SESSION_COOKIE_NAME, // "__nextgen_session"
 } from "@zitadel/testing";
 
 const z = await startLocalZitadel({
@@ -225,7 +229,8 @@ per test, `zitadel` per worker, `passkey` on demand), the flow ceremonies
 `withZitadel(options)` returning `{ webServer }` for the config,
 `enableVirtualPasskey(page)` for non-fixture pages, and
 `nextAppEnv`/`applyAppEnvTemplate` for the env-template mechanism described
-above.
+above. `identity()` and `SESSION_COOKIE_NAME` are on both entry points, so a
+Playwright spec imports everything from this one.
 
 ## How it works
 

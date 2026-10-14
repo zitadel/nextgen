@@ -68,7 +68,7 @@ func TestVariableService_GetVariables(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
 		stored := []*domain.Variable{testVariable(t, "theme", variablesOwner, "dark")}
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, "theme").Return(stored, nil)
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, "theme").Return(stored, nil)
 
 		got, err := svc.GetVariables(t.Context(), variablesOwner, "theme")
 		require.NoError(t, err)
@@ -79,7 +79,7 @@ func TestVariableService_GetVariables(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
 		sentinel := errors.New("connection refused")
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner).Return(nil, sentinel)
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary).Return(nil, sentinel)
 
 		_, err := svc.GetVariables(t.Context(), variablesOwner)
 		require.Error(t, err)
@@ -103,7 +103,7 @@ func TestVariableService_GetDecryptedVariables(t *testing.T) {
 
 		// No key service EXPECT: building a decrypter for a plain read would be
 		// a key lookup nobody asked for.
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, gomock.Any()).Return([]*domain.Variable{
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, gomock.Any()).Return([]*domain.Variable{
 			testVariable(t, "host", variablesOwner, "example.com"),
 		}, nil)
 
@@ -119,7 +119,7 @@ func TestVariableService_GetDecryptedVariables(t *testing.T) {
 		svc, statements, keys := newMockedVariableService(t)
 
 		keys.EXPECT().GetCrypter(gomock.Any(), keyID, alg).Return(testCrypter(keyID), nil).Times(1)
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, gomock.Any()).Return([]*domain.Variable{
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, gomock.Any()).Return([]*domain.Variable{
 			testVariable(t, "client_id", variablesOwner, "public"),
 			{Name: "client_secret", Owner: variablesOwner, Value: encrypted(t, "s3cret"), IsSecret: true},
 		}, nil)
@@ -142,7 +142,7 @@ func TestVariableService_GetDecryptedVariables(t *testing.T) {
 		svc, statements, keys := newMockedVariableService(t)
 
 		keys.EXPECT().GetCrypter(gomock.Any(), keyID, alg).Return(testCrypter(keyID), nil).Times(1)
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, gomock.Any()).Return([]*domain.Variable{
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, gomock.Any()).Return([]*domain.Variable{
 			{Name: "a", Owner: variablesOwner, Value: encrypted(t, "one"), IsSecret: true},
 			{Name: "b", Owner: variablesOwner, Value: encrypted(t, "two"), IsSecret: true},
 		}, nil)
@@ -166,7 +166,7 @@ func TestVariableService_GetDecryptedVariables(t *testing.T) {
 		keys.EXPECT().GetCrypter(gomock.Any(), olderKeyID, alg).Return(testCrypter(olderKeyID), nil).Times(1)
 		keys.EXPECT().GetCrypter(gomock.Any(), keyID, alg).Return(testCrypter(keyID), nil).Times(1)
 
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, gomock.Any()).Return([]*domain.Variable{
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, gomock.Any()).Return([]*domain.Variable{
 			{Name: "old_secret", Owner: variablesOwner, Value: older, IsSecret: true},
 			{Name: "new_secret", Owner: variablesOwner, Value: encrypted(t, "written-after"), IsSecret: true},
 		}, nil)
@@ -182,7 +182,7 @@ func TestVariableService_GetDecryptedVariables(t *testing.T) {
 
 		sentinel := errors.New("key revoked")
 		keys.EXPECT().GetCrypter(gomock.Any(), keyID, alg).Return(nil, sentinel)
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, gomock.Any()).Return([]*domain.Variable{
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, gomock.Any()).Return([]*domain.Variable{
 			{Name: "client_secret", Owner: variablesOwner, Value: encrypted(t, "s3cret"), IsSecret: true},
 		}, nil)
 
@@ -203,6 +203,9 @@ func TestVariableService_SetVariables(t *testing.T) {
 				assert.Equal(t, "theme", v.Name)
 				assert.Equal(t, "dark", v.Value)
 				assert.Equal(t, variablesOwner, v.Owner)
+				// The API carries no kind yet, so a write is the primary
+				// target's.
+				assert.Equal(t, domain.DeploymentOriginKindPrimary, v.Kind)
 				assert.False(t, v.IsSecret)
 				return nil
 			})
@@ -341,8 +344,8 @@ func TestVariableService_SetVariables(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
 		// No key EXPECT: a removal never needs the value, so never a key.
-		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, "theme").Return(nil)
-		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, "locale").Return(nil)
+		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, "theme").Return(nil)
+		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, "locale").Return(nil)
 
 		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
 			{Name: "theme"},
@@ -357,7 +360,7 @@ func TestVariableService_SetVariables(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
 		statements.EXPECT().
-			DeleteVariable(gomock.Any(), variablesOwner, "theme").
+			DeleteVariable(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, "theme").
 			Return(database.NewNoRowFoundError(nil))
 
 		require.NoError(t, svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
@@ -369,7 +372,7 @@ func TestVariableService_SetVariables(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
 		sentinel := errors.New("connection refused")
-		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, "theme").Return(sentinel)
+		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, "theme").Return(sentinel)
 
 		err := svc.SetVariables(t.Context(), variablesOwner, []service.VariableToSet{
 			{Name: "theme"},
@@ -384,7 +387,7 @@ func TestVariableService_SetVariables(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
 		gomock.InOrder(
-			statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, "legacy_host").Return(nil),
+			statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, "legacy_host").Return(nil),
 			statements.EXPECT().
 				SetVariable(gomock.Any(), gomock.Any()).
 				DoAndReturn(func(_ context.Context, v *domain.Variable) error {
@@ -420,7 +423,7 @@ func TestVariableService_DeleteVariable(t *testing.T) {
 	t.Run("deletes at the owner that entered the variable", func(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
-		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, "theme").Return(nil)
+		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, "theme").Return(nil)
 
 		require.NoError(t, svc.DeleteVariable(t.Context(), variablesOwner, "theme"))
 	})
@@ -431,7 +434,7 @@ func TestVariableService_DeleteVariable(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
 		statements.EXPECT().
-			DeleteVariable(gomock.Any(), variablesOwner, "theme").
+			DeleteVariable(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, "theme").
 			Return(database.NewNoRowFoundError(nil))
 
 		err := svc.DeleteVariable(t.Context(), variablesOwner, "theme")
@@ -443,7 +446,7 @@ func TestVariableService_DeleteVariable(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
 		sentinel := errors.New("connection refused")
-		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, "theme").Return(sentinel)
+		statements.EXPECT().DeleteVariable(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, "theme").Return(sentinel)
 
 		err := svc.DeleteVariable(t.Context(), variablesOwner, "theme")
 		require.Error(t, err)
@@ -462,7 +465,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
 		// No key service EXPECT: nothing here is secret, so no key is needed.
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return([]*domain.Variable{
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, anyNames).Return([]*domain.Variable{
 			testVariable(t, "url", variablesOwner, "https://example.test"),
 			testVariable(t, "port", variablesOwner, 8080),
 		}, nil)
@@ -493,8 +496,8 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
 		statements.EXPECT().
-			GetVariables(gomock.Any(), variablesOwner, anyNames).
-			DoAndReturn(func(_ context.Context, _ domain.VariableOwner, names ...string) ([]*domain.Variable, error) {
+			GetVariables(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, anyNames).
+			DoAndReturn(func(_ context.Context, _ domain.VariableOwner, _ domain.DeploymentOriginKind, names ...string) ([]*domain.Variable, error) {
 				// Referenced three times, asked for once.
 				assert.Equal(t, []string{"url"}, names)
 				return nil, nil
@@ -517,7 +520,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 
 		// The key is fetched by the id the stored value names, not by project.
 		keys.EXPECT().GetCrypter(gomock.Any(), "key-1", jose.A256GCM).Return(crypter, nil)
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return([]*domain.Variable{secret}, nil)
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, anyNames).Return([]*domain.Variable{secret}, nil)
 
 		doc := map[string]any{"token": "${{ token }}"}
 		require.NoError(t, svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, doc))
@@ -537,7 +540,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 		// No GetProjectCrypter EXPECT: asking for the project's active key
 		// would hand back key-2 here, which cannot read what key-1 wrote.
 		keys.EXPECT().GetCrypter(gomock.Any(), "key-1", jose.A256GCM).Return(retired, nil)
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return([]*domain.Variable{secret}, nil)
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, anyNames).Return([]*domain.Variable{secret}, nil)
 
 		doc := map[string]any{"token": "${{ token }}"}
 		require.NoError(t, svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, doc))
@@ -555,7 +558,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 		require.NoError(t, err)
 
 		keys.EXPECT().GetCrypter(gomock.Any(), "key-1", jose.A256GCM).Return(crypter, nil).Times(1)
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, anyNames).
 			Return([]*domain.Variable{first, second}, nil)
 
 		doc := map[string]any{
@@ -570,7 +573,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 	t.Run("renders a reference embedded in text", func(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return([]*domain.Variable{
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, anyNames).Return([]*domain.Variable{
 			testVariable(t, "host", variablesOwner, "example.test"),
 		}, nil)
 
@@ -582,7 +585,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 	t.Run("leaves a reference the owner holds nothing for", func(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return(nil, nil)
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, anyNames).Return(nil, nil)
 
 		doc := map[string]any{"url": "${{ nope }}"}
 		require.NoError(t, svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, doc))
@@ -593,7 +596,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
 		big := testVariable(t, "big", variablesOwner, strings.Repeat("A", domain.MaxVariableStringLength))
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return([]*domain.Variable{big}, nil)
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, anyNames).Return([]*domain.Variable{big}, nil)
 
 		doc := make(map[string]any, 200)
 		for i := range 200 {
@@ -610,7 +613,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 
 		secret, err := domain.NewSecretVariable("token", variablesOwner, "s3cret", testCrypter("key-1"))
 		require.NoError(t, err)
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return([]*domain.Variable{secret}, nil)
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, anyNames).Return([]*domain.Variable{secret}, nil)
 
 		doc := map[string]any{"token": "Bearer ${{ token }}"}
 		err = svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, doc)
@@ -628,7 +631,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 
 		sentinel := errors.New("no key with that id")
 		keys.EXPECT().GetCrypter(gomock.Any(), "key-1", jose.A256GCM).Return(nil, sentinel)
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return([]*domain.Variable{secret}, nil)
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, anyNames).Return([]*domain.Variable{secret}, nil)
 
 		err = svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, map[string]any{"token": "${{ token }}"})
 		require.Error(t, err)
@@ -647,7 +650,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 			IsSecret: true,
 		}
 		// No key service EXPECT: there is no key id to look up.
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return([]*domain.Variable{broken}, nil)
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, anyNames).Return([]*domain.Variable{broken}, nil)
 
 		doc := map[string]any{"token": "${{ token }}"}
 		require.Error(t, svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, doc))
@@ -659,7 +662,7 @@ func TestVariableService_ReplaceVariables(t *testing.T) {
 		svc, statements, _ := newMockedVariableService(t)
 
 		sentinel := errors.New("connection refused")
-		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, anyNames).Return(nil, sentinel)
+		statements.EXPECT().GetVariables(gomock.Any(), variablesOwner, domain.DeploymentOriginKindPrimary, anyNames).Return(nil, sentinel)
 
 		err := svc.ReplaceVariablesInPlace(t.Context(), variablesOwner, map[string]any{"url": "${{ url }}"})
 		require.Error(t, err)

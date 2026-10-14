@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import { expect, test } from "@playwright/test";
 
+import { requiredEnv } from "./support";
+
 test.describe.configure({ mode: "serial" });
 
 // The pre-existing-app lane (ADR 044): setup met a host app it did not
@@ -102,10 +104,4 @@ if (preexisting) {
       );
     }
   });
-}
-
-function requiredEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is required`);
-  return value;
 }

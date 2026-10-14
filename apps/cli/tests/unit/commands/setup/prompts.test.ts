@@ -388,7 +388,7 @@ describe("SocialSignInPrompt", () => {
     // The URI has to be exact — the vendor matches it literally — and the
     // port answered a moment earlier is what decides it.
     expect(vi.mocked(note).mock.calls[0]?.[0]).toContain(
-      "http://localhost:4321/__nextgen/idp/callback",
+      "http://localhost:4321/__nextgen/idp/google/callback",
     );
   });
 
@@ -486,7 +486,7 @@ describe("SocialSignInPrompt", () => {
       await new SocialSignInPrompt().ask(baseAnswers({ devPort: 4321 }), ctx);
 
       const [shown, title] = vi.mocked(note).mock.calls[0] ?? [];
-      expect(shown).toContain("http://localhost:4321/__nextgen/idp/callback");
+      expect(shown).toContain("http://localhost:4321/__nextgen/idp/acme-sso/callback");
       expect(shown).toContain("https://sso.acme.example");
       expect(shown).not.toContain("undefined");
       expect(title).toBe("Acme SSO sign-in");

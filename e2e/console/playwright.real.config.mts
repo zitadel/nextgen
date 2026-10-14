@@ -1,8 +1,14 @@
-import { join } from "node:path";
-
-import { defineConfig, devices } from "@playwright/test";
+import { defineConfig } from "@playwright/test";
 import { withZitadel, type AppEnvTemplate } from "@zitadel/testing/playwright";
-import { e2eActionTimeouts, e2eTimeouts, e2eTrace } from "../playwright.shared";
+import {
+  chromiumProjects,
+  e2eActionTimeouts,
+  e2eTimeouts,
+  e2eTrace,
+  inRepoZitadel,
+  realLaneDefaults,
+  workspaceRoot,
+} from "../playwright.shared";
 
 /**
  * Real-instance console coverage:
@@ -15,7 +21,6 @@ import { e2eActionTimeouts, e2eTimeouts, e2eTrace } from "../playwright.shared";
  * config exercises live resource pages through the server-side dev proxy.
  */
 const appDir = import.meta.dirname;
-const workspaceRoot = join(appDir, "../..");
 const zitadelPort = Number(process.env.REAL_ZITADEL_PORT ?? 8093);
 const consoleOrigin = process.env.REAL_CONSOLE_ORIGIN ?? "http://localhost:5174";
 
@@ -25,7 +30,7 @@ const consoleOrigin = process.env.REAL_CONSOLE_ORIGIN ?? "http://localhost:5174"
  * instance's `/console/runtime.json` (its first-created project, the harness
  * one), as in production. No credential: the browser authenticates with the
  * signed-in user's session cookie (#1300), and the specs grant that user
- * access through the API (`src-real/support.ts`).
+ * access through the API (`support/sign-in.ts`).
  */
 const consoleAppEnv: AppEnvTemplate = {
   CONSOLE_BACKEND_URL: "baseUrl",
@@ -34,11 +39,8 @@ const consoleAppEnv: AppEnvTemplate = {
 export default defineConfig({
   ...e2eTimeouts,
   testDir: "./src-real",
-  fullyParallel: true,
-  workers: 2,
+  ...realLaneDefaults("real"),
   retries: process.env.CI ? 1 : 0,
-  outputDir: "test-results/real",
-  reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report/real" }]],
   use: {
     ...e2eActionTimeouts,
     baseURL: consoleOrigin,
@@ -48,13 +50,7 @@ export default defineConfig({
     configDir: appDir,
     port: zitadelPort,
     appOrigin: consoleOrigin,
-    zitadel: {
-      // In-repo runs use the source-built binary; run `moon run server:build`
-      // first (the moon task wires this env var).
-      serverBinary:
-        process.env.ZITADEL_SERVER_BINARY ?? join(workspaceRoot, "dist", "server", "nextgen"),
-      serverBinaryHint: "run `moon run server:build` first.",
-    },
+    zitadel: inRepoZitadel,
     app: {
       command: ["corepack", "pnpm", "--filter", "@zitadel/console", "dev"],
       cwd: workspaceRoot,
@@ -63,10 +59,5 @@ export default defineConfig({
       gracefulShutdownMs: 10_000,
     },
   }),
-  projects: [
-    {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
-    },
-  ],
+  projects: chromiumProjects,
 });
