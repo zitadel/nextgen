@@ -159,22 +159,22 @@ as they were.
 | components | `build-release` (inline + check script) | `#build-release` | **new** script with `check-standalone-artifact.mjs` |
 | components | `test` (mutex, retry, dep build) | `#test` | guarded script |
 | config | `sync-schemas` (mutex generated-sources) | `#sync-schemas` | script wrapped in the guard; the `pre*` scripts keep calling it |
-| config | `build-release` (mutex public-dist) | `#build-release` | ordered after api's release build (chain) |
+| config | `build-release` (mutex public-dist) | `#build-release` | ordered after api's release build |
 | design-tokens | `sync` (cache false) | `#sync` | `passThroughEnv: FIGMA_*` |
 | design-tokens | `sync-export` | `#sync:export` | existing script; gains the output it writes |
 | design-tokens | `generate` (4 outputs) | `#generate` | same outputs |
 | sdk-core / sdk-next / sdk-nuxt / sdk-react / sdk-vue / sdk-angular / sdk-solid / sdk-svelte / sdk-qwik | `typecheck`, `build`, `test` | same | same edges (api-mock for the specs that need it, components, sdk-core) |
-| sdk-* | `build-release` (inline) | `#build-release` | **new** script; chained in release order |
+| sdk-* | `build-release` (inline) | `#build-release` | **new** script; the dev build's edges, on the release builds (components, sdk-core) |
 | sdk-nuxt | `build` (mutex sdk-nuxt-dist) | `#build` | ordered by the demo-nuxt edge; see mutexes |
 | sdk-nuxt | `dev` (persistent) | `#dev` | existing |
 | sdk-qwik | `install-browsers`, `test` (mutex, retry) | same | guarded script |
 | testing | `test-integration` (env, cache false) | `#test:integration` | existing script, now sets the env itself |
-| testing | `build-release` | `#build-release` | last of the chain |
-| cli | `test` (inputs + `/apps/server/bin/**`, mutex public-dist) | `#test` | inputs `$TURBO_ROOT$/apps/server/bin/**`; the mutex becomes the release chain's first edge |
+| testing | `build-release` | `#build-release` | after config's release build |
+| cli | `test` (inputs + `/apps/server/bin/**`, mutex public-dist) | `#test` | inputs `$TURBO_ROOT$/apps/server/bin/**`; the mutex becomes an edge: the release builds start after it |
 | cli | `build-release` (runDepsInParallel false, dep test) | `#build-release` | **new** script; `dependsOn: ["test", "@zitadel/sdk-next#build-release"]` |
 | cli | `readme` | `#readme` | existing; `outputs: ["README.md"]` |
 | console | `build` (outputs staticui, env input) | `#build` | `env: ["CONSOLE_VERCEL_INSIGHTS"]`, outputs `$TURBO_ROOT$/internal/staticui/console/dist/**` |
-| console | `build-release` | `#build-release` | **new** `vite build`; waits for the release chain |
+| console | `build-release` | `#build-release` | **new** `vite build`; waits for the public packages' release builds |
 | console | `dev`, `preview` (persistent) | `#dev`, `#preview` | existing |
 | console | `dev-real`, `dev-claim` (persistent) | `#dev:real`, `#dev:claim` | existing; the script builds the server through the selected runner |
 | demo-next | `build` (outputs .next) | `#build` | outputs `.next/**`, `!.next/cache/**` |
@@ -208,7 +208,7 @@ as they were.
 |---|---|---|
 | `browser-tests` (components, api-mock, storybook, sdk-qwik `test`) | one real-Chromium Vite server at a time (#1490) | `task-guard --mutex browser-tests` in the four `test` scripts: a lock held across the retries. Ordering edges were rejected: with `--continue=dependencies-successful` one failing browser suite would skip the other three. |
 | `generated-sources` (server `generate`, `clean-generated`, `check-generate`, `check-generate-pruned`; api `generate`; config `sync-schemas`) | generation rewriting files other tasks read mid-graph | `task-guard --mutex generated-sources` in the six scripts. Ordering edges were rejected: they would put the Go generation on the critical path of every TypeScript build. |
-| `public-dist` (api, config, sdk-next `build-release`; cli `test`) | release builds cleaning a dist the CLI tests import | an edge: the release chain starts after `@zitadel/cli#test`. Moon could not express that edge (cli depends on those packages, a project-graph cycle); turbo has no project graph. |
+| `public-dist` (api, config, sdk-next `build-release`; cli `test`) | release builds cleaning a dist the CLI tests import | an edge: the release builds start after `@zitadel/cli#test`. Moon could not express that edge (cli depends on those packages, a project-graph cycle); turbo has no project graph. |
 | `e2e-serial` (e2e `console-real`, `console-embedded`, `console-platform`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`, `journey-local`; testing `test-integration`) | the lanes that boot servers in ci.yml's e2e step (`moon exec e2e:all`), one at a time (both demo-next lanes serve :3002) | ci-turbo.yml runs the lane groups as separate steps; within a turbo run only the demo-next pair collides, so their two scripts hold `task-guard --mutex demo-next-app`. |
 | `sdk-nuxt-dist` (sdk-nuxt `build`, `build-release`; demo-nuxt `build`) | demo-nuxt bundling from sdk-nuxt/dist | the existing `demo-nuxt#build → sdk-nuxt#build` edge orders the dev builds; the release build never shares a turbo invocation with demo-nuxt. If that ever changes, the guard covers it. |
 
@@ -222,12 +222,13 @@ task: turbo sets `TURBO_HASH` for every task. Under moon, which has its own
 ### `retryCount: 3` (4 uses)
 
 `task-guard --retries 3` in the same four browser-test `test` scripts. The
-flake it exists for is a cold-start race, so the retry re-runs the whole suite
-(warm), which Vitest's own per-test `retry` would not do — a failed module
-import fails the file. Moon is unchanged: its `test` task runs each package's
-`test:all` script, which calls Vitest directly, so moon keeps its own
-`retryCount: 3` and `mutex` and no suite retries under both. The `test:all`
-scripts go with moon at the cutover.
+flake it exists for is a module import that Chromium aborts when a container
+changes the host's addresses (#1490, now prevented in CI; the retry stays as a
+safety net), so the retry re-runs the whole suite, which Vitest's own per-test
+`retry` would not do — a failed module import fails the file. Moon is
+unchanged: its `test` task runs each package's `test:all` script, which calls
+Vitest directly, so moon keeps its own `retryCount: 3` and `mutex` and no suite
+retries under both. The `test:all` scripts go with moon at the cutover.
 
 ### `runInCI` (72 uses)
 
@@ -298,16 +299,17 @@ needed none: the configs default the binary path and the ports.
 
 Turbo has no serial dependencies. The release project relied on them because
 every `build-release` cleans and rewrites the `dist/` that the dev builds and
-tests of the same graph read. The prototype writes moon's serial order as
-edges: the 14 public-package release builds form a chain (`cli` → `api` →
-`config` → `components` → `sdk-core` → `sdk-next` → `sdk-nuxt` → `sdk-react`
-→ `sdk-vue` → `sdk-angular` → `sdk-solid` → `sdk-svelte` → `sdk-qwik` →
-`testing`), starting after `cli#test`, and the two UI release builds wait for
-the whole chain. One race remains: in `snapshot`, the server's tests run
-alongside the chain, and the console release build rewrites the embedded dist
-they compile. Go compiles the embed package once and caches it, so in
-practice the tests see one dist; the clean fix is for release builds to write
-somewhere other than the dev `dist/` (open decision 5). The order check
+tests of the same graph read. The prototype wrote moon's serial order as
+edges, a chain of the 14 public-package release builds. Since moon runs those
+builds in parallel on their package edges (2026-10-14), turbo has the same
+edges: the release builds start after `cli#test` (`api#build-release`
+depends on it, the rest reach `api`'s), each depends on the release builds of
+the packages its dev build depends on, and the two UI release builds wait for
+all of them. One race remains: in `snapshot`, the server's tests run
+alongside the release builds, and the console release build rewrites the
+embedded dist they compile. Go compiles the embed package once and caches it,
+so in practice the tests see one dist; the clean fix is for release builds to
+write somewhere other than the dev `dist/` (open decision 5). The order check
 (`release:check-graph`) asserts these edges after its port.
 
 ## Script ports
@@ -317,7 +319,7 @@ somewhere other than the dev `dist/` (open decision 5). The order check
 | `scripts/ci-mode.mjs` | `moon query tasks --affected --downstream deep` | `queryAffectedTargets` takes the runner: under turbo, `turbo run <all tasks> --dry=json` gives every task's hashed inputs and dependents; tasks with a changed input are roots, their dependents the affected set, mapped back to `project:task` so the gate logic and its 25 tests are unchanged. A changed global input affects everything, as moon's implicitInputs do. | done, 6 new tests; needs a replay over real PRs during the parity period |
 | `scripts/report-moon-failures.mjs` | `.moon/cache/ciReport.json` | `scripts/report-turbo-failures.mjs` reads the newest `.turbo/runs/*.json` from `--summarize`; same annotations and summary table | done, 4 tests; the moon version stays until moon is removed |
 | `scripts/check-moon-graph.mjs` | `moon query projects` | kept during the dual run (as `//#check-moon-graph`); dropped with moon. Its rule "the moon edge and the npm dependency go together" has no turbo form to check, and its hashed-edge subtlety disappears: turbo hashes every dependency's result. | unchanged |
-| `scripts/check-release-graph.mjs` | `moon task-graph`, `moon task` | reads `turbo run snapshot --dry=json` (dependencies per task) and asserts: every public package's `build-release` is in the chain in manifest order, each cleans local dist, no release build reaches its own `build`, the chain starts after `cli#test`, the UI release builds depend on the chain, and the entry points depend on `build-public-packages`. The mutex and `runInCI` assertions go. | not ported (plan: 1 day incl. tests) |
+| `scripts/check-release-graph.mjs` | `moon task-graph`, `moon task` | reads `turbo run snapshot --dry=json` (dependencies per task) and asserts: each public package's `build-release` cleans local dist, mirrors its dev build's package edges and starts after `cli#test`, no release build reaches its own `build`, the UI release builds depend on the package release builds, and the entry points depend on `build-public-packages`. The mutex and `runInCI` assertions go. | not ported (plan: 1 day incl. tests) |
 | `scripts/release-manifest.mjs` | `moonProject` fields, `buildTarget` `project:build-release` | `buildTarget` becomes `@zitadel/<name>#build-release` (or stays and is mapped through `task-runner.mjs`); `release-manifest.test.ts` asserts against `turbo.json` files instead of `.moon/workspace.yml` and `moon.yml` | not ported (half a day) |
 | `scripts/check-typecheck-programs.mjs` | parses each `moon.yml` `typecheck` task | reads each package's `typecheck` script directly (the moon task only ever ran that script); the `moon.yml` existence check becomes "has a `typecheck` script" | not ported (half a day; test unchanged) |
 | `scripts/doctor.mjs` | `node_modules/.bin/moon --version` | checks turbo the same way (`turbo --version` from `node_modules/.bin`, the catalog pin); drops the PATH-shadowing warning or applies it to turbo | not ported (half a day) |
@@ -418,9 +420,9 @@ Two workable setups; the prototype's draft uses the first.
 |---|---|---|
 | Setup | a repository variable `TURBO_TEAM=zitadel`, `id-token: write` on the job, `vercel/setup-turborepo-remote-cache-action@v1.1.0` before the first `turbo` (with `policy:` set to the policy's ID only if more than one of the team's Turborepo policies matches the token: Vercel then refuses the exchange), `TURBO_API=https://vercel.com` on Depot runners (they inject Depot's `TURBO_API`), and a **Turborepo CLI OIDC policy** in the Vercel team settings (Build and Deployment → OIDC Policies for CLI Access → Turborepo CLI Policies, not a VCR policy; select GitHub, repository `zitadel/nextgen`; optionally restrict to a workflow or branch) | nothing on Depot runners: `TURBO_API`, `TURBO_TOKEN`, `TURBO_TEAM` are injected |
 | Shared with | the cloud deployments (same team cache): a build CI did is a hit on Vercel and the reverse | CI only |
-| Cost | free on the Pro plan; 1 TB/month upload; artifacts expire after 7 days | part of the Depot plan (as moon's cache today) |
+| Cost | free, within a fair-use limit of 1 TB/month of uploads on Pro; artifacts expire after 7 days | part of the Depot plan (as moon's cache today) |
 | Forks | no token, local cache only | same |
-| Write policy | `TURBO_CACHE=local:rw,remote:rw` on pushes to main (which run the gate alone), `local:rw,remote:r` on pull requests and the merge queue; on Vercel, every build reads and writes, Vercel's default, production and previews in separate entries (see "Who may write to the cache") | same flags |
+| Write policy | `TURBO_CACHE=local:rw,remote:rw` on every run: pull requests, the merge queue and pushes to main (which run the gate alone), as moon's runs write Depot's cache; on Vercel, every build reads and writes, Vercel's default, production and previews in separate entries (see "Who may write to the cache") | same flags |
 
 Recommendation: Vercel's, for the one shared cache and because the cloud
 deployments use it already. Set up on 2026-10-12: the variable
@@ -457,12 +459,15 @@ sets them up:
   (Vercel's docs describe no read-only policy; forks get no token).
   Restricting the policy to main would take the remote cache away from
   pull requests without narrowing who can write: anyone who can push a
-  branch can write through that branch's Vercel preview build. So pull requests
-  read (`remote:r`, their own choice). Main creates the cache: a push to
-  main runs the gate and writes, pull requests and the merge queue read.
-  Without `VERCEL_TARGET_ENV`, CI's entries are apart from the Vercel
-  builds'. A poisoned artifact could still make a pull-request or
-  merge-queue run pass for code that fails; the signatures below close that.
+  branch can write through that branch's Vercel preview build. So every run
+  reads and writes (decision 8), as moon's CI runs do with Depot's cache: a
+  pull request's later pushes restore what its earlier ones built, and the
+  merge queue writes the results of the commit that lands on main. A
+  read-only flag (`remote:r`) is the pull request's own choice, so it only
+  ever kept honest branches out. Without `VERCEL_TARGET_ENV`, CI's entries
+  are apart from the Vercel builds'. A poisoned artifact could still make a
+  pull-request or merge-queue run pass for code that fails; the signatures
+  below close that.
 - **Later, to let only main's results reach production:** turbo's
   artifact signatures (`remoteCache.signature: true` with
   `TURBO_REMOTE_CACHE_SIGNATURE_KEY`). Production and trusted CI get the
@@ -539,8 +544,9 @@ the release graph.
 
 ## Risks
 
-1. **The release graph.** Moon ran it serially; the prototype's edge chain
-   reproduces that order for `snapshot`, `pack` and `publish`, but the
+1. **The release graph.** Moon orders it with serial dependencies and the
+   release builds' package edges; turbo's edges reproduce that order for
+   `snapshot`, `pack` and `publish`, but the
    server-tests-versus-console-release-build overlap in `snapshot` is not
    fully ordered. Mitigation: run `snapshot` on the dual-run job every time
    (it is gated like today) and watch for embed mismatches; fix properly by
@@ -592,5 +598,14 @@ the release graph.
    `api-mock`.
 7. **Dual run as proposed:** two to four weeks, exit after two consecutive
    weeks without a divergence that was turbo's fault.
-8. **Main creates the cache** (2026-10-13). `ci-turbo` writes the remote
-   cache only on pushes to main; pull requests and the merge queue read it.
+8. **Every CI run writes the cache** (2026-10-14, replacing "Main creates
+   the cache"). `ci-turbo` reads and writes the remote cache on pull
+   requests, the merge queue and pushes to main, as moon's runs write
+   Depot's. While only main wrote, a pull request restored main's results
+   but never its own earlier pushes' (pull requests averaged almost five CI
+   runs each). Replayed over the 143 green pull-request runs of 2026-10-14,
+   the gate restores 57 of its 119 tasks at the median instead of none. The
+   price is the upload: about 93 MB a run, some 0.5 TB a month at the
+   current number of pull-request runs, against the 1 TB fair-use limit of
+   Vercel's cache on Pro. The read-only flag kept honest branches out of the
+   cache and no one else (see "Who may write to the cache").

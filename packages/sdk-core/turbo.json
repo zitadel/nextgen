@@ -10,7 +10,7 @@
       "dependsOn": ["@zitadel/api#build"]
     },
     "build-release": {
-      "dependsOn": ["@zitadel/api#build-release", "@zitadel/components#build-release"]
+      "dependsOn": ["@zitadel/api#build-release"]
     },
     "test": {
       "dependsOn": ["@zitadel/components#build"]

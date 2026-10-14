@@ -89,6 +89,19 @@ Useful environment overrides:
   passkey setup. CI must run passkey coverage — the `passkey-first` preset
   lane, which is the only shipped preset whose flow offers a passkey.
 
+### Phase timings
+
+Every runner line starts with the time since the runner started
+(`[journey-local 1:12]`), so the log reads as a timeline even where a task
+runner prints a task's output only when it ends. Once the lanes have finished,
+passed or failed, the runner prints a table: a row per lane with when it began,
+the seconds each phase took (doctor, start, setup, the drift probe, the
+testkit's stop and install, app start, Playwright, teardown) and the phase a
+failed lane failed in, and a line with the shared steps before the lanes
+(Playwright browsers, the registry). In GitHub Actions the table also goes to
+the job summary. `scripts/timings.mjs` defines the phases; prepare-app records
+its CLI steps in `timings.json` in the lane's work dir, which the runner reads.
+
 ## CI gate
 
 The required PR CI job runs the framework matrix against the default binary
