@@ -1,4 +1,5 @@
 import { Flags } from "@oclif/core";
+import type { ZitadelClient } from "@zitadel/api/client";
 import type { ListDeployments200DeploymentsItem } from "@zitadel/api/generated/model";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
@@ -48,6 +49,10 @@ export default class DeploymentRollback extends EnvironmentCommand {
     // Bare: undo the latest deployment by re-applying what its targets served
     // before it. With an id, re-apply exactly that one.
     let targetId = args.deployment_id as string | undefined;
+    // The bare form decides from one read of the history, so its guard comes
+    // from that same read: a deploy landing after it is one the caller never
+    // saw, and must make the server refuse rather than become the expected one.
+    let bareGuard: string | undefined;
     if (targetId === undefined) {
       // The prior deployment of a long-lived origin can sit beyond the
       // server's first page, so the whole history is drained rather than the
@@ -57,14 +62,23 @@ export default class DeploymentRollback extends EnvironmentCommand {
         (token) =>
           client.listDeployments({
             project_id: projectId,
-            ...(flags.origin === undefined ? {} : { origin: flags.origin }),
             ...(token === undefined ? {} : { page_token: token }),
           }),
         { items: "deployments", all: true, nextPageToken: "next_page_token" },
       );
       // A preview deployment is never the deploy a bare rollback undoes, nor
-      // one it can restore: the server refuses to roll one back.
-      const deployments = (items as ListDeployments200DeploymentsItem[]).filter(servesPrimary);
+      // one it can restore: the server refuses to roll one back. Read whole,
+      // not narrowed to `--origin`: what the rollback would also move is
+      // decided by every origin's history, not that one's.
+      const history = (items as ListDeployments200DeploymentsItem[]).filter(servesPrimary);
+      const newestTo = (origin: string) =>
+        history.find((deployment) => deployment.targets.some((target) => target.origin === origin));
+      const deployments =
+        flags.origin === undefined
+          ? history
+          : history.filter((deployment) =>
+              deployment.targets.some((target) => target.origin === flags.origin),
+            );
       const latest = deployments[0];
       if (!latest) {
         throw new ZitadelError("E_VALIDATION", "There is no deployment to roll back", {
@@ -110,12 +124,7 @@ export default class DeploymentRollback extends EnvironmentCommand {
       const undone = new Set(origins);
       const beyond = prior.targets
         .map((target) => target.origin)
-        .filter(
-          (target) =>
-            !undone.has(target) &&
-            deployments.find((deployment) => deployment.targets.some((t) => t.origin === target))
-              ?.id !== prior.id,
-        );
+        .filter((target) => !undone.has(target) && newestTo(target)?.id !== prior.id);
       if (beyond.length > 0) {
         throw new ZitadelError(
           "E_VALIDATION",
@@ -127,6 +136,10 @@ export default class DeploymentRollback extends EnvironmentCommand {
         );
       }
       targetId = prior.id;
+      const priorOrigins = new Set(prior.targets.map((target) => target.origin));
+      bareGuard = history.find((deployment) =>
+        deployment.targets.some((target) => priorOrigins.has(target.origin)),
+      )?.id;
     }
 
     // A dry run re-applies nothing, so it stops once the target is resolved,
@@ -148,11 +161,7 @@ export default class DeploymentRollback extends EnvironmentCommand {
     // write in non-interactive mode) makes the server answer 409 rather than
     // letting the rollback overwrite a change the caller never saw. Omitted
     // when nothing is live there, which an optional id cannot stand in for.
-    const target = await client.getDeploymentById(targetId, { project_id: projectId });
-    const targetOrigins = new Set(target.targets.map((entry) => entry.origin));
-    const expectedDeploymentId = (await listLiveDeployments(client, projectId)).find((deployment) =>
-      deployment.targets.some((entry) => targetOrigins.has(entry.origin)),
-    )?.id;
+    const expectedDeploymentId = bareGuard ?? (await liveGuard(client, projectId, targetId));
 
     const confirmed = await this.input({
       kind: "confirm",
@@ -180,4 +189,17 @@ export default class DeploymentRollback extends EnvironmentCommand {
       pretty: `Rolled back to ${deployment.release_id} on ${origins.join(", ")}`,
     });
   }
+}
+
+/** The newest live deployment to any origin the named deployment targets. */
+async function liveGuard(
+  client: ZitadelClient,
+  projectId: string,
+  targetId: string,
+): Promise<string | undefined> {
+  const target = await client.getDeploymentById(targetId, { project_id: projectId });
+  const targetOrigins = new Set(target.targets.map((entry) => entry.origin));
+  return (await listLiveDeployments(client, projectId)).find((deployment) =>
+    deployment.targets.some((entry) => targetOrigins.has(entry.origin)),
+  )?.id;
 }

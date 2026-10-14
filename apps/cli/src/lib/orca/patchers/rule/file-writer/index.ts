@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { ZitadelError } from "../../../../errors";
-import { enforceMode } from "../../../../fs-safe";
+import { enforceMode, envLine } from "../../../../fs-safe";
 import { isObject, parseJsonObject, setTopLevelJsonKey, stableStringify } from "../../../../json";
 import type { PatchedFile } from "../../types";
 import type { FileOp, ScaffoldPlan, ScaffoldResult } from "./types";
@@ -305,7 +305,7 @@ async function mergeEnv(
         .split("\n")
         .map((line) => {
           const key = keyOf(line);
-          return key !== undefined && key in entries ? `${key}=${entries[key]}` : line;
+          return key !== undefined && key in entries ? envLine(key, entries[key] as string) : line;
         })
         .join("\n")
     : raw;
@@ -345,7 +345,7 @@ async function mergeEnv(
   const [firstCommentLine] = commentLines;
   const header =
     firstCommentLine !== undefined && !existing.includes(firstCommentLine) ? commentLines : [];
-  const block = [...header, ...additions.map(([key, value]) => `${key}=${value}`)].join("\n");
+  const block = [...header, ...additions.map(([key, value]) => envLine(key, value))].join("\n");
   const next = `${existing}${existing && !existing.endsWith("\n") ? "\n" : ""}${block}\n`;
   const action = raw === undefined ? "create" : "update";
   if (dryRun) {

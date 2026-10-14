@@ -28,7 +28,7 @@ A spec drives the built CLI through `runCliForTest` against
 observe afterwards.
 
 **One spec file per command, named after the command.** `setup.spec.ts`,
-`plan.spec.ts`, `sso-enable.spec.ts`, `variables-set.spec.ts`. A command's spec is
+`deploy.spec.ts`, `sso-enable.spec.ts`, `variable-set.spec.ts`. A command's spec is
 the only spec that drives that command as its subject. There are no
 cross-command spec files, no "contract" files and no "round-trip" files.
 
@@ -83,8 +83,8 @@ Three rules make that shape hold:
    and never a literal, because a secret in version control cannot be scrubbed
    later. Nothing else — not prose copy, key ordering, generated file contents
    or marker files, all of which a unit test reaches faster.
-3. **One journey per test.** A test that runs setup, then doctor, then plan, then
-   apply, then reruns is not a spec; it is five specs sharing a temp directory.
+3. **One journey per test.** A test that runs setup, then doctor, then deploy, then
+   rollback, then reruns is not a spec; it is five specs sharing a temp directory.
    Split it and let each command's spec own its own leg.
 
 Use `it.each` for anything that varies by framework, preset or resource. A spec
@@ -130,7 +130,7 @@ A spec body contains a fixture call, a command, and matchers — nothing else:
   that is down. Most fail. Some carry on deliberately, for one of two reasons:
   they never needed the server — `resources` describes the command surface,
   `stop`, `reset` and `eject` act on the machine — or they reach it and
-  tolerate the failure, as `plan` does for its old-state fetch, `sso enable`
+  tolerate the failure, as `sso enable` does
   for publishing the credentials, and `doctor` and `status` for their probes.
   Either way it is worth stating rather than leaving to be discovered, and each
   spec's own first group is the record, not this sentence. The `--json` and rendered groups

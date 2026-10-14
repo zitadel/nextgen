@@ -2,7 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
-import { deletedData } from "../../lib/oclif/envelope";
+import { deletedData, nextCommandsData } from "../../lib/oclif/envelope";
 import { shellArg } from "../../lib/shell";
 import { reportWarning } from "../../lib/warnings";
 
@@ -82,17 +82,24 @@ export default class OriginRm extends EnvironmentCommand {
     );
     if (remaining?.length === 0) {
       reportWarning(
-        `${pattern} was the project's last origin, so the project now admits every origin. Add the ones it should admit with "zitadel origin add".`,
+        `${pattern} was the project's last origin, so the project now admits every origin. Add the ones it should admit with the suggested origin add.`,
       );
     }
 
     return this.emit({
       status: "ok",
-      data: deletedData({ pattern }),
+      // Carries this run's selector, so the fix lands on the environment that
+      // was just opened up rather than the default one.
+      data: {
+        ...deletedData({ pattern }),
+        ...(remaining?.length === 0
+          ? nextCommandsData([this.suggest("origin add <url> --kind primary")])
+          : {}),
+      },
       pretty:
         remaining?.length === 0
           ? `Removed ${pattern}; the project has no origins left and admits every origin`
-          : `Stopped admitting ${pattern}`,
+          : `Removed ${pattern} from the project's origins`,
     });
   }
 }

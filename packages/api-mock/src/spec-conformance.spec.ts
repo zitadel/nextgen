@@ -1861,6 +1861,23 @@ describe("api-mock releases and deployments", () => {
     expect(((await rollback.json()) as { code: string }).code).toBe("dep.conflict");
   });
 
+  test("deploys by digest the release of this project, not another's with the same digest", async () => {
+    const first = await newProject("deploy-digest-a");
+    const second = await newProject("deploy-digest-b");
+    await addPrimary(second.id, second.secret, "https://app.acme.com");
+    await createRelease(first.id, first.secret, rel1);
+    const own = (await (await createRelease(second.id, second.secret, rel1)).json()) as {
+      content_hash: string;
+    };
+
+    const deployed = await createDeployment(second.id, second.secret, {
+      content_hash: own.content_hash,
+      targets: ["primary"],
+    });
+
+    expect(deployed.status).toBe(201);
+  });
+
   test("refuses a rollback to an origin that is no longer primary with 403", async () => {
     const project = await newProject("deploy-rollback-removed");
     await addPrimary(project.id, project.secret, "https://app.acme.com");

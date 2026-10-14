@@ -72,6 +72,6 @@ describe("an argument that must not be blank", () => {
     const result = await runCliForTest(["variable", "get", "  FOO  ", "--json"]);
 
     const json = parseJson(result.stdout) as { message: string };
-    expect(json.message).not.toContain("empty value");
+    expect(json.message).not.toMatch(/empty value|Invalid variable name/);
   });
 });
