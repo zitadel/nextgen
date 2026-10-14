@@ -37,8 +37,17 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
 - `<zitadel-login>`
 - `<zitadel-session>`, the signed-in session card with sign-out
-- `<zitadel-logout>`
+- `<zitadel-logout>`, the avatar menu with sign-out
 - atoms such as fields, buttons, alerts, icons, pills, and page shells
+
+## Session events
+
+`<zitadel-session>` and `<zitadel-logout>` dispatch two events, both bubbling and composed:
+
+- `zitadel-signout` (detail `{ display, identifier }`) after a sign-out. The widget then goes to its `post-sign-out-url`, or renders nothing without one.
+- `zitadel-session-missing` (detail `{}`) when the widget finds no session as it loads. It then renders nothing. `<zitadel-session>` also goes to its `post-sign-out-url`, unless that URL is the page it is on; `<zitadel-logout>` stays on the page.
+
+"No session" is the backend's own answer: `401` with `auth.unauthorized`, `404` with `sess.not_found`, or a session that names no user. Anything else, such as a gateway's 401 or 404 page, an HTML 200, a 403, a 429, a 5xx or a network error, keeps the widget and shows the error, and a sign-out that gets one fires no `zitadel-signout`. The framework wrappers expose the events as callbacks; see each [SDK](/docs/sdks) page.
 
 ## Runtime model
 
