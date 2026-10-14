@@ -8,10 +8,11 @@ stack: "frontend"
 # it drives. Each former package is now a subfolder (console/, demo-next/,
 # demo-nuxt/, journey/).
 #
-# Outside this file the project is just another package with a `test` task:
-# `moon ci :test` runs it like every other package. The individual lanes below
-# are an internal detail — `test` depends on them, so there is no need to name a
-# lane anywhere else.
+# Outside this file two tasks matter. `test` is the inherited unit run (the
+# journey harness's own tests), like every other package's, so a local `:test`
+# or `pnpm run check` boots no server. `all` depends on every lane; CI names it
+# in its `moon ci` call, so moon runs the suite in the same graph as the builds.
+# The individual lanes below are an internal detail.
 #
 # Every lane clears CI / GITHUB_ACTIONS (the old workflow ran each e2e step with
 # `env -u CI -u GITHUB_ACTIONS`, so the suites and the journey runner behave as
@@ -40,11 +41,13 @@ tasks:
       # @zitadel/testing/playwright.
       - "testing:build"
 
-  # The one task the rest of the repo sees. It keeps the inherited command
-  # (`corepack pnpm run test:all`, the journey harness unit tests) — overriding
-  # the command here makes moon append it to the inherited one. Its deps run
-  # every browser lane, so `moon ci :test` runs the whole suite.
-  test:
+  # The whole suite: CI's `moon ci` call names `e2e:all`, and moon selects it
+  # whenever a lane is affected (a lane's dependency changed, or a file in this
+  # project), then runs every lane as its dependencies. Run it by hand with
+  # `moon run e2e:all`. `test` stays the inherited unit run, so `:test` never
+  # boots a server.
+  all:
+    command: "noop"
     deps:
       - "e2e:console-smoke"
       - "e2e:console-real"
@@ -136,7 +139,7 @@ tasks:
   # (VERCEL_AUTOMATION_BYPASS_SECRET opens its protection): how vercel.json routes
   # the console's paths, and the console signed out, down to the login widget's
   # first step. Nothing to build or boot, no credential; the deployment-checks
-  # workflow runs it for every deployment. Not a dependency of `test`: the config
+  # workflow runs it for every deployment. Not a dependency of `all`: the config
   # refuses to run without CONSOLE_DEPLOYMENT_URL.
   console-deployment:
     command: "corepack pnpm exec playwright test --config console/playwright.deployment.config.mts"
@@ -202,7 +205,7 @@ tasks:
 
   # Run the journey by hand with any runner flags, e.g.
   # `moon run e2e:journey -- --framework next` (see journey/README.md). Not part
-  # of `test`: the CI task below fixes the flags to the full `--ci` set.
+  # of `all`: the CI task below fixes the flags to the `--ci` set.
   journey:
     command: "corepack pnpm run e2e-local"
     env:

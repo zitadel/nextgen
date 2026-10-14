@@ -84,9 +84,9 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
         run: moon run server:check-generate-pruned
 
-      # Chromium for the e2e lanes (now part of `:test` via the e2e project's
-      # `test` task). moon's component/storybook browser lanes install their own
-      # through an `install-browsers` dep; this covers the Playwright e2e specs.
+      # Chromium for the e2e lanes (`e2e:all` in the graph step below). moon's
+      # component/storybook browser lanes install their own through an
+      # `install-browsers` dep; this covers the Playwright e2e specs.
       - name: Cache Playwright browsers
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         uses: actions/cache@v4
@@ -120,10 +120,11 @@ jobs:
           version="$(node -p "require('./apps/server/package.json').version")"
           echo "JOURNEY_TARBALLS_DIR=$PWD/dist/release/${version}/npm" >> "$GITHUB_ENV"
 
-      # The e2e suites run here too: the `e2e` project's `test` task fans out to
-      # every lane (console real/embedded/platform, demo mock/real, the CLI
-      # journey matrix) and depends on server:build / cli:build, so `:test`
-      # orders and runs them through the DAG — no hand-written per-lane steps.
+      # The e2e suites run here too: `e2e:all` depends on every lane (console
+      # smoke/real/embedded/platform, demo mock/real, the CLI journey matrix, the
+      # kit's real-instance suite), which depend on server:build / cli:build, so
+      # moon orders and runs them through the DAG — no hand-written per-lane
+      # steps. `:test` alone stays unit tests, here as in a local `pnpm run check`.
       # The journey reads the prebuilt JOURNEY_TARBALLS_DIR from the step above.
       - name: Run Moon build and test graph
         id: moon-ci
@@ -131,7 +132,7 @@ jobs:
         # moon ci only selects tasks whose own inputs changed. --downstream deep
         # with --include-relations also runs the tasks of every project that
         # depends on a changed one, so an api change re-tests its consumers.
-        run: moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph --downstream deep --include-relations
+        run: moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph e2e:all --downstream deep --include-relations
 
       - name: Report Moon CI failures
         if: ${{ failure() && steps.moon-ci.conclusion == 'failure' }}
