@@ -6,6 +6,7 @@ import {
   providerOf,
 } from "@zitadel/config/idp";
 
+import type { Asker } from "../../../lib/input";
 import type { FrameworkFacts } from "../../../lib/orca";
 
 /**
@@ -91,6 +92,11 @@ export type SetupAnswers = {
 
 /** Read-only facts a prompt may need. */
 export type PromptContext = {
+  /**
+   * How a prompt asks its question: the command's `input`, so every question
+   * the wizard asks behaves like every other question the CLI asks.
+   */
+  readonly input: Asker;
   readonly framework: FrameworkFacts;
   /**
    * The app directory setup runs in. {@link import("./server").ServerPrompt}

@@ -1,8 +1,5 @@
-import { select } from "@clack/prompts";
-
 import { SETUP_USE_CASES, type SetupUseCase } from "@zitadel/config/defaults";
 
-import { bail } from "./cancel";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**
@@ -27,7 +24,10 @@ export class UseCasePrompt implements SetupPrompt {
       consumer: { label: "Consumers", hint: "collects email, given & family name" },
       business: { label: "Business", hint: "collects email, given & family name, company" },
     };
-    const value = await select({
+    const useCase = await ctx.input({
+      kind: "select",
+      name: "use case",
+      flag: "--use-case",
       message: "Who will sign in to your app? Collected fields stay editable after setup.",
       initialValue: answers.useCase,
       options: SETUP_USE_CASES.map((useCase) => ({
@@ -36,7 +36,6 @@ export class UseCasePrompt implements SetupPrompt {
         hint: options[useCase].hint,
       })),
     });
-    bail(value);
-    return { ...answers, useCase: value as SetupUseCase };
+    return { ...answers, useCase };
   }
 }

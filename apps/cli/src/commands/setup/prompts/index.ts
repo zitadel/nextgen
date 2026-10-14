@@ -19,7 +19,6 @@ import { UseCasePrompt } from "./use-case";
 
 export type { PromptContext, SetupAnswers, SetupPrompt, SsoAnswer, SsoDraft } from "./types";
 export { completeSso } from "./types";
-export { bail } from "./cancel";
 export { DevPortPrompt } from "./dev-port";
 export { FrameworkConfirmPrompt } from "./framework-confirm";
 export { ServerPrompt } from "./server";

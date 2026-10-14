@@ -94,6 +94,16 @@ describe("resources", () => {
         );
       });
 
+      it("refuses to delete without --force when no one can be asked", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["users", "delete", "user_1", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toHintAt("--force");
+        expect(result).toSuggest("users delete user_1 --force");
+      });
+
       it("says what can be done to each topic", async () => {
         const app = await aSetUpApp();
 

@@ -1,7 +1,4 @@
-import { confirm } from "@clack/prompts";
-
 import { ZitadelError } from "../../../lib/errors";
-import { bail } from "./cancel";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**
@@ -16,11 +13,12 @@ export class FrameworkConfirmPrompt implements SetupPrompt {
     if (ctx.frameworkChosen) {
       return answers;
     }
-    const ack = await confirm({
+    const ack = await ctx.input({
+      kind: "confirm",
+      name: "confirm the framework",
       message: `Detected ${ctx.framework.id}. Proceed?`,
       initialValue: true,
     });
-    bail(ack);
     if (ack === false) {
       throw new ZitadelError(
         "E_UNSUPPORTED_PROJECT_SHAPE",

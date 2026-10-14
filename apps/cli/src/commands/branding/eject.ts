@@ -1,7 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { cancel, isCancel, select } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
@@ -143,7 +142,10 @@ export default class BrandingEject extends BaseCommand {
     if (nonInteractive) {
       return DEFAULT_BRANDING_DESIGN;
     }
-    const choice = await select({
+    return this.input({
+      kind: "select",
+      name: "design",
+      flag: "--design",
       message: "Which design do you want to start from?",
       initialValue: DEFAULT_BRANDING_DESIGN as string,
       options: BRANDING_DESIGNS.map((design) => ({
@@ -152,11 +154,6 @@ export default class BrandingEject extends BaseCommand {
         hint: BRANDING_DESIGN_INFO[design].hint,
       })),
     });
-    if (isCancel(choice)) {
-      cancel("Eject cancelled.");
-      throw new ZitadelError("E_VALIDATION", "Eject cancelled by user");
-    }
-    return choice;
   }
 }
 

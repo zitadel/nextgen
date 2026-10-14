@@ -20,6 +20,7 @@ import {
   ssoFromFlags,
 } from "../../../src/commands/setup";
 import { askCustomSettings } from "../../../src/commands/setup/prompts";
+import type { Asker } from "../../../src/lib/input";
 import { writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
@@ -884,6 +885,7 @@ describe("a retry after a failure before the wizard", () => {
 
 describe("a custom provider named with --sso", () => {
   const partial = { sso: "custom", "sso-slug": "acme-sso" };
+  const ask = vi.fn() as unknown as Asker;
 
   it("has the settings it was not given asked for when a person is there", async () => {
     vi.mocked(askCustomSettings).mockResolvedValueOnce({
@@ -893,7 +895,7 @@ describe("a custom provider named with --sso", () => {
       scopes: "openid",
     });
 
-    const draft = await ssoFromFlags(partial, false, false);
+    const draft = await ssoFromFlags(partial, false, false, ask);
 
     expect(draft?.selection).toMatchObject({ kind: "custom", connection: { displayName: "Acme" } });
   });
@@ -907,15 +909,18 @@ describe("a custom provider named with --sso", () => {
       scopes: "openid",
     });
 
-    await ssoFromFlags(partial, false, false);
+    await ssoFromFlags(partial, false, false, ask);
 
-    expect(askCustomSettings).toHaveBeenCalledWith(expect.objectContaining({ slug: "acme-sso" }));
+    expect(askCustomSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ slug: "acme-sso" }),
+      ask,
+    );
   });
 
   it("is not asked about when nobody is there to answer", async () => {
     vi.mocked(askCustomSettings).mockClear();
 
-    await expect(ssoFromFlags(partial, true, false)).rejects.toMatchObject({
+    await expect(ssoFromFlags(partial, true, false, ask)).rejects.toMatchObject({
       code: "E_VALIDATION",
     });
     expect(askCustomSettings).not.toHaveBeenCalled();

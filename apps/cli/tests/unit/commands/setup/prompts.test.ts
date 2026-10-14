@@ -41,6 +41,7 @@ import {
   googleSelection,
 } from "../../../helpers/idp-values";
 
+import { type Asker, input } from "../../../../src/lib/input";
 import { takeReportedWarnings } from "../../../../src/lib/warnings";
 import { detectHealthyLocalServer } from "../../../../src/lib/local-server/runtime";
 
@@ -76,7 +77,9 @@ function baseAnswers(over: Partial<SetupAnswers> = {}): SetupAnswers {
   };
 }
 
-const ctx: PromptContext = { framework: FRAMEWORK, cwd: "/tmp/app" };
+const ask: Asker = (question) => input(question, { interactive: true, force: false });
+
+const ctx: PromptContext = { input: ask, framework: FRAMEWORK, cwd: "/tmp/app" };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -235,7 +238,7 @@ describe("PickFrameworkPrompt", () => {
   it("returns the selected framework id", async () => {
     vi.mocked(select).mockResolvedValueOnce("next" as never);
 
-    const id = await new PickFrameworkPrompt().ask([{ id: "next", displayName: "Next.js" }]);
+    const id = await new PickFrameworkPrompt().ask([{ id: "next", displayName: "Next.js" }], ask);
 
     expect(id).toBe("next");
   });
@@ -245,7 +248,7 @@ describe("PickFrameworkPrompt", () => {
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
     await expect(
-      new PickFrameworkPrompt().ask([{ id: "next", displayName: "Next.js" }]),
+      new PickFrameworkPrompt().ask([{ id: "next", displayName: "Next.js" }], ask),
     ).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 });
@@ -681,7 +684,7 @@ describe("askCustomSettings", () => {
       scopes: "openid",
     };
 
-    expect(await askCustomSettings(given)).toEqual(given);
+    expect(await askCustomSettings(given, ask)).toEqual(given);
     expect(text).not.toHaveBeenCalled();
   });
 
@@ -689,10 +692,13 @@ describe("askCustomSettings", () => {
     vi.mocked(text).mockResolvedValueOnce("Acme SSO" as never);
     vi.mocked(text).mockResolvedValueOnce("openid groups" as never);
 
-    const values = await askCustomSettings({
-      slug: "acme-sso",
-      issuer: "https://sso.acme.example",
-    });
+    const values = await askCustomSettings(
+      {
+        slug: "acme-sso",
+        issuer: "https://sso.acme.example",
+      },
+      ask,
+    );
 
     expect(vi.mocked(text)).toHaveBeenCalledTimes(2);
     expect(values).toEqual({

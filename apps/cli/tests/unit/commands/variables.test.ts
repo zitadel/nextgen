@@ -494,7 +494,7 @@ describe("variables set", () => {
       expect(res.exitCode).not.toBe(0);
       const json = parseJson(res.stdout) as { code: string; hint: string };
       expect(json.code).toBe("E_VALIDATION");
-      expect(json.hint).toContain("Pipe the value in");
+      expect(json.hint).toContain("Pipe it in on stdin");
     } finally {
       if (original) {
         Object.defineProperty(process, "stdin", original);
@@ -544,13 +544,12 @@ describe("variables set", () => {
       ]);
 
       expect(res.exitCode).not.toBe(0);
-      const json = parseJson(res.stdout) as { next_commands: string[]; hint: string };
+      const json = parseJson(res.stdout) as { next_commands: string[] };
       const retry = json.next_commands.join(" ");
       // Dropping the owner or the secret flag would hand back a command that
       // names no owner, or writes the credential as a readable value.
       expect(retry).toContain("--project-level");
       expect(retry).toContain("--secret");
-      expect(json.hint).toContain("--project-level");
     } finally {
       if (original) {
         Object.defineProperty(process, "stdin", original);
