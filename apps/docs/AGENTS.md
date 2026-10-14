@@ -25,8 +25,13 @@ share no components with the console, only what the design system owns.
   (`app/layout.tsx`): Fumadocs styles its dark theme by the class, the tokens
   switch on the attribute.
 - Arimo for text, APK Futural for the page title, the sections of a page and
-  the "Docs" beside the logo, both through `next/font`. APK Futural is a
-  licensed face with one weight, so a heading in it is never bold.
+  the "Docs" beside the logo, both through `next/font/local` from
+  `app/fonts/`, so the build fetches nothing. `Arimo-latin.woff2` is Arimo's
+  variable font (every weight from 400 to 700) in the latin subset, with its
+  licence, the SIL Open Font License, beside it (`Arimo-OFL.txt`); the website
+  holds the same file and says where it comes from
+  ([`apps/website/AGENTS.md`](../website/AGENTS.md#the-fonts)). APK Futural
+  is a licensed face with one weight, so a heading in it is never bold.
 - Code, in the pages and in the API reference's samples, is in the design
   system's syntax colours through Shiki's CSS-variables theme
   (`lib/code-theme.ts`), aliased as the console aliases them.
@@ -59,6 +64,9 @@ So the template's root routes live under `/docs` here:
   `basePath`: the URLs in `llms.txt`, the Markdown and the MCP answers would
   lose their `/docs`.
 - A link in the content is the page's full path: `/docs/cli`, not `/cli`.
+- The favicons are the one exception: `app/layout.tsx` links the cloud's, which
+  the website serves at `/favicons/`
+  ([`apps/website/AGENTS.md`](../website/AGENTS.md#the-logo-and-the-favicons)).
 
 ## Content
 

@@ -9,6 +9,7 @@ import { ensureLocalAdmin, type LocalAdmin } from "../lib/local-server/admin-cre
 import { consoleSignInUrl } from "../lib/local-server/sign-in";
 import {
   binaryLogs,
+  bundledServerVersion,
   isProcessRunning,
   startBinaryRuntime,
   stopBinaryRuntime,
@@ -126,9 +127,21 @@ export default class Start extends BaseCommand {
       : undefined;
 
     if (runtimeBackend === "binary") {
+      // A server another CLI release started serves that release's API, and
+      // `setup` against it fails halfway, after the project exists. So a
+      // running server is reused only when it is the version this CLI ships;
+      // the Docker path compares the image for the same reason.
+      const serverVersion = bundledServerVersion();
+      const otherRelease =
+        existingRuntime?.backend === "binary" &&
+        serverVersion !== undefined &&
+        existingRuntime.server_version !== serverVersion
+          ? existingRuntime
+          : undefined;
       if (
         existingRuntime?.backend === "binary" &&
         existingRuntime.port === port &&
+        !otherRelease &&
         isProcessRunning(existingRuntime.pid) &&
         (await checkLocalServerHealth(serverUrl))
       ) {
@@ -142,6 +155,11 @@ export default class Start extends BaseCommand {
             await consoleLoginFor(serverUrl, local?.admin),
           ),
         });
+      }
+      if (otherRelease && isProcessRunning(otherRelease.pid)) {
+        consola.info(
+          `Restarting the local Zitadel server on ${String(serverVersion)}: it ran ${otherRelease.server_version}. Its data stays.`,
+        );
       }
       await stopExistingRuntime(existingRuntime);
       await assertPortAvailableForStart(port, serverUrl, this.meta.cliVersion);

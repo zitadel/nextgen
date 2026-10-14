@@ -4,9 +4,11 @@
     "createSession",
     "exchangeHandoff",
     "getMySession",
+    "getMySessionCsrfToken",
     "getSession",
     "querySessions",
     "revokeMySession",
-    "revokeSession"
+    "revokeSession",
+    "..."
   ]
 }

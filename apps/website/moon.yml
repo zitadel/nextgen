@@ -12,10 +12,15 @@ workspace:
 tasks:
   # lint is the inherited task unchanged, and so are the commands below.
   typecheck:
-    options:
-      # `next typegen` writes .next/types, which `next build` wipes and
-      # rewrites: side by side, one fails on the other's files.
-      mutex: "website-next"
+    deps:
+      # After the build, never beside it: `next typegen` and `next build`
+      # both write .next/types, and `next build` empties it and fills it
+      # again, while tsc reads the route types there (next-env.d.ts imports
+      # .next/types/routes.d.ts, which declares the LayoutProps of
+      # app/layout.tsx). A tsc that finds the file gone or empty fails with
+      # TS2304. An edge, not a mutex: moon holds a mutex only while a
+      # command runs, not while it restores or archives .next.
+      - "build"
 
   build:
     outputs:
@@ -23,7 +28,6 @@ tasks:
     options:
       # Replaces the inherited dist/**/* rather than adding to it.
       mergeOutputs: "replace"
-      mutex: "website-next"
 
   dev:
     command: "corepack pnpm run dev"

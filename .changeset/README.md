@@ -113,10 +113,13 @@ from Go paths, so judge those from the table.
 
 The repo is in changesets prerelease mode, tag `alpha` (`.changeset/pre.json`):
 
-- `changeset version` cuts `0.1.0-alpha.N`; consumed changesets are recorded in
+- `changeset version` cuts `1.0.0-alpha.N`; consumed changesets are recorded in
   `pre.json`, pending ones stay in the tree.
 - The fixed group versions together; `changeset publish` uses the `alpha` npm
-  dist-tag.
+  dist-tag, except for a package whose every version on npm is an `alpha`
+  prerelease: that one goes to `latest`. `release publish` stops before
+  publishing such a package and prints the one-time fix
+  (`scripts/release-dist-tags.mjs`).
 
 Leave alpha for a stable `latest` release:
 
@@ -141,7 +144,7 @@ per public package, a maintainer adds a trusted publisher on npmjs.com (Settings
 Trusted Publishing): provider GitHub Actions, repo `zitadel/nextgen`, workflow
 `release-publish.yml`. The package must exist on npm first (publish `0.0.x` by
 hand if needed). The release job runs on Depot, which npm treats as self-hosted;
-keep `NPM_CONFIG_PROVENANCE=false` until npm provenance is supported for that
+keep `PNPM_CONFIG_PROVENANCE=false` (pnpm 12 ignores `NPM_CONFIG_PROVENANCE`) until npm provenance is supported for that
 runner environment or the publish job moves to GitHub-hosted runners.
 
 Each public package must declare its license and ship a `LICENSE` file before its

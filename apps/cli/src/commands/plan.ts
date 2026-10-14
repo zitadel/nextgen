@@ -6,6 +6,7 @@ import {
   buildSyncPlan,
   collectPlanWarnings,
   enumeratePlanResources,
+  isUnsupportedDeletion,
   makeSyncers,
   renderPlan,
   summarizePlan,
@@ -59,8 +60,12 @@ export default class Plan extends BaseCommand {
       `Plan: ${summary.creates} create${summary.creates === 1 ? "" : "s"}, ` +
         `${summary.updates} update${summary.updates === 1 ? "" : "s"}, ` +
         `${summary.revisions} new revision${summary.revisions === 1 ? "" : "s"}, ` +
+        `${summary.moves} moved, ` +
         `${summary.deletes} delete${summary.deletes === 1 ? "" : "s"}, ` +
-        `${plan.length - summary.total} unchanged`,
+        `${plan.filter((action) => action.kind === "skip" && !isUnsupportedDeletion(action)).length} unchanged` +
+        (summary.unsupported_deletions > 0
+          ? `, ${summary.unsupported_deletions} removed but kept (cannot be deleted yet)`
+          : ""),
     );
     return this.emit({
       status: "ok",

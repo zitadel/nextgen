@@ -14,8 +14,9 @@ The hosted cloud is the current `main`, built by Vercel from the repository
 and run in Frankfurt (`fra1`) against PlanetScale Postgres in the same AWS
 region. **`main` is production:** every merge deploys. Every other branch
 gets a preview deployment with a database of its own, except the Changesets
-version PR's (see [Deploying](#deploying)). Version tags and their npm
-packages remain the self-hosted artifact; this cloud does not run them.
+version PR's and the merge queue's (see [Deploying](#deploying)). Version
+tags and their npm packages remain the self-hosted artifact; this cloud does
+not run them.
 
 ## Layout
 
@@ -24,15 +25,19 @@ One Vercel deployment, five [services](https://vercel.com/docs/services):
 | Service | Built by | Serves |
 |---|---|---|
 | `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds (with turbo, through `apps/cloud/turbo-build.sh`), compiles `apps/cloud/launcher`, then migrates | every path except the console's, the storybook's, the docs' and the website's, including `/console/runtime.json` and the login UI at `/ui/login/` |
-| `console` | Vite; `apps/cloud/turbo-build.sh` with `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights | `/ui/console/*` (bare `/ui/console` redirects to the slash form) |
+| `console` | Vite; `apps/cloud/turbo-build.sh` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `storybook` | Storybook; `apps/cloud/turbo-build.sh`, moved to `dist/storybook/` | `/storybook/*` (bare `/storybook` redirects to the slash form) |
 | `docs` | Next.js; `apps/docs`' own `pnpm run build`, without a task runner: moon cannot archive the symlinks Vercel's Next.js adapter writes, and turbo could never reuse a build, whose cache key holds the deployment's ID under Skew Protection | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
-| `website` | Next.js; `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the coming-soon page, and its assets at `/_next/*` |
+| `website` | Next.js; `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the coming-soon page, and its assets at `/_next/*`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
 
-The console lives at the path the server would serve it from, on the same
-origin. The server's own console is switched off, and nothing else about
-the server changes: the session cookie, CSRF protection and the console
-links the server derives all work as in a self-hosted install.
+The console lives on the same origin, at `/console/` rather than a
+self-hosted server's `/ui/console/`. The server's own console is switched
+off and its console path set to `/console`, so the console links it derives
+(claim, dashboard) point there; the session cookie and CSRF protection work
+as in a self-hosted install. The server's `/console/runtime.json` lies
+under the console's path, so its rewrite comes first in `vercel.json`, and a
+launcher test holds the mount, the build's base and the console path
+together.
 
 The storybook, the login surface's component workbench, is deployed only
 here. Its orchestrator stories mock the API in the browser with a service
@@ -40,7 +45,7 @@ worker scoped to `/storybook/`, so the mock never answers for the console
 or the login UI on the same origin.
 
 The launcher pins what follows from this layout (listen address from
-`PORT`, console off at `/ui/console`, login UI on) and defaults the rest
+`PORT`, console off with its links at `/console`, login UI on) and defaults the rest
 (platform project bootstrapped, JSON logs, public base from Vercel's URL).
 Any `NEXTGEN_*` variable overrides a default.
 
@@ -196,6 +201,14 @@ or garbled fails the build and the serving deployment stays.
   preview would differ from production in the server's version string
   alone. Once merged, the release builds as production and runs
   production's [deployment checks](#deployment-checks).
+- **The merge queue gets no preview.** The queue tests each pull request
+  on a temporary branch, `gh-readonly-queue/main/pr-<number>-<sha>`, and
+  `git.deploymentEnabled` turns off deployments of `gh-readonly-queue/**`
+  (a single `*` would stop at the branch's second `/` and match nothing).
+  The pull request already has its preview, and the commit the queue lands
+  on `main` deploys as production. A preview per queue branch would build
+  all four services again and leave one more database behind for every
+  queued pull request.
 - **Migrations must be expand/contract.** The previous deployment serves on
   the new schema until the new one is live, and Instant Rollback promotes
   an older deployment without touching the schema.
@@ -207,17 +220,23 @@ Every deployment is tested once Vercel built it, on its own URL
 (`cloud-<hash>-zitadel.vercel.app`, never a production alias):
 [`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) runs each
 service's contract suite against the deployment, today the docs'
-(`moon run docs:e2e-deployment`, [`apps/docs/AGENTS.md`](../../apps/docs/AGENTS.md)).
+(`moon run docs:e2e-deployment`, [`apps/docs/AGENTS.md`](../../apps/docs/AGENTS.md))
+and the console's (`moon run e2e:console-deployment`,
+[`e2e/console/README.md`](../../e2e/console/README.md)). The console's
+signs nobody in: it checks how `vercel.json` routes the console's paths and
+that the signed-out console comes up, down to the login widget's first step,
+which needs the server and its database behind it.
 What starts it, and where the result lands, depends on the environment:
 
 - **A preview:** the `deployment_status` event Vercel posts to GitHub. The
-  check lands on the pull request: `deployment-checks / docs (Preview)`.
+  checks land on the pull request: `deployment-checks / docs (Preview)` and
+  `deployment-checks / console (Preview)`.
 - **Production:** [`production-checks.yml`](../../.github/workflows/production-checks.yml),
   on the `vercel.deployment.ready` dispatch Vercel sends once the deployment
-  is built, before its Deployment Checks run. It calls the same job and sets
-  the commit status `docs (Production)` on the deployed commit. A dispatch
-  runs the workflow as it is on `main`: a change to it takes effect once
-  merged.
+  is built, before its Deployment Checks run. It calls the same jobs and sets
+  one commit status per suite on the deployed commit, `docs (Production)` and
+  `console (Production)`. A dispatch runs the workflow as it is on `main`: a
+  change to it takes effect once merged.
 - The suites reach the protected deployment with the project's Protection
   Bypass for Automation secret, which the workflow expects as the repository
   secret `VERCEL_AUTOMATION_BYPASS_SECRET`. To set it from the project's
@@ -248,19 +267,22 @@ What starts it, and where the result lands, depends on the environment:
   name the failing contract (the test's title) and list every URL that
   failed; the run's summary names the deployment and the command that
   reproduces the run; a failed browser test's screenshots are the
-  `docs-deployment-screenshots` artifact. A flaky production run is run
+  `docs-deployment-screenshots` or `console-deployment-screenshots` artifact.
+  A flaky production run is run
   again from that run's page: it reports on the same commit again.
 - By hand, against any deployment:
-  `DOCS_BASE_URL=https://cloud-….vercel.app VERCEL_AUTOMATION_BYPASS_SECRET=… moon run docs:e2e-deployment`,
+  `DOCS_BASE_URL=https://cloud-….vercel.app VERCEL_AUTOMATION_BYPASS_SECRET=… moon run docs:e2e-deployment`
+  and `CONSOLE_DEPLOYMENT_URL=https://cloud-….vercel.app VERCEL_AUTOMATION_BYPASS_SECRET=… moon run e2e:console-deployment`,
   or `gh workflow run deployment-checks.yml --ref <branch> -f url=https://cloud-….vercel.app`
-  for a run without a new deployment; it reports `docs (dispatch)`, never
-  production's status. A change to `deployment-checks.yml` needs no
+  for a run without a new deployment; it reports `docs (dispatch)` and
+  `console (dispatch)`, never production's statuses. A change to `deployment-checks.yml` needs no
   dispatch: a `deployment_status` run uses the file as it is on the deployed
   commit, so the branch's own preview checks it.
 - **Holding production back on it:** in the project's Build & Deployment
-  settings, Deployment Checks, add the GitHub check `docs (Production)` and
-  let it block. Vercel then assigns the production domains only once the
-  status passes, so a red deployment never replaces the one serving (Force
+  settings, Deployment Checks, add the GitHub checks `docs (Production)` and
+  `console (Production)` and let them block. Vercel then assigns the
+  production domains only once the statuses pass, so a red deployment never
+  replaces the one serving (Force
   Promote on the deployment's page bypasses it). Until then a red status
   only shows on the commit while the deployment already serves. A check
   added there has to come from `production-checks.yml`: one that starts on
@@ -311,13 +333,13 @@ project and imports the root admin.
   previews can be busy at the same time. Raise it (Parameters tab, needs a
   restart) before raising the pool size.
 - **Analytics:** the console reports page views and Web Vitals per route
-  pattern (`/ui/console/users/$userId`), the docs and the website per page,
+  pattern (`/console/users/$userId`), the docs and the website per page,
   to the project's Analytics and Speed Insights tabs. Speed Insights samples
   by one variable per frontend, `CONSOLE_`, `DOCS_` and
   `WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE`, read at build time, so a new rate
   takes a redeploy; `0` turns it off. Web Analytics has no sampling and counts
   every page view.
-- **Signing in:** `/ui/console/` with the environment's root admin from
+- **Signing in:** `/console/` with the environment's root admin from
   1Password (production and preview have different passwords). Anyone else
   registers through the login UI.
 - **Turbo's remote cache:** the console, storybook and login UI builds read

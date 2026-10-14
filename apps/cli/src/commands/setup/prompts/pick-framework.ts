@@ -1,6 +1,6 @@
-import { intro, select } from "@clack/prompts";
+import { intro } from "@clack/prompts";
 
-import { bail } from "./cancel";
+import type { Asker } from "../../../lib/input";
 
 /**
  * "Choose a framework to scaffold" — the only prompt outside the main wizard.
@@ -9,13 +9,16 @@ import { bail } from "./cancel";
  * `Orca.availableFrameworks`.
  */
 export class PickFrameworkPrompt {
-  async ask(choices: ReadonlyArray<{ id: string; displayName: string }>): Promise<string> {
+  async ask(
+    choices: ReadonlyArray<{ id: string; displayName: string }>,
+    ask: Asker,
+  ): Promise<string> {
     intro("Zitadel setup — new project");
-    const picked = await select({
+    return ask({
+      kind: "select",
+      name: "framework",
       message: "Choose a framework to scaffold",
       options: choices.map((choice) => ({ value: choice.id, label: choice.displayName })),
     });
-    bail(picked);
-    return picked as string;
   }
 }

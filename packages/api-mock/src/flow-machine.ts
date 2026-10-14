@@ -24,6 +24,7 @@
  *                            password   --SUBMIT(submit)--> done
  *                                       --SUBMIT(back)----> identifier
  *                                       --SUBMIT(passkey)--> passkey-login
+ *                                       --SUBMIT(sso)-----> sso-redirect
  *      \--START(register)--> register --SUBMIT--> register-password --SUBMIT--> done
  *                                     --SUBMIT(sign_in)--> identifier
  *                                     --SUBMIT(sso)-----> sso-redirect
@@ -78,7 +79,7 @@ export type SsoOutcome = "sso_authenticated" | "sso_user_not_found" | "user_alre
 type SsoReturn = SsoOutcome | "error";
 
 /** The steps that offer provider buttons, and so the steps a failed return goes back to. */
-type SsoOrigin = "identifier" | "register" | "sso-conflict";
+type SsoOrigin = "identifier" | "register" | "password" | "sso-conflict";
 
 export type FlowMachineContext = {
   tokenSeq: number;
@@ -86,6 +87,7 @@ export type FlowMachineContext = {
   purpose: CreateFlowBodyPurpose | null;
   capturedFields: Record<string, string>;
   ssoProviderId: string | null;
+  /** The step the provider button was pressed on, which decides where a return from it goes. */
   ssoOrigin: SsoOrigin | null;
 };
 
@@ -157,11 +159,12 @@ type SubmitEvent = Extract<FlowMachineEvent, { type: "SUBMIT" }>;
 type ProviderReturnEvent = Extract<FlowMachineEvent, { type: "PROVIDER_RETURN" }>;
 
 /**
+ * The transition every step that offers providers takes when one is pressed.
  * The step is remembered because the engine never leaves it: `sso-redirect` is
  * a response, not a step, and a failed return shows the step that offered the
  * button again with the error on it.
  */
-const chooseProvider = (origin: SsoOrigin) =>
+const chooseProviderOn = (origin: SsoOrigin) =>
   ({
     guard: ({ event }: { event: SubmitEvent }) =>
       event.action === "sso" &&
@@ -230,7 +233,7 @@ export const flowMachine = createMachine({
     identifier: {
       on: {
         SUBMIT: [
-          chooseProvider("identifier"),
+          chooseProviderOn("identifier"),
           {
             guard: ({ event }) => event.action === "register",
             target: "register",
@@ -258,7 +261,7 @@ export const flowMachine = createMachine({
     register: {
       on: {
         SUBMIT: [
-          chooseProvider("register"),
+          chooseProviderOn("register"),
           {
             guard: ({ event }) => event.action === "sign_in",
             target: "identifier",
@@ -291,6 +294,7 @@ export const flowMachine = createMachine({
     password: {
       on: {
         SUBMIT: [
+          chooseProviderOn("password"),
           {
             // ADR 022 back-navigation: the engine injects a `back` action on
             // any step that has a predecessor.
@@ -353,7 +357,17 @@ export const flowMachine = createMachine({
         PROVIDER_RETURN: [
           failedReturnTo("identifier"),
           failedReturnTo("register"),
+          failedReturnTo("password"),
           failedReturnTo("sso-conflict"),
+          {
+            // From the password step the attempt is already bound to the
+            // identified user, so the engine restarts the flow instead of
+            // collecting a new account.
+            guard: ({ context, event }) =>
+              event.outcome === "sso_user_not_found" && context.ssoOrigin === "password",
+            target: "identifier",
+            actions: [rotateToken],
+          },
           {
             guard: ({ event }) => event.outcome === "sso_user_not_found",
             target: "register-sso",
@@ -404,7 +418,7 @@ export const flowMachine = createMachine({
     "sso-conflict": {
       on: {
         SUBMIT: [
-          chooseProvider("sso-conflict"),
+          chooseProviderOn("sso-conflict"),
           {
             guard: ({ event }) => event.action === "passkey",
             target: "passkey-login",

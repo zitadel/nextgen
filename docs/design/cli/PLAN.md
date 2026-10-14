@@ -86,6 +86,6 @@ framework version floors are enforced per
 ## Verification
 
 The CLI's behavior contract is enforced by `apps/cli` unit tests
-(`moon run cli:test`), the journey e2e lanes (`apps/cli-journey-e2e`, four
+(`moon run cli:test`), the journey e2e lanes (`e2e/journey`, four
 CI-gated variants: fresh-app, passkey, pre-existing-app, testkit), and the
 doctor drift checks of ADR 042.
