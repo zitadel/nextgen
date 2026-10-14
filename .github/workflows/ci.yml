@@ -35,9 +35,38 @@ jobs:
       # test output is left in the log.
       NO_COLOR: ""
     steps:
+      # Depot runs some jobs on plain EC2 instances, whose root disk is an EBS
+      # volume that writes about 250 MB/s. Linux writes dirty pages back only
+      # once they are 30 s old or 10 % of the memory (6-12 GB there), so that
+      # disk idles while the job unpacks its caches, and the backlog grows to
+      # several GB. A sync waits for all of it, and Docker syncs the root
+      # filesystem on every container create (it unmounts the container's
+      # init layer, an overlay): the postgres lane's first testcontainer
+      # waited 22-29 s there, 2-4 s on Depot's microVMs. With writeback from
+      # 64 MB on, it waited 8-22 s. The cost: writers get throttled from
+      # about 10 % of the memory dirty instead of 15 %.
+      - name: Write dirty pages back early
+        run: sudo sysctl -w vm.dirty_background_bytes=67108864
+
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      # The postgres lane (server:test-postgres) starts its databases through
+      # testcontainers, and every package of the lane waits while the first
+      # one pulls the image: 6-8 s on Depot's microVMs, 11-12 s on its EC2
+      # runners. Pull it now, in the background while the job installs, so
+      # the lane finds it there. The image name comes from the testdb package,
+      # so the two cannot drift; the output goes to a file, so the step
+      # returns at once.
+      - name: Pull the postgres lane's image
+        run: |
+          image="$(sed -n 's/^const containerImage = "\(.*\)"$/\1/p' internal/storage/testdb/postgres.go)"
+          if [ -z "$image" ]; then
+            echo "::warning::internal/storage/testdb/postgres.go has no containerImage constant; nothing to pull"
+            exit 0
+          fi
+          nohup docker pull --quiet "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
 
       # Keyed on both modules' go.sum (tools/bench is a module of its own)
       # instead of setup-go's default, go.mod. ci-turbo.yml shared the go.mod

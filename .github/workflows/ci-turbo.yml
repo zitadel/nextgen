@@ -71,9 +71,24 @@ jobs:
       # cache"). Forks get no token.
       TURBO_CACHE: local:rw,remote:rw
     steps:
+      # As in ci.yml: write dirty pages back early, so that Docker's container
+      # creates do not wait for a backlog of several GB on Depot's EC2 runners.
+      - name: Write dirty pages back early
+        run: sudo sysctl -w vm.dirty_background_bytes=67108864
+
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      # As in ci.yml: the postgres lane's image, pulled while the job installs.
+      - name: Pull the postgres lane's image
+        run: |
+          image="$(sed -n 's/^const containerImage = "\(.*\)"$/\1/p' internal/storage/testdb/postgres.go)"
+          if [ -z "$image" ]; then
+            echo "::warning::internal/storage/testdb/postgres.go has no containerImage constant; nothing to pull"
+            exit 0
+          fi
+          nohup docker pull --quiet "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
 
       # Not setup-go's cache: its key (Go version and go.mod) is ci.yml's
       # too, and the two jobs write GOCACHE in formats the other cannot read.
