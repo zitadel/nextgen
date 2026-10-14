@@ -197,10 +197,11 @@ tasks:
     # Two independent caches can replay these lanes, and both have to be off.
     #
     # -count=1 disables go's test-result cache. These suites talk to an external
-    # database whose state is invisible to go's cache key, and CI restores
-    # GOCACHE between runs (setup-go cache: true), so an unchanged source tree
-    # yields "ok (cached)" without anything executing against the current
-    # backend. Observed on run 32743380406, where this very lane reported
+    # database whose state is invisible to go's cache key, and CI shares go's
+    # cache between runs (Depot's cache service on Depot runners, a restored
+    # GOCACHE on GitHub-hosted ones), so an unchanged source tree yields
+    # "ok (cached)" without anything executing against the current backend.
+    # Observed on run 32743380406, where this very lane reported
     # `ok … integration_test (cached)`.
     #
     # options.cache: false disables moon's. That one sits in front of go: on a

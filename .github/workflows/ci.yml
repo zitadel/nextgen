@@ -39,10 +39,39 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Depot runners set GOCACHEPROG to `depot gocache`, which serves Go's
+      # build cache from Depot's cache service. There the Go cache is the
+      # module downloads alone: setup-go's own cache would also restore
+      # GOCACHE, the 1.8 GB of builds the run that saved it left behind. A
+      # GitHub-hosted runner (a fork's pull request) has no GOCACHEPROG and
+      # keeps setup-go's cache of both.
+      - name: Detect Depot's Go build cache
+        id: go-cache
+        run: echo "remote=${GOCACHEPROG:+true}" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-          cache: true
+          cache: ${{ steps.go-cache.outputs.remote != 'true' }}
+
+      # Keyed by both modules' go.sum: bench (tools/bench) is a module of its
+      # own, and its tasks run on every Go change.
+      - name: Cache Go modules
+        id: go-mod-cache
+        if: ${{ steps.go-cache.outputs.remote == 'true' }}
+        uses: actions/cache@v5
+        with:
+          path: ~/go/pkg/mod
+          key: go-mod-${{ runner.os }}-${{ hashFiles('go.sum', 'tools/bench/go.sum') }}
+
+      # A miss saves the module cache as the job leaves it, which would hold
+      # only what this run's tasks downloaded. Fetch every module of both
+      # first, so the saved entry serves any later run.
+      - name: Download Go modules
+        if: ${{ steps.go-cache.outputs.remote == 'true' && steps.go-mod-cache.outputs.cache-hit != 'true' }}
+        run: |
+          go mod download
+          go -C tools/bench mod download
 
       - uses: pnpm/action-setup@v5
         with:
