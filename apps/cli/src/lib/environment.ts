@@ -59,10 +59,16 @@ export type ResolveEnvironmentInput = Readonly<{
 type Values = Partial<Record<EnvironmentKey, string>>;
 
 /** The environment names a platform build announces, by the variable it sets. */
-const PLATFORM_SIGNALS: ReadonlyArray<{ variable: string; name: (value: string) => string }> = [
+const PLATFORM_SIGNALS: ReadonlyArray<{
+  variable: string;
+  /** Set only inside that platform's build, for a signal whose name is too generic to trust alone. */
+  platform?: string;
+  name: (value: string) => string;
+}> = [
   { variable: "VERCEL_ENV", name: (value) => value },
   {
     variable: "CONTEXT",
+    platform: "NETLIFY",
     name: (value) => {
       if (value === "deploy-preview" || value === "branch-deploy") {
         return "preview";
@@ -86,7 +92,7 @@ function environmentName(env: NodeJS.ProcessEnv, flag?: string): Resolved {
   }
   for (const signal of PLATFORM_SIGNALS) {
     const value = env[signal.variable];
-    if (value) {
+    if (value && (signal.platform === undefined || env[signal.platform] === "true")) {
       return { value: signal.name(value), source: signal.variable };
     }
   }
@@ -122,9 +128,14 @@ function assertEnvironmentName(name: Resolved): void {
   });
 }
 
-/** The dotenv files read for an environment, highest priority first. */
-function environmentFiles(name: string): readonly string[] {
-  return [`.env.${name}.local`, ...(name === "test" ? [] : [".env.local"]), `.env.${name}`, ".env"];
+/**
+ * The dotenv files read for an environment, highest priority first.
+ * `.env.local` is setup's development project, so only the development
+ * environment reads it: another name falling through to it would quietly
+ * address the development project.
+ */
+function environmentFiles(name: string, setupFiles: boolean): readonly string[] {
+  return [`.env.${name}.local`, ...(setupFiles ? [".env.local"] : []), `.env.${name}`, ".env"];
 }
 
 function pick(values: Readonly<Record<string, string | undefined>>): Values {
@@ -158,8 +169,10 @@ async function readEnvFile(path: string): Promise<Values | undefined> {
 /**
  * Resolves the server, project and credentials a command addresses, each
  * value from the first source that supplies it: `--server`, `--env-file`, the
- * process environment, `.env.<env>.local`, `.env.local` (not for `test`),
- * `.env.<env>`, `.env`, then `.zitadel/secret`.
+ * process environment, `.env.<env>.local`, `.env.local`, `.env.<env>`, `.env`,
+ * then `.zitadel/secret`. `.env.local` and `.zitadel/secret` hold the project
+ * setup created, so only the default development environment, without
+ * `--env-file`, reads them.
  *
  * `--env-file` outranks the process environment because a path typed on this
  * invocation is as explicit as `--server`; everywhere else the process
@@ -194,20 +207,27 @@ export async function resolveEnvironment(input: ResolveEnvironmentInput): Promis
     sources.push({ source: `--env-file ${input.envFile}`, values });
   }
   sources.push({ source: "process environment", values: pick(input.env) });
-  for (const file of environmentFiles(name.value)) {
+  // `.env.local` and `.zitadel/secret` hold the project setup created, which is
+  // the development one. A named environment or an explicit --env-file that
+  // lacks a value must fail naming it, not borrow the development project's
+  // id or credential and send it to another server.
+  const setupFiles = name.value === "development" && input.envFile === undefined;
+  for (const file of environmentFiles(name.value, setupFiles)) {
     sources.push({ source: file, values: await readEnvFile(join(input.cwd, file)) });
   }
-  const secret = (await hasZitadelSecret(input.cwd))
-    ? await readZitadelSecret(input.cwd)
-    : undefined;
-  sources.push({
-    source: ".zitadel/secret",
-    values: secret && {
-      ZITADEL_PROJECT_ID: secret.project_id,
-      ZITADEL_PROJECT_SECRET: secret.project_secret,
-      ZITADEL_PREVIEW_TOKEN: secret.preview_secret,
-    },
-  });
+  if (setupFiles) {
+    const secret = (await hasZitadelSecret(input.cwd))
+      ? await readZitadelSecret(input.cwd)
+      : undefined;
+    sources.push({
+      source: ".zitadel/secret",
+      values: secret && {
+        ZITADEL_PROJECT_ID: secret.project_id,
+        ZITADEL_PROJECT_SECRET: secret.project_secret,
+        ZITADEL_PREVIEW_TOKEN: secret.preview_secret,
+      },
+    });
+  }
 
   const values: Partial<Record<EnvironmentKey, Resolved>> = {};
   const consulted: Consulted[] = [];
@@ -241,11 +261,17 @@ export function requireValue(environment: Environment, key: EnvironmentKey): str
     return resolved.value;
   }
   const name = environment.name.value;
+  const consulted = `Consulted, in order: ${environment.consulted.map((entry) => entry.source).join(", ")}.`;
   throw new ZitadelError("E_VALIDATION", `${key} is not set for the ${name} environment`, {
+    // An --env-file run reads that file: pointing it at `.env.<name>.local`
+    // or at `setup`, which creates a new project, would send it elsewhere.
     hint:
-      `Consulted, in order: ${environment.consulted.map((entry) => entry.source).join(", ")}. ` +
-      `Set ${key} in .env.${name}.local or the process environment, or run \`zitadel env add ${name}\`.`,
-    nextCommands: [unscopedCommand(name === "development" ? "setup" : `env add ${name}`)],
+      environment.envFile === undefined
+        ? `${consulted} Set ${key} in .env.${name}.local or the process environment, or run \`zitadel env add ${name}\`.`
+        : `${consulted} Set ${key} in ${environment.envFile} or the process environment.`,
+    ...(environment.envFile === undefined
+      ? { nextCommands: [unscopedCommand(name === "development" ? "setup" : `env add ${name}`)] }
+      : {}),
     details: {
       environment: name,
       variable: key,
@@ -264,7 +290,9 @@ const SECRET_KEYS: ReadonlySet<EnvironmentKey> = new Set([
  * Like {@link requireValue}, but on an interactive terminal a missing value is
  * asked for and persisted to `.env.<name>.local` before it is returned, so the
  * next run resolves it from the file rather than asking again (#1313). A secret
- * is asked for without echo and the file is written `0600`.
+ * is asked for without echo and the file is written `0600`. A run that named
+ * its own file with `--env-file` keeps the value for this run only: writing it
+ * to `.env.<name>.local` would hand it to every later run of that environment.
  *
  * Non-interactive runs never prompt: they throw exactly as {@link requireValue}
  * does, naming every source the chain consulted, so a scripted caller stays
@@ -302,7 +330,9 @@ export async function requireValueInteractive(
     },
     { interactive: true, force: false },
   );
-  await persistEnvValue(join(options.cwd, `.env.${name}.local`), key, value);
+  if (environment.envFile === undefined) {
+    await persistEnvValue(join(options.cwd, `.env.${name}.local`), key, value);
+  }
   return value;
 }
 

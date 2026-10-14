@@ -80,7 +80,7 @@ export default class Status extends EnvironmentCommand {
     );
     const users =
       project.lifecycle === "configured"
-        ? await detectUserPresence(() => this.connect({ quiet: true }))
+        ? await detectUserPresence(() => this.connect({ quiet: true, prompt: false }))
         : "unknown";
     const nextCommands = nextCommandsFor(
       serverLifecycle,
