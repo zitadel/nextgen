@@ -127,7 +127,9 @@ function claim(cwd: string, extra: string[] = []) {
  * response body to itself — so the store snapshot is how a test learns it.
  */
 async function onChallengeMinted(act: (challengeId: string) => void): Promise<void> {
-  const deadline = Date.now() + 5000;
+  // Generous: the first run in a file loads the CLI cold, which on a loaded
+  // machine can take seconds before the request goes out.
+  const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     const [challengeId] = snapshotPlatformStore().claimChallengeIds;
     if (challengeId) {
