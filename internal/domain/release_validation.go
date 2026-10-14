@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -45,8 +44,8 @@ func (c ReleaseContent) Pointers() []ReleasePointer {
 func ValidateRelease(content ReleaseContent) error {
 	documents := make(map[string]*jsonschema.Schema, len(content.Schemas))
 	for _, schema := range content.Schemas {
-		var document *jsonschema.Schema
-		if err := json.Unmarshal(schema.Schema, &document); err != nil {
+		document, err := schema.Document()
+		if err != nil {
 			return ErrInternal(err).WithMessage("failed to unmarshal user schema")
 		}
 		documents[*schema.ObjectType] = document
