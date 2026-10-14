@@ -9,6 +9,22 @@ import { packageName, parsePort } from "./lib.mjs";
 
 export const packageDirs = [...PUBLIC_PACKAGE_DIRS];
 
+// Verdaccio serves a proxied packument from its storage until it is `maxage`
+// old, then asks npmjs again; the default is 2m. CI restores the storage of an
+// earlier run (JOURNEY_REGISTRY_STORAGE), so with the default every packument
+// is stale from the start, and the scaffolds' installs wait on thousands of
+// npmjs round trips that almost all come back 304 Not Modified. With an hour,
+// most CI runs restore packuments another run refreshed within the hour and
+// ask npmjs nothing; a fresh local store only skips repeat checks within a run.
+//
+// Longer is not better: npmjs releases reach the journey up to `maxage` late
+// (`npm create vite@latest`, `nuxi@latest` and `@angular/cli@latest` resolve
+// `latest` here), and `nuxi init` downloads its starter template from GitHub,
+// which has adopted a new nuxt release as soon as two hours after it was
+// published. A packument cached past that point lacks the version the
+// template asks for, and the nuxt install fails until the entry expires.
+const UPLINK_MAXAGE = "1h";
+
 export function localRegistryPaths(workDir) {
   return {
     npmrcPath: join(workDir, "verdaccio.npmrc"),
@@ -257,6 +273,7 @@ max_body_size: 200mb
 uplinks:
   npmjs:
     url: https://registry.npmjs.org/
+    maxage: ${UPLINK_MAXAGE}
 packages:
   '@zitadel/*':
     access: $all
