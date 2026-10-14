@@ -90,7 +90,8 @@ type ReleaseMetadata struct {
 
 // Release is an immutable, project-scoped snapshot pinning one revision of
 // every resource it includes. It holds pointers and metadata, never content:
-// the per-kind tables stay the source of truth for resource bytes.
+// the per-kind tables stay the source of truth for resource bytes. Only
+// RevokedAt changes, once, on the first revoke.
 type Release struct {
 	ProjectID   string
 	ID          string
@@ -98,6 +99,7 @@ type Release struct {
 	Pointers    []ReleasePointer
 	Metadata    ReleaseMetadata
 	CreatedAt   time.Time
+	RevokedAt   *time.Time
 }
 
 // ReleaseField enumerates the fields of Release which can be used for

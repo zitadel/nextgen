@@ -9,7 +9,7 @@ function upstream(entries: Record<string, string>): Headers {
 
 const APP = "https://app.example.com";
 /** The callback the provider returns the browser to. */
-const CALLBACK = `${APP}/__nextgen/idp/callback?code=abc`;
+const CALLBACK = `${APP}/__nextgen/idp/google/callback?code=abc`;
 
 describe("filterResponseHeaders", () => {
   it("forwards a redirect that already points at this app", () => {
@@ -26,16 +26,16 @@ describe("filterResponseHeaders", () => {
 
   it("resolves a path-relative redirect against the request, not the origin root", () => {
     // RFC 3986 §5: a relative reference resolves against the URL it came from.
-    // `next?flow=x` answered to `/__nextgen/idp/callback` means a sibling of
+    // `next?flow=x` answered to `/__nextgen/idp/google/callback` means a sibling of
     // that path, and resolving from `/` would send the browser elsewhere.
     expect(
       filterResponseHeaders(upstream({ location: "next?flow=x" }), CALLBACK).get("location"),
-    ).toBe(`${APP}/__nextgen/idp/next?flow=x`);
+    ).toBe(`${APP}/__nextgen/idp/google/next?flow=x`);
   });
 
   it("keeps a query-only reference on the same path", () => {
     expect(filterResponseHeaders(upstream({ location: "?flow=x" }), CALLBACK).get("location")).toBe(
-      `${APP}/__nextgen/idp/callback?flow=x`,
+      `${APP}/__nextgen/idp/google/callback?flow=x`,
     );
   });
 
